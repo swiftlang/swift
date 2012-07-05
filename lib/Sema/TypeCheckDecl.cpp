@@ -43,13 +43,8 @@ public:
   bool visitValueDecl(ValueDecl *VD);
   void validateAttributes(ValueDecl *VD);
 
-  /// \brief Check the list of inherited protocols on the declaration D (which
-  /// declares or extends nominal type Ty).
-  ///
-  /// \param CheckConformance Will be set true if the caller needs to call
-  /// checkExplicitConformance() for this declaration once its members have
-  /// been type-checked. Otherwise, the conformance check can be delayed.
-  void checkInherited(Decl *D, Type T, MutableArrayRef<Type> Inherited) {
+  /// \brief Check the list of inherited protocols on the declaration D.
+  void checkInherited(Decl *D, MutableArrayRef<Type> Inherited) {
     // Check the list of inherited protocols.
     for (unsigned i = 0, e = Inherited.size(); i != e; ++i) {
       if (TC.validateType(Inherited[i], IsFirstPass)) {
@@ -88,8 +83,7 @@ public:
       auto TypeParam = GP.getAsTypeParam();
 
       // Check the constraints on the type parameter.
-      checkInherited(TypeParam, TypeParam->getDeclaredType(),
-                     TypeParam->getInherited());
+      checkInherited(TypeParam, TypeParam->getInherited());
 
       // Create the archetype for this type parameter.
       ArchetypeType *Archetype
@@ -237,20 +231,20 @@ public:
   }
   
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    if (IsSecondPass) {
-      checkExplicitConformance(TAD, TAD->getDeclaredType(),
-                               TAD->getInherited());
-      return;
+    if (!IsSecondPass) {
+      TC.validateType(TAD->getAliasType(), IsFirstPass);
+      if (!isa<ProtocolDecl>(TAD->getDeclContext()))
+        checkInherited(TAD, TAD->getInherited());
     }
 
-    TC.validateType(TAD->getAliasType(), IsFirstPass);
-
-    checkInherited(TAD, TAD->getDeclaredType(), TAD->getInherited());
+    if (!IsFirstPass)
+      checkExplicitConformance(TAD, TAD->getDeclaredType(),
+                               TAD->getInherited());
   }
 
   void visitOneOfDecl(OneOfDecl *OOD) {
     if (!IsSecondPass) {
-      checkInherited(OOD, OOD->getDeclaredType(), OOD->getInherited());
+      checkInherited(OOD, OOD->getInherited());
       checkGenericParams(OOD->getGenericParams());
     }
     
@@ -264,7 +258,7 @@ public:
 
   void visitStructDecl(StructDecl *SD) {
     if (!IsSecondPass) {
-      checkInherited(SD, SD->getDeclaredType(), SD->getInherited());
+      checkInherited(SD, SD->getInherited());
       checkGenericParams(SD->getGenericParams());
     }
 
@@ -294,7 +288,7 @@ public:
 
   void visitClassDecl(ClassDecl *CD) {
     if (!IsSecondPass) {
-      checkInherited(CD, CD->getDeclaredType(), CD->getInherited());
+      checkInherited(CD, CD->getInherited());
       checkGenericParams(CD->getGenericParams());
     }
 
@@ -310,7 +304,7 @@ public:
     if (IsSecondPass)
       return;
 
-    checkInherited(PD, PD->getDeclaredType(), PD->getInherited());
+    checkInherited(PD, PD->getInherited());
     
     // Assign archetypes each of the associated types.
     // FIXME: We need to build equivalence classes of associated types first,
@@ -319,9 +313,7 @@ public:
     // protocols that each archetype should conform to.
     for (auto Member : PD->getMembers()) {
       if (auto AssocType = dyn_cast<TypeAliasDecl>(Member)) {
-        SmallVector<Type, 4> ConformsTo;
-        ConformsTo.append(AssocType->getInherited().begin(),
-                          AssocType->getInherited().end());
+        checkInherited(AssocType, AssocType->getInherited());
 
         Optional<unsigned> Index;
         // FIXME: Find a better way to identify the 'This' archetype.
@@ -329,7 +321,7 @@ public:
           Index = 0;
         AssocType->setUnderlyingType(
           ArchetypeType::getNew(TC.Context, AssocType->getName().str(),
-                                ConformsTo, Index));
+                                AssocType->getInherited(), Index));
       }
     }
 
@@ -401,7 +393,7 @@ public:
           // declaration, if any.
         }
       
-        checkInherited(ED, ExtendedTy, ED->getInherited());
+        checkInherited(ED, ED->getInherited());
       }
     }
 
