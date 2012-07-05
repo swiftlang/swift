@@ -237,6 +237,218 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
   return OverloadCandidate();
 }
 
+OverloadCandidate
+TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
+                                       SourceLoc Loc,
+                                       Type BaseTy,
+                                       Type DestTy,
+                                       SmallVectorImpl<ValueDecl *> &Viable,
+                                       CoercionContext *CC) {
+  SmallVector<OverloadCandidate, 4> ViableCandidates;
+  bool hasThis = BaseTy && !BaseTy->is<MetaTypeType>();
+
+  auto DestLV = DestTy->getAs<LValueType>();
+  if (DestLV)
+    DestTy = DestLV->getObjectType();
+
+  for (ValueDecl *VD : Candidates) {
+    Type SrcTy = VD->getTypeOfReference();
+    auto SrcLV = SrcTy->getAs<LValueType>();
+
+    // Deal with destination lvalues.
+    if (DestLV) {
+      // If the source isn't an lvalue, skip it.
+      // FIXME: Improve recovery.
+      if (!SrcLV)
+        continue;
+
+      // If the source is more qualified than the destination, skip it.
+      // FIXME: Improve recovery.
+      if (SrcLV->getQualifiers() > DestLV->getQualifiers())
+        continue;
+
+      SrcTy = SrcLV->getObjectType();
+    }
+    
+    // If we have a 'this' type and the declaration is a constructor or
+    // non-static method, look past the 'this' argument.
+    if (hasThis &&
+        ((isa<FuncDecl>(VD) && !cast<FuncDecl>(VD)->isStatic()) ||
+         isa<ConstructorDecl>(VD))) {
+      // FIXME: Derived-to-base conversions will eventually be needed.
+      SrcTy = SrcTy->castTo<AnyFunctionType>()->getResult();
+    }
+
+    // Substitute into the type of this member, if indeed it is a member.
+    SrcTy = substMemberTypeWithBase(SrcTy, BaseTy);
+    if (!SrcTy)
+      continue;
+
+    // Establish the coercion context, which is required when this coercion
+    // involves generic functions.
+    CoercionContext LocalCC(*this);
+    if (CC && CC->requiresSubstitution()) {
+      LocalCC.Substitutions = CC->Substitutions;
+      LocalCC.Conformance = CC->Conformance;
+    }
+
+    if (auto polyFn = SrcTy->getAs<PolymorphicFunctionType>()) {
+      // Create a deducible form of the function type.
+      SmallVector<DeducibleGenericParamType *, 2> DeducibleParams;
+      SrcTy = getDeducibleType(*this, SrcTy,
+                               polyFn->getGenericParams().getParams(),
+                               DeducibleParams);
+      LocalCC.requestSubstitutionsFor(DeducibleParams);
+    }
+
+    if (DestLV) {
+      Type EffectiveDestTy = DestTy;
+
+      if (LocalCC.requiresSubstitution()) {
+        // Check for trivial subtyping, to deduce any generic parameters
+        // that require deduction. We'll do a specific type check later,
+        // after substitution.
+        bool Trivial = true;
+        if (!isSubtypeOf(SrcTy, DestTy, Trivial, &LocalCC) || !Trivial)
+          continue;
+
+        // If we have any substitutions, substitute them now.
+        if (LocalCC.requiresSubstitution()) {
+          // Substitute our deduced parameters.
+          SrcTy = substType(SrcTy, LocalCC.Substitutions);
+          if (!SrcTy)
+            continue;
+
+          EffectiveDestTy = substType(EffectiveDestTy, LocalCC.Substitutions);
+          if (!EffectiveDestTy)
+            continue;
+
+          // If the original type was a polymorphic function type, we've deduced
+          // all of the parameters.
+          // FIXME: Should this be part of substitution?
+          if (auto PolyFn = SrcTy->getAs<PolymorphicFunctionType>()) {
+            SrcTy = FunctionType::get(PolyFn->getInput(), PolyFn->getResult(),
+                                      Context);
+          }
+
+          if (auto PolyFn = EffectiveDestTy->getAs<PolymorphicFunctionType>()) {
+            EffectiveDestTy = FunctionType::get(PolyFn->getInput(),
+                                                PolyFn->getResult(),
+                                                Context);
+          }
+        }
+
+        // If we either have no substitutions or we have an incomplete set of
+        // substitutions, we don't know if we have a match. Keep the candidate.
+        if (!LocalCC.requiresSubstitution() ||
+            !LocalCC.hasCompleteSubstitutions()) {
+          ViableCandidates.push_back(
+             OverloadCandidate(VD, SrcTy,
+                               LocalCC.hasCompleteSubstitutions()));
+          continue;
+        }
+
+        // Fall through to check whether we got the same type.
+      }
+
+      // Simply checking for type equality suffices.
+      if (SrcTy->isEqual(EffectiveDestTy)) {
+        // Compute the type of the reference, which may be an lvalue.
+        Type ResultTy = SrcTy;
+        if (SrcLV)
+          ResultTy = LValueType::get(SrcTy, SrcLV->getQualifiers(), Context);
+
+        if (LocalCC.requiresSubstitution()) {
+          OverloadCandidate::SubstitutionInfoType SubstitutionInfo
+            = { std::move(LocalCC.Substitutions),
+                 std::move(LocalCC.Conformance) };
+          ViableCandidates.push_back(
+             OverloadCandidate(VD, ResultTy, std::move(SubstitutionInfo)));
+        } else {
+          ViableCandidates.push_back(
+            OverloadCandidate(VD, ResultTy, true));
+        }
+      }
+
+      continue;
+    }
+
+    // Check that the source is coercible to the destination.
+    {
+      OpaqueValueExpr OVE(Loc, SrcTy);
+      if (isCoercibleToType(&OVE, DestTy, /*Assignment=*/false, &LocalCC)
+            == CoercionResult::Failed) {
+        continue;
+      }
+    }
+
+    // If we have substitutions, apply them.
+    Type EffectiveDestTy = DestTy;
+    if (LocalCC.requiresSubstitution()) {
+      SrcTy = substType(SrcTy, LocalCC.Substitutions);
+      if (!SrcTy)
+        continue;
+
+      EffectiveDestTy = substType(EffectiveDestTy, LocalCC.Substitutions);
+      if (!EffectiveDestTy)
+        continue;
+
+      // If the original type was a polymorphic function type, and we've deduced
+      // all of the parameters, produce a normal function type.
+      // FIXME: Should this be part of substitution?
+      if (auto PolyFn = SrcTy->getAs<PolymorphicFunctionType>()) {
+        SrcTy = FunctionType::get(PolyFn->getInput(), PolyFn->getResult(),
+                                  Context);
+      }
+
+      if (auto PolyFn = EffectiveDestTy->getAs<PolymorphicFunctionType>()) {
+        EffectiveDestTy = FunctionType::get(PolyFn->getInput(),
+                                            PolyFn->getResult(),
+                                            Context);
+      }
+}
+
+    if (!LocalCC.requiresSubstitution() || !LocalCC.hasCompleteSubstitutions()){
+      // Simple case: no substitution required.
+      ViableCandidates.push_back(
+        OverloadCandidate(VD, SrcTy,
+                          LocalCC.hasCompleteSubstitutions()));
+      continue;
+    }
+
+    // We have performed a complete set of substitutions. Check that the
+    // result is still coercible.
+
+    // Check for coercibility.
+    // FIXME: Does this belong here, or does it belong in isCoercibleToType?
+    {
+      OpaqueValueExpr OVE(Loc, SrcTy);
+      if (isCoercibleToType(&OVE, EffectiveDestTy, /*Assignment=*/false,
+                            &LocalCC)
+          == CoercionResult::Failed) {
+        continue;
+      }
+    }
+    
+    // Add with substitutions.
+    OverloadCandidate::SubstitutionInfoType SubstitutionInfo
+      = { std::move(LocalCC.Substitutions), std::move(LocalCC.Conformance) };
+    ViableCandidates.push_back(OverloadCandidate(VD, SrcTy,
+                                                 std::move(SubstitutionInfo)));
+  }
+
+  // If we found a fully-resolved a viable candidate, we're done.
+  if (ViableCandidates.size() == 1 && ViableCandidates[0].isComplete())
+    return std::move(ViableCandidates[0]);
+
+  // Create the resulting viable-candidates vector.
+  Viable.clear();
+  for (auto const& VC : ViableCandidates)
+    Viable.push_back(VC.getDecl());
+  
+  return OverloadCandidate();
+}
+
 OverloadedExpr TypeChecker::getOverloadedExpr(Expr *E) {
   Expr *expr = E->getSemanticsProvidingExpr();
 

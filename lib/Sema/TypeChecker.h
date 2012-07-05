@@ -428,7 +428,8 @@ public:
   /// for a call to a method. If not provided, then there is no 'this' object.
   ///
   /// \param Arg The call argument, to be passed to the function that is
-  /// eventually selected by overload resolution.
+  /// eventually selected by overload resolution. If null, we're performing
+  /// overloading without a call.
   ///
   /// \param DestTy The type to which the result should be coerced, or null if
   /// not known.
@@ -443,6 +444,29 @@ public:
                                       Expr *Arg,
                                       Type DestTy,
                                       SmallVectorImpl<ValueDecl *> &Viable);
+
+  /// filterOverloadSetForValue - Filter a set of overload candidates based on
+  /// a destination type to which the overload set is being coerced.
+  ///
+  /// \param Candidates The set of overloaded candidates that should be
+  /// considered
+  ///
+  /// \param BaseTy The type of the object that will become the 'this' pointer
+  /// for a call to a method. If not provided, then there is no 'this' object.
+  ///
+  /// \param DestTy The type to which the result should be coerced, or null if
+  /// not known.
+  ///
+  /// \param Viable If there is no single, complete vialbe candidate, output
+  /// vector to which all of the viable candidates will be added.
+  ///
+  /// \returns The best candidate, if there is one.
+  OverloadCandidate filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
+                                              SourceLoc Loc,
+                                              Type BaseTy,
+                                              Type DestTy,
+                                          SmallVectorImpl<ValueDecl *> &Viable,
+                                              CoercionContext *CC = nullptr);
 
   /// \brief Determine whether the given expression refer to an overloaded
   /// set of declarations and, if so, determine the candidates, base type,

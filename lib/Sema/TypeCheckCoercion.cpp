@@ -30,6 +30,10 @@
 #include <utility>
 using namespace swift;
 
+static bool recordDeduction(CoercionContext &CC, SourceLoc Loc,
+                            DeducibleGenericParamType *Deducible,
+                            Type DeducedTy, unsigned Flags);
+
 namespace {
 
 /// CoercedResult - The result of coercing a given expression to a given
@@ -339,97 +343,42 @@ public:
 
   }
   
-  Type matchLValueType(ValueDecl *val, LValueType *lv, Type BaseTy) {
-    if (!val->isReferencedAsLValue())
-      return Type();
-
-    Type valTy = val->getType();
-    valTy = TC.substMemberTypeWithBase(valTy, BaseTy);
-    if (!valTy)
-      return Type();
-
-    if (valTy->isEqual(lv->getObjectType()))
-      return valTy;
-
-    return Type();
-  }
-
-  CoercedResult coerceOverloadToLValue(OverloadSetRefExpr *E, LValueType *lv) {
-    Type BaseTy = E->getBaseType();
-    for (ValueDecl *val : E->getDecls()) {
-      if (Type Matched = matchLValueType(val, lv, BaseTy)) {
-        if (!(Flags & CF_Apply))
-          return Matched;
-        
-        // FIXME: We should be handling this like overload resolution, because
-        // ambiguities are possible.
-        return coerced(TC.buildFilteredOverloadSet(E, val));
-      }
-    }
-
-    if (Flags & CF_Apply) {
-      diagnose(E->getLoc(), diag::no_candidates_ref,
-               E->getDecls()[0]->getName());
-      TC.printOverloadSetCandidates(E->getDecls());
-    }
-
-    return nullptr;
-  }
-  
   CoercedResult visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-    // If we're looking for an lvalue type, we need an exact match
-    // to the target object type.
-    // FIXME: What about qualifiers?
-    if (LValueType *lv = DestTy->getAs<LValueType>())
-      return coerceOverloadToLValue(E, lv);
+    OverloadedExpr Ovl = TC.getOverloadedExpr(E);
+    assert(Ovl && "OverloadSetRefExpr is always overloaded");
 
-    // If DestFT is a FunctionType, get it as one.
-    // FIXME: PolymorphicFunctionType?
-    FunctionType *DestFT = DestTy->getAs<FunctionType>();
-    
-    // Determine which declarations are viable.
     SmallVector<ValueDecl *, 4> Viable;
-    for (ValueDecl *Val : E->getDecls()) {
-      Type srcTy = Val->getType();
-      
-      // If we have a non-static method along with an object argument,
-      // look past the 'this'.
-      if (FuncDecl *Func = dyn_cast<FuncDecl>(Val))
-        if (!Func->isStatic() && E->hasBaseObject())
-          srcTy = srcTy->castTo<FunctionType>()->getResult();
-
-      // If this overloaded set refers to a member of an archetype, substitute
-      // the associated types that depend on that archetype through the
-      // source type.
-      srcTy = TC.substMemberTypeWithBase(srcTy, E->getBaseType());
-      if (!srcTy)
-        continue;
-
-      // If we're trying to coerce the overload set to function type that is
-      // partially specified, filter based on what we know.
-      if (DestFT && DestFT->getInput()->isUnresolvedType()) {
-        if (FunctionType *SFT = srcTy->getAs<FunctionType>())
-          if (TC.isSubtypeOf(SFT->getResult(), DestFT->getResult(), &CC)) {
-            Viable.push_back(Val);
+    if (OverloadCandidate Best
+          = TC.filterOverloadSetForValue(Ovl.getCandidates(), E->getLoc(),
+                                         Ovl.getBaseType(), DestTy,
+                                         Viable, &CC)) {
+      // If the selected candidate has substitutions, record them.
+      if (Best.hasSubstitutions()) {
+        for (auto S : Best.getSubstitutions()) {
+          if (!S.second)
             continue;
-          }
+
+          DeducibleGenericParamType *Param
+            = S.first->castTo<DeducibleGenericParamType>();
+          if (recordDeduction(CC, E->getLoc(), Param, S.second, Flags))
+            return nullptr;
+        }
       }
-      
-      
-      DeclRefExpr DRE(Val, E->getLoc(), srcTy);
-      if (TC.isCoercibleToType(&DRE, DestTy) == CoercionResult::Failed)
-        continue;
-      
-      Viable.push_back(Val);
+
+      if (!(Flags & CF_Apply)) {
+        Type ResultTy = Best.getType();
+        if (!DestTy->is<LValueType>())
+          ResultTy = ResultTy->getRValueType();
+        return ResultTy;
+      }
+
+      // Build the result.
+      Expr *Result = TC.buildFilteredOverloadSet(Ovl, Best);
+      if (!DestTy->is<LValueType>())
+        Result = TC.convertToRValue(Result);
+      return coerced(Result);
     }
-    
-    if (Viable.size() == 1) {
-      if (!(Flags & CF_Apply))
-        return DestTy;
-      
-      return coerced(TC.convertToRValue(TC.buildFilteredOverloadSet(E,Viable)));
-    }
-      
+
     if (Flags & CF_Apply) {
       if (Viable.empty()) {
         diagnose(E->getLoc(), diag::no_candidates_ref, 
@@ -1962,45 +1911,6 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
   if (LValueType *DestLT = DestTy->getAs<LValueType>()) {
     Type SrcTy = E->getType();
     LValueType *SrcLT = SrcTy->getAs<LValueType>();
-    Type SrcObjectTy = SrcLT? SrcLT->getObjectType() : SrcTy;
-
-    // If the destination is deducible, deduce it now (or check it against a
-    // prior deduction).
-    if (auto Deducible
-               = DestLT->getObjectType()->getAs<DeducibleGenericParamType>()) {
-      Type ExistingTy = CC.getSubstitution(Deducible);
-
-      if (SrcTy->isUnresolvedType()) {
-        // If we already have a binding for this archetype, try to use it.
-        if (ExistingTy)
-          return coerceToType(E, 
-                              LValueType::get(SrcObjectTy,
-                                              DestLT->getQualifiers(),
-                                              TC.Context),
-                              CC, Flags);
-
-        // We don't have a binding, and cannot deduce anything from an
-        // unresolved type. Whether coercion will succeed is unknowable.
-        return CoercionResult::Unknowable;
-      }
-
-      // We always deduce an object type (never a reference type).
-      if (recordDeduction(CC, E->getLoc(), Deducible, SrcObjectTy, Flags))
-        return nullptr;
-
-      // Continue with the substituted declaration type.
-      DestLT = LValueType::get(SrcObjectTy,
-                               DestLT->getQualifiers(),
-                               TC.Context);
-      DestTy = DestLT;
-
-      // If the destination and source types are now equal, we're done.
-      if (DestTy->isEqual(SrcTy))
-        return unchanged(E, Flags);
-
-      // Continue along: we may allow implicit lvalues here or be
-      // able to provide a better failure mode.
-    }
 
     // If the input expression has an unresolved type, try to coerce it to an
     // appropriate type.
@@ -2010,8 +1920,8 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
     if ((Flags & CF_ImplicitLValue) ||
         isa<AddressOfExpr>(E->getSemanticsProvidingExpr())) {
       // Qualification conversion.
-      if (SrcLT && DestLT->getObjectType()->isEqual(SrcLT->getObjectType()) &&
-          SrcLT->getQualifiers() < DestLT->getQualifiers()) {
+      if (SrcLT &&
+          sameType(DestLT->getObjectType(), SrcLT->getObjectType(), CC)) {
         assert(SrcLT->getQualifiers() < DestLT->getQualifiers() &&
                "qualifiers match exactly but types are different?");
         if (!(Flags & CF_Apply))
@@ -2025,6 +1935,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
 
     // Use a special diagnostic if the coercion would have worked
     // except we needed an explicit marker.
+    // FIXME: pass in coercion context.
     if (SrcLT && isSubtypeExceptImplicit(SrcLT, DestLT)) {
       if (Flags & CF_Apply)
         TC.diagnose(E->getLoc(), diag::implicit_use_of_lvalue,
