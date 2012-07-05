@@ -536,8 +536,7 @@ Type TypeChecker::substMemberTypeWithBase(Type T, Type BaseTy) {
     BaseTy = MetaBase->getInstanceType();
 
   if (auto BGT = BaseTy->getRValueType()->getAs<BoundGenericType>()) {
-    // FIXME: This isn't the complete table; we need to include the associated
-    // types as well.
+    // FIXME: Cache this?
     TypeSubstitutionMap Substitutions;
     auto Params = BGT->getDecl()->getGenericParams()->getParams();
     auto Args = BGT->getGenericArgs();
