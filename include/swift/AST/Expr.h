@@ -547,6 +547,42 @@ public:
   }
 };
 
+class GenericMemberRefExpr : public Expr {
+  Expr *Base;
+  ValueDecl *Value;
+  SourceLoc DotLoc;
+  SourceLoc NameLoc;
+
+public:  
+  GenericMemberRefExpr(Expr *Base, SourceLoc DotLoc, ValueDecl *Value,
+                       SourceLoc NameLoc);
+  Expr *getBase() const { return Base; }
+  ValueDecl *getDecl() const { return Value; }
+  SourceLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getDotLoc() const { return DotLoc; }
+
+  void setBase(Expr *E) { Base = E; }
+
+  SourceLoc getLoc() const { return NameLoc; }
+  SourceRange getSourceRange() const {
+    if (Base->isImplicit())
+      return SourceRange(NameLoc);
+
+    return SourceRange(Base->getStartLoc(), NameLoc);
+  }
+
+  /// isBaseIgnored - Determine whether the base expression is actually
+  /// ignored, rather than being used as, e.g., the 'this' argument passed
+  /// to an instance method or the base of a variable access.
+  bool isBaseIgnored() const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const GenericMemberRefExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::GenericMemberRef;
+  }
+};
+
 /// UnresolvedMemberExpr - This represents '.foo', an unresolved reference to a
 /// member, which is to be resolved with context sensitive type information into
 /// bar.foo.  These always have unresolved type.

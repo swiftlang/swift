@@ -333,6 +333,11 @@ namespace {
       IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
     }
 
+    void visitGenericMemberRefExpr(GenericMemberRefExpr *E) {
+      IGF.unimplemented(E->getLoc(), "generic member reference");
+      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
+    }
+
     void visitCapturingExpr(CapturingExpr *E) {
       emitClosure(IGF, E, Out);
     }
@@ -478,6 +483,11 @@ namespace {
       return LValue();
     }
 
+    LValue visitGenericMemberRefExpr(GenericMemberRefExpr *E) {
+      IGF.unimplemented(E->getLoc(), "generic member reference");
+      return LValue();
+    }
+
   };
 }
 
@@ -598,6 +608,7 @@ namespace {
     NON_LOCATEABLE(ConstructExpr)
     NON_LOCATEABLE(ExistentialMemberRefExpr)
     NON_LOCATEABLE(ArchetypeMemberRefExpr)
+    NON_LOCATEABLE(GenericMemberRefExpr)
 
     // FIXME: We may want to specialize IR generation for array subscripts.
     NON_LOCATEABLE(SubscriptExpr);

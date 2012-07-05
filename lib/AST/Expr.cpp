@@ -161,6 +161,25 @@ bool ArchetypeMemberRefExpr::isBaseIgnored() const {
   return false;
 }
 
+GenericMemberRefExpr::GenericMemberRefExpr(Expr *Base, SourceLoc DotLoc,
+                                           ValueDecl *Value,
+                                           SourceLoc NameLoc)
+  : Expr(ExprKind::GenericMemberRef), Base(Base), Value(Value),
+    DotLoc(DotLoc), NameLoc(NameLoc) { }
+
+bool GenericMemberRefExpr::isBaseIgnored() const {
+  if (getBase()->getType()->getRValueType()->is<MetaTypeType>())
+    return true;
+
+  if (isa<TypeDecl>(Value))
+    return true;
+
+  if (auto Func = dyn_cast<FuncDecl>(Value))
+    return Func->isStatic();
+
+  return false;
+}
+
 Type OverloadSetRefExpr::getBaseType() const {
   if (isa<OverloadedDeclRefExpr>(this))
     return Type();
@@ -432,6 +451,12 @@ public:
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
     printCommon(E, "archetype_member_ref_expr")
+      << " decl=" << E->getDecl()->getName() << '\n';
+    printRec(E->getBase());
+    OS << ')';
+  }
+  void visitGenericMemberRefExpr(GenericMemberRefExpr *E) {
+    printCommon(E, "generic_member_ref_expr")
       << " decl=" << E->getDecl()->getName() << '\n';
     printRec(E->getBase());
     OS << ')';

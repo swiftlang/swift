@@ -534,7 +534,20 @@ Type TypeChecker::substMemberTypeWithBase(Type T, Type BaseTy) {
   // Look through the metatype.
   if (auto MetaBase = BaseTy->getAs<MetaTypeType>())
     BaseTy = MetaBase->getInstanceType();
-  
+
+  if (auto BGT = BaseTy->getRValueType()->getAs<BoundGenericType>()) {
+    // FIXME: This isn't the complete table; we need to include the associated
+    // types as well.
+    TypeSubstitutionMap Substitutions;
+    auto Params = BGT->getDecl()->getGenericParams()->getParams();
+    auto Args = BGT->getGenericArgs();
+    for (unsigned i = 0, e = BGT->getGenericArgs().size(); i != e; ++i) {
+      Type ParamTy = Params[i].getAsTypeParam()->getUnderlyingType();
+      Substitutions[ParamTy->castTo<ArchetypeType>()] = Args[i];
+    }
+    return substType(T, Substitutions);
+  }
+
   auto BaseArchetype = BaseTy->getRValueType()->getAs<ArchetypeType>();
   if (!BaseArchetype)
     return T;

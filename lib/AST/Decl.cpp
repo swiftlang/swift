@@ -395,9 +395,6 @@ Type FuncDecl::computeThisType() const {
   
   Type ContainerType = getExtensionType();
   if (ContainerType.isNull()) return ContainerType;
-  
-  if (ContainerType->hasReferenceSemantics())
-    return ContainerType;
 
   // For a protocol, the type of 'this' is the associated type 'This', not
   // the protocol itself.
@@ -418,6 +415,19 @@ Type FuncDecl::computeThisType() const {
     assert(This && "Missing 'This' associated type in protocol");
     ContainerType = This->getDeclaredType();
   }
+
+  if (UnboundGenericType *UGT = ContainerType->getAs<UnboundGenericType>()) {
+    // If we have an unbound generic type, bind the type to the archetypes
+    // in the type's definition.
+    NominalTypeDecl *D = UGT->getDecl();
+    SmallVector<Type, 4> GenericArgs;
+    for (auto Param : *D->getGenericParams())
+      GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
+    ContainerType = BoundGenericType::get(D, GenericArgs);
+  }
+
+  if (ContainerType->hasReferenceSemantics())
+    return ContainerType;
 
   // 'this' is accepts implicit l-values and doesn't force them to the heap.
   return LValueType::get(ContainerType, LValueType::Qual::NonHeap,

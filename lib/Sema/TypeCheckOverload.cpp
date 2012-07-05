@@ -672,6 +672,12 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
                                                   MemberLoc);
     }
 
+    // Reference to a member of a generic type.
+    if (baseTy->is<BoundGenericType>()) {
+      return new (Context) GenericMemberRefExpr(Base, DotLoc, Member,
+                                                MemberLoc);
+    }
+
     // Refer to a member variable of an instance.
     if (auto Var = dyn_cast<VarDecl>(Member)) {
       assert(baseIsInstance && "Referencing variable of metatype!");

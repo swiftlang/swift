@@ -265,6 +265,9 @@ public:
   CoercedResult visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
     return unchanged(E);
   }
+  CoercedResult visitGenericMemberRefExpr(GenericMemberRefExpr *E) {
+    return unchanged(E);
+  }
   CoercedResult visitNewArrayExpr(NewArrayExpr *E) {
     return unchanged(E);
   }

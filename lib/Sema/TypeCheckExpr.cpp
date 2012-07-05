@@ -784,6 +784,50 @@ public:
     return E;
   }
 
+  Expr *visitGenericMemberRefExpr(GenericMemberRefExpr *E) {
+    if (E->getDecl()->getType()->is<ErrorType>())
+      return nullptr;
+
+    Type GenericTy = E->getBase()->getType()->getRValueType();
+    if (GenericTy->is<MetaTypeType>())
+      GenericTy = GenericTy->castTo<MetaTypeType>()->getInstanceType();
+
+    // If we're going to use the base, make sure it's an lvalue, materializing
+    // it if needed.
+    if (!E->isBaseIgnored()) {
+      // Ensure that the base is an lvalue, materializing it if is not an
+      // lvalue yet.
+      if (Expr *Base = TC.coerceObjectArgument(E->getBase(), GenericTy))
+        E->setBase(Base);
+      else
+        return nullptr;
+    }
+    
+    // Determine the type of the member.
+    Type MemberTy = E->getDecl()->getType();
+
+    if (!E->isBaseIgnored()) {
+      if (auto Method = dyn_cast<FuncDecl>(E->getDecl())) {
+        if (!Method->isStatic()) {
+          if (auto FuncTy = dyn_cast<FunctionType>(MemberTy))
+            MemberTy = FuncTy->getResult();
+        }
+      } else {
+        MemberTy = LValueType::get(MemberTy,
+                                   LValueType::Qual::DefaultForMemberAccess,
+                                   TC.Context);
+      }
+    }
+    
+    // Substitute each of the associated types into the member type.
+    MemberTy = TC.substMemberTypeWithBase(MemberTy, GenericTy);
+    if (!MemberTy)
+      return nullptr;
+
+    E->setType(MemberTy);
+    return E;
+  }
+
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     E->setType(UnstructuredUnresolvedType::get(TC.Context));
     return E;
