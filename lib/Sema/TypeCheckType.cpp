@@ -118,8 +118,132 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
       D->overwriteUnderlyingType(ErrorType::get(Context));
     break;
   }
-  case TypeKind::Identifier:
-    return validateType(cast<IdentifierType>(T)->getMappedType(), isFirstPass);
+  case TypeKind::Identifier: {
+    IdentifierType *DNT = cast<IdentifierType>(T);
+    if (DNT->Components.back().Value.is<Type>()) {
+      IsInvalid = validateType(DNT->getMappedType(), isFirstPass);
+      break;
+    }
+    MutableArrayRef<IdentifierType::Component> Components = DNT->Components;
+
+    // Iteratively resolve the components.
+    IdentifierType::Component LastOne = Components[0];
+    for (auto &C : Components) {
+      TypeDecl *TD = nullptr;
+      Type BaseTy;
+      if (!C.Value.isNull()) {
+        // If there is a value, it must be a ValueDecl; resolve it.
+        TD = dyn_cast<TypeDecl>(C.Value.get<ValueDecl*>());
+      } else if (LastOne.Value.isNull()) {
+        // We haven't resolved anything yet; use an unqualified lookup.
+        Identifier Name = C.Id;
+        SourceLoc Loc = C.Loc;
+
+        // FIXME: This loop is ridiculously inefficient.
+        DeclContext *DC;
+        for (auto IdAndContext : TU.getUnresolvedIdentifierTypes()) {
+          if (IdAndContext.first == DNT) {
+            DC = IdAndContext.second;
+            break;
+          }
+        }
+
+        // Perform an unqualified lookup.
+        UnqualifiedLookup Globals(Name, DC, SourceLoc(), /*TypeLookup*/true);
+
+        if (Globals.Results.size() > 1) {
+          diagnose(Loc, diag::abiguous_type_base, Name)
+            << SourceRange(Loc, Components.back().Loc);
+          for (auto Result : Globals.Results) {
+            if (Globals.Results[0].hasValueDecl())
+              diagnose(Result.getValueDecl()->getStartLoc(), diag::found_candidate);
+            else
+              diagnose(Loc, diag::found_candidate);
+          }
+          return true;
+        }
+
+        if (Globals.Results.empty()) {
+          diagnose(Loc, Components.size() == 1 ? 
+                     diag::use_undeclared_type : diag::unknown_name_in_type, Name)
+            << SourceRange(Loc, Components.back().Loc);
+          return true;
+        }
+
+        switch (Globals.Results[0].Kind) {
+        case UnqualifiedLookupResult::ModuleMember:
+        case UnqualifiedLookupResult::LocalDecl:
+        case UnqualifiedLookupResult::MemberProperty:
+        case UnqualifiedLookupResult::MemberFunction:
+        case UnqualifiedLookupResult::MetatypeMember:
+        case UnqualifiedLookupResult::ExistentialMember:
+        case UnqualifiedLookupResult::ArchetypeMember:
+          TD = dyn_cast<TypeDecl>(Globals.Results[0].getValueDecl());
+          break;
+        case UnqualifiedLookupResult::ModuleName:
+          C.Value = Globals.Results[0].getNamedModule();
+          break;
+
+        case UnqualifiedLookupResult::MetaArchetypeMember:
+          // FIXME: This is actually possible in protocols.
+          llvm_unreachable("meta-archetype member in unqualified name lookup");
+          break;
+        }
+      } else if (auto M = LastOne.Value.dyn_cast<Module*>()) {
+        // Lookup into a named module.
+        SmallVector<ValueDecl*, 8> Decls;
+        M->lookupValue(Module::AccessPathTy(), C.Id, 
+                       NLKind::QualifiedLookup, Decls);
+        if (Decls.size() == 1)
+          TD = dyn_cast<TypeDecl>(Decls.back());
+        // FIXME: Diagnostic if not found or ambiguous?
+      } else if (auto T = LastOne.Value.dyn_cast<Type>()) {
+        // Lookup into a type.
+        BaseTy = T;
+        MemberLookup ML(T, C.Id, TU, /*TypeLookup*/true);
+        if (ML.Results.size() == 1)
+          TD = dyn_cast<TypeDecl>(ML.Results.back().D);
+        // FIXME: Diagnostic if not found or ambiguous?
+      } else {
+        diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
+          << SourceRange(Components[0].Loc, Components.back().Loc);
+        return true;
+      }
+
+      if (TD) {
+        Type Ty;
+        if (!C.GenericArgs.empty()) {
+          if (auto NTD = dyn_cast<NominalTypeDecl>(TD))
+            Ty = NTD->getGenericTypeWithArgs(C.GenericArgs);
+          // FIXME: Diagnostic if applying the arguments fails?
+        } else {
+          Ty = TD->getDeclaredType();
+        }
+        if (Ty) {
+          if (validateType(Ty, isFirstPass))
+            return true;
+          if (BaseTy)
+            Ty = substMemberTypeWithBase(Ty, BaseTy);
+          C.Value = Ty;
+        }
+      }
+
+      if (C.Value.isNull()) {
+        if (LastOne.Value.isNull())
+          diagnose(C.Loc, Components.size() == 1 ? 
+                   diag::named_definition_isnt_type :
+                   diag::dotted_reference_not_type, C.Id)
+            << SourceRange(C.Loc, Components.back().Loc);
+        else
+          diagnose(C.Loc, diag::invalid_member_type, C.Id, LastOne.Id)
+            << SourceRange(Components[0].Loc, Components.back().Loc);
+        return true;
+      }
+
+      LastOne = C;
+    }
+    break;
+  }
   case TypeKind::Paren:
     return validateType(cast<ParenType>(T)->getUnderlyingType(), isFirstPass);
   case TypeKind::Tuple: {

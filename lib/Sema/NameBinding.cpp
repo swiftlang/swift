@@ -69,8 +69,7 @@ namespace {
     /// resolving it or diagnosing the error as appropriate and return true on
     /// failure.  On failure, this leaves IdentifierType alone, otherwise it
     /// fills in the Components.
-    bool resolveIdentifierType(IdentifierType *DNT, DeclContext *DC,
-                               bool NoMemberLookup = false);
+    bool resolveIdentifierType(IdentifierType *DNT, DeclContext *DC);
 
   private:
     /// getModule - Load a module referenced by an import statement,
@@ -208,8 +207,7 @@ addStandardLibraryImport(SmallVectorImpl<ImportedModule> &Result) {
 /// resolving it or diagnosing the error as appropriate and return true on
 /// failure.  On failure, this leaves IdentifierType alone, otherwise it fills
 /// in the Components.
-bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC,
-                                       bool NoMemberLookup) {
+bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
   MutableArrayRef<IdentifierType::Component> Components = DNT->Components;
 
   // If name lookup for the base of the type didn't get resolved in the
@@ -273,19 +271,10 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC,
                      NLKind::QualifiedLookup, Decls);
       if (Decls.size() == 1 && isa<TypeDecl>(Decls.back()))
         C.Value = cast<TypeDecl>(Decls.back());
-    } else if (auto VD = LastOne.Value.dyn_cast<ValueDecl*>()) {
-      // Lookup into a type.
-      if (auto TD = dyn_cast<TypeDecl>(VD)) {
-        if (NoMemberLookup) {
-          diagnose(C.Loc, diag::cannot_resolve_extension_dot)
-            << SourceRange(Components[0].Loc, Components.back().Loc);
-          return true;
-        }
-
-        MemberLookup ML(TD->getDeclaredType(), C.Id, *TU, /*IsTypeLookup*/true);
-        if (ML.Results.size() == 1 && isa<TypeDecl>(ML.Results.back().D))
-          C.Value = cast<TypeDecl>(ML.Results.back().D);
-      }
+    } else if (LastOne.Value.is<ValueDecl*>()) {
+      diagnose(C.Loc, diag::cannot_resolve_extension_dot)
+        << SourceRange(Components[0].Loc, Components.back().Loc);
+      return true;
     } else {
       diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
         << SourceRange(Components[0].Loc, Components.back().Loc);
@@ -305,12 +294,6 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC,
   if (ValueDecl *Last = Components.back().Value.dyn_cast<ValueDecl*>()) {
     auto GenericArgs = Components.back().GenericArgs;
     if (!GenericArgs.empty()) {
-      if (auto NTD = dyn_cast<NominalTypeDecl>(Last)) {
-        if (Type Ty = NTD->getGenericTypeWithArgs(GenericArgs)) {
-          Components.back().Value = Ty;
-          return false;
-        }
-      }
       // FIXME: Need better diagnostic here
     } else if (auto TD = dyn_cast<TypeDecl>(Last)) {
       Components.back().Value = TD->getDeclaredType();
@@ -417,7 +400,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
     if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(TU->Decls[i])) {
       IdentifierType *DNT = dyn_cast<IdentifierType>(ED->getExtendedType());
       while (true) {
-        if (Binder.resolveIdentifierType(DNT, TU, /*NoMemberLookup*/true)) {
+        if (Binder.resolveIdentifierType(DNT, TU)) {
           for (auto &C : DNT->Components)
             C.Value = TU->Ctx.TheErrorType;
 
@@ -445,21 +428,6 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
           }
         }
       }
-    }
-  }
-
-  typedef TranslationUnit::IdentTypeAndContext IdentTypeAndContext;
-  for (auto IdAndContext : TU->getUnresolvedIdentifierTypes()) {
-    IdentifierType *DNT = IdAndContext.first;
-    DeclContext *DC = IdAndContext.second;
-
-    // Make sure we don't try to resolve a type twice.
-    if (DNT->Components.back().Value.is<Type>())
-      continue;
-
-    if (Binder.resolveIdentifierType(DNT, DC)) {
-      for (auto &C : DNT->Components)
-        C.Value = TU->Ctx.TheErrorType;
     }
   }
 

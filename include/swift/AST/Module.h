@@ -171,7 +171,7 @@ public:
   /// that were unresolved at the end of the translation unit's parse
   /// phase.
   ArrayRef<IdentTypeAndContext> getUnresolvedIdentifierTypes() const {
-    assert(ASTStage == Parsed);
+    assert(ASTStage >= Parsed);
     return UnresolvedIdentifierTypes;
   }
   void setUnresolvedIdentifierTypes(ArrayRef<IdentTypeAndContext> T) {
