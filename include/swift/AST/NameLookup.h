@@ -116,7 +116,8 @@ public:
   /// of a given module 'M'.  This operation corresponds to a standard "dot" 
   /// lookup operation like "a.b" where 'this' is the type of 'a'.  This
   /// operation is only valid after name binding.
-  MemberLookup(Type BaseTy, Identifier Name, Module &M);
+  MemberLookup(Type BaseTy, Identifier Name, Module &M,
+               bool IsTypeLookup = false);
 
   /// Results - The constructor fills this vector in with all of the results.
   /// If name lookup failed, this is empty.
@@ -130,6 +131,7 @@ public:
   
 private:
   Identifier MemberName;
+  bool IsTypeLookup;
   typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
   void doIt(Type BaseTy, Module &M, VisitedSet &Visited);
   void lookupMembers(Type BaseType, Module &M,
@@ -312,7 +314,8 @@ public:
   /// SourceLoc is used to determine which declarations in that FuncExpr's
   /// context are visible.
   UnqualifiedLookup(Identifier Name, DeclContext *DC,
-                    SourceLoc Loc = SourceLoc());
+                    SourceLoc Loc = SourceLoc(),
+                    bool IsTypeLookup = false);
 
   llvm::SmallVector<UnqualifiedLookupResult, 4> Results;
 

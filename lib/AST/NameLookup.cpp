@@ -25,11 +25,10 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
                                     ArrayRef<ValueDecl*> BaseMembers,
                                     Module *CurModule,
                                     Module *BaseModule,
+                                    bool IsTypeLookup,
                                     SmallVectorImpl<ValueDecl*> &Result) {
   bool CurModuleHasTypeDecl = false;
   llvm::SmallPtrSet<CanType, 8> CurModuleTypes;
-
-  bool NameBindingLookup = CurModule->ASTStage == Module::Parsed;
 
   // Find all extensions in this module.
   for (ExtensionDecl *ED : CurModule->lookupExtensions(BaseType)) {
@@ -37,7 +36,7 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
       if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
         if (VD->getName() == Name) {
           Result.push_back(VD);
-          if (!NameBindingLookup)
+          if (!IsTypeLookup)
             CurModuleTypes.insert(VD->getType()->getCanonicalType());
           CurModuleHasTypeDecl |= isa<MetaTypeType>(VD->getType());
         }
@@ -49,7 +48,7 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
     for (ValueDecl *VD : BaseMembers) {
       if (VD->getName() == Name) {
         Result.push_back(VD);
-        if (!NameBindingLookup)
+        if (!IsTypeLookup)
           CurModuleTypes.insert(VD->getType()->getCanonicalType());
         CurModuleHasTypeDecl |= isa<MetaTypeType>(VD->getType());
       }
@@ -76,7 +75,7 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
       for (Decl *Member : ED->getMembers()) {
         if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
           if (VD->getName() == Name &&
-              (NameBindingLookup || isa<TypeDecl>(VD) ||
+              (IsTypeLookup || isa<TypeDecl>(VD) ||
                !CurModuleTypes.count(VD->getType()->getCanonicalType()))) {
             Result.push_back(VD);
           }
@@ -88,7 +87,7 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
   if (BaseModule != CurModule) {
     for (ValueDecl *VD : BaseMembers) {
       if (VD->getName() == Name &&
-          (NameBindingLookup || isa<TypeDecl>(VD) ||
+          (IsTypeLookup || isa<TypeDecl>(VD) ||
            !CurModuleTypes.count(VD->getType()->getCanonicalType()))) {
         Result.push_back(VD);
       }
@@ -96,8 +95,10 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
   }
 }
 
-MemberLookup::MemberLookup(Type BaseTy, Identifier Name, Module &M) {
+MemberLookup::MemberLookup(Type BaseTy, Identifier Name, Module &M,
+                           bool TypeLookup) {
   MemberName = Name;
+  IsTypeLookup = TypeLookup;
   VisitedSet Visited;
   doIt(BaseTy, M, Visited);
 }
@@ -256,7 +257,7 @@ void MemberLookup::lookupMembers(Type BaseType, Module &M,
     DC = DC->getParent();
 
   DoGlobalExtensionLookup(BaseType, MemberName, BaseMembers, &M,
-                          cast<Module>(DC), Result);
+                          cast<Module>(DC), IsTypeLookup, Result);
 }
 
 ConstructorLookup::ConstructorLookup(Type BaseType, Module &M) {
@@ -300,7 +301,7 @@ ConstructorLookup::ConstructorLookup(Type BaseType, Module &M) {
   }
 
   DoGlobalExtensionLookup(BaseType, Constructor, BaseMembers, &M,
-                          cast<Module>(DC), Results);
+                          cast<Module>(DC), /*IsTypeLookup*/false, Results);
 }
 
 struct FindLocalVal : public StmtVisitor<FindLocalVal> {
@@ -413,7 +414,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
 };
 
 UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
-                                     SourceLoc Loc) {
+                                     SourceLoc Loc, bool IsTypeLookup) {
   typedef UnqualifiedLookupResult Result;
 
   DeclContext *ModuleDC = DC;
@@ -486,7 +487,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     }
 
     if (BaseDecl) {
-      MemberLookup Lookup(ExtendedType, Name, M);
+      MemberLookup Lookup(ExtendedType, Name, M, IsTypeLookup);
       
       for (auto Result : Lookup.Results) {
         switch (Result.Kind) {
@@ -554,14 +555,13 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   
   TranslationUnit &TU = cast<TranslationUnit>(M);
 
-  bool NameBindingLookup = TU.ASTStage == Module::Parsed;
   llvm::SmallPtrSet<CanType, 8> CurModuleTypes;
   for (ValueDecl *VD : CurModuleResults) {
     // If we find a type in the current module, don't look into any
     // imported modules.
     if (isa<TypeDecl>(VD))
       return;
-    if (!NameBindingLookup)
+    if (!IsTypeLookup)
       CurModuleTypes.insert(VD->getType()->getCanonicalType());
   }
 
@@ -576,7 +576,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     ImpEntry.second->lookupValue(ImpEntry.first, Name, NLKind::UnqualifiedLookup,
                                  ImportedModuleResults);
     for (ValueDecl *VD : ImportedModuleResults) {
-      if (NameBindingLookup || isa<TypeDecl>(VD) ||
+      if (IsTypeLookup || isa<TypeDecl>(VD) ||
           !CurModuleTypes.count(VD->getType()->getCanonicalType())) {
         Results.push_back(Result::getModuleMember(VD));
       }

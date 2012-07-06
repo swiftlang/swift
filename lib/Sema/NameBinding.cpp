@@ -219,7 +219,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC,
     SourceLoc Loc = Components[0].Loc;
 
     // Perform an unqualified lookup.
-    UnqualifiedLookup Globals(Name, DC);
+    UnqualifiedLookup Globals(Name, DC, SourceLoc(), /*IsTypeLookup*/true);
 
     if (Globals.Results.size() > 1) {
       diagnose(Loc, diag::abiguous_type_base, Name)
@@ -282,7 +282,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC,
           return true;
         }
 
-        MemberLookup ML(TD->getDeclaredType(), C.Id, *TU);
+        MemberLookup ML(TD->getDeclaredType(), C.Id, *TU, /*IsTypeLookup*/true);
         if (ML.Results.size() == 1 && isa<TypeDecl>(ML.Results.back().D))
           C.Value = cast<TypeDecl>(ML.Results.back().D);
       }
