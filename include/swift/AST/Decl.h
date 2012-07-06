@@ -951,6 +951,7 @@ public:
   /// \brief Retrieve the type of the element referenced by a subscript
   /// operation.
   Type getElementType() const { return ElementTy; }
+  void overwriteElementType(Type T) { ElementTy = T; }
   
   /// \brief Retrieve the subscript getter, a function that takes the indices
   /// and produces a value of the element type.

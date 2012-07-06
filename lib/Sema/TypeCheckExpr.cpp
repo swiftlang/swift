@@ -1086,7 +1086,11 @@ public:
     // Do not walk into FuncExpr or explicit closures.  They are analyzed
     // modularly, so we don't need to recurse into them and reanalyze their
     // body.  This prevents N^2 re-sema activity with lots of nested closures.
-    if (isa<FuncExpr>(E)) return false;
+    if (FuncExpr *FE = dyn_cast<FuncExpr>(E)) {
+      if (TC.validateType(FE->getType(), /*isFirstPass*/false))
+        FE->setType(ErrorType::get(TC.Context));
+      return false;
+    }
 
     // Only walk into Explicit Closures if they haven't been seen at all yet.
     // This ensures that everything gets a type, even if it is an
@@ -1611,10 +1615,6 @@ bool TypeChecker::semaFunctionSignature(FuncExpr *FE) {
       continue;
     }
   }
-  if (!hadError && validateType(FE->getType(), /*isFirstPass*/false))
-    hadError = true;
-  if (hadError)
-    FE->setType(ErrorType::get(Context));
   return hadError;
 }
 
