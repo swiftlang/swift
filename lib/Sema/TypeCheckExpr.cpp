@@ -408,7 +408,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   if (FunctionType *FT = E1->getType()->getAs<FunctionType>()) {
     // If this is an operator, make sure that the declaration found was declared
     // as such.
-    bool Assignment = false;
+    CoercionKind Kind = CoercionKind::Normal;
     if (isa<PrefixUnaryExpr>(E) || isa<PostfixUnaryExpr>(E) ||
         isa<BinaryExpr>(E)) {
       DeclRefExpr *DRE;
@@ -423,8 +423,9 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
                                      : diag::binary_op_without_attribute);
         return nullptr;
       }
-      
-      Assignment = DRE->getDecl()->getAttrs().isAssignment();
+
+      if (DRE->getDecl()->getAttrs().isAssignment())
+        Kind = CoercionKind::Assignment;
     }
     
     // We have a function application.  Check that the argument type matches the
@@ -434,7 +435,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     if (isa<ThisApplyExpr>(E))
       E2 = coerceObjectArgument(E2, FT->getInput());
     else {
-      CoercedExpr CoercedE2 = coerceToType(E2, FT->getInput(), Assignment);
+      CoercedExpr CoercedE2 = coerceToType(E2, FT->getInput(), Kind);
       switch (CoercedE2.getKind()) {
       case CoercionResult::Succeeded:
         E2 = CoercedE2.getExpr();
@@ -1812,7 +1813,7 @@ bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
                         LValueType::get(SrcTy,
                                         LValueType::Qual::NonHeap,
                                         Context),
-                        /*Assignment=*/true);
+                        CoercionKind::ImplicitLValue);
     return Dest == nullptr;
   }
   

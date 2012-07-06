@@ -183,16 +183,17 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     }
 
     // Check whether arguments are suitable for this function.
-    if (isCoercibleToType(Arg, FunctionTy->getInput(),
-                          (OperatorSyntax && VD->getAttrs().isAssignment()),
-                          &CC)
+    CoercionKind Kind = CoercionKind::Normal;
+    if (OperatorSyntax && VD->getAttrs().isAssignment())
+      Kind = CoercionKind::Assignment;
+    if (isCoercibleToType(Arg, FunctionTy->getInput(), Kind, &CC)
           == CoercionResult::Failed)
       continue;
 
     // Check whether we can coerce the result type.
     if (DestTy) {
       OpaqueValueExpr OVE(Arg->getLoc(), FunctionTy->getResult());
-      if (isCoercibleToType(&OVE, DestTy, /*Assignment=*/false, &CC) 
+      if (isCoercibleToType(&OVE, DestTy, CoercionKind::Normal, &CC)
             == CoercionResult::Failed)
         continue;
     }
@@ -376,7 +377,7 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
     // Check that the source is coercible to the destination.
     {
       OpaqueValueExpr OVE(Loc, SrcTy);
-      if (isCoercibleToType(&OVE, DestTy, /*Assignment=*/false, &LocalCC)
+      if (isCoercibleToType(&OVE, DestTy, CoercionKind::Normal, &LocalCC)
             == CoercionResult::Failed) {
         continue;
       }
@@ -423,7 +424,7 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
     // FIXME: Does this belong here, or does it belong in isCoercibleToType?
     {
       OpaqueValueExpr OVE(Loc, SrcTy);
-      if (isCoercibleToType(&OVE, EffectiveDestTy, /*Assignment=*/false,
+      if (isCoercibleToType(&OVE, EffectiveDestTy, CoercionKind::Normal,
                             &LocalCC)
           == CoercionResult::Failed) {
         continue;

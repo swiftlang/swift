@@ -129,6 +129,17 @@ public:
   }
 };
 
+/// \brief Describes the kind of coercion being performed.
+enum class CoercionKind {
+  // Normal coercion to the given type.
+  Normal,
+  // Coercion of a tuple when calling an assignment operator, which permits
+  // the first operand to be an implicit lvalue.
+  Assignment,
+  // Coercion to an implicit lvalue.
+  ImplicitLValue
+};
+
 /// \brief Captures information about the context of a type coercion, including
 /// the type checker instance and the type substitutions deduced by the
 /// coercion.
@@ -333,13 +344,14 @@ public:
   /// the types don't match and diagnoses cases where the conversion cannot be
   /// performed.
   ///
-  /// \param Assignment When true, treat this as an assignment.
+  /// \param Kind The kind of coercion being performed.
   ///
   /// On success, returns the coerced expression. Otherwise, returns either
   /// failure (in which case a diagnostic was produced) or 'unknowable', if
   /// it is unknown whether the coercion can occur (e.g., due to literals that
   /// have not been coerced to any specific type).
-  CoercedExpr coerceToType(Expr *E, Type Ty, bool Assignment = false,
+  CoercedExpr coerceToType(Expr *E, Type Ty,
+                           CoercionKind Kind = CoercionKind::Normal,
                            CoercionContext *CC = nullptr);
   
   /// isCoercibleToType - Determine whether the given expression can be 
@@ -351,7 +363,8 @@ public:
   /// The result is a three-state value: the coercion may succeed, may fail, or
   /// it may be unknowable whether it can ever succeed (for example, if
   /// unresolved literals are involved).
-  CoercionResult isCoercibleToType(Expr *E, Type Ty, bool Assignment = false,
+  CoercionResult isCoercibleToType(Expr *E, Type Ty,
+                                   CoercionKind Kind = CoercionKind::Normal,
                                    CoercionContext *CC = nullptr);
   
   /// coerceObjectArgument - Coerce the given expression to an object argument

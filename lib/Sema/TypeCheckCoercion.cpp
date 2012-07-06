@@ -368,6 +368,18 @@ public:
         }
       }
 
+      // We can only perform this coercion in a context where we can
+      // implicitly treat the expression as an lvalue.
+      if (DestTy->is<LValueType>() && !(Flags & CF_ImplicitLValue)) {
+        if (Flags & CF_Apply) {
+          TC.diagnose(E->getLoc(), diag::implicit_use_of_lvalue,
+                      Best.getType()->getRValueType())
+            << E->getSourceRange();
+        }
+        
+        return nullptr;
+      }
+
       if (!(Flags & CF_Apply)) {
         Type ResultTy = Best.getType();
         if (!DestTy->is<LValueType>())
@@ -533,12 +545,13 @@ public:
       return coerceToType(E->getSubExpr(), DestTy, CC, Flags);
     }
     
-    // FIXME: Note that this was an explicit lvalue.
+    // Treat the subexpression as an implicit lvalue.
+    unsigned SubFlags = (Flags & ~CF_UserConversions) | CF_ImplicitLValue;
     if (CoercedResult Sub = coerceToType(E->getSubExpr(), DestTy, CC,
-                                         Flags & ~CF_UserConversions)) {
+                                         SubFlags)) {
       if (!(Flags & CF_Apply))
         return DestTy;
-      
+
       E->setSubExpr(Sub.getExpr());
       E->setType(DestTy);
       return unchanged(E);
@@ -2096,11 +2109,21 @@ bool CoercionContext::hasCompleteSubstitutions() const {
   return true;
 }
 
-CoercedExpr TypeChecker::coerceToType(Expr *E, Type DestTy, bool Assignment,
+CoercedExpr TypeChecker::coerceToType(Expr *E, Type DestTy, CoercionKind Kind,
                                       CoercionContext *CC) {
   unsigned Flags = CF_Apply | CF_UserConversions;
-  if (Assignment)
+  switch (Kind) {
+  case CoercionKind::Normal:
+    break;
+
+  case CoercionKind::Assignment:
     Flags |= CF_Assignment;
+    break;
+
+  case CoercionKind::ImplicitLValue:
+    Flags |= CF_ImplicitLValue;
+    break;
+  }
 
   CoercionContext MyCC(*this);
   if (!CC)
@@ -2135,11 +2158,21 @@ CoercedExpr TypeChecker::coerceToType(Expr *E, Type DestTy, bool Assignment,
 }
 
 CoercionResult TypeChecker::isCoercibleToType(Expr *E, Type Ty,
-                                              bool Assignment,
+                                              CoercionKind Kind,
                                               CoercionContext *CC) {
   unsigned Flags = CF_UserConversions;
-  if (Assignment)
+  switch (Kind) {
+  case CoercionKind::Normal:
+    break;
+
+  case CoercionKind::Assignment:
     Flags |= CF_Assignment;
+    break;
+
+  case CoercionKind::ImplicitLValue:
+    Flags |= CF_ImplicitLValue;
+    break;
+  }
 
   CoercionContext MyCC(*this);
   if (!CC)

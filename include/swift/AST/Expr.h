@@ -1069,7 +1069,7 @@ public:
 
 /// RequalifyExpr - Change the qualification on an l-value.  The new
 /// type always has the same object type as the old type with strictly
-/// "more" (i.e. a supertyped set of) qualifiers (ignoring the 'implicit' bit).
+/// "more" (i.e. a supertyped set of) qualifiers.
 class RequalifyExpr : public ImplicitConversionExpr {
 public:
   RequalifyExpr(Expr *subExpr, Type type)
