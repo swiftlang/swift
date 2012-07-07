@@ -346,6 +346,7 @@ public:
     // Before anything else, set up the 'this' argument correctly.
     if (Type thisType = FD->computeThisType()) {
       FunctionType *fnType = cast<FunctionType>(FD->getType());
+      fnType = FunctionType::get(thisType, fnType->getResult(), TC.Context);
       FD->overwriteType(FunctionType::get(thisType, fnType->getResult(),
                                           TC.Context));
 

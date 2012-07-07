@@ -563,7 +563,7 @@ class UnboundGenericType : public TypeBase {
 
 private:
   UnboundGenericType(NominalTypeDecl *TheDecl, ASTContext &C)
-    : TypeBase(TypeKind::UnboundGeneric, &C, /*Unresolved=*/true),
+    : TypeBase(TypeKind::UnboundGeneric, &C, /*Unresolved=*/false),
       TheDecl(TheDecl) { }
   friend class OneOfDecl;
   friend class StructDecl;

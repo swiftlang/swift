@@ -1171,7 +1171,6 @@ public:
 class SpecializeExpr : public ImplicitConversionExpr {
 public:
   struct Substitution {
-    SubstitutableType *Subst; // FIXME: We want GenericParams here, I think.
     Type Replacement;
     ArrayRef<ProtocolConformance *> Conformance;
   };
