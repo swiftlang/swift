@@ -417,7 +417,15 @@ public:
   void diagnoseEmptyOverloadSet(Expr *E, ArrayRef<ValueDecl *> Candidates);
   void printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates);
 
-  /// filterOverloadSet - Filter a set of overload candidates based on the 
+  /// checkPolymorphicApply - Check the application of a function of the given
+  /// polymorphic type to a particular argument with, optionally, a destination
+  /// type.
+  OverloadCandidate checkPolymorphicApply(PolymorphicFunctionType *PolyFn,
+                                          bool Assignment,
+                                          Expr *Arg,
+                                          Type DestTy);
+
+  /// filterOverloadSet - Filter a set of overload candidates based on the
   /// the given argument type (for a call) or result type (if the context 
   /// provides such a type). 
   /// 

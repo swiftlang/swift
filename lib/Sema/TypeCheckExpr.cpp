@@ -558,7 +558,27 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     diagnose(E1->getLoc(), diag::called_expr_isnt_function);
     return 0;
   }
-  
+
+  if (auto PolyFn = E1->getType()->getAs<PolymorphicFunctionType>()) {
+    OverloadCandidate Ovl = checkPolymorphicApply(PolyFn, false, E2, Type());
+    if (Ovl.isComplete()) {
+      SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
+      Substitutions.resize(Ovl.getSubstitutions().size());
+      auto &Conformances = Ovl.getConformances();
+      for (auto S : Ovl.getSubstitutions()) {
+        unsigned Index = S.first->getPrimaryIndex();
+        Substitutions[Index].Subst = S.first;
+        Substitutions[Index].Replacement = S.second;
+        Substitutions[Index].Conformance
+        = Context.AllocateCopy(Conformances[S.first]);
+      }
+      E1 = new (Context) SpecializeExpr(E1, Ovl.getType(),
+                                        Context.AllocateCopy(Substitutions));
+      E->setFn(E1);
+      return semaApplyExpr(E);
+    }
+  }
+
   // Otherwise, we must have an application to overloaded set.  See if we can
   // resolve which overload member is based on the argument type.
   OverloadedExpr Ovl = getOverloadedExpr(E1);

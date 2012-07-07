@@ -117,6 +117,62 @@ getDeducibleType(TypeChecker &TC, Type T,
   return TC.substType(T, PolySubstitutions);
 }
 
+/// checkPolymorphicApply - Check the application of a function of the given
+/// polymorphic type to a particular argument with, optionally, a destination
+/// type.
+OverloadCandidate
+TypeChecker::checkPolymorphicApply(PolymorphicFunctionType *PolyFn,
+                                   bool Assignment,
+                                   Expr *Arg,
+                                   Type DestTy) {
+  // Set up a coercion context to deduce the parameters to the polymorphic
+  // function.
+  CoercionContext CC(*this);
+  SmallVector<DeducibleGenericParamType *, 2> DeducibleParams;
+  AnyFunctionType *FunctionTy
+    = getDeducibleType(*this, PolyFn,
+                       PolyFn->getGenericParams().getParams(), DeducibleParams)
+        ->castTo<AnyFunctionType>();
+  CC.requestSubstitutionsFor(DeducibleParams);
+
+  // Check whether arguments are suitable for this function.
+  CoercionKind Kind = CoercionKind::Normal;
+  if (Assignment)
+    Kind = CoercionKind::Assignment;
+  if (isCoercibleToType(Arg, FunctionTy->getInput(), Kind, &CC)
+        == CoercionResult::Failed)
+    return OverloadCandidate();
+
+  // Check whether we can coerce the result type.
+  if (DestTy) {
+    OpaqueValueExpr OVE(Arg->getLoc(), FunctionTy->getResult());
+    if (isCoercibleToType(&OVE, DestTy, CoercionKind::Normal, &CC)
+          == CoercionResult::Failed)
+      return OverloadCandidate();
+  }
+
+  if (!CC.hasCompleteSubstitutions())
+    return OverloadCandidate(nullptr, PolyFn, false);
+
+  // We have a complete set of substitutions. Apply them.
+  Type SubstFunctionTy = substType(FunctionTy, CC.Substitutions);
+  if (!SubstFunctionTy)
+    return OverloadCandidate();
+
+  FunctionTy = SubstFunctionTy->castTo<AnyFunctionType>();
+
+  // We stared with a polymorphic function type, and have substituted away
+  // all of the generic parameters. Turn it into the corresponding
+  // monomorphic function type.
+  FunctionTy = FunctionType::get(FunctionTy->getInput(),
+                                 FunctionTy->getResult(),
+                                 Context);
+
+  OverloadCandidate::SubstitutionInfoType SubstitutionInfo
+    = { std::move(CC.Substitutions), std::move(CC.Conformance) };
+  return OverloadCandidate(nullptr, FunctionTy, std::move(SubstitutionInfo));
+}
+
 OverloadCandidate
 TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
                                bool OperatorSyntax,
