@@ -410,7 +410,7 @@ public:
   }
 
   CoercedResult visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-    return visitOverloadedExpr(E);
+    return visitOverloadedExpr(TC.getOverloadedExpr(E));
   }
   
   // If this is an UnresolvedMemberExpr, then this provides the type we've
@@ -1925,6 +1925,13 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
     PE->setSubExpr(Sub.getExpr());
     PE->setType(Sub.getType());
     return coerced(PE, Flags);
+  }
+
+  // If our expression has polymorphic function type, treat it as overloaded.
+  if (E->getType()->is<PolymorphicFunctionType>()) {
+    if (OverloadedExpr Ovl = TC.getOverloadedExpr(E)) {
+      return SemaCoerce(CC, DestTy, Flags).visitOverloadedExpr(Ovl);
+    }
   }
 
   if (LValueType *DestLT = DestTy->getAs<LValueType>()) {
