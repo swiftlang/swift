@@ -345,69 +345,72 @@ public:
     return nullptr;
 
   }
-  
-  CoercedResult visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-    OverloadedExpr Ovl = TC.getOverloadedExpr(E);
-    assert(Ovl && "OverloadSetRefExpr is always overloaded");
 
+  CoercedResult visitOverloadedExpr(OverloadedExpr Ovl) {
+    SourceLoc Loc = Ovl.getExpr()->getLoc();
     SmallVector<ValueDecl *, 4> Viable;
     if (OverloadCandidate Best
-          = TC.filterOverloadSetForValue(Ovl.getCandidates(), E->getLoc(),
-                                         Ovl.getBaseType(), DestTy,
-                                         Viable, &CC)) {
-      // If the selected candidate has substitutions, record them.
-      if (Best.hasSubstitutions()) {
-        for (auto S : Best.getSubstitutions()) {
-          if (!S.second)
-            continue;
-
-          DeducibleGenericParamType *Param
-            = S.first->castTo<DeducibleGenericParamType>();
-          if (recordDeduction(CC, E->getLoc(), Param, S.second, Flags))
-            return nullptr;
-        }
-      }
+        = TC.filterOverloadSetForValue(Ovl.getCandidates(), Loc,
+                                       Ovl.getBaseType(), DestTy,
+                                       Viable, &CC)) {
 
       // We can only perform this coercion in a context where we can
       // implicitly treat the expression as an lvalue.
       if (DestTy->is<LValueType>() && !(Flags & CF_ImplicitLValue)) {
         if (Flags & CF_Apply) {
-          TC.diagnose(E->getLoc(), diag::implicit_use_of_lvalue,
+          TC.diagnose(Loc, diag::implicit_use_of_lvalue,
                       Best.getType()->getRValueType())
-            << E->getSourceRange();
+          << Ovl.getExpr()->getSourceRange();
         }
-        
+
         return nullptr;
       }
 
+      unsigned SubFlags = Flags;
+      if (DestTy->is<LValueType>())
+        SubFlags |= CF_ImplicitLValue;
+
       if (!(Flags & CF_Apply)) {
+        // Check the coercion of the (potentially-specialized) best candidate
+        // to the destination type succeeds. This also deduced generic
+        // arguments from the type of the best candidate.
         Type ResultTy = Best.getType();
-        if (!DestTy->is<LValueType>())
+        if (!DestTy->is<LValueType>()) {
           ResultTy = ResultTy->getRValueType();
-        return ResultTy;
+        }
+        OpaqueValueExpr OVE(Loc, ResultTy);
+        return coerceToType(&OVE, DestTy, CC, SubFlags);
       }
 
-      // Build the result.
       Expr *Result = TC.buildFilteredOverloadSet(Ovl, Best);
       if (!DestTy->is<LValueType>())
         Result = TC.convertToRValue(Result);
-      return coerced(Result);
+      return coerceToType(Result, DestTy, CC, SubFlags);
     }
 
     if (Flags & CF_Apply) {
       if (Viable.empty()) {
-        diagnose(E->getLoc(), diag::no_candidates_ref, 
-                 E->getDecls()[0]->getName())
-          << E->getSourceRange();
-        TC.printOverloadSetCandidates(E->getDecls());
+        diagnose(Loc, diag::no_candidates_ref,
+                 Ovl.getCandidates()[0]->getName())
+          << Ovl.getExpr()->getSourceRange();
+        TC.printOverloadSetCandidates(Ovl.getCandidates());
       } else {
-        diagnose(E->getLoc(), diag::overloading_ambiguity)
-          << E->getSourceRange();
+        diagnose(Loc, diag::overloading_ambiguity)
+          << Ovl.getExpr()->getSourceRange();
         TC.printOverloadSetCandidates(Viable);
       }
     }
+
+    // If we're not applying and we have more than one candidate, the result
+    // is unknowable thus far.
+    if (!(Flags & CF_Apply) && !Viable.empty())
+      return CoercionResult::Unknowable;
     
     return nullptr;
+  }
+
+  CoercedResult visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
+    return visitOverloadedExpr(E);
   }
   
   // If this is an UnresolvedMemberExpr, then this provides the type we've
@@ -1929,21 +1932,42 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
     LValueType *SrcLT = SrcTy->getAs<LValueType>();
 
     // If the input expression has an unresolved type, try to coerce it to an
-    // appropriate type.
-    if (SrcTy->isUnresolvedType())
-      return SemaCoerce(CC, DestTy, Flags).doIt(E);
+    // appropriate type, then continue with type checking.
+    if (SrcTy->isUnresolvedType()) {
+      if (CoercedResult Res = SemaCoerce(CC, DestTy, Flags).doIt(E)) {
+        if (Flags & CF_Apply) {
+          E = Res.getExpr();
+          SrcTy = E->getType();
+        } else {
+          SrcTy = Res.getType();
+        }
+        SrcLT = SrcTy->getAs<LValueType>();
+      } else {
+        return Res;
+      }
+    }
 
     if ((Flags & CF_ImplicitLValue) ||
         isa<AddressOfExpr>(E->getSemanticsProvidingExpr())) {
-      // Qualification conversion.
       if (SrcLT &&
           sameType(DestLT->getObjectType(), SrcLT->getObjectType(), CC)) {
-        assert(SrcLT->getQualifiers() < DestLT->getQualifiers() &&
-               "qualifiers match exactly but types are different?");
-        if (!(Flags & CF_Apply))
-          return DestTy;
-        
-        return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Flags);
+        // Qualification conversion, materi
+
+        // FIXME: Bring this assertion back!
+        //        assert(SrcLT->getQualifiers() < DestLT->getQualifiers() &&
+        //       "qualifiers match exactly but types are different?");
+        if (!(Flags & CF_Apply)) {
+          // FIXME: Shouldn't need to check qualification here.
+          if (SrcLT->getQualifiers() <= DestLT->getQualifiers())
+            return DestTy;
+        }
+
+        // FIXME: The second 'if' shouldn't be needed, because the 'isEqual'
+        // at the top should handle it via sameType.
+        if (SrcLT->getQualifiers() < DestLT->getQualifiers())
+          return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Flags);
+        else if (SrcLT->getQualifiers() == DestLT->getQualifiers())
+          return unchanged(E, Flags);
       }
     }
     
