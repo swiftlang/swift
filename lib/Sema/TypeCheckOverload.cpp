@@ -204,8 +204,7 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
     // Check for trivial subtyping, to deduce any generic parameters
     // that require deduction. We'll do a specific type check later,
     // after substitution.
-    bool Trivial = true;
-    if (!isSubtypeOf(SrcTy, DestTy, Trivial, &LocalCC) || !Trivial)
+    if (!isSameType(SrcTy, DestTy, &LocalCC))
       return OverloadCandidate();
   } else {
     OpaqueValueExpr OVE(Loc, SrcTy);
@@ -240,8 +239,7 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
   if (GlobalCC.requiresSubstitution()) {
     // Deduce arguments.
     if (DestLV) {
-      bool Trivial = true;
-      if (!isSubtypeOf(SrcTy, DestTy, Trivial, &GlobalCC) || !Trivial)
+      if (!isSameType(SrcTy, DestTy, &GlobalCC))
         return OverloadCandidate();
     } else {
       OpaqueValueExpr OVE(Loc, SrcTy);
@@ -268,8 +266,7 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
 
   if (DestLV) {
     // Simply checking for type equality suffices.
-    // FIXME: Want to use TypeCoercion's sameType() here?
-    if (!SrcTy->isEqual(DestTy))
+    if (!isSameType(SrcTy, DestTy, &GlobalCC))
       return OverloadCandidate();
   } else {
     // Check that the source is coercible to the destination.
@@ -487,8 +484,7 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
     if (GlobalCC.requiresSubstitution()) {
       // Deduce arguments.
       if (DestLV) {
-        bool Trivial = true;
-        if (!isSubtypeOf(SrcTy, DestTy, Trivial, &GlobalCC) || !Trivial)
+        if (!isSameType(SrcTy, DestTy, &GlobalCC))
           continue;
       } else {
         OpaqueValueExpr OVE(Loc, SrcTy);
@@ -515,8 +511,7 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
 
     if (DestLV) {
       // Simply checking for type equality suffices.
-      // FIXME: Want to use TypeCoercion's sameType() here?
-      if (!SrcTy->isEqual(EffectiveDestTy))
+      if (!isSameType(SrcTy, EffectiveDestTy, &GlobalCC))
         continue;
     } else {
     // Check that the source is coercible to the destination.

@@ -304,7 +304,12 @@ public:
     bool Trivial = false;
     return isSubtypeOf(T1, T2, Trivial, CC);
   }
-  
+
+  /// \brief Determine whether T1 and T2 are the same type (structureally)
+  /// within the given coercion context, deducing generic arguments if needed.
+  /// FIXME: This routine ignores labels, which may or may not be what we want.
+  bool isSameType(Type T1, Type T2, CoercionContext *CC = nullptr);
+
   bool semaFunctionSignature(FuncExpr *FE);
   bool semaTupleExpr(TupleExpr *TE);
   Expr *semaSubscriptExpr(SubscriptExpr *SE);

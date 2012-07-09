@@ -233,17 +233,6 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
   /// \brief Try to perform a user-defined conversion.
   CoercedResult tryUserConversion(Expr *E);
 
-  /// \brief Determine whether the given types are the same, deducing
-  /// any deducible arguments along the way.
-  static bool sameType(Type T1, Type T2, CoercionContext &CC) {
-    // FIXME: This is really an approximation of the behavior we want, which
-    // would be to check for identical type structure while potentially
-    // deducing at each step.
-    bool Trivial;
-    return CC.TC.isSubtypeOf(T1, T2, Trivial, &CC) && Trivial &&
-           CC.TC.isSubtypeOf(T2, T1, Trivial, &CC) && Trivial;
-  }
-
 public:
   CoercedResult visitErrorExpr(ErrorExpr *E) {
     return unchanged(E);
@@ -1491,7 +1480,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         // Because we have coerced something in the source tuple, we need to
         // rebuild the type of that tuple.
         RebuildSourceType = true;
-      } else if (ETy && !sameType(ElementTy, DestEltTy, CC)) {
+      } else if (ETy && !TC.isSameType(ElementTy, DestEltTy, &CC)) {
         // FIXME: Allow conversions when we don't have a tuple expression?
         if (Flags & CF_Apply)
           TC.diagnose(E->getLoc(), diag::tuple_element_type_mismatch, SrcField,
@@ -1533,7 +1522,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         // Because we have coerced something in the source tuple, we need to
         // rebuild the type of that tuple.
         RebuildSourceType = true;
-      } else if (ETy && !ElementTy->isEqual(DestEltTy)) {
+      } else if (ETy && !TC.isSameType(ElementTy, DestEltTy, &CC)) {
         // FIXME: Allow conversions when we don't have a tuple expression?
         if (Flags & CF_Apply)
           TC.diagnose(E->getLoc(), diag::tuple_element_type_mismatch, SrcField,
@@ -1756,6 +1745,7 @@ SemaCoerce::coerceObjectArgument(Expr *E, Type ContainerTy, CoercionContext &CC,
 /// Would the source lvalue type be coercible to the dest lvalue type
 /// if it were explicit?
 static bool isSubtypeExceptImplicit(LValueType *SrcTy, LValueType *DestTy) {
+  // FIXME: Use coercion context
   return DestTy->getObjectType()->isEqual(SrcTy->getObjectType())
       && SrcTy->getQualifiers() <= DestTy->getQualifiers();
 }
@@ -1998,7 +1988,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
     if ((Flags & CF_ImplicitLValue) ||
         isa<AddressOfExpr>(E->getSemanticsProvidingExpr())) {
       if (SrcLT &&
-          sameType(DestLT->getObjectType(), SrcLT->getObjectType(), CC)) {
+          TC.isSameType(DestLT->getObjectType(), SrcLT->getObjectType(), &CC)) {
         // Qualification conversion, materi
 
         // FIXME: Bring this assertion back!
@@ -2315,23 +2305,28 @@ Expr *TypeChecker::convertLValueToRValue(LValueType *srcLV, Expr *E) {
 }
 
 namespace {
-  /// \brief Flags that control how subtyping is checked.
-  enum SubTypeFlags {
+  /// \brief Flags that control how type matching is performed.
+  enum TypeMatchingFlags {
+    /// \brief Only allow exact matches.
+    ST_None = 0x00,
+    /// \brief Whether to allow the left-hand type (T1) to be a subtype of
+    /// the right-hand type (T2).
+    ST_AllowSubtype = 0x01,
     /// \brief Whether to allow 'non-trivial' subtyping relationships, e.g.,
     /// ones that change the representation of the object.
-    ST_AllowNonTrivial = 0x01,
+    ST_AllowNonTrivialSubtype = 0x02,
     /// \brief Whether to allow 'non-trivial' subtyping relationships in the
     /// input/result of function types.
-    ST_AllowNonTrivialFunction = 0x02
+    ST_AllowNonTrivialFunctionSubtype = 0x04
   };
 }
 
-/// \brief Helper routine for TypeChecker::isSubtypeOf, that performs the
-/// actual 
-static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
-                        bool &Trivial, CoercionContext *CC) {
-  assert((!(Flags & ST_AllowNonTrivialFunction) ||
-          Flags & ST_AllowNonTrivial) &&
+/// \brief Helper routine for TypeChecker::isSubtypeOf and
+/// TypeChecker::isSameType that performs the actual comparison between types.
+static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
+                       bool &Trivial, CoercionContext *CC) {
+  assert((!(Flags & ST_AllowNonTrivialFunctionSubtype) ||
+          Flags & ST_AllowNonTrivialSubtype) &&
          "Non-trivial function input/result without non-trivial subtyping?");
   
   // If the types are equivalent, we're done.
@@ -2367,7 +2362,7 @@ static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
   // (such as selecting a subset of protocols in an existential type, or
   // selecting a protocol from which the protocol T1 inherits) might actually
   // be considered trivial.
-  if (Flags & ST_AllowNonTrivial) {
+  if (Flags & ST_AllowNonTrivialSubtype) {
     SmallVector<ProtocolDecl *, 4> T2Protos;
     if (T2->isExistentialType(T2Protos)) {
       for (auto Proto2 : T2Protos) {
@@ -2385,14 +2380,18 @@ static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
   if (T1->getCanonicalType()->getKind() !=
       T2->getCanonicalType()->getKind())
     return false;
-  
+
   // An lvalue type is a subtype of another lvalue type if their object types
   // are the same and its qualifiers are a subset of the qualifiers of the
   // other.
   if (auto LV1 = T1->getAs<LValueType>()) {
     auto LV2 = T2->getAs<LValueType>();
-    return LV1->getQualifiers() <= LV2->getQualifiers() &&
-           LV1->getObjectType()->isEqual(LV2->getObjectType());
+
+    return (LV1->getQualifiers() == LV2->getQualifiers() ||
+            (Flags & ST_AllowSubtype &&
+             LV1->getQualifiers() < LV2->getQualifiers())) &&
+           matchTypes(TC, LV1->getObjectType(), LV2->getObjectType(),
+                      ST_None, Trivial, CC);
   }
   
   // Function types allow covariant result types and contravariant argument
@@ -2403,28 +2402,30 @@ static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
     // Compute the flags to be used for the subtyping checks of the input
     // and result types.
     unsigned SubFlags = Flags;
-    if (Flags & ST_AllowNonTrivialFunction)
-      SubFlags = SubFlags & ~ST_AllowNonTrivialFunction;
-    else if (Flags & ST_AllowNonTrivial)
-      SubFlags = SubFlags & ~ST_AllowNonTrivial;
-    
-    // [auto_closure] types are subtypes of the corresponding
-    // non-[auto_closure] types.
-    if (Func2->isAutoClosure() && !Func1->isAutoClosure())
-      return false;
-    
-    // Result type can be covariant, ignoring labels.
-    if (!isSubtypeOf(TC,
+    if (Flags & ST_AllowNonTrivialFunctionSubtype)
+      SubFlags = SubFlags & ~ST_AllowNonTrivialFunctionSubtype;
+    else if (Flags & ST_AllowNonTrivialSubtype)
+      SubFlags = SubFlags & ~ST_AllowNonTrivialSubtype;
+
+    if (Func1->isAutoClosure() != Func2->isAutoClosure()) {
+      // [auto_closure] types are subtypes of the corresponding
+      // non-[auto_closure] types.
+      if (!(Flags & ST_AllowSubtype) || Func2->isAutoClosure())
+        return false;
+    }
+
+    // Result type can be covariant (or equal), ignoring labels.
+    if (!matchTypes(TC,
                      Func1->getResult()->getUnlabeledType(TC.Context),
                      Func2->getResult()->getUnlabeledType(TC.Context),
                      SubFlags, Trivial, CC))
       return false;
     
-    // Input types can be contravariant, ignoring labels.
-    return isSubtypeOf(TC,
-                       Func2->getInput()->getUnlabeledType(TC.Context),
-                       Func1->getInput()->getUnlabeledType(TC.Context),
-                       SubFlags, Trivial, CC);
+    // Input types can be contravariant (or equal), ignoring labels.
+    return matchTypes(TC,
+                      Func2->getInput()->getUnlabeledType(TC.Context),
+                      Func1->getInput()->getUnlabeledType(TC.Context),
+                      SubFlags, Trivial, CC);
   }
   
   // Tuple types. The subtyping relationship for tuples is based on subtyping
@@ -2435,13 +2436,18 @@ static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
     if (Tuple1->getFields().size() != Tuple2->getFields().size())
       return false;
     
-    for (unsigned I = 0, N = Tuple1->getFields().size(); I != N; ++I)
-      if (!isSubtypeOf(TC,
-                       Tuple1->getElementType(I),
-                       Tuple2->getElementType(I),
-                       Flags & ~ST_AllowNonTrivial,
-                       Trivial, CC))
+    for (unsigned I = 0, N = Tuple1->getFields().size(); I != N; ++I) {
+      // Names must match.
+      if (Tuple1->getFields()[I].getName() != Tuple2->getFields()[I].getName())
         return false;
+
+      if (!matchTypes(TC,
+                      Tuple1->getElementType(I),
+                      Tuple2->getElementType(I),
+                      Flags & ~ST_AllowNonTrivialSubtype,
+                      Trivial, CC))
+        return false;
+    }
     
     return true;
   }
@@ -2459,6 +2465,12 @@ static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
 bool TypeChecker::isSubtypeOf(Type T1, Type T2, bool &Trivial,
                               CoercionContext *CC) {
   Trivial = true;
-  unsigned Flags = ST_AllowNonTrivial | ST_AllowNonTrivialFunction;
-  return ::isSubtypeOf(*this, T1, T2, Flags, Trivial, CC);
+  unsigned Flags = ST_AllowSubtype | ST_AllowNonTrivialSubtype
+                 |  ST_AllowNonTrivialFunctionSubtype;
+  return matchTypes(*this, T1, T2, Flags, Trivial, CC);
+}
+
+bool TypeChecker::isSameType(Type T1, Type T2, CoercionContext *CC) {
+  bool Trivial = true;
+  return matchTypes(*this, T1, T2, ST_None, Trivial, CC);
 }
