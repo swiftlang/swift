@@ -666,42 +666,51 @@ namespace {
       } Archetype;
     };
     Kind TheKind;
+    typedef ArrayRef<SpecializeExpr::Substitution> SubTy;
+    SubTy Substitutions;
 
   public:
-    static CalleeSource forIndirect(Expr *fn) {
+    static CalleeSource forIndirect(Expr *fn, SubTy subs) {
       CalleeSource result;
       result.TheKind = Kind::Indirect;
       result.Indirect.Fn = fn;
+      result.Substitutions = subs;
       return result;
     }
 
-    static CalleeSource forDirect(FuncDecl *fn) {
+    static CalleeSource forDirect(FuncDecl *fn, SubTy subs) {
       CalleeSource result;
       result.TheKind = Kind::Direct;
       result.Direct.Fn = fn;
+      result.Substitutions = subs;
       return result;
     }
 
     static CalleeSource forDirectWithSideEffects(FuncDecl *fn,
-                                                 Expr *sideEffects) {
+                                                 Expr *sideEffects,
+                                                 SubTy subs) {
       CalleeSource result;
       result.TheKind = Kind::DirectWithSideEffects;
       result.Direct.Fn = fn;
       result.Direct.SideEffects = sideEffects;
+      result.Substitutions = subs;
       return result;
     }
 
-    static CalleeSource forExistential(ExistentialMemberRefExpr *fn) {
+    static CalleeSource forExistential(ExistentialMemberRefExpr *fn,
+                                       SubTy subs) {
       CalleeSource result;
       result.TheKind = Kind::Existential;
       result.Existential.Fn = fn;
+      result.Substitutions = subs;
       return result;
     }
 
-    static CalleeSource forArchetype(ArchetypeMemberRefExpr *fn) {
+    static CalleeSource forArchetype(ArchetypeMemberRefExpr *fn, SubTy subs) {
       CalleeSource result;
       result.TheKind = Kind::Archetype;
       result.Archetype.Fn = fn;
+      result.Substitutions = subs;
       return result;
     }
 
@@ -753,10 +762,14 @@ namespace {
       llvm_unreachable("bad source kind!");
     }
 
+    SubTy getSubstitutions() { return Substitutions; }
+
     Callee emitCallee(IRGenFunction &IGF,
                       SmallVectorImpl<Arg> &calleeArgs,
                       unsigned maxUncurry = ~0U,
                       ExplosionKind maxExplosion = ExplosionKind::Maximal) {
+      if (!getSubstitutions().empty())
+        llvm_unreachable("substitutions not yet implemented");
       switch (getKind()) {
       case Kind::DirectWithSideEffects:
       case Kind::Direct:
@@ -846,6 +859,7 @@ static void emitCompareBuiltin(llvm::CmpInst::Predicate pred, FuncDecl *Fn,
 
 /// emitBuiltinCall - Emit a call to a builtin function.
 static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
+                            ArrayRef<SpecializeExpr::Substitution> Subs,
                             Expr *Arg, CallResult &result) {
   // Emit the arguments.  Maybe we'll get builtins that are more
   // complex than this.
@@ -919,7 +933,7 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
 
   if (BuiltinName == "load") {
     // The type of the operation is the result type of the load function.
-    Type valueTy = Fn->getType()->castTo<AnyFunctionType>()->getResult();
+    Type valueTy = Subs[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
     
     // Treat the raw pointer as a physical l-value of that type.
@@ -935,8 +949,7 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
   if (BuiltinName == "assign") {
     // The type of the operation is the type of the first argument of
     // the store function.
-    Type valueTy = Fn->getType()->castTo<AnyFunctionType>()->getInput()
-      ->castTo<TupleType>()->getElementType(0);
+    Type valueTy = Subs[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
     
     // Treat the raw pointer as a physical l-value of that type.
@@ -953,8 +966,7 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
   if (BuiltinName == "init") {
     // The type of the operation is the type of the first argument of
     // the store function.
-    Type valueTy = Fn->getType()->castTo<AnyFunctionType>()->getInput()
-      ->castTo<TupleType>()->getElementType(0);
+    Type valueTy = Subs[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
     
     // Treat the raw pointer as a physical l-value of that type.
@@ -967,7 +979,7 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     // Perform the init operation.
     return valueTI.initialize(IGF, args.Values, addr);
   }
-  
+
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }
 
@@ -1012,31 +1024,32 @@ static Expr *uncurry(ApplyExpr *E, SmallVectorImpl<CallSite> &callSites) {
   return fnExpr;
 }
 
-static CalleeSource decomposeFunctionReference(DeclRefExpr *E) {
-  if (FuncDecl *fn = dyn_cast<FuncDecl>(E->getDecl()))
-    return CalleeSource::forDirect(fn);
-  return CalleeSource::forIndirect(E);
-}
-
 /// Try to decompose a function reference into a known function
 /// declaration.
 static CalleeSource decomposeFunctionReference(Expr *E) {
   E = E->getSemanticsProvidingExpr();
-  if (auto declRef = dyn_cast<DeclRefExpr>(E))
-    return decomposeFunctionReference(declRef);
+  ArrayRef<SpecializeExpr::Substitution> substitutions;
+  if (auto specialize = dyn_cast<SpecializeExpr>(E)) {
+    substitutions = specialize->getSubstitutions();
+    E = specialize->getSubExpr();
+  }
+  if (auto declRef = dyn_cast<DeclRefExpr>(E)) {
+    if (FuncDecl *fn = dyn_cast<FuncDecl>(declRef->getDecl()))
+      return CalleeSource::forDirect(fn, substitutions);
+    return CalleeSource::forIndirect(declRef, substitutions);
+  }
   if (auto baseIgnored = dyn_cast<DotSyntaxBaseIgnoredExpr>(E)) {
-    CalleeSource src =
-      decomposeFunctionReference(cast<DeclRefExpr>(baseIgnored->getRHS()));
-    if (src.getKind() != CalleeSource::Kind::Direct)
-      return CalleeSource::forIndirect(E);
-    return CalleeSource::forDirectWithSideEffects(src.getDirectFunction(), E);
+    auto rhs = cast<DeclRefExpr>(baseIgnored->getRHS());
+    if (FuncDecl *fn = dyn_cast<FuncDecl>(rhs->getDecl()))
+      return CalleeSource::forDirectWithSideEffects(fn, E, substitutions);
+    return CalleeSource::forIndirect(E, substitutions);
   }
   if (auto existMember = dyn_cast<ExistentialMemberRefExpr>(E))
-    return CalleeSource::forExistential(existMember);
+    return CalleeSource::forExistential(existMember, substitutions);
   if (auto archMember = dyn_cast<ArchetypeMemberRefExpr>(E))
-    return CalleeSource::forArchetype(archMember);
+    return CalleeSource::forArchetype(archMember, substitutions);
 
-  return CalleeSource::forIndirect(E);
+  return CalleeSource::forIndirect(E, substitutions);
 }
 
 /// Compute the plan for performing a sequence of call expressions.
@@ -1418,7 +1431,8 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
     // Handle calls to builtin functions.  These are never curried, but they
     // might return a function pointer.
     if (isa<BuiltinModule>(knownFn->getDeclContext())) {
-      emitBuiltinCall(IGF, knownFn, CallSites.back().Arg, result);
+      emitBuiltinCall(IGF, knownFn, CalleeSrc.getSubstitutions(),
+                      CallSites.back().Arg, result);
 
       // If there are no trailing calls, we're done.
       if (CallSites.size() == 1) return;

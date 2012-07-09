@@ -210,25 +210,54 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Context, Id, FnTy);
 }
 
-static ValueDecl *getLoadOperation(ASTContext &Context, Identifier Id,
-                                   Type ResultTy) {
-  TupleTypeElt ArgElts[] = {
-    TupleTypeElt(Context.TheRawPointerType, Identifier())
-  };
-  Type Arg = TupleType::get(ArgElts, Context);
-  Type FnTy = FunctionType::get(Arg, ResultTy, Context);
-  return getBuiltinFunction(Context, Id, FnTy);
+static std::tuple<Type, GenericParamList*>
+getGenericParam(ASTContext &Context) {
+  Identifier GenericName = Context.getIdentifier("T");
+  ArchetypeType *Archetype
+    = ArchetypeType::getNew(Context, GenericName.str(),
+                            ArrayRef<Type>(), 0);
+  auto GenericTyDecl =
+      new (Context) TypeAliasDecl(SourceLoc(), GenericName,
+                                  SourceLoc(), Archetype,
+                                  Context.TheBuiltinModule,
+                                  MutableArrayRef<Type>());
+  Type GenericTy = GenericTyDecl->getAliasType();
+  GenericParam Param = GenericTyDecl;
+  auto ParamList = GenericParamList::create(Context, SourceLoc(), Param,
+                                             SourceLoc());
+  return std::make_tuple(GenericTy, ParamList);
 }
 
-static ValueDecl *getStoreOperation(ASTContext &Context, Identifier Id,
-                                    Type ValueTy) {
+static ValueDecl *getLoadOperation(ASTContext &Context, Identifier Id) {
+  Type GenericTy;
+  GenericParamList *ParamList;
+  std::tie(GenericTy, ParamList) = getGenericParam(Context);
+
   TupleTypeElt ArgElts[] = {
-    TupleTypeElt(ValueTy, Identifier()),
     TupleTypeElt(Context.TheRawPointerType, Identifier())
   };
   Type Arg = TupleType::get(ArgElts, Context);
-  Type FnTy = FunctionType::get(Arg, TupleType::getEmpty(Context), Context);
-  return getBuiltinFunction(Context, Id, FnTy);
+  Type FnTy = PolymorphicFunctionType::get(Arg, GenericTy, ParamList, Context);
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, SourceLoc(),
+                                ParamList, FnTy, /*init*/ nullptr,
+                                Context.TheBuiltinModule);
+}
+
+static ValueDecl *getStoreOperation(ASTContext &Context, Identifier Id) {
+  Type GenericTy;
+  GenericParamList *ParamList;
+  std::tie(GenericTy, ParamList) = getGenericParam(Context);
+
+  TupleTypeElt ArgElts[] = {
+    TupleTypeElt(GenericTy, Identifier()),
+    TupleTypeElt(Context.TheRawPointerType, Identifier())
+  };
+  Type Arg = TupleType::get(ArgElts, Context);
+  Type FnTy = PolymorphicFunctionType::get(Arg, TupleType::getEmpty(Context),
+                                           ParamList, Context);
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, SourceLoc(),
+                                ParamList, FnTy, /*init*/ nullptr,
+                                Context.TheBuiltinModule);
 }
 
 /// An array of the overloaded builtin kinds.
@@ -410,13 +439,13 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
     return getCastOperation(Context, Id, BV, Types);
       
   case BuiltinValueKind::Load:
-    if (Types.size() != 1) return nullptr;
-    return getLoadOperation(Context, Id, Types[0]);
+    if (!Types.empty()) return nullptr;
+    return getLoadOperation(Context, Id);
 
   case BuiltinValueKind::Assign:
   case BuiltinValueKind::Init:
-    if (Types.size() != 1) return nullptr;
-    return getStoreOperation(Context, Id, Types[0]);
+    if (!Types.empty()) return nullptr;
+    return getStoreOperation(Context, Id);
   }
   llvm_unreachable("bad builtin value!");
 }

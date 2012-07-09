@@ -1159,7 +1159,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
   }
 
   // Handle polymorphic function types.
-  if (auto PolyFn = E->getArg()->getType()->getAs<PolymorphicFunctionType>()) {
+  if (auto PolyFn = E->getFn()->getType()->getAs<PolymorphicFunctionType>()) {
     if (OverloadCandidate Ovl = TC.checkPolymorphicApply(PolyFn, false,
                                                          E->getArg(), DestTy)) {
       if (!(Flags & CF_Apply)) {
@@ -1175,10 +1175,10 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
         Substitutions[Index].Conformance
           = TC.Context.AllocateCopy(Conformances[S.first]);
       }
-      Expr *Arg = new (TC.Context) SpecializeExpr(E->getArg(), Ovl.getType(),
+      Expr *Fn = new (TC.Context) SpecializeExpr(E->getFn(), Ovl.getType(),
                                      TC.Context.AllocateCopy(Substitutions));
-      E->setFn(Arg);
-      return coerceToType(E, DestTy, CC, Flags);
+      E->setFn(Fn);
+      return coerceToType(TC.semaApplyExpr(E), DestTy, CC, Flags);
     }
   }
 

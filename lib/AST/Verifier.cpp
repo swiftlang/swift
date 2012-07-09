@@ -400,12 +400,15 @@ namespace {
     }
 
     void verifyChecked(CoerceExpr *E) {
-      DeclRefExpr *LHS = dyn_cast_or_null<DeclRefExpr>(E->getLHS());
-      if (!LHS) {
+      Expr *LHS = E->getLHS()->getSemanticsProvidingExpr();
+      while (auto DSBIE = dyn_cast<DotSyntaxBaseIgnoredExpr>(LHS))
+        LHS = DSBIE->getRHS();
+      DeclRefExpr *LHSDRE = dyn_cast_or_null<DeclRefExpr>(LHS);
+      if (!LHSDRE) {
         Out << "CoerceExpr LHS must be a DeclRefExpr\n";
         abort();
       }
-      TypeDecl *TD = dyn_cast_or_null<TypeDecl>(LHS->getDecl());
+      TypeDecl *TD = dyn_cast_or_null<TypeDecl>(LHSDRE->getDecl());
       if (!TD) {
         Out << "CoerceExpr LHS must refer to a TypeDecl\n";
         abort();
