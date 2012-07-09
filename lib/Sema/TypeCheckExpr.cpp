@@ -892,7 +892,8 @@ public:
   }
 
   Expr *visitNewArrayExpr(NewArrayExpr *E) {
-    if (TC.validateType(E->getElementType(), /*isFirstPass*/false)) {
+    if (TC.validateType(E->getElementType(), E->getLoc(),
+                        /*isFirstPass*/false)) {
       E->setElementType(ErrorType::get(TC.Context));
       return nullptr;
     }
@@ -972,7 +973,7 @@ public:
   }
 
   Expr *visitNewReferenceExpr(NewReferenceExpr *E) {
-    if (TC.validateType(E->getType(), /*isFirstPass*/false)) {
+    if (TC.validateType(E->getType(), E->getLoc(), /*isFirstPass*/false)) {
       E->setType(ErrorType::get(TC.Context));
       return nullptr;
     }
@@ -1108,7 +1109,7 @@ public:
     // modularly, so we don't need to recurse into them and reanalyze their
     // body.  This prevents N^2 re-sema activity with lots of nested closures.
     if (FuncExpr *FE = dyn_cast<FuncExpr>(E)) {
-      if (TC.validateType(FE->getType(), /*isFirstPass*/false))
+      if (TC.validateType(FE->getType(), E->getLoc(), /*isFirstPass*/false))
         FE->setType(ErrorType::get(TC.Context));
       return false;
     }

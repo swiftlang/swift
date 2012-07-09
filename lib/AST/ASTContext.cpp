@@ -186,7 +186,7 @@ BoundGenericType::BoundGenericType(NominalTypeDecl *TheDecl,
                                    ArrayRef<Type> GenericArgs,
                                    ASTContext *C)
   : TypeBase(TypeKind::BoundGeneric, C, /*Unresolved=*/false),
-    TheDecl(TheDecl), GenericArgs(GenericArgs) 
+    TheDecl(TheDecl), GenericArgs(GenericArgs), AllConformances(nullptr)
 {
   // Determine whether this type is unresolved.
   for (Type Arg : GenericArgs) {

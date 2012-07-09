@@ -47,7 +47,7 @@ public:
   void checkInherited(Decl *D, MutableArrayRef<Type> Inherited) {
     // Check the list of inherited protocols.
     for (unsigned i = 0, e = Inherited.size(); i != e; ++i) {
-      if (TC.validateType(Inherited[i], IsFirstPass)) {
+      if (TC.validateType(Inherited[i], D->getLoc(), IsFirstPass)) {
         Inherited[i] = ErrorType::get(TC.Context);
         continue;
       }
@@ -183,7 +183,7 @@ public:
       Type DestTy;
       if (PBD->getPattern()->hasType()) {
         DestTy = PBD->getPattern()->getType();
-        if (TC.validateType(DestTy, IsFirstPass)) {
+        if (TC.validateType(DestTy, PBD->getLoc(), IsFirstPass)) {
           DestTy = ErrorType::get(TC.Context);
           PBD->getPattern()->overwriteType(DestTy);
         }
@@ -223,7 +223,7 @@ public:
     if (!SD->getDeclContext()->isTypeContext())
       TC.diagnose(SD->getStartLoc(), diag::subscript_not_member);
 
-    if (TC.validateType(SD->getElementType(), IsFirstPass))
+    if (TC.validateType(SD->getElementType(), SD->getLoc(), IsFirstPass))
       SD->overwriteElementType(ErrorType::get(TC.Context));
 
     if (!TC.typeCheckPattern(SD->getIndices(), IsFirstPass))  {
@@ -234,7 +234,7 @@ public:
   
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     if (!IsSecondPass) {
-      TC.validateType(TAD->getAliasType(), IsFirstPass);
+      TC.validateType(TAD->getAliasType(), TAD->getLoc(), IsFirstPass);
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         checkInherited(TAD, TAD->getInherited());
     }
@@ -384,7 +384,7 @@ public:
 
   void visitExtensionDecl(ExtensionDecl *ED) {
     if (!IsSecondPass) {
-      if (TC.validateType(ED->getExtendedType(), IsFirstPass)) {
+      if (TC.validateType(ED->getExtendedType(), ED->getLoc(), IsFirstPass)) {
         ED->setExtendedType(ErrorType::get(TC.Context));
       } else {
         Type ExtendedTy = ED->getExtendedType();

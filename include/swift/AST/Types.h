@@ -44,6 +44,7 @@ namespace swift {
   class ProtocolDecl;
   class ValueDecl;
   class Module;
+  class ProtocolConformance;
   
   enum class TypeKind {
 #define TYPE(id, parent) id,
@@ -588,6 +589,14 @@ class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
   NominalTypeDecl *TheDecl;
   ArrayRef<Type> GenericArgs;
 
+  struct AllConformancesType {
+    ArrayRef<unsigned> Offsets;
+    ArrayRef<ProtocolConformance *> Conformances;
+  };
+
+  // FIXME: Eliminate this storage for non-canonical types?
+  AllConformancesType *AllConformances;
+
 private:
   BoundGenericType(NominalTypeDecl *TheDecl, ArrayRef<Type> GenericArgs,
                    ASTContext *C);
@@ -600,6 +609,22 @@ public:
   NominalTypeDecl *getDecl() const { return TheDecl; }
 
   ArrayRef<Type> getGenericArgs() const { return GenericArgs; }
+
+  /// hasConformanceInformation - Determine whether this bound generic type
+  /// has protocol-conformance information.
+  bool hasConformanceInformation();
+
+  /// getConformances - Retrieve the set of conformances for the argument at
+  /// the given index.
+  ///
+  /// FIXME: This interface won't be sufficient for the conformances of
+  /// associated types.
+  ArrayRef<ProtocolConformance *> getConformances(unsigned Index);
+
+  /// \brief Set the protocol-conformance information for this bound generic
+  /// type.
+  void setConformances(ArrayRef<unsigned> Offsets,
+                       ArrayRef<ProtocolConformance *> Conformances);
 
   void print(raw_ostream &O) const;
 

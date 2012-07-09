@@ -290,7 +290,7 @@ public:
                                  Type lenTy, SourceLoc Loc);
 
   bool validateType(ValueDecl *VD, bool isFirstPass);
-  bool validateType(Type T, bool isFirstPass);
+  bool validateType(Type T, SourceLoc Loc, bool isFirstPass);
 
   Type substType(Type T, TypeSubstitutionMap &Substitutions);
 

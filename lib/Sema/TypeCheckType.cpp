@@ -63,7 +63,7 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
 /// validateType - Recursively check to see if the type of a decl is valid.  If
 /// not, diagnose the problem and collapse it to an ErrorType.
 bool TypeChecker::validateType(ValueDecl *VD, bool isFirstPass) {
-  if (!validateType(VD->getType(), isFirstPass)) return false;
+  if (!validateType(VD->getType(), VD->getLoc(), isFirstPass)) return false;
   
   VD->overwriteType(ErrorType::get(Context));
   return true;
@@ -74,7 +74,7 @@ bool TypeChecker::validateType(ValueDecl *VD, bool isFirstPass) {
 /// expressions are valid and that they have the appropriate conversions etc.
 ///
 /// This returns true if the type is invalid.
-bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
+bool TypeChecker::validateType(Type InTy, SourceLoc Loc, bool isFirstPass) {
   assert(InTy && "Cannot validate null types!");
 
   TypeBase *T = InTy.getPointer();
@@ -113,7 +113,7 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
   case TypeKind::NameAlias: {
     TypeAliasDecl *D = cast<NameAliasType>(T)->getDecl();
     IsInvalid = !D->hasUnderlyingType() ||
-                validateType(D->getUnderlyingType(), isFirstPass);
+                validateType(D->getUnderlyingType(), Loc, isFirstPass);
     if (IsInvalid)
       D->overwriteUnderlyingType(ErrorType::get(Context));
     break;
@@ -121,7 +121,7 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
   case TypeKind::Identifier: {
     IdentifierType *DNT = cast<IdentifierType>(T);
     if (DNT->Components.back().Value.is<Type>()) {
-      IsInvalid = validateType(DNT->getMappedType(), isFirstPass);
+      IsInvalid = validateType(DNT->getMappedType(), Loc, isFirstPass);
       break;
     }
     MutableArrayRef<IdentifierType::Component> Components = DNT->Components;
@@ -220,7 +220,7 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
           Ty = TD->getDeclaredType();
         }
         if (Ty) {
-          if (validateType(Ty, isFirstPass))
+          if (validateType(Ty, Loc, isFirstPass))
             return true;
           if (BaseTy)
             Ty = substMemberTypeWithBase(Ty, BaseTy);
@@ -245,7 +245,8 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
     break;
   }
   case TypeKind::Paren:
-    return validateType(cast<ParenType>(T)->getUnderlyingType(), isFirstPass);
+    return validateType(cast<ParenType>(T)->getUnderlyingType(), Loc,
+                        isFirstPass);
   case TypeKind::Tuple: {
     TupleType *TT = cast<TupleType>(T);
     
@@ -255,7 +256,7 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
       // The element has *at least* a type or an initializer, so we start by
       // verifying each individually.
       Type EltTy = TT->getFields()[i].getType();
-      if (EltTy && validateType(EltTy, isFirstPass)) {
+      if (EltTy && validateType(EltTy, Loc, isFirstPass)) {
         IsInvalid = true;
         break;
       }
@@ -312,27 +313,28 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
 
   case TypeKind::LValue:
     // FIXME: diagnose non-materializability of object type!
-    IsInvalid = validateType(cast<LValueType>(T)->getObjectType(), isFirstPass);
+    IsInvalid = validateType(cast<LValueType>(T)->getObjectType(), Loc,
+                             isFirstPass);
     break;
       
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction: {
     AnyFunctionType *FT = cast<AnyFunctionType>(T);
-    IsInvalid = validateType(FT->getInput(), isFirstPass) ||
-                validateType(FT->getResult(), isFirstPass);
+    IsInvalid = validateType(FT->getInput(), Loc, isFirstPass) ||
+                validateType(FT->getResult(), Loc, isFirstPass);
     // FIXME: diagnose non-materializability of result type!
     break;
   }
   case TypeKind::Array: {
     ArrayType *AT = cast<ArrayType>(T);
-    IsInvalid = validateType(AT->getBaseType(), isFirstPass);
+    IsInvalid = validateType(AT->getBaseType(), Loc, isFirstPass);
     // FIXME: diagnose non-materializability of element type!
     // FIXME: We need to check AT->Size! (It also has to be convertible to int).
     break;
   }
   case TypeKind::ArraySlice: {
     ArraySliceType *AT = cast<ArraySliceType>(T);
-    IsInvalid = validateType(AT->getBaseType(), isFirstPass);
+    IsInvalid = validateType(AT->getBaseType(), Loc, isFirstPass);
     // FIXME: diagnose non-materializability of element type?
     if (!IsInvalid)
       IsInvalid = buildArraySliceType(*this, AT);
@@ -342,7 +344,7 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
   case TypeKind::ProtocolComposition: {
     ProtocolCompositionType *PC = cast<ProtocolCompositionType>(T);
     for (auto Proto : PC->getProtocols()) {
-      if (validateType(Proto, isFirstPass))
+      if (validateType(Proto, Loc, isFirstPass))
         IsInvalid = true;
       else if (!Proto->isExistentialType()) {
         // FIXME: Terrible source-location information.
@@ -356,17 +358,46 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
 
   case TypeKind::MetaType: {
     MetaTypeType *Meta = cast<MetaTypeType>(T);
-    IsInvalid = validateType(Meta->getInstanceType(), isFirstPass);
+    IsInvalid = validateType(Meta->getInstanceType(), Loc,
+                             isFirstPass);
     break;
   }
 
   case TypeKind::BoundGeneric: {
-    // FIXME: Add protocol conformance checking.
     BoundGenericType *BGT = cast<BoundGenericType>(T);
+    unsigned Index = 0;
     for (Type Arg : BGT->getGenericArgs()) {
-      if (validateType(Arg, isFirstPass)) {
+      if (validateType(Arg, Loc, isFirstPass)) {
         IsInvalid = true;
         break;
+      }
+    }
+
+    // Check protocol conformance.
+    if (!isFirstPass && !IsInvalid && !BGT->hasConformanceInformation()) {
+      SmallVector<ProtocolConformance *, 4> Conformances;
+      SmallVector<unsigned, 4> Offsets;
+      for (Type Arg : BGT->getGenericArgs()) {
+        Offsets.push_back(Conformances.size());
+        
+        auto GP = BGT->getDecl()->getGenericParams()->getParams()[Index++];
+        auto Archetype = GP.getAsTypeParam()->getDeclaredType()
+                           ->getAs<ArchetypeType>();
+        for (auto Proto : Archetype->getConformsTo()) {
+          ProtocolConformance *Conformance;
+          if (conformsToProtocol(Arg, Proto, &Conformance)) {
+            Conformances.push_back(Conformance);
+          } else {
+            // FIXME: Wretched location information
+            diagnose(Loc, diag::invalid_implicit_protocol_conformance,
+                     Arg, Proto->getDeclaredType());
+            IsInvalid = true;
+          }
+        }
+      }
+
+      if (!IsInvalid) {
+        BGT->setConformances(Offsets, Conformances);
       }
     }
     break;
