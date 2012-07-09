@@ -350,9 +350,9 @@ public:
     SourceLoc Loc = Ovl.getExpr()->getLoc();
     SmallVector<ValueDecl *, 4> Viable;
     if (OverloadCandidate Best
-        = TC.filterOverloadSetForValue(Ovl.getCandidates(), Loc,
-                                       Ovl.getBaseType(), DestTy,
-                                       Viable, &CC)) {
+          = TC.filterOverloadSetForValue(Ovl.getCandidates(), Loc,
+                                         Ovl.getBaseType(), DestTy,
+                                         Viable, &CC)) {
 
       // We can only perform this coercion in a context where we can
       // implicitly treat the expression as an lvalue.
@@ -1927,10 +1927,27 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
     return coerced(PE, Flags);
   }
 
-  // If our expression has polymorphic function type, treat it as overloaded.
-  if (E->getType()->is<PolymorphicFunctionType>()) {
-    if (OverloadedExpr Ovl = TC.getOverloadedExpr(E)) {
-      return SemaCoerce(CC, DestTy, Flags).visitOverloadedExpr(Ovl);
+  // If our expression has polymorphic function type, perform deduction for it.
+  if (auto polyFn = E->getType()->getAs<PolymorphicFunctionType>()) {
+    if (OverloadCandidate Cand = TC.checkPolymorphicUse(polyFn, DestTy,
+                                                        E->getLoc(), &CC)) {
+      if (!(Flags & CF_Apply)) {
+        return Cand.getType();
+      }
+
+      SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
+      Substitutions.resize(Cand.getSubstitutions().size());
+      auto &Conformances = Cand.getConformances();
+      for (auto S : Cand.getSubstitutions()) {
+        unsigned Index = S.first->getPrimaryIndex();
+        Substitutions[Index].Replacement = S.second;
+        Substitutions[Index].Conformance
+          = TC.Context.AllocateCopy(Conformances[S.first]);
+      }
+      Expr *Result
+        = new (TC.Context) SpecializeExpr(E, Cand.getType(),
+                                        TC.Context.AllocateCopy(Substitutions));
+      return coerced(Result, Flags);
     }
   }
 

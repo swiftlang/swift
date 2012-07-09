@@ -105,6 +105,9 @@ public:
   /// \brief Retrieve the declaration 
   ValueDecl *getDecl() const { return DeclAndComplete.getPointer(); }
 
+  /// \brief Set the declaration.
+  void setDecl(ValueDecl *D) { DeclAndComplete.setPointer(D); }
+
   /// \brief Retrieve the type of a reference to this overload candidate,
   /// after substitution.
   Type getType() const { return Ty; }
@@ -424,6 +427,12 @@ public:
                                           bool Assignment,
                                           Expr *Arg,
                                           Type DestTy);
+
+  /// checkPolymorphicUse - Check the use of a polymorphic function in the
+  /// context of the given destination type.
+  OverloadCandidate checkPolymorphicUse(PolymorphicFunctionType *PolyFn,
+                                        Type DestTy, SourceLoc Loc,
+                                        CoercionContext *CC);
 
   /// filterOverloadSet - Filter a set of overload candidates based on the
   /// the given argument type (for a call) or result type (if the context 

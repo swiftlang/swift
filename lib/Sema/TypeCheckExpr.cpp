@@ -559,29 +559,30 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     return 0;
   }
 
-  if (auto PolyFn = E1->getType()->getAs<PolymorphicFunctionType>()) {
-    OverloadCandidate Ovl = checkPolymorphicApply(PolyFn, false, E2, Type());
-    if (Ovl.isComplete()) {
-      SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
-      Substitutions.resize(Ovl.getSubstitutions().size());
-      auto &Conformances = Ovl.getConformances();
-      for (auto S : Ovl.getSubstitutions()) {
-        unsigned Index = S.first->getPrimaryIndex();
-        Substitutions[Index].Replacement = S.second;
-        Substitutions[Index].Conformance
-        = Context.AllocateCopy(Conformances[S.first]);
-      }
-      E1 = new (Context) SpecializeExpr(E1, Ovl.getType(),
-                                        Context.AllocateCopy(Substitutions));
-      E->setFn(E1);
-      return semaApplyExpr(E);
-    }
-  }
-
   // Otherwise, we must have an application to overloaded set.  See if we can
   // resolve which overload member is based on the argument type.
   OverloadedExpr Ovl = getOverloadedExpr(E1);
   if (!Ovl) {
+    // For polymorphic functions, we'll attempt to deduce the generic arguments.
+    if (auto PolyFn = E1->getType()->getAs<PolymorphicFunctionType>()) {
+      if (OverloadCandidate Ovl = checkPolymorphicApply(PolyFn, false, E2,
+                                                        Type())) {
+        SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
+        Substitutions.resize(Ovl.getSubstitutions().size());
+        auto &Conformances = Ovl.getConformances();
+        for (auto S : Ovl.getSubstitutions()) {
+          unsigned Index = S.first->getPrimaryIndex();
+          Substitutions[Index].Replacement = S.second;
+          Substitutions[Index].Conformance
+            = Context.AllocateCopy(Conformances[S.first]);
+        }
+        E1 = new (Context) SpecializeExpr(E1, Ovl.getType(),
+                                          Context.AllocateCopy(Substitutions));
+        E->setFn(E1);
+        return semaApplyExpr(E);
+      }
+    }
+
     // If not, just use the unresolved type.
     E->setType(UnstructuredUnresolvedType::get(Context));
     return E;
