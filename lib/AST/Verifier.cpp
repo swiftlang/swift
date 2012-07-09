@@ -418,6 +418,49 @@ namespace {
       }
     }
 
+    void verifyChecked(SpecializeExpr *E) {
+      Type SubType = E->getSubExpr()->getType()->getRValueType();
+      GenericParamList *GenericParams = nullptr;
+      if (auto PolyFn = SubType->getAs<PolymorphicFunctionType>()) {
+        GenericParams = &PolyFn->getGenericParams();
+      } else if (auto Meta = SubType->getAs<MetaTypeType>()) {
+        if (auto Unbound = Meta->getInstanceType()->getAs<UnboundGenericType>())
+          GenericParams = Unbound->getDecl()->getGenericParams();
+
+        // FIXME: SpecializeExpr on unbound generic types is currently wrong
+        return;
+      }
+      
+      if (!GenericParams) {
+        Out << "Non-polymorphic expression specialized\n";
+        abort();
+      }
+
+      // Verify that the protocol conformances line up with the archetypes.
+      unsigned Index = 0;
+      for (auto GP : *GenericParams) {
+        auto Archetype = GP.getAsTypeParam()->getDeclaredType()
+                           ->getAs<ArchetypeType>();
+        const auto &Subst = E->getSubstitutions()[Index++];
+        if (Subst.Conformance.size() != Archetype->getConformsTo().size()) {
+          Out << "Wrong number of protocol conformances for archetype\n";
+          abort();
+        }
+
+        for (unsigned I = 0, N = Subst.Conformance.size(); I != N; ++I) {
+          const auto &Conformance = Subst.Conformance[I];
+          if (Conformance->Mapping.empty())
+            continue;
+
+          if (Conformance->Mapping.begin()->first->getDeclContext() !=
+                Archetype->getConformsTo()[I]) {
+            Out << "Protocol conformance doesn't match up with archetype "
+                   "requirement\n";
+            abort();
+          }
+        }
+      }
+    }
 
     void verifyParsed(NewArrayExpr *E) {
       if (E->getBounds().empty()) {
