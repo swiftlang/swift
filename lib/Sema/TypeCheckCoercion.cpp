@@ -1169,6 +1169,30 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
     return CoercionResult::Failed;
   }
 
+  // Handle polymorphic function types.
+  if (auto PolyFn = E->getArg()->getType()->getAs<PolymorphicFunctionType>()) {
+    if (OverloadCandidate Ovl = TC.checkPolymorphicApply(PolyFn, false,
+                                                         E->getArg(), DestTy)) {
+      if (!(Flags & CF_Apply)) {
+        return DestTy;
+      }
+
+      SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
+      Substitutions.resize(Ovl.getSubstitutions().size());
+      auto &Conformances = Ovl.getConformances();
+      for (auto S : Ovl.getSubstitutions()) {
+        unsigned Index = S.first->getPrimaryIndex();
+        Substitutions[Index].Replacement = S.second;
+        Substitutions[Index].Conformance
+          = TC.Context.AllocateCopy(Conformances[S.first]);
+      }
+      Expr *Arg = new (TC.Context) SpecializeExpr(E->getArg(), Ovl.getType(),
+                                     TC.Context.AllocateCopy(Substitutions));
+      E->setFn(Arg);
+      return coerceToType(E, DestTy, CC, Flags);
+    }
+  }
+
   Type FnTy = FunctionType::get(E->getArg()->getType(), DestTy, TC.Context);
   
   if (auto CoRes = SemaCoerce::coerceToType(E->getFn(), FnTy, CC,
