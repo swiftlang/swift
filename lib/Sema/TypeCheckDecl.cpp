@@ -278,7 +278,8 @@ public:
             TupleElts.push_back(TupleTypeElt(VarD->getType(),
                                              VarD->getName()));
       TupleType *TT = TupleType::get(TupleElts, TC.Context);
-      Type CreateTy = FunctionType::get(TT, SD->getDeclaredType(), TC.Context);
+      Type CreateTy = FunctionType::get(TT, SD->getDeclaredTypeInContext(),
+                                        TC.Context);
       cast<OneOfElementDecl>(SD->getMembers().back())->setType(CreateTy);
       cast<OneOfElementDecl>(SD->getMembers().back())->setArgumentType(TT);
     }
@@ -375,16 +376,7 @@ public:
     if (!OOD)
       return;
 
-    Type ElemTy = OOD->getDeclaredType();
-    if (UnboundGenericType *UGT = ElemTy->getAs<UnboundGenericType>()) {
-      // If we have an unbound generic type, bind the type to the archetypes
-      // in the type's definition.
-      NominalTypeDecl *D = UGT->getDecl();
-      SmallVector<Type, 4> GenericArgs;
-      for (auto Param : *D->getGenericParams())
-        GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
-      ElemTy = BoundGenericType::get(D, GenericArgs);
-    }
+    Type ElemTy = OOD->getDeclaredTypeInContext();
 
     // If we have a simple element, just set the type.
     if (ED->getArgumentType().isNull()) {

@@ -206,14 +206,18 @@ Type TypeDecl::getDeclaredType() const {
   return cast<NominalTypeDecl>(this)->getDeclaredType();
 }
 
-Type NominalTypeDecl::getGenericTypeWithArgs(ArrayRef<Type> Args) {
-  if (!GenericParams)
-    return Type();
-
-  if (GenericParams->size() != Args.size())
-    return Type();
-
-  return BoundGenericType::get(this, Args);
+Type NominalTypeDecl::getDeclaredTypeInContext() {
+  Type Ty = getDeclaredType();
+  if (UnboundGenericType *UGT = Ty->getAs<UnboundGenericType>()) {
+    // If we have an unbound generic type, bind the type to the archetypes
+    // in the type's definition.
+    NominalTypeDecl *D = UGT->getDecl();
+    SmallVector<Type, 4> GenericArgs;
+    for (auto Param : *D->getGenericParams())
+      GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
+    Ty = BoundGenericType::get(D, GenericArgs);
+  }
+  return Ty;
 }
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,

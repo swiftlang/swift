@@ -261,11 +261,14 @@ void MemberLookup::lookupMembers(Type BaseType, Module &M,
 }
 
 ConstructorLookup::ConstructorLookup(Type BaseType, Module &M) {
-  NominalType *NT = BaseType->getAs<NominalType>();
-  if (!NT)
+  NominalTypeDecl *D;
+  if (NominalType *NT = BaseType->getAs<NominalType>())
+    D = NT->getDecl();
+  else if (BoundGenericType *BGT = BaseType->getAs<BoundGenericType>())
+    D = BGT->getDecl();
+  else
     return;
 
-  NominalTypeDecl *D = NT->getDecl();
   SmallVector<ValueDecl*, 16> BaseMembers;
   if (StructDecl *SD = dyn_cast<StructDecl>(D)) {
     for (Decl* Member : SD->getMembers()) {

@@ -213,8 +213,13 @@ bool TypeChecker::validateType(Type InTy, SourceLoc Loc, bool isFirstPass) {
       if (TD) {
         Type Ty;
         if (!C.GenericArgs.empty()) {
-          if (auto NTD = dyn_cast<NominalTypeDecl>(TD))
-            Ty = NTD->getGenericTypeWithArgs(C.GenericArgs);
+          if (auto NTD = dyn_cast<NominalTypeDecl>(TD)) {
+            if (auto Params = NTD->getGenericParams()) {
+              if (Params->size() == C.GenericArgs.size())
+                Ty = BoundGenericType::get(NTD, C.GenericArgs);
+            }
+          }
+
           // FIXME: Diagnostic if applying the arguments fails?
         } else {
           Ty = TD->getDeclaredType();

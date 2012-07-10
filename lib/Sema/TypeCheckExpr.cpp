@@ -390,6 +390,17 @@ static bool isDirectTypeReference(Expr *E) {
   return false;
 }
 
+bool isConstructibleType(Type Ty) {
+  if (Ty->is<StructType>() || Ty->is<OneOfType>())
+    return true;
+
+  if (auto BGT = Ty->getAs<BoundGenericType>())
+    if (isa<StructDecl>(BGT->getDecl()) || isa<OneOfDecl>(BGT->getDecl()))
+      return true;
+
+  return false;
+}
+
 Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   Expr *E1 = E->getFn();
   Expr *E2 = E->getArg();
@@ -489,7 +500,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // we first try to cast, then try to construct an object.
     bool IsCast = true;
     // FIXME: Should this check for coercions to any nominal type?
-    if (Ty->is<StructType>() || Ty->is<OneOfType>())
+    if (isConstructibleType(Ty))
       IsCast = isCoercibleToType(E2, Ty) != CoercionResult::Failed;
     if (IsCast) {
       CoercedExpr CoercedArg = coerceToType(E2, Ty);
@@ -537,7 +548,12 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
         return new (Context) ConstructExpr(Ty, E1->getStartLoc(), CD, E2);
       }
       if (Best) {
-        E1 = buildRefExpr(Ctors.Results, E1->getStartLoc());
+        E1 = buildMemberRefExpr(E1, SourceLoc(), Ctors.Results,
+                                E1->getStartLoc());
+        if (E1)
+          E1 = recheckTypes(E1);
+        if (!E1)
+          return nullptr;
         E->setFn(E1);
         return semaApplyExpr(E);
       }    
