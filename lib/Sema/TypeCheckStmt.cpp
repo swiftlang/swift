@@ -536,6 +536,9 @@ static unsigned getNumArgs(ValueDecl *value) {
 }
 
 static bool matchesDeclRefKind(ValueDecl *value, DeclRefKind refKind) {
+  if (value->getType()->is<ErrorType>())
+    return true;
+
   switch (refKind) {
   // An ordinary reference doesn't ignore anything.
   case DeclRefKind::Ordinary:
