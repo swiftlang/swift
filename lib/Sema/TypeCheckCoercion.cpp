@@ -2482,6 +2482,13 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
     
     return false;
   }
+
+  // Metatypes.
+  if (auto Meta1 = T1->getAs<MetaTypeType>()) {
+    auto Meta2 = T2->castTo<MetaTypeType>();
+    return matchTypes(TC, Meta1->getInstanceType(), Meta2->getInstanceType(),
+                      ST_None, Trivial, CC);
+  }
   return false;  
 }
 

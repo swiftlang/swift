@@ -126,4 +126,18 @@ BUILTIN_ASSIGN(Assign, "assign")
 BUILTIN_INIT(Init, "init")
 #undef BUILTIN_INIT
 
+/// Sizeof has type (metatype<T>) -> Int64
+#ifndef BUILTIN_SIZEOF
+#define BUILTIN_SIZEOF(Id, Name) BUILTIN(Id, Name)
+#endif
+BUILTIN_SIZEOF(Sizeof, "sizeof")
+#undef BUILTIN_SIZEOF
+
+/// Alignof has type (metatype<T>) -> Int64
+#ifndef BUILTIN_ALIGNOF
+#define BUILTIN_ALIGNOF(Id, Name) BUILTIN(Id, Name)
+#endif
+BUILTIN_ALIGNOF(Alignof, "alignof")
+#undef BUILTIN_ALIGNOF
+
 #undef BUILTIN

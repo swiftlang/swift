@@ -260,6 +260,23 @@ static ValueDecl *getStoreOperation(ASTContext &Context, Identifier Id) {
                                 Context.TheBuiltinModule);
 }
 
+static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context, Identifier Id) {
+  Type GenericTy;
+  GenericParamList *ParamList;
+  std::tie(GenericTy, ParamList) = getGenericParam(Context);
+
+  TupleTypeElt ArgElts[] = {
+    TupleTypeElt(MetaTypeType::get(GenericTy, Context), Identifier()),
+  };
+  Type Arg = TupleType::get(ArgElts, Context);
+  // FIXME: Size of a pointer here?
+  Type FnTy = PolymorphicFunctionType::get(Arg,
+                                           BuiltinIntegerType::get(64, Context),
+                                           ParamList, Context);
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, SourceLoc(),
+                                ParamList, FnTy, /*init*/ nullptr,
+                                Context.TheBuiltinModule);
+}
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -273,6 +290,8 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 #define BUILTIN_LOAD(id, name) OverloadedBuiltinKind::Special,
 #define BUILTIN_ASSIGN(id, name) OverloadedBuiltinKind::Special,
 #define BUILTIN_INIT(id, name) OverloadedBuiltinKind::Special,
+#define BUILTIN_SIZEOF(id, name) OverloadedBuiltinKind::Special,
+#define BUILTIN_ALIGNOF(id, name) OverloadedBuiltinKind::Special,
 #include "swift/AST/Builtins.def"
 };
 
@@ -446,6 +465,10 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::Init:
     if (!Types.empty()) return nullptr;
     return getStoreOperation(Context, Id);
+
+  case BuiltinValueKind::Sizeof:
+  case BuiltinValueKind::Alignof:
+    return getSizeOrAlignOfOperation(Context, Id);
   }
   llvm_unreachable("bad builtin value!");
 }

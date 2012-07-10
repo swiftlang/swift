@@ -980,6 +980,21 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     return valueTI.initialize(IGF, args.Values, addr);
   }
 
+  if (BuiltinName == "sizeof") {
+    Type valueTy = Subs[0].Replacement;
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    result.setAsSingleDirectUnmanagedFragileValue(valueTI.getSizeOnly(IGF));
+    return;
+  }
+
+  if (BuiltinName == "alignof") {
+    Type valueTy = Subs[0].Replacement;
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    result.setAsSingleDirectUnmanagedFragileValue(
+                                                 valueTI.getAlignmentOnly(IGF));
+    return;
+  }
+
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }
 
