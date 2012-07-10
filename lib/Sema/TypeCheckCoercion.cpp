@@ -1742,14 +1742,6 @@ SemaCoerce::coerceObjectArgument(Expr *E, Type ContainerTy, CoercionContext &CC,
   return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Flags);
 }
 
-/// Would the source lvalue type be coercible to the dest lvalue type
-/// if it were explicit?
-static bool isSubtypeExceptImplicit(LValueType *SrcTy, LValueType *DestTy) {
-  // FIXME: Use coercion context
-  return DestTy->getObjectType()->isEqual(SrcTy->getObjectType())
-      && SrcTy->getQualifiers() <= DestTy->getQualifiers();
-}
-
 namespace {
   class FindCapturedVars : public ASTWalker {
     llvm::SetVector<ValueDecl*> &Captures;
@@ -1985,37 +1977,35 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
       }
     }
 
-    if ((Flags & CF_ImplicitLValue) ||
-        isa<AddressOfExpr>(E->getSemanticsProvidingExpr())) {
-      if (SrcLT &&
-          TC.isSameType(DestLT->getObjectType(), SrcLT->getObjectType(), &CC)) {
-        // Both references with the same object type (after deduction).
-        if (!(Flags & CF_Apply)) {
-          // Check qualification.
-          if (SrcLT->getQualifiers() <= DestLT->getQualifiers())
-            return DestTy;
+    if (SrcLT &&
+        TC.isSameType(DestLT->getObjectType(), SrcLT->getObjectType(), &CC)) {
+      bool AddressAllowed = (Flags & CF_ImplicitLValue)
+                         || isa<AddressOfExpr>(E->getSemanticsProvidingExpr());
+      bool QualifiersOkay = SrcLT->getQualifiers() <= DestLT->getQualifiers();
+      
+      // Both references with the same object type (after deduction).
+      if (!(Flags & CF_Apply)) {
+        return QualifiersOkay && AddressAllowed? CoercedResult(DestTy)
+                                               : CoercedResult(nullptr);
+      }
+
+      if (QualifiersOkay) {
+        // If we weren't actually allowed to make this binding, complain
+        // (build build the ASTs anyway).
+        if (!AddressAllowed) {
+          TC.diagnose(E->getLoc(), diag::implicit_use_of_lvalue,
+                      SrcLT->getObjectType())
+            << E->getSourceRange();
         }
 
-        // Check qualification.
         if (SrcLT->getQualifiers() < DestLT->getQualifiers())
           return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Flags);
-        else if (SrcLT->getQualifiers() == DestLT->getQualifiers())
+        else
           return unchanged(E, Flags);
       }
     }
     
     // Failure.
-
-    // Use a special diagnostic if the coercion would have worked
-    // except we needed an explicit marker.
-    // FIXME: pass in coercion context.
-    if (SrcLT && isSubtypeExceptImplicit(SrcLT, DestLT)) {
-      if (Flags & CF_Apply)
-        TC.diagnose(E->getLoc(), diag::implicit_use_of_lvalue,
-                    SrcLT->getObjectType())
-          << E->getSourceRange();
-      return nullptr;
-    }
 
     // Use a special diagnostic for mismatched l-values.
     if (SrcLT) {
