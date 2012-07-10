@@ -1989,19 +1989,14 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
         isa<AddressOfExpr>(E->getSemanticsProvidingExpr())) {
       if (SrcLT &&
           TC.isSameType(DestLT->getObjectType(), SrcLT->getObjectType(), &CC)) {
-        // Qualification conversion, materi
-
-        // FIXME: Bring this assertion back!
-        //        assert(SrcLT->getQualifiers() < DestLT->getQualifiers() &&
-        //       "qualifiers match exactly but types are different?");
+        // Both references with the same object type (after deduction).
         if (!(Flags & CF_Apply)) {
-          // FIXME: Shouldn't need to check qualification here.
+          // Check qualification.
           if (SrcLT->getQualifiers() <= DestLT->getQualifiers())
             return DestTy;
         }
 
-        // FIXME: The second 'if' shouldn't be needed, because the 'isEqual'
-        // at the top should handle it via sameType.
+        // Check qualification.
         if (SrcLT->getQualifiers() < DestLT->getQualifiers())
           return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Flags);
         else if (SrcLT->getQualifiers() == DestLT->getQualifiers())
@@ -2059,7 +2054,13 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
     if (TupleType *ETy = E->getType()->getAs<TupleType>())
       return convertTupleToTupleType(E, ETy->getFields().size(), TT, CC, Flags);
   }
-  
+
+  // Try to match up the types, deducing any generic arguments along the way.
+  // We do this now, rather than in the earlier isEqual type check, because
+  // lvalues and tuple types need to be decomposed first.
+  if (TC.isSameType(E->getType(), DestTy, &CC))
+    return unchanged(E, Flags);
+
   // If the input expression has an unresolved type, try to coerce it to an
   // appropriate type.
   if (E->getType()->isUnresolvedType())
@@ -2444,7 +2445,7 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
   // Tuple types. The subtyping relationship for tuples is based on subtyping
   // of the elements, ignoring field names and default arguments.
   if (auto Tuple1 = T1->getAs<TupleType>()) {
-    auto Tuple2 = T2->getAs<TupleType>();
+    auto Tuple2 = T2->castTo<TupleType>();
     
     if (Tuple1->getFields().size() != Tuple2->getFields().size())
       return false;
@@ -2470,7 +2471,27 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
     
     return true;
   }
-  
+
+  // Bound generic types.
+  if (auto Bound1 = T1->getAs<BoundGenericType>()) {
+    auto Bound2 = T2->castTo<BoundGenericType>();
+    if (Bound1->getDecl() == Bound2->getDecl() &&
+        Bound1->getGenericArgs().size() == Bound2->getGenericArgs().size()) {
+      auto Args1 = Bound1->getGenericArgs();
+      auto Args2 = Bound2->getGenericArgs();
+
+      // Match up each of the argument types.
+      // FIXME: Should we ignore labels here?
+      for (unsigned I = 0, N = Args1.size(); I != N; ++I) {
+        if (!matchTypes(TC, Args1[I], Args2[I], ST_None, Trivial, CC))
+          return false;
+      }
+
+      return true;
+    }
+    
+    return false;
+  }
   return false;  
 }
 
