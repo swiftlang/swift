@@ -2309,15 +2309,17 @@ namespace {
   enum TypeMatchingFlags {
     /// \brief Only allow exact matches.
     ST_None = 0x00,
+    /// \brief Whether we are comparing the unlabeled types or not.
+    ST_Unlabeled = 0x01,
     /// \brief Whether to allow the left-hand type (T1) to be a subtype of
     /// the right-hand type (T2).
-    ST_AllowSubtype = 0x01,
+    ST_AllowSubtype = 0x02,
     /// \brief Whether to allow 'non-trivial' subtyping relationships, e.g.,
     /// ones that change the representation of the object.
-    ST_AllowNonTrivialSubtype = 0x02,
+    ST_AllowNonTrivialSubtype = 0x04,
     /// \brief Whether to allow 'non-trivial' subtyping relationships in the
     /// input/result of function types.
-    ST_AllowNonTrivialFunctionSubtype = 0x04
+    ST_AllowNonTrivialFunctionSubtype = 0x08
   };
 }
 
@@ -2378,8 +2380,19 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
   
   // From here on, we require the types to have equivalent kind.
   if (T1->getCanonicalType()->getKind() !=
-      T2->getCanonicalType()->getKind())
+      T2->getCanonicalType()->getKind()) {
+    if (Flags & ST_Unlabeled) {
+      // If removing the labels changes anything, try again with the unlabeled
+      // types.
+      Type UnlabeledT1 = T1->getUnlabeledType(TC.Context);
+      Type UnlabeledT2 = T2->getUnlabeledType(TC.Context);
+      if (UnlabeledT1.getPointer() != T1.getPointer() ||
+          UnlabeledT2.getPointer() != T2.getPointer())
+        return matchTypes(TC, UnlabeledT1, UnlabeledT2, Flags, Trivial, CC);
+    }
+
     return false;
+  }
 
   // An lvalue type is a subtype of another lvalue type if their object types
   // are the same and its qualifiers are a subset of the qualifiers of the
@@ -2416,15 +2429,15 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
 
     // Result type can be covariant (or equal), ignoring labels.
     if (!matchTypes(TC,
-                     Func1->getResult()->getUnlabeledType(TC.Context),
-                     Func2->getResult()->getUnlabeledType(TC.Context),
+                     Func1->getResult(),
+                     Func2->getResult(),
                      SubFlags, Trivial, CC))
       return false;
     
     // Input types can be contravariant (or equal), ignoring labels.
     return matchTypes(TC,
-                      Func2->getInput()->getUnlabeledType(TC.Context),
-                      Func1->getInput()->getUnlabeledType(TC.Context),
+                      Func2->getInput(),
+                      Func1->getInput(),
                       SubFlags, Trivial, CC);
   }
   
@@ -2437,14 +2450,20 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
       return false;
     
     for (unsigned I = 0, N = Tuple1->getFields().size(); I != N; ++I) {
-      // Names must match.
-      if (Tuple1->getFields()[I].getName() != Tuple2->getFields()[I].getName())
+      // Unless we're ignoring labels, names must match.
+      const auto &Field1 = Tuple1->getFields()[I];
+      const auto &Field2 = Tuple2->getFields()[I];
+      if (!(Flags & ST_Unlabeled) && Field1.getName() != Field2.getName())
         return false;
 
+      // Varargs must match.
+      if (Field1.isVararg() != Field2.isVararg())
+        return false;
+      
       if (!matchTypes(TC,
                       Tuple1->getElementType(I),
                       Tuple2->getElementType(I),
-                      Flags & ~ST_AllowNonTrivialSubtype,
+                      Flags,
                       Trivial, CC))
         return false;
     }
@@ -2465,12 +2484,16 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
 bool TypeChecker::isSubtypeOf(Type T1, Type T2, bool &Trivial,
                               CoercionContext *CC) {
   Trivial = true;
-  unsigned Flags = ST_AllowSubtype | ST_AllowNonTrivialSubtype
+  unsigned Flags = ST_Unlabeled | ST_AllowSubtype | ST_AllowNonTrivialSubtype
                  |  ST_AllowNonTrivialFunctionSubtype;
   return matchTypes(*this, T1, T2, Flags, Trivial, CC);
 }
 
-bool TypeChecker::isSameType(Type T1, Type T2, CoercionContext *CC) {
+bool TypeChecker::isSameType(Type T1, Type T2, CoercionContext *CC,
+                             bool Labeled) {
   bool Trivial = true;
-  return matchTypes(*this, T1, T2, ST_None, Trivial, CC);
+  unsigned Flags = ST_None;
+  if (!Labeled)
+    Flags |= ST_Unlabeled;
+  return matchTypes(*this, T1, T2, Flags, Trivial, CC);
 }
