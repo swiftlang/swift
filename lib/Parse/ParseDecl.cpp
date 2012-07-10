@@ -1325,19 +1325,12 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   llvm::SmallDenseMap<Identifier, OneOfElementDecl*, 16> SeenSoFar;
   SmallVector<Decl *, 16> MemberDecls;
 
-  Type AliasTy = OOD->getDeclaredType();
-
   for (const OneOfElementInfo &Elt : ElementInfos) {
     Identifier NameI = Context.getIdentifier(Elt.Name);
 
-    Type EltTy = AliasTy;
-    if (Type ArgTy = Elt.EltType)
-      EltTy = FunctionType::get(ArgTy, EltTy, Context);
-
     // Create a decl for each element, giving each a temporary type.
     OneOfElementDecl *OOED = new (Context) OneOfElementDecl(Elt.NameLoc, NameI,
-                                                            EltTy, Elt.EltType,
-                                                            OOD);
+                                                            Elt.EltType, OOD);
 
     // If this was multiply defined, reject it.
     auto insertRes = SeenSoFar.insert(std::make_pair(NameI, OOED));
@@ -1432,7 +1425,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   // constructor.
   Identifier ConstructID = Context.getIdentifier("constructor");
   MemberDecls.push_back(new (Context) OneOfElementDecl(StructLoc, ConstructID,
-                                                       Type(), Type(), SD));
+                                                       Type(), SD));
 
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::oneof_attributes);

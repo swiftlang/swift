@@ -369,10 +369,33 @@ public:
     if (IsSecondPass)
       return;
 
-    // Ignore element decls that carry no type.
-    if (ED->getArgumentType().isNull()) return;
-      
-    // Validate the function type.
+    // Ignore OneOfElementDecls in structs.
+    // FIXME: Remove once the struct hack is fixed.
+    OneOfDecl *OOD = dyn_cast<OneOfDecl>(ED->getDeclContext());
+    if (!OOD)
+      return;
+
+    Type ElemTy = OOD->getDeclaredType();
+    if (UnboundGenericType *UGT = ElemTy->getAs<UnboundGenericType>()) {
+      // If we have an unbound generic type, bind the type to the archetypes
+      // in the type's definition.
+      NominalTypeDecl *D = UGT->getDecl();
+      SmallVector<Type, 4> GenericArgs;
+      for (auto Param : *D->getGenericParams())
+        GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
+      ElemTy = BoundGenericType::get(D, GenericArgs);
+    }
+
+    // If we have a simple element, just set the type.
+    if (ED->getArgumentType().isNull()) {
+      ED->setType(ElemTy);
+      return;
+    }
+
+    // We have an element with a type; compute a function type.
+    ED->setType(FunctionType::get(ED->getArgumentType(), ElemTy, TC.Context));
+
+    // Validate the type.
     if (TC.validateType(ED, IsFirstPass)) return;
 
     // Require the carried type to be materializable.

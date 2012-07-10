@@ -877,9 +877,9 @@ class OneOfElementDecl : public ValueDecl {
   Type ArgumentType;
     
 public:
-  OneOfElementDecl(SourceLoc IdentifierLoc, Identifier Name, Type Ty,
+  OneOfElementDecl(SourceLoc IdentifierLoc, Identifier Name,
                    Type ArgumentType, DeclContext *DC)
-  : ValueDecl(DeclKind::OneOfElement, DC, Name, Ty),
+  : ValueDecl(DeclKind::OneOfElement, DC, Name, Type()),
     IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType) {}
 
   Type getArgumentType() const { return ArgumentType; }
