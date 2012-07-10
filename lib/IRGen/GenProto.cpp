@@ -659,7 +659,30 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr) const {
       emitDestroyCall(IGF, getWitnessTable(IGF), addr.getAddress());
-    }    
+    }
+
+    virtual std::pair<llvm::Value*,llvm::Value*>
+    getSizeAndAlignment(IRGenFunction &IGF) const {
+      // Call the size an alignment witness.
+      llvm::Value *witnessTable = getWitnessTable(IGF);
+      llvm::Value *fn = loadValueWitness(IGF, witnessTable,
+                                         ValueWitness::SizeAndAlignment);
+      llvm::CallInst *call = IGF.Builder.CreateCall(fn, witnessTable);
+      call->setCallingConv(IGF.IGM.RuntimeCC);
+      call->setDoesNotThrow();
+
+      // Extract the size and alignment.
+      unsigned int Array[2] = { 0, 1 };
+      llvm::Value *size
+        = IGF.Builder.CreateExtractValue(call,
+                                         ArrayRef<unsigned int>(Array, 1),
+                                         "size");
+      llvm::Value *align
+        = IGF.Builder.CreateExtractValue(call,
+                                         ArrayRef<unsigned int>(Array + 1, 1),
+                                         "align");
+      return std::make_pair(size, align);
+    }
   };
 
   /// Ways in which an object can fit into a fixed-size buffer.

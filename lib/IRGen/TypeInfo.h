@@ -106,7 +106,7 @@ public:
   llvm::Type *getStorageType() const { return StorageType; }
 
   /// Return the size and alignment of this type.
-  std::pair<llvm::Value*,llvm::Value*>
+  virtual std::pair<llvm::Value*,llvm::Value*>
     getSizeAndAlignment(IRGenFunction &IGF) const;
   llvm::Value *getSizeOnly(IRGenFunction &IGF) const;
   llvm::Value *getAlignmentOnly(IRGenFunction &IGF) const;
