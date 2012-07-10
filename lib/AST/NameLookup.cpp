@@ -234,6 +234,7 @@ void MemberLookup::lookupMembers(Type BaseType, Module &M,
   ArrayRef<ValueDecl*> BaseMembers;
   SmallVector<ValueDecl*, 2> BaseMembersStorage;
   if (BoundGenericType *BGT = BaseType->getAs<BoundGenericType>()) {
+    BaseType = BGT->getDecl()->getDeclaredType();
     D = BGT->getDecl();
   } else if (UnboundGenericType *UGT = BaseType->getAs<UnboundGenericType>()) {
     D = UGT->getDecl();
@@ -467,6 +468,8 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       ExtendedType = ED->getExtendedType();
       if (NominalType *NT = ExtendedType->getAs<NominalType>())
         BaseDecl = NT->getDecl();
+      else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
+        BaseDecl = UGT->getDecl();
     } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(DC)) {
       ExtendedType = ND->getDeclaredType();
       BaseDecl = ND;

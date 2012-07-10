@@ -404,7 +404,8 @@ public:
       } else {
         Type ExtendedTy = ED->getExtendedType();
         if (!ExtendedTy->is<OneOfType>() && !ExtendedTy->is<StructType>() &&
-            !ExtendedTy->is<ClassType>() && !ExtendedTy->is<ErrorType>()) {
+            !ExtendedTy->is<ClassType>() && !ExtendedTy->is<ErrorType>() &&
+            !ExtendedTy->is<UnboundGenericType>()) {
           TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
                       ExtendedTy->is<ProtocolType>(), ExtendedTy);
           // FIXME: It would be nice to point out where we found the named type
