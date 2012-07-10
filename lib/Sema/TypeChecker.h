@@ -316,6 +316,7 @@ public:
   Expr *semaSubscriptExpr(SubscriptExpr *SE);
   Expr *semaSubscriptExpr(ExistentialSubscriptExpr *SE);
   Expr *semaSubscriptExpr(ArchetypeSubscriptExpr *SE);
+  Expr *semaSubscriptExpr(GenericSubscriptExpr *SE);
   Expr *semaApplyExpr(ApplyExpr *E);
   Expr *semaUnresolvedDotExpr(UnresolvedDotExpr *E);
   void typeCheckIgnoredExpr(Expr *E);

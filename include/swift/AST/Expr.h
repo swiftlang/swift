@@ -816,7 +816,7 @@ public:
                          SourceLoc RBracketLoc, SubscriptDecl *D);
   
   /// getBase - Retrieve the base of the subscript expression, i.e., the
-  /// value being indexed. This value has existential type.
+  /// value being indexed. This value has archetype type.
   Expr *getBase() const { return Base; }
   void setBase(Expr *E) { Base = E; }
   
@@ -843,7 +843,49 @@ public:
     return E->getKind() == ExprKind::ArchetypeSubscript;
   }
 };
+
+/// GenericSubscriptExpr - Subscripting expressions like a[i] that refer to
+/// an element within a container, where the container is a generic type.
+class GenericSubscriptExpr : public Expr {
+  SubscriptDecl *D;
+  SourceRange Brackets;
+  Expr *Base;
+  Expr *Index;
   
+public:
+  GenericSubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
+                       SourceLoc RBracketLoc, SubscriptDecl *D);
+  
+  /// getBase - Retrieve the base of the subscript expression, i.e., the
+  /// value being indexed. This value has generic type.
+  Expr *getBase() const { return Base; }
+  void setBase(Expr *E) { Base = E; }
+  
+  /// getIndex - Retrieve the index of the subscript expression, i.e., the
+  /// "offset" into the base value.
+  Expr *getIndex() const { return Index; }
+  void setIndex(Expr *E) { Index = E; }
+  
+  /// getDecl - Retrieve the subscript declaration that this subscripting
+  /// operation refers to. 
+  SubscriptDecl *getDecl() const { return D; }
+  void setDecl(SubscriptDecl *D) { this->D = D; }
+  
+  SourceLoc getLBracketLoc() const { return Brackets.Start; }
+  SourceLoc getRBracketLoc() const { return Brackets.End; }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(Base->getStartLoc(), Brackets.End);
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const GenericSubscriptExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::GenericSubscript;
+  }
+};
+
+
 /// OverloadedSubscriptExpr - Subscripting expressions like a[i] that refer to
 /// an element within a container, for which overload resolution has found
 /// multiple potential subscript declarations that may apply.

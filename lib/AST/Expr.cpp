@@ -254,6 +254,15 @@ ArchetypeSubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
          "use SubscriptExpr for non-archetype type subscript");
 }
 
+GenericSubscriptExpr::
+GenericSubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
+                     SourceLoc RBracketLoc, SubscriptDecl *D)
+  : Expr(ExprKind::GenericSubscript, D? D->getElementType() : Type()),
+    D(D), Brackets(LBracketLoc, RBracketLoc), Base(Base), Index(Index) {
+  assert(Base->getType()->getRValueType()->is<BoundGenericType>() &&
+         "use SubscriptExpr for non-generic type subscript");
+}
+
 Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
                                               ArrayRef<ValueDecl*> Decls,
                                               SourceLoc LBracketLoc,
@@ -273,6 +282,11 @@ Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
       return new (C) ArchetypeSubscriptExpr(Base, LBracketLoc, Index,
                                             RBracketLoc,
                                             cast<SubscriptDecl>(Decls[0]));
+
+    if (ContainerTy->is<BoundGenericType>())
+      return new (C) GenericSubscriptExpr(Base, LBracketLoc, Index,
+                                          RBracketLoc,
+                                          cast<SubscriptDecl>(Decls[0]));
 
     return new (C) SubscriptExpr(Base, LBracketLoc, Index, RBracketLoc,
                                  cast<SubscriptDecl>(Decls[0]));
@@ -499,6 +513,14 @@ public:
   }
   void visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
     printCommon(E, "archetype_subscript_expr");
+    OS << '\n';
+    printRec(E->getBase());
+    OS << '\n';
+    printRec(E->getIndex());
+    OS << ')';
+  }
+  void visitGenericSubscriptExpr(GenericSubscriptExpr *E) {
+    printCommon(E, "generic_subscript_expr");
     OS << '\n';
     printRec(E->getBase());
     OS << '\n';

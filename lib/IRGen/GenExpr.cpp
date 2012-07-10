@@ -228,10 +228,17 @@ namespace {
 
     void visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
       IGF.unimplemented(E->getLBracketLoc(), "existential subscripts");
+      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
     }
 
     void visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
       IGF.unimplemented(E->getLBracketLoc(), "archetype subscripts");
+      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
+    }
+
+    void visitGenericSubscriptExpr(GenericSubscriptExpr *E) {
+      IGF.unimplemented(E->getLBracketLoc(), "generic subscripts");
+      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
     }
 
     void visitTupleShuffleExpr(TupleShuffleExpr *E) {
@@ -478,6 +485,11 @@ namespace {
       return LValue();
     }
 
+    LValue visitGenericSubscriptExpr(GenericSubscriptExpr *E) {
+      IGF.unimplemented(E->getLBracketLoc(), "generic subscripts");
+      return LValue();
+    }
+
     LValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
       IGF.unimplemented(E->getLoc(), "archetype member reference");
       return LValue();
@@ -614,6 +626,7 @@ namespace {
     NON_LOCATEABLE(SubscriptExpr);
     NON_LOCATEABLE(ExistentialSubscriptExpr)
     NON_LOCATEABLE(ArchetypeSubscriptExpr)
+    NON_LOCATEABLE(GenericSubscriptExpr)
 #undef NON_LOCATEABLE
   };
 }

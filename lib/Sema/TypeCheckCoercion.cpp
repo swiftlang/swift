@@ -275,6 +275,9 @@ public:
   CoercedResult visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
     return unchanged(E);
   }
+  CoercedResult visitGenericSubscriptExpr(GenericSubscriptExpr *E) {
+    return unchanged(E);
+  }
   CoercedResult visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) {
     Type BaseTy = E->getBase()->getType()->getRValueType();
 
