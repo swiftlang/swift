@@ -1230,12 +1230,23 @@ Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
     implTypeDecl = cast<NameAliasType>(implType)->getDecl();
   else if (NominalType *Nominal = dyn_cast<NominalType>(implType))
     implTypeDecl = Nominal->getDecl();
+  else if (auto BGT = dyn_cast<BoundGenericType>(implType))
+    implTypeDecl = BGT->getDecl();
   else
     llvm_unreachable("Non-nominal slice type");
   
   Expr *sliceTypeRef =
     recheckTypes(new (Context) DeclRefExpr(implTypeDecl, Loc));
   if (!sliceTypeRef) return nullptr;
+
+  if (auto BGT = implType->getAs<BoundGenericType>()) {
+    // FIXME: This is an ugly hack.
+    SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
+    for (auto Param : BGT->getGenericArgs())
+      Substitutions.push_back({ Param, nullptr });
+    sliceTypeRef = new (Context) SpecializeExpr(sliceTypeRef, implType,
+                                    Context.AllocateCopy(Substitutions));
+  }
 
   // Build the expression "Slice<T>.convertFromHeapArray".
   Expr *injectionFn = semaUnresolvedDotExpr(

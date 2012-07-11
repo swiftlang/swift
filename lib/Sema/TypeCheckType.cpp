@@ -26,11 +26,25 @@ using namespace swift;
 /// implementation type, find its canonicalization.
 static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy) {
   Type baseTy = sliceTy->getBaseType();
-
   SourceLoc loc = sliceTy->getFirstRefLoc();
 
-  // As our current hack for array slices, require the base type to be
-  // a nominal type X, then look for a type SliceX.
+  // Hack for array slices: first, try to look up Slice<T>.
+  UnqualifiedLookup genericSliceLookup(TC.Context.getIdentifier("Slice"),
+                                       &TC.TU);
+  if (TypeDecl *sliceTypeDecl = genericSliceLookup.getSingleTypeResult()) {
+    if (auto sliceTypeNTD = dyn_cast<NominalTypeDecl>(sliceTypeDecl)) {
+      if (auto Params = sliceTypeNTD->getGenericParams()) {
+        if (Params->size() == 1) {
+          Type implTy = BoundGenericType::get(sliceTypeNTD, baseTy);
+          sliceTy->setImplementationType(implTy);
+          return false;
+        }
+      }
+    }
+  }
+
+  // As a fallback until IRGen for generic types works, try looking for
+  // SliceX, where the base type is the nominal type X.
   Identifier name;
   if (NominalType *Nominal = baseTy->getAs<NominalType>()) {
     name = Nominal->getDecl()->getName();
