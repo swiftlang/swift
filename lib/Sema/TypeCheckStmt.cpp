@@ -309,6 +309,7 @@ public:
           } else {
             RangeTy = cast<TypeDecl>(Value)->getDeclaredType();
           }
+          RangeTy = TC.substMemberTypeWithBase(RangeTy, ContainerType);
         } else if (Name.equals("getElements") && isa<FuncDecl>(Value)) {
           if (Conformance)
             getElementsFn = cast<FuncDecl>(Conformance->Mapping[Value]);
@@ -367,6 +368,7 @@ public:
         } else {
           ElementTy = cast<TypeDecl>(Value)->getDeclaredType();
         }
+        ElementTy = TC.substMemberTypeWithBase(ElementTy, RangeTy);
       } else if (Name.equals("isEmpty") && isa<FuncDecl>(Value)) {
         if (Conformance)
           isEmptyFn = cast<FuncDecl>(Conformance->Mapping[Value]);
