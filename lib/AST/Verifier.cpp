@@ -452,7 +452,7 @@ namespace {
 
         for (unsigned I = 0, N = Subst.Conformance.size(); I != N; ++I) {
           const auto &Conformance = Subst.Conformance[I];
-          if (Conformance->Mapping.empty())
+          if (!Conformance || Conformance->Mapping.empty())
             continue;
 
           if (Conformance->Mapping.begin()->first->getDeclContext() !=
