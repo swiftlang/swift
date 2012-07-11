@@ -337,6 +337,7 @@ namespace {
       const TypeInfo &type = IGF.getFragileTypeInfo(var->getType());
       Address addr = I.emitVariable(IGF, var, type);
       type.initialize(IGF, Values, addr);
+      I.markInitialized(IGF, I.getObjectForDecl(var));
     }
   };
 
