@@ -43,6 +43,7 @@ namespace swift {
   class ClassDecl;
   class ConstructorDecl;
   class Decl;
+  class DestructorDecl;
   class ExtensionDecl;
   class FuncDecl;
   class OneOfElementDecl;
@@ -186,6 +187,7 @@ public:
   void emitStaticMethod(FuncDecl *D);
   void emitInstanceMethod(FuncDecl *D);
   void emitConstructor(ConstructorDecl *D);
+  void emitDestructor(DestructorDecl *D);
 
   llvm::FunctionType *getFunctionType(Type fnType, ExplosionKind kind,
                                       unsigned uncurryLevel, bool withData);

@@ -157,6 +157,7 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
     case DeclKind::TopLevelCode:
     case DeclKind::Protocol:
     case DeclKind::Extension:
+    case DeclKind::Destructor:
       llvm_unreachable("decl not allowed in struct!");
 
     // We can have meaningful initializers for variables, but

@@ -260,7 +260,7 @@ public:
                           SmallVectorImpl<Decl *> &Decls);
 
   ConstructorDecl *parseDeclConstructor();
-
+  DestructorDecl *parseDeclDestructor();
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

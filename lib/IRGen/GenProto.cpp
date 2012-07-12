@@ -473,6 +473,7 @@ namespace {
       case DeclKind::Protocol:
       case DeclKind::OneOfElement:
       case DeclKind::Constructor:
+      case DeclKind::Destructor:
         llvm_unreachable("declaration not legal as a protocol member");
 
       case DeclKind::Func:

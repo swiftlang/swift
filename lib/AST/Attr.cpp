@@ -58,6 +58,7 @@ Resilience ValueDecl::getResilienceFrom(Component *C) const {
     // Local declarations are always inherently fragile.
     case DeclContextKind::CapturingExpr:
     case DeclContextKind::ConstructorDecl:
+    case DeclContextKind::DestructorDecl:
     case DeclContextKind::TopLevelCodeDecl:
       return Resilience::InherentlyFragile;
 

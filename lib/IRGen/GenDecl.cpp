@@ -315,6 +315,9 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
   case DeclKind::Constructor:
     llvm_unreachable("there are no global constructor");
 
+  case DeclKind::Destructor:
+    llvm_unreachable("there are no global destructor");
+
   case DeclKind::TypeAlias:
     return;
 
@@ -511,6 +514,7 @@ static AbstractCC addOwnerArgument(ASTContext &ctx, ValueDecl *value,
   case DeclContextKind::CapturingExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::ConstructorDecl:
+  case DeclContextKind::DestructorDecl:
     return AbstractCC::Freestanding;
 
   case DeclContextKind::ExtensionDecl:
@@ -614,6 +618,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     case DeclKind::TopLevelCode:
     case DeclKind::Protocol:
     case DeclKind::Extension:
+    case DeclKind::Destructor:
       llvm_unreachable("decl not allowed in extension!");
 
     // PatternBindingDecls don't really make sense here, but we
@@ -669,6 +674,7 @@ void IRGenFunction::emitLocal(Decl *D) {
   case DeclKind::Extension:
   case DeclKind::OneOfElement:
   case DeclKind::Constructor:
+  case DeclKind::Destructor:
     llvm_unreachable("declaration cannot appear in local scope");
 
   case DeclKind::OneOf:

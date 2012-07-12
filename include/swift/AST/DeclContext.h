@@ -56,6 +56,7 @@ enum class DeclContextKind {
   ExtensionDecl,
   TopLevelCodeDecl,
   ConstructorDecl,
+  DestructorDecl,
   
   First_Module = TranslationUnit, Last_Module = BuiltinModule,
 };
@@ -86,7 +87,8 @@ public:
   bool isLocalContext() const {
     return getContextKind() == DeclContextKind::CapturingExpr ||
            getContextKind() == DeclContextKind::TopLevelCodeDecl ||
-           getContextKind() == DeclContextKind::ConstructorDecl;
+           getContextKind() == DeclContextKind::ConstructorDecl ||
+           getContextKind() == DeclContextKind::DestructorDecl;
   }
   
   /// isModuleContext - Return true if this is a subclass of Module.

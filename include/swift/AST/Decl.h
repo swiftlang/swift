@@ -1021,6 +1021,50 @@ public:
   static bool classof(const ConstructorDecl *D) { return true; }
 };
 
+/// DestructorDecl - Declares a destructor for a type.  For example:
+///
+/// \code
+/// struct X {
+///   var fd : Int
+///   destructor {
+///      close(fd)
+///   }
+/// }
+/// \endcode
+class DestructorDecl : public ValueDecl, public DeclContext {
+  SourceLoc DestructorLoc;
+  BraceStmt *Body;
+  VarDecl *ImplicitThisDecl;
+  
+public:
+  DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
+                  VarDecl *ImplicitThisDecl, DeclContext *Parent)
+    : ValueDecl(DeclKind::Destructor, Parent, NameHack, Type()),
+      DeclContext(DeclContextKind::DestructorDecl, Parent),
+      DestructorLoc(DestructorLoc), Body(nullptr),
+      ImplicitThisDecl(ImplicitThisDecl) {}
+  
+  SourceLoc getStartLoc() const { return DestructorLoc; }
+  SourceLoc getLoc() const { return DestructorLoc; }
+
+  BraceStmt *getBody() const { return Body; }
+  void setBody(BraceStmt *b) { Body = b; }
+
+  /// computeThisType - compute and return the type of 'this'.
+  Type computeThisType() const;
+
+  /// getImplicitThisDecl - This method returns the implicit 'this' decl.
+  VarDecl *getImplicitThisDecl() const { return ImplicitThisDecl; }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Destructor;
+  }
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::DestructorDecl;
+  }
+  static bool classof(const DestructorDecl *D) { return true; }
+};
+
 inline void GenericParam::setDeclContext(DeclContext *DC) {
   TypeParam->setDeclContext(DC);
 }

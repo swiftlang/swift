@@ -40,6 +40,7 @@ enum class tok {
   // Decl and type keywords.
   KEYWORD(class)
   KEYWORD(constructor)
+  KEYWORD(destructor)
   KEYWORD(extension)
   KEYWORD(func)
   KEYWORD(import)

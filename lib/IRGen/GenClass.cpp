@@ -136,6 +136,10 @@ void swift::irgen::emitNewReferenceExpr(IRGenFunction &IGF,
   Out.add(IGF.enterReleaseCleanup(castVal));
 }
 
+void IRGenModule::emitDestructor(DestructorDecl *DD) {
+  // FIXME: Implement me!
+}
+
 /// emitStructType - Emit all the declarations associated with this oneof type.
 void IRGenModule::emitClassDecl(ClassDecl *D) {
   // FIXME: This is mostly copy-paste from emitExtension;
@@ -187,6 +191,10 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
     }
     case DeclKind::Constructor: {
       emitConstructor(cast<ConstructorDecl>(member));
+      continue;
+    }
+    case DeclKind::Destructor: {
+      emitDestructor(cast<DestructorDecl>(member));
       continue;
     }
     }

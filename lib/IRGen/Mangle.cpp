@@ -193,6 +193,10 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     mangleDeclName(cast<ConstructorDecl>(ctx), IncludeType::Yes);
     return;
 
+  case DeclContextKind::DestructorDecl:
+    mangleDeclName(cast<DestructorDecl>(ctx), IncludeType::No);
+    return;
+
   case DeclContextKind::TopLevelCodeDecl:
     // FIXME: I'm not sure this is correct.
     return;

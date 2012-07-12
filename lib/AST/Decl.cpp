@@ -38,6 +38,7 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::TranslationUnit:
   case DeclContextKind::ConstructorDecl:
+  case DeclContextKind::DestructorDecl:
     return Type();
     
   case DeclContextKind::ExtensionDecl:
@@ -156,6 +157,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::Subscript:
   case DeclKind::TopLevelCode:
   case DeclKind::Constructor:
+  case DeclKind::Destructor:
     llvm_unreachable("non-value decls shouldn't get here");
       
   case DeclKind::Func:
@@ -377,6 +379,7 @@ Type FuncDecl::getExtensionType() const {
   case DeclContextKind::CapturingExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::ConstructorDecl:
+  case DeclContextKind::DestructorDecl:
     return Type();
 
   case DeclContextKind::NominalTypeDecl:
@@ -468,9 +471,19 @@ SourceLoc ConstructorDecl::getLoc() const {
 Type ConstructorDecl::computeThisType() const {
   Type ContainerType = getDeclContext()->getDeclaredTypeOfContext();
 
+  if (UnboundGenericType *UGT = ContainerType->getAs<UnboundGenericType>()) {
+    // If we have an unbound generic type, bind the type to the archetypes
+    // in the type's definition.
+    NominalTypeDecl *D = UGT->getDecl();
+    SmallVector<Type, 4> GenericArgs;
+    for (auto Param : *D->getGenericParams())
+      GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
+    ContainerType = BoundGenericType::get(D, GenericArgs);
+  }
+
   if (ContainerType->hasReferenceSemantics())
     return ContainerType;
-  
+
   // 'this' is accepts implicit l-values and doesn't force them to the heap.
   return LValueType::get(ContainerType, LValueType::Qual::NonHeap,
                          getParent()->getASTContext());
@@ -483,6 +496,21 @@ Type ConstructorDecl::getArgumentType() const {
   return ArgTy;
 }
 
+Type DestructorDecl::computeThisType() const {
+  Type ContainerType = getDeclContext()->getDeclaredTypeOfContext();
+
+  if (UnboundGenericType *UGT = ContainerType->getAs<UnboundGenericType>()) {
+    // If we have an unbound generic type, bind the type to the archetypes
+    // in the type's definition.
+    NominalTypeDecl *D = UGT->getDecl();
+    SmallVector<Type, 4> GenericArgs;
+    for (auto Param : *D->getGenericParams())
+      GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
+    ContainerType = BoundGenericType::get(D, GenericArgs);
+  }
+
+  return ContainerType;
+}
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.
@@ -744,6 +772,13 @@ namespace {
       printCommon(CD, "constructor_decl");
       OS << '\n';
       printRec(CD->getBody());
+      OS << ')';
+    }
+
+    void visitDestructorDecl(DestructorDecl *DD) {
+      printCommon(DD, "destructor_decl");
+      OS << '\n';
+      printRec(DD->getBody());
       OS << ')';
     }
 

@@ -446,6 +446,23 @@ public:
     CD->overwriteType(FnTy);
     CD->getImplicitThisDecl()->setType(ThisTy);
   }
+
+  void visitDestructorDecl(DestructorDecl *DD) {
+    if (IsSecondPass)
+      return;
+
+    if (!isa<ClassDecl>(DD->getDeclContext()))
+      TC.diagnose(DD->getStartLoc(), diag::destructor_not_member);
+
+    Type ThisTy = DD->computeThisType();
+    Type FnTy = FunctionType::get(DD->computeThisType(),
+                                 TupleType::getEmpty(TC.Context),
+                                 TC.Context);
+    DD->setType(FnTy);
+    DD->getImplicitThisDecl()->setType(ThisTy);
+
+    visitValueDecl(DD);
+  }
 };
 }; // end anonymous namespace.
 

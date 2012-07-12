@@ -377,6 +377,9 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   case tok::kw_constructor:
     Entries.push_back(parseDeclConstructor());
     break;
+  case tok::kw_destructor:
+    Entries.push_back(parseDeclDestructor());
+    break;
   case tok::kw_protocol:
     Entries.push_back(parseDeclProtocol());
     break;
@@ -1787,4 +1790,40 @@ ConstructorDecl *Parser::parseDeclConstructor() {
   if (Attributes.isValid()) CD->getMutableAttrs() = Attributes;
 
   return CD;
+}
+
+
+DestructorDecl *Parser::parseDeclDestructor() {
+  SourceLoc DestructorLoc = consumeToken(tok::kw_destructor);
+  
+  // attribute-list
+  DeclAttributes Attributes;
+  parseAttributeList(Attributes);
+
+  // '{'
+  if (!Tok.is(tok::l_brace)) {
+    diagnose(Tok.getLoc(), diag::expected_lbrace_destructor);
+    return nullptr;
+  }
+
+  VarDecl *ThisDecl
+    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
+                            Type(), CurDeclContext);
+
+  Scope ConstructorBodyScope(this, /*AllowLookup=*/true);
+  DestructorDecl *DD =
+      new (Context) DestructorDecl(Context.getIdentifier("constructor"),
+                                   DestructorLoc, ThisDecl, CurDeclContext);
+  ThisDecl->setDeclContext(DD);
+  ScopeInfo.addToScope(ThisDecl);
+  ContextChange CC(*this, DD);
+
+  NullablePtr<BraceStmt> Body = parseStmtBrace(diag::invalid_diagnostic);
+
+  if (!Body.isNull())
+    DD->setBody(Body.get());
+
+  if (Attributes.isValid()) DD->getMutableAttrs() = Attributes;
+
+  return DD;
 }
