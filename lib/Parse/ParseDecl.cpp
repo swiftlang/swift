@@ -1492,6 +1492,23 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
     }
   }
 
+  bool hasDestructor = false;
+  for (Decl *Member : MemberDecls) {
+    if (isa<DestructorDecl>(Member))
+      hasDestructor = true;
+  }
+  
+  if (!hasDestructor) {
+    VarDecl *ThisDecl
+      = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
+                              Type(), CD);
+    DestructorDecl *DD =
+        new (Context) DestructorDecl(Context.getIdentifier("destructor"),
+                                     SourceLoc(), ThisDecl, CD);
+    MemberDecls.push_back(DD);
+  }
+
+  
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::oneof_attributes);
   CD->setMembers(Context.AllocateCopy(MemberDecls));
@@ -1810,9 +1827,9 @@ DestructorDecl *Parser::parseDeclDestructor() {
     = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
                             Type(), CurDeclContext);
 
-  Scope ConstructorBodyScope(this, /*AllowLookup=*/true);
+  Scope DestructorBodyScope(this, /*AllowLookup=*/true);
   DestructorDecl *DD =
-      new (Context) DestructorDecl(Context.getIdentifier("constructor"),
+      new (Context) DestructorDecl(Context.getIdentifier("destructor"),
                                    DestructorLoc, ThisDecl, CurDeclContext);
   ThisDecl->setDeclContext(DD);
   ScopeInfo.addToScope(ThisDecl);

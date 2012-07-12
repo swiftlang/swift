@@ -771,14 +771,16 @@ namespace {
     void visitConstructorDecl(ConstructorDecl *CD) {
       printCommon(CD, "constructor_decl");
       OS << '\n';
-      printRec(CD->getBody());
+      if (CD->getBody())
+        printRec(CD->getBody());
       OS << ')';
     }
 
     void visitDestructorDecl(DestructorDecl *DD) {
       printCommon(DD, "destructor_decl");
       OS << '\n';
-      printRec(DD->getBody());
+      if (DD->getBody())
+        printRec(DD->getBody());
       OS << ')';
     }
 

@@ -689,7 +689,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
     // FuncExprs - This is a list of all the FuncExprs we need to analyze, in
     // an appropriate order.
-    SmallVector<PointerUnion<FuncExpr*, ConstructorDecl*>, 32> FuncExprs;
+    SmallVector<llvm::PointerUnion3<FuncExpr*, ConstructorDecl*, DestructorDecl*>, 32> FuncExprs;
 
     virtual bool walkToDeclPre(Decl *D) {
       if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D))
@@ -698,6 +698,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         CurDeclContexts.push_back(ED);
       else if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D))
         CurDeclContexts.push_back(CD);
+      else if (DestructorDecl *DD = dyn_cast<DestructorDecl>(D))
+        CurDeclContexts.push_back(DD);
 
       if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
         // If this is an instance method with a body, set the type of it's
@@ -712,7 +714,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
       if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D))
         FuncExprs.push_back(CD);
-
+      if (DestructorDecl *DD = dyn_cast<DestructorDecl>(D))
+        FuncExprs.push_back(DD);
       return true;
     }
     
@@ -727,6 +730,10 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         CurDeclContexts.pop_back();
       } else if (isa<ConstructorDecl>(D)) {
         assert(CurDeclContexts.back() == cast<ConstructorDecl>(D) &&
+               "Context misbalance");
+        CurDeclContexts.pop_back();
+      } else if (isa<DestructorDecl>(D)) {
+        assert(CurDeclContexts.back() == cast<DestructorDecl>(D) &&
                "Context misbalance");
         CurDeclContexts.pop_back();
       }
@@ -913,7 +920,14 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       if (TC.validateType(CD->getType(), CD->getLoc(), /*isFirstPass*/false))
         continue;
       Stmt *Body = CD->getBody();
-      StmtChecker(TC, CD).typeCheckStmt(Body);
+      if (Body)
+        StmtChecker(TC, CD).typeCheckStmt(Body);
+      continue;
+    }
+    if (DestructorDecl *DD = func.dyn_cast<DestructorDecl*>()) {
+      Stmt *Body = DD->getBody();
+      if (Body)
+        StmtChecker(TC, DD).typeCheckStmt(Body);
       continue;
     }
     FuncExpr *FE = func.get<FuncExpr*>();
