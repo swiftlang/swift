@@ -448,6 +448,8 @@
   
   <pre class="grammar">
     decl ::= <a href="#decl-class">decl-class</a>
+    decl ::= <a href="#decl-constructor">decl-constructor</a>
+    decl ::= <a href="#decl-destructor">decl-destructor</a>
     decl ::= <a href="#decl-extension">decl-extension</a>
     decl ::= <a href="#decl-func">decl-func</a>
     decl ::= <a href="#decl-import">decl-import</a>
@@ -1092,6 +1094,67 @@ vec[2] = true
 if vec[3] {
   print("third bit is set\n");
 }
+  </pre>
+
+  <!-- ===================================================================== -->
+  <h3 id="decl-constructor">constructor Declarations</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    decl-constructor ::= 'constructor' <a href="#attribute-list">attribute-list</a> <a href="#pattern-tuple">pattern-tuple</a> <a href="#stmt-brace">stmt-brace</a>
+  </pre>
+
+  <p>'constructor' declares a constructor for a class, struct, or oneof.  Such
+     a declaration is used whenever an object is constructed.  Specifically,
+     for classes, it is used when a new expression is written, and for structs
+     and oneofs, it is used for function application when the "function"
+     is a metatype.</p>
+
+  <p>FIXME: We haven't decided the precise rules for when constructors are
+     implicitly declared.  Default construction doesn't work right for structs
+     or oneofs.  We haven't decided what the restrictions are if a member
+     isn't default-constructible.</p>
+  
+  <p>A simple example:</p>
+  
+  <pre class="example">
+    struct X {
+      var member : Int
+      constructor(x : Int) {
+        member = x
+      }
+    }
+    var a = X(10)
+  </pre>
+
+  <!-- ===================================================================== -->
+  <h3 id="decl-destructor">destructor Declarations</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    decl-constructor ::= 'destructor' <a href="#attribute-list">attribute-list</a> <a href="#stmt-brace">stmt-brace</a>
+  </pre>
+
+  <p>'destructor' declares a destructor for a class.  This function is called
+     when there are no longer any references to a class object, just before it
+     is destroyed.  Note that destructors can only be declared for classes,
+     and cannot be declared in extensions.</p>
+
+  <p>FIXME: We haven't really decided the precise rules here, but it's probably
+     a fatal error to either throw an exception or stash a reference to 'this'
+     in a destructor.  Not sure what happens when we cause the reference count
+     of another object to reach zero inside a destructor.  We might eventually
+     allow destructors in extensions once we have ivars in extensions.</p>
+
+  <p>A simple example:</p>
+  
+  <pre class="example">
+    class X {
+      var fd : Int
+      destructor {
+        close(fd)
+      }
+    }
   </pre>
 
   <!-- ===================================================================== -->
