@@ -19,6 +19,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Intrinsics.h"
+#include <tuple>
 using namespace swift;
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
