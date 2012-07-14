@@ -219,7 +219,8 @@ namespace {
     /// Given the address of an existential object, drill down to the
     /// buffer.
     Address projectExistentialBuffer(IRGenFunction &IGF, Address addr) const {
-      return IGF.Builder.CreateStructGEP(addr, 1, getBufferOffset(IGF.IGM));
+      return IGF.Builder.CreateStructGEP(addr, getNumTables(),
+                                         getBufferOffset(IGF.IGM));
     }
 
     /// Given the address of an existential object, drill down to the

@@ -288,6 +288,7 @@ IRGenModule::createNominalType(ProtocolCompositionType *type) {
     if (i) nameStream << '+';
     LinkEntity::forNonFunction(protocols[i]).mangle(nameStream);
   }
+  nameStream.flush();
   return llvm::StructType::create(getLLVMContext(), typeName.str());
 }
 
