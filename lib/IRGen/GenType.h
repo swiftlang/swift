@@ -30,6 +30,7 @@ namespace swift {
   class MetaTypeType;
   class ModuleType;
   class OneOfType;
+  class ProtocolCompositionType;
   class ProtocolDecl;
   class ProtocolType;
   class StructType;
@@ -67,6 +68,7 @@ class TypeConverter {
   const TypeInfo *convertMetaTypeType(MetaTypeType *T);
   const TypeInfo *convertModuleType(ModuleType *T);
   const TypeInfo *convertProtocolType(ProtocolType *T);
+  const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
   const TypeInfo *convertBuiltinObjectPointer();
   const TypeInfo *convertBuiltinObjCPointer();
 

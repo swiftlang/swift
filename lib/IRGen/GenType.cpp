@@ -251,7 +251,7 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
   case TypeKind::Protocol:
     return convertProtocolType(cast<ProtocolType>(ty));
   case TypeKind::ProtocolComposition:
-    llvm_unreachable("ProtocolComposition types are unimplemented");
+    return convertProtocolCompositionType(cast<ProtocolCompositionType>(ty));
   case TypeKind::BoundGeneric:
     llvm_unreachable("BoundGeneric types are unimplemented");
   }
@@ -267,6 +267,26 @@ llvm::StructType *IRGenModule::createNominalType(TypeDecl *type) {
   } else {
     llvm::raw_svector_ostream nameStream(typeName);
     LinkEntity::forNonFunction(type).mangle(nameStream);
+  }
+  return llvm::StructType::create(getLLVMContext(), typeName.str());
+}
+
+/// createNominalType - Create a new nominal LLVM type for the given
+/// protocol composition type.  Protocol composition types are
+/// structural in the swift type system, but LLVM's type system
+/// doesn't really care about this distinction, and it's nice to
+/// distinguish different cases.
+llvm::StructType *
+IRGenModule::createNominalType(ProtocolCompositionType *type) {
+  llvm::SmallString<32> typeName;
+  llvm::raw_svector_ostream nameStream(typeName);
+
+  SmallVector<ProtocolDecl *, 4> protocols;
+  type->isExistentialType(protocols);
+
+  for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
+    if (i) nameStream << '+';
+    LinkEntity::forNonFunction(protocols[i]).mangle(nameStream);
   }
   return llvm::StructType::create(getLLVMContext(), typeName.str());
 }

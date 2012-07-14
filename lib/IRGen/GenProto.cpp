@@ -192,29 +192,44 @@ static llvm::StringRef getValueWitnessLabel(ValueWitness index) {
 }
 
 namespace {
-}
+  /// The layout of an existential buffer.  This is intended to be a
+  /// small, easily-computed type that can be passed around by value.
+  class ExistentialLayout {
+  private:
+    unsigned NumTables;
+    // If you add anything to the layout computation, you might need
+    // to update certain uses;  check the external uses of getNumTables().
+    // For example, getAssignExistentialsFunction relies on being uniqued
+    // for different layout kinds.
 
-/// Given the offset of the buffer within an existential type.
-static Size getBufferOffset(IRGenModule &IGM) {
-  return IGM.getPointerSize();
-}
+  public:
+    explicit ExistentialLayout(unsigned numTables) : NumTables(numTables) {}
 
-/// Given the address of an existential object, drill down to the
-/// buffer.
-static Address projectExistentialBuffer(IRGenFunction &IGF, Address addr) {
-  return IGF.Builder.CreateStructGEP(addr, 1, getBufferOffset(IGF.IGM));
-}
+    unsigned getNumTables() const { return NumTables; }
 
-/// Given the address of an existential object, drill down to the
-/// witness-table field.
-static Address projectWitnessTable(IRGenFunction &IGF, Address addr) {
-  return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
-}
+    /// Given the offset of the buffer within an existential type.
+    Size getBufferOffset(IRGenModule &IGM) const {
+      return IGM.getPointerSize() * NumTables;
+    }
 
-/// Given the address of an existential object, load its witness table.
-static llvm::Value *loadWitnessTable(IRGenFunction &IGF, Address addr) {
-  return IGF.Builder.CreateLoad(projectWitnessTable(IGF, addr),
-                                "witness-table");
+    /// Given the address of an existential object, drill down to the
+    /// buffer.
+    Address projectExistentialBuffer(IRGenFunction &IGF, Address addr) {
+      return IGF.Builder.CreateStructGEP(addr, 1, getBufferOffset(IGF.IGM));
+    }
+
+    /// Given the address of an existential object, drill down to the
+    /// witness-table field.
+    static Address projectWitnessTable(IRGenFunction &IGF, Address addr) {
+      return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
+    }
+
+    /// Given the address of an existential object, load its witness table.
+    static llvm::Value *loadWitnessTable(IRGenFunction &IGF, Address addr) {
+      return IGF.Builder.CreateLoad(projectWitnessTable(IGF, addr),
+                                    "witness-table");
+    }
+  };
 }
 
 /// Load a specific witness from a known table.  The result is
@@ -375,13 +390,15 @@ static void emitDeallocateBufferCall(IRGenFunction &IGF,
 }
 
 /// Given the address of an existential object, destroy it.
-static void emitDestroyExistential(IRGenFunction &IGF, Address addr) {
-  llvm::Value *table = loadWitnessTable(IGF, addr);
-  emitDestroyBufferCall(IGF, table, projectExistentialBuffer(IGF, addr));
+static void emitDestroyExistential(IRGenFunction &IGF, Address addr,
+                                   ExistentialLayout layout) {
+  llvm::Value *table = layout.loadWitnessTable(IGF, addr);
+  emitDestroyBufferCall(IGF, table, layout.projectExistentialBuffer(IGF, addr));
 }
 
 static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
-                                                     llvm::Type *objectPtrTy);
+                                                     llvm::Type *objectPtrTy,
+                                                     ExistentialLayout layout);
 
 namespace {
   struct DestroyBuffer : Cleanup {
@@ -407,11 +424,13 @@ namespace {
   };
 
   struct DestroyExistential : Cleanup {
+    ExistentialLayout Layout;
     Address Addr;
-    DestroyExistential(Address addr) : Addr(addr) {}
+    DestroyExistential(ExistentialLayout layout, Address addr)
+      : Layout(layout), Addr(addr) {}
 
     void emit(IRGenFunction &IGF) const {
-      emitDestroyExistential(IGF, Addr);
+      emitDestroyExistential(IGF, Addr, Layout);
     }
   };
 
@@ -536,28 +555,57 @@ namespace {
     ArrayRef<WitnessTableEntry> getEntries() const { return Entries; }
   };
 
-  /// A TypeInfo implementation for "protocol types", i.e. types like:
+  struct ProtocolEntry {
+    explicit ProtocolEntry(const ProtocolInfo &impl) : Impl(impl) {}
+    const ProtocolInfo &Impl;
+  };
+
+  /// A TypeInfo implementation for existential types, i.e. types like:
   ///   Printable
+  ///   protocol<Printable, Serializable>
   /// with the semantic translation:
   ///   \exists t : Printable . t
-  /// t here is an ArchetypeType, and a more generic protocol<> type
-  /// is a ProtocolCompositionType.
-  class ProtocolTypeInfo :
-      public IndirectTypeInfo<ProtocolTypeInfo, FixedTypeInfo> {
-    const ProtocolInfo &Protocol;
+  /// t here is an ArchetypeType.
+  ///
+  /// This is used for both ProtocolTypes and ProtocolCompositionTypes.
+  class ExistentialTypeInfo :
+      public IndirectTypeInfo<ExistentialTypeInfo, FixedTypeInfo> {
+    unsigned NumProtocols;
 
-    ProtocolTypeInfo(llvm::Type *ty, Size size, Alignment align,
-                     const ProtocolInfo &protocol)
-      : IndirectTypeInfo(ty, size, align, IsNotPOD), Protocol(protocol) {}
-
-  public:
-    static const ProtocolTypeInfo *create(llvm::Type *ty, Size size,
-                                          Alignment align,
-                                          const ProtocolInfo &protocol) {
-      return new ProtocolTypeInfo(ty, size, align, protocol);
+    ProtocolEntry *getProtocolsBuffer() {
+      return reinterpret_cast<ProtocolEntry *>(this + 1);
+    }
+    const ProtocolEntry *getProtocolsBuffer() const {
+      return reinterpret_cast<const ProtocolEntry *>(this + 1);
     }
 
-    const ProtocolInfo &getProtocol() const { return Protocol; }
+    ExistentialTypeInfo(llvm::Type *ty, Size size, Alignment align,
+                        ArrayRef<ProtocolEntry> protocols)
+      : IndirectTypeInfo(ty, size, align, IsNotPOD), NumProtocols(protocols.size()) {
+
+      for (unsigned i = 0; i != NumProtocols; ++i) {
+        new (&getProtocolsBuffer()[i]) ProtocolEntry(protocols[i]);
+      }
+    }
+
+  public:
+    ExistentialLayout getLayout() const {
+      return ExistentialLayout(std::max(NumProtocols, 1U));
+    }
+
+    static const ExistentialTypeInfo *create(llvm::Type *ty, Size size,
+                                          Alignment align,
+                                          ArrayRef<ProtocolEntry> protocols) {
+      void *buffer = operator new(sizeof(ExistentialTypeInfo) +
+                                  protocols.size() * sizeof(ProtocolEntry));
+      return new(buffer) ExistentialTypeInfo(ty, size, align, protocols);
+    }
+
+    ArrayRef<ProtocolEntry> getProtocols() const {
+      return ArrayRef<ProtocolEntry>(getProtocolsBuffer(), NumProtocols);
+    }
+
+    const ProtocolInfo &getProtocol() const { return getProtocols()[0].Impl; }
 
     using FixedTypeInfo::allocate;
     Address allocate(IRGenFunction &IGF,
@@ -567,7 +615,7 @@ namespace {
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
       auto objPtrTy = dest.getAddress()->getType();
-      auto fn = getAssignExistentialsFunction(IGF.IGM, objPtrTy);
+      auto fn = getAssignExistentialsFunction(IGF.IGM, objPtrTy, getLayout());
       auto call = IGF.Builder.CreateCall2(fn, dest.getAddress(),
                                           src.getAddress());
       call->setCallingConv(IGF.IGM.RuntimeCC);
@@ -576,20 +624,22 @@ namespace {
 
     void initializeWithCopy(IRGenFunction &IGF,
                             Address dest, Address src) const {
+      auto layout = getLayout();
+
       // Load the witness table and copy it into the new object.
-      llvm::Value *table = loadWitnessTable(IGF, src);
-      IGF.Builder.CreateStore(table, projectWitnessTable(IGF, dest));
+      llvm::Value *table = layout.loadWitnessTable(IGF, src);
+      IGF.Builder.CreateStore(table, layout.projectWitnessTable(IGF, dest));
 
       // Project down to the buffers and ask the witnesses to do a
       // copy-initialize.
-      Address srcBuffer = projectExistentialBuffer(IGF, src);
-      Address destBuffer = projectExistentialBuffer(IGF, dest);
+      Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
+      Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
       emitInitializeBufferWithCopyOfBufferCall(IGF, table,
                                                destBuffer, srcBuffer);
     }
 
     void destroy(IRGenFunction &IGF, Address addr) const {
-      emitDestroyExistential(IGF, addr);
+      emitDestroyExistential(IGF, addr, getLayout());
     }
   };
 
@@ -1110,12 +1160,18 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
 /// Existential types are nominal, so we potentially need to cast the
 /// function to the appropriate object-pointer type.
 static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
-                                                     llvm::Type *objectPtrTy) {
+                                                     llvm::Type *objectPtrTy,
+                                                     ExistentialLayout layout) {
   llvm::Type *argTys[] = { objectPtrTy, objectPtrTy };
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(IGM.VoidTy, argTys, false);
-  llvm::Constant *fn =
-    IGM.Module.getOrInsertFunction("__swift_assign_existentials", fnTy);
+
+  // __swift_assign_existentials_N is the well-known function for
+  // assigning existential types with N witness tables.
+  llvm::SmallString<40> fnName;
+  llvm::raw_svector_ostream(fnName)
+    << "__swift_assign_existentials_" << layout.getNumTables();
+  llvm::Constant *fn = IGM.Module.getOrInsertFunction(fnName, fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
@@ -1134,13 +1190,13 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
 
     // Project down to the buffers.
     IGF.Builder.emitBlock(contBB);
-    Address destBuffer = projectExistentialBuffer(IGF, dest);
-    Address srcBuffer = projectExistentialBuffer(IGF, src);
+    Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
+    Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
 
     // Load the dest and source tables.
-    Address destTableSlot = projectWitnessTable(IGF, dest);
+    Address destTableSlot = layout.projectWitnessTable(IGF, dest);
     llvm::Value *destTable = IGF.Builder.CreateLoad(destTableSlot);
-    llvm::Value *srcTable = loadWitnessTable(IGF, src);
+    llvm::Value *srcTable = layout.loadWitnessTable(IGF, src);
 
     llvm::BasicBlock *matchBB = IGF.createBasicBlock("match");
     llvm::BasicBlock *noMatchBB = IGF.createBasicBlock("no-match");
@@ -1944,8 +2000,8 @@ namespace {
     /// of this type to that protocol.
     void addOutOfLineBaseProtocol(Type baseType, ProtocolDecl *baseProto) {
       // Look for a protocol type info.
-      const ProtocolTypeInfo &baseTI =
-        IGM.getFragileTypeInfo(baseType).as<ProtocolTypeInfo>();
+      const ExistentialTypeInfo &baseTI =
+        IGM.getFragileTypeInfo(baseType).as<ExistentialTypeInfo>();
       const ProtocolConformance *astConf =
         Conformance.InheritedMapping.find(baseProto)->second;
       assert(astConf && "couldn't find base conformance!");
@@ -2094,13 +2150,57 @@ const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
 
   const ProtocolInfo &protocol = getProtocolInfo(T->getDecl());
 
+  ExistentialLayout layout(1);
+
   Alignment align = getFixedBufferAlignment(IGM);
 
-  Size size = getBufferOffset(IGM);
+  Size size = layout.getBufferOffset(IGM);
   assert(size.roundUpToAlignment(align) == size);
   size += getFixedBufferSize(IGM);
 
-  return ProtocolTypeInfo::create(type, size, align, protocol);
+  ProtocolEntry entries[] = { ProtocolEntry(protocol) };
+  return ExistentialTypeInfo::create(type, size, align, entries);
+}
+
+const TypeInfo *
+TypeConverter::convertProtocolCompositionType(ProtocolCompositionType *T) {
+  // Find the canonical protocols.  There might not be any.
+  SmallVector<ProtocolDecl*, 4> protocols;
+  bool isExistential = T->isExistentialType(protocols);
+  assert(isExistential); (void) isExistential;
+
+  // Protocol composition types are not nominal, but we name them anyway.
+  llvm::StructType *type = IGM.createNominalType(T);
+  SmallVector<llvm::Type*, 5> fields;
+  SmallVector<ProtocolEntry, 4> entries;
+
+  if (protocols.empty()) {
+    // We always need at least one witness table.
+    fields.push_back(IGM.WitnessTablePtrTy);
+  } else {
+    for (auto protocol : protocols) {
+      // Find the protocol layout.
+      const ProtocolInfo &impl = getProtocolInfo(protocol);
+      entries.push_back(ProtocolEntry(impl));
+
+      // Each protocol gets a witness table.
+      fields.push_back(IGM.WitnessTablePtrTy);
+    }
+  }
+
+  ExistentialLayout layout(fields.size());
+
+  // Add the value buffer to the fields.
+  fields.push_back(IGM.getFixedBufferTy());
+  type->setBody(fields);
+
+  Alignment align = getFixedBufferAlignment(IGM);
+
+  Size size = layout.getBufferOffset(IGM);
+  assert(size.roundUpToAlignment(align) == size);
+  size += getFixedBufferSize(IGM);
+
+  return ExistentialTypeInfo::create(type, size, align, entries);
 }
 
 const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *T) {
@@ -2171,14 +2271,15 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
     return;
   }
 
+  ExistentialLayout layout(1);
   ProtocolDecl *protocol = E->getType()->castTo<ProtocolType>()->getDecl();
 
   if (!E->getConformances()[0]) {
     // Special case: we're converting from an existential type to another
     // existential type in some trivial manner (e.g., to an inherited protocol).
     Type srcType = E->getSubExpr()->getType();
-    const ProtocolTypeInfo &srcProtoTI =
-      IGF.getFragileTypeInfo(srcType).as<ProtocolTypeInfo>();
+    const ExistentialTypeInfo &srcProtoTI =
+      IGF.getFragileTypeInfo(srcType).as<ExistentialTypeInfo>();
     
     // Compute the path to the destination protocol.
     auto &witnessEntry = srcProtoTI.getProtocol().getWitnessEntry(protocol);
@@ -2196,7 +2297,7 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
     if (!witnessEntry.isOutOfLineBase()) return;
     
     // Otherwise, we need to map the witness down.  Find the old table.
-    Address tableSlot = projectWitnessTable(IGF, dest);
+    Address tableSlot = layout.projectWitnessTable(IGF, dest);
     llvm::Value *oldTable = IGF.Builder.CreateLoad(tableSlot, "derived-table");
     
     // Drill down to get the new table.
@@ -2211,7 +2312,7 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
   }
 
   // We're converting from a concrete type to an existential type.
-  auto &protoI = rawTI.as<ProtocolTypeInfo>().getProtocol();
+  auto &protoI = rawTI.as<ExistentialTypeInfo>().getProtocol();
 
   // Find the concrete type.
   Type concreteType = E->getSubExpr()->getType();
@@ -2227,7 +2328,7 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
   // destination.
 
   llvm::Value *table = conformance.getTable(IGF);
-  Address tableSlot = projectWitnessTable(IGF, dest);
+  Address tableSlot = layout.projectWitnessTable(IGF, dest);
   IGF.Builder.CreateStore(table, tableSlot);
 
   FixedPacking packing = conformance.getPacking();
@@ -2239,7 +2340,7 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
   }
 
   // Otherwise, allocate if necessary.
-  Address buffer = projectExistentialBuffer(IGF, dest);
+  Address buffer = layout.projectExistentialBuffer(IGF, dest);
   Address object = emitAllocateBuffer(IGF, buffer, packing, concreteTI);
 
   // Push a cleanup to destroy that.
@@ -2262,8 +2363,8 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
 /// Emit an expression which erases the concrete type of its value and
 /// replaces it with a generic type.
 void irgen::emitErasure(IRGenFunction &IGF, ErasureExpr *E, Explosion &out) {
-  const ProtocolTypeInfo &protoTI =
-    IGF.getFragileTypeInfo(E->getType()).as<ProtocolTypeInfo>();
+  const ExistentialTypeInfo &protoTI =
+    IGF.getFragileTypeInfo(E->getType()).as<ExistentialTypeInfo>();
 
   // Create a temporary of the appropriate type.
   Address temp = protoTI.allocate(IGF);
@@ -2401,6 +2502,7 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
   Type baseTy = E->getBase()->getType();
   baseTy = baseTy->castTo<LValueType>()->getObjectType();
   ProtocolDecl *proto = baseTy->castTo<ProtocolType>()->getDecl();
+  ExistentialLayout layout(1);
 
   // The function we're going to call.
   FuncDecl *fn = cast<FuncDecl>(E->getDecl());
@@ -2411,7 +2513,7 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
                                                        NotOnHeap);
 
   // Load the witness table.
-  llvm::Value *wtable = loadWitnessTable(IGF, existAddr);
+  llvm::Value *wtable = layout.loadWitnessTable(IGF, existAddr);
 
   // The thing we're going to invoke a method on.
   Address thisObject;
@@ -2428,7 +2530,7 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
     Address copyBuffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
                                           getFixedBufferAlignment(IGF.IGM),
                                           "copy-for-call");
-    Address srcBuffer = projectExistentialBuffer(IGF, existAddr);
+    Address srcBuffer = layout.projectExistentialBuffer(IGF, existAddr);
 
     // The result of the copy is an i8* which points at the new object.
     llvm::Value *copy =

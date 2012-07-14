@@ -48,6 +48,7 @@ namespace swift {
   class FuncDecl;
   class OneOfElementDecl;
   class OneOfDecl;
+  class ProtocolCompositionType;
   class ProtocolDecl;
   class SourceLoc;
   class StructDecl;
@@ -127,6 +128,7 @@ public:
   const TypeInfo &getFragileTypeInfo(Type T);
   llvm::Type *getFragileType(Type T);
   llvm::StructType *createNominalType(TypeDecl *D);
+  llvm::StructType *createNominalType(ProtocolCompositionType *T);
   void getSchema(Type T, ExplosionSchema &schema);
   unsigned getExplosionSize(Type T, ExplosionKind kind);
 
