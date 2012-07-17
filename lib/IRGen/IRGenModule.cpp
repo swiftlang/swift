@@ -52,6 +52,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   SizeTy = TargetData.getIntPtrType(getLLVMContext());
   MemCpyFn = nullptr;
   AllocObjectFn = nullptr;
+  AllocClassFn = nullptr;
   RetainNoResultFn = nullptr;
   ReleaseFn = nullptr;
   DeallocObjectFn = nullptr;
@@ -118,6 +119,16 @@ llvm::Constant *IRGenModule::getAllocObjectFn() {
     llvm::FunctionType::get(RefCountedPtrTy, types, false);
   AllocObjectFn = createRuntimeFunction(*this, "swift_allocObject", fnType);
   return AllocObjectFn;
+}
+
+llvm::Constant *IRGenModule::getAllocClassFn() {
+  if (AllocClassFn) return AllocClassFn;
+
+  llvm::Type *types[] = { HeapMetadataPtrTy, SizeTy, SizeTy };
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(RefCountedPtrTy, types, false);
+  AllocClassFn = createRuntimeFunction(*this, "swift_allocClass", fnType);
+  return AllocClassFn;
 }
 
 llvm::Constant *IRGenModule::getRawAllocFn() {

@@ -72,6 +72,13 @@ struct SwiftHeapObject *
 swift_allocObject(struct SwiftHeapMetadata *metadata,
             size_t requiredSize, size_t requiredAlignment);
 
+/// Alternate entry point, specifically for classes.
+/// FIXME: Currently, this just forwards to swift_allocObject;
+/// we need to actually design this API.
+struct SwiftHeapObject *
+swift_allocClass(struct SwiftHeapMetadata *metadata,
+            size_t requiredSize, size_t requiredAlignment);
+
 // Allocate plain old memory, this is the generalized entry point
 //
 // The default API will wait for available memory and return zero filled.

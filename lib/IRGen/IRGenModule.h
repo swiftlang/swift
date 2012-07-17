@@ -147,6 +147,7 @@ private:
 //--- Runtime ---------------------------------------------------------------
 public:
   llvm::Constant *getAllocObjectFn();
+  llvm::Constant *getAllocClassFn();
   llvm::Constant *getRetainNoResultFn();
   llvm::Constant *getReleaseFn();
   llvm::Constant *getDeallocObjectFn();
@@ -162,6 +163,7 @@ public:
 private:
   llvm::Function *MemCpyFn;
   llvm::Constant *AllocObjectFn;
+  llvm::Constant *AllocClassFn;
   llvm::Constant *RetainNoResultFn;
   llvm::Constant *ReleaseFn;
   llvm::Constant *ObjCRetainFn;

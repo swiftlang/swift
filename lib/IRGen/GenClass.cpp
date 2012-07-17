@@ -268,8 +268,11 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   llvm::Value *metadata = getClassMetadataVar(IGF.IGM, curClass, layout);
   llvm::Value *size = layout.emitSize(IGF);
   llvm::Value *align = layout.emitAlign(IGF);
-  llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, align,
-                                             "reference.new");
+  llvm::Value *args[] = { metadata, size, align };
+  llvm::CallInst *call = IGF.Builder.CreateCall(IGM.getAllocClassFn(),
+                                                args, "reference.new");
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  llvm::Value *val = call;
   llvm::Type *destType = layout.getType()->getPointerTo();
   llvm::Value *castVal = IGF.Builder.CreateBitCast(val, destType);
   IGF.Builder.CreateStore(castVal, addr);
