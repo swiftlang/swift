@@ -303,8 +303,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     // If we have a 'this' argument and the declaration is a non-static method,
     // the method's 'this' parameter has already been bound. Look instead at the
     // actual argument types.
-    if (hasThis && ((isa<FuncDecl>(VD) && !cast<FuncDecl>(VD)->isStatic()) ||
-                   isa<ConstructorDecl>(VD))) {
+    if (hasThis && (isa<FuncDecl>(VD) && !cast<FuncDecl>(VD)->isStatic())) {
       // FIXME: Derived-to-base conversions will eventually be needed.
       FunctionTy = FunctionTy->getResult()->castTo<AnyFunctionType>();
     }
@@ -446,8 +445,7 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
     // If we have a 'this' type and the declaration is a constructor or
     // non-static method, look past the 'this' argument.
     if (hasThis &&
-        ((isa<FuncDecl>(VD) && !cast<FuncDecl>(VD)->isStatic()) ||
-         isa<ConstructorDecl>(VD))) {
+        (isa<FuncDecl>(VD) && !cast<FuncDecl>(VD)->isStatic())) {
       // FIXME: Derived-to-base conversions will eventually be needed.
       SrcTy = SrcTy->castTo<AnyFunctionType>()->getResult();
     }

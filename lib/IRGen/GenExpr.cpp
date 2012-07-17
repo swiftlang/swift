@@ -276,19 +276,7 @@ namespace {
     }
 
     void visitConstructExpr(ConstructExpr *E) {
-      const TypeInfo &type = IGF.getFragileTypeInfo(E->getType());
-
-      Initialization I;
-      InitializedObject object = I.getObjectForTemporary();
-      I.registerObjectWithoutDestroy(object);
-      OwnedAddress addr =
-        I.emitLocalAllocation(IGF, object, NotOnHeap, type,
-                              "construction.temp");
-      I.emitZeroInit(IGF, object, addr, type);
-
-      IGF.constructObject(addr.getAddress(), E->getConstructor(),
-                          E->getInput());
-      type.loadAsTake(IGF, addr.getAddress(), Out);
+      IGF.constructObject(E->getConstructor(), E->getInput(), Out);
     }
 
     void visitNewArrayExpr(NewArrayExpr *E) {

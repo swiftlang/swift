@@ -926,8 +926,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
     if (DestructorDecl *DD = func.dyn_cast<DestructorDecl*>()) {
       Stmt *Body = DD->getBody();
-      if (Body)
-        StmtChecker(TC, DD).typeCheckStmt(Body);
+      StmtChecker(TC, DD).typeCheckStmt(Body);
       continue;
     }
     FuncExpr *FE = func.get<FuncExpr*>();

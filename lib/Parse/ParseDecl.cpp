@@ -1492,22 +1492,28 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
     }
   }
 
-  bool hasDestructor = false;
+  bool hasConstructor = false;
   for (Decl *Member : MemberDecls) {
-    if (isa<DestructorDecl>(Member))
-      hasDestructor = true;
+    if (isa<ConstructorDecl>(Member))
+      hasConstructor = true;
   }
-  
-  if (!hasDestructor) {
+
+  if (!hasConstructor) {
     VarDecl *ThisDecl
       = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
                               Type(), CD);
-    DestructorDecl *DD =
-        new (Context) DestructorDecl(Context.getIdentifier("destructor"),
-                                     SourceLoc(), ThisDecl, CD);
-    MemberDecls.push_back(DD);
+    Pattern *Arguments = TuplePattern::create(Context, SourceLoc(),
+                                              ArrayRef<TuplePatternElt>(),
+                                              SourceLoc());
+    Type ConstructorTy;
+    checkFullyTyped(Arguments, ConstructorTy);
+    ConstructorDecl *Constructor =
+        new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
+                                     SourceLoc(), Arguments, ThisDecl, CD);
+    Constructor->setType(ConstructorTy);
+    ThisDecl->setDeclContext(Constructor);
+    MemberDecls.push_back(Constructor);
   }
-
   
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::oneof_attributes);

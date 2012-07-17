@@ -1086,13 +1086,11 @@ public:
       assert(Arg && "Coercion shouldn't fail!");
       E->setCtor(CD);
       E->setCtorArg(Arg);
-    } else if (!Viable.empty()) {
-      TC.diagnose(E->getLoc(), diag::constructor_overload_fail, true, CT)
+    } else {
+      TC.diagnose(E->getLoc(), diag::constructor_overload_fail,
+                  !Viable.empty(), CT)
         << E->getSourceRange();
       TC.printOverloadSetCandidates(Viable);
-    } else {
-      // FIXME: We should diagnose this once we synthesize
-      // default constructors yet.
     }
 
     return E;

@@ -455,17 +455,17 @@ llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
 /// Fetch the declaration of the given known function.
 llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
                                                   ExplosionKind kind) {
-  LinkEntity entity = LinkEntity::forFunction(cons, kind, 1);
+  LinkEntity entity = LinkEntity::forFunction(cons, kind, 0);
 
   // Check whether we've cached this.
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
   llvm::FunctionType *fnType =
-    getFunctionType(cons->getType(), kind, 1, /*needsData*/false);
+    getFunctionType(cons->getType(), kind, 0, /*needsData*/false);
 
   bool indirectResult = hasIndirectResult(*this, cons->getType(),
-                                          kind, 1);
+                                          kind, 0);
 
   SmallVector<llvm::AttributeWithIndex, 4> attrs;
   auto cc = expandAbstractCC(*this, AbstractCC::Method, indirectResult,

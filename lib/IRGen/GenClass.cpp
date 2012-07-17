@@ -19,6 +19,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/Pattern.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 
@@ -30,6 +31,8 @@
 #include "LValue.h"
 #include "GenHeap.h"
 #include "HeapTypeInfo.h"
+#include "GenInit.h"
+#include "Scope.h"
 
 
 using namespace swift;
@@ -105,39 +108,58 @@ LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
 void swift::irgen::emitNewReferenceExpr(IRGenFunction &IGF,
                                         NewReferenceExpr *E,
                                         Explosion &Out) {
-  const ClassTypeInfo &info =
-      IGF.getFragileTypeInfo(E->getType()).as<ClassTypeInfo>();
-
-  // Allocate the class using the given layout.
-  // FIXME: Long-term, we clearly need a specialized runtime entry point.
-  llvm::Value *val = IGF.emitUnmanagedAlloc(info.getLayout(IGF.IGM),
-                                            "reference.new");
-  llvm::Type *destType = info.getLayout(IGF.IGM).getType()->getPointerTo();
-  llvm::Value *castVal = IGF.Builder.CreateBitCast(val, destType);
-
   // Call the constructor for the class.
-  if (ConstructorDecl *CD = E->getCtor()) {
-    llvm::Function *fn =
-        IGF.IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
-    Callee c = Callee::forMethod(CD->getType(), fn, ExplosionKind::Minimal, 1);
+  ConstructorDecl *CD = E->getCtor();
+  llvm::Function *fn =
+      IGF.IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
+  Callee c = Callee::forMethod(CD->getType(), fn, ExplosionKind::Minimal, 0);
 
-    Explosion inputE(ExplosionKind::Minimal);
-    IGF.emitRValue(E->getCtorArg(), inputE);
-    Explosion thisE(ExplosionKind::Minimal);
-    IGF.emitRetain(castVal, thisE);
-    Arg args[] = { Arg::forUnowned(thisE), Arg::forUnowned(inputE) };
+  Explosion inputE(ExplosionKind::Minimal);
+  IGF.emitRValue(E->getCtorArg(), inputE);
 
-    Explosion Result(ExplosionKind::Minimal);
-    emitCall(IGF, c, args,
-             IGF.getFragileTypeInfo(TupleType::getEmpty(IGF.IGM.Context)),
-             Result);
-  }
-
-  Out.add(IGF.enterReleaseCleanup(castVal));
+  Explosion Result(ExplosionKind::Minimal);
+  emitCall(IGF, c, Arg::forUnowned(inputE),
+           IGF.getFragileTypeInfo(CD->getImplicitThisDecl()->getType()),
+           Out);
 }
 
 void IRGenModule::emitDestructor(DestructorDecl *DD) {
   // FIXME: Implement me!
+}
+
+static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
+  llvm::Function *fn = IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
+  auto thisDecl = CD->getImplicitThisDecl();
+  const ClassTypeInfo &info =
+      IGM.getFragileTypeInfo(thisDecl->getType()).as<ClassTypeInfo>();
+
+  Pattern* pats[] = {
+    CD->getArguments()
+  };
+  Type CtorType = FunctionType::get(CD->getArguments()->getType(),
+                                    thisDecl->getType(), IGM.Context);
+  IRGenFunction IGF(IGM, CtorType, pats,
+                    ExplosionKind::Minimal, 0, fn, Prologue::Standard);
+
+  // Emit the "this" variable
+  Initialization I;
+  I.registerObject(IGF, I.getObjectForDecl(thisDecl),
+                    thisDecl->hasFixedLifetime() ? NotOnHeap : OnHeap, info);
+  Address addr = I.emitVariable(IGF, thisDecl, info);
+
+  // Allocate the class.
+  {
+    FullExpr scope(IGF);
+    // FIXME: Long-term, we clearly need a specialized runtime entry point.
+    llvm::Value *val = IGF.emitUnmanagedAlloc(info.getLayout(IGF.IGM),
+                                              "reference.new");
+    llvm::Type *destType = info.getLayout(IGF.IGM).getType()->getPointerTo();
+    llvm::Value *castVal = IGF.Builder.CreateBitCast(val, destType);
+    IGF.Builder.CreateStore(castVal, addr);
+  }
+  I.markInitialized(IGF, I.getObjectForDecl(thisDecl));
+
+  IGF.emitConstructorBody(CD);
 }
 
 /// emitStructType - Emit all the declarations associated with this oneof type.
@@ -190,7 +212,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       continue;
     }
     case DeclKind::Constructor: {
-      emitConstructor(cast<ConstructorDecl>(member));
+      emitClassConstructor(*this, cast<ConstructorDecl>(member));
       continue;
     }
     case DeclKind::Destructor: {

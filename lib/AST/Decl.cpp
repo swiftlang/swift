@@ -481,17 +481,11 @@ Type ConstructorDecl::computeThisType() const {
     ContainerType = BoundGenericType::get(D, GenericArgs);
   }
 
-  if (ContainerType->hasReferenceSemantics())
-    return ContainerType;
-
-  // 'this' is accepts implicit l-values and doesn't force them to the heap.
-  return LValueType::get(ContainerType, LValueType::Qual::NonHeap,
-                         getParent()->getASTContext());
+  return ContainerType;
 }
 
 Type ConstructorDecl::getArgumentType() const {
   Type ArgTy = getType();
-  ArgTy = ArgTy->castTo<FunctionType>()->getResult();
   ArgTy = ArgTy->castTo<FunctionType>()->getInput();
   return ArgTy;
 }
@@ -779,8 +773,7 @@ namespace {
     void visitDestructorDecl(DestructorDecl *DD) {
       printCommon(DD, "destructor_decl");
       OS << '\n';
-      if (DD->getBody())
-        printRec(DD->getBody());
+      printRec(DD->getBody());
       OS << ')';
     }
 

@@ -615,10 +615,8 @@ public:
       }
     } else if (DestructorDecl *DD = dyn_cast<DestructorDecl>(D)) {
       Stmt *S = DD->getBody();
-      if (S) {
-        S = doIt(S);
-        DD->setBody(cast<BraceStmt>(S));
-      }
+      S = doIt(S);
+      DD->setBody(cast<BraceStmt>(S));
     }
     
     return !Walker.walkToDeclPost(D);

@@ -440,9 +440,8 @@ public:
 
     Type ThisTy = CD->computeThisType();
     Type FnTy = FunctionType::get(CD->getType(), 
-                                 TupleType::getEmpty(TC.Context),
+                                 ThisTy,
                                  TC.Context);
-    FnTy = FunctionType::get(ThisTy, FnTy, TC.Context);
     CD->overwriteType(FnTy);
     CD->getImplicitThisDecl()->setType(ThisTy);
   }

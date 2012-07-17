@@ -328,7 +328,7 @@ public:
 
   Condition emitCondition(Expr *E, bool hasFalseCode, bool invertValue = false);
 
-  void constructObject(Address addr, ConstructorDecl *CD, Expr *Input);
+  void constructObject(ConstructorDecl *CD, Expr *Input, Explosion &Result);
 
 //--- Declaration emission -----------------------------------------------------
 public:
@@ -349,6 +349,8 @@ public:
                                          unsigned uncurryLevel);
 
   void bindArchetype(ArchetypeType *type, llvm::Value *wtable);
+
+  void emitConstructorBody(ConstructorDecl *CD);
 
 private:
   union LocalEntry {

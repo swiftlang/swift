@@ -17,6 +17,8 @@
 #include "IRGenModule.h"
 #include "IRGenFunction.h"
 #include "GenFunc.h"
+#include "GenInit.h"
+#include "TypeInfo.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
@@ -28,31 +30,44 @@ using namespace irgen;
 void IRGenModule::emitConstructor(ConstructorDecl *CD) {
   llvm::Function *fn = getAddrOfConstructor(CD, ExplosionKind::Minimal);
 
-
+  IRGenFunction IGF(*this, CD->getType(), CD->getArguments(),
+                    ExplosionKind::Minimal, 0, fn, Prologue::Standard);
   auto thisDecl = CD->getImplicitThisDecl();
-  Pattern* pats[] = {
-    new (Context) NamedPattern(thisDecl),
-    CD->getArguments()
-  };
-  pats[0]->setType(thisDecl->getType());
+  const TypeInfo &type = getFragileTypeInfo(thisDecl->getType());
 
-  IRGenFunction IGF(*this, CD->getType(), pats,
-                    ExplosionKind::Minimal, 1, fn, Prologue::Standard);
+  // Emit the "this" variable.
+  Initialization I;
+  InitializedObject object = I.getObjectForDecl(thisDecl);
+  I.registerObject(IGF, object,
+                   thisDecl->hasFixedLifetime() ? NotOnHeap : OnHeap, type);
+  Address addr = I.emitVariable(IGF, thisDecl, type);
+  I.emitZeroInit(IGF, object, addr, type);
 
-  IGF.emitFunctionTopLevel(CD->getBody());
+  IGF.emitConstructorBody(CD);
 }
 
-void IRGenFunction::constructObject(Address addr, ConstructorDecl *CD,
-                                    Expr *input) {
-  llvm::Function *fn = IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
-  Callee c = Callee::forMethod(CD->getType(), fn, ExplosionKind::Minimal, 1);
+void IRGenFunction::emitConstructorBody(ConstructorDecl *CD) {
+  // FIXME: Member init here?
 
+  // Emit explicit body, if present.
+  if (CD->getBody())
+    emitFunctionTopLevel(CD->getBody());
+
+  // Return "this".
+  auto thisDecl = CD->getImplicitThisDecl();
+  const TypeInfo &type = getFragileTypeInfo(thisDecl->getType());
+  OwnedAddress addr = getLocalVar(thisDecl);
+  type.initializeWithCopy(*this, ReturnSlot, addr);
+  emitBranch(JumpDest(ReturnBB, Cleanups.stable_end()));
+  Builder.ClearInsertionPoint();
+}
+
+void IRGenFunction::constructObject(ConstructorDecl *CD, Expr *input,
+                                    Explosion &Result) {
+  llvm::Function *fn = IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
+  Callee c = Callee::forMethod(CD->getType(), fn, ExplosionKind::Minimal, 0);
   Explosion inputE(ExplosionKind::Minimal);
   emitRValue(input, inputE);
-  Explosion thisE(ExplosionKind::Minimal);
-  thisE.addUnmanaged(addr.getAddress());
-  Arg args[] = { Arg::forUnowned(thisE), Arg::forUnowned(inputE) };
-
-  Explosion Result(ExplosionKind::Minimal);
-  emitCall(*this, c, args, getFragileTypeInfo(TupleType::getEmpty(IGM.Context)), Result);
+  emitCall(*this, c, Arg::forUnowned(inputE),
+           getFragileTypeInfo(CD->getImplicitThisDecl()->getType()), Result);
 }
