@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/IRBuilder.h"
+#include "swift/AST/LLVM.h"
 #include "Address.h"
 #include "IRGen.h"
 

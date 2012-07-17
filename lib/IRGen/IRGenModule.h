@@ -190,7 +190,6 @@ public:
   void emitStaticMethod(FuncDecl *D);
   void emitInstanceMethod(FuncDecl *D);
   void emitConstructor(ConstructorDecl *D);
-  void emitDestructor(DestructorDecl *D);
 
   llvm::FunctionType *getFunctionType(Type fnType, ExplosionKind kind,
                                       unsigned uncurryLevel, bool withData);
@@ -203,6 +202,7 @@ public:
   llvm::Function *getAddrOfSetter(ValueDecl *D, ExplosionKind kind);
   llvm::Function *getAddrOfValueWitness(Type concreteType, ValueWitness index);
   llvm::Function *getAddrOfConstructor(ConstructorDecl *D, ExplosionKind kind);
+  llvm::Function *getAddrOfDestructor(ClassDecl *D);
 };
 
 } // end namespace irgen

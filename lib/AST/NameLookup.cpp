@@ -490,6 +490,23 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       BaseDecl = CD->getImplicitThisDecl();
       ExtendedType = CD->getDeclContext()->getDeclaredTypeOfContext();
       DC = DC->getParent();
+    } else if (DestructorDecl *DD = dyn_cast<DestructorDecl>(DC)) {
+      // Look for local variables; normally, the parser resolves these
+      // for us, but it can't do the right thing inside local types.
+      if (Loc.isValid()) {
+        FindLocalVal localVal(Loc, Name);
+        localVal.visit(CD->getBody());
+        if (!localVal.MatchingValue)
+          localVal.checkPattern(CD->getArguments());
+        if (localVal.MatchingValue) {
+          Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
+          return;
+        }
+      }
+
+      BaseDecl = DD->getImplicitThisDecl();
+      ExtendedType = DD->getDeclContext()->getDeclaredTypeOfContext();
+      DC = DC->getParent();
     }
 
     if (BaseDecl) {

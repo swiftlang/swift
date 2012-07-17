@@ -176,6 +176,10 @@ class CaptureAnalysisVisitor : public ASTWalker {
       VisitValueDecl(CD->getImplicitThisDecl());
     }
 
+    if (DestructorDecl *DD = dyn_cast<DestructorDecl>(D)) {
+      VisitValueDecl(DD->getImplicitThisDecl());
+    }
+
     return true;
   }
 };

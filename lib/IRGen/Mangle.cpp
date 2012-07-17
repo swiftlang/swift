@@ -523,6 +523,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   case Kind::Other: break;
   case Kind::Getter: buffer << "g"; break;
   case Kind::Setter: buffer << "s"; break;
+  case Kind::Destructor: buffer << "10destructor"; break;
   case Kind::ValueWitness: llvm_unreachable("filtered out!");
   }
 

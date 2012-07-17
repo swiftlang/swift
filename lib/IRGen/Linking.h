@@ -65,7 +65,7 @@ class LinkEntity {
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
 
   enum class Kind {
-    Function, Getter, Setter, ValueWitness, Other
+    Function, Getter, Setter, ValueWitness, Destructor, Other
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -130,6 +130,12 @@ public:
     assert(hasGetterSetter(decl));
     LinkEntity entity;
     entity.setForDecl(Kind::Setter, decl, explosionKind, 0);
+    return entity;
+  }
+
+  static LinkEntity forDestructor(ClassDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::Destructor, decl, ExplosionKind::Minimal, 0);
     return entity;
   }
 

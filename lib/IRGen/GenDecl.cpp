@@ -230,6 +230,9 @@ static bool isLocalLinkageType(Type type) {
 }
 
 bool LinkEntity::isLocalLinkage() const {
+  if (getKind() == Kind::Destructor) {
+    return true;
+  }
   if (getKind() == Kind::ValueWitness) {
     return isLocalLinkageType(getType());
   }
@@ -475,6 +478,23 @@ llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
   entry = link.createFunction(*this, fnType, cc, attrs);
   return entry;
 }
+
+/// Fetch the declaration of the given known function.
+llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd) {
+  LinkEntity entity = LinkEntity::forDestructor(cd);
+
+  // Check whether we've cached this.
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) return cast<llvm::Function>(entry);
+
+  SmallVector<llvm::AttributeWithIndex, 4> attrs;
+  auto cc = expandAbstractCC(*this, AbstractCC::Method, false, attrs);
+
+  LinkInfo link = LinkInfo::get(*this, entity);
+  entry = link.createFunction(*this, DtorTy, cc, attrs);
+  return entry;
+}
+
 
 /// Returns the address of a value-witness function.
 llvm::Function *IRGenModule::getAddrOfValueWitness(Type concreteType,
