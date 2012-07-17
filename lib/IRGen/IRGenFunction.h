@@ -348,7 +348,7 @@ public:
                                          ExplosionKind explosionLevel,
                                          unsigned uncurryLevel);
 
-  void bindArchetype(ArchetypeType *type, llvm::Value *wtable);
+  void bindArchetype(ArchetypeType *type, ArrayRef<llvm::Value*> wtables);
 
   void emitConstructorBody(ConstructorDecl *CD);
 

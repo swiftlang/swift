@@ -840,6 +840,21 @@ namespace {
     }
   };
 
+  class ArchetypeProtocolEntry : public ProtocolEntry {
+    mutable llvm::Value *WTable = nullptr;
+  public:
+    ArchetypeProtocolEntry(const ProtocolEntry &entry)
+      : ProtocolEntry(entry) {}
+
+    llvm::Value *getWitnessTable() const {
+      assert(WTable && "witness table not set!");
+      return WTable;
+    }
+    void setWitnessTable(llvm::Value *wtable) const {
+      WTable = wtable;
+    }
+  };
+
   /// A type implementation for an ArchetypeType, otherwise known as a
   /// type variable: for example, This in a protocol declaration, or T
   /// in a generic declaration like foo<T>(x : T) -> T.  The critical
@@ -848,22 +863,56 @@ namespace {
   class ArchetypeTypeInfo :
       public IndirectTypeInfo<ArchetypeTypeInfo, TypeInfo> {
 
-    /// The current witness-table pointer registered with this type.
-    /// I'm not really sure this is a good idea.
-    mutable llvm::Value *WTable = nullptr;
-    
-  public:
-    ArchetypeTypeInfo(llvm::Type *type)
-      : IndirectTypeInfo(type, Size(1), Alignment(1), IsNotPOD) {}
+    /// The "value" witness-table pointer registered with this type.
+    /// This is set even when there are no protocols associated with
+    /// the type.
+    mutable llvm::Value *ValueWTable = nullptr;
 
-    /// Return the witness table that's been set for this type.
-    llvm::Value *getWitnessTable(IRGenFunction &IGF) const{
-      assert(WTable && "witness table not set!");
-      return WTable;
+    /// The number of protocols that this archetype ascribes to.
+    unsigned NumProtocols;
+
+    ArchetypeProtocolEntry *getProtocolsBuffer() {
+      return reinterpret_cast<ArchetypeProtocolEntry*>(this + 1);
+    }
+    const ArchetypeProtocolEntry *getProtocolsBuffer() const {
+      return reinterpret_cast<const ArchetypeProtocolEntry*>(this + 1);
     }
 
-    void setWitnessTable(llvm::Value *wtable) const {
-      WTable = wtable;
+    ArchetypeTypeInfo(llvm::Type *type, ArrayRef<ProtocolEntry> protocols)
+      : IndirectTypeInfo(type, Size(1), Alignment(1), IsNotPOD),
+        NumProtocols(protocols.size()) {
+      for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
+        new (&getProtocolsBuffer()[i]) ArchetypeProtocolEntry(protocols[i]);
+      }
+    }
+
+  public:
+    static const ArchetypeTypeInfo *create(llvm::Type *type,
+                                           ArrayRef<ProtocolEntry> protocols) {
+      void *buffer =
+        operator new(sizeof(ArchetypeTypeInfo) +
+                     protocols.size() * sizeof(ArchetypeProtocolEntry));
+      return new (buffer) ArchetypeTypeInfo(type, protocols);
+    }
+
+    ArrayRef<ArchetypeProtocolEntry> getProtocols() const {
+      return llvm::makeArrayRef(getProtocolsBuffer(), NumProtocols);
+    }
+
+    /// Return the witness table that's been set for this type.
+    llvm::Value *getWitnessTable(IRGenFunction &IGF, unsigned which) const {
+      return getProtocols()[which].getWitnessTable();
+    }
+    void setWitnessTable(unsigned which, llvm::Value *wtable) const {
+      getProtocols()[which].setWitnessTable(wtable);
+    }
+
+    llvm::Value *getValueWitnessTable(IRGenFunction &IGF) const {
+      assert(ValueWTable && "value witness table not set!");
+      return ValueWTable;
+    }
+    void setValueWitnessTable(llvm::Value *wtable) const {
+      ValueWTable = wtable;
     }
 
     /// Create an uninitialized archetype object.
@@ -882,7 +931,7 @@ namespace {
                                         name);
 
       // Allocate an object of the appropriate type within it.
-      llvm::Value *wtable = getWitnessTable(IGF);
+      llvm::Value *wtable = getValueWitnessTable(IGF);
       Address allocated(emitAllocateBufferCall(IGF, wtable, buffer),
                         Alignment(1));
       OwnedAddress ownedAddr(allocated, IGF.IGM.RefCountedNull);
@@ -895,24 +944,24 @@ namespace {
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
-      emitAssignWithCopyCall(IGF, getWitnessTable(IGF),
+      emitAssignWithCopyCall(IGF, getValueWitnessTable(IGF),
                              dest.getAddress(), src.getAddress());
     }
 
     void initializeWithCopy(IRGenFunction &IGF,
                             Address dest, Address src) const {
-      emitInitializeWithCopyCall(IGF, getWitnessTable(IGF),
+      emitInitializeWithCopyCall(IGF, getValueWitnessTable(IGF),
                                  dest.getAddress(), src.getAddress());
     }
 
     void destroy(IRGenFunction &IGF, Address addr) const {
-      emitDestroyCall(IGF, getWitnessTable(IGF), addr.getAddress());
+      emitDestroyCall(IGF, getValueWitnessTable(IGF), addr.getAddress());
     }
 
     virtual std::pair<llvm::Value*,llvm::Value*>
     getSizeAndAlignment(IRGenFunction &IGF) const {
       // Call the size an alignment witness.
-      llvm::Value *witnessTable = getWitnessTable(IGF);
+      llvm::Value *witnessTable = getValueWitnessTable(IGF);
       llvm::Value *fn = loadValueWitness(IGF, witnessTable,
                                          ValueWitness::SizeAndAlignment);
       llvm::CallInst *call = IGF.Builder.CreateCall(fn, witnessTable);
@@ -2468,17 +2517,27 @@ TypeConverter::convertProtocolCompositionType(ProtocolCompositionType *T) {
 }
 
 const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *T) {
+  // Compute layouts for the protocols we ascribe to.
+  SmallVector<ProtocolEntry, 4> protocols;
+  for (auto protocol : T->getConformsTo()) {
+    const ProtocolInfo &impl = IGM.getProtocolInfo(protocol);
+    protocols.push_back(ProtocolEntry(protocol, impl));
+  }
+  
   // For now, just always use the same type.
-  // TODO: also store something about the protocols we conform to?
   llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();
-  return new ArchetypeTypeInfo(storageType);
+  return ArchetypeTypeInfo::create(storageType, protocols);
 }
 
 /// Inform IRGenFunction that the given archetype has the given value
 /// witness value within this scope.
-void IRGenFunction::bindArchetype(ArchetypeType *type, llvm::Value *wtable) {
+void IRGenFunction::bindArchetype(ArchetypeType *type,
+                                  ArrayRef<llvm::Value*> wtables) {
+  assert(wtables.size() >= 1);
   auto &ti = getFragileTypeInfo(type).as<ArchetypeTypeInfo>();
-  ti.setWitnessTable(wtable);
+  ti.setValueWitnessTable(wtables[0]);
+  for (unsigned i = 0, e = ti.getProtocols().size(); i != e; ++i)
+    ti.setWitnessTable(i, wtables[i]);
 }
 
 /// Perform all the bindings necessary to emit the given declaration.
@@ -2489,19 +2548,32 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
   for (auto &param : generics) {
     TypeAliasDecl *typeParam = param.getAsTypeParam();
     assert(typeParam && "unknown generic parameter kind!");
+    auto paramName = typeParam->getName().str();
+
     auto archetype = cast<ArchetypeType>(typeParam->getUnderlyingType());
     auto &archetypeTI =
       IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
 
-    // There's always at least one witness table.
-    llvm::Value *wtable = in.claimUnmanagedNext();
-    wtable->setName(typeParam->getName().str());
-    archetypeTI.setWitnessTable(wtable);
+    // Find the protocols the parameter implements.
+    auto protocols = archetypeTI.getProtocols();
 
-    // Ignore the remaining ones.  FIXME: save all of these
-    auto protocols = typeParam->getInherited();
-    if (!protocols.empty()) {
-      in.ignoreUnmanaged(protocols.size() - 1);
+    // Even if there are no formal protocols, we always have at least
+    // one witness table so that we can use the type parameter as a
+    // value type.
+    if (protocols.empty()) {
+      llvm::Value *wtable = in.claimUnmanagedNext();
+      wtable->setName(paramName);
+      archetypeTI.setValueWitnessTable(wtable);
+      continue;
+    }
+
+    // Otherwise, set all the protocol witnesses.
+    for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
+      llvm::Value *wtable = in.claimUnmanagedNext();
+      wtable->setName(Twine(paramName) + "." +
+                        protocols[i].getProtocol()->getName().str());
+      if (i == 0) archetypeTI.setValueWitnessTable(wtable);
+      archetypeTI.setWitnessTable(i, wtable);
     }
   }
 }
@@ -2517,7 +2589,8 @@ void irgen::expandPolymorphicSignature(IRGenModule &IGM,
     // For now, pass each signature requirement separately.  We always
     // need to pass at least one witness table in order to know how to
     // manipulate the type.
-    unsigned n = std::max(unsigned(paramType->getInherited().size()), 1U);
+    auto archetype = paramType->getUnderlyingType()->castTo<ArchetypeType>();
+    unsigned n = std::max(unsigned(archetype->getConformsTo().size()), 1U);
     while (n--) out.push_back(IGM.WitnessTablePtrTy);
   }
 }
@@ -2715,62 +2788,6 @@ LValue irgen::emitExistentialMemberRefLValue(IRGenFunction &IGF,
   return IGF.emitFakeLValue(IGF.getFragileTypeInfo(E->getType()));
 }
 
-/// Find the path of base protocols necessary to reach the given
-/// function.
-/// TODO: try to find an optimal path, not just the first path.
-static bool findBasePath(SmallVectorImpl<ProtocolDecl*> &path,
-                         ProtocolDecl *from, ProtocolDecl *to) {
-  if (from == to) return true;
-  for (Type ty : from->getInherited()) {
-    ProtocolDecl *next = ty->castTo<ProtocolType>()->getDecl();
-    path.push_back(next);
-    if (findBasePath(path, next, to))
-      return true;
-    path.pop_back();
-  }
-  return false;
-}
-
-/// Given a witness table and the protocol it testifies to, find a
-/// witness for the given declaration.  The table will be left
-/// pointing at the appropriate witness table for the protocol.
-static llvm::Value *findWitness(IRGenFunction &IGF,
-                                llvm::Value *&table,
-                                ProtocolDecl *tableProtocol,
-                                Decl *target,
-                       WitnessIndex (WitnessTableEntry::*getIndex)() const) {
-  ProtocolDecl *owner = cast<ProtocolDecl>(target->getDeclContext());
-
-  // Find a path to the protocol which declares the method.
-  SmallVector<ProtocolDecl*, 4> basePath;
-  bool foundPath = findBasePath(basePath, tableProtocol, owner);
-  assert(foundPath && "no path to protocol declaring method!");
-  (void) foundPath;
-
-  // Walk through the protocols.
-  for (unsigned i = 0, e = basePath.size(); i != e; ++i) {
-    ProtocolDecl *derived = (i == 0 ? tableProtocol : basePath[i-1]);
-    ProtocolDecl *base = basePath[i];
-
-    // Find the witness table index for the base protocol.
-    auto &derivedPI = IGF.IGM.getProtocolInfo(derived);
-    auto &witnessEntry = derivedPI.getWitnessEntry(base);
-    assert(witnessEntry.isBase());
-
-    // If it's an inline base, the conversion is trivial.
-    if (!witnessEntry.isOutOfLineBase()) continue;
-
-    // If it's out-of-line, we have to drill down.
-    table = loadOpaqueWitness(IGF, table, witnessEntry.getOutOfLineBaseIndex());
-    table = IGF.Builder.CreateBitCast(table, IGF.IGM.WitnessTablePtrTy);
-  }
-
-  // Pull out the function witness.
-  auto &ownerPI = IGF.IGM.getProtocolInfo(owner);
-  auto &witnessEntry = ownerPI.getWitnessEntry(target);
-  return loadOpaqueWitness(IGF, table, (witnessEntry.*getIndex)());
-}
-
 /// Emit a callee for a protocol method.
 ///
 /// \param fn - the protocol member being called
@@ -2893,17 +2910,18 @@ Callee irgen::emitArchetypeMemberRefCallee(IRGenFunction &IGF,
   ArchetypeType *archetype = baseTy->castTo<ArchetypeType>();
 
   // The protocol we're calling on.
-  // TODO: support protocol compositions here.
-  assert(archetype->getConformsTo().size() == 1);
-  ProtocolDecl *proto = archetype->getConformsTo()[0];
+  ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
 
   // Find the witness table.
   auto &archetypeTI = IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
-  llvm::Value *wtable = archetypeTI.getWitnessTable(IGF);
+  ProtocolPath path(IGF.IGM, archetypeTI.getProtocols(), fnProto);
+  llvm::Value *origin = archetypeTI.getWitnessTable(IGF, path.getOriginIndex());
+  llvm::Value *wtable = path.apply(IGF, origin);
 
   // Find the actual witness.
-  llvm::Value *witness = findWitness(IGF, wtable, proto, fn,
-                                     &WitnessTableEntry::getFunctionIndex);
+  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(fnProto);
+  auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
+  llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
 
   // Emit the callee.
   return emitProtocolMethodCallee(IGF, fn, witness, calleeArgs,
