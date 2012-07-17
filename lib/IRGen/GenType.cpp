@@ -284,10 +284,12 @@ IRGenModule::createNominalType(ProtocolCompositionType *type) {
   SmallVector<ProtocolDecl *, 4> protocols;
   type->isExistentialType(protocols);
 
+  nameStream << "protocol<";
   for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-    if (i) nameStream << '+';
+    if (i) nameStream << ',';
     LinkEntity::forNonFunction(protocols[i]).mangle(nameStream);
   }
+  nameStream << '>';
   nameStream.flush();
   return llvm::StructType::create(getLLVMContext(), typeName.str());
 }

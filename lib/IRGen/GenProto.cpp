@@ -53,6 +53,7 @@
 
 using namespace swift;
 using namespace irgen;
+namespace swift { namespace irgen { class GenProto; } }
 
 /// A fixed-size buffer is always 16 bytes and pointer-aligned.
 /// If we align them more, we'll need to introduce padding to
@@ -2256,6 +2257,80 @@ namespace {
   };
 }
 
+/// Collect the value witnesses for a particular type.
+static void addValueWitnesses(IRGenModule &IGM, FixedPacking packing,
+                              Type concreteType, const TypeInfo &concreteTI,
+                              SmallVectorImpl<llvm::Constant*> &table) {
+  for (unsigned i = 0; i != NumValueWitnesses; ++i) {
+    table.push_back(getValueWitness(IGM, ValueWitness(i),
+                                    packing, concreteType,
+                                    concreteTI));
+  }
+}
+
+/// Construct a global variable to hold a witness table.
+///
+/// \param protocol - optional; null if this is the trivial
+///   witness table
+ /// \return a value of type IGM.WitnessTablePtrTy
+static llvm::Constant *buildWitnessTable(IRGenModule &IGM,
+                                         Type concreteType,
+                                         ProtocolDecl *protocol,
+                                         ArrayRef<llvm::Constant*> witnesses) {
+  assert(witnesses.size() >= NumValueWitnesses);
+
+  // We've got our global initializer.
+  llvm::ArrayType *tableTy =
+    llvm::ArrayType::get(IGM.Int8PtrTy, witnesses.size());
+  llvm::Constant *initializer =
+    llvm::ConstantArray::get(tableTy, witnesses);
+
+  // Construct a variable for that.
+  // FIXME: linkage, better name, agreement across t-units,
+  // interaction with runtime, etc.
+  llvm::GlobalVariable *var =
+    new llvm::GlobalVariable(IGM.Module, tableTy, /*constant*/ true,
+                             llvm::GlobalVariable::InternalLinkage,
+                             initializer, "witness_table");
+
+  // Abstract away the length.
+  llvm::ConstantInt *zero = llvm::ConstantInt::get(IGM.SizeTy, 0);
+  llvm::Constant *indices[] = { zero, zero };
+  return llvm::ConstantExpr::getInBoundsGetElementPtr(var, indices);
+}
+
+/// A little helper to give this file some privileged access.
+class irgen::GenProto {
+public:
+  static llvm::DenseMap<TypeBase*, llvm::Constant*> &
+  getTrivialWitnessTablesCache(IRGenModule &IGM) {
+    return IGM.Types.TrivialWitnessTables;
+  }
+};
+
+/// Get or create the trivial witness table for a type.
+static llvm::Constant *
+getTrivialWitnessTable(IRGenModule &IGM, Type concreteType,
+                       const TypeInfo &concreteTI, FixedPacking packing) {
+  auto &cache = GenProto::getTrivialWitnessTablesCache(IGM);
+
+  // Check whether we've already made an entry for this.
+  TypeBase *key = concreteType->getCanonicalType().getPointer();
+  auto it = cache.find(key);
+  if (it != cache.end())
+    return it->second;
+
+  // Build the actual table.
+  SmallVector<llvm::Constant*, NumValueWitnesses> witnesses;
+  addValueWitnesses(IGM, packing, concreteType, concreteTI, witnesses);
+  llvm::Constant *table =
+    buildWitnessTable(IGM, concreteType, nullptr, witnesses);
+
+  // Add to the cache and return.
+  cache.insert(std::make_pair(key, table));
+  return table;
+}
+
 /// Do a memoized witness-table layout for a protocol.
 const ProtocolInfo &IRGenModule::getProtocolInfo(ProtocolDecl *protocol) {
   return Types.getProtocolInfo(protocol);
@@ -2317,35 +2392,15 @@ ProtocolInfo::getConformance(IRGenModule &IGM, Type concreteType,
   SmallVector<llvm::Constant*, 32> witnesses;
 
   // First, build the value witnesses.
-  for (unsigned i = 0; i != NumValueWitnesses; ++i) {
-    witnesses.push_back(getValueWitness(IGM, ValueWitness(i),
-                                        packing, concreteType,
-                                        concreteTI));
-  }
+  addValueWitnesses(IGM, packing, concreteType, concreteTI, witnesses);
 
   // Next, build the protocol witnesses.
   WitnessTableBuilder(IGM, witnesses, packing, concreteType, concreteTI,
                       conformance).visit(protocol);
 
-  // We've got our global initializer.
-  llvm::ArrayType *tableTy =
-    llvm::ArrayType::get(IGM.Int8PtrTy, witnesses.size());
-  llvm::Constant *initializer =
-    llvm::ConstantArray::get(tableTy, witnesses);
-
-  // Construct a variable for that.
-  // FIXME: linkage, better name, agreement across t-units,
-  // interaction with runtime, etc.
-  llvm::GlobalVariable *var =
-    new llvm::GlobalVariable(IGM.Module, tableTy, /*constant*/ true,
-                             llvm::GlobalVariable::InternalLinkage,
-                             initializer, "witness_table");
-
-  // Abstract away the length.
-  llvm::ConstantInt *zero = llvm::ConstantInt::get(IGM.SizeTy, 0);
-  llvm::Constant *indices[] = { zero, zero };
+  // Build the actual global variable.
   llvm::Constant *table =
-    llvm::ConstantExpr::getInBoundsGetElementPtr(var, indices);
+    buildWitnessTable(IGM, concreteType, protocol, witnesses);
 
   ConformanceInfo *info = new ConformanceInfo;
   info->Table = table;
@@ -2588,8 +2643,12 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
 
   // Okay, now write the witness table pointers into the existential.
 
+  // If this is the trivial composition type, grab the witness table.
   if (destEntries.empty()) {
-    IGF.unimplemented(E->getLoc(), "erasure to no protocols");
+    llvm::Constant *wtable =
+      getTrivialWitnessTable(IGF.IGM, srcType, srcTI, packing);
+    Address tableSlot = destLayout.projectWitnessTable(IGF, dest, 0);
+    IGF.Builder.CreateStore(wtable, tableSlot);
     return;
   }
 

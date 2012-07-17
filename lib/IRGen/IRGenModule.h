@@ -135,6 +135,7 @@ public:
 private:
   TypeConverter &Types;
   friend class TypeConverter;
+  friend class GenProto;
 
 //--- Globals ---------------------------------------------------------------
 private:

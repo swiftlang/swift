@@ -20,6 +20,10 @@
 
 #include "llvm/ADT/DenseMap.h"
 
+namespace llvm {
+  class Constant;
+}
+
 namespace swift {
   class ArchetypeType;
   class ArrayType;
@@ -50,8 +54,11 @@ class TypeConverter {
   IRGenModule &IGM;
   llvm::DenseMap<TypeBase*, const TypeInfo*> Types;
   llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
+  llvm::DenseMap<TypeBase*, llvm::Constant*> TrivialWitnessTables;
   const TypeInfo *FirstType;
   const ProtocolInfo *FirstProtocol;
+
+  friend class GenProto;
 
   static const TypeInfo *createPrimitive(llvm::Type *T,
                                          Size size, Alignment align);
