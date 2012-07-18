@@ -247,8 +247,7 @@ collectArchetypeToExistentialSubstitutions(ASTContext &Context,
                        std::back_inserter(ConformsTo),
                        [](ProtocolDecl *P) { return P->getDeclaredType(); });
         Substitutions[Archetype]
-          = ProtocolCompositionType::get(Context, SourceLoc(),
-                                         Context.AllocateCopy(ConformsTo));
+          = ProtocolCompositionType::get(Context, SourceLoc(), ConformsTo);
       }
     }
   }

@@ -302,8 +302,7 @@ bool Parser::parseTypeComposition(Type &Result, TypeLoc *&ResultLoc) {
     EndLoc = consumeStartingGreater();
   }
   
-  Result = ProtocolCompositionType::get(Context, ProtocolLoc,
-                                        Context.AllocateCopy(Protocols));
+  Result = ProtocolCompositionType::get(Context, ProtocolLoc, Protocols);
   ResultLoc = TypeLoc::get(Context, SourceRange(ProtocolLoc, EndLoc));
   return false;
 }

@@ -693,8 +693,7 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     if (!AnyChanged)
       return T;
     
-    return ProtocolCompositionType::get(Context, PC->getFirstLoc(),
-                                        Context.AllocateCopy(Protocols));
+    return ProtocolCompositionType::get(Context, PC->getFirstLoc(), Protocols);
   }
   }
   

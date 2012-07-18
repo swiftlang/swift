@@ -240,8 +240,8 @@ IdentifierType *IdentifierType::getNew(ASTContext &C,
 }
 
 ProtocolCompositionType *
-ProtocolCompositionType::get(ASTContext &C, SourceLoc FirstLoc,
-                             ArrayRef<Type> Protocols) {
+ProtocolCompositionType::build(ASTContext &C, SourceLoc FirstLoc,
+                               ArrayRef<Type> Protocols) {
   // Check to see if we've already seen this protocol composition before.
   void *InsertPos = 0;
   llvm::FoldingSetNodeID ID;
@@ -249,10 +249,17 @@ ProtocolCompositionType::get(ASTContext &C, SourceLoc FirstLoc,
   if (ProtocolCompositionType *Result
         = C.Impl.ProtocolCompositionTypes.FindNodeOrInsertPos(ID, InsertPos))
     return Result;
-  
+
+  bool isCanonical = true;
+  for (Type t : Protocols) {
+    if (!t->isCanonical())
+      isCanonical = false;
+  }
+
   // Create a new protocol composition type.
-  ProtocolCompositionType *New = new (C) ProtocolCompositionType(C, FirstLoc,
-                                                                 Protocols);
+  ProtocolCompositionType *New =
+      new (C) ProtocolCompositionType(isCanonical ? &C : nullptr, FirstLoc,
+                                      C.AllocateCopy(Protocols));
   C.Impl.ProtocolCompositionTypes.InsertNode(New, InsertPos);
   return New;
 }

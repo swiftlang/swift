@@ -435,44 +435,13 @@ CanType TypeBase::getCanonicalType() {
     break;
   }
   case TypeKind::ProtocolComposition: {
-    // Collect all of the protocols composed together.
-    auto PC = cast<ProtocolCompositionType>(this);
-    SmallVector<ProtocolDecl *, 4> Protocols;
-    addProtocols(this, Protocols);
-    
-    // Minimize the set of protocols composed together.
-    minimizeProtocols(Protocols);
-    
-    // If one protocol remains, its nominal type is the canonical type.
-    if (Protocols.size() == 1)
-      Result = Protocols.front()->getDeclaredType();
-    else {
-      // Sort the set of protocols by module + name, to give a stable
-      // ordering.
-      // FIXME: Consider namespaces here as well.
-      llvm::array_pod_sort(Protocols.begin(),Protocols.end(), compareProtocols);
-      
-      // Form the set of canonical protocol types from the protocol
-      // declarations, and use that to buid the canonical composition type.
-      SmallVector<Type, 4> ProtocolTypes;
-      std::transform(Protocols.begin(), Protocols.end(),
-                     std::back_inserter(ProtocolTypes),
-                     [](ProtocolDecl *Proto) {
-                       return Proto->getDeclaredType();
-                     });
-      
-      Result = ProtocolCompositionType::get(
-                 PC->getASTContext(),
-                 PC->getFirstLoc(),
-                 PC->getASTContext().AllocateCopy(ProtocolTypes));
-      
-      // We now know that the result type we computed is canonical; make it so.
-      Result->CanonicalType = &PC->getASTContext();
-    }
-    
-    // If the result type we found was ourselves, we're done.
-    if (this == Result)
-      return CanType(Result);
+    SmallVector<Type, 4> CanProtos;
+    for (Type t : cast<ProtocolCompositionType>(this)->getProtocols())
+      CanProtos.push_back(t->getCanonicalType());
+    assert(!CanProtos.empty() && "Non-canonical empty composition?");
+    ASTContext &C = CanProtos[0]->getASTContext();
+    Type Composition = ProtocolCompositionType::get(C, SourceLoc(), CanProtos);
+    Result = Composition.getPointer();
     break;
   }
   case TypeKind::MetaType: {
@@ -713,6 +682,42 @@ BoundGenericType::setConformances(ArrayRef<unsigned> Offsets,
   AllConformances = new (Mem) AllConformancesType;
   AllConformances->Offsets = Ctx.AllocateCopy(Offsets);
   AllConformances->Conformances = Ctx.AllocateCopy(Conformances);
+}
+
+Type
+ProtocolCompositionType::get(ASTContext &C, SourceLoc FirstLoc,
+                             ArrayRef<Type> ProtocolTypes) {
+  for (Type t : ProtocolTypes) {
+    if (!t->isCanonical())
+      return build(C, FirstLoc, ProtocolTypes);
+  }
+    
+  SmallVector<ProtocolDecl *, 4> Protocols;
+  for (Type t : ProtocolTypes)
+    addProtocols(t, Protocols);
+  
+  // Minimize the set of protocols composed together.
+  minimizeProtocols(Protocols);
+
+  // If one protocol remains, its nominal type is the canonical type.
+  if (Protocols.size() == 1)
+    return Protocols.front()->getDeclaredType();
+
+  // Sort the set of protocols by module + name, to give a stable
+  // ordering.
+  // FIXME: Consider namespaces here as well.
+  llvm::array_pod_sort(Protocols.begin(), Protocols.end(), compareProtocols);
+
+  // Form the set of canonical protocol types from the protocol
+  // declarations, and use that to buid the canonical composition type.
+  SmallVector<Type, 4> CanProtocolTypes;
+  std::transform(Protocols.begin(), Protocols.end(),
+                 std::back_inserter(CanProtocolTypes),
+                 [](ProtocolDecl *Proto) {
+                   return Proto->getDeclaredType();
+                 });
+
+  return build(C, SourceLoc(), CanProtocolTypes);
 }
 
 //===----------------------------------------------------------------------===//
