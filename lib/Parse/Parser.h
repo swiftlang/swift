@@ -328,9 +328,11 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing
-  GenericParamList *parseGenericParameters();
-  GenericParamList *maybeParseGenericParamsIntoScope(Optional<Scope>& scope,
-                                                     bool AllowLookup);
+  GenericParamList *parseGenericParameters(Optional<Scope>& scope,
+                                           bool AllowLookup);
+  GenericParamList *maybeParseGenericParams(Optional<Scope>& scope,                                                     bool AllowLookup);
+  bool parseRequiresClause(SourceLoc &RequiresLoc,
+                           SmallVectorImpl<Requirement> &Requirements);
 };
 
 } // end namespace swift

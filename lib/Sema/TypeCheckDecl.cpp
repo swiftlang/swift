@@ -128,6 +128,50 @@ public:
         }
       }
     }
+
+    for (auto &Req : GenericParams->getRequirements()) {
+      switch (Req.getKind()) {
+      case RequirementKind::Conformance:
+        // FIXME: Terrible location info
+        if (TC.validateType(Req.getSubject(), GenericParams->getRequiresLoc(),
+                            IsFirstPass)) {
+          Req.overrideSubject(ErrorType::get(TC.Context));
+          return;
+        }
+
+        if (TC.validateType(Req.getProtocol(), GenericParams->getRequiresLoc(),
+                            IsFirstPass)) {
+          Req.overrideProtocol(ErrorType::get(TC.Context));
+          return;
+        }
+
+        if (!Req.getProtocol()->isExistentialType()) {
+          TC.diagnose(GenericParams->getRequiresLoc(),
+                      diag::requires_conformance_nonprotocol,
+                      Req.getSubject(), Req.getProtocol());
+          Req.overrideProtocol(ErrorType::get(TC.Context));
+          return;
+        }
+        break;
+
+      case RequirementKind::SameType:
+        // FIXME: Terrible location info
+        if (TC.validateType(Req.getFirstType(),
+                            GenericParams->getRequiresLoc(),
+                            IsFirstPass)) {
+          Req.overrideFirstType(ErrorType::get(TC.Context));
+          return;
+        }
+
+        if (TC.validateType(Req.getSecondType(),
+                            GenericParams->getRequiresLoc(),
+                            IsFirstPass)) {
+          Req.overrideSecondType(ErrorType::get(TC.Context));
+          return;
+        }
+        break;
+      }
+    }
   }
 
   //===--------------------------------------------------------------------===//

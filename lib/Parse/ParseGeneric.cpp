@@ -19,21 +19,26 @@
 using namespace swift;
 
 /// parseGenericParameters - Parse a sequence of generic parameters, e.g.,
-/// < T : Comparable, U : Container>
+/// < T : Comparable, U : Container> along with an optional requires clause.
 ///
 ///   generic-params:
-///     '<' generic-param (',' generic-param)? '>'
+///     '<' generic-param (',' generic-param)? requires-clause? '>'
 ///
 ///   generic-param:
 ///     identifier
 ///     identifier ':' type-identifier
 ///     identifier ':' type-composition
-GenericParamList *Parser::parseGenericParameters() {
+///
+/// When parsing the generic parameters, this routine establishes a new scope
+/// and adds those parameters to the scope.
+GenericParamList *Parser::parseGenericParameters(Optional<Scope>& scope,
+                                                 bool AllowLookup) {
   // Parse the opening '<'.
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
   SourceLoc LAngleLoc = consumeStartingLess();
 
   // Parse the generic parameter list.
+  // FIXME: Allow a bare 'requires' clause with no generic parameters?
   SmallVector<GenericParam, 4> GenericParams;
   bool Invalid = false;
   while (true) {
@@ -70,7 +75,15 @@ GenericParamList *Parser::parseGenericParameters() {
                                     CurDeclContext,
                                     Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);
-    
+
+    // If we haven't built a scope yet, do so now.
+    if (!scope) {
+      scope.emplace(this, AllowLookup);
+    }
+
+    // Add this parameter to the scope.
+    ScopeInfo.addToScope(Param);
+
     // Parse the comma, if the list continues.
     if (Tok.is(tok::comma)) {
       consumeToken();
@@ -80,6 +93,14 @@ GenericParamList *Parser::parseGenericParameters() {
     break;
   }
 
+  // Parse the optional requires-clause.
+  SourceLoc RequiresLoc;
+  SmallVector<Requirement, 4> Requirements;
+  if (Tok.is(tok::kw_requires) &&
+      parseRequiresClause(RequiresLoc, Requirements)) {
+    Invalid = true;
+  }
+  
   // Parse the closing '>'.
   SourceLoc RAngleLoc;
   if (!startsWithGreater(Tok)) {
@@ -103,26 +124,111 @@ GenericParamList *Parser::parseGenericParameters() {
   if (GenericParams.empty())
     return nullptr;
 
-  return GenericParamList::create(Context, LAngleLoc, GenericParams, RAngleLoc);
+  return GenericParamList::create(Context, LAngleLoc, GenericParams,
+                                  RequiresLoc, Requirements, RAngleLoc);
 }
 
-GenericParamList *Parser::maybeParseGenericParamsIntoScope(
-                              Optional<Scope>& scope,
-                              bool AllowLookup) {
+GenericParamList *Parser::maybeParseGenericParams(Optional<Scope>& scope,
+                                                  bool AllowLookup) {
   if (!startsWithLess(Tok))
     return nullptr;
 
-  GenericParamList *GenericParams = parseGenericParameters();
+  return parseGenericParameters(scope, AllowLookup);
+}
 
-  // If there were any generic parameters, introduce the new scope to
-  // hold those generic parameters.
-  if (GenericParams) {
-    scope.emplace(this, AllowLookup);
-    
-    for (auto Param : *GenericParams) {
-      ScopeInfo.addToScope(Param.getDecl());
+/// parseRequiresClause - Parse a requires clause, which places additional
+/// constraints on generic parameters or types based on them.
+///
+///   requires-clause:
+///     'requires' requirement (',' requirement) *
+///
+///   requirement:
+///     conformance-requirement
+///     same-type-requirement
+///
+///   conformance-requirement:
+///     type-identifier ':' type-identifier
+///     type-identifier ':' type-composition
+///
+///   same-type-requirement:
+///     type-identifier '==' type-identifier
+bool Parser::parseRequiresClause(SourceLoc &RequiresLoc,
+                                 SmallVectorImpl<Requirement> &Requirements) {
+  // Parse the 'requires'.
+  RequiresLoc = consumeToken(tok::kw_requires);
+  bool Invalid = false;
+  while (true) {
+    // Parse the leading type-identifier.
+    // FIXME: Dropping TypeLocs left and right.
+    Type FirstType;
+    TypeLoc *FirstTypeLoc = nullptr;
+    if (parseTypeIdentifier(FirstType, FirstTypeLoc)) {
+      Invalid = true;
+      break;
     }
+
+    if (Tok.is(tok::colon)) {
+      // A conformance-requirement.
+      SourceLoc ColonLoc = consumeToken();
+
+      // Parse the protocol or composition.
+      Type Protocol;
+      TypeLoc *ProtocolLoc = nullptr;
+      if (Tok.is(tok::kw_protocol)) {
+        if (parseTypeComposition(Protocol, ProtocolLoc)) {
+          Invalid = true;
+          break;
+        }
+      } else if (parseTypeIdentifier(Protocol, ProtocolLoc)) {
+        Invalid = true;
+        break;
+      }
+
+      // Add the requirement.
+      Requirements.push_back(Requirement::getConformance(FirstType, ColonLoc,
+                                                         Protocol));
+
+      // If there's a comma, keep parsing the list.
+      if (Tok.is(tok::comma)) {
+        consumeToken();
+        continue;
+      }
+
+      break;
+    }
+
+    if ((Tok.isAnyOperator() && Tok.getText() == "==") || Tok.is(tok::equal)) {
+      // A same-type-requirement
+      if (Tok.is(tok::equal)) {
+        // FIXME: Fix-It here!
+        diagnose(Tok, diag::requires_single_equal);
+      }
+      SourceLoc EqualLoc = consumeToken();
+
+      // Parse the second type.
+      Type SecondType;
+      TypeLoc *SecondTypeLoc = nullptr;
+      if (parseTypeIdentifier(SecondType, SecondTypeLoc)) {
+        Invalid = true;
+        break;
+      }
+
+      // Add the requirement
+      Requirements.push_back(Requirement::getSameType(FirstType, EqualLoc,
+                                                      SecondType));
+
+      // If there's a comma, keep parsing the list.
+      if (Tok.is(tok::comma)) {
+        consumeToken();
+        continue;
+      }
+
+      break;
+    }
+
+    diagnose(Tok, diag::expected_requirement_delim);
+    break;
   }
 
-  return GenericParams;
+  return Invalid;
 }

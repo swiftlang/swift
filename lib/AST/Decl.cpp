@@ -95,8 +95,11 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLoc();
 
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
                                    ArrayRef<GenericParam> Params,
+                                   SourceLoc RequiresLoc,
+                                   MutableArrayRef<Requirement> Requirements,
                                    SourceLoc RAngleLoc)
-  : Brackets(LAngleLoc, RAngleLoc), NumParams(Params.size())
+  : Brackets(LAngleLoc, RAngleLoc), NumParams(Params.size()),
+    RequiresLoc(RequiresLoc), Requirements(Requirements)
 {
   memcpy(this + 1, Params.data(), NumParams * sizeof(GenericParam));
 }
@@ -108,7 +111,25 @@ GenericParamList *GenericParamList::create(ASTContext &Context,
   unsigned Size = sizeof(GenericParamList)
                 + sizeof(GenericParam) * Params.size();
   void *Mem = Context.Allocate(Size, llvm::alignOf<GenericParamList>());
-  return new (Mem) GenericParamList(LAngleLoc, Params, RAngleLoc);
+  return new (Mem) GenericParamList(LAngleLoc, Params, SourceLoc(),
+                                    MutableArrayRef<Requirement>(),
+                                    RAngleLoc);
+}
+
+GenericParamList *
+GenericParamList::create(ASTContext &Context,
+                         SourceLoc LAngleLoc,
+                         ArrayRef<GenericParam> Params,
+                         SourceLoc RequiresLoc,
+                         MutableArrayRef<Requirement> Requirements,
+                         SourceLoc RAngleLoc) {
+  unsigned Size = sizeof(GenericParamList)
+                + sizeof(GenericParam) * Params.size();
+  void *Mem = Context.Allocate(Size, llvm::alignOf<GenericParamList>());
+  return new (Mem) GenericParamList(LAngleLoc, Params,
+                                    RequiresLoc,
+                                    Context.AllocateCopy(Requirements),
+                                    RAngleLoc);
 }
 
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,

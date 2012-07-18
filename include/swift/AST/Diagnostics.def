@@ -549,6 +549,11 @@ ERROR(expected_generics_parameter_name,parsing,none,
 ERROR(expected_generics_type_restriction,parsing,none,
       "expected a type name or protocol composition restricting %0",
       (Identifier))
+ERROR(requires_single_equal,parsing,none,
+      "use '==' for same-type requirements rather than '='", ())
+ERROR(expected_requirement_delim,parsing,none,
+      "expected ':' or '==' to indicate a conformance or same-type requirement",
+      ())
 
 //==============================================================================
 // Semantic Analysis Diagnostics
@@ -739,6 +744,9 @@ NOTE(protocol_here,sema_tcd,none,
 ERROR(protocol_composition_not_protocol,sema_tcd,none, 
       "non-protocol type %0 cannot be used within 'protocol<...>'", (Type))
 
+ERROR(requires_conformance_nonprotocol,sema_tcd,none,
+      "type %0 constrained to non-protocol type %1", (Type, Type))
+      
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------

@@ -171,21 +171,177 @@ public:
   void setDeclContext(DeclContext *DC);
 };
 
+/// \brief Describes the kind of a requirement that occurs within a requirements
+/// clause.
+enum class RequirementKind : unsigned int {
+  /// \brief A conformance requirement T : P, where T is a type that depends
+  /// on a generic parameter and P is a protocol to which T must conform.
+  Conformance,
+  /// \brief A same-type requirement T == U, where T and U are types that
+  /// shall be equivalent.
+  SameType
+};
+
+/// \brief A single requirement in a requires clause, which places additional
+/// restrictions on the generic parameters or associated types of a generic
+/// function, class, or protocol.
+class Requirement {
+  SourceLoc SeparatorLoc;
+  RequirementKind Kind : 1;
+  Type Types[2];
+
+  Requirement(SourceLoc SeparatorLoc, RequirementKind Kind, Type FirstType,
+              Type SecondType)
+    : SeparatorLoc(SeparatorLoc), Kind(Kind), Types{FirstType, SecondType} { }
+  
+public:
+  /// \brief Construct a new conformance requirement.
+  ///
+  /// \param Subject The type that must conform to the given protocol or
+  /// composition.
+  /// \param ColonLoc The location of the ':', or an invalid location if
+  /// this requirement was implied.
+  /// \param Protocol The protocol or protocol composition to which the
+  /// subject must conform.
+  static Requirement getConformance(Type Subject,
+                                               SourceLoc ColonLoc,
+                                               Type Protocol) {
+    return { ColonLoc, RequirementKind::Conformance, Subject, Protocol };
+  }
+
+  /// \brief Construct a new same-type requirement.
+  ///
+  /// \param FirstType The first type.
+  /// \param EqualLoc The location of the '==' in the same-type constraint, or
+  /// an invalid location if this requirement was implied.
+  /// \param SecondType The second type.
+  static Requirement getSameType(Type FirstType,
+                                 SourceLoc EqualLoc,
+                                 Type SecondType) {
+    return { EqualLoc, RequirementKind::SameType, FirstType, SecondType };
+  }
+
+  /// \brief Determine the kind of requirement
+  RequirementKind getKind() const { return Kind; }
+
+  /// \brief Determine whether this is an implicitly-generated requirement.
+  bool isImplicit() const {
+    return SeparatorLoc.isInvalid();
+  }
+
+  /// \brief For a conformance requirement, return the subject of the
+  /// conformance relationship.
+  Type getSubject() const {
+    assert(getKind() == RequirementKind::Conformance);
+    return Types[0];
+  }
+
+  /// \brief Override the subject of a conformance relationship.
+  void overrideSubject(Type Subject) {
+    assert(getKind() == RequirementKind::Conformance);
+    Types[0] = Subject;
+  }
+
+  /// \brief For a conformance requirement, return the protocol to which
+  /// the subject conforms.
+  Type getProtocol() const {
+    assert(getKind() == RequirementKind::Conformance);
+    return Types[1];
+  }
+
+  /// \brief Override the protocol of a conformance relationship.
+  void overrideProtocol(Type Protocol) {
+    assert(getKind() == RequirementKind::Conformance);
+    Types[1] = Protocol;
+  }
+
+  /// \brief Retrieve the location of the ':' in an explicitly-written
+  /// conformance requirement.
+  SourceLoc getColonLoc() const {
+    assert(getKind() == RequirementKind::Conformance);
+    assert(!isImplicit() && "Implicit requirements have no location");
+    return SeparatorLoc;
+  }
+
+  /// \brief Retrieve the first type of a same-type requirement.
+  Type getFirstType() const {
+    assert(getKind() == RequirementKind::SameType);
+    return Types[0];
+  }
+
+  /// \brief Override the first type of a same-type relationship.
+  void overrideFirstType(Type T) {
+    assert(getKind() == RequirementKind::SameType);
+    Types[0] = T;
+  }
+
+  /// \brief Retrieve the second type of a same-type requirement.
+  Type getSecondType() const {
+    assert(getKind() == RequirementKind::SameType);
+    return Types[1];
+  }
+
+  /// \brief Override the second type of a same-type relationship.
+  void overrideSecondType(Type T) {
+    assert(getKind() == RequirementKind::SameType);
+    Types[1] = T;
+  }
+
+  /// \brief Retrieve the location of the '==' in an explicitly-written
+  /// same-type requirement.
+  SourceLoc getEqualLoc() const {
+    assert(getKind() == RequirementKind::SameType);
+    assert(!isImplicit() && "Implicit requirements have no location");
+    return SeparatorLoc;
+  }
+};
+
 /// GenericParamList - A list of generic parameters that is part of a generic
-/// function or type.
+/// function or type, along with extra requirements placed on those generic
+/// parameters and types derived from them.
 class GenericParamList {
   SourceRange Brackets;
   unsigned NumParams;
+  SourceLoc RequiresLoc;
+  MutableArrayRef<Requirement> Requirements;
 
   GenericParamList(SourceLoc LAngleLoc,
                    ArrayRef<GenericParam> Params,
+                   SourceLoc RequiresLoc,
+                   MutableArrayRef<Requirement> Requirements,
                    SourceLoc RAngleLoc);
-  
+
 public:
   /// create - Create a new generic parameter list within the given AST context.
+  ///
+  /// \param Context The ASTContext in which the generic parameter list will
+  /// be allocated.
+  /// \param LAngleLoc The location of the opening angle bracket ('<')
+  /// \param Params The list of generic parameters, which will be copied into
+  /// ASTContext-allocated memory.
+  /// \param RAngleLoc The location of the closing angle bracket ('>')
   static GenericParamList *create(ASTContext &Context,
                                   SourceLoc LAngleLoc,
                                   ArrayRef<GenericParam> Params,
+                                  SourceLoc RAngleLoc);
+
+  /// create - Create a new generic parameter list and requires clause within
+  /// the given AST context.
+  ///
+  /// \param Context The ASTContext in which the generic parameter list will
+  /// be allocated.
+  /// \param LAngleLoc The location of the opening angle bracket ('<')
+  /// \param Params The list of generic parameters, which will be copied into
+  /// ASTContext-allocated memory.
+  /// \param RequiresLoc The location of the 'requires' keyword, if any.
+  /// \param Requirements The list of requirements, which will be copied into
+  /// ASTContext-allocated memory.
+  /// \param RAngleLoc The location of the closing angle bracket ('>')
+  static GenericParamList *create(ASTContext &Context,
+                                  SourceLoc LAngleLoc,
+                                  ArrayRef<GenericParam> Params,
+                                  SourceLoc RequiresLoc,
+                                  MutableArrayRef<Requirement> Requirements,
                                   SourceLoc RAngleLoc);
 
   MutableArrayRef<GenericParam> getParams() {
@@ -203,6 +359,37 @@ public:
   GenericParam *end()   { return getParams().end(); }
   const GenericParam *begin() const { return getParams().begin(); }
   const GenericParam *end()   const { return getParams().end(); }
+
+  /// \brief Retrieve the location of the 'requires' keyword, or an invald
+  /// location if 'requires' was not present.
+  SourceLoc getRequiresLoc() const { return RequiresLoc; }
+
+  /// \brief Retrieve the set of additional requirements placed on these
+  /// generic parameters and types derived from them.
+  ///
+  /// This list may contain both explicitly-written requirements as well as
+  /// implicitly-generated requirements, and may be non-empty even if no
+  /// 'requires' keyword were present.
+  MutableArrayRef<Requirement> getRequirements() { return Requirements; }
+
+  /// \brief Retrieve the set of additional requirements placed on these
+  /// generic parameters and types derived from them.
+  ///
+  /// This list may contain both explicitly-written requirements as well as
+  /// implicitly-generated requirements, and may be non-empty even if no
+  /// 'requires' keyword were present.
+  ArrayRef<Requirement> getRequirements() const { return Requirements; }
+
+  /// \brief Override the set of requirements associated with this generic
+  /// parameter list.
+  ///
+  /// \param NewRequirements The new set of requirements, which is expected
+  /// to be a superset of the existing set of requirements (although this
+  /// property is not checked here). It is assumed that the array reference
+  /// refers to ASTContext-allocated memory.
+  void overrideRequirements(MutableArrayRef<Requirement> NewRequirements) {
+    Requirements = NewRequirements;
+  }
 
   SourceRange getSourceRange() const { return Brackets; }
 };

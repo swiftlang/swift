@@ -322,6 +322,7 @@ void Lexer::lexIdentifier() {
     .Case("import", tok::kw_import)
     .Case("oneof", tok::kw_oneof)
     .Case("protocol", tok::kw_protocol)
+    .Case("requires", tok::kw_requires)
     .Case("struct", tok::kw_struct)
     .Case("typealias", tok::kw_typealias)
     .Case("var", tok::kw_var)
