@@ -579,8 +579,6 @@ public:
         FD->setBody(E2);
       else
         return true;
-      }
-      
     } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
       for (Decl *M : ED->getMembers()) {
         if (doIt(M))
