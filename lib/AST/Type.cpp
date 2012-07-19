@@ -632,6 +632,26 @@ ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, StringRef DisplayName,
                                    Index);
 }
 
+ArchetypeType *
+ArchetypeType::getNew(ASTContext &Ctx, StringRef DisplayName,
+                      llvm::SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                      Optional<unsigned> Index) {
+  void *Mem = Ctx.Allocate(sizeof(ArchetypeType) + DisplayName.size(),
+                           llvm::alignOf<ArchetypeType>());
+  char *StoredStringData = (char*)Mem + sizeof(ArchetypeType);
+  memcpy(StoredStringData, DisplayName.data(), DisplayName.size());
+
+  // Gather the set of protocol declarations to which this archetype conforms.
+  minimizeProtocols(ConformsTo);
+  llvm::array_pod_sort(ConformsTo.begin(), ConformsTo.end(), compareProtocols);
+
+  return ::new (Mem) ArchetypeType(Ctx,
+                                   StringRef(StoredStringData,
+                                             DisplayName.size()),
+                                   Ctx.AllocateCopy(ConformsTo),
+                                   Index);
+}
+
 DeducibleGenericParamType *
 DeducibleGenericParamType::getNew(ASTContext &Ctx, Identifier Name,
                                   unsigned Index,

@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "llvm/ADT/Twine.h"
@@ -75,9 +76,7 @@ public:
       return;
 
     // Assign archetypes to each of the generic parameters.
-    // FIXME: Actually solve the various same-type constraints, written and
-    // implied, to compute the set of archetypes we need and the requirements
-    // on those archetypes.
+    ArchetypeBuilder Builder(TC);
     unsigned Index = 0;
     for (auto GP : *GenericParams) {
       auto TypeParam = GP.getAsTypeParam();
@@ -85,63 +84,20 @@ public:
       // Check the constraints on the type parameter.
       checkInherited(TypeParam, TypeParam->getInherited());
 
-      // Create the archetype for this type parameter.
-      ArchetypeType *Archetype
-        = ArchetypeType::getNew(TC.Context, TypeParam->getName().str(),
-                                TypeParam->getInherited(), Index++);
-      TypeParam->setUnderlyingType(Archetype);
-
-      // Create archetypes for each of the associated types in each protocol.
-      // FIXME: This should also be subject to same-type constraints, which
-      // come from either a protocol or are implied by the presence of
-      // same-named associated types in different protocols that our type
-      // parameter conforms to.
-      for (auto Inherited : TypeParam->getInherited()) {
-        SmallVector<ProtocolDecl *, 4> Protocols;
-        if (Inherited->isExistentialType(Protocols)) {
-          for (auto P : Protocols) {
-            for (auto Member : P->getMembers()) {
-              TypeAliasDecl *AssocType = dyn_cast<TypeAliasDecl>(Member);
-              if (!AssocType)
-                continue;
-
-              ArchetypeType *AssocArchetype
-                = AssocType->getDeclaredType()->getAs<ArchetypeType>();
-              if (!AssocArchetype)
-                continue;
-              
-              // FIXME: Identify 'This' in some sane manner.
-              Type MappedTo;
-              if (AssocType->getName().str() == "This") {
-                MappedTo = Archetype;
-              } else {
-                MappedTo
-                  = ArchetypeType::getNew(TC.Context,
-                                          AssocType->getName().str(),
-                                          AssocType->getInherited());
-              }
-              
-              TC.Context.AssociatedTypeMap[Archetype][AssocArchetype]
-                = MappedTo;
-            }
-          }
-        }
-      }
+      // Add the generic parameter to the builder.
+      Builder.addGenericParameter(TypeParam, Index++);
     }
 
+    // Add the requirements clause to the builder, validating only those
+    // types that need to be complete at this point.
+    // FIXME: Tell the type validator not to assert about unresolved types.
     for (auto &Req : GenericParams->getRequirements()) {
       switch (Req.getKind()) {
       case RequirementKind::Conformance:
         // FIXME: TypeLoc info?
-        if (TC.validateType(Req.getSubject(), nullptr, IsFirstPass)) {
-          Req.overrideSubject(ErrorType::get(TC.Context));
-          return;
-        }
-
-        // FIXME: TypeLoc info?
         if (TC.validateType(Req.getProtocol(), nullptr, IsFirstPass)) {
           Req.overrideProtocol(ErrorType::get(TC.Context));
-          return;
+          continue;
         }
 
         if (!Req.getProtocol()->isExistentialType()) {
@@ -149,24 +105,51 @@ public:
                       diag::requires_conformance_nonprotocol,
                       Req.getSubject(), Req.getProtocol());
           Req.overrideProtocol(ErrorType::get(TC.Context));
-          return;
+          continue;
         }
         break;
 
       case RequirementKind::SameType:
-        // FIXME: TypeLoc info?
-        if (TC.validateType(Req.getFirstType(), nullptr, IsFirstPass)) {
-          Req.overrideFirstType(ErrorType::get(TC.Context));
-          return;
-        }
-
-        // FIXME: TypeLoc info?
-        if (TC.validateType(Req.getSecondType(), nullptr, IsFirstPass)) {
-          Req.overrideSecondType(ErrorType::get(TC.Context));
-          return;
-        }
         break;
       }
+
+      Builder.addRequirement(Req);
+    }
+
+    // Wire up the archetypes.
+    llvm::DenseMap<TypeAliasDecl *, ArchetypeType *> Archetypes
+      = Builder.assignArchetypes();
+    for (auto Arch : Archetypes) {
+      Arch.first->setUnderlyingType(Arch.second);
+    }
+
+    // Validate the types in the requirements clause.
+    for (auto &Req : GenericParams->getRequirements()) {
+      switch (Req.getKind()) {
+        case RequirementKind::Conformance:
+          // FIXME: TypeLoc info?
+          if (TC.validateType(Req.getSubject(), nullptr, IsFirstPass)) {
+            Req.overrideSubject(ErrorType::get(TC.Context));
+            continue;
+          }
+          break;
+
+        case RequirementKind::SameType:
+          // FIXME: TypeLoc info?
+          if (TC.validateType(Req.getFirstType(), nullptr, IsFirstPass)) {
+            Req.overrideFirstType(ErrorType::get(TC.Context));
+            continue;
+          }
+
+          // FIXME: TypeLoc info?
+          if (TC.validateType(Req.getSecondType(), nullptr, IsFirstPass)) {
+            Req.overrideSecondType(ErrorType::get(TC.Context));
+            continue;
+          }
+          break;
+      }
+      
+      Builder.addRequirement(Req);
     }
   }
 

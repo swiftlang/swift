@@ -1226,7 +1226,15 @@ public:
   static ArchetypeType *getNew(ASTContext &Ctx, StringRef DisplayName,
                                ArrayRef<Type> ConformsTo,
                                Optional<unsigned> Index = Optional<unsigned>());
-  
+
+  /// getNew - Create a new archetype with the given name.
+  ///
+  /// The ConformsTo array will be minimized then copied into the ASTContext
+  /// by this routine.
+  static ArchetypeType *getNew(ASTContext &Ctx, StringRef DisplayName,
+                          llvm::SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                          Optional<unsigned> Index = Optional<unsigned>());
+
   void print(raw_ostream &OS) const;
 
   /// getDisplayName - Retrieve the name that should be used to display

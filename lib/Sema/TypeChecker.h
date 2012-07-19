@@ -255,8 +255,6 @@ public:
 
     return ArrayRef<ValueDecl *>(&Generic.Single, 1);
   }
-
-  
 };
 
 class TypeChecker {
@@ -538,6 +536,8 @@ public:
 
   /// \brief Retrieve the Range protocol declaration, if it exists.
   ProtocolDecl *getRangeProtocol();
+
+  
 };
 
   
