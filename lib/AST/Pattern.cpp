@@ -16,6 +16,7 @@
 
 #include "swift/AST/Pattern.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -97,4 +98,8 @@ TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
   TuplePattern *pattern = ::new(buffer) TuplePattern(lp, n, rp);
   memcpy(pattern->getFieldsBuffer(), elts.data(), n * sizeof(TuplePatternElt));
   return pattern;
+}
+
+SourceRange TypedPattern::getSourceRange() const {
+  return { SubPattern->getSourceRange().Start, PatTypeLoc->getSourceRange().End };
 }

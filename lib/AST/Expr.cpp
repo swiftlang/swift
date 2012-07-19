@@ -19,6 +19,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
@@ -314,11 +315,12 @@ FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
 }
 
 SourceRange FuncExpr::getSourceRange() const {
-  if (!Body) {
-    Pattern *LastPat = getParamPatterns().back();
-    return SourceRange(FuncLoc, LastPat->getEndLoc());
-  }
-  return SourceRange(FuncLoc, Body->getEndLoc());
+  if (Body)
+    return { FuncLoc, Body->getEndLoc() };
+  if (FnRetTypeLoc)
+    return { FuncLoc, FnRetTypeLoc->getSourceRange().End };
+  Pattern *LastPat = getParamPatterns().back();
+  return { FuncLoc, LastPat->getEndLoc() };
 }
 
 static ValueDecl *getCalledValue(Expr *E) {

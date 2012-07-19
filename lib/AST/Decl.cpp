@@ -18,6 +18,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -68,13 +69,16 @@ template<typename Class>
 inline char checkSourceLocType(SourceLoc (Class::*)() const);
 inline TwoChars checkSourceLocType(SourceLoc (Decl::*)() const);
 
+template<typename Class> 
+inline char checkSourceRangeType(SourceRange (Class::*)() const);
+inline TwoChars checkSourceRangeType(SourceRange (Decl::*)() const);
 
-SourceLoc Decl::getStartLoc() const {
+SourceRange Decl::getSourceRange() const {
   switch (getKind()) {
 #define DECL(ID, PARENT) \
-static_assert(sizeof(checkSourceLocType(&ID##Decl::getStartLoc)) == 1, \
-              #ID "Decl is missing getStartLoc()"); \
-case DeclKind::ID: return cast<ID##Decl>(this)->getStartLoc();
+static_assert(sizeof(checkSourceRangeType(&ID##Decl::getSourceRange)) == 1, \
+              #ID "Decl is missing getSourceRange()"); \
+case DeclKind::ID: return cast<ID##Decl>(this)->getSourceRange();
 #include "swift/AST/DeclNodes.def"
   }
 
@@ -148,10 +152,22 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc,
   memcpy(getPathBuffer(), Path.data(), Path.size() * sizeof(AccessPathElement));
 }
 
+SourceRange PatternBindingDecl::getSourceRange() const {
+  if (Init)
+    return { VarLoc, Init->getSourceRange().End };
+  return { VarLoc, Pat->getSourceRange().End };
+}
+
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
   if (Body.is<Expr*>())
     return Body.get<Expr*>()->getStartLoc();
   return Body.get<Stmt*>()->getStartLoc();
+}
+
+SourceRange TopLevelCodeDecl::getSourceRange() const {
+  if (Body.is<Expr*>())
+    return Body.get<Expr*>()->getSourceRange();
+  return Body.get<Stmt*>()->getSourceRange();
 }
 
 /// getTypeOfReference - Return the full type judgement for a non-member
@@ -255,6 +271,13 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
   ASTContext &Ctx = getASTContext();
   AliasTy = new (Ctx) NameAliasType(this);
   setType(MetaTypeType::get(AliasTy, Ctx));
+}
+
+SourceRange TypeAliasDecl::getSourceRange() const {
+  if (UnderlyingTyLoc)
+    return { TypeAliasLoc, UnderlyingTyLoc->getSourceRange().End };
+  // FIXME: Inherits clauses
+  return { TypeAliasLoc, NameLoc };
 }
 
 OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
@@ -482,12 +505,34 @@ VarDecl *FuncDecl::getImplicitThisDecl() {
   return 0;
 }
 
+SourceRange FuncDecl::getSourceRange() const {
+  return Body->getSourceRange();
+}
+
+SourceRange OneOfElementDecl::getSourceRange() const {
+  if (ArgumentTypeLoc)
+    return { IdentifierLoc, ArgumentTypeLoc->getSourceRange().End };
+  return IdentifierLoc;
+}
+
 SourceLoc SubscriptDecl::getLoc() const {
   return Indices->getStartLoc();
 }
 
+SourceRange SubscriptDecl::getSourceRange() const {
+  if (Braces.isValid())
+    return { SubscriptLoc, Braces.End };
+  return { SubscriptLoc, ElementTyLoc->getSourceRange().End };
+}
+
 SourceLoc ConstructorDecl::getLoc() const {
   return Arguments->getStartLoc();
+}
+
+SourceRange ConstructorDecl::getSourceRange() const {
+  if (!Body)
+    return cast<NominalTypeDecl>(getDeclContext())->getLoc();
+  return { ConstructorLoc, Body->getEndLoc() };
 }
 
 Type ConstructorDecl::computeThisType() const {
@@ -526,6 +571,10 @@ Type DestructorDecl::computeThisType() const {
   }
 
   return ContainerType;
+}
+
+SourceRange DestructorDecl::getSourceRange() const {
+  return { DestructorLoc, Body->getEndLoc() };
 }
 
 //===----------------------------------------------------------------------===//

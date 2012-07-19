@@ -245,10 +245,7 @@ public:
   TypeLoc *getTypeLoc() const { return PatTypeLoc; }
 
   SourceLoc getLoc() const { return SubPattern->getLoc(); }
-  SourceRange getSourceRange() const {
-    // FIXME: end location for type!
-    return SubPattern->getSourceRange();
-  }
+  SourceRange getSourceRange() const;
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Typed;

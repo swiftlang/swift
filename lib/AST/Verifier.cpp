@@ -616,7 +616,14 @@ namespace {
     }
 
     void checkSourceRanges(Decl *D) {
-      // FIXME: Implement this!
+      if (!D->getSourceRange().isValid()) {
+        Out << "invalid source range for decl: ";
+        D->print(Out);
+        Out << "\n";
+        abort();
+      }
+      checkSourceRanges(D->getSourceRange(), Parent,
+                        ^ { D->print(Out); });
     }
     
     /// \brief Verify that the given source ranges is contained within the

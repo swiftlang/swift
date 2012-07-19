@@ -119,10 +119,10 @@ public:
     assert(Context && "Decl doesn't have an assigned context");
     return Context->getASTContext();
   }
-  
-  SourceLoc getStartLoc() const;
+
+  SourceLoc getStartLoc() const { return getSourceRange().Start; }
   SourceLoc getLoc() const;
-  // FIXME: We also want getSourceRange().
+  SourceRange getSourceRange() const;
 
   void dump() const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;
@@ -445,6 +445,7 @@ public:
 /// there are no runtime values of the Extension's type.  
 class ExtensionDecl : public Decl, public DeclContext {
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
+  SourceRange Braces;
 
   /// ExtendedType - The type being extended.
   Type ExtendedType;
@@ -466,6 +467,9 @@ public:
   
   SourceLoc getStartLoc() const { return ExtensionLoc; }
   SourceLoc getLoc() const { return ExtensionLoc; }
+  SourceRange getSourceRange() const {
+    return { ExtensionLoc, Braces.End };
+  }
 
   Type getExtendedType() const { return ExtendedType; }
   void setExtendedType(Type t) { ExtendedType = t; }
@@ -477,7 +481,10 @@ public:
   ArrayRef<Type> getInherited() const { return Inherited; }
 
   ArrayRef<Decl*> getMembers() const { return Members; }
-  void setMembers(ArrayRef<Decl*> M) { Members = M; }
+  void setMembers(ArrayRef<Decl*> M, SourceRange B) {
+    Members = M;
+    Braces = B;
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -509,6 +516,7 @@ public:
 
   SourceLoc getStartLoc() const { return VarLoc; }
   SourceLoc getLoc() const { return VarLoc; }
+  SourceRange getSourceRange() const;
 
   Pattern *getPattern() const { return Pat; }
   void setPattern(Pattern *P) { Pat = P; }
@@ -549,6 +557,7 @@ public:
 
   SourceLoc getStartLoc() const;
   SourceLoc getLoc() const { return getStartLoc(); }
+  SourceRange getSourceRange() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::TopLevelCode;
@@ -695,6 +704,7 @@ public:
 
   SourceLoc getStartLoc() const { return TypeAliasLoc; }
   SourceLoc getLoc() const { return NameLoc; }
+  SourceRange getSourceRange() const;
 
   /// getUnderlyingType - Returns the underlying type, which is
   /// assumed to have been set.
@@ -732,6 +742,7 @@ public:
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.  This
 /// decl is always a DeclContext.
 class NominalTypeDecl : public TypeDecl, public DeclContext {
+  SourceRange Braces;
   ArrayRef<Decl*> Members;
   GenericParamList *GenericParams;
 
@@ -747,7 +758,11 @@ public:
     GenericParams(GenericParams), DeclaredTy(nullptr) {}
 
   ArrayRef<Decl*> getMembers() const { return Members; }
-  void setMembers(ArrayRef<Decl*> elems) { Members = elems; }
+  SourceRange getBraces() const { return Braces; }
+  void setMembers(ArrayRef<Decl*> M, SourceRange B) {
+    Members = M;
+    Braces = B;
+  }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
 
@@ -784,6 +799,9 @@ public:
 
   SourceLoc getStartLoc() const { return OneOfLoc; }
   SourceLoc getLoc() const { return NameLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(OneOfLoc, getBraces().End);
+  }
 
   OneOfElementDecl *getElement(Identifier Name) const;
 
@@ -817,6 +835,9 @@ public:
 
   SourceLoc getStartLoc() const { return StructLoc; }
   SourceLoc getLoc() const { return NameLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(StructLoc, getBraces().End);
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -848,6 +869,9 @@ public:
 
   SourceLoc getStartLoc() const { return ClassLoc; }
   SourceLoc getLoc() const { return NameLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(ClassLoc, getBraces().End);
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -871,7 +895,6 @@ public:
 class ProtocolDecl : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
   SourceLoc NameLoc;
-  SourceRange Braces;
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
@@ -880,8 +903,7 @@ public:
   using Decl::getASTContext;
 
   void setMembers(MutableArrayRef<Decl *> M, SourceRange B) {
-    NominalTypeDecl::setMembers(M);
-    Braces = B;
+    NominalTypeDecl::setMembers(M, B);
   }
 
   /// \brief Determine whether this protocol inherits from the given ("super")
@@ -897,7 +919,9 @@ public:
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceLoc getLoc() const { return NameLoc; }
-  SourceRange getSourceRange() { return SourceRange(ProtocolLoc, Braces.End); }
+  SourceRange getSourceRange() const {
+    return SourceRange(ProtocolLoc, getBraces().End);
+  }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -1006,6 +1030,7 @@ public:
     return StaticLoc.isValid() ? StaticLoc : FuncLoc;
   }
   SourceLoc getLoc() const { return NameLoc; }
+  SourceRange getSourceRange() const;
 
   /// getGenericParams - Retrieve the set of parameters to a generic function,
   /// or null if this function is not generic.
@@ -1058,7 +1083,7 @@ public:
 /// oneof.
 class OneOfElementDecl : public ValueDecl {
   SourceLoc IdentifierLoc;
-  
+
   /// ArgumentType - This is the type specified with the oneof element.  For
   /// example 'int' in the Y example above.  This is null if there is no type
   /// associated with this element (such as in the Z example).
@@ -1079,6 +1104,7 @@ public:
 
   SourceLoc getStartLoc() const { return IdentifierLoc; }
   SourceLoc getLoc() const { return IdentifierLoc; }
+  SourceRange getSourceRange() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -1138,6 +1164,7 @@ public:
   
   SourceLoc getStartLoc() const { return SubscriptLoc; }
   SourceLoc getLoc() const;
+  SourceRange getSourceRange() const;
 
   /// \brief Retrieve the indices for this subscript operation.
   Pattern *getIndices() const { return Indices; }
@@ -1192,6 +1219,7 @@ public:
   
   SourceLoc getStartLoc() const { return ConstructorLoc; }
   SourceLoc getLoc() const;
+  SourceRange getSourceRange() const;
 
   Pattern *getArguments() { return Arguments; }
 
@@ -1241,6 +1269,7 @@ public:
   
   SourceLoc getStartLoc() const { return DestructorLoc; }
   SourceLoc getLoc() const { return DestructorLoc; }
+  SourceRange getSourceRange() const;
 
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *b) { Body = b; }

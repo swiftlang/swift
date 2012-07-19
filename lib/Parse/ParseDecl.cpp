@@ -540,10 +540,10 @@ Decl *Parser::parseDeclExtension() {
       skipUntilDeclRBrace();
   }
 
-  ED->setMembers(Context.AllocateCopy(MemberDecls));
-
   parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_extension,
                      LBLoc, diag::opening_brace);
+
+  ED->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
 
   return ED;
 }
@@ -1323,7 +1323,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
     }
   }
 
-  OOD->setMembers(Context.AllocateCopy(MemberDecls));
+  OOD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, Tok.getLoc() });
 
   ScopeInfo.addToScope(OOD);
 
@@ -1394,7 +1394,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
 
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::oneof_attributes);
-  SD->setMembers(Context.AllocateCopy(MemberDecls));
+  SD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, Tok.getLoc() });
   ScopeInfo.addToScope(SD);
 
   if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_struct,
@@ -1476,7 +1476,7 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
   
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::oneof_attributes);
-  CD->setMembers(Context.AllocateCopy(MemberDecls));
+  CD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, Tok.getLoc() });
   ScopeInfo.addToScope(CD);
 
   if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_class,
