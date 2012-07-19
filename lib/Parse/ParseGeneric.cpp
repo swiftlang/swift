@@ -71,7 +71,7 @@ GenericParamList *Parser::parseGenericParameters(Optional<Scope>& scope,
 
     // FIXME: Bad location info here
     TypeAliasDecl *Param
-      = new (Context) TypeAliasDecl(NameLoc, Name, NameLoc, Type(),
+      = new (Context) TypeAliasDecl(NameLoc, Name, NameLoc, Type(), nullptr,
                                     CurDeclContext,
                                     Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);

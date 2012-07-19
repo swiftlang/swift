@@ -157,14 +157,15 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   VarDecl *Arg = new (Context) VarDecl(Loc, Context.getIdentifier("arg"), T,
                                        nullptr);
   Pattern* ParamPat = new (Context) NamedPattern(Arg);
-  ParamPat = new (Context) TypedPattern(ParamPat, Arg->getType());
+  ParamPat = new (Context) TypedPattern(ParamPat, Arg->getType(), nullptr);
   if (!isa<TupleType>(T)) {
     TuplePatternElt elt{ParamPat};
     ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
   }
   typeCheckPattern(ParamPat, /*isFirstPass*/false);
   FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat,
-                                  TupleType::getEmpty(Context), 0, TLCD);
+                                  TupleType::getEmpty(Context), nullptr,
+                                  0, TLCD);
   Type FuncTy = FunctionType::get(ParamPat->getType(),
                                   TupleType::getEmpty(Context), Context);
   FE->setType(FuncTy);
@@ -267,13 +268,13 @@ void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
   VarDecl *Arg = new (Context) VarDecl(Loc, Context.getIdentifier("arg"), T,
                                        nullptr);
   Pattern* ParamPat = new (Context) NamedPattern(Arg);
-  ParamPat = new (Context) TypedPattern(ParamPat, Arg->getType());
+  ParamPat = new (Context) TypedPattern(ParamPat, Arg->getType(), nullptr);
   if (!isa<TupleType>(T)) {
     TuplePatternElt elt{ParamPat};
     ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
   }
   typeCheckPattern(ParamPat, /*isFirstPass*/false);
-  FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, T, 0, &TU);
+  FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, T, nullptr, 0, &TU);
   Type FuncTy = FunctionType::get(ParamPat->getType(), T, Context);
   FE->setType(FuncTy);
   Arg->setDeclContext(FE);

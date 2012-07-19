@@ -25,6 +25,7 @@
 namespace swift {
   class ASTContext;
   class ExprHandle;
+  class TypeLoc;
 
 /// PatternKind - The classification of different kinds of
 /// value-matching pattern.
@@ -234,12 +235,14 @@ public:
 /// type.
 class TypedPattern : public Pattern {
   Pattern *SubPattern;
+  TypeLoc *PatTypeLoc;
 
 public:
-  TypedPattern(Pattern *pattern, Type type)
-    : Pattern(PatternKind::Typed, type), SubPattern(pattern) {}
+  TypedPattern(Pattern *pattern, Type type, TypeLoc *tl)
+    : Pattern(PatternKind::Typed, type), SubPattern(pattern), PatTypeLoc(tl) {}
 
   Pattern *getSubPattern() const { return SubPattern; }
+  TypeLoc *getTypeLoc() const { return PatTypeLoc; }
 
   SourceLoc getLoc() const { return SubPattern->getLoc(); }
   SourceRange getSourceRange() const {

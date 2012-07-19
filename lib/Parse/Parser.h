@@ -304,6 +304,7 @@ public:
   Expr *parseExprOperator();
   Expr *actOnIdentifierExpr(Identifier Text, SourceLoc Loc);
   FuncExpr *actOnFuncExprStart(SourceLoc FuncLoc, Type FuncRetTy,
+                               TypeLoc *FuncRetTyLoc,
                                ArrayRef<Pattern*> Patterns);
 
   //===--------------------------------------------------------------------===//

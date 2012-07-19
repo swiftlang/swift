@@ -244,11 +244,12 @@ Type NominalTypeDecl::getDeclaredTypeInContext() {
 }
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                             SourceLoc NameLoc, Type Underlyingty,
+                             SourceLoc NameLoc, Type UnderlyingTy,
+                             TypeLoc *UnderlyingTyLoc,
                              DeclContext *DC, MutableArrayRef<Type> Inherited)
   : TypeDecl(DeclKind::TypeAlias, DC, Name, Inherited, Type()),
     TypeAliasLoc(TypeAliasLoc), NameLoc(NameLoc),
-    UnderlyingTy(Underlyingty)
+    UnderlyingTy(UnderlyingTy), UnderlyingTyLoc(UnderlyingTyLoc)
 {
   // Set the type of the TypeAlias to the right MetaTypeType.
   ASTContext &Ctx = getASTContext();

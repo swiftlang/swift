@@ -188,9 +188,9 @@ NullablePtr<Expr> Parser::parseExprNew() {
   if (hadInvalid) return nullptr;
 
   if (bounds.empty())
-    return new (Context) NewReferenceExpr(elementTy, newLoc);
+    return new (Context) NewReferenceExpr(elementTy, elementLoc, newLoc);
 
-  return NewArrayExpr::create(Context, newLoc, elementTy, bounds);
+  return NewArrayExpr::create(Context, newLoc, elementTy, elementLoc, bounds);
 }
 
 /// parseExprPostfix
@@ -620,7 +620,7 @@ NullablePtr<Expr> Parser::parseExprFunc() {
   
   // The arguments to the func are defined in their own scope.
   Scope FuncBodyScope(this, /*AllowLookup=*/true);
-  FuncExpr *FE = actOnFuncExprStart(FuncLoc, RetTy, Params);
+  FuncExpr *FE = actOnFuncExprStart(FuncLoc, RetTy, RetTyLoc, Params);
 
   // Establish the new context.
   ContextChange CC(*this, FE);
@@ -674,10 +674,11 @@ static void AddFuncArgumentsToScope(Pattern *pat, FuncExpr *FE, Parser &P) {
   llvm_unreachable("bad pattern kind!");
 }
 
-FuncExpr *Parser::actOnFuncExprStart(SourceLoc FuncLoc, Type FuncRetTy,
+FuncExpr *Parser::actOnFuncExprStart(SourceLoc FuncLoc, Type FuncRetTy, 
+                                     TypeLoc *FuncRetTyLoc,
                                      ArrayRef<Pattern*> Params) {
-  FuncExpr *FE = FuncExpr::create(Context, FuncLoc, Params, FuncRetTy, 0,
-                                  CurDeclContext);
+  FuncExpr *FE = FuncExpr::create(Context, FuncLoc, Params, FuncRetTy, FuncRetTyLoc,
+                                  nullptr, CurDeclContext);
 
   for (Pattern *P : Params)
     AddFuncArgumentsToScope(P, FE, *this);

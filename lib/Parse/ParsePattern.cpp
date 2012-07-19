@@ -64,7 +64,7 @@ NullablePtr<Pattern> Parser::parsePattern() {
     if (parseTypeAnnotation(type, loc))
       return nullptr;
 
-    pattern = new (Context) TypedPattern(pattern.get(), type);
+    pattern = new (Context) TypedPattern(pattern.get(), type, loc);
   }
 
   return pattern;

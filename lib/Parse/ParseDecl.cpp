@@ -513,7 +513,6 @@ Decl *Parser::parseDeclExtension() {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
   Type Ty;
-  SourceLoc TyStartLoc = Tok.getLoc();
   TypeLoc *TyLoc;
   SourceLoc LBLoc, RBLoc;
   if (parseTypeIdentifier(Ty, TyLoc))
@@ -528,7 +527,7 @@ Decl *Parser::parseDeclExtension() {
     return nullptr;
   
   ExtensionDecl *ED
-    = new (Context) ExtensionDecl(ExtensionLoc, Ty, TyStartLoc,
+    = new (Context) ExtensionDecl(ExtensionLoc, Ty, TyLoc,
                                   Context.AllocateCopy(Inherited),
                                   CurDeclContext);
   ContextChange CC(*this, ED);
@@ -580,7 +579,8 @@ TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
   }
 
   TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc, Ty, CurDeclContext,
+    new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc, Ty, TyLoc,
+                                CurDeclContext,
                                 Context.AllocateCopy(Inherited));
   ScopeInfo.addToScope(TAD);
   return TAD;
@@ -691,7 +691,7 @@ static Pattern *clonePattern(ASTContext &Context, Pattern *Pat) {
     TypedPattern *Typed = cast<TypedPattern>(Pat);
     return new (Context) TypedPattern(clonePattern(Context,
                                                    Typed->getSubPattern()),
-                                      Typed->getType());
+                                      Typed->getType(), Typed->getTypeLoc());
   }
   }
 }
@@ -773,7 +773,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
       // Start the function.
       Type GetterRetTy = ElementTy;
-      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, GetterRetTy, Params);
+      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, GetterRetTy, nullptr,
+                                           Params);
       
       // Establish the new context.
       ContextChange CC(*this, GetFn);
@@ -875,7 +876,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       
       Pattern *ValuePattern
         = new (Context) TypedPattern(new (Context) NamedPattern(Value),
-                                     ElementTy);
+                                     ElementTy, nullptr);
       
       TupleElts.push_back(TuplePatternElt(ValuePattern, /*Init=*/nullptr));
       Pattern *ValueParamsPattern
@@ -888,7 +889,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
     // Start the function.
     Type SetterRetTy = TupleType::getEmpty(Context);
-    FuncExpr *SetFn = actOnFuncExprStart(SetLoc, SetterRetTy, Params);
+    FuncExpr *SetFn = actOnFuncExprStart(SetLoc, SetterRetTy, nullptr, Params);
     
     // Establish the new context.
     ContextChange CC(*this, SetFn);
@@ -1056,7 +1057,8 @@ bool Parser::parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls){
             break;
 
           TypedPattern *NewTP = new (Context) TypedPattern(PrevPat,
-                                                           TP->getType());
+                                                           TP->getType(),
+                                                           TP->getTypeLoc());
           PrevPBD->setPattern(NewTP);
         }
       }
@@ -1080,7 +1082,8 @@ Pattern *Parser::buildImplicitThisParameter() {
     = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
                             Type(), CurDeclContext);
   Pattern *P = new (Context) NamedPattern(D);
-  return new (Context) TypedPattern(P, UnstructuredUnresolvedType::get(Context));
+  return new (Context) TypedPattern(P, UnstructuredUnresolvedType::get(Context),
+                                    nullptr);
 }
 
 /// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
@@ -1153,7 +1156,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   {
     Scope FnBodyScope(this, /*AllowLookup=*/true);
     
-    FE = actOnFuncExprStart(FuncLoc, FuncRetTy, Params);
+    FE = actOnFuncExprStart(FuncLoc, FuncRetTy, FuncRetTyLoc, Params);
 
     // Now that we have a context, update the generic parameters with that
     // context.
@@ -1258,7 +1261,8 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
       OneOfElementInfo ElementInfo;
       ElementInfo.Name = Tok.getText();
       ElementInfo.NameLoc = Tok.getLoc();
-      ElementInfo.EltType = 0;
+      ElementInfo.EltType = nullptr;
+      ElementInfo.EltTypeLoc = nullptr;
     
       consumeToken(tok::identifier);
     
@@ -1289,8 +1293,9 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
     Identifier NameI = Context.getIdentifier(Elt.Name);
 
     // Create a decl for each element, giving each a temporary type.
-    OneOfElementDecl *OOED = new (Context) OneOfElementDecl(Elt.NameLoc, NameI,
-                                                            Elt.EltType, OOD);
+    OneOfElementDecl *OOED =
+        new (Context) OneOfElementDecl(Elt.NameLoc, NameI, Elt.EltType,
+                                       Elt.EltTypeLoc, OOD);
 
     // If this was multiply defined, reject it.
     auto insertRes = SeenSoFar.insert(std::make_pair(NameI, OOED));
@@ -1385,7 +1390,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   // constructor.
   Identifier ConstructID = Context.getIdentifier("constructor");
   MemberDecls.push_back(new (Context) OneOfElementDecl(StructLoc, ConstructID,
-                                                       Type(), SD));
+                                                       Type(), nullptr, SD));
 
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::oneof_attributes);
@@ -1531,7 +1536,7 @@ Decl *Parser::parseDeclProtocol() {
     // FIXME: Mark as 'implicit'.
     Members.push_back(new (Context) TypeAliasDecl(ProtocolLoc,
                                                   Context.getIdentifier("This"),
-                                                  ProtocolLoc, Type(),
+                                                  ProtocolLoc, Type(), nullptr,
                                                   CurDeclContext,
                                                   MutableArrayRef<Type>()));
     
@@ -1614,8 +1619,8 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
     SubscriptDecl *Subscript
       = new (Context) SubscriptDecl(Context.getIdentifier("__subscript"),
                                     SubscriptLoc, Indices.get(), ArrowLoc,
-                                    ElementTy, SourceRange(), 0, 0,
-                                    CurDeclContext);
+                                    ElementTy, ElementTyLoc, SourceRange(),
+                                    0, 0, CurDeclContext);
     Decls.push_back(Subscript);
     return false;
   }
@@ -1661,8 +1666,9 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
     SubscriptDecl *Subscript
       = new (Context) SubscriptDecl(Context.getIdentifier("__subscript"),
                                     SubscriptLoc, Indices.get(), ArrowLoc,
-                                    ElementTy, SourceRange(LBLoc, RBLoc),
-                                    Get, Set, CurDeclContext);
+                                    ElementTy, ElementTyLoc,
+                                    SourceRange(LBLoc, RBLoc), Get, Set,
+                                    CurDeclContext);
     Decls.push_back(Subscript);
 
     // FIXME: Order of get/set not preserved.

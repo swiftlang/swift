@@ -31,6 +31,7 @@ namespace swift {
   class ASTContext;
   class ASTWalker;
   class Type;
+  class TypeLoc;
   class ClassType;
   class Expr;
   class FuncDecl;
@@ -444,29 +445,31 @@ public:
 /// there are no runtime values of the Extension's type.  
 class ExtensionDecl : public Decl, public DeclContext {
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
-  SourceLoc NameLoc; // Location of the extended type.
 
   /// ExtendedType - The type being extended.
   Type ExtendedType;
+  TypeLoc *ExtendedTypeLoc;
   MutableArrayRef<Type> Inherited;
   ArrayRef<Decl*> Members;
 public:
 
   ExtensionDecl(SourceLoc ExtensionLoc, Type ExtendedType,
-                SourceLoc NameLoc,
+                TypeLoc *ExtendedTypeLoc,
                 MutableArrayRef<Type> Inherited,
                 DeclContext *Parent)
     : Decl(DeclKind::Extension, Parent),
       DeclContext(DeclContextKind::ExtensionDecl, Parent),
-      ExtensionLoc(ExtensionLoc), NameLoc(NameLoc),
-      ExtendedType(ExtendedType), Inherited(Inherited) {
+      ExtensionLoc(ExtensionLoc),
+      ExtendedType(ExtendedType), ExtendedTypeLoc(ExtendedTypeLoc),
+      Inherited(Inherited) {
   }
   
   SourceLoc getStartLoc() const { return ExtensionLoc; }
-  SourceLoc getLoc() const { return NameLoc; }
+  SourceLoc getLoc() const { return ExtensionLoc; }
 
   Type getExtendedType() const { return ExtendedType; }
   void setExtendedType(Type t) { ExtendedType = t; }
+  TypeLoc *getExtendedTypeLoc() { return ExtendedTypeLoc; }
 
   /// \brief Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
@@ -683,11 +686,12 @@ class TypeAliasDecl : public TypeDecl {
   SourceLoc TypeAliasLoc; // The location of the 'typalias' keyword
   SourceLoc NameLoc; // The location of the declared type
   Type UnderlyingTy;
-  
+  TypeLoc *UnderlyingTyLoc;
+
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                SourceLoc NameLoc, Type Underlyingty, DeclContext *DC,
-                MutableArrayRef<Type> Inherited);
+                SourceLoc NameLoc, Type Underlyingty, TypeLoc *UnderlyingTyLoc,
+                DeclContext *DC, MutableArrayRef<Type> Inherited);
 
   SourceLoc getStartLoc() const { return TypeAliasLoc; }
   SourceLoc getLoc() const { return NameLoc; }
@@ -1062,12 +1066,15 @@ class OneOfElementDecl : public ValueDecl {
   /// example 'int' in the Y example above.  This is null if there is no type
   /// associated with this element (such as in the Z example).
   Type ArgumentType;
+  TypeLoc *ArgumentTypeLoc;
     
 public:
   OneOfElementDecl(SourceLoc IdentifierLoc, Identifier Name,
-                   Type ArgumentType, DeclContext *DC)
+                   Type ArgumentType, TypeLoc *ArgumentTypeLoc,
+                   DeclContext *DC)
   : ValueDecl(DeclKind::OneOfElement, DC, Name, Type()),
-    IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType) {}
+    IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType),
+    ArgumentTypeLoc(ArgumentTypeLoc) {}
 
   Type getArgumentType() const { return ArgumentType; }
   void setArgumentType(Type t) { ArgumentType = t; }
@@ -1116,18 +1123,20 @@ class SubscriptDecl : public ValueDecl {
   SourceLoc ArrowLoc;
   Pattern *Indices;
   Type ElementTy;
+  TypeLoc *ElementTyLoc;
   SourceRange Braces;
   FuncDecl *Get;
   FuncDecl *Set;
   
 public:
   SubscriptDecl(Identifier NameHack, SourceLoc SubscriptLoc, Pattern *Indices,
-                SourceLoc ArrowLoc, Type ElementTy, SourceRange Braces,
-                FuncDecl *Get, FuncDecl *Set, DeclContext *Parent)
+                SourceLoc ArrowLoc, Type ElementTy, TypeLoc *ElementTyLoc,
+                SourceRange Braces, FuncDecl *Get, FuncDecl *Set,
+                DeclContext *Parent)
     : ValueDecl(DeclKind::Subscript, Parent, NameHack, Type()),
       SubscriptLoc(SubscriptLoc),
       ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy),
-      Braces(Braces), Get(Get), Set(Set) { }
+      ElementTyLoc(ElementTyLoc), Braces(Braces), Get(Get), Set(Set) { }
   
   SourceLoc getStartLoc() const { return SubscriptLoc; }
   SourceLoc getLoc() const;
@@ -1139,7 +1148,8 @@ public:
   /// operation.
   Type getElementType() const { return ElementTy; }
   void overwriteElementType(Type T) { ElementTy = T; }
-  
+  TypeLoc *getElementTypeLoc() { return ElementTyLoc; }
+
   /// \brief Retrieve the subscript getter, a function that takes the indices
   /// and produces a value of the element type.
   FuncDecl *getGetter() const { return Get; }

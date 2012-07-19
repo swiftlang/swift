@@ -206,12 +206,13 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
 }
 
 NewArrayExpr *NewArrayExpr::create(ASTContext &ctx, SourceLoc newLoc,
-                                   Type elementTy, ArrayRef<Bound> bounds) {
+                                   Type elementTy, TypeLoc *elementTyLoc,
+                                   ArrayRef<Bound> bounds) {
   void *buffer = ctx.Allocate(sizeof(NewArrayExpr) +
                               bounds.size() * sizeof(Bound),
                               Expr::Alignment);
   NewArrayExpr *E =
-    ::new(buffer) NewArrayExpr(newLoc, elementTy, bounds.size(), Type());
+    ::new(buffer) NewArrayExpr(newLoc, elementTy, elementTyLoc, bounds.size());
   memcpy(E->getBoundsBuffer(), bounds.data(), bounds.size() * sizeof(Bound));
   return E;
 }
@@ -300,11 +301,13 @@ Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
 
 FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
                            ArrayRef<Pattern*> params, Type fnRetType,
-                           BraceStmt *body, DeclContext *parent) {
+                           TypeLoc *fnRetTypeLoc, BraceStmt *body,
+                           DeclContext *parent) {
   unsigned nParams = params.size();
   void *buf = C.Allocate(sizeof(FuncExpr) + nParams * sizeof(Pattern*),
                          Expr::Alignment);
-  FuncExpr *fn = ::new(buf) FuncExpr(funcLoc, nParams, fnRetType, body, parent);
+  FuncExpr *fn = ::new (buf) FuncExpr(funcLoc, nParams, fnRetType, fnRetTypeLoc,
+                                      body, parent);
   for (unsigned i = 0; i != nParams; ++i)
     fn->getParamsBuffer()[i] = params[i];
   return fn;

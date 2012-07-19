@@ -29,6 +29,7 @@ namespace swift {
   class ArchetypeType;
   class ASTContext;
   class Type;
+  class TypeLoc;
   class ValueDecl;
   class Decl;
   class Pattern;
@@ -1353,6 +1354,7 @@ class FuncExpr : public CapturingExpr {
   FuncDecl *TheFuncDecl;
 
   Type FnRetType;
+  TypeLoc *FnRetTypeLoc;
 
   Pattern **getParamsBuffer() {
     return reinterpret_cast<Pattern**>(this+1);
@@ -1362,14 +1364,15 @@ class FuncExpr : public CapturingExpr {
   }
   
   FuncExpr(SourceLoc FuncLoc, unsigned NumPatterns, Type FnRetType,
-           BraceStmt *Body, DeclContext *Parent)
+           TypeLoc *FnRetTypeLoc, BraceStmt *Body, DeclContext *Parent)
     : CapturingExpr(ExprKind::Func, Type(), Parent),
       FuncLoc(FuncLoc), NumPatterns(NumPatterns), Body(Body),
-      TheFuncDecl(nullptr), FnRetType(FnRetType) {}
+      TheFuncDecl(nullptr), FnRetType(FnRetType), FnRetTypeLoc(FnRetTypeLoc) {}
 public:
   static FuncExpr *create(ASTContext &Context, SourceLoc FuncLoc,
                           ArrayRef<Pattern*> Params, Type FnRetType,
-                          BraceStmt *Body, DeclContext *Parent);
+                          TypeLoc *FnRetTypeLoc, BraceStmt *Body,
+                          DeclContext *Parent);
 
   SourceRange getSourceRange() const;
   SourceLoc getLoc() const { return FuncLoc; }
@@ -1519,13 +1522,16 @@ public:
 
 private:
   Type ElementTy;
+  TypeLoc *ElementTyLoc;
   unsigned NumBounds;
   SourceLoc NewLoc;
   Expr *InjectionFn;
 
-  NewArrayExpr(SourceLoc newLoc, Type elementTy, unsigned numBounds, Type ty)
-    : Expr(ExprKind::NewArray, ty), ElementTy(elementTy),
-      NumBounds(numBounds), NewLoc(newLoc), InjectionFn(nullptr) {}
+  NewArrayExpr(SourceLoc newLoc, Type elementTy, TypeLoc *elementTyLoc,
+               unsigned numBounds)
+    : Expr(ExprKind::NewArray, Type()), ElementTy(elementTy),
+      ElementTyLoc(elementTyLoc), NumBounds(numBounds), NewLoc(newLoc),
+      InjectionFn(nullptr) {}
 
   Bound *getBoundsBuffer() {
     return reinterpret_cast<Bound*>(this + 1);
@@ -1536,7 +1542,8 @@ private:
 
 public:
   static NewArrayExpr *create(ASTContext &Context, SourceLoc newLoc,
-                              Type elementTy, ArrayRef<Bound> bounds);
+                              Type elementTy, TypeLoc *elementTyLoc,
+                              ArrayRef<Bound> bounds);
 
   unsigned getNumBounds() const { return NumBounds; }
 
@@ -1565,6 +1572,8 @@ public:
   Type getElementType() const { return ElementTy; }
   void setElementType(Type ty) { ElementTy = ty; }
 
+  TypeLoc *getElementTypeLoc() const { return ElementTyLoc; }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const NewArrayExpr *) { return true; }
   static bool classof(const Expr *E) {
@@ -1579,11 +1588,12 @@ private:
   SourceLoc NewLoc;
   ConstructorDecl *Ctor;
   Expr *CtorArg;
+  TypeLoc *ElementTyLoc;
 
 public:
-  NewReferenceExpr(Type ty, SourceLoc newLoc)
+  NewReferenceExpr(Type ty, TypeLoc *tyLoc, SourceLoc newLoc)
     : Expr(ExprKind::NewReference, ty), NewLoc(newLoc),
-      Ctor(nullptr), CtorArg(nullptr) {}
+      Ctor(nullptr), CtorArg(nullptr), ElementTyLoc(tyLoc) {}
 
   /// Return the location of the 'new' keyword.
   SourceLoc getNewLoc() const { return NewLoc; }
@@ -1599,6 +1609,8 @@ public:
 
   Expr *getCtorArg() { return CtorArg; }
   void setCtorArg(Expr *e) { CtorArg = e; }
+
+  TypeLoc *getElementTypeLoc() const { return ElementTyLoc; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const NewReferenceExpr *) { return true; }
