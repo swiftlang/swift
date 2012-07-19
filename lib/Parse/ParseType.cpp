@@ -259,9 +259,9 @@ bool Parser::parseTypeComposition(Type &Result, TypeLoc *&ResultLoc) {
   
   // Check for empty protocol composition.
   if (startsWithGreater(Tok)) {
-    consumeStartingGreater();
-    Result = ProtocolCompositionType::get(Context, ProtocolLoc,
-                                          ArrayRef<Type>());
+    SourceLoc RAngleLoc = consumeStartingGreater();
+    Result = ProtocolCompositionType::get(Context, ArrayRef<Type>());
+    ResultLoc = TypeLoc::get(Context, SourceRange(ProtocolLoc, RAngleLoc));
     return false;
   }
   
@@ -303,7 +303,7 @@ bool Parser::parseTypeComposition(Type &Result, TypeLoc *&ResultLoc) {
     EndLoc = consumeStartingGreater();
   }
   
-  Result = ProtocolCompositionType::get(Context, ProtocolLoc, Protocols);
+  Result = ProtocolCompositionType::get(Context, Protocols);
   ResultLoc = TypeLoc::get(Context, SourceRange(ProtocolLoc, EndLoc));
   return false;
 }

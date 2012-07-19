@@ -40,14 +40,14 @@ public:
   // Helper Functions.
   //===--------------------------------------------------------------------===//
 
-  bool visitValueDecl(ValueDecl *VD);
   void validateAttributes(ValueDecl *VD);
 
   /// \brief Check the list of inherited protocols on the declaration D.
   void checkInherited(Decl *D, MutableArrayRef<Type> Inherited) {
     // Check the list of inherited protocols.
     for (unsigned i = 0, e = Inherited.size(); i != e; ++i) {
-      if (TC.validateType(Inherited[i], D->getLoc(), IsFirstPass)) {
+      // FIXME: TypeLoc info?
+      if (TC.validateType(Inherited[i], nullptr, IsFirstPass)) {
         Inherited[i] = ErrorType::get(TC.Context);
         continue;
       }
@@ -132,15 +132,14 @@ public:
     for (auto &Req : GenericParams->getRequirements()) {
       switch (Req.getKind()) {
       case RequirementKind::Conformance:
-        // FIXME: Terrible location info
-        if (TC.validateType(Req.getSubject(), GenericParams->getRequiresLoc(),
-                            IsFirstPass)) {
+        // FIXME: TypeLoc info?
+        if (TC.validateType(Req.getSubject(), nullptr, IsFirstPass)) {
           Req.overrideSubject(ErrorType::get(TC.Context));
           return;
         }
 
-        if (TC.validateType(Req.getProtocol(), GenericParams->getRequiresLoc(),
-                            IsFirstPass)) {
+        // FIXME: TypeLoc info?
+        if (TC.validateType(Req.getProtocol(), nullptr, IsFirstPass)) {
           Req.overrideProtocol(ErrorType::get(TC.Context));
           return;
         }
@@ -155,17 +154,14 @@ public:
         break;
 
       case RequirementKind::SameType:
-        // FIXME: Terrible location info
-        if (TC.validateType(Req.getFirstType(),
-                            GenericParams->getRequiresLoc(),
-                            IsFirstPass)) {
+        // FIXME: TypeLoc info?
+        if (TC.validateType(Req.getFirstType(), nullptr, IsFirstPass)) {
           Req.overrideFirstType(ErrorType::get(TC.Context));
           return;
         }
 
-        if (TC.validateType(Req.getSecondType(),
-                            GenericParams->getRequiresLoc(),
-                            IsFirstPass)) {
+        // FIXME: TypeLoc info?
+        if (TC.validateType(Req.getSecondType(), nullptr, IsFirstPass)) {
           Req.overrideSecondType(ErrorType::get(TC.Context));
           return;
         }
@@ -195,9 +191,18 @@ public:
       return visitBoundVars(cast<TypedPattern>(P)->getSubPattern());
 
     // Handle vars.
-    case PatternKind::Named:
-      visitValueDecl(cast<NamedPattern>(P)->getDecl());
+    case PatternKind::Named: {
+      VarDecl *VD = cast<NamedPattern>(P)->getDecl();
+
+      if (!VD->getType()->isMaterializable()) {
+        TC.diagnose(VD->getStartLoc(), diag::var_type_not_materializable,
+                    VD->getType());
+        VD->overwriteType(ErrorType::get(TC.Context));
+      }
+
+      validateAttributes(VD);
       return;
+    }
 
     // Handle non-vars.
     case PatternKind::Any:
@@ -226,11 +231,9 @@ public:
     if (PBD->getInit() && !IsFirstPass) {
       Type DestTy;
       if (PBD->getPattern()->hasType()) {
+        if (TC.typeCheckPattern(PBD->getPattern(), /*isFirstPass*/false))
+          return;
         DestTy = PBD->getPattern()->getType();
-        if (TC.validateType(DestTy, PBD->getLoc(), IsFirstPass)) {
-          DestTy = ErrorType::get(TC.Context);
-          PBD->getPattern()->overwriteType(DestTy);
-        }
       }
       Expr *Init = PBD->getInit();
       if (TC.typeCheckExpression(Init, DestTy)) {
@@ -248,9 +251,6 @@ public:
         if (TC.coerceToType(PBD->getPattern(), Init->getType(),
                             /*isFirstPass*/false))
           return;
-      } else {
-        if (TC.typeCheckPattern(PBD->getPattern(), /*isFirstPass*/false))
-          return;
       }
     } else if (!IsFirstPass || !DelayCheckingPattern) {
       if (TC.typeCheckPattern(PBD->getPattern(), IsFirstPass))
@@ -267,7 +267,8 @@ public:
     if (!SD->getDeclContext()->isTypeContext())
       TC.diagnose(SD->getStartLoc(), diag::subscript_not_member);
 
-    if (TC.validateType(SD->getElementType(), SD->getLoc(), IsFirstPass))
+    if (TC.validateType(SD->getElementType(), SD->getElementTypeLoc(),
+                        IsFirstPass))
       SD->overwriteElementType(ErrorType::get(TC.Context));
 
     if (!TC.typeCheckPattern(SD->getIndices(), IsFirstPass))  {
@@ -278,7 +279,7 @@ public:
   
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     if (!IsSecondPass) {
-      TC.validateType(TAD->getAliasType(), TAD->getLoc(), IsFirstPass);
+      TC.validateType(TAD->getAliasType(), nullptr, IsFirstPass);
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         checkInherited(TAD, TAD->getInherited());
     }
@@ -404,7 +405,7 @@ public:
     TC.semaFuncExpr(body, IsFirstPass);
     FD->setType(body->getType());
 
-    visitValueDecl(FD);
+    validateAttributes(FD);
   }
 
   void visitOneOfElementDecl(OneOfElementDecl *ED) {
@@ -425,11 +426,14 @@ public:
       return;
     }
 
-    // We have an element with a type; compute a function type.
+    // We have an element with an argument type; validate the argument,
+    // then compute a function type.
+    if (TC.validateType(ED->getArgumentType(), ED->getArgumentTypeLoc(),
+                        IsFirstPass)) {
+      ED->setType(ErrorType::get(TC.Context));
+      return;
+    } 
     ED->setType(FunctionType::get(ED->getArgumentType(), ElemTy, TC.Context));
-
-    // Validate the type.
-    if (TC.validateType(ED, IsFirstPass)) return;
 
     // Require the carried type to be materializable.
     if (!ED->getArgumentType()->isMaterializable()) {
@@ -440,7 +444,8 @@ public:
 
   void visitExtensionDecl(ExtensionDecl *ED) {
     if (!IsSecondPass) {
-      if (TC.validateType(ED->getExtendedType(), ED->getLoc(), IsFirstPass)) {
+      if (TC.validateType(ED->getExtendedType(), ED->getExtendedTypeLoc(),
+                          IsFirstPass)) {
         ED->setExtendedType(ErrorType::get(TC.Context));
       } else {
         Type ExtendedTy = ED->getExtendedType();
@@ -489,7 +494,7 @@ public:
       CD->setType(FnTy);
     }
 
-    visitValueDecl(CD);
+    validateAttributes(CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
@@ -506,7 +511,7 @@ public:
     DD->setType(FnTy);
     DD->getImplicitThisDecl()->setType(ThisTy);
 
-    visitValueDecl(DD);
+    validateAttributes(DD);
   }
 };
 }; // end anonymous namespace.
@@ -516,21 +521,6 @@ void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
   bool isSecondPass = !isFirstPass && D->getDeclContext()->isModuleContext();
   DeclChecker(*this, isFirstPass, isSecondPass).visit(D);
 }
-
-bool DeclChecker::visitValueDecl(ValueDecl *VD) {
-  if (TC.validateType(VD, IsFirstPass))
-    return true;
-
-  if (!VD->getType()->isMaterializable()) {
-    TC.diagnose(VD->getStartLoc(), diag::var_type_not_materializable,
-                VD->getType());
-    VD->overwriteType(ErrorType::get(TC.Context));
-  }
-
-  validateAttributes(VD);
-  return false;
-}
-
 
 /// validateAttributes - Check that the func/var declaration attributes are ok.
 void DeclChecker::validateAttributes(ValueDecl *VD) {

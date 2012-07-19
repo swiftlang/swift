@@ -289,8 +289,7 @@ public:
   Expr *buildArrayInjectionFnRef(ArraySliceType *sliceType,
                                  Type lenTy, SourceLoc Loc);
 
-  bool validateType(ValueDecl *VD, bool isFirstPass);
-  bool validateType(Type T, SourceLoc Loc, bool isFirstPass);
+  bool validateType(Type T, TypeLoc *Loc, bool isFirstPass);
 
   Type substType(Type T, TypeSubstitutionMap &Substitutions);
 

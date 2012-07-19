@@ -115,12 +115,11 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
     return this;
 
   case TypeKind::NameAlias:
-    if (TypeAliasDecl *D = cast<NameAliasType>(this)->getDecl())
-      if (D->hasUnderlyingType()) {
-        Type UnderlingTy = D->getUnderlyingType()->getUnlabeledType(Context);
-        if (UnderlingTy.getPointer() != D->getUnderlyingType().getPointer())
-          return UnderlingTy;
-      }
+    if (TypeAliasDecl *D = cast<NameAliasType>(this)->getDecl()) {
+      Type UnderlingTy = D->getUnderlyingType()->getUnlabeledType(Context);
+      if (UnderlingTy.getPointer() != D->getUnderlyingType().getPointer())
+        return UnderlingTy;
+    }
     
     return this;
       
@@ -440,7 +439,7 @@ CanType TypeBase::getCanonicalType() {
       CanProtos.push_back(t->getCanonicalType());
     assert(!CanProtos.empty() && "Non-canonical empty composition?");
     ASTContext &C = CanProtos[0]->getASTContext();
-    Type Composition = ProtocolCompositionType::get(C, SourceLoc(), CanProtos);
+    Type Composition = ProtocolCompositionType::get(C, CanProtos);
     Result = Composition.getPointer();
     break;
   }
@@ -684,11 +683,10 @@ BoundGenericType::setConformances(ArrayRef<unsigned> Offsets,
 }
 
 Type
-ProtocolCompositionType::get(ASTContext &C, SourceLoc FirstLoc,
-                             ArrayRef<Type> ProtocolTypes) {
+ProtocolCompositionType::get(ASTContext &C, ArrayRef<Type> ProtocolTypes) {
   for (Type t : ProtocolTypes) {
     if (!t->isCanonical())
-      return build(C, FirstLoc, ProtocolTypes);
+      return build(C, ProtocolTypes);
   }
     
   SmallVector<ProtocolDecl *, 4> Protocols;
@@ -716,7 +714,7 @@ ProtocolCompositionType::get(ASTContext &C, SourceLoc FirstLoc,
                    return Proto->getDeclaredType();
                  });
 
-  return build(C, SourceLoc(), CanProtocolTypes);
+  return build(C, CanProtocolTypes);
 }
 
 //===----------------------------------------------------------------------===//

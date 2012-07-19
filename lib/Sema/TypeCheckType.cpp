@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -75,21 +76,12 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
   return sliceTy;
 }
 
-/// validateType - Recursively check to see if the type of a decl is valid.  If
-/// not, diagnose the problem and collapse it to an ErrorType.
-bool TypeChecker::validateType(ValueDecl *VD, bool isFirstPass) {
-  if (!validateType(VD->getType(), VD->getLoc(), isFirstPass)) return false;
-  
-  VD->overwriteType(ErrorType::get(Context));
-  return true;
-}
-
 /// validateType - Types can contain expressions (in the default values for
 /// tuple elements), and thus need semantic analysis to ensure that these
 /// expressions are valid and that they have the appropriate conversions etc.
 ///
 /// This returns true if the type is invalid.
-bool TypeChecker::validateType(Type InTy, SourceLoc Loc, bool isFirstPass) {
+bool TypeChecker::validateType(Type InTy, TypeLoc *Loc, bool isFirstPass) {
   assert(InTy && "Cannot validate null types!");
 
   TypeBase *T = InTy.getPointer();
@@ -127,8 +119,8 @@ bool TypeChecker::validateType(Type InTy, SourceLoc Loc, bool isFirstPass) {
 
   case TypeKind::NameAlias: {
     TypeAliasDecl *D = cast<NameAliasType>(T)->getDecl();
-    IsInvalid = !D->hasUnderlyingType() ||
-                validateType(D->getUnderlyingType(), Loc, isFirstPass);
+    IsInvalid = validateType(D->getUnderlyingType(), D->getUnderlyingTypeLoc(),
+                             isFirstPass);
     if (IsInvalid)
       D->overwriteUnderlyingType(ErrorType::get(Context));
     break;
@@ -369,8 +361,12 @@ bool TypeChecker::validateType(Type InTy, SourceLoc Loc, bool isFirstPass) {
       if (validateType(Proto, Loc, isFirstPass))
         IsInvalid = true;
       else if (!Proto->isExistentialType()) {
-        // FIXME: Terrible source-location information.
-        diagnose(PC->getFirstLoc(), diag::protocol_composition_not_protocol,
+        // FIXME: ValidateType needs to actually pick apart TypeLocs
+        // where appropriate.
+        SourceLoc DiagLoc;
+        if (Loc)
+          DiagLoc = Loc->getSourceRange().Start;
+        diagnose(DiagLoc, diag::protocol_composition_not_protocol,
                  Proto);
         IsInvalid = true;
       }
@@ -410,8 +406,12 @@ bool TypeChecker::validateType(Type InTy, SourceLoc Loc, bool isFirstPass) {
           if (conformsToProtocol(Arg, Proto, &Conformance)) {
             Conformances.push_back(Conformance);
           } else {
-            // FIXME: Wretched location information
-            diagnose(Loc, diag::invalid_implicit_protocol_conformance,
+            // FIXME: ValidateType needs to actually pick apart TypeLocs
+            // where appropriate.
+            SourceLoc DiagLoc;
+            if (Loc)
+              DiagLoc = Loc->getSourceRange().Start;
+            diagnose(DiagLoc, diag::invalid_implicit_protocol_conformance,
                      Arg, Proto->getDeclaredType());
             IsInvalid = true;
           }
@@ -696,7 +696,7 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     if (!AnyChanged)
       return T;
     
-    return ProtocolCompositionType::get(Context, PC->getFirstLoc(), Protocols);
+    return ProtocolCompositionType::get(Context, Protocols);
   }
   }
   

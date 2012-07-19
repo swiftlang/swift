@@ -696,11 +696,6 @@ public:
   SourceLoc getStartLoc() const { return TypeAliasLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
-  /// hasUnderlyingType - Returns whether the underlying type has been set.
-  bool hasUnderlyingType() const {
-    return !UnderlyingTy.isNull();
-  }
-
   /// getUnderlyingType - Returns the underlying type, which is
   /// assumed to have been set.
   Type getUnderlyingType() const {
@@ -721,6 +716,8 @@ public:
   void overwriteUnderlyingType(Type T) {
     UnderlyingTy = T;
   }
+
+  TypeLoc *getUnderlyingTypeLoc() const { return UnderlyingTyLoc; }
 
   /// getAliasType - Return the sugared version of this decl as a Type.
   NameAliasType *getAliasType() const { return AliasTy; }
@@ -1078,6 +1075,7 @@ public:
 
   Type getArgumentType() const { return ArgumentType; }
   void setArgumentType(Type t) { ArgumentType = t; }
+  TypeLoc *getArgumentTypeLoc() const { return ArgumentTypeLoc; }
 
   SourceLoc getStartLoc() const { return IdentifierLoc; }
   SourceLoc getLoc() const { return IdentifierLoc; }

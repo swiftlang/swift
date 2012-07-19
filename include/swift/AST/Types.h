@@ -991,17 +991,12 @@ private:
 /// protocol, then the canonical type is that protocol type. Otherwise, it is
 /// a composition of the protocols in that list.
 class ProtocolCompositionType : public TypeBase, public llvm::FoldingSetNode {
-  SourceLoc FirstLoc; // FIXME: Egregious hack due to lack of TypeLocs
   ArrayRef<Type> Protocols;
   
 public:
   /// \brief Retrieve an instance of a protocol composition type with the
   /// given set of protocols.
-  static Type get(ASTContext &C, SourceLoc FirstLoc, ArrayRef<Type> Protocols);
-  
-  /// \brief Retrieve the source location where this type was first uttered.
-  /// FIXME: This is a hackaround for the lack of TypeLocs.
-  SourceLoc getFirstLoc() const { return FirstLoc; }
+  static Type get(ASTContext &C, ArrayRef<Type> Protocols);
   
   /// \brief Retrieve the set of protocols composed to create this type.
   ArrayRef<Type> getProtocols() const { return Protocols; }
@@ -1020,14 +1015,13 @@ public:
   }
   
 private:
-  static ProtocolCompositionType *build(ASTContext &C, SourceLoc FirstLoc,
+  static ProtocolCompositionType *build(ASTContext &C,
                                         ArrayRef<Type> Protocols);
 
-  ProtocolCompositionType(ASTContext *Ctx, SourceLoc FirstLoc,
-                          ArrayRef<Type> Protocols)
+  ProtocolCompositionType(ASTContext *Ctx, ArrayRef<Type> Protocols)
     : TypeBase(TypeKind::ProtocolComposition, /*Context=*/Ctx,
                /*Unresolved=*/false),
-      FirstLoc(FirstLoc), Protocols(Protocols) { }
+      Protocols(Protocols) { }
 };
 
 /// LValueType - An l-value is a handle to a physical object.  The

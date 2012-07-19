@@ -1391,6 +1391,7 @@ public:
   void setBody(BraceStmt *S) { Body = S; }
 
   Type getBodyResultType() const { return FnRetType; }
+  TypeLoc *getBodyResultTypeLoc() const { return FnRetTypeLoc; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FuncExpr *) { return true; }

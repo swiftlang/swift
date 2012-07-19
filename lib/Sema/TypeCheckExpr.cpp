@@ -247,7 +247,7 @@ collectArchetypeToExistentialSubstitutions(ASTContext &Context,
                        std::back_inserter(ConformsTo),
                        [](ProtocolDecl *P) { return P->getDeclaredType(); });
         Substitutions[Archetype]
-          = ProtocolCompositionType::get(Context, SourceLoc(), ConformsTo);
+          = ProtocolCompositionType::get(Context, ConformsTo);
       }
     }
   }
@@ -975,7 +975,7 @@ public:
   }
 
   Expr *visitNewArrayExpr(NewArrayExpr *E) {
-    if (TC.validateType(E->getElementType(), E->getLoc(),
+    if (TC.validateType(E->getElementType(), E->getElementTypeLoc(),
                         /*isFirstPass*/false)) {
       E->setElementType(ErrorType::get(TC.Context));
       return nullptr;
@@ -1056,7 +1056,8 @@ public:
   }
 
   Expr *visitNewReferenceExpr(NewReferenceExpr *E) {
-    if (TC.validateType(E->getType(), E->getLoc(), /*isFirstPass*/false)) {
+    if (TC.validateType(E->getType(), E->getElementTypeLoc(),
+                        /*isFirstPass*/false)) {
       E->setType(ErrorType::get(TC.Context));
       return nullptr;
     }
@@ -1721,7 +1722,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
 
 void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
   bool badType = false;
-  if (validateType(FE->getBodyResultType(), FE->getLoc(),
+  if (validateType(FE->getBodyResultType(), FE->getBodyResultTypeLoc(),
                    isFirstPass))
     badType = true;
 
