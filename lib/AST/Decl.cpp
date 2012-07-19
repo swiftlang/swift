@@ -254,7 +254,6 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
   // Set the type of the TypeAlias to the right MetaTypeType.
   ASTContext &Ctx = getASTContext();
   AliasTy = new (Ctx) NameAliasType(this);
-  setType(MetaTypeType::get(AliasTy, Ctx));
 }
 
 OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
