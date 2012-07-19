@@ -24,6 +24,7 @@
 
 namespace swift {
   class ASTContext;
+  class ExprHandle;
 
 /// PatternKind - The classification of different kinds of
 /// value-matching pattern.
@@ -132,21 +133,20 @@ public:
 /// An element of a tuple pattern.
 class TuplePatternElt {
   Pattern *ThePattern;
-  Expr *Init;
+  ExprHandle *Init;
   Type VarargBaseType;
 
 public:
   TuplePatternElt() = default;
-  explicit TuplePatternElt(Pattern *P, Expr *init = nullptr,
+  explicit TuplePatternElt(Pattern *P, ExprHandle *init = nullptr,
                            Type varargBaseType = Type())
     : ThePattern(P), Init(init), VarargBaseType(varargBaseType) {}
 
   Pattern *getPattern() const { return ThePattern; }
-  Expr *getInit() const { return Init; }
+  ExprHandle *getInit() const { return Init; }
   bool isVararg() { return !VarargBaseType.isNull(); }
   Type getVarargBaseType() { return VarargBaseType; }
   void setVarargBaseType(Type ty) { VarargBaseType = ty; }
-  void setInit(Expr *E) { Init = E; }
 };
 
 /// A pattern consisting of a tuple of patterns.

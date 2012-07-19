@@ -603,11 +603,10 @@ int TupleType::getFieldForScalarInit() const {
 /// updateInitializedElementType - This methods updates the element type and
 /// initializer for a non-canonical TupleType that has an initializer for the
 /// specified element.  This should only be used by TypeChecker.
-void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy,
-                                             Expr *NewInit) {
+void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy) {
   TupleTypeElt &Elt = const_cast<TupleTypeElt&>(Fields[EltNo]);
   assert(Elt.hasInit() && "Can only update elements with default values");
-  Elt = TupleTypeElt(NewTy, Elt.getName(), NewInit);
+  Elt = TupleTypeElt(NewTy, Elt.getName(), Elt.getInit());
 }
 
 ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, StringRef DisplayName,

@@ -32,7 +32,7 @@ namespace llvm {
 namespace swift {
   class ASTContext;
   class ClassDecl;
-  class Expr;
+  class ExprHandle;
   class GenericParamList;
   class Identifier;
   class TypeAliasDecl;
@@ -468,7 +468,7 @@ class TupleTypeElt {
 
   /// Init - This is a default value for the tuple element, used if an explicit
   /// value is not specified.
-  Expr *Init;
+  ExprHandle *Init;
 
   /// VarargBaseTy - This is the base type of the field, ignoring the "..."
   /// specifier, if one is present.
@@ -476,7 +476,7 @@ class TupleTypeElt {
 
 public:
   TupleTypeElt() = default;
-  TupleTypeElt(Type ty, Identifier name, Expr *init = nullptr,
+  TupleTypeElt(Type ty, Identifier name, ExprHandle *init = nullptr,
                Type VarargBaseTy = Type())
     : Name(name), Ty(ty), Init(init), VarargBaseTy(VarargBaseTy) { }
 
@@ -495,8 +495,8 @@ public:
   }
   
   bool hasInit() const { return Init != nullptr; }
-  Expr *getInit() const { return Init; }
-  void setInit(Expr *E) { Init = E; }
+  ExprHandle *getInit() const { return Init; }
+  void setInit(ExprHandle *E) { Init = E; }
 };
   
 /// TupleType - A tuple is a parenthesized list of types where each name has an
@@ -537,7 +537,7 @@ public:
   /// updateInitializedElementType - This methods updates the element type and
   /// initializer for a non-canonical TupleType that has an initializer for the
   /// specified element.  This should only be used by TypeChecker.
-  void updateInitializedElementType(unsigned EltNo, Type NewTy, Expr *NewInit);
+  void updateInitializedElementType(unsigned EltNo, Type NewTy);
   
   void print(raw_ostream &OS) const;
 

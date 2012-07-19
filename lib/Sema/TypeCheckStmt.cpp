@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ExprHandle.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -487,6 +488,9 @@ void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
 
 void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
   BraceStmt *BS = FE->getBody();
+  if (!BS)
+    return;
+
   StmtChecker(*this, FE).typeCheckStmt(BS);
   FE->setBody(BS);
 }
@@ -704,12 +708,10 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
         // If this is an instance method with a body, set the type of it's
         // implicit 'this' variable.
-        if (FD->getBody())
-          if (Type ThisTy = FD->computeThisType()) {
-            // References to the 'this' declaration will add back the lvalue
-            // type as appropriate.
-            FD->getImplicitThisDecl()->setType(ThisTy->getRValueType());
-          }
+        // FIXME: This is only necessary because we do name-binding for
+        // DeclRefs too early.
+        if (Type ThisTy = FD->computeThisType())
+          FD->getImplicitThisDecl()->setType(ThisTy);
       }
 
       if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D))
@@ -831,6 +833,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // We don't know the types of all the global declarations in the first
   // pass, which means we can't completely analyze everything. Perform the
   // second pass now.
+
+  // Check default arguments in types.
   for (auto TypeAndContext : TU->getTypesWithDefaultValues()) {
     TupleType *TT = TypeAndContext.first;
     for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
@@ -840,20 +844,70 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         // FIXME: This screws up the FuncExprs list for FuncExprs in a
         // default value; conceptually, we should be appending to the list
         // in source order.
-        Expr *Init = Elt.getInit();
-        Init = prePass.doWalk(Init, TypeAndContext.second);
-        TT->updateInitializedElementType(i, Elt.getType(), Init);
+        ExprHandle *init = Elt.getInit();
+        Expr *initExpr = prePass.doWalk(init->getExpr(), TypeAndContext.second);
+        init->setExpr(initExpr);
 
         if (TT->hasCanonicalTypeComputed()) {
           // If we already examined a tuple in the first pass, we didn't
           // get a chance to type-check it; do that now.
-          if (!TC.typeCheckExpression(Init, Elt.getType()))
-            TT->updateInitializedElementType(i, Elt.getType(), Init);
+          if (!TC.typeCheckExpression(initExpr, Elt.getType()))
+            init->setExpr(initExpr);
         }
       }
     }
   }
   TU->clearTypesWithDefaultValues();
+
+  // Check default arguments in patterns.
+  // FIXME: This is an ugly hack to keep default arguments working for the
+  // moment; I don't really want to invest more time into them until we're
+  // sure how they are acutally supposed to work.
+  struct PatternDefaultArgChecker : public ASTWalker {
+    TypeChecker &TC;
+    ExprPrePassWalker &PrePass;
+
+    PatternDefaultArgChecker(TypeChecker &TC,
+                             ExprPrePassWalker &PrePass)
+      : TC(TC), PrePass(PrePass) {}
+
+    void visitPattern(Pattern *P, DeclContext *DC) {
+      switch (P->getKind()) {
+      case PatternKind::Tuple:
+        for (auto &field : cast<TuplePattern>(P)->getFields()) {
+          if (field.getInit() && field.getPattern()->hasType()) {
+            Expr *e = field.getInit()->getExpr();
+            e = PrePass.doWalk(e, DC);
+            TC.typeCheckExpression(e, field.getPattern()->getType());
+            field.getInit()->setExpr(e);
+          }
+        }
+        return;
+      case PatternKind::Paren:
+        return visitPattern(cast<ParenPattern>(P)->getSubPattern(), DC);
+      case PatternKind::Typed:
+      case PatternKind::Named:
+      case PatternKind::Any:
+        return;
+      }
+      llvm_unreachable("bad pattern kind!");
+    }
+
+    virtual bool walkToDeclPre(Decl *D) {
+      if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D)) {
+        visitPattern(CD->getArguments(), D->getDeclContext());
+      } else if (SubscriptDecl *SD = dyn_cast<SubscriptDecl>(D)) {
+        visitPattern(SD->getIndices(), D->getDeclContext());
+      } else if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+        for (Pattern *p : FD->getBody()->getParamPatterns())
+          visitPattern(p, D->getDeclContext());
+      }
+      return true;
+    }
+  };
+  PatternDefaultArgChecker pdac(TC, prePass);
+  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i)
+    TU->Decls[i]->walk(pdac);
 
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     Decl *D = TU->Decls[i];
@@ -915,8 +969,6 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // work correctly.
   for (auto func : prePass.FuncExprs) {
     if (ConstructorDecl *CD = func.dyn_cast<ConstructorDecl*>()) {
-      if (TC.typeCheckPattern(CD->getArguments(), /*isFirstPass*/false))
-        continue;
       if (TC.validateType(CD->getType(), CD->getLoc(), /*isFirstPass*/false))
         continue;
       Stmt *Body = CD->getBody();
@@ -930,7 +982,6 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       continue;
     }
     FuncExpr *FE = func.get<FuncExpr*>();
-    TC.semaFunctionSignature(FE);
 
     PrettyStackTraceExpr StackEntry(TC.Context, "type-checking", FE);
 

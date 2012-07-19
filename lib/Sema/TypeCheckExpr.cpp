@@ -1190,8 +1190,7 @@ public:
     // modularly, so we don't need to recurse into them and reanalyze their
     // body.  This prevents N^2 re-sema activity with lots of nested closures.
     if (FuncExpr *FE = dyn_cast<FuncExpr>(E)) {
-      if (TC.validateType(FE->getType(), E->getLoc(), /*isFirstPass*/false))
-        FE->setType(ErrorType::get(TC.Context));
+      TC.semaFuncExpr(FE, /*isFirstPass*/false);
       return false;
     }
 
@@ -1720,16 +1719,45 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   return true;
 }
 
-bool TypeChecker::semaFunctionSignature(FuncExpr *FE) {
-  bool hadError = false;
-  for (unsigned i = FE->getParamPatterns().size(); i != 0; --i) {
-    Pattern *pattern = FE->getParamPatterns()[i - 1];
-    if (typeCheckPattern(pattern, /*isFirstPass*/false)) {
-      hadError = true;
+void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
+  bool badType = false;
+  if (validateType(FE->getBodyResultType(), FE->getLoc(),
+                   isFirstPass))
+    badType = true;
+
+  for (Pattern *P : FE->getParamPatterns()) {
+    if (P->hasType())
       continue;
+    if (typeCheckPattern(P, isFirstPass))
+      badType = true;
+  }
+
+  if (badType) {
+    FE->setType(ErrorType::get(Context));
+    return;
+  }
+
+  Type funcTy = FE->getBodyResultType();
+
+  auto patterns = FE->getParamPatterns();
+  bool isInstanceFunc = false;
+  GenericParamList *genericParams = nullptr;
+  if (FE->getDecl()) {
+    isInstanceFunc = FE->getDecl()->getImplicitThisDecl() != nullptr;
+    genericParams = FE->getDecl()->getGenericParams();
+  }
+
+  for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
+    Type argTy = patterns[e - i - 1]->getType();
+    if (e - i - 1 == isInstanceFunc && genericParams) {
+      funcTy = PolymorphicFunctionType::get(argTy, funcTy,
+                                            genericParams,
+                                            Context);
+    } else {
+      funcTy = FunctionType::get(argTy, funcTy, Context);
     }
   }
-  return hadError;
+  FE->setType(funcTy);
 }
 
 static bool convertWithMethod(TypeChecker &TC, Expr *&E, Identifier method,

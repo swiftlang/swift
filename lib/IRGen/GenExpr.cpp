@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ExprHandle.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Optional.h"
@@ -682,7 +683,7 @@ namespace {
       TupleType *TT = E->getType()->castTo<TupleType>();
       for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
         if (E->getElementMapping()[i] == -1)
-          visit(TT->getFields()[i].getInit());
+          visit(TT->getFields()[i].getInit()->getExpr());
       }
     }
 

@@ -386,28 +386,25 @@ public:
     if (IsSecondPass)
       return;
 
-    checkGenericParams(FD->getGenericParams());
+    FuncExpr *body = FD->getBody();
 
     // Before anything else, set up the 'this' argument correctly.
+    bool isInstanceFunc = false;
     if (Type thisType = FD->computeThisType()) {
-      FunctionType *fnType = cast<FunctionType>(FD->getType());
-      fnType = FunctionType::get(thisType, fnType->getResult(), TC.Context);
-      FD->overwriteType(FunctionType::get(thisType, fnType->getResult(),
-                                          TC.Context));
-
-      if (FuncExpr *body = FD->getBody()) {
-        body->setType(FD->getType());
-        TypedPattern *thisPattern =
-          cast<TypedPattern>(body->getParamPatterns()[0]);
-        assert(thisPattern->getType()->isUnresolvedType());
-        thisPattern->overwriteType(thisType);
-      }
+      TypedPattern *thisPattern =
+        cast<TypedPattern>(body->getParamPatterns()[0]);
+      assert(thisPattern->getType()->isUnresolvedType() ||
+             thisPattern->getType().getPointer() == thisType.getPointer());
+      thisPattern->overwriteType(thisType);
+      isInstanceFunc = true;
     }
 
-    if (visitValueDecl(FD)) {
-      if (FD->getBody())
-        FD->getBody()->setType(FD->getType());
-    }
+    checkGenericParams(FD->getGenericParams());
+
+    TC.semaFuncExpr(body, IsFirstPass);
+    FD->setType(body->getType());
+
+    visitValueDecl(FD);
   }
 
   void visitOneOfElementDecl(OneOfElementDecl *ED) {
@@ -480,14 +477,19 @@ public:
     if (!CD->getDeclContext()->isTypeContext())
       TC.diagnose(CD->getStartLoc(), diag::constructor_not_member);
 
-    visitValueDecl(CD);
-
     Type ThisTy = CD->computeThisType();
-    Type FnTy = FunctionType::get(CD->getType(), 
-                                 ThisTy,
-                                 TC.Context);
-    CD->overwriteType(FnTy);
     CD->getImplicitThisDecl()->setType(ThisTy);
+
+    if (TC.typeCheckPattern(CD->getArguments(), IsFirstPass)) {
+      CD->setType(ErrorType::get(TC.Context));
+    } else {
+      Type FnTy = FunctionType::get(CD->getArguments()->getType(),
+                                    ThisTy,
+                                    TC.Context);
+      CD->setType(FnTy);
+    }
+
+    visitValueDecl(CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
@@ -635,7 +637,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       TC.diagnose(VD->getStartLoc(), diag::conversion_not_instance_method,
                   VD->getName());
       VD->getMutableAttrs().Conversion = false;
-    } else {
+    } else if (!VD->getType()->is<ErrorType>()) {
       AnyFunctionType *BoundMethodTy
         = VD->getType()->castTo<AnyFunctionType>()->getResult()
             ->castTo<AnyFunctionType>();

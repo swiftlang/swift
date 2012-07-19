@@ -128,7 +128,6 @@ public:
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
 };
 
-  
 /// ErrorExpr - Represents a semantically erroneous subexpression in the AST,
 /// typically this will have an ErrorType.
 class ErrorExpr : public Expr {
@@ -1353,6 +1352,8 @@ class FuncExpr : public CapturingExpr {
 
   FuncDecl *TheFuncDecl;
 
+  Type FnRetType;
+
   Pattern **getParamsBuffer() {
     return reinterpret_cast<Pattern**>(this+1);
   }
@@ -1360,14 +1361,14 @@ class FuncExpr : public CapturingExpr {
     return reinterpret_cast<Pattern*const*>(this+1);
   }
   
-  FuncExpr(SourceLoc FuncLoc, unsigned NumPatterns, Type FnType,
+  FuncExpr(SourceLoc FuncLoc, unsigned NumPatterns, Type FnRetType,
            BraceStmt *Body, DeclContext *Parent)
-    : CapturingExpr(ExprKind::Func, FnType, Parent),
+    : CapturingExpr(ExprKind::Func, Type(), Parent),
       FuncLoc(FuncLoc), NumPatterns(NumPatterns), Body(Body),
-      TheFuncDecl(nullptr) {}
+      TheFuncDecl(nullptr), FnRetType(FnRetType) {}
 public:
   static FuncExpr *create(ASTContext &Context, SourceLoc FuncLoc,
-                          ArrayRef<Pattern*> Params, Type FnType,
+                          ArrayRef<Pattern*> Params, Type FnRetType,
                           BraceStmt *Body, DeclContext *Parent);
 
   SourceRange getSourceRange() const;
@@ -1386,8 +1387,8 @@ public:
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *S) { Body = S; }
 
-  Type getBodyResultType() const;
- 
+  Type getBodyResultType() const { return FnRetType; }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FuncExpr *) { return true; }
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Func; }

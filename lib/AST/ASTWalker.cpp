@@ -240,6 +240,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   }
   
   Expr *visitFuncExpr(FuncExpr *E) {
+    if (!E->getBody())
+      return E;
     if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(E->getBody()))) {
       E->setBody(S);
       return E;
@@ -569,14 +571,14 @@ public:
           return true;
       }
     } else if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-      if (FuncExpr *Body = FD->getBody()) {
+      FuncExpr *Body = FD->getBody();
 #ifndef NDEBUG
-        PrettyStackTraceDecl debugStack("walking into body of", FD);
+      PrettyStackTraceDecl debugStack("walking into body of", FD);
 #endif
-        if (FuncExpr *E2 = cast_or_null<FuncExpr>(doIt(Body)))
-          FD->setBody(E2);
-        else
-          return true;
+      if (FuncExpr *E2 = cast_or_null<FuncExpr>(doIt(Body)))
+        FD->setBody(E2);
+      else
+        return true;
       }
       
     } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {

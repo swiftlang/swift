@@ -154,16 +154,20 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
     return;
 
   // Build a function to call to print the expression.
-  Type FuncTy = T;
-  if (!isa<TupleType>(FuncTy)) {
-    TupleTypeElt Elt(T, Context.getIdentifier("arg"));
-    FuncTy = TupleType::get(Elt, Context);
-  }
-  FuncTy = FunctionType::get(FuncTy, TupleType::getEmpty(Context), Context);
   VarDecl *Arg = new (Context) VarDecl(Loc, Context.getIdentifier("arg"), T,
                                        nullptr);
   Pattern* ParamPat = new (Context) NamedPattern(Arg);
-  FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, FuncTy, 0, TLCD);
+  ParamPat = new (Context) TypedPattern(ParamPat, Arg->getType());
+  if (!isa<TupleType>(T)) {
+    TuplePatternElt elt{ParamPat};
+    ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
+  }
+  typeCheckPattern(ParamPat, /*isFirstPass*/false);
+  FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat,
+                                  TupleType::getEmpty(Context), 0, TLCD);
+  Type FuncTy = FunctionType::get(ParamPat->getType(),
+                                  TupleType::getEmpty(Context), Context);
+  FE->setType(FuncTy);
   Arg->setDeclContext(FE);
 
   // Build the body of the function which prints the expression.
@@ -260,16 +264,18 @@ void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
     PrintDecls.push_back(Result.getValueDecl());
 
   // Build function of type T->T which prints the operand.
-  Type FuncTy = T;
-  if (!isa<TupleType>(FuncTy)) {
-    TupleTypeElt Elt(T, Context.getIdentifier("arg"));
-    FuncTy = TupleType::get(Elt, Context);
-  }
-  FuncTy = FunctionType::get(FuncTy, T, Context);
   VarDecl *Arg = new (Context) VarDecl(Loc, Context.getIdentifier("arg"), T,
                                        nullptr);
   Pattern* ParamPat = new (Context) NamedPattern(Arg);
-  FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, FuncTy, 0, &TU);
+  ParamPat = new (Context) TypedPattern(ParamPat, Arg->getType());
+  if (!isa<TupleType>(T)) {
+    TuplePatternElt elt{ParamPat};
+    ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
+  }
+  typeCheckPattern(ParamPat, /*isFirstPass*/false);
+  FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, T, 0, &TU);
+  Type FuncTy = FunctionType::get(ParamPat->getType(), T, Context);
+  FE->setType(FuncTy);
   Arg->setDeclContext(FE);
   
   // Fill in body of function.

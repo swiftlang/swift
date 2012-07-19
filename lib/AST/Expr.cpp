@@ -299,40 +299,23 @@ Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
 }
 
 FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
-                           ArrayRef<Pattern*> params, Type fnType,
+                           ArrayRef<Pattern*> params, Type fnRetType,
                            BraceStmt *body, DeclContext *parent) {
   unsigned nParams = params.size();
   void *buf = C.Allocate(sizeof(FuncExpr) + nParams * sizeof(Pattern*),
                          Expr::Alignment);
-  FuncExpr *fn = ::new(buf) FuncExpr(funcLoc, nParams, fnType, body, parent);
+  FuncExpr *fn = ::new(buf) FuncExpr(funcLoc, nParams, fnRetType, body, parent);
   for (unsigned i = 0; i != nParams; ++i)
     fn->getParamsBuffer()[i] = params[i];
   return fn;
 }
 
 SourceRange FuncExpr::getSourceRange() const {
+  if (!Body) {
+    Pattern *LastPat = getParamPatterns().back();
+    return SourceRange(FuncLoc, LastPat->getEndLoc());
+  }
   return SourceRange(FuncLoc, Body->getEndLoc());
-}
-
-/// Returns the result type of the function defined by the body.  For
-/// an uncurried function, this is just the normal result type; for a
-/// curried function, however, this is the result type of the
-/// uncurried part.
-///
-/// Examples:
-///   func(x : int) -> ((y : int) -> (int -> int))
-///     The body result type is '((y : int) -> (int -> int))'.
-///   func(x : int) -> (y : int) -> (int -> int)
-///     The body result type is '(int -> int)'.
-Type FuncExpr::getBodyResultType() const {
-  if (getType()->is<ErrorType>())
-    return getType();
-  unsigned n = getParamPatterns().size();
-  Type ty = getType();
-  do {
-    ty = cast<AnyFunctionType>(ty)->getResult();
-  } while (--n);
-  return ty;
 }
 
 static ValueDecl *getCalledValue(Expr *E) {

@@ -278,15 +278,12 @@ public:
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 
-  bool parseFunctionSignature(SmallVectorImpl<Pattern*> &params, Type &type,
-                              TypeLoc *&loc);
-  bool buildFunctionSignature(SmallVectorImpl<Pattern*> &params, Type &type,
-                              TypeLoc *&loc);
+  bool parseFunctionSignature(SmallVectorImpl<Pattern*> &params, Type &retType,
+                              TypeLoc *&retLoc);
   NullablePtr<Pattern> parsePattern();
   NullablePtr<Pattern> parsePatternTuple();
   NullablePtr<Pattern> parsePatternAtom();
-  bool checkFullyTyped(Pattern *Param, Type &funcTy);
-  
+
   //===--------------------------------------------------------------------===//
   // Expression Parsing
   
@@ -306,7 +303,7 @@ public:
   
   Expr *parseExprOperator();
   Expr *actOnIdentifierExpr(Identifier Text, SourceLoc Loc);
-  FuncExpr *actOnFuncExprStart(SourceLoc FuncLoc, Type FuncTy,
+  FuncExpr *actOnFuncExprStart(SourceLoc FuncLoc, Type FuncRetTy,
                                ArrayRef<Pattern*> Patterns);
 
   //===--------------------------------------------------------------------===//

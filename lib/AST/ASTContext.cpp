@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/ExprHandle.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/DenseMap.h"
@@ -374,4 +375,13 @@ SubstitutedType *SubstitutedType::get(Type Original, Type Replacement,
   if (!Known)
     Known = new (C) SubstitutedType(Original, Replacement);
   return Known;
+}
+
+void *ExprHandle::operator new(size_t Bytes, ASTContext &C,
+                            unsigned Alignment) {
+  return C.Allocate(Bytes, Alignment);
+}
+
+ExprHandle *ExprHandle::get(ASTContext &Context, Expr *E) {
+  return new (Context) ExprHandle(E);
 }

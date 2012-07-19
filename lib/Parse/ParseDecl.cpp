@@ -423,7 +423,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
       }
       
       if (auto Func = dyn_cast<FuncDecl>(VD)) {
-        if ((Flags & PD_DisallowFuncDef) && Func->getBody() &&
+        if ((Flags & PD_DisallowFuncDef) && Func->getBody()->getBody() &&
             !Func->isGetterOrSetter())
           diagnose(Func->getBody()->getLoc(), diag::disallowed_func_def);
       }
@@ -644,7 +644,6 @@ static void cloneTuplePatternElts(ASTContext &Context, Pattern &From,
                                   SmallVectorImpl<TuplePatternElt> &To) {
   if (TuplePattern *FromTuple = dyn_cast<TuplePattern>(&From)) {
     for (auto &Elt : FromTuple->getFields())
-      // FIXME: Do we have to clone the initializer?
       To.push_back(TuplePatternElt(clonePattern(Context, Elt.getPattern()),
                                    Elt.getInit(), Elt.getVarargBaseType()));
     return;
@@ -769,20 +768,12 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
         cloneTuplePatternElts(Context, *Indices, TupleElts);
       Params.push_back(TuplePattern::create(Context, SourceLoc(), TupleElts,
                                             SourceLoc()));
-      
-      // Getter has type: () -> T.
-      Type FuncTy = ElementTy;
-      TypeLoc *FuncLoc = nullptr;
-      if (buildFunctionSignature(Params, FuncTy, FuncLoc)) {
-        skipUntilDeclRBrace();
-        Invalid = true;
-        break;
-      }
 
       Scope FnBodyScope(this, /*AllowLookup=*/true);
 
       // Start the function.
-      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, FuncTy, Params);
+      Type GetterRetTy = ElementTy;
+      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, GetterRetTy, Params);
       
       // Establish the new context.
       ContextChange CC(*this, GetFn);
@@ -806,7 +797,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       
       Get = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), GetLoc,
                                    Identifier(), GetLoc, /*generic=*/nullptr,
-                                   FuncTy, GetFn, CurDeclContext);
+                                   Type(), GetFn, CurDeclContext);
       GetFn->setDecl(Get);
       continue;
     }
@@ -892,20 +883,12 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                              SetNameParens.End);
       Params.push_back(ValueParamsPattern);
     }
-    
-    // Getter has type: (value : T) -> ()
-    Type FuncTy = TupleType::getEmpty(Context);
-    TypeLoc *FuncLoc = nullptr;
-    if (buildFunctionSignature(Params, FuncTy, FuncLoc)) {
-      skipUntilDeclRBrace();
-      Invalid = true;
-      break;
-    }
 
     Scope FnBodyScope(this, /*AllowLookup=*/true);
 
     // Start the function.
-    FuncExpr *SetFn = actOnFuncExprStart(SetLoc, FuncTy, Params);
+    Type SetterRetTy = TupleType::getEmpty(Context);
+    FuncExpr *SetFn = actOnFuncExprStart(SetLoc, SetterRetTy, Params);
     
     // Establish the new context.
     ContextChange CC(*this, SetFn);
@@ -929,7 +912,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     
     Set = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), SetLoc,
                                  Identifier(), SetLoc, /*generic=*/nullptr,
-                                 FuncTy, SetFn, CurDeclContext);
+                                 Type(), SetFn, CurDeclContext);
     SetFn->setDecl(Set);
   }
   
@@ -1100,21 +1083,6 @@ Pattern *Parser::buildImplicitThisParameter() {
   return new (Context) TypedPattern(P, UnstructuredUnresolvedType::get(Context));
 }
 
-/// Given a FunctionType structure built by parseFunctionSignature,
-/// rebuild it as a polymorphic type.
-static Type buildPolymorphicType(ASTContext &C, Type sigTy,
-                                 GenericParamList *params,
-                                 bool hasContainerType) {
-  assert(params);
-  FunctionType *fnType = cast<FunctionType>(sigTy);
-  if (hasContainerType) {
-    Type output = buildPolymorphicType(C, fnType->getResult(), params, false);
-    return FunctionType::get(fnType->getInput(), output, C);
-  }
-  return PolymorphicFunctionType::get(fnType->getInput(), fnType->getResult(),
-                                      params, C);
-}
-
 /// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
 /// caller handles this case and does recovery as appropriate.  If AllowScoped
 /// is true, we parse both productions.
@@ -1173,16 +1141,10 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
     hasImplicitThis = true;
   }
 
-  Type FuncTy;
-  TypeLoc *FuncTyLoc;
-  if (parseFunctionSignature(Params, FuncTy, FuncTyLoc))
+  Type FuncRetTy;
+  TypeLoc *FuncRetTyLoc;
+  if (parseFunctionSignature(Params, FuncRetTy, FuncRetTyLoc))
     return 0;
-
-  // FIXME: for efficiency, do this as part of the previous operation.
-  if (GenericParams) {
-    FuncTy = buildPolymorphicType(Context, FuncTy, GenericParams,
-                                  hasImplicitThis);
-  }
   
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name
@@ -1191,7 +1153,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   {
     Scope FnBodyScope(this, /*AllowLookup=*/true);
     
-    FE = actOnFuncExprStart(FuncLoc, FuncTy, Params);
+    FE = actOnFuncExprStart(FuncLoc, FuncRetTy, Params);
 
     // Now that we have a context, update the generic parameters with that
     // context.
@@ -1211,7 +1173,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
     if (Tok.is(tok::l_brace)) {
       NullablePtr<BraceStmt> Body = parseStmtBrace(diag::invalid_diagnostic);
       if (Body.isNull()) {
-        FE = 0; // FIXME: Should do some sort of error recovery here.
+        // FIXME: Should do some sort of error recovery here?
       } else {
         FE->setBody(Body.get());
         
@@ -1220,11 +1182,6 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
         Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
         FE->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
       }
-      
-    } else {
-      // Note, we just discard FE here.  It is bump pointer allocated, so this
-      // is fine (if suboptimal).
-      FE = 0;
     }
   }
 
@@ -1233,7 +1190,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
 
   // Create the decl for the func and add it to the parent scope.
   FuncDecl *FD = new (Context) FuncDecl(StaticLoc, FuncLoc, Name, NameLoc,
-                                        GenericParams, FuncTy, FE,
+                                        GenericParams, Type(), FE,
                                         CurDeclContext);
   if (FE)
     FE->setDecl(FD);
@@ -1505,12 +1462,9 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
     Pattern *Arguments = TuplePattern::create(Context, SourceLoc(),
                                               ArrayRef<TuplePatternElt>(),
                                               SourceLoc());
-    Type ConstructorTy;
-    checkFullyTyped(Arguments, ConstructorTy);
     ConstructorDecl *Constructor =
         new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
                                      SourceLoc(), Arguments, ThisDecl, CD);
-    Constructor->setType(ConstructorTy);
     ThisDecl->setDeclContext(Constructor);
     MemberDecls.push_back(Constructor);
   }
@@ -1641,9 +1595,6 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   NullablePtr<Pattern> Indices = parsePatternTuple();
   if (Indices.isNull())
     return true;
-  Type DummyTy; // FIXME: We actually need to use this type here!
-  if (checkFullyTyped(Indices.get(), DummyTy))
-    Invalid = true;
   
   // '->'
   if (!Tok.is(tok::arrow)) {
@@ -1764,7 +1715,6 @@ static void AddConstructorArgumentsToScope(Pattern *pat, ConstructorDecl *CD,
 
 
 ConstructorDecl *Parser::parseDeclConstructor() {
-  bool Invalid = false;
   SourceLoc ConstructorLoc = consumeToken(tok::kw_constructor);
   
   // attribute-list
@@ -1780,9 +1730,6 @@ ConstructorDecl *Parser::parseDeclConstructor() {
   NullablePtr<Pattern> Arguments = parsePatternTuple();
   if (Arguments.isNull())
     return nullptr;
-  Type ConstructorTy;
-  if (checkFullyTyped(Arguments.get(), ConstructorTy))
-    Invalid = true;
 
   // '{'
   if (!Tok.is(tok::l_brace)) {
@@ -1799,7 +1746,6 @@ ConstructorDecl *Parser::parseDeclConstructor() {
       new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
                                     ConstructorLoc, Arguments.get(), ThisDecl,
                                     CurDeclContext);
-  CD->setType(ConstructorTy);
   ThisDecl->setDeclContext(CD);
   AddConstructorArgumentsToScope(Arguments.get(), CD, *this);
   ScopeInfo.addToScope(ThisDecl);

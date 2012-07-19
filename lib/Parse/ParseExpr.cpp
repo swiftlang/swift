@@ -602,25 +602,25 @@ NullablePtr<Expr> Parser::parseExprFunc() {
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
   SmallVector<Pattern*, 4> Params;
-  Type Ty;
-  TypeLoc *Loc;
+  Type RetTy;
+  TypeLoc *RetTyLoc;
   if (Tok.is(tok::l_brace)) {
     // If the func-signature isn't present, then this is a ()->() function.
     Params.push_back(TuplePattern::create(Context, SourceLoc(),
                                           llvm::ArrayRef<TuplePatternElt>(),
                                           SourceLoc()));
-    Ty = TupleType::getEmpty(Context);
-    Ty = FunctionType::get(Ty, Ty, Context);
+    RetTy = TupleType::getEmpty(Context);
+    RetTyLoc = nullptr;
   } else if (Tok.isNotAnyLParen()) {
     diagnose(Tok, diag::func_decl_without_paren);
     return 0;
-  } else if (parseFunctionSignature(Params, Ty, Loc)) {
+  } else if (parseFunctionSignature(Params, RetTy, RetTyLoc)) {
     return 0;
   }
   
   // The arguments to the func are defined in their own scope.
   Scope FuncBodyScope(this, /*AllowLookup=*/true);
-  FuncExpr *FE = actOnFuncExprStart(FuncLoc, Ty, Params);
+  FuncExpr *FE = actOnFuncExprStart(FuncLoc, RetTy, Params);
 
   // Establish the new context.
   ContextChange CC(*this, FE);
@@ -674,9 +674,9 @@ static void AddFuncArgumentsToScope(Pattern *pat, FuncExpr *FE, Parser &P) {
   llvm_unreachable("bad pattern kind!");
 }
 
-FuncExpr *Parser::actOnFuncExprStart(SourceLoc FuncLoc, Type FuncTy,
+FuncExpr *Parser::actOnFuncExprStart(SourceLoc FuncLoc, Type FuncRetTy,
                                      ArrayRef<Pattern*> Params) {
-  FuncExpr *FE = FuncExpr::create(Context, FuncLoc, Params, FuncTy, 0,
+  FuncExpr *FE = FuncExpr::create(Context, FuncLoc, Params, FuncRetTy, 0,
                                   CurDeclContext);
 
   for (Pattern *P : Params)

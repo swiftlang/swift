@@ -17,6 +17,7 @@
 
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ExprHandle.h"
 #include "swift/AST/NameLookup.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -280,28 +281,29 @@ bool TypeChecker::validateType(Type InTy, SourceLoc Loc, bool isFirstPass) {
         break;
       }
 
-      Expr *EltInit = TT->getFields()[i].getInit();
+      ExprHandle *EltInit = TT->getFields()[i].getInit();
       if (EltInit == 0) continue;
 
       if (isFirstPass) {
         if (!EltTy) {
-          diagnose(EltInit->getLoc(), diag::tuple_global_missing_type);
+          diagnose(EltInit->getExpr()->getLoc(),
+                   diag::tuple_global_missing_type);
           IsInvalid = true;
           break;
         }
         continue;
       } 
 
-      Expr *OldInit = EltInit;
-      if (typeCheckExpression(EltInit, EltTy)) {
-        diagnose(OldInit->getLoc(),diag::while_converting_default_tuple_value,
+      Expr *initExpr = EltInit->getExpr();
+      if (typeCheckExpression(initExpr, EltTy)) {
+        diagnose(initExpr->getLoc(), diag::while_converting_default_tuple_value,
                  EltTy);
         IsInvalid = true;
         break;
       }
 
       if (!EltTy)
-        EltInit = convertToMaterializable(EltInit);
+        initExpr = convertToMaterializable(initExpr);
 
       struct CheckForLocalRef : public ASTWalker {
         TypeChecker &TC;
@@ -318,14 +320,15 @@ bool TypeChecker::validateType(Type InTy, SourceLoc Loc, bool isFirstPass) {
         }
       };
 
-      EltInit->walk(CheckForLocalRef(*this));
+      initExpr->walk(CheckForLocalRef(*this));
 
       // If both a type and an initializer are specified, make sure the
       // initializer's type agrees with the (redundant) type.
-      assert(EltTy.isNull() || EltTy->isEqual(EltInit->getType()));
-      EltTy = EltInit->getType();
+      assert(EltTy.isNull() || EltTy->isEqual(initExpr->getType()));
+      EltTy = initExpr->getType();
 
-      TT->updateInitializedElementType(i, EltTy, EltInit);
+      EltInit->setExpr(initExpr);
+      TT->updateInitializedElementType(i, EltTy);
     }
     break;
   }

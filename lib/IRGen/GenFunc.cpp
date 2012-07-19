@@ -1774,9 +1774,7 @@ namespace {
 /// Emit a specific parameter clause.
 static void emitParameterClause(IRGenFunction &IGF, AnyFunctionType *fnType,
                                 Pattern *param, Explosion &args) {
-  // This assertion doesn't quite hold because Parser::checkFullyTyped
-  // erases default arguments in the pattern type for some reason.
-  // assert(param->getType()->isEqual(fnType->getInput()));
+  assert(param->getType()->isEqual(fnType->getInput()));
 
   // Emit the pattern.
   ParamPatternEmitter(IGF, args).visit(param);
@@ -2220,7 +2218,7 @@ namespace {
 static void emitFunction(IRGenModule &IGM, FuncDecl *func,
                          unsigned startingUncurryLevel) {
   // Nothing to do if the function has no body.
-  if (!func->getBody()) return;
+  if (!func->getBody()->getBody()) return;
   FuncExpr *funcExpr = func->getBody();
 
   // FIXME: support defining currying entrypoints for local functions.

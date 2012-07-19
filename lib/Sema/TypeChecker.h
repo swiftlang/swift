@@ -311,7 +311,7 @@ public:
   bool isSameType(Type T1, Type T2, CoercionContext *CC = nullptr,
                   bool Labeled = true);
 
-  bool semaFunctionSignature(FuncExpr *FE);
+  void semaFuncExpr(FuncExpr *FE, bool isFirstPass);
   bool semaTupleExpr(TupleExpr *TE);
   Expr *semaSubscriptExpr(SubscriptExpr *SE);
   Expr *semaSubscriptExpr(ExistentialSubscriptExpr *SE);

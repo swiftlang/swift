@@ -15,73 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "Parser.h"
+#include "swift/AST/ExprHandle.h"
+
 using namespace swift;
-
-/// Check that the given pattern is fully-typed.
-bool Parser::checkFullyTyped(Pattern *pattern, Type &funcTy) {
-  switch (pattern->getKind()) {
-  // Any type with an explicit annotation is okay, as long as the
-  // annotation is fully-typed.
-  case PatternKind::Typed:
-    funcTy = pattern->getType();
-    return false;
-
-  // Paren types depend on their parenthesized pattern.
-  case PatternKind::Paren: {
-    Pattern *sub = cast<ParenPattern>(pattern)->getSubPattern();
-    if (checkFullyTyped(sub, funcTy)) return true;
-    pattern->setType(sub->getType());
-    return false;
-  }
-
-  // Tuple types can be built up from their components.
-  case PatternKind::Tuple: {
-    TuplePattern *tuple = cast<TuplePattern>(pattern);
-    SmallVector<TupleTypeElt, 8> typeElts;
-    SmallVector<TupleTypeElt, 8> typeEltsWithInits;
-    typeElts.reserve(tuple->getNumFields());
-    bool HadInit = false;
-    for (TuplePatternElt &elt : tuple->getFields()) {
-      Pattern *subpattern = elt.getPattern();
-      Type eltTy;
-      if (checkFullyTyped(subpattern, eltTy))
-        return true;
-      typeElts.push_back(TupleTypeElt(subpattern->getType(),
-                                      subpattern->getBoundName(), nullptr,
-                                      elt.getVarargBaseType()));
-      typeEltsWithInits.push_back(TupleTypeElt(eltTy,
-                                               subpattern->getBoundName(),
-                                               elt.getInit(),
-                                               elt.getVarargBaseType()));
-      HadInit |= (elt.getInit() != 0);
-      // The grammar allows default values in general patterns, but
-      // they aren't ever allowed semantically.  However, function
-      // declarations use a syntactic shortcut of sorts: the argument list
-      // declares both the pattern for the argument declarations, and the type
-      // of the function itself.  Default values are part of the type, not the
-      // pattern, so we set the pattern's initializer to null when we build
-      // the type.
-      elt.setInit(nullptr);
-    }
-    TupleType *patternTT = TupleType::get(typeElts, Context);
-    TupleType *funcTT = TupleType::get(typeEltsWithInits, Context);
-    if (HadInit)
-      TypesWithDefaultValues.emplace_back(funcTT, CurDeclContext);
-
-    tuple->setType(patternTT);
-    funcTy = funcTT;
-    return false;
-  }
-
-  // Everything else is uninferrable.
-  case PatternKind::Named:
-  case PatternKind::Any:
-    diagnose(pattern->getLoc(), diag::untyped_pattern_in_function_signature)
-      << pattern->getSourceRange();
-    return true;
-  }
-  llvm_unreachable("bad pattern kind");
-}
 
 /// parseFunctionSignature - Parse a function definition signature.
 ///   func-signature:
@@ -89,7 +25,7 @@ bool Parser::checkFullyTyped(Pattern *pattern, Type &funcTy) {
 ///   func-signature-result:
 ///     '->' type
 bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
-                                    Type &type, TypeLoc *&loc) {
+                                    Type &retType, TypeLoc *&retLoc) {
   // Parse curried function argument clauses as long as we can.
   do {
     NullablePtr<Pattern> pattern = parsePatternTuple();
@@ -101,40 +37,17 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
 
   // If there's a trailing arrow, parse the rest as the result type.
   if (consumeIf(tok::arrow)) {
-    if (parseType(type, loc))
+    if (parseType(retType, retLoc))
       return true;
 
   // Otherwise, we implicitly return ().
   } else {
-    type = TupleType::getEmpty(Context);
-    loc = nullptr;
+    retType = TupleType::getEmpty(Context);
+    retLoc = nullptr;
   }
 
-  // Now build up the function type.  We require all function
-  // signatures to be fully-typed: that is, all top-down paths to a
-  // leaf pattern must pass through a TypedPattern.
-  return buildFunctionSignature(params, type, loc);
+  return false;
 }
-
-bool Parser::buildFunctionSignature(SmallVectorImpl<Pattern*> &params,
-                                    Type &type, TypeLoc *&loc) {
-  // Now build up the function type.  We require all function
-  // signatures to be fully-typed: that is, all top-down paths to a
-  // leaf pattern must pass through a TypedPattern.
-  for (unsigned i = params.size(); i != 0; --i) {
-    Pattern *param = params[i - 1];
-    
-    Type paramType;
-    if (checkFullyTyped(param, paramType)) {
-      // Recover by ignoring everything.
-      paramType = TupleType::getEmpty(Context);
-    }
-    type = FunctionType::get(paramType, type, Context);
-  }
-  
-  return false;  
-}
-
 
 /// Parse a pattern.
 ///   pattern ::= pattern-atom
@@ -209,7 +122,7 @@ NullablePtr<Pattern> Parser::parsePatternTuple() {
   if (Tok.isNot(tok::r_paren)) {
     do {
       NullablePtr<Pattern> pattern = parsePattern();
-      Expr *init = nullptr;
+      ExprHandle *init = nullptr;
 
       if (pattern.isNull()) {
         skipUntil(tok::r_paren);
@@ -221,7 +134,7 @@ NullablePtr<Pattern> Parser::parsePatternTuple() {
           return nullptr;
         }
         
-        init = initR.get();
+        init = ExprHandle::get(Context, initR.get());
       }
 
       elts.push_back(TuplePatternElt(pattern.get(), init));

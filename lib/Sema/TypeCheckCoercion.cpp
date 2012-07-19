@@ -928,6 +928,8 @@ CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
     }
     
     // FIXME: PolymorphicFunctionType
+    if (R.D->getType()->is<ErrorType>())
+      continue;
     Type ResultTy
       = R.D->getType()->castTo<FunctionType>()->getResult()->
           castTo<AnyFunctionType>()->getResult();
@@ -1254,13 +1256,16 @@ CoercedResult SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
     std::vector<TuplePatternElt> ArgElts;
     for (unsigned i = 0; i < NumInputArgs; ++i) {
       ArgVars[i]->setType(FuncInputTT->getElementType(i));
-      ArgElts.emplace_back(new (TC.Context) NamedPattern(ArgVars[i]));
+      auto p = new (TC.Context) NamedPattern(ArgVars[i]);
+      p->setType(FuncInputTT->getElementType(i));
+      ArgElts.emplace_back(p);
     }
     ArgPat = TuplePattern::create(TC.Context, loc, ArgElts, loc);
   } else {
     ArgVars[0]->setType(FT->getInput());
     ArgPat = new (TC.Context) NamedPattern(ArgVars[0]);
   }
+  ArgPat->setType(FT->getInput());
   E->setPattern(ArgPat);
 
   Expr *Result = E->getBody();
@@ -1856,6 +1861,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
       Pattern *Pat = TuplePattern::create(TC.Context, E->getLoc(),
                                           ArrayRef<TuplePatternElt>(),
                                           E->getLoc());
+      Pat->setType(TupleType::getEmpty(TC.Context));
       ICE->setPattern(Pat);
 
       // Perform a recursive walk to compute the capture list; this is quite

@@ -17,17 +17,8 @@
 
 #include "TypeChecker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ExprHandle.h"
 using namespace swift;
-
-/// Set the type of the pattern if it does not already have a type.
-/// Only evaluate the type expression if needed.
-#define SET_TYPE(pattern, type) { \
-  Pattern *PAT = (pattern); \
-  if (PAT->hasType()) \
-    assert(PAT->getType()->isEqual(type)); \
-  else \
-    PAT->setType(type); \
-}
 
 /// Perform bottom-up type-checking on a pattern.  If this returns
 /// false, the type of the pattern will have been set.
@@ -37,9 +28,11 @@ bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass) {
   // propagating that type out.
   case PatternKind::Paren: {
     Pattern *SP = cast<ParenPattern>(P)->getSubPattern();
-    if (typeCheckPattern(SP, isFirstPass))
+    if (typeCheckPattern(SP, isFirstPass)) {
+      P->setType(ErrorType::get(Context));
       return true;
-    SET_TYPE(P, SP->getType());
+    }
+    P->setType(SP->getType());
     return false;
   }
 
@@ -61,6 +54,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass) {
   case PatternKind::Any:
   case PatternKind::Named:
     diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
+    P->setType(ErrorType::get(Context));
     return true;
 
   // A tuple pattern propagates its tuple-ness out.
@@ -70,25 +64,29 @@ bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass) {
 
     for (TuplePatternElt &elt : cast<TuplePattern>(P)->getFields()) {
       Type type;
-      Expr *init = elt.getInit();
+      ExprHandle *init = elt.getInit();
       Pattern *pattern = elt.getPattern();
-      if (init) {
-        diagnose(pattern->getLoc(), diag::coerced_tuple_pattern_has_init)
-          << pattern->getSourceRange();
-        elt.setInit(nullptr);
-        hadError = true;
-      } else if (typeCheckPattern(pattern, isFirstPass)) {
+      if (typeCheckPattern(pattern, isFirstPass)) {
         hadError = true;
       } else {
         type = pattern->getType();
+      }
+
+      if (init && !isFirstPass) {
+        Expr *e = init->getExpr();
+        typeCheckExpression(e, type);
+        init->setExpr(e);
       }
 
       typeElts.push_back(TupleTypeElt(type, pattern->getBoundName(), init,
                                       elt.getVarargBaseType()));
     }
 
-    if (hadError) return true;
-    SET_TYPE(P, TupleType::get(typeElts, Context));
+    if (hadError) {
+      P->setType(ErrorType::get(Context));
+      return true;
+    }
+    P->setType(TupleType::get(typeElts, Context));
     return false;
   }
   }
@@ -170,7 +168,6 @@ bool TypeChecker::coerceToType(Pattern *P, Type type, bool isFirstPass) {
       if (elt.getInit()) {
         diagnose(pattern->getLoc(), diag::coerced_tuple_pattern_has_init)
           << pattern->getSourceRange();
-        elt.setInit(nullptr);
         hadError = true;
       }
 

@@ -23,6 +23,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ExprHandle.h"
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/DerivedTypes.h"
@@ -266,7 +267,7 @@ void swift::irgen::emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
     // If the shuffle index is -1, we're supposed to use the default value.
     if (shuffleIndex == -1) {
       assert(outerField.hasInit() && "no default initializer for field!");
-      IGF.emitRValue(outerField.getInit(), outerTupleExplosion);
+      IGF.emitRValue(outerField.getInit()->getExpr(), outerTupleExplosion);
       continue;
     }
 

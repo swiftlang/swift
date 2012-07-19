@@ -16,6 +16,7 @@
 
 #include "Parser.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ExprHandle.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -337,8 +338,13 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result, TypeLoc *&ResultL
         if ((HadError = parseValueSpecifier(type, loc, init)))
           break;
 
+        ExprHandle *initHandle = nullptr;
+        if (init.isNonNull()) {
+          HadExpr = true;
+          initHandle = ExprHandle::get(Context, init.get());
+        }
         HadExpr |= init.isNonNull();
-        Elements.push_back(TupleTypeElt(type, name, init.getPtrOrNull()));
+        Elements.push_back(TupleTypeElt(type, name, initHandle));
         continue;
       }
 
@@ -386,7 +392,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result, TypeLoc *&ResultL
     Type BaseTy = Elements.back().getType();
     Type FullTy = ArraySliceType::get(BaseTy, EllipsisLoc, Context);
     Identifier Name = Elements.back().getName();
-    Expr *Init = Elements.back().getInit();
+    ExprHandle *Init = Elements.back().getInit();
     Elements.back() = TupleTypeElt(FullTy, Name, Init, BaseTy);
   }
 
