@@ -901,7 +901,7 @@ ERROR(continue_outside_loop,sema_tcs,none,
 //------------------------------------------------------------------------------
 
 ERROR(cannot_infer_type_for_pattern,sema_tcp,none,
-      "cannot infer a type for this pattern", ())
+      "type annotation missing in pattern", ())
 ERROR(pattern_type_mismatch_context,sema_tcp,none,
       "type annotation does not match contextual type %0", (Type))
 ERROR(tuple_pattern_in_non_tuple_context,sema_tcp,none,
