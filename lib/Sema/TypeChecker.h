@@ -383,14 +383,6 @@ public:
   /// to a subtype of the requested container type.
   Expr *coerceObjectArgument(Expr *E, Type ContainerTy,
                              CoercionContext *CC = nullptr);
-
-  /// isCoercibleObjectArgument - Determine whether the given expression can
-  /// be coerced to an object argument for a member of the given type.
-  ///
-  /// If a non-NULL coercion context is provided, that coercion context
-  /// will be used (and updated) based on this coercion.
-  bool isCoercibleObjectArgument(Expr *E, Type ContainerTy,
-                                 CoercionContext *CC = nullptr);
   
   Expr *convertToRValue(Expr *E);
   Expr *convertLValueToRValue(LValueType *SrcLT, Expr *E);

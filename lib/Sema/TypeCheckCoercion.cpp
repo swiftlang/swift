@@ -2280,16 +2280,6 @@ Expr *TypeChecker::coerceObjectArgument(Expr *E, Type ContainerTy,
   return nullptr;
 }
 
-bool TypeChecker::isCoercibleObjectArgument(Expr *E, Type ContainerTy,
-                                            CoercionContext *CC) {
-  // FIXME: Propagate Unknowable to caller.
-  CoercionContext MyCC(*this);
-  if (!CC)
-    CC = &MyCC;
-  return (bool)SemaCoerce::coerceObjectArgument(E, ContainerTy, *CC,
-                                                /*Flags=*/0);
-}
-
 Expr *TypeChecker::convertLValueToRValue(LValueType *srcLV, Expr *E) {
   assert(E && "no expression to load!");
   assert(E->getType()->isEqual(srcLV));
