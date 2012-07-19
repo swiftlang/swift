@@ -60,15 +60,11 @@ void BuiltinModuleCache::lookupValue(Identifier Name, NLKind LookupKind,
   
   ValueDecl *&Entry = Cache[Name];
 
-  if (Entry == 0) {
-    if (Type Ty = getBuiltinType(M.Ctx, Name.str())) {
-      auto TAD = new (M.Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
+  if (Entry == 0)
+    if (Type Ty = getBuiltinType(M.Ctx, Name.str()))
+      Entry = new (M.Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
                                         Ty, nullptr, M.Ctx.TheBuiltinModule,
                                         MutableArrayRef<Type>());
-      TAD->setType(MetaTypeType::get(TAD->getAliasType(), M.Ctx));
-      Entry = TAD;
-    }
-  }
 
   if (Entry == 0)
     Entry = getBuiltinValue(M.Ctx, Name);

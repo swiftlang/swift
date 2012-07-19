@@ -282,7 +282,6 @@ public:
       TC.validateType(TAD->getAliasType(), nullptr, IsFirstPass);
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         checkInherited(TAD, TAD->getInherited());
-      TAD->setType(MetaTypeType::get(TAD->getAliasType(), TC.Context));
     }
 
     if (!IsFirstPass)

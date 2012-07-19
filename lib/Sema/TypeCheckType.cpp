@@ -128,7 +128,7 @@ bool TypeChecker::validateType(Type InTy, TypeLoc *Loc, bool isFirstPass) {
   case TypeKind::Identifier: {
     IdentifierType *DNT = cast<IdentifierType>(T);
     if (DNT->Components.back().Value.is<Type>()) {
-      IsInvalid = validateType(DNT->getMappedType(), nullptr, isFirstPass);
+      IsInvalid = validateType(DNT->getMappedType(), Loc, isFirstPass);
       break;
     }
     MutableArrayRef<IdentifierType::Component> Components = DNT->Components;
@@ -232,7 +232,7 @@ bool TypeChecker::validateType(Type InTy, TypeLoc *Loc, bool isFirstPass) {
           Ty = TD->getDeclaredType();
         }
         if (Ty) {
-          if (validateType(Ty, nullptr, isFirstPass))
+          if (validateType(Ty, Loc, isFirstPass))
             return true;
           if (BaseTy)
             Ty = substMemberTypeWithBase(Ty, BaseTy);
@@ -257,7 +257,6 @@ bool TypeChecker::validateType(Type InTy, TypeLoc *Loc, bool isFirstPass) {
     break;
   }
   case TypeKind::Paren:
-    // FIXME: Extract sub-TypeLoc
     return validateType(cast<ParenType>(T)->getUnderlyingType(), Loc,
                         isFirstPass);
   case TypeKind::Tuple: {
@@ -269,7 +268,6 @@ bool TypeChecker::validateType(Type InTy, TypeLoc *Loc, bool isFirstPass) {
       // The element has *at least* a type or an initializer, so we start by
       // verifying each individually.
       Type EltTy = TT->getFields()[i].getType();
-      // FIXME: Extract sub-TypeLoc
       if (EltTy && validateType(EltTy, Loc, isFirstPass)) {
         IsInvalid = true;
         break;
@@ -329,7 +327,6 @@ bool TypeChecker::validateType(Type InTy, TypeLoc *Loc, bool isFirstPass) {
 
   case TypeKind::LValue:
     // FIXME: diagnose non-materializability of object type!
-    // FIXME: Extract sub-TypeLoc
     IsInvalid = validateType(cast<LValueType>(T)->getObjectType(), Loc,
                              isFirstPass);
     break;
@@ -337,7 +334,6 @@ bool TypeChecker::validateType(Type InTy, TypeLoc *Loc, bool isFirstPass) {
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction: {
     AnyFunctionType *FT = cast<AnyFunctionType>(T);
-    // FIXME: Extract sub-TypeLocs
     IsInvalid = validateType(FT->getInput(), Loc, isFirstPass) ||
                 validateType(FT->getResult(), Loc, isFirstPass);
     // FIXME: diagnose non-materializability of result type!
@@ -345,7 +341,6 @@ bool TypeChecker::validateType(Type InTy, TypeLoc *Loc, bool isFirstPass) {
   }
   case TypeKind::Array: {
     ArrayType *AT = cast<ArrayType>(T);
-    // FIXME: Extract sub-TypeLoc
     IsInvalid = validateType(AT->getBaseType(), Loc, isFirstPass);
     // FIXME: diagnose non-materializability of element type!
     // FIXME: We need to check AT->Size! (It also has to be convertible to int).
@@ -353,7 +348,6 @@ bool TypeChecker::validateType(Type InTy, TypeLoc *Loc, bool isFirstPass) {
   }
   case TypeKind::ArraySlice: {
     ArraySliceType *AT = cast<ArraySliceType>(T);
-    // FIXME: Extract sub-TypeLoc
     IsInvalid = validateType(AT->getBaseType(), Loc, isFirstPass);
     // FIXME: diagnose non-materializability of element type?
     if (!IsInvalid)
@@ -364,11 +358,11 @@ bool TypeChecker::validateType(Type InTy, TypeLoc *Loc, bool isFirstPass) {
   case TypeKind::ProtocolComposition: {
     ProtocolCompositionType *PC = cast<ProtocolCompositionType>(T);
     for (auto Proto : PC->getProtocols()) {
-      // FIXME: Extract sub-TypeLoc
       if (validateType(Proto, Loc, isFirstPass))
         IsInvalid = true;
       else if (!Proto->isExistentialType()) {
-        // FIXME: Get rid of "if" check once we always have TypeLocs.
+        // FIXME: ValidateType needs to actually pick apart TypeLocs
+        // where appropriate.
         SourceLoc DiagLoc;
         if (Loc)
           DiagLoc = Loc->getSourceRange().Start;
@@ -381,9 +375,9 @@ bool TypeChecker::validateType(Type InTy, TypeLoc *Loc, bool isFirstPass) {
   }
 
   case TypeKind::MetaType: {
-    assert(cast<MetaTypeType>(T)->getInstanceType()
-           ->hasCanonicalTypeComputed() &&
-           "We only create MetaTypes for validated types at the moment");
+    MetaTypeType *Meta = cast<MetaTypeType>(T);
+    IsInvalid = validateType(Meta->getInstanceType(), Loc,
+                             isFirstPass);
     break;
   }
 
@@ -391,7 +385,6 @@ bool TypeChecker::validateType(Type InTy, TypeLoc *Loc, bool isFirstPass) {
     BoundGenericType *BGT = cast<BoundGenericType>(T);
     unsigned Index = 0;
     for (Type Arg : BGT->getGenericArgs()) {
-      // FIXME: Extract sub-TypeLoc?
       if (validateType(Arg, Loc, isFirstPass)) {
         IsInvalid = true;
         break;
@@ -413,7 +406,8 @@ bool TypeChecker::validateType(Type InTy, TypeLoc *Loc, bool isFirstPass) {
           if (conformsToProtocol(Arg, Proto, &Conformance)) {
             Conformances.push_back(Conformance);
           } else {
-            // FIXME: Get rid of "if" check once we always have TypeLocs.
+            // FIXME: ValidateType needs to actually pick apart TypeLocs
+            // where appropriate.
             SourceLoc DiagLoc;
             if (Loc)
               DiagLoc = Loc->getSourceRange().Start;
