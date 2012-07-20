@@ -25,6 +25,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
+#include <sys/stat.h> // stat
+#include <fcntl.h>    // open
+#include <unistd.h>  // read, close
 #include "llvm/ADT/StringExtras.h"
 
 // FIXME: We shouldn't be writing implemenetations for functions in the swift
@@ -250,4 +253,35 @@ _swift_initBenchmark() {
   }
 
   return _swift_startBenchmark;
+}
+
+extern "C"
+int
+swift_file_open(const char* filename)
+{
+    return open(filename, O_RDONLY);
+}
+
+extern "C"
+int
+swift_file_close(int fd)
+{
+    return close(fd);
+}
+
+extern "C"
+size_t
+swift_file_read(int fd, char* buf, size_t nb)
+{
+    return read(fd, buf, nb);
+}
+
+extern "C"
+size_t
+swift_file_size(const char* filename)
+{
+    struct stat buf;
+    int err = stat(filename, &buf);
+    assert(err == 0);
+    return buf.st_size;
 }
