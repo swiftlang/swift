@@ -130,6 +130,7 @@ public:
   llvm::StructType *createNominalType(TypeDecl *D);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
   void getSchema(Type T, ExplosionSchema &schema);
+  ExplosionSchema getSchema(Type T, ExplosionKind kind);
   unsigned getExplosionSize(Type T, ExplosionKind kind);
 
 private:

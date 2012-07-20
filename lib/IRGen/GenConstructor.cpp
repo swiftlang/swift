@@ -20,6 +20,7 @@
 #include "GenInit.h"
 #include "TypeInfo.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "llvm/Function.h"
@@ -62,12 +63,17 @@ void IRGenFunction::emitConstructorBody(ConstructorDecl *CD) {
   Builder.ClearInsertionPoint();
 }
 
-void IRGenFunction::constructObject(ConstructorDecl *CD, Expr *input,
-                                    Explosion &Result) {
+void IRGenFunction::constructObject(ConstructExpr *E,
+                                    Explosion &result) {
+  ConstructorDecl *CD = E->getConstructor();
   llvm::Function *fn = IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
-  Callee c = Callee::forMethod(CD->getType(), fn, ExplosionKind::Minimal, 0);
+  ArrayRef<Substitution> subs = E->getSubstitutions();
+
+  Callee c = Callee::forMethod(CD->getType(), subs, fn,
+                               ExplosionKind::Minimal, 0);
   Explosion inputE(ExplosionKind::Minimal);
-  emitRValue(input, inputE);
+  emitRValueUnderSubstitutions(E->getInput(),
+                               CD->getArgumentType(), subs, inputE);
   emitCall(*this, c, Arg::forUnowned(inputE),
-           getFragileTypeInfo(CD->getImplicitThisDecl()->getType()), Result);
+           getFragileTypeInfo(CD->getImplicitThisDecl()->getType()), result);
 }

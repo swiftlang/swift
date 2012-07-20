@@ -55,6 +55,7 @@ namespace irgen {
   /// Emit an existential member reference as a callee.
   Callee emitExistentialMemberRefCallee(IRGenFunction &IGF,
                                         ExistentialMemberRefExpr *E,
+                                        ArrayRef<Substitution> subs,
                                         SmallVectorImpl<Arg> &calleeArgs,
                                         ExplosionKind maxExplosionLevel,
                                         unsigned maxUncurry);
@@ -62,6 +63,7 @@ namespace irgen {
   /// Emit an existential member reference as a callee.
   Callee emitArchetypeMemberRefCallee(IRGenFunction &IGF,
                                       ArchetypeMemberRefExpr *E,
+                                      ArrayRef<Substitution> subs,
                                       SmallVectorImpl<Arg> &calleeArgs,
                                       ExplosionKind maxExplosionLevel,
                                       unsigned maxUncurry);
@@ -81,6 +83,13 @@ namespace irgen {
   void emitPolymorphicParameters(IRGenFunction &IGF,
                                  const GenericParamList &generics,
                                  Explosion &args);
+
+  /// When calling a polymorphic call, pass the arguments for the
+  /// generics clause.
+  void emitPolymorphicArguments(IRGenFunction &IGF,
+                                const GenericParamList &generics,
+                                ArrayRef<Substitution> subs,
+                                Explosion &args);
 
 
 } // end namespace irgen

@@ -2579,6 +2579,74 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
   }
 }
 
+/// Pass all the arguments necessary for the given function.
+void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
+                                     const GenericParamList &generics,
+                                     ArrayRef<Substitution> subs,
+                                     Explosion &out) {
+  assert(generics.size() == subs.size());
+
+  // For now, treat all generic clauses independently.
+  for (unsigned i = 0, e = generics.size(); i != e; ++i) {
+    TypeAliasDecl *typeParam = generics.getParams()[i].getAsTypeParam();
+    assert(typeParam && "unknown generic parameter kind!");
+    auto archetype = cast<ArchetypeType>(typeParam->getUnderlyingType());
+    auto archetypeProtos = archetype->getConformsTo();
+
+    Type typeArg = subs[i].Replacement;
+    auto &argTI = IGF.getFragileTypeInfo(typeArg);
+
+    // If the type argument is an archetype (FIXME: or is *dependent*
+    // on an archetype!), we can gather the protocol witnesses from
+    // that.
+    if (typeArg->is<ArchetypeType>()) {
+      auto &archTI = argTI.as<ArchetypeTypeInfo>();
+      if (archetypeProtos.empty()) {
+        out.addUnmanaged(archTI.getValueWitnessTable(IGF));
+      } else {
+        for (auto proto : archetypeProtos) {
+          ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
+          auto wtable = archTI.getWitnessTable(IGF, path.getOriginIndex());
+          wtable = path.apply(IGF, wtable);
+          out.addUnmanaged(wtable);
+        }
+      }
+      continue;
+    }
+
+    // If the type argument is an existential type, we can construct
+    // protocol witnesses that apply generically to existentials.
+    // Or, well, at least we can do this for the value witnesses.
+    // Hopefully the type-checker won't let these through for protocols
+    // that aren't theoretically sound?
+    assert(archetypeProtos.empty() || !typeArg->isExistentialType());
+
+    // Okay, we have a concrete type.
+
+    FixedPacking packing = computePacking(IGF.IGM, argTI);
+
+    // If we just need value witnesses, go ahead and build those.
+    if (archetypeProtos.empty()) {
+      auto wtable = getTrivialWitnessTable(IGF.IGM, typeArg, argTI, packing);
+      out.addUnmanaged(wtable);
+      continue;
+    }
+
+    // Otherwise, we can construct the witnesses from the protocol
+    // conformances.
+    assert(archetypeProtos.size() == subs[i].Conformance.size());
+    for (unsigned j = 0, je = archetypeProtos.size(); j != je; ++j) {
+      auto proto = archetypeProtos[j];
+      auto &protoI = IGF.IGM.getProtocolInfo(proto);
+      auto &confI = protoI.getConformance(IGF.IGM, typeArg, argTI, proto,
+                                          *subs[i].Conformance[j]);
+
+      llvm::Value *wtable = confI.getTable(IGF);
+      out.addUnmanaged(wtable);
+    }                                         
+  }
+}
+
 /// Given a generic signature, add the argument types required in order to call it.
 void irgen::expandPolymorphicSignature(IRGenModule &IGM,
                                        const GenericParamList &generics,
@@ -2796,13 +2864,14 @@ LValue irgen::emitExistentialMemberRefLValue(IRGenFunction &IGF,
 /// \param wtable - the witness table from which the witness was loaded
 /// \param thisObject - the object (if applicable) to call the method on
 static Callee emitProtocolMethodCallee(IRGenFunction &IGF, FuncDecl *fn,
+                                       ArrayRef<Substitution> subs,
                                        llvm::Value *witness,
                                        SmallVectorImpl<Arg> &calleeArgs,
                                        llvm::Value *wtable,
                                        Address thisObject) {
   if (fn->isStatic())
-    return Callee::forKnownFunction(AbstractCC::Method, fn->getType(), witness,
-                                    ManagedValue(nullptr),
+    return Callee::forKnownFunction(AbstractCC::Method, fn->getType(),
+                                    subs, witness, ManagedValue(nullptr),
                                     ExplosionKind::Minimal, 0);
 
   // Add the temporary address as a callee arg.
@@ -2816,14 +2885,15 @@ static Callee emitProtocolMethodCallee(IRGenFunction &IGF, FuncDecl *fn,
   calleeArgs.push_back(Arg::forOwned(arg));
 
   // FIXME: writeback
-  return Callee::forKnownFunction(AbstractCC::Method, fn->getType(), witness,
-                                  ManagedValue(nullptr),
+  return Callee::forKnownFunction(AbstractCC::Method, fn->getType(), subs,
+                                  witness, ManagedValue(nullptr),
                                   ExplosionKind::Minimal, 1);
 }
 
 /// Emit an existential member reference as a callee.
 Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
                                              ExistentialMemberRefExpr *E,
+                                             ArrayRef<Substitution> subs,
                                              SmallVectorImpl<Arg> &calleeArgs,
                                              ExplosionKind maxExplosionLevel,
                                              unsigned maxUncurry) {
@@ -2881,13 +2951,14 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
   llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
 
   // Emit the callee.
-  return emitProtocolMethodCallee(IGF, fn, witness, calleeArgs,
+  return emitProtocolMethodCallee(IGF, fn, subs, witness, calleeArgs,
                                   wtable, thisObject);
 }
 
 /// Emit an existential member reference as a callee.
 Callee irgen::emitArchetypeMemberRefCallee(IRGenFunction &IGF,
                                            ArchetypeMemberRefExpr *E,
+                                           ArrayRef<Substitution> subs,
                                            SmallVectorImpl<Arg> &calleeArgs,
                                            ExplosionKind maxExplosionLevel,
                                            unsigned maxUncurry) {
@@ -2925,7 +2996,7 @@ Callee irgen::emitArchetypeMemberRefCallee(IRGenFunction &IGF,
   llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
 
   // Emit the callee.
-  return emitProtocolMethodCallee(IGF, fn, witness, calleeArgs,
+  return emitProtocolMethodCallee(IGF, fn, subs, witness, calleeArgs,
                                   wtable, thisObject);
 }
 
@@ -2941,3 +3012,4 @@ AbstractCallee irgen::getAbstractProtocolCallee(IRGenFunction &IGF,
   return AbstractCallee(AbstractCC::Method, ExplosionKind::Minimal,
                         1, 1, false);
 }
+

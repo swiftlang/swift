@@ -39,6 +39,7 @@ namespace swift {
   class BraceStmt;
   class BreakStmt;
   class ClassType;
+  class ConstructExpr;
   class ConstructorDecl;
   class ContinueStmt;
   class Decl;
@@ -57,6 +58,7 @@ namespace swift {
   class SourceLoc;
   class Stmt;
   class StructType;
+  class Substitution;
   class TranslationUnit;
   class ValueDecl;
   class VarDecl;
@@ -313,6 +315,9 @@ public:
 
   void emitRValueAsInit(Expr *E, Address addr, const TypeInfo &type);
   void emitRValue(Expr *E, Explosion &explosion);
+  void emitRValueUnderSubstitutions(Expr *E, Type destType,
+                                    ArrayRef<Substitution> subs,
+                                    Explosion &explosion);
 
   llvm::Value *emitAsPrimitiveScalar(Expr *E);
 
@@ -328,7 +333,7 @@ public:
 
   Condition emitCondition(Expr *E, bool hasFalseCode, bool invertValue = false);
 
-  void constructObject(ConstructorDecl *CD, Expr *Input, Explosion &Result);
+  void constructObject(ConstructExpr *E, Explosion &result);
 
 //--- Declaration emission -----------------------------------------------------
 public:

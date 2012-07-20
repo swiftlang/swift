@@ -29,6 +29,7 @@ namespace swift {
   class ApplyExpr;
   class FuncDecl;
   template <class T> class Optional;
+  class Substitution;
 
 namespace irgen {
   class Address;
@@ -105,33 +106,40 @@ namespace irgen {
     /// invariant that this never stores an llvm::ConstantPointerNull.
     ManagedValue DataPtr;
 
+    /// The archetype substitutions under which the function is being
+    /// called.
+    ArrayRef<Substitution> Substitutions;
+
   public:
     Callee() = default;
 
     /// Prepare a callee for a known freestanding function that
     /// requires no data pointer.
     static Callee forFreestandingFunction(Type formalType,
+                                          ArrayRef<Substitution> subs,
                                           llvm::Constant *fn,
                                           ExplosionKind explosionLevel,
                                           unsigned uncurryLevel) {
       return forKnownFunction(AbstractCC::Freestanding, formalType,
-                              fn, ManagedValue(nullptr),
+                              subs, fn, ManagedValue(nullptr),
                               explosionLevel, uncurryLevel);
     }
 
     /// Prepare a callee for a known instance method.  Methods never
     /// require a data pointer.  The formal type here should
     /// include the 'this' clause.
-    static Callee forMethod(Type formalType, llvm::Constant *fn,
+    static Callee forMethod(Type formalType, ArrayRef<Substitution> subs,
+                            llvm::Constant *fn,
                             ExplosionKind explosionLevel,
                             unsigned uncurryLevel) {
-      return forKnownFunction(AbstractCC::Method, formalType,
+      return forKnownFunction(AbstractCC::Method, formalType, subs,
                               fn, ManagedValue(nullptr),
                               explosionLevel, uncurryLevel);
     }
 
     /// Prepare a callee for a known function with a known data pointer.
     static Callee forKnownFunction(AbstractCC convention, Type formalType,
+                                   ArrayRef<Substitution> subs,
                                    llvm::Value *fn, ManagedValue data,
                                    ExplosionKind explosionLevel,
                                    unsigned uncurryLevel) {
@@ -142,16 +150,20 @@ namespace irgen {
       result.FormalType = formalType;
       result.FnPtr = fn;
       result.DataPtr = data;
+      result.Substitutions = subs;
       return result;
     }
 
     /// Prepare a callee for an indirect call to a function.
-    static Callee forIndirectCall(Type formalType, llvm::Value *fn,
-                                  ManagedValue data);
+    static Callee forIndirectCall(Type formalType, ArrayRef<Substitution> subs,
+                                  llvm::Value *fn, ManagedValue data);
 
     AbstractCC getConvention() const { return Convention; }
 
     Type getFormalType() const { return FormalType; }
+
+    bool hasSubstitutions() const { return !Substitutions.empty(); }
+    ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
 
     ExplosionKind getExplosionLevel() const { return ExplosionLevel; }
     unsigned getUncurryLevel() const { return UncurryLevel; }

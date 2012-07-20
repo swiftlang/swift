@@ -277,7 +277,7 @@ namespace {
     }
 
     void visitConstructExpr(ConstructExpr *E) {
-      IGF.constructObject(E->getConstructor(), E->getInput(), Out);
+      IGF.constructObject(E, Out);
     }
 
     void visitNewArrayExpr(NewArrayExpr *E) {
@@ -352,6 +352,134 @@ namespace {
 
 void IRGenFunction::emitRValue(Expr *E, Explosion &explosion) {
   RValueEmitter(*this, explosion).visit(E);
+}
+
+/// Emit the given expression as a temporary, casting the address to
+/// the given pointer type at the last minute.
+static void emitAsCastTemporary(IRGenFunction &IGF, Expr *E,
+                                llvm::PointerType *castTy,
+                                Explosion &out) {
+  auto &actualTI = IGF.getFragileTypeInfo(E->getType());
+
+  // Set up the temporary.
+  Initialization init;
+  auto object = init.getObjectForTemporary();
+  auto cleanup = init.registerObject(IGF, object, NotOnHeap, actualTI);
+  auto addr = init.emitLocalAllocation(IGF, object, NotOnHeap, actualTI,
+                                       "substitution.temp").getAddress();
+
+  // Initialize into it.
+  init.emitInit(IGF, object, addr, E, actualTI);
+
+  // Cast to the expected pointer type.
+  addr = IGF.Builder.CreateBitCast(addr, castTy, "temp.cast");
+
+  // Add that to the output explosion.
+  out.add(ManagedValue(addr.getAddress(), cleanup));
+}
+
+namespace {
+  /// A visitor for emitting a value under substitution rules.
+  class SubstitutedRValueEmitter
+      : public irgen::ExprVisitor<SubstitutedRValueEmitter> {
+    IRGenFunction &IGF;
+    Type ExpectedTy;
+    ArrayRef<Substitution> Substitutions;
+    Explosion &Out;
+  public:
+    SubstitutedRValueEmitter(IRGenFunction &IGF, Type expected,
+                             ArrayRef<Substitution> subs, Explosion &out)
+      : IGF(IGF), ExpectedTy(expected), Substitutions(subs), Out(out) {}
+
+    void visitTupleExpr(TupleExpr *E) {
+      // If the expected type isn't a tuple type, but the original
+      // type is, then the expected type must abstract over tuples in
+      // some way that forces an indirect representation.  Therefore
+      // it wouldn't get here.
+      auto expectedTuple = ExpectedTy->castTo<TupleType>();
+      assert(expectedTuple->getFields().size() == E->getElements().size());
+      for (unsigned i = 0, e = expectedTuple->getFields().size(); i != e; ++i) {
+        IGF.emitRValueUnderSubstitutions(E->getElements()[i],
+                                         expectedTuple->getElementType(i),
+                                         Substitutions, Out);
+      }
+    }
+
+    // TODO: shuffles?
+
+    void visitExpr(Expr *E) {
+      // Okay, generic case.  We are converting to something which is
+      // not equal to the operand type, but which is also not passed
+      // indirectly, or at least not as a single aggregate.
+
+      // For this to have type-checked, the substitutions must turn
+      // ExpectedTy into E->getType().  Substitutions can only walk
+      // into structural types, which in swift are:
+      //   (1) TupleType
+      //   (2) LValueType
+      //   (3) AnyFunctionType
+      //   (4) BoundGenericType
+      //   (5) MetaTypeType (?)
+
+      // L-values don't need reinterpretation and should have been
+      // filtered out before.
+      assert(!ExpectedTy->is<LValueType>());
+
+      // Metatypes are trivial and don't require reinterpretation (?).
+
+      // Tuples are passed as their components, and their components
+      // might require transformation.  Note that we special-case the
+      // patterns where the individual tuple elements are
+      // decomposable, so now we're dealing with a whole, opaque tuple.
+      if (ExpectedTy->is<TupleType>()) {
+        IGF.unimplemented(E->getLoc(),
+                          "emitting opaque tuple under substitution");
+        IGF.emitFakeExplosion(IGF.getFragileTypeInfo(ExpectedTy), Out);
+        return;
+      }
+
+      // If the expected type is a function type, we need to
+      // potentially pass a thunk in order to map abstracted types
+      // into concrete types.
+      if (auto *fnTy = ExpectedTy->getAs<AnyFunctionType>())
+        return createThunk(E, fnTy);
+
+      // Otherwise, just assume that we can pass things freely.
+      IGF.emitRValue(E, Out);
+    }
+
+    // Create a thunk (if necessary) to map from substituted types down
+    void createThunk(Expr *E, AnyFunctionType *fnType) {
+      IGF.unimplemented(E->getLoc(), "monomorphic invocation thunk");
+      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(ExpectedTy), Out);
+    }
+  };
+}
+
+/// Emit a value under substitution rules.
+void IRGenFunction::emitRValueUnderSubstitutions(Expr *E, Type expectedType,
+                                                 ArrayRef<Substitution> subs,
+                                                 Explosion &out) {
+  // If the substitution work is trivial, or if there's no practical
+  // difference between the types, use the normal path.
+  if (subs.empty() || expectedType->isEqual(E->getType()) ||
+      expectedType->is<LValueType>())
+    return emitRValue(E, out);
+
+  // If the expected type would be passed as a single indirect value,
+  // just evaluate to a temporary.  We ignore tuples before the schema
+  // computation just to prevent unnecessary work (potentially saving
+  // ourselves from an O(n^2) pitfall with deeply nested tuples).
+  if (!expectedType->is<TupleType>()) {
+    auto schema = IGM.getSchema(expectedType, out.getKind());
+    if (schema.isSingleAggregate()) {
+      auto expectedTy = schema.begin()->getAggregateType()->getPointerTo(0);
+      return emitAsCastTemporary(*this, E, expectedTy, out);
+    }
+  }
+
+  // Otherwise, use the specialized emitter.
+  SubstitutedRValueEmitter(*this, expectedType, subs, out).visit(E);
 }
 
 namespace {

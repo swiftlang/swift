@@ -493,6 +493,11 @@ namespace {
                                 subscript, baseSize, indexSize);
     }
 
+    // FIXME
+    ArrayRef<Substitution> getSubstitutions() const {
+      return ArrayRef<Substitution>();
+    }
+
     Kind getKind() const { return TargetKind; }
     bool isSubscript() const { return isSubscriptKind(getKind()); }
     bool isVar() const { return !isSubscript(); }
@@ -545,9 +550,11 @@ namespace {
       // The uncurry level is 0 unless we have a 'this' argument.
       llvm::Constant *fn = IGF.IGM.getAddrOfGetter(getDecl(), explosionLevel);
       if (isMember()) {
-        return Callee::forMethod(Type(), fn, explosionLevel, 1);
+        return Callee::forMethod(Type(), getSubstitutions(),
+                                 fn, explosionLevel, 1);
       } else {
-        return Callee::forFreestandingFunction(Type(), fn, explosionLevel, 0);
+        return Callee::forFreestandingFunction(Type(), getSubstitutions(),
+                                               fn, explosionLevel, 0);
       }
     }
 
@@ -559,9 +566,11 @@ namespace {
       // The uncurry level is 0 unless we have a 'this' argument.
       llvm::Constant *fn = IGF.IGM.getAddrOfSetter(getDecl(), explosionLevel);
       if (isMember()) {
-        return Callee::forMethod(Type(), fn, explosionLevel, 1);
+        return Callee::forMethod(Type(), getSubstitutions(),
+                                 fn, explosionLevel, 1);
       } else {
-        return Callee::forFreestandingFunction(Type(), fn, explosionLevel, 0);
+        return Callee::forFreestandingFunction(Type(), getSubstitutions(),
+                                               fn, explosionLevel, 0);
       }
     }
 

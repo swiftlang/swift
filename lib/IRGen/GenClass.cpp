@@ -115,10 +115,13 @@ void swift::irgen::emitNewReferenceExpr(IRGenFunction &IGF,
   ConstructorDecl *CD = E->getCtor();
   llvm::Function *fn =
       IGF.IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
-  Callee c = Callee::forMethod(CD->getType(), fn, ExplosionKind::Minimal, 0);
+  ArrayRef<Substitution> subs = E->getSubstitutions();
+  Callee c = Callee::forMethod(CD->getType(), subs, fn,
+                               ExplosionKind::Minimal, 0);
 
   Explosion inputE(ExplosionKind::Minimal);
-  IGF.emitRValue(E->getCtorArg(), inputE);
+  IGF.emitRValueUnderSubstitutions(E->getCtorArg(), CD->getArgumentType(),
+                                   subs, inputE);
 
   Explosion Result(ExplosionKind::Minimal);
   emitCall(IGF, c, Arg::forUnowned(inputE),

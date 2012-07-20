@@ -1197,6 +1197,13 @@ public:
   }
 };
 
+/// Substitution - A substitution into a generic specialization.
+class Substitution {
+public:
+  Type Replacement;
+  ArrayRef<ProtocolConformance *> Conformance;
+};
+
 /// SpecializeExpr - Specializes a reference to a generic entity by binding
 /// each of its type parameters to a specific type.
 ///
@@ -1212,10 +1219,7 @@ public:
 /// \endcode
 class SpecializeExpr : public ImplicitConversionExpr {
 public:
-  struct Substitution {
-    Type Replacement;
-    ArrayRef<ProtocolConformance *> Conformance;
-  };
+  typedef swift::Substitution Substitution;
 
 private:
   ArrayRef<Substitution> Substitutions;
@@ -1603,6 +1607,15 @@ public:
   ConstructorDecl *getCtor() { return Ctor; }
   void setCtor(ConstructorDecl *c) { Ctor = c; }
 
+  /// Get the substitutions in effect for this constructor call.  A
+  /// constructor will have polymorphic function type if it either
+  /// (or both)
+  ///   (1) constructs a polymorphic type or
+  ///   (2) is polymorphic over its arguments in some way.
+  ArrayRef<Substitution> getSubstitutions() const {
+    return ArrayRef<Substitution>(); // FIXME
+  }
+
   Expr *getCtorArg() { return CtorArg; }
   void setCtorArg(Expr *e) { CtorArg = e; }
 
@@ -1889,6 +1902,15 @@ public:
   Expr *getInput() const { return Input; }
 
   void setInput(Expr *E) { Input = E; }
+
+  /// Get the substitutions in effect for this constructor call.  A
+  /// constructor will have polymorphic function type if it either
+  /// (or both)
+  ///   (1) constructs a polymorphic type or
+  ///   (2) is polymorphic over its arguments in some way.
+  ArrayRef<Substitution> getSubstitutions() const {
+    return ArrayRef<Substitution>(); // FIXME
+  }
 
   SourceLoc getStartLoc() const { return ConstructorLoc; }
   SourceLoc getEndLoc() const { return Input->getEndLoc(); }

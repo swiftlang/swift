@@ -295,6 +295,13 @@ IRGenModule::createNominalType(ProtocolCompositionType *type) {
 }
 
 /// Compute the explosion schema for the given type.
+ExplosionSchema IRGenModule::getSchema(Type type, ExplosionKind kind) {
+  ExplosionSchema schema(kind);
+  getSchema(type, schema);
+  return schema;
+}
+
+/// Compute the explosion schema for the given type.
 void IRGenModule::getSchema(Type type, ExplosionSchema &schema) {
   // As an optimization, avoid actually building a TypeInfo for any
   // obvious TupleTypes.  This assumes that a TupleType's explosion
