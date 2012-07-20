@@ -666,51 +666,43 @@ namespace {
       } Archetype;
     };
     Kind TheKind;
-    typedef ArrayRef<SpecializeExpr::Substitution> SubTy;
-    SubTy Substitutions;
+    ArrayRef<SpecializeExpr::Substitution> Substitutions;
 
   public:
-    static CalleeSource forIndirect(Expr *fn, SubTy subs) {
+    static CalleeSource forIndirect(Expr *fn) {
       CalleeSource result;
       result.TheKind = Kind::Indirect;
       result.Indirect.Fn = fn;
-      result.Substitutions = subs;
       return result;
     }
 
-    static CalleeSource forDirect(FuncDecl *fn, SubTy subs) {
+    static CalleeSource forDirect(FuncDecl *fn) {
       CalleeSource result;
       result.TheKind = Kind::Direct;
       result.Direct.Fn = fn;
-      result.Substitutions = subs;
       return result;
     }
 
     static CalleeSource forDirectWithSideEffects(FuncDecl *fn,
-                                                 Expr *sideEffects,
-                                                 SubTy subs) {
+                                                 Expr *sideEffects) {
       CalleeSource result;
       result.TheKind = Kind::DirectWithSideEffects;
       result.Direct.Fn = fn;
       result.Direct.SideEffects = sideEffects;
-      result.Substitutions = subs;
       return result;
     }
 
-    static CalleeSource forExistential(ExistentialMemberRefExpr *fn,
-                                       SubTy subs) {
+    static CalleeSource forExistential(ExistentialMemberRefExpr *fn) {
       CalleeSource result;
       result.TheKind = Kind::Existential;
       result.Existential.Fn = fn;
-      result.Substitutions = subs;
       return result;
     }
 
-    static CalleeSource forArchetype(ArchetypeMemberRefExpr *fn, SubTy subs) {
+    static CalleeSource forArchetype(ArchetypeMemberRefExpr *fn) {
       CalleeSource result;
       result.TheKind = Kind::Archetype;
       result.Archetype.Fn = fn;
-      result.Substitutions = subs;
       return result;
     }
 
@@ -762,7 +754,15 @@ namespace {
       llvm_unreachable("bad source kind!");
     }
 
-    SubTy getSubstitutions() { return Substitutions; }
+    void addSubstitutions(ArrayRef<SpecializeExpr::Substitution> subs) {
+      // FIXME: collect these
+      assert(Substitutions.empty());
+      Substitutions = subs;
+    }
+
+    ArrayRef<SpecializeExpr::Substitution> getSubstitutions() const {
+      return Substitutions;
+    }
 
     Callee emitCallee(IRGenFunction &IGF,
                       SmallVectorImpl<Arg> &calleeArgs,
@@ -1039,32 +1039,48 @@ static Expr *uncurry(ApplyExpr *E, SmallVectorImpl<CallSite> &callSites) {
   return fnExpr;
 }
 
+namespace {
+  /// A class for decomposing an expression into a function reference
+  /// which can, hopefully, be called more efficiently.
+  struct FunctionDecomposer :
+      irgen::ExprVisitor<FunctionDecomposer, CalleeSource> {
+    CalleeSource visitDeclRefExpr(DeclRefExpr *E) {
+      if (FuncDecl *fn = dyn_cast<FuncDecl>(E->getDecl()))
+        return CalleeSource::forDirect(fn);
+      return CalleeSource::forIndirect(E);
+    }
+
+    CalleeSource visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
+      auto rhs = cast<DeclRefExpr>(E->getRHS());
+      if (FuncDecl *fn = dyn_cast<FuncDecl>(rhs->getDecl()))
+        return CalleeSource::forDirectWithSideEffects(fn, E);
+      return CalleeSource::forIndirect(E);
+    }
+
+    CalleeSource visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
+      return CalleeSource::forExistential(E);
+    }
+
+    CalleeSource visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
+      return CalleeSource::forArchetype(E);
+    }
+
+    CalleeSource visitSpecializeExpr(SpecializeExpr *E) {
+      CalleeSource src = visit(E->getSubExpr());
+      src.addSubstitutions(E->getSubstitutions());
+      return src;
+    }
+
+    CalleeSource visitExpr(Expr *E) {
+      return CalleeSource::forIndirect(E);
+    }
+  };
+}
+
 /// Try to decompose a function reference into a known function
 /// declaration.
 static CalleeSource decomposeFunctionReference(Expr *E) {
-  E = E->getSemanticsProvidingExpr();
-  ArrayRef<SpecializeExpr::Substitution> substitutions;
-  if (auto specialize = dyn_cast<SpecializeExpr>(E)) {
-    substitutions = specialize->getSubstitutions();
-    E = specialize->getSubExpr();
-  }
-  if (auto declRef = dyn_cast<DeclRefExpr>(E)) {
-    if (FuncDecl *fn = dyn_cast<FuncDecl>(declRef->getDecl()))
-      return CalleeSource::forDirect(fn, substitutions);
-    return CalleeSource::forIndirect(declRef, substitutions);
-  }
-  if (auto baseIgnored = dyn_cast<DotSyntaxBaseIgnoredExpr>(E)) {
-    auto rhs = cast<DeclRefExpr>(baseIgnored->getRHS());
-    if (FuncDecl *fn = dyn_cast<FuncDecl>(rhs->getDecl()))
-      return CalleeSource::forDirectWithSideEffects(fn, E, substitutions);
-    return CalleeSource::forIndirect(E, substitutions);
-  }
-  if (auto existMember = dyn_cast<ExistentialMemberRefExpr>(E))
-    return CalleeSource::forExistential(existMember, substitutions);
-  if (auto archMember = dyn_cast<ArchetypeMemberRefExpr>(E))
-    return CalleeSource::forArchetype(archMember, substitutions);
-
-  return CalleeSource::forIndirect(E, substitutions);
+  return FunctionDecomposer().visit(E);
 }
 
 /// Compute the plan for performing a sequence of call expressions.
