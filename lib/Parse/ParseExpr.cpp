@@ -142,12 +142,6 @@ NullablePtr<Expr> Parser::parseExprNew() {
   if (parseTypeIdentifier(elementTy))
     return nullptr;
 
-  // TODO: we should probably allow a tuple-expr here as an initializer.
-  if (Tok.is(tok::l_paren)) {
-    diagnose(newLoc, diag::array_new_init_unsupported);
-    return nullptr;
-  }
-
   bool hadInvalid = false;
   SmallVector<NewArrayExpr::Bound, 4> bounds;
   while (Tok.is(tok::l_square)) {
@@ -186,8 +180,22 @@ NullablePtr<Expr> Parser::parseExprNew() {
 
   if (hadInvalid) return nullptr;
 
-  if (bounds.empty())
-    return new (Context) NewReferenceExpr(elementTy, newLoc);
+  if (bounds.empty()) {
+    NullablePtr<Expr> Init;
+    if (Tok.is(tok::l_paren)) {
+      Init = parseExprParen();
+      if (Init.isNull())
+        return nullptr;
+    }
+    return new (Context) NewReferenceExpr(elementTy, newLoc,
+                                          Init.getPtrOrNull());
+  }
+
+  // TODO: we allow a tuple-expr here as an initializer?
+  if (Tok.is(tok::l_paren)) {
+    diagnose(newLoc, diag::array_new_init_unsupported);
+    return nullptr;
+  }
 
   return NewArrayExpr::create(Context, newLoc, elementTy, bounds);
 }

@@ -217,6 +217,12 @@ NewArrayExpr *NewArrayExpr::create(ASTContext &ctx, SourceLoc newLoc,
   return E;
 }
 
+SourceRange NewReferenceExpr::getSourceRange() const {
+  if (CtorArg)
+    return { NewLoc, CtorArg->getEndLoc() };
+  return { NewLoc, ElementTy.getSourceRange().End };
+}
+
 SourceRange TupleExpr::getSourceRange() const {
   if (LParenLoc.isValid()) {
     assert(RParenLoc.isValid() && "Mismatched parens?");

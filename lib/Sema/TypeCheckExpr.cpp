@@ -1064,11 +1064,17 @@ public:
       return nullptr;
     }
 
-    // We don't have an explicit argument; fake one up.
-    Expr *Arg = new (TC.Context) TupleExpr(E->getLoc(),
-                                           MutableArrayRef<Expr *>(),
-                                           nullptr, E->getLoc());
-    Arg->setType(TupleType::getEmpty(TC.Context));
+    Expr *Arg;
+    if (E->getCtorArg()) {
+      Arg = E->getCtorArg();
+    } else {
+      // We don't have an explicit argument; fake one up.
+      Arg = new (TC.Context) TupleExpr(E->getLoc(),
+                                       MutableArrayRef<Expr *>(),
+                                       nullptr, E->getLoc());
+      Arg->setType(TupleType::getEmpty(TC.Context));
+    }
+    
 
     ConstructorLookup Ctors(CT, TC.TU);
     llvm::SmallVector<ValueDecl *, 4> Viable;

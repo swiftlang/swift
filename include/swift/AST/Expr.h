@@ -1590,17 +1590,14 @@ private:
   TypeLoc ElementTy;
 
 public:
-  NewReferenceExpr(TypeLoc ty, SourceLoc newLoc)
+  NewReferenceExpr(TypeLoc ty, SourceLoc newLoc, Expr *CtorArg)
     : Expr(ExprKind::NewReference), NewLoc(newLoc),
-      Ctor(nullptr), CtorArg(nullptr), ElementTy(ty) {}
+      Ctor(nullptr), CtorArg(CtorArg), ElementTy(ty) {}
 
   /// Return the location of the 'new' keyword.
   SourceLoc getNewLoc() const { return NewLoc; }
 
-  SourceRange getSourceRange() const {
-    // FIXME: This source range is wrong
-    return SourceRange(NewLoc, NewLoc);
-  }
+  SourceRange getSourceRange() const;
   SourceLoc getLoc() const { return NewLoc; }
 
   ConstructorDecl *getCtor() { return Ctor; }
