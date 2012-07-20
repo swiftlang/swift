@@ -134,7 +134,7 @@ static bool isLocalLinkageGenericClause(const GenericParamList &params) {
   // types are.
   for (auto &param : params) {
     for (auto inherited : param.getAsTypeParam()->getInherited())
-      if (isLocalLinkageType(inherited))
+      if (isLocalLinkageType(inherited.getType()))
         return true;
   }
   return false;

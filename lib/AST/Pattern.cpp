@@ -101,5 +101,5 @@ TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
 }
 
 SourceRange TypedPattern::getSourceRange() const {
-  return { SubPattern->getSourceRange().Start, PatTypeLoc->getSourceRange().End };
+  return { SubPattern->getSourceRange().Start, PatType.getSourceRange().End };
 }

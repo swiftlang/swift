@@ -273,7 +273,7 @@ static void addMinimumProtocols(Type T,
 
     if (Visited.insert(Proto->getDecl())) {
       for (auto Inherited : Proto->getDecl()->getInherited())
-        addProtocols(Inherited, Stack);
+        addProtocols(Inherited.getType(), Stack);
     }
     return;
   }
@@ -320,8 +320,8 @@ static void minimizeProtocols(SmallVectorImpl<ProtocolDecl *> &Protocols) {
     
     // Add the protocols we inherited.
     for (auto Inherited : Current->getInherited()) {
-      addMinimumProtocols(Inherited, Protocols, Known, Visited, Stack,
-                          ZappedAny);
+      addMinimumProtocols(Inherited.getType(), Protocols, Known, Visited,
+                          Stack, ZappedAny);
     }
   }
   
@@ -849,6 +849,23 @@ static void printGenericArgs(raw_ostream &OS, ArrayRef<Type> Args) {
   OS << '>';
 }
 
+static void printGenericArgs(raw_ostream &OS, ArrayRef<TypeLoc> Args) {
+  if (Args.empty())
+    return;
+
+  OS << '<';
+  bool First = true;
+  for (TypeLoc Arg : Args) {
+    if (First)
+      First = false;
+    else
+      OS << ", ";
+    Arg.getType()->print(OS);
+  }
+  OS << '>';
+}
+
+
 void IdentifierType::print(raw_ostream &OS) const {
   OS << Components[0].Id.get();
   printGenericArgs(OS, Components[0].GenericArgs);
@@ -904,7 +921,7 @@ void PolymorphicFunctionType::print(raw_ostream &OS) const {
     OS << paramTy->getName().str();
     auto inherited = paramTy->getInherited();
     for (unsigned ii = 0, ie = inherited.size(); ii != ie; ++ii) {
-      OS << (ii ? StringRef(", ") : " : ") << inherited[ii];
+      OS << (ii ? StringRef(", ") : " : ") << inherited[ii].getType();
     }
   }
   OS << "> " << getInput() << " -> " << getResult();
@@ -990,19 +1007,4 @@ void DeducibleGenericParamType::print(raw_ostream &OS) const {
 
 void SubstitutedType::print(raw_ostream &OS) const {
   getReplacementType()->print(OS);
-}
-
-//===----------------------------------------------------------------------===//
-//  TypeLoc implementation
-//===----------------------------------------------------------------------===//
-
-TypeLoc::TypeLoc(SourceRange Range) : Range(Range) {}
-
-void *TypeLoc::operator new(size_t Bytes, ASTContext &C,
-                            unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
-TypeLoc *TypeLoc::get(ASTContext &Context, SourceRange Range) {
-  return new (Context) TypeLoc(Range);
 }

@@ -207,13 +207,12 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
 }
 
 NewArrayExpr *NewArrayExpr::create(ASTContext &ctx, SourceLoc newLoc,
-                                   Type elementTy, TypeLoc *elementTyLoc,
-                                   ArrayRef<Bound> bounds) {
+                                   TypeLoc elementTy, ArrayRef<Bound> bounds) {
   void *buffer = ctx.Allocate(sizeof(NewArrayExpr) +
                               bounds.size() * sizeof(Bound),
                               Expr::Alignment);
   NewArrayExpr *E =
-    ::new(buffer) NewArrayExpr(newLoc, elementTy, elementTyLoc, bounds.size());
+    ::new (buffer) NewArrayExpr(newLoc, elementTy, bounds.size());
   memcpy(E->getBoundsBuffer(), bounds.data(), bounds.size() * sizeof(Bound));
   return E;
 }
@@ -301,13 +300,12 @@ Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
 }
 
 FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
-                           ArrayRef<Pattern*> params, Type fnRetType,
-                           TypeLoc *fnRetTypeLoc, BraceStmt *body,
-                           DeclContext *parent) {
+                           ArrayRef<Pattern*> params, TypeLoc fnRetType,
+                           BraceStmt *body, DeclContext *parent) {
   unsigned nParams = params.size();
   void *buf = C.Allocate(sizeof(FuncExpr) + nParams * sizeof(Pattern*),
                          Expr::Alignment);
-  FuncExpr *fn = ::new (buf) FuncExpr(funcLoc, nParams, fnRetType, fnRetTypeLoc,
+  FuncExpr *fn = ::new (buf) FuncExpr(funcLoc, nParams, fnRetType,
                                       body, parent);
   for (unsigned i = 0; i != nParams; ++i)
     fn->getParamsBuffer()[i] = params[i];
@@ -317,8 +315,8 @@ FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
 SourceRange FuncExpr::getSourceRange() const {
   if (Body)
     return { FuncLoc, Body->getEndLoc() };
-  if (FnRetTypeLoc)
-    return { FuncLoc, FnRetTypeLoc->getSourceRange().End };
+  if (FnRetType.hasLocation())
+    return { FuncLoc, FnRetType.getSourceRange().End };
   Pattern *LastPat = getParamPatterns().back();
   return { FuncLoc, LastPat->getEndLoc() };
 }
@@ -621,9 +619,14 @@ public:
 
   void visitNewArrayExpr(NewArrayExpr *E) {
     printCommon(E, "new_array_expr")
-      << " elementType='" << E->getElementType() << "'\n";
-    for (auto &bound : E->getBounds())
-      printRec(bound.Value);
+      << " elementType='" << E->getElementType() << "'";
+    for (auto &bound : E->getBounds()) {
+      OS << '\n';
+      if (bound.Value)
+        printRec(bound.Value);
+      else
+        OS.indent(Indent + 2) << "(empty bound)";
+    }
     OS << ')';
   }
 

@@ -479,18 +479,17 @@ Decl *Parser::parseDeclImport() {
 ///
 ///   inheritance:
 ///      ':' type-identifier (',' type-identifier)*
-bool Parser::parseInheritance(SmallVectorImpl<Type> &Inherited) {
+bool Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
   consumeToken(tok::colon);
   
   do {
     // Parse the inherited type (which must be a protocol).
-    Type Ty;
-    TypeLoc *Loc;
-    if (parseTypeIdentifier(Ty, Loc))
+    TypeLoc Loc;
+    if (parseTypeIdentifier(Loc))
       return true;
     
     // Record the type.
-    Inherited.push_back(Ty);
+    Inherited.push_back(Loc);
     
     // Check for a ',', which indicates that there are more protocols coming.
     if (Tok.is(tok::comma)) {
@@ -512,14 +511,13 @@ bool Parser::parseInheritance(SmallVectorImpl<Type> &Inherited) {
 Decl *Parser::parseDeclExtension() {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
-  Type Ty;
-  TypeLoc *TyLoc;
+  TypeLoc Loc;
   SourceLoc LBLoc, RBLoc;
-  if (parseTypeIdentifier(Ty, TyLoc))
+  if (parseTypeIdentifier(Loc))
     return nullptr;
   
   // Parse optional inheritance clause.
-  SmallVector<Type, 2> Inherited;
+  SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
     parseInheritance(Inherited);
 
@@ -527,7 +525,7 @@ Decl *Parser::parseDeclExtension() {
     return nullptr;
   
   ExtensionDecl *ED
-    = new (Context) ExtensionDecl(ExtensionLoc, Ty, TyLoc,
+    = new (Context) ExtensionDecl(ExtensionLoc, Loc,
                                   Context.AllocateCopy(Inherited),
                                   CurDeclContext);
   ContextChange CC(*this, ED);
@@ -556,30 +554,29 @@ TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   
   Identifier Id;
-  Type Ty;
-  TypeLoc *TyLoc;
+  TypeLoc UnderlyingLoc;
   SourceLoc IdLoc = Tok.getLoc();
   if (parseIdentifier(Id, diag::expected_identifier_in_decl, "typealias"))
     return nullptr;
 
   // Parse optional inheritance clause.
-  SmallVector<Type, 2> Inherited;
+  SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
     parseInheritance(Inherited);
 
   if (WantDefinition || Tok.is(tok::equal)) {
     if (parseToken(tok::equal, diag::expected_equal_in_typealias) ||
-        parseType(Ty, TyLoc, diag::expected_type_in_typealias))
+        parseType(UnderlyingLoc, diag::expected_type_in_typealias))
       return nullptr;
     
     if (!WantDefinition) {
       diagnose(IdLoc, diag::associated_type_def, Id);
-      Ty = Type();
+      UnderlyingLoc = TypeLoc();
     }
   }
 
   TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc, Ty, TyLoc,
+    new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc, UnderlyingLoc,
                                 CurDeclContext,
                                 Context.AllocateCopy(Inherited));
   ScopeInfo.addToScope(TAD);
@@ -691,7 +688,7 @@ static Pattern *clonePattern(ASTContext &Context, Pattern *Pat) {
     TypedPattern *Typed = cast<TypedPattern>(Pat);
     return new (Context) TypedPattern(clonePattern(Context,
                                                    Typed->getSubPattern()),
-                                      Typed->getType(), Typed->getTypeLoc());
+                                      Typed->getTypeLoc());
   }
   }
 }
@@ -773,7 +770,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
       // Start the function.
       Type GetterRetTy = ElementTy;
-      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, GetterRetTy, nullptr,
+      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, TypeLoc(GetterRetTy),
                                            Params);
       
       // Establish the new context.
@@ -876,7 +873,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       
       Pattern *ValuePattern
         = new (Context) TypedPattern(new (Context) NamedPattern(Value),
-                                     ElementTy, nullptr);
+                                     TypeLoc(ElementTy));
       
       TupleElts.push_back(TuplePatternElt(ValuePattern, /*Init=*/nullptr));
       Pattern *ValueParamsPattern
@@ -889,7 +886,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
     // Start the function.
     Type SetterRetTy = TupleType::getEmpty(Context);
-    FuncExpr *SetFn = actOnFuncExprStart(SetLoc, SetterRetTy, nullptr, Params);
+    FuncExpr *SetFn = actOnFuncExprStart(SetLoc, TypeLoc(SetterRetTy), Params);
     
     // Establish the new context.
     ContextChange CC(*this, SetFn);
@@ -947,9 +944,9 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool hasContainerType) {
   // The grammar syntactically requires a type annotation. Complain if
   // our pattern does not have one.
   Type Ty;
-  if (pattern.hasType())
-    Ty = pattern.getType();
-  else {
+  if (TypedPattern *TP = dyn_cast<TypedPattern>(&pattern)) {
+    Ty = TP->getTypeLoc().getType();
+  } else {
     if (PrimaryVar)
       diagnose(pattern.getLoc(), diag::getset_missing_type);
     Ty = ErrorType::get(Context);
@@ -1057,7 +1054,6 @@ bool Parser::parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls){
             break;
 
           TypedPattern *NewTP = new (Context) TypedPattern(PrevPat,
-                                                           TP->getType(),
                                                            TP->getTypeLoc());
           PrevPBD->setPattern(NewTP);
         }
@@ -1082,8 +1078,8 @@ Pattern *Parser::buildImplicitThisParameter() {
     = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
                             Type(), CurDeclContext);
   Pattern *P = new (Context) NamedPattern(D);
-  return new (Context) TypedPattern(P, UnstructuredUnresolvedType::get(Context),
-                                    nullptr);
+  return new (Context) TypedPattern(P,
+                         TypeLoc(UnstructuredUnresolvedType::get(Context)));
 }
 
 /// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
@@ -1144,9 +1140,8 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
     hasImplicitThis = true;
   }
 
-  Type FuncRetTy;
-  TypeLoc *FuncRetTyLoc;
-  if (parseFunctionSignature(Params, FuncRetTy, FuncRetTyLoc))
+  TypeLoc FuncRetTy;
+  if (parseFunctionSignature(Params, FuncRetTy))
     return 0;
   
   // Enter the arguments for the function into a new function-body scope.  We
@@ -1156,7 +1151,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   {
     Scope FnBodyScope(this, /*AllowLookup=*/true);
     
-    FE = actOnFuncExprStart(FuncLoc, FuncRetTy, FuncRetTyLoc, Params);
+    FE = actOnFuncExprStart(FuncLoc, FuncRetTy, Params);
 
     // Now that we have a context, update the generic parameters with that
     // context.
@@ -1231,7 +1226,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
     maybeParseGenericParams(GenericsScope, /*AllowLookup=*/false);
 
   // Parse optional inheritance clause.
-  SmallVector<Type, 2> Inherited;
+  SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
     parseInheritance(Inherited);
   
@@ -1247,8 +1242,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   struct OneOfElementInfo {
     SourceLoc NameLoc;
     StringRef Name;
-    Type EltType;
-    TypeLoc *EltTypeLoc;
+    TypeLoc EltTypeLoc;
   };
   SmallVector<OneOfElementInfo, 8> ElementInfos;
 
@@ -1261,14 +1255,13 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
       OneOfElementInfo ElementInfo;
       ElementInfo.Name = Tok.getText();
       ElementInfo.NameLoc = Tok.getLoc();
-      ElementInfo.EltType = nullptr;
-      ElementInfo.EltTypeLoc = nullptr;
     
       consumeToken(tok::identifier);
     
-      // See if we have a type specifier for this oneof element.  If so, parse it.
+      // See if we have a type specifier for this oneof element.
+      // If so, parse it.
       if (consumeIf(tok::colon) &&
-          parseTypeAnnotation(ElementInfo.EltType, ElementInfo.EltTypeLoc,
+          parseTypeAnnotation(ElementInfo.EltTypeLoc,
                               diag::expected_type_oneof_element)) {
         skipUntil(tok::r_brace);
         return true;
@@ -1294,7 +1287,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
 
     // Create a decl for each element, giving each a temporary type.
     OneOfElementDecl *OOED =
-        new (Context) OneOfElementDecl(Elt.NameLoc, NameI, Elt.EltType,
+        new (Context) OneOfElementDecl(Elt.NameLoc, NameI,
                                        Elt.EltTypeLoc, OOD);
 
     // If this was multiply defined, reject it.
@@ -1361,7 +1354,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
     maybeParseGenericParams(GenericsScope, /*AllowLookup=*/false);
 
   // Parse optional inheritance clause.
-  SmallVector<Type, 2> Inherited;
+  SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
     parseInheritance(Inherited);
   
@@ -1390,7 +1383,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   // constructor.
   Identifier ConstructID = Context.getIdentifier("constructor");
   MemberDecls.push_back(new (Context) OneOfElementDecl(StructLoc, ConstructID,
-                                                       Type(), nullptr, SD));
+                                                       TypeLoc(), SD));
 
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::oneof_attributes);
@@ -1431,7 +1424,7 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
     maybeParseGenericParams(GenericsScope, /*AllowLookup=*/false);
 
   // Parse optional inheritance clause.
-  SmallVector<Type, 2> Inherited;
+  SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
     parseInheritance(Inherited);
   
@@ -1512,7 +1505,7 @@ Decl *Parser::parseDeclProtocol() {
                       diag::expected_identifier_in_decl, "protocol"))
     return 0;
   
-  SmallVector<Type, 4> InheritedProtocols;
+  SmallVector<TypeLoc, 4> InheritedProtocols;
   if (Tok.is(tok::colon))
     parseInheritance(InheritedProtocols);
   
@@ -1536,9 +1529,9 @@ Decl *Parser::parseDeclProtocol() {
     // FIXME: Mark as 'implicit'.
     Members.push_back(new (Context) TypeAliasDecl(ProtocolLoc,
                                                   Context.getIdentifier("This"),
-                                                  ProtocolLoc, Type(), nullptr,
+                                                  ProtocolLoc, TypeLoc(),
                                                   CurDeclContext,
-                                                  MutableArrayRef<Type>()));
+                                                  MutableArrayRef<TypeLoc>()));
     
     bool HadError = false;
     while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
@@ -1609,17 +1602,15 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   SourceLoc ArrowLoc = consumeToken();
   
   // type
-  Type ElementTy;
-  TypeLoc *ElementTyLoc;
-  if (parseTypeAnnotation(ElementTy, ElementTyLoc,
-                          diag::expected_type_subscript))
+  TypeLoc ElementTy;
+  if (parseTypeAnnotation(ElementTy, diag::expected_type_subscript))
     return true;
   
   if (!NeedDefinition) {
     SubscriptDecl *Subscript
       = new (Context) SubscriptDecl(Context.getIdentifier("__subscript"),
                                     SubscriptLoc, Indices.get(), ArrowLoc,
-                                    ElementTy, ElementTyLoc, SourceRange(),
+                                    ElementTy, SourceRange(),
                                     0, 0, CurDeclContext);
     Decls.push_back(Subscript);
     return false;
@@ -1636,8 +1627,8 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   FuncDecl *Get = 0;
   FuncDecl *Set = 0;
   SourceLoc LastValidLoc = LBLoc;
-  if (parseGetSet(HasContainerType, Indices.get(), ElementTy, Get, Set,
-                  LastValidLoc))
+  if (parseGetSet(HasContainerType, Indices.get(), ElementTy.getType(),
+                  Get, Set, LastValidLoc))
     Invalid = true;
 
   // Parse the final '}'.
@@ -1666,9 +1657,8 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
     SubscriptDecl *Subscript
       = new (Context) SubscriptDecl(Context.getIdentifier("__subscript"),
                                     SubscriptLoc, Indices.get(), ArrowLoc,
-                                    ElementTy, ElementTyLoc,
-                                    SourceRange(LBLoc, RBLoc), Get, Set,
-                                    CurDeclContext);
+                                    ElementTy, SourceRange(LBLoc, RBLoc),
+                                    Get, Set, CurDeclContext);
     Decls.push_back(Subscript);
 
     // FIXME: Order of get/set not preserved.

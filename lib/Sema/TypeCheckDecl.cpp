@@ -44,28 +44,29 @@ public:
   void validateAttributes(ValueDecl *VD);
 
   /// \brief Check the list of inherited protocols on the declaration D.
-  void checkInherited(Decl *D, MutableArrayRef<Type> Inherited) {
+  void checkInherited(Decl *D, MutableArrayRef<TypeLoc> Inherited) {
     // Check the list of inherited protocols.
     for (unsigned i = 0, e = Inherited.size(); i != e; ++i) {
-      // FIXME: TypeLoc info?
-      if (TC.validateType(Inherited[i], nullptr, IsFirstPass)) {
-        Inherited[i] = ErrorType::get(TC.Context);
+      if (TC.validateType(Inherited[i], IsFirstPass)) {
+        Inherited[i].setInvalidType(TC.Context);
         continue;
       }
 
-      if (!Inherited[i]->isExistentialType() && !Inherited[i]->is<ErrorType>()) {
+      if (!Inherited[i].getType()->isExistentialType() &&
+          !Inherited[i].getType()->is<ErrorType>()) {
         // FIXME: Terrible location information.
-        TC.diagnose(D->getStartLoc(), diag::nonprotocol_inherit, Inherited[i]);
+        TC.diagnose(D->getStartLoc(), diag::nonprotocol_inherit,
+                    Inherited[i].getType());
       }
     }
   }
 
   void checkExplicitConformance(Decl *D, Type T,
-                                MutableArrayRef<Type> Inherited) {
+                                MutableArrayRef<TypeLoc> Inherited) {
     for (auto InheritedTy : Inherited) {
       // FIXME: Poor location info.
       SmallVector<ProtocolDecl *, 4> InheritedProtos;
-      if (InheritedTy->isExistentialType(InheritedProtos))
+      if (InheritedTy.getType()->isExistentialType(InheritedProtos))
         for (auto Proto : InheritedProtos)
           TC.conformsToProtocol(T, Proto, nullptr, D->getStartLoc());
     }
@@ -93,9 +94,10 @@ public:
     // FIXME: Tell the type validator not to assert about unresolved types.
     for (auto &Req : GenericParams->getRequirements()) {
       switch (Req.getKind()) {
-      case RequirementKind::Conformance:
+      case RequirementKind::Conformance: {
         // FIXME: TypeLoc info?
-        if (TC.validateType(Req.getProtocol(), nullptr, IsFirstPass)) {
+        TypeLoc TempLoc{ Req.getProtocol() };
+        if (TC.validateType(TempLoc, IsFirstPass)) {
           Req.overrideProtocol(ErrorType::get(TC.Context));
           continue;
         }
@@ -108,6 +110,7 @@ public:
           continue;
         }
         break;
+      }
 
       case RequirementKind::SameType:
         break;
@@ -120,29 +123,33 @@ public:
     llvm::DenseMap<TypeAliasDecl *, ArchetypeType *> Archetypes
       = Builder.assignArchetypes();
     for (auto Arch : Archetypes) {
-      Arch.first->setUnderlyingType(Arch.second);
+      Arch.first->getUnderlyingTypeLoc() = TypeLoc(Arch.second);
     }
 
     // Validate the types in the requirements clause.
     for (auto &Req : GenericParams->getRequirements()) {
       switch (Req.getKind()) {
-        case RequirementKind::Conformance:
+        case RequirementKind::Conformance: {
           // FIXME: TypeLoc info?
-          if (TC.validateType(Req.getSubject(), nullptr, IsFirstPass)) {
+          TypeLoc TempLoc{ Req.getSubject() };
+          if (TC.validateType(TempLoc, IsFirstPass)) {
             Req.overrideSubject(ErrorType::get(TC.Context));
             continue;
           }
           break;
+        }
 
         case RequirementKind::SameType:
           // FIXME: TypeLoc info?
-          if (TC.validateType(Req.getFirstType(), nullptr, IsFirstPass)) {
+          TypeLoc TempLoc{ Req.getFirstType() };
+          if (TC.validateType(TempLoc, IsFirstPass)) {
             Req.overrideFirstType(ErrorType::get(TC.Context));
             continue;
           }
 
           // FIXME: TypeLoc info?
-          if (TC.validateType(Req.getSecondType(), nullptr, IsFirstPass)) {
+          TempLoc = TypeLoc{ Req.getSecondType() };
+          if (TC.validateType(TempLoc, IsFirstPass)) {
             Req.overrideSecondType(ErrorType::get(TC.Context));
             continue;
           }
@@ -213,7 +220,7 @@ public:
     }
     if (PBD->getInit() && !IsFirstPass) {
       Type DestTy;
-      if (PBD->getPattern()->hasType()) {
+      if (isa<TypedPattern>(PBD->getPattern())) {
         if (TC.typeCheckPattern(PBD->getPattern(), /*isFirstPass*/false))
           return;
         DestTy = PBD->getPattern()->getType();
@@ -250,9 +257,7 @@ public:
     if (!SD->getDeclContext()->isTypeContext())
       TC.diagnose(SD->getStartLoc(), diag::subscript_not_member);
 
-    if (TC.validateType(SD->getElementType(), SD->getElementTypeLoc(),
-                        IsFirstPass))
-      SD->overwriteElementType(ErrorType::get(TC.Context));
+    TC.validateType(SD->getElementTypeLoc(), IsFirstPass);
 
     if (!TC.typeCheckPattern(SD->getIndices(), IsFirstPass))  {
       SD->setType(FunctionType::get(SD->getIndices()->getType(),
@@ -262,7 +267,7 @@ public:
   
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     if (!IsSecondPass) {
-      TC.validateType(TAD->getAliasType(), nullptr, IsFirstPass);
+      TC.validateType(TAD->getUnderlyingTypeLoc(), IsFirstPass);
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         checkInherited(TAD, TAD->getInherited());
     }
@@ -308,8 +313,9 @@ public:
       TupleType *TT = TupleType::get(TupleElts, TC.Context);
       Type CreateTy = FunctionType::get(TT, SD->getDeclaredTypeInContext(),
                                         TC.Context);
-      cast<OneOfElementDecl>(SD->getMembers().back())->setType(CreateTy);
-      cast<OneOfElementDecl>(SD->getMembers().back())->setArgumentType(TT);
+      auto ElementCtor = cast<OneOfElementDecl>(SD->getMembers().back());
+      ElementCtor->setType(CreateTy);
+      ElementCtor->getArgumentTypeLoc() = TypeLoc(TT);
     }
 
     if (!IsFirstPass)
@@ -350,9 +356,13 @@ public:
         // FIXME: Find a better way to identify the 'This' archetype.
         if (AssocType->getName().str().equals("This"))
           Index = 0;
-        AssocType->setUnderlyingType(
-          ArchetypeType::getNew(TC.Context, AssocType->getName().str(),
-                                AssocType->getInherited(), Index));
+        SmallVector<Type, 4> InheritedTypes;
+        for (TypeLoc T : AssocType->getInherited())
+          InheritedTypes.push_back(T.getType());
+        Type UnderlyingTy =
+            ArchetypeType::getNew(TC.Context, AssocType->getName().str(),
+                                  InheritedTypes, Index);
+        AssocType->getUnderlyingTypeLoc() = TypeLoc(UnderlyingTy);
       }
     }
 
@@ -377,9 +387,11 @@ public:
     if (Type thisType = FD->computeThisType()) {
       TypedPattern *thisPattern =
         cast<TypedPattern>(body->getParamPatterns()[0]);
-      assert(thisPattern->getType()->isUnresolvedType() ||
-             thisPattern->getType().getPointer() == thisType.getPointer());
-      thisPattern->overwriteType(thisType);
+      if (thisPattern->hasType()) {
+        assert(thisPattern->getType().getPointer() == thisType.getPointer());
+      } else {
+        thisPattern->setType(thisType);
+      }
       isInstanceFunc = true;
     }
 
@@ -411,11 +423,9 @@ public:
 
     // We have an element with an argument type; validate the argument,
     // then compute a function type.
-    if (TC.validateType(ED->getArgumentType(), ED->getArgumentTypeLoc(),
-                        IsFirstPass)) {
-      ED->setType(ErrorType::get(TC.Context));
+    if (TC.validateType(ED->getArgumentTypeLoc(), IsFirstPass))
       return;
-    } 
+
     ED->setType(FunctionType::get(ED->getArgumentType(), ElemTy, TC.Context));
 
     // Require the carried type to be materializable.
@@ -427,22 +437,19 @@ public:
 
   void visitExtensionDecl(ExtensionDecl *ED) {
     if (!IsSecondPass) {
-      if (TC.validateType(ED->getExtendedType(), ED->getExtendedTypeLoc(),
-                          IsFirstPass)) {
-        ED->setExtendedType(ErrorType::get(TC.Context));
-      } else {
-        Type ExtendedTy = ED->getExtendedType();
-        if (!ExtendedTy->is<OneOfType>() && !ExtendedTy->is<StructType>() &&
-            !ExtendedTy->is<ClassType>() && !ExtendedTy->is<ErrorType>() &&
-            !ExtendedTy->is<UnboundGenericType>()) {
-          TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
-                      ExtendedTy->is<ProtocolType>(), ExtendedTy);
-          // FIXME: It would be nice to point out where we found the named type
-          // declaration, if any.
-        }
-      
-        checkInherited(ED, ED->getInherited());
+      TC.validateType(ED->getExtendedTypeLoc(), IsFirstPass);
+
+      Type ExtendedTy = ED->getExtendedType();
+      if (!ExtendedTy->is<OneOfType>() && !ExtendedTy->is<StructType>() &&
+          !ExtendedTy->is<ClassType>() && !ExtendedTy->is<ErrorType>() &&
+          !ExtendedTy->is<UnboundGenericType>()) {
+        TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
+                    ExtendedTy->is<ProtocolType>(), ExtendedTy);
+        // FIXME: It would be nice to point out where we found the named type
+        // declaration, if any.
       }
+    
+      checkInherited(ED, ED->getInherited());
     }
 
     for (Decl *Member : ED->getMembers())

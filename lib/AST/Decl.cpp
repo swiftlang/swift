@@ -260,12 +260,12 @@ Type NominalTypeDecl::getDeclaredTypeInContext() {
 }
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                             SourceLoc NameLoc, Type UnderlyingTy,
-                             TypeLoc *UnderlyingTyLoc,
-                             DeclContext *DC, MutableArrayRef<Type> Inherited)
+                             SourceLoc NameLoc, TypeLoc UnderlyingTy,
+                             DeclContext *DC,
+                             MutableArrayRef<TypeLoc> Inherited)
   : TypeDecl(DeclKind::TypeAlias, DC, Name, Inherited, Type()),
     TypeAliasLoc(TypeAliasLoc), NameLoc(NameLoc),
-    UnderlyingTy(UnderlyingTy), UnderlyingTyLoc(UnderlyingTyLoc)
+    UnderlyingTy(UnderlyingTy)
 {
   // Set the type of the TypeAlias to the right MetaTypeType.
   ASTContext &Ctx = getASTContext();
@@ -274,14 +274,14 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
 }
 
 SourceRange TypeAliasDecl::getSourceRange() const {
-  if (UnderlyingTyLoc)
-    return { TypeAliasLoc, UnderlyingTyLoc->getSourceRange().End };
+  if (UnderlyingTy.hasLocation())
+    return { TypeAliasLoc, UnderlyingTy.getSourceRange().End };
   // FIXME: Inherits clauses
   return { TypeAliasLoc, NameLoc };
 }
 
 OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
-                     MutableArrayRef<Type> Inherited,
+                     MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::OneOf, Parent, Name, Inherited, GenericParams),
     OneOfLoc(OneOfLoc), NameLoc(NameLoc) {
@@ -296,7 +296,7 @@ OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
-                       MutableArrayRef<Type> Inherited,
+                       MutableArrayRef<TypeLoc> Inherited,
                        GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Struct, Parent, Name, Inherited, GenericParams),
     StructLoc(StructLoc), NameLoc(NameLoc){
@@ -311,7 +311,7 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
 }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
-                     MutableArrayRef<Type> Inherited,
+                     MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Class, Parent, Name, Inherited, GenericParams),
     ClassLoc(ClassLoc), NameLoc(NameLoc) {
@@ -337,7 +337,7 @@ OneOfElementDecl *OneOfDecl::getElement(Identifier Name) const {
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
                            SourceLoc NameLoc, Identifier Name,
-                           MutableArrayRef<Type> Inherited)
+                           MutableArrayRef<TypeLoc> Inherited)
   : NominalTypeDecl(DeclKind::Protocol, DC, Name, Inherited, nullptr),
     ProtocolLoc(ProtocolLoc), NameLoc(NameLoc)
 {
@@ -363,7 +363,7 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *Super) const {
     
     for (auto Inherited : Current->getInherited()) {
       SmallVector<ProtocolDecl *, 4> InheritedDecls;
-      if (Inherited->isExistentialType(InheritedDecls)) {
+      if (Inherited.getType()->isExistentialType(InheritedDecls)) {
         for (auto InheritedProto : InheritedDecls) {
           if (InheritedProto == Super)
             return true;
@@ -389,7 +389,7 @@ void ProtocolDecl::collectInherited(
     
     for (auto IType : Current->getInherited()) {
       SmallVector<ProtocolDecl *, 4> InheritedDecls;
-      if (IType->isExistentialType(InheritedDecls)) {
+      if (IType.getType()->isExistentialType(InheritedDecls)) {
         for (auto InheritedProto : InheritedDecls) {
           if (Inherited.insert(InheritedProto))
             Stack.push_back(InheritedProto);
@@ -510,8 +510,8 @@ SourceRange FuncDecl::getSourceRange() const {
 }
 
 SourceRange OneOfElementDecl::getSourceRange() const {
-  if (ArgumentTypeLoc)
-    return { IdentifierLoc, ArgumentTypeLoc->getSourceRange().End };
+  if (ArgumentType.hasLocation())
+    return { IdentifierLoc, ArgumentType.getSourceRange().End };
   return IdentifierLoc;
 }
 
@@ -522,7 +522,7 @@ SourceLoc SubscriptDecl::getLoc() const {
 SourceRange SubscriptDecl::getSourceRange() const {
   if (Braces.isValid())
     return { SubscriptLoc, Braces.End };
-  return { SubscriptLoc, ElementTyLoc->getSourceRange().End };
+  return { SubscriptLoc, ElementTy.getSourceRange().End };
 }
 
 SourceLoc ConstructorDecl::getLoc() const {
@@ -642,7 +642,7 @@ namespace {
         OS << P.getDecl()->getName();
         if (!P.getAsTypeParam()->getInherited().empty()) {
           OS << " : ";
-          P.getAsTypeParam()->getInherited()[0]->print(OS);
+          P.getAsTypeParam()->getInherited()[0].getType()->print(OS);
         }
       }
       OS << '>';
@@ -652,7 +652,7 @@ namespace {
       OS.indent(Indent) << "(" << Name;
     }
 
-    void printInherited(ArrayRef<Type> Inherited) {
+    void printInherited(ArrayRef<TypeLoc> Inherited) {
       if (Inherited.empty())
         return;
       OS << "inherits: ";
@@ -663,7 +663,7 @@ namespace {
         else
           OS << ", ";
         
-        Super->print(OS);
+        Super.getType()->print(OS);
       }
     }
     

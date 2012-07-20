@@ -271,7 +271,7 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
 ///   ':' type-annotation
 ///   ':' type-annotation '=' expr
 ///   '=' expr
-bool Parser::parseValueSpecifier(Type &Ty, TypeLoc *&Loc,
+bool Parser::parseValueSpecifier(TypeLoc &Ty,
                                  NullablePtr<Expr> &Init) {
   // Diagnose when we don't have a type or an expression.
   if (Tok.isNot(tok::colon) && Tok.isNot(tok::equal)) {
@@ -283,7 +283,7 @@ bool Parser::parseValueSpecifier(Type &Ty, TypeLoc *&Loc,
   
   // Parse the type if present.
   if (consumeIf(tok::colon) &&
-      parseTypeAnnotation(Ty, Loc, diag::expected_type))
+      parseTypeAnnotation(Ty, diag::expected_type))
     return true;
   
   // Parse the initializer, if present.

@@ -34,7 +34,7 @@ namespace swift {
   class DiagnosticEngine;
   class Lexer;
   class ScopeInfo;
-  class TypeLoc;
+  struct TypeLoc;
   class TupleType;
   
   struct OneOfElementInfo;
@@ -203,7 +203,7 @@ public:
                           SourceLoc OtherLoc, Diag<> OtherNote,
                           tok SkipToTok = tok::unknown);
   
-  bool parseValueSpecifier(Type &Ty, TypeLoc *&Loc, NullablePtr<Expr> &Init);
+  bool parseValueSpecifier(TypeLoc &Loc, NullablePtr<Expr> &Init);
 
   void parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Decls,
                           bool IsTopLevel);
@@ -240,7 +240,7 @@ public:
   bool parseAttribute(DeclAttributes &Attributes);
   
   Decl *parseDeclImport();
-  bool parseInheritance(SmallVectorImpl<Type> &Inherited);
+  bool parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
   Decl *parseDeclExtension();
   bool parseDeclOneOf(SmallVectorImpl<Decl*> &Decls);
 
@@ -265,21 +265,21 @@ public:
   //===--------------------------------------------------------------------===//
   // Type Parsing
   
-  bool parseType(Type &Result, TypeLoc *&ResultLoc);
-  bool parseType(Type &Result, TypeLoc *&ResultLoc, Diag<> ID);
-  bool parseTypeAnnotation(Type &Result, TypeLoc *&ResultLoc);
-  bool parseTypeAnnotation(Type &Result, TypeLoc *&ResultLoc, Diag<> ID);
-  bool parseGenericArguments(ArrayRef<Type> &Args);
-  bool parseTypeIdentifier(Type &Result, TypeLoc *&ResultLoc);
-  bool parseTypeComposition(Type &Result, TypeLoc *&ResultLoc);
-  bool parseTypeTupleBody(SourceLoc LPLoc, Type &Result, TypeLoc *&ResultLoc);
-  bool parseTypeArray(Type &result, TypeLoc *&ResultLoc);
+  bool parseType(TypeLoc &ResultLoc);
+  bool parseType(TypeLoc &ResultLoc, Diag<> ID);
+  bool parseTypeAnnotation(TypeLoc &ResultLoc);
+  bool parseTypeAnnotation(TypeLoc &ResultLoc, Diag<> ID);
+  bool parseGenericArguments(ArrayRef<TypeLoc> &Args);
+  bool parseTypeIdentifier(TypeLoc &ResultLoc);
+  bool parseTypeComposition(TypeLoc &ResultLoc);
+  bool parseTypeTupleBody(SourceLoc LPLoc, TypeLoc &ResultLoc);
+  bool parseTypeArray(TypeLoc &ResultLoc);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 
-  bool parseFunctionSignature(SmallVectorImpl<Pattern*> &params, Type &retType,
-                              TypeLoc *&retLoc);
+  bool parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
+                              TypeLoc &retLoc);
   NullablePtr<Pattern> parsePattern();
   NullablePtr<Pattern> parsePatternTuple();
   NullablePtr<Pattern> parsePatternAtom();
@@ -303,8 +303,7 @@ public:
   
   Expr *parseExprOperator();
   Expr *actOnIdentifierExpr(Identifier Text, SourceLoc Loc);
-  FuncExpr *actOnFuncExprStart(SourceLoc FuncLoc, Type FuncRetTy,
-                               TypeLoc *FuncRetTyLoc,
+  FuncExpr *actOnFuncExprStart(SourceLoc FuncLoc, TypeLoc FuncRetTy,
                                ArrayRef<Pattern*> Patterns);
 
   //===--------------------------------------------------------------------===//

@@ -485,16 +485,16 @@ namespace {
   private:
     T &asDerived() { return *static_cast<T*>(this); }
 
-    void visitInherited(ArrayRef<Type> inherited) {
+    void visitInherited(ArrayRef<TypeLoc> inherited) {
       if (inherited.empty()) return;
 
       // TODO: We need to figure out all the guarantees we want here.
       // It would be abstractly good to allow conversion to a base
       // protocol to be trivial, but it's not clear that there's
       // really a structural guarantee we can rely on here.
-      for (Type baseType : inherited) {
+      for (TypeLoc baseType : inherited) {
         SmallVector<ProtocolDecl *, 4> baseProtos;
-        baseType->isExistentialType(baseProtos);
+        baseType.getType()->isExistentialType(baseProtos);
         for (auto baseProto : baseProtos) {
           asDerived().addOutOfLineBaseProtocol(baseProto);
         }
@@ -670,8 +670,9 @@ namespace {
       // Keep track of whether we found a better path than the
       // previous best.
       bool foundBetter = false;
-      for (Type inherited : proto->getInherited()) {
-        ProtocolDecl *base = inherited->castTo<ProtocolType>()->getDecl();
+      for (TypeLoc inherited : proto->getInherited()) {
+        ProtocolDecl *base =
+            inherited.getType()->castTo<ProtocolType>()->getDecl();
         auto &baseEntry = protoInfo.getWitnessEntry(base);
         assert(baseEntry.isBase());
 

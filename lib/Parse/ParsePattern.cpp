@@ -25,7 +25,7 @@ using namespace swift;
 ///   func-signature-result:
 ///     '->' type
 bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
-                                    Type &retType, TypeLoc *&retLoc) {
+                                    TypeLoc &retType) {
   // Parse curried function argument clauses as long as we can.
   do {
     NullablePtr<Pattern> pattern = parsePatternTuple();
@@ -37,13 +37,12 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
 
   // If there's a trailing arrow, parse the rest as the result type.
   if (consumeIf(tok::arrow)) {
-    if (parseType(retType, retLoc))
+    if (parseType(retType))
       return true;
 
   // Otherwise, we implicitly return ().
   } else {
-    retType = TupleType::getEmpty(Context);
-    retLoc = nullptr;
+    retType = TypeLoc(TupleType::getEmpty(Context));
   }
 
   return false;
@@ -59,12 +58,11 @@ NullablePtr<Pattern> Parser::parsePattern() {
 
   // Now parse an optional type annotation.
   if (consumeIf(tok::colon)) {
-    Type type;
-    TypeLoc *loc;
-    if (parseTypeAnnotation(type, loc))
+    TypeLoc type;
+    if (parseTypeAnnotation(type))
       return nullptr;
 
-    pattern = new (Context) TypedPattern(pattern.get(), type, loc);
+    pattern = new (Context) TypedPattern(pattern.get(), type);
   }
 
   return pattern;
@@ -157,10 +155,11 @@ NullablePtr<Pattern> Parser::parsePatternTuple() {
         skipUntil(tok::r_paren);
         return nullptr;
       }
-      Type subTy = subpattern->getType();
+      Type subTy = subpattern->getTypeLoc().getType();
       elts.back().setVarargBaseType(subTy);
-      subpattern->overwriteType(ArraySliceType::get(subTy, SourceLoc(),
-                                                    Context));
+      // FIXME: This is wrong for TypeLoc info.
+      subpattern->getTypeLoc() = TypeLoc(ArraySliceType::get(subTy, SourceLoc(),
+                                                             Context));
     }
 
     if (Tok.isNot(tok::r_paren)) {

@@ -423,7 +423,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
           if (!DNT) {
             Binder.diagnose(ED->getLoc(), diag::non_nominal_extension,
                             false, ED->getExtendedType());
-            ED->setExtendedType(ErrorType::get(Binder.Context));
+            ED->getExtendedTypeLoc().setInvalidType(Binder.Context);
             break;
           }
         }

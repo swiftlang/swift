@@ -71,7 +71,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   // Check that T conforms to all inherited protocols.
   for (auto Inherited : Proto->getInherited()) {
     SmallVector<ProtocolDecl *, 4> InheritedProtos;
-    if (!Inherited->isExistentialType(InheritedProtos))
+    if (!Inherited.getType()->isExistentialType(InheritedProtos))
       return nullptr;
     
     for (auto InheritedProto : InheritedProtos) {
@@ -84,7 +84,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         // to establish the relationship.
         if (ComplainLoc.isValid()) {
           TC.diagnose(Proto->getStartLoc(),
-                      diag::inherited_protocol_does_not_conform, T, Inherited);
+                      diag::inherited_protocol_does_not_conform, T,
+                      Inherited.getType());
         }
         return nullptr;
       }
@@ -133,7 +134,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
             for (auto Req : AssociatedType->getInherited()) {
               SmallVector<ProtocolDecl *, 4> ReqProtos;
-              if (!Req->isExistentialType(ReqProtos))
+              if (!Req.getType()->isExistentialType(ReqProtos))
                 return nullptr;
 
               for (auto ReqProto : ReqProtos) {

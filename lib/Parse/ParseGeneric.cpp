@@ -51,27 +51,26 @@ GenericParamList *Parser::parseGenericParameters(Optional<Scope>& scope,
     }
 
     // Parse the ':' followed by a type.
-    SmallVector<Type, 1> Inherited;
+    SmallVector<TypeLoc, 1> Inherited;
     if (Tok.is(tok::colon)) {
       (void)consumeToken();
-      Type Ty;
-      TypeLoc *TyLoc = nullptr;
+      TypeLoc Ty;
       if (Tok.getKind() == tok::identifier) {
-        parseTypeIdentifier(Ty, TyLoc);
+        parseTypeIdentifier(Ty);
       } else if (Tok.getKind() == tok::kw_protocol) {
-        parseTypeComposition(Ty, TyLoc);
+        parseTypeComposition(Ty);
       } else {
         diagnose(Tok.getLoc(), diag::expected_generics_type_restriction, Name);
         Invalid = true;
       }
 
-      if (Ty)
+      if (Ty.hasLocation())
         Inherited.push_back(Ty);
     }
 
     // FIXME: Bad location info here
     TypeAliasDecl *Param
-      = new (Context) TypeAliasDecl(NameLoc, Name, NameLoc, Type(), nullptr,
+      = new (Context) TypeAliasDecl(NameLoc, Name, NameLoc, TypeLoc(),
                                     CurDeclContext,
                                     Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);
@@ -160,9 +159,8 @@ bool Parser::parseRequiresClause(SourceLoc &RequiresLoc,
   while (true) {
     // Parse the leading type-identifier.
     // FIXME: Dropping TypeLocs left and right.
-    Type FirstType;
-    TypeLoc *FirstTypeLoc = nullptr;
-    if (parseTypeIdentifier(FirstType, FirstTypeLoc)) {
+    TypeLoc FirstType;
+    if (parseTypeIdentifier(FirstType)) {
       Invalid = true;
       break;
     }
@@ -172,21 +170,21 @@ bool Parser::parseRequiresClause(SourceLoc &RequiresLoc,
       SourceLoc ColonLoc = consumeToken();
 
       // Parse the protocol or composition.
-      Type Protocol;
-      TypeLoc *ProtocolLoc = nullptr;
+      TypeLoc Protocol;
       if (Tok.is(tok::kw_protocol)) {
-        if (parseTypeComposition(Protocol, ProtocolLoc)) {
+        if (parseTypeComposition(Protocol)) {
           Invalid = true;
           break;
         }
-      } else if (parseTypeIdentifier(Protocol, ProtocolLoc)) {
+      } else if (parseTypeIdentifier(Protocol)) {
         Invalid = true;
         break;
       }
 
       // Add the requirement.
-      Requirements.push_back(Requirement::getConformance(FirstType, ColonLoc,
-                                                         Protocol));
+      Requirements.push_back(Requirement::getConformance(FirstType.getType(),
+                                                         ColonLoc,
+                                                         Protocol.getType()));
 
       // If there's a comma, keep parsing the list.
       if (Tok.is(tok::comma)) {
@@ -206,16 +204,16 @@ bool Parser::parseRequiresClause(SourceLoc &RequiresLoc,
       SourceLoc EqualLoc = consumeToken();
 
       // Parse the second type.
-      Type SecondType;
-      TypeLoc *SecondTypeLoc = nullptr;
-      if (parseTypeIdentifier(SecondType, SecondTypeLoc)) {
+      TypeLoc SecondType;
+      if (parseTypeIdentifier(SecondType)) {
         Invalid = true;
         break;
       }
 
       // Add the requirement
-      Requirements.push_back(Requirement::getSameType(FirstType, EqualLoc,
-                                                      SecondType));
+      Requirements.push_back(Requirement::getSameType(FirstType.getType(),
+                                                      EqualLoc,
+                                                      SecondType.getType()));
 
       // If there's a comma, keep parsing the list.
       if (Tok.is(tok::comma)) {

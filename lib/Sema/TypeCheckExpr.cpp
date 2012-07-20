@@ -975,13 +975,10 @@ public:
   }
 
   Expr *visitNewArrayExpr(NewArrayExpr *E) {
-    if (TC.validateType(E->getElementType(), E->getElementTypeLoc(),
-                        /*isFirstPass*/false)) {
-      E->setElementType(ErrorType::get(TC.Context));
+    if (TC.validateType(E->getElementTypeLoc(), /*isFirstPass*/false))
       return nullptr;
-    }
 
-    Type resultType = E->getElementType();
+    Type resultType = E->getElementTypeLoc().getType();
     if (resultType->isUnresolvedType()) {
       E->setType(UnstructuredUnresolvedType::get(TC.Context));
       return E;
@@ -1056,11 +1053,10 @@ public:
   }
 
   Expr *visitNewReferenceExpr(NewReferenceExpr *E) {
-    if (TC.validateType(E->getType(), E->getElementTypeLoc(),
-                        /*isFirstPass*/false)) {
-      E->setType(ErrorType::get(TC.Context));
+    if (TC.validateType(E->getElementTypeLoc(), /*isFirstPass*/false))
       return nullptr;
-    }
+
+    E->setType(E->getElementTypeLoc().getType());
 
     ClassType *CT = E->getType()->getAs<ClassType>();
     if (!CT) {
@@ -1722,8 +1718,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
 
 void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
   bool badType = false;
-  if (validateType(FE->getBodyResultType(), FE->getBodyResultTypeLoc(),
-                   isFirstPass))
+  if (validateType(FE->getBodyResultTypeLoc(), isFirstPass))
     badType = true;
 
   for (Pattern *P : FE->getParamPatterns()) {

@@ -21,11 +21,11 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/LLVM.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeLoc.h"
 
 namespace swift {
   class ASTContext;
   class ExprHandle;
-  class TypeLoc;
 
 /// PatternKind - The classification of different kinds of
 /// value-matching pattern.
@@ -55,7 +55,7 @@ protected:
     TuplePatternBitfields TuplePatternBits;
   };
 
-  Pattern(PatternKind kind, Type type = Type()) : Ty(type) {
+  Pattern(PatternKind kind) {
     PatternBits.Kind = unsigned(kind);
   }
 
@@ -114,8 +114,8 @@ class ParenPattern : public Pattern {
   SourceLoc LPLoc, RPLoc;
   Pattern *SubPattern;
 public:
-  ParenPattern(SourceLoc lp, Pattern *sub, SourceLoc rp, Type type = Type())
-    : Pattern(PatternKind::Paren, type),
+  ParenPattern(SourceLoc lp, Pattern *sub, SourceLoc rp)
+    : Pattern(PatternKind::Paren),
       LPLoc(lp), RPLoc(rp), SubPattern(sub) {}
 
   Pattern *getSubPattern() const { return SubPattern; }
@@ -235,14 +235,14 @@ public:
 /// type.
 class TypedPattern : public Pattern {
   Pattern *SubPattern;
-  TypeLoc *PatTypeLoc;
+  TypeLoc PatType;
 
 public:
-  TypedPattern(Pattern *pattern, Type type, TypeLoc *tl)
-    : Pattern(PatternKind::Typed, type), SubPattern(pattern), PatTypeLoc(tl) {}
+  TypedPattern(Pattern *pattern, TypeLoc tl)
+    : Pattern(PatternKind::Typed), SubPattern(pattern), PatType(tl) {}
 
   Pattern *getSubPattern() const { return SubPattern; }
-  TypeLoc *getTypeLoc() const { return PatTypeLoc; }
+  TypeLoc &getTypeLoc() { return PatType; }
 
   SourceLoc getLoc() const { return SubPattern->getLoc(); }
   SourceRange getSourceRange() const;

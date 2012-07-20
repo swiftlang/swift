@@ -20,6 +20,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeLoc.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -31,7 +32,6 @@ namespace swift {
   class ASTContext;
   class ASTWalker;
   class Type;
-  class TypeLoc;
   class ClassType;
   class Expr;
   class FuncDecl;
@@ -448,21 +448,18 @@ class ExtensionDecl : public Decl, public DeclContext {
   SourceRange Braces;
 
   /// ExtendedType - The type being extended.
-  Type ExtendedType;
-  TypeLoc *ExtendedTypeLoc;
-  MutableArrayRef<Type> Inherited;
+  TypeLoc ExtendedType;
+  MutableArrayRef<TypeLoc> Inherited;
   ArrayRef<Decl*> Members;
 public:
 
-  ExtensionDecl(SourceLoc ExtensionLoc, Type ExtendedType,
-                TypeLoc *ExtendedTypeLoc,
-                MutableArrayRef<Type> Inherited,
+  ExtensionDecl(SourceLoc ExtensionLoc, TypeLoc ExtendedType,
+                MutableArrayRef<TypeLoc> Inherited,
                 DeclContext *Parent)
     : Decl(DeclKind::Extension, Parent),
       DeclContext(DeclContextKind::ExtensionDecl, Parent),
       ExtensionLoc(ExtensionLoc),
-      ExtendedType(ExtendedType), ExtendedTypeLoc(ExtendedTypeLoc),
-      Inherited(Inherited) {
+      ExtendedType(ExtendedType), Inherited(Inherited) {
   }
   
   SourceLoc getStartLoc() const { return ExtensionLoc; }
@@ -471,14 +468,13 @@ public:
     return { ExtensionLoc, Braces.End };
   }
 
-  Type getExtendedType() const { return ExtendedType; }
-  void setExtendedType(Type t) { ExtendedType = t; }
-  TypeLoc *getExtendedTypeLoc() { return ExtendedTypeLoc; }
+  Type getExtendedType() const { return ExtendedType.getType(); }
+  TypeLoc &getExtendedTypeLoc() { return ExtendedType; }
 
   /// \brief Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
-  MutableArrayRef<Type> getInherited() { return Inherited; }
-  ArrayRef<Type> getInherited() const { return Inherited; }
+  MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
+  ArrayRef<TypeLoc> getInherited() const { return Inherited; }
 
   ArrayRef<Decl*> getMembers() const { return Members; }
   void setMembers(ArrayRef<Decl*> M, SourceRange B) {
@@ -660,19 +656,19 @@ public:
 
 /// This is a common base class for declarations which declare a type.
 class TypeDecl : public ValueDecl {
-  MutableArrayRef<Type> Inherited;
+  MutableArrayRef<TypeLoc> Inherited;
 
 public:
   TypeDecl(DeclKind K, DeclContext *DC, Identifier name,
-           MutableArrayRef<Type> inherited, Type ty) :
+           MutableArrayRef<TypeLoc> inherited, Type ty) :
     ValueDecl(K, DC, name, ty), Inherited(inherited) {}
 
   Type getDeclaredType() const;
 
   /// \brief Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
-  MutableArrayRef<Type> getInherited() { return Inherited; }
-  ArrayRef<Type> getInherited() const { return Inherited; }
+  MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
+  ArrayRef<TypeLoc> getInherited() const { return Inherited; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -694,13 +690,12 @@ class TypeAliasDecl : public TypeDecl {
 
   SourceLoc TypeAliasLoc; // The location of the 'typalias' keyword
   SourceLoc NameLoc; // The location of the declared type
-  Type UnderlyingTy;
-  TypeLoc *UnderlyingTyLoc;
+  TypeLoc UnderlyingTy;
 
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                SourceLoc NameLoc, Type Underlyingty, TypeLoc *UnderlyingTyLoc,
-                DeclContext *DC, MutableArrayRef<Type> Inherited);
+                SourceLoc NameLoc, TypeLoc UnderlyingTy,
+                DeclContext *DC, MutableArrayRef<TypeLoc> Inherited);
 
   SourceLoc getStartLoc() const { return TypeAliasLoc; }
   SourceLoc getLoc() const { return NameLoc; }
@@ -709,25 +704,12 @@ public:
   /// getUnderlyingType - Returns the underlying type, which is
   /// assumed to have been set.
   Type getUnderlyingType() const {
-    assert(!UnderlyingTy.isNull() && "getting invalid underlying type");
-    return UnderlyingTy;
+    assert(!UnderlyingTy.getType().isNull() &&
+           "getting invalid underlying type");
+    return UnderlyingTy.getType();
   }
 
-  /// setUnderlyingType - Set the underlying type.  This is meant to
-  /// be used when resolving an unresolved type name during name-binding.
-  void setUnderlyingType(Type T) {
-    assert(UnderlyingTy.isNull() && "changing underlying type of type-alias");
-    UnderlyingTy = T;
-  }
-
-  /// overwriteUnderlyingType - Actually change the underlying type.
-  /// Typically it is overwritten to an error type.  It's possible for
-  /// type canonicalization to not see these changes.
-  void overwriteUnderlyingType(Type T) {
-    UnderlyingTy = T;
-  }
-
-  TypeLoc *getUnderlyingTypeLoc() const { return UnderlyingTyLoc; }
+  TypeLoc &getUnderlyingTypeLoc() { return UnderlyingTy; }
 
   /// getAliasType - Return the sugared version of this decl as a Type.
   NameAliasType *getAliasType() const { return AliasTy; }
@@ -751,7 +733,7 @@ protected:
   
 public:
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
-                  MutableArrayRef<Type> inherited,
+                  MutableArrayRef<TypeLoc> inherited,
                   GenericParamList *GenericParams) :
     TypeDecl(K, DC, name, inherited, Type()),
     DeclContext(DeclContextKind::NominalTypeDecl, DC),
@@ -794,8 +776,8 @@ class OneOfDecl : public NominalTypeDecl {
 
 public:
   OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
-            MutableArrayRef<Type> Inherited, GenericParamList *GenericParams,
-            DeclContext *DC);
+            MutableArrayRef<TypeLoc> Inherited,
+            GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return OneOfLoc; }
   SourceLoc getLoc() const { return NameLoc; }
@@ -830,8 +812,8 @@ class StructDecl : public NominalTypeDecl {
 
 public:
   StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
-             MutableArrayRef<Type> Inherited, GenericParamList *GenericParams,
-             DeclContext *DC);
+             MutableArrayRef<TypeLoc> Inherited,
+             GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return StructLoc; }
   SourceLoc getLoc() const { return NameLoc; }
@@ -864,8 +846,8 @@ class ClassDecl : public NominalTypeDecl {
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
-            MutableArrayRef<Type> Inherited, GenericParamList *GenericParams,
-            DeclContext *DC);
+            MutableArrayRef<TypeLoc> Inherited,
+            GenericParamList *GenericParams, DeclContext *DC);
 
   SourceLoc getStartLoc() const { return ClassLoc; }
   SourceLoc getLoc() const { return NameLoc; }
@@ -898,7 +880,7 @@ class ProtocolDecl : public NominalTypeDecl {
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
-               Identifier Name, MutableArrayRef<Type> Inherited);
+               Identifier Name, MutableArrayRef<TypeLoc> Inherited);
   
   using Decl::getASTContext;
 
@@ -1087,20 +1069,17 @@ class OneOfElementDecl : public ValueDecl {
   /// ArgumentType - This is the type specified with the oneof element.  For
   /// example 'int' in the Y example above.  This is null if there is no type
   /// associated with this element (such as in the Z example).
-  Type ArgumentType;
-  TypeLoc *ArgumentTypeLoc;
+  TypeLoc ArgumentType;
     
 public:
   OneOfElementDecl(SourceLoc IdentifierLoc, Identifier Name,
-                   Type ArgumentType, TypeLoc *ArgumentTypeLoc,
-                   DeclContext *DC)
+                   TypeLoc ArgumentType, DeclContext *DC)
   : ValueDecl(DeclKind::OneOfElement, DC, Name, Type()),
-    IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType),
-    ArgumentTypeLoc(ArgumentTypeLoc) {}
+    IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType) {}
 
-  Type getArgumentType() const { return ArgumentType; }
-  void setArgumentType(Type t) { ArgumentType = t; }
-  TypeLoc *getArgumentTypeLoc() const { return ArgumentTypeLoc; }
+  bool hasArgumentType() const { return !ArgumentType.getType().isNull(); }
+  Type getArgumentType() const { return ArgumentType.getType(); }
+  TypeLoc &getArgumentTypeLoc() { return ArgumentType; }
 
   SourceLoc getStartLoc() const { return IdentifierLoc; }
   SourceLoc getLoc() const { return IdentifierLoc; }
@@ -1146,21 +1125,20 @@ class SubscriptDecl : public ValueDecl {
   SourceLoc SubscriptLoc;
   SourceLoc ArrowLoc;
   Pattern *Indices;
-  Type ElementTy;
-  TypeLoc *ElementTyLoc;
+  TypeLoc ElementTy;
   SourceRange Braces;
   FuncDecl *Get;
   FuncDecl *Set;
   
 public:
   SubscriptDecl(Identifier NameHack, SourceLoc SubscriptLoc, Pattern *Indices,
-                SourceLoc ArrowLoc, Type ElementTy, TypeLoc *ElementTyLoc,
+                SourceLoc ArrowLoc, TypeLoc ElementTy,
                 SourceRange Braces, FuncDecl *Get, FuncDecl *Set,
                 DeclContext *Parent)
     : ValueDecl(DeclKind::Subscript, Parent, NameHack, Type()),
       SubscriptLoc(SubscriptLoc),
       ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy),
-      ElementTyLoc(ElementTyLoc), Braces(Braces), Get(Get), Set(Set) { }
+      Braces(Braces), Get(Get), Set(Set) { }
   
   SourceLoc getStartLoc() const { return SubscriptLoc; }
   SourceLoc getLoc() const;
@@ -1171,9 +1149,8 @@ public:
   
   /// \brief Retrieve the type of the element referenced by a subscript
   /// operation.
-  Type getElementType() const { return ElementTy; }
-  void overwriteElementType(Type T) { ElementTy = T; }
-  TypeLoc *getElementTypeLoc() { return ElementTyLoc; }
+  Type getElementType() const { return ElementTy.getType(); }
+  TypeLoc &getElementTypeLoc() { return ElementTy; }
 
   /// \brief Retrieve the subscript getter, a function that takes the indices
   /// and produces a value of the element type.

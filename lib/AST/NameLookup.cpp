@@ -147,7 +147,7 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
       return;
       
     for (auto Inherited : PT->getDecl()->getInherited())
-      doIt(Inherited, M, Visited);
+      doIt(Inherited.getType(), M, Visited);
     
     for (auto Member : PT->getDecl()->getMembers()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {

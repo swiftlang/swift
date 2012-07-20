@@ -181,7 +181,7 @@ bool ArchetypeBuilder::addGenericParameter(TypeAliasDecl *GenericParam,
   // Add each of the requirements placed on this generic parameter.
   for (auto Inherited : GenericParam->getInherited()) {
     SmallVector<ProtocolDecl *, 4> ConformsTo;
-    if (Inherited->isExistentialType(ConformsTo)) {
+    if (Inherited.getType()->isExistentialType(ConformsTo)) {
       for (auto Proto : ConformsTo)
         if (addConformanceRequirement(PA, Proto))
           return true;
@@ -200,7 +200,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
   // Add all of the inherited protocol requirements, recursively.
   for (auto Inherited : Proto->getInherited()) {
     SmallVector<ProtocolDecl *, 4> InheritedProtos;
-    if (Inherited->isExistentialType(InheritedProtos)) {
+    if (Inherited.getType()->isExistentialType(InheritedProtos)) {
       for (auto InheritedProto : InheritedProtos) {
         if (addConformanceRequirement(T, InheritedProto))
           return true;
@@ -219,7 +219,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
       auto AssocPA = T->getNestedType(AssocType->getName());
       for (auto Inherited : AssocType->getInherited()) {
         SmallVector<ProtocolDecl *, 4> InheritedProtos;
-        if (Inherited->isExistentialType(InheritedProtos)) {
+        if (Inherited.getType()->isExistentialType(InheritedProtos)) {
           for (auto InheritedProto : InheritedProtos) {
             if (addConformanceRequirement(AssocPA, InheritedProto))
               return true;

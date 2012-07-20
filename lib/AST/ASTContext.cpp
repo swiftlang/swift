@@ -384,3 +384,7 @@ void *ExprHandle::operator new(size_t Bytes, ASTContext &C,
 ExprHandle *ExprHandle::get(ASTContext &Context, Expr *E) {
   return new (Context) ExprHandle(E);
 }
+
+void TypeLoc::setInvalidType(ASTContext &C) {
+  T = ErrorType::get(C);
+}

@@ -41,9 +41,11 @@ bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass) {
   case PatternKind::Typed: {
     bool hadError = false;
     TypedPattern *TP = cast<TypedPattern>(P);
-    if (validateType(TP->getType(), TP->getTypeLoc(), isFirstPass)) {
-      TP->overwriteType(ErrorType::get(Context));
+    if (validateType(TP->getTypeLoc(), isFirstPass)) {
+      TP->setType(ErrorType::get(Context));
       hadError = true;
+    } else {
+      TP->setType(TP->getTypeLoc().getType());
     }
     hadError |= coerceToType(TP->getSubPattern(),
                              P->getType(), isFirstPass);
@@ -108,14 +110,17 @@ bool TypeChecker::coerceToType(Pattern *P, Type type, bool isFirstPass) {
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
     bool hadError = false;
-    if (validateType(TP->getType(), TP->getTypeLoc(), isFirstPass)) {
+    if (validateType(TP->getTypeLoc(), isFirstPass)) {
       TP->overwriteType(ErrorType::get(Context));
       hadError = true;
-    } else if (!type->isEqual(TP->getType()) && !type->is<ErrorType>()) {
-      // Complain if the types don't match exactly.
-      // TODO: allow implicit conversions?
-      diagnose(P->getLoc(), diag::pattern_type_mismatch_context, type);
-      hadError = true;
+    } else {
+      TP->setType(TP->getTypeLoc().getType());
+      if (!type->isEqual(TP->getType()) && !type->is<ErrorType>()) {
+        // Complain if the types don't match exactly.
+        // TODO: allow implicit conversions?
+        diagnose(P->getLoc(), diag::pattern_type_mismatch_context, type);
+        hadError = true;
+      }
     }
 
     hadError |= coerceToType(TP->getSubPattern(), TP->getType(), isFirstPass);

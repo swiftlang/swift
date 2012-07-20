@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the TypeLoc class.
+// This file defines the TypeLoc struct and related structs.
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,30 +18,35 @@
 #define SWIFT_TYPELOC_H
 
 #include "swift/Basic/SourceLoc.h"
+#include "swift/AST/Type.h"
 
 namespace swift {
   class ASTContext;
 
 /// TypeLoc - Provides source location information for a parsed type.
-/// A TypeLoc* is stored in AST nodes which use an explicitly written type.
-class TypeLoc {
+/// A TypeLoc is stored in AST nodes which use an explicitly written type.
+struct TypeLoc {
 private:
-  TypeLoc(SourceRange Range);
+  Type T;
   // FIXME: Currently, there's only one kind of TypeLoc; we need multiple kinds
   // for more accurate source location information.
   SourceRange Range;
 
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = 8);
 public:
-  SourceRange getSourceRange() {
+  TypeLoc() {}
+  TypeLoc(Type T, SourceRange Range) : T(T), Range(Range) {}
+  explicit TypeLoc(Type T) : T(T) {}
+
+  SourceRange getSourceRange() const {
     return Range;
   }
-
-  static TypeLoc *get(ASTContext &Context, SourceRange Range);
+  bool hasLocation() const {
+    return Range.isValid();
+  }
+  Type getType() const {
+    return T;
+  }
+  void setInvalidType(ASTContext &C);
 };
 
 } // end namespace llvm

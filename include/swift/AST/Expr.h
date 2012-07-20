@@ -20,6 +20,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeLoc.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -29,7 +30,6 @@ namespace swift {
   class ArchetypeType;
   class ASTContext;
   class Type;
-  class TypeLoc;
   class ValueDecl;
   class Decl;
   class Pattern;
@@ -1353,8 +1353,7 @@ class FuncExpr : public CapturingExpr {
 
   FuncDecl *TheFuncDecl;
 
-  Type FnRetType;
-  TypeLoc *FnRetTypeLoc;
+  TypeLoc FnRetType;
 
   Pattern **getParamsBuffer() {
     return reinterpret_cast<Pattern**>(this+1);
@@ -1363,16 +1362,15 @@ class FuncExpr : public CapturingExpr {
     return reinterpret_cast<Pattern*const*>(this+1);
   }
   
-  FuncExpr(SourceLoc FuncLoc, unsigned NumPatterns, Type FnRetType,
-           TypeLoc *FnRetTypeLoc, BraceStmt *Body, DeclContext *Parent)
+  FuncExpr(SourceLoc FuncLoc, unsigned NumPatterns, TypeLoc FnRetType,
+           BraceStmt *Body, DeclContext *Parent)
     : CapturingExpr(ExprKind::Func, Type(), Parent),
       FuncLoc(FuncLoc), NumPatterns(NumPatterns), Body(Body),
-      TheFuncDecl(nullptr), FnRetType(FnRetType), FnRetTypeLoc(FnRetTypeLoc) {}
+      TheFuncDecl(nullptr), FnRetType(FnRetType) {}
 public:
   static FuncExpr *create(ASTContext &Context, SourceLoc FuncLoc,
-                          ArrayRef<Pattern*> Params, Type FnRetType,
-                          TypeLoc *FnRetTypeLoc, BraceStmt *Body,
-                          DeclContext *Parent);
+                          ArrayRef<Pattern*> Params, TypeLoc FnRetType,
+                          BraceStmt *Body, DeclContext *Parent);
 
   SourceRange getSourceRange() const;
   SourceLoc getLoc() const { return FuncLoc; }
@@ -1390,8 +1388,8 @@ public:
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *S) { Body = S; }
 
-  Type getBodyResultType() const { return FnRetType; }
-  TypeLoc *getBodyResultTypeLoc() const { return FnRetTypeLoc; }
+  Type getBodyResultType() const { return FnRetType.getType(); }
+  TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FuncExpr *) { return true; }
@@ -1522,17 +1520,16 @@ public:
   };
 
 private:
+  TypeLoc ElementTyAsWritten;
   Type ElementTy;
-  TypeLoc *ElementTyLoc;
   unsigned NumBounds;
   SourceLoc NewLoc;
   Expr *InjectionFn;
 
-  NewArrayExpr(SourceLoc newLoc, Type elementTy, TypeLoc *elementTyLoc,
+  NewArrayExpr(SourceLoc newLoc, TypeLoc elementTy,
                unsigned numBounds)
-    : Expr(ExprKind::NewArray, Type()), ElementTy(elementTy),
-      ElementTyLoc(elementTyLoc), NumBounds(numBounds), NewLoc(newLoc),
-      InjectionFn(nullptr) {}
+    : Expr(ExprKind::NewArray, Type()), ElementTyAsWritten(elementTy),
+      NumBounds(numBounds), NewLoc(newLoc), InjectionFn(nullptr) {}
 
   Bound *getBoundsBuffer() {
     return reinterpret_cast<Bound*>(this + 1);
@@ -1543,8 +1540,7 @@ private:
 
 public:
   static NewArrayExpr *create(ASTContext &Context, SourceLoc newLoc,
-                              Type elementTy, TypeLoc *elementTyLoc,
-                              ArrayRef<Bound> bounds);
+                              TypeLoc elementTy, ArrayRef<Bound> bounds);
 
   unsigned getNumBounds() const { return NumBounds; }
 
@@ -1570,10 +1566,12 @@ public:
     return InjectionFn;
   }
 
-  Type getElementType() const { return ElementTy; }
-  void setElementType(Type ty) { ElementTy = ty; }
-
-  TypeLoc *getElementTypeLoc() const { return ElementTyLoc; }
+  Type getElementType() const {
+    assert(ElementTy && "Element type not yet computed!");
+    return ElementTy;
+  }
+  void setElementType(Type T) { ElementTy = T; }
+  TypeLoc &getElementTypeLoc() { return ElementTyAsWritten; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const NewArrayExpr *) { return true; }
@@ -1589,12 +1587,12 @@ private:
   SourceLoc NewLoc;
   ConstructorDecl *Ctor;
   Expr *CtorArg;
-  TypeLoc *ElementTyLoc;
+  TypeLoc ElementTy;
 
 public:
-  NewReferenceExpr(Type ty, TypeLoc *tyLoc, SourceLoc newLoc)
-    : Expr(ExprKind::NewReference, ty), NewLoc(newLoc),
-      Ctor(nullptr), CtorArg(nullptr), ElementTyLoc(tyLoc) {}
+  NewReferenceExpr(TypeLoc ty, SourceLoc newLoc)
+    : Expr(ExprKind::NewReference), NewLoc(newLoc),
+      Ctor(nullptr), CtorArg(nullptr), ElementTy(ty) {}
 
   /// Return the location of the 'new' keyword.
   SourceLoc getNewLoc() const { return NewLoc; }
@@ -1611,7 +1609,7 @@ public:
   Expr *getCtorArg() { return CtorArg; }
   void setCtorArg(Expr *e) { CtorArg = e; }
 
-  TypeLoc *getElementTypeLoc() const { return ElementTyLoc; }
+  TypeLoc &getElementTypeLoc() { return ElementTy; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const NewReferenceExpr *) { return true; }

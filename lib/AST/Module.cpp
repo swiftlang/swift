@@ -63,8 +63,8 @@ void BuiltinModuleCache::lookupValue(Identifier Name, NLKind LookupKind,
   if (Entry == 0)
     if (Type Ty = getBuiltinType(M.Ctx, Name.str()))
       Entry = new (M.Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
-                                        Ty, nullptr, M.Ctx.TheBuiltinModule,
-                                        MutableArrayRef<Type>());
+                                        TypeLoc(Ty), M.Ctx.TheBuiltinModule,
+                                        MutableArrayRef<TypeLoc>());
 
   if (Entry == 0)
     Entry = getBuiltinValue(M.Ctx, Name);

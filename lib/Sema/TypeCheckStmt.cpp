@@ -507,7 +507,7 @@ bool checkProtocolCircularity(TypeChecker &TC, ProtocolDecl *Proto,
                               llvm::SmallVectorImpl<ProtocolDecl *> &Path) {
   for (auto InheritedTy : Proto->getInherited()) {
     SmallVector<ProtocolDecl *, 4> InheritedProtos;
-    if (!InheritedTy->isExistentialType(InheritedProtos))
+    if (!InheritedTy.getType()->isExistentialType(InheritedProtos))
       continue;
     
     for (auto InheritedProto : InheritedProtos) {

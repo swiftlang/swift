@@ -19,6 +19,7 @@
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeLoc.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
@@ -385,13 +386,13 @@ public:
   public:
     SourceLoc Loc;
     Identifier Id;
-    ArrayRef<Type> GenericArgs;
+    ArrayRef<TypeLoc> GenericArgs;
     
     /// Value is the decl or module that this refers to.  After name binding,
     /// the last entry in the component list is known to be a TypeBase*.
     llvm::PointerUnion3<ValueDecl*, Type, Module*> Value;
     Component(SourceLoc Loc, Identifier Id,
-              ArrayRef<Type> GenericArgs) :
+              ArrayRef<TypeLoc> GenericArgs) :
         Loc(Loc), Id(Id), GenericArgs(GenericArgs) {}
   };
   
