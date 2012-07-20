@@ -1184,15 +1184,16 @@ class ConstructorDecl : public ValueDecl, public DeclContext {
   Pattern *Arguments;
   BraceStmt *Body;
   VarDecl *ImplicitThisDecl;
-  
+  GenericParamList *GenericParams;
+
 public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
                   Pattern *Arguments, VarDecl *ImplicitThisDecl,
-                  DeclContext *Parent)
+                  GenericParamList *GenericParams, DeclContext *Parent)
     : ValueDecl(DeclKind::Constructor, Parent, NameHack, Type()),
       DeclContext(DeclContextKind::ConstructorDecl, Parent),
       ConstructorLoc(ConstructorLoc), Arguments(Arguments), Body(nullptr),
-      ImplicitThisDecl(ImplicitThisDecl) {}
+      ImplicitThisDecl(ImplicitThisDecl), GenericParams(GenericParams) {}
   
   SourceLoc getStartLoc() const { return ConstructorLoc; }
   SourceLoc getLoc() const;
@@ -1211,6 +1212,9 @@ public:
 
   /// getImplicitThisDecl - This method returns the implicit 'this' decl.
   VarDecl *getImplicitThisDecl() const { return ImplicitThisDecl; }
+
+  GenericParamList *getGenericParams() const { return GenericParams; }
+  bool isGeneric() const { return GenericParams != nullptr; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;

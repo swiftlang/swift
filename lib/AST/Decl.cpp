@@ -553,7 +553,7 @@ Type ConstructorDecl::computeThisType() const {
 
 Type ConstructorDecl::getArgumentType() const {
   Type ArgTy = getType();
-  ArgTy = ArgTy->castTo<FunctionType>()->getInput();
+  ArgTy = ArgTy->castTo<AnyFunctionType>()->getInput();
   return ArgTy;
 }
 
@@ -718,6 +718,8 @@ namespace {
       printDeclName(VD);
       if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
         printGenericParameters(FD->getGenericParams());
+      if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(VD))
+        printGenericParameters(CD->getGenericParams());
       if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(VD))
         printGenericParameters(NTD->getGenericParams());
 

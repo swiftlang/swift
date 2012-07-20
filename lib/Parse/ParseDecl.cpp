@@ -1462,7 +1462,8 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
                                               SourceLoc());
     ConstructorDecl *Constructor =
         new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
-                                     SourceLoc(), Arguments, ThisDecl, CD);
+                                     SourceLoc(), Arguments, ThisDecl,
+                                     nullptr, CD);
     ThisDecl->setDeclContext(Constructor);
     MemberDecls.push_back(Constructor);
   }
@@ -1716,7 +1717,12 @@ ConstructorDecl *Parser::parseDeclConstructor() {
   // attribute-list
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
-  
+
+  // Parse the generic-params, if present.
+  Optional<Scope> GenericsScope;
+  GenericParamList *GenericParams =
+    maybeParseGenericParams(GenericsScope, /*AllowLookup=*/true);
+
   // pattern-tuple
   if (Tok.isNotAnyLParen()) {
     diagnose(Tok.getLoc(), diag::expected_lparen_subscript);
@@ -1741,8 +1747,12 @@ ConstructorDecl *Parser::parseDeclConstructor() {
   ConstructorDecl *CD =
       new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
                                     ConstructorLoc, Arguments.get(), ThisDecl,
-                                    CurDeclContext);
+                                    GenericParams, CurDeclContext);
   ThisDecl->setDeclContext(CD);
+  if (GenericParams) {
+    for (auto Param : *GenericParams)
+      Param.setDeclContext(CD);
+  }
   AddConstructorArgumentsToScope(Arguments.get(), CD, *this);
   ScopeInfo.addToScope(ThisDecl);
   ContextChange CC(*this, CD);

@@ -472,15 +472,22 @@ public:
     if (!CD->getDeclContext()->isTypeContext())
       TC.diagnose(CD->getStartLoc(), diag::constructor_not_member);
 
+    checkGenericParams(CD->getGenericParams());
+
     Type ThisTy = CD->computeThisType();
     CD->getImplicitThisDecl()->setType(ThisTy);
 
     if (TC.typeCheckPattern(CD->getArguments(), IsFirstPass)) {
       CD->setType(ErrorType::get(TC.Context));
     } else {
-      Type FnTy = FunctionType::get(CD->getArguments()->getType(),
-                                    ThisTy,
-                                    TC.Context);
+      Type FnTy;
+      if (CD->getGenericParams())
+        FnTy = PolymorphicFunctionType::get(CD->getArguments()->getType(),
+                                            ThisTy, CD->getGenericParams(),
+                                            TC.Context);
+      else
+        FnTy = FunctionType::get(CD->getArguments()->getType(),
+                                 ThisTy, TC.Context);
       CD->setType(FnTy);
     }
 
