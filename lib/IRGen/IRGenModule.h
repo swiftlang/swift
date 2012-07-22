@@ -132,6 +132,8 @@ public:
   void getSchema(Type T, ExplosionSchema &schema);
   ExplosionSchema getSchema(Type T, ExplosionKind kind);
   unsigned getExplosionSize(Type T, ExplosionKind kind);
+  llvm::PointerType *isSingleIndirectValue(Type T, ExplosionKind kind);
+  llvm::PointerType *requiresIndirectResult(Type T, ExplosionKind kind);
 
 private:
   TypeConverter &Types;

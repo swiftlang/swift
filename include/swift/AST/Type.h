@@ -63,6 +63,10 @@ public:
     assert(isActuallyCanonicalOrNull() &&
            "Forming a CanType out of a non-canonical type!");
   }
+  explicit CanType(Type T) : Type(T) {
+    assert(isActuallyCanonicalOrNull() &&
+           "Forming a CanType out of a non-canonical type!");
+  }
   
   // Direct comparison is allowed for CanTypes - they are known canonical.
   bool operator==(CanType T) const { return getPointer() == T.getPointer(); }

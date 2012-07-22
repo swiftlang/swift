@@ -331,3 +331,26 @@ unsigned IRGenModule::getExplosionSize(Type type, ExplosionKind kind) {
   // Okay, that didn't work;  just do the general thing.
   return getFragileTypeInfo(type).getExplosionSize(kind);
 }
+
+/// Determine whether this type is a single value that is passed
+/// indirectly at the given level.
+llvm::PointerType *IRGenModule::isSingleIndirectValue(Type type,
+                                                      ExplosionKind kind) {
+  if (type->is<ArchetypeType>()) return OpaquePtrTy;
+
+  ExplosionSchema schema(kind);
+  getSchema(type, schema);
+  if (schema.size() == 1 && schema.begin()->isAggregate())
+    return schema.begin()->getAggregateType()->getPointerTo(0);
+  return nullptr;
+}
+
+/// Determine whether this type requires an indirect result.
+llvm::PointerType *IRGenModule::requiresIndirectResult(Type type,
+                                                       ExplosionKind kind) {
+  auto &ti = getFragileTypeInfo(type);
+  ExplosionSchema schema = ti.getSchema(kind);
+  if (schema.requiresIndirectResult())
+    return ti.getStorageType()->getPointerTo();
+  return nullptr;
+}

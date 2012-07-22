@@ -378,10 +378,192 @@ static void emitAsCastTemporary(IRGenFunction &IGF, Expr *E,
   out.add(ManagedValue(addr.getAddress(), cleanup));
 }
 
+enum class DBAKind : bool{
+  Ordinary,
+  Argument
+};
+
+/// Does the representation of the first type "differ by abstraction"
+/// from the second type, which is the result of applying a
+/// substitution to it?
+///
+/// Because we support rich value types, and because we don't want to
+/// always coerce value types into a universal representation (as a
+/// dynamically-typed language would have to), the representation of a
+/// type with an abstract component may differ from the representation
+/// of a type that's fully concrete.
+///
+/// The fundamental cause of this complication is function types.  For
+/// example, a function that returns an Int will return it directly in
+/// a register, but a function that returns an abstracted type T will
+/// return it indirectly (via a hidden out-parameter); a similar rule
+/// applies to parameters.
+///
+/// This difference then propagates through other structural types,
+/// creating a set of general rules for translating values.
+///
+/// The following is a complete list of the canonical type forms
+/// which can contain generic parameters:
+///   - archetypes, e.g. T
+///   - tuples, e.g. (T, Int)
+///   - functions, e.g. T -> Int
+///   - l-values, e.g. [byref] T
+///   - generic bindings, e.g. Vector<T>
+///   - metatypes ?
+///
+/// Given a type T and a substitution S, T "differs by
+/// abstraction" under S if, informally, its representation
+/// is different from that of S(T).
+///
+/// Note S(T) == T if T is not dependent.  Note also that some
+/// substitutions don't cause a change in representation: e.g.
+/// if T := U -> Int and S := (T=>Printable), the substitution
+/// doesn't change representation because an existential type
+/// like Printable is always passed indirectly.
+///
+/// More formally, T differs by abstraction under S if:
+///   - T == (T_1, ..., T_k) and T_i differs by abstraction under S
+///     for some i;
+///   - T == [byref] U and U differs by abstraction under S;
+///   - T == U -> V and either
+///       - U differs by abstraction as an argument under S or
+///       - V differs by abstraction as a result under S; or
+///   - T == U.class and U is dependent but S(U) is not.
+/// T differs by abstraction as an argument under S if:
+///   - T differs by abstraction under S; or
+///   - T is an archetype and S(T) is not passed indirectly; or
+///   - T == (T_1, ..., T_k) and T_i differs by abstraction as
+///     an argument under S for some i.
+/// T differs by abstraction as a result under S if:
+///   - T differs by abstraction under S or
+///   - T is returned indirectly but S(T) is not.
+///
+/// ** Variables **
+///
+/// All accessors to a variable must agree on its representation.
+/// This is generally okay, because most accesses to a variable
+/// are direct accesses, i.e. occur in code where its declaration
+/// is known, and that declaration determines its abstraction.
+///
+/// For example, suppose we have a generic type:
+///   class Producer<T> {
+///     var f : () -> T
+///   }
+/// Code that accesses Producer<Int>.f directly will know how the
+/// functions stored there are meant to be abstracted because the
+/// declaration of 'f' spells it out.  They will know that they
+/// cannot store a () -> Int function in that variable; it must
+/// first be "thunked" so that it returns indirectly.
+///
+/// The same rule applies to local variables, which are contained
+/// and declared in the context of a possibly-generic function.
+///
+/// There is (currently) one way in which a variable can be accessed
+/// indirectly, without knowledge of how it was originally declared,
+/// and that is when it is passed [byref].  A variable cannot be
+/// passed directly by reference when the target l-value type
+/// differs by abstraction from the variable's type.  However, the
+/// mechanics and relatively weak guarantees of [byref] make it
+/// legal to instead pass a properly-abstracted temporary variable,
+/// thunking the current value as it's passed in and "un-thunking"
+/// it on the way out.  Of course, that ain't free.
+///
+/// \param orig - T in the definition;  the type which the
+///   substitution was performed on
+/// \param subst - S(T)
+static bool differsByAbstraction(IRGenModule &IGM,
+                                 CanType orig, CanType subst,
+                                 DBAKind diffKind,
+                                 ExplosionKind explosionKind) {
+  if (orig == subst) return false;
+
+  // Archetypes vary by what we're consider this for.
+  if (isa<ArchetypeType>(orig)) {
+    if (diffKind == DBAKind::Ordinary) return false;
+
+    // For function arguments, consider whether the substituted type
+    // is passed indirectly under the indirect-call conventions.
+    return !IGM.isSingleIndirectValue(subst, explosionKind);
+  }
+
+  // Tuples are considered element-wise.
+  if (auto origTuple = dyn_cast<TupleType>(orig)) {
+    auto substTuple = cast<TupleType>(subst);
+    for (unsigned i = 0, e = origTuple->getFields().size(); i != e; ++i) {
+      if (differsByAbstraction(IGM, CanType(origTuple->getElementType(i)),
+                               CanType(substTuple->getElementType(i)),
+                               diffKind, explosionKind))
+        return true;
+    }
+    return false;
+  }
+
+  // L-values go by the object type;  note that we ask the ordinary
+  // question, not the argument question.
+  if (auto origLV = dyn_cast<LValueType>(orig)) {
+    auto substLV = cast<LValueType>(subst);
+    return differsByAbstraction(IGM, CanType(origLV->getObjectType()),
+                                CanType(substLV->getObjectType()),
+                                DBAKind::Ordinary, ExplosionKind::Minimal);
+  }
+
+  // Functions follow complicated rules.
+  // FIXME: is this right for PolymorphicFunctionTypes?
+  if (auto origFn = dyn_cast<AnyFunctionType>(orig)) {
+    auto substFn = cast<AnyFunctionType>(subst);
+
+    // Arguments use a different rule for archetypes.
+    if (differsByAbstraction(IGM, CanType(origFn->getInput()),
+                             CanType(substFn->getInput()),
+                             DBAKind::Argument, ExplosionKind::Minimal))
+      return true;
+
+    // Results consider ordinary rules...
+    if (differsByAbstraction(IGM, CanType(origFn->getResult()),
+                             CanType(substFn->getResult()),
+                             DBAKind::Ordinary, ExplosionKind::Minimal))
+      return true;
+
+    // ...and then we also have to decide whether the substituted
+    // makes us stop passing something indirectly.
+
+    // If the abstract type doesn't pass indirectly, the substituted
+    // type doesn't either.
+    if (!IGM.requiresIndirectResult(origFn->getResult(),
+                                    ExplosionKind::Minimal))
+      return false;
+
+    // Otherwise, if the substituted type doesn't pass indirectly,
+    // we've got a mismatch.
+    return !IGM.requiresIndirectResult(substFn->getResult(),
+                                       ExplosionKind::Minimal);
+  }
+      
+  /// FIXME: don't punt on generic applications for now.
+  if (auto origGeneric = dyn_cast<BoundGenericType>(orig)) {
+    (void) origGeneric;
+    IGM.unimplemented(SourceLoc(), "difference in bound generic");
+    return false;
+  }
+
+  llvm_unreachable("difference for nominal type?");
+}
+
+static void emitUnderSubstitutions(IRGenFunction &IGF, Expr *E,
+                                   Type expectedType,
+                                   ArrayRef<Substitution> subs,
+                                   Explosion &out);
+
 namespace {
   /// A visitor for emitting a value under substitution rules.
+  ///
+  /// Invariants:
+  ///  - ExpectedTy differs by abstraction under Substitutions.
+  ///  - Substitutions(ExpectedTy) == E->getType().
   class SubstitutedRValueEmitter
       : public irgen::ExprVisitor<SubstitutedRValueEmitter> {
+    typedef irgen::ExprVisitor<SubstitutedRValueEmitter> super;
+
     IRGenFunction &IGF;
     Type ExpectedTy;
     ArrayRef<Substitution> Substitutions;
@@ -394,8 +576,8 @@ namespace {
     void visitTupleExpr(TupleExpr *E) {
       // If the expected type isn't a tuple type, but the original
       // type is, then the expected type must abstract over tuples in
-      // some way that forces an indirect representation.  Therefore
-      // it wouldn't get here.
+      // some way that should have forced an indirect representation.
+      // Therefore it wouldn't get here.
       auto expectedTuple = ExpectedTy->castTo<TupleType>();
       assert(expectedTuple->getFields().size() == E->getElements().size());
       for (unsigned i = 0, e = expectedTuple->getFields().size(); i != e; ++i) {
@@ -412,20 +594,9 @@ namespace {
       // not equal to the operand type, but which is also not passed
       // indirectly, or at least not as a single aggregate.
 
-      // For this to have type-checked, the substitutions must turn
-      // ExpectedTy into E->getType().  Substitutions can only walk
-      // into structural types, which in swift are:
-      //   (1) TupleType
-      //   (2) LValueType
-      //   (3) AnyFunctionType
-      //   (4) BoundGenericType
-      //   (5) MetaTypeType (?)
-
       // L-values don't need reinterpretation and should have been
       // filtered out before.
       assert(!ExpectedTy->is<LValueType>());
-
-      // Metatypes are trivial and don't require reinterpretation (?).
 
       // Tuples are passed as their components, and their components
       // might require transformation.  Note that we special-case the
@@ -456,30 +627,33 @@ namespace {
   };
 }
 
+/// A helper routine that does some quick, common filtering before
+/// falling back to the general emitter.
+static void emitUnderSubstitutions(IRGenFunction &IGF, Expr *E,
+                                   Type expectedType,
+                                   ArrayRef<Substitution> subs,
+                                   Explosion &out) {
+  // It's fairly common to be targetting an archetype.  Filter that
+  // out here.  This is also useful because it removes the need for
+  // some of the specialized emitters to worry about things like
+  // abstracting an entire tuple as a unit.
+  if (expectedType->is<ArchetypeType>()) {
+    return emitAsCastTemporary(IGF, E, IGF.IGM.OpaquePtrTy, out);
+  }
+
+  // Otherwise, use the specialized emitter.
+  SubstitutedRValueEmitter(IGF, expectedType, subs, out).visit(E);  
+}
+
 /// Emit a value under substitution rules.
 void IRGenFunction::emitRValueUnderSubstitutions(Expr *E, Type expectedType,
                                                  ArrayRef<Substitution> subs,
                                                  Explosion &out) {
-  // If the substitution work is trivial, or if there's no practical
-  // difference between the types, use the normal path.
-  if (subs.empty() || expectedType->isEqual(E->getType()) ||
-      expectedType->is<LValueType>())
-    return emitRValue(E, out);
+  // It's convenient to call this with no substitutions sometimes.
+  // Just ignore that now.
+  if (subs.empty()) return emitRValue(E, out);
 
-  // If the expected type would be passed as a single indirect value,
-  // just evaluate to a temporary.  We ignore tuples before the schema
-  // computation just to prevent unnecessary work (potentially saving
-  // ourselves from an O(n^2) pitfall with deeply nested tuples).
-  if (!expectedType->is<TupleType>()) {
-    auto schema = IGM.getSchema(expectedType, out.getKind());
-    if (schema.isSingleAggregate()) {
-      auto expectedTy = schema.begin()->getAggregateType()->getPointerTo(0);
-      return emitAsCastTemporary(*this, E, expectedTy, out);
-    }
-  }
-
-  // Otherwise, use the specialized emitter.
-  SubstitutedRValueEmitter(*this, expectedType, subs, out).visit(E);
+  emitUnderSubstitutions(*this, E, expectedType, subs, out);
 }
 
 namespace {
