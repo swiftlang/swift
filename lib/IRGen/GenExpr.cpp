@@ -385,8 +385,44 @@ enum class DBAKind : bool{
 };
 
 static bool differsByAbstraction(IRGenModule &IGM,
+                                 CanType origTy, CanType substTy,
+                                 DBAKind diffKind,
+                                 ExplosionKind explosionKind);
+
+/// Answer the differs-by-abstraction question for the given
+/// function types.  See the comment below.
+static bool differsByAbstraction(IRGenModule &IGM,
                                  AnyFunctionType *origTy,
-                                 AnyFunctionType *substTy);
+                                 AnyFunctionType *substTy) {
+  assert(origTy->isCanonical());
+  assert(substTy->isCanonical());
+
+  // Arguments use a different rule for archetypes.
+  if (differsByAbstraction(IGM, CanType(origTy->getInput()),
+                           CanType(substTy->getInput()),
+                           DBAKind::Argument, ExplosionKind::Minimal))
+    return true;
+
+  // Results consider ordinary rules...
+  if (differsByAbstraction(IGM, CanType(origTy->getResult()),
+                           CanType(substTy->getResult()),
+                           DBAKind::Ordinary, ExplosionKind::Minimal))
+    return true;
+
+  // ...and then we also have to decide whether the substituted
+  // makes us stop passing something indirectly.
+
+  // If the abstract type doesn't pass indirectly, the substituted
+  // type doesn't either.
+  if (!IGM.requiresIndirectResult(origTy->getResult(),
+                                  ExplosionKind::Minimal))
+    return false;
+
+  // Otherwise, if the substituted type doesn't pass indirectly,
+  // we've got a mismatch.
+  return !IGM.requiresIndirectResult(substTy->getResult(),
+                                     ExplosionKind::Minimal);
+}
 
 /// Does the representation of the first type "differ by abstraction"
 /// from the second type, which is the result of applying a
@@ -476,90 +512,92 @@ static bool differsByAbstraction(IRGenModule &IGM,
 /// \param orig - T in the definition;  the type which the
 ///   substitution was performed on
 /// \param subst - S(T)
+namespace {
+  class DiffersByAbstraction
+      : public SubstTypeVisitor<DiffersByAbstraction, bool> {
+    IRGenModule &IGM;
+    DBAKind DiffKind;
+    ExplosionKind ExplosionLevel;
+  public:
+    DiffersByAbstraction(IRGenModule &IGM, DBAKind kind, ExplosionKind ek)
+      : IGM(IGM), DiffKind(kind), ExplosionLevel(ek) {}
+
+    bool visit(CanType origTy, CanType substTy) {
+      if (origTy == substTy) return false;
+      return super::visit(origTy, substTy);
+    }
+
+    bool visitLeafType(CanType origTy, CanType substTy) {
+      // The check in visit should make this impossible.
+      llvm_unreachable("difference with leaf types");
+    }
+
+    bool visitArchetypeType(ArchetypeType *origTy, CanType substTy) {
+      // Archetypes vary by what we're considering this for.
+      if (DiffKind == DBAKind::Ordinary) return false;
+
+      // For function arguments, consider whether the substituted type
+      // is passed indirectly under the specified convention.
+      return !IGM.isSingleIndirectValue(substTy, ExplosionLevel);
+    }
+
+    bool visitArrayType(ArrayType *origTy, ArrayType *substTy) {
+      return visit(CanType(origTy->getBaseType()),
+                   CanType(substTy->getBaseType()));
+    }
+
+    bool visitBoundGenericType(BoundGenericType *origTy,
+                               BoundGenericType *substTy) {
+      assert(origTy->getDecl() == substTy->getDecl());
+      if (origTy->hasReferenceSemantics())
+        return false;
+
+      // Not really sure what to do here?
+      IGM.unimplemented(SourceLoc(),
+              "testing differ-by-abstraction for bound generic value types");
+      return false;
+    }
+
+    /// Functions use a more complicated algorithm which calls back
+    /// into this.
+    bool visitAnyFunctionType(AnyFunctionType *origTy,
+                              AnyFunctionType *substTy) {
+      return differsByAbstraction(IGM, origTy, substTy);
+    }
+
+    // L-values go by the object type;  note that we ask the ordinary
+    // question, not the argument question.
+    bool visitLValueType(LValueType *origTy, LValueType *substTy) {
+      return differsByAbstraction(IGM, CanType(origTy->getObjectType()),
+                                  CanType(substTy->getObjectType()),
+                                  DBAKind::Ordinary, ExplosionKind::Minimal);
+    }
+
+    bool visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
+      // There's actually nothing to do here right now, but eventually
+      // we'll actually implement metatypes with representations.
+      IGM.unimplemented(SourceLoc(),
+                        "testing differ-by-abstraction for metatypes");
+      return false;
+    }
+
+    /// Tuples are considered element-wise.
+    bool visitTupleType(TupleType *origTy, TupleType *substTy) {
+      assert(origTy->getFields().size() == substTy->getFields().size());
+      for (unsigned i = 0, e = origTy->getFields().size(); i != e; ++i)
+        if (visit(CanType(origTy->getElementType(i)),
+                  CanType(substTy->getElementType(i))))
+          return true;
+      return false;
+    }
+  };
+}
 static bool differsByAbstraction(IRGenModule &IGM,
-                                 CanType orig, CanType subst,
+                                 CanType origTy, CanType substTy,
                                  DBAKind diffKind,
                                  ExplosionKind explosionKind) {
-  if (orig == subst) return false;
-
-  // Archetypes vary by what we're consider this for.
-  if (isa<ArchetypeType>(orig)) {
-    if (diffKind == DBAKind::Ordinary) return false;
-
-    // For function arguments, consider whether the substituted type
-    // is passed indirectly under the indirect-call conventions.
-    return !IGM.isSingleIndirectValue(subst, explosionKind);
-  }
-
-  // Tuples are considered element-wise.
-  if (auto origTuple = dyn_cast<TupleType>(orig)) {
-    auto substTuple = cast<TupleType>(subst);
-    for (unsigned i = 0, e = origTuple->getFields().size(); i != e; ++i) {
-      if (differsByAbstraction(IGM, CanType(origTuple->getElementType(i)),
-                               CanType(substTuple->getElementType(i)),
-                               diffKind, explosionKind))
-        return true;
-    }
-    return false;
-  }
-
-  // L-values go by the object type;  note that we ask the ordinary
-  // question, not the argument question.
-  if (auto origLV = dyn_cast<LValueType>(orig)) {
-    auto substLV = cast<LValueType>(subst);
-    return differsByAbstraction(IGM, CanType(origLV->getObjectType()),
-                                CanType(substLV->getObjectType()),
-                                DBAKind::Ordinary, ExplosionKind::Minimal);
-  }
-
-  // Functions follow complicated rules.
-  // FIXME: is this right for PolymorphicFunctionTypes?
-  if (auto origFn = dyn_cast<AnyFunctionType>(orig)) {
-    auto substFn = cast<AnyFunctionType>(subst);
-    return differsByAbstraction(IGM, origFn, substFn);
-  }
-      
-  /// FIXME: don't punt on generic applications for now.
-  if (auto origGeneric = dyn_cast<BoundGenericType>(orig)) {
-    (void) origGeneric;
-    IGM.unimplemented(SourceLoc(), "difference in bound generic");
-    return false;
-  }
-
-  llvm_unreachable("difference for nominal type?");
-}
-
-static bool differsByAbstraction(IRGenModule &IGM,
-                                 AnyFunctionType *origTy,
-                                 AnyFunctionType *substTy) {
-  assert(origTy->isCanonical());
-  assert(substTy->isCanonical());
-
-  // Arguments use a different rule for archetypes.
-  if (differsByAbstraction(IGM, CanType(origTy->getInput()),
-                           CanType(substTy->getInput()),
-                           DBAKind::Argument, ExplosionKind::Minimal))
-    return true;
-
-  // Results consider ordinary rules...
-  if (differsByAbstraction(IGM, CanType(origTy->getResult()),
-                           CanType(substTy->getResult()),
-                           DBAKind::Ordinary, ExplosionKind::Minimal))
-    return true;
-
-  // ...and then we also have to decide whether the substituted
-  // makes us stop passing something indirectly.
-
-  // If the abstract type doesn't pass indirectly, the substituted
-  // type doesn't either.
-  if (!IGM.requiresIndirectResult(origTy->getResult(),
-                                  ExplosionKind::Minimal))
-    return false;
-
-  // Otherwise, if the substituted type doesn't pass indirectly,
-  // we've got a mismatch.
-  return !IGM.requiresIndirectResult(substTy->getResult(),
-                                     ExplosionKind::Minimal);
+  return DiffersByAbstraction(IGM, diffKind, explosionKind)
+           .visit(origTy, substTy);
 }
 
 namespace {

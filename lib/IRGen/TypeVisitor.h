@@ -65,6 +65,9 @@ public:
 /// In addition, all the leaf type kinds map to the same function:
 ///   visitLeafType(CanType origTy, CanType substTy);
 template<typename Impl, typename RetTy = void> class SubstTypeVisitor {
+protected:
+  typedef SubstTypeVisitor super;
+
 public:
   RetTy visit(CanType origTy, CanType substTy) {
     switch (origTy->getKind()) {
