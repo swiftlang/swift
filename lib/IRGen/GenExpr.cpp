@@ -40,6 +40,7 @@
 #include "LValue.h"
 #include "Explosion.h"
 #include "TypeInfo.h"
+#include "TypeVisitor.h"
 
 using namespace swift;
 using namespace irgen;
@@ -404,7 +405,7 @@ enum class DBAKind : bool{
 ///
 /// The following is a complete list of the canonical type forms
 /// which can contain generic parameters:
-///   - archetypes, e.g. T
+///   - generic parameters, e.g. T
 ///   - tuples, e.g. (T, Int)
 ///   - functions, e.g. T -> Int
 ///   - l-values, e.g. [byref] T
@@ -431,7 +432,7 @@ enum class DBAKind : bool{
 ///   - T == U.class and U is dependent but S(U) is not.
 /// T differs by abstraction as an argument under S if:
 ///   - T differs by abstraction under S; or
-///   - T is an archetype and S(T) is not passed indirectly; or
+///   - T is a generic parameter and S(T) is not passed indirectly; or
 ///   - T == (T_1, ..., T_k) and T_i differs by abstraction as
 ///     an argument under S for some i.
 /// T differs by abstraction as a result under S if:
@@ -574,16 +575,16 @@ namespace {
       : IGF(IGF), ExpectedTy(expected), Substitutions(subs), Out(out) {}
 
     void visitTupleExpr(TupleExpr *E) {
-      // If the expected type isn't a tuple type, but the original
-      // type is, then the expected type must abstract over tuples in
-      // some way that should have forced an indirect representation.
-      // Therefore it wouldn't get here.
+      // The only way that the substituted type can be a tuple when
+      // the abstracted type isn't is when the abstracted type is an
+      // archetype, which is filtered out already.  Otherwise, we're
+      // much down to passing these things indirectly.
       auto expectedTuple = ExpectedTy->castTo<TupleType>();
       assert(expectedTuple->getFields().size() == E->getElements().size());
       for (unsigned i = 0, e = expectedTuple->getFields().size(); i != e; ++i) {
-        IGF.emitRValueUnderSubstitutions(E->getElements()[i],
-                                         expectedTuple->getElementType(i),
-                                         Substitutions, Out);
+        emitUnderSubstitutions(IGF, E->getElements()[i],
+                               expectedTuple->getElementType(i),
+                               Substitutions, Out);
       }
     }
 
@@ -625,6 +626,75 @@ namespace {
       IGF.emitFakeExplosion(IGF.getFragileTypeInfo(ExpectedTy), Out);
     }
   };
+
+  /// The definition of "dependence" that we care about is "can it be
+  /// a legitimate target of a substitution"?
+  struct IsDependent : irgen::TypeVisitor<IsDependent, bool> {
+    llvm::SmallPtrSet<ArchetypeType*, 4> BoundTypes;
+
+    bool visitBuiltinType(BuiltinType *T) { return false; }
+    bool visitNominalType(NominalType *T) { return false; }
+    bool visitModuleType(ModuleType *T) { return false; }
+
+    // FIXME: Some of these are actually rigid and therefore can't be
+    // substituted.
+    bool visitArchetypeType(ArchetypeType *T) {
+      return !BoundTypes.count(T);
+    }
+
+    bool visitArrayType(ArrayType *T) {
+      return visit(CanType(T->getBaseType()));
+    }
+
+    bool visitBoundGenericType(BoundGenericType *T) {
+      for (Type arg : T->getGenericArgs())
+        if (visit(CanType(arg)))
+          return true;
+      return false;
+    }
+
+    bool visitFunctionType(FunctionType *T) {
+      return visit(CanType(T->getInput())) || visit(CanType(T->getResult()));
+    }
+
+    bool visitLValueType(LValueType *T) {
+      return visit(CanType(T->getObjectType()));
+    }
+
+    bool visitMetaTypeType(MetaTypeType *T) {
+      return visit(CanType(T->getInstanceType()));
+    }
+
+    bool visitPolymorphicFunctionType(PolymorphicFunctionType *T) {
+      for (auto &param : T->getGenericParams().getParams()) {
+        auto type = param.getAsTypeParam()->getUnderlyingType();
+        BoundTypes.insert(cast<ArchetypeType>(type));
+      }
+      return visit(CanType(T->getInput())) || visit(CanType(T->getResult()));
+    }
+
+    // Can this become dependent due to constraints?
+    bool visitProtocolCompositionType(ProtocolCompositionType *T) {
+      return false;
+    }
+
+    bool visitTupleType(TupleType *T) {
+      for (auto &elt : T->getFields())
+        if (visit(CanType(elt.getType())))
+          return true;
+      return false;
+    }
+
+  };
+}
+
+/// Is the given type dependent?
+///
+/// This really ought to be provided efficiently by every type,
+/// but it isn't, and it's not clear that our definition here
+/// isn't idiosyncratic.
+static bool isDependentType(Type type) {
+  return IsDependent().visit(type->getCanonicalType());
 }
 
 /// A helper routine that does some quick, common filtering before
@@ -633,6 +703,10 @@ static void emitUnderSubstitutions(IRGenFunction &IGF, Expr *E,
                                    Type expectedType,
                                    ArrayRef<Substitution> subs,
                                    Explosion &out) {
+  // If the expected type isn't dependent, just use the normal emitter.
+  if (!isDependentType(expectedType))
+    return IGF.emitRValue(E, out);
+
   // It's fairly common to be targetting an archetype.  Filter that
   // out here.  This is also useful because it removes the need for
   // some of the specialized emitters to worry about things like

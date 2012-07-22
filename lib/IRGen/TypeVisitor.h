@@ -44,6 +44,9 @@ public:
   }
 #include "swift/AST/TypeNodes.def"
 
+  RetTy visitDeducibleGenericParamType(DeducibleGenericParamType *T) {
+    llvm_unreachable("DeducibleGenericParamType should not survive Sema");
+  }
 };  
   
 } // end namespace irgen
