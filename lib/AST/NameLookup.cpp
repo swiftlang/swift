@@ -435,6 +435,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   // and if so, whether this is a reference to one of them.
   while (!DC->isModuleContext()) {
     ValueDecl *BaseDecl = 0;
+    ValueDecl *MetaBaseDecl = 0;
     GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
     if (FuncExpr *FE = dyn_cast<FuncExpr>(DC)) {
@@ -457,6 +458,10 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       if (FD && FD->getExtensionType() && !FD->isStatic()) {
         ExtendedType = FD->getExtensionType();
         BaseDecl = FD->getImplicitThisDecl();
+        if (NominalType *NT = ExtendedType->getAs<NominalType>())
+          MetaBaseDecl = NT->getDecl();
+        else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
+          MetaBaseDecl = UGT->getDecl();
         DC = DC->getParent();
       }
 
@@ -470,9 +475,11 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         BaseDecl = NT->getDecl();
       else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
         BaseDecl = UGT->getDecl();
+      MetaBaseDecl = BaseDecl;
     } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(DC)) {
       ExtendedType = ND->getDeclaredType();
       BaseDecl = ND;
+      MetaBaseDecl = BaseDecl;
     } else if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(DC)) {
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
@@ -489,6 +496,10 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
 
       BaseDecl = CD->getImplicitThisDecl();
       ExtendedType = CD->getDeclContext()->getDeclaredTypeOfContext();
+      if (NominalType *NT = ExtendedType->getAs<NominalType>())
+        MetaBaseDecl = NT->getDecl();
+      else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
+        MetaBaseDecl = UGT->getDecl();
       DC = DC->getParent();
     } else if (DestructorDecl *DD = dyn_cast<DestructorDecl>(DC)) {
       // Look for local variables; normally, the parser resolves these
@@ -506,6 +517,10 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
 
       BaseDecl = DD->getImplicitThisDecl();
       ExtendedType = DD->getDeclContext()->getDeclaredTypeOfContext();
+      if (NominalType *NT = ExtendedType->getAs<NominalType>())
+        MetaBaseDecl = NT->getDecl();
+      else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
+        MetaBaseDecl = UGT->getDecl();
       DC = DC->getParent();
     }
 
@@ -521,7 +536,12 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
           Results.push_back(Result::getMemberFunction(BaseDecl, Result.D));
           break;
         case MemberLookupResult::MetatypeMember:
-          Results.push_back(Result::getMetatypeMember(BaseDecl, Result.D));
+          // For results that can only be accessed via the metatype (e.g.,
+          // type aliases), we need to use the metatype declaration as the
+          // base.
+          Results.push_back(Result::getMetatypeMember(isa<FuncDecl>(Result.D)?
+                                                        BaseDecl : MetaBaseDecl,
+                                                      Result.D));
           break;
         case MemberLookupResult::ExistentialMember:
           Results.push_back(Result::getExistentialMember(BaseDecl, Result.D));
@@ -530,7 +550,12 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
           Results.push_back(Result::getArchetypeMember(BaseDecl, Result.D));
           break;
         case MemberLookupResult::MetaArchetypeMember:
-          Results.push_back(Result::getMetaArchetypeMember(BaseDecl, Result.D));
+          // For results that can only be accessed via the metatype (e.g.,
+          // type aliases), we need to use the metatype declaration as the
+          // base.
+          Results.push_back(Result::getMetaArchetypeMember(
+                              isa<FuncDecl>(Result.D)? BaseDecl : MetaBaseDecl,
+                              Result.D));
           break;
         }
       }

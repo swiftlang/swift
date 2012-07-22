@@ -451,6 +451,12 @@ static bool isDirectTypeReference(Expr *E) {
   if (auto DSBIE = dyn_cast<DotSyntaxBaseIgnoredExpr>(E))
     return isDirectTypeReference(DSBIE->getRHS());
 
+  if (auto GMRE = dyn_cast<GenericMemberRefExpr>(E))
+    return isDirectTypeReference(GMRE->getBase());
+  
+  if (auto SE = dyn_cast<SpecializeExpr>(E))
+    return isDirectTypeReference(SE->getSubExpr());
+  
   return false;
 }
 
