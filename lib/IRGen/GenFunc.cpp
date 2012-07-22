@@ -646,6 +646,31 @@ static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
 }
 
 namespace {
+  /// A single call site, with argument expression and the type of
+  /// function being applied.
+  struct CallSite {
+    CallSite(Expr *arg, Type fnType) : Arg(arg), FnType(fnType) {}
+
+    Expr *Arg;
+    Type FnType;
+
+    void emit(IRGenFunction &IGF, ArrayRef<Substitution> subs,
+              Explosion &out) const {
+      // If we have substitutions, then (1) it's possible for this to
+      // be a polymorphic function type that we need to expand and
+      // (2) we might need to evaluate the r-value differently.
+      if (!subs.empty()) {
+        FunctionType *fnType = FnType->castTo<FunctionType>();
+        if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType)) {
+          emitPolymorphicArguments(IGF, polyFn->getGenericParams(), subs, out);
+        }
+        IGF.emitRValueUnderSubstitutions(Arg, fnType->getInput(), subs, out);
+      } else {
+        IGF.emitRValue(Arg, out);
+      }
+    }
+  };
+
   struct CalleeSource {
   public:
     enum class Kind {
@@ -670,6 +695,7 @@ namespace {
     };
     Kind TheKind;
     ArrayRef<Substitution> Substitutions;
+    SmallVector<CallSite, 4> CallSites;
 
   public:
     static CalleeSource forIndirect(Expr *fn) {
@@ -767,12 +793,18 @@ namespace {
       return Substitutions;
     }
 
+    void addCallSite(CallSite site) {
+      CallSites.push_back(site);
+    }
+
+    ArrayRef<CallSite> getCallSites() const {
+      return CallSites;
+    }
+
     Callee emitCallee(IRGenFunction &IGF,
                       SmallVectorImpl<Arg> &calleeArgs,
                       unsigned maxUncurry = ~0U,
                       ExplosionKind maxExplosion = ExplosionKind::Maximal) {
-      if (!getSubstitutions().empty())
-        llvm_unreachable("substitutions not yet implemented");
       switch (getKind()) {
       case Kind::DirectWithSideEffects:
       case Kind::Direct:
@@ -1007,22 +1039,8 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
 }
 
 namespace {
-  /// A single call site, with argument expression and the type of
-  /// function being applied.
-  struct CallSite {
-    CallSite(Expr *arg, Type fnType) : Arg(arg), FnType(fnType) {}
-
-    Expr *Arg;
-    Type FnType;
-  };
-
   /// A holistic plan for performing a call.
   struct CallPlan {
-    /// All the call sites we're going to evaluate.  Note that the
-    /// call sites are in reversed order of application, i.e. the
-    /// first site is the last call which will logically be performed.
-    llvm::SmallVector<CallSite, 8> CallSites;
-
     CalleeSource CalleeSrc;
 
     /// getFinalResultExplosionLevel - Returns the explosion level at
@@ -1034,17 +1052,6 @@ namespace {
     void emit(IRGenFunction &IGF, CallResult &result,
               const TypeInfo &resultType);
   };
-}
-
-/// Given a function application, try to form an uncurried call.  If
-/// successful, argExprs contains all the arguments applied, but in
-/// reversed order.
-static Expr *uncurry(ApplyExpr *E, SmallVectorImpl<CallSite> &callSites) {
-  callSites.push_back(CallSite(E->getArg(),  E->getFn()->getType()));
-  Expr *fnExpr = E->getFn()->getSemanticsProvidingExpr();
-  if (ApplyExpr *fnApply = dyn_cast<ApplyExpr>(fnExpr))
-    return uncurry(fnApply, callSites);
-  return fnExpr;
 }
 
 namespace {
@@ -1079,6 +1086,12 @@ namespace {
       return src;
     }
 
+    CalleeSource visitApplyExpr(ApplyExpr *E) {
+      CalleeSource source = visit(E->getFn());
+      source.addCallSite(CallSite(E->getArg(), E->getFn()->getType()));
+      return source;
+    }
+
     CalleeSource visitExpr(Expr *E) {
       return CalleeSource::forIndirect(E);
     }
@@ -1094,7 +1107,7 @@ static CalleeSource decomposeFunctionReference(Expr *E) {
 /// Compute the plan for performing a sequence of call expressions.
 static CallPlan getCallPlan(IRGenModule &IGM, ApplyExpr *E) {
   CallPlan plan;
-  plan.CalleeSrc = decomposeFunctionReference(uncurry(E, plan.CallSites));
+  plan.CalleeSrc = decomposeFunctionReference(E);
   return plan;
 }
 
@@ -1103,10 +1116,17 @@ static CallPlan getCallPlan(IRGenModule &IGM, ApplyExpr *E) {
 Callee irgen::emitCallee(IRGenFunction &IGF, Expr *fn,
                          ExplosionKind bestExplosion,
                          unsigned addedUncurrying,
-                         llvm::SmallVectorImpl<Arg> &args) {
-  // TODO: uncurry, accumulate arguments.
+                         SmallVectorImpl<Arg> &args) {
   CalleeSource source = decomposeFunctionReference(fn);
   Callee callee = source.emitCallee(IGF, args, 0, bestExplosion);
+  assert(source.getCallSites().size() + args.size() + addedUncurrying
+           == callee.getUncurryLevel());
+
+  for (auto &site : source.getCallSites()) {
+    Explosion *out = new Explosion(callee.getExplosionLevel());
+    site.emit(IGF, source.getSubstitutions(), *out);
+    args.push_back(Arg::forOwned(out));
+  }
 
   // We need the callee to actually be appropriately typed.
   llvm::FunctionType *fnType =
@@ -1236,12 +1256,12 @@ namespace {
   /// based on a stack of CallSites.
   class CallSiteCallEmitter : public CallEmitter {
     ArrayRef<Arg> CalleeArgs;
-    SmallVectorImpl<CallSite> &CallSites;
+    ArrayRef<CallSite> &CallSites;
 
   public:
     CallSiteCallEmitter(IRGenFunction &IGF, const Callee &callee,
                         ArrayRef<Arg> calleeArgs,
-                        SmallVectorImpl<CallSite> &callSites,
+                        ArrayRef<CallSite> &callSites,
                         const TypeInfo &resultTI, CallResult &result,
                         Address finalAddress)
       : CallEmitter(IGF, callee, resultTI, result, finalAddress),
@@ -1257,32 +1277,16 @@ namespace {
       }
 
       // Emit all of the arguments we need to pass here.
-      for (unsigned i = TheCallee.getUncurryLevel() + 1 - CalleeArgs.size();
-             i != 0; --i) {
-        CallSite site = CallSites.back();
-        CallSites.pop_back();
+      unsigned numArgs = TheCallee.getUncurryLevel() + 1 - CalleeArgs.size();
+      auto callSites = CallSites.slice(0, numArgs);
+      CallSites = CallSites.slice(numArgs);
 
+      for (const CallSite &site : callSites) {
         // Emit the arguments for this clause.
         Explosion argExplosion(TheCallee.getExplosionLevel());
         assert(hasSubstitutions() ||
                !site.FnType->is<PolymorphicFunctionType>());
-
-        // If we have substitutions, then (1) it's possible for this to
-        // be a polymorphic function type that we need to expand and
-        // (2) we might need to evaluate the r-value differently.
-        if (hasSubstitutions()) {
-          FunctionType *fnType = site.FnType->castTo<FunctionType>();
-          if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType)) {
-            emitPolymorphicArguments(IGF, polyFn->getGenericParams(),
-                                     getSubstitutions(), argExplosion);
-          }
-
-          IGF.emitRValueUnderSubstitutions(site.Arg, fnType->getInput(),
-                                           getSubstitutions(), argExplosion);
-        } else {
-          IGF.emitRValue(site.Arg, argExplosion);
-        }
-
+        site.emit(IGF, getSubstitutions(), argExplosion);
         emitArg(argExplosion);
       }
     }
@@ -1397,7 +1401,7 @@ static void emitCall(IRGenFunction &IGF, const Callee &callee,
 // FIXME: This is a rather ugly, but it's the best way I can think
 // of to avoid emitting calls to getLogicValue as external calls.
 static bool emitKnownCall(IRGenFunction &IGF, FuncDecl *Fn,
-                          llvm::SmallVectorImpl<CallSite> &CallSites,
+                          ArrayRef<CallSite> &callSites,
                           CallResult &result) {
   if (Fn->getName().str() == "getLogicValue") {
     ExtensionDecl *ED = dyn_cast<ExtensionDecl>(Fn->getDeclContext());
@@ -1418,10 +1422,10 @@ static bool emitKnownCall(IRGenFunction &IGF, FuncDecl *Fn,
     if (M->Name.str() != "swift")
       return false;
 
-    if (CallSites.size() != 2)
+    if (callSites.size() != 2)
       return false;
 
-    Expr *Arg = CallSites.back().Arg;
+    Expr *Arg = callSites[0].Arg;
     Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
     Explosion temp(ExplosionKind::Maximal);
     Type ObjTy = Arg->getType()->castTo<LValueType>()->getObjectType();
@@ -1438,7 +1442,7 @@ static bool emitKnownCall(IRGenFunction &IGF, FuncDecl *Fn,
     if (M->Name.str() != "swift")
       return false;
 
-    TupleExpr *Arg = cast<TupleExpr>(CallSites.back().Arg);
+    TupleExpr *Arg = cast<TupleExpr>(callSites.front().Arg);
     
     Condition cond = IGF.emitCondition(Arg->getElement(0), true,
                                        Fn->getName().str() == "||");
@@ -1482,6 +1486,8 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
   Callee callee;
   SmallVector<Arg, 2> calleeArgs;
 
+  ArrayRef<CallSite> callSites = CalleeSrc.getCallSites();
+
   switch (CalleeSrc.getKind()) {
 
   // We can do a lot if we know we're calling a known function.
@@ -1496,12 +1502,13 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
     // might return a function pointer.
     if (isa<BuiltinModule>(knownFn->getDeclContext())) {
       emitBuiltinCall(IGF, knownFn, CalleeSrc.getSubstitutions(),
-                      CallSites.back().Arg, result);
+                      callSites.front().Arg, result);
 
       // If there are no trailing calls, we're done.
-      if (CallSites.size() == 1) return;
+      if (callSites.size() == 1) return;
 
       // Otherwise, pop that call site off and set up the callee conservatively.
+      callSites = callSites.slice(1);
       Type formalResult =
         knownFn->getType()->castTo<AnyFunctionType>()->getResult();
       callee = result.getDirectValuesAsIndirectCallee(formalResult,
@@ -1509,7 +1516,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
       result.reset();
       break;
 
-    } else if (emitKnownCall(IGF, knownFn, CallSites, result)) {
+    } else if (emitKnownCall(IGF, knownFn, callSites, result)) {
       return;
     }
 
@@ -1520,13 +1527,13 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
   case CalleeSource::Kind::Indirect:
   case CalleeSource::Kind::Existential:
   case CalleeSource::Kind::Archetype:
-    callee = CalleeSrc.emitCallee(IGF, calleeArgs, CallSites.size() - 1);
+    callee = CalleeSrc.emitCallee(IGF, calleeArgs, callSites.size() - 1);
     break;
   }
 
   // 3. Emit arguments and call.
   while (true) {
-    assert(callee.getUncurryLevel() < CallSites.size() + calleeArgs.size());
+    assert(callee.getUncurryLevel() < callSites.size() + calleeArgs.size());
 
     // Find the formal type of the function we're calling.  This is the
     // least-uncurried function type.
@@ -1537,17 +1544,16 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
     // Additionally compute the information for the formal result
     // type.  This is the result of the uncurried function type.
     Type formalResultType =
-      CallSites[CallSites.size() + calleeArgs.size()
-                  - callee.getUncurryLevel() - 1]
+      callSites[callee.getUncurryLevel() - calleeArgs.size()]
         .FnType->castTo<AnyFunctionType>()->getResult();
     const TypeInfo &resultTI = IGF.IGM.getFragileTypeInfo(formalResultType);
 
-    CallSiteCallEmitter(IGF, callee, calleeArgs, CallSites,
+    CallSiteCallEmitter(IGF, callee, calleeArgs, callSites,
                         resultTI, result, finalAddress)
       .emit(fnPtr);
 
     // If this is the end of the call sites, we're done.
-    if (CallSites.empty()) {
+    if (callSites.empty()) {
       return;
     }
 
