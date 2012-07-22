@@ -225,12 +225,25 @@ public:
   }
 };
 
+/// BuiltinType - An abstract class for all the builtin types.
+class BuiltinType : public TypeBase {
+protected:
+  BuiltinType(TypeKind kind, ASTContext &canTypeCtx)
+    : TypeBase(kind, &canTypeCtx, /*unresolved*/ false) {}
+public:
+  static bool classof(const BuiltinType *T) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_BuiltinType &&
+           T->getKind() <= TypeKind::Last_BuiltinType;
+  }
+};
+
 /// BuiltinRawPointerType - The builtin raw (and dangling) pointer type.  This
 /// pointer is completely unmanaged and is equivalent to i8* in LLVM IR.
-class BuiltinRawPointerType : public TypeBase {
+class BuiltinRawPointerType : public BuiltinType {
   friend class ASTContext;
   BuiltinRawPointerType(ASTContext &C)
-    : TypeBase(TypeKind::BuiltinRawPointer, &C, /*Unresolved=*/false) {}
+    : BuiltinType(TypeKind::BuiltinRawPointer, C) {}
 public:
   void print(raw_ostream &OS) const;
   
@@ -244,10 +257,10 @@ public:
 /// BuiltinObjectPointerType - The builtin opaque object-pointer type.
 /// Useful for keeping an object alive when it is otherwise being
 /// manipulated via an unsafe pointer type.
-class BuiltinObjectPointerType : public TypeBase {
+class BuiltinObjectPointerType : public BuiltinType {
   friend class ASTContext;
   BuiltinObjectPointerType(ASTContext &C)
-    : TypeBase(TypeKind::BuiltinObjectPointer, &C, /*Unresolved=*/false) {}
+    : BuiltinType(TypeKind::BuiltinObjectPointer, C) {}
 public:
   void print(raw_ostream &OS) const;
 
@@ -259,10 +272,10 @@ public:
 
 /// BuiltinObjCPointerType - The builtin opaque Objective-C pointer type.
 /// Useful for pushing an Objective-C type through swift.
-class BuiltinObjCPointerType : public TypeBase {
+class BuiltinObjCPointerType : public BuiltinType {
   friend class ASTContext;
   BuiltinObjCPointerType(ASTContext &C)
-    : TypeBase(TypeKind::BuiltinObjCPointer, &C, /*Unresolved=*/false) {}
+    : BuiltinType(TypeKind::BuiltinObjCPointer, C) {}
 public:
   void print(raw_ostream &OS) const;
 
@@ -275,12 +288,11 @@ public:
 /// BuiltinIntegerType - The builtin integer types.  These directly correspond
 /// to LLVM IR integer types.  They lack signedness and have an arbitrary
 /// bitwidth.
-class BuiltinIntegerType : public TypeBase {
+class BuiltinIntegerType : public BuiltinType {
   friend class ASTContext;
   unsigned BitWidth;
   BuiltinIntegerType(unsigned BitWidth, ASTContext &C)
-    : TypeBase(TypeKind::BuiltinInteger, &C, /*Unresolved=*/false), 
-      BitWidth(BitWidth) {}
+    : BuiltinType(TypeKind::BuiltinInteger, C), BitWidth(BitWidth) {}
 public:
   
   static BuiltinIntegerType *get(unsigned BitWidth, ASTContext &C);
@@ -298,7 +310,7 @@ public:
   }
 };
   
-class BuiltinFloatType : public TypeBase {
+class BuiltinFloatType : public BuiltinType {
   friend class ASTContext;
 public:
   enum FPKind {
@@ -309,8 +321,7 @@ private:
   FPKind Kind;
   
   BuiltinFloatType(FPKind Kind, ASTContext &C)
-    : TypeBase(TypeKind::BuiltinFloat, &C, /*Unresolved=*/false), 
-      Kind(Kind) {}
+    : BuiltinType(TypeKind::BuiltinFloat, C), Kind(Kind) {}
 public:
   
   /// getFPKind - Get the 
