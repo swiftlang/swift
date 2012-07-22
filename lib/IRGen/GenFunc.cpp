@@ -652,19 +652,23 @@ namespace {
     CallSite(Expr *arg, Type fnType) : Arg(arg), FnType(fnType) {}
 
     Expr *Arg;
+
+    /// The function type that we're actually calling.  This is
+    /// "un-substituted" if necessary.
     Type FnType;
 
     void emit(IRGenFunction &IGF, ArrayRef<Substitution> subs,
               Explosion &out) const {
+      assert(!subs.empty() || !FnType->is<PolymorphicFunctionType>());
+
       // If we have substitutions, then (1) it's possible for this to
       // be a polymorphic function type that we need to expand and
       // (2) we might need to evaluate the r-value differently.
       if (!subs.empty()) {
-        FunctionType *fnType = FnType->castTo<FunctionType>();
-        if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType)) {
-          emitPolymorphicArguments(IGF, polyFn->getGenericParams(), subs, out);
-        }
+        auto fnType = FnType->castTo<AnyFunctionType>();
         IGF.emitRValueUnderSubstitutions(Arg, fnType->getInput(), subs, out);
+        if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType))
+          emitPolymorphicArguments(IGF, polyFn->getGenericParams(), subs, out);
       } else {
         IGF.emitRValue(Arg, out);
       }
@@ -698,6 +702,8 @@ namespace {
     SmallVector<CallSite, 4> CallSites;
 
   public:
+    static CalleeSource decompose(Expr *fn);
+
     static CalleeSource forIndirect(Expr *fn) {
       CalleeSource result;
       result.TheKind = Kind::Indirect;
@@ -789,9 +795,8 @@ namespace {
       Substitutions = subs;
     }
 
-    ArrayRef<Substitution> getSubstitutions() const {
-      return Substitutions;
-    }
+    ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
+    bool hasSubstitutions() const { return !Substitutions.empty(); }
 
     void addCallSite(CallSite site) {
       CallSites.push_back(site);
@@ -799,6 +804,58 @@ namespace {
 
     ArrayRef<CallSite> getCallSites() const {
       return CallSites;
+    }
+
+    /// Return the formal, unsubstituted type to which the call sites
+    /// are applied.
+    Type getFormalTypeForCallSites() const {
+      switch (getKind()) {
+      case Kind::DirectWithSideEffects:
+      case Kind::Direct:
+        return Direct.Fn->getType();
+
+      case Kind::Indirect:
+        return Indirect.Fn->getType();
+
+      case Kind::Existential:
+        return getFormalTypeForCallSites(getExistentialFunction()->getDecl());
+
+      case Kind::Archetype:
+        return getFormalTypeForCallSites(getArchetypeFunction()->getDecl());
+      }
+      llvm_unreachable("bad kind");
+    }
+
+  private:
+    static Type getFormalTypeForCallSites(ValueDecl *val) {
+      FuncDecl *fn = cast<FuncDecl>(val);
+      Type formalType = fn->getType();
+      if (!fn->isStatic())
+        formalType = formalType->castTo<AnyFunctionType>()->getResult();
+      return formalType;
+    }
+
+  public:
+    /// Given that this is a potentially polymorphic call, update the
+    /// function types on the CallSites to provide the unsubstituted
+    /// types.  where it occurs.
+    void unsubstituteCallSiteTypes() {
+      assert(hasSubstitutions());
+      Type formalType = getFormalTypeForCallSites();
+      for (CallSite &site : CallSites) {
+        // If the unsubstituted formal type gives us a function type,
+        // that's what we should be working with.
+        if (auto fnType = formalType->getAs<AnyFunctionType>()) {
+          site.FnType = formalType;
+          formalType = fnType->getResult();
+
+        // Otherwise, we must be instantiating at a function type; use
+        // the type we're instantiating to for the rest of the sites.
+        } else {
+          formalType = site.FnType->castTo<FunctionType>()->getResult();
+        }
+        assert(site.FnType->is<AnyFunctionType>());
+      }
     }
 
     Callee emitCallee(IRGenFunction &IGF,
@@ -1043,6 +1100,8 @@ namespace {
   struct CallPlan {
     CalleeSource CalleeSrc;
 
+    CallPlan(Expr *E) : CalleeSrc(CalleeSource::decompose(E)) {}
+
     /// getFinalResultExplosionLevel - Returns the explosion level at
     /// which we will naturally emit the last call.
     ExplosionKind getFinalResultExplosionLevel(IRGenFunction &IGF) const {
@@ -1100,15 +1159,21 @@ namespace {
 
 /// Try to decompose a function reference into a known function
 /// declaration.
-static CalleeSource decomposeFunctionReference(Expr *E) {
-  return FunctionDecomposer().visit(E);
+CalleeSource CalleeSource::decompose(Expr *E) {
+  // Do the basic decomposition.
+  CalleeSource source = FunctionDecomposer().visit(E);
+
+  // If we have substitutions, change the call sites to list their
+  // non-subsituted types.
+  if (source.hasSubstitutions())
+    source.unsubstituteCallSiteTypes();
+
+  return source;
 }
 
 /// Compute the plan for performing a sequence of call expressions.
 static CallPlan getCallPlan(IRGenModule &IGM, ApplyExpr *E) {
-  CallPlan plan;
-  plan.CalleeSrc = decomposeFunctionReference(E);
-  return plan;
+  return CallPlan(E);
 }
 
 /// Emit an expression as a callee suitable for being passed to
@@ -1117,7 +1182,7 @@ Callee irgen::emitCallee(IRGenFunction &IGF, Expr *fn,
                          ExplosionKind bestExplosion,
                          unsigned addedUncurrying,
                          SmallVectorImpl<Arg> &args) {
-  CalleeSource source = decomposeFunctionReference(fn);
+  CalleeSource source = CalleeSource::decompose(fn);
   Callee callee = source.emitCallee(IGF, args, 0, bestExplosion);
   assert(source.getCallSites().size() + args.size() + addedUncurrying
            == callee.getUncurryLevel());
@@ -1284,8 +1349,6 @@ namespace {
       for (const CallSite &site : callSites) {
         // Emit the arguments for this clause.
         Explosion argExplosion(TheCallee.getExplosionLevel());
-        assert(hasSubstitutions() ||
-               !site.FnType->is<PolymorphicFunctionType>());
         site.emit(IGF, getSubstitutions(), argExplosion);
         emitArg(argExplosion);
       }
