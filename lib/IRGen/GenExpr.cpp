@@ -384,6 +384,10 @@ enum class DBAKind : bool{
   Argument
 };
 
+static bool differsByAbstraction(IRGenModule &IGM,
+                                 AnyFunctionType *origTy,
+                                 AnyFunctionType *substTy);
+
 /// Does the representation of the first type "differ by abstraction"
 /// from the second type, which is the result of applying a
 /// substitution to it?
@@ -512,32 +516,7 @@ static bool differsByAbstraction(IRGenModule &IGM,
   // FIXME: is this right for PolymorphicFunctionTypes?
   if (auto origFn = dyn_cast<AnyFunctionType>(orig)) {
     auto substFn = cast<AnyFunctionType>(subst);
-
-    // Arguments use a different rule for archetypes.
-    if (differsByAbstraction(IGM, CanType(origFn->getInput()),
-                             CanType(substFn->getInput()),
-                             DBAKind::Argument, ExplosionKind::Minimal))
-      return true;
-
-    // Results consider ordinary rules...
-    if (differsByAbstraction(IGM, CanType(origFn->getResult()),
-                             CanType(substFn->getResult()),
-                             DBAKind::Ordinary, ExplosionKind::Minimal))
-      return true;
-
-    // ...and then we also have to decide whether the substituted
-    // makes us stop passing something indirectly.
-
-    // If the abstract type doesn't pass indirectly, the substituted
-    // type doesn't either.
-    if (!IGM.requiresIndirectResult(origFn->getResult(),
-                                    ExplosionKind::Minimal))
-      return false;
-
-    // Otherwise, if the substituted type doesn't pass indirectly,
-    // we've got a mismatch.
-    return !IGM.requiresIndirectResult(substFn->getResult(),
-                                       ExplosionKind::Minimal);
+    return differsByAbstraction(IGM, origFn, substFn);
   }
       
   /// FIXME: don't punt on generic applications for now.
@@ -550,8 +529,153 @@ static bool differsByAbstraction(IRGenModule &IGM,
   llvm_unreachable("difference for nominal type?");
 }
 
+static bool differsByAbstraction(IRGenModule &IGM,
+                                 AnyFunctionType *origTy,
+                                 AnyFunctionType *substTy) {
+  assert(origTy->isCanonical());
+  assert(substTy->isCanonical());
+
+  // Arguments use a different rule for archetypes.
+  if (differsByAbstraction(IGM, CanType(origTy->getInput()),
+                           CanType(substTy->getInput()),
+                           DBAKind::Argument, ExplosionKind::Minimal))
+    return true;
+
+  // Results consider ordinary rules...
+  if (differsByAbstraction(IGM, CanType(origTy->getResult()),
+                           CanType(substTy->getResult()),
+                           DBAKind::Ordinary, ExplosionKind::Minimal))
+    return true;
+
+  // ...and then we also have to decide whether the substituted
+  // makes us stop passing something indirectly.
+
+  // If the abstract type doesn't pass indirectly, the substituted
+  // type doesn't either.
+  if (!IGM.requiresIndirectResult(origTy->getResult(),
+                                  ExplosionKind::Minimal))
+    return false;
+
+  // Otherwise, if the substituted type doesn't pass indirectly,
+  // we've got a mismatch.
+  return !IGM.requiresIndirectResult(substTy->getResult(),
+                                     ExplosionKind::Minimal);
+}
+
+namespace {
+  /// A visitor for emitting substituted r-values.
+  class SubstRValueReemitter : public SubstTypeVisitor<SubstRValueReemitter> {
+    IRGenFunction &IGF;
+    ArrayRef<Substitution> Subs;
+    Explosion &In;
+    Explosion &Out;
+  public:
+    SubstRValueReemitter(IRGenFunction &IGF, ArrayRef<Substitution> subs,
+                         Explosion &in, Explosion &out)
+      : IGF(IGF), Subs(subs), In(in), Out(out) {
+      assert(in.getKind() == out.getKind());
+    }
+
+    void visitLeafType(CanType origTy, CanType substTy) {
+      assert(origTy == substTy);
+      Out.transferInto(In, IGF.IGM.getExplosionSize(origTy, In.getKind()));
+    }
+
+    void visitArchetypeType(ArchetypeType *origTy, CanType substTy) {
+      // Handle the not-unlikely case that the input is a single
+      // indirect value.
+      if (IGF.IGM.isSingleIndirectValue(substTy, In.getKind())) {
+        ManagedValue inValue = In.claimNext();
+        auto addr = IGF.Builder.CreateBitCast(inValue.getValue(),
+                                              IGF.IGM.OpaquePtrTy,
+                                              "substitution.reinterpret");
+        Out.add(ManagedValue(addr, inValue.getCleanup()));
+        return;
+      }
+
+      // Otherwise, we need to make a temporary.
+      auto &substTI = IGF.getFragileTypeInfo(substTy);
+      initIntoTemporary(substTI);
+    }
+
+    void initIntoTemporary(const TypeInfo &substTI) {
+      Initialization init;
+      auto object = init.getObjectForTemporary();
+      auto cleanup = init.registerObject(IGF, object, NotOnHeap, substTI);
+      auto addr = init.emitLocalAllocation(IGF, object, NotOnHeap, substTI,
+                                           "substitution.temp").getAddress();
+
+      // Initialize into it.
+      substTI.initialize(IGF, In, addr);
+      init.markInitialized(IGF, object);
+
+      // Cast to the expected pointer type.
+      addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.OpaquePtrTy, "temp.cast");
+
+      // Add that to the output explosion.
+      Out.add(ManagedValue(addr.getAddress(), cleanup));
+    }
+
+    void visitArrayType(ArrayType *origTy, ArrayType *substTy) {
+      llvm_unreachable("remapping values of array type");
+    }
+
+    void visitBoundGenericType(BoundGenericType *origTy,
+                               BoundGenericType *substTy) {
+      assert(origTy->getDecl() == substTy->getDecl());
+
+      // If the base type has reference semantics, we can just copy
+      // that reference into the output explosion.
+      if (origTy->hasReferenceSemantics())
+        return In.transferInto(Out, 1);
+
+      // Otherwise, this gets more complicated.
+      IGF.unimplemented(SourceLoc(), "remapping bound generic value types");
+    }
+
+    void visitAnyFunctionType(AnyFunctionType *origTy,
+                              AnyFunctionType *substTy) {
+      if (differsByAbstraction(IGF.IGM, origTy, substTy))
+        IGF.unimplemented(SourceLoc(), "remapping bound function type");
+      In.transferInto(Out, 2);
+    }
+
+    void visitLValueType(LValueType *origTy, LValueType *substTy) {
+      if (differsByAbstraction(IGF.IGM, CanType(origTy), CanType(substTy),
+                               DBAKind::Ordinary, In.getKind()))
+        IGF.unimplemented(SourceLoc(), "remapping l-values");
+      In.transferInto(Out, 1);
+    }
+
+    void visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
+      // There's actually nothing to do here right now, but eventually
+      // we'll actually implement metatypes with representations.
+      IGF.unimplemented(SourceLoc(), "remapping metatypes");
+    }
+
+    void visitTupleType(TupleType *origTy, TupleType *substTy) {
+      assert(origTy->getFields().size() == substTy->getFields().size());
+      for (unsigned i = 0, e = origTy->getFields().size(); i != e; ++i) {
+        visit(CanType(origTy->getElementType(i)),
+              CanType(substTy->getElementType(i)));
+      }
+    }
+  };
+}
+
+/// Re-emit a value under a set of substitutions.
+///
+/// The explosions have the same kind;  the input obeys
+/// the constraints of expectedTy, and the output needs to obey
+/// the constraints of substTy.
+static void reemitUnderSubstitutions(IRGenFunction &IGF,
+                                     ArrayRef<Substitution> subs,
+                                     CanType expectedTy, CanType substTy,
+                                     Explosion &in, Explosion &out) {
+}
+
 static void emitUnderSubstitutions(IRGenFunction &IGF, Expr *E,
-                                   Type expectedType,
+                                   CanType expectedType,
                                    ArrayRef<Substitution> subs,
                                    Explosion &out);
 
@@ -559,18 +683,17 @@ namespace {
   /// A visitor for emitting a value under substitution rules.
   ///
   /// Invariants:
-  ///  - ExpectedTy differs by abstraction under Substitutions.
   ///  - Substitutions(ExpectedTy) == E->getType().
   class SubstitutedRValueEmitter
       : public irgen::ExprVisitor<SubstitutedRValueEmitter> {
     typedef irgen::ExprVisitor<SubstitutedRValueEmitter> super;
 
     IRGenFunction &IGF;
-    Type ExpectedTy;
+    CanType ExpectedTy;
     ArrayRef<Substitution> Substitutions;
     Explosion &Out;
   public:
-    SubstitutedRValueEmitter(IRGenFunction &IGF, Type expected,
+    SubstitutedRValueEmitter(IRGenFunction &IGF, CanType expected,
                              ArrayRef<Substitution> subs, Explosion &out)
       : IGF(IGF), ExpectedTy(expected), Substitutions(subs), Out(out) {}
 
@@ -579,11 +702,11 @@ namespace {
       // the abstracted type isn't is when the abstracted type is an
       // archetype, which is filtered out already.  Otherwise, we're
       // much down to passing these things indirectly.
-      auto expectedTuple = ExpectedTy->castTo<TupleType>();
+      auto expectedTuple = cast<TupleType>(ExpectedTy);
       assert(expectedTuple->getFields().size() == E->getElements().size());
       for (unsigned i = 0, e = expectedTuple->getFields().size(); i != e; ++i) {
         emitUnderSubstitutions(IGF, E->getElements()[i],
-                               expectedTuple->getElementType(i),
+                               CanType(expectedTuple->getElementType(i)),
                                Substitutions, Out);
       }
     }
@@ -591,39 +714,18 @@ namespace {
     // TODO: shuffles?
 
     void visitExpr(Expr *E) {
-      // Okay, generic case.  We are converting to something which is
-      // not equal to the operand type, but which is also not passed
-      // indirectly, or at least not as a single aggregate.
+      CanType substTy = E->getType()->getCanonicalType();
 
-      // L-values don't need reinterpretation and should have been
-      // filtered out before.
-      assert(!ExpectedTy->is<LValueType>());
+      // TODO: when we're converting to an abstracted function, try to
+      // emit a direct-call thunk.
 
-      // Tuples are passed as their components, and their components
-      // might require transformation.  Note that we special-case the
-      // patterns where the individual tuple elements are
-      // decomposable, so now we're dealing with a whole, opaque tuple.
-      if (ExpectedTy->is<TupleType>()) {
-        IGF.unimplemented(E->getLoc(),
-                          "emitting opaque tuple under substitution");
-        IGF.emitFakeExplosion(IGF.getFragileTypeInfo(ExpectedTy), Out);
-        return;
-      }
+      // Go ahead and emit to an explosion.
+      Explosion temp(Out.getKind());
+      IGF.emitRValue(E, temp);
 
-      // If the expected type is a function type, we need to
-      // potentially pass a thunk in order to map abstracted types
-      // into concrete types.
-      if (auto *fnTy = ExpectedTy->getAs<AnyFunctionType>())
-        return createThunk(E, fnTy);
-
-      // Otherwise, just assume that we can pass things freely.
-      IGF.emitRValue(E, Out);
-    }
-
-    // Create a thunk (if necessary) to map from substituted types down
-    void createThunk(Expr *E, AnyFunctionType *fnType) {
-      IGF.unimplemented(E->getLoc(), "monomorphic invocation thunk");
-      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(ExpectedTy), Out);
+      // Re-emit under substitution.
+      reemitUnderSubstitutions(IGF, Substitutions, ExpectedTy, substTy,
+                               temp, Out);
     }
   };
 
@@ -684,7 +786,6 @@ namespace {
           return true;
       return false;
     }
-
   };
 }
 
@@ -693,14 +794,14 @@ namespace {
 /// This really ought to be provided efficiently by every type,
 /// but it isn't, and it's not clear that our definition here
 /// isn't idiosyncratic.
-static bool isDependentType(Type type) {
-  return IsDependent().visit(type->getCanonicalType());
+static bool isDependentType(CanType type) {
+  return IsDependent().visit(type);
 }
 
 /// A helper routine that does some quick, common filtering before
 /// falling back to the general emitter.
 static void emitUnderSubstitutions(IRGenFunction &IGF, Expr *E,
-                                   Type expectedType,
+                                   CanType expectedType,
                                    ArrayRef<Substitution> subs,
                                    Explosion &out) {
   // If the expected type isn't dependent, just use the normal emitter.
@@ -711,7 +812,7 @@ static void emitUnderSubstitutions(IRGenFunction &IGF, Expr *E,
   // out here.  This is also useful because it removes the need for
   // some of the specialized emitters to worry about things like
   // abstracting an entire tuple as a unit.
-  if (expectedType->is<ArchetypeType>()) {
+  if (isa<ArchetypeType>(expectedType)) {
     return emitAsCastTemporary(IGF, E, IGF.IGM.OpaquePtrTy, out);
   }
 
@@ -727,7 +828,7 @@ void IRGenFunction::emitRValueUnderSubstitutions(Expr *E, Type expectedType,
   // Just ignore that now.
   if (subs.empty()) return emitRValue(E, out);
 
-  emitUnderSubstitutions(*this, E, expectedType, subs, out);
+  emitUnderSubstitutions(*this, E, expectedType->getCanonicalType(), subs, out);
 }
 
 namespace {
