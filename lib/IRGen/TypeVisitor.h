@@ -60,7 +60,7 @@ public:
 ///
 /// Archetypes are an exception, and the second parameter should just
 /// be a CanType:
-///   visitArchetypeType(FunctionType *origTy, CanType substTy);
+///   visitArchetypeType(ArchetypeType *origTy, CanType substTy);
 ///
 /// In addition, all the leaf type kinds map to the same function:
 ///   visitLeafType(CanType origTy, CanType substTy);
