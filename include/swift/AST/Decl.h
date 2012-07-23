@@ -189,11 +189,13 @@ enum class RequirementKind : unsigned int {
 class Requirement {
   SourceLoc SeparatorLoc;
   RequirementKind Kind : 1;
+  bool Invalid : 1;
   Type Types[2];
 
   Requirement(SourceLoc SeparatorLoc, RequirementKind Kind, Type FirstType,
               Type SecondType)
-    : SeparatorLoc(SeparatorLoc), Kind(Kind), Types{FirstType, SecondType} { }
+    : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
+      Types{FirstType, SecondType} { }
   
 public:
   /// \brief Construct a new conformance requirement.
@@ -224,6 +226,12 @@ public:
 
   /// \brief Determine the kind of requirement
   RequirementKind getKind() const { return Kind; }
+
+  /// \brief Determine whether this requirement is invalid.
+  bool isInvalid() const { return Invalid; }
+
+  /// \brief Mark this requirement invalid.
+  void setInvalid() { Invalid = true; }
 
   /// \brief Determine whether this is an implicitly-generated requirement.
   bool isImplicit() const {

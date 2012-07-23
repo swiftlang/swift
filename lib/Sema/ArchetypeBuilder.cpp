@@ -356,7 +356,10 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
   case RequirementKind::Conformance: {
     PotentialArchetype *PA = resolveType(Req.getSubject());
     if (!PA) {
-      // FIXME: Diagnose this failure.
+      // FIXME: Poor location information.
+      // FIXME: Delay diagnostic until after type validation?
+      TC.diagnose(Req.getColonLoc(), diag::requires_not_suitable_archetype,
+                  0, Req.getSubject(), 0);
       return true;
     }
 
@@ -377,13 +380,19 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
   case RequirementKind::SameType: {
     PotentialArchetype *FirstPA = resolveType(Req.getFirstType());
     if (!FirstPA) {
-      // FIXME: Diagnose this failure.
+      // FIXME: Poor location information.
+      // FIXME: Delay diagnostic until after type validation?
+      TC.diagnose(Req.getEqualLoc(), diag::requires_not_suitable_archetype,
+                  1, Req.getFirstType(), 1);
       return true;
     }
 
     PotentialArchetype *SecondPA = resolveType(Req.getSecondType());
     if (!SecondPA) {
-      // FIXME: Diagnose this failure.
+      // FIXME: Poor location information.
+      // FIXME: Delay diagnostic until after type validation?
+      TC.diagnose(Req.getEqualLoc(), diag::requires_not_suitable_archetype,
+                  2, Req.getSecondType(), 1);
       return true;
     }
     return addSameTypeRequirement(FirstPA, SecondPA);

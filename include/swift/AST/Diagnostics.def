@@ -744,7 +744,11 @@ ERROR(protocol_composition_not_protocol,sema_tcd,none,
 
 ERROR(requires_conformance_nonprotocol,sema_tcd,none,
       "type %0 constrained to non-protocol type %1", (Type, Type))
-      
+ERROR(requires_not_suitable_archetype,sema_tcd,none,
+      "%select{|first |second }0type %1 in %select{conformance|same-type}2 "
+      "requirement does not refer to a generic parameter or associated type",
+      (int, Type, int))
+
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------
