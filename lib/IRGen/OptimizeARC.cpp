@@ -36,6 +36,11 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
+// FIXME: performStoreOnlyObjectElimination currently causes leaks when
+// retainable pointers are stored into the object in question.
+// See <rdar://problem/11939216>.
+// #define STORE_ONLY_OBJECT_ELIMINATION
+
 STATISTIC(NumNoopDeleted,
           "Number of no-op swift calls eliminated");
 STATISTIC(NumRetainReleasePairs,
@@ -44,8 +49,10 @@ STATISTIC(NumObjCRetainReleasePairs,
           "Number of objc retain/release pairs eliminated");
 STATISTIC(NumAllocateReleasePairs,
           "Number of swift allocate/release pairs eliminated");
+#ifdef STORE_ONLY_OBJECT_ELIMINATION
 STATISTIC(NumStoreOnlyObjectsEliminated,
           "Number of swift stored-only objects eliminated");
+#endif
 STATISTIC(NumReturnThreeTailCallsFormed,
           "Number of swift_retainAndReturnThree tail calls formed");
 
@@ -683,6 +690,7 @@ OutOfLoop:
 /// (this happens because GVN and other optimizations hoists forward substitutes
 /// all stores to the object to eliminate all loads from it), then zap the
 /// object and all accesses related to it.
+#ifdef STORE_ONLY_OBJECT_ELIMINATION
 static bool performStoreOnlyObjectElimination(CallInst &Allocation,
                                               BasicBlock::iterator &BBI) {
   // Do a depth first search exploring all of the uses of the object pointer,
@@ -794,6 +802,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
   ++NumStoreOnlyObjectsEliminated;
   return true;
 }
+#endif
 
 /// performGeneralOptimizations - This does a forward scan over basic blocks,
 /// looking for interesting local optimizations that can be done.
@@ -810,7 +819,9 @@ static bool performGeneralOptimizations(Function &F) {
       switch (classifyInstruction(I)) {
       default: break;
       case RT_AllocObject:
+#ifdef STORE_ONLY_OBJECT_ELIMINATION
         Changed |= performStoreOnlyObjectElimination(cast<CallInst>(I), BBI);
+#endif
         break;
       case RT_Release:
         Changed |= performLocalReleaseMotion(cast<CallInst>(I), BB);
