@@ -25,6 +25,7 @@ namespace swift {
 class ArchetypeType;
 class ProtocolDecl;
 class Requirement;
+class SourceLoc;
 class Type;
 class TypeAliasDecl;
 class TypeChecker;
@@ -55,11 +56,14 @@ class ArchetypeBuilder {
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype conforms to the given protocol.
-  bool addConformanceRequirement(PotentialArchetype *T, ProtocolDecl *Proto);
+  bool addConformanceRequirement(PotentialArchetype *T,
+                                 ProtocolDecl *Proto);
 
   /// \brief Add a new same-type requirement specifying that the given potential
   /// archetypes should map to the equivalent archetype.
-  bool addSameTypeRequirement(PotentialArchetype *T1, PotentialArchetype *T2);
+  bool addSameTypeRequirement(PotentialArchetype *T1,
+                              SourceLoc EqualLoc,
+                              PotentialArchetype *T2);
 
 public:
   ArchetypeBuilder(TypeChecker &TC);

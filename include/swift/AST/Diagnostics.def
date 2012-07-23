@@ -748,6 +748,9 @@ ERROR(requires_not_suitable_archetype,sema_tcd,none,
       "%select{|first |second }0type %1 in %select{conformance|same-type}2 "
       "requirement does not refer to a generic parameter or associated type",
       (int, Type, int))
+ERROR(requires_generic_param_equal,same_tcd,none,
+      "same-type requirement makes generic parameters %0 and %1 equivalent",
+      (Identifier, Identifier))
 
 //------------------------------------------------------------------------------
 // Type Check Expressions

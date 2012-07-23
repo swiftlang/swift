@@ -313,6 +313,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
 }
 
 bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
+                                              SourceLoc EqualLoc,
                                               PotentialArchetype *T2) {
   // Operate on the representatives
   T1 = T1->getRepresentative();
@@ -331,8 +332,19 @@ bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
   // T.A rather than U.B.C. when the two are required to be the same type) and
   // because we want to select a generic parameter as a representative over an
   // associated type.
-  if (T2->getNestingDepth() < T1->getNestingDepth())
+  unsigned T1Depth = T1->getNestingDepth();
+  unsigned T2Depth = T2->getNestingDepth();
+  if (T2Depth < T1Depth)
     std::swap(T1, T2);
+
+  // Don't allow two generic parameters to be equivalent, because then we
+  // don't actually have two parameters.
+  // FIXME: Should we simply allow this?
+  if (T1Depth == 0 && T2Depth == 0) {
+    TC.diagnose(EqualLoc, diag::requires_generic_param_equal,
+                T1->Name, T2->Name);
+    return true;
+  }
 
   // Make T1 the representative of T2, merging the equivalence classes.
   T2->Representative = T1;
@@ -344,7 +356,7 @@ bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
   // Recursively merge the associated types of T2 into T1.
   for (auto T2Nested : T2->NestedTypes) {
     auto T1Nested = T1->getNestedType(T2Nested.first);
-    if (addSameTypeRequirement(T1Nested, T2Nested.second))
+    if (addSameTypeRequirement(T1Nested, EqualLoc, T2Nested.second))
       return true;
   }
 
@@ -378,6 +390,8 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
   }
 
   case RequirementKind::SameType: {
+    // FIXME: Allow one of the types to not be a potential archetype, e.g.,
+    // T.Element == Int?
     PotentialArchetype *FirstPA = resolveType(Req.getFirstType());
     if (!FirstPA) {
       // FIXME: Poor location information.
@@ -395,7 +409,7 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
                   2, Req.getSecondType(), 1);
       return true;
     }
-    return addSameTypeRequirement(FirstPA, SecondPA);
+    return addSameTypeRequirement(FirstPA, Req.getEqualLoc(), SecondPA);
   }
   }
 
