@@ -27,8 +27,9 @@ using llvm::DenseMap;
 /// \brief A type that will be mapped down to some archetype, which gathers
 /// all of the requirements and nested types of that archetype.
 struct ArchetypeBuilder::PotentialArchetype {
-  PotentialArchetype(StringRef DisplayName, Optional<unsigned> Index = Nothing)
-    : DisplayName(DisplayName.str()), Index(Index), Representative(this),
+  PotentialArchetype(PotentialArchetype *Parent, Identifier Name,
+                     Optional<unsigned> Index = Nothing)
+    : Parent(Parent), Name(Name), Index(Index), Representative(this),
       Archetype(nullptr) { }
 
   ~PotentialArchetype() {
@@ -39,8 +40,12 @@ struct ArchetypeBuilder::PotentialArchetype {
     }
   }
 
-  /// \brief The name used to describe this archetype.
-  std::string DisplayName;
+  /// \brief The parent of this potential archetype, which will be non-null
+  /// when this potential archetype is an associated type.
+  PotentialArchetype *Parent;
+
+  /// \brief The name of this potential archetype.
+  Identifier Name;
 
   /// \brief The index of the computed archetype.
   Optional<unsigned> Index;
@@ -57,6 +62,36 @@ struct ArchetypeBuilder::PotentialArchetype {
 
   /// \brief The actual archetype, once it has been assigned.
   ArchetypeType *Archetype;
+
+  /// \brief Retrieve the name of this potential archetype.
+  StringRef getName() const { return Name.str(); }
+
+private:
+  /// \brief Recursively build the full name.
+  void buildFullName(llvm::SmallVectorImpl<char> &Result) const {
+    if (Parent) {
+      Parent->buildFullName(Result);
+      Result.push_back('.');
+    }
+    Result.append(getName().begin(), getName().end());
+  }
+
+public:
+  /// \brief Retrieve the full display name of this potential archetype.
+  std::string getFullName() const {
+    llvm::SmallString<64> Result;
+    buildFullName(Result);
+    return Result.str().str();
+  }
+
+  /// \brief Determine the nesting depth of this potential archetype, e.g.,
+  /// the number of associated type references.
+  unsigned getNestingDepth() const {
+    unsigned Depth = 0;
+    for (auto P = Parent; P; P = P->Parent)
+      ++Depth;
+    return Depth;
+  }
 
   /// \brief Retrieve the representative for this archetype, performing
   /// path compression on the way.
@@ -89,7 +124,7 @@ struct ArchetypeBuilder::PotentialArchetype {
       if (Name.str() == "This")
         Result = this;
       else
-        Result = new PotentialArchetype(DisplayName + "." + Name.get());
+        Result = new PotentialArchetype(this, Name);
     }
 
     return Result;
@@ -106,7 +141,8 @@ struct ArchetypeBuilder::PotentialArchetype {
       // Allocate a new archetype.
       SmallVector<ProtocolDecl *, 4> Protos(ConformsTo.begin(),
                                             ConformsTo.end());
-      Archetype = ArchetypeType::getNew(TC.Context, DisplayName, Protos, Index);
+      Archetype = ArchetypeType::getNew(TC.Context, getFullName(), Protos,
+                                        Index);
 
       // For each of the protocols we conform to, find the appropriate nested
       // types and add archetype mappings for them.
@@ -133,11 +169,7 @@ struct ArchetypeBuilder::PotentialArchetype {
 
   void dump(llvm::raw_ostream &Out, unsigned Indent) {
     // Print name.
-    StringRef Name = DisplayName;
-    std::size_t DotPos = Name.rfind('.');
-    if (DotPos != StringRef::npos)
-      Name = Name.substr(DotPos+1);
-    Out.indent(Indent) << Name;
+    Out.indent(Indent) << getName();
 
     // Print requirements.
     if (!ConformsTo.empty()) {
@@ -219,7 +251,7 @@ bool ArchetypeBuilder::addGenericParameter(TypeAliasDecl *GenericParam,
 
   // Create a potential archetype for this generic parameter.
   assert(!Impl->PotentialArchetypes[GenericParam]);
-  auto PA = new PotentialArchetype(GenericParam->getName().str(), Index);
+  auto PA = new PotentialArchetype(nullptr, GenericParam->getName(), Index);
   Impl->PotentialArchetypes[GenericParam] = PA;
 
   // Add each of the requirements placed on this generic parameter.
@@ -294,15 +326,12 @@ bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
   // equivalent? For example, can two generic parameters T and U be made
   // equivalent? What about a generic parameter and a concrete type?
 
-  // Merge into the potential archetype with the shorter name, which captures
-  // (however crudely) the nesting depth of the associated type. We prefer
-  // lower-depth names both for better diagnostics (use T.A rather than U.B.C.D
-  // when the two are required to be the same type) and because we want to
-  // select a generic parameter as a representative over an associated type.
-  //
-  // FIXME:
-  if (std::count(T2->DisplayName.begin(), T2->DisplayName.end(), '.') <
-      std::count(T1->DisplayName.begin(), T1->DisplayName.end(), '.'))
+  // Merge into the potential archetype with the smaller nesting depth. We
+  // prefer lower-depth potential archetypes both for better diagnostics (use
+  // T.A rather than U.B.C. when the two are required to be the same type) and
+  // because we want to select a generic parameter as a representative over an
+  // associated type.
+  if (T2->getNestingDepth() < T1->getNestingDepth())
     std::swap(T1, T2);
 
   // Make T1 the representative of T2, merging the equivalence classes.
