@@ -13,14 +13,14 @@ table       { border: 2px solid black;
   margin-right: 1em; margin-bottom: 1em; }
 tr, td      { border: 2px solid gray; padding: 4pt 4pt 2pt 2pt; }
 th          { border: 2px solid gray; font-weight: bold; font-size: 105%;
-  background: url("http://llvm.org/docs/img/lines.gif");
+  background: url("http://llvm.org/img/lines.gif");
   font-family: "Georgia,Palatino,Times,Roman,SanSerif";
   text-align: center; vertical-align: middle; }
 
 
 /* Common for title and header */
 h1, h2 {
-  color: black; background: url("http://llvm.org/docs/img/lines.gif");
+  color: black; background: url("http://llvm.org/img/lines.gif");
   font-family: "Georgia,Palatino,Times,Roman,SanSerif"; font-weight: bold;
   border-width: 1px;
   border-style: solid none solid none;
@@ -50,6 +50,7 @@ h3 {
   font-weight: bold; font-style: oblique;
   border-bottom: 1px solid #999999; font-size: 12pt;
   width: 75%;
+  clear:both;
 }
 
 body p {
@@ -65,4 +66,12 @@ pre.grammar, pre.stdlib {
 pre.example {
   background: #F0F0F0;
   padding: 1em 0 0 0;
+}
+
+.commentary {
+  float: right;
+  width: 33%;
+  background: #C0C0FF;
+  padding: 1em 1em 1em 1em;
+  margin: 0em 0em 0em 1em; 
 }

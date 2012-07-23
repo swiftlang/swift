@@ -1,21 +1,22 @@
-//===----------------------------------------------------------------------===//
-//  General Type State Notes 
-//===----------------------------------------------------------------------===//
+General Type State Notes
+========================
 
-//===----------------------------------------------------------------------===//
-//  Immutability
-//===----------------------------------------------------------------------===//
+Immutability
+------------
 
 Using Typestate to control immutability requires recursive immutability
 propagation (just like sending a value in a message does a recursive deep copy).
 This brings up interesting questions:
 
-1) should types be able to opt-in or out of Immutabilizability?
-2) It seems that 'int' shouldn't be bloated by tracking the possibility of
+1. should types be able to opt-in or out of Immutabilizability?
+
+2. It seems that 'int' shouldn't be bloated by tracking the possibility of
    immutabilizability.
-3) We can reserve a bit in the object header for reference types to indicate
+
+3. We can reserve a bit in the object header for reference types to indicate
    "has become immutable".
-4) If a type opts-out of immutabilization (either explicitly or implicitly) then
+
+4. If a type opts-out of immutabilization (either explicitly or implicitly) then
    a recursive type derived from it can only be immutabilized if the type is
    explicitly marked immutable.  For example, you could only turn a struct
    immutable if it contained "const int's"?  Or is this really only true for
@@ -23,9 +24,8 @@ This brings up interesting questions:
    follow the immutability of the containing object.  Array slices need a
    pointer to the containing object for more than just the refcount it seems.
 
-//===----------------------------------------------------------------------===//
-//  Typestate + GC + ARC
-//===----------------------------------------------------------------------===//
+Typestate + GC + ARC
+--------------------
 
 A random email from Mike Ferris.  DVTInvalidation models a type state, one which
 requires recursive transitive propagation just like immutable does:
@@ -40,8 +40,8 @@ assert validity in key external entry points to attempt to enforce that once
 they're invalid, no one should be talking to them.
 
 In a couple cases we have found single-ownership to be insufficient and, in
-those cases, we do have, essentially, ref-counting of validity.  But in the
-vast majority of cases, there is a single owner who _should_ be controlling the
+those cases, we do have, essentially, ref-counting of validity.  But in the vast
+majority of cases, there is a single owner who _should_ be controlling the
 useful lifetime of these objects.  And anyone else keeping them alive after that
 useful lifetime is basically in error (and is in a position to be caught by our
 validity assertions.)
@@ -61,18 +61,15 @@ trigger to be sure you'll eventually invalidate the object)...  Over time, more
 and more of our classes wind up adopting this protocol.  I am not sure that's a
 bad thing, but it has been an observed effect of having this pattern."
 
-
-//===----------------------------------------------------------------------===//
-//  Plaid Language notes
-//===----------------------------------------------------------------------===//
+Plaid Language notes
+--------------------
 
 http://plaid-lang.org/ aka http://www.cs.cmu.edu/~aldrich/plaid/
 
 This paper uses the hybrid dynamic/static approach I chatted to Ted about (which
 attaches dynamic tags to values, which the optimizer then tries to remove). This
 moves the approach from "crazy theory" to "has at least been implemented
-somewhere once":
-http://www.cs.cmu.edu/~aldrich/papers/plaid-oopsla11.pdf
+somewhere once": http://www.cs.cmu.edu/~aldrich/papers/plaid-oopsla11.pdf
 
 It allows typestate changes to change representation.  It sounds to me like
 conjoined discriminated unions + type state.
@@ -82,7 +79,7 @@ to butterfly.
 
 It only allows data types with finite/enumerable typestates.
 
-It defines typestates with syntax that looks like it is defining types:
+It defines typestates with syntax that looks like it is defining types::
 
   state File {
     val filename;
@@ -112,7 +109,7 @@ we do want anyway).
 It strikes me that typestate declarations themselves (e.g. a type can be in the
 "open" or "closed" state) should be independently declared from types and should
 have the same sort of visibility controls as types.  I should be able to declare
-a protocol/java interface along the lines of:
+a protocol/java interface along the lines of::
 
   protocol fileproto {
     open(...) closed;
@@ -134,7 +131,8 @@ list of *open* files".
 
 
 You should be allowed to declare typestate transitions on "this" any any by-ref
-arguments/ret values on functions.  In Plaid syntax:
+arguments/ret values on functions.  In Plaid syntax::
+
   public void open() [ClosedFile>>OpenFile]
 
 should be a precondition that 'this' starts out in the ClosedFile state and a
@@ -150,5 +148,3 @@ Their examples remind me that discriminated unions should be allowed to have a
 to another slice should not change this stuff.
 
 'instate' is the keyword they choose to use for a dynamic state test.
-
-//===----------------------------------------------------------------------===//

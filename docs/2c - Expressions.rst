@@ -1,4 +1,6 @@
-
+===================
+ Swift Expressions
+===================
 
 Tuple Literals
 ==============
@@ -21,11 +23,11 @@ API Fragility With Named Arguments
 ==================================
 
 Because we allow calls with tuple arguments, default arguments, named arguments,
-and reordering arguments is allowed.  For example, given:
+and reordering arguments is allowed.  For example, given::
 
   func foo(a : int = 4, b : int = 5, c : int = 6) { ... }
 
-The following calls to foo are allowed: 
+The following calls to foo are allowed::
 
   foo(1, 2, 3)                // calls foo(1, 2, 3)
   foo(1, 2)                   // calls foo(1, 2, 6)
