@@ -252,8 +252,28 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
     return convertProtocolType(cast<ProtocolType>(ty));
   case TypeKind::ProtocolComposition:
     return convertProtocolCompositionType(cast<ProtocolCompositionType>(ty));
-  case TypeKind::BoundGeneric:
-    llvm_unreachable("BoundGeneric types are unimplemented");
+
+  case TypeKind::BoundGeneric: {
+    NominalTypeDecl *decl = cast<BoundGenericType>(ty)->getDecl();
+    switch (decl->getKind()) {
+#define NOMINAL_TYPE_DECL(ID, PARENT)
+#define DECL(ID, PARENT) \
+    case DeclKind::ID:
+#include "swift/AST/DeclNodes.def"
+      llvm_unreachable("not a nominal type declaration");
+
+    case DeclKind::Protocol:
+      llvm_unreachable("protocol types don't take generic parameters");
+
+    case DeclKind::OneOf:
+    case DeclKind::Struct:
+    case DeclKind::Class:
+      IGM.unimplemented(SourceLoc(), "bound generic type");
+      return createPrimitive(IGM.Int8Ty, Size(1), Alignment(1));
+    }
+    llvm_unreachable("bad declaration kind");
+  }
+
   }
   llvm_unreachable("bad type kind");
 }
