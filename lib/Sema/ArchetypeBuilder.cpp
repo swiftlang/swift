@@ -30,6 +30,14 @@ struct ArchetypeBuilder::PotentialArchetype {
   PotentialArchetype(StringRef DisplayName, Optional<unsigned> Index = Nothing)
     : DisplayName(DisplayName.str()), Index(Index), Archetype(nullptr) { }
 
+  ~PotentialArchetype() {
+    for (auto Nested : NestedTypes) {
+      if (Nested.second != this) {
+        delete Nested.second;
+      }
+    }
+  }
+
   /// \brief The name used to describe this archetype.
   std::string DisplayName;
 
@@ -137,7 +145,10 @@ ArchetypeBuilder::ArchetypeBuilder(TypeChecker &TC)
 {
 }
 
-ArchetypeBuilder::~ArchetypeBuilder() {}
+ArchetypeBuilder::~ArchetypeBuilder() {
+  for (auto PA : Impl->PotentialArchetypes)
+    delete PA.second;
+}
 
 auto ArchetypeBuilder::resolveType(Type T) -> PotentialArchetype * {
   auto IdType = dyn_cast<IdentifierType>(T);
