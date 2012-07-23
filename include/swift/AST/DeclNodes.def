@@ -38,6 +38,13 @@
 #define VALUE_DECL(Id, Parent) DECL(Id, Parent)
 #endif
 
+/// NOMINAL_TYPE_DECL(Id, Parent)
+///   Used for subclasses of NominalTypeDecl.  The default behavior is
+///   to do the same as for ValueDecl.
+#ifndef NOMINAL_TYPE_DECL
+#define NOMINAL_TYPE_DECL(Id, Parent) VALUE_DECL(Id, Parent)
+#endif
+
 /// A convenience for determining the range of declarations.  These will always
 /// appear immediately after the last member.
 #ifndef DECL_RANGE
@@ -52,10 +59,10 @@ ABSTRACT_DECL(Value, Decl)
   ABSTRACT_DECL(Type, Decl)
     VALUE_DECL(TypeAlias, TypeDecl)
     ABSTRACT_DECL(NominalType, TypeDecl)
-      VALUE_DECL(OneOf, NominalTypeDecl)
-      VALUE_DECL(Struct, NominalTypeDecl)
-      VALUE_DECL(Class, NominalTypeDecl)
-      VALUE_DECL(Protocol, NominalTypeDecl)
+      NOMINAL_TYPE_DECL(OneOf, NominalTypeDecl)
+      NOMINAL_TYPE_DECL(Struct, NominalTypeDecl)
+      NOMINAL_TYPE_DECL(Class, NominalTypeDecl)
+      NOMINAL_TYPE_DECL(Protocol, NominalTypeDecl)
       DECL_RANGE(NominalType, OneOf, Protocol)
     DECL_RANGE(Type, TypeAlias, Protocol)
   VALUE_DECL(Var, ValueDecl)
@@ -66,6 +73,7 @@ ABSTRACT_DECL(Value, Decl)
   VALUE_DECL(Destructor, ValueDecl)
   DECL_RANGE(Value, TypeAlias, Constructor)
 
+#undef NOMINAL_TYPE_DECL
 #undef VALUE_DECL
 #undef DECL_RANGE
 #undef ABSTRACT_DECL
