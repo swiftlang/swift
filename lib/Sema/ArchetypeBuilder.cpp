@@ -28,7 +28,8 @@ using llvm::DenseMap;
 /// all of the requirements and nested types of that archetype.
 struct ArchetypeBuilder::PotentialArchetype {
   PotentialArchetype(StringRef DisplayName, Optional<unsigned> Index = Nothing)
-    : DisplayName(DisplayName.str()), Index(Index), Archetype(nullptr) { }
+    : DisplayName(DisplayName.str()), Index(Index), Representative(this),
+      Archetype(nullptr) { }
 
   ~PotentialArchetype() {
     for (auto Nested : NestedTypes) {
@@ -44,6 +45,10 @@ struct ArchetypeBuilder::PotentialArchetype {
   /// \brief The index of the computed archetype.
   Optional<unsigned> Index;
 
+  /// \brief The representative of the equivalent class of potential archetypes
+  /// to which this potential archetype belongs.
+  PotentialArchetype *Representative;
+
   /// \brief The list of protocols to which this archetype will conform.
   llvm::SetVector<ProtocolDecl *> ConformsTo;
 
@@ -53,8 +58,31 @@ struct ArchetypeBuilder::PotentialArchetype {
   /// \brief The actual archetype, once it has been assigned.
   ArchetypeType *Archetype;
 
+  /// \brief Retrieve the representative for this archetype, performing
+  /// path compression on the way.
+  PotentialArchetype *getRepresentative() {
+    // Find the representative.
+    PotentialArchetype *Result = Representative;
+    while (Result != Result->Representative)
+      Result = Result->Representative;
+
+    // Perform (full) path compression.
+    PotentialArchetype *FixUp = this;
+    while (FixUp != FixUp->Representative) {
+      PotentialArchetype *Next = FixUp->Representative;
+      FixUp->Representative = Result;
+      FixUp = Next;
+    }
+
+    return Result;
+  }
+
   /// \brief Retrieve (or create) a nested type with the given name.
   PotentialArchetype *getNestedType(Identifier Name) {
+    // Retrieve the nested type from the representation of this set.
+    if (Representative != this)
+      return getRepresentative()->getNestedType(Name);
+
     PotentialArchetype *&Result = NestedTypes[Name];
     if (!Result) {
       // FIXME: The 'This' hack is pretty ugly.
@@ -70,6 +98,10 @@ struct ArchetypeBuilder::PotentialArchetype {
   /// \brief Retrieve (or build) the archetype corresponding to the potential
   /// archetype.
   ArchetypeType *getArchetype(TypeChecker &TC) {
+    // Retrieve the archetype from the representation of this set.
+    if (Representative != this)
+      return getRepresentative()->getArchetype(TC);
+
     if (!Archetype) {
       // Allocate a new archetype.
       SmallVector<ProtocolDecl *, 4> Protos(ConformsTo.begin(),
@@ -162,7 +194,8 @@ auto ArchetypeBuilder::resolveType(Type T) -> PotentialArchetype * {
   // The first type needs to be known as a potential archetype, e.g., a
   // generic parameter.
   TypeAliasDecl *FirstType
-    = dyn_cast<TypeAliasDecl>(IdType->Components[0].Value.get<ValueDecl *>());
+    = dyn_cast_or_null<TypeAliasDecl>(
+        IdType->Components[0].Value.get<ValueDecl *>());
   if (!FirstType)
     return nullptr;
 
@@ -203,7 +236,7 @@ bool ArchetypeBuilder::addGenericParameter(TypeAliasDecl *GenericParam,
 }
 
 bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
-                                                ProtocolDecl *Proto){
+                                                 ProtocolDecl *Proto){
   // If we've already added this requirement, we're done.
   if (!T->ConformsTo.insert(Proto))
     return false;
@@ -247,6 +280,48 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
   return false;
 }
 
+bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
+                                              PotentialArchetype *T2) {
+  // Operate on the representatives
+  T1 = T1->getRepresentative();
+  T2 = T2->getRepresentative();
+
+  // If the representives are already the same, we're done.
+  if (T1 == T2)
+    return false;
+
+  // FIXME: Do we want to restrict which potential archetypes can be made
+  // equivalent? For example, can two generic parameters T and U be made
+  // equivalent? What about a generic parameter and a concrete type?
+
+  // Merge into the potential archetype with the shorter name, which captures
+  // (however crudely) the nesting depth of the associated type. We prefer
+  // lower-depth names both for better diagnostics (use T.A rather than U.B.C.D
+  // when the two are required to be the same type) and because we want to
+  // select a generic parameter as a representative over an associated type.
+  //
+  // FIXME:
+  if (std::count(T2->DisplayName.begin(), T2->DisplayName.end(), '.') <
+      std::count(T1->DisplayName.begin(), T1->DisplayName.end(), '.'))
+    std::swap(T1, T2);
+
+  // Make T1 the representative of T2, merging the equivalence classes.
+  T2->Representative = T1;
+
+  // Add all of the protocol conformance requirements of T2 to T1.
+  for (auto Proto : T2->ConformsTo)
+    T1->ConformsTo.insert(Proto);
+
+  // Recursively merge the associated types of T2 into T1.
+  for (auto T2Nested : T2->NestedTypes) {
+    auto T1Nested = T1->getNestedType(T2Nested.first);
+    if (addSameTypeRequirement(T1Nested, T2Nested.second))
+      return true;
+  }
+
+  return false;
+}
+
 bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
   switch (Req.getKind()) {
   case RequirementKind::Conformance: {
@@ -271,8 +346,18 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
   }
 
   case RequirementKind::SameType: {
-    // FIXME: Implement same-type constraints.
-    return false;
+    PotentialArchetype *FirstPA = resolveType(Req.getFirstType());
+    if (!FirstPA) {
+      // FIXME: Diagnose this failure.
+      return true;
+    }
+
+    PotentialArchetype *SecondPA = resolveType(Req.getSecondType());
+    if (!SecondPA) {
+      // FIXME: Diagnose this failure.
+      return true;
+    }
+    return addSameTypeRequirement(FirstPA, SecondPA);
   }
   }
 

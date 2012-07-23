@@ -57,6 +57,10 @@ class ArchetypeBuilder {
   /// potential archetype conforms to the given protocol.
   bool addConformanceRequirement(PotentialArchetype *T, ProtocolDecl *Proto);
 
+  /// \brief Add a new same-type requirement specifying that the given potential
+  /// archetypes should map to the equivalent archetype.
+  bool addSameTypeRequirement(PotentialArchetype *T1, PotentialArchetype *T2);
+
 public:
   ArchetypeBuilder(TypeChecker &TC);
   ArchetypeBuilder(ArchetypeBuilder &&) = default;
