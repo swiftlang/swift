@@ -31,8 +31,7 @@ using namespace swift;
 ///
 /// When parsing the generic parameters, this routine establishes a new scope
 /// and adds those parameters to the scope.
-GenericParamList *Parser::parseGenericParameters(Optional<Scope>& scope,
-                                                 bool AllowLookup) {
+GenericParamList *Parser::parseGenericParameters() {
   // Parse the opening '<'.
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
   SourceLoc LAngleLoc = consumeStartingLess();
@@ -74,11 +73,6 @@ GenericParamList *Parser::parseGenericParameters(Optional<Scope>& scope,
                                     CurDeclContext,
                                     Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);
-
-    // If we haven't built a scope yet, do so now.
-    if (!scope) {
-      scope.emplace(this, AllowLookup);
-    }
 
     // Add this parameter to the scope.
     ScopeInfo.addToScope(Param);
@@ -127,12 +121,11 @@ GenericParamList *Parser::parseGenericParameters(Optional<Scope>& scope,
                                   RequiresLoc, Requirements, RAngleLoc);
 }
 
-GenericParamList *Parser::maybeParseGenericParams(Optional<Scope>& scope,
-                                                  bool AllowLookup) {
+GenericParamList *Parser::maybeParseGenericParams() {
   if (!startsWithLess(Tok))
     return nullptr;
 
-  return parseGenericParameters(scope, AllowLookup);
+  return parseGenericParameters();
 }
 
 /// parseRequiresClause - Parse a requires clause, which places additional

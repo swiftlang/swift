@@ -1118,8 +1118,8 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
 
   // Parse the generic-params, if present.
   Optional<Scope> GenericsScope;
-  GenericParamList *GenericParams =
-    maybeParseGenericParams(GenericsScope, /*AllowLookup=*/true);
+  GenericsScope.emplace(this, /*AllowLookup*/true);
+  GenericParamList *GenericParams = maybeParseGenericParams();
 
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.isNotAnyLParen()) {
@@ -1183,7 +1183,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
     }
   }
 
-  // Exit the scope introduced for the generic parameters, if we're in one.
+  // Exit the scope introduced for the generic parameters.
   GenericsScope.reset();
 
   // Create the decl for the func and add it to the parent scope.
@@ -1221,9 +1221,11 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
     return true;
 
   // Parse the generic-params, if present.
-  Optional<Scope> GenericsScope;
-  GenericParamList *GenericParams =
-    maybeParseGenericParams(GenericsScope, /*AllowLookup=*/false);
+  GenericParamList *GenericParams = nullptr;
+  {
+    Scope GenericsScope(this, /*AllowLookup*/true);
+    GenericParams = maybeParseGenericParams();
+  }
 
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 2> Inherited;
@@ -1349,9 +1351,11 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
     return true;
 
   // Parse the generic-params, if present.
-  Optional<Scope> GenericsScope;
-  GenericParamList *GenericParams =
-    maybeParseGenericParams(GenericsScope, /*AllowLookup=*/false);
+  GenericParamList *GenericParams = nullptr;
+  {
+    Scope GenericsScope(this, /*AllowLookup*/true);
+    GenericParams = maybeParseGenericParams();
+  }
 
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 2> Inherited;
@@ -1419,9 +1423,11 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
     return true;
 
   // Parse the generic-params, if present.
-  Optional<Scope> GenericsScope;
-  GenericParamList *GenericParams =
-    maybeParseGenericParams(GenericsScope, /*AllowLookup=*/false);
+  GenericParamList *GenericParams = nullptr;
+  {
+    Scope GenericsScope(this, /*AllowLookup*/true);
+    GenericParams = maybeParseGenericParams();
+  }
 
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 2> Inherited;
@@ -1719,9 +1725,8 @@ ConstructorDecl *Parser::parseDeclConstructor() {
   parseAttributeList(Attributes);
 
   // Parse the generic-params, if present.
-  Optional<Scope> GenericsScope;
-  GenericParamList *GenericParams =
-    maybeParseGenericParams(GenericsScope, /*AllowLookup=*/true);
+  Scope GenericsScope(this, /*AllowLookup*/true);
+  GenericParamList *GenericParams = maybeParseGenericParams();
 
   // pattern-tuple
   if (Tok.isNotAnyLParen()) {

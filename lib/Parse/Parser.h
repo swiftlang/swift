@@ -325,9 +325,8 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing
-  GenericParamList *parseGenericParameters(Optional<Scope>& scope,
-                                           bool AllowLookup);
-  GenericParamList *maybeParseGenericParams(Optional<Scope>& scope,                                                     bool AllowLookup);
+  GenericParamList *parseGenericParameters();
+  GenericParamList *maybeParseGenericParams();
   bool parseRequiresClause(SourceLoc &RequiresLoc,
                            SmallVectorImpl<Requirement> &Requirements);
 };
