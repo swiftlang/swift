@@ -1730,8 +1730,10 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
 
 void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
   bool badType = false;
-  if (validateType(FE->getBodyResultTypeLoc(), isFirstPass))
+  if (validateType(FE->getBodyResultTypeLoc(), isFirstPass)) {
+    FE->getBodyResultTypeLoc().setInvalidType(Context);
     badType = true;
+  }
 
   for (Pattern *P : FE->getParamPatterns()) {
     if (P->hasType())
