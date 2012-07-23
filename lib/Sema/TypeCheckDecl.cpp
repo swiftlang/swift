@@ -354,25 +354,32 @@ public:
     checkInherited(PD, PD->getInherited());
     
     // Assign archetypes each of the associated types.
-    // FIXME: We need to build equivalence classes of associated types first,
-    // then assign an archtype to each equivalence class.
-    // FIXME: As part of building the equivalence class, find all of the
-    // protocols that each archetype should conform to.
+    // FIXME: Switch to the archetype builder.
+    ArchetypeType *This = nullptr;
     for (auto Member : PD->getMembers()) {
       if (auto AssocType = dyn_cast<TypeAliasDecl>(Member)) {
         checkInherited(AssocType, AssocType->getInherited());
 
+        ArchetypeType *Parent = nullptr;
         Optional<unsigned> Index;
         // FIXME: Find a better way to identify the 'This' archetype.
-        if (AssocType->getName().str().equals("This"))
+        if (AssocType->getName().str().equals("This")) {
           Index = 0;
+        } else {
+          assert(This && "No archetype for 'This'?");
+          Parent = This;
+        }
         SmallVector<Type, 4> InheritedTypes;
         for (TypeLoc T : AssocType->getInherited())
           InheritedTypes.push_back(T.getType());
         Type UnderlyingTy =
-            ArchetypeType::getNew(TC.Context, AssocType->getName().str(),
+            ArchetypeType::getNew(TC.Context, Parent, AssocType->getName(),
                                   InheritedTypes, Index);
         AssocType->getUnderlyingTypeLoc() = TypeLoc(UnderlyingTy);
+
+        // Set the 'This' archetype.
+        if (!Parent)
+          This = UnderlyingTy->castTo<ArchetypeType>();
       }
     }
 

@@ -20,6 +20,7 @@
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -613,14 +614,9 @@ void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy) {
   Elt = TupleTypeElt(NewTy, Elt.getName(), Elt.getInit());
 }
 
-ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, StringRef DisplayName,
-                                     ArrayRef<Type> ConformsTo,
+ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, ArchetypeType *Parent,
+                                     Identifier Name, ArrayRef<Type> ConformsTo,
                                      Optional<unsigned> Index) {
-  void *Mem = Ctx.Allocate(sizeof(ArchetypeType) + DisplayName.size(),
-                           llvm::alignOf<ArchetypeType>());
-  char *StoredStringData = (char*)Mem + sizeof(ArchetypeType);
-  memcpy(StoredStringData, DisplayName.data(), DisplayName.size());
-
   // Gather the set of protocol declarations to which this archetype conforms.
   SmallVector<ProtocolDecl *, 4> ConformsToProtos;
   for (auto P : ConformsTo) {
@@ -630,31 +626,38 @@ ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, StringRef DisplayName,
   llvm::array_pod_sort(ConformsToProtos.begin(), ConformsToProtos.end(),
                        compareProtocols);
 
-  return ::new (Mem) ArchetypeType(Ctx,
-                                   StringRef(StoredStringData,
-                                             DisplayName.size()),
-                                   Ctx.AllocateCopy(ConformsToProtos),
-                                   Index);
+  return new (Ctx) ArchetypeType(Ctx, Parent, Name,
+                                 Ctx.AllocateCopy(ConformsToProtos),
+                                 Index);
 }
 
 ArchetypeType *
-ArchetypeType::getNew(ASTContext &Ctx, StringRef DisplayName,
+ArchetypeType::getNew(ASTContext &Ctx, ArchetypeType *Parent,
+                      Identifier Name,
                       llvm::SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Optional<unsigned> Index) {
-  void *Mem = Ctx.Allocate(sizeof(ArchetypeType) + DisplayName.size(),
-                           llvm::alignOf<ArchetypeType>());
-  char *StoredStringData = (char*)Mem + sizeof(ArchetypeType);
-  memcpy(StoredStringData, DisplayName.data(), DisplayName.size());
-
   // Gather the set of protocol declarations to which this archetype conforms.
   minimizeProtocols(ConformsTo);
   llvm::array_pod_sort(ConformsTo.begin(), ConformsTo.end(), compareProtocols);
 
-  return ::new (Mem) ArchetypeType(Ctx,
-                                   StringRef(StoredStringData,
-                                             DisplayName.size()),
-                                   Ctx.AllocateCopy(ConformsTo),
-                                   Index);
+  return new (Ctx) ArchetypeType(Ctx, Parent, Name,
+                                 Ctx.AllocateCopy(ConformsTo), Index);
+}
+
+static void collectFullName(const ArchetypeType *Archetype,
+                            llvm::SmallVectorImpl<char> &Result) {
+  if (auto Parent = Archetype->getParent()) {
+    collectFullName(Parent, Result);
+    Result.push_back('.');
+  }
+  Result.append(Archetype->getName().str().begin(),
+                Archetype->getName().str().end());
+}
+
+std::string ArchetypeType::getFullName() const {
+  llvm::SmallString<64> Result;
+  collectFullName(this, Result);
+  return Result.str().str();
 }
 
 DeducibleGenericParamType *
@@ -1003,7 +1006,7 @@ void OneOfType::print(raw_ostream &OS) const {
 }
 
 void ArchetypeType::print(raw_ostream &OS) const {
-  OS << DisplayName;
+  OS << getFullName();
 }
 
 void DeducibleGenericParamType::print(raw_ostream &OS) const {

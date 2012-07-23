@@ -1226,30 +1226,40 @@ public:
 /// point in time, whether it be at compile time due to a direct binding or
 /// at run time due to the use of generic types.
 class ArchetypeType : public SubstitutableType {
-  StringRef DisplayName;
+  ArchetypeType *Parent;
+  Identifier Name;
   unsigned IndexIfPrimary;
 
 public:
   /// getNew - Create a new archetype with the given name.
   ///
   /// The ConformsTo array will be copied into the ASTContext by this routine.
-  static ArchetypeType *getNew(ASTContext &Ctx, StringRef DisplayName,
-                               ArrayRef<Type> ConformsTo,
+  static ArchetypeType *getNew(ASTContext &Ctx, ArchetypeType *Parent,
+                               Identifier Name, ArrayRef<Type> ConformsTo,
                                Optional<unsigned> Index = Optional<unsigned>());
 
   /// getNew - Create a new archetype with the given name.
   ///
   /// The ConformsTo array will be minimized then copied into the ASTContext
   /// by this routine.
-  static ArchetypeType *getNew(ASTContext &Ctx, StringRef DisplayName,
+  static ArchetypeType *getNew(ASTContext &Ctx, ArchetypeType *Parent,
+                          Identifier Name,
                           llvm::SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                           Optional<unsigned> Index = Optional<unsigned>());
 
   void print(raw_ostream &OS) const;
 
-  /// getDisplayName - Retrieve the name that should be used to display
-  /// this archetype.
-  StringRef getDisplayName() const { return DisplayName; }
+  /// \brief Retrieve the name of this archetype.
+  Identifier getName() const { return Name; }
+
+  /// \brief Retrieve the fully-dotted name that should be used to display this
+  /// archetype.
+  std::string getFullName() const;
+
+  /// \brief Retrieve the parent of this archetype, or null if this is a
+  /// primary archetype.
+  ArchetypeType *getParent() const { return Parent; }
+
 
   /// isPrimary - Determine whether this is the archetype for a 'primary'
   /// archetype, e.g., 
@@ -1268,12 +1278,12 @@ public:
   }
   
 private:
-  ArchetypeType(ASTContext &Ctx, StringRef DisplayName,
-                ArrayRef<ProtocolDecl *> ConformsTo,
+  ArchetypeType(ASTContext &Ctx, ArchetypeType *Parent,
+                Identifier Name, ArrayRef<ProtocolDecl *> ConformsTo,
                 Optional<unsigned> Index)
     : SubstitutableType(TypeKind::Archetype, &Ctx, /*Unresolved=*/false,
                         ConformsTo),
-      DisplayName(DisplayName), IndexIfPrimary(Index? *Index + 1 : 0) { }
+      Parent(Parent), Name(Name), IndexIfPrimary(Index? *Index + 1 : 0) { }
 };
 
 /// DeducibleGenericParamType - A type that refers to a generic type parameter

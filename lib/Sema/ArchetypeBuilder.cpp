@@ -139,10 +139,14 @@ public:
 
     if (!Archetype) {
       // Allocate a new archetype.
+      ArchetypeType *ParentArchetype = nullptr;
+      if (Parent)
+        ParentArchetype = Parent->getArchetype(TC);
+
       SmallVector<ProtocolDecl *, 4> Protos(ConformsTo.begin(),
                                             ConformsTo.end());
-      Archetype = ArchetypeType::getNew(TC.Context, getFullName(), Protos,
-                                        Index);
+      Archetype = ArchetypeType::getNew(TC.Context, ParentArchetype,
+                                        Name, Protos, Index);
 
       // For each of the protocols we conform to, find the appropriate nested
       // types and add archetype mappings for them.
