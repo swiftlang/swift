@@ -63,6 +63,7 @@ namespace irgen {
   class Address;
   enum class ExplosionKind : unsigned;
   class ExplosionSchema;
+  class FormalType;
   class LinkEntity;
   class Options;
   class ProtocolInfo;
@@ -199,11 +200,18 @@ public:
   llvm::FunctionType *getFunctionType(Type fnType, ExplosionKind kind,
                                       unsigned uncurryLevel, bool withData);
 
+  FormalType getTypeOfGetter(ValueDecl *D);
+  FormalType getTypeOfSetter(ValueDecl *D);
+
   Address getAddrOfGlobalVariable(VarDecl *D);
   llvm::Function *getAddrOfFunction(FuncDecl *D, ExplosionKind kind,
                                     unsigned uncurryLevel, bool needsData);
   llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);
+  llvm::Function *getAddrOfGetter(ValueDecl *D, FormalType type,
+                                  ExplosionKind kind);
   llvm::Function *getAddrOfGetter(ValueDecl *D, ExplosionKind kind);
+  llvm::Function *getAddrOfSetter(ValueDecl *D, FormalType type,
+                                  ExplosionKind kind);
   llvm::Function *getAddrOfSetter(ValueDecl *D, ExplosionKind kind);
   llvm::Function *getAddrOfValueWitness(Type concreteType, ValueWitness index);
   llvm::Function *getAddrOfConstructor(ConstructorDecl *D, ExplosionKind kind);

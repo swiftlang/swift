@@ -32,6 +32,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Explosion.h"
+#include "FormalType.h"
 #include "LValue.h"
 #include "FixedTypeInfo.h"
 #include "ScalarTypeInfo.h"
@@ -547,15 +548,14 @@ namespace {
       // For now, always be pessimistic.
       explosionLevel = ExplosionKind::Minimal;
 
-      // The uncurry level is 0 unless we have a 'this' argument.
-      llvm::Constant *fn = IGF.IGM.getAddrOfGetter(getDecl(), explosionLevel);
-      if (isMember()) {
-        return Callee::forMethod(Type(), getSubstitutions(),
-                                 fn, explosionLevel, 1);
-      } else {
-        return Callee::forFreestandingFunction(Type(), getSubstitutions(),
-                                               fn, explosionLevel, 0);
-      }
+      FormalType formal = IGF.IGM.getTypeOfGetter(getDecl());
+      llvm::Constant *fn =
+        IGF.IGM.getAddrOfGetter(getDecl(), formal, explosionLevel);
+      return Callee::forKnownFunction(formal.getCC(), formal.getType(),
+                                      getType(), getSubstitutions(),
+                                      fn, ManagedValue(nullptr),
+                                      explosionLevel,
+                                      formal.getNaturalUncurryLevel());
     }
 
     /// Find the address of the getter function.
@@ -563,15 +563,16 @@ namespace {
       // For now, always be pessimistic.
       explosionLevel = ExplosionKind::Minimal;
 
-      // The uncurry level is 0 unless we have a 'this' argument.
-      llvm::Constant *fn = IGF.IGM.getAddrOfSetter(getDecl(), explosionLevel);
-      if (isMember()) {
-        return Callee::forMethod(Type(), getSubstitutions(),
-                                 fn, explosionLevel, 1);
-      } else {
-        return Callee::forFreestandingFunction(Type(), getSubstitutions(),
-                                               fn, explosionLevel, 0);
-      }
+      FormalType formal = IGF.IGM.getTypeOfSetter(getDecl());
+      llvm::Constant *fn =
+        IGF.IGM.getAddrOfSetter(getDecl(), formal, explosionLevel);
+
+      Type voidTy = cast<AnyFunctionType>(formal.getType())->getResult();
+      return Callee::forKnownFunction(formal.getCC(), formal.getType(),
+                                      voidTy, getSubstitutions(),
+                                      fn, ManagedValue(nullptr),
+                                      explosionLevel,
+                                      formal.getNaturalUncurryLevel());
     }
 
   private:
@@ -769,17 +770,15 @@ namespace {
         args.push_back(Arg::forUnowned(selfArg));
       }
 
-      // The next argument is the "index".
-      // In a subscript, this is a tuple of the subscript and the value.
+      // The next argument is the "index", when present.
       Explosion index(getter.getExplosionLevel());
       if (Target.isSubscript()) {
         addIndexValues(IGF, index, preserve);
         args.push_back(Arg::forUnowned(index));
-
-      // Otherwise, it's an empty tuple.
-      } else {
-        args.push_back(Arg());
       }
+
+      // The last argument is always an empty tuple.
+      args.push_back(Arg());
 
       const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
       emitCall(IGF, getter, args, valueTI, out);
@@ -805,17 +804,15 @@ namespace {
         args.push_back(Arg::forUnowned(selfArg));
       }
 
-      // The next argument is the "index".
-      // In a subscript, this is a tuple of the subscript and the value.
+      // The next argument is the "index", for subscripts.
       Explosion index(getter.getExplosionLevel());
       if (Target.isSubscript()) {
         addIndexValues(IGF, index, preserve);
         args.push_back(Arg::forUnowned(index));
-
-      // Otherwise, it's an empty tuple.
-      } else {
-        args.push_back(Arg());
       }
+
+      // The last argument is always an empty tuple.
+      args.push_back(Arg());
 
       const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
       emitCallToMemory(IGF, getter, args, valueTI, temp);

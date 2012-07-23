@@ -132,8 +132,8 @@ void swift::irgen::emitArrayInjectionCall(IRGenFunction &IGF, ManagedValue alloc
 
   // Emit the callee.
   llvm::SmallVector<Arg, 4> args;
-  Callee callee = emitCallee(IGF, injectionFn,
-                             out.getKind(), /*uncurry*/ 0, args);
+  Callee callee =
+    emitCallee(IGF, injectionFn, out.getKind(), /*uncurry*/ 0, args);
 
   // The injection function takes this tuple:
   //   (Builtin.RawPointer, Builtin.ObjectPointer, typeof(length))

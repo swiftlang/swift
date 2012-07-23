@@ -26,6 +26,7 @@
 #include "llvm/GlobalVariable.h"
 
 #include "Explosion.h"
+#include "GenConstructor.h"
 #include "GenFunc.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
@@ -108,25 +109,22 @@ LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
   return IGF.emitAddressLValue(OwnedAddress(memberAddr, baseVal.getValue()));
 }
 
-void swift::irgen::emitNewReferenceExpr(IRGenFunction &IGF,
-                                        NewReferenceExpr *E,
-                                        Explosion &Out) {
+void irgen::emitNewReferenceExpr(IRGenFunction &IGF,
+                                 NewReferenceExpr *E,
+                                 Explosion &out) {
   // Call the constructor for the class.
-  ConstructorDecl *CD = E->getCtor();
-  llvm::Function *fn =
-      IGF.IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
+  ConstructorDecl *ctor = E->getCtor();
   ArrayRef<Substitution> subs = E->getSubstitutions();
-  Callee c = Callee::forMethod(CD->getType(), subs, fn,
-                               ExplosionKind::Minimal, 0);
+  Callee callee = getConstructorCallee(IGF.IGM, ctor, subs,
+                                       E->getType(), out.getKind());
 
+  // Emit the argument under substitution.
   Explosion inputE(ExplosionKind::Minimal);
-  IGF.emitRValueUnderSubstitutions(E->getCtorArg(), CD->getArgumentType(),
+  IGF.emitRValueUnderSubstitutions(E->getCtorArg(), ctor->getArgumentType(),
                                    subs, inputE);
 
-  Explosion Result(ExplosionKind::Minimal);
-  emitCall(IGF, c, Arg::forUnowned(inputE),
-           IGF.getFragileTypeInfo(CD->getImplicitThisDecl()->getType()),
-           Out);
+  emitCall(IGF, callee, Arg::forUnowned(inputE),
+           IGF.getFragileTypeInfo(E->getType()), out);
 }
 
 namespace {

@@ -96,8 +96,11 @@ namespace irgen {
     /// being called.
     unsigned UncurryLevel;
 
-    /// The function type being called.
-    Type FormalType;
+    /// The unsubstituted function type being called.
+    Type OrigFormalType;
+
+    /// The substituted result type of the function being called.
+    Type SubstResultType;
 
     /// The pointer to the actual function.
     llvm::Value *FnPtr;
@@ -115,30 +118,35 @@ namespace irgen {
 
     /// Prepare a callee for a known freestanding function that
     /// requires no data pointer.
-    static Callee forFreestandingFunction(Type formalType,
+    static Callee forFreestandingFunction(Type origFormalType,
+                                          Type substResultType,
                                           ArrayRef<Substitution> subs,
                                           llvm::Constant *fn,
                                           ExplosionKind explosionLevel,
                                           unsigned uncurryLevel) {
-      return forKnownFunction(AbstractCC::Freestanding, formalType,
-                              subs, fn, ManagedValue(nullptr),
+      return forKnownFunction(AbstractCC::Freestanding,
+                              origFormalType, substResultType, subs,
+                              fn, ManagedValue(nullptr),
                               explosionLevel, uncurryLevel);
     }
 
     /// Prepare a callee for a known instance method.  Methods never
     /// require a data pointer.  The formal type here should
     /// include the 'this' clause.
-    static Callee forMethod(Type formalType, ArrayRef<Substitution> subs,
+    static Callee forMethod(Type origFormalType, Type substResultType,
+                            ArrayRef<Substitution> subs,
                             llvm::Constant *fn,
                             ExplosionKind explosionLevel,
                             unsigned uncurryLevel) {
-      return forKnownFunction(AbstractCC::Method, formalType, subs,
+      return forKnownFunction(AbstractCC::Method,
+                              origFormalType, substResultType, subs,
                               fn, ManagedValue(nullptr),
                               explosionLevel, uncurryLevel);
     }
 
     /// Prepare a callee for a known function with a known data pointer.
-    static Callee forKnownFunction(AbstractCC convention, Type formalType,
+    static Callee forKnownFunction(AbstractCC convention,
+                                   Type origFormalType, Type substResultType,
                                    ArrayRef<Substitution> subs,
                                    llvm::Value *fn, ManagedValue data,
                                    ExplosionKind explosionLevel,
@@ -147,7 +155,8 @@ namespace irgen {
       result.ExplosionLevel = explosionLevel;
       result.Convention = convention;
       result.UncurryLevel = uncurryLevel;
-      result.FormalType = formalType;
+      result.OrigFormalType = origFormalType;
+      result.SubstResultType = substResultType;
       result.FnPtr = fn;
       result.DataPtr = data;
       result.Substitutions = subs;
@@ -155,12 +164,14 @@ namespace irgen {
     }
 
     /// Prepare a callee for an indirect call to a function.
-    static Callee forIndirectCall(Type formalType, ArrayRef<Substitution> subs,
+    static Callee forIndirectCall(Type origFormalType, Type substResultType,
+                                  ArrayRef<Substitution> subs,
                                   llvm::Value *fn, ManagedValue data);
 
     AbstractCC getConvention() const { return Convention; }
 
-    Type getFormalType() const { return FormalType; }
+    Type getOrigFormalType() const { return OrigFormalType; }
+    Type getSubstResultType() const { return SubstResultType; }
 
     bool hasSubstitutions() const { return !Substitutions.empty(); }
     ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
@@ -169,14 +180,14 @@ namespace irgen {
     unsigned getUncurryLevel() const { return UncurryLevel; }
     llvm::Value *getFunction() const { return FnPtr; }
 
-    llvm::PointerType *getFunctionPointerType(IRGenModule &IGM,
-                                              Type formalType) const;
+    llvm::PointerType *getFunctionPointerType(IRGenModule &IGM) const;
 
     /// Return the function pointer as an i8*.
     llvm::Value *getOpaqueFunctionPointer(IRGenFunction &IGF) const;
 
-    /// Return the function pointer as an appropriately-casted 
-    llvm::Value *getFunctionPointer(IRGenFunction &IGF, Type formalType) const;
+    /// Return the function pointer as an appropriately-casted pointer
+    /// to LLVM function.
+    llvm::Value *getFunctionPointer(IRGenFunction &IGF) const;
 
     llvm::Value *getRawFunctionPointer() const {
       return FnPtr;
@@ -293,12 +304,12 @@ namespace irgen {
 
   /// Emit a call.
   void emitCall(IRGenFunction &IGF, const Callee &callee,
-                ArrayRef<Arg> args, const TypeInfo &resultTI,
+                ArrayRef<Arg> args, const TypeInfo &substResultTI,
                 Explosion &result);
 
   /// Emit a call and place the result in memory.
   void emitCallToMemory(IRGenFunction &IGF, const Callee &callee,
-                        ArrayRef<Arg> args, const TypeInfo &resultTI,
+                        ArrayRef<Arg> args, const TypeInfo &substResultTI,
                         Address resultAddress);
 
   /// Emit a call with a void return value.

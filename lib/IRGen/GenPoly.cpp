@@ -27,6 +27,8 @@
 #include "TypeInfo.h"
 #include "TypeVisitor.h"
 
+#include "GenPoly.h"
+
 using namespace swift;
 using namespace irgen;
 
@@ -54,16 +56,6 @@ static void emitAsCastTemporary(IRGenFunction &IGF, Expr *E,
   out.add(ManagedValue(addr.getAddress(), cleanup));
 }
 
-enum class DBAKind : bool{
-  Ordinary,
-  Argument
-};
-
-static bool differsByAbstraction(IRGenModule &IGM,
-                                 CanType origTy, CanType substTy,
-                                 DBAKind diffKind,
-                                 ExplosionKind explosionKind);
-
 /// Answer the differs-by-abstraction question for the given
 /// function types.  See the comment below.
 static bool differsByAbstraction(IRGenModule &IGM,
@@ -75,13 +67,13 @@ static bool differsByAbstraction(IRGenModule &IGM,
   // Arguments use a different rule for archetypes.
   if (differsByAbstraction(IGM, CanType(origTy->getInput()),
                            CanType(substTy->getInput()),
-                           DBAKind::Argument, ExplosionKind::Minimal))
+                           AbstractionDifference::Argument))
     return true;
 
   // Results consider ordinary rules...
   if (differsByAbstraction(IGM, CanType(origTy->getResult()),
                            CanType(substTy->getResult()),
-                           DBAKind::Ordinary, ExplosionKind::Minimal))
+                           AbstractionDifference::Memory))
     return true;
 
   // ...and then we also have to decide whether the substituted
@@ -191,11 +183,10 @@ namespace {
   class DiffersByAbstraction
       : public SubstTypeVisitor<DiffersByAbstraction, bool> {
     IRGenModule &IGM;
-    DBAKind DiffKind;
-    ExplosionKind ExplosionLevel;
+    AbstractionDifference DiffKind;
   public:
-    DiffersByAbstraction(IRGenModule &IGM, DBAKind kind, ExplosionKind ek)
-      : IGM(IGM), DiffKind(kind), ExplosionLevel(ek) {}
+    DiffersByAbstraction(IRGenModule &IGM, AbstractionDifference kind)
+      : IGM(IGM), DiffKind(kind) {}
 
     bool visit(CanType origTy, CanType substTy) {
       if (origTy == substTy) return false;
@@ -209,11 +200,15 @@ namespace {
 
     bool visitArchetypeType(ArchetypeType *origTy, CanType substTy) {
       // Archetypes vary by what we're considering this for.
-      if (DiffKind == DBAKind::Ordinary) return false;
+
+      // Archetypes are laid out in memory in the same way as a
+      // concrete type would be.
+      if (DiffKind == AbstractionDifference::Memory) return false;
 
       // For function arguments, consider whether the substituted type
-      // is passed indirectly under the specified convention.
-      return !IGM.isSingleIndirectValue(substTy, ExplosionLevel);
+      // is passed indirectly under the abstract-call convention.
+      // We only ever care about the abstract-call convention.
+      return !IGM.isSingleIndirectValue(substTy, ExplosionKind::Minimal);
     }
 
     bool visitArrayType(ArrayType *origTy, ArrayType *substTy) {
@@ -245,7 +240,7 @@ namespace {
     bool visitLValueType(LValueType *origTy, LValueType *substTy) {
       return differsByAbstraction(IGM, CanType(origTy->getObjectType()),
                                   CanType(substTy->getObjectType()),
-                                  DBAKind::Ordinary, ExplosionKind::Minimal);
+                                  AbstractionDifference::Memory);
     }
 
     bool visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
@@ -267,12 +262,11 @@ namespace {
     }
   };
 }
-static bool differsByAbstraction(IRGenModule &IGM,
+
+bool irgen::differsByAbstraction(IRGenModule &IGM,
                                  CanType origTy, CanType substTy,
-                                 DBAKind diffKind,
-                                 ExplosionKind explosionKind) {
-  return DiffersByAbstraction(IGM, diffKind, explosionKind)
-           .visit(origTy, substTy);
+                                 AbstractionDifference diffKind) {
+  return DiffersByAbstraction(IGM, diffKind).visit(origTy, substTy);
 }
 
 namespace {
@@ -354,8 +348,10 @@ namespace {
     }
 
     void visitLValueType(LValueType *origTy, LValueType *substTy) {
-      if (differsByAbstraction(IGF.IGM, CanType(origTy), CanType(substTy),
-                               DBAKind::Ordinary, In.getKind()))
+      if (differsByAbstraction(IGF.IGM,
+                               CanType(origTy->getObjectType()),
+                               CanType(substTy->getObjectType()),
+                               AbstractionDifference::Memory))
         IGF.unimplemented(SourceLoc(), "remapping l-values");
       In.transferInto(Out, 1);
     }

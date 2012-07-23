@@ -25,6 +25,8 @@
 #include "swift/AST/Types.h"
 #include "llvm/Function.h"
 
+#include "GenConstructor.h"
+
 using namespace swift;
 using namespace irgen;
 
@@ -63,17 +65,27 @@ void IRGenFunction::emitConstructorBody(ConstructorDecl *CD) {
   Builder.ClearInsertionPoint();
 }
 
-void IRGenFunction::constructObject(ConstructExpr *E,
-                                    Explosion &result) {
-  ConstructorDecl *CD = E->getConstructor();
-  llvm::Function *fn = IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
+Callee irgen::getConstructorCallee(IRGenModule &IGM,
+                                   ConstructorDecl *ctor,
+                                   ArrayRef<Substitution> subs,
+                                   Type substResultType,
+                                   ExplosionKind bestExplosion) {
+  bestExplosion = ExplosionKind::Minimal;
+  llvm::Function *fn = IGM.getAddrOfConstructor(ctor, bestExplosion);
+  return Callee::forMethod(ctor->getType(), substResultType, subs,
+                           fn, bestExplosion, /*uncurry*/ 0);
+}
+
+void IRGenFunction::constructObject(ConstructExpr *E, Explosion &out) {
+  ConstructorDecl *ctor = E->getConstructor();
   ArrayRef<Substitution> subs = E->getSubstitutions();
 
-  Callee c = Callee::forMethod(CD->getType(), subs, fn,
-                               ExplosionKind::Minimal, 0);
+  Callee callee =
+    getConstructorCallee(IGM, ctor, subs, E->getType(), out.getKind());
+
   Explosion inputE(ExplosionKind::Minimal);
-  emitRValueUnderSubstitutions(E->getInput(),
-                               CD->getArgumentType(), subs, inputE);
-  emitCall(*this, c, Arg::forUnowned(inputE),
-           getFragileTypeInfo(CD->getImplicitThisDecl()->getType()), result);
+  emitRValueUnderSubstitutions(E->getInput(), ctor->getArgumentType(),
+                               subs, inputE);
+  emitCall(*this, callee, Arg::forUnowned(inputE),
+           getFragileTypeInfo(E->getType()), out);
 }

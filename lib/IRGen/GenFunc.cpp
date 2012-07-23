@@ -69,6 +69,7 @@
 #include "Explosion.h"
 #include "GenHeap.h"
 #include "GenInit.h"
+#include "GenPoly.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
@@ -99,18 +100,8 @@ static unsigned getNumCurries(AnyFunctionType *type) {
 /// is the number of additional parameter clauses that are uncurried
 /// in the function body.
 static unsigned getNaturalUncurryLevel(FuncDecl *func) {
-  if (func->getBody())
-    return func->getBody()->getParamPatterns().size() - 1;
-
-  AnyFunctionType *type = func->getType()->castTo<AnyFunctionType>();
-  unsigned count = 0;
-  do {
-    count++;
-    type = dyn_cast<AnyFunctionType>(type->getResult());
-  } while (type);
-
-  assert(count <= getNumCurries(func->getType()->castTo<AnyFunctionType>()));
-  return count - 1;
+  assert(func->getBody());
+  return func->getBody()->getParamPatterns().size() - 1;
 }
 
 /// Given a function type, return the formal result type at the given
@@ -225,14 +216,16 @@ namespace {
     bool isDirect() const { return CurState == State::Direct; }
     bool isIndirect() const { return CurState == State::Indirect; }
 
-    Callee getDirectValuesAsIndirectCallee(Type formalType,
+    Callee getDirectValuesAsIndirectCallee(Type origFormalType,
+                                           Type substResultType,
                                            ArrayRef<Substitution> subs) {
       assert(isDirect());
       Explosion &values = getDirectValues();
       assert(values.size() == 2);
       llvm::Value *fn = values.claimUnmanagedNext();
       ManagedValue data = values.claimNext();
-      return Callee::forIndirectCall(formalType, subs, fn, data);
+      return Callee::forIndirectCall(origFormalType, substResultType, subs,
+                                     fn, data);
     }
 
     Explosion &getDirectValues() {
@@ -580,9 +573,8 @@ static AbstractCallee getAbstractDirectCallee(IRGenFunction &IGF,
 
 /// Return the appropriate function pointer type at which to call the
 /// given function.
-llvm::PointerType *Callee::getFunctionPointerType(IRGenModule &IGM,
-                                                  Type fnType) const {
-  return IGM.getFunctionType(fnType, ExplosionLevel, UncurryLevel,
+llvm::PointerType *Callee::getFunctionPointerType(IRGenModule &IGM) const {
+  return IGM.getFunctionType(getOrigFormalType(), ExplosionLevel, UncurryLevel,
                              hasDataPointer())->getPointerTo();
 }
 
@@ -594,8 +586,8 @@ llvm::Value *Callee::getOpaqueFunctionPointer(IRGenFunction &IGF) const {
 }
 
 /// Return this function pointer, bitcasted to the appropriate formal type.
-llvm::Value *Callee::getFunctionPointer(IRGenFunction &IGF, Type fnType) const {
-  llvm::Type *ty = getFunctionPointerType(IGF.IGM, fnType);
+llvm::Value *Callee::getFunctionPointer(IRGenFunction &IGF) const {
+  llvm::Type *ty = getFunctionPointerType(IGF.IGM);
   return IGF.Builder.CreateBitCast(FnPtr, ty);
 }
 
@@ -605,17 +597,20 @@ ManagedValue Callee::getDataPointer(IRGenFunction &IGF) const {
   return ManagedValue(IGF.IGM.RefCountedNull);
 }
 
-Callee Callee::forIndirectCall(Type formalType, ArrayRef<Substitution> subs,
+Callee Callee::forIndirectCall(Type origFormalType, Type substResultType,
+                               ArrayRef<Substitution> subs,
                                llvm::Value *fn, ManagedValue data) {
   if (isa<llvm::ConstantPointerNull>(data.getValue()))
     data = ManagedValue(nullptr);
-  return forKnownFunction(AbstractCC::Freestanding, formalType, subs,
+  return forKnownFunction(AbstractCC::Freestanding,
+                          origFormalType, substResultType, subs,
                           fn, data, ExplosionKind::Minimal, 0);
 }
 
 /// Emit a reference to a function, using the best parameters possible
 /// up to given limits.
 static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
+                         Type substResultType,
                          ArrayRef<Substitution> subs,
                          ExplosionKind bestExplosion, unsigned bestUncurry) {
   if (bestUncurry != 0 || bestExplosion != ExplosionKind::Minimal) {
@@ -628,10 +623,11 @@ static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
     llvm::Constant *fnPtr =
       IGF.IGM.getAddrOfFunction(fn, bestExplosion, bestUncurry, /*data*/ false);
     if (isInstanceMethod(fn)) {
-      return Callee::forMethod(fn->getType(), subs, fnPtr,
+      return Callee::forMethod(fn->getType(), substResultType, subs, fnPtr,
                                bestExplosion, bestUncurry);
     } else {
-      return Callee::forFreestandingFunction(fn->getType(), subs, fnPtr,
+      return Callee::forFreestandingFunction(fn->getType(), substResultType,
+                                             subs, fnPtr,
                                              bestExplosion, bestUncurry);
     }
   }
@@ -641,7 +637,8 @@ static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
   IGF.emitRetain(IGF.getLocalFuncData(fn), e);
   ManagedValue data = e.claimNext();
   return Callee::forKnownFunction(AbstractCC::Freestanding,
-                                  fn->getType(), subs, fnPtr, data,
+                                  fn->getType(), substResultType, subs,
+                                  fnPtr, data,
                                   bestExplosion, bestUncurry);
 }
 
@@ -649,13 +646,18 @@ namespace {
   /// A single call site, with argument expression and the type of
   /// function being applied.
   struct CallSite {
-    CallSite(Expr *arg, Type fnType) : Arg(arg), FnType(fnType) {}
+    CallSite(ApplyExpr *apply)
+      : Apply(apply), FnType(apply->getFn()->getType()) {}
 
-    Expr *Arg;
+    ApplyExpr *Apply;
 
     /// The function type that we're actually calling.  This is
     /// "un-substituted" if necessary.
     Type FnType;
+
+    Expr *getArg() const { return Apply->getArg(); }
+    Type getOrigFnType() const { return FnType; }
+    Type getSubstResultType() const { return Apply->getType(); }
 
     void emit(IRGenFunction &IGF, ArrayRef<Substitution> subs,
               Explosion &out) const {
@@ -666,11 +668,12 @@ namespace {
       // (2) we might need to evaluate the r-value differently.
       if (!subs.empty()) {
         auto fnType = FnType->castTo<AnyFunctionType>();
-        IGF.emitRValueUnderSubstitutions(Arg, fnType->getInput(), subs, out);
+        IGF.emitRValueUnderSubstitutions(getArg(), fnType->getInput(),
+                                         subs, out);
         if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType))
           emitPolymorphicArguments(IGF, polyFn->getGenericParams(), subs, out);
       } else {
-        IGF.emitRValue(Arg, out);
+        IGF.emitRValue(getArg(), out);
       }
     }
   };
@@ -698,6 +701,7 @@ namespace {
       } Archetype;
     };
     Kind TheKind;
+    Type SubstResultType;
     ArrayRef<Substitution> Substitutions;
     SmallVector<CallSite, 4> CallSites;
 
@@ -795,6 +799,10 @@ namespace {
       Substitutions = subs;
     }
 
+    void setSubstResultType(Type type) {
+      SubstResultType = type;
+    }
+
     ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
     bool hasSubstitutions() const { return !Substitutions.empty(); }
 
@@ -865,7 +873,8 @@ namespace {
       switch (getKind()) {
       case Kind::DirectWithSideEffects:
       case Kind::Direct:
-        return ::emitCallee(IGF, getDirectFunction(), getSubstitutions(),
+        return ::emitCallee(IGF, getDirectFunction(),
+                            SubstResultType, getSubstitutions(),
                             maxExplosion, maxUncurry);
       case Kind::Indirect: {
         Explosion fnValues(ExplosionKind::Maximal);
@@ -873,16 +882,19 @@ namespace {
         IGF.emitRValue(fn, fnValues);
         llvm::Value *fnPtr = fnValues.claimUnmanagedNext();
         ManagedValue dataPtr = fnValues.claimNext();
-        return Callee::forIndirectCall(fn->getType(), getSubstitutions(),
+        return Callee::forIndirectCall(fn->getType(), SubstResultType,
+                                       getSubstitutions(),
                                        fnPtr, dataPtr);
       }
       case Kind::Existential:
         return emitExistentialMemberRefCallee(IGF, getExistentialFunction(),
+                                              SubstResultType,
                                               getSubstitutions(),
                                               calleeArgs, maxExplosion,
                                               maxUncurry);
       case Kind::Archetype:
         return emitArchetypeMemberRefCallee(IGF, getArchetypeFunction(),
+                                            SubstResultType,
                                             getSubstitutions(),
                                             calleeArgs, maxExplosion,
                                             maxUncurry);
@@ -893,10 +905,11 @@ namespace {
 }
 
 /// Emit a reference to the given function as a generic function pointer.
-void swift::irgen::emitRValueForFunction(IRGenFunction &IGF, FuncDecl *fn,
-                                         Explosion &explosion) {
+void irgen::emitRValueForFunction(IRGenFunction &IGF, FuncDecl *fn,
+                                  Explosion &explosion) {
   // Function pointers are always fully curried and use ExplosionKind::Minimal.
-  Callee callee = ::emitCallee(IGF, fn, ArrayRef<Substitution>(),
+  Type resultType = fn->getType()->castTo<AnyFunctionType>()->getResult();
+  Callee callee = ::emitCallee(IGF, fn, resultType, ArrayRef<Substitution>(),
                                ExplosionKind::Minimal, 0);
   assert(callee.getExplosionLevel() == ExplosionKind::Minimal);
   assert(callee.getUncurryLevel() == 0);
@@ -1147,7 +1160,7 @@ namespace {
 
     CalleeSource visitApplyExpr(ApplyExpr *E) {
       CalleeSource source = visit(E->getFn());
-      source.addCallSite(CallSite(E->getArg(), E->getFn()->getType()));
+      source.addCallSite(CallSite(E));
       return source;
     }
 
@@ -1168,6 +1181,9 @@ CalleeSource CalleeSource::decompose(Expr *E) {
   if (source.hasSubstitutions())
     source.unsubstituteCallSiteTypes();
 
+  // Remember the substituted result type, which is to say, the type
+  // of the original expression.
+  source.setSubstResultType(E->getType());
   return source;
 }
 
@@ -1204,7 +1220,9 @@ Callee irgen::emitCallee(IRGenFunction &IGF, Expr *fn,
     (callee.hasDataPointer() ? callee.getDataPointer(IGF)
                              : ManagedValue(nullptr));
   return Callee::forKnownFunction(callee.getConvention(),
-                                  fn->getType(), callee.getSubstitutions(),
+                                  callee.getOrigFormalType(),
+                                  callee.getSubstResultType(),
+                                  callee.getSubstitutions(),
                                   fnPtr, dataPtr,
                                   callee.getExplosionLevel(),
                                   callee.getUncurryLevel());
@@ -1241,7 +1259,7 @@ namespace {
     const Callee &TheCallee;
 
   private:
-    const TypeInfo &ResultTI;
+    const TypeInfo &SubstResultTI;
     CallResult &Result;
     Address FinalAddress;
 
@@ -1251,10 +1269,10 @@ namespace {
     
   protected:
     CallEmitter(IRGenFunction &IGF, const Callee &callee,
-                const TypeInfo &resultTI, CallResult &result,
-                Address finalAddress)
-      : IGF(IGF), TheCallee(callee), ResultTI(resultTI), Result(result),
-        FinalAddress(finalAddress) {
+                const TypeInfo &substResultTI,
+                CallResult &result, Address finalAddress)
+      : IGF(IGF), TheCallee(callee), SubstResultTI(substResultTI),
+        Result(result), FinalAddress(finalAddress) {
     }
 
     bool hasSubstitutions() const {
@@ -1289,10 +1307,10 @@ namespace {
 
   public:
     ArgCallEmitter(IRGenFunction &IGF, const Callee &callee,
-                   ArrayRef<Arg> args,
-                   const TypeInfo &resultTI, CallResult &result,
-                   Address finalAddress)
-      : CallEmitter(IGF, callee, resultTI, result, finalAddress), Args(args) {
+                   ArrayRef<Arg> args, const TypeInfo &substResultTI,
+                   CallResult &result, Address finalAddress)
+      : CallEmitter(IGF, callee, substResultTI, result, finalAddress),
+        Args(args) {
       assert(TheCallee.getUncurryLevel() + 1 == Args.size());
     }
 
@@ -1327,9 +1345,9 @@ namespace {
     CallSiteCallEmitter(IRGenFunction &IGF, const Callee &callee,
                         ArrayRef<Arg> calleeArgs,
                         ArrayRef<CallSite> &callSites,
-                        const TypeInfo &resultTI, CallResult &result,
-                        Address finalAddress)
-      : CallEmitter(IGF, callee, resultTI, result, finalAddress),
+                        const TypeInfo &substResultTI,
+                        CallResult &result, Address finalAddress)
+      : CallEmitter(IGF, callee, substResultTI, result, finalAddress),
         CalleeArgs(calleeArgs), CallSites(callSites) {
       assert(TheCallee.getUncurryLevel() <
                CallSites.size() + calleeArgs.size());
@@ -1371,39 +1389,88 @@ void CallEmitter::emit(llvm::Value *fnPtr) {
   Args.set_size(numArgs);
   LastArgWritten = numArgs;
 
-  //   Add the data pointer in.
+  // - Add the data pointer in.
   if (TheCallee.hasDataPointer()) {
     Args[--LastArgWritten] = TheCallee.getDataPointer(IGF).split(ArgCleanups);
   }
 
-  //   Emit all of the formal arguments we have.
+  // - Emit all of the formal arguments we have.
   emitArgs();
 
+  // Prepare the return value slot:
   Initialization indirectInit;
   InitializedObject indirectResultObject = InitializedObject::invalid();
 
+  // - Compute the callee's formal result type and determine if we
+  //   need to translate the result.
+  bool resultDiffers;
+  bool resultDiffersByAbstraction;
+  Type calleeResultType;
+
+  //   If we don't have substitutions, this is easy.
+  if (!TheCallee.hasSubstitutions()) {
+    calleeResultType = TheCallee.getSubstResultType();
+    resultDiffersByAbstraction = false;
+    resultDiffers = false;
+
+  //   If we do, drill into the formal type and check for differences
+  //   in abstraction.
+  } else {
+    calleeResultType =
+      getResultType(TheCallee.getOrigFormalType(), TheCallee.getUncurryLevel());
+    resultDiffers = !calleeResultType->isEqual(TheCallee.getSubstResultType());
+    resultDiffersByAbstraction =
+      (resultDiffers &&
+       differsByAbstraction(IGF.IGM, calleeResultType->getCanonicalType(),
+                            TheCallee.getSubstResultType()->getCanonicalType(),
+                            AbstractionDifference::Memory));
+  }
+
+  const TypeInfo *calleeResultTI = nullptr;
+  if (resultDiffers) calleeResultTI = &IGF.getFragileTypeInfo(calleeResultType);
+
   // Emit and insert the result slot if required.
   assert(LastArgWritten == 0 || LastArgWritten == 1);
-  bool isAggregateResult = (LastArgWritten != 0);
-  assert(isAggregateResult ==
-         ResultTI.getSchema(TheCallee.getExplosionLevel())
-           .requiresIndirectResult());
-  if (isAggregateResult) {
+  bool isCalleeAggregateResult = (LastArgWritten != 0);
+  assert(isCalleeAggregateResult ==
+         (IGF.IGM.requiresIndirectResult(calleeResultType,
+                                         TheCallee.getExplosionLevel())
+            != nullptr));
+  if (isCalleeAggregateResult) {
     // Force there to be an indirect address.
     Address resultAddress;
-    if (FinalAddress.isValid()) {
+
+    // If we have a final address, use that if we don't differ by
+    // abstraction.
+    if (!resultDiffersByAbstraction && FinalAddress.isValid()) {
       resultAddress = FinalAddress;
+
+    // Otherwise, we need to allocate a temporary.
     } else {
+      // Use the substituted type, which has the more accurate
+      // information, unless we differ by abstraction.
+      auto &resultTI =
+        (resultDiffersByAbstraction ? *calleeResultTI : SubstResultTI);
+
       indirectResultObject = indirectInit.getObjectForTemporary();
       indirectInit.registerObject(IGF, indirectResultObject,
-                                  NotOnHeap, ResultTI);
+                                  NotOnHeap, resultTI);
       resultAddress =
         indirectInit.emitLocalAllocation(IGF, indirectResultObject,
-                                         NotOnHeap, ResultTI,
+                                         NotOnHeap, resultTI,
                                          "call.aggresult");
     }
-    Args[0] = resultAddress.getAddress();
+
+    // Okay, remember resultAddress uncasted.  It's typed for the
+    // substituted result unless we differ by abstraction.
     Result.setAsIndirectAddress(resultAddress);
+
+    // However, we might need a cast before we pass it as an argument.
+    if (resultDiffers && !resultDiffersByAbstraction) {
+      auto calleeRetTy = calleeResultTI->getStorageType()->getPointerTo();
+      resultAddress = IGF.Builder.CreateBitCast(resultAddress, calleeRetTy);
+    }
+    Args[0] = resultAddress.getAddress();
   }
 
   // Deactivate all the cleanups.
@@ -1412,21 +1479,29 @@ void CallEmitter::emit(llvm::Value *fnPtr) {
 
   // Determine the calling convention.
   auto cc = expandAbstractCC(IGF.IGM, TheCallee.getConvention(),
-                             isAggregateResult, attrs);
+                             isCalleeAggregateResult, attrs);
 
   // Make the call.
   llvm::CallSite call = IGF.emitInvoke(cc, fnPtr, Args,
                                        llvm::AttrListPtr::get(attrs));
+
+  // Handle the return value.  We don't want to add any abstraction
+  // penalties here:  the result should be 
     
   // If we have an aggregate result, set the sret and noalias
-  // attributes on the agg return slot, then return, since agg
-  // results can only be final.
-  if (isAggregateResult) {
+  // attributes on the agg return slot.
+  if (isCalleeAggregateResult) {
+    assert(Result.isIndirect());
+
     // Mark that we've successfully initialized the indirect result.
     if (indirectResultObject.isValid())
       indirectInit.markInitialized(IGF, indirectResultObject);
 
-    assert(Result.isIndirect());
+    // If we differ by abstraction, we need to do that translation here.
+    // Otherwise we're done.
+    if (!resultDiffersByAbstraction) return;
+
+    IGF.unimplemented(SourceLoc(), "translation of aggregate return values");
     return;
   }
 
@@ -1436,14 +1511,22 @@ void CallEmitter::emit(llvm::Value *fnPtr) {
     return;
   }
 
+  // If the result differs by abstraction, we need to do that
+  // translation here.
+  if (resultDiffersByAbstraction) {
+    IGF.unimplemented(SourceLoc(), "translation of scalar return values");
+    return;
+  }
+
   // Extract out the scalar results.
   Explosion &out = Result.initForDirectValues(TheCallee.getExplosionLevel());
-  extractScalarResults(IGF, call.getInstruction(), ResultTI, out);
+  extractScalarResults(IGF, call.getInstruction(), SubstResultTI, out);
 }
 
 /// Emit a call with a set of arguments which have already been emitted.
 static void emitCall(IRGenFunction &IGF, const Callee &callee,
-                     ArrayRef<Arg> args, const TypeInfo &resultTI,
+                     ArrayRef<Arg> args,
+                     const TypeInfo &substResultTI,
                      CallResult &result) {
   // Remember the requested final address, if applicable.
   Address finalAddress;
@@ -1457,7 +1540,8 @@ static void emitCall(IRGenFunction &IGF, const Callee &callee,
   llvm::Value *fn = callee.getRawFunctionPointer();
 
   // Emit the call.
-  ArgCallEmitter(IGF, callee, args, resultTI, result, finalAddress).emit(fn);
+  ArgCallEmitter(IGF, callee, args,
+                 substResultTI, result, finalAddress).emit(fn);
 }
 
 /// emitKnownCall - Emit a call to a known function.
@@ -1488,7 +1572,7 @@ static bool emitKnownCall(IRGenFunction &IGF, FuncDecl *Fn,
     if (callSites.size() != 2)
       return false;
 
-    Expr *Arg = callSites[0].Arg;
+    Expr *Arg = callSites[0].getArg();
     Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
     Explosion temp(ExplosionKind::Maximal);
     Type ObjTy = Arg->getType()->castTo<LValueType>()->getObjectType();
@@ -1505,7 +1589,7 @@ static bool emitKnownCall(IRGenFunction &IGF, FuncDecl *Fn,
     if (M->Name.str() != "swift")
       return false;
 
-    TupleExpr *Arg = cast<TupleExpr>(callSites.front().Arg);
+    TupleExpr *Arg = cast<TupleExpr>(callSites.front().getArg());
     
     Condition cond = IGF.emitCondition(Arg->getElement(0), true,
                                        Fn->getName().str() == "||");
@@ -1564,17 +1648,21 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
     // Handle calls to builtin functions.  These are never curried, but they
     // might return a function pointer.
     if (isa<BuiltinModule>(knownFn->getDeclContext())) {
+      CallSite site = callSites.front();
       emitBuiltinCall(IGF, knownFn, CalleeSrc.getSubstitutions(),
-                      callSites.front().Arg, result);
+                      site.getArg(), result);
 
       // If there are no trailing calls, we're done.
       if (callSites.size() == 1) return;
 
       // Otherwise, pop that call site off and set up the callee conservatively.
       callSites = callSites.slice(1);
-      Type formalResult =
-        knownFn->getType()->castTo<AnyFunctionType>()->getResult();
-      callee = result.getDirectValuesAsIndirectCallee(formalResult,
+      Type origFnType =
+        site.getOrigFnType()->castTo<AnyFunctionType>()->getResult();
+      Type substResultType =
+        site.getSubstResultType()->castTo<AnyFunctionType>()->getResult();
+      callee = result.getDirectValuesAsIndirectCallee(origFnType,
+                                                      substResultType,
                                                CalleeSrc.getSubstitutions());
       result.reset();
       break;
@@ -1600,16 +1688,14 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
 
     // Find the formal type of the function we're calling.  This is the
     // least-uncurried function type.
-    Type calleeFormalType = callee.getFormalType();
-    llvm::Value *fnPtr =
-      callee.getFunctionPointer(IGF, calleeFormalType);
+    llvm::Value *fnPtr = callee.getFunctionPointer(IGF);
 
     // Additionally compute the information for the formal result
     // type.  This is the result of the uncurried function type.
-    Type formalResultType =
-      callSites[callee.getUncurryLevel() - calleeArgs.size()]
-        .FnType->castTo<AnyFunctionType>()->getResult();
-    const TypeInfo &resultTI = IGF.IGM.getFragileTypeInfo(formalResultType);
+    auto &lastSite = callSites[callee.getUncurryLevel() - calleeArgs.size()];
+    Type origResultType =
+      lastSite.getOrigFnType()->castTo<AnyFunctionType>()->getResult();
+    const TypeInfo &resultTI = IGF.IGM.getFragileTypeInfo(origResultType);
 
     CallSiteCallEmitter(IGF, callee, calleeArgs, callSites,
                         resultTI, result, finalAddress)
@@ -1620,9 +1706,13 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
       return;
     }
 
+    Type substResultResultType =
+      lastSite.getSubstResultType()->castTo<FunctionType>()->getResult();
+
     // Otherwise, we must have gotten a function back.  Set ourselves
     // up to call it, then continue emitting calls.
-    callee = result.getDirectValuesAsIndirectCallee(formalResultType,
+    callee = result.getDirectValuesAsIndirectCallee(origResultType,
+                                                    substResultResultType,
                                                CalleeSrc.getSubstitutions());
     calleeArgs.clear();
     result.reset();
@@ -1696,12 +1786,13 @@ swift::irgen::tryEmitApplyAsAddress(IRGenFunction &IGF, ApplyExpr *E,
 
 /// Emit a call against a set of arguments which have already been
 /// emitted, placing the result in memory.
-void swift::irgen::emitCallToMemory(IRGenFunction &IGF, const Callee &callee,
-                                    ArrayRef<Arg> args, const TypeInfo &resultTI,
-                                    Address resultAddress) {
+void irgen::emitCallToMemory(IRGenFunction &IGF, const Callee &callee,
+                             ArrayRef<Arg> args,
+                             const TypeInfo &substResultTI,
+                             Address resultAddress) {
   CallResult result;
   result.setAsIndirectAddress(resultAddress);
-  ::emitCall(IGF, callee, args, resultTI, result);
+  ::emitCall(IGF, callee, args, substResultTI, result);
 
   if (result.isIndirect()) {
     assert(result.getIndirectAddress().getAddress()
@@ -1710,19 +1801,19 @@ void swift::irgen::emitCallToMemory(IRGenFunction &IGF, const Callee &callee,
   }
 
   Explosion &directValues = result.getDirectValues();
-  resultTI.initialize(IGF, directValues, resultAddress);
+  substResultTI.initialize(IGF, directValues, resultAddress);
 }
 
 /// Emit a call against a set of arguments which have already been
 /// emitted, placing the result in an explosion.
-void swift::irgen::emitCall(IRGenFunction &IGF, const Callee &callee,
-                            ArrayRef<Arg> args, const TypeInfo &resultTI,
-                            Explosion &resultExplosion) {
+void irgen::emitCall(IRGenFunction &IGF, const Callee &callee,
+                     ArrayRef<Arg> args, const TypeInfo &substResultTI,
+                     Explosion &resultExplosion) {
   CallResult result;
-  ::emitCall(IGF, callee, args, resultTI, result);
+  ::emitCall(IGF, callee, args, substResultTI, result);
 
   if (result.isIndirect()) {
-    resultTI.load(IGF, result.getIndirectAddress(), resultExplosion);
+    substResultTI.load(IGF, result.getIndirectAddress(), resultExplosion);
     return;
   }
 
@@ -1730,28 +1821,32 @@ void swift::irgen::emitCall(IRGenFunction &IGF, const Callee &callee,
   if (directValues.getKind() == resultExplosion.getKind())
     return resultExplosion.add(directValues.claimAll());
 
-  resultTI.reexplode(IGF, directValues, resultExplosion);
+  substResultTI.reexplode(IGF, directValues, resultExplosion);
 }
 
 /// Emit a void-returning call against a set of arguments which have
 /// already been emitted.
-void swift::irgen::emitVoidCall(IRGenFunction &IGF, const Callee &callee,
-                                ArrayRef<Arg> args) {
-  const TypeInfo &resultTI =
-    IGF.getFragileTypeInfo(TupleType::getEmpty(IGF.IGM.Context));
+void irgen::emitVoidCall(IRGenFunction &IGF, const Callee &callee,
+                         ArrayRef<Arg> args) {
+  Type voidTy = callee.getSubstResultType();
+  const TypeInfo &voidTI = IGF.getFragileTypeInfo(voidTy);
 
   CallResult result;
-  ::emitCall(IGF, callee, args, resultTI, result);
+  ::emitCall(IGF, callee, args, voidTI, result);
   assert(result.isDirect() && result.getDirectValues().empty());
 }
 
-/// Emit a nullary call to the given function, using the standard
-/// calling-convention and so on, and explode the result.
+/// Emit a nullary call to the given monomorphic function, using the
+/// standard calling-convention and so on, and explode the result.
 void IRGenFunction::emitNullaryCall(llvm::Value *fnPtr,
                                     Type resultType,
                                     Explosion &resultExplosion) {
+  Type formalType = TupleType::getEmpty(IGM.Context);
+  formalType = FunctionType::get(formalType, resultType, IGM.Context);
+
   Callee callee =
-    Callee::forKnownFunction(AbstractCC::Freestanding, Type(),
+    Callee::forKnownFunction(AbstractCC::Freestanding,
+                             formalType, resultType,
                              ArrayRef<Substitution>(),
                              fnPtr, ManagedValue(nullptr),
                              resultExplosion.getKind(),

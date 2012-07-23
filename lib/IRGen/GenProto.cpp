@@ -2864,14 +2864,16 @@ LValue irgen::emitExistentialMemberRefLValue(IRGenFunction &IGF,
 /// \param wtable - the witness table from which the witness was loaded
 /// \param thisObject - the object (if applicable) to call the method on
 static Callee emitProtocolMethodCallee(IRGenFunction &IGF, FuncDecl *fn,
+                                       Type substResultType,
                                        ArrayRef<Substitution> subs,
                                        llvm::Value *witness,
                                        SmallVectorImpl<Arg> &calleeArgs,
                                        llvm::Value *wtable,
                                        Address thisObject) {
   if (fn->isStatic())
-    return Callee::forKnownFunction(AbstractCC::Method, fn->getType(),
-                                    subs, witness, ManagedValue(nullptr),
+    return Callee::forKnownFunction(AbstractCC::Method,
+                                    fn->getType(), substResultType, subs,
+                                    witness, ManagedValue(nullptr),
                                     ExplosionKind::Minimal, 0);
 
   // Add the temporary address as a callee arg.
@@ -2885,7 +2887,8 @@ static Callee emitProtocolMethodCallee(IRGenFunction &IGF, FuncDecl *fn,
   calleeArgs.push_back(Arg::forOwned(arg));
 
   // FIXME: writeback
-  return Callee::forKnownFunction(AbstractCC::Method, fn->getType(), subs,
+  return Callee::forKnownFunction(AbstractCC::Method,
+                                  fn->getType(), substResultType, subs,
                                   witness, ManagedValue(nullptr),
                                   ExplosionKind::Minimal, 1);
 }
@@ -2893,6 +2896,7 @@ static Callee emitProtocolMethodCallee(IRGenFunction &IGF, FuncDecl *fn,
 /// Emit an existential member reference as a callee.
 Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
                                              ExistentialMemberRefExpr *E,
+                                             Type substResultType,
                                              ArrayRef<Substitution> subs,
                                              SmallVectorImpl<Arg> &calleeArgs,
                                              ExplosionKind maxExplosionLevel,
@@ -2951,13 +2955,14 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
   llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
 
   // Emit the callee.
-  return emitProtocolMethodCallee(IGF, fn, subs, witness, calleeArgs,
-                                  wtable, thisObject);
+  return emitProtocolMethodCallee(IGF, fn, substResultType, subs,
+                                  witness, calleeArgs, wtable, thisObject);
 }
 
 /// Emit an existential member reference as a callee.
 Callee irgen::emitArchetypeMemberRefCallee(IRGenFunction &IGF,
                                            ArchetypeMemberRefExpr *E,
+                                           Type substResultType,
                                            ArrayRef<Substitution> subs,
                                            SmallVectorImpl<Arg> &calleeArgs,
                                            ExplosionKind maxExplosionLevel,
@@ -2996,8 +3001,8 @@ Callee irgen::emitArchetypeMemberRefCallee(IRGenFunction &IGF,
   llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
 
   // Emit the callee.
-  return emitProtocolMethodCallee(IGF, fn, subs, witness, calleeArgs,
-                                  wtable, thisObject);
+  return emitProtocolMethodCallee(IGF, fn, substResultType, subs,
+                                  witness, calleeArgs, wtable, thisObject);
 }
 
 

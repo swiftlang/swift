@@ -27,6 +27,7 @@
 
 #include "CallingConvention.h"
 #include "Explosion.h"
+#include "FormalType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Linking.h"
@@ -553,15 +554,9 @@ static Type getObjectType(ValueDecl *decl) {
   return decl->getType();
 }
 
-/// getAddrOfGetter - Get the address of the function which performs a
-/// get of a variable or subscripted object.
-llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
-                                             ExplosionKind explosionLevel) {
-  LinkEntity entity = LinkEntity::forGetter(value, explosionLevel);
-
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) return entry;
-
+/// getTypeOfGetter - Return the formal type of a getter for a
+/// variable or subscripted object.
+FormalType IRGenModule::getTypeOfGetter(ValueDecl *value) {
   // The formal type of a getter function is one of:
   //   S -> () -> T (for a nontype member)
   //   A -> S -> () -> T (for a type member)
@@ -578,27 +573,39 @@ llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
   }
   AbstractCC cc = addOwnerArgument(Context, value, formalType, uncurryLevel);
 
+  return FormalType(formalType, cc, uncurryLevel);
+}
+
+llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
+                                             ExplosionKind explosionLevel) {
+  return getAddrOfGetter(value, getTypeOfGetter(value), explosionLevel);
+}
+
+/// getAddrOfGetter - Get the address of the function which performs a
+/// get of a variable or subscripted object.
+llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
+                                             FormalType formal,
+                                             ExplosionKind explosionLevel) {
+  LinkEntity entity = LinkEntity::forGetter(value, explosionLevel);
+
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) return entry;
+
   llvm::FunctionType *fnType =
-    getFunctionType(formalType, explosionLevel, uncurryLevel,
-                    /*data*/ false);
+    getFunctionType(formal.getType(), explosionLevel,
+                    formal.getNaturalUncurryLevel(), /*data*/ false);
 
   SmallVector<llvm::AttributeWithIndex, 4> attrs;
-  auto convention = expandAbstractCC(*this, cc, false, attrs);
+  auto convention = expandAbstractCC(*this, formal.getCC(), false, attrs);
 
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, convention, attrs);
   return entry;
 }
 
-/// getAddrOfSetter - Get the address of the function which performs a
-/// set of a variable or subscripted object.
-llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
-                                             ExplosionKind explosionLevel) {
-  LinkEntity entity = LinkEntity::forSetter(value, explosionLevel);
-
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) return entry;
-
+/// getTypeOfSetter - Return the formal type of a setter for a
+/// variable or subscripted object.
+FormalType IRGenModule::getTypeOfSetter(ValueDecl *value) {
   // The formal type of a setter function is one of:
   //   (S, T) -> () (for a nontype member)
   //   A -> (S, T) -> () (for a type member)
@@ -617,12 +624,30 @@ llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
 
   auto cc = addOwnerArgument(Context, value, formalType, uncurryLevel);
 
+  return FormalType(formalType, cc, uncurryLevel);
+}
+
+llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
+                                             ExplosionKind explosionLevel) {
+  return getAddrOfSetter(value, getTypeOfSetter(value), explosionLevel);
+}
+
+/// getAddrOfSetter - Get the address of the function which performs a
+/// set of a variable or subscripted object.
+llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
+                                             FormalType formal,
+                                             ExplosionKind explosionLevel) {
+  LinkEntity entity = LinkEntity::forSetter(value, explosionLevel);
+
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) return entry;
+
   llvm::FunctionType *fnType =
-    getFunctionType(formalType, explosionLevel, uncurryLevel,
-                    /*data*/ false);
+    getFunctionType(formal.getType(), explosionLevel,
+                    formal.getNaturalUncurryLevel(), /*data*/ false);
 
   SmallVector<llvm::AttributeWithIndex, 4> attrs;
-  auto convention = expandAbstractCC(*this, cc, false, attrs);
+  auto convention = expandAbstractCC(*this, formal.getCC(), false, attrs);
 
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, convention, attrs);
