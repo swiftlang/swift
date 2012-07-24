@@ -175,9 +175,9 @@ bool Parser::parseRequiresClause(SourceLoc &RequiresLoc,
       }
 
       // Add the requirement.
-      Requirements.push_back(Requirement::getConformance(FirstType.getType(),
+      Requirements.push_back(Requirement::getConformance(FirstType,
                                                          ColonLoc,
-                                                         Protocol.getType()));
+                                                         Protocol));
 
       // If there's a comma, keep parsing the list.
       if (Tok.is(tok::comma)) {
@@ -204,9 +204,9 @@ bool Parser::parseRequiresClause(SourceLoc &RequiresLoc,
       }
 
       // Add the requirement
-      Requirements.push_back(Requirement::getSameType(FirstType.getType(),
+      Requirements.push_back(Requirement::getSameType(FirstType,
                                                       EqualLoc,
-                                                      SecondType.getType()));
+                                                      SecondType));
 
       // If there's a comma, keep parsing the list.
       if (Tok.is(tok::comma)) {

@@ -190,10 +190,10 @@ class Requirement {
   SourceLoc SeparatorLoc;
   RequirementKind Kind : 1;
   bool Invalid : 1;
-  Type Types[2];
+  TypeLoc Types[2];
 
-  Requirement(SourceLoc SeparatorLoc, RequirementKind Kind, Type FirstType,
-              Type SecondType)
+  Requirement(SourceLoc SeparatorLoc, RequirementKind Kind, TypeLoc FirstType,
+              TypeLoc SecondType)
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       Types{FirstType, SecondType} { }
   
@@ -206,9 +206,9 @@ public:
   /// this requirement was implied.
   /// \param Protocol The protocol or protocol composition to which the
   /// subject must conform.
-  static Requirement getConformance(Type Subject,
-                                               SourceLoc ColonLoc,
-                                               Type Protocol) {
+  static Requirement getConformance(TypeLoc Subject,
+                                    SourceLoc ColonLoc,
+                                    TypeLoc Protocol) {
     return { ColonLoc, RequirementKind::Conformance, Subject, Protocol };
   }
 
@@ -218,9 +218,9 @@ public:
   /// \param EqualLoc The location of the '==' in the same-type constraint, or
   /// an invalid location if this requirement was implied.
   /// \param SecondType The second type.
-  static Requirement getSameType(Type FirstType,
+  static Requirement getSameType(TypeLoc FirstType,
                                  SourceLoc EqualLoc,
-                                 Type SecondType) {
+                                 TypeLoc SecondType) {
     return { EqualLoc, RequirementKind::SameType, FirstType, SecondType };
   }
 
@@ -242,26 +242,24 @@ public:
   /// conformance relationship.
   Type getSubject() const {
     assert(getKind() == RequirementKind::Conformance);
-    return Types[0];
+    return Types[0].getType();
   }
 
-  /// \brief Override the subject of a conformance relationship.
-  void overrideSubject(Type Subject) {
+  TypeLoc &getSubjectLoc() {
     assert(getKind() == RequirementKind::Conformance);
-    Types[0] = Subject;
+    return Types[0];
   }
 
   /// \brief For a conformance requirement, return the protocol to which
   /// the subject conforms.
   Type getProtocol() const {
     assert(getKind() == RequirementKind::Conformance);
-    return Types[1];
+    return Types[1].getType();
   }
 
-  /// \brief Override the protocol of a conformance relationship.
-  void overrideProtocol(Type Protocol) {
+  TypeLoc &getProtocolLoc() {
     assert(getKind() == RequirementKind::Conformance);
-    Types[1] = Protocol;
+    return Types[1];
   }
 
   /// \brief Retrieve the location of the ':' in an explicitly-written
@@ -275,25 +273,23 @@ public:
   /// \brief Retrieve the first type of a same-type requirement.
   Type getFirstType() const {
     assert(getKind() == RequirementKind::SameType);
-    return Types[0];
+    return Types[0].getType();
   }
 
-  /// \brief Override the first type of a same-type relationship.
-  void overrideFirstType(Type T) {
+  TypeLoc &getFirstTypeLoc() {
     assert(getKind() == RequirementKind::SameType);
-    Types[0] = T;
+    return Types[0];
   }
 
   /// \brief Retrieve the second type of a same-type requirement.
   Type getSecondType() const {
     assert(getKind() == RequirementKind::SameType);
-    return Types[1];
+    return Types[1].getType();
   }
 
-  /// \brief Override the second type of a same-type relationship.
-  void overrideSecondType(Type T) {
+  TypeLoc &getSecondTypeLoc() {
     assert(getKind() == RequirementKind::SameType);
-    Types[1] = T;
+    return Types[1];
   }
 
   /// \brief Retrieve the location of the '==' in an explicitly-written

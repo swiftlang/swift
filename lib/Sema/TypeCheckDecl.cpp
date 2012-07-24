@@ -98,10 +98,7 @@ public:
       
       switch (Req.getKind()) {
       case RequirementKind::Conformance: {
-        // FIXME: TypeLoc info?
-        TypeLoc TempLoc{ Req.getProtocol() };
-        if (TC.validateType(TempLoc, IsFirstPass)) {
-          Req.overrideProtocol(ErrorType::get(TC.Context));
+        if (TC.validateType(Req.getProtocolLoc(), IsFirstPass)) {
           Req.setInvalid();
           continue;
         }
@@ -110,7 +107,7 @@ public:
           TC.diagnose(GenericParams->getRequiresLoc(),
                       diag::requires_conformance_nonprotocol,
                       Req.getSubject(), Req.getProtocol());
-          Req.overrideProtocol(ErrorType::get(TC.Context));
+          Req.getProtocolLoc().setInvalidType(TC.Context);
           Req.setInvalid();
           continue;
         }
@@ -139,10 +136,7 @@ public:
 
       switch (Req.getKind()) {
       case RequirementKind::Conformance: {
-        // FIXME: TypeLoc info?
-        TypeLoc TempLoc{ Req.getSubject() };
-        if (TC.validateType(TempLoc, IsFirstPass)) {
-          Req.overrideSubject(ErrorType::get(TC.Context));
+        if (TC.validateType(Req.getSubjectLoc(), IsFirstPass)) {
           Req.setInvalid();
           continue;
         }
@@ -150,18 +144,12 @@ public:
       }
 
       case RequirementKind::SameType:
-        // FIXME: TypeLoc info?
-        TypeLoc TempLoc{ Req.getFirstType() };
-        if (TC.validateType(TempLoc, IsFirstPass)) {
-          Req.overrideFirstType(ErrorType::get(TC.Context));
+        if (TC.validateType(Req.getFirstTypeLoc(), IsFirstPass)) {
           Req.setInvalid();
           continue;
         }
 
-        // FIXME: TypeLoc info?
-        TempLoc = TypeLoc{ Req.getSecondType() };
-        if (TC.validateType(TempLoc, IsFirstPass)) {
-          Req.overrideSecondType(ErrorType::get(TC.Context));
+        if (TC.validateType(Req.getSecondTypeLoc(), IsFirstPass)) {
           Req.setInvalid();
           continue;
         }
