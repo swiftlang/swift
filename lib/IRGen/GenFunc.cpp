@@ -1692,36 +1692,30 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
 
     // Additionally compute the information for the formal result
     // type.  This is the result of the uncurried function type.
-    auto &lastSite = callSites[callee.getUncurryLevel() - calleeArgs.size()];
-    Type origResultType =
-      lastSite.getOrigFnType()->castTo<AnyFunctionType>()->getResult();
-    const TypeInfo &resultTI = IGF.IGM.getFragileTypeInfo(origResultType);
-
+    const TypeInfo &substResultTI =
+      IGF.IGM.getFragileTypeInfo(callee.getSubstResultType());
     CallSiteCallEmitter(IGF, callee, calleeArgs, callSites,
-                        resultTI, result, finalAddress)
+                        substResultTI, result, finalAddress)
       .emit(fnPtr);
 
     // If this is the end of the call sites, we're done.
-    if (callSites.empty()) {
+    if (callSites.empty())
       return;
-    }
 
-    Type substResultResultType =
-      lastSite.getSubstResultType()->castTo<FunctionType>()->getResult();
+    auto &nextSite = callSites.front();
 
     // Otherwise, we must have gotten a function back.  Set ourselves
     // up to call it, then continue emitting calls.
-    callee = result.getDirectValuesAsIndirectCallee(origResultType,
-                                                    substResultResultType,
-                                               CalleeSrc.getSubstitutions());
+    callee = result.getDirectValuesAsIndirectCallee(nextSite.getOrigFnType(),
+                                               nextSite.getSubstResultType(),
+                                                    callee.getSubstitutions());
     calleeArgs.clear();
     result.reset();
   }
 }
 
 /// Emit a call for its exploded results.
-void swift::irgen::emitApplyExpr(IRGenFunction &IGF, ApplyExpr *E,
-                                 Explosion &explosion) {
+void irgen::emitApplyExpr(IRGenFunction &IGF, ApplyExpr *E, Explosion &out) {
   CallPlan plan = getCallPlan(IGF.IGM, E);
 
   const TypeInfo &resultTI = IGF.getFragileTypeInfo(E->getType());
@@ -1731,18 +1725,18 @@ void swift::irgen::emitApplyExpr(IRGenFunction &IGF, ApplyExpr *E,
 
   // If this was an indirect return, explode it.
   if (result.isIndirect()) {
-    return resultTI.load(IGF, result.getIndirectAddress(), explosion);
+    return resultTI.load(IGF, result.getIndirectAddress(), out);
   }
 
   Explosion &directValues = result.getDirectValues();
 
   // If the explosion kind of the direct values matches that of the
   // result, we're okay.
-  if (directValues.getKind() == explosion.getKind())
-    return explosion.add(directValues.claimAll());
+  if (directValues.getKind() == out.getKind())
+    return out.add(directValues.claimAll());
 
   // Otherwise we need to re-explode.
-  resultTI.reexplode(IGF, directValues, explosion);
+  resultTI.reexplode(IGF, directValues, out);
 }
 
 /// Emit a call as the initializer for an object in memory.
