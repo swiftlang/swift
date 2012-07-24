@@ -163,14 +163,23 @@ public:
           if (!AssocType)
             continue;
 
-          ArchetypeType *AssocArchetype
-            = AssocType->getDeclaredType()->castTo<ArchetypeType>();
-
           ArchetypeType *RemappedArchetype
             = getNestedType(AssocType->getName())->getArchetype(TC);
-          
-          TC.Context.AssociatedTypeMap[Archetype][AssocArchetype]
-            = RemappedArchetype;
+
+          if (AssocType->hasUnderlyingType()) {
+            // Common case: provide a mapping for the underlying type.
+            ArchetypeType *AssocArchetype
+              = AssocType->getDeclaredType()->castTo<ArchetypeType>();
+
+            TC.Context.AssociatedTypeMap[Archetype][AssocArchetype]
+              = RemappedArchetype;
+          } else {
+            // While computing archetypes for a protocol itself, we have to
+            // fill in the underlying archetypes for each of the associated
+            // types.
+            // FIXME: Bogus location info.
+            AssocType->getUnderlyingTypeLoc() = TypeLoc(RemappedArchetype);
+          }
         }
       }
     }
@@ -425,6 +434,12 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
   }
 
   llvm_unreachable("Unhandled requirement?");
+}
+
+bool ArchetypeBuilder::addImplicitConformance(TypeAliasDecl *Param,
+                                              ProtocolDecl *Proto) {
+  assert(Impl->PotentialArchetypes[Param] != nullptr && "Unknown parameter");
+  return addConformanceRequirement(Impl->PotentialArchetypes[Param], Proto);
 }
 
 llvm::DenseMap<TypeAliasDecl *, ArchetypeType *>

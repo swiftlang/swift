@@ -783,6 +783,15 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   };
   ExprPrePassWalker prePass(TC);
 
+  // Validate the conformance types of all of the protocols in the translation
+  // unit. This includes inherited protocols, associated types with
+  // requirements, and (FIXME:) conformance requirements in requires clauses.
+  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
+    Decl *D = TU->Decls[i];
+    if (auto Proto = dyn_cast<ProtocolDecl>(D))
+      TC.preCheckProtocol(Proto);
+  }
+
   // Type check the top-level elements of the translation unit.
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     Decl *D = TU->Decls[i];

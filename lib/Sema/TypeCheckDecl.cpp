@@ -342,38 +342,25 @@ public:
     if (IsSecondPass)
       return;
 
-    checkInherited(PD, PD->getInherited());
-    
-    // Assign archetypes each of the associated types.
-    // FIXME: Switch to the archetype builder.
-    ArchetypeType *This = nullptr;
+    // Fix the 'This' associated type.
+    TypeAliasDecl *thisDecl = nullptr;
     for (auto Member : PD->getMembers()) {
       if (auto AssocType = dyn_cast<TypeAliasDecl>(Member)) {
-        checkInherited(AssocType, AssocType->getInherited());
-
-        ArchetypeType *Parent = nullptr;
-        Optional<unsigned> Index;
-        // FIXME: Find a better way to identify the 'This' archetype.
-        if (AssocType->getName().str().equals("This")) {
-          Index = 0;
-        } else {
-          assert(This && "No archetype for 'This'?");
-          Parent = This;
+        if (AssocType->getName().str() == "This") {
+          thisDecl = AssocType;
+          break;
         }
-        SmallVector<Type, 4> InheritedTypes;
-        for (TypeLoc T : AssocType->getInherited())
-          InheritedTypes.push_back(T.getType());
-        Type UnderlyingTy =
-            ArchetypeType::getNew(TC.Context, Parent, AssocType->getName(),
-                                  InheritedTypes, Index);
-        AssocType->getUnderlyingTypeLoc() = TypeLoc(UnderlyingTy);
-
-        // Set the 'This' archetype.
-        if (!Parent)
-          This = UnderlyingTy->castTo<ArchetypeType>();
       }
     }
 
+    // Build archetypes for this protocol.
+    ArchetypeBuilder builder(TC);
+    builder.addGenericParameter(thisDecl, 0);
+    builder.addImplicitConformance(thisDecl, PD);
+    llvm::DenseMap<TypeAliasDecl *, ArchetypeType *> assignments
+      = builder.assignArchetypes();
+    thisDecl->getUnderlyingTypeLoc() = TypeLoc(assignments[thisDecl]);
+    
     // Check the members.
     for (auto Member : PD->getMembers())
       visit(Member);
@@ -525,6 +512,15 @@ public:
 void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
   bool isSecondPass = !isFirstPass && D->getDeclContext()->isModuleContext();
   DeclChecker(*this, isFirstPass, isSecondPass).visit(D);
+}
+
+void TypeChecker::preCheckProtocol(ProtocolDecl *D) {
+  DeclChecker checker(*this, /*isFirstPass=*/true, /*isSecondPass=*/false);
+  checker.checkInherited(D, D->getInherited());
+  for (auto member : D->getMembers()) {
+    if (auto assocType = dyn_cast<TypeAliasDecl>(member))
+      checker.checkInherited(assocType, assocType->getInherited());
+  }
 }
 
 /// validateAttributes - Check that the func/var declaration attributes are ok.

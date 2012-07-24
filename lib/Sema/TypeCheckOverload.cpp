@@ -332,13 +332,15 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     // As a temporary hack, manually introduce the substitutions for operators
     // which are members of protocols.  (This will go away once we start using
     // PolymorphicFunctionTypes for protocol members.)
+    // FIXME: Eliminate this hack.
     if (VD->getName().isOperator()) {
       if (Type Extension = cast<FuncDecl>(VD)->getExtensionType()) {
         if (ProtocolType *P = Extension->getAs<ProtocolType>()) {
           SmallVector<GenericParam, 4> Params;
           for (auto m : P->getDecl()->getMembers()) {
             if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(m))
-              Params.push_back(TAD);
+              if (TAD->getName().str() == "This")
+                Params.push_back(TAD);
           }
 
           SmallVector<DeducibleGenericParamType *, 2> DeducibleParams;

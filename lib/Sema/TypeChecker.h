@@ -330,6 +330,10 @@ public:
 
   void typeCheckDecl(Decl *D, bool isFirstPass);
 
+  /// \brief Pre-check protocol declaration, validating all of the types
+  /// that are involved in conformance requirements.
+  void preCheckProtocol(ProtocolDecl *D);
+
   bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
   bool typeCheckPattern(Pattern *P, bool isFirstPass);
   bool coerceToType(Pattern *P, Type Ty, bool isFirstPass);

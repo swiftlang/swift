@@ -713,7 +713,11 @@ public:
     return UnderlyingTy.getType();
   }
 
+  /// \brief Determine whether this type alias has an underlying type.
+  bool hasUnderlyingType() const { return !UnderlyingTy.getType().isNull(); }
+
   TypeLoc &getUnderlyingTypeLoc() { return UnderlyingTy; }
+
 
   /// getAliasType - Return the sugared version of this decl as a Type.
   NameAliasType *getAliasType() const { return AliasTy; }

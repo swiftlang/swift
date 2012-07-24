@@ -83,6 +83,10 @@ public:
   /// inconsistent, in which case a diagnostic will have been issued.
   bool addRequirement(const Requirement &Req);
 
+  /// \brief Add a new, implicit conformance requirement for one of the
+  /// parameters.
+  bool addImplicitConformance(TypeAliasDecl *Param, ProtocolDecl *Proto);
+
   /// \brief Assign archetypes
   ///
   /// This operation should only be performed after all generic parameters and
