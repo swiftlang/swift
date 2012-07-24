@@ -341,12 +341,18 @@ IRGenFunction::getAddrOfLocalFunction(FuncDecl *func,
 
   // Recompute capture information in that context.
   CaptureInfo info(*definingIGF, func->getBody());
-  assert(info.requiresData());
-  HeapLayout layout = getHeapLayout(IGM, info);
+  assert(info.requiresData() == needsData);
 
-  // Emit the function body.
-  emitLocalFunctionBody(*definingIGF, fn, func->getBody(), explosionLevel,
-                        uncurryLevel, info, &layout);
+  if (!needsData) {
+    emitLocalFunctionBody(*definingIGF, fn, func->getBody(), explosionLevel,
+                          uncurryLevel, info, nullptr);
+  } else {
+    HeapLayout layout = getHeapLayout(IGM, info);
+
+    // Emit the function body.
+    emitLocalFunctionBody(*definingIGF, fn, func->getBody(), explosionLevel,
+                          uncurryLevel, info, &layout);
+  }
 
   return fn;
 }
