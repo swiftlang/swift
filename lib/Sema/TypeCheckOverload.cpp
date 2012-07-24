@@ -765,9 +765,11 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
     }
 
     // Refer to a member variable of an instance.
-    if (auto Var = dyn_cast<VarDecl>(Member)) {
-      assert(baseIsInstance && "Referencing variable of metatype!");
-      return new (Context) MemberRefExpr(Base, DotLoc, Var, MemberLoc);
+    if (!baseTy->is<ModuleType>()) {
+      if (auto Var = dyn_cast<VarDecl>(Member)) {
+        assert(baseIsInstance && "Referencing variable of metatype!");
+        return new (Context) MemberRefExpr(Base, DotLoc, Var, MemberLoc);
+      }
     }
 
     Expr *Ref = new (Context) DeclRefExpr(Member, MemberLoc,
