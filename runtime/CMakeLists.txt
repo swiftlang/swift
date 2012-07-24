@@ -2,6 +2,7 @@
 # directory.
 set(SWIFTLIB_SOURCES
     Bool.swift
+    File.swift
     FixedPoint.swift
     FloatingPoint.swift
     Misc.swift
