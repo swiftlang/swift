@@ -1949,7 +1949,29 @@ bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
       return true;
     
     Src = coerceToType(Src, DestTy);
-    return Src == nullptr;    
+    if (!Src)
+      return true;
+
+    SrcDependence.reset();
+    Src->walk(SrcDependence);
+    IsSrcUnresolved = SrcDependence.OneUnresolvedExpr != nullptr;
+
+    if (IsSrcUnresolved) {
+      if (resolveUnresolvedLiterals(Src))
+        return true;
+      
+      SrcDependence.reset();
+      Src->walk(SrcDependence);
+      IsSrcUnresolved = SrcDependence.OneUnresolvedExpr != nullptr;
+    }
+
+    if (!IsSrcUnresolved)
+      return false;
+
+    diagnose(SrcDependence.OneUnresolvedExpr->getLoc(),
+             diag::ambiguous_expression_unresolved)
+      << SrcDependence.OneUnresolvedExpr->getSourceRange();
+    return true;
   }
 
   // If the source is not unresolved (but the destination is), coerce the
