@@ -321,5 +321,4 @@ add_subdirectory(runtime)
 add_custom_target(Documentation
   SOURCES README.txt
   docs/LangRef.html
-  docs/swift.css
   docs/toc.js)
