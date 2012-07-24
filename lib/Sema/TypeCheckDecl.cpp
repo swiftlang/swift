@@ -255,9 +255,12 @@ public:
     if (!SD->getDeclContext()->isTypeContext())
       TC.diagnose(SD->getStartLoc(), diag::subscript_not_member);
 
-    TC.validateType(SD->getElementTypeLoc(), IsFirstPass);
+    bool isInvalid = TC.validateType(SD->getElementTypeLoc(), IsFirstPass);
+    isInvalid |= TC.typeCheckPattern(SD->getIndices(), IsFirstPass);
 
-    if (!TC.typeCheckPattern(SD->getIndices(), IsFirstPass))  {
+    if (isInvalid) {
+      SD->setType(ErrorType::get(TC.Context));
+    } else {
       SD->setType(FunctionType::get(SD->getIndices()->getType(),
                                     SD->getElementType(), TC.Context));
     }
