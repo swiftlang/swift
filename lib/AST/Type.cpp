@@ -215,8 +215,7 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
     ArraySliceType *sliceTy = cast<ArraySliceType>(this);
     Type baseTy = sliceTy->getBaseType()->getUnlabeledType(Context);
     if (baseTy.getPointer() != sliceTy->getBaseType().getPointer()) {
-      ArraySliceType *newSliceTy 
-        = ArraySliceType::get(baseTy, sliceTy->getFirstRefLoc(), Context);
+      ArraySliceType *newSliceTy = ArraySliceType::get(baseTy, Context);
       if (!newSliceTy->hasImplementationType())
         newSliceTy->setImplementationType(sliceTy->getImplementationType());
       return newSliceTy;

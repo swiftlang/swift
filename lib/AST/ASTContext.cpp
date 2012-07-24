@@ -346,11 +346,11 @@ ArrayType::ArrayType(Type base, uint64_t size)
 
 
 /// Return a uniqued array slice type with the specified base type.
-ArraySliceType *ArraySliceType::get(Type base, SourceLoc loc, ASTContext &C) {
+ArraySliceType *ArraySliceType::get(Type base, ASTContext &C) {
   ArraySliceType *&entry = C.Impl.ArraySliceTypes[base];
   if (entry) return entry;
 
-  return entry = new (C) ArraySliceType(loc, base);
+  return entry = new (C) ArraySliceType(base);
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, ASTContext &Ctx)

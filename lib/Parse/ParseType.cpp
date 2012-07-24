@@ -391,7 +391,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, TypeLoc &Result) {
       return true;
     }
     Type BaseTy = Elements.back().getType();
-    Type FullTy = ArraySliceType::get(BaseTy, EllipsisLoc, Context);
+    Type FullTy = ArraySliceType::get(BaseTy, Context);
     Identifier Name = Elements.back().getName();
     ExprHandle *Init = Elements.back().getInit();
     Elements.back() = TupleTypeElt(FullTy, Name, Init, BaseTy);
@@ -428,7 +428,7 @@ bool Parser::parseTypeArray(TypeLoc &result) {
 
     // Just build a normal array slice type.
     SourceRange arrayRange{ result.getSourceRange().Start, rsquareLoc };
-    result = { ArraySliceType::get(result.getType(), lsquareLoc, Context),
+    result = { ArraySliceType::get(result.getType(), Context),
                arrayRange };
     return false;
   }

@@ -26,9 +26,9 @@ using namespace swift;
 
 /// Given an array slice type with a valid base type and no
 /// implementation type, find its canonicalization.
-static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy) {
+static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy,
+                                SourceLoc loc) {
   Type baseTy = sliceTy->getBaseType();
-  SourceLoc loc = sliceTy->getFirstRefLoc();
 
   // Hack for array slices: first, try to look up Slice<T>.
   UnqualifiedLookup genericSliceLookup(TC.Context.getIdentifier("Slice"),
@@ -69,9 +69,9 @@ static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy) {
 }
 
 Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
-  ArraySliceType *sliceTy = ArraySliceType::get(elementType, loc, Context);
+  ArraySliceType *sliceTy = ArraySliceType::get(elementType, Context);
   if (sliceTy->hasCanonicalTypeComputed()) return sliceTy;
-  if (buildArraySliceType(*this, sliceTy)) return Type();
+  if (buildArraySliceType(*this, sliceTy, loc)) return Type();
   sliceTy->getCanonicalType();
   return sliceTy;
 }
@@ -377,7 +377,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     IsInvalid = validateType(TempLoc, isFirstPass);
     // FIXME: diagnose non-materializability of element type?
     if (!IsInvalid)
-      IsInvalid = buildArraySliceType(*this, AT);
+      IsInvalid = buildArraySliceType(*this, AT, Loc.getSourceRange().Start);
     break;
   }
       
@@ -678,7 +678,7 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     if (BaseTy.getPointer() == Slice->getBaseType().getPointer())
       return T;
     
-    return getArraySliceType(Slice->getFirstRefLoc(), BaseTy);
+    return getArraySliceType(SourceLoc(), BaseTy);
   }
       
   case TypeKind::LValue: {

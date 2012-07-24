@@ -922,21 +922,15 @@ private:
 /// always sugar for a library type.
 class ArraySliceType : public TypeBase {
   // ArraySliceTypes are never canonical.
-  ArraySliceType(SourceLoc loc, Type base)
+  ArraySliceType(Type base)
     : TypeBase(TypeKind::ArraySlice, nullptr, /*Unresolved=*/false),
-      FirstRef(loc), Base(base) {}
+      Base(base) {}
 
-  SourceLoc FirstRef;
   Type Base;
   Type Impl;
 
 public:
-  static ArraySliceType *get(Type baseTy, SourceLoc loc, ASTContext &C);
-
-  // HACK
-  SourceLoc getFirstRefLoc() const {
-    return FirstRef;
-  }
+  static ArraySliceType *get(Type baseTy, ASTContext &C);
 
   bool hasImplementationType() const { return !Impl.isNull(); }
   void setImplementationType(Type ty) {
