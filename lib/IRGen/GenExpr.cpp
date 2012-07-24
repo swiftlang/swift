@@ -160,6 +160,10 @@ static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
 
 static void emitConstructorRef(IRGenFunction &IGF, ConstructorRefExpr *E,
                                Explosion &explosion) {
+  if (Expr *BaseE = E->getBase().dyn_cast<Expr*>()) {
+    IGF.emitIgnored(BaseE);
+  }
+
   ValueDecl *D = E->getConstructor();
   switch (D->getKind()) {
 #define VALUE_DECL(id, parent)
