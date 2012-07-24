@@ -143,6 +143,11 @@ public:
       if (Parent)
         ParentArchetype = Parent->getArchetype(TC);
 
+      // If we ended up building our parent archetype, then we'll have
+      // already filled in our own archetype.
+      if (Archetype)
+        return Archetype;
+
       SmallVector<ProtocolDecl *, 4> Protos(ConformsTo.begin(),
                                             ConformsTo.end());
       Archetype = ArchetypeType::getNew(TC.Context, ParentArchetype,
