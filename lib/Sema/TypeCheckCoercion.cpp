@@ -243,7 +243,9 @@ public:
   visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E);
 
   CoercedResult visitDeclRefExpr(DeclRefExpr *E) {
-    return unchanged(E);
+    // An unresolved DeclRefExpr is a closure argument; we don't know what it
+    // will be deduced to.
+    return CoercionResult::Unknowable;
   }
   CoercedResult visitMemberRefExpr(MemberRefExpr *E) {
     return unchanged(E);

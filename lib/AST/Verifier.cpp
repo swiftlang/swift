@@ -465,6 +465,42 @@ namespace {
       }
     }
 
+    void verifyChecked(TupleShuffleExpr *E) {
+      TupleType *TT = E->getType()->getAs<TupleType>();
+      TupleType *SubTT = E->getSubExpr()->getType()->getAs<TupleType>();
+      if (!TT || !SubTT) {
+        Out << "Unexpected types in TupleShuffleExpr\n";
+        abort();
+      }
+      unsigned varargsStartIndex = 0;
+      Type varargsType;
+      for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
+        unsigned subElem = E->getElementMapping()[i];
+        if (subElem == -1U)
+          continue;
+        if (subElem == -2U) {
+          varargsStartIndex = i + 1;
+          varargsType = TT->getFields()[i].getVarargBaseTy();
+          break;
+        }
+        if (!TT->getElementType(i)->isEqual(SubTT->getElementType(subElem))) {
+          Out << "Type mismatch in TupleShuffleExpr\n";
+          abort();
+        }
+      }
+      if (varargsStartIndex) {
+        unsigned i = varargsStartIndex, e = E->getElementMapping().size();
+        for (; i != e; ++i) {
+          unsigned subElem = E->getElementMapping()[i];
+          if (!SubTT->getElementType(subElem)->isEqual(varargsType)) {
+            Out << "Vararg type mismatch in TupleShuffleExpr\n";
+            abort();
+          }
+        }
+      }
+    }
+
+
     void verifyParsed(NewArrayExpr *E) {
       if (E->getBounds().empty()) {
         Out << "NewArrayExpr has an empty bounds list\n";
