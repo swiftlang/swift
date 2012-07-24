@@ -278,7 +278,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
           // Determine the effective type of the candidate.
           Type CandidateTy = getInstanceUsageType(Candidate.D, TC.Context);
-          CandidateTy = TC.substMemberTypeWithBase(CandidateTy, T);
+          CandidateTy = TC.substMemberTypeWithBase(CandidateTy, Candidate.D, T);
           if (!CandidateTy)
             break;
 

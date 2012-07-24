@@ -306,7 +306,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     }
 
     // Substitute into the type of this member, if indeed it is a member.
-    Type SubstFunctionTy = substMemberTypeWithBase(FunctionTy, BaseTy);
+    Type SubstFunctionTy = substMemberTypeWithBase(FunctionTy, VD, BaseTy);
     if (!SubstFunctionTy)
       continue;
     FunctionTy = SubstFunctionTy->castTo<AnyFunctionType>();
@@ -450,7 +450,7 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
     }
 
     // Substitute into the type of this member, if indeed it is a member.
-    SrcTy = substMemberTypeWithBase(SrcTy, BaseTy);
+    SrcTy = substMemberTypeWithBase(SrcTy, VD, BaseTy);
     if (!SrcTy)
       continue;
 

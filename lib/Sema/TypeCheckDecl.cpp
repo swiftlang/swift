@@ -359,8 +359,23 @@ public:
     builder.addImplicitConformance(thisDecl, PD);
     llvm::DenseMap<TypeAliasDecl *, ArchetypeType *> assignments
       = builder.assignArchetypes();
-    thisDecl->getUnderlyingTypeLoc() = TypeLoc(assignments[thisDecl]);
-    
+
+    // Set the underlying type of each of the associated types to the
+    // appropriate archetype.
+    ArchetypeType *thisArchetype = assignments[thisDecl];
+    for (auto member : PD->getMembers()) {
+      if (auto assocType = dyn_cast<TypeAliasDecl>(member)) {
+        TypeLoc underlyingTy;
+        if (assocType == thisDecl)
+          underlyingTy = TypeLoc(thisArchetype);
+        else
+          underlyingTy = TypeLoc(thisArchetype->getNestedType(
+                                   assocType->getName()));
+        assocType->getUnderlyingTypeLoc() = underlyingTy;
+      }
+    }
+
+
     // Check the members.
     for (auto Member : PD->getMembers())
       visit(Member);

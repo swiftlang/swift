@@ -912,7 +912,10 @@ public:
   SourceRange getSourceRange() const {
     return SourceRange(ProtocolLoc, getBraces().End);
   }
-  
+
+  /// \brief Retrieve the associated type 'This'.
+  TypeAliasDecl *getThis() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Protocol;

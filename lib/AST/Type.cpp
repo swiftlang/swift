@@ -643,6 +643,46 @@ ArchetypeType::getNew(ASTContext &Ctx, ArchetypeType *Parent,
                                  Ctx.AllocateCopy(ConformsTo), Index);
 }
 
+namespace {
+  /// \brief Function object that orders archetypes by name.
+  struct OrderArchetypeByName {
+    bool operator()(std::pair<Identifier, ArchetypeType *> X,
+                    std::pair<Identifier, ArchetypeType *> Y) const {
+      return X.first.str() < Y.second->getName().str();
+    }
+
+    bool operator()(std::pair<Identifier, ArchetypeType *> X,
+                    Identifier Y) const {
+      return X.first.str() < Y.str();
+    }
+
+    bool operator()(Identifier X,
+                    std::pair<Identifier, ArchetypeType *> Y) const {
+      return X.str() < Y.first.str();
+    }
+
+    bool operator()(Identifier X, Identifier Y) const {
+      return X.str() < Y.str();
+    }
+  };
+}
+
+ArchetypeType *ArchetypeType::getNestedType(Identifier Name) const {
+  ArrayRef<std::pair<Identifier, ArchetypeType *>>::const_iterator Pos
+    = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
+                       OrderArchetypeByName());
+  assert(Pos != NestedTypes.end() && Pos->first == Name);
+  return Pos->second;
+}
+
+void
+ArchetypeType::
+setNestedTypes(ASTContext &Ctx,
+               MutableArrayRef<std::pair<Identifier, ArchetypeType *>> Nested) {
+  std::sort(Nested.begin(), Nested.end(), OrderArchetypeByName());
+  NestedTypes = Ctx.AllocateCopy(Nested);
+}
+
 static void collectFullName(const ArchetypeType *Archetype,
                             llvm::SmallVectorImpl<char> &Result) {
   if (auto Parent = Archetype->getParent()) {

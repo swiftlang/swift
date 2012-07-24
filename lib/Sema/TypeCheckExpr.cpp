@@ -355,7 +355,7 @@ Expr *TypeChecker::semaSubscriptExpr(ArchetypeSubscriptExpr *E) {
   
   // Determine the index type.
   Type IndexType = SubDecl->getIndices()->getType();
-  IndexType = substMemberTypeWithBase(IndexType, ContainerTy);
+  IndexType = substMemberTypeWithBase(IndexType, SubDecl, ContainerTy);
   if (!IndexType)
     return nullptr;
   
@@ -372,7 +372,7 @@ Expr *TypeChecker::semaSubscriptExpr(ArchetypeSubscriptExpr *E) {
   
   // Determine the value type.
   Type ValueType = SubDecl->getElementType();
-  ValueType = substMemberTypeWithBase(ValueType, ContainerTy);
+  ValueType = substMemberTypeWithBase(ValueType, SubDecl, ContainerTy);
   if (!ValueType) {
     E->setType(ErrorType::get(Context));
     return nullptr;
@@ -408,7 +408,7 @@ Expr *TypeChecker::semaSubscriptExpr(GenericSubscriptExpr *E) {
   
   // Determine the index type.
   Type IndexType = SubDecl->getIndices()->getType();
-  IndexType = substMemberTypeWithBase(IndexType, ContainerTy);
+  IndexType = substMemberTypeWithBase(IndexType, SubDecl, ContainerTy);
   if (!IndexType)
     return nullptr;
   
@@ -425,7 +425,7 @@ Expr *TypeChecker::semaSubscriptExpr(GenericSubscriptExpr *E) {
   
   // Determine the value type.
   Type ValueType = SubDecl->getElementType();
-  ValueType = substMemberTypeWithBase(ValueType, ContainerTy);
+  ValueType = substMemberTypeWithBase(ValueType, SubDecl, ContainerTy);
   if (!ValueType) {
     E->setType(ErrorType::get(Context));
     return nullptr;
@@ -833,7 +833,7 @@ public:
     }
     
     // Substitute each of the associated types into the member type.
-    MemberTy = TC.substMemberTypeWithBase(MemberTy, Archetype);
+    MemberTy = TC.substMemberTypeWithBase(MemberTy, E->getDecl(), Archetype);
     if (!MemberTy)
       return nullptr;
 
@@ -877,7 +877,7 @@ public:
     }
     
     // Substitute each of the associated types into the member type.
-    MemberTy = TC.substMemberTypeWithBase(MemberTy, GenericTy);
+    MemberTy = TC.substMemberTypeWithBase(MemberTy, E->getDecl(), GenericTy);
     if (!MemberTy)
       return nullptr;
 
@@ -1067,7 +1067,7 @@ public:
   Expr *visitConstructorRefExpr(ConstructorRefExpr *E) {
     if (E->getType().isNull()) {
       Type T = E->getConstructor()->getType();
-      T = TC.substMemberTypeWithBase(T, E->getBaseType());
+      T = TC.substMemberTypeWithBase(T, E->getConstructor(), E->getBaseType());
       E->setType(T);
     }
     return E;

@@ -152,36 +152,15 @@ public:
                                             ConformsTo.end());
       Archetype = ArchetypeType::getNew(TC.Context, ParentArchetype,
                                         Name, Protos, Index);
-      // For each of the protocols we conform to, find the appropriate nested
-      // types and add archetype mappings for them.
-      // FIXME: This hideousness is caused by the hideousness inherent in
-      // the AssociatedTypeMap anti-design. Fix that, and this becomes less
-      // horrible.
-      for (auto Proto : ConformsTo) {
-        for (auto Member : Proto->getMembers()) {
-          auto AssocType = dyn_cast<TypeAliasDecl>(Member);
-          if (!AssocType)
-            continue;
 
-          ArchetypeType *RemappedArchetype
-            = getNestedType(AssocType->getName())->getArchetype(TC);
-
-          if (AssocType->hasUnderlyingType()) {
-            // Common case: provide a mapping for the underlying type.
-            ArchetypeType *AssocArchetype
-              = AssocType->getDeclaredType()->castTo<ArchetypeType>();
-
-            TC.Context.AssociatedTypeMap[Archetype][AssocArchetype]
-              = RemappedArchetype;
-          } else {
-            // While computing archetypes for a protocol itself, we have to
-            // fill in the underlying archetypes for each of the associated
-            // types.
-            // FIXME: Bogus location info.
-            AssocType->getUnderlyingTypeLoc() = TypeLoc(RemappedArchetype);
-          }
-        }
+      // Collect the set of nested types of this archetype, and put them into
+      // the archetype itself.
+      SmallVector<std::pair<Identifier, ArchetypeType *>, 4> FlatNestedTypes;
+      for (auto Nested : NestedTypes) {
+        FlatNestedTypes.push_back({ Nested.first,
+                                    Nested.second->getArchetype(TC) });
       }
+      Archetype->setNestedTypes(TC.Context, FlatNestedTypes);
     }
 
     return Archetype;

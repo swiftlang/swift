@@ -228,6 +228,19 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
           llvm_unreachable("meta-archetype member in unqualified name lookup");
           break;
         }
+
+        // If we found an associated type in an inherited protocol, the base
+        // for our reference to this associated type is our own 'This'.
+        // FIXME: We'll need to turn this into a more general 'implicit base'
+        // projection, so that any time we find something in an outer context
+        // we make sure to map to that context.
+        if (TD && isa<TypeAliasDecl>(TD) &&
+            isa<ProtocolDecl>(TD->getDeclContext()) &&
+            TD->getDeclContext() != DC) {
+          if (auto Proto = dyn_cast<ProtocolDecl>(DC)) {
+            BaseTy = Proto->getThis()->getDeclaredType();
+          }
+        }
       } else if (auto M = LastOne.Value.dyn_cast<Module*>()) {
         // Lookup into a named module.
         SmallVector<ValueDecl*, 8> Decls;
@@ -274,8 +287,9 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
           TypeLoc TempLoc{ Ty, Loc.getSourceRange() };
           if (validateType(TempLoc, isFirstPass))
             return true;
+
           if (BaseTy)
-            Ty = substMemberTypeWithBase(Ty, BaseTy);
+            Ty = substMemberTypeWithBase(Ty, TD, BaseTy);
           C.Value = Ty;
         }
       }
@@ -540,12 +554,18 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
       return NewChild;
     }
 
+    // If the parent is an archetype, extract the child archetype with the
+    // given name.
+    if (auto ArchetypeParent = SubstParent->getAs<ArchetypeType>()) {
+      return ArchetypeParent->getNestedType(Original->getName());
+    }
+
     // Retrieve the type with the given name.
     // FIXME: Shouldn't we be using protocol-conformance information here?
     MemberLookup ML(SubstParent, Original->getName(), TU, /*TypeLookup*/true);
     assert(ML.Results.size() && "No type lookup results?");
     TypeDecl *TD = cast<TypeDecl>(ML.Results.back().D);
-    return substMemberTypeWithBase(TD->getDeclaredType(), SubstParent);
+    return substMemberTypeWithBase(TD->getDeclaredType(), TD, SubstParent);
   }
 
   switch (T->getKind()) {
@@ -791,7 +811,8 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
   llvm_unreachable("Unhandled type in substitution");
 }
 
-Type TypeChecker::substMemberTypeWithBase(Type T, Type BaseTy) {
+Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
+                                          Type BaseTy) {
   if (!BaseTy)
     return T;
 
@@ -815,8 +836,15 @@ Type TypeChecker::substMemberTypeWithBase(Type T, Type BaseTy) {
   if (!BaseArchetype)
     return T;
 
-  // FIXME: Lame that we need to copy the substitutions here, but the
-  // underlying DenseMap might get reallocated.
-  TypeSubstitutionMap Substitutions = Context.AssociatedTypeMap[BaseArchetype];
+  auto ProtoType = Member->getDeclContext()->getDeclaredTypeOfContext()
+                     ->getAs<ProtocolType>();
+  if (!ProtoType)
+    return T;
+
+  auto Proto = ProtoType->getDecl();
+  auto ThisDecl = Proto->getThis();
+  TypeSubstitutionMap Substitutions;
+  Substitutions[ThisDecl->getDeclaredType()->castTo<ArchetypeType>()]
+    = BaseArchetype;
   return substType(T, Substitutions);
 }

@@ -1230,7 +1230,8 @@ class ArchetypeType : public SubstitutableType {
   ArchetypeType *Parent;
   Identifier Name;
   unsigned IndexIfPrimary;
-
+  ArrayRef<std::pair<Identifier, ArchetypeType *>> NestedTypes;
+  
 public:
   /// getNew - Create a new archetype with the given name.
   ///
@@ -1260,6 +1261,19 @@ public:
   /// \brief Retrieve the parent of this archetype, or null if this is a
   /// primary archetype.
   ArchetypeType *getParent() const { return Parent; }
+
+  /// \brief Retrieve the nested type with the given name.
+  ArchetypeType *getNestedType(Identifier Name) const;
+
+  /// \brief Retrieve the nested types of this archetype.
+  ArrayRef<std::pair<Identifier, ArchetypeType *>> getNestedTypes() const {
+    return NestedTypes;
+  }
+
+  /// \brief Set the nested types to a copy of the given array of
+  /// archetypes, which will first be sorted in place.
+  void setNestedTypes(ASTContext &Ctx,
+         MutableArrayRef<std::pair<Identifier, ArchetypeType *>> Nested);
 
   /// isPrimary - Determine whether this is the archetype for a 'primary'
   /// archetype, e.g., 

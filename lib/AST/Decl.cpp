@@ -399,6 +399,15 @@ void ProtocolDecl::collectInherited(
   }
 }
 
+TypeAliasDecl *ProtocolDecl::getThis() const {
+  for (auto member : getMembers()) {
+    if (auto assocType = dyn_cast<TypeAliasDecl>(member))
+      if (assocType->getName().str() == "This")
+        return assocType;
+  }
+  llvm_unreachable("No 'This' associated type?");
+}
+
 void VarDecl::setProperty(ASTContext &Context, SourceLoc LBraceLoc,
                           FuncDecl *Get, FuncDecl *Set, SourceLoc RBraceLoc) {
   assert(!GetSet && "Variable is already a property?");
