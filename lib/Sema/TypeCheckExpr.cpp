@@ -440,26 +440,6 @@ Expr *TypeChecker::semaSubscriptExpr(GenericSubscriptExpr *E) {
 }
 
 
-/// \brief Determine whether this expression refers to a type directly (ignoring
-/// parentheses), rather than some variable of metatype type.
-static bool isDirectTypeReference(Expr *E) {
-  E = E->getSemanticsProvidingExpr();
-
-  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
-    return isa<TypeDecl>(DRE->getDecl());
-
-  if (auto DSBIE = dyn_cast<DotSyntaxBaseIgnoredExpr>(E))
-    return isDirectTypeReference(DSBIE->getRHS());
-
-  if (auto GMRE = dyn_cast<GenericMemberRefExpr>(E))
-    return isDirectTypeReference(GMRE->getBase());
-  
-  if (auto SE = dyn_cast<SpecializeExpr>(E))
-    return isDirectTypeReference(SE->getSubExpr());
-  
-  return false;
-}
-
 bool isConstructibleType(Type Ty) {
   if (Ty->is<StructType>() || Ty->is<OneOfType>())
     return true;
@@ -557,14 +537,6 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     if (Ty->is<ErrorType>())
       return 0;  // Squelch an erroneous subexpression.
 
-    // FIXME: This check isn't really sufficient; we can still end up dropping
-    // side-effects.
-    if (!isDirectTypeReference(E1)) {
-      // FIXME: Is it really appropriate to give an error here?
-      diagnose(E1->getLoc(), diag::called_expr_indirect_metatype);
-      return 0;
-    }
-
     // If the 'function' is a direct reference to a type, and the type isn't
     // a struct or oneof, this is a cast.  If the type is a struct or oneof,
     // we first try to cast, then try to construct an object.
@@ -595,38 +567,16 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     if (Ctors.isSuccess()) {
       auto Best = filterOverloadSet(Ctors.Results, false, Ty, E2, Type(),
                                     Viable);
-      ConstructorDecl *CD = dyn_cast_or_null<ConstructorDecl>(Best.getDecl());
-      if (CD) {
-        // FIXME: PolymorphicFunctionType!
-        Type ArgTy = Best.getType()->castTo<FunctionType>()->getInput();
-        CoercedExpr CoercedE2 = coerceToType(E2, ArgTy);
-        switch (CoercedE2.getKind()) {
-        case CoercionResult::Succeeded:
-          E2 = CoercedE2.getExpr();
-          break;
-          
-        case CoercionResult::Failed:
-          E2 = 0;
-          break;
-          
-        case CoercionResult::Unknowable:
-          // Leave E2 as it is; we'll end up type-checking again later anyway.
-          break;
-        }
-        // FIXME: Record substitution
-        assert(E2 && "Coercion shouldn't fail!");
-        return new (Context) ConstructExpr(Ty, E1->getStartLoc(), CD, E2);
-      }
       if (Best) {
-        E1 = buildMemberRefExpr(E1, SourceLoc(), Ctors.Results,
-                                E1->getStartLoc());
-        if (E1)
-          E1 = recheckTypes(E1);
+        E1 = new (Context) ConstructorRefExpr(E1, Best.getDecl());
+        E1 = recheckTypes(E1);
         if (!E1)
           return nullptr;
+  
+        E1 = specializeOverloadResult(Best, E1);
         E->setFn(E1);
         return semaApplyExpr(E);
-      }    
+      }
     }
     if (!E2->getType()->isUnresolvedType()) {
       diagnose(E->getLoc(), diag::constructor_overload_fail, !Viable.empty(), Ty)
@@ -1114,13 +1064,17 @@ public:
     return E;
   }
 
-  Expr *visitCoerceExpr(CoerceExpr *E) {
-    // The type of the expr is always the type that the MetaType LHS specifies.
-    assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
+  Expr *visitConstructorRefExpr(ConstructorRefExpr *E) {
+    if (E->getType().isNull()) {
+      Type T = E->getConstructor()->getType();
+      T = TC.substMemberTypeWithBase(T, E->getBaseType());
+      E->setType(T);
+    }
     return E;
   }
 
-  Expr *visitConstructExpr(ConstructExpr *E) {
+
+  Expr *visitCoerceExpr(CoerceExpr *E) {
     // The type of the expr is always the type that the MetaType LHS specifies.
     assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
     return E;

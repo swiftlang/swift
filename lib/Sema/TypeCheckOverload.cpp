@@ -652,22 +652,7 @@ TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
     result = expr;
   }
 
-  // If matching the candidate required substitutions, introduce a
-  // specialization expression that encodes those substitutions and provides
-  // a concrete type.
-  if (Candidate.hasSubstitutions()) {
-    SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
-    Substitutions.resize(Candidate.getSubstitutions().size());
-    auto &Conformances = Candidate.getConformances();
-    for (auto S : Candidate.getSubstitutions()) {
-      unsigned Index = S.first->getPrimaryIndex();
-      Substitutions[Index].Replacement = S.second;
-      Substitutions[Index].Conformance
-        = Context.AllocateCopy(Conformances[S.first]);
-    }
-    result = new (Context) SpecializeExpr(result, Candidate.getType(),
-                                          Context.AllocateCopy(Substitutions));
-  }
+  result = specializeOverloadResult(Candidate, result);
 
   // Replace the semantics-providing expression with the newly-built result.
   return replaceSemanticsProvidingExpr(expr, result, Ovl.getExpr());
@@ -692,9 +677,11 @@ Expr *TypeChecker::buildRefExpr(const OverloadCandidate &Candidate,
   Expr *result = new (Context) DeclRefExpr(decl, NameLoc,
                                            decl->getTypeOfReference());
 
-  // If matching the candidate required substitutions, introduce a
-  // specialization expression that encodes those substitutions and provides
-  // a concrete type.
+  return specializeOverloadResult(Candidate, result);
+}
+
+Expr *TypeChecker::specializeOverloadResult(const OverloadCandidate &Candidate,
+                                            Expr *E) {
   if (Candidate.hasSubstitutions()) {
     SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
     Substitutions.resize(Candidate.getSubstitutions().size());
@@ -705,11 +692,11 @@ Expr *TypeChecker::buildRefExpr(const OverloadCandidate &Candidate,
       Substitutions[Index].Conformance
         = Context.AllocateCopy(Conformances[S.first]);
     }
-    result = new (Context) SpecializeExpr(result, Candidate.getType(),
-                                          Context.AllocateCopy(Substitutions));
+    E = new (Context) SpecializeExpr(E, Candidate.getType(),
+                                     Context.AllocateCopy(Substitutions));
   }
 
-  return recheckTypes(result);
+  return E;
 }
 
 Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,

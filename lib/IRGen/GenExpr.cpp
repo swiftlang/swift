@@ -158,6 +158,40 @@ static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
   llvm_unreachable("bad decl kind");
 }
 
+static void emitConstructorRef(IRGenFunction &IGF, ConstructorRefExpr *E,
+                               Explosion &explosion) {
+  ValueDecl *D = E->getConstructor();
+  switch (D->getKind()) {
+#define VALUE_DECL(id, parent)
+#define DECL(id, parent) case DeclKind::id:
+#include "swift/AST/DeclNodes.def"
+    llvm_unreachable("decl is not a value decl");
+
+  case DeclKind::OneOfElement:
+    return emitOneOfElementRef(IGF, cast<OneOfElementDecl>(D), explosion);
+
+  case DeclKind::Constructor: {
+    llvm::Function *fn = IGF.IGM.getAddrOfConstructor(cast<ConstructorDecl>(D),
+                                                      ExplosionKind::Minimal);
+    explosion.addUnmanaged(fn);
+    explosion.addUnmanaged(IGF.IGM.RefCountedNull);
+    return;
+  }
+
+  case DeclKind::TypeAlias:
+  case DeclKind::OneOf:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Protocol:
+  case DeclKind::Subscript:
+  case DeclKind::Destructor:
+  case DeclKind::Func:
+  case DeclKind::Var:
+    llvm_unreachable("construction requires Constructor or OneOfElement");
+  }
+  llvm_unreachable("bad decl kind");
+}
+
 /// Emit the given expression, which must have primitive scalar type,
 /// as that primitive scalar value.  This is just a convenience method
 /// for not needing to construct and destroy an Explosion.
@@ -276,10 +310,6 @@ namespace {
       IGF.emitRValue(E->getRHS(), Out);
     }
 
-    void visitConstructExpr(ConstructExpr *E) {
-      IGF.constructObject(E, Out);
-    }
-
     void visitNewArrayExpr(NewArrayExpr *E) {
       emitNewArrayExpr(IGF, E, Out);
     }
@@ -346,6 +376,10 @@ namespace {
 
     void visitModuleExpr(ModuleExpr *E) {
       // Nothing to do: modules have no runtime representation.
+    }
+
+    void visitConstructorRefExpr(ConstructorRefExpr *E) {
+      emitConstructorRef(IGF, E, Out);
     }
   };
 }
@@ -431,7 +465,7 @@ namespace {
     NOT_LVALUE_EXPR(NewArray)
     NOT_LVALUE_EXPR(NewReference)
     NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
-    NOT_LVALUE_EXPR(Construct)
+    NOT_LVALUE_EXPR(ConstructorRef)
     NOT_LVALUE_EXPR(Coerce)
     NOT_LVALUE_EXPR(Module)
 #undef NOT_LVALUE_EXPR
@@ -610,10 +644,10 @@ namespace {
     NON_LOCATEABLE(CapturingExpr)
     NON_LOCATEABLE(ModuleExpr)
     NON_LOCATEABLE(DotSyntaxBaseIgnoredExpr)
+    NON_LOCATEABLE(ConstructorRefExpr)
     NON_LOCATEABLE(NewReferenceExpr)
     NON_LOCATEABLE(NewArrayExpr)
     NON_LOCATEABLE(CoerceExpr)
-    NON_LOCATEABLE(ConstructExpr)
     NON_LOCATEABLE(ExistentialMemberRefExpr)
     NON_LOCATEABLE(ArchetypeMemberRefExpr)
     NON_LOCATEABLE(GenericMemberRefExpr)

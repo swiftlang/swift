@@ -56,6 +56,7 @@ ABSTRACT_EXPR(Literal, Expr)
   EXPR_RANGE(Literal, IntegerLiteral, InterpolatedStringLiteral)
 EXPR(DeclRef, Expr)
 EXPR(DotSyntaxBaseIgnored, Expr)
+EXPR(ConstructorRef, Expr)
 ABSTRACT_EXPR(OverloadSetRef, Expr)
   UNCHECKED_EXPR(OverloadedDeclRef, OverloadSetRefExpr)
   UNCHECKED_EXPR(OverloadedMemberRef, OverloadSetRefExpr)
@@ -106,7 +107,6 @@ ABSTRACT_EXPR(ImplicitConversion, Expr)
   EXPR(Specialize, ImplicitConversionExpr)
   EXPR_RANGE(ImplicitConversion, Load, Specialize)
 EXPR(Coerce, Expr)
-EXPR(Construct, Expr)
 
 #undef EXPR_RANGE
 #undef UNCHECKED_EXPR

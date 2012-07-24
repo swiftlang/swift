@@ -75,17 +75,3 @@ Callee irgen::getConstructorCallee(IRGenModule &IGM,
   return Callee::forMethod(ctor->getType(), substResultType, subs,
                            fn, bestExplosion, /*uncurry*/ 0);
 }
-
-void IRGenFunction::constructObject(ConstructExpr *E, Explosion &out) {
-  ConstructorDecl *ctor = E->getConstructor();
-  ArrayRef<Substitution> subs = E->getSubstitutions();
-
-  Callee callee =
-    getConstructorCallee(IGM, ctor, subs, E->getType(), out.getKind());
-
-  Explosion inputE(ExplosionKind::Minimal);
-  emitRValueUnderSubstitutions(E->getInput(), ctor->getArgumentType(),
-                               subs, inputE);
-  emitCall(*this, callee, Arg::forUnowned(inputE),
-           getFragileTypeInfo(E->getType()), out);
-}

@@ -522,6 +522,10 @@ public:
   /// \brief Build a reference to a (non-member) overload candidate.
   Expr *buildRefExpr(const OverloadCandidate &Candidate, SourceLoc NameLoc);
 
+  /// \brief Specialize the given expression with substitutions from the
+  /// given candidate.
+  Expr *specializeOverloadResult(const OverloadCandidate &Candidate, Expr *E);
+
   /// \brief Build a reference to a member of the given base expression, where
   /// name lookup for the member returned the given set of declarations. 
   Expr *buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,

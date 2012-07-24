@@ -508,11 +508,11 @@ public:
     return unchanged(E);
   }
 
-  CoercedResult visitCoerceExpr(CoerceExpr *E) {
+  CoercedResult visitConstructorRefExpr(ConstructorRefExpr *E) {
     return unchanged(E);
   }
 
-  CoercedResult visitConstructExpr(ConstructExpr *E) {
+  CoercedResult visitCoerceExpr(CoerceExpr *E) {
     return unchanged(E);
   }
 
@@ -1013,21 +1013,14 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
       if (!(Flags & CF_Apply))
         continue;
 
-      if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(Best.getDecl())) {
-        Type ArgTy = CD->getArgumentType();
-        if (CoercedResult CoercedS = coerceToType(Segment, ArgTy, CC, Flags)) {
-          Segment = new (TC.Context) ConstructExpr(
-                                       DestTy,
-                                       CoercedS.getExpr()->getStartLoc(),
-                                       CD, CoercedS.getExpr());
-          continue;
-        } else {
-          assert(CoercedS.getKind() == CoercionResult::Unknowable);
-          return CoercedS;
-        }
-      }
+      Expr *CtorRef;
+      CtorRef = new (TC.Context) ConstructorRefExpr(DestTy, Best.getDecl(),
+                                                    Segment->getStartLoc());
+      CtorRef = TC.recheckTypes(CtorRef);
+      if (!CtorRef)
+        return nullptr;
 
-      Expr *CtorRef = TC.buildRefExpr(Best, Segment->getStartLoc());
+      CtorRef = TC.specializeOverloadResult(Best, CtorRef);
       ApplyExpr *Call = new (TC.Context) CallExpr(CtorRef, Segment);
       Expr *Checked = TC.semaApplyExpr(Call);
       if (!Checked)

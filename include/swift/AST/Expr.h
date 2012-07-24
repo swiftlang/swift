@@ -22,8 +22,9 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/NullablePtr.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
@@ -1852,6 +1853,47 @@ public:
   }
 };
 
+/// ConstructorRefExpr - This is a reference to a constructor which will be
+/// used to build a value of the type of the base.
+class ConstructorRefExpr : public Expr {
+  llvm::PointerUnion<Expr *, Type> Base;
+  ValueDecl *Ctor;
+  SourceLoc Loc;
+
+public:
+  ConstructorRefExpr(Expr *Base, ValueDecl *Ctor)
+    : Expr(ExprKind::ConstructorRef), Base(Base), Ctor(Ctor),
+      Loc(Base->getLoc()) {
+  }
+  ConstructorRefExpr(Type Base, ValueDecl *Ctor, SourceLoc Loc)
+    : Expr(ExprKind::ConstructorRef), Base(Base), Ctor(Ctor),
+      Loc(Loc) {
+  }
+
+  llvm::PointerUnion<Expr *, Type> getBase() const { return Base; }
+  Type getBaseType() {
+    if (Base.is<Type>())
+      return Base.get<Type>();
+    return Base.get<Expr*>()->getType();
+  }
+  void setBase(Type t) { Base = t; }
+  void setBase(Expr *b) { Base = b; }
+  ValueDecl *getConstructor() const { return Ctor; }
+
+  SourceLoc getLoc() const { return Loc; }
+  SourceRange getSourceRange() const {
+    if (Base.is<Expr*>())
+      return Base.get<Expr*>()->getSourceRange();
+    return Loc;
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ConstructorRefExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ConstructorRef;
+  }
+};
+
 /// CoerceExpr - Represents a function application a(b) that is actually a
 /// type coercion of the expression 'b' to the type 'a'. This expression
 /// is not used for actual casts, because those are constructor calls.
@@ -1885,46 +1927,6 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Coerce;
   }
-};
-
-class ConstructExpr : public Expr {
-  SourceLoc ConstructorLoc;
-  ConstructorDecl *Constructor;
-  Expr *Input;
-
-public:
-  ConstructExpr(Type T, SourceLoc ConstructorLoc,
-                ConstructorDecl *Constructor, Expr *Input)
-    : Expr(ExprKind::Construct, T), ConstructorLoc(ConstructorLoc),
-      Constructor(Constructor), Input(Input) { }
-
-  ConstructorDecl *getConstructor() const { return Constructor; }
-  Expr *getInput() const { return Input; }
-
-  void setInput(Expr *E) { Input = E; }
-
-  /// Get the substitutions in effect for this constructor call.  A
-  /// constructor will have polymorphic function type if it either
-  /// (or both)
-  ///   (1) constructs a polymorphic type or
-  ///   (2) is polymorphic over its arguments in some way.
-  ArrayRef<Substitution> getSubstitutions() const {
-    return ArrayRef<Substitution>(); // FIXME
-  }
-
-  SourceLoc getStartLoc() const { return ConstructorLoc; }
-  SourceLoc getEndLoc() const { return Input->getEndLoc(); }
-
-  SourceRange getSourceRange() const {
-    return SourceRange(getStartLoc(), getEndLoc());
-  }
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const ConstructExpr *) { return true; }
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::Construct;
-  }
-
 };
 
 } // end namespace swift
