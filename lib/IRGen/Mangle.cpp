@@ -73,7 +73,7 @@ namespace {
                             unsigned uncurryingLevel);
     void mangleDeclContext(DeclContext *ctx);
     void mangleIdentifier(Identifier ident);
-    void mangleGetterOrSetterType(FuncDecl *fn);
+    void mangleGetterOrSetterContext(FuncDecl *fn);
     bool tryMangleSubstitution(void *ptr);
     void addSubstitution(void *ptr);
   };
@@ -183,6 +183,10 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     // FIXME: We need a real solution here for local types.
     if (FuncExpr *FE = dyn_cast<FuncExpr>(ctx)) {
       if (FE->getDecl()) {
+        if (FE->getDecl()->isGetterOrSetter()) {
+          mangleGetterOrSetterContext(FE->getDecl());
+          return;
+        }
         mangleDeclName(FE->getDecl(), IncludeType::Yes);
         return;
       }
@@ -205,18 +209,19 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
   llvm_unreachable("bad decl context");
 }
 
-void Mangler::mangleGetterOrSetterType(FuncDecl *func) {
+void Mangler::mangleGetterOrSetterContext(FuncDecl *func) {
   assert(func->isGetterOrSetter());
   Decl *D = func->getGetterDecl();
   if (!D) D = func->getSetterDecl();
   assert(D && "no value type for getter/setter!");
+  assert(isa<VarDecl>(D) || isa<SubscriptDecl>(D));
+
+  mangleDeclName(cast<ValueDecl>(D), IncludeType::No);
 
   // We mangle the type with a canonical set of parameters because
   // objects nested within functions are shared across all expansions
   // of the function.
-  assert(isa<VarDecl>(D) || isa<SubscriptDecl>(D));
-  mangleType(cast<ValueDecl>(D)->getType(),
-             ExplosionKind::Minimal,
+  mangleType(cast<ValueDecl>(D)->getType(), ExplosionKind::Minimal,
              /*uncurry*/ 0);
 
   if (func->getGetterDecl()) {
@@ -233,11 +238,6 @@ void Mangler::mangleDeclName(ValueDecl *decl, IncludeType includeType) {
   mangleIdentifier(decl->getName());
 
   if (includeType == IncludeType::No) return;
-
-  // Special case for getters and setters.
-  if (auto func = dyn_cast<FuncDecl>(decl))
-    if (func->isGetterOrSetter())
-      return mangleGetterOrSetterType(func);
 
   // We mangle the type with a canonical set of parameters because
   // objects nested within functions are shared across all expansions
