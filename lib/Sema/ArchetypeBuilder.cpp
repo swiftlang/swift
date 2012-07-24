@@ -147,6 +147,27 @@ public:
                                             ConformsTo.end());
       Archetype = ArchetypeType::getNew(TC.Context, ParentArchetype,
                                         Name, Protos, Index);
+      // For each of the protocols we conform to, find the appropriate nested
+      // types and add archetype mappings for them.
+      // FIXME: This hideousness is caused by the hideousness inherent in
+      // the AssociatedTypeMap anti-design. Fix that, and this becomes less
+      // horrible.
+      for (auto Proto : ConformsTo) {
+        for (auto Member : Proto->getMembers()) {
+          auto AssocType = dyn_cast<TypeAliasDecl>(Member);
+          if (!AssocType)
+            continue;
+
+          ArchetypeType *AssocArchetype
+            = AssocType->getDeclaredType()->castTo<ArchetypeType>();
+
+          ArchetypeType *RemappedArchetype
+            = getNestedType(AssocType->getName())->getArchetype(TC);
+          
+          TC.Context.AssociatedTypeMap[Archetype][AssocArchetype]
+            = RemappedArchetype;
+        }
+      }
     }
 
     return Archetype;
@@ -404,34 +425,9 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
 llvm::DenseMap<TypeAliasDecl *, ArchetypeType *>
 ArchetypeBuilder::assignArchetypes() {
   llvm::DenseMap<TypeAliasDecl *, ArchetypeType *> Archetypes;
-  llvm::SetVector<PotentialArchetype*> ConvertedPotentialArchetypes;
   for (const auto& PA : Impl->PotentialArchetypes) {
-    ConvertedPotentialArchetypes.insert(PA.second);
-    Archetypes[PA.first] = PA.second->getArchetype(TC);
-  }
-
-  for (unsigned i = 0; i != ConvertedPotentialArchetypes.size(); ++i) {
-    PotentialArchetype *PE = ConvertedPotentialArchetypes[i];
-    // For each of the protocols we conform to, find the appropriate nested
-    // types and add archetype mappings for them.
-    // FIXME: This hideousness is caused by the hideousness inherent in
-    // the AssociatedTypeMap anti-design. Fix that, and this becomes less
-    // horrible.
-    for (auto Proto : PE->ConformsTo) {
-      for (auto Member : Proto->getMembers()) {
-        auto AssocType = dyn_cast<TypeAliasDecl>(Member);
-        if (!AssocType)
-          continue;
-
-        ArchetypeType *AssocArchetype
-          = AssocType->getDeclaredType()->castTo<ArchetypeType>();
-
-        PotentialArchetype *NestedPE = PE->getNestedType(AssocType->getName());
-        ConvertedPotentialArchetypes.insert(NestedPE);
-        TC.Context.AssociatedTypeMap[PE->Archetype][AssocArchetype]
-          = NestedPE->getArchetype(TC);
-      }
-    }
+    auto Archetype = PA.second->getArchetype(TC);
+    Archetypes[PA.first] = Archetype;
   }
   
   return std::move(Archetypes);

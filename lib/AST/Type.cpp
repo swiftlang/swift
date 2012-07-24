@@ -660,10 +660,10 @@ std::string ArchetypeType::getFullName() const {
 }
 
 DeducibleGenericParamType *
-DeducibleGenericParamType::getNew(ASTContext &Ctx, Identifier Name,
-                                  unsigned Index,
-                                  ArrayRef<ProtocolDecl *> ConformsTo) {
-  return new (Ctx) DeducibleGenericParamType(Ctx, Name, Index, ConformsTo);
+DeducibleGenericParamType::getNew(ASTContext &Ctx,
+                                  DeducibleGenericParamType *Parent,
+                                  ArchetypeType *Archetype) {
+  return new (Ctx) DeducibleGenericParamType(Ctx, Parent, Archetype);
 }
 
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -1009,7 +1009,7 @@ void ArchetypeType::print(raw_ostream &OS) const {
 }
 
 void DeducibleGenericParamType::print(raw_ostream &OS) const {
-  OS << getName().str();
+  getArchetype()->print(OS);
 }
 
 void SubstitutedType::print(raw_ostream &OS) const {

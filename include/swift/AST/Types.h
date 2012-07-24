@@ -1198,6 +1198,13 @@ protected:
     : TypeBase(K, C, Unresolved), ConformsTo(ConformsTo) { }
 
 public:
+  /// \brief Retrieve the name of this type.
+  Identifier getName() const;
+
+  /// \brief Retrieve the parent of this type, or null if this is a
+  /// primary type.
+  SubstitutableType *getParent() const;
+
   // FIXME: Temporary hack.
   bool isPrimary() const;
   unsigned getPrimaryIndex() const;
@@ -1254,7 +1261,6 @@ public:
   /// primary archetype.
   ArchetypeType *getParent() const { return Parent; }
 
-
   /// isPrimary - Determine whether this is the archetype for a 'primary'
   /// archetype, e.g., 
   bool isPrimary() const { return IndexIfPrimary > 0; }
@@ -1292,26 +1298,36 @@ private:
 /// The type of 'identity', for the purpose of substitution, contains a
 /// \c DeducibleGenericParamType in the input type of the function.
 class DeducibleGenericParamType : public SubstitutableType {
-  Identifier Name;
-  unsigned Index;
+  DeducibleGenericParamType *Parent;
+  ArchetypeType *Archetype;
 
-  DeducibleGenericParamType(ASTContext &Ctx, Identifier Name, unsigned Index,
-                            ArrayRef<ProtocolDecl *> ConformsTo)
+  DeducibleGenericParamType(ASTContext &Ctx,
+                            DeducibleGenericParamType *Parent,
+                            ArchetypeType *Archetype)
     : SubstitutableType(TypeKind::DeducibleGenericParam, &Ctx,
-                        /*Unresolved=*/true, ConformsTo),
-      Name(Name), Index(Index) { }
+                        /*Unresolved=*/true, Archetype->getConformsTo()),
+      Parent(Parent), Archetype(Archetype)
+  {
+  }
 
 public:
-  static DeducibleGenericParamType *getNew(ASTContext &Ctx, Identifier Name,
-                                           unsigned Index,
-                                           ArrayRef<ProtocolDecl *> ConformsTo);
+  static DeducibleGenericParamType *getNew(ASTContext &Ctx,
+                                           DeducibleGenericParamType *Parent,
+                                           ArchetypeType *Archetype);
+
+  /// \brief Retrieve the archetype that generic parameter will substitute.
+  ArchetypeType *getArchetype() const { return Archetype; }
+
+  /// \brief Retrieve the parent of this generic parameter, if this generic
+  /// parameter describes a nested type.
+  DeducibleGenericParamType *getParent() const { return Parent; }
 
   /// getName - Retrieve the name of this deducible generic parameter.
-  Identifier getName() const { return Name; }
+  Identifier getName() const { return Archetype->getName(); }
 
   /// getIndex - Retrieve the index into the list of generic parameters in
   /// which this generic parameter occurs.
-  unsigned getIndex() const { return Index; }
+  unsigned getIndex() const { return Archetype->getPrimaryIndex(); }
 
   void print(raw_ostream &OS) const;
 
@@ -1373,11 +1389,25 @@ inline Type TypeBase::getRValueType() {
   return castTo<LValueType>()->getObjectType();
 }
 
+inline Identifier SubstitutableType::getName() const {
+  if (auto Archetype = dyn_cast<ArchetypeType>(this))
+    return Archetype->getName();
+
+  return cast<DeducibleGenericParamType>(this)->getName();
+}
+
+inline SubstitutableType *SubstitutableType::getParent() const {
+  if (auto Archetype = dyn_cast<ArchetypeType>(this))
+    return Archetype->getParent();
+
+  return cast<DeducibleGenericParamType>(this)->getParent();
+}
+
 inline bool SubstitutableType::isPrimary() const {
   if (auto Archetype = dyn_cast<ArchetypeType>(this))
     return Archetype->isPrimary();
 
-  return true;
+  return cast<DeducibleGenericParamType>(this)->getParent() == nullptr;
 }
 
 inline unsigned SubstitutableType::getPrimaryIndex() const {

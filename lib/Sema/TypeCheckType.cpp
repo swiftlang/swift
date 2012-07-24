@@ -479,12 +479,44 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
 Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
   if (auto Original = dyn_cast<SubstitutableType>(T)) {
     TypeSubstitutionMap::const_iterator Known = Substitutions.find(Original);
-    if (Known == Substitutions.end() || !Known->second)
+    if (Known != Substitutions.end() && Known->second)
+      return SubstitutedType::get(Original, Known->second, Context);
+
+    auto Parent = Original->getParent();
+    if (!Parent)
       return T;
 
-    return SubstitutedType::get(Original, Known->second, Context);
+    // Substitute into the parent type.
+    Type SubstParent = substType(Parent, Substitutions);
+    if (!SubstParent)
+      return Type();
+
+    // If the parent didn't change, we won't change.
+    if (SubstParent.getPointer() == Parent)
+      return T;
+
+    // If the parent is a deducible generic parameter, build a new child
+    // generic parameter and record it.
+    if (auto DeducibleParent = SubstParent->getAs<DeducibleGenericParamType>()){
+      auto OriginalArchetype = dyn_cast<ArchetypeType>(Original);
+      if (!OriginalArchetype)
+        return T;
+
+      auto NewChild
+        = DeducibleGenericParamType::getNew(Context, DeducibleParent,
+                                            OriginalArchetype);
+      Substitutions[Original] = NewChild;
+      return NewChild;
+    }
+
+    // Retrieve the type with the given name.
+    // FIXME: Shouldn't we be using protocol-conformance information here?
+    MemberLookup ML(SubstParent, Original->getName(), TU, /*TypeLookup*/true);
+    assert(ML.Results.size() && "No type lookup results?");
+    TypeDecl *TD = cast<TypeDecl>(ML.Results.back().D);
+    return substMemberTypeWithBase(TD->getDeclaredType(), SubstParent);
   }
-  
+
   switch (T->getKind()) {
 #define ALWAYS_CANONICAL_TYPE(Id, Parent) \
   case TypeKind::Id:                    \

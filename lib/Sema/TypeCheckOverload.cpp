@@ -102,16 +102,13 @@ getDeducibleType(TypeChecker &TC, Type T,
   TypeSubstitutionMap PolySubstitutions;
   SmallVector<DeducibleGenericParamType *, 2> DeducibleTypes;
   DeducibleParams.reserve(GenericParams.size());
-  unsigned Index = 0;
   for (auto GP : GenericParams) {
     TypeAliasDecl *TypeParam = GP.getAsTypeParam();
     auto Archetype = TypeParam->getDeclaredType()->getAs<ArchetypeType>();
-    auto Deducible = DeducibleGenericParamType::getNew(TC.Context,
-                                                       TypeParam->getName(),
-                                                       Index++,
-                                                    Archetype->getConformsTo());
-    DeducibleParams.push_back(Deducible);
+    auto Deducible = DeducibleGenericParamType::getNew(TC.Context, nullptr,
+                                                       Archetype);
     PolySubstitutions[Archetype] = Deducible;
+    DeducibleParams.push_back(Deducible);
   }
 
   return TC.substType(T, PolySubstitutions);

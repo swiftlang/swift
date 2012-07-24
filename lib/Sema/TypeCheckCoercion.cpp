@@ -1883,6 +1883,9 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
   // If the destination is deducible, deduce it now (or check it against a
   // prior deduction).
   if (auto Deducible = DestTy->getAs<DeducibleGenericParamType>()) {
+    if (!Deducible->isPrimary())
+      return CoercionResult::Unknowable;
+    
     Type ExistingTy = CC.getSubstitution(Deducible);
 
     if (E->getType()->isUnresolvedType()) {
@@ -1914,6 +1917,9 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
   // If the source is deducible, deduce it now (or check it against a
   // prior deduction).
   if (auto DeducibleSrc = E->getType()->getAs<DeducibleGenericParamType>()) {
+    if (!DeducibleSrc->isPrimary())
+      return CoercionResult::Unknowable;
+
     // We always deduce an object type (never a reference type).
     Type DeducedTy = DestTy->getRValueType();
 
@@ -2329,6 +2335,9 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
   // respectively.
   if (CC) {
     if (auto Deducible1 = T1->getAs<DeducibleGenericParamType>()) {
+      if (!Deducible1->isPrimary())
+        return true;
+
       if (!T2->isUnresolvedType()) {
         // Record this deduction.
         // FIXME: Would be useful to get the diagnostic back out, if
@@ -2338,6 +2347,9 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
     }
     
     if (auto Deducible2 = T2->getAs<DeducibleGenericParamType>()) {
+      if (!Deducible2->isPrimary())
+        return true;
+
       if (!T1->isUnresolvedType()) {
         // Record this deduction.
         // FIXME: Would be useful to get the diagnostic back out, if
