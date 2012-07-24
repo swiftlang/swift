@@ -76,6 +76,35 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
   return sliceTy;
 }
 
+/// \brief Determine whether all of the lookup results are associated types.
+static bool
+allAssociatedTypes(SmallVectorImpl<UnqualifiedLookupResult> &Results) {
+  for (auto &Result : Results) {
+    if (Result.hasValueDecl() &&
+        isa<TypeAliasDecl>(Result.getValueDecl()) &&
+        isa<ProtocolDecl>(Result.getValueDecl()->getDeclContext()))
+      continue;
+
+    return false;
+  }
+
+  return true;
+}
+
+/// \brief Determine whether all of the lookup results are associated types.
+static bool
+allAssociatedTypes(SmallVectorImpl<ValueDecl *> &Results) {
+  for (auto VD : Results) {
+    if (isa<TypeAliasDecl>(VD) &&
+        isa<ProtocolDecl>(VD->getDeclContext()))
+      continue;
+
+    return false;
+  }
+
+  return true;
+}
+
 /// validateType - Types can contain expressions (in the default values for
 /// tuple elements), and thus need semantic analysis to ensure that these
 /// expressions are valid and that they have the appropriate conversions etc.
@@ -160,7 +189,8 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
         // Perform an unqualified lookup.
         UnqualifiedLookup Globals(Name, DC, SourceLoc(), /*TypeLookup*/true);
 
-        if (Globals.Results.size() > 1) {
+        // FIXME: We need to centralize ambiguity checking
+        if (Globals.Results.size() > 1 && !allAssociatedTypes(Globals.Results)){
           diagnose(Loc, diag::abiguous_type_base, Name)
             << SourceRange(Loc, Components.back().Loc);
           for (auto Result : Globals.Results) {
@@ -203,8 +233,9 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
         SmallVector<ValueDecl*, 8> Decls;
         M->lookupValue(Module::AccessPathTy(), C.Id, 
                        NLKind::QualifiedLookup, Decls);
-        if (Decls.size() == 1)
-          TD = dyn_cast<TypeDecl>(Decls.back());
+        if (Decls.size() == 1 ||
+            (Decls.size() > 1 && !allAssociatedTypes(Decls)))
+          TD = dyn_cast<TypeDecl>(Decls.front());
         // FIXME: Diagnostic if not found or ambiguous?
       } else if (auto T = LastOne.Value.dyn_cast<Type>()) {
         // Lookup into a type.
