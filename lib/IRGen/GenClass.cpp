@@ -252,9 +252,7 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   Pattern* pats[] = {
     CD->getArguments()
   };
-  Type CtorType = FunctionType::get(CD->getArguments()->getType(),
-                                    thisDecl->getType(), IGM.Context);
-  IRGenFunction IGF(IGM, CtorType, pats,
+  IRGenFunction IGF(IGM, CD->getType(), pats,
                     ExplosionKind::Minimal, 0, fn, Prologue::Standard);
 
   // Emit the "this" variable
