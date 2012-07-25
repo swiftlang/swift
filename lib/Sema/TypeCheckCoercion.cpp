@@ -265,6 +265,9 @@ public:
   CoercedResult visitNewReferenceExpr(NewReferenceExpr *E) {
     return unchanged(E);
   }
+  CoercedResult visitTypeOfExpr(TypeOfExpr *E) {
+    return unchanged(E);
+  }
   CoercedResult visitOpaqueValueExpr(OpaqueValueExpr *E) {
     return unchanged(E);
   }

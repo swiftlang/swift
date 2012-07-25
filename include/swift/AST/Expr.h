@@ -1620,6 +1620,28 @@ public:
   }
 };
 
+/// TypeOfExpr - Produces an instance of a given metatype.
+///
+/// FIXME: This has no parsed representation (yet), although we suspect that
+/// it will become useful once metatypes get 'real', so that one can retrieve
+/// the (dynamic) metatype of a value, in which case it will need to gain an
+/// optional subexpression.
+class TypeOfExpr : public Expr {
+  SourceLoc Loc;
+
+public:
+  explicit TypeOfExpr(SourceLoc Loc, Type Ty)
+    : Expr(ExprKind::TypeOf, Ty), Loc(Loc) { }
+
+  SourceRange getSourceRange() const { return Loc; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeOfExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::TypeOf;
+  }
+};
+
 /// OpaqueValueExpr - An expression referring to an opaque object of a
 /// fixed type. It is used internally to perform type-checking when we require
 /// an expression but do not want to form a complete expression.

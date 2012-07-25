@@ -322,6 +322,10 @@ namespace {
       emitNewReferenceExpr(IGF, E, Out);
     }
 
+    void visitTypeOfExpr(TypeOfExpr *E) {
+      emitMetaTypeRef(IGF, E->getType(), Out);
+    }
+
     void visitApplyExpr(ApplyExpr *E) {
       emitApplyExpr(IGF, E, Out);
     }
@@ -468,6 +472,7 @@ namespace {
     NOT_LVALUE_EXPR(Tuple)
     NOT_LVALUE_EXPR(NewArray)
     NOT_LVALUE_EXPR(NewReference)
+    NOT_LVALUE_EXPR(TypeOf)
     NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
     NOT_LVALUE_EXPR(ConstructorRef)
     NOT_LVALUE_EXPR(Coerce)
@@ -651,6 +656,7 @@ namespace {
     NON_LOCATEABLE(ConstructorRefExpr)
     NON_LOCATEABLE(NewReferenceExpr)
     NON_LOCATEABLE(NewArrayExpr)
+    NON_LOCATEABLE(TypeOfExpr)
     NON_LOCATEABLE(CoerceExpr)
     NON_LOCATEABLE(ExistentialMemberRefExpr)
     NON_LOCATEABLE(ArchetypeMemberRefExpr)

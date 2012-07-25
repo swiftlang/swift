@@ -333,21 +333,17 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     // which are members of protocols.  (This will go away once we start using
     // PolymorphicFunctionTypes for protocol members.)
     // FIXME: Eliminate this hack.
+    // FIXME: Extend this hack's replacement to operators in generic classes
+    // and structs.
+    SmallVector<DeducibleGenericParamType *, 1> operatorDeducibleParams;
     if (VD->getName().isOperator()) {
       if (Type Extension = cast<FuncDecl>(VD)->getExtensionType()) {
         if (ProtocolType *P = Extension->getAs<ProtocolType>()) {
-          SmallVector<GenericParam, 4> Params;
-          for (auto m : P->getDecl()->getMembers()) {
-            if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(m))
-              if (TAD->getName().str() == "This")
-                Params.push_back(TAD);
-          }
-
-          SmallVector<DeducibleGenericParamType *, 2> DeducibleParams;
-          FunctionTy = getDeducibleType(*this, FunctionTy, Params,
-                                        DeducibleParams)
+          GenericParam Param = P->getDecl()->getThis();
+          FunctionTy = getDeducibleType(*this, FunctionTy, { &Param, 1 },
+                                        operatorDeducibleParams)
                          ->castTo<AnyFunctionType>();
-          CC.requestSubstitutionsFor(DeducibleParams);
+          CC.requestSubstitutionsFor(operatorDeducibleParams);
         }
       }
     }
@@ -388,6 +384,15 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     FunctionTy = FunctionType::get(FunctionTy->getInput(),
                                    FunctionTy->getResult(),
                                    Context);
+
+    if (!operatorDeducibleParams.empty()) {
+      // For an operator found in a protocol, use the type inferred for 'This'
+      // as the inferred base type.
+      ViableCandidates.push_back(
+        OverloadCandidate(VD, FunctionTy,
+                          CC.Substitutions[operatorDeducibleParams.front()]));
+      continue;
+    }
 
     // Add with substitutions.
     OverloadCandidate::SubstitutionInfoType SubstitutionInfo
@@ -682,6 +687,22 @@ Expr *TypeChecker::buildRefExpr(const OverloadCandidate &Candidate,
 
 Expr *TypeChecker::specializeOverloadResult(const OverloadCandidate &Candidate,
                                             Expr *E) {
+  if (Type baseTy = Candidate.getInferredBaseType()) {
+    if (auto dre = dyn_cast<DeclRefExpr>(E)) {
+      Expr *baseExpr
+        = new (Context) TypeOfExpr(E->getLoc(),
+                                   MetaTypeType::get(baseTy, Context));
+      ValueDecl *decl = dre->getDecl();
+      E = buildMemberRefExpr(baseExpr, SourceLoc(), { &decl, 1 },
+                             dre->getLoc());
+      if (!E)
+        return nullptr;
+      E = recheckTypes(E);
+      if (!E)
+        return nullptr;
+    }
+  }
+
   if (Candidate.hasSubstitutions()) {
     SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
     Substitutions.resize(Candidate.getSubstitutions().size());

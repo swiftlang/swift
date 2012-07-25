@@ -642,6 +642,10 @@ public:
     OS << ')';
   }
 
+  void visitTypeOfExpr(TypeOfExpr *E) {
+    printCommon(E, "typeof_expr") << ")";
+  }
+
   void visitOpaqueValueExpr(OpaqueValueExpr *E) {
     printCommon(E, "opaque_value_expr") << ')';
   }

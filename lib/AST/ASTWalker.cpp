@@ -254,6 +254,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;
   }
 
+  Expr *visitTypeOfExpr(TypeOfExpr *E) {
+    return E;
+  }
+
   Expr *visitFuncExpr(FuncExpr *E) {
     if (!E->getBody())
       return E;

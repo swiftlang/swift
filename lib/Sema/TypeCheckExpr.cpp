@@ -451,6 +451,36 @@ bool isConstructibleType(Type Ty) {
   return false;
 }
 
+/// \brief Retrieve the declaration that this expression references.
+static ValueDecl *getReferencedDecl(Expr *E) {
+  E = E->getSemanticsProvidingExpr();
+  if (auto SE = dyn_cast<SpecializeExpr>(E))
+    E = SE->getSubExpr()->getSemanticsProvidingExpr();
+
+  if (auto DRE = dyn_cast<DeclRefExpr>(E))
+    return DRE->getDecl();
+  if (auto CRE = dyn_cast<ConstructorRefExpr>(E))
+    return CRE->getConstructor();
+  if (auto MRE = dyn_cast<MemberRefExpr>(E))
+    return MRE->getDecl();
+  if (auto EMR = dyn_cast<ExistentialMemberRefExpr>(E))
+    return EMR->getDecl();
+  if (auto AMR = dyn_cast<ArchetypeMemberRefExpr>(E))
+    return AMR->getDecl();
+  if (auto GMR = dyn_cast<GenericMemberRefExpr>(E))
+    return GMR->getDecl();
+  if (auto Sub = dyn_cast<SubscriptExpr>(E))
+    return Sub->getDecl();
+  if (auto ES = dyn_cast<ExistentialSubscriptExpr>(E))
+    return ES->getDecl();
+  if (auto AS = dyn_cast<ArchetypeSubscriptExpr>(E))
+    return AS->getDecl();
+  if (auto GS = dyn_cast<GenericSubscriptExpr>(E))
+    return GS->getDecl();
+
+  llvm_unreachable("Expression does not reference a declaration");
+}
+
 Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   Expr *E1 = E->getFn();
   Expr *E2 = E->getArg();
@@ -472,20 +502,16 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     CoercionKind Kind = CoercionKind::Normal;
     if (isa<PrefixUnaryExpr>(E) || isa<PostfixUnaryExpr>(E) ||
         isa<BinaryExpr>(E)) {
-      DeclRefExpr *DRE;
-      if (SpecializeExpr *SE = dyn_cast<SpecializeExpr>(E1))
-        DRE = cast<DeclRefExpr>(SE->getSubExpr());
-      else
-        DRE = cast<DeclRefExpr>(E1);
+      auto D = getReferencedDecl(E1);
       
-      if (!DRE->getDecl()->isOperator()) {
+      if (!D->isOperator()) {
         diagnose(E1->getLoc(),
                  !isa<BinaryExpr>(E) ? diag::unary_op_without_attribute
                                      : diag::binary_op_without_attribute);
         return nullptr;
       }
 
-      if (DRE->getDecl()->getAttrs().isAssignment())
+      if (D->getAttrs().isAssignment())
         Kind = CoercionKind::Assignment;
     }
     
@@ -1058,6 +1084,11 @@ public:
       TC.printOverloadSetCandidates(Viable);
     }
 
+    return E;
+  }
+
+  Expr *visitTypeOfExpr(TypeOfExpr *E) {
+    // TypeOfExpr is fully type-checked.
     return E;
   }
 
