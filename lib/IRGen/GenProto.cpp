@@ -2983,8 +2983,13 @@ Callee irgen::emitArchetypeMemberRefCallee(IRGenFunction &IGF,
 
   // Find the archetype we're calling on.
   Type baseTy = E->getBase()->getType();
-  baseTy = baseTy->castTo<LValueType>()->getObjectType();
-  ArchetypeType *archetype = baseTy->castTo<ArchetypeType>();
+  ArchetypeType *archetype;
+  if (auto baseLV = baseTy->getAs<LValueType>()) {
+    archetype = baseLV->getObjectType()->castTo<ArchetypeType>();
+  } else {
+    archetype = baseTy->castTo<MetaTypeType>()->getInstanceType()
+                  ->castTo<ArchetypeType>();
+  }
 
   // The protocol we're calling on.
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());

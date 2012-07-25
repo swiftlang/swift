@@ -247,18 +247,97 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     // Associated type requirements handled above.
     if (isa<TypeAliasDecl>(Requirement))
       continue;
-    
+
+    // FIXME: This screams 'refactor me!', starting with collapsing the
+    // lookup-results structures of member lookup and unqualified lookup into
+    // a single structure.
+    // Determine the type that we require the witness to have, substituting
+    // in the witnesses we've collected for our archetypes.
+    Type RequiredTy = TC.substType(getInstanceUsageType(Requirement,TC.Context),
+                                   TypeMapping)->getUnlabeledType(TC.Context);
+    if (Requirement->getName().isOperator()) {
+      // Operator lookup is always global.
+      UnqualifiedLookup Lookup(Requirement->getName(), &TC.TU);
+
+      if (Lookup.isSuccess()) {
+        SmallVector<ValueDecl *, 2> Viable;
+        for (auto Candidate : Lookup.Results) {
+          switch (Candidate.Kind) {
+          case UnqualifiedLookupResult::ModuleMember:
+            if (valueMemberMatches(Candidate.getValueDecl(), Requirement,
+                                   RequiredTy, TC.Context))
+              Viable.push_back(Candidate.getValueDecl());
+            break;
+
+          case UnqualifiedLookupResult::ArchetypeMember:
+          case UnqualifiedLookupResult::ExistentialMember:
+          case UnqualifiedLookupResult::LocalDecl:
+          case UnqualifiedLookupResult::MemberFunction:
+          case UnqualifiedLookupResult::MemberProperty:
+          case UnqualifiedLookupResult::MetaArchetypeMember:
+          case UnqualifiedLookupResult::MetatypeMember:
+          case UnqualifiedLookupResult::ModuleName:
+            break;
+          }
+        }
+
+        if (Viable.size() == 1) {
+          Mapping[Requirement] = Viable.front();
+          continue;
+        }
+
+        if (ComplainLoc.isInvalid())
+          return nullptr;
+
+        if (!Viable.empty()) {
+          if (!Complained) {
+            TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+                        T, Proto->getDeclaredType());
+            Complained = true;
+          }
+
+          TC.diagnose(Requirement->getStartLoc(), diag::ambiguous_witnesses,
+                      getRequirementKind(Requirement),
+                      Requirement->getName(),
+                      RequiredTy);
+
+          for (auto Candidate : Viable)
+            TC.diagnose(Candidate->getStartLoc(), diag::protocol_witness,
+                        getInstanceUsageType(Candidate, TC.Context));
+          
+          continue;
+        }
+      }
+
+      if (ComplainLoc.isValid()) {
+        if (!Complained) {
+          TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+                      T, Proto->getDeclaredType());
+          Complained = true;
+        }
+
+        TC.diagnose(Requirement->getStartLoc(), diag::no_witnesses,
+                    getRequirementKind(Requirement),
+                    Requirement->getName(),
+                    getInstanceUsageType(Requirement, TC.Context));
+        for (auto Candidate : Lookup.Results)
+          if (Candidate.hasValueDecl())
+          TC.diagnose(Candidate.getValueDecl()->getStartLoc(),
+                      diag::protocol_witness,
+                      getInstanceUsageType(Candidate.getValueDecl(),
+                                           TC.Context));
+        continue;
+      }
+
+      return nullptr;
+    }
+
     // Variable/function/subscript requirements.
     MemberLookup Lookup(T, Requirement->getName(), TC.TU);
 
     if (Lookup.isSuccess()) {
       SmallVector<ValueDecl *, 2> Viable;
-      // Determine the type that we require the witness to have, substituting
-      // in the witnesses we've collected for our archetypes.
-      Type RequiredTy = TC.substType(getInstanceUsageType(Requirement,
-                                                          TC.Context),
-                                     TypeMapping)->getUnlabeledType(TC.Context);
-      
+
       for (auto Candidate : Lookup.Results) {
         switch (Candidate.Kind) {
         case MemberLookupResult::MetatypeMember:
@@ -316,7 +395,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         continue;
       }
     }
-
+    
     if (ComplainLoc.isValid()) {
       if (!Complained) {
         TC.diagnose(ComplainLoc, diag::type_does_not_conform,
