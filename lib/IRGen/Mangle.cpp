@@ -249,6 +249,7 @@ void Mangler::mangleDeclName(ValueDecl *decl, IncludeType includeType) {
 /// <type> ::= C <decl>              # class (substitutable)
 /// <type> ::= P <decl>* _           # protocol composition (substitutable)
 /// <type> ::= F <type> <type>       # function type
+/// <type> ::= G <type> <type>+ _    # bound generic type
 /// <type> ::= f <type> <type>       # uncurried function type
 /// <type> ::= O <decl>              # oneof (substitutable)
 /// <type> ::= R <type>              # lvalue
@@ -268,9 +269,6 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   case TypeKind::DeducibleGenericParam:
   case TypeKind::UnboundGeneric:
     llvm_unreachable("mangling unresolved type");
-
-  case TypeKind::BoundGeneric:
-    llvm_unreachable("Cannot mangle generic type yet");
 
   case TypeKind::MetaType:
     llvm_unreachable("Cannot mangle metatype yet");
@@ -344,6 +342,18 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // FIXME
     Buffer << 'v';
     return;
+
+  case TypeKind::BoundGeneric: {
+    // type ::= 'G' <type> <type>+ '_'
+    auto type = cast<BoundGenericType>(base);
+    Buffer << 'G';
+    mangleNominalType(type->getDecl(), explosion);
+    for (auto arg : type->getGenericArgs()) {
+      mangleType(arg, ExplosionKind::Minimal, /*uncurry*/ 0);
+    }
+    Buffer << '_';
+    return;
+  }
 
   case TypeKind::PolymorphicFunction: {
     // type ::= 'U' generic-parameter-list type
