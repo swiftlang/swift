@@ -1590,7 +1590,7 @@ public:
 class NewReferenceExpr : public Expr {
 private:
   SourceLoc NewLoc;
-  ConstructorDecl *Ctor;
+  Expr *Ctor;
   Expr *CtorArg;
   TypeLoc ElementTy;
 
@@ -1605,17 +1605,8 @@ public:
   SourceRange getSourceRange() const;
   SourceLoc getLoc() const { return NewLoc; }
 
-  ConstructorDecl *getCtor() { return Ctor; }
-  void setCtor(ConstructorDecl *c) { Ctor = c; }
-
-  /// Get the substitutions in effect for this constructor call.  A
-  /// constructor will have polymorphic function type if it either
-  /// (or both)
-  ///   (1) constructs a polymorphic type or
-  ///   (2) is polymorphic over its arguments in some way.
-  ArrayRef<Substitution> getSubstitutions() const {
-    return ArrayRef<Substitution>(); // FIXME
-  }
+  Expr *getCtor() { return Ctor; }
+  void setCtor(Expr *c) { Ctor = c; }
 
   Expr *getCtorArg() { return CtorArg; }
   void setCtorArg(Expr *e) { CtorArg = e; }

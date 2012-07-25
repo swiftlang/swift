@@ -112,18 +112,18 @@ LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
 void irgen::emitNewReferenceExpr(IRGenFunction &IGF,
                                  NewReferenceExpr *E,
                                  Explosion &out) {
-  // Call the constructor for the class.
-  ConstructorDecl *ctor = E->getCtor();
-  ArrayRef<Substitution> subs = E->getSubstitutions();
-  Callee callee = getConstructorCallee(IGF.IGM, ctor, subs,
-                                       E->getType(), out.getKind());
+  SmallVector<Arg, 4> Args;
+  Callee callee = emitCallee(IGF, E->getCtor(), ExplosionKind::Minimal,
+                             0, Args);
+  Type ArgTy = E->getCtor()->getType()->getAs<FunctionType>()->getInput();
 
   // Emit the argument under substitution.
   Explosion inputE(ExplosionKind::Minimal);
-  IGF.emitRValueUnderSubstitutions(E->getCtorArg(), ctor->getArgumentType(),
-                                   subs, inputE);
+  IGF.emitRValueUnderSubstitutions(E->getCtorArg(), ArgTy,
+                                   callee.getSubstitutions(), inputE);
+  Args.push_back(Arg::forUnowned(inputE));
 
-  emitCall(IGF, callee, Arg::forUnowned(inputE),
+  emitCall(IGF, callee, Args,
            IGF.getFragileTypeInfo(E->getType()), out);
 }
 

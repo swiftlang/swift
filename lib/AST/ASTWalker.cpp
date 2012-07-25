@@ -239,6 +239,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   }
 
   Expr *visitNewReferenceExpr(NewReferenceExpr *E) {
+    if (E->getCtor()) {
+      if (Expr *Arg = doIt(E->getCtor()))
+        E->setCtor(Arg);
+      else
+        return nullptr;
+    }
     if (E->getCtorArg()) {
       if (Expr *Arg = doIt(E->getCtorArg()))
         E->setCtorArg(Arg);

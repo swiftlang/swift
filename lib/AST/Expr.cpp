@@ -619,8 +619,11 @@ public:
   }
 
   void visitNewReferenceExpr(NewReferenceExpr *E) {
-    printCommon(E, "new_reference_expr")
-      << " elementType='" << E->getType() << ')';
+    printCommon(E, "new_reference_expr") << '\n';
+    printRec(E->getCtor());
+    OS << '\n';
+    printRec(E->getCtorArg());
+    OS << ')';
   }
 
   void visitNewArrayExpr(NewArrayExpr *E) {

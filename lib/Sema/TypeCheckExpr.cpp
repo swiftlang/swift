@@ -570,9 +570,6 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
       if (Best) {
         E1 = new (Context) ConstructorRefExpr(E1, Best.getDecl());
         E1 = recheckTypes(E1);
-        if (!E1)
-          return nullptr;
-  
         E1 = specializeOverloadResult(Best, E1);
         E->setFn(E1);
         return semaApplyExpr(E);
@@ -1014,7 +1011,13 @@ public:
 
     E->setType(E->getElementTypeLoc().getType());
 
-    ClassType *CT = E->getType()->getAs<ClassType>();
+    Type CT;
+    if (E->getType()->is<ClassType>())
+      CT = E->getType();
+    else if (auto BGT = E->getType()->getAs<BoundGenericType>()) {
+      if (isa<ClassDecl>(BGT->getDecl()))
+        CT = E->getType();
+    }
     if (!CT) {
       TC.diagnose(E->getLoc(), diag::new_reference_not_class);
       return nullptr;
@@ -1038,13 +1041,17 @@ public:
                                      Viable);
 
     if (Best) {
-      // FIXME: Handle substitutions here.
-      ConstructorDecl *CD = cast<ConstructorDecl>(Best.getDecl());
-      Arg = TC.coerceToType(Arg, CD->getArgumentType());
+      Expr *Ctor = new (TC.Context) ConstructorRefExpr(CT, Best.getDecl(),
+                                                       E->getLoc());
+      Ctor = TC.recheckTypes(Ctor);
+      Ctor = TC.specializeOverloadResult(Best, Ctor);
+      E->setCtor(Ctor);
+
+      Type ArgTy = Ctor->getType()->getAs<FunctionType>()->getInput();
+      Arg = TC.coerceToType(Arg, ArgTy);
       assert(Arg && "Coercion shouldn't fail!");
-      E->setCtor(CD);
       E->setCtorArg(Arg);
-    } else {
+    } else if (!Arg->getType()->isUnresolvedType()) {
       TC.diagnose(E->getLoc(), diag::constructor_overload_fail,
                   !Viable.empty(), CT)
         << E->getSourceRange();
