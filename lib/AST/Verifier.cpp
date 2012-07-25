@@ -422,18 +422,16 @@ namespace {
     }
 
     void verifyChecked(SpecializeExpr *E) {
+      if (!E->getType()->is<FunctionType>()) {
+        Out << "SpecializeExpr must have FunctionType result\n";
+        abort();
+      }
+
       Type SubType = E->getSubExpr()->getType()->getRValueType();
       GenericParamList *GenericParams = nullptr;
-      if (auto PolyFn = SubType->getAs<PolymorphicFunctionType>()) {
+      if (auto PolyFn = SubType->getAs<PolymorphicFunctionType>())
         GenericParams = &PolyFn->getGenericParams();
-      } else if (auto Meta = SubType->getAs<MetaTypeType>()) {
-        if (auto Unbound = Meta->getInstanceType()->getAs<UnboundGenericType>())
-          GenericParams = Unbound->getDecl()->getGenericParams();
 
-        // FIXME: SpecializeExpr on unbound generic types is currently wrong
-        return;
-      }
-      
       if (!GenericParams) {
         Out << "Non-polymorphic expression specialized\n";
         abort();
