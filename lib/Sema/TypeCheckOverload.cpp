@@ -388,9 +388,16 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     if (!operatorDeducibleParams.empty()) {
       // For an operator found in a protocol, use the type inferred for 'This'
       // as the inferred base type.
-      ViableCandidates.push_back(
-        OverloadCandidate(VD, FunctionTy,
-                          CC.Substitutions[operatorDeducibleParams.front()]));
+      Type inferredBaseType = CC.Substitutions[operatorDeducibleParams.front()];
+
+      // Only support this operation on archetypes.
+      // FIXME: We may, at some point, allow this for 'extensions' protocols,
+      // or when there are default function implementations in protocols.
+      if (!inferredBaseType->is<ArchetypeType>())
+        continue;
+
+      ViableCandidates.push_back(OverloadCandidate(VD, FunctionTy,
+                                                   inferredBaseType));
       continue;
     }
 
