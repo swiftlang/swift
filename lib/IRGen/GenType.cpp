@@ -233,16 +233,18 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
 
   case TypeKind::Archetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
+  case TypeKind::BoundGeneric:
+    return convertBoundGenericType(cast<BoundGenericType>(ty)->getDecl());
   case TypeKind::LValue:
     return convertLValueType(cast<LValueType>(ty));
   case TypeKind::Tuple:
     return convertTupleType(cast<TupleType>(ty));
   case TypeKind::OneOf:
-    return convertOneOfType(cast<OneOfType>(ty));
+    return convertOneOfType(cast<OneOfType>(ty)->getDecl());
   case TypeKind::Struct:
-    return convertStructType(cast<StructType>(ty));
+    return convertStructType(cast<StructType>(ty)->getDecl());
   case TypeKind::Class:
-    return convertClassType(cast<ClassType>(ty));
+    return convertClassType(cast<ClassType>(ty)->getDecl());
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
     return convertFunctionType(cast<AnyFunctionType>(ty));
@@ -252,30 +254,52 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
     return convertProtocolType(cast<ProtocolType>(ty));
   case TypeKind::ProtocolComposition:
     return convertProtocolCompositionType(cast<ProtocolCompositionType>(ty));
-
-  case TypeKind::BoundGeneric: {
-    NominalTypeDecl *decl = cast<BoundGenericType>(ty)->getDecl();
-    switch (decl->getKind()) {
-#define NOMINAL_TYPE_DECL(ID, PARENT)
-#define DECL(ID, PARENT) \
-    case DeclKind::ID:
-#include "swift/AST/DeclNodes.def"
-      llvm_unreachable("not a nominal type declaration");
-
-    case DeclKind::Protocol:
-      llvm_unreachable("protocol types don't take generic parameters");
-
-    case DeclKind::OneOf:
-    case DeclKind::Struct:
-    case DeclKind::Class:
-      IGM.unimplemented(SourceLoc(), "bound generic type");
-      return createPrimitive(IGM.Int8Ty, Size(1), Alignment(1));
-    }
-    llvm_unreachable("bad declaration kind");
-  }
-
   }
   llvm_unreachable("bad type kind");
+}
+
+const TypeInfo *TypeConverter::convertBoundGenericType(NominalTypeDecl *decl) {
+  assert(decl->getGenericParams());
+
+  // Look to see if we've already emitted this type under a different
+  // set of arguments.  We cache under the unbound type, which should
+  // never collide with anything.
+  assert(decl->getDeclaredType()->isCanonical());
+  assert(decl->getDeclaredType()->is<UnboundGenericType>());
+  TypeBase *key = decl->getDeclaredType().getPointer();
+  auto entry = Types.find(key);
+  if (entry != Types.end())
+    return entry->second;
+
+  switch (decl->getKind()) {
+#define NOMINAL_TYPE_DECL(ID, PARENT)
+#define DECL(ID, PARENT) \
+  case DeclKind::ID:
+#include "swift/AST/DeclNodes.def"
+    llvm_unreachable("not a nominal type declaration");
+
+  case DeclKind::Protocol:
+    llvm_unreachable("protocol types don't take generic parameters");
+
+  case DeclKind::Class: {
+    auto result = convertClassType(cast<ClassDecl>(decl));
+    Types.insert(std::make_pair(key, result));
+    return result;
+  }
+
+  case DeclKind::OneOf: {
+    auto result = convertOneOfType(cast<OneOfDecl>(decl));
+    assert(Types.count(key) && "didn't insert forward declaration!");    
+    return result;
+  }
+
+  case DeclKind::Struct: {
+    auto result = convertStructType(cast<StructDecl>(decl));
+    assert(Types.count(key) && "didn't insert forward declaration!");
+    return result;
+  }
+  }
+  llvm_unreachable("bad declaration kind");
 }
 
 /// createNominalType - Create a new nominal type.

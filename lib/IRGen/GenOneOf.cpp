@@ -266,58 +266,134 @@ namespace {
       IGF.Builder.CreateRet(getDiscriminatorIndex(elt));
     }
   };
+
+  bool isObviouslyEmptyType(CanType type) {
+    if (auto tuple = dyn_cast<TupleType>(type)) {
+      for (auto &field : tuple->getFields())
+        if (!isObviouslyEmptyType(CanType(field.getType())))
+          return false;
+      return true;
+    }
+    // Add more cases here?  Meh.
+    return false;
+  }
+
+  /// An implementation strategy for a oneof.
+  class OneofImplStrategy {
+  public:
+    enum Kind {
+      Singleton,
+      Enum,
+      Aggregate
+    };
+
+  private:
+    unsigned NumElements;
+    Kind TheKind;
+
+  public:
+    explicit OneofImplStrategy(OneOfDecl *oneof) {
+      NumElements = 0;
+
+      bool hasApparentPayload = false;
+      for (auto member : oneof->getMembers()) {
+        auto elt = dyn_cast<OneOfElementDecl>(member);
+        if (!elt) continue;
+
+        NumElements++;
+
+        // Compute whether this gives us an apparent payload.
+        if (hasApparentPayload) continue;
+
+        Type argType = elt->getArgumentType();
+        if (!argType.isNull() &&
+            !isObviouslyEmptyType(argType->getCanonicalType()))
+          hasApparentPayload = true;
+      }
+
+      assert(NumElements != 0);
+      if (NumElements == 1) {
+        TheKind = Singleton;
+      } else if (hasApparentPayload) {
+        TheKind = Aggregate;
+      } else {
+        TheKind = Enum;
+      }
+    }
+
+    Kind getKind() const { return TheKind; }
+    unsigned getNumElements() const { return NumElements; }
+
+    /// Create a forward declaration for the oneof.
+    OneofTypeInfo *create(llvm::StructType *convertedStruct) const {
+      switch (getKind()) {
+      case Singleton:
+        return new SingletonOneofTypeInfo(convertedStruct,
+                                          Size(0), Alignment(0), IsPOD);
+      case Enum:
+        return new EnumTypeInfo(convertedStruct,
+                                Size(0), Alignment(0));
+      case Aggregate:
+        return new AggregateOneofTypeInfo(convertedStruct,
+                                          Size(0), Alignment(0), IsPOD);
+      }
+      llvm_unreachable("bad strategy kind");
+    }
+  };
 }
 
-const TypeInfo *TypeConverter::convertOneOfType(OneOfType *T) {
-  OneOfDecl *D = T->getDecl();
-  llvm::StructType *convertedStruct = IGM.createNominalType(D);
+const TypeInfo *TypeConverter::convertOneOfType(OneOfDecl *oneof) {
+  llvm::StructType *convertedStruct = IGM.createNominalType(oneof);
 
-  unsigned numElements = 0;
-  for (auto elt : D->getMembers())
-    if (isa<OneOfElementDecl>(elt))
-      ++numElements;
+  // Compute the implementation strategy.
+  OneofImplStrategy strategy(oneof);
+
+  // Create the TI as a forward declaration and map it in the table.
+  OneofTypeInfo *convertedTI = strategy.create(convertedStruct);
+  auto typesMapKey = oneof->getDeclaredType().getPointer();
+  assert(!Types.count(typesMapKey));
+  Types.insert(std::make_pair(typesMapKey, convertedTI));
 
   // We don't need a discriminator if this is a singleton ADT.
-  if (numElements == 1) {
-    SingletonOneofTypeInfo *convertedTInfo =
-      new SingletonOneofTypeInfo(convertedStruct, Size(0), Alignment(0), IsPOD);
-    assert(!Types.count(T));
-    Types.insert(std::make_pair(T, convertedTInfo));
+  if (strategy.getKind() == OneofImplStrategy::Singleton) {
+    auto oneofTI = static_cast<SingletonOneofTypeInfo*>(convertedTI);
 
     Type eltType =
-        cast<OneOfElementDecl>(D->getMembers()[0])->getArgumentType();
+      cast<OneOfElementDecl>(oneof->getMembers()[0])->getArgumentType();
 
     llvm::Type *storageType;
     if (eltType.isNull()) {
       storageType = IGM.Int8Ty;
-      convertedTInfo->StorageAlignment = Alignment(1);
-      convertedTInfo->Singleton = nullptr;
+      oneofTI->StorageAlignment = Alignment(1);
+      oneofTI->Singleton = nullptr;
     } else {
-      const TypeInfo &eltTInfo = getFragileTypeInfo(eltType);
-      assert(eltTInfo.isComplete());
-      storageType = eltTInfo.StorageType;
-      convertedTInfo->StorageSize = eltTInfo.StorageSize;
-      convertedTInfo->StorageAlignment = eltTInfo.StorageAlignment;
-      convertedTInfo->Singleton = &eltTInfo;
-      convertedTInfo->setPOD(eltTInfo.isPOD(ResilienceScope::Local));
+      const TypeInfo &eltTI = getFragileTypeInfo(eltType);
+      assert(eltTI.isComplete());
+      storageType = eltTI.StorageType;
+      oneofTI->StorageSize = eltTI.StorageSize;
+      oneofTI->StorageAlignment = eltTI.StorageAlignment;
+      oneofTI->Singleton = &eltTI;
+      oneofTI->setPOD(eltTI.isPOD(ResilienceScope::Local));
     }
 
     llvm::Type *body[] = { storageType };
     convertedStruct->setBody(body);
 
-    return convertedTInfo;
+    return oneofTI;
   }
 
   // Otherwise, we need a discriminator.
+
+  // Compute the discriminator type.
   llvm::Type *discriminatorType;
   Size discriminatorSize;
-  if (numElements == 2) {
+  if (strategy.getNumElements() == 2) {
     discriminatorType = IGM.Int1Ty;
     discriminatorSize = Size(1);
-  } else if (numElements <= (1 << 8)) {
+  } else if (strategy.getNumElements() <= (1 << 8)) {
     discriminatorType = IGM.Int8Ty;
     discriminatorSize = Size(1);
-  } else if (numElements <= (1 << 16)) {
+  } else if (strategy.getNumElements() <= (1 << 16)) {
     discriminatorType = IGM.Int16Ty;
     discriminatorSize = Size(2);
   } else {
@@ -333,7 +409,7 @@ const TypeInfo *TypeConverter::convertOneOfType(OneOfType *T) {
   IsPOD_t isPOD = IsPOD;
 
   // Figure out how much storage we need for the union.
-  for (Decl *member : D->getMembers()) {
+  for (Decl *member : oneof->getMembers()) {
     OneOfElementDecl *elt = dyn_cast<OneOfElementDecl>(member);
     if (!elt)
       continue;
@@ -360,27 +436,20 @@ const TypeInfo *TypeConverter::convertOneOfType(OneOfType *T) {
     isPOD &= eltTInfo.isPOD(ResilienceScope::Local);
   }
 
-  Size storageSize = discriminatorSize + payloadSize;
+  convertedTI->StorageSize = discriminatorSize + payloadSize;
+  convertedTI->StorageAlignment = storageAlignment;
+  convertedTI->setPOD(isPOD);
 
-  OneofTypeInfo *convertedTInfo;
-
-  // If there's no payload at all, use the enum TypeInfo.
-  if (!payloadSize) {
-    assert(isPOD);
-    convertedTInfo = new EnumTypeInfo(convertedStruct, storageSize,
-                                      storageAlignment);
-
-  // Otherwise, add the payload array to the storage.
-  } else {
+  // Add the payload to the body if necessary.
+  if (payloadSize) {
     body.push_back(llvm::ArrayType::get(IGM.Int8Ty, payloadSize.getValue()));
-
-    // TODO: don't always use an aggregate representation.
-    convertedTInfo = new AggregateOneofTypeInfo(convertedStruct, storageSize,
-                                                storageAlignment, isPOD);
   }
 
+  // TODO: remember element layout information above and stash it in
+  // convertedTI.
+
   convertedStruct->setBody(body);
-  return convertedTInfo;
+  return convertedTI;
 }
 /// Emit a reference to a oneof element decl.
 void irgen::emitOneOfElementRef(IRGenFunction &IGF,

@@ -28,16 +28,17 @@ namespace swift {
   class ArchetypeType;
   class ArrayType;
   class CanType;
-  class ClassType;
+  class ClassDecl;
   class AnyFunctionType;
   class LValueType;
   class MetaTypeType;
   class ModuleType;
-  class OneOfType;
+  class NominalTypeDecl;
+  class OneOfDecl;
   class ProtocolCompositionType;
   class ProtocolDecl;
   class ProtocolType;
-  class StructType;
+  class StructDecl;
   class TupleType;
   class TypeBase;
   class Type;
@@ -65,9 +66,9 @@ class TypeConverter {
 
   const TypeInfo *convertType(CanType T);
   const TypeInfo *convertTupleType(TupleType *T);
-  const TypeInfo *convertOneOfType(OneOfType *T);
-  const TypeInfo *convertStructType(StructType *T);
-  const TypeInfo *convertClassType(ClassType *T);
+  const TypeInfo *convertOneOfType(OneOfDecl *D);
+  const TypeInfo *convertStructType(StructDecl *D);
+  const TypeInfo *convertClassType(ClassDecl *D);
   const TypeInfo *convertFunctionType(AnyFunctionType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
   const TypeInfo *convertArrayType(ArrayType *T);
@@ -78,6 +79,7 @@ class TypeConverter {
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
   const TypeInfo *convertBuiltinObjectPointer();
   const TypeInfo *convertBuiltinObjCPointer();
+  const TypeInfo *convertBoundGenericType(NominalTypeDecl *D);
 
 public:
   TypeConverter(IRGenModule &IGM);

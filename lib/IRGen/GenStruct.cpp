@@ -214,19 +214,21 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
   }
 }
 
-const TypeInfo *TypeConverter::convertStructType(StructType *T) {
-  StructTypeBuilder builder(IGM, IGM.createNominalType(T->getDecl()));
+const TypeInfo *TypeConverter::convertStructType(StructDecl *D) {
+  StructTypeBuilder builder(IGM, IGM.createNominalType(D));
 
   // Collect all the fields from the type.
   SmallVector<VarDecl*, 8> fields;
-  for (Decl *D : T->getDecl()->getMembers())
+  for (Decl *D : D->getMembers())
     if (VarDecl *VD = dyn_cast<VarDecl>(D))
       if (!VD->isProperty())
         fields.push_back(VD);
 
   // Allocate the TypeInfo and register it as a forward-declaration.
+  // We do this before we look at any of the child types.
   auto structTI = builder.create(fields);
-  Types.insert(std::make_pair(T, structTI));
+  auto typesMapKey = D->getDeclaredType().getPointer();
+  Types.insert(std::make_pair(typesMapKey, structTI));
 
   // Complete the type and return it.
   return builder.complete(fields);

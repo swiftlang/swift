@@ -19,8 +19,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/Types.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 #include "llvm/GlobalVariable.h"
@@ -45,18 +45,20 @@ using namespace irgen;
 namespace {
   /// Layout information for class types.
   class ClassTypeInfo : public HeapTypeInfo {
-    ClassType *Ty;
+    ClassDecl *TheClass;
     mutable HeapLayout *Layout;
 
   public:
     ClassTypeInfo(llvm::PointerType *irType, Size size, Alignment align,
-                  ClassType *Ty)
-      : HeapTypeInfo(irType, size, align), Ty(Ty), Layout(nullptr) {
+                  ClassDecl *D)
+      : HeapTypeInfo(irType, size, align), TheClass(D), Layout(nullptr) {
     }
 
     ~ClassTypeInfo() {
       delete Layout;
     }
+
+    ClassDecl *getClass() const { return TheClass; }
 
     const HeapLayout &getLayout(IRGenModule &IGM) const {
       if (Layout)
@@ -64,8 +66,8 @@ namespace {
 
       // Collect all the fields from the type.
       SmallVector<const TypeInfo*, 8> fieldTypes;
-      for (Decl *D : Ty->getDecl()->getMembers())
-        if (VarDecl *VD = dyn_cast<VarDecl>(D))
+      for (Decl *member : getClass()->getMembers())
+        if (VarDecl *VD = dyn_cast<VarDecl>(member))
           if (!VD->isProperty())
             fieldTypes.push_back(&IGM.getFragileTypeInfo(VD->getType()));
 
@@ -86,9 +88,8 @@ namespace {
 
 LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
                                             MemberRefExpr *E) {
-  ClassType *T = E->getBase()->getType()->castTo<ClassType>();
-  const ClassTypeInfo &info =
-    IGF.getFragileTypeInfo(T).as<ClassTypeInfo>();
+  const ClassTypeInfo &classTI =
+    IGF.getFragileTypeInfo(E->getBase()->getType()).as<ClassTypeInfo>();
   Explosion explosion(ExplosionKind::Maximal);
   // FIXME: Can we avoid the retain/release here in some cases?
   IGF.emitRValue(E->getBase(), explosion);
@@ -96,15 +97,15 @@ LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
 
   // FIXME: This field index computation is an ugly hack.
   unsigned FieldIndex = 0;
-  for (Decl *D : T->getDecl()->getMembers()) {
+  for (Decl *D : classTI.getClass()->getMembers()) {
     if (D == E->getDecl())
       break;
     if (isa<VarDecl>(D) && !cast<VarDecl>(D)->isProperty())
       ++FieldIndex;
   }
 
-  Address baseAddr(baseVal.getValue(), info.getHeapAlignment(IGF.IGM));
-  const ElementLayout &element = info.getElements(IGF.IGM)[FieldIndex];
+  Address baseAddr(baseVal.getValue(), classTI.getHeapAlignment(IGF.IGM));
+  const ElementLayout &element = classTI.getElements(IGF.IGM)[FieldIndex];
   Address memberAddr = element.project(IGF, baseAddr);
   return IGF.emitAddressLValue(OwnedAddress(memberAddr, baseVal.getValue()));
 }
@@ -226,10 +227,10 @@ static llvm::Constant *getClassMetadataVar(IRGenModule &IGM,
 static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   llvm::Function *fn = IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
   auto thisDecl = CD->getImplicitThisDecl();
-  const ClassTypeInfo &info =
+  const ClassTypeInfo &classTI =
       IGM.getFragileTypeInfo(thisDecl->getType()).as<ClassTypeInfo>();
-  auto &layout = info.getLayout(IGM);
-  ClassDecl *curClass = thisDecl->getType()->castTo<ClassType>()->getDecl();
+  auto &layout = classTI.getLayout(IGM);
+  ClassDecl *curClass = classTI.getClass();
 
   Pattern* pats[] = {
     CD->getArguments()
@@ -240,8 +241,8 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   // Emit the "this" variable
   Initialization I;
   I.registerObject(IGF, I.getObjectForDecl(thisDecl),
-                    thisDecl->hasFixedLifetime() ? NotOnHeap : OnHeap, info);
-  Address addr = I.emitVariable(IGF, thisDecl, info);
+                   thisDecl->hasFixedLifetime() ? NotOnHeap : OnHeap, classTI);
+  Address addr = I.emitVariable(IGF, thisDecl, classTI);
 
   FullExpr scope(IGF);
   // Allocate the class.
@@ -329,9 +330,9 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   emitClassDestructor(*this, D);
 }
 
-const TypeInfo *TypeConverter::convertClassType(ClassType *T) {
-  llvm::StructType *ST = IGM.createNominalType(T->getDecl());
+const TypeInfo *TypeConverter::convertClassType(ClassDecl *D) {
+  llvm::StructType *ST = IGM.createNominalType(D);
   llvm::PointerType *irType = ST->getPointerTo();
   return new ClassTypeInfo(irType, IGM.getPointerSize(),
-                           IGM.getPointerAlignment(), T);
+                           IGM.getPointerAlignment(), D);
 }
