@@ -218,8 +218,8 @@ NewArrayExpr *NewArrayExpr::create(ASTContext &ctx, SourceLoc newLoc,
 }
 
 SourceRange NewReferenceExpr::getSourceRange() const {
-  if (CtorArg)
-    return { NewLoc, CtorArg->getEndLoc() };
+  if (getArg())
+    return { NewLoc, getArg()->getEndLoc() };
   return { NewLoc, ElementTy.getSourceRange().End };
 }
 
@@ -621,14 +621,6 @@ public:
     OS << ')';
   }
 
-  void visitNewReferenceExpr(NewReferenceExpr *E) {
-    printCommon(E, "new_reference_expr") << '\n';
-    printRec(E->getCtor());
-    OS << '\n';
-    printRec(E->getCtorArg());
-    OS << ')';
-  }
-
   void visitNewArrayExpr(NewArrayExpr *E) {
     printCommon(E, "new_array_expr")
       << " elementType='" << E->getElementType() << "'";
@@ -672,6 +664,9 @@ public:
   }
   void visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
     printApplyExpr(E, "dot_syntax_call_expr");
+  }
+  void visitNewReferenceExpr(NewReferenceExpr *E) {
+    printApplyExpr(E, "new_reference_expr");
   }
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
     printCommon(E, "dot_syntax_base_ignored") << '\n';

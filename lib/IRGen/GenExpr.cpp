@@ -318,10 +318,6 @@ namespace {
       emitNewArrayExpr(IGF, E, Out);
     }
 
-    void visitNewReferenceExpr(NewReferenceExpr *E) {
-      emitNewReferenceExpr(IGF, E, Out);
-    }
-
     void visitTypeOfExpr(TypeOfExpr *E) {
       emitMetaTypeRef(IGF, E->getType(), Out);
     }

@@ -109,24 +109,6 @@ LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
   return IGF.emitAddressLValue(OwnedAddress(memberAddr, baseVal.getValue()));
 }
 
-void irgen::emitNewReferenceExpr(IRGenFunction &IGF,
-                                 NewReferenceExpr *E,
-                                 Explosion &out) {
-  SmallVector<Arg, 4> Args;
-  Callee callee = emitCallee(IGF, E->getCtor(), ExplosionKind::Minimal,
-                             0, Args);
-  Type ArgTy = E->getCtor()->getType()->getAs<FunctionType>()->getInput();
-
-  // Emit the argument under substitution.
-  Explosion inputE(ExplosionKind::Minimal);
-  IGF.emitRValueUnderSubstitutions(E->getCtorArg(), ArgTy,
-                                   callee.getSubstitutions(), inputE);
-  Args.push_back(Arg::forUnowned(inputE));
-
-  emitCall(IGF, callee, Args,
-           IGF.getFragileTypeInfo(E->getType()), out);
-}
-
 namespace {
   class ClassDestroyCleanup : public Cleanup {
     ClassDecl *CD;

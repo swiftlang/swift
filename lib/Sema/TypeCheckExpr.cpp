@@ -1050,8 +1050,8 @@ public:
     }
 
     Expr *Arg;
-    if (E->getCtorArg()) {
-      Arg = E->getCtorArg();
+    if (E->getArg()) {
+      Arg = E->getArg();
     } else {
       // We don't have an explicit argument; fake one up.
       Arg = new (TC.Context) TupleExpr(E->getLoc(),
@@ -1071,12 +1071,9 @@ public:
                                                        E->getLoc());
       Ctor = TC.recheckTypes(Ctor);
       Ctor = TC.specializeOverloadResult(Best, Ctor);
-      E->setCtor(Ctor);
-
-      Type ArgTy = Ctor->getType()->getAs<FunctionType>()->getInput();
-      Arg = TC.coerceToType(Arg, ArgTy);
-      assert(Arg && "Coercion shouldn't fail!");
-      E->setCtorArg(Arg);
+      E->setFn(Ctor);
+      E->setArg(Arg);
+      return TC.semaApplyExpr(E);
     } else if (!Arg->getType()->isUnresolvedType()) {
       TC.diagnose(E->getLoc(), diag::constructor_overload_fail,
                   !Viable.empty(), CT)

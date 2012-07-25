@@ -238,22 +238,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;
   }
 
-  Expr *visitNewReferenceExpr(NewReferenceExpr *E) {
-    if (E->getCtor()) {
-      if (Expr *Arg = doIt(E->getCtor()))
-        E->setCtor(Arg);
-      else
-        return nullptr;
-    }
-    if (E->getCtorArg()) {
-      if (Expr *Arg = doIt(E->getCtorArg()))
-        E->setCtorArg(Arg);
-      else
-        return nullptr;
-    }
-    return E;
-  }
-
   Expr *visitTypeOfExpr(TypeOfExpr *E) {
     return E;
   }
@@ -287,13 +271,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   Expr *visitModuleExpr(ModuleExpr *E) { return E; }
 
   Expr *visitApplyExpr(ApplyExpr *E) {
-    Expr *E2 = doIt(E->getFn());
-    if (E2 == nullptr) return nullptr;
-    E->setFn(E2);
-    
-    E2 = doIt(E->getArg());
-    if (E2 == nullptr) return nullptr;
-    E->setArg(E2);
+    if (E->getFn()) {
+      Expr *E2 = doIt(E->getFn());
+      if (E2 == nullptr) return nullptr;
+      E->setFn(E2);
+    }
+
+    if (E->getArg()) {
+      Expr *E2 = doIt(E->getArg());
+      if (E2 == nullptr) return nullptr;
+      E->setArg(E2);
+    }
+
     return E;
   }
 

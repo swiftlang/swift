@@ -1585,41 +1585,6 @@ public:
   }
 };
 
-/// NewReferenceExpr - The allocation of a reference type.  Allocates and
-/// constructs an object, then returns a reference to it.
-class NewReferenceExpr : public Expr {
-private:
-  SourceLoc NewLoc;
-  Expr *Ctor;
-  Expr *CtorArg;
-  TypeLoc ElementTy;
-
-public:
-  NewReferenceExpr(TypeLoc ty, SourceLoc newLoc, Expr *CtorArg)
-    : Expr(ExprKind::NewReference), NewLoc(newLoc),
-      Ctor(nullptr), CtorArg(CtorArg), ElementTy(ty) {}
-
-  /// Return the location of the 'new' keyword.
-  SourceLoc getNewLoc() const { return NewLoc; }
-
-  SourceRange getSourceRange() const;
-  SourceLoc getLoc() const { return NewLoc; }
-
-  Expr *getCtor() { return Ctor; }
-  void setCtor(Expr *c) { Ctor = c; }
-
-  Expr *getCtorArg() { return CtorArg; }
-  void setCtorArg(Expr *e) { CtorArg = e; }
-
-  TypeLoc &getElementTypeLoc() { return ElementTy; }
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const NewReferenceExpr *) { return true; }
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::NewReference;
-  }
-};
-
 /// TypeOfExpr - Produces an instance of a given metatype.
 ///
 /// FIXME: This has no parsed representation (yet), although we suspect that
@@ -1772,6 +1737,33 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Binary;}
+};
+
+/// NewReferenceExpr - The allocation of a reference type.  Allocates and
+/// constructs an object, then returns a reference to it.
+class NewReferenceExpr : public ApplyExpr {
+private:
+  SourceLoc NewLoc;
+  TypeLoc ElementTy;
+
+public:
+  NewReferenceExpr(TypeLoc ty, SourceLoc newLoc, Expr *CtorArg)
+    : ApplyExpr(ExprKind::NewReference, nullptr, CtorArg), NewLoc(newLoc),
+      ElementTy(ty) {}
+
+  /// Return the location of the 'new' keyword.
+  SourceLoc getNewLoc() const { return NewLoc; }
+
+  SourceRange getSourceRange() const;
+  SourceLoc getLoc() const { return NewLoc; }
+
+  TypeLoc &getElementTypeLoc() { return ElementTy; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const NewReferenceExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::NewReference;
+  }
 };
 
 /// ThisApplyExpr - Abstract application that provides the 'this' pointer for
