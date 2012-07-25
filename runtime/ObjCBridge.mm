@@ -24,11 +24,10 @@ struct SwiftString;
 extern "C" {
 
 int64_t
-_TNSs6String4sizefRS_FT_NSs5Int64(void *swiftString);
+_TSS4sizefRSSFT_Si(void *swiftString);
 
 uint32_t
-_TNSs6String11__subscriptFT3idxNSs5Int64_NSs4Charg(uint64_t idx,
-                                                   void *swiftString);
+_TSS11__subscriptFT3idxSi_Scg(uint64_t idx, void *swiftString);
 
 void
 swift_NSStringToString(NSString *nsstring, SwiftString *string);
@@ -63,11 +62,11 @@ struct _NSSwiftString_s {
   // XXX FIXME
   // Become bug-for-bug compatible with NSString being UTF16.
   // In practice, this API is oblivious to UTF16 surrogate pairs.
-  return _TNSs6String11__subscriptFT3idxNSs5Int64_NSs4Charg(idx, &swiftString);
+  return _TSS11__subscriptFT3idxSi_Scg(idx, &swiftString);
 }
 
 - (NSUInteger)length {
-  return _TNSs6String4sizefRS_FT_NSs5Int64(&swiftString);
+  return _TSS4sizefRSSFT_Si(&swiftString);
 }
 
 // Disable the warning about chaining dealloc to super, we *specifically* don't

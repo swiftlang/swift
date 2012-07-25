@@ -55,6 +55,10 @@ static char mangleOperatorChar(char op) {
   }
 }
 
+static bool isSwiftModule(Module *module) {
+  return (!module->getParent() && module->Name.str() == "swift");
+}
+
 namespace {
   enum class IncludeType : bool { No, Yes };
 
@@ -71,9 +75,11 @@ namespace {
   private:
     void mangleFunctionType(AnyFunctionType *fn, ExplosionKind explosionKind,
                             unsigned uncurryingLevel);
+    void mangleNominalType(NominalTypeDecl *decl, ExplosionKind explosionKind);
     void mangleDeclContext(DeclContext *ctx);
     void mangleIdentifier(Identifier ident);
     void mangleGetterOrSetterContext(FuncDecl *fn);
+    bool tryMangleStandardSubstitution(NominalTypeDecl *type);
     bool tryMangleSubstitution(void *ptr);
     void addSubstitution(void *ptr);
   };
@@ -132,7 +138,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
 
     // Try the special 'swift' substitution.
     // context ::= Ss
-    if (!module->getParent() && module->Name.str() == "swift") {
+    if (isSwiftModule(module)) {
       Buffer << "Ss";
       return;
     }
@@ -152,32 +158,17 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     return;
   }
 
-  case DeclContextKind::NominalTypeDecl: {
-    if (isa<OneOfDecl>(ctx)) {
-      OneOfDecl *oneof = cast<OneOfDecl>(ctx);
-
-      // FIXME: The mangling rule here is kind of weird.
-      if (tryMangleSubstitution(oneof->getDeclaredType().getPointer())) return;
-      mangleDeclContext(ctx->getParent());
-      mangleIdentifier(oneof->getName());
-      addSubstitution(oneof->getDeclaredType().getPointer());
-      return;
-    }
-    if (isa<StructDecl>(ctx) || isa<ClassDecl>(ctx)) {
-      // FIXME: The mangling rule here is kind of weird.
-      mangleType(cast<NominalTypeDecl>(ctx)->getDeclaredType(),
-                 ExplosionKind::Minimal, 0);
-      return;
-    }
-    // It's not clear what would be mangled for protocols.
-    llvm_unreachable("Unexpected context");
-  }
-
-  case DeclContextKind::ExtensionDecl:
-    // Mandle the extension as the original type.
-    mangleType(cast<ExtensionDecl>(ctx)->getExtendedType(),
-               ExplosionKind::Minimal, 0);
+  case DeclContextKind::NominalTypeDecl:
+    mangleNominalType(cast<NominalTypeDecl>(ctx), ExplosionKind::Minimal);
     return;
+
+  case DeclContextKind::ExtensionDecl: {
+    // Mangle the extension as the originally-extended type.
+    Type type = cast<ExtensionDecl>(ctx)->getExtendedType();
+    mangleNominalType(type->castTo<NominalType>()->getDecl(),
+                      ExplosionKind::Minimal);
+    return;
+  }
 
   case DeclContextKind::CapturingExpr:
     // FIXME: We need a real solution here for local types.
@@ -250,19 +241,20 @@ void Mangler::mangleDeclName(ValueDecl *decl, IncludeType includeType) {
 /// Type manglings should never start with [0-9_].
 ///
 /// <type> ::= A <natural> <type>    # fixed-sized arrays
-/// <type> ::= C <type>* _           # protocol composition (substitutable)
+/// <type> ::= Bf <natural>          # Builtin.Float
+/// <type> ::= Bi <natural>          # Builtin.Integer
+/// <type> ::= BO                    # Builtin.ObjCPointer
+/// <type> ::= Bo                    # Builtin.ObjectPointer
+/// <type> ::= Bp                    # Builtin.RawPointer
+/// <type> ::= C <decl>              # class (substitutable)
+/// <type> ::= P <decl>* _           # protocol composition (substitutable)
 /// <type> ::= F <type> <type>       # function type
 /// <type> ::= f <type> <type>       # uncurried function type
-/// <type> ::= f <natural>           # Builtin.Float
-/// <type> ::= i <natural>           # Builtin.Integer
-/// <type> ::= N <decl>              # oneof, struct, or class (substitutable)
-/// <type> ::= O                     # Builtin.ObjCPointer
-/// <type> ::= o                     # Builtin.ObjectPointer
-/// <type> ::= P <decl>              # protocol (substitutable)
-/// <type> ::= p                     # Builtin.RawPointer
+/// <type> ::= O <decl>              # oneof (substitutable)
 /// <type> ::= R <type>              # lvalue
+/// <type> ::= V <decl>              # struct (substitutable)
 /// <type> ::= T <tuple-element>* _  # tuple
-/// <type> ::= V                     # an archetype (provisional, obviously)
+/// <type> ::= v                     # an archetype (provisional, obviously)
 ///
 /// <tuple-element> ::= <identifier>? <type>
 void Mangler::mangleType(Type type, ExplosionKind explosion,
@@ -289,25 +281,25 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   // don't expect them to come up that often in API names.
   case TypeKind::BuiltinFloat:
     switch (cast<BuiltinFloatType>(type)->getFPKind()) {
-    case BuiltinFloatType::IEEE16: Buffer << "f16"; return;
-    case BuiltinFloatType::IEEE32: Buffer << "f32"; return;
-    case BuiltinFloatType::IEEE64: Buffer << "f64"; return;
-    case BuiltinFloatType::IEEE80: Buffer << "f80"; return;
-    case BuiltinFloatType::IEEE128: Buffer << "f128"; return;
+    case BuiltinFloatType::IEEE16: Buffer << "Bf16"; return;
+    case BuiltinFloatType::IEEE32: Buffer << "Bf32"; return;
+    case BuiltinFloatType::IEEE64: Buffer << "Bf64"; return;
+    case BuiltinFloatType::IEEE80: Buffer << "Bf80"; return;
+    case BuiltinFloatType::IEEE128: Buffer << "Bf128"; return;
     case BuiltinFloatType::PPC128: llvm_unreachable("ppc128 not supported");
     }
     llvm_unreachable("bad floating-point kind");
   case TypeKind::BuiltinInteger:
-    Buffer << "i" << cast<BuiltinIntegerType>(type)->getBitWidth();
+    Buffer << "Bi" << cast<BuiltinIntegerType>(type)->getBitWidth();
     return;
   case TypeKind::BuiltinRawPointer:
-    Buffer << "p";
+    Buffer << "Bp";
     return;
   case TypeKind::BuiltinObjectPointer:
-    Buffer << "o";
+    Buffer << "Bo";
     return;
   case TypeKind::BuiltinObjCPointer:
-    Buffer << "O";
+    Buffer << "BO";
     return;
 
 #define SUGARED_TYPE(id, parent) \
@@ -336,55 +328,21 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     return;
   }
 
-  case TypeKind::OneOf: {
-    // Try to mangle the entire name as a substitution.
-    // type ::= substitution
-    if (tryMangleSubstitution(base))
-      return;
+  case TypeKind::OneOf:
+    return mangleNominalType(cast<OneOfType>(base)->getDecl(), explosion);
 
-    // type ::= 'N' decl
-    Buffer << 'N';
-    mangleDeclName(cast<OneOfType>(base)->getDecl(), IncludeType::No);
+  case TypeKind::Protocol:
+    return mangleNominalType(cast<ProtocolType>(base)->getDecl(), explosion);
 
-    addSubstitution(base);
-    return;
-  }
+  case TypeKind::Struct:
+    return mangleNominalType(cast<StructType>(base)->getDecl(), explosion);
 
-  case TypeKind::Struct: {
-    // Try to mangle the entire name as a substitution.
-    // type ::= substitution
-    if (tryMangleSubstitution(base))
-      return;
-
-    // FIXME: Leaving this the same as oneof for the moment, to avoid changing
-    // the mangling, but this should probably change eventually.
-    // type ::= 'N' decl
-    Buffer << 'N';
-    mangleDeclName(cast<StructType>(base)->getDecl(), IncludeType::No);
-
-    addSubstitution(base);
-    return;
-  }
-
-  case TypeKind::Class: {
-    // Try to mangle the entire name as a substitution.
-    // type ::= substitution
-    if (tryMangleSubstitution(base))
-      return;
-
-    // FIXME: Leaving this the same as oneof for the moment, to avoid changing
-    // the mangling, but this should probably change eventually.
-    // type ::= 'N' decl
-    Buffer << 'N';
-    mangleDeclName(cast<ClassType>(base)->getDecl(), IncludeType::No);
-
-    addSubstitution(base);
-    return;
-  }
+  case TypeKind::Class:
+    return mangleNominalType(cast<ClassType>(base)->getDecl(), explosion);
 
   case TypeKind::Archetype:
     // FIXME
-    Buffer << 'V';
+    Buffer << 'v';
     return;
 
   case TypeKind::PolymorphicFunction: {
@@ -417,32 +375,94 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     return;
   };
 
-  case TypeKind::Protocol: {
-    if (tryMangleSubstitution(base))
-      return;
-
-    // type ::= 'P'
-    Buffer << 'P';
-    mangleDeclName(cast<ProtocolType>(base)->getDecl(), IncludeType::No);
-
-    addSubstitution(base);
-    return;
-  }
-
   case TypeKind::ProtocolComposition: {
+    // Protocol compositions are substitutable as a whole.
     if (tryMangleSubstitution(base))
       return;
     
-    // <type> ::= C <type>* _
-    Buffer << 'C';
-    for (auto Proto : cast<ProtocolCompositionType>(base)->getProtocols())
-      mangleType(Proto, ExplosionKind::Minimal, 0);
+    // <type> ::= P <decl>* _
+    Buffer << 'P';
+    for (auto protoTy : cast<ProtocolCompositionType>(base)->getProtocols()) {
+      ProtocolDecl *proto = protoTy->castTo<ProtocolType>()->getDecl();
+      mangleDeclName(proto, IncludeType::No);
+    }
     Buffer << '_';
     addSubstitution(base);
     return;
   }
   }
   llvm_unreachable("bad type kind");
+}
+
+static char getSpecifierForNominalType(NominalTypeDecl *decl) {
+  switch (decl->getKind()) {
+#define NOMINAL_TYPE_DECL(id, parent)
+#define DECL(id, parent) \
+  case DeclKind::id:
+#include "swift/AST/DeclNodes.def"
+    llvm_unreachable("not a nominal type");
+
+  case DeclKind::Protocol: return 'P';
+  case DeclKind::Class: return 'C';
+  case DeclKind::OneOf: return 'O';
+  case DeclKind::Struct: return 'V';
+  }
+  llvm_unreachable("bad decl kind");
+}
+
+void Mangler::mangleNominalType(NominalTypeDecl *decl,
+                                ExplosionKind explosion) {
+  // Check for certain standard types.
+  if (tryMangleStandardSubstitution(decl))
+    return;
+
+  // For generic types, this uses the unbound type.
+  TypeBase *key = decl->getDeclaredType().getPointer();
+
+  // Try to mangle the entire name as a substitution.
+  // type ::= substitution
+  if (tryMangleSubstitution(key))
+    return;
+
+  Buffer << getSpecifierForNominalType(decl);
+  mangleDeclName(decl, IncludeType::No);
+
+  addSubstitution(key);
+}
+
+bool Mangler::tryMangleStandardSubstitution(NominalTypeDecl *decl) {
+  // Bail out if our parent isn't the swift standard library.
+  Module *parent = dyn_cast<Module>(decl->getDeclContext());
+  if (!parent || !isSwiftModule(parent)) return false;
+
+  // Standard substitutions shouldn't start with 's' (because that's
+  // reserved for the swift module itself) or a digit or '_'.
+
+  StringRef name = decl->getName().str();
+  if (name == "Int64") {
+    Buffer << "Si";
+    return true;
+  } else if (name == "UInt64") {
+    Buffer << "Su";
+    return true;
+  } else if (name == "Bool") {
+    Buffer << "Sb";
+    return true;
+  } else if (name == "Char") {
+    Buffer << "Sc";
+    return true;
+  } else if (name == "Double") {
+    Buffer << "Sd";
+    return true;
+  } else if (name == "Float") {
+    Buffer << "Sf";
+    return true;
+  } else if (name == "String") {
+    Buffer << "SS";
+    return true;
+  } else {
+    return false;
+  }
 }
 
 void Mangler::mangleFunctionType(AnyFunctionType *fn,
