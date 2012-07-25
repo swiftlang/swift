@@ -500,6 +500,12 @@ namespace {
       }
     }
 
+    void verifyChecked(TypeOfExpr *E) {
+      if (!E->getType()->is<MetaTypeType>()) {
+        Out << "TypeOfExpr must have MetaTypeType\n";
+        abort();
+      }
+    }
 
     void verifyParsed(NewArrayExpr *E) {
       if (E->getBounds().empty()) {

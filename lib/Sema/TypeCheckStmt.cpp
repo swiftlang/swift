@@ -653,21 +653,14 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   }
 
   if (AllMemberRefs) {
-    Expr *BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc,
-                                                  Base->getTypeOfReference());
+    Expr *BaseExpr;
     if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
-      if (auto GenericParams = NTD->getGenericParams()) {
-        SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
-        SmallVector<Type, 4> Types;
-        for (auto Param : *GenericParams) {
-          Type T = Param.getAsTypeParam()->getDeclaredType();
-          Types.push_back(T);
-          Substitutions.push_back({ T, nullptr });
-        }
-        Type BoundTy = BoundGenericType::get(NTD, Types);
-        BaseExpr = new (TC.Context) SpecializeExpr(BaseExpr, BoundTy,
-                                    TC.Context.AllocateCopy(Substitutions));
-      }
+      Type BaseTy = MetaTypeType::get(NTD->getDeclaredTypeInContext(),
+                                      TC.Context);
+      BaseExpr = new (TC.Context) TypeOfExpr(Loc, BaseTy);
+    } else {
+      BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc,
+                                              Base->getTypeOfReference());
     }
     return TC.buildMemberRefExpr(BaseExpr, SourceLoc(), ResultValues, Loc);
   }
