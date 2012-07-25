@@ -773,10 +773,8 @@ namespace {
     
     void visitFuncDecl(FuncDecl *FD) {
       printCommon(FD, "func_decl");
-      if (FuncExpr *E = FD->getBody()) {
-        OS << '\n';
-        printRec(E);
-      }
+      OS << '\n';
+      printRec(FD->getBody());
       OS << ')';
     }
 
