@@ -108,6 +108,7 @@ BUILTIN_GEP_OPERATION(Gep, "gep", OverloadedBuiltinKind::Integer)
 #define BUILTIN_LOAD(Id, Name) BUILTIN(Id, Name)
 #endif
 BUILTIN_LOAD(Load, "load")
+BUILTIN_LOAD(Move, "move")
 #undef BUILTIN_LOAD
 
 /// Assign has type (T, Builtin.RawPointer) -> ()

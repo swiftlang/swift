@@ -1041,7 +1041,7 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     return result.setAsSingleDirectUnmanagedFragileValue(gep);
   }
 
-  if (BuiltinName == "load") {
+  if (BuiltinName == "load" || BuiltinName == "move") {
     // The type of the operation is the result type of the load function.
     Type valueTy = Subs[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
@@ -1053,6 +1053,8 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     
     // Perform the load.
     Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
+    if (BuiltinName == "move")
+      return valueTI.loadAsTake(IGF, addr, out);
     return valueTI.load(IGF, addr, out);
   }
   

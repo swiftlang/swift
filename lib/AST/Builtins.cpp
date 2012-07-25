@@ -458,6 +458,7 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
     return getCastOperation(Context, Id, BV, Types);
       
   case BuiltinValueKind::Load:
+  case BuiltinValueKind::Move:
     if (!Types.empty()) return nullptr;
     return getLoadOperation(Context, Id);
 
