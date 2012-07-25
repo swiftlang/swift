@@ -459,10 +459,13 @@ public:
   }
     
   CoercedResult visitTupleExpr(TupleExpr *E) {
-    if (DestTy->isEqual(E->getType()))
-      return unchanged(E);
-      
-    return tryUserConversion(E);
+    // We can't coerce a TupleExpr to anything other than a tuple.
+    assert(!DestTy->is<TupleType>() &&
+           "Already special cased in SemaCoerce::coerceToType");
+    if (Flags & CF_Apply)
+      TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), DestTy)
+        << E->getSourceRange();
+    return nullptr;
   }
   
   CoercedResult visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
@@ -566,6 +569,7 @@ public:
   }
   
   CoercedResult doIt(Expr *E) {
+    assert(E->getType()->isUnresolvedType() && "Unexpected expr");
     return visit(E);
   }
   
