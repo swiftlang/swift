@@ -2550,13 +2550,12 @@ void IRGenFunction::bindArchetype(ArchetypeType *type,
 void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
                                       const GenericParamList &generics,
                                       Explosion &in) {
-  // For now, treat all generic clauses independently.
-  for (auto &param : generics) {
-    TypeAliasDecl *typeParam = param.getAsTypeParam();
-    assert(typeParam && "unknown generic parameter kind!");
-    auto paramName = typeParam->getName().str();
-
-    auto archetype = cast<ArchetypeType>(typeParam->getUnderlyingType());
+  // For now, treat all archetypes independently.
+  // FIXME: Later, we'll want to emit only the minimal set of archetypes,
+  // because non-primary archetypes (which correspond to associated types)
+  // will have their witness tables embedded in the witness table corresponding
+  // to their parent.
+  for (auto archetype : generics.getAllArchetypes()) {
     auto &archetypeTI =
       IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
 
@@ -2568,7 +2567,7 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
     // value type.
     if (protocols.empty()) {
       llvm::Value *wtable = in.claimUnmanagedNext();
-      wtable->setName(paramName);
+      wtable->setName(archetype->getFullName());
       archetypeTI.setValueWitnessTable(wtable);
       continue;
     }
@@ -2576,7 +2575,7 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
     // Otherwise, set all the protocol witnesses.
     for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
       llvm::Value *wtable = in.claimUnmanagedNext();
-      wtable->setName(Twine(paramName) + "." +
+      wtable->setName(Twine(archetype->getFullName()) + "." +
                         protocols[i].getProtocol()->getName().str());
       if (i == 0) archetypeTI.setValueWitnessTable(wtable);
       archetypeTI.setWitnessTable(i, wtable);
@@ -2589,16 +2588,17 @@ void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
                                      const GenericParamList &generics,
                                      ArrayRef<Substitution> subs,
                                      Explosion &out) {
-  assert(generics.size() == subs.size());
-
-  // For now, treat all generic clauses independently.
-  for (unsigned i = 0, e = generics.size(); i != e; ++i) {
-    TypeAliasDecl *typeParam = generics.getParams()[i].getAsTypeParam();
-    assert(typeParam && "unknown generic parameter kind!");
-    auto archetype = cast<ArchetypeType>(typeParam->getUnderlyingType());
+  assert(generics.getAllArchetypes().size() == subs.size());
+  
+  // For now, treat all archetypes independently.
+  // FIXME: Later, we'll want to emit only the minimal set of archetypes,
+  // because non-primary archetypes (which correspond to associated types)
+  // will have their witness tables embedded in the witness table corresponding
+  // to their parent.
+  for (const auto &sub : subs) {
+    auto archetype = sub.Archetype;
     auto archetypeProtos = archetype->getConformsTo();
-
-    Type typeArg = subs[i].Replacement;
+    Type typeArg = sub.Replacement;
     auto &argTI = IGF.getFragileTypeInfo(typeArg);
 
     // If the type argument is an archetype (FIXME: or is *dependent*
@@ -2639,12 +2639,12 @@ void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
 
     // Otherwise, we can construct the witnesses from the protocol
     // conformances.
-    assert(archetypeProtos.size() == subs[i].Conformance.size());
+    assert(archetypeProtos.size() == sub.Conformance.size());
     for (unsigned j = 0, je = archetypeProtos.size(); j != je; ++j) {
       auto proto = archetypeProtos[j];
       auto &protoI = IGF.IGM.getProtocolInfo(proto);
       auto &confI = protoI.getConformance(IGF.IGM, typeArg, argTI, proto,
-                                          *subs[i].Conformance[j]);
+                                          *sub.Conformance[j]);
 
       llvm::Value *wtable = confI.getTable(IGF);
       out.addUnmanaged(wtable);
@@ -2656,14 +2656,10 @@ void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
 void irgen::expandPolymorphicSignature(IRGenModule &IGM,
                                        const GenericParamList &generics,
                                        SmallVectorImpl<llvm::Type*> &out) {
-  for (auto &param : generics) {
-    TypeAliasDecl *paramType = param.getAsTypeParam();
-    assert(paramType);
-
+  for (auto archetype : generics.getAllArchetypes()) {
     // For now, pass each signature requirement separately.  We always
     // need to pass at least one witness table in order to know how to
     // manipulate the type.
-    auto archetype = paramType->getUnderlyingType()->castTo<ArchetypeType>();
     unsigned n = std::max(unsigned(archetype->getConformsTo().size()), 1U);
     while (n--) out.push_back(IGM.WitnessTablePtrTy);
   }

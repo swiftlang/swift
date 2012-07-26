@@ -438,8 +438,14 @@ namespace {
       }
 
       // Verify that the protocol conformances line up with the archetypes.
+      unsigned Index = 0;
       for (auto &Subst : E->getSubstitutions()) {
         auto Archetype = Subst.Archetype;
+        if (Archetype != GenericParams->getAllArchetypes()[Index++]) {
+          Out << "Substitution order doesn't match with archetypes order\n";
+          abort();
+        }
+
         if (Subst.Conformance.size() != Archetype->getConformsTo().size()) {
           Out << "Wrong number of protocol conformances for archetype\n";
           abort();

@@ -224,7 +224,9 @@ getGenericParam(ASTContext &Context) {
   Type GenericTy = GenericTyDecl->getAliasType();
   GenericParam Param = GenericTyDecl;
   auto ParamList = GenericParamList::create(Context, SourceLoc(), Param,
-                                             SourceLoc());
+                                            SourceLoc());
+  ParamList->setAllArchetypes(
+    Context.AllocateCopy(ArrayRef<ArchetypeType *>(&Archetype, 1)));
   return std::make_tuple(GenericTy, ParamList);
 }
 

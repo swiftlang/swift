@@ -674,14 +674,41 @@ SpecializeExpr *
 TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
                                  const TypeSubstitutionMap &Substitutions,
                                  const ConformanceMap &Conformances) {
-  SmallVector<SpecializeExpr::Substitution, 2> storedSubstitutions;
-  storedSubstitutions.resize(Substitutions.size());
+  // Figure out the mapping from primary archetypes to their deducible
+  // parameters.
+  // FIXME: This is terribly inefficient. We should keep track of this
+  // information when we substituted in deducible parameters for the archetypes.
+  llvm::SmallDenseMap<ArchetypeType *, DeducibleGenericParamType *>
+    closedToOpen;
   for (auto subst : Substitutions) {
-    unsigned index = subst.first->getPrimaryIndex();
-    storedSubstitutions[index].Archetype = subst.first->getArchetype();
-    storedSubstitutions[index].Replacement = subst.second;
+    if (auto deducible = subst.first->getAs<DeducibleGenericParamType>()) {
+      closedToOpen[deducible->getArchetype()] = deducible;
+    }
+  }
+
+  auto polyFn = Sub->getType()->castTo<PolymorphicFunctionType>();
+  auto archetypes = polyFn->getGenericParams().getAllArchetypes();
+  SmallVector<SpecializeExpr::Substitution, 2> storedSubstitutions;
+  storedSubstitutions.resize(archetypes.size());
+  unsigned index = 0;
+  for (auto archetype : archetypes) {
+    // Figure out the key into the maps we were given.
+    SubstitutableType *key = archetype;
+    if (archetype->isPrimary()) {
+      key = closedToOpen[archetype];
+      assert(key && "can't find deducible form of primary archetype");
+    }
+    assert(Substitutions.count(key) && "Missing substitution information");
+    assert(Conformances.count(key) && "Missing conformance information");
+
+    // Record this substitution.
+    storedSubstitutions[index].Archetype = archetype;
+    storedSubstitutions[index].Replacement
+      = Substitutions.find(key)->second;
     storedSubstitutions[index].Conformance
-      = Context.AllocateCopy(Conformances.find(subst.first)->second);
+      = Context.AllocateCopy(Conformances.find(key)->second);
+    
+    ++index;
   }
 
   return new (Context) SpecializeExpr(Sub, Ty,

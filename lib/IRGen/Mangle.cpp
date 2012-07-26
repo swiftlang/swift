@@ -386,10 +386,9 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
 
     ArchetypesDepth++;
     unsigned index = 0;
-    for (auto &param : fn->getGenericParams()) {
-      ArchetypeType *archetype =
-        cast<ArchetypeType>(param.getAsTypeParam()->getUnderlyingType());
-
+    // FIXME: Only mangle the archetypes and protocol requirements that
+    // matter, rather than everything.
+    for (auto archetype : fn->getGenericParams().getAllArchetypes()) {
       // Remember the current depth and level.
       ArchetypeInfo info;
       info.Depth = ArchetypesDepth;

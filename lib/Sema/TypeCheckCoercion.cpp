@@ -2192,6 +2192,9 @@ static bool finalizeSubstitutions(CoercionContext &CC, SourceLoc ComplainLoc) {
       if (!T)
         return true;
 
+      // Record substitution for this non-primary archetype.
+      CC.Substitutions[Archetype] = T;
+
       SmallVectorImpl<ProtocolConformance *> &Conformances
         = CC.Conformance[Archetype];
       for (auto Proto : Archetype->getConformsTo()) {
