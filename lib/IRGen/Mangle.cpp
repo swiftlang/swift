@@ -61,11 +61,30 @@ static bool isSwiftModule(Module *module) {
 
 namespace {
   enum class IncludeType : bool { No, Yes };
+  
+  struct ArchetypeInfo {
+    unsigned Depth;
+    unsigned Index;
+  };
+
+  /// A helpful little wrapper for a value that should be mangled
+  /// in a particular, compressed value.
+  class Index {
+    unsigned N;
+  public:
+    explicit Index(unsigned n) : N(n) {}
+    friend raw_ostream &operator<<(raw_ostream &out, Index n) {
+      if (n.N != 0) out << (n.N - 1);
+      return (out << '_');
+    }
+  };
 
   /// A class for mangling declarations.
   class Mangler {
     raw_ostream &Buffer;
     llvm::DenseMap<void*, unsigned> Substitutions;
+    llvm::DenseMap<ArchetypeType*, ArchetypeInfo> Archetypes;
+    unsigned ArchetypesDepth = 0;
 
   public:
     Mangler(raw_ostream &buffer) : Buffer(buffer) {}
@@ -76,6 +95,9 @@ namespace {
     void mangleFunctionType(AnyFunctionType *fn, ExplosionKind explosionKind,
                             unsigned uncurryingLevel);
     void mangleNominalType(NominalTypeDecl *decl, ExplosionKind explosionKind);
+    void mangleProtocolList(ArrayRef<ProtocolDecl*> protocols);
+    void mangleProtocolList(ArrayRef<Type> protocols);
+    void mangleProtocolName(ProtocolDecl *protocol);
     void mangleDeclContext(DeclContext *ctx);
     void mangleIdentifier(Identifier ident);
     void mangleGetterOrSetterContext(FuncDecl *fn);
@@ -238,24 +260,29 @@ void Mangler::mangleDeclName(ValueDecl *decl, IncludeType includeType) {
 
 /// Mangle a type into the buffer.
 ///
-/// Type manglings should never start with [0-9_].
+/// Type manglings should never start with [0-9_] or end with [0-9].
 ///
 /// <type> ::= A <natural> <type>    # fixed-sized arrays
-/// <type> ::= Bf <natural>          # Builtin.Float
-/// <type> ::= Bi <natural>          # Builtin.Integer
+/// <type> ::= Bf <natural> _        # Builtin.Float
+/// <type> ::= Bi <natural> _        # Builtin.Integer
 /// <type> ::= BO                    # Builtin.ObjCPointer
 /// <type> ::= Bo                    # Builtin.ObjectPointer
 /// <type> ::= Bp                    # Builtin.RawPointer
 /// <type> ::= C <decl>              # class (substitutable)
-/// <type> ::= P <decl>* _           # protocol composition (substitutable)
 /// <type> ::= F <type> <type>       # function type
-/// <type> ::= G <type> <type>+ _    # bound generic type
 /// <type> ::= f <type> <type>       # uncurried function type
+/// <type> ::= G <type> <type>+ _    # bound generic type
 /// <type> ::= O <decl>              # oneof (substitutable)
+/// <type> ::= P <protocol-list> _   # protocol composition
+/// <type> ::= Q <index>             # archetype with depth=0, index=N
+/// <type> ::= Qd <index> <index>    # archetype with depth=M+1, index=N
 /// <type> ::= R <type>              # lvalue
-/// <type> ::= V <decl>              # struct (substitutable)
 /// <type> ::= T <tuple-element>* _  # tuple
-/// <type> ::= v                     # an archetype (provisional, obviously)
+/// <type> ::= U <generic-parameter>+ _ <type>
+/// <type> ::= V <decl>              # struct (substitutable)
+///
+/// <index> ::= _                    # 0
+/// <index> ::= <natural> _          # N+1
 ///
 /// <tuple-element> ::= <identifier>? <type>
 void Mangler::mangleType(Type type, ExplosionKind explosion,
@@ -279,16 +306,16 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   // don't expect them to come up that often in API names.
   case TypeKind::BuiltinFloat:
     switch (cast<BuiltinFloatType>(type)->getFPKind()) {
-    case BuiltinFloatType::IEEE16: Buffer << "Bf16"; return;
-    case BuiltinFloatType::IEEE32: Buffer << "Bf32"; return;
-    case BuiltinFloatType::IEEE64: Buffer << "Bf64"; return;
-    case BuiltinFloatType::IEEE80: Buffer << "Bf80"; return;
-    case BuiltinFloatType::IEEE128: Buffer << "Bf128"; return;
+    case BuiltinFloatType::IEEE16: Buffer << "Bf16_"; return;
+    case BuiltinFloatType::IEEE32: Buffer << "Bf32_"; return;
+    case BuiltinFloatType::IEEE64: Buffer << "Bf64_"; return;
+    case BuiltinFloatType::IEEE80: Buffer << "Bf80_"; return;
+    case BuiltinFloatType::IEEE128: Buffer << "Bf128_"; return;
     case BuiltinFloatType::PPC128: llvm_unreachable("ppc128 not supported");
     }
     llvm_unreachable("bad floating-point kind");
   case TypeKind::BuiltinInteger:
-    Buffer << "Bi" << cast<BuiltinIntegerType>(type)->getBitWidth();
+    Buffer << "Bi" << cast<BuiltinIntegerType>(type)->getBitWidth() << '_';
     return;
   case TypeKind::BuiltinRawPointer:
     Buffer << "Bp";
@@ -338,11 +365,6 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   case TypeKind::Class:
     return mangleNominalType(cast<ClassType>(base)->getDecl(), explosion);
 
-  case TypeKind::Archetype:
-    // FIXME
-    Buffer << 'v';
-    return;
-
   case TypeKind::BoundGeneric: {
     // type ::= 'G' <type> <type>+ '_'
     auto type = cast<BoundGenericType>(base);
@@ -356,19 +378,54 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   }
 
   case TypeKind::PolymorphicFunction: {
-    // type ::= 'U' generic-parameter-list type
+    // <type> ::= U <generic-parameter>+ _ <type>
     // 'U' is for "universal qualification".
     // The nested type is always a function type.
     PolymorphicFunctionType *fn = cast<PolymorphicFunctionType>(base);
     Buffer << 'U';
 
+    ArchetypesDepth++;
+    unsigned index = 0;
     for (auto &param : fn->getGenericParams()) {
-      (void) param;
-      // TODO: bind the archetypes here.
-      // TODO: mangle the parameter somehow.
+      ArchetypeType *archetype =
+        cast<ArchetypeType>(param.getAsTypeParam()->getUnderlyingType());
+
+      // Remember the current depth and level.
+      ArchetypeInfo info;
+      info.Depth = ArchetypesDepth;
+      info.Index = index++;
+      Archetypes.insert(std::make_pair(archetype, info));
+
+      // Mangle this type parameter.
+      //   <generic-parameter> ::= <protocol-list> _
+      mangleProtocolList(archetype->getConformsTo());
+      Buffer << '_';
     }
+    Buffer << '_';
     mangleFunctionType(fn, explosion, uncurryLevel);
-    // TODO: unbind the archetypes
+    ArchetypesDepth--;
+    return;
+  }
+
+  case TypeKind::Archetype: {
+    // <type> ::= Q <index>             # archetype with depth=0, index=N
+    // <type> ::= Qd <index> <index>    # archetype with depth=M+1, index=N
+
+    // Find the archetype information.  It may be possible for this to
+    // fail for local declarations --- that might be okay; it means we
+    // probably need to insert contexts for all the enclosing contexts.
+    // And of course, linkage is not critical for such things.
+    auto it = Archetypes.find(cast<ArchetypeType>(base));
+    assert(it != Archetypes.end());
+    auto &info = it->second;
+    assert(ArchetypesDepth >= info.Depth);
+
+    Buffer << 'Q';
+    unsigned relativeDepth = ArchetypesDepth - info.Depth;
+    if (relativeDepth != 0) {
+      Buffer << 'd' << Index(relativeDepth - 1);
+    }
+    Buffer << Index(info.Index);
     return;
   }
 
@@ -386,22 +443,49 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   };
 
   case TypeKind::ProtocolComposition: {
-    // Protocol compositions are substitutable as a whole.
-    if (tryMangleSubstitution(base))
-      return;
-    
-    // <type> ::= P <decl>* _
+    // We mangle ProtocolType and ProtocolCompositionType using the
+    // same production:
+    //   <type> ::= P <protocol-list> _
+    // As a special case, if there is exactly one protocol in the
+    // list, and it is a substitution candidate, then the *entire*
+    // producton is substituted.
+
+    auto protocols = cast<ProtocolCompositionType>(base)->getProtocols();
+    assert(protocols.size() != 1);
     Buffer << 'P';
-    for (auto protoTy : cast<ProtocolCompositionType>(base)->getProtocols()) {
-      ProtocolDecl *proto = protoTy->castTo<ProtocolType>()->getDecl();
-      mangleDeclName(proto, IncludeType::No);
-    }
+    mangleProtocolList(protocols);
     Buffer << '_';
-    addSubstitution(base);
     return;
   }
   }
   llvm_unreachable("bad type kind");
+}
+
+/// Mangle a list of protocols.  Each protocol is a substitution
+/// candidate.
+///   <protocol-list> ::= <protocol-name>+
+void Mangler::mangleProtocolList(ArrayRef<Type> protocols) {
+  for (auto protoTy : protocols) {
+    mangleProtocolName(protoTy->castTo<ProtocolType>()->getDecl());
+  }
+}
+void Mangler::mangleProtocolList(ArrayRef<ProtocolDecl*> protocols) {
+  for (auto protocol : protocols) {
+    mangleProtocolName(protocol);
+  }
+}
+
+/// Mangle the name of a protocol as a substitution candidate.
+void Mangler::mangleProtocolName(ProtocolDecl *protocol) {
+  //  <protocol-name> ::= <decl>      # substitutable
+  // The <decl> in a protocol-name is the same substitution
+  // candidate as a protocol <type>, but it is mangled without
+  // the surrounding 'P'...'_'.
+  ProtocolType *type = cast<ProtocolType>(protocol->getDeclaredType());
+  if (tryMangleSubstitution(type))
+    return;
+  mangleDeclName(protocol, IncludeType::No);
+  addSubstitution(type);
 }
 
 static char getSpecifierForNominalType(NominalTypeDecl *decl) {
