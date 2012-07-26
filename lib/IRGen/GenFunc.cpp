@@ -78,6 +78,7 @@
 #include "Condition.h"
 #include "FixedTypeInfo.h"
 #include "ScalarTypeInfo.h"
+#include "Scope.h"
 
 #include "GenFunc.h"
 
@@ -1599,9 +1600,11 @@ static bool emitKnownCall(IRGenFunction &IGF, FuncDecl *Fn,
                                         "logical.cond");
     if (cond.hasTrue()) {
       cond.enterTrue(IGF);
+      Scope condScope(IGF);
       Expr *Body = cast<ImplicitClosureExpr>(Arg->getElement(1))->getBody();
       llvm::Value *Val = IGF.emitAsPrimitiveScalar(Body);
       IGF.Builder.CreateStore(Val, CondBool);
+      condScope.pop();
       cond.exitTrue(IGF);
     }
     if (cond.hasFalse()) {
