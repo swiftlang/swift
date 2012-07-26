@@ -1173,18 +1173,9 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
         return DestTy;
       }
 
-      SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
-      Substitutions.resize(Ovl.getSubstitutions().size());
-      auto &Conformances = Ovl.getConformances();
-      for (auto S : Ovl.getSubstitutions()) {
-        unsigned Index = S.first->getPrimaryIndex();
-        Substitutions[Index].Archetype = S.first->getArchetype();
-        Substitutions[Index].Replacement = S.second;
-        Substitutions[Index].Conformance
-          = TC.Context.AllocateCopy(Conformances[S.first]);
-      }
-      Expr *Fn = new (TC.Context) SpecializeExpr(E->getFn(), Ovl.getType(),
-                                     TC.Context.AllocateCopy(Substitutions));
+      Expr *Fn = TC.buildSpecializeExpr(E->getFn(), Ovl.getType(),
+                                        Ovl.getSubstitutions(),
+                                        Ovl.getConformances());
       E->setFn(Fn);
       return coerceToType(TC.semaApplyExpr(E), DestTy, CC, Flags);
     }
@@ -1959,19 +1950,9 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
         return Cand.getType();
       }
 
-      SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
-      Substitutions.resize(Cand.getSubstitutions().size());
-      auto &Conformances = Cand.getConformances();
-      for (auto S : Cand.getSubstitutions()) {
-        unsigned Index = S.first->getPrimaryIndex();
-        Substitutions[Index].Archetype = S.first->getArchetype();
-        Substitutions[Index].Replacement = S.second;
-        Substitutions[Index].Conformance
-          = TC.Context.AllocateCopy(Conformances[S.first]);
-      }
-      Expr *Result
-        = new (TC.Context) SpecializeExpr(E, Cand.getType(),
-                                        TC.Context.AllocateCopy(Substitutions));
+      Expr *Result = TC.buildSpecializeExpr(E, Cand.getType(),
+                                            Cand.getSubstitutions(),
+                                            Cand.getConformances());
       return coerced(Result, Flags);
     }
   }

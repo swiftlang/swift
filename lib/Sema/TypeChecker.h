@@ -525,6 +525,22 @@ public:
   Expr *buildFilteredOverloadSet(OverloadedExpr Ovl,
                                  const OverloadCandidate &Candidate);
 
+  /// \brief Build a new SpecializeExpr wrapping the given subexpression.
+  ///
+  /// \param Sub The subexpression to wrap, which must have polymorphic
+  /// function type.
+  ///
+  /// \param Ty The type of the resulting SpecializeExpr.
+  ///
+  /// \param Substitutions The set of substitutions from each of the archetypes
+  /// to the replacement type.
+  ///
+  /// \param Conformances The set of protocol-conformance structures for each
+  /// of the substitutions.
+  SpecializeExpr *buildSpecializeExpr(Expr *Sub, Type Ty,
+                                      const TypeSubstitutionMap &Substitutions,
+                                      const ConformanceMap &Conformances);
+
   /// \brief Build a reference to a declaration, where name lookup returned
   /// the given set of declarations.
   Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc);

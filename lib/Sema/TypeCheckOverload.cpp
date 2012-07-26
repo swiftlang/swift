@@ -670,6 +670,24 @@ TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
   return replaceSemanticsProvidingExpr(expr, result, Ovl.getExpr());
 }
 
+SpecializeExpr *
+TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
+                                 const TypeSubstitutionMap &Substitutions,
+                                 const ConformanceMap &Conformances) {
+  SmallVector<SpecializeExpr::Substitution, 2> storedSubstitutions;
+  storedSubstitutions.resize(Substitutions.size());
+  for (auto subst : Substitutions) {
+    unsigned index = subst.first->getPrimaryIndex();
+    storedSubstitutions[index].Archetype = subst.first->getArchetype();
+    storedSubstitutions[index].Replacement = subst.second;
+    storedSubstitutions[index].Conformance
+      = Context.AllocateCopy(Conformances.find(subst.first)->second);
+  }
+
+  return new (Context) SpecializeExpr(Sub, Ty,
+                                     Context.AllocateCopy(storedSubstitutions));
+}
+
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc) {
   assert(!Decls.empty() && "Must have at least one declaration");
 
@@ -711,18 +729,9 @@ Expr *TypeChecker::specializeOverloadResult(const OverloadCandidate &Candidate,
   }
 
   if (Candidate.hasSubstitutions()) {
-    SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
-    Substitutions.resize(Candidate.getSubstitutions().size());
-    auto &Conformances = Candidate.getConformances();
-    for (auto S : Candidate.getSubstitutions()) {
-      unsigned Index = S.first->getPrimaryIndex();
-      Substitutions[Index].Archetype = S.first->getArchetype();
-      Substitutions[Index].Replacement = S.second;
-      Substitutions[Index].Conformance
-        = Context.AllocateCopy(Conformances[S.first]);
-    }
-    E = new (Context) SpecializeExpr(E, Candidate.getType(),
-                                     Context.AllocateCopy(Substitutions));
+    E = buildSpecializeExpr(E, Candidate.getType(),
+                            Candidate.getSubstitutions(),
+                            Candidate.getConformances());
   }
 
   return E;
