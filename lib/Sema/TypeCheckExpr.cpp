@@ -631,6 +631,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
         auto &Conformances = Ovl.getConformances();
         for (auto S : Ovl.getSubstitutions()) {
           unsigned Index = S.first->getPrimaryIndex();
+          Substitutions[Index].Archetype = S.first->getArchetype();
           Substitutions[Index].Replacement = S.second;
           Substitutions[Index].Conformance
             = Context.AllocateCopy(Conformances[S.first]);

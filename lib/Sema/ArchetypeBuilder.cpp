@@ -18,6 +18,7 @@
 #include "ArchetypeBuilder.h"
 #include "TypeChecker.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -201,6 +202,8 @@ public:
 struct ArchetypeBuilder::Implementation {
   SmallVector<TypeAliasDecl *, 4> GenericParams;
   DenseMap<TypeAliasDecl *, PotentialArchetype *> PotentialArchetypes;
+  DenseMap<TypeAliasDecl *, ArchetypeType *> PrimaryArchetypeMap;
+  SmallVector<ArchetypeType *, 4> AllArchetypes;
 };
 
 ArchetypeBuilder::ArchetypeBuilder(TypeChecker &TC)
@@ -421,15 +424,54 @@ bool ArchetypeBuilder::addImplicitConformance(TypeAliasDecl *Param,
   return addConformanceRequirement(Impl->PotentialArchetypes[Param], Proto);
 }
 
-llvm::DenseMap<TypeAliasDecl *, ArchetypeType *>
-ArchetypeBuilder::assignArchetypes() {
-  llvm::DenseMap<TypeAliasDecl *, ArchetypeType *> Archetypes;
+/// \brief Add the nested archetypes of the given archetype to the set of
+/// all archetypes.
+static void addNestedArchetypes(ArchetypeType *Archetype,
+                                llvm::SmallPtrSet<ArchetypeType *, 8> &Known,
+                                SmallVectorImpl<ArchetypeType *> &All) {
+  for (auto Nested : Archetype->getNestedTypes()) {
+    if (Known.insert(Nested.second)) {
+      assert(!Nested.second->isPrimary() && "Unexpected primary archetype");
+      All.push_back(Nested.second);
+      addNestedArchetypes(Nested.second, Known, All);
+    }
+  }
+}
+
+void ArchetypeBuilder::assignArchetypes() {
+  // Compute the archetypes for each of the potential archetypes (i.e., the
+  // generic parameters).
   for (const auto& PA : Impl->PotentialArchetypes) {
     auto Archetype = PA.second->getArchetype(TC);
-    Archetypes[PA.first] = Archetype;
+    Impl->PrimaryArchetypeMap[PA.first] = Archetype;
   }
-  
-  return std::move(Archetypes);
+}
+
+ArchetypeType *
+ArchetypeBuilder::getArchetype(TypeAliasDecl *GenericParam) const {
+  auto Pos = Impl->PrimaryArchetypeMap.find(GenericParam);
+  assert(Pos != Impl->PrimaryArchetypeMap.end() && "Not a parameter!");
+  return Pos->second;
+}
+
+ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
+  if (Impl->AllArchetypes.empty()) {
+    // Collect the primary archetypes first.
+    llvm::SmallPtrSet<ArchetypeType *, 8> KnownArchetypes;
+    for (auto GP : Impl->GenericParams) {
+      auto Archetype = Impl->PrimaryArchetypeMap[GP];
+      if (Archetype->isPrimary() && KnownArchetypes.insert(Archetype))
+        Impl->AllArchetypes.push_back(Archetype);
+    }
+
+    // Collect all of the remaining archetypes.
+    for (auto GP : Impl->GenericParams) {
+      auto Archetype = Impl->PrimaryArchetypeMap[GP];
+      addNestedArchetypes(Archetype, KnownArchetypes, Impl->AllArchetypes);
+    }
+  }
+
+  return Impl->AllArchetypes;
 }
 
 void ArchetypeBuilder::dump() {

@@ -31,6 +31,7 @@ namespace llvm {
   struct fltSemantics;
 }
 namespace swift {
+  class ArchetypeType;
   class ASTContext;
   class ClassDecl;
   class ExprHandle;
@@ -1205,6 +1206,9 @@ public:
   /// primary type.
   SubstitutableType *getParent() const;
 
+  /// \brief Retrieve the archetype corresponding to this substitutable type.
+  ArchetypeType *getArchetype();
+
   // FIXME: Temporary hack.
   bool isPrimary() const;
   unsigned getPrimaryIndex() const;
@@ -1415,6 +1419,13 @@ inline SubstitutableType *SubstitutableType::getParent() const {
     return Archetype->getParent();
 
   return cast<DeducibleGenericParamType>(this)->getParent();
+}
+
+inline ArchetypeType *SubstitutableType::getArchetype() {
+  if (auto Archetype = dyn_cast<ArchetypeType>(this))
+    return Archetype;
+
+  return cast<DeducibleGenericParamType>(this)->getArchetype();
 }
 
 inline bool SubstitutableType::isPrimary() const {

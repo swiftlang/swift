@@ -716,6 +716,7 @@ Expr *TypeChecker::specializeOverloadResult(const OverloadCandidate &Candidate,
     auto &Conformances = Candidate.getConformances();
     for (auto S : Candidate.getSubstitutions()) {
       unsigned Index = S.first->getPrimaryIndex();
+      Substitutions[Index].Archetype = S.first->getArchetype();
       Substitutions[Index].Replacement = S.second;
       Substitutions[Index].Conformance
         = Context.AllocateCopy(Conformances[S.first]);

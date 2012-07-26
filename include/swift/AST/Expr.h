@@ -1201,6 +1201,7 @@ public:
 /// Substitution - A substitution into a generic specialization.
 class Substitution {
 public:
+  ArchetypeType *Archetype;
   Type Replacement;
   ArrayRef<ProtocolConformance *> Conformance;
 };

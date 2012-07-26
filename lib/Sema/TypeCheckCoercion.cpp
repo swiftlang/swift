@@ -1178,6 +1178,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
       auto &Conformances = Ovl.getConformances();
       for (auto S : Ovl.getSubstitutions()) {
         unsigned Index = S.first->getPrimaryIndex();
+        Substitutions[Index].Archetype = S.first->getArchetype();
         Substitutions[Index].Replacement = S.second;
         Substitutions[Index].Conformance
           = TC.Context.AllocateCopy(Conformances[S.first]);
@@ -1963,6 +1964,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
       auto &Conformances = Cand.getConformances();
       for (auto S : Cand.getSubstitutions()) {
         unsigned Index = S.first->getPrimaryIndex();
+        Substitutions[Index].Archetype = S.first->getArchetype();
         Substitutions[Index].Replacement = S.second;
         Substitutions[Index].Conformance
           = TC.Context.AllocateCopy(Conformances[S.first]);
@@ -2179,6 +2181,61 @@ bool CoercionContext::hasCompleteSubstitutions() const {
   return true;
 }
 
+/// \brief "Finalize" a complete set of substitutions by computing
+static bool finalizeSubstitutions(CoercionContext &CC, SourceLoc ComplainLoc) {
+  TypeChecker &TC = CC.TC;
+
+
+  // Seed the archetype stack with the set of substitutions we asked for.
+  llvm::SmallPtrSet<ArchetypeType *, 8> KnownArchetypes;
+  SmallVector<ArchetypeType *, 8> ArchetypeStack;
+  TypeSubstitutionMap TwoStepSubstitutions; // FIXME: Inefficient!
+  for (auto &Sub : CC.Substitutions) {
+    auto Archetype = Sub.first->getArchetype();
+    if (KnownArchetypes.insert(Archetype))
+      ArchetypeStack.push_back(Archetype);
+    TwoStepSubstitutions[Archetype] = Sub.second;
+  }
+
+  // Check that each of the replacements for the non-primary archetypes conform
+  // to the required protocols.
+  while (!ArchetypeStack.empty()) {
+    // Grab the last archetype on the stack.
+    auto Archetype = ArchetypeStack.back();
+    ArchetypeStack.pop_back();
+
+    if (!Archetype->isPrimary()) {
+      // Substitute our deductions into the archetype type to produce the
+      // concrete type we need to evaluate.
+      Type T = TC.substType(Archetype, TwoStepSubstitutions);
+      if (!T)
+        return true;
+
+      SmallVectorImpl<ProtocolConformance *> &Conformances
+        = CC.Conformance[Archetype];
+      for (auto Proto : Archetype->getConformsTo()) {
+        ProtocolConformance *Conformance = nullptr;
+        if (TC.conformsToProtocol(T, Proto, &Conformance, ComplainLoc)) {
+          Conformances.push_back(Conformance);
+        } else {
+          // FIXME: Diagnose, if requested.
+          return true;
+        }
+      }
+    }
+
+    // Add any nested archetypes to the archetype stack.
+    for (auto Nested : Archetype->getNestedTypes()) {
+      if (KnownArchetypes.insert(Nested.second))
+        ArchetypeStack.push_back(Nested.second);
+    }
+  }
+
+  // FIXME: Check same-type constraints!
+
+  return false;
+}
+
 CoercedExpr TypeChecker::coerceToType(Expr *E, Type DestTy, CoercionKind Kind,
                                       CoercionContext *CC) {
   unsigned Flags = CF_Apply | CF_UserConversions;
@@ -2219,6 +2276,12 @@ CoercedExpr TypeChecker::coerceToType(Expr *E, Type DestTy, CoercionKind Kind,
     if (!DestTy)
       return CoercedExpr(*this, CoercionResult::Failed, E, DestTy);
   }
+
+  // If we've completed our substitutions, finalize them by gathering
+  // protocol-conformance information for all of the associated types.
+  if (CC->requiresSubstitution() && CC->hasCompleteSubstitutions() &&
+      finalizeSubstitutions(*CC, E->getLoc()))
+    return CoercedExpr(*this, CoercionResult::Failed, E, DestTy);
 
   CoercedResult Res = SemaCoerce::coerceToType(E, DestTy, *CC, Flags);
   return CoercedExpr(*this, Res.getKind(),
@@ -2264,6 +2327,12 @@ CoercionResult TypeChecker::isCoercibleToType(Expr *E, Type Ty,
     if (!Ty)
       return CoercionResult::Failed;
   }
+
+  // If we've completed our substitutions, finalize them by gathering
+  // protocol-conformance information for all of the associated types.
+  if (CC->requiresSubstitution() && CC->hasCompleteSubstitutions() &&
+      finalizeSubstitutions(*CC, /*ComplainLoc=*/SourceLoc()))
+    return CoercionResult::Failed;
 
   return SemaCoerce::coerceToType(E, Ty, *CC, Flags).getKind();
 }

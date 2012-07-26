@@ -123,11 +123,15 @@ public:
     }
 
     // Wire up the archetypes.
-    llvm::DenseMap<TypeAliasDecl *, ArchetypeType *> Archetypes
-      = Builder.assignArchetypes();
-    for (auto Arch : Archetypes) {
-      Arch.first->getUnderlyingTypeLoc() = TypeLoc(Arch.second);
+    Builder.assignArchetypes();
+    for (auto GP : *GenericParams) {
+      auto TypeParam = GP.getAsTypeParam();
+
+      TypeParam->getUnderlyingTypeLoc()
+        = TypeLoc(Builder.getArchetype(TypeParam));
     }
+    GenericParams->setAllArchetypes(
+      TC.Context.AllocateCopy(Builder.getAllArchetypes()));
 
     // Validate the types in the requirements clause.
     for (auto &Req : GenericParams->getRequirements()) {
@@ -357,12 +361,11 @@ public:
     ArchetypeBuilder builder(TC);
     builder.addGenericParameter(thisDecl, 0);
     builder.addImplicitConformance(thisDecl, PD);
-    llvm::DenseMap<TypeAliasDecl *, ArchetypeType *> assignments
-      = builder.assignArchetypes();
+    builder.assignArchetypes();
 
     // Set the underlying type of each of the associated types to the
     // appropriate archetype.
-    ArchetypeType *thisArchetype = assignments[thisDecl];
+    ArchetypeType *thisArchetype = builder.getArchetype(thisDecl);
     for (auto member : PD->getMembers()) {
       if (auto assocType = dyn_cast<TypeAliasDecl>(member)) {
         TypeLoc underlyingTy;
@@ -374,7 +377,6 @@ public:
         assocType->getUnderlyingTypeLoc() = underlyingTy;
       }
     }
-
 
     // Check the members.
     for (auto Member : PD->getMembers())

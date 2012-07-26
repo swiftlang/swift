@@ -29,6 +29,7 @@
 #include <cstddef>
 
 namespace swift {
+  class ArchetypeType;
   class ASTContext;
   class ASTWalker;
   class Type;
@@ -309,6 +310,7 @@ class GenericParamList {
   unsigned NumParams;
   SourceLoc RequiresLoc;
   MutableArrayRef<Requirement> Requirements;
+  ArrayRef<ArchetypeType *> AllArchetypes;
 
   GenericParamList(SourceLoc LAngleLoc,
                    ArrayRef<GenericParam> Params,
@@ -394,6 +396,19 @@ public:
   /// refers to ASTContext-allocated memory.
   void overrideRequirements(MutableArrayRef<Requirement> NewRequirements) {
     Requirements = NewRequirements;
+  }
+
+  /// \brief Retrieves the list containing all archetypes described by this
+  /// generic parameter clause.
+  ///
+  /// In this list of archetypes, the primary archetypes come first followed by
+  /// any non-primary archetypes (i.e., those archetypes that encode associated
+  /// types of another archetype).
+  ArrayRef<ArchetypeType *> getAllArchetypes() const { return AllArchetypes; }
+
+  /// \brief Sets all archetypes *without* copying the source array.
+  void setAllArchetypes(ArrayRef<ArchetypeType *> AA) {
+    AllArchetypes = AA;
   }
 
   SourceRange getSourceRange() const { return Brackets; }

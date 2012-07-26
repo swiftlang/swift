@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Optional.h"
-#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/ArrayRef.h"
 #include <memory>
 
 namespace swift {
@@ -87,11 +87,21 @@ public:
   /// parameters.
   bool addImplicitConformance(TypeAliasDecl *Param, ProtocolDecl *Proto);
 
-  /// \brief Assign archetypes
+  /// \brief Assign archetypes to each of the generic parameters and all
+  /// of their associated types, recursively.
   ///
   /// This operation should only be performed after all generic parameters and
-  /// requirements have been added to the builder.
-  llvm::DenseMap<TypeAliasDecl *, ArchetypeType *> assignArchetypes();
+  /// requirements have been added to the builder. It is non-reversible.
+  void assignArchetypes();
+
+  /// \brief Retrieve the archetype that corresponds to the given generic
+  /// parameter.
+  ArchetypeType *getArchetype(TypeAliasDecl *GenericParam) const;
+
+  /// \brief Retrieve the array of all of the archetypes produced during
+  /// archetype assignment. The 'primary' archetypes will occur first in this
+  /// list.
+  llvm::ArrayRef<ArchetypeType *> getAllArchetypes();
 
   // FIXME: Infer requirements from signatures
   // FIXME: Compute the set of 'extra' witness tables needed to express this

@@ -438,11 +438,8 @@ namespace {
       }
 
       // Verify that the protocol conformances line up with the archetypes.
-      unsigned Index = 0;
-      for (auto GP : *GenericParams) {
-        auto Archetype = GP.getAsTypeParam()->getDeclaredType()
-                           ->getAs<ArchetypeType>();
-        const auto &Subst = E->getSubstitutions()[Index++];
+      for (auto &Subst : E->getSubstitutions()) {
+        auto Archetype = Subst.Archetype;
         if (Subst.Conformance.size() != Archetype->getConformsTo().size()) {
           Out << "Wrong number of protocol conformances for archetype\n";
           abort();
