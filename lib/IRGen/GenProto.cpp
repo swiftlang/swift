@@ -2121,15 +2121,11 @@ namespace {
       // machinery to do all this for us.
       llvm::CallInst *call = IGF.Builder.CreateCall(ImplPtr, finalArgs);
 
-      // In an abstracted result, we build into the buffer given us,
-      // but we also return the result pointer.
+      // In an abstracted result, we build into the buffer given us.
       if (HasAbstractedResult) {
         if (outerResultCleanup.isValid())
           IGF.setCleanupState(outerResultCleanup, CleanupState::Dead);
-
-        llvm::Value *addr = innerResult.getAddress();
-        addr = IGF.Builder.CreateBitCast(addr, IGM.OpaquePtrTy);
-        IGF.Builder.CreateRet(addr);
+        IGF.Builder.CreateRetVoid();
 
       // Otherwise we're just using the call return.
       } else if (call->getType()->isVoidTy()) {
