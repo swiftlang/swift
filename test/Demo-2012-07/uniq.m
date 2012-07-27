@@ -3,7 +3,11 @@
 
 void uniq(NSString *path) {
   // Load the file into a string.
-  NSString *contents = [[NSString alloc] initWithContentsOfFile: path];
+  NSStringEncoding encoding;
+  NSError *error;
+  NSString *contents = [[NSString alloc] initWithContentsOfFile: path
+                                         usedEncoding: &encoding
+                                         error: &error];
 
   // Split into lines.
   NSArray *lines = [contents componentsSeparatedByString:@"\n"];
@@ -28,14 +32,13 @@ void uniq(NSString *path) {
 
   // Convert the items into an array of objects.
   for (NSString *key in orderedKeys) {
-    NSString *message =
-      [[NSString alloc] initWithFormat:@"%@: %@", [counts objectForKey:key], key];
-    puts([message UTF8String]);
+    NSNumber *count = [counts objectForKey:key];
+    printf("%d: %s\n", count.intValue, [key UTF8String]);
   }
 }
 
-int main() {
+int main(int argc, char **argv) {
   @autoreleasepool {
-    uniq(@"test.txt");
+    uniq([[NSString alloc] initWithUTF8String: argv[1]]);
   }
 }
