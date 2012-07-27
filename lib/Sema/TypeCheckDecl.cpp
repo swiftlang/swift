@@ -530,10 +530,17 @@ public:
     if (!isa<ClassDecl>(DD->getDeclContext()))
       TC.diagnose(DD->getStartLoc(), diag::destructor_not_member);
 
-    Type ThisTy = DD->computeThisType();
-    Type FnTy = FunctionType::get(DD->computeThisType(),
-                                 TupleType::getEmpty(TC.Context),
-                                 TC.Context);
+    GenericParamList *outerGenericParams = nullptr;
+    Type ThisTy = DD->computeThisType(&outerGenericParams);
+    Type FnTy;
+    if (outerGenericParams)
+      FnTy = PolymorphicFunctionType::get(ThisTy,
+                                          TupleType::getEmpty(TC.Context),
+                                          outerGenericParams, TC.Context);
+    else
+      FnTy = FunctionType::get(ThisTy, TupleType::getEmpty(TC.Context),
+                               TC.Context);
+    
     DD->setType(FnTy);
     DD->getImplicitThisDecl()->setType(ThisTy);
 

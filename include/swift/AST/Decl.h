@@ -1286,7 +1286,7 @@ public:
   void setBody(BraceStmt *b) { Body = b; }
 
   /// computeThisType - compute and return the type of 'this'.
-  Type computeThisType() const;
+  Type computeThisType(GenericParamList **OuterGenericParams = nullptr) const;
 
   /// getImplicitThisDecl - This method returns the implicit 'this' decl.
   VarDecl *getImplicitThisDecl() const { return ImplicitThisDecl; }

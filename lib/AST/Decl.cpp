@@ -550,7 +550,8 @@ SourceRange ConstructorDecl::getSourceRange() const {
   return { ConstructorLoc, Body->getEndLoc() };
 }
 
-Type ConstructorDecl::computeThisType(GenericParamList **OuterGenericParams) const {
+Type
+ConstructorDecl::computeThisType(GenericParamList **OuterGenericParams) const {
   Type ContainerType = getDeclContext()->getDeclaredTypeOfContext();
 
   if (UnboundGenericType *UGT = ContainerType->getAs<UnboundGenericType>()) {
@@ -577,7 +578,8 @@ Type ConstructorDecl::getArgumentType() const {
   return ArgTy;
 }
 
-Type DestructorDecl::computeThisType() const {
+Type
+DestructorDecl::computeThisType(GenericParamList **OuterGenericParams) const {
   Type ContainerType = getDeclContext()->getDeclaredTypeOfContext();
 
   if (UnboundGenericType *UGT = ContainerType->getAs<UnboundGenericType>()) {
@@ -588,6 +590,11 @@ Type DestructorDecl::computeThisType() const {
     for (auto Param : *D->getGenericParams())
       GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
     ContainerType = BoundGenericType::get(D, GenericArgs);
+
+    if (OuterGenericParams)
+      *OuterGenericParams = D->getGenericParams();
+  } else if (OuterGenericParams) {
+    *OuterGenericParams = nullptr;
   }
 
   return ContainerType;
