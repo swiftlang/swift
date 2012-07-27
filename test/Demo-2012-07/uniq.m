@@ -18,7 +18,7 @@ void uniq(NSString *path) {
       count = countObject.intValue;
 
     // Update the count.
-    [counts setObject:[[NSNumber alloc] initWithInt: (count + 1)] forKey:ln];
+    [counts setObject:@(count + 1) forKey:ln];
   }
 
   // Get the keys ordered by the count.
