@@ -478,7 +478,24 @@ public:
   Type substBaseForGenericTypeMember(ValueDecl *VD, Type BaseTy, Type T,
                                      SourceLoc Loc, CoercionContext &CC,
                                      GenericParamList **GenericParams =nullptr);
-  
+
+  /// \brief Substitute a specific base type into the type T of a generic type
+  /// member, returning the appropriately substituted type along with a coercion
+  /// context.
+  ///
+  /// \param VD The declaration we're referring to.
+  /// \param BaseTy The type of the base of the member reference.
+  /// \param Types An array of types that we'll substitute into.
+  /// \param Loc The location of this substitution.
+  /// \param CC A fresh coercion context that will be populated with the
+  /// substitutions.
+  /// \param [out] GenericParams If non-NULL, will be provided with the generic
+  /// parameter list used for substitution.
+  bool substBaseForGenericTypeMember(ValueDecl *VD, Type BaseTy,
+                                     MutableArrayRef<Type> Types,
+                                     SourceLoc Loc, CoercionContext &CC,
+                                     GenericParamList **GenericParams =nullptr);
+
   /// checkPolymorphicApply - Check the application of a function of the given
   /// polymorphic type to a particular argument with, optionally, a destination
   /// type.

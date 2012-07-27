@@ -871,7 +871,8 @@ class GenericSubscriptExpr : public Expr {
   SourceRange Brackets;
   Expr *Base;
   Expr *Index;
-  
+  ArrayRef<Substitution> Substitutions;
+
 public:
   GenericSubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
                        SourceLoc RBracketLoc, SubscriptDecl *D);
@@ -890,7 +891,16 @@ public:
   /// operation refers to. 
   SubscriptDecl *getDecl() const { return D; }
   void setDecl(SubscriptDecl *D) { this->D = D; }
-  
+
+  /// \brief Retrieve the set of substitutions applied to specialize the
+  /// member.
+  ///
+  /// Each substitution contains the archetype being substitued, the type it is
+  /// being replaced with, and the protocol conformance relationships.
+  ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
+
+  void setSubstitutions(ArrayRef<Substitution> S) { Substitutions = S; }
+
   SourceLoc getLBracketLoc() const { return Brackets.Start; }
   SourceLoc getRBracketLoc() const { return Brackets.End; }
   

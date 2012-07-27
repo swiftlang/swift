@@ -345,6 +345,58 @@ Type TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
   return T;
 }
 
+bool TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
+                                                Type BaseTy,
+                                                MutableArrayRef<Type> Types,
+                                                SourceLoc Loc,
+                                                CoercionContext &CC,
+                                            GenericParamList **GenericParams) {
+  // Dig out the instance type we're dealing with for the base.
+  BaseTy = BaseTy->getRValueType();
+  if (auto BaseMeta = BaseTy->getAs<MetaTypeType>())
+    BaseTy = BaseMeta->getInstanceType();
+
+  // Dig out the (bound) generic type that describes
+  // FIXME: Cope with extensions that have generic parameters!
+  NominalTypeDecl *owner
+  = VD->getDeclContext()->getDeclaredTypeOfContext()
+  ->castTo<UnboundGenericType>()->getDecl();
+  Type ownerTy = owner->getDeclaredTypeInContext();
+
+  // Open up the owner type so we can deduce its arguments.
+  SmallVector<Type, 4> openedTypes;
+  openedTypes.reserve(Types.size() + 1);
+  openedTypes.append(Types.begin(), Types.end());
+  openedTypes.push_back(ownerTy);
+  openPolymorphicTypes(openedTypes, *owner->getGenericParams(), CC);
+
+  if (GenericParams)
+    *GenericParams = owner->getGenericParams();
+
+  // Deduce the arguments.
+  OpaqueValueExpr base(Loc, BaseTy);
+  CoercionResult cr = isCoercibleToType(&base, openedTypes.back(),
+                                        CoercionKind::Normal, &CC);
+  if (cr == CoercionResult::Failed)
+    return true;
+
+  assert(CC.hasCompleteSubstitutions() && "Incomplete substitution?");
+
+  for (unsigned i = 0, n = Types.size(); i != n; ++i) {
+    Type T = substType(openedTypes[i], CC.Substitutions);
+
+    // We've already substituted through the parameters of the polymorphic
+    // function type, so make it a monomorphic function type.
+    if (auto polyFn = T->getAs<PolymorphicFunctionType>()) {
+      T = FunctionType::get(polyFn->getInput(), polyFn->getResult(), Context);
+    }
+
+    Types[i] = T;
+  }
+
+  return false;
+}
+
 OverloadCandidate
 TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
                                bool OperatorSyntax,

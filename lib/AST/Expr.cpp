@@ -522,6 +522,7 @@ public:
   void visitGenericSubscriptExpr(GenericSubscriptExpr *E) {
     printCommon(E, "generic_subscript_expr");
     OS << '\n';
+    printSubstitutions(E->getSubstitutions());
     printRec(E->getBase());
     OS << '\n';
     printRec(E->getIndex());

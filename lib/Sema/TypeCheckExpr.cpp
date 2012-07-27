@@ -405,12 +405,20 @@ Expr *TypeChecker::semaSubscriptExpr(GenericSubscriptExpr *E) {
   }
 
   SubscriptDecl *SubDecl = E->getDecl();
-  
-  // Determine the index type.
-  Type IndexType = SubDecl->getIndices()->getType();
-  IndexType = substMemberTypeWithBase(IndexType, SubDecl, ContainerTy);
-  if (!IndexType)
+
+  // Substitute the known base into the index and element types.
+  CoercionContext CC(*this);
+  GenericParamList *GenericParams = nullptr;
+  Type Types[2] = { SubDecl->getIndices()->getType(),
+                    SubDecl->getElementType() };
+
+  if (substBaseForGenericTypeMember(E->getDecl(), ContainerTy, Types,
+                                    E->getLoc(), CC, &GenericParams)) {
+    E->setType(ErrorType::get(Context));
     return nullptr;
+  }
+  Type IndexType = Types[0];
+  Type ValueType = Types[1];
   
   // Coerce the index argument to the index type.
   Expr *Index = coerceToType(E->getIndex(), IndexType);
@@ -423,17 +431,11 @@ Expr *TypeChecker::semaSubscriptExpr(GenericSubscriptExpr *E) {
   }
   E->setIndex(Index);
   
-  // Determine the value type.
-  Type ValueType = SubDecl->getElementType();
-  ValueType = substMemberTypeWithBase(ValueType, SubDecl, ContainerTy);
-  if (!ValueType) {
-    E->setType(ErrorType::get(Context));
-    return nullptr;
-  }
-  
   ValueType = LValueType::get(ValueType,
                               LValueType::Qual::DefaultForMemberAccess,
                               Context);
+  E->setSubstitutions(encodeSubstitutions(GenericParams->getAllArchetypes(),
+                                          CC.Substitutions, CC.Conformance));
   E->setType(ValueType);
   return E;
   
@@ -857,8 +859,10 @@ public:
   }
 
   Expr *visitGenericMemberRefExpr(GenericMemberRefExpr *E) {
-    if (E->getDecl()->getType()->is<ErrorType>())
+    if (E->getDecl()->getType()->is<ErrorType>()) {
+      E->setType(ErrorType::get(TC.Context));
       return nullptr;
+    }
 
     Type GenericTy = E->getBase()->getType()->getRValueType();
     if (GenericTy->is<MetaTypeType>())
@@ -871,8 +875,10 @@ public:
       // lvalue yet.
       if (Expr *Base = TC.coerceObjectArgument(E->getBase(), GenericTy))
         E->setBase(Base);
-      else
+      else {
+        E->setType(ErrorType::get(TC.Context));
         return nullptr;
+      }
     }
     
     // Substitute the known base into the member's type.
@@ -882,8 +888,10 @@ public:
       = TC.substBaseForGenericTypeMember(E->getDecl(), GenericTy,
                                          E->getDecl()->getTypeOfReference(),
                                          E->getDotLoc(), CC, &GenericParams);
-    if (!MemberTy)
+    if (!MemberTy) {
+      E->setType(ErrorType::get(TC.Context));
       return nullptr;
+    }
 
     E->setSubstitutions(
       TC.encodeSubstitutions(GenericParams->getAllArchetypes(),
