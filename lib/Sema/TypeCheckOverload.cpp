@@ -902,11 +902,11 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
           // type, which we build as a reference to the underlying declaration
           // specialized based on the deducing the arguments of the generic
           // type.
-          auto polyFn = func->getType()->castTo<PolymorphicFunctionType>();
-          OverloadCandidate candidate
-            = checkPolymorphicApply(polyFn, CoercionKind::ImplicitThis, Base,
-                                    Type());
-          assert(candidate.isComplete() && "'this' substitution failed?");
+          CoercionContext CC(*this);
+          Type substTy = substBaseForGenericTypeMember(func, baseTy,
+                                                       func->getType(),
+                                                       MemberLoc, CC);
+          // FIXME: Check for errors here?
 
           // Reference to the generic member.
           Expr *ref = new (Context) DeclRefExpr(Member, MemberLoc,
@@ -916,9 +916,8 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
           // argument. This eliminates the genericity that comes from being
           // an instance method of a generic class.
           Expr *specializedRef
-            = buildSpecializeExpr(ref, candidate.getType(),
-                                  candidate.getSubstitutions(),
-                                  candidate.getConformances());
+            = buildSpecializeExpr(ref, substTy, CC.Substitutions,
+                                  CC.Conformance);
 
           // Call the specialized instance method with the object.
           Expr *apply = new (Context) DotSyntaxCallExpr(specializedRef, DotLoc,
