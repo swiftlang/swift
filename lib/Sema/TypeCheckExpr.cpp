@@ -1739,7 +1739,7 @@ void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
         diagnose(FD->getLoc(), diag::unsupported_generic_generic);
       }
 
-      // An instance method of generic type X would be built with a monomorphic
+      // A method of generic type X would be built with a monomorphic
       // signature such as
       //
       //   (this : X<T1', T2', ..., TN'>) -> (Params) -> Result
@@ -1751,11 +1751,6 @@ void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
       //   <T1, T2, ..., TN> (this : X<T1, T2, ..., TN>) -> (Params) -> Result
       //
       // because the underlying declaration is generic.
-      //
-      // FIXME: When we have 'this : metatype<blah>' for static methods,
-      // we'll be able to do this for static methods as well.
-      if (!isInstanceFunc)
-        outerGenericParams = false;
     }
 
     genericParams = FD->getGenericParams();

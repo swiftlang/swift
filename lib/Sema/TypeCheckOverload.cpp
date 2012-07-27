@@ -366,7 +366,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     if (auto nominalOwner = dyn_cast<NominalTypeDecl>(VD->getDeclContext())) {
       if (BaseTy && nominalOwner->getGenericParams()) {
         if (isa<ConstructorDecl>(VD) || isa<OneOfElementDecl>(VD) ||
-            (isa<FuncDecl>(VD) && !cast<FuncDecl>(VD)->isStatic())) {
+            isa<FuncDecl>(VD)) {
           CoercionContext InitialCC(*this);
           FunctionTy = substBaseForGenericTypeMember(VD, BaseTy, FunctionTy,
                                                      Arg->getLoc(), InitialCC)
@@ -897,33 +897,35 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
     // Reference to a member of a generic type.
     if (baseTy->is<BoundGenericType>()) {
       if (auto func = dyn_cast<FuncDecl>(Member)) {
-        if (baseIsInstance && func->isInstanceMember()) {
-          // We're binding a reference to an instance method of a generic
-          // type, which we build as a reference to the underlying declaration
-          // specialized based on the deducing the arguments of the generic
-          // type.
-          CoercionContext CC(*this);
-          Type substTy = substBaseForGenericTypeMember(func, baseTy,
-                                                       func->getType(),
-                                                       MemberLoc, CC);
-          // FIXME: Check for errors here?
+        // We're binding a reference to an instance method of a generic
+        // type, which we build as a reference to the underlying declaration
+        // specialized based on the deducing the arguments of the generic
+        // type.
+        CoercionContext CC(*this);
+        Type substTy = substBaseForGenericTypeMember(func, baseTy,
+                                                     func->getType(),
+                                                     MemberLoc, CC);
+        // FIXME: Check for errors here?
 
-          // Reference to the generic member.
-          Expr *ref = new (Context) DeclRefExpr(Member, MemberLoc,
-                                                Member->getTypeOfReference());
+        // Reference to the generic member.
+        Expr *ref = new (Context) DeclRefExpr(Member, MemberLoc,
+                                              Member->getTypeOfReference());
 
-          // Specialize the member with the types deduced from the object
-          // argument. This eliminates the genericity that comes from being
-          // an instance method of a generic class.
-          Expr *specializedRef
-            = buildSpecializeExpr(ref, substTy, CC.Substitutions,
-                                  CC.Conformance);
+        // Specialize the member with the types deduced from the object
+        // argument. This eliminates the genericity that comes from being
+        // an instance method of a generic class.
+        Expr *specializedRef
+          = buildSpecializeExpr(ref, substTy, CC.Substitutions,
+                                CC.Conformance);
 
-          // Call the specialized instance method with the object.
-          Expr *apply = new (Context) DotSyntaxCallExpr(specializedRef, DotLoc,
-                                                        Base);
-          return recheckTypes(apply);
-        }
+        // Call the specialized method with the object.
+        Expr *apply;
+        if (baseIsInstance && Member->isInstanceMember())
+          apply = new (Context) DotSyntaxCallExpr(specializedRef, DotLoc, Base);
+        else
+          apply = new (Context) DotSyntaxBaseIgnoredExpr(Base, DotLoc,
+                                                         specializedRef);
+        return recheckTypes(apply);
       }
 
       return new (Context) GenericMemberRefExpr(Base, DotLoc, Member,

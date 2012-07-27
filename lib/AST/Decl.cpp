@@ -455,7 +455,17 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
     *OuterGenericParams = nullptr;
 
   // 'static' functions have no 'this' argument.
-  if (isStatic()) return Type();
+  if (isStatic()) {
+    if (OuterGenericParams) {
+      if (Type containerType = getExtensionType()) {
+        if (auto UGT = containerType->getAs<UnboundGenericType>()) {
+          *OuterGenericParams = UGT->getDecl()->getGenericParams();
+        }
+      }
+    }
+    
+    return Type();
+  }
   
   Type ContainerType = getExtensionType();
   if (ContainerType.isNull()) return ContainerType;
