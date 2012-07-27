@@ -1547,6 +1547,12 @@ static void emitCall(IRGenFunction &IGF, const Callee &callee,
                  substResultTI, result, finalAddress).emit(fn);
 }
 
+static bool isInSwiftModule(Decl *D) {
+  if (Module *M = dyn_cast<Module>(D->getDeclContext()))
+    return M->Name.str() == "swift";
+  return false;
+}
+
 /// emitKnownCall - Emit a call to a known function.
 // FIXME: This is a rather ugly, but it's the best way I can think
 // of to avoid emitting calls to getLogicValue as external calls.
@@ -1565,11 +1571,7 @@ static bool emitKnownCall(IRGenFunction &IGF, FuncDecl *Fn,
     if (OOT->getDecl()->getName().str() != "Bool")
       return false;
 
-    Module *M = dyn_cast<Module>(ED->getDeclContext());
-    if (!M)
-      return false;
-
-    if (M->Name.str() != "swift")
+    if (!isInSwiftModule(ED))
       return false;
 
     if (callSites.size() != 2)
@@ -1585,11 +1587,7 @@ static bool emitKnownCall(IRGenFunction &IGF, FuncDecl *Fn,
   }
 
   if (Fn->getName().str() == "&&" || Fn->getName().str() == "||") {
-    Module *M = dyn_cast<Module>(Fn->getDeclContext());
-    if (!M)
-      return false;
-
-    if (M->Name.str() != "swift")
+    if (!isInSwiftModule(Fn))
       return false;
 
     TupleExpr *Arg = cast<TupleExpr>(callSites.front().getArg());
@@ -1617,6 +1615,52 @@ static bool emitKnownCall(IRGenFunction &IGF, FuncDecl *Fn,
     cond.complete(IGF);
     Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
     out.addUnmanaged(IGF.Builder.CreateLoad(CondBool));
+    return true;
+  }
+
+  // Integer / floating-point literals.
+  if (Fn->getName().str() == "convertFromIntegerLiteral") {
+    // Do this only for the standard integer and floating-point types.
+    auto decl = dyn_cast<StructDecl>(Fn->getDeclContext());
+    if (!isInSwiftModule(decl))
+      return false;
+    StringRef name = decl->getName().str();
+    if (!name.startswith("Int") && !name.startswith("UInt") &&
+        name != "Float" && name != "Double")
+      return false;
+
+    Expr *arg = callSites[0].getArg();
+    Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
+    ExplosionSchema schema =
+      IGF.IGM.getSchema(callSites[0].getSubstResultType(), out.getKind());
+    assert(schema.size() == 1);
+    llvm::Type *outTy = schema.begin()->getScalarType();
+    if (isa<llvm::IntegerType>(outTy)) {
+      IGF.emitRValue(arg, out);
+    } else {
+      assert(outTy->isFloatingPointTy());
+      Explosion temp(ExplosionKind::Maximal);
+      IGF.emitRValue(arg, temp);
+      llvm::Value *value = temp.claimUnmanagedNext();
+      value = IGF.Builder.CreateUIToFP(value, outTy);
+      out.addUnmanaged(value);
+    }
+    return true;
+  }
+
+  // Integer / floating-point literals.
+  if (Fn->getName().str() == "convertFromFloatLiteral") {
+    // Do this only for the standard floating-point types.
+    auto decl = dyn_cast<StructDecl>(Fn->getDeclContext());
+    if (!isInSwiftModule(decl))
+      return false;
+    StringRef name = decl->getName().str();
+    if (name != "Float" && name != "Double")
+      return false;
+
+    Expr *arg = callSites[0].getArg();
+    Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
+    IGF.emitRValue(arg, out);
     return true;
   }
 
