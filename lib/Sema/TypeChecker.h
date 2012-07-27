@@ -448,6 +448,36 @@ public:
   Type openPolymorphicType(Type T, const GenericParamList &GenericParams,
                            CoercionContext &CC);
 
+  /// \brief "Open" the archetypes of a set of types to make them deducible.
+  ///
+  /// \param Types The type to be opened, which will be mutated in place.
+  ///
+  /// \param GenericParams The generic parameter list, which contains the
+  /// archetypes to be opened up (made deducible).
+  ///
+  /// \param CC The coercion context into which the types will be opened.
+  /// After having opened the types, the coercion context contains the mappings
+  /// needed to determine when all types have been deduced.
+  ///
+  /// \returns The type T, with each of the archetypes in \c GenericParams
+  /// substitued for deducible types.
+  void openPolymorphicTypes(MutableArrayRef<Type> Types,
+                            const GenericParamList &GenericParams,
+                            CoercionContext &CC);
+
+  /// \brief Substitute a specific base type into the type T of a generic type
+  /// member, returning the appropriately substituted type along with a coercion
+  /// context.
+  ///
+  /// \param VD The declaration we're referring to.
+  /// \param BaseTy The type of the base of the member reference.
+  /// \param T The type of the declaration.
+  /// \param Loc The location of this substitution.
+  /// \param CC A fresh coercion context that will be populated with the
+  /// substitutions.
+  Type substBaseForGenericTypeMember(ValueDecl *VD, Type BaseTy, Type T,
+                                     SourceLoc Loc, CoercionContext &CC);
+  
   /// checkPolymorphicApply - Check the application of a function of the given
   /// polymorphic type to a particular argument with, optionally, a destination
   /// type.

@@ -316,8 +316,16 @@ public:
             TupleElts.push_back(TupleTypeElt(VarD->getType(),
                                              VarD->getName()));
       TupleType *TT = TupleType::get(TupleElts, TC.Context);
-      Type CreateTy = FunctionType::get(TT, SD->getDeclaredTypeInContext(),
-                                        TC.Context);
+
+      Type CreateTy;
+      if (SD->getGenericParams())
+        CreateTy = PolymorphicFunctionType::get(TT,
+                                                SD->getDeclaredTypeInContext(),
+                                                SD->getGenericParams(),
+                                                TC.Context);
+      else
+        CreateTy = FunctionType::get(TT, SD->getDeclaredTypeInContext(),
+                                     TC.Context);
       auto ElementCtor = cast<OneOfElementDecl>(SD->getMembers().back());
       ElementCtor->setType(CreateTy);
       ElementCtor->getArgumentTypeLoc() = TypeLoc(TT);
@@ -486,14 +494,23 @@ public:
 
     checkGenericParams(CD->getGenericParams());
 
-    Type ThisTy = CD->computeThisType();
+    GenericParamList *outerGenericParams = nullptr;
+    Type ThisTy = CD->computeThisType(&outerGenericParams);
     CD->getImplicitThisDecl()->setType(ThisTy);
 
     if (TC.typeCheckPattern(CD->getArguments(), IsFirstPass)) {
       CD->setType(ErrorType::get(TC.Context));
     } else {
       Type FnTy;
-      if (CD->getGenericParams())
+      if (outerGenericParams) {
+        if (CD->getGenericParams())
+          TC.diagnose(CD->getLoc(), diag::unsupported_generic_generic);
+
+        FnTy = PolymorphicFunctionType::get(CD->getArguments()->getType(),
+                                            ThisTy, outerGenericParams,
+                                            TC.Context);
+      }
+      else if (CD->getGenericParams())
         FnTy = PolymorphicFunctionType::get(CD->getArguments()->getType(),
                                             ThisTy, CD->getGenericParams(),
                                             TC.Context);

@@ -90,13 +90,8 @@ void TypeChecker::printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates) {
     diagnose(TheDecl->getStartLoc(), diag::found_candidate);
 }
 
-/// \brief Form a version of the type \c T with all of the given generic
-/// parameters replaced by deducible parameters.
-///
-/// \param DeducibleParams Will be populated with the synthesized deducible
-/// generic parameters.
-static Type
-getDeducibleType(TypeChecker &TC, Type T,
+static void
+getDeducibleTypes(TypeChecker &TC, MutableArrayRef<Type> Types,
                  ArrayRef<GenericParam> GenericParams,
                  SmallVectorImpl<DeducibleGenericParamType *> &DeducibleParams){
   TypeSubstitutionMap PolySubstitutions;
@@ -111,7 +106,23 @@ getDeducibleType(TypeChecker &TC, Type T,
     DeducibleParams.push_back(Deducible);
   }
 
-  return TC.substType(T, PolySubstitutions);
+  for (unsigned I = 0, N = Types.size(); I != N; ++I) {
+    Types[I] = TC.substType(Types[I], PolySubstitutions);
+  }
+}
+
+/// \brief Form a version of the type \c T with all of the given generic
+/// parameters replaced by deducible parameters.
+///
+/// \param DeducibleParams Will be populated with the synthesized deducible
+/// generic parameters.
+static Type
+getDeducibleType(TypeChecker &TC, Type T,
+                 ArrayRef<GenericParam> GenericParams,
+                 SmallVectorImpl<DeducibleGenericParamType *> &DeducibleParams){
+  getDeducibleTypes(TC, MutableArrayRef<Type>(&T, 1), GenericParams,
+                    DeducibleParams);
+  return T;
 }
 
 Type TypeChecker::openPolymorphicType(Type T,
@@ -121,6 +132,14 @@ Type TypeChecker::openPolymorphicType(Type T,
   T = getDeducibleType(*this, T, GenericParams.getParams(), deducibleParams);
   CC.requestSubstitutionsFor(deducibleParams);
   return T;
+}
+
+void TypeChecker::openPolymorphicTypes(MutableArrayRef<Type> Types,
+                                       const GenericParamList &GenericParams,
+                                       CoercionContext &CC) {
+  SmallVector<DeducibleGenericParamType *, 2> deducibleParams;
+  getDeducibleTypes(*this, Types, GenericParams.getParams(), deducibleParams);
+  CC.requestSubstitutionsFor(deducibleParams);
 }
 
 /// checkPolymorphicApply - Check the application of a function of the given
@@ -280,6 +299,48 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
   return OverloadCandidate(nullptr, SrcTy, std::move(SubstitutionInfo));
 }
 
+Type TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
+                                                Type BaseTy,
+                                                Type T,
+                                                SourceLoc Loc,
+                                                CoercionContext &CC) {
+  // Dig out the instance type we're dealing with for the base.
+  BaseTy = BaseTy->getRValueType();
+  if (auto BaseMeta = BaseTy->getAs<MetaTypeType>())
+    BaseTy = BaseMeta->getInstanceType();
+
+  // Dig out the (bound) generic type that describes
+  // FIXME: Cope with extensions that have generic parameters!
+  NominalTypeDecl *owner
+    = VD->getDeclContext()->getDeclaredTypeOfContext()
+        ->castTo<UnboundGenericType>()->getDecl();
+  Type ownerTy = owner->getDeclaredTypeInContext();
+
+  // Open up the owner type so we can deduce its arguments.
+  Type openedTypes[2] = { ownerTy, T };
+  openPolymorphicTypes(openedTypes, *owner->getGenericParams(), CC);
+
+  // Deduce the arguments.
+  OpaqueValueExpr base(Loc, BaseTy);
+  CoercionResult cr = isCoercibleToType(&base, openedTypes[0],
+                                        CoercionKind::Normal, &CC);
+  if (cr == CoercionResult::Failed)
+    return nullptr;
+
+  assert(CC.hasCompleteSubstitutions() && "Incomplete substitution?");
+
+  // Substitute the deduced arguments into the type T.
+  T = substType(openedTypes[1], CC.Substitutions);
+
+  // We've already substituted through the parameters of the polymorphic
+  // function type, so make it a monomorphic function type.
+  if (auto polyFn = T->getAs<PolymorphicFunctionType>()) {
+    T = FunctionType::get(polyFn->getInput(), polyFn->getResult(), Context);
+  }
+
+  return T;
+}
+
 OverloadCandidate
 TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
                                bool OperatorSyntax,
@@ -297,6 +358,24 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     if (!FunctionTy)
       continue;
 
+    // If we're referring to an instance method, constructor, or oneof element
+    // within a generic type, we deduce the generic type's generic arguments
+    // from the base type, then substitute those results through the rest of
+    // the type.
+    bool substitutedWithBase = false;
+    if (auto nominalOwner = dyn_cast<NominalTypeDecl>(VD->getDeclContext())) {
+      if (BaseTy && nominalOwner->getGenericParams()) {
+        if (isa<ConstructorDecl>(VD) || isa<OneOfElementDecl>(VD) ||
+            (isa<FuncDecl>(VD) && !cast<FuncDecl>(VD)->isStatic())) {
+          CoercionContext InitialCC(*this);
+          FunctionTy = substBaseForGenericTypeMember(VD, BaseTy, FunctionTy,
+                                                     Arg->getLoc(), InitialCC)
+                           ->castTo<AnyFunctionType>();
+          substitutedWithBase = true;
+        }
+      }
+    }
+
     // If we have a 'this' argument and the declaration is a non-static method,
     // the method's 'this' parameter has already been bound. Look instead at the
     // actual argument types.
@@ -305,12 +384,14 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
       FunctionTy = FunctionTy->getResult()->castTo<AnyFunctionType>();
     }
 
-    // Substitute into the type of this member, if indeed it is a member.
-    Type SubstFunctionTy = substMemberTypeWithBase(FunctionTy, VD, BaseTy);
-    if (!SubstFunctionTy)
-      continue;
-    FunctionTy = SubstFunctionTy->castTo<AnyFunctionType>();
-
+    if (!substitutedWithBase) {
+      // Substitute into the type of this member, if indeed it is a member.
+      Type SubstFunctionTy = substMemberTypeWithBase(FunctionTy, VD, BaseTy);
+      if (!SubstFunctionTy)
+        continue;
+      FunctionTy = SubstFunctionTy->castTo<AnyFunctionType>();
+    }
+    
     // Handle polymorphic functions.
     if (auto polyFn = FunctionTy->getAs<PolymorphicFunctionType>()) {
       CoercionKind Kind = CoercionKind::Normal;
@@ -373,7 +454,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     }
 
     // We have a complete set of substitutions. Apply them.
-    SubstFunctionTy = substType(FunctionTy, CC.Substitutions);
+    Type SubstFunctionTy = substType(FunctionTy, CC.Substitutions);
     if (!SubstFunctionTy)
       continue;
 

@@ -829,6 +829,7 @@ Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
       Type ParamTy = Params[i].getAsTypeParam()->getUnderlyingType();
       Substitutions[ParamTy->castTo<ArchetypeType>()] = Args[i];
     }
+
     return substType(T, Substitutions);
   }
 

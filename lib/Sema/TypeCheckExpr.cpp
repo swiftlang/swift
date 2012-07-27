@@ -1092,10 +1092,27 @@ public:
   }
 
   Expr *visitConstructorRefExpr(ConstructorRefExpr *E) {
+    ValueDecl *constructor = E->getConstructor();
     if (E->getType().isNull()) {
-      Type T = E->getConstructor()->getType();
-      T = TC.substMemberTypeWithBase(T, E->getConstructor(), E->getBaseType());
+      Type T = constructor->getType();
       E->setType(T);
+    }
+
+    // If the constructor is part of a generic type, specialize this expression
+    // based on the 'base' type of the constructor reference.
+    
+    if (auto nominalOwner
+          = dyn_cast<NominalTypeDecl>(constructor->getDeclContext())) {
+      if (nominalOwner->getGenericParams()) {
+        CoercionContext CC(TC);
+        Type T = TC.substBaseForGenericTypeMember(constructor,
+                                                  E->getBaseType(),
+                                                  constructor->getType(),
+                                                  E->getLoc(),
+                                                  CC);
+        // FIXME: Error checking here.
+        return TC.buildSpecializeExpr(E, T, CC.Substitutions, CC.Conformance);
+      }
     }
     return E;
   }

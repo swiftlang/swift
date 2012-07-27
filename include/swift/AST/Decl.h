@@ -1235,7 +1235,7 @@ public:
   void setBody(BraceStmt *b) { Body = b; }
 
   /// computeThisType - compute and return the type of 'this'.
-  Type computeThisType() const;
+  Type computeThisType(GenericParamList **OuterGenericParams = nullptr) const;
 
   /// getArgumentType - get the type of the argument tuple
   Type getArgumentType() const;
