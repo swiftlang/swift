@@ -473,8 +473,11 @@ public:
   /// \param Loc The location of this substitution.
   /// \param CC A fresh coercion context that will be populated with the
   /// substitutions.
+  /// \param [out] GenericParams If non-NULL, will be provided with the generic
+  /// parameter list used for substitution.
   Type substBaseForGenericTypeMember(ValueDecl *VD, Type BaseTy, Type T,
-                                     SourceLoc Loc, CoercionContext &CC);
+                                     SourceLoc Loc, CoercionContext &CC,
+                                     GenericParamList **GenericParams =nullptr);
   
   /// checkPolymorphicApply - Check the application of a function of the given
   /// polymorphic type to a particular argument with, optionally, a destination
@@ -569,6 +572,22 @@ public:
   /// candidate.
   Expr *buildFilteredOverloadSet(OverloadedExpr Ovl,
                                  const OverloadCandidate &Candidate);
+
+  /// \brief Encode the provided substitutions in the form used by
+  /// SpecializeExpr (and another other AST nodes that require specialization).
+  ///
+  /// \param AllArchetypes All of the archetypes used in the description of the
+  /// member being specialized.
+  ///
+  /// \param Substitutions The set of substitutions.
+  ///
+  /// \param Conformances The set of protocol conformances.
+  ///
+  /// \returns an ASTContext-allocate array of substitutions.
+  ArrayRef<Substitution>
+  encodeSubstitutions(ArrayRef<ArchetypeType *> AllArchetypes,
+                      const TypeSubstitutionMap &Substitutions,
+                      const ConformanceMap &Conformances);
 
   /// \brief Build a new SpecializeExpr wrapping the given subexpression.
   ///

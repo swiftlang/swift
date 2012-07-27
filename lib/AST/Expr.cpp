@@ -382,10 +382,17 @@ public:
   void printRec(Decl *D) { D->print(OS, Indent+2); }
   void printRec(Stmt *S) { S->print(OS, Indent+2); }
 
+  void printSubstitutions(ArrayRef<Substitution> Substitutions) {
+    for (auto S : Substitutions) {
+      OS.indent(Indent + 2) << "(with " << S.Archetype->getFullName()
+                            << " = " << S.Replacement.getString() << ")\n";
+    }
+  }
+
   raw_ostream &printCommon(Expr *E, const char *C) {
     return OS.indent(Indent) << '(' << C << " type='" << E->getType() << '\'';
   }
-  
+
   void visitErrorExpr(ErrorExpr *E) {
     printCommon(E, "error_expr") << ')';
   }
@@ -464,6 +471,7 @@ public:
   void visitGenericMemberRefExpr(GenericMemberRefExpr *E) {
     printCommon(E, "generic_member_ref_expr")
       << " decl=" << E->getDecl()->getName() << '\n';
+    printSubstitutions(E->getSubstitutions());
     printRec(E->getBase());
     OS << ')';
   }
@@ -567,9 +575,7 @@ public:
   }
   void visitSpecializeExpr(SpecializeExpr *E) {
     printCommon(E, "specialize_expr") << '\n';
-    for (auto S : E->getSubstitutions()) {
-      OS.indent(Indent + 2) << "(with " << S.Replacement.getString() << ")\n";
-    }
+    printSubstitutions(E->getSubstitutions());
     printRec(E->getSubExpr());
     OS << ')';
   }

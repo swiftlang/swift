@@ -548,20 +548,39 @@ public:
   }
 };
 
+/// Substitution - A substitution into a generic specialization.
+class Substitution {
+public:
+  ArchetypeType *Archetype;
+  Type Replacement;
+  ArrayRef<ProtocolConformance *> Conformance;
+};
+
 class GenericMemberRefExpr : public Expr {
   Expr *Base;
   ValueDecl *Value;
   SourceLoc DotLoc;
   SourceLoc NameLoc;
+  ArrayRef<Substitution> Substitutions;
 
 public:  
   GenericMemberRefExpr(Expr *Base, SourceLoc DotLoc, ValueDecl *Value,
                        SourceLoc NameLoc);
+
   Expr *getBase() const { return Base; }
   ValueDecl *getDecl() const { return Value; }
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
 
+  /// \brief Retrieve the set of substitutions applied to specialize the
+  /// member.
+  ///
+  /// Each substitution contains the archetype being substitued, the type it is
+  /// being replaced with, and the protocol conformance relationships.
+  ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
+
+  void setSubstitutions(ArrayRef<Substitution> S) { Substitutions = S; }
+  
   void setBase(Expr *E) { Base = E; }
 
   SourceLoc getLoc() const { return NameLoc; }
@@ -1198,14 +1217,6 @@ public:
   }
 };
 
-/// Substitution - A substitution into a generic specialization.
-class Substitution {
-public:
-  ArchetypeType *Archetype;
-  Type Replacement;
-  ArrayRef<ProtocolConformance *> Conformance;
-};
-
 /// SpecializeExpr - Specializes a reference to a generic entity by binding
 /// each of its type parameters to a specific type.
 ///
@@ -1235,7 +1246,7 @@ public:
   /// subexpression.
   ///
   /// Each substitution contains the archetype being substitued, the type it is
-  /// being replaced with.
+  /// being replaced with, and the protocol conformance relationships.
   ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
 
   // Implement isa/cast/dyncast/etc.

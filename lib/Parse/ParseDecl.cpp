@@ -1241,6 +1241,14 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
                                            GenericParams, CurDeclContext);
   Decls.push_back(OOD);
 
+  // Now that we have a context, update the generic parameters with that
+  // context.
+  if (GenericParams) {
+    for (auto Param : *GenericParams) {
+      Param.setDeclContext(OOD);
+    }
+  }
+
   struct OneOfElementInfo {
     SourceLoc NameLoc;
     StringRef Name;
@@ -1372,6 +1380,14 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
                                             CurDeclContext);
   Decls.push_back(SD);
 
+  // Now that we have a context, update the generic parameters with that
+  // context.
+  if (GenericParams) {
+    for (auto Param : *GenericParams) {
+      Param.setDeclContext(SD);
+    }
+  }
+
   // Parse the body.
   SmallVector<Decl*, 8> MemberDecls;
   {
@@ -1441,6 +1457,14 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
                                           Context.AllocateCopy(Inherited),
                                           GenericParams, CurDeclContext);
   Decls.push_back(CD);
+
+  // Now that we have a context, update the generic parameters with that
+  // context.
+  if (GenericParams) {
+    for (auto Param : *GenericParams) {
+      Param.setDeclContext(CD);
+    }
+  }
 
   // Parse the body.
   SmallVector<Decl*, 8> MemberDecls;

@@ -303,7 +303,8 @@ Type TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
                                                 Type BaseTy,
                                                 Type T,
                                                 SourceLoc Loc,
-                                                CoercionContext &CC) {
+                                                CoercionContext &CC,
+                                            GenericParamList **GenericParams) {
   // Dig out the instance type we're dealing with for the base.
   BaseTy = BaseTy->getRValueType();
   if (auto BaseMeta = BaseTy->getAs<MetaTypeType>())
@@ -319,6 +320,9 @@ Type TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
   // Open up the owner type so we can deduce its arguments.
   Type openedTypes[2] = { ownerTy, T };
   openPolymorphicTypes(openedTypes, *owner->getGenericParams(), CC);
+
+  if (GenericParams)
+    *GenericParams = owner->getGenericParams();
 
   // Deduce the arguments.
   OpaqueValueExpr base(Loc, BaseTy);
@@ -752,18 +756,10 @@ TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
   return replaceSemanticsProvidingExpr(expr, result, Ovl.getExpr());
 }
 
-/// \brief Encode the provided substitutions in the form used by
-/// SpecializeExpr (and another other AST nodes that require specialization).
-///
-/// \param Context 
-///
-///
-/// \returns an ASTContext-allocate array of substitutions.
-static ArrayRef<Substitution>
-encodeSubstitutions(ASTContext &Context,
-                    ArrayRef<ArchetypeType *> AllArchetypes,
-                    const TypeSubstitutionMap &Substitutions,
-                    const ConformanceMap &Conformances) {
+ArrayRef<Substitution>
+TypeChecker::encodeSubstitutions(ArrayRef<ArchetypeType *> AllArchetypes,
+                                 const TypeSubstitutionMap &Substitutions,
+                                 const ConformanceMap &Conformances) {
   // Figure out the mapping from primary archetypes to their deducible
   // parameters.
   // FIXME: This is terribly inefficient. We should keep track of this
@@ -809,7 +805,7 @@ TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
   auto polyFn = Sub->getType()->castTo<PolymorphicFunctionType>();
   auto archetypes = polyFn->getGenericParams().getAllArchetypes();
   return new (Context) SpecializeExpr(Sub, Ty,
-                                      encodeSubstitutions(Context, archetypes,
+                                      encodeSubstitutions(archetypes,
                                                           Substitutions,
                                                           Conformances));
 }
@@ -921,11 +917,10 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
         // specialized based on the deducing the arguments of the generic
         // type.
         CoercionContext CC(*this);
-        Type substTy
-          = substBaseForGenericTypeMember(Member, baseTy,
-                                          Member->getType()->getRValueType(),
-                                          MemberLoc, CC);
-        // FIXME: Check for errors here?
+        Type substTy = substBaseForGenericTypeMember(Member, baseTy,
+                                                     Member->getTypeOfReference(),
+                                                     MemberLoc, CC);
+            // FIXME: Check for errors here?
 
         // Reference to the generic member.
         Expr *ref = new (Context) DeclRefExpr(Member, MemberLoc,
@@ -948,7 +943,6 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
         return recheckTypes(apply);
       }
 
-      // FIXME: Need specialization information here, too?
       return new (Context) GenericMemberRefExpr(Base, DotLoc, Member,
                                                 MemberLoc);
     }

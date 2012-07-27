@@ -875,27 +875,19 @@ public:
         return nullptr;
     }
     
-    // Determine the type of the member.
-    Type MemberTy = E->getDecl()->getType();
-
-    if (!E->isBaseIgnored()) {
-      if (auto Method = dyn_cast<FuncDecl>(E->getDecl())) {
-        if (!Method->isStatic()) {
-          if (auto FuncTy = dyn_cast<FunctionType>(MemberTy))
-            MemberTy = FuncTy->getResult();
-        }
-      } else {
-        MemberTy = LValueType::get(MemberTy,
-                                   LValueType::Qual::DefaultForMemberAccess,
-                                   TC.Context);
-      }
-    }
-    
-    // Substitute each of the associated types into the member type.
-    MemberTy = TC.substMemberTypeWithBase(MemberTy, E->getDecl(), GenericTy);
+    // Substitute the known base into the member's type.
+    CoercionContext CC(TC);
+    GenericParamList *GenericParams = nullptr;
+    Type MemberTy
+      = TC.substBaseForGenericTypeMember(E->getDecl(), GenericTy,
+                                         E->getDecl()->getTypeOfReference(),
+                                         E->getDotLoc(), CC, &GenericParams);
     if (!MemberTy)
       return nullptr;
 
+    E->setSubstitutions(
+      TC.encodeSubstitutions(GenericParams->getAllArchetypes(),
+                             CC.Substitutions, CC.Conformance));
     E->setType(MemberTy);
     return E;
   }
