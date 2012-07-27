@@ -150,7 +150,9 @@ enum class CoercionKind {
   // the first operand to be an implicit lvalue.
   Assignment,
   // Coercion to an implicit lvalue.
-  ImplicitLValue
+  ImplicitLValue,
+  // Coercion to the 'this' lvalue.
+  ImplicitThis
 };
 
 /// \brief Captures information about the context of a type coercion, including
@@ -434,8 +436,7 @@ public:
   /// polymorphic type to a particular argument with, optionally, a destination
   /// type.
   OverloadCandidate checkPolymorphicApply(PolymorphicFunctionType *PolyFn,
-                                          bool Assignment,
-                                          Expr *Arg,
+                                          CoercionKind Kind, Expr *Arg,
                                           Type DestTy);
 
   /// checkPolymorphicUse - Check the use of a polymorphic function in the

@@ -26,7 +26,7 @@ static Type getInstanceUsageType(ValueDecl *Value, ASTContext &Context) {
   if (FuncDecl *Func = dyn_cast<FuncDecl>(Value)) {
     // FIXME: Revisit when we add 'this' to static functions.
     if (!Func->isStatic()) {
-      if (auto FuncTy = dyn_cast<FunctionType>(Func->getType()))
+      if (auto FuncTy = dyn_cast<AnyFunctionType>(Func->getType()))
         return FuncTy->getResult()->getUnlabeledType(Context);
     }
   }

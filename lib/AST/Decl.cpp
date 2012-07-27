@@ -450,7 +450,10 @@ Type FuncDecl::getExtensionType() const {
 /// type (which varies based on whether the extended type is a reference type
 /// or not), or an empty Type() if no 'this' argument should exist.  This can
 /// only be used after name binding has resolved types.
-Type FuncDecl::computeThisType() const {
+Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
+  if (OuterGenericParams)
+    *OuterGenericParams = nullptr;
+
   // 'static' functions have no 'this' argument.
   if (isStatic()) return Type();
   
@@ -485,6 +488,9 @@ Type FuncDecl::computeThisType() const {
     for (auto Param : *D->getGenericParams())
       GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
     ContainerType = BoundGenericType::get(D, GenericArgs);
+
+    if (OuterGenericParams)
+      *OuterGenericParams = D->getGenericParams();
   }
 
   if (ContainerType->hasReferenceSemantics())

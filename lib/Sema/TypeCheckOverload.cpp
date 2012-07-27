@@ -119,7 +119,7 @@ getDeducibleType(TypeChecker &TC, Type T,
 /// type.
 OverloadCandidate
 TypeChecker::checkPolymorphicApply(PolymorphicFunctionType *PolyFn,
-                                   bool Assignment,
+                                   CoercionKind Kind,
                                    Expr *Arg,
                                    Type DestTy) {
   // Set up a coercion context to deduce the parameters to the polymorphic
@@ -133,9 +133,6 @@ TypeChecker::checkPolymorphicApply(PolymorphicFunctionType *PolyFn,
   CC.requestSubstitutionsFor(DeducibleParams);
 
   // Check whether arguments are suitable for this function.
-  CoercionKind Kind = CoercionKind::Normal;
-  if (Assignment)
-    Kind = CoercionKind::Assignment;
   if (isCoercibleToType(Arg, FunctionTy->getInput(), Kind, &CC)
         == CoercionResult::Failed)
     return OverloadCandidate();
@@ -313,10 +310,11 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
 
     // Handle polymorphic functions.
     if (auto polyFn = FunctionTy->getAs<PolymorphicFunctionType>()) {
+      CoercionKind Kind = CoercionKind::Normal;
+      if (OperatorSyntax && VD->getAttrs().isAssignment())
+        Kind = CoercionKind::Assignment;
       OverloadCandidate Candidate
-        = checkPolymorphicApply(polyFn,
-                                OperatorSyntax && VD->getAttrs().isAssignment(),
-                                Arg, DestTy);
+        = checkPolymorphicApply(polyFn, Kind, Arg, DestTy);
       if (!Candidate.getType())
         continue;
 
@@ -814,6 +812,37 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
 
     // Reference to a member of a generic type.
     if (baseTy->is<BoundGenericType>()) {
+      if (auto func = dyn_cast<FuncDecl>(Member)) {
+        if (baseIsInstance && func->isInstanceMember()) {
+          // We're binding a reference to an instance method of a generic
+          // type, which we build as a reference to the underlying declaration
+          // specialized based on the deducing the arguments of the generic
+          // type.
+          auto polyFn = func->getType()->castTo<PolymorphicFunctionType>();
+          OverloadCandidate candidate
+            = checkPolymorphicApply(polyFn, CoercionKind::ImplicitThis, Base,
+                                    Type());
+          assert(candidate.isComplete() && "'this' substitution failed?");
+
+          // Reference to the generic member.
+          Expr *ref = new (Context) DeclRefExpr(Member, MemberLoc,
+                                                Member->getTypeOfReference());
+
+          // Specialize the member with the types deduced from the object
+          // argument. This eliminates the genericity that comes from being
+          // an instance method of a generic class.
+          Expr *specializedRef
+            = buildSpecializeExpr(ref, candidate.getType(),
+                                  candidate.getSubstitutions(),
+                                  candidate.getConformances());
+
+          // Call the specialized instance method with the object.
+          Expr *apply = new (Context) DotSyntaxCallExpr(specializedRef, DotLoc,
+                                                        Base);
+          return recheckTypes(apply);
+        }
+      }
+
       return new (Context) GenericMemberRefExpr(Base, DotLoc, Member,
                                                 MemberLoc);
     }

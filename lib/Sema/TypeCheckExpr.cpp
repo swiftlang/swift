@@ -624,8 +624,9 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   if (!Ovl) {
     // For polymorphic functions, we'll attempt to deduce the generic arguments.
     if (auto PolyFn = E1->getType()->getAs<PolymorphicFunctionType>()) {
-      if (OverloadCandidate Ovl = checkPolymorphicApply(PolyFn, false, E2,
-                                                        Type())) {
+      if (OverloadCandidate Ovl = checkPolymorphicApply(PolyFn,
+                                                        CoercionKind::Normal,
+                                                        E2, Type())) {
         E1 = buildSpecializeExpr(E1, Ovl.getType(), Ovl.getSubstitutions(),
                                  Ovl.getConformances());
         E->setFn(E1);
@@ -1711,9 +1712,36 @@ void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
   auto patterns = FE->getParamPatterns();
   bool isInstanceFunc = false;
   GenericParamList *genericParams = nullptr;
-  if (FE->getDecl()) {
-    isInstanceFunc = FE->getDecl()->getImplicitThisDecl() != nullptr;
-    genericParams = FE->getDecl()->getGenericParams();
+  GenericParamList *outerGenericParams = nullptr;
+  if (FuncDecl *FD = FE->getDecl()) {
+    isInstanceFunc = FD->computeThisType(&outerGenericParams);
+
+    if (outerGenericParams) {
+      // FIXME: Support generic functions in generic classes.
+      if (FD->getGenericParams()) {
+        diagnose(FD->getLoc(), diag::unsupported_generic_generic);
+      }
+
+      // An instance method of generic type X would be built with a monomorphic
+      // signature such as
+      //
+      //   (this : X<T1', T2', ..., TN'>) -> (Params) -> Result
+      //
+      // using the archetypes T1', T2', ..., TN'.
+      //
+      // Adjust the method type to a polymorphic function type
+      //
+      //   <T1, T2, ..., TN> (this : X<T1, T2, ..., TN>) -> (Params) -> Result
+      //
+      // because the underlying declaration is generic.
+      //
+      // FIXME: When we have 'this : metatype<blah>' for static methods,
+      // we'll be able to do this for static methods as well.
+      if (!isInstanceFunc)
+        outerGenericParams = false;
+    }
+
+    genericParams = FD->getGenericParams();
   }
 
   for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
@@ -1721,6 +1749,10 @@ void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
     if (e - i - 1 == isInstanceFunc && genericParams) {
       funcTy = PolymorphicFunctionType::get(argTy, funcTy,
                                             genericParams,
+                                            Context);
+    } else if (e - i - 1 == 0 && outerGenericParams) {
+      funcTy = PolymorphicFunctionType::get(argTy, funcTy,
+                                            outerGenericParams,
                                             Context);
     } else {
       funcTy = FunctionType::get(argTy, funcTy, Context);

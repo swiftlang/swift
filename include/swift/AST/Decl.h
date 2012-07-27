@@ -1021,7 +1021,11 @@ public:
   /// type (which varies based on whether the extended type is a reference type
   /// or not), or an empty Type() if no 'this' argument should exist.  This can
   /// only be used after name binding has resolved types.
-  Type computeThisType() const;
+  ///
+  /// \param OuterGenericParams If non-NULL, and this function is an instance
+  /// of a generic type, will be set to the generic parameter list of that
+  /// generic type.
+  Type computeThisType(GenericParamList **OuterGenericParams = nullptr) const;
   
   /// getImplicitThisDecl - If this FuncDecl is a non-static method in an
   /// extension context, it will have a 'this' argument.  This method returns it
