@@ -114,6 +114,15 @@ getDeducibleType(TypeChecker &TC, Type T,
   return TC.substType(T, PolySubstitutions);
 }
 
+Type TypeChecker::openPolymorphicType(Type T,
+                                      const GenericParamList &GenericParams,
+                                      CoercionContext &CC) {
+  SmallVector<DeducibleGenericParamType *, 2> deducibleParams;
+  T = getDeducibleType(*this, T, GenericParams.getParams(), deducibleParams);
+  CC.requestSubstitutionsFor(deducibleParams);
+  return T;
+}
+
 /// checkPolymorphicApply - Check the application of a function of the given
 /// polymorphic type to a particular argument with, optionally, a destination
 /// type.
@@ -125,12 +134,9 @@ TypeChecker::checkPolymorphicApply(PolymorphicFunctionType *PolyFn,
   // Set up a coercion context to deduce the parameters to the polymorphic
   // function.
   CoercionContext CC(*this);
-  SmallVector<DeducibleGenericParamType *, 2> DeducibleParams;
   AnyFunctionType *FunctionTy
-    = getDeducibleType(*this, PolyFn,
-                       PolyFn->getGenericParams().getParams(), DeducibleParams)
+    = openPolymorphicType(PolyFn, PolyFn->getGenericParams(), CC)
         ->castTo<AnyFunctionType>();
-  CC.requestSubstitutionsFor(DeducibleParams);
 
   // Check whether arguments are suitable for this function.
   if (isCoercibleToType(Arg, FunctionTy->getInput(), Kind, &CC)
@@ -176,12 +182,9 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
   // Set up a coercion context to deduce the parameters to the polymorphic
   // function.
   CoercionContext LocalCC(*this);
-  SmallVector<DeducibleGenericParamType *, 2> DeducibleParams;
   AnyFunctionType *FunctionTy
-    = getDeducibleType(*this, PolyFn,
-                       PolyFn->getGenericParams().getParams(), DeducibleParams)
+    = openPolymorphicType(PolyFn, PolyFn->getGenericParams(), LocalCC)
         ->castTo<AnyFunctionType>();
-  LocalCC.requestSubstitutionsFor(DeducibleParams);
 
   auto DestLV = DestTy->getAs<LValueType>();
   if (DestLV)

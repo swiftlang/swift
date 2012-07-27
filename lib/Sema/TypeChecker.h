@@ -432,6 +432,22 @@ public:
   void diagnoseEmptyOverloadSet(Expr *E, ArrayRef<ValueDecl *> Candidates);
   void printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates);
 
+  /// \brief "Open" the archetypes of a type to make them deducible.
+  ///
+  /// \param T The type to be opened.
+  ///
+  /// \param GenericParams The generic parameter list, which contains the
+  /// archetypes to be opened up (made deducible).
+  ///
+  /// \param CC The coercion context into which the types will be opened.
+  /// After having opened the types, the coercion context contains the mappings
+  /// needed to determine when all types have been deduced.
+  ///
+  /// \returns The type T, with each of the archetypes in \c GenericParams
+  /// substitued for deducible types.
+  Type openPolymorphicType(Type T, const GenericParamList &GenericParams,
+                           CoercionContext &CC);
+
   /// checkPolymorphicApply - Check the application of a function of the given
   /// polymorphic type to a particular argument with, optionally, a destination
   /// type.
