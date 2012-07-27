@@ -73,7 +73,48 @@ bool TypeBase::isMaterializable() {
 /// hasReferenceSemantics - Does this type have reference semantics?
 bool TypeBase::hasReferenceSemantics() {
   // At the moment, Builtin.ObjectPointer, class types, and function types.
-  return is<BuiltinObjectPointerType>() || is<ClassType>() || is<FunctionType>();
+  CanType canonical = getCanonicalType();
+  switch (canonical->getKind()) {
+#define SUGARED_TYPE(id, parent) case TypeKind::id:
+#define TYPE(id, parent)
+    return false;
+#include "swift/AST/TypeNodes.def"
+
+  case TypeKind::Error:
+  case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinObjCPointer:
+  case TypeKind::UnstructuredUnresolved:
+  case TypeKind::Tuple:
+  case TypeKind::OneOf:
+  case TypeKind::Struct:
+  case TypeKind::Protocol:
+  case TypeKind::MetaType:
+  case TypeKind::Module:
+  case TypeKind::Archetype:
+  case TypeKind::DeducibleGenericParam:
+  case TypeKind::Array:
+  case TypeKind::ProtocolComposition:
+  case TypeKind::LValue:
+    return false;
+
+  case TypeKind::BuiltinObjectPointer:
+  case TypeKind::Class:
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction:
+    return true;
+
+  case TypeKind::UnboundGeneric:
+    return isa<ClassDecl>(canonical->castTo<UnboundGenericType>()->getDecl());
+      
+  case TypeKind::BoundGeneric:
+    return isa<ClassDecl>(canonical->castTo<BoundGenericType>()->getDecl());
+  }
+
+  llvm_unreachable("Unhandled type kind!");
+
+  
 }
 
 bool TypeBase::isExistentialType(SmallVectorImpl<ProtocolDecl *> &Protocols) {
