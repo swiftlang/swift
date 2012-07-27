@@ -20,6 +20,8 @@
 #include "llvm/GlobalVariable.h"
 #include "llvm/Intrinsics.h"
 
+#include "swift/Basic/SourceLoc.h"
+
 #include "Cleanup.h"
 #include "Explosion.h"
 #include "GenType.h"
@@ -193,8 +195,13 @@ static void emitArrayDestroy(IRGenFunction &IGF,
 
 /// Create the destructor function for an array layout.
 /// TODO: give this some reasonable name and possibly linkage.
-static llvm::Function *createArrayDtorFn(IRGenModule &IGM,
+static llvm::Constant *createArrayDtorFn(IRGenModule &IGM,
                                          const ArrayHeapLayout &layout) {
+  if (!layout.getElementTypeInfo().StorageType->isSized()) {
+    IGM.unimplemented(SourceLoc(), "generic array dtor fn");
+    return llvm::UndefValue::get(IGM.DtorTy->getPointerTo());
+  }
+
   llvm::Function *fn =
     llvm::Function::Create(IGM.DtorTy, llvm::Function::InternalLinkage,
                            "arraydestroy", &IGM.Module);

@@ -1141,9 +1141,22 @@ namespace {
     }
 
     CalleeSource visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
-      auto rhs = cast<DeclRefExpr>(E->getRHS());
-      if (FuncDecl *fn = dyn_cast<FuncDecl>(rhs->getDecl()))
-        return CalleeSource::forDirectWithSideEffects(fn, E);
+      Expr *rhs = E->getRHS();
+      if (SpecializeExpr *specialize = dyn_cast<SpecializeExpr>(rhs)) {
+        // FIXME: We should generalize forDirectWithSideEffects.
+        Expr *subExpr = specialize->getSubExpr();
+        if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(subExpr)) {
+          if (FuncDecl *fn = dyn_cast<FuncDecl>(dre->getDecl())) {
+            CalleeSource src = CalleeSource::forDirectWithSideEffects(fn, E);
+            src.addSubstitutions(specialize->getSubstitutions());
+            return src;
+          }
+        }
+      }
+      if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(rhs)) {
+        if (FuncDecl *fn = dyn_cast<FuncDecl>(dre->getDecl()))
+          return CalleeSource::forDirectWithSideEffects(fn, E);
+      }
       return CalleeSource::forIndirect(E);
     }
 
@@ -1165,6 +1178,10 @@ namespace {
       CalleeSource source = visit(E->getFn());
       source.addCallSite(CallSite(E));
       return source;
+    }
+
+    CalleeSource visitFunctionConversionExpr(FunctionConversionExpr *E) {
+      return visit(E->getSubExpr());
     }
 
     CalleeSource visitExpr(Expr *E) {
