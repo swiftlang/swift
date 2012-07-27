@@ -446,7 +446,13 @@ public:
     if (TC.validateType(ED->getArgumentTypeLoc(), IsFirstPass))
       return;
 
-    ED->setType(FunctionType::get(ED->getArgumentType(), ElemTy, TC.Context));
+    Type fnTy;
+    if (OOD->getGenericParams())
+      fnTy = PolymorphicFunctionType::get(ED->getArgumentType(), ElemTy,
+                                          OOD->getGenericParams(), TC.Context);
+    else
+      fnTy = FunctionType::get(ED->getArgumentType(), ElemTy, TC.Context);
+    ED->setType(fnTy);
 
     // Require the carried type to be materializable.
     if (!ED->getArgumentType()->isMaterializable()) {

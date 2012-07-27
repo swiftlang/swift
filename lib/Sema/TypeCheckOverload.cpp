@@ -896,15 +896,18 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
 
     // Reference to a member of a generic type.
     if (baseTy->is<BoundGenericType>()) {
-      if (auto func = dyn_cast<FuncDecl>(Member)) {
+      if (isa<FuncDecl>(Member) ||
+          (isa<OneOfElementDecl>(Member) &&
+           Member->getType()->is<PolymorphicFunctionType>())) {
         // We're binding a reference to an instance method of a generic
         // type, which we build as a reference to the underlying declaration
         // specialized based on the deducing the arguments of the generic
         // type.
         CoercionContext CC(*this);
-        Type substTy = substBaseForGenericTypeMember(func, baseTy,
-                                                     func->getType(),
-                                                     MemberLoc, CC);
+        Type substTy
+          = substBaseForGenericTypeMember(Member, baseTy,
+                                          Member->getType()->getRValueType(),
+                                          MemberLoc, CC);
         // FIXME: Check for errors here?
 
         // Reference to the generic member.
@@ -928,6 +931,7 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
         return recheckTypes(apply);
       }
 
+      // FIXME: Need specialization information here, too?
       return new (Context) GenericMemberRefExpr(Base, DotLoc, Member,
                                                 MemberLoc);
     }
