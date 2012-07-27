@@ -752,10 +752,18 @@ TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
   return replaceSemanticsProvidingExpr(expr, result, Ovl.getExpr());
 }
 
-SpecializeExpr *
-TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
-                                 const TypeSubstitutionMap &Substitutions,
-                                 const ConformanceMap &Conformances) {
+/// \brief Encode the provided substitutions in the form used by
+/// SpecializeExpr (and another other AST nodes that require specialization).
+///
+/// \param Context 
+///
+///
+/// \returns an ASTContext-allocate array of substitutions.
+static ArrayRef<Substitution>
+encodeSubstitutions(ASTContext &Context,
+                    ArrayRef<ArchetypeType *> AllArchetypes,
+                    const TypeSubstitutionMap &Substitutions,
+                    const ConformanceMap &Conformances) {
   // Figure out the mapping from primary archetypes to their deducible
   // parameters.
   // FIXME: This is terribly inefficient. We should keep track of this
@@ -768,12 +776,10 @@ TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
     }
   }
 
-  auto polyFn = Sub->getType()->castTo<PolymorphicFunctionType>();
-  auto archetypes = polyFn->getGenericParams().getAllArchetypes();
   SmallVector<SpecializeExpr::Substitution, 2> storedSubstitutions;
-  storedSubstitutions.resize(archetypes.size());
+  storedSubstitutions.resize(AllArchetypes.size());
   unsigned index = 0;
-  for (auto archetype : archetypes) {
+  for (auto archetype : AllArchetypes) {
     // Figure out the key into the maps we were given.
     SubstitutableType *key = archetype;
     if (archetype->isPrimary()) {
@@ -786,15 +792,26 @@ TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
     // Record this substitution.
     storedSubstitutions[index].Archetype = archetype;
     storedSubstitutions[index].Replacement
-      = Substitutions.find(key)->second;
+    = Substitutions.find(key)->second;
     storedSubstitutions[index].Conformance
-      = Context.AllocateCopy(Conformances.find(key)->second);
-    
+    = Context.AllocateCopy(Conformances.find(key)->second);
+
     ++index;
   }
 
+  return Context.AllocateCopy(storedSubstitutions);
+}
+
+SpecializeExpr *
+TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
+                                 const TypeSubstitutionMap &Substitutions,
+                                 const ConformanceMap &Conformances) {
+  auto polyFn = Sub->getType()->castTo<PolymorphicFunctionType>();
+  auto archetypes = polyFn->getGenericParams().getAllArchetypes();
   return new (Context) SpecializeExpr(Sub, Ty,
-                                     Context.AllocateCopy(storedSubstitutions));
+                                      encodeSubstitutions(Context, archetypes,
+                                                          Substitutions,
+                                                          Conformances));
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc) {
