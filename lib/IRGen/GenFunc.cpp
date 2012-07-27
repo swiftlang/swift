@@ -2283,7 +2283,8 @@ namespace {
       Clauses[clauseIndex].DataTypesBeginIndex = AllDataTypes.size();
       Clauses[clauseIndex].ForwardingFnType = fn->getResult();
 
-      assert(!isa<PolymorphicFunctionType>(fn) && "not implemented!");
+      if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fn))
+        accumulatePolymorphicSignatureTypes(polyFn);
       accumulateParameterDataTypes(fn->getInput());
     }
 
@@ -2302,6 +2303,18 @@ namespace {
       const TypeInfo &type = IGM.getFragileTypeInfo(ty);
       if (!type.isEmpty(ResilienceScope::Local))
         AllDataTypes.push_back(&type);
+    }
+
+    /// Accumulate the polymorphic signature of a function.
+    void accumulatePolymorphicSignatureTypes(PolymorphicFunctionType *fn) {
+      SmallVector<llvm::Type*, 4> types;
+      expandPolymorphicSignature(IGM, fn->getGenericParams(), types);
+      assert(!types.empty());
+      auto &witnessTablePtrTI = IGM.getWitnessTablePtrTypeInfo();
+      for (auto type : types) {
+        assert(type == IGM.WitnessTablePtrTy); (void) type;
+        AllDataTypes.push_back(&witnessTablePtrTI);
+      }
     }
 
     /// Create a forwarding stub.

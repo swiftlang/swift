@@ -381,6 +381,7 @@ static void reemitUnderSubstitutions(IRGenFunction &IGF,
                                      ArrayRef<Substitution> subs,
                                      CanType expectedTy, CanType substTy,
                                      Explosion &in, Explosion &out) {
+  SubstRValueReemitter(IGF, subs, in, out).visit(expectedTy, substTy);
 }
 
 static void emitUnderSubstitutions(IRGenFunction &IGF, Expr *E,

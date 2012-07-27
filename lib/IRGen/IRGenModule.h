@@ -127,6 +127,7 @@ private:
 public:
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *D);
   const TypeInfo &getFragileTypeInfo(Type T);
+  const TypeInfo &getWitnessTablePtrTypeInfo();
   llvm::Type *getFragileType(Type T);
   llvm::StructType *createNominalType(TypeDecl *D);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);

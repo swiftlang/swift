@@ -58,6 +58,7 @@ class TypeConverter {
   llvm::DenseMap<TypeBase*, llvm::Constant*> TrivialWitnessTables;
   const TypeInfo *FirstType;
   const ProtocolInfo *FirstProtocol;
+  const TypeInfo *WitnessTablePtrTI = nullptr;
 
   friend class GenProto;
 
@@ -85,6 +86,7 @@ public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
   const TypeInfo &getFragileTypeInfo(Type T);
+  const TypeInfo &getWitnessTablePtrTypeInfo();
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
 };
 

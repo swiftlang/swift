@@ -137,6 +137,20 @@ TypeConverter::~TypeConverter() {
   }
 }
 
+const TypeInfo &IRGenModule::getWitnessTablePtrTypeInfo() {
+  return Types.getWitnessTablePtrTypeInfo();
+}
+
+const TypeInfo &TypeConverter::getWitnessTablePtrTypeInfo() {
+  if (WitnessTablePtrTI) return *WitnessTablePtrTI;
+  WitnessTablePtrTI = createPrimitive(IGM.WitnessTablePtrTy,
+                                      IGM.getPointerSize(),
+                                      IGM.getPointerAlignment());
+  WitnessTablePtrTI->NextConverted = FirstType;
+  FirstType = WitnessTablePtrTI;
+  return *WitnessTablePtrTI;
+}
+
 /// Get the fragile type information for the given type.
 const TypeInfo &IRGenFunction::getFragileTypeInfo(Type T) {
   return IGM.getFragileTypeInfo(T);
