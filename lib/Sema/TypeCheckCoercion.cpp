@@ -127,14 +127,11 @@ enum CoercionFlags {
   CF_Assignment = 0x02,
   /// \brief The argument will be treated as an implicit lvalue.
   CF_ImplicitLValue = 0x04,
-  /// \brief The argument will be treated as the 'this' argument, and can
-  /// therefore be materialized.
-  CF_ImplicitThis = 0x08,
   /// \brief The argument allows user-defined conversions.
-  CF_UserConversions = 0x10,
+  CF_UserConversions = 0x08,
   
   /// \brief The basic set of "non-propagated" flags.
-  CF_NotPropagated = CF_Assignment|CF_ImplicitLValue|CF_ImplicitThis
+  CF_NotPropagated = CF_Assignment|CF_ImplicitLValue
 };
 
 /// SemaCoerce - This class implements top-down semantic analysis (aka "root to
@@ -1981,17 +1978,6 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
       }
     }
 
-    // If the source is not an lvalue and we're allowed to 
-    if (!SrcLT && (Flags & CF_ImplicitThis)) {
-      // Materialize.
-      SrcLT = LValueType::get(SrcTy,
-                              LValueType::Qual::DefaultForMemberAccess,
-                              TC.Context);
-      SrcTy = SrcLT;
-      if (Flags & CF_Apply)
-        E = new (TC.Context) MaterializeExpr(E, SrcTy);
-    }
-
     if (SrcLT &&
         TC.isSameType(DestLT->getObjectType(), SrcLT->getObjectType(), &CC)) {
       bool AddressAllowed = (Flags & CF_ImplicitLValue)
@@ -2249,10 +2235,6 @@ CoercedExpr TypeChecker::coerceToType(Expr *E, Type DestTy, CoercionKind Kind,
   case CoercionKind::ImplicitLValue:
     Flags |= CF_ImplicitLValue;
     break;
-
-  case CoercionKind::ImplicitThis:
-    Flags |= CF_ImplicitThis|CF_ImplicitLValue;
-    break;
   }
 
   CoercionContext MyCC(*this);
@@ -2307,10 +2289,6 @@ CoercionResult TypeChecker::isCoercibleToType(Expr *E, Type Ty,
 
   case CoercionKind::ImplicitLValue:
     Flags |= CF_ImplicitLValue;
-    break;
-
-  case CoercionKind::ImplicitThis:
-    Flags |= CF_ImplicitThis|CF_ImplicitLValue;
     break;
   }
 

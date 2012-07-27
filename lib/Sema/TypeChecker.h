@@ -150,9 +150,7 @@ enum class CoercionKind {
   // the first operand to be an implicit lvalue.
   Assignment,
   // Coercion to an implicit lvalue.
-  ImplicitLValue,
-  // Coercion to the 'this' lvalue.
-  ImplicitThis
+  ImplicitLValue
 };
 
 /// \brief Captures information about the context of a type coercion, including
