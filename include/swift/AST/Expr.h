@@ -1266,14 +1266,15 @@ public:
   }
 };
 
-/// GetMetatypeExpr - 
+/// GetMetatypeExpr - Given a value of type T, returns the corresponding value
+/// of type metatype<T>.
 class GetMetatypeExpr : public ImplicitConversionExpr {
 public:
   GetMetatypeExpr(Expr *subExpr, Type type)
     : ImplicitConversionExpr(ExprKind::GetMetatype, subExpr, type) {}
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const LoadExpr *) { return true; }
+  static bool classof(const GetMetatypeExpr *) { return true; }
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::GetMetatype;
   }
