@@ -1135,7 +1135,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   // [byref] FooTy)->((int)->int)".  Note that we can't actually compute the
   // type here until Sema.
   bool hasImplicitThis = false;
-  if (hasContainerType && !StaticLoc.isValid() && !Name.isOperator()) {
+  if (hasContainerType) {
     Params.push_back(buildImplicitThisParameter());
     hasImplicitThis = true;
   }

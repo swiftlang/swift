@@ -405,7 +405,6 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
                                Type DestTy,
                                SmallVectorImpl<ValueDecl *> &Viable) {
   SmallVector<OverloadCandidate, 4> ViableCandidates;
-  bool hasThis = BaseTy && !BaseTy->is<MetaTypeType>();
   for (ValueDecl *VD : Candidates) {
     Type VDType = VD->getTypeOfReference()->getRValueType();
 
@@ -432,10 +431,11 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
       }
     }
 
-    // If we have a 'this' argument and the declaration is a non-static method,
+    // If we have a 'this' argument and the declaration is a method,
     // the method's 'this' parameter has already been bound. Look instead at the
     // actual argument types.
-    if (hasThis && (isa<FuncDecl>(VD) && !cast<FuncDecl>(VD)->isStatic())) {
+    if (BaseTy && isa<FuncDecl>(VD) &&
+        (!BaseTy->is<MetaTypeType>() || !VD->isInstanceMember())) {
       // FIXME: Derived-to-base conversions will eventually be needed.
       FunctionTy = FunctionTy->getResult()->castTo<AnyFunctionType>();
     }
@@ -476,6 +476,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     SmallVector<DeducibleGenericParamType *, 1> operatorDeducibleParams;
     if (VD->getName().isOperator()) {
       if (Type Extension = cast<FuncDecl>(VD)->getExtensionType()) {
+        FunctionTy = FunctionTy->getResult()->castTo<AnyFunctionType>();
         if (ProtocolType *P = Extension->getAs<ProtocolType>()) {
           GenericParam Param = P->getDecl()->getThis();
           FunctionTy = getDeducibleType(*this, FunctionTy, { &Param, 1 },
@@ -566,7 +567,6 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
                                        SmallVectorImpl<ValueDecl *> &Viable,
                                        CoercionContext *CC) {
   SmallVector<OverloadCandidate, 4> ViableCandidates;
-  bool hasThis = BaseTy && !BaseTy->is<MetaTypeType>();
 
   auto DestLV = DestTy->getAs<LValueType>();
   if (DestLV)
@@ -591,10 +591,10 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
       SrcTy = SrcLV->getObjectType();
     }
     
-    // If we have a 'this' type and the declaration is a constructor or
-    // non-static method, look past the 'this' argument.
-    if (hasThis &&
-        (isa<FuncDecl>(VD) && !cast<FuncDecl>(VD)->isStatic())) {
+    // If we have a base type and the declaration is a constructor or
+    // method, look past the 'this' argument.
+    if (BaseTy && isa<FuncDecl>(VD) &&
+        (!BaseTy->is<MetaTypeType>() || cast<FuncDecl>(VD)->isStatic())) {
       // FIXME: Derived-to-base conversions will eventually be needed.
       SrcTy = SrcTy->castTo<AnyFunctionType>()->getResult();
     }
@@ -961,9 +961,7 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
 
     // Reference to a member of a generic type.
     if (baseTy->is<BoundGenericType>()) {
-      if (isa<FuncDecl>(Member) ||
-          (isa<OneOfElementDecl>(Member) &&
-           Member->getType()->is<PolymorphicFunctionType>())) {
+      if (isa<FuncDecl>(Member)) {
         // We're binding a reference to an instance method of a generic
         // type, which we build as a reference to the underlying declaration
         // specialized based on the deducing the arguments of the generic
@@ -985,13 +983,17 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
           = buildSpecializeExpr(ref, substTy, CC.Substitutions,
                                 CC.Conformance);
 
-        // Call the specialized method with the object.
         Expr *apply;
-        if (baseIsInstance && Member->isInstanceMember())
-          apply = new (Context) DotSyntaxCallExpr(specializedRef, DotLoc, Base);
-        else
+        if (!baseIsInstance && Member->isInstanceMember()) {
           apply = new (Context) DotSyntaxBaseIgnoredExpr(Base, DotLoc,
                                                          specializedRef);
+        } else {
+          if (baseIsInstance && !Member->isInstanceMember()) {
+            Type baseMetaTy = MetaTypeType::get(baseTy, Context);
+            Base = new (Context) GetMetatypeExpr(Base, baseMetaTy);
+          }
+          apply = new (Context) DotSyntaxCallExpr(specializedRef, DotLoc, Base);
+        }
         return recheckTypes(apply);
       }
 
@@ -1010,13 +1012,19 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
     Expr *Ref = new (Context) DeclRefExpr(Member, MemberLoc,
                                           Member->getTypeOfReference());
 
-    // Refer to a non-static member function that binds 'this':
-    if (baseIsInstance && Member->isInstanceMember()) {
-      return new (Context) DotSyntaxCallExpr(Ref, DotLoc, Base);
+    // Refer to a member function that binds 'this':
+    if (isa<FuncDecl>(Member) &&
+         Member->getDeclContext()->isTypeContext()) {
+      if (baseIsInstance == Member->isInstanceMember())
+        return new (Context) DotSyntaxCallExpr(Ref, DotLoc, Base);
+
+      if (baseIsInstance && !Member->isInstanceMember()) {
+        Type baseMetaTy = MetaTypeType::get(baseTy, Context);
+        Base = new (Context) GetMetatypeExpr(Base, baseMetaTy);
+        return new (Context) DotSyntaxCallExpr(Ref, DotLoc, Base);
+      }
     }
 
-    // FIXME: If metatype types ever get a runtime representation, we'll need
-    // to evaluate the object.
     return new (Context) DotSyntaxBaseIgnoredExpr(Base, DotLoc, Ref);
   }
 

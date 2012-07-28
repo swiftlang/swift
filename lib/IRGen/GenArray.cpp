@@ -132,8 +132,22 @@ void swift::irgen::emitArrayInjectionCall(IRGenFunction &IGF, ManagedValue alloc
 
   // Emit the callee.
   llvm::SmallVector<Arg, 4> args;
+  // FIXME: emitCallee is currently broken; use an ugly workaround in the
+  // meantime.
+#if 0
   Callee callee =
     emitCallee(IGF, injectionFn, out.getKind(), /*uncurry*/ 0, args);
+#else
+  Explosion CalleeExplosion(ExplosionKind::Minimal);
+  IGF.emitRValue(injectionFn, CalleeExplosion);
+  llvm::Value *fn = CalleeExplosion.claimUnmanagedNext();
+  llvm::Type *fnTy = IGF.IGM.getFunctionType(injectionFn->getType(),
+                                             ExplosionKind::Minimal, 0, true);
+  fn = IGF.Builder.CreateBitCast(fn, fnTy->getPointerTo());
+  ManagedValue data = CalleeExplosion.claimNext();
+  Callee callee = Callee::forIndirectCall(injectionFn->getType(), sliceTy,
+                                          ArrayRef<Substitution>(), fn, data);
+#endif
 
   // The injection function takes this tuple:
   //   (Builtin.RawPointer, Builtin.ObjectPointer, typeof(length))

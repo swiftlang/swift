@@ -453,19 +453,6 @@ Type FuncDecl::getExtensionType() const {
 Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
   if (OuterGenericParams)
     *OuterGenericParams = nullptr;
-
-  // 'static' functions have no 'this' argument.
-  if (isStatic()) {
-    if (OuterGenericParams) {
-      if (Type containerType = getExtensionType()) {
-        if (auto UGT = containerType->getAs<UnboundGenericType>()) {
-          *OuterGenericParams = UGT->getDecl()->getGenericParams();
-        }
-      }
-    }
-    
-    return Type();
-  }
   
   Type ContainerType = getExtensionType();
   if (ContainerType.isNull()) return ContainerType;
@@ -503,6 +490,10 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
       *OuterGenericParams = D->getGenericParams();
   }
 
+  // 'static' functions have 'this' of type metatype<T>.
+  if (isStatic())
+    return MetaTypeType::get(ContainerType, getASTContext());
+
   if (ContainerType->hasReferenceSemantics())
     return ContainerType;
 
@@ -515,8 +506,6 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
 /// extension context, it will have a 'this' argument.  This method returns it
 /// if present, or returns null if not.
 VarDecl *FuncDecl::getImplicitThisDecl() {
-  if (isStatic()) return 0;
-  
   if (Body->getParamPatterns().empty()) return 0;
   
   // "this" is represented as (typed_pattern (named_pattern (var_decl 'this')).

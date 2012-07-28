@@ -283,7 +283,8 @@ namespace {
         if (isa<ThisApplyExpr>(E)) {
           LValueType::Qual InputExprQuals;
           Type InputExprObjectTy;
-          if (InputExprTy->hasReferenceSemantics())
+          if (InputExprTy->hasReferenceSemantics() ||
+              InputExprTy->is<MetaTypeType>())
             InputExprObjectTy = InputExprTy;
           else
             InputExprObjectTy = checkLValue(InputExprTy, InputExprQuals,

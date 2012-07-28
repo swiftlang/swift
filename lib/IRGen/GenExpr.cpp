@@ -300,6 +300,9 @@ namespace {
       IGF.unimplemented(E->getLoc(), "specialize expressions");
       IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
     }
+    void visitGetMetatypeExpr(GetMetatypeExpr *E) {
+      IGF.emitIgnored(E->getSubExpr());
+    }
     void visitTupleElementExpr(TupleElementExpr *E) {
       emitTupleElement(IGF, E, Out);
     }
@@ -462,6 +465,7 @@ namespace {
     NOT_LVALUE_EXPR(TupleShuffle)
     NOT_LVALUE_EXPR(Erasure)
     NOT_LVALUE_EXPR(Specialize) // FIXME: Generic subscripts?
+    NOT_LVALUE_EXPR(GetMetatype)
     NOT_LVALUE_EXPR(Func)
     NOT_LVALUE_EXPR(Closure)
     NOT_LVALUE_EXPR(Load)
@@ -646,6 +650,7 @@ namespace {
     NON_LOCATEABLE(TupleShuffleExpr)
     NON_LOCATEABLE(ErasureExpr)
     NON_LOCATEABLE(SpecializeExpr) // FIXME: Generic subscripts?
+    NON_LOCATEABLE(GetMetatypeExpr)
     NON_LOCATEABLE(CapturingExpr)
     NON_LOCATEABLE(ModuleExpr)
     NON_LOCATEABLE(DotSyntaxBaseIgnoredExpr)

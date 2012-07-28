@@ -1266,6 +1266,19 @@ public:
   }
 };
 
+/// GetMetatypeExpr - 
+class GetMetatypeExpr : public ImplicitConversionExpr {
+public:
+  GetMetatypeExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::GetMetatype, subExpr, type) {}
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const LoadExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::GetMetatype;
+  }
+};
+
 /// AddressOfExpr - Using the builtin unary '&' operator, convert the
 /// given l-value into an explicit l-value.
 class AddressOfExpr : public Expr {

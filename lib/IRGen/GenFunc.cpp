@@ -1646,10 +1646,13 @@ static bool emitKnownCall(IRGenFunction &IGF, FuncDecl *Fn,
         name != "Float" && name != "Double")
       return false;
 
-    Expr *arg = callSites[0].getArg();
+    if (callSites.size() != 2)
+      return false;
+
+    Expr *arg = callSites[1].getArg();
     Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
     ExplosionSchema schema =
-      IGF.IGM.getSchema(callSites[0].getSubstResultType(), out.getKind());
+      IGF.IGM.getSchema(callSites[1].getSubstResultType(), out.getKind());
     assert(schema.size() == 1);
     llvm::Type *outTy = schema.begin()->getScalarType();
     if (isa<llvm::IntegerType>(outTy)) {
@@ -1675,7 +1678,10 @@ static bool emitKnownCall(IRGenFunction &IGF, FuncDecl *Fn,
     if (name != "Float" && name != "Double")
       return false;
 
-    Expr *arg = callSites[0].getArg();
+    if (callSites.size() != 2)
+      return false;
+
+    Expr *arg = callSites[1].getArg();
     Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
     IGF.emitRValue(arg, out);
     return true;

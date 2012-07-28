@@ -533,7 +533,10 @@ bool checkProtocolCircularity(TypeChecker &TC, ProtocolDecl *Proto,
 static unsigned getNumArgs(ValueDecl *value) {
   if (!isa<FuncDecl>(value)) return ~0U;
 
-  Type argTy = cast<AnyFunctionType>(value->getType())->getInput();
+  AnyFunctionType *fnTy = cast<AnyFunctionType>(value->getType());
+  if (value->getDeclContext()->isTypeContext())
+    fnTy = cast<AnyFunctionType>(fnTy->getResult());
+  Type argTy = fnTy->getInput();
   if (auto tuple = argTy->getAs<TupleType>()) {
     return tuple->getFields().size();
   } else {

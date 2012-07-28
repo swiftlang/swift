@@ -106,7 +106,8 @@ ABSTRACT_EXPR(ImplicitConversion, Expr)
   EXPR(FunctionConversion, ImplicitConversionExpr)
   EXPR(Erasure, ImplicitConversionExpr)
   EXPR(Specialize, ImplicitConversionExpr)
-  EXPR_RANGE(ImplicitConversion, Load, Specialize)
+  EXPR(GetMetatype, ImplicitConversionExpr)
+  EXPR_RANGE(ImplicitConversion, Load, GetMetatype)
 EXPR(Coerce, Expr)
 
 #undef EXPR_RANGE

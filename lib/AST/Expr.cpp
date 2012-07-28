@@ -150,14 +150,8 @@ ArchetypeType *ArchetypeMemberRefExpr::getArchetype() const {
 }
 
 bool ArchetypeMemberRefExpr::isBaseIgnored() const {
-  if (getBase()->getType()->getRValueType()->is<MetaTypeType>())
-    return true;
-
   if (isa<TypeDecl>(Value))
     return true;
-
-  if (auto Func = dyn_cast<FuncDecl>(Value))
-    return Func->isStatic();
 
   return false;
 }
@@ -592,6 +586,11 @@ public:
   }
   void visitRequalifyExpr(RequalifyExpr *E) {
     printCommon(E, "requalify_expr") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
+  void visitGetMetatypeExpr(GetMetatypeExpr *E) {
+    printCommon(E, "get_metatype_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }

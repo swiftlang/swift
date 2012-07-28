@@ -449,9 +449,16 @@ public:
     // If it does, then everything is good, resolve the reference.
     if (!(Flags & CF_Apply))
       return DED->getType();
-    
-    return coerced(new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
-                                                DED->getType()));
+
+    if (!DED->hasArgumentType()) {
+      return coerced(new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
+                                                  DED->getType()));
+    }
+
+    Expr *E = new (TC.Context) TypeOfExpr(UME->getColonLoc(),
+                                          MetaTypeType::get(DT, TC.Context));
+    E = TC.buildMemberRefExpr(E, SourceLoc(), DED, UME->getColonLoc());
+    return coerced(TC.recheckTypes(E));
   }  
   
   CoercedResult visitParenExpr(ParenExpr *E) {
@@ -679,9 +686,8 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
   
   // Check that the type of the 'convertFrom*Literal' method makes
   // sense.  We want a type of "S -> DestTy" where S is the expected type.
-  AnyFunctionType *FT = cast<AnyFunctionType>(Method->getType());
-
-  // FIXME: PolymorphicFunctionType?
+  AnyFunctionType *FT = Method->getType()->castTo<AnyFunctionType>();
+  FT = FT->getResult()->castTo<AnyFunctionType>();
   
   // The result of the convert function must be the destination type.
   if (!FT->getResult()->isEqual(Ty)) {
@@ -891,13 +897,12 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
   
   if (!(Flags & CF_Apply))
     return DestTy;
-  
-  DeclRefExpr *DRE
-    = new (TC.Context) DeclRefExpr(Method,
-                                   // FIXME: This location is a hack!
-                                   Intermediate->getStartLoc(),
-                                   Method->getType());
-  
+
+  Expr *DRE = new (TC.Context) TypeOfExpr(Intermediate->getStartLoc(),
+                                          Method->computeThisType());
+  DRE = TC.recheckTypes(TC.buildMemberRefExpr(DRE, SourceLoc(), Method,
+                                              Intermediate->getStartLoc()));
+
   // Return a new call of the conversion function, passing in the integer
   // literal.
   return coerced(new (TC.Context) CallExpr(DRE, Intermediate, DestTy));
@@ -1708,7 +1713,7 @@ SemaCoerce::coerceObjectArgument(Expr *E, Type ContainerTy, CoercionContext &CC,
     return nullptr;
   }
 
-  if (SrcObjectTy->hasReferenceSemantics()) {
+  if (SrcObjectTy->hasReferenceSemantics() || SrcObjectTy->is<MetaTypeType>()) {
     // The destination type is just the source object type.
     if (!(Flags & CF_Apply))
       return SrcObjectTy;

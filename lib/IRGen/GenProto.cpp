@@ -2279,7 +2279,7 @@ namespace {
 
     void addStaticMethod(FuncDecl *iface) {
       FuncDecl *impl = cast<FuncDecl>(Conformance.Mapping.find(iface)->second);
-      Table.push_back(getStaticMethodWitness(impl, iface->getType()));
+      Table.push_back(getInstanceMethodWitness(impl, iface->getType()));
     }
 
     void addInstanceMethod(FuncDecl *iface) {
@@ -2293,12 +2293,6 @@ namespace {
       llvm::Constant *implPtr =
         IGM.getAddrOfFunction(impl, ExplosionKind::Minimal, 1, /*data*/ false);
       return getWitness(implPtr, impl->getType(), ifaceType, 1);
-    }
-
-    llvm::Constant *getStaticMethodWitness(FuncDecl *impl, Type ifaceType) {
-      llvm::Constant *implPtr =
-        IGM.getAddrOfFunction(impl, ExplosionKind::Minimal, 0, /*data*/ false);
-      return getWitness(implPtr, impl->getType(), ifaceType, 0);
     }
 
     llvm::Constant *getWitness(llvm::Constant *fn, Type fnTy, Type ifaceTy,

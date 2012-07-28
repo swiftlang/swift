@@ -297,8 +297,6 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   case TypeKind::UnboundGeneric:
     llvm_unreachable("mangling unresolved type");
 
-  case TypeKind::MetaType:
-    llvm_unreachable("Cannot mangle metatype yet");
   case TypeKind::Module:
     llvm_unreachable("Cannot mangle module type yet");
       
@@ -333,6 +331,11 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
                       explosion, uncurryLevel);
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+
+  case TypeKind::MetaType:
+    Buffer << 'M';
+    return mangleType(cast<MetaTypeType>(base)->getInstanceType(),
+                      ExplosionKind::Minimal, 0);
 
   case TypeKind::LValue:
     Buffer << 'R';

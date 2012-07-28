@@ -777,11 +777,9 @@ public:
     
     // Determine the type of the member.
     Type MemberTy = E->getDecl()->getType();
-    if (auto Method = dyn_cast<FuncDecl>(E->getDecl())) {
-      if (!Method->isStatic()) {
-        if (auto FuncTy = dyn_cast<FunctionType>(MemberTy))
-          MemberTy = FuncTy->getResult();
-      }
+    if (isa<FuncDecl>(E->getDecl())) {
+      if (auto FuncTy = dyn_cast<AnyFunctionType>(MemberTy))
+        MemberTy = FuncTy->getResult();
     } else {
       MemberTy = LValueType::get(MemberTy,
                                  LValueType::Qual::DefaultForMemberAccess,
@@ -821,10 +819,11 @@ public:
       return nullptr;
 
     Type Archetype = E->getArchetype();
+    bool isMetatypeBase = E->getBase()->getType()->is<MetaTypeType>();
 
     // If we're going to use the base, make sure it's an lvalue, materializing
     // it if needed.
-    if (!E->isBaseIgnored()) {
+    if (!E->isBaseIgnored() && !isMetatypeBase) {
       // Ensure that the base is an lvalue, materializing it if is not an
       // lvalue yet.
       if (Expr *Base = TC.coerceObjectArgument(E->getBase(), Archetype))
@@ -838,8 +837,8 @@ public:
 
     if (!E->isBaseIgnored()) {
       if (auto Method = dyn_cast<FuncDecl>(E->getDecl())) {
-        if (!Method->isStatic()) {
-          if (auto FuncTy = dyn_cast<FunctionType>(MemberTy))
+        if (!isMetatypeBase || Method->isStatic()) {
+          if (auto FuncTy = dyn_cast<AnyFunctionType>(MemberTy))
             MemberTy = FuncTy->getResult();
         }
       } else {
@@ -1226,9 +1225,8 @@ public:
 Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
                                             Type lenTy, SourceLoc Loc) {
   // Build the expression "Slice<T>".
-  Type implType = sliceType->getImplementationType();
   Expr *sliceTypeRef =
-      new (Context) TypeOfExpr(Loc, MetaTypeType::get(implType, Context));
+      new (Context) TypeOfExpr(Loc, MetaTypeType::get(sliceType, Context));
 
   // Build the expression "Slice<T>.convertFromHeapArray".
   Expr *injectionFn = semaUnresolvedDotExpr(
@@ -1732,27 +1730,6 @@ void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
   GenericParamList *outerGenericParams = nullptr;
   if (FuncDecl *FD = FE->getDecl()) {
     isInstanceFunc = FD->computeThisType(&outerGenericParams);
-
-    if (outerGenericParams) {
-      // FIXME: Support generic functions in generic classes.
-      if (FD->getGenericParams()) {
-        diagnose(FD->getLoc(), diag::unsupported_generic_generic);
-      }
-
-      // A method of generic type X would be built with a monomorphic
-      // signature such as
-      //
-      //   (this : X<T1', T2', ..., TN'>) -> (Params) -> Result
-      //
-      // using the archetypes T1', T2', ..., TN'.
-      //
-      // Adjust the method type to a polymorphic function type
-      //
-      //   <T1, T2, ..., TN> (this : X<T1, T2, ..., TN>) -> (Params) -> Result
-      //
-      // because the underlying declaration is generic.
-    }
-
     genericParams = FD->getGenericParams();
   }
 

@@ -577,9 +577,13 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   
   // Get the number of lexical arguments, for semantic checks below.
   int NumArguments = -1;
-  if (AnyFunctionType *FT = dyn_cast<AnyFunctionType>(Ty))
+  if (AnyFunctionType *FT = dyn_cast<AnyFunctionType>(Ty)) {
+    if (isa<FuncDecl>(VD) && VD->getDeclContext()->isTypeContext() &&
+        cast<FuncDecl>(VD)->isStatic())
+      FT = FT->getResult()->castTo<AnyFunctionType>();
     if (TupleType *TT = dyn_cast<TupleType>(FT->getInput()))
       NumArguments = TT->getFields().size();
+  }
 
   bool isOperator = VD->isOperator();
 

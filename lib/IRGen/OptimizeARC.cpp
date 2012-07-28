@@ -1101,6 +1101,9 @@ static bool performARCExpansion(Function &F) {
         CI.setTailCall(true);
         Inst.eraseFromParent();
 
+        if (!isa<Instruction>(ArgVal))
+          continue;
+
         TinyPtrVector<Instruction*> &GlobalEntry = DefsOfValue[ArgVal];
 
         // If this is the first definition of a value for the argument that
