@@ -285,7 +285,6 @@ void swift::REPL(ASTContext &Context) {
   EditLineWrapper e;
 
   char* CurBuffer = const_cast<char*>(Buffer->getBufferStart());
-  char* LastValidLineEnd = CurBuffer;
   unsigned CurBufferOffset = 0;
   unsigned CurBufferEndOffset = 0;
   
@@ -302,7 +301,7 @@ void swift::REPL(ASTContext &Context) {
   strcpy(CurBuffer, importstmt);
   CurBuffer += strlen(importstmt);
   CurBufferEndOffset += strlen(importstmt);
-  LastValidLineEnd = CurBuffer;
+  char* LastValidLineEnd = CurBuffer;
 
   swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
                                      CurBufferOffset,
