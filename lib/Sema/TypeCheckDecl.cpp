@@ -403,7 +403,6 @@ public:
     FuncExpr *body = FD->getBody();
 
     // Before anything else, set up the 'this' argument correctly.
-    bool isInstanceFunc = false;
     if (Type thisType = FD->computeThisType()) {
       TypedPattern *thisPattern =
         cast<TypedPattern>(body->getParamPatterns()[0]);
@@ -412,7 +411,6 @@ public:
       } else {
         thisPattern->setType(thisType);
       }
-      isInstanceFunc = true;
     }
 
     checkGenericParams(FD->getGenericParams());
