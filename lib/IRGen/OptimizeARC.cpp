@@ -340,11 +340,9 @@ static bool canonicalizeInputFunction(Function &F) {
       Value *ArgVal = CI.getArgOperand(0);
 
       // Rewrite uses of the result to use the argument.
-      if (!CI.use_empty()) {
+      if (!CI.use_empty())
         Inst.replaceAllUsesWith(ArgVal);
-        Changed = true;
-      }
-      
+
       // Insert a call to swift_retain_noresult to replace this and reset the
       // iterator so that we visit it next.
       I = CallInst::Create(getRetainNoResult(F, ArgVal->getType(),
