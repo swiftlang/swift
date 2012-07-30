@@ -1,7 +1,10 @@
 a
 b
-c
 d
+c
+a
+d
+c
 a
 a
 c
