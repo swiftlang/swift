@@ -26,6 +26,9 @@ add_swift_library(swift_runtime
   ObjCBridge.mm
   ${CMAKE_BINARY_DIR}/lib/swift.swift)
 
+set_source_files_properties(${CMAKE_BINARY_DIR}/lib/swift.swift
+  PROPERTIES GENERATED ON)
+
 if(SWIFT_OPTIMIZED)
   if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
    set_target_properties(swift_runtime PROPERTIES
@@ -46,7 +49,8 @@ add_dependencies(swift_runtime swift)
 if(XCODE)
   # Create the symlinks necessary to get the compiler to to find the
   # swift runtime during development with Xcode.
-  add_custom_command(TARGET swift_runtime POST_BUILD
+  add_custom_command(TARGET swift_runtime PRE_BUILD
+    COMMAND mkdir "-p" "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}"
     COMMAND ln "-fs" "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}"
             "${CMAKE_BINARY_DIR}/bin/lib"
     COMMAND mkdir "-p" "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}/swift"
