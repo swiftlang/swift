@@ -1134,11 +1134,8 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   // named 'this'.  This turns "(int)->int" on FooTy into "(this :
   // [byref] FooTy)->((int)->int)".  Note that we can't actually compute the
   // type here until Sema.
-  bool hasImplicitThis = false;
-  if (hasContainerType) {
+  if (hasContainerType)
     Params.push_back(buildImplicitThisParameter());
-    hasImplicitThis = true;
-  }
 
   TypeLoc FuncRetTy;
   if (parseFunctionSignature(Params, FuncRetTy))
