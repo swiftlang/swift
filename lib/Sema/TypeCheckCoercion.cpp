@@ -435,8 +435,9 @@ public:
       return nullptr;
     }
 
-    if (DED->getType()->is<FunctionType>() != DestTy->is<FunctionType>()) {
-      if (DED->getType()->is<FunctionType>())
+    Type ElemTy = DED->getType()->getAs<AnyFunctionType>()->getResult();
+    if (ElemTy->is<FunctionType>() != DestTy->is<FunctionType>()) {
+      if (ElemTy->is<FunctionType>())
         diagnose(UME->getLoc(), diag::call_element_function_type,
                  DestTy, UME->getName());
       else
@@ -449,11 +450,6 @@ public:
     // If it does, then everything is good, resolve the reference.
     if (!(Flags & CF_Apply))
       return DED->getType();
-
-    if (!DED->hasArgumentType()) {
-      return coerced(new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
-                                                  DED->getType()));
-    }
 
     Expr *E = new (TC.Context) TypeOfExpr(UME->getColonLoc(),
                                           MetaTypeType::get(DT, TC.Context));

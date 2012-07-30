@@ -435,7 +435,15 @@ public:
 
     // If we have a simple element, just set the type.
     if (ED->getArgumentType().isNull()) {
-      ED->setType(ElemTy);
+      Type argTy = MetaTypeType::get(ElemTy, TC.Context);
+      Type fnTy;
+      if (OOD->getGenericParams())
+        fnTy = PolymorphicFunctionType::get(argTy, ElemTy,
+                                            OOD->getGenericParams(),
+                                            TC.Context);
+      else
+        fnTy = FunctionType::get(argTy, ElemTy, TC.Context);
+      ED->setType(fnTy);
       return;
     }
 
@@ -444,12 +452,14 @@ public:
     if (TC.validateType(ED->getArgumentTypeLoc(), IsFirstPass))
       return;
 
-    Type fnTy;
+    Type fnTy = FunctionType::get(ED->getArgumentType(), ElemTy, TC.Context);
     if (OOD->getGenericParams())
-      fnTy = PolymorphicFunctionType::get(ED->getArgumentType(), ElemTy,
-                                          OOD->getGenericParams(), TC.Context);
+      fnTy = PolymorphicFunctionType::get(MetaTypeType::get(ElemTy, TC.Context),
+                                          fnTy, OOD->getGenericParams(),
+                                          TC.Context);
     else
-      fnTy = FunctionType::get(ED->getArgumentType(), ElemTy, TC.Context);
+      fnTy = FunctionType::get(MetaTypeType::get(ElemTy, TC.Context), fnTy,
+                               TC.Context);
     ED->setType(fnTy);
 
     // Require the carried type to be materializable.

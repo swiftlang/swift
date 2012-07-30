@@ -397,6 +397,23 @@ bool TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
   return false;
 }
 
+static bool lookPastThisArgument(Type BaseTy, ValueDecl *VD) {
+  if (!BaseTy)
+    return false;
+
+  if (FuncDecl *FD = dyn_cast<FuncDecl>(VD)) {
+    if (!BaseTy->is<MetaTypeType>())
+      return true;
+    if (FD->isStatic())
+      return true;
+  } else if (OneOfElementDecl *OOED = dyn_cast<OneOfElementDecl>(VD)) {
+    if (isa<OneOfDecl>(OOED->getDeclContext()))
+      return true;
+  }
+
+  return false;
+}
+
 OverloadCandidate
 TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
                                bool OperatorSyntax,
@@ -434,10 +451,12 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     // If we have a 'this' argument and the declaration is a method,
     // the method's 'this' parameter has already been bound. Look instead at the
     // actual argument types.
-    if (BaseTy && isa<FuncDecl>(VD) &&
-        (!BaseTy->is<MetaTypeType>() || !VD->isInstanceMember())) {
+    if (lookPastThisArgument(BaseTy, VD)) {
       // FIXME: Derived-to-base conversions will eventually be needed.
-      FunctionTy = FunctionTy->getResult()->castTo<AnyFunctionType>();
+      if (auto resultFnTy = FunctionTy->getResult()->getAs<AnyFunctionType>())
+        FunctionTy = resultFnTy;
+      else
+        continue;
     }
 
     if (!substitutedWithBase) {
@@ -593,8 +612,7 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
     
     // If we have a base type and the declaration is a constructor or
     // method, look past the 'this' argument.
-    if (BaseTy && isa<FuncDecl>(VD) &&
-        (!BaseTy->is<MetaTypeType>() || cast<FuncDecl>(VD)->isStatic())) {
+    if (lookPastThisArgument(BaseTy, VD)) {
       // FIXME: Derived-to-base conversions will eventually be needed.
       SrcTy = SrcTy->castTo<AnyFunctionType>()->getResult();
     }
@@ -961,7 +979,9 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
 
     // Reference to a member of a generic type.
     if (baseTy->is<BoundGenericType>()) {
-      if (isa<FuncDecl>(Member)) {
+      if (isa<FuncDecl>(Member) ||
+          (isa<OneOfElementDecl>(Member) &&
+           isa<OneOfDecl>(Member->getDeclContext()))) {
         // We're binding a reference to an instance method of a generic
         // type, which we build as a reference to the underlying declaration
         // specialized based on the deducing the arguments of the generic
@@ -1013,8 +1033,10 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
                                           Member->getTypeOfReference());
 
     // Refer to a member function that binds 'this':
-    if (isa<FuncDecl>(Member) &&
-         Member->getDeclContext()->isTypeContext()) {
+    if ((isa<FuncDecl>(Member) ||
+        (isa<OneOfElementDecl>(Member) &&
+         isa<OneOfDecl>(Member->getDeclContext()))) &&
+        Member->getDeclContext()->isTypeContext()) {
       if (baseIsInstance == Member->isInstanceMember())
         return new (Context) DotSyntaxCallExpr(Ref, DotLoc, Base);
 

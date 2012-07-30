@@ -425,24 +425,17 @@ llvm::Function *IRGenModule::getAddrOfFunction(FuncDecl *func,
 /// getAddrOfGlobalInjectionFunction - Get the address of the function to
 /// perform a particular injection into a oneof type.
 llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
-  LinkEntity entity = LinkEntity::forFunction(D, ExplosionKind::Minimal, 0);
-
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) return cast<llvm::Function>(entry);
-
-  // The formal type of the function is generally the type of the decl,
-  // but if that's not a function type, it's () -> that.
-  Type formalType = D->getType();
-  if (!isa<FunctionType>(formalType)) {
-    formalType = FunctionType::get(TupleType::getEmpty(Context),
-                                   formalType, Context);
-  }
-
   // TODO: emit at more optimal explosion kinds when reasonable!
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   unsigned uncurryLevel = 0;
 
-  bool indirectResult = hasIndirectResult(*this, formalType,
+  LinkEntity entity = LinkEntity::forFunction(D, ExplosionKind::Minimal,
+                                              uncurryLevel);
+
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) return cast<llvm::Function>(entry);
+
+  bool indirectResult = hasIndirectResult(*this, D->getType(),
                                           explosionLevel, uncurryLevel);
 
   SmallVector<llvm::AttributeWithIndex, 1> attrs;
@@ -450,7 +443,7 @@ llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
                              indirectResult, attrs);
 
   llvm::FunctionType *fnType =
-    getFunctionType(formalType, explosionLevel, uncurryLevel, /*data*/ false);
+    getFunctionType(D->getType(), explosionLevel, uncurryLevel, /*data*/false);
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, cc, attrs);
   return entry;

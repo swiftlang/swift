@@ -674,6 +674,9 @@ public:
   void visitNewReferenceExpr(NewReferenceExpr *E) {
     printApplyExpr(E, "new_reference_expr");
   }
+  void visitConstructorRefCallExpr(ConstructorRefCallExpr *E) {
+    printApplyExpr(E, "constructor_ref_call_expr");
+  }
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
     printCommon(E, "dot_syntax_base_ignored") << '\n';
     printRec(E->getLHS());

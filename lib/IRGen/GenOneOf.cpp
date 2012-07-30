@@ -33,6 +33,7 @@
 #include "llvm/Function.h"
 
 #include "FixedTypeInfo.h"
+#include "GenProto.h"
 #include "GenType.h"
 #include "IRGenModule.h"
 #include "LValue.h"
@@ -477,13 +478,22 @@ void irgen::emitOneOfElementRef(IRGenFunction &IGF,
 /// Emit the injection function for the given element.
 static void emitInjectionFunction(IRGenModule &IGM,
                                   llvm::Function *fn,
-                                  const OneofTypeInfo &oneofTI,
                                   OneOfElementDecl *elt) {
   ExplosionKind explosionKind = ExplosionKind::Minimal;
   IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(), explosionKind,
                     /*uncurry level*/ 0, fn, Prologue::Bare);
+  if (elt->hasArgumentType()) {
+    // FIXME: Implement!
+    IGF.Builder.CreateUnreachable();
+    return;
+  }
 
   Explosion explosion = IGF.collectParameters();
+  OneOfDecl *ood = cast<OneOfDecl>(elt->getDeclContext());
+  if (ood->getGenericParams())
+    emitPolymorphicParameters(IGF, *ood->getGenericParams(), explosion);
+  const OneofTypeInfo &oneofTI =
+      IGM.getFragileTypeInfo(ood->getDeclaredTypeInContext()).as<OneofTypeInfo>();
   oneofTI.emitInjectionFunctionBody(IGF, elt, explosion);
 }
 
@@ -536,13 +546,9 @@ void IRGenModule::emitOneOfDecl(OneOfDecl *oneof) {
       continue;
     }
     case DeclKind::OneOfElement: {
-      if (oneof->getGenericParams())
-        llvm_unreachable("don't know how to emit generic constructor yet");
-      const OneofTypeInfo &typeInfo =
-          getFragileTypeInfo(oneof->getDeclaredType()).as<OneofTypeInfo>();
       OneOfElementDecl *elt = cast<OneOfElementDecl>(member);
       llvm::Function *fn = getAddrOfInjectionFunction(elt);
-      emitInjectionFunction(*this, fn, typeInfo, elt);
+      emitInjectionFunction(*this, fn, elt);
       continue;
     }
     case DeclKind::Constructor: {

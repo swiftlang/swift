@@ -596,6 +596,18 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
       auto Best = filterOverloadSet(Ctors.Results, false, Ty, E2, Type(),
                                     Viable);
       if (Best) {
+        if (isa<OneOfElementDecl>(Best.getDecl()) && 
+            isa<OneOfDecl>(Best.getDecl()->getDeclContext())) {
+          // FIXME: All constructors should eventually start using this
+          // codepath.
+          ValueDecl *BestDecl = Best.getDecl();
+          Expr *Ref = new (Context) DeclRefExpr(BestDecl, E1->getStartLoc(),
+                                                BestDecl->getType());
+          E1 = new (Context) ConstructorRefCallExpr(Ref, E1);
+          E1 = recheckTypes(E1);
+          E->setFn(E1);
+          return semaApplyExpr(E);
+        }
         E1 = new (Context) ConstructorRefExpr(E1, Best.getDecl());
         E1 = recheckTypes(E1);
         E1 = specializeOverloadResult(Best, E1);

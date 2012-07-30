@@ -1857,6 +1857,27 @@ public:
   }
 };
 
+/// ConstructorRefCallExpr - Refer to a constructor for a type P.  The
+/// actual reference to function which returns the constructor is modeled
+/// as a DeclRefExpr.
+class ConstructorRefCallExpr : public ThisApplyExpr {
+public:
+  ConstructorRefCallExpr(Expr *FnExpr, Expr *BaseExpr, Type Ty = Type())
+    : ThisApplyExpr(ExprKind::ConstructorRefCall, FnExpr, BaseExpr, Ty) {}
+
+  SourceLoc getLoc() const {
+    return getArg()->getLoc();
+  }
+  SourceRange getSourceRange() const {
+    return SourceRange(getArg()->getSourceRange());
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ConstructorRefCallExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ConstructorRefCall;
+  }
+};
   
 /// DotSyntaxBaseIgnoredExpr - When a.b resolves to something that does not need
 /// the actual value of the base (e.g. when applied to a metatype, module, or

@@ -34,6 +34,7 @@ namespace irgen {
   enum class ExplosionKind : unsigned;
   class Callee;
   class IRGenFunction;
+  class IRGenModule;
   class LValue;
   enum class ValueWitness : unsigned;
 
