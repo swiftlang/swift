@@ -657,10 +657,13 @@ namespace {
     unsigned Indent;
     bool ShowColors;
     
-    PrintDecl(raw_ostream &os, unsigned indent, bool ShowColors)
-      : OS(os), Indent(indent), ShowColors(ShowColors) {}
+    PrintDecl(raw_ostream &os, unsigned indent)
+      : OS(os), Indent(indent), ShowColors(false) {
+      if (&os == &llvm::errs() || &os == &llvm::outs())
+	ShowColors = llvm::errs().is_displayed() && llvm::outs().is_displayed();
+    }
     
-    void printRec(Decl *D) { D->print(OS, Indent+2, ShowColors); }
+    void printRec(Decl *D) { D->print(OS, Indent+2); }
     void printRec(Expr *E) { E->print(OS, Indent+2); }
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
 
@@ -915,20 +918,16 @@ namespace {
   };
 } // end anonymous namespace.
 
-static bool shouldShowColors() {
-  return llvm::errs().is_displayed() && llvm::outs().is_displayed();
-}
-
-void Decl::print(raw_ostream &OS, unsigned Indent, bool ShowColors) const {
-  PrintDecl(OS, Indent, ShowColors).visit(const_cast<Decl*>(this));
+void Decl::print(raw_ostream &OS, unsigned Indent) const {
+  PrintDecl(OS, Indent).visit(const_cast<Decl*>(this));
 }
 
 void Decl::dump() const {
-  print(llvm::errs(), shouldShowColors());
+  print(llvm::errs());
   llvm::errs() << '\n';
 }
 
 void TranslationUnit::dump() const {
-  PrintDecl(llvm::errs(), 0, shouldShowColors()).visitTranslationUnit(this);
+  PrintDecl(llvm::errs(), 0).visitTranslationUnit(this);
   llvm::errs() << '\n';
 }
