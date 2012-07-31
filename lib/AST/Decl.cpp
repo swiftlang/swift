@@ -20,6 +20,8 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
@@ -607,6 +609,14 @@ SourceRange DestructorDecl::getSourceRange() const {
 //  Decl printing.
 //===----------------------------------------------------------------------===//
 
+#define DEF_COLOR(NAME, COLOR)\
+llvm::raw_ostream::Colors NAME##Color = llvm::raw_ostream::COLOR;
+
+DEF_COLOR(Func, YELLOW)
+DEF_COLOR(Extension, MAGENTA)
+
+#undef DEF_COLOR
+
 namespace {
   class PrintPattern : public PatternVisitor<PrintPattern> {
   public:
@@ -645,11 +655,12 @@ namespace {
   public:
     raw_ostream &OS;
     unsigned Indent;
+    bool ShowColors;
     
-    PrintDecl(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) {
-    }
+    PrintDecl(raw_ostream &os, unsigned indent, bool ShowColors)
+      : OS(os), Indent(indent), ShowColors(ShowColors) {}
     
-    void printRec(Decl *D) { D->print(OS, Indent+2); }
+    void printRec(Decl *D) { D->print(OS, Indent+2, ShowColors); }
     void printRec(Expr *E) { E->print(OS, Indent+2); }
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
 
@@ -674,8 +685,23 @@ namespace {
       OS << '>';
     }
 
-    void printCommon(Decl *D, const char *Name) {
-      OS.indent(Indent) << "(" << Name;
+    void printCommon(Decl *D, const char *Name,
+                     llvm::Optional<llvm::raw_ostream::Colors> Color =
+                      llvm::Optional<llvm::raw_ostream::Colors>()) {
+      OS.indent(Indent) << '(';
+
+      // Support optional color output.
+      if (ShowColors && Color.hasValue()) {
+        if (const char *CStr =
+            llvm::sys::Process::OutputColor(Color.getValue(), false, false)) {
+          OS << CStr;
+        }
+      }
+
+      OS << Name;
+
+      if (ShowColors)
+        OS << llvm::sys::Process::ResetColor();
     }
 
     void printInherited(ArrayRef<TypeLoc> Inherited) {
@@ -702,7 +728,7 @@ namespace {
     }
 
     void visitExtensionDecl(ExtensionDecl *ED) {
-      printCommon(ED, "extension_decl");
+      printCommon(ED, "extension_decl", ExtensionColor);
       OS << ' ';
       ED->getExtendedType()->print(OS);
       printInherited(ED->getInherited());
@@ -775,13 +801,13 @@ namespace {
         if (FuncDecl *Get = VD->getGetter()) {
           OS << "\n";
           OS.indent(Indent + 2);
-          OS << "get = ";
+          OS << "get =";
           printRec(Get);
         }
         if (FuncDecl *Set = VD->getSetter()) {
           OS << "\n";
           OS.indent(Indent + 2);
-          OS << "set = ";
+          OS << "set =";
           printRec(Set);
         }
       }
@@ -789,7 +815,7 @@ namespace {
     }
     
     void visitFuncDecl(FuncDecl *FD) {
-      printCommon(FD, "func_decl");
+      printCommon(FD, "func_decl", FuncColor);
       OS << '\n';
       printRec(FD->getBody());
       OS << ')';
@@ -860,7 +886,7 @@ namespace {
     }
 
     void visitConstructorDecl(ConstructorDecl *CD) {
-      printCommon(CD, "constructor_decl");
+      printCommon(CD, "constructor_decl", FuncColor);
       OS << '\n';
       if (CD->getBody())
         printRec(CD->getBody());
@@ -889,18 +915,20 @@ namespace {
   };
 } // end anonymous namespace.
 
+static bool shouldShowColors() {
+  return llvm::errs().is_displayed() && llvm::outs().is_displayed();
+}
 
-
-void Decl::print(raw_ostream &OS, unsigned Indent) const {
-  PrintDecl(OS, Indent).visit(const_cast<Decl*>(this));
+void Decl::print(raw_ostream &OS, unsigned Indent, bool ShowColors) const {
+  PrintDecl(OS, Indent, ShowColors).visit(const_cast<Decl*>(this));
 }
 
 void Decl::dump() const {
-  print(llvm::errs());
+  print(llvm::errs(), shouldShowColors());
   llvm::errs() << '\n';
 }
 
 void TranslationUnit::dump() const {
-  PrintDecl(llvm::errs(), 0).visitTranslationUnit(this);
+  PrintDecl(llvm::errs(), 0, shouldShowColors()).visitTranslationUnit(this);
   llvm::errs() << '\n';
 }

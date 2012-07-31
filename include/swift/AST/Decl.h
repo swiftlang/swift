@@ -126,7 +126,8 @@ public:
   SourceRange getSourceRange() const;
 
   void dump() const;
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
+  void print(raw_ostream &OS, unsigned Indent = 0,
+             bool ShowColors = false) const;
 
   bool walk(ASTWalker &walker);
 
