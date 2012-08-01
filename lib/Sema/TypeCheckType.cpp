@@ -281,6 +281,18 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
           // FIXME: Diagnostic if applying the arguments fails?
         } else {
           Ty = TD->getDeclaredType();
+
+          // If we're referencing a nominal type that is in a generic context,
+          // we need to consider our base type a well.
+          // FIXME: NameAliasTypes need to be substituted through as well.
+          // FIXME: Also deal with unbound and bound generic types.
+          if (auto nominalD = dyn_cast<NominalTypeDecl>(TD)) {
+            if (BaseTy &&
+                !nominalD->getGenericParams() &&
+                nominalD->getDeclContext()->getGenericParamsOfContext()) {
+              Ty = NominalType::get(nominalD, BaseTy, Context);
+            }
+          }
         }
         if (Ty) {
           // FIXME: Refactor this to avoid fake TypeLoc

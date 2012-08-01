@@ -662,13 +662,28 @@ class NominalType : public TypeBase {
   /// specifies the name and other useful information about this type.
   NominalTypeDecl * const TheDecl;
 
+  /// \brief The type of the parent, in which this type is nested.
+  Type Parent;
+
 protected:
-  NominalType(TypeKind K, ASTContext *C, NominalTypeDecl *TheDecl)
-    : TypeBase(K, C, /*Unresolved=*/false), TheDecl(TheDecl) { }
+  NominalType(TypeKind K, ASTContext *C, NominalTypeDecl *TheDecl,
+              Type Parent)
+    : TypeBase(K, C, /*Unresolved=*/false), TheDecl(TheDecl), Parent(Parent) { }
 
 public:
+  static NominalType *get(NominalTypeDecl *D, Type Parent, ASTContext &C);
+
   /// \brief Returns the declaration that declares this type.
   NominalTypeDecl *getDecl() const { return TheDecl; }
+
+  /// \brief Returns the type of the parent of this type. This will
+  /// be null for top-level types or local types, and for non-generic types
+  /// will simply be the same as the declared type of the declaration context
+  /// of TheDecl. For types nested within generic types, however, this will
+  /// involve \c BoundGenericType nodes that provide context for the nested
+  /// type, e.g., the type Dictionary<String, Int>.ItemRange would be
+  /// represented as a NominalType with 
+  Type getParent() const { return Parent; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const NominalType *) { return true; }
@@ -679,36 +694,53 @@ public:
 };
 
 /// OneOfType - This represents the type declared by a OneOfDecl.
-class OneOfType : public NominalType {
+class OneOfType : public NominalType, public llvm::FoldingSetNode {
 public:
   /// getDecl() - Returns the decl which declares this type.
   OneOfDecl *getDecl() const {
     return reinterpret_cast<OneOfDecl *>(NominalType::getDecl());
   }
 
+  /// \brief Retrieve the type when we're referencing the given oneof
+  /// declaration in the parent type \c Parent.
+  static OneOfType *get(OneOfDecl *D, Type Parent, ASTContext &C);
+
   void print(raw_ostream &O) const;
-  
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getDecl(), getParent());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, OneOfDecl *D, Type Parent);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OneOfType *D) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OneOf;
   }
-  
+
 private:
-  OneOfType(OneOfDecl *TheDecl, ASTContext &Ctx);
-  friend class OneOfDecl;
+  OneOfType(OneOfDecl *TheDecl, Type Parent, ASTContext &Ctx);
 };
 
 /// StructType - This represents the type declared by a StructDecl.
-class StructType : public NominalType {  
+class StructType : public NominalType, public llvm::FoldingSetNode {  
 public:
   /// getDecl() - Returns the decl which declares this type.
   StructDecl *getDecl() const {
     return reinterpret_cast<StructDecl *>(NominalType::getDecl());
   }
 
+  /// \brief Retrieve the type when we're referencing the given struct
+  /// declaration in the parent type \c Parent.
+  static StructType *get(StructDecl *D, Type Parent, ASTContext &C);
+
   void print(raw_ostream &O) const;
-  
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getDecl(), getParent());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, StructDecl *D, Type Parent);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const StructType *D) { return true; }
   static bool classof(const TypeBase *T) {
@@ -716,20 +748,28 @@ public:
   }
   
 private:
-  StructType(StructDecl *TheDecl, ASTContext &Ctx);
-  friend class StructDecl;
+  StructType(StructDecl *TheDecl, Type Parent, ASTContext &Ctx);
 };
 
 /// ClassType - This represents the type declared by a ClassDecl.
-class ClassType : public NominalType {  
+class ClassType : public NominalType, public llvm::FoldingSetNode {  
 public:
   /// getDecl() - Returns the decl which declares this type.
   ClassDecl *getDecl() const {
     return reinterpret_cast<ClassDecl *>(NominalType::getDecl());
   }
 
+  /// \brief Retrieve the type when we're referencing the given class
+  /// declaration in the parent type \c Parent.
+  static ClassType *get(ClassDecl *D, Type Parent, ASTContext &C);
+
   void print(raw_ostream &O) const;
-  
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getDecl(), getParent());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, ClassDecl *D, Type Parent);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ClassType *D) { return true; }
   static bool classof(const TypeBase *T) {
@@ -737,8 +777,7 @@ public:
   }
   
 private:
-  ClassType(ClassDecl *TheDecl, ASTContext &Ctx);
-  friend class ClassDecl;
+  ClassType(ClassDecl *TheDecl, Type Parent, ASTContext &Ctx);
 };
 
 /// MetaTypeType - This is the type given to a metatype value.  When a type is

@@ -354,7 +354,7 @@ OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
   // Compute the associated type for this OneOfDecl.
   ASTContext &Ctx = Parent->getASTContext();
   if (!GenericParams)
-    DeclaredTy = new (Ctx) OneOfType(this, Ctx);
+    DeclaredTy = OneOfType::get(this, Type(), Ctx);
   else
     DeclaredTy = new (Ctx) UnboundGenericType(this, Ctx);
   // Set the type of the OneOfDecl to the right MetaTypeType.
@@ -369,7 +369,7 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
   // Compute the associated type for this StructDecl.
   ASTContext &Ctx = Parent->getASTContext();
   if (!GenericParams)
-    DeclaredTy = new (Ctx) StructType(this, Ctx);
+    DeclaredTy = StructType::get(this, Type(), Ctx);
   else
     DeclaredTy = new (Ctx) UnboundGenericType(this, Ctx);
   // Set the type of the StructDecl to the right MetaTypeType.
@@ -384,7 +384,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   // Compute the associated type for this ClassDecl.
   ASTContext &Ctx = Parent->getASTContext();
   if (!GenericParams)
-    DeclaredTy = new (Ctx) ClassType(this, Ctx);
+    DeclaredTy = ClassType::get(this, Type(), Ctx);
   else
     DeclaredTy = new (Ctx) UnboundGenericType(this, Ctx);
   // Set the type of the ClassDecl to the right MetaTypeType.

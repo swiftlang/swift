@@ -42,6 +42,10 @@ struct ASTContext::Implementation {
   llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
     LValueTypes;
   llvm::DenseMap<std::pair<Type, Type>, SubstitutedType *> SubstitutedTypes;
+
+  llvm::FoldingSet<OneOfType> OneOfTypes;
+  llvm::FoldingSet<StructType> StructTypes;
+  llvm::FoldingSet<ClassType> ClassTypes;
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
 };
@@ -225,14 +229,99 @@ BoundGenericType* BoundGenericType::get(NominalTypeDecl *TheDecl,
   return New;
 }
 
-OneOfType::OneOfType(OneOfDecl *TheDecl, ASTContext &C)
-  : NominalType(TypeKind::OneOf, &C, TheDecl) { }
+NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, ASTContext &C) {
+  switch (D->getKind()) {
+  case DeclKind::OneOf:
+    return OneOfType::get(cast<OneOfDecl>(D), Parent, C);
+  case DeclKind::Struct:
+    return StructType::get(cast<StructDecl>(D), Parent, C);
+  case DeclKind::Class:
+    return ClassType::get(cast<ClassDecl>(D), Parent, C);
+  case DeclKind::Protocol:
+    return D->getDeclaredType()->castTo<ProtocolType>();
 
-StructType::StructType(StructDecl *TheDecl, ASTContext &C)
-  : NominalType(TypeKind::Struct, &C, TheDecl) { }
+  default:
+    llvm_unreachable("Not a nominal declaration!");
+  }
+}
 
-ClassType::ClassType(ClassDecl *TheDecl, ASTContext &C)
-  : NominalType(TypeKind::Class, &C, TheDecl) { }
+OneOfType::OneOfType(OneOfDecl *TheDecl, Type Parent, ASTContext &C)
+  : NominalType(TypeKind::OneOf, &C, TheDecl, Parent) { }
+
+OneOfType *OneOfType::get(OneOfDecl *D, Type Parent, ASTContext &C) {
+  if (Parent) {
+    assert(D->getDeclContext()->getGenericParamsOfContext());
+    Parent = Parent->getCanonicalType();
+  }
+
+  llvm::FoldingSetNodeID id;
+  BoundGenericType::Profile(id, D,Parent);
+
+  void *insertPos = 0;
+  if (auto oneOfTy = C.Impl.OneOfTypes.FindNodeOrInsertPos(id, insertPos))
+    return oneOfTy;
+
+  auto oneOfTy = new (C) OneOfType(D, Parent, C);
+  C.Impl.OneOfTypes.InsertNode(oneOfTy, insertPos);
+  return oneOfTy;
+}
+
+void OneOfType::Profile(llvm::FoldingSetNodeID &ID, OneOfDecl *D, Type Parent) {
+  ID.AddPointer(D);
+  ID.AddPointer(Parent.getPointer());
+}
+
+StructType::StructType(StructDecl *TheDecl, Type Parent, ASTContext &C)
+  : NominalType(TypeKind::Struct, &C, TheDecl, Parent) { }
+
+StructType *StructType::get(StructDecl *D, Type Parent, ASTContext &C) {
+  if (Parent) {
+    assert(D->getDeclContext()->getGenericParamsOfContext());
+    Parent = Parent->getCanonicalType();
+  }
+
+  llvm::FoldingSetNodeID id;
+  BoundGenericType::Profile(id, D,Parent);
+
+  void *insertPos = 0;
+  if (auto structTy = C.Impl.StructTypes.FindNodeOrInsertPos(id, insertPos))
+    return structTy;
+
+  auto structTy = new (C) StructType(D, Parent, C);
+  C.Impl.StructTypes.InsertNode(structTy, insertPos);
+  return structTy;
+}
+
+void StructType::Profile(llvm::FoldingSetNodeID &ID, StructDecl *D, Type Parent) {
+  ID.AddPointer(D);
+  ID.AddPointer(Parent.getPointer());
+}
+
+ClassType::ClassType(ClassDecl *TheDecl, Type Parent, ASTContext &C)
+  : NominalType(TypeKind::Class, &C, TheDecl, Parent) { }
+
+ClassType *ClassType::get(ClassDecl *D, Type Parent, ASTContext &C) {
+  if (Parent) {
+    assert(D->getDeclContext()->getGenericParamsOfContext());
+    Parent = Parent->getCanonicalType();
+  }
+
+  llvm::FoldingSetNodeID id;
+  BoundGenericType::Profile(id, D,Parent);
+
+  void *insertPos = 0;
+  if (auto classTy = C.Impl.ClassTypes.FindNodeOrInsertPos(id, insertPos))
+    return classTy;
+
+  auto classTy = new (C) ClassType(D, Parent, C);
+  C.Impl.ClassTypes.InsertNode(classTy, insertPos);
+  return classTy;
+}
+
+void ClassType::Profile(llvm::FoldingSetNodeID &ID, ClassDecl *D, Type Parent) {
+  ID.AddPointer(D);
+  ID.AddPointer(Parent.getPointer());
+}
 
 IdentifierType *IdentifierType::getNew(ASTContext &C,
                                        MutableArrayRef<Component> Components) {
@@ -354,7 +443,7 @@ ArraySliceType *ArraySliceType::get(Type base, ASTContext &C) {
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, ASTContext &Ctx)
-  : NominalType(TypeKind::Protocol, &Ctx, TheDecl) { }
+  : NominalType(TypeKind::Protocol, &Ctx, TheDecl, /*Parent=*/Type()) { }
 
 LValueType *LValueType::get(Type objectTy, Qual quals, ASTContext &C) {
   auto key = std::make_pair(objectTy, quals.getOpaqueData());

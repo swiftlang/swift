@@ -1074,14 +1074,29 @@ void BoundGenericType::print(raw_ostream &OS) const {
 }
 
 void StructType::print(raw_ostream &OS) const {
+  if (auto parent = getParent()) {
+    parent.print(OS);
+    OS << ".";
+  }
+
   OS << getDecl()->getName().get();
 }
 
 void ClassType::print(raw_ostream &OS) const {
+  if (auto parent = getParent()) {
+    parent.print(OS);
+    OS << ".";
+  }
+
   OS << getDecl()->getName().get();
 }
 
 void OneOfType::print(raw_ostream &OS) const {
+  if (auto parent = getParent()) {
+    parent.print(OS);
+    OS << ".";
+  }
+
   OS << getDecl()->getName().get();
 }
 
