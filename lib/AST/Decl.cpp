@@ -52,6 +52,70 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   }
 }
 
+GenericParamList *DeclContext::getGenericParamsOfContext() const {
+  switch (getContextKind()) {
+    case DeclContextKind::BuiltinModule:
+    case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::TranslationUnit:
+      return nullptr;
+
+    case DeclContextKind::CapturingExpr: {
+      if (auto funcE = dyn_cast<FuncExpr>(this)) {
+        if (auto funcD = funcE->getDecl()) {
+          if (auto gp = funcD->getGenericParams()) {
+            return gp;
+          }
+
+          return funcD->getDeclContext()->getGenericParamsOfContext();
+        }
+      }
+
+      return nullptr;
+    }
+      
+    case DeclContextKind::ConstructorDecl: {
+      auto constructor = cast<ConstructorDecl>(this);
+      if (auto gp = constructor->getGenericParams())
+        return gp;
+
+      return constructor->getDeclContext()->getGenericParamsOfContext();
+    }
+
+    case DeclContextKind::DestructorDecl:
+      return cast<DestructorDecl>(this)->getDeclContext()
+               ->getGenericParamsOfContext();
+
+    case DeclContextKind::NominalTypeDecl: {
+      auto nominal = cast<NominalTypeDecl>(this);
+      if (auto gp = nominal->getGenericParams())
+        return gp;
+
+      return nominal->getDeclContext()->getGenericParamsOfContext();
+    }
+
+    case DeclContextKind::ExtensionDecl: {
+      auto extension = cast<ExtensionDecl>(this);
+      auto extendedType = extension->getExtendedType();
+      if (auto unbound = extendedType->getAs<UnboundGenericType>()) {
+        return unbound->getDecl()->getGenericParams();
+      }
+      if (auto nominalTy = extendedType->getAs<NominalType>()) {
+        auto nominalDecl = nominalTy->getDecl();
+        if (auto gp = nominalDecl->getGenericParams())
+          return gp;
+        return nominalDecl->getDeclContext()->getGenericParamsOfContext();
+      }
+
+      // FIXME: Eventually, extensions will be able to have their own
+      // generic parameters.
+
+      return nullptr;
+    }
+  }
+
+  llvm_unreachable("Unhandled declaration context kind");
+}
+
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *Decl::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) {
@@ -490,6 +554,8 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
 
     if (OuterGenericParams)
       *OuterGenericParams = D->getGenericParams();
+  } else if (OuterGenericParams) {
+    *OuterGenericParams = getDeclContext()->getGenericParamsOfContext();
   }
 
   // 'static' functions have 'this' of type metatype<T>.
@@ -567,7 +633,7 @@ ConstructorDecl::computeThisType(GenericParamList **OuterGenericParams) const {
     if (OuterGenericParams)
       *OuterGenericParams = D->getGenericParams();
   } else if (OuterGenericParams) {
-    *OuterGenericParams = nullptr;
+    *OuterGenericParams = getDeclContext()->getGenericParamsOfContext();
   }
 
   return ContainerType;
@@ -595,7 +661,7 @@ DestructorDecl::computeThisType(GenericParamList **OuterGenericParams) const {
     if (OuterGenericParams)
       *OuterGenericParams = D->getGenericParams();
   } else if (OuterGenericParams) {
-    *OuterGenericParams = nullptr;
+    *OuterGenericParams = getDeclContext()->getGenericParamsOfContext();
   }
 
   return ContainerType;

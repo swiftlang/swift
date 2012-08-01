@@ -25,6 +25,7 @@
 namespace swift {
   class ASTContext;
   class DeclContext;
+  class GenericParamList;
   class Type;
 }
 
@@ -107,7 +108,12 @@ public:
   /// getDeclaredTypeOfContext - For a type context, retrieves the declared
   /// type of the context. Returns a null type for non-type contexts.
   Type getDeclaredTypeOfContext() const;
-  
+
+  /// \brief Retrieve the innermost generic parameters introduced by this
+  /// context or one of its parent contexts, or null if this context is not
+  /// directly dependent on any generic parameters.
+  GenericParamList *getGenericParamsOfContext() const;
+
   /// Returns the semantic parent of this context.  A context has a
   /// parent if and only if it is not a module context.
   DeclContext *getParent() const {

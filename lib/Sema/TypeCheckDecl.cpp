@@ -22,6 +22,7 @@
 using namespace swift;
 
 namespace {
+
 class DeclChecker : public DeclVisitor<DeclChecker> {
   
 public:
@@ -318,10 +319,10 @@ public:
       TupleType *TT = TupleType::get(TupleElts, TC.Context);
 
       Type CreateTy;
-      if (SD->getGenericParams())
+      if (auto gp = SD->getGenericParamsOfContext())
         CreateTy = PolymorphicFunctionType::get(TT,
                                                 SD->getDeclaredTypeInContext(),
-                                                SD->getGenericParams(),
+                                                gp,
                                                 TC.Context);
       else
         CreateTy = FunctionType::get(TT, SD->getDeclaredTypeInContext(),
@@ -437,10 +438,8 @@ public:
     if (ED->getArgumentType().isNull()) {
       Type argTy = MetaTypeType::get(ElemTy, TC.Context);
       Type fnTy;
-      if (OOD->getGenericParams())
-        fnTy = PolymorphicFunctionType::get(argTy, ElemTy,
-                                            OOD->getGenericParams(),
-                                            TC.Context);
+      if (auto gp = OOD->getGenericParamsOfContext())
+        fnTy = PolymorphicFunctionType::get(argTy, ElemTy, gp, TC.Context);
       else
         fnTy = FunctionType::get(argTy, ElemTy, TC.Context);
       ED->setType(fnTy);
@@ -453,10 +452,9 @@ public:
       return;
 
     Type fnTy = FunctionType::get(ED->getArgumentType(), ElemTy, TC.Context);
-    if (OOD->getGenericParams())
+    if (auto gp = OOD->getGenericParamsOfContext())
       fnTy = PolymorphicFunctionType::get(MetaTypeType::get(ElemTy, TC.Context),
-                                          fnTy, OOD->getGenericParams(),
-                                          TC.Context);
+                                          fnTy, gp, TC.Context);
     else
       fnTy = FunctionType::get(MetaTypeType::get(ElemTy, TC.Context), fnTy,
                                TC.Context);
