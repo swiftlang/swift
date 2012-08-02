@@ -41,6 +41,7 @@
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenFunc.h"
+#include "GenHeap.h"
 #include "GenType.h"
 #include "IndirectTypeInfo.h"
 #include "IRGenFunction.h"
@@ -841,21 +842,6 @@ namespace {
     }
   };
 
-  class ArchetypeProtocolEntry : public ProtocolEntry {
-    mutable llvm::Value *WTable = nullptr;
-  public:
-    ArchetypeProtocolEntry(const ProtocolEntry &entry)
-      : ProtocolEntry(entry) {}
-
-    llvm::Value *getWitnessTable() const {
-      assert(WTable && "witness table not set!");
-      return WTable;
-    }
-    void setWitnessTable(llvm::Value *wtable) const {
-      WTable = wtable;
-    }
-  };
-
   /// A type implementation for an ArchetypeType, otherwise known as a
   /// type variable: for example, This in a protocol declaration, or T
   /// in a generic declaration like foo<T>(x : T) -> T.  The critical
@@ -872,18 +858,18 @@ namespace {
     /// The number of protocols that this archetype ascribes to.
     unsigned NumProtocols;
 
-    ArchetypeProtocolEntry *getProtocolsBuffer() {
-      return reinterpret_cast<ArchetypeProtocolEntry*>(this + 1);
+    ProtocolEntry *getProtocolsBuffer() {
+      return reinterpret_cast<ProtocolEntry*>(this + 1);
     }
-    const ArchetypeProtocolEntry *getProtocolsBuffer() const {
-      return reinterpret_cast<const ArchetypeProtocolEntry*>(this + 1);
+    const ProtocolEntry *getProtocolsBuffer() const {
+      return reinterpret_cast<const ProtocolEntry*>(this + 1);
     }
 
     ArchetypeTypeInfo(llvm::Type *type, ArrayRef<ProtocolEntry> protocols)
       : IndirectTypeInfo(type, Size(1), Alignment(1), IsNotPOD),
         NumProtocols(protocols.size()) {
       for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-        new (&getProtocolsBuffer()[i]) ArchetypeProtocolEntry(protocols[i]);
+        new (&getProtocolsBuffer()[i]) ProtocolEntry(protocols[i]);
       }
     }
 
@@ -892,28 +878,25 @@ namespace {
                                            ArrayRef<ProtocolEntry> protocols) {
       void *buffer =
         operator new(sizeof(ArchetypeTypeInfo) +
-                     protocols.size() * sizeof(ArchetypeProtocolEntry));
+                     protocols.size() * sizeof(ProtocolEntry));
       return new (buffer) ArchetypeTypeInfo(type, protocols);
     }
 
-    ArrayRef<ArchetypeProtocolEntry> getProtocols() const {
+    ArrayRef<ProtocolEntry> getProtocols() const {
       return llvm::makeArrayRef(getProtocolsBuffer(), NumProtocols);
     }
 
     /// Return the witness table that's been set for this type.
     llvm::Value *getWitnessTable(IRGenFunction &IGF, unsigned which) const {
-      return getProtocols()[which].getWitnessTable();
+      return IGF.ArchetypeValueWitnessMap[std::make_pair(this, which)];
     }
-    void setWitnessTable(unsigned which, llvm::Value *wtable) const {
-      getProtocols()[which].setWitnessTable(wtable);
+    void setWitnessTable(IRGenFunction &IGF, unsigned which,
+                         llvm::Value *wtable) const {
+      IGF.ArchetypeValueWitnessMap[std::make_pair(this, which)] = wtable;
     }
 
     llvm::Value *getValueWitnessTable(IRGenFunction &IGF) const {
-      assert(ValueWTable && "value witness table not set!");
-      return ValueWTable;
-    }
-    void setValueWitnessTable(llvm::Value *wtable) const {
-      ValueWTable = wtable;
+      return IGF.ArchetypeValueWitnessMap[std::make_pair(this, 0U)];
     }
 
     /// Create an uninitialized archetype object.
@@ -921,9 +904,28 @@ namespace {
                           InitializedObject object, OnHeap_t onHeap,
                           const llvm::Twine &name) const {
       if (onHeap) {
-        IGF.IGM.unimplemented(SourceLoc(),
-                              "on-heap emission of archetype object");
-        // Just fall into the NotOnHeap path.
+        // Lay out the type as a heap object.
+        HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, this);
+        assert(!layout.empty() && "non-empty type had empty layout?");
+        auto &elt = layout.getElements()[0];
+
+        // Allocate a new object.
+        // TODO: lifetime intrinsics?
+        llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout,
+                                                         name + ".alloc");
+
+        // Cast and GEP down to the element.
+        Address rawAddr = layout.emitCastOfAlloc(IGF, allocation);
+        rawAddr = elt.project(IGF, rawAddr, name);
+
+        // Push a cleanup to dealloc the allocation.
+        // FIXME: don't emit the size twice!
+        CleanupsDepth deallocCleanup
+          = IGF.pushDeallocCleanup(allocation, layout.emitSize(IGF));
+
+        OwnedAddress addr(rawAddr, allocation);
+        init.markAllocated(IGF, object, addr, deallocCleanup);
+        return addr;
       }
 
       // Make a fixed-size buffer.
@@ -2531,9 +2533,12 @@ void IRGenFunction::bindArchetype(ArchetypeType *type,
                                   ArrayRef<llvm::Value*> wtables) {
   assert(wtables.size() >= 1);
   auto &ti = getFragileTypeInfo(type).as<ArchetypeTypeInfo>();
-  ti.setValueWitnessTable(wtables[0]);
-  for (unsigned i = 0, e = ti.getProtocols().size(); i != e; ++i)
-    ti.setWitnessTable(i, wtables[i]);
+  if (ti.getProtocols().empty()) {
+    ti.setWitnessTable(*this, 0, wtables[0]);
+  } else {
+    for (unsigned i = 0, e = ti.getProtocols().size(); i != e; ++i)
+      ti.setWitnessTable(*this, i, wtables[i]);
+  }
 }
 
 /// Perform all the bindings necessary to emit the given declaration.
@@ -2558,7 +2563,7 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
     if (protocols.empty()) {
       llvm::Value *wtable = in.claimUnmanagedNext();
       wtable->setName(archetype->getFullName());
-      archetypeTI.setValueWitnessTable(wtable);
+      archetypeTI.setWitnessTable(IGF, 0, wtable);
       continue;
     }
 
@@ -2567,9 +2572,48 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
       llvm::Value *wtable = in.claimUnmanagedNext();
       wtable->setName(Twine(archetype->getFullName()) + "." +
                         protocols[i].getProtocol()->getName().str());
-      if (i == 0) archetypeTI.setValueWitnessTable(wtable);
-      archetypeTI.setWitnessTable(i, wtable);
+      archetypeTI.setWitnessTable(IGF, i, wtable);
     }
+  }
+}
+
+void irgen::getValueWitnessTableElements(Type T,
+                                      llvm::SetVector<ArchetypeType*> &types) {
+  // We need a value witness table for T
+  if (auto archetype = T->getAs<ArchetypeType>()) {
+    types.insert(archetype);
+    return;
+  }
+
+  // In (T, U). we need witness tables for T and U
+  if (auto tuple = T->getAs<TupleType>()) {
+    for (auto element : tuple->getFields())
+      getValueWitnessTableElements(element.getType(), types);
+    return;
+  }
+
+  // FIXME: For X<T>, we need a witness table for T if X is a struct or oneof.
+}
+
+void irgen::getValueWitnessTables(IRGenFunction &IGF,
+                                  ArrayRef<ArchetypeType*> archetypes,
+                                  Explosion &tables) {
+  for (auto archetype : archetypes) {
+    auto &archetypeTI =
+      IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
+    tables.addUnmanaged(archetypeTI.getValueWitnessTable(IGF));
+  }
+}
+
+void irgen::setValueWitnessTables(IRGenFunction &IGF,
+                                  ArrayRef<ArchetypeType*> archetypes,
+                                  Explosion &tables) {
+  for (auto archetype : archetypes) {
+    auto &archetypeTI =
+      IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
+    llvm::Value *wtable = tables.claimUnmanagedNext();
+    wtable->setName(archetype->getFullName());
+    archetypeTI.setWitnessTable(IGF, 0, wtable);
   }
 }
 

@@ -282,7 +282,7 @@ void swift::irgen::emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
           IGF.getFragileTypeInfo(outerField.getVarargBaseTy());
 
       Expr *init = nullptr;
-      ArrayHeapLayout layout(IGF.IGM, elementTI);
+      ArrayHeapLayout layout(IGF, outerField.getVarargBaseTy());
 
       // Allocate the array.
       // FIXME: This includes an unnecessary memset.

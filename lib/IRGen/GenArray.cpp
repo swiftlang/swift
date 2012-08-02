@@ -106,10 +106,8 @@ void swift::irgen::emitNewArrayExpr(IRGenFunction &IGF, NewArrayExpr *E,
     length = bounds.claimUnmanagedNext();
   }
 
-  const TypeInfo &elementTI = IGF.getFragileTypeInfo(E->getElementType());
-
   Expr *init = nullptr;
-  ArrayHeapLayout layout(IGF.IGM, elementTI);
+  ArrayHeapLayout layout(IGF, E->getElementType());
 
   Address begin;
   ManagedValue alloc =

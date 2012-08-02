@@ -17,11 +17,14 @@
 #ifndef SWIFT_IRGEN_GENPROTO_H
 #define SWIFT_IRGEN_GENPROTO_H
 
+#include <llvm/ADT/SetVector.h>
+
 namespace llvm {
   class Type;
 }
 
 namespace swift {
+  class ArchetypeMemberRefExpr;
   class ErasureExpr;
   class ExistentialMemberRefExpr;
   class FuncDecl;
@@ -94,6 +97,14 @@ namespace irgen {
                                 ArrayRef<Substitution> subs,
                                 Explosion &args);
 
+  void getValueWitnessTableElements(Type T,
+                                  llvm::SetVector<ArchetypeType*> &archetypes);
+  void getValueWitnessTables(IRGenFunction &IGF,
+                             ArrayRef<ArchetypeType*> archetypes,
+                             Explosion &tables);
+  void setValueWitnessTables(IRGenFunction &IGF,
+                             ArrayRef<ArchetypeType*> archetypes,
+                             Explosion &tables);
 
 } // end namespace irgen
 } // end namespace swift

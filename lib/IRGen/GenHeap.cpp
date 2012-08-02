@@ -24,6 +24,7 @@
 
 #include "Cleanup.h"
 #include "Explosion.h"
+#include "GenProto.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -127,27 +128,31 @@ llvm::Constant *HeapLayout::getPrivateMetadata(IRGenModule &IGM) const {
 }
 
 /// Lay out an array on the heap.
-ArrayHeapLayout::ArrayHeapLayout(IRGenModule &IGM, const TypeInfo &elementTI)
-  : ElementTI(elementTI) {
+ArrayHeapLayout::ArrayHeapLayout(IRGenFunction &IGF, Type T)
+  : ElementTI(IGF.getFragileTypeInfo(T)) {
 
   // Add the heap header.
   Size size(0);
   Alignment align(1);
   SmallVector<llvm::Type*, 4> fields;
-  addHeapHeaderToLayout(IGM, size, align, fields);
+  addHeapHeaderToLayout(IGF.IGM, size, align, fields);
   assert((size % align).isZero());
-  assert(align >= IGM.getPointerAlignment());
+  assert(align >= IGF.IGM.getPointerAlignment());
 
   // Add the length field.
-  size += IGM.getPointerSize();
+  size += IGF.IGM.getPointerSize();
+
+  // Add value witness tables.
+  getValueWitnessTableElements(T, WitnessTypes);
+  size += IGF.IGM.getPointerSize() * WitnessTypes.size();
 
   // Update the required alignment.
-  if (elementTI.StorageAlignment > align)
-    align = elementTI.StorageAlignment;
+  if (ElementTI.StorageAlignment > align)
+    align = ElementTI.StorageAlignment;
 
   // Round the size up to the alignment of the element type.
   // FIXME: resilient types.
-  size = size.roundUpToAlignment(elementTI.StorageAlignment);
+  size = size.roundUpToAlignment(ElementTI.StorageAlignment);
 
   HeaderSize = size;
   Align = align;
@@ -156,7 +161,8 @@ ArrayHeapLayout::ArrayHeapLayout(IRGenModule &IGM, const TypeInfo &elementTI)
 /// Destroy all the elements of an array.
 static void emitArrayDestroy(IRGenFunction &IGF,
                              llvm::Value *begin, llvm::Value *end,
-                             const TypeInfo &elementTI) {
+                             const TypeInfo &elementTI,
+                             llvm::Value *elementSize) {
   assert(!elementTI.isPOD(ResilienceScope::Local));
 
   llvm::BasicBlock *endBB = IGF.createBasicBlock("end");
@@ -178,8 +184,15 @@ static void emitArrayDestroy(IRGenFunction &IGF,
 
   // 'prev' points one past the end of the valid array; make something
   // that points at the end.
-  llvm::Value *cur =
-    IGF.Builder.CreateInBoundsGEP(prev, getSizeMax(IGF), "cur");
+  llvm::Value *cur;
+  if (elementTI.StorageType->isSized()) {
+    cur = IGF.Builder.CreateInBoundsGEP(prev, getSizeMax(IGF), "cur");
+  } else {
+    cur = IGF.Builder.CreateBitCast(prev, IGF.IGM.Int8PtrTy);
+    llvm::Value *strideBytes = IGF.Builder.CreateNeg(elementSize);
+    cur = IGF.Builder.CreateInBoundsGEP(cur, strideBytes);
+    cur = IGF.Builder.CreateBitCast(cur, prev->getType());
+  }
 
   // Destroy this element.
   elementTI.destroy(IGF, Address(cur, elementTI.StorageAlignment));
@@ -193,15 +206,34 @@ static void emitArrayDestroy(IRGenFunction &IGF,
   IGF.Builder.emitBlock(endBB);
 }
 
+static void
+loadValueWitnessTables(IRGenFunction &IGF,
+                       llvm::Value *header,
+                       const llvm::SetVector<ArchetypeType*> &witnessTypes) {
+  if (witnessTypes.empty())
+    return;
+
+  Explosion tables(ExplosionKind::Maximal);
+  llvm::Value *tablesPtr = IGF.Builder.CreateConstInBoundsGEP1_32(header, 2);
+  llvm::Type *tablesPtrTy = IGF.IGM.WitnessTablePtrTy->getPointerTo();
+  tablesPtr = IGF.Builder.CreateBitCast(tablesPtr, tablesPtrTy);
+  for (unsigned i = 0, e = witnessTypes.size(); i != e; ++i) {
+    llvm::Value *table = IGF.Builder.CreateConstInBoundsGEP1_32(tablesPtr, i);
+    table = IGF.Builder.CreateLoad(table, IGF.IGM.getPointerAlignment());
+    tables.addUnmanaged(table);
+  }
+  setValueWitnessTables(
+      IGF,
+      llvm::makeArrayRef(&*witnessTypes.begin(), &*witnessTypes.end()),
+      tables);
+}
+
 /// Create the destructor function for an array layout.
 /// TODO: give this some reasonable name and possibly linkage.
-static llvm::Constant *createArrayDtorFn(IRGenModule &IGM,
-                                         const ArrayHeapLayout &layout) {
-  if (!layout.getElementTypeInfo().StorageType->isSized()) {
-    IGM.unimplemented(SourceLoc(), "generic array dtor fn");
-    return llvm::UndefValue::get(IGM.DtorTy->getPointerTo());
-  }
-
+static llvm::Constant *
+createArrayDtorFn(IRGenModule &IGM,
+                  const ArrayHeapLayout &layout,
+                  const llvm::SetVector<ArchetypeType*> &witnessTypes) {
   llvm::Function *fn =
     llvm::Function::Create(IGM.DtorTy, llvm::Function::InternalLinkage,
                            "arraydestroy", &IGM.Module);
@@ -213,10 +245,21 @@ static llvm::Constant *createArrayDtorFn(IRGenModule &IGM,
   Address lengthPtr = layout.getLengthPointer(IGF, header);
   llvm::Value *length = IGF.Builder.CreateLoad(lengthPtr, "length");
 
+  loadValueWitnessTables(IGF, header, witnessTypes);
+
+  llvm::Value *elementSize = layout.getElementTypeInfo().getSizeOnly(IGF);
   if (!layout.getElementTypeInfo().isPOD(ResilienceScope::Local)) {
     llvm::Value *begin = layout.getBeginPointer(IGF, header);
-    llvm::Value *end = IGF.Builder.CreateInBoundsGEP(begin, length, "end");
-    emitArrayDestroy(IGF, begin, end, layout.getElementTypeInfo());
+    llvm::Value *end;
+    if (layout.getElementTypeInfo().StorageType->isSized()) {
+      end = IGF.Builder.CreateInBoundsGEP(begin, length, "end");
+    } else {
+      end = IGF.Builder.CreateBitCast(begin, IGF.IGM.Int8PtrTy);
+      llvm::Value *lengthBytes = IGF.Builder.CreateMul(elementSize, length);
+      end = IGF.Builder.CreateInBoundsGEP(end, lengthBytes);
+      end = IGF.Builder.CreateBitCast(end, begin->getType());
+    }
+    emitArrayDestroy(IGF, begin, end, layout.getElementTypeInfo(), elementSize);
   }
 
   llvm::Value *size = layout.getAllocationSize(IGF, length, false, false);
@@ -227,8 +270,10 @@ static llvm::Constant *createArrayDtorFn(IRGenModule &IGM,
 
 /// Create the size function for an array layout.
 /// TODO: give this some reasonable name and possibly linkage.
-static llvm::Function *createArraySizeFn(IRGenModule &IGM,
-                                         const ArrayHeapLayout &layout) {
+static llvm::Function *
+createArraySizeFn(IRGenModule &IGM,
+                  const ArrayHeapLayout &layout,
+                  const llvm::SetVector<ArchetypeType*> &witnessTypes) {
   llvm::Function *fn =
     llvm::Function::Create(IGM.DtorTy, llvm::Function::InternalLinkage,
                            "arraysize", &IGM.Module);
@@ -240,6 +285,8 @@ static llvm::Function *createArraySizeFn(IRGenModule &IGM,
   Address lengthPtr = layout.getLengthPointer(IGF, header);
   llvm::Value *length = IGF.Builder.CreateLoad(lengthPtr, "length");
 
+  loadValueWitnessTables(IGF, header, witnessTypes);
+
   llvm::Value *size = layout.getAllocationSize(IGF, length, false, false);
   IGF.Builder.CreateRet(size);
 
@@ -248,8 +295,8 @@ static llvm::Function *createArraySizeFn(IRGenModule &IGM,
 
 void ArrayHeapLayout::buildMetadataInto(IRGenModule &IGM,
                       llvm::SmallVectorImpl<llvm::Constant*> &fields) const {
-  fields.push_back(createArrayDtorFn(IGM, *this));
-  fields.push_back(createArraySizeFn(IGM, *this));
+  fields.push_back(createArrayDtorFn(IGM, *this, WitnessTypes));
+  fields.push_back(createArraySizeFn(IGM, *this, WitnessTypes));
 }
 
 llvm::Constant *ArrayHeapLayout::getPrivateMetadata(IRGenModule &IGM) const {
@@ -298,8 +345,8 @@ llvm::Value *ArrayHeapLayout::getAllocationSize(IRGenFunction &IGF,
   // We're computing HeaderSize + length * sizeof(element).
 
   // Easy case: the length is a static constant.
-  // FIXME: don't take this path for resilient element types.
-  if (llvm::ConstantInt *clength = dyn_cast<llvm::ConstantInt>(length)) {
+  llvm::ConstantInt *clength = dyn_cast<llvm::ConstantInt>(length);
+  if (clength && ElementTI.StorageType->isSized()) {
     unsigned sizeWidth = IGF.IGM.SizeTy->getBitWidth();
 
     // Get the length to size_t, making sure it isn't too large.
@@ -368,7 +415,7 @@ llvm::Value *ArrayHeapLayout::getAllocationSize(IRGenFunction &IGF,
   llvm::Value *size = properLength;
 
   // Scale that by the element stride, saturating at SIZE_MAX.
-  llvm::Value *elementStride = getSize(IGF, getElementStride(ElementTI));
+  llvm::Value *elementStride = ElementTI.getSizeOnly(IGF);
   if (canOverflow) {
     size = checkOverflow(IGF, llvm::Intrinsic::umul_with_overflow,
                          size, elementStride);
@@ -381,7 +428,7 @@ llvm::Value *ArrayHeapLayout::getAllocationSize(IRGenFunction &IGF,
     size = checkOverflow(IGF, llvm::Intrinsic::uadd_with_overflow,
                          size, headerSize);
   } else {
-    size = IGF.Builder.CreateAdd(length, headerSize);
+    size = IGF.Builder.CreateAdd(size, headerSize);
   }
 
   return size;

@@ -373,6 +373,12 @@ public:
   void emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem);
 private:
   void emitGlobalDecl(Decl *D);
+
+//--- Type emission ------------------------------------------------------------
+
+public:
+  llvm::DenseMap<std::pair<const void*, unsigned>, llvm::Value*>
+      ArchetypeValueWitnessMap;
 };
 
 } // end namespace irgen
