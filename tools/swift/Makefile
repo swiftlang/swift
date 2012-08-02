@@ -23,7 +23,7 @@ include $(SWIFT_LEVEL)/../../Makefile.config
 # necessary to write out a .bc file. jit and linker are used for
 # JIT execution.
 LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitwriter ipo jit linker mcjit asmparser
-USEDLIBS = swiftIRGen.a swiftParse.a swiftSema.a swiftAST.a swiftBasic.a
+USEDLIBS = swiftIRGen.a swiftParse.a swiftSema.a swiftCFG.a swiftAST.a swiftBasic.a
 LLVMLibsOptions := $(LLVMLibsOptions) -ledit
 
 include $(SWIFT_LEVEL)/Makefile

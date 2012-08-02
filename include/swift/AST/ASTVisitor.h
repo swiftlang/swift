@@ -84,6 +84,15 @@ public:
     llvm_unreachable("Not reachable, all cases handled");
   }
 
+  DeclRetTy visitDecl(Decl *D) { return DeclRetTy(); }
+
+#define DECL(CLASS, PARENT) \
+  DeclRetTy visit##CLASS##Decl(CLASS##Decl *D) {\
+    return static_cast<ImplClass*>(this)->visit##PARENT(D);\
+  }
+#define ABSTRACT_DECL(CLASS, PARENT) DECL(CLASS, PARENT)
+#include "swift/AST/DeclNodes.def"
+
   PatternRetTy visit(Pattern *P) {
     switch (P->getKind()) {
 #define PATTERN(CLASS, PARENT) \
