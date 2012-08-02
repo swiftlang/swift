@@ -2557,6 +2557,26 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
     return matchTypes(TC, Meta1->getInstanceType(), Meta2->getInstanceType(),
                       ST_None, Trivial, CC);
   }
+
+  // Nominal types.
+  if (auto Nominal1 = T1->getAs<NominalType>()) {
+    auto Nominal2 = T2->castTo<NominalType>();
+
+    // If we're pointing at different declarations, this can't be the same
+    // type.
+    if (Nominal1->getDecl() != Nominal2->getDecl())
+      return false;
+
+    // If one of the nominal types is missing a parent, the types are
+    // only equivalent if both are parentless.
+    if (!Nominal1->getParent() || !Nominal2->getParent()) {
+      return (bool)Nominal1->getParent() == (bool)Nominal2->getParent();
+    }
+
+    // Match up the parents.
+    return matchTypes(TC, Nominal1->getParent(), Nominal2->getParent(),
+                      ST_None, Trivial, CC);
+  }
   return false;  
 }
 

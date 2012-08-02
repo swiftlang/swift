@@ -52,6 +52,33 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   }
 }
 
+Type DeclContext::getDeclaredTypeInContext() const {
+  switch (getContextKind()) {
+    case DeclContextKind::BuiltinModule:
+    case DeclContextKind::CapturingExpr:
+    case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::TranslationUnit:
+    case DeclContextKind::ConstructorDecl:
+    case DeclContextKind::DestructorDecl:
+      return Type();
+
+    case DeclContextKind::ExtensionDecl: {
+      auto ty = cast<ExtensionDecl>(this)->getExtendedType();
+      if (auto unbound = ty->getAs<UnboundGenericType>())
+        return unbound->getDecl()->getDeclaredTypeInContext();
+
+      if (auto nominal = ty->getAs<NominalType>())
+        return nominal->getDecl()->getDeclaredTypeInContext();
+
+      return Type();
+    }
+
+    case DeclContextKind::NominalTypeDecl:
+      return cast<NominalTypeDecl>(this)->getDeclaredTypeInContext();
+  }
+
+}
+
 GenericParamList *DeclContext::getGenericParamsOfContext() const {
   switch (getContextKind()) {
     case DeclContextKind::BuiltinModule:
@@ -311,7 +338,7 @@ Type TypeDecl::getDeclaredType() const {
   return cast<NominalTypeDecl>(this)->getDeclaredType();
 }
 
-Type NominalTypeDecl::getDeclaredTypeInContext() {
+Type NominalTypeDecl::getDeclaredTypeInContext() const {
   Type Ty = getDeclaredType();
   if (UnboundGenericType *UGT = Ty->getAs<UnboundGenericType>()) {
     // If we have an unbound generic type, bind the type to the archetypes
@@ -354,7 +381,7 @@ OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
   // Compute the associated type for this OneOfDecl.
   ASTContext &Ctx = Parent->getASTContext();
   if (!GenericParams)
-    DeclaredTy = OneOfType::get(this, Type(), Ctx);
+    DeclaredTy = OneOfType::get(this, Parent->getDeclaredTypeInContext(), Ctx);
   else
     DeclaredTy = new (Ctx) UnboundGenericType(this, Ctx);
   // Set the type of the OneOfDecl to the right MetaTypeType.
@@ -369,7 +396,7 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
   // Compute the associated type for this StructDecl.
   ASTContext &Ctx = Parent->getASTContext();
   if (!GenericParams)
-    DeclaredTy = StructType::get(this, Type(), Ctx);
+    DeclaredTy = StructType::get(this, Parent->getDeclaredTypeInContext(), Ctx);
   else
     DeclaredTy = new (Ctx) UnboundGenericType(this, Ctx);
   // Set the type of the StructDecl to the right MetaTypeType.
@@ -384,7 +411,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   // Compute the associated type for this ClassDecl.
   ASTContext &Ctx = Parent->getASTContext();
   if (!GenericParams)
-    DeclaredTy = ClassType::get(this, Type(), Ctx);
+    DeclaredTy = ClassType::get(this, Parent->getDeclaredTypeInContext(), Ctx);
   else
     DeclaredTy = new (Ctx) UnboundGenericType(this, Ctx);
   // Set the type of the ClassDecl to the right MetaTypeType.

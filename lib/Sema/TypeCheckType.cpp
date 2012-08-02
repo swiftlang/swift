@@ -588,6 +588,18 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
 
+  case TypeKind::OneOf:
+  case TypeKind::Struct:
+  case TypeKind::Class: {
+    auto nominalTy = cast<NominalType>(T);
+    if (auto parentTy = nominalTy->getParent()) {
+      parentTy = substType(parentTy, Substitutions);
+      if (parentTy.getPointer() != nominalTy->getParent().getPointer())
+        return NominalType::get(nominalTy->getDecl(), parentTy, Context);
+    }
+    return T;
+  }
+
   case TypeKind::BoundGeneric: {
     auto BGT = cast<BoundGenericType>(T);
     SmallVector<Type, 4> SubstArgs;

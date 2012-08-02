@@ -183,7 +183,7 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
                                                     Sub));
     }
 
-    if (BaseTy->is<BoundGenericType>()) {
+    if (BaseTy->isSpecialized()) {
       // We picked a subscript operator in a generic type; create the
       // appropriate AST node.
       return semaSubscriptExpr(

@@ -134,6 +134,67 @@ bool TypeBase::isExistentialType(SmallVectorImpl<ProtocolDecl *> &Protocols) {
   return false;
 }
 
+bool TypeBase::isSpecialized() {
+  CanType CT = getCanonicalType();
+  if (CT.getPointer() != this)
+    return CT->isSpecialized();
+
+  switch (getKind()) {
+#define UNCHECKED_TYPE(id, parent) case TypeKind::id:
+#define SUGARED_TYPE(id, parent) case TypeKind::id:
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+      return false;
+
+  case TypeKind::BoundGeneric:
+    return true;
+
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction: {
+    auto funcTy = cast<AnyFunctionType>(this);
+    return funcTy->getInput()->isSpecialized() ||
+           funcTy->getResult()->isSpecialized();
+  }
+
+  case TypeKind::Class:
+  case TypeKind::Struct:
+  case TypeKind::OneOf:
+    if (auto parentTy = cast<NominalType>(this)->getParent())
+      return parentTy->isSpecialized();
+    return false;
+
+  case TypeKind::MetaType:
+    return cast<MetaTypeType>(this)->getInstanceType()->isSpecialized();
+
+  case TypeKind::LValue:
+    return cast<LValueType>(this)->getObjectType()->isSpecialized();
+
+  case TypeKind::Tuple: {
+    auto tupleTy = cast<TupleType>(this);
+    for (auto &Elt : tupleTy->getFields())
+      if (Elt.getType()->isSpecialized())
+        return true;
+    
+    return false;
+  }
+
+  case TypeKind::Archetype:
+  case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinObjCPointer:
+  case TypeKind::BuiltinObjectPointer:
+  case TypeKind::BuiltinRawPointer:
+  case TypeKind::DeducibleGenericParam:
+  case TypeKind::Module:
+  case TypeKind::Protocol:
+  case TypeKind::ProtocolComposition:
+    return false;
+
+  case TypeKind::Array:
+    return cast<ArrayType>(this)->getBaseType()->isSpecialized();
+  }
+}
+
 Type TypeBase::getUnlabeledType(ASTContext &Context) {
   switch (getKind()) {
   case TypeKind::Error: 
@@ -422,6 +483,16 @@ CanType TypeBase::getCanonicalType() {
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
 
+  case TypeKind::OneOf:
+  case TypeKind::Struct:
+  case TypeKind::Class: {
+    auto nominalTy = cast<NominalType>(this);
+    auto parentTy = nominalTy->getParent()->getCanonicalType();
+    Result = NominalType::get(nominalTy->getDecl(), parentTy,
+                              parentTy->getASTContext());
+    break;
+  }
+
   case TypeKind::Tuple: {
     TupleType *TT = cast<TupleType>(this);
     assert(!TT->getFields().empty() && "Empty tuples are always canonical");
@@ -521,6 +592,9 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::ProtocolComposition:
   case TypeKind::MetaType:
   case TypeKind::BoundGeneric:
+  case TypeKind::OneOf:
+  case TypeKind::Struct:
+  case TypeKind::Class:
     // None of these types have sugar at the outer level.
     return this;
   case TypeKind::Paren:

@@ -284,7 +284,7 @@ Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
                                             RBracketLoc,
                                             cast<SubscriptDecl>(Decls[0]));
 
-    if (ContainerTy->is<BoundGenericType>())
+    if (ContainerTy->isSpecialized())
       return new (C) GenericSubscriptExpr(Base, LBracketLoc, Index,
                                           RBracketLoc,
                                           cast<SubscriptDecl>(Decls[0]));

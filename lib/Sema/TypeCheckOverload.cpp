@@ -304,25 +304,35 @@ Type TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
                                                 Type T,
                                                 SourceLoc Loc,
                                                 CoercionContext &CC,
-                                            GenericParamList **GenericParams) {
+                                          GenericParamList **OutGenericParams) {
   // Dig out the instance type we're dealing with for the base.
   BaseTy = BaseTy->getRValueType();
   if (auto BaseMeta = BaseTy->getAs<MetaTypeType>())
     BaseTy = BaseMeta->getInstanceType();
 
-  // Dig out the (bound) generic type that describes
-  // FIXME: Cope with extensions that have generic parameters!
-  NominalTypeDecl *owner
-    = VD->getDeclContext()->getDeclaredTypeOfContext()
-        ->castTo<UnboundGenericType>()->getDecl();
-  Type ownerTy = owner->getDeclaredTypeInContext();
+  // Find the innermost generic parameters that apply to this member.
+  auto owner = VD->getDeclContext();
+  auto genericParams = owner->getGenericParamsOfContext();
+  Type ownerTy;
+  if (auto nominalOwner = dyn_cast<NominalTypeDecl>(owner))
+    ownerTy = nominalOwner->getDeclaredTypeInContext();
+  else {
+    auto extensionOwner = cast<ExtensionDecl>(owner);
+    auto extendedTy = extensionOwner->getExtendedType();
+    if (auto nominal = extendedTy->getAs<NominalType>())
+      ownerTy = nominal->getDecl()->getDeclaredTypeInContext();
+    else if (auto unbound = extendedTy->getAs<UnboundGenericType>())
+      ownerTy = unbound->getDecl()->getDeclaredTypeInContext();
+    else
+      llvm_unreachable("unknown owner for generic type member");
+  }
 
   // Open up the owner type so we can deduce its arguments.
   Type openedTypes[2] = { ownerTy, T };
-  openPolymorphicTypes(openedTypes, *owner->getGenericParams(), CC);
+  openPolymorphicTypes(openedTypes, *genericParams, CC);
 
-  if (GenericParams)
-    *GenericParams = owner->getGenericParams();
+  if (OutGenericParams)
+    *OutGenericParams = genericParams;
 
   // Deduce the arguments.
   OpaqueValueExpr base(Loc, BaseTy);
@@ -350,17 +360,15 @@ bool TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
                                                 MutableArrayRef<Type> Types,
                                                 SourceLoc Loc,
                                                 CoercionContext &CC,
-                                            GenericParamList **GenericParams) {
+                                          GenericParamList **OutGenericParams) {
   // Dig out the instance type we're dealing with for the base.
   BaseTy = BaseTy->getRValueType();
   if (auto BaseMeta = BaseTy->getAs<MetaTypeType>())
     BaseTy = BaseMeta->getInstanceType();
 
-  // Dig out the (bound) generic type that describes
-  // FIXME: Cope with extensions that have generic parameters!
-  NominalTypeDecl *owner
-  = VD->getDeclContext()->getDeclaredTypeOfContext()
-  ->castTo<UnboundGenericType>()->getDecl();
+  // Find the innermost generic parameters that apply to this member.
+  auto owner = cast<NominalTypeDecl>(VD->getDeclContext());
+  auto genericParams = owner->getGenericParamsOfContext();
   Type ownerTy = owner->getDeclaredTypeInContext();
 
   // Open up the owner type so we can deduce its arguments.
@@ -368,10 +376,10 @@ bool TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
   openedTypes.reserve(Types.size() + 1);
   openedTypes.append(Types.begin(), Types.end());
   openedTypes.push_back(ownerTy);
-  openPolymorphicTypes(openedTypes, *owner->getGenericParams(), CC);
+  openPolymorphicTypes(openedTypes, *genericParams, CC);
 
-  if (GenericParams)
-    *GenericParams = owner->getGenericParams();
+  if (OutGenericParams)
+    *OutGenericParams = genericParams;
 
   // Deduce the arguments.
   OpaqueValueExpr base(Loc, BaseTy);
@@ -858,9 +866,9 @@ TypeChecker::encodeSubstitutions(ArrayRef<ArchetypeType *> AllArchetypes,
     // Record this substitution.
     storedSubstitutions[index].Archetype = archetype;
     storedSubstitutions[index].Replacement
-    = Substitutions.find(key)->second;
+      = Substitutions.find(key)->second;
     storedSubstitutions[index].Conformance
-    = Context.AllocateCopy(Conformances.find(key)->second);
+      = Context.AllocateCopy(Conformances.find(key)->second);
 
     ++index;
   }
@@ -978,7 +986,7 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
     }
 
     // Reference to a member of a generic type.
-    if (baseTy->is<BoundGenericType>()) {
+    if (baseTy->isSpecialized()) {
       if (isa<FuncDecl>(Member) ||
           (isa<OneOfElementDecl>(Member) &&
            isa<OneOfDecl>(Member->getDeclContext()))) {

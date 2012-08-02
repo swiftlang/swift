@@ -249,13 +249,8 @@ OneOfType::OneOfType(OneOfDecl *TheDecl, Type Parent, ASTContext &C)
   : NominalType(TypeKind::OneOf, &C, TheDecl, Parent) { }
 
 OneOfType *OneOfType::get(OneOfDecl *D, Type Parent, ASTContext &C) {
-  if (Parent) {
-    assert(D->getDeclContext()->getGenericParamsOfContext());
-    Parent = Parent->getCanonicalType();
-  }
-
   llvm::FoldingSetNodeID id;
-  BoundGenericType::Profile(id, D,Parent);
+  OneOfType::Profile(id, D,Parent);
 
   void *insertPos = 0;
   if (auto oneOfTy = C.Impl.OneOfTypes.FindNodeOrInsertPos(id, insertPos))
@@ -275,13 +270,8 @@ StructType::StructType(StructDecl *TheDecl, Type Parent, ASTContext &C)
   : NominalType(TypeKind::Struct, &C, TheDecl, Parent) { }
 
 StructType *StructType::get(StructDecl *D, Type Parent, ASTContext &C) {
-  if (Parent) {
-    assert(D->getDeclContext()->getGenericParamsOfContext());
-    Parent = Parent->getCanonicalType();
-  }
-
   llvm::FoldingSetNodeID id;
-  BoundGenericType::Profile(id, D,Parent);
+  StructType::Profile(id, D, Parent);
 
   void *insertPos = 0;
   if (auto structTy = C.Impl.StructTypes.FindNodeOrInsertPos(id, insertPos))
@@ -301,13 +291,8 @@ ClassType::ClassType(ClassDecl *TheDecl, Type Parent, ASTContext &C)
   : NominalType(TypeKind::Class, &C, TheDecl, Parent) { }
 
 ClassType *ClassType::get(ClassDecl *D, Type Parent, ASTContext &C) {
-  if (Parent) {
-    assert(D->getDeclContext()->getGenericParamsOfContext());
-    Parent = Parent->getCanonicalType();
-  }
-
   llvm::FoldingSetNodeID id;
-  BoundGenericType::Profile(id, D,Parent);
+  ClassType::Profile(id, D, Parent);
 
   void *insertPos = 0;
   if (auto classTy = C.Impl.ClassTypes.FindNodeOrInsertPos(id, insertPos))

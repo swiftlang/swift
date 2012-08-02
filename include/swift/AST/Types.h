@@ -175,6 +175,12 @@ public:
   /// populated with the set of protocols
   bool isExistentialType(SmallVectorImpl<ProtocolDecl *> &Protocols);
 
+  /// \brief Determine whether the given type is "specialized", meaning that
+  /// it involves generic types for which generic arguments have been provided.
+  /// For example, the types Vector<Int> and Vector<Int>.Element are both
+  /// specialized, but the type Vector is not.
+  bool isSpecialized();
+
   /// getUnlabeledType - Retrieve a version of this type with all labels
   /// removed at every level. For example, given a tuple type 
   /// \code
@@ -668,7 +674,8 @@ class NominalType : public TypeBase {
 protected:
   NominalType(TypeKind K, ASTContext *C, NominalTypeDecl *TheDecl,
               Type Parent)
-    : TypeBase(K, C, /*Unresolved=*/false), TheDecl(TheDecl), Parent(Parent) { }
+    : TypeBase(K, (!Parent || Parent->isCanonical())? C : nullptr,
+               /*Unresolved=*/false), TheDecl(TheDecl), Parent(Parent) { }
 
 public:
   static NominalType *get(NominalTypeDecl *D, Type Parent, ASTContext &C);

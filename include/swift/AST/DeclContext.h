@@ -109,6 +109,11 @@ public:
   /// type of the context. Returns a null type for non-type contexts.
   Type getDeclaredTypeOfContext() const;
 
+  /// getDeclaredTypeOfContext - For a type context, retrieves the declared
+  /// type of the context as visible from within the context. Returns a null
+  /// type for non-type contexts.
+  Type getDeclaredTypeInContext() const;
+
   /// \brief Retrieve the innermost generic parameters introduced by this
   /// context or one of its parent contexts, or null if this context is not
   /// directly dependent on any generic parameters.

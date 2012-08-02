@@ -774,7 +774,7 @@ public:
   /// getDeclaredType - Retrieve the type declared by this entity.
   Type getDeclaredType() const { return DeclaredTy; }
 
-  Type getDeclaredTypeInContext();
+  Type getDeclaredTypeInContext() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
