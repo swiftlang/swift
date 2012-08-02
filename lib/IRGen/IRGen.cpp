@@ -119,6 +119,9 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   IRGenModule IRM(TU->Ctx, Opts, *Module, *TargetData);
   IRM.emitTranslationUnit(TU, StartElem);
 
+  // Bail out if there are any errors.
+  if (TU->Ctx.hadError()) return;
+
   // Ugly standard library optimization hack, part 1: pull in the relevant
   // IR from swift.swift.
   // FIXME: We should pre-generate a swift.bc; it would be substantially
@@ -162,9 +165,6 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
       }
     }
   }
-
-  // Bail out if there are any errors.
-  if (TU->Ctx.hadError()) return;
 
   llvm::OwningPtr<raw_fd_ostream> RawOS;
   formatted_raw_ostream FormattedOS;
