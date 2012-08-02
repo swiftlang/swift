@@ -1479,8 +1479,8 @@ public:
 };
 
 /// ExplicitClosureExpr - An explicitly formed closure expression in braces,
-/// e.g. "{ foo() }".  This may contain AnonClosureArgExprs within it that
-/// reference the formal arguments of the closure.
+/// e.g. "{ foo() }" or "{}".  This may contain AnonClosureArgExprs within it
+/// that reference the formal arguments of the closure.
 class ExplicitClosureExpr : public ClosureExpr {
   SourceLoc LBraceLoc, RBraceLoc;
 

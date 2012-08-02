@@ -1981,7 +1981,7 @@ ill-formed if the type does not conform to the protocol.</p>
   </div>
 
   <pre class="grammar">
-    expr-explicit-closure ::= '{' expr '}'
+    expr-explicit-closure ::= '{' expr? '}'
   </pre>
   
   <p>A closure expression is a super-concise version of <a 
@@ -1991,6 +1991,8 @@ ill-formed if the type does not conform to the protocol.</p>
      return values types for the closure from the context it is used in, and
      allows access to the formal arguments of the closure through <a 
       href="#expr-anon-closure-arg">anonymous closure argument expressions</a>.
+     In tuples with no body expression, the '()' expression is used as the
+     result.
   </p>
   
   <p>It is illegal to use these expressions when there is insufficient context

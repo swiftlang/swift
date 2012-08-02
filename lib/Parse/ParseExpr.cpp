@@ -436,7 +436,7 @@ Expr *Parser::parseExprIdentifier() {
 }
 
 ///   expr-explicit-closure:
-///     '{' expr '}'
+///     '{' expr? '}'
 NullablePtr<Expr> Parser::parseExprExplicitClosure() {
   SourceLoc LBLoc = consumeToken(tok::l_brace);
   
@@ -446,9 +446,13 @@ NullablePtr<Expr> Parser::parseExprExplicitClosure() {
   ContextChange CC(*this, ThisClosure);
   AnonClosureVars.emplace_back();
 
-  NullablePtr<Expr> Body = parseExpr(diag::expected_expr_closure);
-  if (Body.isNull()) return 0;
-  
+  NullablePtr<Expr> Body;
+  if (Tok.isNot(tok::r_brace)) {
+    Body = parseExpr(diag::expected_expr_closure);
+    if (Body.isNull()) return 0;
+  } else {
+    Body = new (Context) TupleExpr(LBLoc, MutableArrayRef<Expr *>(), 0, LBLoc);
+  }
   ThisClosure->setBody(Body.get());
   
   SourceLoc RBLoc;
