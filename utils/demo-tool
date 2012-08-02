@@ -1,0 +1,82 @@
+#!/usr/bin/env python
+
+import json
+import optparse
+import subprocess
+import time
+
+def send_to_screen(screen_name, arg0=None, command='stuff'):
+    args = ['screen', '-S', screen_name, '-p', '0',
+            '-X', command]
+    if arg0 is not None:
+        args.append(arg0)
+    p = subprocess.Popen(args)
+    p.communicate()
+
+def main():
+    parser = optparse.OptionParser("""\
+usage: %%prog [options] <demo script>
+
+Run a command line demo script using 'screen'. The script file should be a JSON
+document listing the commands to run, as in::
+
+  [
+    { "command" : "ls" },
+    { "command" : "echo Hello" }
+  ]
+
+The script requires the 'screen' session to have been started in another window,
+for example::
+
+  $ screen -S demo
+""")
+
+    def send(*args, **kwargs):
+        return send_to_screen(opts.screen_name, *args, **kwargs)
+    parser.add_option("-S", "--screen-name", dest="screen_name", metavar="NAME",
+                      help="name of the screen sesison to use [%default]",
+                      action="store", default="demo")
+
+    opts, args = parser.parse_args()
+
+    if len(args) == 1:
+        path, = args
+    else:
+        parser.error("invalid number of arguments")
+
+    # Read in the demo script.
+    with open(path) as f:
+        demo_script = json.load(f)
+
+    # Validate the entries.
+    for item in demo_script:
+        command = str(item.get('command'))
+        if not isinstance(command, str):
+            raise SystemError("error: invalid item in script: %r" % (
+                    item,))
+
+    # Notify screen that we are starting the demo.
+    raw_input('press enter to begin demo...')
+
+    # Iterate over each command, sending it and waiting for user direction to
+    # continue.
+    for item in demo_script:
+        command = str(item['command'])
+
+        # Send the command slowly, as if it was typed.
+        print "sending command: %r" % (command.replace('\n', '<cr>'),)
+        for c in command:
+            send(c)
+            time.sleep(0.01)
+
+        # Wait for user input, then send a return.
+        raw_input('press enter to send return...')
+        send('\n')
+        if item is not demo_script[-1]:
+            raw_input('press enter to continue to next command...')
+
+    # Notify screen that the demo is over.
+    send('Demo session is over.', command='wall')
+
+if __name__ == '__main__':
+    main()
