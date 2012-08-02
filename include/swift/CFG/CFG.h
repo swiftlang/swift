@@ -181,7 +181,7 @@ template <> struct GraphTraits<Inverse< TYPE *> >\
   static nodes_iterator nodes_end(TYPE *C) { return C->nodes_end(); }\
 };
 
-DEF_GRAPHTRAIT(::swift::CFG, ::swift::BasicBlock)
+DEF_GRAPHTRAIT(::swift::CFG, ::swift::BasicBlock, )
 DEF_GRAPHTRAIT(const ::swift::CFG, const ::swift::BasicBlock, const_)
 
 #undef DEF_GRAPHTRAIT

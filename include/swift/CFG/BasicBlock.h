@@ -63,9 +63,9 @@ public:
 
   ~BasicBlock();
 
-  DEF_ITERATOR(iterator, next, FrontI, begin, end)
+  DEF_ITERATOR(iterator, next, FrontI, begin, end, )
   DEF_ITERATOR(const_iterator, next, FrontI, begin, end, const)
-  DEF_ITERATOR(reverse_iterator, prev, BackI, rbegin, rend)
+  DEF_ITERATOR(reverse_iterator, prev, BackI, rbegin, rend, )
   DEF_ITERATOR(const_reverse_iterator, prev, BackI, rbegin, rend, const)
 
   /// Return the instruction at the entry of the basic block.
