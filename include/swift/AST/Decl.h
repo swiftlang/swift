@@ -1230,6 +1230,10 @@ public:
   SourceRange getSourceRange() const;
 
   Pattern *getArguments() { return Arguments; }
+  void setArguments(Pattern *args) {
+    assert(!Arguments && "Resetting arguments?");
+    Arguments = args;
+  }
 
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *b) { Body = b; }

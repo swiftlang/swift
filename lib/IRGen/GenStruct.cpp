@@ -19,10 +19,12 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Pattern.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 
+#include "GenInit.h"
 #include "GenSequential.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
@@ -54,21 +56,6 @@ namespace {
   public:
     StructTypeInfo(llvm::Type *T, unsigned numFields)
       : SequentialTypeInfo(T, numFields) {
-    }
-
-    void emitInjectionFunctionBody(IRGenFunction &IGF,
-                                   OneOfElementDecl *elt,
-                                   Explosion &params) const {
-      ExplosionSchema schema(params.getKind());
-      getSchema(schema);
-      if (schema.requiresIndirectResult()) {
-        Address returnSlot(params.claimUnmanagedNext(),
-                           StorageAlignment);
-        initialize(IGF, params, returnSlot);
-        IGF.Builder.CreateRetVoid();
-      } else {
-        IGF.emitScalarReturn(params);
-      }
     }
   };
 
@@ -113,16 +100,40 @@ namespace {
   };
 }
 
-static void emitInjectionFunction(IRGenModule &IGM,
-                                  llvm::Function *fn,
-                                  const StructTypeInfo &structTI,
-                                  OneOfElementDecl *elt) {
-  ExplosionKind explosionKind = ExplosionKind::Minimal;
-  IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(), explosionKind,
-                    /*uncurry level*/ 0, fn, Prologue::Bare);
+static void emitValueConstructor(IRGenModule &IGM,
+                                 llvm::Function *fn,
+                                 ConstructorDecl *ctor) {
+  IRGenFunction IGF(IGM, ctor->getType(), ctor->getArguments(),
+                    ExplosionKind::Minimal, 0, fn, Prologue::Standard);
 
-  Explosion explosion = IGF.collectParameters();
-  structTI.emitInjectionFunctionBody(IGF, elt, explosion);
+  auto thisDecl = ctor->getImplicitThisDecl();
+  const StructTypeInfo &thisTI =
+      IGF.getFragileTypeInfo(thisDecl->getType()).as<StructTypeInfo>();
+  Initialization I;
+  I.registerObject(IGF, I.getObjectForDecl(thisDecl),
+                   thisDecl->hasFixedLifetime() ? NotOnHeap : OnHeap, thisTI);
+  OwnedAddress addr = I.emitVariable(IGF, thisDecl, thisTI);
+
+  unsigned FieldIndex = 0;
+  TuplePattern *TP = cast<TuplePattern>(ctor->getArguments());
+  StructDecl *SD = cast<StructDecl>(ctor->getDeclContext());
+  for (Decl *D : SD->getMembers()) {
+    if (isa<VarDecl>(D) && !cast<VarDecl>(D)->isProperty()) {
+      TypedPattern *P = cast<TypedPattern>(TP->getFields()[FieldIndex].getPattern());
+      NamedPattern *NP = cast<NamedPattern>(P->getSubPattern());
+      OwnedAddress inaddr = IGF.getLocalVar(NP->getDecl());
+
+      Explosion e(ExplosionKind::Minimal);
+      const StructFieldInfo &field = thisTI.getFields()[FieldIndex];
+      field.getTypeInfo().load(IGF, inaddr, e);
+      field.getTypeInfo().initialize(IGF, e, field.projectAddress(IGF, addr));
+      FieldIndex++;
+    }
+  }
+
+  I.markInitialized(IGF, I.getObjectForDecl(thisDecl));
+
+  IGF.emitConstructorBody(ctor);
 }
 
 LValue swift::irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
@@ -158,6 +169,7 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
     case DeclKind::Protocol:
     case DeclKind::Extension:
     case DeclKind::Destructor:
+    case DeclKind::OneOfElement:
       llvm_unreachable("decl not allowed in struct!");
 
     // We can have meaningful initializers for variables, but
@@ -195,18 +207,14 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
       }
       continue;
     }
-    case DeclKind::OneOfElement: {
-      if (st->getGenericParams())
-        llvm_unreachable("don't know how to emit generic constructor yet");
-      const StructTypeInfo &typeInfo =
-          getFragileTypeInfo(st->getDeclaredType()).as<StructTypeInfo>();
-      OneOfElementDecl *elt = cast<OneOfElementDecl>(member);
-      llvm::Function *fn = getAddrOfInjectionFunction(elt);
-      emitInjectionFunction(*this, fn, typeInfo, elt);
-      continue;
-    }
     case DeclKind::Constructor: {
-      emitConstructor(cast<ConstructorDecl>(member));
+      auto ctor = cast<ConstructorDecl>(member);
+      if (!ctor->getBody()) {
+        llvm::Function *fn = getAddrOfConstructor(ctor, ExplosionKind::Minimal);
+        emitValueConstructor(*this, fn, ctor);
+      } else {
+        emitConstructor(ctor);
+      }
       continue;
     }
     }

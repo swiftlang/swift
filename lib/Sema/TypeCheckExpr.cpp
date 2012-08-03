@@ -597,8 +597,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
       auto Best = filterOverloadSet(Ctors.Results, false, Ty, E2, Type(),
                                     Viable);
       if (Best) {
-        if (isa<OneOfElementDecl>(Best.getDecl()) && 
-            isa<OneOfDecl>(Best.getDecl()->getDeclContext())) {
+        if (isa<OneOfElementDecl>(Best.getDecl())) {
           // FIXME: All constructors should eventually start using this
           // codepath.
           ValueDecl *BestDecl = Best.getDecl();

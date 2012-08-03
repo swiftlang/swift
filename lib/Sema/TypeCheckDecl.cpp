@@ -303,34 +303,37 @@ public:
       checkGenericParams(SD->getGenericParams());
     }
 
+    ConstructorDecl *ValueCD = cast<ConstructorDecl>(SD->getMembers().back());
+
     for (Decl *Member : SD->getMembers()) {
-      visit(Member);
+      if (Member != ValueCD)
+        visit(Member);
     }
 
     if (!IsSecondPass) {
-      // FIXME: We should come up with a better way to represent this implied
-      // constructor.
+      // FIXME: This is a bit of a hack.
+      SmallVector<TuplePatternElt, 8> PatternElts;
       SmallVector<TupleTypeElt, 8> TupleElts;
-      for (Decl *Member : SD->getMembers())
-        if (VarDecl *VarD = dyn_cast<VarDecl>(Member))
-          if (!VarD->isProperty())
+      for (Decl *Member : SD->getMembers()) {
+        if (VarDecl *VarD = dyn_cast<VarDecl>(Member)) {
+          if (!VarD->isProperty()) {
+            VarDecl *ArgD = new (TC.Context) VarDecl(SD->getLoc(),
+                                                     VarD->getName(),
+                                                     Type(), ValueCD);
+            Pattern *P = new (TC.Context) NamedPattern(ArgD);
+            P = new (TC.Context) TypedPattern(P, TypeLoc(VarD->getType()));
+            PatternElts.push_back(TuplePatternElt(P));
             TupleElts.push_back(TupleTypeElt(VarD->getType(),
                                              VarD->getName()));
-      TupleType *TT = TupleType::get(TupleElts, TC.Context);
-
-      Type CreateTy;
-      if (auto gp = SD->getGenericParamsOfContext())
-        CreateTy = PolymorphicFunctionType::get(TT,
-                                                SD->getDeclaredTypeInContext(),
-                                                gp,
-                                                TC.Context);
-      else
-        CreateTy = FunctionType::get(TT, SD->getDeclaredTypeInContext(),
-                                     TC.Context);
-      auto ElementCtor = cast<OneOfElementDecl>(SD->getMembers().back());
-      ElementCtor->setType(CreateTy);
-      ElementCtor->getArgumentTypeLoc() = TypeLoc(TT);
+          }
+        }
+      }
+      TuplePattern *TP = TuplePattern::create(TC.Context, SD->getLoc(),
+                                              PatternElts, SD->getLoc());
+      ValueCD->setArguments(TP);
     }
+
+    visit(ValueCD);
 
     if (!IsFirstPass)
       checkExplicitConformance(SD, SD->getDeclaredType(),
@@ -426,12 +429,7 @@ public:
     if (IsSecondPass)
       return;
 
-    // Ignore OneOfElementDecls in structs.
-    // FIXME: Remove once the struct hack is fixed.
-    OneOfDecl *OOD = dyn_cast<OneOfDecl>(ED->getDeclContext());
-    if (!OOD)
-      return;
-
+    OneOfDecl *OOD = cast<OneOfDecl>(ED->getDeclContext());
     Type ElemTy = OOD->getDeclaredTypeInContext();
 
     // If we have a simple element, just set the type.

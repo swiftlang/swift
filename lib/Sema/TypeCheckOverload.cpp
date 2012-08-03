@@ -415,8 +415,7 @@ static bool lookPastThisArgument(Type BaseTy, ValueDecl *VD) {
     if (FD->isStatic())
       return true;
   } else if (OneOfElementDecl *OOED = dyn_cast<OneOfElementDecl>(VD)) {
-    if (isa<OneOfDecl>(OOED->getDeclContext()))
-      return true;
+    return true;
   }
 
   return false;
@@ -991,9 +990,7 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
 
     // Reference to a member of a generic type.
     if (baseTy->isSpecialized()) {
-      if (isa<FuncDecl>(Member) ||
-          (isa<OneOfElementDecl>(Member) &&
-           isa<OneOfDecl>(Member->getDeclContext()))) {
+      if (isa<FuncDecl>(Member) || isa<OneOfElementDecl>(Member)) {
         // We're binding a reference to an instance method of a generic
         // type, which we build as a reference to the underlying declaration
         // specialized based on the deducing the arguments of the generic
@@ -1045,9 +1042,7 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
                                           Member->getTypeOfReference());
 
     // Refer to a member function that binds 'this':
-    if ((isa<FuncDecl>(Member) ||
-        (isa<OneOfElementDecl>(Member) &&
-         isa<OneOfDecl>(Member->getDeclContext()))) &&
+    if ((isa<FuncDecl>(Member) || isa<OneOfElementDecl>(Member)) &&
         Member->getDeclContext()->isTypeContext()) {
       if (baseIsInstance == Member->isInstanceMember())
         return new (Context) DotSyntaxCallExpr(Ref, DotLoc, Base);

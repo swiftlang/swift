@@ -1396,11 +1396,16 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
     }
   }
 
-  // FIXME: We should come up with a better way to represent this implied
-  // constructor.
+  // FIXME: Need better handling for implicit constructors.
   Identifier ConstructID = Context.getIdentifier("constructor");
-  MemberDecls.push_back(new (Context) OneOfElementDecl(StructLoc, ConstructID,
-                                                       TypeLoc(), SD));
+  VarDecl *ThisDecl
+    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
+                            Type(), SD);
+  ConstructorDecl *ValueCD = 
+      new (Context) ConstructorDecl(ConstructID, StructLoc, nullptr, ThisDecl,
+                                    nullptr, SD);
+  MemberDecls.push_back(ValueCD);
+  ThisDecl->setDeclContext(ValueCD);
 
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::oneof_attributes);

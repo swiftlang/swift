@@ -900,7 +900,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
     virtual bool walkToDeclPre(Decl *D) {
       if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D)) {
-        visitPattern(CD->getArguments(), D->getDeclContext());
+        if (CD->getArguments())
+          visitPattern(CD->getArguments(), D->getDeclContext());
       } else if (SubscriptDecl *SD = dyn_cast<SubscriptDecl>(D)) {
         visitPattern(SD->getIndices(), D->getDeclContext());
       } else if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
