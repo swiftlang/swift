@@ -17,6 +17,7 @@
 #ifndef SWIFT_INSTRUCTION_H
 #define SWIFT_INSTRUCTION_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"

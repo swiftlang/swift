@@ -70,7 +70,7 @@ public:
   /// The successors of a BasicBlock are defined either explicitly as
   /// a single successor as the branch targets of the terminator instruction.
   Successors succs() {
-    return llvm::cast<TermInst>(instructions.back()).successors();
+    return cast<TermInst>(instructions.back()).successors();
   }
   const Successors succs() const {
     return const_cast<BasicBlock*>(this)->succs();

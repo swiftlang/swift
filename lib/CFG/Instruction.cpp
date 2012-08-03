@@ -22,13 +22,13 @@
 
 using namespace swift;
 
-void Instruction::print(llvm::raw_ostream &OS) const {
+void Instruction::print(raw_ostream &OS) const {
   switch (kind) {
     case Invalid:
       OS << "InvalidInstruction";
       return;
     case UncondBranch: {
-      const UncondBranchInst &UBI = *llvm::cast<UncondBranchInst>(this);
+      const UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
       OS << "br " << UBI.targetBlock();
       const UncondBranchInst::ArgsTy Args = UBI.blockArgs();
       if (!Args.empty()) {
@@ -48,7 +48,7 @@ void Instruction::validate() const {
     case Invalid:
       return;
     case UncondBranch: {
-      const UncondBranchInst &UBI = *llvm::cast<UncondBranchInst>(this);
+      const UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
       assert(!basicBlock->instructions.empty() &&
              &*basicBlock->instructions.rbegin() == this &&
              "UncondBranchInst must appear at end of BasicBlock");
@@ -66,7 +66,7 @@ TermInst::Successors TermInst::successors() {
     case Invalid:
       llvm_unreachable("Only TermInst's are allowed");
     case UncondBranch: {
-      UncondBranchInst &UBI = *llvm::cast<UncondBranchInst>(this);
+      UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
       return Successors(&UBI.targetBlock());
     }
   }

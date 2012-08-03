@@ -47,7 +47,7 @@ class DumpVisitor : public ASTVisitor<DumpVisitor> {
 public:
   DumpVisitor(llvm::raw_ostream &OS) : OS(OS) {}
 
-  llvm::raw_ostream &OS;
+  raw_ostream &OS;
 
   void visitFuncDecl(FuncDecl *FD) {
     OS << "(func_decl " << FD->getName() << '\n';

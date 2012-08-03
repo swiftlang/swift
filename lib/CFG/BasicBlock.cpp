@@ -27,7 +27,7 @@ BasicBlock::~BasicBlock() {}
 void BasicBlock::dump() const { print(llvm::errs()); }
 
 /// Pretty-print the BasicBlock with the designated stream.
-void BasicBlock::print(llvm::raw_ostream &OS) const {
+void BasicBlock::print(raw_ostream &OS) const {
   OS << "[Block " << (void*) this << "]\n";
   for (const Instruction &I : instructions)
     I.print(OS);

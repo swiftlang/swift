@@ -59,7 +59,7 @@ public:
   static void dump(TranslationUnit *TU);
 
   /// Pretty-print the CFG with the designated stream.
-  void print(llvm::raw_ostream &OS) const;
+  void print(raw_ostream &OS) const;
 
   /// Allocate memory using CFG's internal allocator.
   void *allocate(unsigned Size, unsigned Align) const {
