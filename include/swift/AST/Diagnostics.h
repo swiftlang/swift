@@ -17,7 +17,7 @@
 #ifndef SWIFT_DIAGNOSTICS_H
 #define SWIFT_DIAGNOSTICS_H
 
-#include "swift/AST/LLVM.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/AST/DiagnosticEngine.h"
 
 namespace swift {

@@ -18,7 +18,7 @@
 #define SWIFT_TYPE_H
 
 #include "llvm/ADT/DenseMapInfo.h"
-#include "swift/AST/LLVM.h"
+#include "swift/Basic/LLVM.h"
 #include <string>
 
 namespace swift {

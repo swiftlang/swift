@@ -18,7 +18,7 @@
 #define SWIFT_TOKEN_H
 
 #include "swift/Basic/SourceLoc.h"
-#include "swift/AST/LLVM.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {

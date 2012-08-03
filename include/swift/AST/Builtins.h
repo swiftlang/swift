@@ -17,7 +17,7 @@
 #ifndef SWIFT_AST_BUILTINS_H
 #define SWIFT_AST_BUILTINS_H
 
-#include "swift/AST/LLVM.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {

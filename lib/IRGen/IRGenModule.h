@@ -18,7 +18,7 @@
 #ifndef SWIFT_IRGEN_IRGENMODULE_H
 #define SWIFT_IRGEN_IRGENMODULE_H
 
-#include "swift/AST/LLVM.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/CallingConv.h"
 #include "IRGen.h"

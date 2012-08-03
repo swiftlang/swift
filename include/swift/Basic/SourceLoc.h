@@ -17,7 +17,7 @@
 #ifndef SWIFT_SOURCELOC_H
 #define SWIFT_SOURCELOC_H
 
-#include "swift/AST/LLVM.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/Support/SMLoc.h"
 
 namespace llvm {

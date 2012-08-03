@@ -17,7 +17,7 @@
 #ifndef SWIFT_AST_IDENTIFIER_H
 #define SWIFT_AST_IDENTIFIER_H
 
-#include "swift/AST/LLVM.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/StringRef.h"
 #include <cstring>

@@ -19,7 +19,7 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/LLVM.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
 

@@ -18,7 +18,7 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICENGINE_H
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
-#include "swift/AST/LLVM.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/DiagnosticConsumer.h"

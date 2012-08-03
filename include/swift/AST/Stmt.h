@@ -17,7 +17,7 @@
 #ifndef SWIFT_AST_STMT_H
 #define SWIFT_AST_STMT_H
 
-#include "swift/AST/LLVM.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/NullablePtr.h"
