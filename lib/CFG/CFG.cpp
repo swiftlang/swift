@@ -13,6 +13,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/CFG/CFG.h"
+#include "llvm/Support/ADT/OwningPtr.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -64,10 +65,9 @@ public:
   void visitFuncDecl(FuncDecl *FD) {
     OS << "(func_decl " << FD->getName() << '\n';
     FuncExpr *FE = FD->getBody();
-    CFG *C = CFG::constructCFG(FE->getBody());
+    llvm::OwningPtr<CFG> C(CFG::constructCFG(FE->getBody()));
     C->print(OS);
-    delete C;
-    OS << ')';
+    OS << ")\n";
   }
 };
 }
