@@ -29,17 +29,20 @@ class Stmt;
 class TranslationUnit;
 
 class CFG {
+public:
+  typedef llvm::iplist<BasicBlock> BlockListType;
+
+  /// The collection of all BasicBlocks in the CFG.
+  BlockListType blocks;
+
+  /// The entrance of the CFG.
+  BasicBlock *entryBlock;
+
+private:
   friend class BasicBlock;
-  typedef std::vector<BasicBlock *> Blocks;
 
   /// Allocator that manages the memory of all the pieces of the CFG.
   mutable llvm::BumpPtrAllocator BPA;
-  /// The collection fo all CFG blocks.
-  Blocks Blks;
-  /// The Entry block.
-  BasicBlock *EntryBlock;
-  /// The Exit block;
-  BasicBlock *ExitBlock;
 
   // Intentionally marked private so that we need to use 'build()'
   // to construct a CFG.
@@ -52,12 +55,6 @@ public:
   /// to 'delete' this object.  This can return nullptr if the CFG cannot
   /// be constructed.
   static CFG *constructCFG(const Stmt *S);
-
-  /// Return true if the CFG is empty.
-  bool empty() const { return Blks.empty(); }
-
-  /// Return the number of basic blocks in the CFG.
-  unsigned size() const { return Blks.size(); }
 
   /// Pretty-print the CFG.
   void dump() const;
@@ -77,25 +74,6 @@ public:
   /// CFG dies.
   void deallocate(void *Ptr) const {}
 
-  typedef Blocks::iterator iterator;
-  typedef Blocks::const_iterator const_iterator;
-  typedef Blocks::reverse_iterator reverse_iterator;
-  typedef Blocks::const_reverse_iterator const_reverse_iterator;
-
-  iterator begin() { return Blks.begin(); }
-  iterator end() { return Blks.end(); }
-  const_iterator begin() const { return Blks.begin(); }
-  const_iterator end() const { return Blks.end(); }
-  reverse_iterator rbegin() { return Blks.rbegin(); }
-  reverse_iterator rend() { return Blks.rend(); }
-  const_reverse_iterator rbegin() const { return Blks.rbegin(); }
-  const_reverse_iterator rend() const { return Blks.rend(); }
-
-  BasicBlock *entryBlock() { return EntryBlock; }
-  const BasicBlock *entryBlock() const { return EntryBlock; }
-  BasicBlock *exitBlock() { return ExitBlock; }
-  const BasicBlock *exitBlock() const { return ExitBlock; }
-
   /// \brief Provides a custom implementation of the iterator class to have the
   /// same interface as Function::iterator - iterator returns BasicBlock
   /// (not a pointer to BasicBlock).
@@ -104,15 +82,15 @@ public:
     typedef const BasicBlock value_type;
     typedef value_type& reference;
     typedef value_type* pointer;
-    typedef Blocks::iterator ImplTy;
+    typedef BlockListType::iterator ImplTy;
 
     graph_iterator(const ImplTy &i) : I(i) {}
 
     bool operator==(const graph_iterator &X) const { return I == X.I; }
     bool operator!=(const graph_iterator &X) const { return I != X.I; }
-    reference operator*() const { return **I; }
-    pointer operator->() const { return  *I; }
-    operator BasicBlock*() { return  *I; }
+    reference operator*() const { return *I; }
+    pointer operator->() const { return  &*I; }
+    operator BasicBlock*() { return  &*I; }
 
     graph_iterator &operator++() { ++I; return *this; }
     graph_iterator &operator--() { --I; return *this; }
@@ -126,16 +104,16 @@ public:
     typedef const BasicBlock value_type;
     typedef value_type& reference;
     typedef value_type* pointer;
-    typedef Blocks::const_iterator ImplTy;
+    typedef BlockListType::const_iterator ImplTy;
 
     const_graph_iterator(const ImplTy &i) : I(i) {}
 
     bool operator==(const const_graph_iterator &X) const { return I == X.I; }
     bool operator!=(const const_graph_iterator &X) const { return I != X.I; }
 
-    reference operator*() const { return **I; }
-    pointer operator->() const { return  *I; }
-    operator BasicBlock*() const { return  *I; }
+    reference operator*() const { return *I; }
+    pointer operator->() const { return  &*I; }
+    operator const BasicBlock*() const { return  &*I; }
 
     const_graph_iterator &operator++() { ++I; return *this; }
     const_graph_iterator &operator--() { --I; return *this; }
@@ -145,16 +123,16 @@ public:
   };
 
   graph_iterator nodes_begin() {
-    return graph_iterator(Blks.begin());
+    return graph_iterator(blocks.begin());
   }
   graph_iterator nodes_end() {
-    return graph_iterator(Blks.end());
+    return graph_iterator(blocks.end());
   }
   const_graph_iterator nodes_begin() const {
-    return const_graph_iterator(Blks.begin());
+    return const_graph_iterator(blocks.begin());
   }
   const_graph_iterator nodes_end() const {
-    return const_graph_iterator(Blks.end());
+    return const_graph_iterator(blocks.end());
   }
 };
 
@@ -162,27 +140,15 @@ public:
 
 namespace llvm {
 
-#define DEF_GRAPHTRAIT(TYPE, BLOCK_TYPE, ...)\
-template <> struct GraphTraits< TYPE *>\
-  : public GraphTraits< BLOCK_TYPE *>  {\
-  typedef TYPE::__VA_ARGS__##graph_iterator nodes_iterator;\
-  static NodeType *getEntryNode(TYPE *C) { return C->entryBlock(); }\
-  static nodes_iterator nodes_begin(TYPE *C) { return C->nodes_begin(); }\
-  static nodes_iterator nodes_end(TYPE *C) { return C->nodes_end(); }\
-  static unsigned size(TYPE *C) { return C->size(); }\
-};\
-template <> struct GraphTraits<Inverse< TYPE *> >\
-  : public GraphTraits<Inverse< BLOCK_TYPE *> > {\
-  typedef TYPE::__VA_ARGS__##graph_iterator nodes_iterator;\
-  static NodeType *getEntryNode(TYPE *C) { return C->exitBlock(); }\
-  static nodes_iterator nodes_begin(TYPE *C) {return C->nodes_begin();}\
-  static nodes_iterator nodes_end(TYPE *C) { return C->nodes_end(); }\
+template <> struct GraphTraits<::swift::CFG *>
+  : public GraphTraits<::swift::BasicBlock *>
+{
+  static NodeType *getEntryNode(::swift::CFG *C) { return C->entryBlock; }
+  typedef ::swift::CFG::BlockListType::iterator nodes_iterator;
+  static nodes_iterator nodes_begin(::swift::CFG *C) {return C->blocks.begin();}
+  static nodes_iterator nodes_end(::swift::CFG *C) { return C->blocks.end(); }
+  static unsigned size(::swift::CFG *C) { return C->blocks.size(); }
 };
-
-DEF_GRAPHTRAIT(::swift::CFG, ::swift::BasicBlock, )
-DEF_GRAPHTRAIT(const ::swift::CFG, const ::swift::BasicBlock, const_)
-
-#undef DEF_GRAPHTRAIT
 
 } // end llvm namespace
 

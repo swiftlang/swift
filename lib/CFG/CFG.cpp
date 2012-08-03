@@ -18,14 +18,12 @@
 
 using namespace swift;
 
-CFG::CFG() :
-  EntryBlock(0),
-  ExitBlock(0) {}
+CFG::CFG() : entryBlock(0) {}
 
 CFG::~CFG() {
   // FIXME: if all parts of BasicBlock are BumpPtrAllocated, this shouldn't
   // eventually be needed.
-  for(BasicBlock *B : *this) { B->~BasicBlock(); }
+  for(BasicBlock &B : blocks) { B.~BasicBlock(); }
 }
 
 /// Pretty-print the basic block.
@@ -33,8 +31,8 @@ void CFG::dump() const { print(llvm::errs()); }
 
 /// Pretty-print the basi block with the designated stream.
 void CFG::print(llvm::raw_ostream &OS) const {
-  for (const BasicBlock *B : Blks) {
-    B->print(OS);
+  for (const BasicBlock &B : blocks) {
+    B.print(OS);
   }
 }
 

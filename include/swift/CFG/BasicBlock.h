@@ -19,16 +19,14 @@
 
 #include "swift/CFG/Instruction.h"
 #include "llvm/Support/Casting.h"
-#include "llvm/ADT/ilist.h"
 #include "llvm/ADT/GraphTraits.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
 
 class CFG;
 
-class BasicBlock {
+class BasicBlock : public llvm::ilist_node<BasicBlock>  {
 public:
   typedef llvm::iplist<Instruction> InstListType;
 
@@ -39,8 +37,9 @@ public:
   CFG * const cfg;
 
 private:
-  BasicBlock(); // Do not implement.
-  BasicBlock(const BasicBlock &B); // Do not implement.
+  friend struct llvm::ilist_sentinel_traits<BasicBlock>;
+  BasicBlock() : cfg(0) {}
+  void operator=(const BasicBlock &) =delete;
 
   std::vector<BasicBlock *> Preds;
 
@@ -78,32 +77,30 @@ public:
 } // end swift namespace
 
 namespace llvm {
-#define DEF_GRAPHTRAIT(BLOCK_TYPE)\
-template <> struct GraphTraits< BLOCK_TYPE *> {\
-  typedef BLOCK_TYPE NodeType;\
-  typedef BLOCK_TYPE::Successors::const_iterator ChildIteratorType;\
-  static NodeType *getEntryNode(BLOCK_TYPE *B) { return B; }\
-  static inline ChildIteratorType child_begin(NodeType *N) {\
-    return N->succs().begin();\
-  }\
-  static inline ChildIteratorType child_end(NodeType *N) {\
-    return N->succs().end();\
-  }\
-};\
-template <> struct GraphTraits<Inverse< BLOCK_TYPE *> > {\
-  typedef BLOCK_TYPE NodeType;\
-  typedef BLOCK_TYPE::Predecessors::const_iterator ChildIteratorType;\
-  static NodeType *getEntryNode(Inverse< BLOCK_TYPE *> G) { return G.Graph; }\
-  static inline ChildIteratorType child_begin(NodeType *N) {\
-    return N->preds().begin();\
-  }\
-  static inline ChildIteratorType child_end(NodeType *N) {\
-    return N->preds().end();\
-  }\
+
+template <> struct GraphTraits<::swift::BasicBlock*> {
+  typedef ::swift::BasicBlock NodeType;
+  typedef ::swift::BasicBlock::Successors::iterator ChildIteratorType;
+  static NodeType *getEntryNode(::swift::BasicBlock *BB) { return BB; }
+  static inline ChildIteratorType child_begin(NodeType *N) {
+    return N->succs().begin();
+  }
+  static inline ChildIteratorType child_end(NodeType *N) {
+    return N->succs().end();
+  }
 };
 
-DEF_GRAPHTRAIT(::swift::BasicBlock)
-DEF_GRAPHTRAIT(const ::swift::BasicBlock)
+template <> struct GraphTraits<const ::swift::BasicBlock*> {
+  typedef const ::swift::BasicBlock NodeType;
+  typedef ::swift::BasicBlock::Successors::const_iterator ChildIteratorType;
+  static NodeType *getEntryNode(const ::swift::BasicBlock *BB) { return BB; }
+  static inline ChildIteratorType child_begin(NodeType *N) {
+    return N->succs().begin();
+  }
+  static inline ChildIteratorType child_end(NodeType *N) {
+    return N->succs().end();
+  }
+};
 
 } // end llvm namespace
 

@@ -20,17 +20,11 @@
 
 using namespace swift;
 
-BasicBlock::BasicBlock(CFG *C) : cfg(C)
-{
-  cfg->Blks.push_back(this);
-}
-
+BasicBlock::BasicBlock(CFG *C) : cfg(C) { cfg->blocks.push_back(this); }
 BasicBlock::~BasicBlock() {}
 
 /// Pretty-print the BasicBlock.
-void BasicBlock::dump() const {
-  print(llvm::errs());
-}
+void BasicBlock::dump() const { print(llvm::errs()); }
 
 /// Pretty-print the BasicBlock with the designated stream.
 void BasicBlock::print(llvm::raw_ostream &OS) const {
