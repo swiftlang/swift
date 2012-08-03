@@ -56,6 +56,7 @@ void Instruction::validate() const {
       assert(std::find(targetBlock.preds().begin(), targetBlock.preds().end(),
                        basicBlock) &&
              "BasicBlock of UncondBranchInst must be a predecessor of target");
+      (void)targetBlock;
     }
   }
 }

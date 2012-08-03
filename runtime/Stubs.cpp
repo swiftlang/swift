@@ -283,5 +283,6 @@ swift_file_size(const char* filename)
     struct stat buf;
     int err = stat(filename, &buf);
     assert(err == 0);
+    (void) err;
     return buf.st_size;
 }
