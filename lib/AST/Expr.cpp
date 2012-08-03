@@ -630,6 +630,8 @@ public:
   void visitNewArrayExpr(NewArrayExpr *E) {
     printCommon(E, "new_array_expr")
       << " elementType='" << E->getElementType() << "'";
+    OS << '\n';
+    printRec(E->getInjectionFunction());
     for (auto &bound : E->getBounds()) {
       OS << '\n';
       if (bound.Value)
