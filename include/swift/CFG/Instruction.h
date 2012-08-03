@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist_node.h"
+#include "llvm/ADT/ilist.h"
 
 namespace llvm {
   class raw_ostream;
@@ -46,12 +47,15 @@ public:
   /// A backreference to the containing basic block.
   BasicBlock *basicBlock;
 
+private:
+  friend struct llvm::ilist_sentinel_traits<Instruction>;
+  Instruction() : kind(Invalid) {}
+  void operator=(const Instruction &) = delete;
+
 protected:
   Instruction(Kind k) : kind(k), basicBlock(0) {}
 
 public:
-  Instruction() : kind(Invalid) {}
-
   virtual ~Instruction();
 
   /// Check that Instruction invariants are preserved.
