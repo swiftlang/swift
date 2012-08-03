@@ -318,7 +318,7 @@ public:
   bool isSameType(Type T1, Type T2, CoercionContext *CC = nullptr,
                   bool Labeled = true);
 
-  void semaFuncExpr(FuncExpr *FE, bool isFirstPass);
+  void semaFuncExpr(FuncExpr *FE, bool isFirstPass, bool allowUnknownTypes);
   bool semaTupleExpr(TupleExpr *TE);
   Expr *semaSubscriptExpr(SubscriptExpr *SE);
   Expr *semaSubscriptExpr(ExistentialSubscriptExpr *SE);
@@ -345,7 +345,7 @@ public:
   void preCheckProtocol(ProtocolDecl *D);
 
   bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
-  bool typeCheckPattern(Pattern *P, bool isFirstPass);
+  bool typeCheckPattern(Pattern *P, bool isFirstPass, bool allowUnknownTypes);
   bool coerceToType(Pattern *P, Type Ty, bool isFirstPass);
   bool typeCheckCondition(Expr *&E);
   bool typeCheckArrayBound(Expr *&E, bool requireConstant);

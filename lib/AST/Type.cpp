@@ -656,8 +656,7 @@ Type IdentifierType::getMappedType() {
 }
 
 TupleType::TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx)
-  : TypeBase(TypeKind::Tuple, CanCtx, /*Unresolved=*/false), Fields(fields) 
-{
+  : TypeBase(TypeKind::Tuple, CanCtx, /*Unresolved=*/false), Fields(fields) {
   // Determine whether this tuple type is unresolved.
   for (const auto &F : Fields) {
     if (!F.getType().isNull() && F.getType()->isUnresolvedType()) {

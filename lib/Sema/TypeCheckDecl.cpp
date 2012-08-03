@@ -224,7 +224,8 @@ public:
     if (PBD->getInit() && !IsFirstPass) {
       Type DestTy;
       if (isa<TypedPattern>(PBD->getPattern())) {
-        if (TC.typeCheckPattern(PBD->getPattern(), /*isFirstPass*/false))
+        if (TC.typeCheckPattern(PBD->getPattern(), /*isFirstPass*/false,
+                                /*allowUnknownTypes*/false))
           return;
         DestTy = PBD->getPattern()->getType();
       }
@@ -246,7 +247,8 @@ public:
           return;
       }
     } else if (!IsFirstPass || !DelayCheckingPattern) {
-      if (TC.typeCheckPattern(PBD->getPattern(), IsFirstPass))
+      if (TC.typeCheckPattern(PBD->getPattern(), IsFirstPass,
+                              /*allowUnknownTypes*/false))
         return;
     }
     visitBoundVars(PBD->getPattern());
@@ -261,7 +263,8 @@ public:
       TC.diagnose(SD->getStartLoc(), diag::subscript_not_member);
 
     bool isInvalid = TC.validateType(SD->getElementTypeLoc(), IsFirstPass);
-    isInvalid |= TC.typeCheckPattern(SD->getIndices(), IsFirstPass);
+    isInvalid |= TC.typeCheckPattern(SD->getIndices(), IsFirstPass,
+                                     /*allowUnknownTypes*/false);
 
     if (isInvalid) {
       SD->setType(ErrorType::get(TC.Context));
@@ -419,7 +422,7 @@ public:
 
     checkGenericParams(FD->getGenericParams());
 
-    TC.semaFuncExpr(body, IsFirstPass);
+    TC.semaFuncExpr(body, IsFirstPass, /*allowUnknownTypes*/false);
     FD->setType(body->getType());
 
     validateAttributes(FD);
@@ -508,7 +511,8 @@ public:
     Type ThisTy = CD->computeThisType(&outerGenericParams);
     CD->getImplicitThisDecl()->setType(ThisTy);
 
-    if (TC.typeCheckPattern(CD->getArguments(), IsFirstPass)) {
+    if (TC.typeCheckPattern(CD->getArguments(), IsFirstPass,
+                            /*allowUnknownTypes*/false)) {
       CD->setType(ErrorType::get(TC.Context));
     } else {
       Type FnTy;

@@ -1,4 +1,4 @@
-//===--- TypeCheckCoercion.cpp - Expression Coercion ---------------------------------===//
+//===--- TypeCheckCoercion.cpp - Expression Coercion ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -498,9 +498,7 @@ public:
     llvm_unreachable("SequenceExprs should all be resolved by this pass");
   }
 
-  CoercedResult visitFuncExpr(FuncExpr *E) {
-    return unchanged(E);      
-  }
+  CoercedResult visitFuncExpr(FuncExpr *E);
 
   CoercedResult visitExplicitClosureExpr(ExplicitClosureExpr *E);
 
@@ -1272,6 +1270,39 @@ CoercedResult SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
   E->setBody(Result);
   return unchanged(E);
 }
+
+CoercedResult SemaCoerce::visitFuncExpr(FuncExpr *E) {
+  // Make sure that we're converting the closure to a function type.  If not,
+  // diagnose the error.
+  FunctionType *FT = DestTy->getAs<FunctionType>();
+  if (FT == 0 || E->getParamPatterns().size() != 1) {
+    diagnose(E->getStartLoc(), diag::funcexpr_not_function_type, DestTy)
+      << E->getSourceRange();
+    return nullptr;
+  }
+
+  // Now that we have a FunctionType for the closure, we can know how many
+  // arguments are allowed.
+  if (Flags & CF_Apply)
+    E->setType(FT);
+
+  // The pattern that specifies the arguments of the FuncExpr must be missing
+  // some type information.  e.g. 'a' in "func(a,b : Int) {}".  Try to resolve
+  // something useful from DestTy.
+  if (!(Flags & CF_Apply))
+    return DestTy;
+
+  // Apply inferred argument type information to the argument patterns.
+  if (TC.coerceToType(E->getParamPatterns()[0], FT->getInput(), false))
+    return nullptr;
+  
+  // FIXME: Result type too!
+  
+  // Now that we potentially resolved something in the FuncExpr, reanalyze it.
+  TC.semaFuncExpr(E, false, /*allowUnknownTypes*/true);
+  return coerced(E);
+}
+
 
 
 /// convertTupleToTupleType - Given an expression that has tuple type, convert
@@ -2136,9 +2167,10 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
   (void)Trivial;
 
   // When diagnosing a failed conversion, ignore l-values on the source type.
-  if (Flags & CF_Apply)
+  if (Flags & CF_Apply) {
     TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), DestTy)
       << E->getSourceRange();
+    }
   return nullptr;
 }
 

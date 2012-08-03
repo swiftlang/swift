@@ -21,14 +21,17 @@
 using namespace swift;
 
 /// Perform bottom-up type-checking on a pattern.  If this returns
-/// false, the type of the pattern will have been set.
-bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass) {
+/// false, the type of the pattern will have been set.  If allowUnknownTypes is
+/// true, then this accepts "any" and "named" patterns, setting their type to
+/// UnresolvedType.
+bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass,
+                                   bool allowUnknownTypes) {
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
   case PatternKind::Paren: {
     Pattern *SP = cast<ParenPattern>(P)->getSubPattern();
-    if (typeCheckPattern(SP, isFirstPass)) {
+    if (typeCheckPattern(SP, isFirstPass, allowUnknownTypes)) {
       P->setType(ErrorType::get(Context));
       return true;
     }
@@ -56,6 +59,14 @@ bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass) {
   // which requires an explicit type.
   case PatternKind::Any:
   case PatternKind::Named:
+    // If we're type checking this pattern in a context that can provide type
+    // information, then the lack of type information is not an error.  Just set
+    // our type to UnresolvedType.
+    if (allowUnknownTypes) {
+      P->setType(Context.TheUnstructuredUnresolvedType);
+      return false;
+    }
+      
     diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
     P->setType(ErrorType::get(Context));
     return true;
@@ -69,7 +80,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass) {
       Type type;
       ExprHandle *init = elt.getInit();
       Pattern *pattern = elt.getPattern();
-      if (typeCheckPattern(pattern, isFirstPass)) {
+      if (typeCheckPattern(pattern, isFirstPass, allowUnknownTypes)) {
         hadError = true;
       } else {
         type = pattern->getType();

@@ -42,6 +42,13 @@ template<typename Class>
 inline char checkSourceRangeType(SourceRange (Class::*)() const);
 inline TwoChars checkSourceRangeType(SourceRange (Pattern::*)() const);
 
+
+void Pattern::setType(Type ty) {
+  assert(!hasType() || getType()->isUnresolvedType());
+  Ty = ty;
+}
+
+
 /// getSourceRange - Return the full source range of the pattern.
 SourceRange Pattern::getSourceRange() const {
   switch (getKind()) {

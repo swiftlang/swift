@@ -1174,7 +1174,7 @@ public:
     // modularly, so we don't need to recurse into them and reanalyze their
     // body.  This prevents N^2 re-sema activity with lots of nested closures.
     if (FuncExpr *FE = dyn_cast<FuncExpr>(E)) {
-      TC.semaFuncExpr(FE, /*isFirstPass*/false);
+      TC.semaFuncExpr(FE, /*isFirstPass*/false, /*allowUnknownTypes*/true);
       return false;
     }
     
@@ -1685,7 +1685,8 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   return true;
 }
 
-void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
+void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass,
+                               bool allowUnknownTypes) {
   bool badType = false;
   if (validateType(FE->getBodyResultTypeLoc(), isFirstPass)) {
     FE->getBodyResultTypeLoc().setInvalidType(Context);
@@ -1695,8 +1696,10 @@ void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
   for (Pattern *P : FE->getParamPatterns()) {
     if (P->hasType())
       continue;
-    if (typeCheckPattern(P, isFirstPass))
+    if (typeCheckPattern(P, isFirstPass, allowUnknownTypes)) {
       badType = true;
+      continue;
+    }
   }
 
   if (badType) {
@@ -1706,6 +1709,7 @@ void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
 
   Type funcTy = FE->getBodyResultType();
 
+  // FIXME: it would be nice to have comments explaining what this is all about.
   auto patterns = FE->getParamPatterns();
   bool isInstanceFunc = false;
   GenericParamList *genericParams = nullptr;

@@ -80,7 +80,7 @@ public:
 
   /// Set the type of this pattern, given that it was previously not
   /// type-checked.
-  void setType(Type ty) { assert(!hasType()); Ty = ty; }
+  void setType(Type ty);
 
   /// Overwrite the type of this pattern.
   void overwriteType(Type ty) { assert(hasType()); Ty = ty; }
