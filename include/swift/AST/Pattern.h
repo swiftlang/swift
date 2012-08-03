@@ -215,7 +215,7 @@ public:
 };
 
 /// A pattern which matches an arbitrary value of a type, but does not
-/// bind a name to it.
+/// bind a name to it.  This is spelled "_".
 class AnyPattern : public Pattern {
   SourceLoc Loc;
 
