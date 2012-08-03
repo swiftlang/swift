@@ -104,6 +104,4 @@ template <> struct GraphTraits<const ::swift::BasicBlock*> {
 
 } // end llvm namespace
 
-#undef DEF_GRAPHTRAIT
-#undef DEF_ITERATOR
 #endif
