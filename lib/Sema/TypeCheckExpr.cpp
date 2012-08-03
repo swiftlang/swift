@@ -1155,7 +1155,9 @@ public:
     return E;
   }
   Expr *visitImplicitClosureExpr(ImplicitClosureExpr *E) {
-    llvm_unreachable("Should not walk into ClosureExprs!");
+    // ImplicitClosureExpr is fully resolved.
+    assert(!E->getType()->isUnresolvedType());
+    return E;
   }
 
   Expr *visitApplyExpr(ApplyExpr *E) {
@@ -1177,10 +1179,6 @@ public:
       TC.semaFuncExpr(FE, /*isFirstPass*/false, /*allowUnknownTypes*/true);
       return false;
     }
-    
-    // If an implicit closure has already been formed, don't walk into it.
-    if (isa<ImplicitClosureExpr>(E))
-      return false;
 
     // Only walk into Explicit Closures if they haven't been seen at all yet.
     // This ensures that everything gets a type, even if it is an
