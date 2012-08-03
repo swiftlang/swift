@@ -70,10 +70,6 @@ public:
     return BPA.Allocate(Size, Align);
   }
 
-  /// Matching method for 'Allocate', but memory is not freed until the
-  /// CFG dies.
-  void deallocate(void *Ptr) const {}
-
   /// \brief Provides a custom implementation of the iterator class to have the
   /// same interface as Function::iterator - iterator returns BasicBlock
   /// (not a pointer to BasicBlock).
@@ -169,9 +165,7 @@ inline void *operator new(size_t Bytes, const swift::CFG &C,
 /// invoking it directly; see the new operator for more details. This operator
 /// is called implicitly by the compiler if a placement new expression using
 /// the CFG throws in the object constructor.
-inline void operator delete(void *Ptr, const swift::CFG &C, size_t) {
-  C.deallocate(Ptr);
-}
+inline void operator delete(void *Ptr, const swift::CFG &C, size_t) {}
 
 /// This placement form of operator new[] uses the CFG's allocator for
 /// obtaining memory.
@@ -190,8 +184,6 @@ inline void *operator new[](size_t Bytes, const swift::CFG& C,
 /// invoking it directly; see the new[] operator for more details. This operator
 /// is called implicitly by the compiler if a placement new[] expression using
 /// the CFG throws in the object constructor.
-inline void operator delete[](void *Ptr, const swift::CFG &C, size_t) {
-  C.deallocate(Ptr);
-}
+inline void operator delete[](void *Ptr, const swift::CFG &C, size_t) {}
 
 #endif
