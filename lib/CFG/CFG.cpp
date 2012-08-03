@@ -18,7 +18,7 @@
 
 using namespace swift;
 
-CFG::CFG() : entryBlock(0) {}
+CFG::CFG() {}
 
 CFG::~CFG() {
   // FIXME: if all parts of BasicBlock are BumpPtrAllocated, this shouldn't

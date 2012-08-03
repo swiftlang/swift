@@ -35,9 +35,6 @@ public:
   /// The collection of all BasicBlocks in the CFG.
   BlockListType blocks;
 
-  /// The entrance of the CFG.
-  BasicBlock *entryBlock;
-
 private:
   friend class BasicBlock;
 
@@ -139,7 +136,7 @@ namespace llvm {
 template <> struct GraphTraits<::swift::CFG *>
   : public GraphTraits<::swift::BasicBlock *>
 {
-  static NodeType *getEntryNode(::swift::CFG *C) { return C->entryBlock; }
+  static NodeType *getEntryNode(::swift::CFG *C) { return &C->blocks.front(); }
   typedef ::swift::CFG::BlockListType::iterator nodes_iterator;
   static nodes_iterator nodes_begin(::swift::CFG *C) {return C->blocks.begin();}
   static nodes_iterator nodes_end(::swift::CFG *C) { return C->blocks.end(); }
