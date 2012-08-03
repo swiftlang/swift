@@ -61,13 +61,6 @@ swift_allocObject(struct SwiftHeapMetadata *metadata,
   return object;
 }
 
-struct SwiftHeapObject *
-swift_allocClass(struct SwiftHeapMetadata *metadata,
-                  size_t requiredSize,
-                  size_t requiredAlignment) {
-  return swift_allocObject(metadata, requiredSize, requiredAlignment);
-}
-
 extern "C" void
 _swift_release_slow(struct SwiftHeapObject *object)
   __attribute__((noinline,used));
