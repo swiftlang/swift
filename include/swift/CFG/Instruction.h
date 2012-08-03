@@ -56,18 +56,14 @@ protected:
   Instruction(BasicBlock *B, Kind K) : kind(K), basicBlock(B) {}
 
 public:
-  virtual ~Instruction();
-
   /// Check that Instruction invariants are preserved.
-  virtual void validate() const;
+  void validate() const;
 
   /// Pretty-print the Instruction.
   void dump() const;
 
   /// Pretty-print the Instruction to the designated stream.
-  // FIXME: if no subclasses contain virtual methods, we can devirtualize
-  // this class and save a VPTR.
-  virtual void print(llvm::raw_ostream &OS) const;
+  void print(llvm::raw_ostream &OS) const;
 
   static bool classof(const Instruction *I) { return true; }
 };
@@ -76,13 +72,10 @@ public:
 class TermInst : public Instruction {
 public:
   TermInst(BasicBlock *B, Kind K) : Instruction(B, K) {}
-  virtual ~TermInst();
 
   // FIXME: Implement.
-  virtual llvm::ArrayRef<BasicBlock *> successors() = 0;
-
-  /// Pretty-print the TermInst.
-  void dump() const;
+  typedef llvm::ArrayRef<BasicBlock *> Successors;
+  Successors successors();
 
   static bool classof(const Instruction *I) {
     return I->kind >= TERM_INST_BEGIN && I->kind <= TERM_INST_END;
@@ -106,14 +99,6 @@ public:
   UncondBranchInst(BasicBlock &SrcBlk,
                    BasicBlock &DstBlk,
                    llvm::ArrayRef<unsigned> Args);
-
-  virtual ~UncondBranchInst();
-
-  /// Pretty-print the TermInst to the designated stream.
-  void print(llvm::raw_ostream &OS) const;
-
-  /// Check that UncondBranchInst invariants are preserved.
-  void validate() const;
 };
 } // end swift namespace
 

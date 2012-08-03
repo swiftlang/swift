@@ -17,16 +17,10 @@
 #include "swift/CFG/Instruction.h"
 #include "swift/CFG/BasicBlock.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 
 using namespace swift;
-
-Instruction::~Instruction() {}
-void Instruction::print(llvm::raw_ostream &OS) const {}
-void Instruction::dump() const { print(llvm::errs()); }
-void Instruction::validate() const {}
-
-TermInst::~TermInst() {}
 
 UncondBranchInst::UncondBranchInst(BasicBlock &SrcBlk,
                                    BasicBlock &DstBlk,
@@ -44,23 +38,51 @@ UncondBranchInst::UncondBranchInst(BasicBlock &SrcBlk,
   llvm::ArrayRef<unsigned>(Args, NumArgs) = BArgs;
 }
 
-UncondBranchInst::~UncondBranchInst() {}
-
-void UncondBranchInst::print(llvm::raw_ostream &OS) const {
-  OS << "br " << *basicBlock;
-  const ArgsTy Args = blockArgs();
-  if (!Args.empty()) {
-    OS << '(';
-    for (auto Arg : Args) { OS << "%" << Arg; }
-    OS << ')';
+void Instruction::print(llvm::raw_ostream &OS) const {
+  switch (kind) {
+    case Invalid:
+      OS << "InvalidInstruction";
+      return;
+    case UncondBranch: {
+      const UncondBranchInst &UBI = *llvm::cast<UncondBranchInst>(this);
+      OS << "br " << UBI.targetBlock;
+      const UncondBranchInst::ArgsTy Args = UBI.blockArgs();
+      if (!Args.empty()) {
+        OS << '(';
+        for (auto Arg : Args) { OS << "%" << Arg; }
+        OS << ')';
+      }
+      return;
+    }
   }
 }
 
-void UncondBranchInst::validate() const {
-  assert(!basicBlock->instructions.empty() &&
-         &*basicBlock->instructions.rbegin() == this &&
-         "UncondBranchInst must appear at end of BasicBlock");
-  assert(std::find(targetBlock.preds().begin(), targetBlock.preds().end(),
-                   basicBlock) &&
-         "BasicBlock of UncondBranchInst must be a predecessor of target");
+void Instruction::dump() const { print(llvm::errs()); }
+
+void Instruction::validate() const {
+  switch (kind) {
+    case Invalid:
+      return;
+    case UncondBranch: {
+      const UncondBranchInst &UBI = *llvm::cast<UncondBranchInst>(this);
+      assert(!basicBlock->instructions.empty() &&
+             &*basicBlock->instructions.rbegin() == this &&
+             "UncondBranchInst must appear at end of BasicBlock");
+      const BasicBlock &targetBlock = UBI.targetBlock;
+      assert(std::find(targetBlock.preds().begin(), targetBlock.preds().end(),
+                       basicBlock) &&
+             "BasicBlock of UncondBranchInst must be a predecessor of target");
+    }
+  }
+}
+
+TermInst::Successors TermInst::successors() {
+  switch (kind) {
+    case Invalid:
+      llvm_unreachable("Only TermInst's are allowed");
+    case UncondBranch: {
+      const UncondBranchInst &UBI = *llvm::cast<UncondBranchInst>(this);
+      return Successors(&UBI.targetBlock);
+    }
+  }
 }
