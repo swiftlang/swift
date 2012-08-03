@@ -218,6 +218,13 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
     return CoercedResult(E);
   }
 
+  CoercedResult failed(Expr *E) {
+    if (Flags & CF_Apply)
+      TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), DestTy)
+        << E->getSourceRange();
+    return nullptr;
+  }
+
   /// coerce - Return a newly-coerced expression.
   CoercedResult coerced(Expr *E) {
     return coerced(E, Flags);
@@ -248,40 +255,42 @@ public:
     return CoercionResult::Unknowable;
   }
   CoercedResult visitMemberRefExpr(MemberRefExpr *E) {
-    return unchanged(E);
+    return failed(E); // FIXME: Is this reachable?
   }
   CoercedResult visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
-    return unchanged(E);
+    return failed(E); // FIXME: Is this reachable?
   }
   CoercedResult visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
-    return unchanged(E);
+    return failed(E); // FIXME: Is this reachable?
   }
   CoercedResult visitGenericMemberRefExpr(GenericMemberRefExpr *E) {
-    return unchanged(E);
+    return failed(E); // FIXME: Is this reachable?
   }
   CoercedResult visitNewArrayExpr(NewArrayExpr *E) {
-    return unchanged(E);
+    return failed(E); // FIXME: Is this reachable?
   }
   CoercedResult visitNewReferenceExpr(NewReferenceExpr *E) {
-    return unchanged(E);
+    return failed(E); // FIXME: Is this reachable?
   }
   CoercedResult visitTypeOfExpr(TypeOfExpr *E) {
-    return unchanged(E);
+    llvm_unreachable("This node doesn't exist for unresolved types");
   }
   CoercedResult visitOpaqueValueExpr(OpaqueValueExpr *E) {
-    return unchanged(E);
+    // An OpaqueValueExpr can be unresolved if deducible types are involved.
+    // If it could be resolved, though, we would have already resolved it.
+    return failed(E);
   }
   CoercedResult visitSubscriptExpr(SubscriptExpr *E) {
-    return unchanged(E);
+    return failed(E); // FIXME: Is this reachable?
   }
   CoercedResult visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
-    return unchanged(E);
+    return failed(E); // FIXME: Is this reachable?
   }
   CoercedResult visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
-    return unchanged(E);
+    return failed(E); // FIXME: Is this reachable?
   }
   CoercedResult visitGenericSubscriptExpr(GenericSubscriptExpr *E) {
-    return unchanged(E);
+    return failed(E); // FIXME: Is this reachable?
   }
   CoercedResult visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) {
     Type BaseTy = E->getBase()->getType()->getRValueType();
@@ -465,10 +474,7 @@ public:
     // We can't coerce a TupleExpr to anything other than a tuple.
     assert(!DestTy->is<TupleType>() &&
            "Already special cased in SemaCoerce::coerceToType");
-    if (Flags & CF_Apply)
-      TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), DestTy)
-        << E->getSourceRange();
-    return nullptr;
+    return failed(E);
   }
   
   CoercedResult visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
@@ -503,24 +509,24 @@ public:
   CoercedResult visitExplicitClosureExpr(ExplicitClosureExpr *E);
 
   CoercedResult visitImplicitClosureExpr(ImplicitClosureExpr *E) {
-    return unchanged(E);      
+    llvm_unreachable("This node doesn't exist for unresolved types");
   }
   
   CoercedResult visitModuleExpr(ModuleExpr *E) {
-    return unchanged(E);
+    llvm_unreachable("This node doesn't exist for unresolved types");
   }
 
   CoercedResult visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
     // FIXME: Coerces the RHS.
-    return unchanged(E);
+    return failed(E);
   }
 
   CoercedResult visitCoerceExpr(CoerceExpr *E) {
-    return unchanged(E);
+    llvm_unreachable("This node doesn't exist for unresolved types");
   }
 
   CoercedResult visitImplicitConversionExpr(ImplicitConversionExpr *E) {
-    return unchanged(E);
+    llvm_unreachable("This node doesn't exist for unresolved types");
   }
 
   CoercedResult visitAddressOfExpr(AddressOfExpr *E) {
@@ -2083,11 +2089,6 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
   if (TC.isSameType(E->getType(), DestTy, &CC))
     return unchanged(E, Flags);
 
-  // If the input expression has an unresolved type, try to coerce it to an
-  // appropriate type.
-  if (E->getType()->isUnresolvedType())
-    return SemaCoerce(CC, DestTy, Flags).doIt(E);
-
   // If there is an implicit conversion from the source to the destination
   // type, use it.
   if (Flags & CF_UserConversions) {
@@ -2112,6 +2113,25 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
       return Loaded;
     }
   }
+
+  // A value of function type can be converted to a value of another function
+  // type, so long as the source is a subtype of the destination.
+  if (E->getType()->is<AnyFunctionType>() && DestTy->is<AnyFunctionType>()) {
+    bool Trivial;
+    if (TC.isSubtypeOf(E->getType(), DestTy, Trivial, &CC)) {
+      if (!(Flags & CF_Apply))
+        return DestTy;
+      
+      return coerced(new (TC.Context) FunctionConversionExpr(E, DestTy,
+                                                             Trivial),
+                     Flags);
+    }
+  }
+
+  // If the input expression has an unresolved type, try to coerce it to an
+  // appropriate type.
+  if (E->getType()->isUnresolvedType())
+    return SemaCoerce(CC, DestTy, Flags).doIt(E);
 
   {
     // A value of any given type can be converted to a value of existential if
@@ -2143,20 +2163,6 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
                new (TC.Context) ErasureExpr(E, DestTy,
                                   TC.Context.AllocateCopy(Conformances)),
                     Flags);
-    }
-  }
-
-  // A value of function type can be converted to a value of another function
-  // type, so long as the source is a subtype of the destination.
-  if (E->getType()->is<AnyFunctionType>() && DestTy->is<AnyFunctionType>()) {
-    bool Trivial;
-    if (TC.isSubtypeOf(E->getType(), DestTy, Trivial, &CC)) {
-      if (!(Flags & CF_Apply))
-        return DestTy;
-      
-      return coerced(new (TC.Context) FunctionConversionExpr(E, DestTy,
-                                                             Trivial),
-                     Flags);
     }
   }
 
