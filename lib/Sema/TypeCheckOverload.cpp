@@ -414,7 +414,7 @@ static bool lookPastThisArgument(Type BaseTy, ValueDecl *VD) {
       return true;
     if (FD->isStatic())
       return true;
-  } else if (OneOfElementDecl *OOED = dyn_cast<OneOfElementDecl>(VD)) {
+  } else if (isa<OneOfElementDecl>(VD)) {
     return true;
   }
 
