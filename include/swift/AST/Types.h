@@ -847,10 +847,11 @@ class AnyFunctionType : public TypeBase {
   const Type Input;
   const Type Output;
 protected:
-  AnyFunctionType(TypeKind kind, ASTContext *canTypeContext,
-                  Type input, Type output, bool isUnresolved)
-    : TypeBase(kind, canTypeContext, /*unresolved*/ false),
-      Input(input), Output(output) {
+  AnyFunctionType(TypeKind Kind, ASTContext *CanTypeContext,
+                  Type Input, Type Output, bool isUnresolved)
+    : TypeBase(Kind, CanTypeContext,
+               Input->isUnresolvedType() || Output->isUnresolvedType()),
+      Input(Input), Output(Output) {
   }
 
 public:
