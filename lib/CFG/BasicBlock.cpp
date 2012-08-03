@@ -20,8 +20,7 @@
 
 using namespace swift;
 
-BasicBlock::BasicBlock(CFG *C, unsigned &BlockID) :
-  FrontI(0), BackI(0), cfg(C), blockID(BlockID++)
+BasicBlock::BasicBlock(CFG *C) : cfg(C)
 {
   cfg->Blks.push_back(this);
 }
@@ -35,19 +34,15 @@ void BasicBlock::dump() const {
 
 /// Pretty-print the BasicBlock with the designated stream.
 void BasicBlock::print(llvm::raw_ostream &OS) const {
-  OS << "[Block " << blockID << "]\n";
-  for (const Instruction *I : *this)
-    I->print(OS);
-  if (TermInst *TI = terminator()) {
-    OS << "Terminator: ";
-    TI->print(OS);
-  }
+  OS << "[Block " << (void*) this << "]\n";
+  for (const Instruction &I : instructions)
+    I.print(OS);
   OS << "Preds:";
   for (const BasicBlock *B : preds())
-    OS << ' ' << B->blockID;
+    OS << ' ' << (void*) B;
   OS << "\nSuccs:";
   for (const BasicBlock *B : succs())
-    OS << ' ' << B->blockID;
+    OS << ' ' << (void*) B;
   OS << '\n';
 }
 

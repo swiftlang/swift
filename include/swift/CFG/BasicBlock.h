@@ -18,6 +18,8 @@
 #define SWIFT_BASICBLOCK_H
 
 #include "swift/CFG/Instruction.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/ADT/ilist.h"
 #include "llvm/ADT/GraphTraits.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -26,58 +28,25 @@ namespace swift {
 
 class CFG;
 
-#define DEF_ITERATOR(ITER, ADVANCE, START, BEGIN, END, ...)\
-class ITER {\
-  __VA_ARGS__ Instruction *I;\
-public:\
-  ITER( __VA_ARGS__ Instruction *I = 0) : I(I) {}\
-  bool operator==(const ITER &X) const { return I == X.I; };\
-  bool operator!=(const ITER &X) const { return I != X.I; };\
-  ITER &operator++() { I = I->ADVANCE##Inst; return *this; }\
-  __VA_ARGS__ Instruction *operator*() const { return I; }\
-  __VA_ARGS__ Instruction &operator->() const { return *I; }\
-};\
-ITER BEGIN () __VA_ARGS__ { return START; }\
-ITER END () __VA_ARGS__ { return nullptr; }
-
 class BasicBlock {
-  // FIXME: Optimize Preds representation later.
-  std::vector<BasicBlock *> Preds;
-  Instruction *FrontI, *BackI;
-  llvm::PointerUnion<BasicBlock*, TermInst *> SuccOrTerm;
+public:
+  typedef llvm::iplist<Instruction> InstListType;
+
+  /// The ordered set of instructions in the BasicBlock.
+  InstListType instructions;
+
+  /// A backreference to the containing CFG.
+  CFG * const cfg;
 
 private:
   BasicBlock(); // Do not implement.
   BasicBlock(const BasicBlock &B); // Do not implement.
 
+  std::vector<BasicBlock *> Preds;
+
 public:
-  /// A backreference to the containing CFG.
-  CFG * const cfg;
-
-  /// The numeric identifier for the block.
-  const unsigned blockID;
-
-  BasicBlock(CFG *C, unsigned &BlockID);
-
+  BasicBlock(CFG *C);
   ~BasicBlock();
-
-  DEF_ITERATOR(iterator, next, FrontI, begin, end, )
-  DEF_ITERATOR(const_iterator, next, FrontI, begin, end, const)
-  DEF_ITERATOR(reverse_iterator, prev, BackI, rbegin, rend, )
-  DEF_ITERATOR(const_reverse_iterator, prev, BackI, rbegin, rend, const)
-
-  /// Return the instruction at the entry of the basic block.
-  Instruction *front() const { return FrontI; }
-
-  /// Return the instruction at the end of the basic block, but before the
-  /// terminator.
-  Instruction *back() const { return BackI; }
-
-  /// Return true if the block is empty (excluding terminator).
-  bool empty() { return front() == nullptr; }
-
-  /// Return the terminator instruction (if any).
-  TermInst *terminator() const { return SuccOrTerm.dyn_cast<TermInst*>(); }
 
   /// Pretty-print the BasicBlock.
   void dump() const;
@@ -86,16 +55,6 @@ public:
   void print(llvm::raw_ostream &OS) const;
 
   void addPred(BasicBlock *B) { Preds.push_back(B); }
-  void setFront(Instruction *I) { FrontI = I; }
-  void setBack(Instruction *I) { BackI = I; }
-  void setTerm(TermInst *I) {
-    assert(SuccOrTerm.isNull());
-    SuccOrTerm = I;
-  }
-  void setSucc(BasicBlock *Succ) {
-    assert(SuccOrTerm.isNull());
-    SuccOrTerm = Succ;
-  }
 
   typedef llvm::ArrayRef<BasicBlock *> Predecessors;
   typedef llvm::ArrayRef<BasicBlock *> Successors;
@@ -109,12 +68,7 @@ public:
   /// The successors of a BasicBlock are defined either explicitly as
   /// a single successor as the branch targets of the terminator instruction.
   Successors succs() {
-    if (SuccOrTerm.isNull())
-      return nullptr;
-    if (TermInst *T = terminator())
-      return T->branchTargets();
-    BasicBlock **Succ = SuccOrTerm.getAddrOfPtr1();
-    return llvm::ArrayRef<BasicBlock*>(Succ, Succ);
+    return llvm::cast<TermInst>(instructions.back()).successors();
   }
   const Successors succs() const {
     return const_cast<BasicBlock*>(this)->succs();

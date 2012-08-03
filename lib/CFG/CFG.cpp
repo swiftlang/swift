@@ -34,7 +34,6 @@ void CFG::dump() const { print(llvm::errs()); }
 /// Pretty-print the basi block with the designated stream.
 void CFG::print(llvm::raw_ostream &OS) const {
   for (const BasicBlock *B : Blks) {
-    OS << "[Block " << B->blockID << "]\n";
     B->print(OS);
   }
 }
@@ -42,17 +41,7 @@ void CFG::print(llvm::raw_ostream &OS) const {
 CFG *CFG::constructCFG(const Stmt *S) {
   // FIXME: implement CFG construction.
   CFG *C = new CFG();
-  unsigned blockID = 0;
-
-  BasicBlock *ExitBlock = new (*C, 8) BasicBlock(C, blockID);
-  BasicBlock *EntryBlock = new (*C, 8) BasicBlock(C, blockID);
-  ExitBlock->addPred(EntryBlock);
-  EntryBlock->setSucc(ExitBlock);
-
-  (void) ExitBlock;
-  (void) EntryBlock;
-
-  return new CFG();
+  return C;
 }
 
 namespace {

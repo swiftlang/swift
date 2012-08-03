@@ -18,6 +18,7 @@
 #define SWIFT_INSTRUCTION_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/ilist_node.h"
 
 namespace llvm {
   class raw_ostream;
@@ -30,22 +31,31 @@ class BasicBlock;
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift BasicBlock.  They cannot be used as terminators for BasicBlocks;
 /// for those we have TermInst.
-class Instruction {
-  Instruction() : prevInst(0), nextInst(0), basicBlock(0) {}
+class Instruction : public llvm::ilist_node<Instruction> {
 public:
-  virtual ~Instruction();
+  enum Kind {
+    Invalid,
+    UncondBranch,
+    TERM_INST_BEGIN = UncondBranch,
+    TERM_INST_END = TERM_INST_BEGIN
+  };
 
-  /// The previous instruction in the containing basic block.
-  Instruction *prevInst;
-
-  /// The next instruction in the containing basic block.
-  Instruction *nextInst;
+  /// The kind of the Instruction.
+  const Kind kind;
 
   /// A backreference to the containing basic block.
   BasicBlock *basicBlock;
 
+protected:
+  Instruction(Kind k) : kind(k), basicBlock(0) {}
+
+public:
+  Instruction() : kind(Invalid) {}
+
+  virtual ~Instruction();
+
   /// Check that Instruction invariants are preserved.
-  virtual bool validate() const = 0;
+  virtual bool validate() const;
 
   /// Pretty-print the Instruction.
   void dump() const;
@@ -53,20 +63,19 @@ public:
   /// Pretty-print the Instruction to the designated stream.
   // FIXME: if no subclasses contain virtual methods, we can devirtualize
   // this class and save a VPTR.
-  virtual void print(llvm::raw_ostream &OS) const = 0;
+  virtual void print(llvm::raw_ostream &OS) const;
+
+  static bool classof(const Instruction *I) { return true; }
 };
 
 /// This class defines a "terminating instruction" for a BasicBlock.
-/// These instructions are different from regular Instruction objects, as
-/// they are exclusively used for representing terminators in BasicBlock,
-/// while Instruction objects must appear within the BasicBlock body.
-class TermInst {
-  TermInst() {}
+class TermInst : public Instruction {
 public:
+  TermInst(Kind k) : Instruction(k) {}
   virtual ~TermInst();
 
   // FIXME: Implement.
-  llvm::ArrayRef<BasicBlock *> branchTargets() { return nullptr; }
+  llvm::ArrayRef<BasicBlock *> successors() { return nullptr; }
 
   /// Pretty-print the TermInst.
   void dump() const;
@@ -75,8 +84,22 @@ public:
   // FIXME: if no subclasses contain virtual methods, we can devirtualize
   // this class and save a VPTR.
   virtual void print(llvm::raw_ostream &OS) const = 0;
+
+  static bool classof(const Instruction *I) {
+    return I->kind >= TERM_INST_BEGIN && I->kind <= TERM_INST_END;
+  }
+
 };
 
+class UncondBranchInst : public TermInst {
+  BasicBlock *TargetBlock;
+public:
+  UncondBranchInst(BasicBlock *B);
+  virtual ~UncondBranchInst();
+
+  BasicBlock *targetBlock() { return TargetBlock; }
+  void setTargetBlock();
+};
 } // end swift namespace
 
 #endif
