@@ -35,7 +35,7 @@ namespace irgen {
   class Arg;
   class Explosion;
   enum class ExplosionKind : unsigned;
-  class Callee;
+  class CallEmission;
   class IRGenFunction;
   class IRGenModule;
   class LValue;
@@ -57,20 +57,18 @@ namespace irgen {
                                         ExistentialMemberRefExpr *E);
 
   /// Emit an existential member reference as a callee.
-  Callee emitExistentialMemberRefCallee(IRGenFunction &IGF,
+  CallEmission prepareExistentialMemberRefCall(IRGenFunction &IGF,
                                         ExistentialMemberRefExpr *E,
                                         Type substResultType,
                                         ArrayRef<Substitution> subs,
-                                        SmallVectorImpl<Arg> &calleeArgs,
                                         ExplosionKind maxExplosionLevel,
                                         unsigned maxUncurry);
 
   /// Emit an existential member reference as a callee.
-  Callee emitArchetypeMemberRefCallee(IRGenFunction &IGF,
+  CallEmission prepareArchetypeMemberRefCall(IRGenFunction &IGF,
                                       ArchetypeMemberRefExpr *E,
                                       Type substResultType,
                                       ArrayRef<Substitution> subs,
-                                      SmallVectorImpl<Arg> &calleeArgs,
                                       ExplosionKind maxExplosionLevel,
                                       unsigned maxUncurry);
 

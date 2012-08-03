@@ -16,7 +16,7 @@
 
 #include "IRGenModule.h"
 #include "IRGenFunction.h"
-#include "GenFunc.h"
+#include "Callee.h"
 #include "GenInit.h"
 #include "TypeInfo.h"
 #include "swift/AST/Decl.h"

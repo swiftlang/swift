@@ -22,8 +22,8 @@
 #include "llvm/DerivedTypes.h"
 
 #include "Address.h"
+#include "CallEmission.h"
 #include "Explosion.h"
-#include "GenFunc.h"
 #include "GenHeap.h"
 #include "GenType.h"
 #include "IRGenModule.h"
@@ -117,10 +117,10 @@ void swift::irgen::emitNewArrayExpr(IRGenFunction &IGF, NewArrayExpr *E,
                          E->getInjectionFunction(), length, out);
 }
 
-void swift::irgen::emitArrayInjectionCall(IRGenFunction &IGF, ManagedValue alloc,
-                                          Address begin, Type sliceTy,
-                                          Expr *injectionFn, llvm::Value *length,
-                                          Explosion &out) {
+void irgen::emitArrayInjectionCall(IRGenFunction &IGF, ManagedValue alloc,
+                                   Address begin, Type sliceTy,
+                                   Expr *injectionFn, llvm::Value *length,
+                                   Explosion &out) {
   // Emit the allocation.
 
   // Eventually the data address will be well-typed, but for now it
@@ -129,32 +129,17 @@ void swift::irgen::emitArrayInjectionCall(IRGenFunction &IGF, ManagedValue alloc
   dataAddr = IGF.Builder.CreateBitCast(dataAddr, IGF.IGM.Int8PtrTy);
 
   // Emit the callee.
-  llvm::SmallVector<Arg, 4> args;
-  // FIXME: emitCallee is currently broken; use an ugly workaround in the
-  // meantime.
-#if 0
-  Callee callee =
-    emitCallee(IGF, injectionFn, out.getKind(), /*uncurry*/ 0, args);
-#else
-  Explosion CalleeExplosion(ExplosionKind::Minimal);
-  IGF.emitRValue(injectionFn, CalleeExplosion);
-  llvm::Value *fn = CalleeExplosion.claimUnmanagedNext();
-  llvm::Type *fnTy = IGF.IGM.getFunctionType(injectionFn->getType(),
-                                             ExplosionKind::Minimal, 0, true);
-  fn = IGF.Builder.CreateBitCast(fn, fnTy->getPointerTo());
-  ManagedValue data = CalleeExplosion.claimNext();
-  Callee callee = Callee::forIndirectCall(injectionFn->getType(), sliceTy,
-                                          ArrayRef<Substitution>(), fn, data);
-#endif
+  CallEmission emission = prepareCall(IGF, injectionFn, out.getKind(),
+                                      1, sliceTy);
 
   // The injection function takes this tuple:
   //   (Builtin.RawPointer, Builtin.ObjectPointer, typeof(length))
-  Explosion injectionArg(callee.getExplosionLevel());
+  Explosion injectionArg(emission.getCurExplosionLevel());
   injectionArg.addUnmanaged(dataAddr);
   injectionArg.add(alloc);
   injectionArg.addUnmanaged(length);
-  args.push_back(Arg::forUnowned(injectionArg));
+  emission.addArg(injectionArg);
 
-  const TypeInfo &sliceTI = IGF.getFragileTypeInfo(sliceTy);
-  emitCall(IGF, callee, args, sliceTI, out);
+  // Force the call.
+  emission.emitToExplosion(out);
 }

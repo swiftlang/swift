@@ -3,6 +3,8 @@ add_swift_library(swiftIRGen
   Address.h
   CMakeLists.txt
   CallingConvention.h
+  CallEmission.h
+  Callee.h
   Cleanup.h
   Condition.h
   DiverseList.h

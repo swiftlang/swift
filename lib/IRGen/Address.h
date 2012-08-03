@@ -63,6 +63,11 @@ public:
   Address getAddress() const { return Addr; }
   llvm::Value *getOwner() const { return Owner; }
 
+  Address getUnownedAddress() const {
+    assert(getOwner() == nullptr);
+    return getAddress();
+  }
+
   operator Address() const { return getAddress(); }
 
   bool isValid() const { return Addr.isValid(); }

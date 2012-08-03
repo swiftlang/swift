@@ -24,8 +24,8 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Optional.h"
 #include "ASTVisitor.h"
+#include "CallEmission.h"
 #include "GenClass.h"
-#include "GenFunc.h"
 #include "GenInit.h"
 #include "GenStruct.h"
 #include "GenType.h"
@@ -567,7 +567,7 @@ namespace {
       llvm::Constant *fn =
         IGF.IGM.getAddrOfSetter(getDecl(), formal, explosionLevel);
 
-      Type voidTy = cast<AnyFunctionType>(formal.getType())->getResult();
+      Type voidTy = TupleType::getEmpty(IGF.IGM.Context);
       return Callee::forKnownFunction(formal.getCC(), formal.getType(),
                                       voidTy, getSubstitutions(),
                                       fn, ManagedValue(nullptr),
@@ -684,39 +684,52 @@ namespace {
       }
     }
 
+    void addSelfArg(IRGenFunction &IGF, CallEmission &emission,
+                    Address base, bool preserve) const {
+      if (Target.isByrefMember()) {
+        Explosion selfArg(emission.getCurExplosionLevel());
+        selfArg.addUnmanaged(base.getAddress());
+        emission.addArg(selfArg);
+      } else if (Target.isByvalMember()) {
+        Explosion selfArg(emission.getCurExplosionLevel());
+        addBaseValues(IGF, selfArg, preserve);
+        emission.addArg(selfArg);
+      }
+    }
+
+    void addIndexArg(IRGenFunction &IGF, CallEmission &emission,
+                     bool preserve) const {
+      if (Target.isSubscript()) {
+        Explosion index(emission.getCurExplosionLevel());
+        addIndexValues(IGF, index, preserve);
+        emission.addArg(index);
+      }
+    }
+
     /// A helper routine for performing code common to all store paths.
     void store(IRGenFunction &IGF, const Callee &setter, Address base,
                Explosion &rawValue, const TypeInfo &valueTI,
                bool preserve) const {
-      // An explosion for the 'self' argument, if required.
-      Explosion selfArg(setter.getExplosionLevel());
-
-      SmallVector<Arg, 2> args;
+      CallEmission emission(IGF, setter);
 
       // A byref member requires 'self' as its first argument.
-      if (Target.isByrefMember()) {
-        selfArg.addUnmanaged(base.getAddress());
-        args.push_back(Arg::forUnowned(selfArg));
-      } else if (Target.isByvalMember()) {
-        addBaseValues(IGF, selfArg, preserve);
-        args.push_back(Arg::forUnowned(selfArg));
-      }
+      addSelfArg(IGF, emission, base, preserve);
 
       // Add the value argument.
       // In a subscript, this is a tuple of the subscript and the value.
-      Explosion value(setter.getExplosionLevel());
       if (Target.isSubscript()) {
+        Explosion value(setter.getExplosionLevel());
         addIndexValues(IGF, value, preserve);
         valueTI.reexplode(IGF, rawValue, value);
-        args.push_back(Arg::forUnowned(value));
+        emission.addArg(value);
 
       // Otherwise, it's just the original value.
       } else {
-        args.push_back(Arg::forUnowned(rawValue, valueTI));
+        emission.addArg(rawValue);
       }
 
       // Make the call.
-      emitVoidCall(IGF, setter, args);
+      emission.emitVoid();
     }
 
     void storeRValue(IRGenFunction &IGF, Expr *rvalue,
@@ -753,69 +766,36 @@ namespace {
     void loadExplosion(IRGenFunction &IGF, Address base, Explosion &out,
                        bool preserve) const {
       Callee getter = Target.getGetter(IGF, out.getKind());
-
-      // Build the arguments.
-      SmallVector<Arg, 2> args;
+      CallEmission emission(IGF, getter);
 
       // Byref members need a 'self' argument.
-      Explosion selfArg(getter.getExplosionLevel());
-      if (Target.isByrefMember()) {
-        selfArg.addUnmanaged(base.getAddress());
-
-        // We can use an untyped Arg because we perfectly match the
-        // getter's explosion level.
-        args.push_back(Arg::forUnowned(selfArg));
-      } else if (Target.isByvalMember()) {
-        addBaseValues(IGF, selfArg, preserve);
-        args.push_back(Arg::forUnowned(selfArg));
-      }
+      addSelfArg(IGF, emission, base, preserve);
 
       // The next argument is the "index", when present.
-      Explosion index(getter.getExplosionLevel());
-      if (Target.isSubscript()) {
-        addIndexValues(IGF, index, preserve);
-        args.push_back(Arg::forUnowned(index));
-      }
+      addIndexArg(IGF, emission, preserve);
 
       // The last argument is always an empty tuple.
-      args.push_back(Arg());
+      emission.addEmptyArg();
 
-      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
-      emitCall(IGF, getter, args, valueTI, out);
+      emission.emitToExplosion(out);
     }
 
     void loadMaterialized(IRGenFunction &IGF, Address base, Address temp,
                           bool preserve) const {
       Callee getter = Target.getGetter(IGF, ExplosionKind::Maximal);
-
-      // Build the arguments.
-      SmallVector<Arg, 2> args;
+      CallEmission emission(IGF, getter);
 
       // Byref members need a 'self' argument.
-      Explosion selfArg(getter.getExplosionLevel());
-      if (Target.isByrefMember()) {
-        selfArg.addUnmanaged(base.getAddress());
-
-        // We can use an untyped Arg because we perfectly match the
-        // getter's explosion level.
-        args.push_back(Arg::forUnowned(selfArg));
-      } else if (Target.isByvalMember()) {
-        addBaseValues(IGF, selfArg, preserve);
-        args.push_back(Arg::forUnowned(selfArg));
-      }
+      addSelfArg(IGF, emission, base, preserve);
 
       // The next argument is the "index", for subscripts.
-      Explosion index(getter.getExplosionLevel());
-      if (Target.isSubscript()) {
-        addIndexValues(IGF, index, preserve);
-        args.push_back(Arg::forUnowned(index));
-      }
+      addIndexArg(IGF, emission, preserve);
 
       // The last argument is always an empty tuple.
-      args.push_back(Arg());
+      emission.addEmptyArg();
 
       const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
-      emitCallToMemory(IGF, getter, args, valueTI, temp);
+      emission.emitToMemory(temp, valueTI);
     }
 
     OwnedAddress loadAndMaterialize(IRGenFunction &IGF, OnHeap_t onHeap,

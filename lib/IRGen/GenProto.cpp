@@ -37,10 +37,10 @@
 #include "llvm/Function.h"
 #include "llvm/Module.h"
 
+#include "CallEmission.h"
 #include "Cleanup.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
-#include "GenFunc.h"
 #include "GenHeap.h"
 #include "GenType.h"
 #include "IndirectTypeInfo.h"
@@ -2281,7 +2281,7 @@ namespace {
 
     void addStaticMethod(FuncDecl *iface) {
       FuncDecl *impl = cast<FuncDecl>(Conformance.Mapping.find(iface)->second);
-      Table.push_back(getInstanceMethodWitness(impl, iface->getType()));
+      Table.push_back(getStaticMethodWitness(impl, iface->getType()));
     }
 
     void addInstanceMethod(FuncDecl *iface) {
@@ -2292,6 +2292,14 @@ namespace {
     /// Returns a function which calls the given implementation under
     /// the given interface.
     llvm::Constant *getInstanceMethodWitness(FuncDecl *impl, Type ifaceType) {
+      llvm::Constant *implPtr =
+        IGM.getAddrOfFunction(impl, ExplosionKind::Minimal, 1, /*data*/ false);
+      return getWitness(implPtr, impl->getType(), ifaceType, 1);
+    }
+
+    /// Returns a function which calls the given implementation under
+    /// the given interface.
+    llvm::Constant *getStaticMethodWitness(FuncDecl *impl, Type ifaceType) {
       llvm::Constant *implPtr =
         IGM.getAddrOfFunction(impl, ExplosionKind::Minimal, 1, /*data*/ false);
       return getWitness(implPtr, impl->getType(), ifaceType, 1);
@@ -2898,44 +2906,58 @@ LValue irgen::emitExistentialMemberRefLValue(IRGenFunction &IGF,
 /// \param witness - the actual function address being called
 /// \param wtable - the witness table from which the witness was loaded
 /// \param thisObject - the object (if applicable) to call the method on
-static Callee emitProtocolMethodCallee(IRGenFunction &IGF, FuncDecl *fn,
-                                       Type substResultType,
-                                       ArrayRef<Substitution> subs,
-                                       llvm::Value *witness,
-                                       SmallVectorImpl<Arg> &calleeArgs,
-                                       llvm::Value *wtable,
-                                       Address thisObject) {
-  if (fn->isStatic())
-    return Callee::forKnownFunction(AbstractCC::Method,
-                                    fn->getType(), substResultType, subs,
-                                    witness, ManagedValue(nullptr),
-                                    ExplosionKind::Minimal, 0);
+static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
+                                              Type substResultType,
+                                              ArrayRef<Substitution> subs,
+                                              llvm::Value *witness,
+                                              llvm::Value *wtable,
+                                              Address thisObject) {
+  ExplosionKind explosionLevel = ExplosionKind::Minimal;
+  unsigned uncurryLevel = 1;
 
-  // Add the temporary address as a callee arg.
-  // This argument is bitcast to the type of the 'this' argument (a
-  // [byref] to the archetype This), although the underlying function
-  // actually takes the underlying object pointer.
-  thisObject = IGF.Builder.CreateBitCast(thisObject, IGF.IGM.OpaquePtrTy,
-                                         "object-pointer");
-  Explosion *arg = new Explosion(ExplosionKind::Minimal);
-  arg->addUnmanaged(thisObject.getAddress());
-  calleeArgs.push_back(Arg::forOwned(arg));
+  Type origFnType = fn->getType();
+  llvm::FunctionType *fnTy =
+    IGF.IGM.getFunctionType(origFnType, explosionLevel, uncurryLevel,
+                            /*data*/ false);
+  witness = IGF.Builder.CreateBitCast(witness, fnTy->getPointerTo());
 
-  // FIXME: writeback
-  return Callee::forKnownFunction(AbstractCC::Method,
-                                  fn->getType(), substResultType, subs,
-                                  witness, ManagedValue(nullptr),
-                                  ExplosionKind::Minimal, 1);
+  Callee callee =
+    Callee::forKnownFunction(fn->isStatic() ? AbstractCC::Freestanding
+                                            : AbstractCC::Method,
+                             origFnType, substResultType, subs,
+                             witness, ManagedValue(nullptr),
+                             explosionLevel, uncurryLevel);
+
+  CallEmission emission(IGF, callee);
+
+  // If this isn't a static method, add the temporary address as a
+  // callee argument.  This argument is bitcast to the type of the
+  // 'this' argument (a [byref] to the archetype This), although the
+  // underlying function actually takes the underlying object pointer.
+  if (!fn->isStatic()) {
+    thisObject = IGF.Builder.CreateBitCast(thisObject, IGF.IGM.OpaquePtrTy,
+                                           "object-pointer");
+    Explosion arg(ExplosionKind::Minimal);
+    arg.addUnmanaged(thisObject.getAddress());
+    emission.addArg(arg);
+
+  // If this is a static method, add an empty argument as the metatype.
+  // This is really questionable.
+  } else {
+    emission.addEmptyArg();
+  }
+
+  return emission;
 }
 
 /// Emit an existential member reference as a callee.
-Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
-                                             ExistentialMemberRefExpr *E,
-                                             Type substResultType,
-                                             ArrayRef<Substitution> subs,
-                                             SmallVectorImpl<Arg> &calleeArgs,
-                                             ExplosionKind maxExplosionLevel,
-                                             unsigned maxUncurry) {
+CallEmission
+irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
+                                       ExistentialMemberRefExpr *E,
+                                       Type substResultType,
+                                       ArrayRef<Substitution> subs,
+                                       ExplosionKind maxExplosionLevel,
+                                       unsigned maxUncurry) {
   // The protocol we're calling on.
   // TODO: support protocol compositions here.
   Type baseTy = E->getBase()->getType();
@@ -2990,18 +3012,18 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
   llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
 
   // Emit the callee.
-  return emitProtocolMethodCallee(IGF, fn, substResultType, subs,
-                                  witness, calleeArgs, wtable, thisObject);
+  return prepareProtocolMethodCall(IGF, fn, substResultType, subs,
+                                   witness, wtable, thisObject);
 }
 
 /// Emit an existential member reference as a callee.
-Callee irgen::emitArchetypeMemberRefCallee(IRGenFunction &IGF,
-                                           ArchetypeMemberRefExpr *E,
-                                           Type substResultType,
-                                           ArrayRef<Substitution> subs,
-                                           SmallVectorImpl<Arg> &calleeArgs,
-                                           ExplosionKind maxExplosionLevel,
-                                           unsigned maxUncurry) {
+CallEmission
+irgen::prepareArchetypeMemberRefCall(IRGenFunction &IGF,
+                                     ArchetypeMemberRefExpr *E,
+                                     Type substResultType,
+                                     ArrayRef<Substitution> subs,
+                                     ExplosionKind maxExplosionLevel,
+                                     unsigned maxUncurry) {
   // The function we're going to call.
   FuncDecl *fn = cast<FuncDecl>(E->getDecl());
 
@@ -3041,8 +3063,8 @@ Callee irgen::emitArchetypeMemberRefCallee(IRGenFunction &IGF,
   llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
 
   // Emit the callee.
-  return emitProtocolMethodCallee(IGF, fn, substResultType, subs,
-                                  witness, calleeArgs, wtable, thisObject);
+  return prepareProtocolMethodCall(IGF, fn, substResultType, subs,
+                                   witness, wtable, thisObject);
 }
 
 
