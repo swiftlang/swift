@@ -103,7 +103,10 @@ template <> struct GraphTraits<const ::swift::BasicBlock*> {
   static inline ChildIteratorType child_end(NodeType *N) {
     return N->succs().end();
   }
+
 };
+
+raw_ostream &operator<<(raw_ostream &, const swift::BasicBlock &B);
 
 } // end llvm namespace
 

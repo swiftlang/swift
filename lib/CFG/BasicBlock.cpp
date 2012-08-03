@@ -40,4 +40,9 @@ void BasicBlock::print(llvm::raw_ostream &OS) const {
   OS << '\n';
 }
 
-
+namespace llvm {
+raw_ostream &operator<<(raw_ostream &OS, const ::swift::BasicBlock &B) {
+  OS << 'B' << (void*) &B;
+  return OS;
+}
+} // end namespace llvm
