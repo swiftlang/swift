@@ -20,9 +20,8 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/GraphTraits.h"
-#include "Instruction.h"
-#include "BasicBlock.h"
-#include <vector>
+#include "swift/CFG/Instruction.h"
+#include "swift/CFG/BasicBlock.h"
 
 namespace swift {
 

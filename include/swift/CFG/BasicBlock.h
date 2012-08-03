@@ -17,12 +17,11 @@
 #ifndef SWIFT_BASICBLOCK_H
 #define SWIFT_BASICBLOCK_H
 
-#include "Instruction.h"
+#include "swift/CFG/Instruction.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/GraphTraits.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
-#include <vector>
 
 namespace swift {
 
