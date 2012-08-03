@@ -10,7 +10,8 @@ void uniq(NSString *path) {
                                          error: &error];
 
   // Split into lines.
-  NSArray *lines = [contents componentsSeparatedByString:@"\n"];
+  NSArray *lines = [contents componentsSeparatedByCharactersInSet:
+          [NSCharacterSet characterSetWithCharactersInString:@"\n\r"]];
 
   // Count the items.
   NSMutableDictionary *counts = [[NSMutableDictionary alloc] init];
