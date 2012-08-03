@@ -19,8 +19,11 @@
 
 #include "swift/CFG/Instruction.h"
 #include "llvm/Support/Casting.h"
-#include "llvm/ADT/GraphTraits.h"
 #include "llvm/ADT/ArrayRef.h"
+
+namespace llvm {
+  template<class GraphType> struct GraphTraits;
+}
 
 namespace swift {
 

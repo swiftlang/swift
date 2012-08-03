@@ -18,7 +18,6 @@
 #define SWIFT_CFG_H
 
 #include "llvm/Support/Allocator.h"
-#include "llvm/ADT/GraphTraits.h"
 #include "swift/CFG/Instruction.h"
 #include "swift/CFG/BasicBlock.h"
 
