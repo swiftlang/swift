@@ -161,7 +161,7 @@ bool TypeChecker::coerceToType(Pattern *P, Type type, bool isFirstPass) {
 
     // The context type must be a tuple.
     TupleType *tupleTy = type->getAs<TupleType>();
-    if (!tupleTy) {
+    if (!tupleTy && !hadError) {
       diagnose(TP->getLParenLoc(), diag::tuple_pattern_in_non_tuple_context,
                type);
       hadError = true;

@@ -486,7 +486,16 @@ void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
   }
 }
 
+// Type check a function body (defined with the func keyword) that is either a
+// named function or an anonymous func expression.
 void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
+  // If this was a func() expression whose context did not fully infer types for
+  // the arguments, mark the argument types as error type.
+  if (FE->getType()->isUnresolvedType()) {
+    for (auto P : FE->getParamPatterns())
+      coerceToType(P, ErrorType::get(Context), false);
+  }
+  
   BraceStmt *BS = FE->getBody();
   if (!BS)
     return;
@@ -689,7 +698,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
     // FuncExprs - This is a list of all the FuncExprs we need to analyze, in
     // an appropriate order.
-    SmallVector<llvm::PointerUnion3<FuncExpr*, ConstructorDecl*, DestructorDecl*>, 32> FuncExprs;
+    SmallVector<llvm::PointerUnion3<FuncExpr*, ConstructorDecl*,
+                                    DestructorDecl*>, 32> FuncExprs;
 
     virtual bool walkToDeclPre(Decl *D) {
       if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D))
@@ -986,7 +996,6 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       continue;
     }
     FuncExpr *FE = func.get<FuncExpr*>();
-
     PrettyStackTraceExpr StackEntry(TC.Context, "type-checking", FE);
 
     TC.typeCheckFunctionBody(FE);
