@@ -16,6 +16,7 @@
 
 #include "swift/CFG/BasicBlock.h"
 #include "swift/CFG/CFG.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 

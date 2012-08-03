@@ -13,6 +13,8 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/CFG/CFG.h"
+#include "llvm/Support/raw_ostream.h"
+
 using namespace swift;
 
 CFG::CFG() :

@@ -17,8 +17,11 @@
 #ifndef SWIFT_INSTRUCTION_H
 #define SWIFT_INSTRUCTION_H
 
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/ArrayRef.h"
+
+namespace llvm {
+  class raw_ostream;
+}
 
 namespace swift {
 
