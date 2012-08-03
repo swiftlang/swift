@@ -17,13 +17,13 @@
 #ifndef SWIFT_AST_H
 #define SWIFT_AST_H
 
-#include "Swift/AST/ASTContext.h"
-#include "Swift/AST/Builtins.h"
-#include "Swift/AST/Decl.h"
-#include "Swift/AST/Expr.h"
-#include "Swift/AST/Module.h"
-#include "Swift/AST/Pattern.h"
-#include "Swift/AST/Stmt.h"
-#include "Swift/AST/Types.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Builtins.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/Stmt.h"
+#include "swift/AST/Types.h"
 
 #endif
