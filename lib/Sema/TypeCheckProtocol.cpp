@@ -476,3 +476,63 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   }
   return nullptr;
 }
+
+bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
+                                     ConformanceMap &Conformance,
+                                     SourceLoc ComplainLoc,
+                                     TypeSubstitutionMap *RecordSubstitutions) {
+  llvm::SmallPtrSet<ArchetypeType *, 8> knownArchetypes;
+  SmallVector<ArchetypeType *, 8> archetypeStack;
+
+  // Find all of the primary archetypes and enter them into the archetype
+  // stack.
+  for (const auto &sub : Substitutions) {
+    auto archetype = sub.first->getArchetype();
+    if (archetype->isPrimary() && knownArchetypes.insert(archetype))
+      archetypeStack.push_back(archetype);
+  }
+
+  // Check that each of the replacements for the archetypes conform
+  // to the required protocols.
+  while (!archetypeStack.empty()) {
+    // Grab the last archetype on the stack.
+    auto archetype = archetypeStack.back();
+    archetypeStack.pop_back();
+
+    // Substitute our deductions into the archetype type to produce the
+    // concrete type we need to evaluate.
+    Type T = substType(archetype, Substitutions);
+    if (!T)
+      return true;
+
+    // If we were asked to record the substitution, do so now.
+    if (RecordSubstitutions)
+      (*RecordSubstitutions)[archetype] = T;
+
+    SmallVectorImpl<ProtocolConformance *> &Conformances
+      = Conformance[archetype];
+    if (Conformances.empty()) {
+      for (auto Proto : archetype->getConformsTo()) {
+        ProtocolConformance *Conformance = nullptr;
+        if (conformsToProtocol(T, Proto, &Conformance, ComplainLoc)) {
+          Conformances.push_back(Conformance);
+        } else {
+          // FIXME: Diagnose, if requested.
+          return true;
+        }
+      }
+    }
+
+    // Add any nested archetypes to the archetype stack.
+    for (auto Nested : archetype->getNestedTypes()) {
+      if (knownArchetypes.insert(Nested.second))
+        archetypeStack.push_back(Nested.second);
+    }
+  }
+
+  // FIXME: Check same-type constraints!
+  
+  return false; 
+
+}
+

@@ -2168,7 +2168,6 @@ bool CoercionContext::hasCompleteSubstitutions() const {
 static bool finalizeSubstitutions(CoercionContext &CC, SourceLoc ComplainLoc) {
   TypeChecker &TC = CC.TC;
 
-
   // Seed the archetype stack with the set of substitutions we asked for.
   llvm::SmallPtrSet<ArchetypeType *, 8> KnownArchetypes;
   SmallVector<ArchetypeType *, 8> ArchetypeStack;
@@ -2180,46 +2179,8 @@ static bool finalizeSubstitutions(CoercionContext &CC, SourceLoc ComplainLoc) {
     TwoStepSubstitutions[Archetype] = Sub.second;
   }
 
-  // Check that each of the replacements for the non-primary archetypes conform
-  // to the required protocols.
-  while (!ArchetypeStack.empty()) {
-    // Grab the last archetype on the stack.
-    auto Archetype = ArchetypeStack.back();
-    ArchetypeStack.pop_back();
-
-    if (!Archetype->isPrimary()) {
-      // Substitute our deductions into the archetype type to produce the
-      // concrete type we need to evaluate.
-      Type T = TC.substType(Archetype, TwoStepSubstitutions);
-      if (!T)
-        return true;
-
-      // Record substitution for this non-primary archetype.
-      CC.Substitutions[Archetype] = T;
-
-      SmallVectorImpl<ProtocolConformance *> &Conformances
-        = CC.Conformance[Archetype];
-      for (auto Proto : Archetype->getConformsTo()) {
-        ProtocolConformance *Conformance = nullptr;
-        if (TC.conformsToProtocol(T, Proto, &Conformance, ComplainLoc)) {
-          Conformances.push_back(Conformance);
-        } else {
-          // FIXME: Diagnose, if requested.
-          return true;
-        }
-      }
-    }
-
-    // Add any nested archetypes to the archetype stack.
-    for (auto Nested : Archetype->getNestedTypes()) {
-      if (KnownArchetypes.insert(Nested.second))
-        ArchetypeStack.push_back(Nested.second);
-    }
-  }
-
-  // FIXME: Check same-type constraints!
-
-  return false;
+  return TC.checkSubstitutions(TwoStepSubstitutions, CC.Conformance,
+                               ComplainLoc, &CC.Substitutions);
 }
 
 CoercedExpr TypeChecker::coerceToType(Expr *E, Type DestTy, CoercionKind Kind,

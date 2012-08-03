@@ -419,6 +419,13 @@ public:
                           ProtocolConformance **Conformance = 0,
                           SourceLoc ComplainLoc = SourceLoc());
 
+  /// \brief Given a set of archetype substitutions, verify and recird all of
+  /// the required protocol-conformance relationships.
+  bool checkSubstitutions(TypeSubstitutionMap &Substitutions,
+                          ConformanceMap &Conformance,
+                          SourceLoc ComplainLoc,
+                          TypeSubstitutionMap *RecordSubstitutions = nullptr);
+
   /// \name Overload resolution
   ///
   /// Routines that perform overload resolution or provide diagnostics related
@@ -600,11 +607,15 @@ public:
   ///
   /// \param Conformances The set of protocol conformances.
   ///
+  /// \param ArchetypesAreOpen Whether the substitutions refer to the opened
+  /// form of the archetypes, as is used by the coercion code.
+  ///
   /// \returns an ASTContext-allocate array of substitutions.
   ArrayRef<Substitution>
   encodeSubstitutions(ArrayRef<ArchetypeType *> AllArchetypes,
                       const TypeSubstitutionMap &Substitutions,
-                      const ConformanceMap &Conformances);
+                      const ConformanceMap &Conformances,
+                      bool ArchetypesAreOpen);
 
   /// \brief Build a new SpecializeExpr wrapping the given subexpression.
   ///

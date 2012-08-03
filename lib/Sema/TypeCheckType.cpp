@@ -478,30 +478,27 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     }
 
     // Check protocol conformance.
-    if (!isFirstPass && !IsInvalid && !BGT->hasConformanceInformation()) {
-      SmallVector<ProtocolConformance *, 4> Conformances;
-      SmallVector<unsigned, 4> Offsets;
+    if (!isFirstPass && !IsInvalid && !BGT->hasSubstitutions()) {
+      // FIXME: Record that we're checking substitutions, so we can't end up
+      // with infinite recursion.
+      TypeSubstitutionMap Substitutions;
+      ConformanceMap Conformance;
+      auto genericParams = BGT->getDecl()->getGenericParams();
       for (Type Arg : BGT->getGenericArgs()) {
-        Offsets.push_back(Conformances.size());
-        
-        auto GP = BGT->getDecl()->getGenericParams()->getParams()[Index++];
+        auto GP = genericParams->getParams()[Index++];
         auto Archetype = GP.getAsTypeParam()->getDeclaredType()
                            ->getAs<ArchetypeType>();
-        for (auto Proto : Archetype->getConformsTo()) {
-          ProtocolConformance *Conformance;
-          if (conformsToProtocol(Arg, Proto, &Conformance)) {
-            Conformances.push_back(Conformance);
-          } else {
-            SourceLoc DiagLoc = Loc.getSourceRange().Start;
-            diagnose(DiagLoc, diag::invalid_implicit_protocol_conformance,
-                     Arg, Proto->getDeclaredType());
-            IsInvalid = true;
-          }
-        }
+        Substitutions[Archetype] = Arg;
       }
 
-      if (!IsInvalid) {
-        BGT->setConformances(Offsets, Conformances);
+      if (checkSubstitutions(Substitutions, Conformance,
+                             Loc.getSourceRange().Start, &Substitutions))
+        IsInvalid = true;
+      else {
+        // Record these substitutions.
+        auto allArchetypes = genericParams->getAllArchetypes();
+        BGT->setSubstitutions(encodeSubstitutions(allArchetypes, Substitutions,
+                                                  Conformance, false));
       }
     }
     break;

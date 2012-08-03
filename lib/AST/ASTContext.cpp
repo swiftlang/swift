@@ -48,6 +48,9 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<ClassType> ClassTypes;
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
+
+  llvm::DenseMap<BoundGenericType *, ArrayRef<Substitution>>
+    BoundGenericSubstitutions;
 };
 
 ASTContext::Implementation::Implementation()
@@ -98,6 +101,23 @@ bool ASTContext::hadError() const {
   return Diags.hadAnyError();
 }
 
+Optional<ArrayRef<Substitution>>
+ASTContext::getSubstitutions(BoundGenericType* Bound) {
+  assert(Bound->isCanonical() && "Requesting non-canonical substitutions");
+  auto Known = Impl.BoundGenericSubstitutions.find(Bound);
+  if (Known == Impl.BoundGenericSubstitutions.end())
+    return Nothing;
+
+  return Known->second;
+}
+
+void ASTContext::setSubstitutions(BoundGenericType* Bound,
+                                  ArrayRef<Substitution> Subs) {
+  assert(Bound->isCanonical() && "Requesting non-canonical substitutions");
+  assert(Impl.BoundGenericSubstitutions.count(Bound) == 0 &&
+         "Already have substitutions?");
+  Impl.BoundGenericSubstitutions[Bound] = Subs;
+}
 
 //===----------------------------------------------------------------------===//
 // Type manipulation routines.
@@ -191,7 +211,7 @@ BoundGenericType::BoundGenericType(NominalTypeDecl *TheDecl,
                                    ArrayRef<Type> GenericArgs,
                                    ASTContext *C)
   : TypeBase(TypeKind::BoundGeneric, C, /*Unresolved=*/false),
-    TheDecl(TheDecl), GenericArgs(GenericArgs), AllConformances(nullptr)
+    TheDecl(TheDecl), GenericArgs(GenericArgs)
 {
   // Determine whether this type is unresolved.
   for (Type Arg : GenericArgs) {

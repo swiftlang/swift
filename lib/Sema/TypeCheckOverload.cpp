@@ -837,26 +837,29 @@ TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
 ArrayRef<Substitution>
 TypeChecker::encodeSubstitutions(ArrayRef<ArchetypeType *> AllArchetypes,
                                  const TypeSubstitutionMap &Substitutions,
-                                 const ConformanceMap &Conformances) {
+                                 const ConformanceMap &Conformances,
+                                 bool ArchetypesAreOpen) {
   // Figure out the mapping from primary archetypes to their deducible
   // parameters.
   // FIXME: This is terribly inefficient. We should keep track of this
   // information when we substituted in deducible parameters for the archetypes.
   llvm::SmallDenseMap<ArchetypeType *, DeducibleGenericParamType *>
     closedToOpen;
-  for (auto subst : Substitutions) {
-    if (auto deducible = subst.first->getAs<DeducibleGenericParamType>()) {
-      closedToOpen[deducible->getArchetype()] = deducible;
+  if (ArchetypesAreOpen) {
+    for (auto subst : Substitutions) {
+      if (auto deducible = subst.first->getAs<DeducibleGenericParamType>()) {
+        closedToOpen[deducible->getArchetype()] = deducible;
+      }
     }
   }
-
+  
   SmallVector<SpecializeExpr::Substitution, 2> storedSubstitutions;
   storedSubstitutions.resize(AllArchetypes.size());
   unsigned index = 0;
   for (auto archetype : AllArchetypes) {
     // Figure out the key into the maps we were given.
     SubstitutableType *key = archetype;
-    if (archetype->isPrimary()) {
+    if (ArchetypesAreOpen && archetype->isPrimary()) {
       key = closedToOpen[archetype];
       assert(key && "can't find deducible form of primary archetype");
     }
@@ -885,7 +888,8 @@ TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
   return new (Context) SpecializeExpr(Sub, Ty,
                                       encodeSubstitutions(archetypes,
                                                           Substitutions,
-                                                          Conformances));
+                                                          Conformances,
+                                                          true));
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc) {

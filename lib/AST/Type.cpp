@@ -827,41 +827,23 @@ void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
     ID.AddPointer(P.getPointer());
 }
 
-bool BoundGenericType::hasConformanceInformation() {
-  return getCanonicalType()->castTo<BoundGenericType>()->AllConformances
-           != nullptr;
+bool BoundGenericType::hasSubstitutions() {
+  auto *canon = getCanonicalType()->castTo<BoundGenericType>();
+  ASTContext &ctx = canon->getASTContext();
+  return (bool)ctx.getSubstitutions(canon);
 }
 
-ArrayRef<ProtocolConformance *>
-BoundGenericType::getConformances(unsigned Index) {
-  auto *Canon = getCanonicalType()->castTo<BoundGenericType>();
-  if (Canon != this)
-    return Canon->getConformances(Index);
-
-  assert(AllConformances && "Protocol-conformance information not recorded!");
-  unsigned Start = AllConformances->Offsets[Index];
-  auto GP = TheDecl->getGenericParams()->getParams()[Index];
-  auto Archetype
-    = GP.getAsTypeParam()->getDeclaredType()->getAs<ArchetypeType>();
-  unsigned Length = Archetype->getConformsTo().size();
-  return ArrayRef<ProtocolConformance *>(
-           AllConformances->Conformances.begin() + Start,
-           AllConformances->Conformances.begin() + Start + Length);
+ArrayRef<Substitution>
+BoundGenericType::getSubstitutions() {
+  auto *canon = getCanonicalType()->castTo<BoundGenericType>();
+  ASTContext &ctx = canon->getASTContext();
+  return *ctx.getSubstitutions(canon);
 }
 
-void
-BoundGenericType::setConformances(ArrayRef<unsigned> Offsets,
-                                  ArrayRef<ProtocolConformance *> Conformances){
-  auto *Canon = getCanonicalType()->castTo<BoundGenericType>();
-  if (Canon != this)
-    return Canon->setConformances(Offsets, Conformances);
-
-  assert(!AllConformances && "Already have protocol-conformance information!");
-  ASTContext &Ctx = getASTContext();
-  void *Mem = Ctx.Allocate<AllConformancesType>(1);
-  AllConformances = new (Mem) AllConformancesType;
-  AllConformances->Offsets = Ctx.AllocateCopy(Offsets);
-  AllConformances->Conformances = Ctx.AllocateCopy(Conformances);
+void BoundGenericType::setSubstitutions(ArrayRef<Substitution> Subs){
+  auto *canon = getCanonicalType()->castTo<BoundGenericType>();
+  ASTContext &ctx = canon->getASTContext();
+  ctx.setSubstitutions(canon, Subs);
 }
 
 Type

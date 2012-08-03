@@ -19,6 +19,8 @@
 
 #include "llvm/Support/DataTypes.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Optional.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/DenseMap.h"
 #include <vector>
@@ -29,6 +31,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class BoundGenericType;
   class SourceLoc;
   class Type;
   class TupleType;
@@ -43,6 +46,7 @@ namespace swift {
   class SubstitutableType;
   class ValueDecl;
   class DiagnosticEngine;
+  class Substitution;
   
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
@@ -148,6 +152,7 @@ public:
   }
 
   
+
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str);
@@ -182,6 +187,15 @@ public:
   const Type TheIEEE80Type;     /// TheIEEE80Type  - 80-bit IEEE floating point
   const Type TheIEEE128Type;    /// TheIEEE128Type - 128-bit IEEE floating point
   const Type ThePPC128Type;     /// ThePPC128Type  - 128-bit PowerPC 2xDouble
+
+private:
+  friend class BoundGenericType;
+
+  /// \brief Retrieve the substitutions for a bound generic type, if known.
+  Optional<ArrayRef<Substitution>> getSubstitutions(BoundGenericType* Bound);
+
+  /// \brief Set the substitutions for the given bound generic type.
+  void setSubstitutions(BoundGenericType* Bound, ArrayRef<Substitution> Subs);
 };
   
 } // end namespace swift

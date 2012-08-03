@@ -435,7 +435,8 @@ Expr *TypeChecker::semaSubscriptExpr(GenericSubscriptExpr *E) {
                               LValueType::Qual::DefaultForMemberAccess,
                               Context);
   E->setSubstitutions(encodeSubstitutions(GenericParams->getAllArchetypes(),
-                                          CC.Substitutions, CC.Conformance));
+                                          CC.Substitutions, CC.Conformance,
+                                          true));
   E->setType(ValueType);
   return E;
   
@@ -906,7 +907,7 @@ public:
 
     E->setSubstitutions(
       TC.encodeSubstitutions(GenericParams->getAllArchetypes(),
-                             CC.Substitutions, CC.Conformance));
+                             CC.Substitutions, CC.Conformance, true));
     E->setType(MemberTy);
     return E;
   }

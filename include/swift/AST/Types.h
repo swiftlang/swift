@@ -47,7 +47,8 @@ namespace swift {
   class ValueDecl;
   class Module;
   class ProtocolConformance;
-  
+  class Substitution;
+
   enum class TypeKind {
 #define TYPE(id, parent) id,
 #define TYPE_RANGE(Id, FirstId, LastId) \
@@ -608,14 +609,6 @@ class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
   NominalTypeDecl *TheDecl;
   ArrayRef<Type> GenericArgs;
 
-  struct AllConformancesType {
-    ArrayRef<unsigned> Offsets;
-    ArrayRef<ProtocolConformance *> Conformances;
-  };
-
-  // FIXME: Eliminate this storage for non-canonical types?
-  AllConformancesType *AllConformances;
-
 private:
   BoundGenericType(NominalTypeDecl *TheDecl, ArrayRef<Type> GenericArgs,
                    ASTContext *C);
@@ -629,21 +622,19 @@ public:
 
   ArrayRef<Type> getGenericArgs() const { return GenericArgs; }
 
-  /// hasConformanceInformation - Determine whether this bound generic type
-  /// has protocol-conformance information.
-  bool hasConformanceInformation();
+  /// \brief Determine whether this bound generic type has substitution
+  /// information that provides protocol conformances.
+  bool hasSubstitutions();
 
-  /// getConformances - Retrieve the set of conformances for the argument at
-  /// the given index.
+  /// \brief Retrieve the set of substitutions used to produce this bound
+  /// generic type from the underlying generic type.
+  ArrayRef<Substitution> getSubstitutions();
+
+  /// \brief Set the substitution information for this bound generic type.
   ///
-  /// FIXME: This interface won't be sufficient for the conformances of
-  /// associated types.
-  ArrayRef<ProtocolConformance *> getConformances(unsigned Index);
-
-  /// \brief Set the protocol-conformance information for this bound generic
-  /// type.
-  void setConformances(ArrayRef<unsigned> Offsets,
-                       ArrayRef<ProtocolConformance *> Conformances);
+  /// \param Subs The set of substitutions, which must point into
+  /// ASTContext-allocated memory.
+  void setSubstitutions(ArrayRef<Substitution> Subs);
 
   void print(raw_ostream &O) const;
 
