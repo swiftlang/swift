@@ -739,7 +739,10 @@ namespace {
     void visitTypedPattern(TypedPattern *P) {
       visit(P->getSubPattern());
       OS << " : ";
-      P->getType()->print(OS);
+      if (!P->hasType())
+        OS << "<no type yet>";
+      else
+        P->getType()->print(OS);
     }
   };
 
