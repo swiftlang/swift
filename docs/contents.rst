@@ -14,6 +14,7 @@ Contents
    5 - Memory and Ownership Model
    6 - Memory and Concurrency Model
    7 - Memory and Error Handling Model
+   DesignDecisions
    Generics
    Pattern Matching
    Resilience
