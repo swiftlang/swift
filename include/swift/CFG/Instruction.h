@@ -73,32 +73,56 @@ class TermInst : public Instruction {
 public:
   TermInst(BasicBlock *B, Kind K) : Instruction(B, K) {}
 
-  // FIXME: Implement.
   typedef llvm::ArrayRef<BasicBlock *> Successors;
+
+  /// The successor basic blocks of this terminator.
   Successors successors();
+
+  /// The successor basic blocks of this terminator.
+  const Successors successors() const {
+    return const_cast<TermInst*>(this)->successors();
+  }
 
   static bool classof(const Instruction *I) {
     return I->kind >= TERM_INST_BEGIN && I->kind <= TERM_INST_END;
   }
-
 };
 
 class UncondBranchInst : public TermInst {
+public:
+  typedef llvm::ArrayRef<unsigned> ArgsTy;
+
+protected:
   unsigned *Args;
   unsigned NumArgs;
-public:
-  /// The jump target for the branch.
-  BasicBlock &targetBlock;
+  BasicBlock *TargetBlock;
 
-  typedef llvm::ArrayRef<unsigned> ArgsTy;
+public:
+  /// Construct an UncondBranchInst that will become the terminator
+  /// for the specified BasicBlock.
+  UncondBranchInst(BasicBlock *BB) :
+    TermInst(BB, UncondBranch), Args(nullptr), NumArgs(0),
+    TargetBlock(nullptr) {}
+
+  /// The jump target for the branch.
+  BasicBlock &targetBlock() { return *TargetBlock; }
+
+  /// The jump target for the branch.
+  const BasicBlock &targetBlock() const { return *TargetBlock; }
 
   /// The temporary arguments to the target blocks.
   ArgsTy blockArgs() { return ArgsTy(Args, NumArgs); }
   const ArgsTy blockArgs() const { return ArgsTy(Args, NumArgs); }
 
-  UncondBranchInst(BasicBlock &SrcBlk,
-                   BasicBlock &DstBlk,
-                   llvm::ArrayRef<unsigned> Args);
+  /// Set the target block (with the matching arguments) for this branch.
+  void setTarget(BasicBlock *Target, const ArgsTy BlockArgs);
+
+  static bool classof(const Instruction *I) {
+    return I->kind == UncondBranch;
+  }
+
+private:
+  void unregisterTarget();
 };
 } // end swift namespace
 

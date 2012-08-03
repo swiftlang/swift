@@ -22,22 +22,6 @@
 
 using namespace swift;
 
-UncondBranchInst::UncondBranchInst(BasicBlock &SrcBlk,
-                                   BasicBlock &DstBlk,
-                                   llvm::ArrayRef<unsigned> BArgs)
-  : TermInst(&SrcBlk, UncondBranch),
-    Args(nullptr), NumArgs(0),
-    targetBlock(DstBlk)
-{
-  DstBlk.addPred(&SrcBlk);
-
-  if (BArgs.empty())
-    return;
-  NumArgs = BArgs.size();
-  Args = new (targetBlock.cfg) unsigned[NumArgs];
-  llvm::ArrayRef<unsigned>(Args, NumArgs) = BArgs;
-}
-
 void Instruction::print(llvm::raw_ostream &OS) const {
   switch (kind) {
     case Invalid:
@@ -45,7 +29,7 @@ void Instruction::print(llvm::raw_ostream &OS) const {
       return;
     case UncondBranch: {
       const UncondBranchInst &UBI = *llvm::cast<UncondBranchInst>(this);
-      OS << "br " << UBI.targetBlock;
+      OS << "br " << UBI.targetBlock();
       const UncondBranchInst::ArgsTy Args = UBI.blockArgs();
       if (!Args.empty()) {
         OS << '(';
@@ -68,7 +52,7 @@ void Instruction::validate() const {
       assert(!basicBlock->instructions.empty() &&
              &*basicBlock->instructions.rbegin() == this &&
              "UncondBranchInst must appear at end of BasicBlock");
-      const BasicBlock &targetBlock = UBI.targetBlock;
+      const BasicBlock &targetBlock = UBI.targetBlock();
       assert(std::find(targetBlock.preds().begin(), targetBlock.preds().end(),
                        basicBlock) &&
              "BasicBlock of UncondBranchInst must be a predecessor of target");
@@ -81,8 +65,32 @@ TermInst::Successors TermInst::successors() {
     case Invalid:
       llvm_unreachable("Only TermInst's are allowed");
     case UncondBranch: {
-      const UncondBranchInst &UBI = *llvm::cast<UncondBranchInst>(this);
-      return Successors(&UBI.targetBlock);
+      UncondBranchInst &UBI = *llvm::cast<UncondBranchInst>(this);
+      return Successors(&UBI.targetBlock());
     }
   }
+}
+
+void UncondBranchInst::unregisterTarget() {
+  if (!TargetBlock)
+    return;
+
+}
+
+void UncondBranchInst::setTarget(BasicBlock *NewTarget, const ArgsTy BlockArgs){
+  if (TargetBlock != NewTarget) {
+    unregisterTarget();
+    TargetBlock = NewTarget;
+    TargetBlock->addPred(basicBlock);
+  }
+
+  // FIXME: check that TargetBlock's # args agrees with BlockArgs.
+
+  if (BlockArgs.empty())
+    return;
+
+  // Copy the arguments over to our holding buffer.
+  NumArgs = BlockArgs.size();
+  Args = new (basicBlock->cfg) unsigned[NumArgs];
+  ArgsTy(Args, NumArgs) = BlockArgs;
 }
