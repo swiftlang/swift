@@ -53,13 +53,13 @@ private:
   void operator=(const Instruction &) = delete;
 
 protected:
-  Instruction(Kind k) : kind(k), basicBlock(0) {}
+  Instruction(BasicBlock *B, Kind K) : kind(K), basicBlock(B) {}
 
 public:
   virtual ~Instruction();
 
   /// Check that Instruction invariants are preserved.
-  virtual bool validate() const;
+  virtual void validate() const;
 
   /// Pretty-print the Instruction.
   void dump() const;
@@ -75,19 +75,14 @@ public:
 /// This class defines a "terminating instruction" for a BasicBlock.
 class TermInst : public Instruction {
 public:
-  TermInst(Kind k) : Instruction(k) {}
+  TermInst(BasicBlock *B, Kind K) : Instruction(B, K) {}
   virtual ~TermInst();
 
   // FIXME: Implement.
-  llvm::ArrayRef<BasicBlock *> successors() { return nullptr; }
+  virtual llvm::ArrayRef<BasicBlock *> successors() = 0;
 
   /// Pretty-print the TermInst.
   void dump() const;
-
-  /// Pretty-print the TermInst to the designated stream.
-  // FIXME: if no subclasses contain virtual methods, we can devirtualize
-  // this class and save a VPTR.
-  virtual void print(llvm::raw_ostream &OS) const = 0;
 
   static bool classof(const Instruction *I) {
     return I->kind >= TERM_INST_BEGIN && I->kind <= TERM_INST_END;
@@ -96,13 +91,29 @@ public:
 };
 
 class UncondBranchInst : public TermInst {
-  BasicBlock *TargetBlock;
+  unsigned *Args;
+  unsigned NumArgs;
 public:
-  UncondBranchInst(BasicBlock *B);
+  /// The jump target for the branch.
+  BasicBlock &targetBlock;
+
+  typedef llvm::ArrayRef<unsigned> ArgsTy;
+
+  /// The temporary arguments to the target blocks.
+  ArgsTy blockArgs() { return ArgsTy(Args, NumArgs); }
+  const ArgsTy blockArgs() const { return ArgsTy(Args, NumArgs); }
+
+  UncondBranchInst(BasicBlock &SrcBlk,
+                   BasicBlock &DstBlk,
+                   llvm::ArrayRef<unsigned> Args);
+
   virtual ~UncondBranchInst();
 
-  BasicBlock *targetBlock() { return TargetBlock; }
-  void setTargetBlock();
+  /// Pretty-print the TermInst to the designated stream.
+  void print(llvm::raw_ostream &OS) const;
+
+  /// Check that UncondBranchInst invariants are preserved.
+  void validate() const;
 };
 } // end swift namespace
 
