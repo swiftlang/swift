@@ -100,9 +100,14 @@ static unsigned getNumCurries(AnyFunctionType *type) {
 /// Return the natural level at which to uncurry this function.  This
 /// is the number of additional parameter clauses that are uncurried
 /// in the function body.
-static unsigned getNaturalUncurryLevel(FuncDecl *func) {
-  assert(func->getBody());
-  return func->getBody()->getParamPatterns().size() - 1;
+static unsigned getNaturalUncurryLevel(ValueDecl *val) {
+  if (FuncDecl *func = dyn_cast<FuncDecl>(val)) {
+    return func->getBody()->getParamPatterns().size() - 1;
+  }
+  if (isa<ConstructorDecl>(val) || isa<OneOfElementDecl>(val)) {
+    return 1;
+  }
+  llvm_unreachable("Unexpected ValueDecl");
 }
 
 /// Given a function type, return the formal result type at the given
@@ -537,20 +542,16 @@ IRGenModule::getFunctionType(Type type, ExplosionKind explosionKind,
   return sig.getType();
 }
 
-static bool isInstanceMethod(FuncDecl *fn) {
-  return (!fn->isStatic() && fn->getDeclContext()->isTypeContext());
-}
-
-AbstractCC irgen::getAbstractCC(FuncDecl *fn) {
-  if (isInstanceMethod(fn))
+AbstractCC irgen::getAbstractCC(ValueDecl *fn) {
+  if (fn->isInstanceMember())
     return AbstractCC::Method;
   return AbstractCC::Freestanding;
 }
 
 /// Construct the best known limits on how we can call the given function.
 static AbstractCallee getAbstractDirectCallee(IRGenFunction &IGF,
-                                              FuncDecl *fn) {
-  bool isLocal = fn->getDeclContext()->isLocalContext();
+                                              ValueDecl *val) {
+  bool isLocal = val->getDeclContext()->isLocalContext();
 
   // FIXME: be more aggressive about all this.
   ExplosionKind level;
@@ -561,13 +562,16 @@ static AbstractCallee getAbstractDirectCallee(IRGenFunction &IGF,
   }
 
   unsigned minUncurry = 0;
-  if (!fn->isStatic() && fn->getDeclContext()->isTypeContext())
+  if (val->getDeclContext()->isTypeContext())
     minUncurry = 1;
-  unsigned maxUncurry = getNaturalUncurryLevel(fn);
+  unsigned maxUncurry = getNaturalUncurryLevel(val);
   
-  bool needsData =
-    (isLocal && !isa<llvm::ConstantPointerNull>(IGF.getLocalFuncData(fn)));
-  AbstractCC convention = getAbstractCC(fn);
+  bool needsData = false;
+  if (FuncDecl *fn = dyn_cast<FuncDecl>(val)) {
+    needsData =
+        (isLocal && !isa<llvm::ConstantPointerNull>(IGF.getLocalFuncData(fn)));
+  }
+  AbstractCC convention = getAbstractCC(val);
 
   return AbstractCallee(convention, level, minUncurry, maxUncurry, needsData);
 }
@@ -610,20 +614,51 @@ Callee Callee::forIndirectCall(Type origFormalType, Type substResultType,
 
 /// Emit a reference to a function, using the best parameters possible
 /// up to given limits.
-static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
+static Callee emitCallee(IRGenFunction &IGF, ValueDecl *val,
                          Type substResultType,
                          ArrayRef<Substitution> subs,
                          ExplosionKind bestExplosion, unsigned bestUncurry) {
   if (bestUncurry != 0 || bestExplosion != ExplosionKind::Minimal) {
-    AbstractCallee absCallee = getAbstractDirectCallee(IGF, fn);
+    AbstractCallee absCallee = getAbstractDirectCallee(IGF, val);
     bestUncurry = std::min(bestUncurry, absCallee.getMaxUncurryLevel());
     bestExplosion = absCallee.getBestExplosionLevel();
   }
 
+  if (ConstructorDecl *ctor = dyn_cast<ConstructorDecl>(val)) {
+    llvm::Constant *fnPtr;
+    if (bestUncurry != 1) {
+      IGF.unimplemented(val->getLoc(), "uncurried reference to constructor");
+      fnPtr = llvm::UndefValue::get(
+          IGF.IGM.getFunctionType(val->getType(), bestExplosion,
+                                  bestUncurry, /*needsData*/false));
+    } else {
+      fnPtr = IGF.IGM.getAddrOfConstructor(ctor, bestExplosion);
+    }
+    return Callee::forFreestandingFunction(ctor->getType(), substResultType,
+                                           subs, fnPtr,
+                                           bestExplosion, bestUncurry);
+  }
+
+  if (OneOfElementDecl *oneofelt = dyn_cast<OneOfElementDecl>(val)) {
+    llvm::Constant *fnPtr;
+    if (bestUncurry != oneofelt->hasArgumentType() ? 1 : 0) {
+      IGF.unimplemented(val->getLoc(), "uncurried reference to oneof element");
+      fnPtr = llvm::UndefValue::get(
+          IGF.IGM.getFunctionType(val->getType(), bestExplosion,
+                                  bestUncurry, /*needsData*/false));
+    } else {
+      fnPtr = IGF.IGM.getAddrOfInjectionFunction(oneofelt);
+    }
+    return Callee::forFreestandingFunction(oneofelt->getType(), substResultType,
+                                           subs, fnPtr,
+                                           bestExplosion, bestUncurry);
+  }
+
+  FuncDecl *fn = cast<FuncDecl>(val);
   if (!fn->getDeclContext()->isLocalContext()) {
     llvm::Constant *fnPtr =
       IGF.IGM.getAddrOfFunction(fn, bestExplosion, bestUncurry, /*data*/ false);
-    if (isInstanceMethod(fn)) {
+    if (fn->isInstanceMember()) {
       return Callee::forMethod(fn->getType(), substResultType, subs, fnPtr,
                                bestExplosion, bestUncurry);
     } else {
@@ -691,7 +726,7 @@ namespace {
         Expr *Fn;
       } Indirect;
       struct {
-        FuncDecl *Fn;
+        ValueDecl *Fn;
         Expr *SideEffects;
       } Direct;
       struct {
@@ -716,7 +751,7 @@ namespace {
       return result;
     }
 
-    static CalleeSource forDirect(FuncDecl *fn) {
+    static CalleeSource forDirect(ValueDecl *fn) {
       CalleeSource result;
       result.TheKind = Kind::Direct;
       result.Direct.Fn = fn;
@@ -748,7 +783,7 @@ namespace {
 
     Kind getKind() const { return TheKind; }
 
-    FuncDecl *getDirectFunction() const {
+    ValueDecl *getDirectFunction() const {
       assert(getKind() == Kind::Direct ||
              getKind() == Kind::DirectWithSideEffects);
       return Direct.Fn;
@@ -1137,6 +1172,10 @@ namespace {
     CalleeSource visitDeclRefExpr(DeclRefExpr *E) {
       if (FuncDecl *fn = dyn_cast<FuncDecl>(E->getDecl()))
         return CalleeSource::forDirect(fn);
+      if (ConstructorDecl *ctor = dyn_cast<ConstructorDecl>(E->getDecl()))
+        return CalleeSource::forDirect(ctor);
+      if (OneOfElementDecl *ctor = dyn_cast<OneOfElementDecl>(E->getDecl()))
+        return CalleeSource::forDirect(ctor);
       return CalleeSource::forIndirect(E);
     }
 
@@ -1573,7 +1612,7 @@ static bool isInSwiftModule(Decl *D) {
 /// emitKnownCall - Emit a call to a known function.
 // FIXME: This is a rather ugly, but it's the best way I can think
 // of to avoid emitting calls to getLogicValue as external calls.
-static bool emitKnownCall(IRGenFunction &IGF, FuncDecl *Fn,
+static bool emitKnownCall(IRGenFunction &IGF, ValueDecl *Fn,
                           ArrayRef<CallSite> &callSites,
                           CallResult &result) {
   if (Fn->getName().str() == "getLogicValue") {
@@ -1715,14 +1754,14 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
     IGF.emitIgnored(CalleeSrc.getDirectSideEffects());
     // fallthrough
   case CalleeSource::Kind::Direct: {
-    FuncDecl *knownFn = CalleeSrc.getDirectFunction();
+    ValueDecl *knownFn = CalleeSrc.getDirectFunction();
 
     // Handle calls to builtin functions.  These are never curried, but they
     // might return a function pointer.
     if (isa<BuiltinModule>(knownFn->getDeclContext())) {
       CallSite site = callSites.front();
-      emitBuiltinCall(IGF, knownFn, CalleeSrc.getSubstitutions(),
-                      site.getArg(), result);
+      emitBuiltinCall(IGF, cast<FuncDecl>(knownFn),
+                      CalleeSrc.getSubstitutions(), site.getArg(), result);
 
       // If there are no trailing calls, we're done.
       if (callSites.size() == 1) return;

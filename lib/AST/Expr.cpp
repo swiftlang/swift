@@ -684,16 +684,6 @@ public:
     printRec(E->getRHS());
     OS << ')';
   }
-  void visitConstructorRefExpr(ConstructorRefExpr *E) {
-    printCommon(E, "constructor_ref_expr")
-      << " decl=" << E->getConstructor()->getName() << '\n';
-    auto base = E->getBase();
-    if (base.is<Expr*>())
-      printRec(base.get<Expr*>());
-    else
-      OS.indent(Indent+2) << "base_type='" << base.get<Type>() << '\'';
-    OS << ')';
-  }
   void visitCoerceExpr(CoerceExpr *E) {
     printCommon(E, "coerce_expr") << '\n';
     printRec(E->getLHS());

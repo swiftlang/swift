@@ -43,7 +43,7 @@ enum class AbstractCC : unsigned char {
   Method
 };
 
-AbstractCC getAbstractCC(FuncDecl *fn);
+AbstractCC getAbstractCC(ValueDecl *fn);
 
 /// Expand an abstract calling convention into a physical convention
 /// and a set of attributes.

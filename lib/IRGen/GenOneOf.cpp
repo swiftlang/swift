@@ -39,8 +39,6 @@
 #include "LValue.h"
 #include "ScalarTypeInfo.h"
 
-#include "GenOneOf.h"
-
 using namespace swift;
 using namespace irgen;
 
@@ -451,28 +449,6 @@ const TypeInfo *TypeConverter::convertOneOfType(OneOfDecl *oneof) {
 
   convertedStruct->setBody(body);
   return convertedTI;
-}
-/// Emit a reference to a oneof element decl.
-void irgen::emitOneOfElementRef(IRGenFunction &IGF,
-                                OneOfElementDecl *elt,
-                                Explosion &result) {
-  // Get the injection function.
-  llvm::Function *injection = IGF.IGM.getAddrOfInjectionFunction(elt);
-
-  // If the element is of function type, just emit this as a function
-  // reference.  It will always literally be of function type when
-  // written this way.
-  if (isa<FunctionType>(elt->getType())) {
-    result.addUnmanaged(
-               llvm::ConstantExpr::getBitCast(injection, IGF.IGM.Int8PtrTy));
-    result.addUnmanaged(IGF.IGM.RefCountedNull);
-    return;
-  }
-
-  // Otherwise, we need to call the injection function (with no
-  // arguments, except maybe a temporary result) and expand the result
-  // into the explosion.
-  IGF.emitNullaryCall(injection, elt->getType(), result);
 }
 
 /// Emit the injection function for the given element.

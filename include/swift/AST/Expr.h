@@ -24,7 +24,6 @@
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/NullablePtr.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
@@ -1912,47 +1911,6 @@ public:
   static bool classof(const DotSyntaxBaseIgnoredExpr *) { return true; }
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DotSyntaxBaseIgnored;
-  }
-};
-
-/// ConstructorRefExpr - This is a reference to a constructor which will be
-/// used to build a value of the type of the base.
-class ConstructorRefExpr : public Expr {
-  llvm::PointerUnion<Expr *, Type> Base;
-  ValueDecl *Ctor;
-  SourceLoc Loc;
-
-public:
-  ConstructorRefExpr(Expr *Base, ValueDecl *Ctor)
-    : Expr(ExprKind::ConstructorRef), Base(Base), Ctor(Ctor),
-      Loc(Base->getLoc()) {
-  }
-  ConstructorRefExpr(Type Base, ValueDecl *Ctor, SourceLoc Loc)
-    : Expr(ExprKind::ConstructorRef), Base(Base), Ctor(Ctor),
-      Loc(Loc) {
-  }
-
-  llvm::PointerUnion<Expr *, Type> getBase() const { return Base; }
-  Type getBaseType() {
-    if (Base.is<Type>())
-      return Base.get<Type>();
-    return Base.get<Expr*>()->getType();
-  }
-  void setBase(Type t) { Base = t; }
-  void setBase(Expr *b) { Base = b; }
-  ValueDecl *getConstructor() const { return Ctor; }
-
-  SourceLoc getLoc() const { return Loc; }
-  SourceRange getSourceRange() const {
-    if (Base.is<Expr*>())
-      return Base.get<Expr*>()->getSourceRange();
-    return Loc;
-  }
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const ConstructorRefExpr *) { return true; }
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ConstructorRef;
   }
 };
 

@@ -32,7 +32,6 @@
 #include "GenInit.h"
 #include "GenLValue.h"
 #include "GenMeta.h"
-#include "GenOneOf.h"
 #include "GenProto.h"
 #include "GenTuple.h"
 #include "IRGenFunction.h"
@@ -143,55 +142,22 @@ static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
   case DeclKind::Func:
     return emitRValueForFunction(IGF, cast<FuncDecl>(D), explosion);
 
-  case DeclKind::OneOfElement:
-    return emitOneOfElementRef(IGF, cast<OneOfElementDecl>(D), explosion);
+  case DeclKind::OneOfElement: {
+    IGF.unimplemented(E->getLoc(), "uncurried reference to oneof");
+    IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), explosion);
+    return;
+  }
 
   case DeclKind::Subscript:
     llvm_unreachable("subscript decl cannot be referenced");
 
-  case DeclKind::Constructor:
-    llvm_unreachable("constructor decl cannot be referenced");
-
-  case DeclKind::Destructor:
-    llvm_unreachable("destructor decl cannot be referenced");
-  }
-  llvm_unreachable("bad decl kind");
-}
-
-static void emitConstructorRef(IRGenFunction &IGF, ConstructorRefExpr *E,
-                               Explosion &explosion) {
-  if (Expr *BaseE = E->getBase().dyn_cast<Expr*>()) {
-    IGF.emitIgnored(BaseE);
-  }
-
-  ValueDecl *D = E->getConstructor();
-  switch (D->getKind()) {
-#define VALUE_DECL(id, parent)
-#define DECL(id, parent) case DeclKind::id:
-#include "swift/AST/DeclNodes.def"
-    llvm_unreachable("decl is not a value decl");
-
-  case DeclKind::OneOfElement:
-    return emitOneOfElementRef(IGF, cast<OneOfElementDecl>(D), explosion);
-
   case DeclKind::Constructor: {
-    llvm::Function *fn = IGF.IGM.getAddrOfConstructor(cast<ConstructorDecl>(D),
-                                                      ExplosionKind::Minimal);
-    explosion.addUnmanaged(fn);
-    explosion.addUnmanaged(IGF.IGM.RefCountedNull);
+    IGF.unimplemented(E->getLoc(), "uncurried reference to constructor");
+    IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), explosion);
     return;
   }
-
-  case DeclKind::TypeAlias:
-  case DeclKind::OneOf:
-  case DeclKind::Struct:
-  case DeclKind::Class:
-  case DeclKind::Protocol:
-  case DeclKind::Subscript:
   case DeclKind::Destructor:
-  case DeclKind::Func:
-  case DeclKind::Var:
-    llvm_unreachable("construction requires Constructor or OneOfElement");
+    llvm_unreachable("destructor decl cannot be referenced");
   }
   llvm_unreachable("bad decl kind");
 }
@@ -384,10 +350,6 @@ namespace {
     void visitModuleExpr(ModuleExpr *E) {
       // Nothing to do: modules have no runtime representation.
     }
-
-    void visitConstructorRefExpr(ConstructorRefExpr *E) {
-      emitConstructorRef(IGF, E, Out);
-    }
   };
 }
 
@@ -474,7 +436,6 @@ namespace {
     NOT_LVALUE_EXPR(NewReference)
     NOT_LVALUE_EXPR(TypeOf)
     NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
-    NOT_LVALUE_EXPR(ConstructorRef)
     NOT_LVALUE_EXPR(Coerce)
     NOT_LVALUE_EXPR(Module)
 #undef NOT_LVALUE_EXPR
@@ -654,7 +615,6 @@ namespace {
     NON_LOCATEABLE(CapturingExpr)
     NON_LOCATEABLE(ModuleExpr)
     NON_LOCATEABLE(DotSyntaxBaseIgnoredExpr)
-    NON_LOCATEABLE(ConstructorRefExpr)
     NON_LOCATEABLE(NewReferenceExpr)
     NON_LOCATEABLE(NewArrayExpr)
     NON_LOCATEABLE(TypeOfExpr)

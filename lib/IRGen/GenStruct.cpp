@@ -103,10 +103,16 @@ namespace {
 static void emitValueConstructor(IRGenModule &IGM,
                                  llvm::Function *fn,
                                  ConstructorDecl *ctor) {
-  IRGenFunction IGF(IGM, ctor->getType(), ctor->getArguments(),
-                    ExplosionKind::Minimal, 0, fn, Prologue::Standard);
-
   auto thisDecl = ctor->getImplicitThisDecl();
+
+  Pattern *pats[] = {
+    new (IGM.Context) AnyPattern(SourceLoc()),
+    ctor->getArguments()
+  };
+  pats[0]->setType(MetaTypeType::get(thisDecl->getType(), IGM.Context));
+  IRGenFunction IGF(IGM, ctor->getType(), pats,
+                    ExplosionKind::Minimal, 1, fn, Prologue::Standard);
+
   const StructTypeInfo &thisTI =
       IGF.getFragileTypeInfo(thisDecl->getType()).as<StructTypeInfo>();
   Initialization I;

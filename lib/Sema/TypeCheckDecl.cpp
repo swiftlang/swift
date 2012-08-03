@@ -512,21 +512,20 @@ public:
       CD->setType(ErrorType::get(TC.Context));
     } else {
       Type FnTy;
-      if (outerGenericParams) {
-        if (CD->getGenericParams())
-          TC.diagnose(CD->getLoc(), diag::unsupported_generic_generic);
-
-        FnTy = PolymorphicFunctionType::get(CD->getArguments()->getType(),
-                                            ThisTy, outerGenericParams,
-                                            TC.Context);
-      }
-      else if (CD->getGenericParams())
+      if (CD->getGenericParams())
         FnTy = PolymorphicFunctionType::get(CD->getArguments()->getType(),
                                             ThisTy, CD->getGenericParams(),
                                             TC.Context);
       else
         FnTy = FunctionType::get(CD->getArguments()->getType(),
                                  ThisTy, TC.Context);
+      Type ThisMetaTy = MetaTypeType::get(ThisTy, TC.Context);
+      if (outerGenericParams) {
+        FnTy = PolymorphicFunctionType::get(ThisMetaTy, FnTy, 
+                                            outerGenericParams, TC.Context);
+      } else {
+        FnTy = FunctionType::get(ThisMetaTy, FnTy, TC.Context);
+      }
       CD->setType(FnTy);
     }
 

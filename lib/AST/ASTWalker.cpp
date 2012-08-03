@@ -297,16 +297,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;      
   }
 
-  Expr *visitConstructorRefExpr(ConstructorRefExpr *E) {
-    auto base = E->getBase();
-    if (Expr *E2 = base.dyn_cast<Expr*>())  {
-      E2 = doIt(E2);
-      if (E2 == nullptr) return nullptr;
-      E->setBase(E2);
-    }
-    return E;      
-  }
-
   Expr *visitCoerceExpr(CoerceExpr *E) {
     Expr *LHS = doIt(E->getLHS());
     if (!LHS) return nullptr;

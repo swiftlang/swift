@@ -416,6 +416,8 @@ static bool lookPastThisArgument(Type BaseTy, ValueDecl *VD) {
       return true;
   } else if (isa<OneOfElementDecl>(VD)) {
     return true;
+  } else if (isa<ConstructorDecl>(VD)) {
+    return true;
   }
 
   return false;
@@ -443,7 +445,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     // the type.
     bool substitutedWithBase = false;
     if (auto nominalOwner = dyn_cast<NominalTypeDecl>(VD->getDeclContext())) {
-      if (BaseTy && nominalOwner->getGenericParams()) {
+      if (BaseTy && nominalOwner->getGenericParamsOfContext()) {
         if (isa<ConstructorDecl>(VD) || isa<OneOfElementDecl>(VD) ||
             isa<FuncDecl>(VD)) {
           CoercionContext InitialCC(*this);
@@ -990,7 +992,8 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
 
     // Reference to a member of a generic type.
     if (baseTy->isSpecialized()) {
-      if (isa<FuncDecl>(Member) || isa<OneOfElementDecl>(Member)) {
+      if (isa<FuncDecl>(Member) || isa<OneOfElementDecl>(Member) ||
+          isa<ConstructorDecl>(Member)) {
         // We're binding a reference to an instance method of a generic
         // type, which we build as a reference to the underlying declaration
         // specialized based on the deducing the arguments of the generic
@@ -1042,8 +1045,8 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
                                           Member->getTypeOfReference());
 
     // Refer to a member function that binds 'this':
-    if ((isa<FuncDecl>(Member) || isa<OneOfElementDecl>(Member)) &&
-        Member->getDeclContext()->isTypeContext()) {
+    if ((isa<FuncDecl>(Member) && Member->getDeclContext()->isTypeContext()) ||
+        isa<OneOfElementDecl>(Member) || isa<ConstructorDecl>(Member)) {
       if (baseIsInstance == Member->isInstanceMember())
         return new (Context) DotSyntaxCallExpr(Ref, DotLoc, Base);
 

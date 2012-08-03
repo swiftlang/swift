@@ -26,7 +26,6 @@
 #include "llvm/GlobalVariable.h"
 
 #include "Explosion.h"
-#include "GenConstructor.h"
 #include "GenFunc.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
@@ -233,10 +232,12 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   ClassDecl *curClass = classTI.getClass();
 
   Pattern* pats[] = {
+    new (IGM.Context) AnyPattern(SourceLoc()),
     CD->getArguments()
   };
+  pats[0]->setType(MetaTypeType::get(thisDecl->getType(), IGM.Context));
   IRGenFunction IGF(IGM, CD->getType(), pats,
-                    ExplosionKind::Minimal, 0, fn, Prologue::Standard);
+                    ExplosionKind::Minimal, 1, fn, Prologue::Standard);
 
   // Emit the "this" variable
   Initialization I;

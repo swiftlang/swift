@@ -517,10 +517,6 @@ public:
     return unchanged(E);
   }
 
-  CoercedResult visitConstructorRefExpr(ConstructorRefExpr *E) {
-    return unchanged(E);
-  }
-
   CoercedResult visitCoerceExpr(CoerceExpr *E) {
     return unchanged(E);
   }
@@ -1021,14 +1017,17 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
       if (!(Flags & CF_Apply))
         continue;
 
-      Expr *CtorRef;
-      CtorRef = new (TC.Context) ConstructorRefExpr(DestTy, Best.getDecl(),
-                                                    Segment->getStartLoc());
+      Type DestMetaTy = MetaTypeType::get(DestTy, TC.Context);
+      Expr *TypeBase = new (TC.Context) TypeOfExpr(Segment->getStartLoc(),
+                                                   DestMetaTy);
+      Expr *CtorRef = new (TC.Context) DeclRefExpr(Best.getDecl(),
+                                                   Segment->getStartLoc(),
+                                                   Best.getDecl()->getType());
+      CtorRef = new (TC.Context) ConstructorRefCallExpr(CtorRef, TypeBase);
       CtorRef = TC.recheckTypes(CtorRef);
       if (!CtorRef)
         return nullptr;
 
-      CtorRef = TC.specializeOverloadResult(Best, CtorRef);
       ApplyExpr *Call = new (TC.Context) CallExpr(CtorRef, Segment);
       Expr *Checked = TC.semaApplyExpr(Call);
       if (!Checked)

@@ -25,17 +25,20 @@
 #include "swift/AST/Types.h"
 #include "llvm/Function.h"
 
-#include "GenConstructor.h"
-
 using namespace swift;
 using namespace irgen;
 
 void IRGenModule::emitConstructor(ConstructorDecl *CD) {
   llvm::Function *fn = getAddrOfConstructor(CD, ExplosionKind::Minimal);
 
-  IRGenFunction IGF(*this, CD->getType(), CD->getArguments(),
-                    ExplosionKind::Minimal, 0, fn, Prologue::Standard);
   auto thisDecl = CD->getImplicitThisDecl();
+  Pattern *pats[] = {
+    new (Context) AnyPattern(SourceLoc()),
+    CD->getArguments()
+  };
+  pats[0]->setType(MetaTypeType::get(thisDecl->getType(), Context));
+  IRGenFunction IGF(*this, CD->getType(), pats,
+                    ExplosionKind::Minimal, 1, fn, Prologue::Standard);
   const TypeInfo &type = getFragileTypeInfo(thisDecl->getType());
 
   // Emit the "this" variable.
@@ -65,13 +68,3 @@ void IRGenFunction::emitConstructorBody(ConstructorDecl *CD) {
   Builder.ClearInsertionPoint();
 }
 
-Callee irgen::getConstructorCallee(IRGenModule &IGM,
-                                   ConstructorDecl *ctor,
-                                   ArrayRef<Substitution> subs,
-                                   Type substResultType,
-                                   ExplosionKind bestExplosion) {
-  bestExplosion = ExplosionKind::Minimal;
-  llvm::Function *fn = IGM.getAddrOfConstructor(ctor, bestExplosion);
-  return Callee::forMethod(ctor->getType(), substResultType, subs,
-                           fn, bestExplosion, /*uncurry*/ 0);
-}

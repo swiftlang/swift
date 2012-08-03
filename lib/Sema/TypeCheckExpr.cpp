@@ -462,8 +462,6 @@ static ValueDecl *getReferencedDecl(Expr *E) {
 
   if (auto DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->getDecl();
-  if (auto CRE = dyn_cast<ConstructorRefExpr>(E))
-    return CRE->getConstructor();
   if (auto MRE = dyn_cast<MemberRefExpr>(E))
     return MRE->getDecl();
   if (auto EMR = dyn_cast<ExistentialMemberRefExpr>(E))
@@ -597,20 +595,11 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
       auto Best = filterOverloadSet(Ctors.Results, false, Ty, E2, Type(),
                                     Viable);
       if (Best) {
-        if (isa<OneOfElementDecl>(Best.getDecl())) {
-          // FIXME: All constructors should eventually start using this
-          // codepath.
-          ValueDecl *BestDecl = Best.getDecl();
-          Expr *Ref = new (Context) DeclRefExpr(BestDecl, E1->getStartLoc(),
-                                                BestDecl->getType());
-          E1 = new (Context) ConstructorRefCallExpr(Ref, E1);
-          E1 = recheckTypes(E1);
-          E->setFn(E1);
-          return semaApplyExpr(E);
-        }
-        E1 = new (Context) ConstructorRefExpr(E1, Best.getDecl());
+        ValueDecl *BestDecl = Best.getDecl();
+        Expr *Ref = new (Context) DeclRefExpr(BestDecl, E1->getStartLoc(),
+                                              BestDecl->getType());
+        E1 = new (Context) ConstructorRefCallExpr(Ref, E1);
         E1 = recheckTypes(E1);
-        E1 = specializeOverloadResult(Best, E1);
         E->setFn(E1);
         return semaApplyExpr(E);
       }
@@ -1070,11 +1059,15 @@ public:
                                      Viable);
 
     if (Best) {
-      Expr *Ctor = new (TC.Context) ConstructorRefExpr(CT, Best.getDecl(),
-                                                       E->getLoc());
-      Ctor = TC.recheckTypes(Ctor);
-      Ctor = TC.specializeOverloadResult(Best, Ctor);
-      E->setFn(Ctor);
+      Type ClassMetaTy = MetaTypeType::get(CT, TC.Context);
+      Expr *TypeBase = new (TC.Context) TypeOfExpr(E->getLoc(),
+                                                   ClassMetaTy);
+      Expr *CtorRef = new (TC.Context) DeclRefExpr(Best.getDecl(),
+                                                   E->getLoc(),
+                                                   Best.getDecl()->getType());
+      CtorRef = new (TC.Context) ConstructorRefCallExpr(CtorRef, TypeBase);
+      CtorRef = TC.recheckTypes(CtorRef);
+      E->setFn(CtorRef);
       E->setArg(Arg);
       return TC.semaApplyExpr(E);
     } else if (!Arg->getType()->isUnresolvedType()) {
@@ -1101,33 +1094,6 @@ public:
     // DotSyntaxBaseIgnoredExpr is fully type checked.
     return E;
   }
-
-  Expr *visitConstructorRefExpr(ConstructorRefExpr *E) {
-    ValueDecl *constructor = E->getConstructor();
-    if (E->getType().isNull()) {
-      Type T = constructor->getType();
-      E->setType(T);
-    }
-
-    // If the constructor is part of a generic type, specialize this expression
-    // based on the 'base' type of the constructor reference.
-    
-    if (auto nominalOwner
-          = dyn_cast<NominalTypeDecl>(constructor->getDeclContext())) {
-      if (nominalOwner->getGenericParams()) {
-        CoercionContext CC(TC);
-        Type T = TC.substBaseForGenericTypeMember(constructor,
-                                                  E->getBaseType(),
-                                                  constructor->getType(),
-                                                  E->getLoc(),
-                                                  CC);
-        // FIXME: Error checking here.
-        return TC.buildSpecializeExpr(E, T, CC.Substitutions, CC.Conformance);
-      }
-    }
-    return E;
-  }
-
 
   Expr *visitCoerceExpr(CoerceExpr *E) {
     // The type of the expr is always the type that the MetaType LHS specifies.

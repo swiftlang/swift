@@ -30,7 +30,6 @@ add_swift_library(swiftIRGen
   GenMeta.h
   GenObjC.cpp
   GenOneOf.cpp
-  GenOneOf.h
   GenPoly.cpp
   GenProto.cpp
   GenProto.h
