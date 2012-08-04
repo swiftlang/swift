@@ -89,6 +89,8 @@ namespace {
   public:
     Mangler(raw_ostream &buffer) : Buffer(buffer) {}
     void mangleDeclName(ValueDecl *decl, IncludeType includeType);
+    void mangleDeclType(ValueDecl *decl, ExplosionKind kind,
+                        unsigned uncurryingLevel);
     void mangleType(Type type, ExplosionKind kind, unsigned uncurryingLevel);
 
   private:
@@ -187,7 +189,11 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
   case DeclContextKind::ExtensionDecl: {
     // Mangle the extension as the originally-extended type.
     Type type = cast<ExtensionDecl>(ctx)->getExtendedType();
-    mangleNominalType(type->castTo<NominalType>()->getDecl(),
+    if (NominalType *nom = type->getAs<NominalType>()) {
+      mangleNominalType(nom->getDecl(), ExplosionKind::Minimal);
+      return;
+    }
+    mangleNominalType(type->castTo<UnboundGenericType>()->getDecl(),
                       ExplosionKind::Minimal);
     return;
   }
@@ -234,8 +240,7 @@ void Mangler::mangleGetterOrSetterContext(FuncDecl *func) {
   // We mangle the type with a canonical set of parameters because
   // objects nested within functions are shared across all expansions
   // of the function.
-  mangleType(cast<ValueDecl>(D)->getType(), ExplosionKind::Minimal,
-             /*uncurry*/ 0);
+  mangleDeclType(cast<ValueDecl>(D), ExplosionKind::Minimal, /*uncurry*/ 0);
 
   if (func->getGetterDecl()) {
     Buffer << 'g';
@@ -255,7 +260,38 @@ void Mangler::mangleDeclName(ValueDecl *decl, IncludeType includeType) {
   // We mangle the type with a canonical set of parameters because
   // objects nested within functions are shared across all expansions
   // of the function.
-  mangleType(decl->getType(), ExplosionKind::Minimal, /*uncurry*/ 0);
+  mangleDeclType(decl, ExplosionKind::Minimal, /*uncurry*/ 0);
+}
+
+void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
+                             unsigned uncurryLevel) {
+  if (isa<SubscriptDecl>(decl)) {
+    auto genericParams = decl->getDeclContext()->getGenericParamsOfContext();
+    if (genericParams) {
+      // FIXME: Prefix?
+      ArchetypesDepth++;
+      unsigned index = 0;
+      // FIXME: Only mangle the archetypes and protocol requirements that
+      // matter, rather than everything.
+      for (auto archetype : genericParams->getAllArchetypes()) {
+        // Remember the current depth and level.
+        ArchetypeInfo info;
+        info.Depth = ArchetypesDepth;
+        info.Index = index++;
+        Archetypes.insert(std::make_pair(archetype, info));
+
+        // Mangle this type parameter.
+        //   <generic-parameter> ::= <protocol-list> _
+        mangleProtocolList(archetype->getConformsTo());
+        Buffer << '_';
+      }
+      mangleType(decl->getType(), explosion, uncurryLevel);
+      ArchetypesDepth--;
+      return;
+    }
+  }
+  if (!isa<TypeDecl>(decl))
+    mangleType(decl->getType(), explosion, uncurryLevel);
 }
 
 /// Mangle a type into the buffer.
@@ -628,10 +664,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   // on all kinds of declarations, even variables, because at the
   // moment they can *all* be overloaded.
   if (ValueDecl *valueDecl = dyn_cast<ValueDecl>(getDecl()))
-    if (!isa<TypeDecl>(getDecl()))
-      mangler.mangleType(valueDecl->getType(),
-                         getExplosionKind(),
-                         getUncurryLevel());
+    mangler.mangleDeclType(valueDecl, getExplosionKind(), getUncurryLevel());
 
   // Add a getter/setter suffix if applicable.
   switch (getKind()) {
