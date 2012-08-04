@@ -511,12 +511,14 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(Type concreteType,
   return entry;
 }
 
-static Type addOwnerArgument(ASTContext &ctx, Type owner, Type resultType) {
-  Type argType = owner;
+static Type addOwnerArgument(ASTContext &ctx, DeclContext *DC, Type resultType) {
+  Type argType = DC->getDeclaredTypeOfContext();
   if (!argType->hasReferenceSemantics()) {
     argType = LValueType::get(argType, LValueType::Qual::DefaultForMemberAccess,
                               ctx);
   }
+  if (auto params = DC->getGenericParamsOfContext())
+    return PolymorphicFunctionType::get(argType, resultType, params, ctx);
   return FunctionType::get(argType, resultType, ctx);
 }
 
@@ -534,8 +536,7 @@ static AbstractCC addOwnerArgument(ASTContext &ctx, ValueDecl *value,
 
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::NominalTypeDecl:
-    resultType = addOwnerArgument(ctx, DC->getDeclaredTypeOfContext(),
-                                  resultType);
+    resultType = addOwnerArgument(ctx, DC, resultType);
     uncurryLevel++;
     return AbstractCC::Method;
   }
