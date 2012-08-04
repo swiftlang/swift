@@ -2017,6 +2017,14 @@ namespace {
         return;
       }
 
+      // We don't have a representation for metatypes yet, so no conversion
+      // is required.
+      if (sig->is<MetaTypeType>()) {
+        assert(impl->is<MetaTypeType>());
+        Args.push_back(Arg(Arg::Direct, implTI));
+        return;
+      }
+
       // That's all the structural types, so the types really ought to
       // match perfectly now.
       assert(sig->isEqual(impl));
@@ -2300,6 +2308,17 @@ namespace {
     /// Returns a function which calls the given implementation under
     /// the given interface.
     llvm::Constant *getStaticMethodWitness(FuncDecl *impl, Type ifaceType) {
+      if (impl->getDeclContext()->isModuleContext()) {
+        llvm::Constant *implPtr =
+          IGM.getAddrOfFunction(impl, ExplosionKind::Minimal, 0, /*data*/ false);
+        // FIXME: This is an ugly hack: we're pretending that the function
+        // has a different type from its actual type.  This works because the
+        // LLVM representation happens to be the same.
+        Type concreteMeta = MetaTypeType::get(ConcreteType, IGM.Context);
+        Type implTy = 
+            FunctionType::get(concreteMeta, impl->getType(), IGM.Context);
+        return getWitness(implPtr, implTy, ifaceType, 1);
+      }
       llvm::Constant *implPtr =
         IGM.getAddrOfFunction(impl, ExplosionKind::Minimal, 1, /*data*/ false);
       return getWitness(implPtr, impl->getType(), ifaceType, 1);
