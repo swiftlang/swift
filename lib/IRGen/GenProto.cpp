@@ -2897,7 +2897,7 @@ LValue irgen::emitExistentialMemberRefLValue(IRGenFunction &IGF,
 
   IGF.unimplemented(E->getLoc(),
                     "using existential member reference as l-value");
-  return IGF.emitFakeLValue(IGF.getFragileTypeInfo(E->getType()));
+  return IGF.emitFakeLValue(E->getType());
 }
 
 /// Emit a callee for a protocol method.

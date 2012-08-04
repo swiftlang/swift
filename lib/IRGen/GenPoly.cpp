@@ -338,6 +338,9 @@ namespace {
 
       // Otherwise, this gets more complicated.
       IGF.unimplemented(SourceLoc(), "remapping bound generic value types");
+      // FIXME: This is my first shot at implementing this, but it doesn't
+      // handle cases which actually need remapping.
+      In.transferInto(Out, IGF.IGM.getExplosionSize(origTy, In.getKind()));
     }
 
     void visitAnyFunctionType(AnyFunctionType *origTy,

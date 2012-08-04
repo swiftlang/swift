@@ -298,7 +298,7 @@ private:
 //--- Expression emission ------------------------------------------------------
 public:
   void emitFakeExplosion(const TypeInfo &type, Explosion &explosion);
-  LValue emitFakeLValue(const TypeInfo &type);
+  LValue emitFakeLValue(Type type);
 
   void emitIgnored(Expr *E);
 

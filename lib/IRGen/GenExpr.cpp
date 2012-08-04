@@ -476,27 +476,27 @@ namespace {
 
     LValue visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
       IGF.unimplemented(E->getLBracketLoc(), "existential subscripts");
-      return LValue();
+      return IGF.emitFakeLValue(E->getType());
     }
 
     LValue visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
       IGF.unimplemented(E->getLBracketLoc(), "archetype subscripts");
-      return LValue();
+      return IGF.emitFakeLValue(E->getType());
     }
 
     LValue visitGenericSubscriptExpr(GenericSubscriptExpr *E) {
       IGF.unimplemented(E->getLBracketLoc(), "generic subscripts");
-      return LValue();
+      return IGF.emitFakeLValue(E->getType());
     }
 
     LValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
       IGF.unimplemented(E->getLoc(), "archetype member reference");
-      return LValue();
+      return IGF.emitFakeLValue(E->getType());
     }
 
     LValue visitGenericMemberRefExpr(GenericMemberRefExpr *E) {
       IGF.unimplemented(E->getLoc(), "generic member reference");
-      return LValue();
+      return IGF.emitFakeLValue(E->getType());
     }
 
   };
@@ -710,10 +710,13 @@ void IRGenFunction::emitIgnored(Expr *E) {
 
 /// Emit a fake l-value which obeys the given specification.  This
 /// should only ever be used for error recovery.
-LValue IRGenFunction::emitFakeLValue(const TypeInfo &type) {
+LValue IRGenFunction::emitFakeLValue(Type type) {
+  Type objTy = type->castTo<LValueType>()->getObjectType();
+  const TypeInfo &lvalueInfo = getFragileTypeInfo(objTy);
   llvm::Value *fakeAddr =
-    llvm::UndefValue::get(type.getStorageType()->getPointerTo());
-  return emitAddressLValue(OwnedAddress(Address(fakeAddr, type.StorageAlignment),
+    llvm::UndefValue::get(lvalueInfo.getStorageType()->getPointerTo());
+  return emitAddressLValue(OwnedAddress(Address(fakeAddr,
+                                                lvalueInfo.StorageAlignment),
                                         IGM.RefCountedNull));
 }
 
