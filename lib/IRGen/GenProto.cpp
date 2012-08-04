@@ -2073,75 +2073,54 @@ namespace {
 
     void emitThunk(IRGenFunction &IGF) {
       Explosion outerArgs = IGF.collectParameters();
-      Explosion innerArgs(ExplosionKind::Minimal);
 
       const TypeInfo &innerResultTI = IGM.getFragileTypeInfo(ImplResultTy);
       bool innerHasIndirectResult =
-        innerResultTI.getSchema(innerArgs.getKind()).requiresIndirectResult();
+        innerResultTI.getSchema(ExplosionKind::Minimal).requiresIndirectResult();
 
-      Address innerResult;
-      Address outerResult;
-
-      // Pull off the outer result.
-      FixedPacking innerResultPacking;
-      CleanupsDepth outerResultCleanup = CleanupsDepth::invalid();
+      Address resultAddr;
       if (HasAbstractedResult) {
-        outerResult = Address(outerArgs.claimUnmanagedNext(),
-                              getFixedBufferAlignment(IGM));
-        innerResultPacking = computePacking(IGM, innerResultTI);
-
-        // Allocate space for the output.
-        innerResult = emitAllocateBuffer(IGF, outerResult,
-                                         innerResultPacking, innerResultTI);
-
-        // Enter a deallocate cleanup if necessary.
-        if (!isNeverAllocated(innerResultPacking)) {
-          IGF.pushFullExprCleanup<DeallocateConcreteBuffer>(outerResult,
-                                                            innerResultPacking,
-                                                            innerResultTI);
-          outerResultCleanup = IGF.getCleanupsDepth();
-        }
+        llvm::Value *resultPtr = outerArgs.claimUnmanagedNext();
+        llvm::Type *resultPtrTy = innerResultTI.StorageType->getPointerTo();
+        resultPtr = IGF.Builder.CreateBitCast(resultPtr, resultPtrTy);
+        resultAddr = Address(resultPtr, innerResultTI.StorageAlignment);
       } else if (innerHasIndirectResult) {
-        innerResult = Address(outerArgs.claimUnmanagedNext(),
+        resultAddr = Address(outerArgs.claimUnmanagedNext(),
                               innerResultTI.StorageAlignment);
       }
 
-      // Add the inner result.
-      if (innerHasIndirectResult) {
-        assert(innerResult.isValid());
-        innerArgs.addUnmanaged(innerResult.getAddress());
-      }
+      // FIXME: Pass in the right types so that differsByAbstraction works
+      // correctly.
+      CallEmission emission(IGF,
+          Callee::forFreestandingFunction(ImplTy, ImplResultTy,
+                                          ArrayRef<Substitution>(), ImplPtr,
+                                          ExplosionKind::Minimal,
+                                          UncurryLevel));
 
-      // Okay, walk backwards through the parameter clauses,
-      // forward the arguments.
+      // Walk backwards through the parameter clauses, forward the arguments.
+      std::vector<Explosion> innerArgs;
       for (unsigned i = UncurryLevel + 1; i != 0; ) {
+        innerArgs.emplace_back(ExplosionKind::Minimal);
+        Explosion& innerArg = innerArgs.back();
         unsigned clauseBegin = UncurryClauseBegin[--i];
         unsigned clauseEnd =
           (i == UncurryLevel ? Args.size() : UncurryClauseBegin[i+1]);
 
-        forwardArgs(IGF, outerArgs, innerArgs,
+        forwardArgs(IGF, outerArgs, innerArg,
                     ArrayRef<Arg>(&Args[clauseBegin], clauseEnd - clauseBegin));
       }
-
-      // Do the call.
-      SmallVector<llvm::Value*, 16> finalArgs;
-      innerArgs.forward(IGF, innerArgs.size(), finalArgs);
-
-      // FIXME: exceptions!  Or better yet, get the basic call
-      // machinery to do all this for us.
-      llvm::CallInst *call = IGF.Builder.CreateCall(ImplPtr, finalArgs);
-
-      // In an abstracted result, we build into the buffer given us.
-      if (HasAbstractedResult) {
-        if (outerResultCleanup.isValid())
-          IGF.setCleanupState(outerResultCleanup, CleanupState::Dead);
-        IGF.Builder.CreateRetVoid();
-
-      // Otherwise we're just using the call return.
-      } else if (call->getType()->isVoidTy()) {
+      for (unsigned i = innerArgs.size(); i != 0; --i)
+        emission.addArg(innerArgs[i-1]);
+      
+      if (HasAbstractedResult || innerHasIndirectResult) {
+        // If the result needs to be in memory, emit it to memory.
+        emission.emitToMemory(resultAddr, innerResultTI);
         IGF.Builder.CreateRetVoid();
       } else {
-        IGF.Builder.CreateRet(call);
+        // Otherwise, just forward the result in registers.
+        Explosion resultExplosion(ExplosionKind::Minimal);
+        emission.emitToExplosion(resultExplosion);
+        IGF.emitScalarReturn(resultExplosion);
       }
     }
 
