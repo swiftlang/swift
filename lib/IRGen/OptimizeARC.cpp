@@ -36,11 +36,6 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
-// FIXME: performStoreOnlyObjectElimination currently causes leaks when
-// retainable pointers are stored into the object in question.
-// See <rdar://problem/11939216>.
-// #define STORE_ONLY_OBJECT_ELIMINATION
-
 STATISTIC(NumNoopDeleted,
           "Number of no-op swift calls eliminated");
 STATISTIC(NumRetainReleasePairs,
@@ -49,10 +44,8 @@ STATISTIC(NumObjCRetainReleasePairs,
           "Number of objc retain/release pairs eliminated");
 STATISTIC(NumAllocateReleasePairs,
           "Number of swift allocate/release pairs eliminated");
-#ifdef STORE_ONLY_OBJECT_ELIMINATION
 STATISTIC(NumStoreOnlyObjectsEliminated,
           "Number of swift stored-only objects eliminated");
-#endif
 STATISTIC(NumReturnThreeTailCallsFormed,
           "Number of swift_retainAndReturnThree tail calls formed");
 
@@ -683,14 +676,83 @@ OutOfLoop:
 //                       Store-Only Object Elimination
 //===----------------------------------------------------------------------===//
 
+/// DT_Kind - Classification for destructor semantics.
+enum class DtorKind {
+  /// NoSideEffects - The destructor does nothing, or just touches the local
+  /// object in a non-observable way after it is destroyed.
+  NoSideEffects,
+  
+  /// NoEscape - The destructor potentially has some side effects, but the
+  /// address of the destroyed object never escapes (in the LLVM IR sense).
+  NoEscape,
+  
+  /// Unknown - Something potentially crazy is going on here.
+  Unknown
+};
+
+/// analyzeDestructor - Given the heap.metadata argument to swift_allocObject,
+/// take a look a the destructor and try to decide if it has side effects or any
+/// other bad effects that can prevent it from being optimized.
+static DtorKind analyzeDestructor(Value *P) {
+  // If we have a null pointer for the metadata info, the dtor has no side
+  // effects.  Actually, the final release would crash.  This is really only
+  // useful for writing testcases.
+  if (isa<ConstantPointerNull>(P->stripPointerCasts()))
+    return DtorKind::NoSideEffects;
+    
+  // We have to have a known heap metadata value, reject dynamically computed
+  // ones, or places 
+  GlobalVariable *GV = dyn_cast<GlobalVariable>(P->stripPointerCasts());
+  if (GV == 0 || GV->mayBeOverridden()) return DtorKind::Unknown;
+  
+  ConstantStruct *CS = dyn_cast_or_null<ConstantStruct>(GV->getInitializer());
+  if (CS == 0 || CS->getNumOperands() == 0) return DtorKind::Unknown;
+  
+  // FIXME: Would like to abstract the dtor slot (#0) out from this to somewhere
+  // unified.
+  enum { DTorSlotOfHeapMeatadata = 0 };
+  Function *DTorFn =dyn_cast<Function>(CS->getOperand(DTorSlotOfHeapMeatadata));
+  if (DTorFn == 0 || DTorFn->mayBeOverridden() || DTorFn->hasExternalLinkage())
+    return DtorKind::Unknown;
+  
+  // Okay, we have a body, and we can trust it.  The first argument
+  assert(DTorFn->arg_size() == 1 && !DTorFn->isVarArg() &&
+         "expected a single object argument to destructors");
+
+  // Scan the body of the function, looking for anything scary.
+  for (BasicBlock &BB : *DTorFn) {
+    for (Instruction &I : BB) {
+      // Ignore all instructions with side effects.
+      if (!I.mayHaveSideEffects()) continue;
+      
+      // TODO: Ignore instructions that just side effect the object
+      // (stores/loads/memcpy/etc).
+        
+        
+      // Okay, the function has some side effects, if it doesn't capture the
+      // object argument, at least that is something.
+      return DTorFn->doesNotCapture(0) ? DtorKind::NoEscape : DtorKind::Unknown;
+    }
+  }
+  
+  // If we didn't find any side effects, we win.
+  return DtorKind::NoSideEffects;
+}
+
+
 /// performStoreOnlyObjectElimination - Scan the graph of uses of the specified
 /// object allocation.  If the object does not escape and is only stored to
 /// (this happens because GVN and other optimizations hoists forward substitutes
 /// all stores to the object to eliminate all loads from it), then zap the
 /// object and all accesses related to it.
-#ifdef STORE_ONLY_OBJECT_ELIMINATION
 static bool performStoreOnlyObjectElimination(CallInst &Allocation,
                                               BasicBlock::iterator &BBI) {
+  DtorKind DtorInfo = analyzeDestructor(Allocation.getArgOperand(0));
+
+  // We can't delete the object if its destructor has side effects.
+  if (DtorInfo != DtorKind::NoSideEffects)
+    return false;
+  
   // Do a depth first search exploring all of the uses of the object pointer,
   // following through casts, pointer adjustments etc.  If we find any loads or
   // any escape sites of the object, we give up.  If we succeed in walking the
@@ -800,7 +862,6 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
   ++NumStoreOnlyObjectsEliminated;
   return true;
 }
-#endif
 
 /// performGeneralOptimizations - This does a forward scan over basic blocks,
 /// looking for interesting local optimizations that can be done.
@@ -817,9 +878,7 @@ static bool performGeneralOptimizations(Function &F) {
       switch (classifyInstruction(I)) {
       default: break;
       case RT_AllocObject:
-#ifdef STORE_ONLY_OBJECT_ELIMINATION
         Changed |= performStoreOnlyObjectElimination(cast<CallInst>(I), BBI);
-#endif
         break;
       case RT_Release:
         Changed |= performLocalReleaseMotion(cast<CallInst>(I), BB);
