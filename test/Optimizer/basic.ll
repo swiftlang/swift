@@ -115,3 +115,30 @@ define void @objc_retain_release_opt(%objc_object* %P, i32* %IP) {
 ; CHECK-NEXT: store i32 42
 ; CHECK-NEXT: ret void
 
+
+
+; trivial_alloc_eliminate1 - Show that we can eliminate an allocation with a
+; trivial destructor.
+@trivial_dtor_metadata = internal constant %swift.heapmetadata { i64 (%swift.refcounted*)* @trivial_dtor, i64 (%swift.refcounted*)* null }
+define internal i64 @trivial_dtor(%swift.refcounted* nocapture) nounwind readonly {
+entry:
+  %1 = getelementptr inbounds %swift.refcounted* %0, i64 1
+  %2 = bitcast %swift.refcounted* %1 to i64*
+  %length = load i64* %2, align 8
+  %3 = shl i64 %length, 3
+  %4 = add i64 %3, 24
+  ret i64 %4
+}
+define void @trivial_alloc_eliminate1(i64 %x) nounwind {
+entry:
+  %0 = tail call noalias %swift.refcounted* @swift_allocObject(%swift.heapmetadata* @trivial_dtor_metadata, i64 24, i64 8) nounwind
+  tail call void @swift_release(%swift.refcounted* %0) nounwind
+  ret void
+}
+; CHECK: @trivial_alloc_eliminate1
+; CHECK-NEXT: entry:
+; CHECK-NEXT: ret void
+
+
+
+
