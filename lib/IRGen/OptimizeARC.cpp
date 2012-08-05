@@ -711,16 +711,22 @@ static DtorKind analyzeDestructor(Value *P) {
   // FIXME: Would like to abstract the dtor slot (#0) out from this to somewhere
   // unified.
   enum { DTorSlotOfHeapMeatadata = 0 };
-  Function *DTorFn =dyn_cast<Function>(CS->getOperand(DTorSlotOfHeapMeatadata));
-  if (DTorFn == 0 || DTorFn->mayBeOverridden() || DTorFn->hasExternalLinkage())
+  Function *DtorFn =dyn_cast<Function>(CS->getOperand(DTorSlotOfHeapMeatadata));
+  if (DtorFn == 0 || DtorFn->mayBeOverridden() || DtorFn->hasExternalLinkage())
     return DtorKind::Unknown;
   
-  // Okay, we have a body, and we can trust it.  The first argument
-  assert(DTorFn->arg_size() == 1 && !DTorFn->isVarArg() &&
+  // Okay, we have a body, and we can trust it.  If the function is marked
+  // readonly, then we know it can't have any interesting side effects, so we
+  // don't need to analyze it at all.
+  if (DtorFn->onlyReadsMemory())
+    return DtorKind::NoSideEffects;
+  
+  // The first argument is the object being destroyed.
+  assert(DtorFn->arg_size() == 1 && !DtorFn->isVarArg() &&
          "expected a single object argument to destructors");
 
   // Scan the body of the function, looking for anything scary.
-  for (BasicBlock &BB : *DTorFn) {
+  for (BasicBlock &BB : *DtorFn) {
     for (Instruction &I : BB) {
       // Ignore all instructions with side effects.
       if (!I.mayHaveSideEffects()) continue;
@@ -731,7 +737,7 @@ static DtorKind analyzeDestructor(Value *P) {
         
       // Okay, the function has some side effects, if it doesn't capture the
       // object argument, at least that is something.
-      return DTorFn->doesNotCapture(0) ? DtorKind::NoEscape : DtorKind::Unknown;
+      return DtorFn->doesNotCapture(0) ? DtorKind::NoEscape : DtorKind::Unknown;
     }
   }
   
