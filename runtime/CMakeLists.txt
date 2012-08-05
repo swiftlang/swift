@@ -7,6 +7,7 @@ set(SWIFTLIB_SOURCES
     FloatingPoint.swift
     Misc.swift
     String.swift
+    Algorithm.swift
     demangle.swift)
 
 add_custom_command(
