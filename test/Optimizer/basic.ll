@@ -26,26 +26,6 @@ entry:
 ; CHECK-NEXT: ret void
 
 
-; rdar://11542743
-define i64 @max_test(i64 %x) nounwind {
-entry:
-  %0 = tail call noalias %swift.refcounted* @swift_allocObject(%swift.heapmetadata* null, i64 24, i64 8) nounwind
-  %1 = tail call %swift.refcounted* @swift_retain(%swift.refcounted* %0) nounwind
-  tail call void @swift_release(%swift.refcounted* %0) nounwind
-  %2 = icmp sgt i64 %x, 0
-  %x.y.i = select i1 %2, i64 %x, i64 0
-  %3 = tail call %swift.refcounted* @swift_retain(%swift.refcounted* %1) nounwind
-  tail call void @swift_release(%swift.refcounted* %3) nounwind
-  tail call void @swift_release(%swift.refcounted* %1) nounwind
-  ret i64 %x.y.i
-}
-; CHECK: @max_test
-; CHECK-NEXT: entry:
-; CHECK-NEXT: icmp
-; CHECK-NEXT: select
-; CHECK-NEXT: ret
-
-
 ; retain3_test2 - This shows a case where something else (eg inlining an already
 ; optimized function) has given us a swift_retainAndReturnThree that we need to
 ; destructure and reassemble.
@@ -113,30 +93,6 @@ define void @objc_retain_release_opt(%objc_object* %P, i32* %IP) {
 
 ; CHECK: @objc_retain_release_opt(
 ; CHECK-NEXT: store i32 42
-; CHECK-NEXT: ret void
-
-
-
-; trivial_alloc_eliminate1 - Show that we can eliminate an allocation with a
-; trivial destructor.
-@trivial_dtor_metadata = internal constant %swift.heapmetadata { i64 (%swift.refcounted*)* @trivial_dtor, i64 (%swift.refcounted*)* null }
-define internal i64 @trivial_dtor(%swift.refcounted* nocapture) nounwind readonly {
-entry:
-  %1 = getelementptr inbounds %swift.refcounted* %0, i64 1
-  %2 = bitcast %swift.refcounted* %1 to i64*
-  %length = load i64* %2, align 8
-  %3 = shl i64 %length, 3
-  %4 = add i64 %3, 24
-  ret i64 %4
-}
-define void @trivial_alloc_eliminate1(i64 %x) nounwind {
-entry:
-  %0 = tail call noalias %swift.refcounted* @swift_allocObject(%swift.heapmetadata* @trivial_dtor_metadata, i64 24, i64 8) nounwind
-  tail call void @swift_release(%swift.refcounted* %0) nounwind
-  ret void
-}
-; CHECK: @trivial_alloc_eliminate1
-; CHECK-NEXT: entry:
 ; CHECK-NEXT: ret void
 
 
