@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -103,6 +104,9 @@ namespace {
     void mangleDeclContext(DeclContext *ctx);
     void mangleIdentifier(Identifier ident);
     void mangleGetterOrSetterContext(FuncDecl *fn);
+    void manglePolymorphicType(const GenericParamList *genericParams, Type T,
+                               ExplosionKind explosion, unsigned uncurryLevel,
+                               bool mangleAsFunction);
     bool tryMangleStandardSubstitution(NominalTypeDecl *type);
     bool tryMangleSubstitution(void *ptr);
     void addSubstitution(void *ptr);
@@ -249,6 +253,43 @@ void Mangler::mangleGetterOrSetterContext(FuncDecl *func) {
   }
 }
 
+void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
+                                    Type T, ExplosionKind explosion,
+                                    unsigned uncurryLevel,
+                                    bool mangleAsFunction) {
+  SmallVector<const GenericParamList *, 2> paramLists;
+  for (; genericParams; genericParams = genericParams->getOuterParameters())
+    paramLists.push_back(genericParams);
+
+  // FIXME: Prefix?
+  llvm::SaveAndRestore<unsigned> oldArchetypesDepth(ArchetypesDepth);
+  for (auto gp = paramLists.rbegin(), gpEnd = paramLists.rend(); gp != gpEnd;
+       ++gp) {
+    ArchetypesDepth++;
+    unsigned index = 0;
+    // FIXME: Only mangle the archetypes and protocol requirements that
+    // matter, rather than everything.
+    for (auto archetype : (*gp)->getAllArchetypes()) {
+      // Remember the current depth and level.
+      ArchetypeInfo info;
+      info.Depth = ArchetypesDepth;
+      info.Index = index++;
+      Archetypes.insert(std::make_pair(archetype, info));
+
+      // Mangle this type parameter.
+      //   <generic-parameter> ::= <protocol-list> _
+      mangleProtocolList(archetype->getConformsTo());
+      Buffer << '_';
+    }
+  }
+  Buffer << '_';
+
+  if (mangleAsFunction)
+    mangleFunctionType(cast<AnyFunctionType>(T), explosion, uncurryLevel);
+  else
+    mangleType(T, explosion, uncurryLevel);
+}
+
 void Mangler::mangleDeclName(ValueDecl *decl, IncludeType includeType) {
   // decl ::= context identifier
   mangleDeclContext(decl->getDeclContext());
@@ -268,25 +309,8 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
   if (isa<SubscriptDecl>(decl)) {
     auto genericParams = decl->getDeclContext()->getGenericParamsOfContext();
     if (genericParams) {
-      // FIXME: Prefix?
-      ArchetypesDepth++;
-      unsigned index = 0;
-      // FIXME: Only mangle the archetypes and protocol requirements that
-      // matter, rather than everything.
-      for (auto archetype : genericParams->getAllArchetypes()) {
-        // Remember the current depth and level.
-        ArchetypeInfo info;
-        info.Depth = ArchetypesDepth;
-        info.Index = index++;
-        Archetypes.insert(std::make_pair(archetype, info));
-
-        // Mangle this type parameter.
-        //   <generic-parameter> ::= <protocol-list> _
-        mangleProtocolList(archetype->getConformsTo());
-        Buffer << '_';
-      }
-      mangleType(decl->getType(), explosion, uncurryLevel);
-      ArchetypesDepth--;
+      manglePolymorphicType(genericParams, decl->getType(), explosion,
+                            uncurryLevel, /*mangleAsFunction=*/false);
       return;
     }
   }
@@ -422,26 +446,8 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // The nested type is always a function type.
     PolymorphicFunctionType *fn = cast<PolymorphicFunctionType>(base);
     Buffer << 'U';
-
-    ArchetypesDepth++;
-    unsigned index = 0;
-    // FIXME: Only mangle the archetypes and protocol requirements that
-    // matter, rather than everything.
-    for (auto archetype : fn->getGenericParams().getAllArchetypes()) {
-      // Remember the current depth and level.
-      ArchetypeInfo info;
-      info.Depth = ArchetypesDepth;
-      info.Index = index++;
-      Archetypes.insert(std::make_pair(archetype, info));
-
-      // Mangle this type parameter.
-      //   <generic-parameter> ::= <protocol-list> _
-      mangleProtocolList(archetype->getConformsTo());
-      Buffer << '_';
-    }
-    Buffer << '_';
-    mangleFunctionType(fn, explosion, uncurryLevel);
-    ArchetypesDepth--;
+    manglePolymorphicType(&fn->getGenericParams(), fn, explosion, uncurryLevel,
+                          /*mangleAsFunction=*/true);
     return;
   }
 
