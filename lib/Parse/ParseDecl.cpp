@@ -1756,7 +1756,7 @@ ConstructorDecl *Parser::parseDeclConstructor() {
 
   // pattern-tuple
   if (Tok.isNotAnyLParen()) {
-    diagnose(Tok.getLoc(), diag::expected_lparen_subscript);
+    diagnose(Tok.getLoc(), diag::expected_lparen_constructor);
     return nullptr;
   }
   

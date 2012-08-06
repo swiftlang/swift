@@ -241,6 +241,8 @@ ERROR(set_without_get_subscript,decl_parsing,none,
       "subscripting with a setter must also have a getter", ())
 
 // Constructor
+ERROR(expected_lparen_constructor,decl_parsing,none,
+      "expected '(' for constructor parameters", ())
 ERROR(expected_lbrace_constructor,decl_parsing,none,
       "expected '{' for constructor", ())
 
