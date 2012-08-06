@@ -724,17 +724,59 @@ static DtorKind analyzeDestructor(Value *P) {
   // The first argument is the object being destroyed.
   assert(DtorFn->arg_size() == 1 && !DtorFn->isVarArg() &&
          "expected a single object argument to destructors");
-
+  Value *ThisObject = DtorFn->arg_begin();
+  
   // Scan the body of the function, looking for anything scary.
   for (BasicBlock &BB : *DtorFn) {
     for (Instruction &I : BB) {
-      // Ignore all instructions with side effects.
-      if (!I.mayHaveSideEffects()) continue;
+      // Note that the destructor may not be in any particular canonical form.
+      switch (classifyInstruction(I)) {
+      case RT_NoMemoryAccessed:
+      case RT_AllocObject:
+        // Skip over random instructions that don't touch memory in the caller.
+        continue;
+          
+      case RT_Retain:                // x = swift_retain(y)
+      case RT_RetainAndReturnThree:  // swift_retainAndReturnThree(obj,a,b,c)
+      case RT_RetainNoResult: {      // swift_retain_noresult(obj)
+
+        // Ignore retains of the "this" object, no ressurection is possible.
+        Value *ThisRetainedObject = cast<CallInst>(I).getArgOperand(0);
+        if (ThisRetainedObject->stripPointerCasts() ==
+            ThisObject->stripPointerCasts())
+          continue;
+        // Otherwise, we may be retaining something scary.
+        break;
+      }
+        
+      case RT_Release: {
+        // If we get to a release that is provably to this object, then we can
+        // ignore it.
+        Value *ThisReleasedObject = cast<CallInst>(I).getArgOperand(0);
+
+        if (ThisReleasedObject->stripPointerCasts() ==
+            ThisObject->stripPointerCasts())
+          continue;
+        // Otherwise, we may be retaining something scary.
+        break;
+      }
+        
+      case RT_ObjCRelease:
+      case RT_ObjCRetain:
+        // Objective-C retain and release can have arbitrary side effects.
+        break;
+          
+      case RT_Unknown:
+        // Ignore all instructions with no side effects.
+        if (!I.mayHaveSideEffects()) continue;
+          
+
+        // store, memcpy, memmove to the object can be dropped.
+        //if (isa<StoreInst>(I) || isa<MemIntrinsic>(I))
+        //break;
+        break;
+      }
       
-      // TODO: Ignore instructions that just side effect the object
-      // (stores/loads/memcpy/etc).
-        
-        
       // Okay, the function has some side effects, if it doesn't capture the
       // object argument, at least that is something.
       return DtorFn->doesNotCapture(0) ? DtorKind::NoEscape : DtorKind::Unknown;

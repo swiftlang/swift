@@ -60,4 +60,23 @@ entry:
 
 
 
+; trivial_alloc_eliminate2 - Show that we can eliminate an allocation with a
+; destructor that does a retain on the 'this' object.
+@trivial_dtor_metadata2 = internal constant %swift.heapmetadata { i64 (%swift.refcounted*)* @trivial_dtor2, i64 (%swift.refcounted*)* null }
+define internal i64 @trivial_dtor2(%swift.refcounted* nocapture %this) nounwind readonly {
+entry:
+  tail call %swift.refcounted* @swift_retain(%swift.refcounted* %this)
+  ret i64 48
+}
+define void @trivial_alloc_eliminate2(i64 %x) nounwind {
+entry:
+  %0 = tail call noalias %swift.refcounted* @swift_allocObject(%swift.heapmetadata* @trivial_dtor_metadata2, i64 24, i64 8) nounwind
+  tail call void @swift_release(%swift.refcounted* %0) nounwind
+  ret void
+}
+; CHECK: @trivial_alloc_eliminate2
+; CHECK-NEXT: entry:
+; CHECK-NEXT: ret void
+
+
 
