@@ -294,6 +294,11 @@ public:
                             OOD->getDeclContext()->getGenericParamsOfContext());
         checkGenericParams(gp);
       }
+
+      // Now that we have archetypes for our generic parameters (including
+      // generic parameters from outer scopes), we can canonicalize our type.
+      OOD->overwriteType(OOD->getType()->getCanonicalType());
+      OOD->overwriteDeclaredType(OOD->getDeclaredType()->getCanonicalType());
     }
     
     for (Decl *member : OOD->getMembers())
@@ -313,6 +318,11 @@ public:
                              SD->getDeclContext()->getGenericParamsOfContext());
         checkGenericParams(gp);
       }
+
+      // Now that we have archetypes for our generic parameters (including
+      // generic parameters from outer scopes), we can canonicalize our type.
+      SD->overwriteType(SD->getType()->getCanonicalType());
+      SD->overwriteDeclaredType(SD->getDeclaredType()->getCanonicalType());
     }
 
     ConstructorDecl *ValueCD = cast<ConstructorDecl>(SD->getMembers().back());
@@ -361,6 +371,11 @@ public:
                              CD->getDeclContext()->getGenericParamsOfContext());
         checkGenericParams(gp);
       }
+
+      // Now that we have archetypes for our generic parameters (including
+      // generic parameters from outer scopes), we can canonicalize our type.
+      CD->overwriteType(CD->getType()->getCanonicalType());
+      CD->overwriteDeclaredType(CD->getDeclaredType()->getCanonicalType());
     }
 
     for (Decl *Member : CD->getMembers())

@@ -798,6 +798,8 @@ public:
   /// getDeclaredType - Retrieve the type declared by this entity.
   Type getDeclaredType() const { return DeclaredTy; }
 
+  void overwriteDeclaredType(Type DT) { DeclaredTy = DT; }
+
   Type getDeclaredTypeInContext() const;
 
   // Implement isa/cast/dyncast/etc.
