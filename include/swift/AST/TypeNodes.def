@@ -91,7 +91,7 @@ TYPE(Array, Type)
 SUGARED_TYPE(ArraySlice, Type)
 TYPE(ProtocolComposition, Type)
 TYPE(LValue, Type)
-UNCHECKED_TYPE(UnboundGeneric, Type)
+TYPE(UnboundGeneric, Type)
 TYPE(BoundGeneric, Type)
 
 #undef TYPE_RANGE

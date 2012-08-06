@@ -37,7 +37,7 @@ static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy,
     if (auto sliceTypeNTD = dyn_cast<NominalTypeDecl>(sliceTypeDecl)) {
       if (auto Params = sliceTypeNTD->getGenericParams()) {
         if (Params->size() == 1) {
-          Type implTy = BoundGenericType::get(sliceTypeNTD, baseTy);
+          Type implTy = BoundGenericType::get(sliceTypeNTD, Type(), baseTy);
           sliceTy->setImplementationType(implTy);
           return false;
         }
@@ -272,7 +272,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
                 SmallVector<Type, 4> GenericArgTypes;
                 for (TypeLoc T : C.GenericArgs)
                   GenericArgTypes.push_back(T.getType());
-                Ty = BoundGenericType::get(NTD, GenericArgTypes);
+                Ty = BoundGenericType::get(NTD, BaseTy, GenericArgTypes);
               }
                 
             }
@@ -597,10 +597,38 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     return T;
   }
 
+  case TypeKind::UnboundGeneric: {
+    auto unbound = cast<UnboundGenericType>(T);
+    Type substParentTy;
+    if (auto parentTy = unbound->getParent()) {
+      substParentTy = substType(parentTy, Substitutions);
+      if (!substParentTy)
+        return Type();
+
+      if (substParentTy.getPointer() == parentTy.getPointer())
+        return T;
+    } else {
+      // Substitutions only affect the parent.
+      return T;
+    }
+
+    return UnboundGenericType::get(unbound->getDecl(), substParentTy, Context);
+  }
+
   case TypeKind::BoundGeneric: {
     auto BGT = cast<BoundGenericType>(T);
     SmallVector<Type, 4> SubstArgs;
     bool AnyChanged = false;
+    Type substParentTy;
+    if (auto parentTy = BGT->getParent()) {
+      substParentTy = substType(parentTy, Substitutions);
+      if (!substParentTy)
+        return Type();
+
+      if (substParentTy.getPointer() != parentTy.getPointer())
+        AnyChanged = true;
+    }
+
     for (Type Arg : BGT->getGenericArgs()) {
       Type SubstArg = substType(Arg, Substitutions);
       if (!SubstArg)
@@ -613,7 +641,7 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     if (!AnyChanged)
       return T;
 
-    return BoundGenericType::get(BGT->getDecl(), SubstArgs);
+    return BoundGenericType::get(BGT->getDecl(), substParentTy, SubstArgs);
   }
 
   case TypeKind::MetaType: {
@@ -824,7 +852,7 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     
     if (!AnyChanged)
       return T;
-    
+
     return ProtocolCompositionType::get(Context, Protocols);
   }
   }

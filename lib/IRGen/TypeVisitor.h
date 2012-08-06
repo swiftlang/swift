@@ -47,7 +47,11 @@ public:
   RetTy visitDeducibleGenericParamType(DeducibleGenericParamType *T) {
     llvm_unreachable("DeducibleGenericParamType should not survive Sema");
   }
-};  
+
+  RetTy visitUnboundGenericType(UnboundGenericType *T) {
+    llvm_unreachable("UnboundGenericType should not survive Sema");
+  }
+};
 
 /// SubstTypeVisitor - This is a specialized type visitor for visiting
 /// both a type and the result of substituting it.  The original type
@@ -105,6 +109,9 @@ public:
       return static_cast<Impl*>(this)
         ->visitArrayType(cast<ArrayType>(origTy),
                          cast<ArrayType>(substTy));
+
+    case TypeKind::UnboundGeneric:
+      llvm_unreachable("UnboundGeneric should not survive Sema");
 
     case TypeKind::BoundGeneric:
       return static_cast<Impl*>(this)

@@ -579,22 +579,43 @@ private:
 
 /// UnboundGenericType - Represents a generic nominal type where the
 /// type arguments have not yet been resolved.
-class UnboundGenericType : public TypeBase {
+class UnboundGenericType : public TypeBase, public llvm::FoldingSetNode {
   NominalTypeDecl *TheDecl;
 
+  /// \brief The type of the parent, in which this type is nested.
+  Type Parent;
+
 private:
-  UnboundGenericType(NominalTypeDecl *TheDecl, ASTContext &C)
-    : TypeBase(TypeKind::UnboundGeneric, &C, /*Unresolved=*/false),
-      TheDecl(TheDecl) { }
-  friend class OneOfDecl;
-  friend class StructDecl;
-  friend class ClassDecl;
+  UnboundGenericType(NominalTypeDecl *TheDecl, Type Parent, ASTContext &C)
+    : TypeBase(TypeKind::UnboundGeneric,
+               (!Parent || Parent->isCanonical())? &C : nullptr,
+               /*Unresolved=*/false),
+      TheDecl(TheDecl), Parent(Parent) { }
 
 public:
+  static UnboundGenericType* get(NominalTypeDecl *TheDecl, Type Parent,
+                                 ASTContext &C);
+
   /// \brief Returns the declaration that declares this type.
   NominalTypeDecl *getDecl() const { return TheDecl; }
 
+  /// \brief Returns the type of the parent of this type. This will
+  /// be null for top-level types or local types, and for non-generic types
+  /// will simply be the same as the declared type of the declaration context
+  /// of TheDecl. For types nested within generic types, however, this will
+  /// involve \c BoundGenericType nodes that provide context for the nested
+  /// type, e.g., the bound type Dictionary<String, Int>.Inner would be
+  /// represented as an UnoundGenericType with Dictionary<String, Int> as its
+  /// parent type.
+  Type getParent() const { return Parent; }
+
   void print(raw_ostream &O) const;
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getDecl(), getParent());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *D,
+                      Type Parent);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnboundGenericType *) { return true; }
@@ -607,18 +628,33 @@ public:
 /// given type arguments.
 class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
   NominalTypeDecl *TheDecl;
+
+  /// \brief The type of the parent, in which this type is nested.
+  Type Parent;
+  
   ArrayRef<Type> GenericArgs;
+  
 
 private:
-  BoundGenericType(NominalTypeDecl *TheDecl, ArrayRef<Type> GenericArgs,
-                   ASTContext *C);
+  BoundGenericType(NominalTypeDecl *TheDecl, Type Parent,
+                   ArrayRef<Type> GenericArgs, ASTContext *C);
 
 public:
-  static BoundGenericType* get(NominalTypeDecl *TheDecl,
+  static BoundGenericType* get(NominalTypeDecl *TheDecl, Type Parent,
                                ArrayRef<Type> GenericArgs);
 
   /// \brief Returns the declaration that declares this type.
   NominalTypeDecl *getDecl() const { return TheDecl; }
+
+  /// \brief Returns the type of the parent of this type. This will
+  /// be null for top-level types or local types, and for non-generic types
+  /// will simply be the same as the declared type of the declaration context
+  /// of TheDecl. For types nested within generic types, however, this will
+  /// involve \c BoundGenericType nodes that provide context for the nested
+  /// type, e.g., the bound type Dictionary<String, Int>.Inner<Int> would be
+  /// represented as a BoundGenericType with Dictionary<String, Int> as its
+  /// parent type.
+  Type getParent() const { return Parent; }
 
   ArrayRef<Type> getGenericArgs() const { return GenericArgs; }
 
@@ -639,10 +675,10 @@ public:
   void print(raw_ostream &O) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, TheDecl, GenericArgs);
+    Profile(ID, TheDecl, Parent, GenericArgs);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *TheDecl,
-                      ArrayRef<Type> Protocols);
+                      Type Parent, ArrayRef<Type> GenericArgs);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BoundGenericType *) { return true; }
@@ -680,7 +716,8 @@ public:
   /// of TheDecl. For types nested within generic types, however, this will
   /// involve \c BoundGenericType nodes that provide context for the nested
   /// type, e.g., the type Dictionary<String, Int>.ItemRange would be
-  /// represented as a NominalType with 
+  /// represented as a NominalType with Dictionary<String, Int> as its parent
+  /// type.
   Type getParent() const { return Parent; }
 
   // Implement isa/cast/dyncast/etc.

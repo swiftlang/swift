@@ -755,8 +755,7 @@ ERROR(requires_not_suitable_archetype,sema_tcd,none,
 ERROR(requires_generic_param_equal,sema_tcd,none,
       "same-type requirement makes generic parameters %0 and %1 equivalent",
       (Identifier, Identifier))
-ERROR(unsupported_generic_generic,sema_tcd,none,
-      "nested generics are unsupported for now", ())
+
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------

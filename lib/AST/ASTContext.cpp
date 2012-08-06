@@ -47,6 +47,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<StructType> StructTypes;
   llvm::FoldingSet<ClassType> ClassTypes;
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
+  llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
   llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
 
   llvm::DenseMap<BoundGenericType *, ArrayRef<Substitution>>
@@ -198,20 +199,44 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
   return New;
 }
 
+void UnboundGenericType::Profile(llvm::FoldingSetNodeID &ID,
+                                 NominalTypeDecl *TheDecl, Type Parent) {
+  ID.AddPointer(TheDecl);
+  ID.AddPointer(Parent.getPointer());
+}
+
+UnboundGenericType* UnboundGenericType::get(NominalTypeDecl *TheDecl,
+                                            Type Parent,
+                                            ASTContext &C) {
+  llvm::FoldingSetNodeID ID;
+  UnboundGenericType::Profile(ID, TheDecl, Parent);
+
+  void *InsertPos = 0;
+  if (auto unbound = C.Impl.UnboundGenericTypes.FindNodeOrInsertPos(ID,
+                                                                    InsertPos))
+    return unbound;
+
+  auto result = new (C) UnboundGenericType(TheDecl, Parent, C);
+  C.Impl.UnboundGenericTypes.InsertNode(result, InsertPos);
+  return result;
+}
+
 void BoundGenericType::Profile(llvm::FoldingSetNodeID &ID,
-                               NominalTypeDecl *TheDecl,
+                               NominalTypeDecl *TheDecl, Type Parent,
                                ArrayRef<Type> GenericArgs) {
   ID.AddPointer(TheDecl);
+  ID.AddPointer(Parent.getPointer());
   ID.AddInteger(GenericArgs.size());
   for (Type Arg : GenericArgs)
     ID.AddPointer(Arg.getPointer());
 }
 
-BoundGenericType::BoundGenericType(NominalTypeDecl *TheDecl, 
+BoundGenericType::BoundGenericType(NominalTypeDecl *TheDecl,
+                                   Type Parent,
                                    ArrayRef<Type> GenericArgs,
                                    ASTContext *C)
   : TypeBase(TypeKind::BoundGeneric, C, /*Unresolved=*/false),
-    TheDecl(TheDecl), GenericArgs(GenericArgs)
+    TheDecl(TheDecl), Parent(Parent), GenericArgs(GenericArgs)
 {
   // Determine whether this type is unresolved.
   for (Type Arg : GenericArgs) {
@@ -223,10 +248,11 @@ BoundGenericType::BoundGenericType(NominalTypeDecl *TheDecl,
 }
 
 BoundGenericType* BoundGenericType::get(NominalTypeDecl *TheDecl,
+                                        Type Parent,
                                         ArrayRef<Type> GenericArgs) {
   ASTContext &C = TheDecl->getDeclContext()->getASTContext();
   llvm::FoldingSetNodeID ID;
-  BoundGenericType::Profile(ID, TheDecl, GenericArgs);
+  BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs);
 
   void *InsertPos = 0;
   if (BoundGenericType *BGT =
@@ -234,15 +260,17 @@ BoundGenericType* BoundGenericType::get(NominalTypeDecl *TheDecl,
     return BGT;
 
   ArrayRef<Type> ArgsCopy = C.AllocateCopy(GenericArgs);
-  bool IsCanonical = true;   // All canonical elts means this is canonical.
-  for (Type Arg : GenericArgs) {
-    if (!Arg->isCanonical()) {
-      IsCanonical = false;
-      break;
+  bool IsCanonical = !Parent || Parent->isCanonical();
+  if (IsCanonical) {
+    for (Type Arg : GenericArgs) {
+      if (!Arg->isCanonical()) {
+        IsCanonical = false;
+        break;
+      }
     }
   }
-
-  BoundGenericType *New = new (C) BoundGenericType(TheDecl, ArgsCopy,
+  
+  BoundGenericType *New = new (C) BoundGenericType(TheDecl, Parent, ArgsCopy,
                                                    IsCanonical ? &C : 0);
   C.Impl.BoundGenericTypes.InsertNode(New, InsertPos);
 

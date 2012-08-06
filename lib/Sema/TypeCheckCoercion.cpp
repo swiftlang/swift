@@ -2531,22 +2531,31 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
   // Bound generic types.
   if (auto Bound1 = T1->getAs<BoundGenericType>()) {
     auto Bound2 = T2->castTo<BoundGenericType>();
-    if (Bound1->getDecl() == Bound2->getDecl()) {
-      auto Args1 = Bound1->getGenericArgs();
-      auto Args2 = Bound2->getGenericArgs();
+    if (Bound1->getDecl() != Bound2->getDecl())
+      return false;
 
-      // Match up each of the argument types.
-      // FIXME: Should we ignore labels here?
-      assert(Args1.size() == Args2.size() && "Bound generic size mismatch");
-      for (unsigned I = 0, N = Args1.size(); I != N; ++I) {
-        if (!matchTypes(TC, Args1[I], Args2[I], ST_None, Trivial, CC))
-          return false;
-      }
-
-      return true;
+    // Match up the parents.
+    if (Bound1->getParent() && Bound2->getParent()) {
+      if (!matchTypes(TC, Bound1->getParent(), Bound2->getParent(),
+                      ST_None, Trivial, CC))
+        return false;
+    } else {
+      assert(!Bound1->getParent() && !Bound2->getParent() &&
+             "Parent mismatch with bound generic types");
     }
-    
-    return false;
+
+    auto Args1 = Bound1->getGenericArgs();
+    auto Args2 = Bound2->getGenericArgs();
+
+    // Match up each of the argument types.
+    // FIXME: Should we ignore labels here?
+    assert(Args1.size() == Args2.size() && "Bound generic size mismatch");
+    for (unsigned I = 0, N = Args1.size(); I != N; ++I) {
+      if (!matchTypes(TC, Args1[I], Args2[I], ST_None, Trivial, CC))
+        return false;
+    }
+
+    return true;
   }
 
   // Metatypes.

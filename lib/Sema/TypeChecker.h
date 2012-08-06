@@ -448,10 +448,13 @@ public:
   /// After having opened the types, the coercion context contains the mappings
   /// needed to determine when all types have been deduced.
   ///
+  /// \param OnlyInnermostParams Whether we should only up the innermost
+  /// generic parameters. Otherwise, parameters from all levels will be opened.
+  ///
   /// \returns The type T, with each of the archetypes in \c GenericParams
   /// substitued for deducible types.
   Type openPolymorphicType(Type T, const GenericParamList &GenericParams,
-                           CoercionContext &CC);
+                           CoercionContext &CC, bool OnlyInnermostParams);
 
   /// \brief "Open" the archetypes of a set of types to make them deducible.
   ///
@@ -464,11 +467,14 @@ public:
   /// After having opened the types, the coercion context contains the mappings
   /// needed to determine when all types have been deduced.
   ///
+  /// \param OnlyInnermostParams Whether we should only up the innermost
+  /// generic parameters. Otherwise, parameters from all levels will be opened.
+  ///
   /// \returns The type T, with each of the archetypes in \c GenericParams
   /// substitued for deducible types.
   void openPolymorphicTypes(MutableArrayRef<Type> Types,
                             const GenericParamList &GenericParams,
-                            CoercionContext &CC);
+                            CoercionContext &CC, bool OnlyInnermostParams);
 
   /// \brief Substitute a specific base type into the type T of a generic type
   /// member, returning the appropriately substituted type along with a coercion

@@ -146,8 +146,15 @@ bool TypeBase::isSpecialized() {
 #include "swift/AST/TypeNodes.def"
       return false;
 
+  case TypeKind::UnboundGeneric:
+    if (auto parentTy = cast<UnboundGenericType>(this)->getParent())
+      return parentTy->isSpecialized();
+
+    return false;
+
   case TypeKind::BoundGeneric:
     return true;
+
 
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction: {
@@ -561,12 +568,23 @@ CanType TypeBase::getCanonicalType() {
     Result = MetaTypeType::get(InstanceTy, InstanceTy->getASTContext());
     break;
   }
+  case TypeKind::UnboundGeneric: {
+    auto unbound = cast<UnboundGenericType>(this);
+    Type parentTy = unbound->getParent()->getCanonicalType();
+    Result = UnboundGenericType::get(unbound->getDecl(), parentTy,
+                                     parentTy->getASTContext());
+    break;
+  }
   case TypeKind::BoundGeneric: {
     BoundGenericType *BGT = cast<BoundGenericType>(this);
+    Type parentTy;
+    if (BGT->getParent())
+      parentTy = BGT->getParent()->getCanonicalType();
     SmallVector<Type, 4> CanGenericArgs;
     for (Type Arg : BGT->getGenericArgs())
       CanGenericArgs.push_back(Arg->getCanonicalType());
-    Result = BoundGenericType::get(BGT->getDecl(), CanGenericArgs);
+    Result = BoundGenericType::get(BGT->getDecl(), parentTy, CanGenericArgs);
+    break;
   }
   }
     
@@ -591,6 +609,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::LValue:
   case TypeKind::ProtocolComposition:
   case TypeKind::MetaType:
+  case TypeKind::UnboundGeneric:
   case TypeKind::BoundGeneric:
   case TypeKind::OneOf:
   case TypeKind::Struct:
@@ -1120,10 +1139,20 @@ void LValueType::print(raw_ostream &OS) const {
 }
 
 void UnboundGenericType::print(raw_ostream &OS) const {
+  if (auto parent = getParent()) {
+    parent.print(OS);
+    OS << ".";
+  }
+
   OS << getDecl()->getName().get();
 }
 
 void BoundGenericType::print(raw_ostream &OS) const {
+  if (auto parent = getParent()) {
+    parent.print(OS);
+    OS << ".";
+  }
+
   OS << getDecl()->getName().get();
   printGenericArgs(OS, getGenericArgs());
 }

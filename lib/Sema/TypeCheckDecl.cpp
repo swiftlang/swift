@@ -74,8 +74,7 @@ public:
   }
 
   void checkGenericParams(GenericParamList *GenericParams) {
-    if (!GenericParams)
-      return;
+    assert(GenericParams && "Missing generic parameters");
 
     // Assign archetypes to each of the generic parameters.
     ArchetypeBuilder Builder(TC);
@@ -289,7 +288,12 @@ public:
   void visitOneOfDecl(OneOfDecl *OOD) {
     if (!IsSecondPass) {
       checkInherited(OOD, OOD->getInherited());
-      checkGenericParams(OOD->getGenericParams());
+
+      if (auto gp = OOD->getGenericParams()) {
+        gp->setOuterParameters(
+                            OOD->getDeclContext()->getGenericParamsOfContext());
+        checkGenericParams(gp);
+      }
     }
     
     for (Decl *member : OOD->getMembers())
@@ -303,7 +307,12 @@ public:
   void visitStructDecl(StructDecl *SD) {
     if (!IsSecondPass) {
       checkInherited(SD, SD->getInherited());
-      checkGenericParams(SD->getGenericParams());
+
+      if (auto gp = SD->getGenericParams()) {
+        gp->setOuterParameters(
+                             SD->getDeclContext()->getGenericParamsOfContext());
+        checkGenericParams(gp);
+      }
     }
 
     ConstructorDecl *ValueCD = cast<ConstructorDecl>(SD->getMembers().back());
@@ -346,7 +355,12 @@ public:
   void visitClassDecl(ClassDecl *CD) {
     if (!IsSecondPass) {
       checkInherited(CD, CD->getInherited());
-      checkGenericParams(CD->getGenericParams());
+
+      if (auto gp = CD->getGenericParams()) {
+        gp->setOuterParameters(
+                             CD->getDeclContext()->getGenericParamsOfContext());
+        checkGenericParams(gp);
+      }
     }
 
     for (Decl *Member : CD->getMembers())
@@ -410,7 +424,8 @@ public:
     FuncExpr *body = FD->getBody();
 
     // Before anything else, set up the 'this' argument correctly.
-    if (Type thisType = FD->computeThisType()) {
+    GenericParamList *outerGenericParams = nullptr;
+    if (Type thisType = FD->computeThisType(&outerGenericParams)) {
       TypedPattern *thisPattern =
         cast<TypedPattern>(body->getParamPatterns()[0]);
       if (thisPattern->hasType()) {
@@ -420,7 +435,10 @@ public:
       }
     }
 
-    checkGenericParams(FD->getGenericParams());
+    if (auto gp = FD->getGenericParams()) {
+      gp->setOuterParameters(outerGenericParams);
+      checkGenericParams(gp);
+    }
 
     TC.semaFuncExpr(body, IsFirstPass, /*allowUnknownTypes*/false);
     FD->setType(body->getType());
@@ -505,22 +523,26 @@ public:
     if (!CD->getDeclContext()->isTypeContext())
       TC.diagnose(CD->getStartLoc(), diag::constructor_not_member);
 
-    checkGenericParams(CD->getGenericParams());
-
     GenericParamList *outerGenericParams = nullptr;
     Type ThisTy = CD->computeThisType(&outerGenericParams);
     CD->getImplicitThisDecl()->setType(ThisTy);
+
+    if (auto gp = CD->getGenericParams()) {
+      gp->setOuterParameters(outerGenericParams);
+      checkGenericParams(gp);
+    }
 
     if (TC.typeCheckPattern(CD->getArguments(), IsFirstPass,
                             /*allowUnknownTypes*/false)) {
       CD->setType(ErrorType::get(TC.Context));
     } else {
       Type FnTy;
-      if (CD->getGenericParams())
+      if (GenericParamList *innerGenericParams = CD->getGenericParams()) {
+        innerGenericParams->setOuterParameters(outerGenericParams);
         FnTy = PolymorphicFunctionType::get(CD->getArguments()->getType(),
-                                            ThisTy, CD->getGenericParams(),
+                                            ThisTy, innerGenericParams,
                                             TC.Context);
-      else
+      } else
         FnTy = FunctionType::get(CD->getArguments()->getType(),
                                  ThisTy, TC.Context);
       Type ThisMetaTy = MetaTypeType::get(ThisTy, TC.Context);

@@ -312,6 +312,8 @@ class GenericParamList {
   MutableArrayRef<Requirement> Requirements;
   ArrayRef<ArchetypeType *> AllArchetypes;
 
+  GenericParamList *OuterParameters;
+
   GenericParamList(SourceLoc LAngleLoc,
                    ArrayRef<GenericParam> Params,
                    SourceLoc RequiresLoc,
@@ -410,6 +412,28 @@ public:
   void setAllArchetypes(ArrayRef<ArchetypeType *> AA) {
     AllArchetypes = AA;
   }
+
+  /// \brief Retrieve the outer generic parameter list, which provides the
+  /// generic parameters of the context in which this generic parameter list
+  /// exists.
+  ///
+  /// Consider the following generic class:
+  ///
+  /// \code
+  /// class Vector<T> {
+  ///   constructor<R : Range requires R.Element == T>(range : R) { }
+  /// }
+  /// \endcode
+  ///
+  /// The generic parameter list <T> has no outer parameters, because it is
+  /// the outermost generic parameter list. The generic parameter list
+  /// <R : Range...> for the constructor has the generic parameter list <T> as
+  /// its outer generic parameter list.
+  GenericParamList *getOuterParameters() const { return OuterParameters; }
+
+  /// \brief Set the outer generic parameter list. See \c getOuterParameters
+  /// for more information.
+  void setOuterParameters(GenericParamList *Outer) { OuterParameters = Outer; }
 
   SourceRange getSourceRange() const { return Brackets; }
 };

@@ -196,7 +196,8 @@ GenericParamList::GenericParamList(SourceLoc LAngleLoc,
                                    MutableArrayRef<Requirement> Requirements,
                                    SourceLoc RAngleLoc)
   : Brackets(LAngleLoc, RAngleLoc), NumParams(Params.size()),
-    RequiresLoc(RequiresLoc), Requirements(Requirements)
+    RequiresLoc(RequiresLoc), Requirements(Requirements),
+    OuterParameters(nullptr)
 {
   memcpy(this + 1, Params.data(), NumParams * sizeof(GenericParam));
 }
@@ -347,7 +348,8 @@ Type NominalTypeDecl::getDeclaredTypeInContext() const {
     SmallVector<Type, 4> GenericArgs;
     for (auto Param : *D->getGenericParams())
       GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
-    Ty = BoundGenericType::get(D, GenericArgs);
+    Ty = BoundGenericType::get(D, getDeclContext()->getDeclaredTypeInContext(),
+                               GenericArgs);
   }
   return Ty;
 }
@@ -383,7 +385,9 @@ OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
   if (!GenericParams)
     DeclaredTy = OneOfType::get(this, Parent->getDeclaredTypeInContext(), Ctx);
   else
-    DeclaredTy = new (Ctx) UnboundGenericType(this, Ctx);
+    DeclaredTy = UnboundGenericType::get(this,
+                                         Parent->getDeclaredTypeInContext(),
+                                         Ctx);
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(DeclaredTy, Ctx));
 }
@@ -398,7 +402,9 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
   if (!GenericParams)
     DeclaredTy = StructType::get(this, Parent->getDeclaredTypeInContext(), Ctx);
   else
-    DeclaredTy = new (Ctx) UnboundGenericType(this, Ctx);
+    DeclaredTy = UnboundGenericType::get(this,
+                                         Parent->getDeclaredTypeInContext(),
+                                         Ctx);
   // Set the type of the StructDecl to the right MetaTypeType.
   setType(MetaTypeType::get(DeclaredTy, Ctx));
 }
@@ -413,7 +419,9 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   if (!GenericParams)
     DeclaredTy = ClassType::get(this, Parent->getDeclaredTypeInContext(), Ctx);
   else
-    DeclaredTy = new (Ctx) UnboundGenericType(this, Ctx);
+    DeclaredTy = UnboundGenericType::get(this,
+                                         Parent->getDeclaredTypeInContext(),
+                                         Ctx);
   // Set the type of the ClassDecl to the right MetaTypeType.
   setType(MetaTypeType::get(DeclaredTy, Ctx));
 }
@@ -577,7 +585,7 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
     SmallVector<Type, 4> GenericArgs;
     for (auto Param : *D->getGenericParams())
       GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
-    ContainerType = BoundGenericType::get(D, GenericArgs);
+    ContainerType = BoundGenericType::get(D, UGT->getParent(), GenericArgs);
 
     if (OuterGenericParams)
       *OuterGenericParams = D->getGenericParams();
@@ -655,7 +663,7 @@ ConstructorDecl::computeThisType(GenericParamList **OuterGenericParams) const {
     SmallVector<Type, 4> GenericArgs;
     for (auto Param : *D->getGenericParams())
       GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
-    ContainerType = BoundGenericType::get(D, GenericArgs);
+    ContainerType = BoundGenericType::get(D, UGT->getParent(), GenericArgs);
 
     if (OuterGenericParams)
       *OuterGenericParams = D->getGenericParams();
@@ -683,7 +691,7 @@ DestructorDecl::computeThisType(GenericParamList **OuterGenericParams) const {
     SmallVector<Type, 4> GenericArgs;
     for (auto Param : *D->getGenericParams())
       GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
-    ContainerType = BoundGenericType::get(D, GenericArgs);
+    ContainerType = BoundGenericType::get(D, UGT->getParent(), GenericArgs);
 
     if (OuterGenericParams)
       *OuterGenericParams = D->getGenericParams();

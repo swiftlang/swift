@@ -92,20 +92,33 @@ void TypeChecker::printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates) {
 
 static void
 getDeducibleTypes(TypeChecker &TC, MutableArrayRef<Type> Types,
-                 ArrayRef<GenericParam> GenericParams,
+                  ArrayRef<GenericParam> GenericParams,
+                  const GenericParamList *OuterGenericParams,
                  SmallVectorImpl<DeducibleGenericParamType *> &DeducibleParams){
   TypeSubstitutionMap PolySubstitutions;
   SmallVector<DeducibleGenericParamType *, 2> DeducibleTypes;
   DeducibleParams.reserve(GenericParams.size());
-  for (auto GP : GenericParams) {
-    TypeAliasDecl *TypeParam = GP.getAsTypeParam();
-    auto Archetype = TypeParam->getDeclaredType()->getAs<ArchetypeType>();
-    auto Deducible = DeducibleGenericParamType::getNew(TC.Context, nullptr,
-                                                       Archetype);
-    PolySubstitutions[Archetype] = Deducible;
-    DeducibleParams.push_back(Deducible);
+
+  // Collect the outer parameter lists.
+  SmallVector<ArrayRef<GenericParam>, 2> paramLists;
+  paramLists.push_back(GenericParams);
+  for (const auto *gpList = OuterGenericParams; gpList;
+         gpList = gpList->getOuterParameters()) {
+    paramLists.push_back(gpList->getParams());
   }
 
+  for (auto gpList = paramLists.rbegin(), gpListEnd = paramLists.rend();
+       gpList != gpListEnd; ++gpList) {
+    for (auto GP : *gpList) {
+      TypeAliasDecl *TypeParam = GP.getAsTypeParam();
+      auto Archetype = TypeParam->getDeclaredType()->getAs<ArchetypeType>();
+      auto Deducible = DeducibleGenericParamType::getNew(TC.Context, nullptr,
+                                                         Archetype);
+      PolySubstitutions[Archetype] = Deducible;
+      DeducibleParams.push_back(Deducible);
+    }
+  }
+  
   for (unsigned I = 0, N = Types.size(); I != N; ++I) {
     Types[I] = TC.substType(Types[I], PolySubstitutions);
   }
@@ -117,28 +130,37 @@ getDeducibleTypes(TypeChecker &TC, MutableArrayRef<Type> Types,
 /// \param DeducibleParams Will be populated with the synthesized deducible
 /// generic parameters.
 static Type
-getDeducibleType(TypeChecker &TC, Type T,
-                 ArrayRef<GenericParam> GenericParams,
+getDeducibleType(TypeChecker &TC, Type T, ArrayRef<GenericParam> GenericParams,
+                 const GenericParamList *OuterGenericParams,
                  SmallVectorImpl<DeducibleGenericParamType *> &DeducibleParams){
   getDeducibleTypes(TC, MutableArrayRef<Type>(&T, 1), GenericParams,
+                    OuterGenericParams,
                     DeducibleParams);
   return T;
 }
 
 Type TypeChecker::openPolymorphicType(Type T,
                                       const GenericParamList &GenericParams,
-                                      CoercionContext &CC) {
+                                      CoercionContext &CC,
+                                      bool OnlyInnermostParams) {
   SmallVector<DeducibleGenericParamType *, 2> deducibleParams;
-  T = getDeducibleType(*this, T, GenericParams.getParams(), deducibleParams);
+  T = getDeducibleType(*this, T, GenericParams.getParams(),
+                       OnlyInnermostParams? nullptr
+                                          : GenericParams.getOuterParameters(),
+                       deducibleParams);
   CC.requestSubstitutionsFor(deducibleParams);
   return T;
 }
 
 void TypeChecker::openPolymorphicTypes(MutableArrayRef<Type> Types,
                                        const GenericParamList &GenericParams,
-                                       CoercionContext &CC) {
+                                       CoercionContext &CC,
+                                       bool OnlyInnermostParams) {
   SmallVector<DeducibleGenericParamType *, 2> deducibleParams;
-  getDeducibleTypes(*this, Types, GenericParams.getParams(), deducibleParams);
+  getDeducibleTypes(*this, Types, GenericParams.getParams(),
+                    OnlyInnermostParams? nullptr
+                                       : GenericParams.getOuterParameters(),
+                    deducibleParams);
   CC.requestSubstitutionsFor(deducibleParams);
 }
 
@@ -154,7 +176,8 @@ TypeChecker::checkPolymorphicApply(PolymorphicFunctionType *PolyFn,
   // function.
   CoercionContext CC(*this);
   AnyFunctionType *FunctionTy
-    = openPolymorphicType(PolyFn, PolyFn->getGenericParams(), CC)
+    = openPolymorphicType(PolyFn, PolyFn->getGenericParams(), CC,
+                          /*OnlyInnermostParams=*/true)
         ->castTo<AnyFunctionType>();
 
   // Check whether arguments are suitable for this function.
@@ -202,7 +225,8 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
   // function.
   CoercionContext LocalCC(*this);
   AnyFunctionType *FunctionTy
-    = openPolymorphicType(PolyFn, PolyFn->getGenericParams(), LocalCC)
+    = openPolymorphicType(PolyFn, PolyFn->getGenericParams(), LocalCC,
+                          /*OnlyInnermostParams=*/true)
         ->castTo<AnyFunctionType>();
 
   auto DestLV = DestTy->getAs<LValueType>();
@@ -329,7 +353,8 @@ Type TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
 
   // Open up the owner type so we can deduce its arguments.
   Type openedTypes[2] = { ownerTy, T };
-  openPolymorphicTypes(openedTypes, *genericParams, CC);
+  openPolymorphicTypes(openedTypes, *genericParams, CC,
+                       /*OnlyInnermostParams=*/false);
 
   if (OutGenericParams)
     *OutGenericParams = genericParams;
@@ -376,7 +401,8 @@ bool TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
   openedTypes.reserve(Types.size() + 1);
   openedTypes.append(Types.begin(), Types.end());
   openedTypes.push_back(ownerTy);
-  openPolymorphicTypes(openedTypes, *genericParams, CC);
+  openPolymorphicTypes(openedTypes, *genericParams, CC,
+                       /*OnlyInnermostParams=*/false);
 
   if (OutGenericParams)
     *OutGenericParams = genericParams;
@@ -508,7 +534,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
         if (ProtocolType *P = Extension->getAs<ProtocolType>()) {
           GenericParam Param = P->getDecl()->getThis();
           FunctionTy = getDeducibleType(*this, FunctionTy, { &Param, 1 },
-                                        operatorDeducibleParams)
+                                        nullptr, operatorDeducibleParams)
                          ->castTo<AnyFunctionType>();
           CC.requestSubstitutionsFor(operatorDeducibleParams);
         }

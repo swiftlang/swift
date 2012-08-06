@@ -201,6 +201,9 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
   case TypeKind::DeducibleGenericParam:
     llvm_unreachable("deducible generic parameter");
 
+  case TypeKind::UnboundGeneric:
+    llvm_unreachable("unbound generic type");
+
   case TypeKind::MetaType:
     return convertMetaTypeType(cast<MetaTypeType>(ty));
   case TypeKind::Module:
