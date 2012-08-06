@@ -770,10 +770,18 @@ static DtorKind analyzeDestructor(Value *P) {
         // Ignore all instructions with no side effects.
         if (!I.mayHaveSideEffects()) continue;
           
+        // store, memcpy, memmove *to* the object can be dropped.
+        if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
+          if (SI->getPointerOperand()->stripInBoundsOffsets() == ThisObject)
+            continue;
+        }
+          
+        if (MemIntrinsic *MI = dyn_cast<MemIntrinsic>(&I)) {
+          if (MI->getDest()->stripInBoundsOffsets() == ThisObject)
+            continue;
+        }
 
-        // store, memcpy, memmove to the object can be dropped.
-        //if (isa<StoreInst>(I) || isa<MemIntrinsic>(I))
-        //break;
+        // Otherwise, we can't remove the deallocation completely.
         break;
       }
       
