@@ -814,7 +814,7 @@ namespace {
     void printInherited(ArrayRef<TypeLoc> Inherited) {
       if (Inherited.empty())
         return;
-      OS << "inherits: ";
+      OS << " inherits: ";
       bool First = true;
       for (auto Super : Inherited) {
         if (First)
@@ -950,7 +950,7 @@ namespace {
         OS << '\n';
         printRec(D);
       }
-      OS << "')";
+      OS << ")";
     }
 
     void visitClassDecl(ClassDecl *CD) {
@@ -960,7 +960,7 @@ namespace {
         OS << '\n';
         printRec(D);
       }
-      OS << "')";
+      OS << ")";
     }
 
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
@@ -994,9 +994,10 @@ namespace {
 
     void visitConstructorDecl(ConstructorDecl *CD) {
       printCommon(CD, "constructor_decl", FuncColor);
-      OS << '\n';
-      if (CD->getBody())
+      if (CD->getBody()) {
+        OS << '\n';
         printRec(CD->getBody());
+      }
       OS << ')';
     }
 
