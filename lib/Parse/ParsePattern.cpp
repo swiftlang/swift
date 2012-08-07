@@ -24,6 +24,8 @@ using namespace swift;
 ///     pattern-tuple+ func-signature-result?
 ///   func-signature-result:
 ///     '->' type
+///
+/// Note that this leaves retType as null if unspecified.
 bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
                                     TypeLoc &retType) {
   // Parse curried function argument clauses as long as we can.
@@ -39,11 +41,8 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
   if (consumeIf(tok::arrow)) {
     if (parseType(retType))
       return true;
-
-  // Otherwise, we implicitly return ().
-  } else {
-    retType = TypeLoc(TupleType::getEmpty(Context));
   }
+  // Otherwise, we leave retType null.
 
   return false;
 }

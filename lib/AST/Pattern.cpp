@@ -44,7 +44,8 @@ inline TwoChars checkSourceRangeType(SourceRange (Pattern::*)() const);
 
 
 void Pattern::setType(Type ty) {
-  assert(!hasType() || getType()->isUnresolvedType());
+  assert(!hasType() || getType()->isUnresolvedType() ||
+         ty->is<ErrorType>() || ty.getPointer() == Ty.getPointer());
   Ty = ty;
 }
 

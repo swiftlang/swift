@@ -495,6 +495,10 @@ void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
     for (auto P : FE->getParamPatterns())
       coerceToType(P, ErrorType::get(Context), false);
   }
+  // If we failed to infer a return type for the FuncExpr, force it to
+  // ErrorType.
+  if (FE->getBodyResultType()->isUnresolvedType())
+    FE->getBodyResultTypeLoc().setInvalidType(Context);
   
   BraceStmt *BS = FE->getBody();
   if (!BS)

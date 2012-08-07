@@ -615,17 +615,22 @@ NullablePtr<Expr> Parser::parseExprFunc() {
   SmallVector<Pattern*, 4> Params;
   TypeLoc RetTy;
   if (Tok.is(tok::l_brace)) {
-    // If the func-signature isn't present, then this is a ()->() function.
+    // If the func-signature isn't present, then this is a ()->Unresolved
+    // function.
     Params.push_back(TuplePattern::create(Context, SourceLoc(),
                                           llvm::ArrayRef<TuplePatternElt>(),
                                           SourceLoc()));
-    RetTy = TypeLoc(TupleType::getEmpty(Context));
   } else if (Tok.isNotAnyLParen()) {
     diagnose(Tok, diag::func_decl_without_paren);
     return 0;
   } else if (parseFunctionSignature(Params, RetTy)) {
     return 0;
   }
+
+  // If an explicit return type was not specified, use an Unresolved type.
+  if (RetTy.getType().isNull())
+    RetTy = TypeLoc(UnstructuredUnresolvedType::get(Context));
+
   
   // The arguments to the func are defined in their own scope.
   Scope FuncBodyScope(this, /*AllowLookup=*/true);

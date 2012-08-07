@@ -1522,6 +1522,11 @@ namespace {
         // Also remember if we see any literals with unresolved types.
         if (isa<LiteralExpr>(E))
           HasUnresolvedLiterals = true;
+      
+        // func{} defaults to return () if we can't infer a result type.
+        if (auto FE = dyn_cast<FuncExpr>(E))
+          if (FE->getBodyResultType()->isUnresolvedType())
+            HasUnresolvedLiterals = true;
       }
       return E;
     }
@@ -1596,10 +1601,19 @@ bool TypeChecker::resolveUnresolvedLiterals(Expr *&E) {
     
     Expr *walkToExprPost(Expr *E) {
       // Process unresolved literals.
-      if (E->getType()->isUnresolvedType()) {
-        if (LiteralExpr *Lit = dyn_cast<LiteralExpr>(E))
-          return TC.coerceToType(Lit, TC.getDefaultLiteralType(Lit));        
-      }
+      if (!E->getType()->isUnresolvedType())
+        return E;
+      
+      if (LiteralExpr *Lit = dyn_cast<LiteralExpr>(E))
+        return TC.coerceToType(Lit, TC.getDefaultLiteralType(Lit));
+        
+      // func{} defaults to return () if we can't infer a result type.
+      if (auto FE = dyn_cast<FuncExpr>(E))
+        if (FE->getBodyResultType()->isUnresolvedType()) {
+          FE->getBodyResultTypeLoc() = TypeLoc(TC.Context.TheEmptyTupleType);
+          TC.semaFuncExpr(FE, false, true);
+          return FE;
+        }
       return E;
     }
     

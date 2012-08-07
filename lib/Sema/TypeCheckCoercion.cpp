@@ -1286,17 +1286,34 @@ CoercedResult SemaCoerce::visitFuncExpr(FuncExpr *E) {
       << E->getSourceRange();
     return nullptr;
   }
-
-  // Now that we have a FunctionType for the closure, we can know how many
-  // arguments are allowed.
-  if (Flags & CF_Apply)
-    E->setType(FT);
+  
+  // If we're inferring an incompatible result type, diagnose it.
+  if (!FT->getResult()->is<UnstructuredUnresolvedType>()) {
+    // FIXME: isEquals is almost certainly the wrong predicate here.
+    if (!E->getBodyResultType()->is<UnstructuredUnresolvedType>() &&
+        !E->getBodyResultType()->is<ErrorType>() &&
+        !E->getBodyResultType()->isEqual(FT->getResult())) {
+      diagnose(E->getStartLoc(), diag::funcexpr_incompatible_result,
+               E->getBodyResultType(), FT->getResult())
+        << E->getSourceRange();
+      return nullptr;
+    }
+    
+    // Infer result information if we're applying result types.
+    if (Flags & CF_Apply)
+      E->getBodyResultTypeLoc() = TypeLoc(FT->getResult());
+  }
+  
 
   // The pattern that specifies the arguments of the FuncExpr must be missing
   // some type information.  e.g. 'a' in "func(a,b : Int) {}".  Try to resolve
   // something useful from DestTy.
   if (!(Flags & CF_Apply))
     return DestTy;
+
+  // Now that we have a FunctionType for the closure, we can know how many
+  // arguments are allowed.
+  E->setType(FT);
 
   // Apply inferred argument type information to the argument patterns.
   if (TC.coerceToType(E->getParamPatterns()[0], FT->getInput(), false))

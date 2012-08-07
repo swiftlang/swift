@@ -662,6 +662,8 @@ ERROR(inconsistent_deduction,sema_tcc,none,
       (StringRef, Type, Type))
 ERROR(funcexpr_not_function_type,sema_tcc,none,
       "cannot convert func expression to non-function type %0", (Type))
+ERROR(funcexpr_incompatible_result,sema_tcc,none,
+      "func has declared type %0 but inferred type %1", (Type, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations

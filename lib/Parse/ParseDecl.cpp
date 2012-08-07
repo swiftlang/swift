@@ -1140,6 +1140,9 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   TypeLoc FuncRetTy;
   if (parseFunctionSignature(Params, FuncRetTy))
     return 0;
+
+  if (FuncRetTy.getType().isNull())
+    FuncRetTy = TypeLoc(TupleType::getEmpty(Context));
   
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name
