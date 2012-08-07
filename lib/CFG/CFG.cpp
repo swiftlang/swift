@@ -65,8 +65,102 @@ void CFG::print(llvm::raw_ostream &OS) const {
 // CFG construction.
 //===----------------------------------------------------------------------===//
 
-CFG *CFG::constructCFG(const Stmt *S) {
+namespace {
+class CFGBuilder : public ASTVisitor<CFGBuilder> {
+  /// The current basic block being constructed.
+  BasicBlock *Block;
+
+  /// The CFG being constructed.
+  CFG &C;
+
+public:
+  CFGBuilder(CFG &C) : Block(0), C(C), badCFG(false) {}
+
+  /// A flag indicating whether or not there were problems
+  /// constructing the CFG.
+  bool badCFG;
+
+  /// The current basic block being constructed.
+  BasicBlock *block() {
+    if (!Block)
+      Block = new (C) BasicBlock(&C);
+    return Block;
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Statements.
+  //===--------------------------------------------------------------------===//
+
+  /// Construct the CFG components for the given BraceStmt.
+  void visitBraceStmt(BraceStmt *S);
+
+  /// SemiStmts are ignored for CFG construction.
+  void visitSemiStmt(SemiStmt *S) {}
+
+  void visitAssignStmt(AssignStmt *S) {
+    assert(false && "Not yet implemented");
+  }
+
+  void visitReturnStmt(ReturnStmt *S) {
+    assert(false && "Not yet implemented");
+  }
+
+  void visitIfStmt(IfStmt *S) {
+    assert(false && "Not yet implemented");
+  }
+
+  void visitWhileStmt(WhileStmt *S) {
+    assert(false && "Not yet implemented");
+  }
+
+  void visitDoWhileStmt(DoWhileStmt *S) {
+    assert(false && "Not yet implemented");
+  }
+
+  void visitForStmt(ForStmt *S) {
+    assert(false && "Not yet implemented");
+  }
+
+  void visitForEachStmt(ForEachStmt *S) {
+    assert(false && "Not yet implemented");
+  }
+
+  void visitBreakStmt(BreakStmt *S) {
+    assert(false && "Not yet implemented");
+  }
+
+  void visitContinueStmt(ContinueStmt *S) {
+    assert(false && "Not yet implemented");
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Expressions.
+  //===--------------------------------------------------------------------===//
+
+  void visitExpr(Expr *E) {
+    assert(false && "Not yet implemented");
+  }
+};
+} // end anonymous namespace
+
+CFG *CFG::constructCFG(Stmt *S) {
   // FIXME: implement CFG construction.
-  CFG *C = new CFG();
-  return C;
+  llvm::OwningPtr<CFG> C(new CFG());
+  CFGBuilder builder(*C);
+  builder.visit(S);
+  return builder.badCFG ? nullptr : C.take();
 }
+
+void CFGBuilder::visitBraceStmt(BraceStmt *S) {
+  // BraceStmts do not need to be explicitly represented in the CFG.
+  // We should consider whether or not the scopes they introduce are
+  // represented in the CFG.
+  for (const BraceStmt::ExprStmtOrDecl &ESD : S->elements()) {
+    assert(!ESD.is<Decl*>() && "FIXME: Handle Decls");
+    if (Stmt *S = ESD.dyn_cast<Stmt*>())
+      return visit(S);
+    if (Expr *E = ESD.dyn_cast<Expr*>())
+      return visit(E);
+  }
+}
+

@@ -46,7 +46,7 @@ public:
   /// Construct a CFG from a given statement.  It is the caller's responsibility
   /// to 'delete' this object.  This can return nullptr if the CFG cannot
   /// be constructed.
-  static CFG *constructCFG(const Stmt *S);
+  static CFG *constructCFG(Stmt *S);
 
   /// Pretty-print the CFG.
   void dump() const;
