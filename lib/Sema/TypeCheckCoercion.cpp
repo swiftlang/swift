@@ -1180,7 +1180,8 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
 
       Expr *Fn = TC.buildSpecializeExpr(E->getFn(), Ovl.getType(),
                                         Ovl.getSubstitutions(),
-                                        Ovl.getConformances());
+                                        Ovl.getConformances(),
+                                        /*OnlyInnermostParams=*/true);
       E->setFn(Fn);
       return coerceToType(TC.semaApplyExpr(E), DestTy, CC, Flags);
     }
@@ -2007,7 +2008,8 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
 
       Expr *Result = TC.buildSpecializeExpr(E, Cand.getType(),
                                             Cand.getSubstitutions(),
-                                            Cand.getConformances());
+                                            Cand.getConformances(),
+                                            /*OnlyInnermostParams=*/true);
       return coerced(Result, Flags);
     }
   }

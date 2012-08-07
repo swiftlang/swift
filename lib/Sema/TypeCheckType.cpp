@@ -496,9 +496,8 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
         IsInvalid = true;
       else {
         // Record these substitutions.
-        auto allArchetypes = genericParams->getAllArchetypes();
-        BGT->setSubstitutions(encodeSubstitutions(allArchetypes, Substitutions,
-                                                  Conformance, false));
+        BGT->setSubstitutions(encodeSubstitutions(genericParams, Substitutions,
+                                                  Conformance, false, true));
       }
     }
     break;

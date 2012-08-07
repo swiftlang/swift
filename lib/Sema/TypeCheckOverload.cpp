@@ -862,10 +862,11 @@ TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
 }
 
 ArrayRef<Substitution>
-TypeChecker::encodeSubstitutions(ArrayRef<ArchetypeType *> AllArchetypes,
+TypeChecker::encodeSubstitutions(const GenericParamList *GenericParams,
                                  const TypeSubstitutionMap &Substitutions,
                                  const ConformanceMap &Conformances,
-                                 bool ArchetypesAreOpen) {
+                                 bool ArchetypesAreOpen,
+                                 bool OnlyInnermostParams) {
   // Figure out the mapping from primary archetypes to their deducible
   // parameters.
   // FIXME: This is terribly inefficient. We should keep track of this
@@ -879,11 +880,30 @@ TypeChecker::encodeSubstitutions(ArrayRef<ArchetypeType *> AllArchetypes,
       }
     }
   }
-  
+
+  // Collect all of the archetypes.
+  SmallVector<ArchetypeType *, 2> allArchetypesList;
+  ArrayRef<ArchetypeType *> allArchetypes = GenericParams->getAllArchetypes();
+  if (GenericParams->getOuterParameters() && !OnlyInnermostParams) {
+    SmallVector<const GenericParamList *, 2> allGenericParams;
+    unsigned numArchetypes = 0;
+    for (; GenericParams; GenericParams = GenericParams->getOuterParameters()) {
+      allGenericParams.push_back(GenericParams);
+      numArchetypes += GenericParams->getAllArchetypes().size();
+    }
+    allArchetypesList.reserve(numArchetypes);
+    for (auto gp = allGenericParams.rbegin(), gpEnd = allGenericParams.rend();
+         gp != gpEnd; ++gp) {
+      allArchetypesList.append((*gp)->getAllArchetypes().begin(),
+                               (*gp)->getAllArchetypes().end());
+    }
+    allArchetypes = allArchetypesList;
+  }
+
   SmallVector<SpecializeExpr::Substitution, 2> storedSubstitutions;
-  storedSubstitutions.resize(AllArchetypes.size());
+  storedSubstitutions.resize(allArchetypes.size());
   unsigned index = 0;
-  for (auto archetype : AllArchetypes) {
+  for (auto archetype : allArchetypes) {
     // Figure out the key into the maps we were given.
     SubstitutableType *key = archetype;
     if (ArchetypesAreOpen && archetype->isPrimary()) {
@@ -909,14 +929,15 @@ TypeChecker::encodeSubstitutions(ArrayRef<ArchetypeType *> AllArchetypes,
 SpecializeExpr *
 TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
                                  const TypeSubstitutionMap &Substitutions,
-                                 const ConformanceMap &Conformances) {
+                                 const ConformanceMap &Conformances,
+                                 bool OnlyInnermostParams) {
   auto polyFn = Sub->getType()->castTo<PolymorphicFunctionType>();
-  auto archetypes = polyFn->getGenericParams().getAllArchetypes();
   return new (Context) SpecializeExpr(Sub, Ty,
-                                      encodeSubstitutions(archetypes,
-                                                          Substitutions,
-                                                          Conformances,
-                                                          true));
+                         encodeSubstitutions(&polyFn->getGenericParams(),
+                                             Substitutions,
+                                             Conformances,
+                                             true,
+                                             OnlyInnermostParams));
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc) {
@@ -962,7 +983,8 @@ Expr *TypeChecker::specializeOverloadResult(const OverloadCandidate &Candidate,
   if (Candidate.hasSubstitutions()) {
     E = buildSpecializeExpr(E, Candidate.getType(),
                             Candidate.getSubstitutions(),
-                            Candidate.getConformances());
+                            Candidate.getConformances(),
+                            /*OnlyInnermostParams=*/true);
   }
 
   return E;
@@ -1039,7 +1061,8 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
         // an instance method of a generic class.
         Expr *specializedRef
           = buildSpecializeExpr(ref, substTy, CC.Substitutions,
-                                CC.Conformance);
+                                CC.Conformance,
+                                /*OnlyInnermostParams=*/false);
 
         Expr *apply;
         if (!baseIsInstance && Member->isInstanceMember()) {

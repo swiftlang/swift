@@ -606,8 +606,8 @@ public:
   /// \brief Encode the provided substitutions in the form used by
   /// SpecializeExpr (and another other AST nodes that require specialization).
   ///
-  /// \param AllArchetypes All of the archetypes used in the description of the
-  /// member being specialized.
+  /// \param GenericParams The generic parameters whose substitutions are
+  /// being encoded.
   ///
   /// \param Substitutions The set of substitutions.
   ///
@@ -617,11 +617,15 @@ public:
   /// form of the archetypes, as is used by the coercion code.
   ///
   /// \returns an ASTContext-allocate array of substitutions.
+  ///
+  /// \param OnlyInnermostParams Whether we're specializing only the innermost
+  /// generic parameters (rather than all levels of generic parameters).
   ArrayRef<Substitution>
-  encodeSubstitutions(ArrayRef<ArchetypeType *> AllArchetypes,
+  encodeSubstitutions(const GenericParamList *GenericParams,
                       const TypeSubstitutionMap &Substitutions,
                       const ConformanceMap &Conformances,
-                      bool ArchetypesAreOpen);
+                      bool ArchetypesAreOpen,
+                      bool OnlyInnermostParams);
 
   /// \brief Build a new SpecializeExpr wrapping the given subexpression.
   ///
@@ -635,9 +639,13 @@ public:
   ///
   /// \param Conformances The set of protocol-conformance structures for each
   /// of the substitutions.
+  ///
+  /// \param OnlyInnermostParams Whether we're specializing only the innermost
+  /// generic parameters (rather than all levels of generic parameters).
   SpecializeExpr *buildSpecializeExpr(Expr *Sub, Type Ty,
                                       const TypeSubstitutionMap &Substitutions,
-                                      const ConformanceMap &Conformances);
+                                      const ConformanceMap &Conformances,
+                                      bool OnlyInnermostParams);
 
   /// \brief Build a reference to a declaration, where name lookup returned
   /// the given set of declarations.

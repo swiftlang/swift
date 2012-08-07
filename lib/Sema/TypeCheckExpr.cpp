@@ -434,9 +434,9 @@ Expr *TypeChecker::semaSubscriptExpr(GenericSubscriptExpr *E) {
   ValueType = LValueType::get(ValueType,
                               LValueType::Qual::DefaultForMemberAccess,
                               Context);
-  E->setSubstitutions(encodeSubstitutions(GenericParams->getAllArchetypes(),
+  E->setSubstitutions(encodeSubstitutions(GenericParams,
                                           CC.Substitutions, CC.Conformance,
-                                          true));
+                                          true, false));
   E->setType(ValueType);
   return E;
   
@@ -631,7 +631,8 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
                                                         CoercionKind::Normal,
                                                         E2, Type())) {
         E1 = buildSpecializeExpr(E1, Ovl.getType(), Ovl.getSubstitutions(),
-                                 Ovl.getConformances());
+                                 Ovl.getConformances(),
+                                 /*OnlyInnermostParams=*/true);
         E->setFn(E1);
         return semaApplyExpr(E);
       }
@@ -894,8 +895,8 @@ public:
     }
 
     E->setSubstitutions(
-      TC.encodeSubstitutions(GenericParams->getAllArchetypes(),
-                             CC.Substitutions, CC.Conformance, true));
+      TC.encodeSubstitutions(GenericParams,
+                             CC.Substitutions, CC.Conformance, true, false));
     E->setType(MemberTy);
     return E;
   }
