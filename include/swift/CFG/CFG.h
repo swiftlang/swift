@@ -17,7 +17,6 @@
 #ifndef SWIFT_CFG_H
 #define SWIFT_CFG_H
 
-#include "llvm/Support/Allocator.h"
 #include "swift/CFG/Instruction.h"
 #include "swift/CFG/BasicBlock.h"
 
@@ -27,7 +26,7 @@ class Instruction;
 class Stmt;
 class TranslationUnit;
 
-class CFG {
+class CFG : public CFGBase {
 public:
   typedef llvm::iplist<BasicBlock> BlockListType;
 
@@ -36,9 +35,6 @@ public:
 
 private:
   friend class BasicBlock;
-
-  /// Allocator that manages the memory of all the pieces of the CFG.
-  mutable llvm::BumpPtrAllocator BPA;
 
   // Intentionally marked private so that we need to use 'build()'
   // to construct a CFG.
@@ -60,11 +56,6 @@ public:
 
   /// Pretty-print the CFG with the designated stream.
   void print(raw_ostream &OS) const;
-
-  /// Allocate memory using CFG's internal allocator.
-  void *allocate(unsigned Size, unsigned Align) const {
-    return BPA.Allocate(Size, Align);
-  }
 
   /// \brief Provides a custom implementation of the iterator class to have the
   /// same interface as Function::iterator - iterator returns BasicBlock
@@ -143,43 +134,5 @@ template <> struct GraphTraits<::swift::CFG *>
 };
 
 } // end llvm namespace
-
-// operator new and delete aren't allowed inside namespaces.
-
-/// @brief Placement new for using the CFG's allocator.
-///
-/// This placement form of operator new uses the CFG's allocator for
-/// obtaining memory.
-inline void *operator new(size_t Bytes, const swift::CFG &C,
-                          size_t Alignment) {
-  return C.allocate(Bytes, Alignment);
-}
-
-/// @brief Placement delete companion to the new above.
-///
-/// This operator is just a companion to the new above. There is no way of
-/// invoking it directly; see the new operator for more details. This operator
-/// is called implicitly by the compiler if a placement new expression using
-/// the CFG throws in the object constructor.
-inline void operator delete(void *Ptr, const swift::CFG &C, size_t) {}
-
-/// This placement form of operator new[] uses the CFG's allocator for
-/// obtaining memory.
-///
-/// We intentionally avoid using a nothrow specification here so that the calls
-/// to this operator will not perform a null check on the result -- the
-/// underlying allocator never returns null pointers.
-inline void *operator new[](size_t Bytes, const swift::CFG& C,
-                            size_t Alignment = 8) {
-  return C.allocate(Bytes, Alignment);
-}
-
-/// @brief Placement delete[] companion to the new[] above.
-///
-/// This operator is just a companion to the new[] above. There is no way of
-/// invoking it directly; see the new[] operator for more details. This operator
-/// is called implicitly by the compiler if a placement new[] expression using
-/// the CFG throws in the object constructor.
-inline void operator delete[](void *Ptr, const swift::CFG &C, size_t) {}
 
 #endif

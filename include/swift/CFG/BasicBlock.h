@@ -29,7 +29,8 @@ namespace swift {
 
 class CFG;
 
-class BasicBlock : public llvm::ilist_node<BasicBlock>  {
+class BasicBlock : public llvm::ilist_node<BasicBlock>,
+                   public CFGAllocated<BasicBlock>  {
 public:
   typedef llvm::iplist<Instruction> InstListType;
 
