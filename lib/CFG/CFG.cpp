@@ -26,21 +26,9 @@ CFG::~CFG() {
   for(BasicBlock &B : blocks) { B.~BasicBlock(); }
 }
 
-/// Pretty-print the basic block.
-void CFG::dump() const { print(llvm::errs()); }
-
-/// Pretty-print the basi block with the designated stream.
-void CFG::print(llvm::raw_ostream &OS) const {
-  for (const BasicBlock &B : blocks) {
-    B.print(OS);
-  }
-}
-
-CFG *CFG::constructCFG(const Stmt *S) {
-  // FIXME: implement CFG construction.
-  CFG *C = new CFG();
-  return C;
-}
+//===----------------------------------------------------------------------===//
+// CFG pretty-printing.
+//===----------------------------------------------------------------------===//
 
 namespace {
 class DumpVisitor : public ASTVisitor<DumpVisitor> {
@@ -61,4 +49,24 @@ public:
 
 void CFG::dump(TranslationUnit *TU) {
   for (Decl *D : TU->Decls) { DumpVisitor(llvm::errs()).visit(D); }
+}
+
+/// Pretty-print the basic block.
+void CFG::dump() const { print(llvm::errs()); }
+
+/// Pretty-print the basi block with the designated stream.
+void CFG::print(llvm::raw_ostream &OS) const {
+  for (const BasicBlock &B : blocks) {
+    B.print(OS);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// CFG construction.
+//===----------------------------------------------------------------------===//
+
+CFG *CFG::constructCFG(const Stmt *S) {
+  // FIXME: implement CFG construction.
+  CFG *C = new CFG();
+  return C;
 }
