@@ -14,10 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/AST.h"
 #include "swift/CFG/Instruction.h"
 #include "swift/CFG/BasicBlock.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/ADT/APInt.h"
 #include <algorithm>
 
 using namespace swift;
@@ -26,7 +28,12 @@ void Instruction::print(raw_ostream &OS) const {
   switch (kind) {
     case Invalid:
       OS << "InvalidInstruction";
-      return;
+      break;
+    case IntegerLit: {
+      const IntegerLiteralInst &ILE = *cast<IntegerLiteralInst>(this);
+      OS << "IntegerLiteralInst " << ILE.literal->getValue();
+      break;
+    }
     case UncondBranch: {
       const UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
       OS << "br " << UBI.targetBlock();
@@ -36,16 +43,27 @@ void Instruction::print(raw_ostream &OS) const {
         for (auto Arg : Args) { OS << "%" << Arg; }
         OS << ')';
       }
-      return;
+      break;
     }
   }
+  OS << '\n';
 }
 
 void Instruction::dump() const { print(llvm::errs()); }
 
+void Instruction::validateNonTerm() const {
+  assert(basicBlock->instructions.size() > 1);
+  assert(&*basicBlock->instructions.rbegin() != this &&
+         "Non-terminator Instructions cannot be the last in a block");
+}
+
 void Instruction::validate() const {
+  if (kind > Invalid && kind < TERM_INST_BEGIN)
+    validateNonTerm();
+
   switch (kind) {
     case Invalid:
+    case IntegerLit:
       return;
     case UncondBranch: {
       const UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
@@ -64,6 +82,7 @@ void Instruction::validate() const {
 TermInst::Successors TermInst::successors() {
   switch (kind) {
     case Invalid:
+    case IntegerLit:
       llvm_unreachable("Only TermInst's are allowed");
     case UncondBranch: {
       UncondBranchInst &UBI = *cast<UncondBranchInst>(this);

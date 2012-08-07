@@ -28,6 +28,7 @@ namespace llvm {
 
 namespace swift {
 
+class IntegerLiteralExpr;
 class BasicBlock;
 
 /// This is the root class for all instructions that can be used as the contents
@@ -37,6 +38,7 @@ class Instruction : public llvm::ilist_node<Instruction> {
 public:
   enum Kind {
     Invalid,
+    IntegerLit,
     UncondBranch,
     TERM_INST_BEGIN = UncondBranch,
     TERM_INST_END = TERM_INST_BEGIN
@@ -53,6 +55,9 @@ private:
   Instruction() : kind(Invalid) {}
   void operator=(const Instruction &) = delete;
 
+  /// Helper method for validating non-terminator Instructions.
+  void validateNonTerm() const;
+
 protected:
   Instruction(BasicBlock *B, Kind K) : kind(K), basicBlock(B) {}
 
@@ -68,6 +73,21 @@ public:
 
   static bool classof(const Instruction *I) { return true; }
 };
+
+class IntegerLiteralInst : public Instruction {
+public:
+  /// The backing IntegerLiteralExpr in the AST.
+  IntegerLiteralExpr *literal;
+
+  IntegerLiteralInst(IntegerLiteralExpr *IE, BasicBlock *B) :
+    Instruction(B, IntegerLit), literal(IE) {}
+
+  static bool classof(const Instruction *I) { return I->kind == IntegerLit; }
+};
+
+//===----------------------------------------------------------------------===//
+// Instructions representing terminators.
+//===----------------------------------------------------------------------===//
 
 /// This class defines a "terminating instruction" for a BasicBlock.
 class TermInst : public Instruction {
