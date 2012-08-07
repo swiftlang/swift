@@ -11,7 +11,7 @@ Syntax overview
     func f(x : Int) -> Int {
       return MyVar + x
     }
-    static fund getAMyclass() -> MyClass {
+    static func getAMyclass() -> MyClass {
       return new MyClass
     }
     constructor() {
@@ -80,9 +80,8 @@ is still sort of an open question. There are a few possible models here:
 
 1. All ivars are implicitly initialized before the body of the constructor.
    Initializers can be provided on the ivar directly if necessary.  This is the
-   closest to the current model.  This was discarded sucks because it doesn't
-   allow initialization based on
-   arguments.
+   closest to the current model.  This was discarded & sucks because it doesn't
+   allow initialization based on arguments.
 2. Some sort of C++-style list of initializers; this was discarded quickly
    during discussion as being both ugly and not as flexible as we would like.
 3. Add some sort of init block to constructors, like::
