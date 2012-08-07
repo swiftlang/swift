@@ -1,6 +1,9 @@
 Swift classes in detail
 =======================
 
+FIXME: This document is describing where we want to be; many pieces aren't
+implemented yet.
+
 Syntax overview
 ---------------
 
@@ -54,9 +57,12 @@ Inheritance
 -----------
 
 A class inherits from at most one other class.  The base class is named in
-the same place protocols are named.  All member functions/properties of the
+the same place protocols are named; if a base class is named, it must come
+first in the list.  All member functions/properties of the
 base class can be accessed through an instance of the derived class 
-(ignoring access control and shadowing).
+(ignoring access control and shadowing).  Constructors are never inherited; see
+the section on constructors.  Destructors have special rules; see the section
+on destructors.
 
 Constructors
 ------------
@@ -93,10 +99,11 @@ is still sort of an open question. There are a few possible models here:
         print(myIvar)
       }
 
-   Capturing self in the init block would be banned.  If an ivar is accessed
-   before initialization, or not initialized in the init block, it would be
-   automatically "default"-initialized (as-if with an empty argument list) if
-   such construction is possible, or an error otherwise. The ivar rules would
+   Capturing self in the init block would be banned because it could allow
+   uses of uninitialized ivars.  If an ivar is accessed before initialization,
+   or not initialized in the init block, it would be automatically
+   "default"-initialized (as-if with an empty argument list) if such
+   construction is possible, or an error otherwise. The ivar rules would
    be enforced using CFG analysis.  Delegation to the base class would be in
    the init block; the syntax here is also an open question.  Proposals
    included ``super(1,2)``, ``constructor(1,2)``, ``This(1,2)``,
@@ -122,7 +129,8 @@ is still sort of an open question. There are a few possible models here:
    slightly more flexible in the presence of control flow because there
    could be multiple end-points).  The downside here is that it isn't obvious
    at a glance where exactly the split occurs, which could lead to unexpected
-   default construction.
+   default construction.  Also, it could lead to surprises when refactoring
+   code.
 
 Destructors
 -----------
@@ -133,6 +141,7 @@ class declaration itself.  It's a runtime error if the body resurrects the
 object (i.e. if there are live reference to the object after the body of
 the destructor runs).  Member ivars are destroyed after the body of the
 destructor runs.  FIXME: Where exactly do we run the base class destructor?
+FIXME: We don't actually detect resurrection at the moment.
 
 Member functions and properties
 -------------------------------
@@ -144,22 +153,30 @@ attribute.
 
 In a derived class, if you define a member with the same name as a member
 of its base class, the base class member is overridden by default.  If the
-type doesn't match (what exactly "match" means TBD), it's an error.  This
-implies that it's impossible to hide a base class member without explicit
+kind and type doesn't match (what exactly "match" means TBD), it's an error.
+This implies that it's impossible to hide a base class member without explicit
 markings.
 
-The override-by-default model requires two attributes to control when it
-isn't doing the right thing: "shadow" and "overload".  "overload" means
-that the member of the derived class is an overload of the base class member;
+This model requires two attributes to control it when the default isn't correct:
+"shadow" and "overload".  "overload" means that the member of the
+derived class is an overload of the base class member;
 all the members from the base class and the derived class are part of overload
-resolution.  "shadow" means that the derived class is intentionally shadowing
+resolution.  Each member which adds a new overload needs the "overload"
+attribute.  "shadow" means that the derived class is intentionally shadowing
 the base class name; the name from the base class is never found by name lookup
-on the derived class.
+on the derived class.  If any member with a given name has the "shadow"
+attribute, every member with that name must have it.  (Note that this means
+either none of the base class members with a given name are shadowed, or
+all of them are; more sophisticated models are possible, but this seems like
+a reasonable compromise in terms of complexity.)
+
+FIXME: is adding an override for a method from a base class allowed in a
+stable API? 
 
 Accessing overridden members of the base class
 ----------------------------------------------
 
-Tentatively, ``super.foo()`` accesses foo from the base class, bypassing
+Tentatively, ``super.foo()`` accesses foo from the parent class, bypassing
 dynamic dispatch.
 
 Extensions
@@ -171,9 +188,10 @@ and constructors. They always use static dispatch.
 Extensions for classes are more flexible in two respects:
 
 1. They can contains ivars: these are essentially baking in language support
-   for a side-table lookup.  They must be either default-initializable or have
-   an explicit initializer on the variable definition.  The initializer is run
-   lazily.
+   for the equivalent of a side-table lookup.  They must be either
+   default-initializable or have an explicit initializer on the variable
+   definition.  The initializer is run lazily.  (If the ivar is in the same
+   resilience scope as the class, we can optimize the allocation.)
 2. Members of extensions of classes can be overridden (?).  Per our discussion
    in the meeting, I thought this model could work, but in retrospect it might
    be way too confusing; if you have a base class X and a derived class Y,
@@ -185,9 +203,10 @@ Name lookup for extensions works much the same way that it does for a derived
 class, except that rather than base class vs. derived class, it's names from
 current extension vs. names from other sources (or something similar to this).
 If there's multiple declarations with the same name, it's an error, and the
-user has to resolve it with "shadow", and "overload" (where "shadow" only works
+user has to resolve it with "shadow" and "overload" (where "shadow" only works
 for names from other modules; we'll want some other mechanism for name remapping
-for protocol implementations).
+for protocol implementations).  The shadow and overload attributes work
+essentially the same way they work for class definitions.
 
 Constructors in extensions are required to delegate to another constructor. This
 is necessary because of access-control etc.  (FIXME: implicit delegation?)
