@@ -165,7 +165,17 @@ public:
     assert(i < NumElements && "index out of range!");
     getElementsStorage()[i] = elt;
   }
-  
+
+  /// The elements contained within the BraceStmt.
+  ArrayRef<ExprStmtOrDecl> elements() {
+    return ArrayRef<ExprStmtOrDecl>(getElementsStorage(), getNumElements());
+  }
+
+  /// The elements contained within the BraceStmt (const version).
+  const ArrayRef<ExprStmtOrDecl> elements() const {
+    return const_cast<BraceStmt*>(this)->elements();
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BraceStmt *) { return true; }
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
