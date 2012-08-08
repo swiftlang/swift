@@ -153,26 +153,13 @@ public:
   
   SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
 
-  unsigned getNumElements() const { return NumElements; }
-  ArrayRef<ExprStmtOrDecl> getElements() const {
-    return ArrayRef<ExprStmtOrDecl>(getElementsStorage(), NumElements);
-  }
-  ExprStmtOrDecl getElement(unsigned i) const {
-    assert(i < NumElements && "index out of range!");
-    return getElementsStorage()[i];
-  }
-  void setElement(unsigned i, ExprStmtOrDecl elt) {
-    assert(i < NumElements && "index out of range!");
-    getElementsStorage()[i] = elt;
-  }
-
   /// The elements contained within the BraceStmt.
-  ArrayRef<ExprStmtOrDecl> elements() {
-    return ArrayRef<ExprStmtOrDecl>(getElementsStorage(), getNumElements());
+  MutableArrayRef<ExprStmtOrDecl> elements() {
+    return MutableArrayRef<ExprStmtOrDecl>(getElementsStorage(), NumElements);
   }
 
   /// The elements contained within the BraceStmt (const version).
-  const ArrayRef<ExprStmtOrDecl> elements() const {
+  ArrayRef<ExprStmtOrDecl> elements() const {
     return const_cast<BraceStmt*>(this)->elements();
   }
 

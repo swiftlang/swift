@@ -448,19 +448,19 @@ public:
   
   
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
-  for (unsigned i = 0, e = BS->getNumElements(); i != e; ++i) {
-    if (Expr *SubExpr = BS->getElement(i).dyn_cast<Expr*>()) {
+  for (auto &elem : BS->elements()) {
+    if (Expr *SubExpr = elem.dyn_cast<Expr*>()) {
       if (typeCheckExpr(SubExpr)) continue;
       TC.typeCheckIgnoredExpr(SubExpr);
-      BS->setElement(i, SubExpr);
+      elem = SubExpr;
       continue;
     }
     
-    if (Stmt *SubStmt = BS->getElement(i).dyn_cast<Stmt*>()) {
+    if (Stmt *SubStmt = elem.dyn_cast<Stmt*>()) {
       if (!typeCheckStmt(SubStmt))
-        BS->setElement(i, SubStmt);
+        elem = SubStmt;
     } else {
-      TC.typeCheckDecl(BS->getElement(i).get<Decl*>(), /*isFirstPass*/false);
+      TC.typeCheckDecl(elem.get<Decl*>(), /*isFirstPass*/false);
     }
   }
   

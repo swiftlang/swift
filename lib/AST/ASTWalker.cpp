@@ -335,24 +335,24 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   }
   
   Stmt *visitBraceStmt(BraceStmt *BS) {
-    for (unsigned i = 0, e = BS->getNumElements(); i != e; ++i) {
-      if (Expr *SubExpr = BS->getElement(i).dyn_cast<Expr*>()) {
+    for (auto &Elem : BS->elements()) {
+      if (Expr *SubExpr = Elem.dyn_cast<Expr*>()) {
         if (Expr *E2 = doIt(SubExpr))
-          BS->setElement(i, E2);
+          Elem = E2;
         else
           return nullptr;
         continue;
       }
       
-      if (Stmt *S = BS->getElement(i).dyn_cast<Stmt*>()) {
+      if (Stmt *S = Elem.dyn_cast<Stmt*>()) {
         if (Stmt *S2 = doIt(S))
-          BS->setElement(i, S2);
+          Elem = S2;
         else
           return nullptr;
         continue;
       }
 
-      if (doIt(BS->getElement(i).get<Decl*>()))
+      if (doIt(Elem.get<Decl*>()))
         return nullptr;
     }
     

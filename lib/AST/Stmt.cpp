@@ -143,7 +143,7 @@ public:
 
   void visitBraceStmt(BraceStmt *S) {
     OS.indent(Indent) << "(brace_stmt";
-    for (auto Elt : S->getElements()) {
+    for (auto Elt : S->elements()) {
       OS << '\n';
       if (Expr *SubExpr = Elt.dyn_cast<Expr*>())
         printRec(SubExpr);
