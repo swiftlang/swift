@@ -234,7 +234,7 @@ swift_slowDealloc(void *ptr, size_t bytes)
     // the caller either doesn't know the size
     // or the caller really does think the size is zero
     // in any case, punt!
-    free(ptr);
+    return free(ptr);
   }
 
   bytes--;
@@ -270,7 +270,7 @@ swift_slowRawDealloc(void *ptr, size_t bytes)
     // the caller either doesn't know the size
     // or the caller really does think the size is zero
     // in any case, punt!
-    free(ptr);
+    return free(ptr);
   }
 
   bytes--;
