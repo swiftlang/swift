@@ -279,6 +279,39 @@ static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context, Identifier Id) 
                                 ParamList, FnTy, /*init*/ nullptr,
                                 Context.TheBuiltinModule);
 }
+
+static ValueDecl *getObjectPointerCast(ASTContext &Context, Identifier Id,
+                                       BuiltinValueKind BV) {
+  Type GenericTy;
+  GenericParamList *ParamList;
+  std::tie(GenericTy, ParamList) = getGenericParam(Context);
+
+  Type BuiltinTy;
+  if (BV == BuiltinValueKind::BridgeToRawPointer ||
+      BV == BuiltinValueKind::BridgeFromRawPointer)
+    BuiltinTy = Context.TheRawPointerType;
+  else
+    BuiltinTy = Context.TheObjectPointerType;
+
+  Type Arg, Ret;
+  if (BV == BuiltinValueKind::CastToObjectPointer ||
+      BV == BuiltinValueKind::BridgeToRawPointer) {
+    Arg = GenericTy;
+    Ret = BuiltinTy;
+  } else {
+    Arg = BuiltinTy;
+    Ret = GenericTy;
+  }
+
+  TupleTypeElt ArgElts[] = { TupleTypeElt(Arg, Identifier()) };
+  Arg = TupleType::get(ArgElts, Context);
+
+  Type FnTy = PolymorphicFunctionType::get(Arg, Ret, ParamList, Context);
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, SourceLoc(),
+                                ParamList, FnTy, /*init*/ nullptr,
+                                Context.TheBuiltinModule);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -294,6 +327,7 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 #define BUILTIN_INIT(id, name) OverloadedBuiltinKind::Special,
 #define BUILTIN_SIZEOF(id, name) OverloadedBuiltinKind::Special,
 #define BUILTIN_ALIGNOF(id, name) OverloadedBuiltinKind::Special,
+#define BUILTIN_CASTOBJECTPOINTER(id, name) OverloadedBuiltinKind::Special,
 #include "swift/AST/Builtins.def"
 };
 
@@ -472,6 +506,13 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::Sizeof:
   case BuiltinValueKind::Alignof:
     return getSizeOrAlignOfOperation(Context, Id);
+
+  case BuiltinValueKind::CastToObjectPointer:
+  case BuiltinValueKind::CastFromObjectPointer:
+  case BuiltinValueKind::BridgeToRawPointer:
+  case BuiltinValueKind::BridgeFromRawPointer:
+    if (!Types.empty()) return nullptr;
+    return getObjectPointerCast(Context, Id, BV);
   }
   llvm_unreachable("bad builtin value!");
 }

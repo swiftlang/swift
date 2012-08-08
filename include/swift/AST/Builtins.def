@@ -103,7 +103,6 @@ BUILTIN_GEP_OPERATION(Gep, "gep", OverloadedBuiltinKind::Integer)
 #undef BUILTIN_GEP_OPERATION
 
 /// Load has type (Builtin.RawPointer) -> T
-/// FIXME: Is Arithmetic a proper stand in for 'any type?'
 #ifndef BUILTIN_LOAD
 #define BUILTIN_LOAD(Id, Name) BUILTIN(Id, Name)
 #endif
@@ -112,7 +111,6 @@ BUILTIN_LOAD(Move, "move")
 #undef BUILTIN_LOAD
 
 /// Assign has type (T, Builtin.RawPointer) -> ()
-/// FIXME: Is Arithmetic a proper stand in for 'any type?'
 #ifndef BUILTIN_ASSIGN
 #define BUILTIN_ASSIGN(Id, Name) BUILTIN(Id, Name)
 #endif
@@ -120,7 +118,6 @@ BUILTIN_ASSIGN(Assign, "assign")
 #undef BUILTIN_ASSIGN
 
 /// Init has type (T, Builtin.RawPointer) -> ()
-/// FIXME: Is Arithmetic a proper stand in for 'any type?'
 #ifndef BUILTIN_INIT
 #define BUILTIN_INIT(Id, Name) BUILTIN(Id, Name)
 #endif
@@ -140,5 +137,20 @@ BUILTIN_SIZEOF(Sizeof, "sizeof")
 #endif
 BUILTIN_ALIGNOF(Alignof, "alignof")
 #undef BUILTIN_ALIGNOF
+
+/// CastToObjectPointer has type (T) -> Builtin.ObjectPointer.
+/// CastFromObjectPointer has type (Builtin.ObjectPointer) -> T.
+/// BridgeToRawPointer has type (T) -> Builtin.RawPointer.
+/// BridgeFromRawPointer (Builtin.RawPointer) -> T.
+/// IRGen requires that T is a single retainable pointer.
+/// Bridging to/from a raw pointer does not imply a retain.
+#ifndef BUILTIN_CASTOBJECTPOINTER
+#define BUILTIN_CASTOBJECTPOINTER(Id, Name) BUILTIN(Id, Name)
+#endif
+BUILTIN_CASTOBJECTPOINTER(CastToObjectPointer, "castToObjectPointer")
+BUILTIN_CASTOBJECTPOINTER(CastFromObjectPointer, "castFromObjectPointer")
+BUILTIN_CASTOBJECTPOINTER(BridgeToRawPointer, "bridgeToRawPointer")
+BUILTIN_CASTOBJECTPOINTER(BridgeFromRawPointer, "bridgeFromRawPointer")
+#undef BUILTIN_CASTOBJECTPOINTER
 
 #undef BUILTIN

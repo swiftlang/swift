@@ -1306,6 +1306,43 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return;
   }
 
+  if (BuiltinName == "castToObjectPointer" ||
+      BuiltinName == "castFromObjectPointer" ||
+      BuiltinName == "bridgeToRawPointer" ||
+      BuiltinName == "bridgeFromRawPointer") {
+    Type valueTy = emission.getSubstitutions()[0].Replacement;
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    if (!valueTI.isSingleRetainablePointer(ResilienceScope::Local)) {
+      IGF.unimplemented(SourceLoc(), "builtin pointer cast on invalid type");
+      IGF.emitFakeExplosion(valueTI, emission.getSubstExplosion());
+      return;
+    }
+
+    if (BuiltinName == "castToObjectPointer") {
+      // Just bitcast and rebuild the cleanup.
+      llvm::Value *value = args.forwardNext(IGF);
+      value = IGF.Builder.CreateBitCast(value, IGF.IGM.RefCountedPtrTy);
+      emission.getSubstExplosion().add(IGF.enterReleaseCleanup(value));
+    } else if (BuiltinName == "castFromObjectPointer") {
+      // Just bitcast and rebuild the cleanup.
+      llvm::Value *value = args.forwardNext(IGF);
+      value = IGF.Builder.CreateBitCast(value, valueTI.StorageType);
+      emission.getSubstExplosion().add(IGF.enterReleaseCleanup(value));
+    } else if (BuiltinName == "bridgeToRawPointer") {
+      // Bitcast and immediately release the operand.
+      llvm::Value *value = args.forwardNext(IGF);
+      IGF.emitRelease(value);
+      value = IGF.Builder.CreateBitCast(value, IGF.IGM.Int8PtrTy);
+      emission.getSubstExplosion().addUnmanaged(value);
+    } else if (BuiltinName == "bridgeFromRawPointer") {
+      // Bitcast, and immediately retain (and introduce a release cleanup).
+      llvm::Value *value = args.claimUnmanagedNext();
+      value = IGF.Builder.CreateBitCast(value, valueTI.StorageType);
+      IGF.emitRetain(value, emission.getSubstExplosion());
+    }
+    return;
+  }
+
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }
 
