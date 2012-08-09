@@ -64,6 +64,7 @@ private:
   friend struct llvm::ilist_sentinel_traits<Instruction>;
   Instruction() : kind(Invalid), basicBlock(0) {}
   void operator=(const Instruction &) = delete;
+  void operator delete(void *Ptr, size_t)  = delete;
 
   /// Helper method for validating non-terminator Instructions.
   void validateNonTerm() const;
@@ -80,16 +81,6 @@ public:
 
   /// Pretty-print the Instruction to the designated stream.
   void print(llvm::raw_ostream &OS) const;
-
-  /// Forward to ordinary 'delete' if this is Invalid.
-  void operator delete(void *Ptr, size_t) {
-#if 0
-    // LEAK FOR NOW, so we can fix this up.
-    if (Ptr && ((Instruction*)Ptr)->kind != Invalid)
-      return;
-    ::operator delete(Ptr);
-#endif
-  }
 
   static bool classof(const Instruction *I) { return true; }
 };
@@ -255,5 +246,37 @@ private:
   void unregisterTarget();
 };
 } // end swift namespace
+
+//===----------------------------------------------------------------------===//
+// ilist_traits for Instruction
+//===----------------------------------------------------------------------===//
+
+namespace llvm {
+
+template <>
+struct ilist_traits<::swift::Instruction> :
+  public ilist_default_traits<::swift::Instruction>
+{
+  typedef ::swift::Instruction Instruction;
+
+private:
+  mutable ilist_half_node<Instruction> Sentinel;
+
+public:
+  Instruction *createSentinel() const {
+    return static_cast<Instruction*>(&Sentinel);
+  }
+  void destroySentinel(Instruction *) const {}
+
+  Instruction *provideInitialHead() const { return createSentinel(); }
+  Instruction *ensureHead(Instruction*) const { return createSentinel(); }
+  static void noteHead(Instruction*, Instruction*) {}
+  static void deleteNode(Instruction *V) {}
+
+private:
+  void createNode(const Instruction &);
+};
+
+} // end llvm namespace
 
 #endif

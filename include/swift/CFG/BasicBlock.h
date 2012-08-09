@@ -44,6 +44,7 @@ private:
   friend struct llvm::ilist_sentinel_traits<BasicBlock>;
   BasicBlock() : cfg(0) {}
   void operator=(const BasicBlock &) =delete;
+  void operator delete(void *Ptr, size_t) = delete;
 
   std::vector<BasicBlock *> Preds;
 
@@ -80,13 +81,6 @@ public:
   const Successors succs() const {
     return const_cast<BasicBlock*>(this)->succs();
   }
-
-  /// Forward to ordinary 'delete' if this is Invalid.
-  void operator delete(void *Ptr, size_t) {
-#if 0
-                       // LEAK FOR NOW, so we can fix this up.
-#endif
-  }
 };
 
 } // end swift namespace
@@ -119,6 +113,34 @@ template <> struct GraphTraits<const ::swift::BasicBlock*> {
 };
 
 raw_ostream &operator<<(raw_ostream &, const swift::BasicBlock &B);
+
+//===----------------------------------------------------------------------===//
+// ilist_traits for BasicBlock
+//===----------------------------------------------------------------------===//
+
+template <>
+struct ilist_traits<::swift::BasicBlock> :
+public ilist_default_traits<::swift::BasicBlock>
+{
+  typedef ::swift::BasicBlock BasicBlock;
+
+private:
+  mutable ilist_half_node<BasicBlock> Sentinel;
+
+public:
+  BasicBlock *createSentinel() const {
+    return static_cast<BasicBlock*>(&Sentinel);
+  }
+  void destroySentinel(BasicBlock *) const {}
+
+  BasicBlock *provideInitialHead() const { return createSentinel(); }
+  BasicBlock *ensureHead(BasicBlock*) const { return createSentinel(); }
+  static void noteHead(BasicBlock*, BasicBlock*) {}
+  static void deleteNode(BasicBlock *V) {}
+  
+private:
+  void createNode(const BasicBlock &);
+};
 
 } // end llvm namespace
 
