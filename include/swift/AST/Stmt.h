@@ -139,9 +139,6 @@ private:
   ExprStmtOrDecl *getElementsStorage() {
     return reinterpret_cast<ExprStmtOrDecl*>(this + 1);
   }
-  const ExprStmtOrDecl *getElementsStorage() const {
-    return const_cast<BraceStmt*>(this)->getElementsStorage();
-  }
 
 public:
   static BraceStmt *create(ASTContext &ctx, SourceLoc lbloc,
