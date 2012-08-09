@@ -13,6 +13,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/CFG/CFG.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -38,9 +39,13 @@ public:
   raw_ostream &OS;
 
   void visitFuncDecl(FuncDecl *FD) {
-    OS << "(func_decl " << FD->getName() << '\n';
     FuncExpr *FE = FD->getBody();
     llvm::OwningPtr<CFG> C(CFG::constructCFG(FE->getBody()));
+
+    if (!C)
+      return;
+
+    OS << "(func_decl " << FD->getName() << '\n';
     C->print(OS);
     OS << ")\n";
   }
@@ -65,8 +70,16 @@ void CFG::print(llvm::raw_ostream &OS) const {
 // CFG construction.
 //===----------------------------------------------------------------------===//
 
+static Expr *ignoreParens(Expr *Ex) {
+  while (ParenExpr *P = dyn_cast<ParenExpr>(Ex)) { Ex = P->getSubExpr(); }
+  return Ex;
+}
+
 namespace {
 class CFGBuilder : public ASTVisitor<CFGBuilder> {
+  /// Mapping from expressions to instructions.
+  llvm::DenseMap<Expr *, Instruction *> ExprToInst;
+
   /// The current basic block being constructed.
   BasicBlock *Block;
 
@@ -81,10 +94,20 @@ public:
   bool badCFG;
 
   /// The current basic block being constructed.
-  BasicBlock *block() {
+  BasicBlock *currentBlock() {
     if (!Block)
       Block = new (C) BasicBlock(&C);
     return Block;
+  }
+
+  void addInst(Expr *Ex, Instruction *I) {
+    ExprToInst[Ex] = I;
+  }
+
+  Instruction *getInst(Expr *Ex) {
+    auto I = ExprToInst.find(Ex);
+    assert(I != ExprToInst.end());
+    return I->second;
   }
 
   //===--------------------------------------------------------------------===//
@@ -102,7 +125,8 @@ public:
   }
 
   void visitReturnStmt(ReturnStmt *S) {
-    assert(false && "Not yet implemented");
+    visit(S->getResult());
+    //assert(false && "Not yet implemented");
   }
 
   void visitIfStmt(IfStmt *S) {
@@ -122,7 +146,8 @@ public:
   }
 
   void visitForEachStmt(ForEachStmt *S) {
-    assert(false && "Not yet implemented");
+    badCFG = true;
+    return;
   }
 
   void visitBreakStmt(BreakStmt *S) {
@@ -140,6 +165,15 @@ public:
   void visitExpr(Expr *E) {
     assert(false && "Not yet implemented");
   }
+
+  void visitCallExpr(CallExpr *E);
+  void visitDeclRefExpr(DeclRefExpr *E);
+  void visitIntegerLiteralExpr(IntegerLiteralExpr *E);
+  void visitParenExpr(ParenExpr *E);
+  void visitThisApplyExpr(ThisApplyExpr *E);
+  void visitTupleExpr(TupleExpr *E);
+  void visitTypeOfExpr(TypeOfExpr *E);
+  
 };
 } // end anonymous namespace
 
@@ -164,3 +198,52 @@ void CFGBuilder::visitBraceStmt(BraceStmt *S) {
   }
 }
 
+void CFGBuilder::visitCallExpr(CallExpr *E) {
+  llvm::SmallVector<Instruction*, 10> Args;
+  Expr *Arg = ignoreParens(E->getArg());
+  Expr *Fn = E->getFn();
+  visit(Fn);
+
+  if (TupleExpr *TU = dyn_cast<TupleExpr>(Arg)) {
+      for (auto arg : TU->getElements()) {
+        visit(arg);
+        Args.push_back(getInst(arg));
+      }
+    addInst(E, CallInst::create(E, currentBlock(), getInst(Fn), Args));
+  }
+  else {
+    visit(Arg);
+    Instruction *ArgI = getInst(Arg);
+    addInst(E, CallInst::create(E, currentBlock(), getInst(Fn),
+                                ArrayRef<Instruction*>(&ArgI, 1)));
+  }
+}
+
+void CFGBuilder::visitDeclRefExpr(DeclRefExpr *E) {
+  addInst(E, new (C) DeclRefInst(E, currentBlock()));
+}
+
+void CFGBuilder::visitThisApplyExpr(ThisApplyExpr *E) {
+  visit(E->getFn());
+  visit(E->getArg());
+  addInst(E, new (C) ThisApplyInst(E,
+                                   getInst(E->getFn()),
+                                   getInst(E->getArg()),
+                                   currentBlock()));
+}
+
+void CFGBuilder::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+  addInst(E, new (C) IntegerLiteralInst(E, currentBlock()));
+}
+
+void CFGBuilder::visitParenExpr(ParenExpr *E) {
+  visit(E->getSubExpr());
+}
+
+void CFGBuilder::visitTupleExpr(TupleExpr *E) {
+  for (auto &I : E->getElements()) visit(I);
+}
+
+void CFGBuilder::visitTypeOfExpr(TypeOfExpr *E) {
+  addInst(E, new (C) TypeOfInst(E, currentBlock()));
+}

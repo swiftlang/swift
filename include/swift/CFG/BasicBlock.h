@@ -71,10 +71,21 @@ public:
   /// The successors of a BasicBlock are defined either explicitly as
   /// a single successor as the branch targets of the terminator instruction.
   Successors succs() {
-    return cast<TermInst>(instructions.back()).successors();
+    if (instructions.empty())
+      return nullptr;
+    if (TermInst *TI = dyn_cast<TermInst>(&instructions.back()))
+      return TI->successors();
+    return nullptr;
   }
   const Successors succs() const {
     return const_cast<BasicBlock*>(this)->succs();
+  }
+
+  /// Forward to ordinary 'delete' if this is Invalid.
+  void operator delete(void *Ptr, size_t) {
+#if 0
+                       // LEAK FOR NOW, so we can fix this up.
+#endif
   }
 };
 

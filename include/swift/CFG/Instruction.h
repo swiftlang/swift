@@ -29,17 +29,26 @@ namespace llvm {
 
 namespace swift {
 
-class IntegerLiteralExpr;
 class BasicBlock;
+class CallExpr;
+class DeclRefExpr;
+class IntegerLiteralExpr;
+class ThisApplyExpr;
+class TypeOfExpr;
 
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift BasicBlock.  They cannot be used as terminators for BasicBlocks;
 /// for those we have TermInst.
-class Instruction : public llvm::ilist_node<Instruction> {
+class Instruction : public llvm::ilist_node<Instruction>,
+                    public CFGAllocated<Instruction> {
 public:
   enum Kind {
     Invalid,
+    Call,
+    DeclRef,
     IntegerLit,
+    ThisApply,
+    TypeOf,
     UncondBranch,
     TERM_INST_BEGIN = UncondBranch,
     TERM_INST_END = TERM_INST_BEGIN
@@ -53,14 +62,14 @@ public:
 
 private:
   friend struct llvm::ilist_sentinel_traits<Instruction>;
-  Instruction() : kind(Invalid) {}
+  Instruction() : kind(Invalid), basicBlock(0) {}
   void operator=(const Instruction &) = delete;
 
   /// Helper method for validating non-terminator Instructions.
   void validateNonTerm() const;
 
 protected:
-  Instruction(BasicBlock *B, Kind K) : kind(K), basicBlock(B) {}
+  Instruction(BasicBlock *B, Kind K);
 
 public:
   /// Check that Instruction invariants are preserved.
@@ -72,10 +81,75 @@ public:
   /// Pretty-print the Instruction to the designated stream.
   void print(llvm::raw_ostream &OS) const;
 
+  /// Forward to ordinary 'delete' if this is Invalid.
+  void operator delete(void *Ptr, size_t) {
+#if 0
+    // LEAK FOR NOW, so we can fix this up.
+    if (Ptr && ((Instruction*)Ptr)->kind != Invalid)
+      return;
+    ::operator delete(Ptr);
+#endif
+  }
+
   static bool classof(const Instruction *I) { return true; }
 };
 
+class CallInst : public Instruction {
+private:
+  /// Construct a CallInst from a given call expression and the provided
+  /// arguments.
+  CallInst(CallExpr *expr,
+           BasicBlock *B,
+           Instruction *function,
+           ArrayRef<Instruction*> args);
+
+  CallInst() = delete;
+
+  Instruction **getArgsStorage() {
+    return reinterpret_cast<Instruction**>(this + 1);
+  }
+
+  unsigned NumArgs;
+public:
+  static CallInst *create(CallExpr *expr,
+                          BasicBlock *B,
+                          Instruction *function,
+                          ArrayRef<Instruction*> args);
+
+  /// The backing expression for the call.
+  CallExpr *expr;
+
+  /// The instruction representing the called function.
+  Instruction *function;
+
+  /// The arguments referenced by this CallInst.
+  MutableArrayRef<Instruction*> arguments() {
+    return MutableArrayRef<Instruction*>(getArgsStorage(), NumArgs);
+  }
+
+  /// The arguments referenced by this CallInst.
+  ArrayRef<Instruction*> arguments() const {
+    return const_cast<CallInst*>(this)->arguments();
+  }
+
+
+  static bool classof(const Instruction *I) { return I->kind == Call; }
+};
+
+class DeclRefInst : public Instruction {
+  DeclRefInst() = delete;
+public:
+  /// The backing DeclRefExpr in the AST.
+  DeclRefExpr *expr;
+
+  DeclRefInst(DeclRefExpr *expr, BasicBlock *B)
+    : Instruction(B, DeclRef), expr(expr) {}
+
+  static bool classof(const Instruction *I) { return I->kind == DeclRef; }
+};
+
 class IntegerLiteralInst : public Instruction {
+  IntegerLiteralInst() = delete;
 public:
   /// The backing IntegerLiteralExpr in the AST.
   IntegerLiteralExpr *literal;
@@ -84,6 +158,40 @@ public:
     Instruction(B, IntegerLit), literal(IE) {}
 
   static bool classof(const Instruction *I) { return I->kind == IntegerLit; }
+};
+
+class ThisApplyInst : public Instruction {
+  ThisApplyInst() = delete;
+public:
+  /// The backing ThisApplyExpr in the AST.
+  ThisApplyExpr *expr;
+
+  /// The instruction representing the called function.
+  Instruction *function;
+
+  /// The instruction representing the argument expression.
+  Instruction *argument;
+
+  ThisApplyInst(ThisApplyExpr *expr,
+                Instruction *function,
+                Instruction *argument,
+                BasicBlock *B)
+    : Instruction(B, ThisApply), expr(expr),
+      function(function), argument(argument) {}
+
+  static bool classof(const Instruction *I) { return I->kind == ThisApply; }
+};
+
+class TypeOfInst : public Instruction {
+  TypeOfInst() = delete;
+public:
+  /// The backing TypeOfExpr in the AST.
+  TypeOfExpr *expr;
+
+  TypeOfInst(TypeOfExpr *expr, BasicBlock *B)
+    : Instruction(B, TypeOf), expr(expr) {}
+
+  static bool classof(const Instruction *I) { return I->kind == TypeOf; }
 };
 
 //===----------------------------------------------------------------------===//
