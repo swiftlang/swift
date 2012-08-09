@@ -7,6 +7,7 @@ set(SWIFTLIB_SOURCES
     FloatingPoint.swift
     Misc.swift
     String.swift
+    Vector.swift
     Algorithm.swift
     demangle.swift)
 

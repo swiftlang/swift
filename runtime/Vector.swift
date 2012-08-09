@@ -1,6 +1,3 @@
-// RUN: false
-// REQUIRES: disabled
-
 struct VectorString {
   typealias Element = String
   var elements : Element[]
