@@ -1279,6 +1279,20 @@ public:
   }
 };
 
+/// GetMetatypeExpr - Convert a value of class type to a value of base class
+/// type.
+class DerivedToBaseExpr : public ImplicitConversionExpr {
+public:
+  DerivedToBaseExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::DerivedToBase, subExpr, type) {}
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const DerivedToBaseExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DerivedToBase;
+  }
+};
+
 /// AddressOfExpr - Using the builtin unary '&' operator, convert the
 /// given l-value into an explicit l-value.
 class AddressOfExpr : public Expr {

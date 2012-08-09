@@ -713,6 +713,8 @@ public:
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
 
+  void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_TypeDecl &&
@@ -892,6 +894,7 @@ public:
 class ClassDecl : public NominalTypeDecl {
   SourceLoc ClassLoc;
   SourceLoc NameLoc;
+  TypeLoc BaseClass;
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -903,6 +906,10 @@ public:
   SourceRange getSourceRange() const {
     return SourceRange(ClassLoc, getBraces().End);
   }
+
+  bool hasBaseClass() { return BaseClass.getType(); }
+  Type getBaseClass() { return BaseClass.getType(); }
+  void setBaseClassLoc(TypeLoc base) { BaseClass = base; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

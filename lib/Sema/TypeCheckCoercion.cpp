@@ -1694,32 +1694,6 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   return convertTupleToTupleType(TE, 1, DestTy, CC, Flags);
 }
 
-/// \brief Determine whether the protocol set X is a subset of (or equivalent
-/// to) the protocol set Y.
-static bool
-isProtocolSubset(ArrayRef<ProtocolDecl *> X, ArrayRef<ProtocolDecl *> Y) {
-  if (X.empty())
-    return true;
-  
-  if (Y.empty())
-    return false;
-  
-  // Gather the set of protocols in Y and anything they inherit.
-  llvm::SmallPtrSet<ProtocolDecl *, 4> YProtos;
-  for (auto YProto : Y) {
-    if (YProtos.insert(YProto))
-      YProto->collectInherited(YProtos);
-  }
-  
-  // Check whether each of the Xs has been found in Y.
-  for (auto XProto : X) {
-    if (!YProtos.count(XProto))
-      return false;
-  }
-  
-  return true;
-}
-
 /// \brief Coerce the object argument for a member reference (.) or function
 /// application.
 CoercedResult
@@ -1743,20 +1717,8 @@ SemaCoerce::coerceObjectArgument(Expr *E, Type ContainerTy, CoercionContext &CC,
 
   // Check whether the source object is the same as or a subtype of the
   // container type.
-  bool Convertible = false;
-  if (TC.isSameType(SrcObjectTy, ContainerTy, &CC)) {
-    Convertible = true;
-  } else {
-    SmallVector<ProtocolDecl *, 4> DestProtocols;
-    SmallVector<ProtocolDecl *, 4> SrcProtocols;
-    if (ContainerTy->isExistentialType(DestProtocols) &&
-        SrcObjectTy->isExistentialType(SrcProtocols) &&
-        isProtocolSubset(DestProtocols, SrcProtocols))
-      Convertible = true;
-  }
-  
-  // Complain if no conversion is possible.
-  if (!Convertible) {
+  bool Trivial;
+  if (!TC.isSubtypeOf(SrcObjectTy, ContainerTy, Trivial, &CC)) {
     if (Flags & CF_Apply)
       TC.diagnose(E->getLoc(), diag::no_convert_object_arg, SrcObjectTy,
                   ContainerTy);
@@ -1768,13 +1730,7 @@ SemaCoerce::coerceObjectArgument(Expr *E, Type ContainerTy, CoercionContext &CC,
     if (!(Flags & CF_Apply))
       return SrcObjectTy;
 
-    // If the source is an lvalue, perform an lvalue-to-rvalue conversion.
-    if (SrcLV) {
-      E = TC.convertLValueToRValue(SrcLV, E);
-      return coerced(E, Flags);
-    }
-
-    return unchanged(E, Flags);
+    return coerceToType(E, ContainerTy, CC, Flags);
   }
 
   // Compute the destination type, which is simply an lvalue of the source
@@ -2147,6 +2103,21 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
     }
   }
 
+  // A value of class type can be converted to a value of the type of its
+  // base class.
+  if (auto PotentialDerived = E->getType()->getAs<ClassType>()) {
+    if (auto PotentialBase = DestTy->getAs<ClassType>()) {
+      bool Trivial;
+      if (TC.isSubtypeOf(PotentialDerived, PotentialBase, Trivial, &CC)) {
+        if (!(Flags & CF_Apply))
+          return DestTy;
+
+        return coerced(new (TC.Context) DerivedToBaseExpr(E, DestTy),
+                        Flags);
+      }
+    }
+  }
+
   // If the input expression has an unresolved type, try to coerce it to an
   // appropriate type.
   if (E->getType()->isUnresolvedType())
@@ -2453,7 +2424,26 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
       return true;
     }
   }
-  
+
+  if (Flags & ST_AllowSubtype) {
+    if (auto PotentialDerived = T1->getAs<ClassType>()) {
+      if (auto PotentialBase = T2->getAs<ClassType>()) {
+        // If have two distinct class types; check if DerivedClass is actually
+        // derived from BaseClass.
+        while (PotentialDerived->getDecl() != PotentialBase->getDecl()) {
+          Type CurBase = PotentialDerived->getDecl()->getBaseClass();
+          if (!CurBase)
+            break;
+          if (CurBase->isEqual(PotentialBase))
+            return true;
+          PotentialDerived = CurBase->getAs<ClassType>();
+          if (!PotentialDerived)
+            break;
+        }
+      }
+    }
+  }
+
   // From here on, we require the types to have equivalent kind.
   if (T1->getCanonicalType()->getKind() !=
       T2->getCanonicalType()->getKind()) {

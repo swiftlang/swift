@@ -199,30 +199,47 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
     return;
   }
 
-  // Look in any extensions that add methods to the base type.
-  SmallVector<ValueDecl*, 8> ExtensionMethods;
-  lookupMembers(BaseTy, M, ExtensionMethods);
+  do {
+    // Look in for members of a nominal type.
+    SmallVector<ValueDecl*, 8> ExtensionMethods;
+    lookupMembers(BaseTy, M, ExtensionMethods);
 
-  for (ValueDecl *VD : ExtensionMethods) {
-    if (TypeDecl *TAD = dyn_cast<TypeDecl>(VD)) {
-      Results.push_back(Result::getMetatypeMember(TAD));
-      continue;
+    for (ValueDecl *VD : ExtensionMethods) {
+      if (TypeDecl *TAD = dyn_cast<TypeDecl>(VD)) {
+        Results.push_back(Result::getMetatypeMember(TAD));
+        continue;
+      }
+      if (FuncDecl *FD = dyn_cast<FuncDecl>(VD)) {
+        if (FD->isStatic())
+          Results.push_back(Result::getMetatypeMember(FD));
+        else
+          Results.push_back(Result::getMemberFunction(FD));
+        continue;
+      }
+      if (OneOfElementDecl *OOED = dyn_cast<OneOfElementDecl>(VD)) {
+        Results.push_back(Result::getMetatypeMember(OOED));
+        continue;
+      }
+      assert((isa<VarDecl>(VD) || isa<SubscriptDecl>(VD)) &&
+             "Unexpected extension member");
+      Results.push_back(Result::getMemberProperty(VD));
     }
-    if (FuncDecl *FD = dyn_cast<FuncDecl>(VD)) {
-      if (FD->isStatic())
-        Results.push_back(Result::getMetatypeMember(FD));
-      else
-        Results.push_back(Result::getMemberFunction(FD));
-      continue;
+
+    // If we have a class type, look into its base class.
+    ClassDecl *CurClass = nullptr;
+    if (auto CT = BaseTy->getAs<ClassType>())
+      CurClass = CT->getDecl();
+    else if (auto BGT = BaseTy->getAs<BoundGenericType>())
+      CurClass = dyn_cast<ClassDecl>(BGT->getDecl());
+    else if (UnboundGenericType *UGT = BaseTy->getAs<UnboundGenericType>())
+      CurClass = dyn_cast<ClassDecl>(UGT->getDecl());
+
+    if (CurClass && CurClass->hasBaseClass()) {
+      BaseTy = CurClass->getBaseClass();
+    } else {
+      break;
     }
-    if (OneOfElementDecl *OOED = dyn_cast<OneOfElementDecl>(VD)) {
-      Results.push_back(Result::getMetatypeMember(OOED));
-      continue;
-    }
-    assert((isa<VarDecl>(VD) || isa<SubscriptDecl>(VD)) &&
-           "Unexpected extension member");
-    Results.push_back(Result::getMemberProperty(VD));
-  }
+  } while (1);
 }
 
 void MemberLookup::lookupMembers(Type BaseType, Module &M,

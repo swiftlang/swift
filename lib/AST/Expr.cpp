@@ -594,6 +594,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitDerivedToBaseExpr(DerivedToBaseExpr *E) {
+    printCommon(E, "derived_to_base_expr") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
 
   void visitAddressOfExpr(AddressOfExpr *E) {
     printCommon(E, "address_of_expr") << '\n';
