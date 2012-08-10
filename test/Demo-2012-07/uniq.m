@@ -28,7 +28,7 @@ void uniq(NSString *path) {
 
   // Get the keys ordered by the count.
   NSArray *orderedKeys =
-    [counts keysSortedByValueUsingComparator:^(NSString *a, NSString *b) {
+    [counts keysSortedByValueUsingComparator:^(NSNumber *a, NSNumber *b) {
         return -[a compare:b]; }];
 
   // Convert the items into an array of objects.
