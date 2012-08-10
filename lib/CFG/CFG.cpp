@@ -199,7 +199,7 @@ void CFGBuilder::visitBraceStmt(BraceStmt *S) {
 }
 
 void CFGBuilder::visitCallExpr(CallExpr *E) {
-  llvm::SmallVector<Instruction*, 10> Args;
+  llvm::SmallVector<CFGValue, 10> Args;
   Expr *Arg = ignoreParens(E->getArg());
   Expr *Fn = E->getFn();
   visit(Fn);
@@ -213,9 +213,9 @@ void CFGBuilder::visitCallExpr(CallExpr *E) {
   }
   else {
     visit(Arg);
-    Instruction *ArgI = getInst(Arg);
+    CFGValue ArgI = getInst(Arg);
     addInst(E, CallInst::create(E, currentBlock(), getInst(Fn),
-                                ArrayRef<Instruction*>(&ArgI, 1)));
+                                ArrayRef<CFGValue>(&ArgI, 1)));
   }
 }
 
@@ -233,7 +233,7 @@ void CFGBuilder::visitThisApplyExpr(ThisApplyExpr *E) {
 }
 
 void CFGBuilder::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-  addInst(E, new (C) IntegerLiteralInst(E, currentBlock()));
+  //addInst(E, new (C) IntegerLiteralInst(E, currentBlock()));
 }
 
 void CFGBuilder::visitParenExpr(ParenExpr *E) {

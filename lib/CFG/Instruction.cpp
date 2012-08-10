@@ -65,6 +65,26 @@ static raw_ostream &printID(raw_ostream &OS, const Instruction *Inst) {
   return OS;
 }
 
+static raw_ostream &printID(raw_ostream &OS, const CFGConstant *Const) {
+  OS << "Constant (unsupported)\n";
+  return OS;
+}
+
+static raw_ostream &printID(raw_ostream &OS, const BasicBlockArg *BBArg) {
+  OS << "BBArg (unsupported)\n";
+  return OS;
+}
+
+static raw_ostream &printID(raw_ostream &OS, const CFGValue &Val) {
+  if (const Instruction *Inst = Val.dyn_cast<Instruction*>())
+    printID(OS, Inst);
+  else if (const CFGConstant *Const = Val.dyn_cast<CFGConstant*>())
+    printID(OS, Const);
+  else
+    printID(OS, Val.get<BasicBlockArg*>());
+  return OS;
+}
+
 void Instruction::print(raw_ostream &OS) const {
   printID(OS, this) << ": (";
 
@@ -90,12 +110,6 @@ void Instruction::print(raw_ostream &OS) const {
     case DeclRef: {
       const DeclRefInst &DI = *cast<DeclRefInst>(this);
       OS << "DeclRef decl=" << DI.expr->getDecl()->getName();
-      break;
-    }
-    case IntegerLit: {
-      const IntegerLiteralInst &ILE = *cast<IntegerLiteralInst>(this);
-      const auto &lit = ILE.literal->getValue();
-      OS << "Integer val=" << lit << " width=" << lit.getBitWidth();
       break;
     }
     case ThisApply: {
@@ -142,7 +156,6 @@ void Instruction::validate() const {
     case Invalid:
     case Call:
     case DeclRef:
-    case IntegerLit:
     case ThisApply:
     case TypeOf:
       return;
@@ -165,7 +178,6 @@ TermInst::Successors TermInst::successors() {
     case Invalid:
     case Call:
     case DeclRef:
-    case IntegerLit:
     case ThisApply:
     case TypeOf:
       llvm_unreachable("Only TermInst's are allowed");
@@ -176,22 +188,23 @@ TermInst::Successors TermInst::successors() {
   }
 }
 
-CallInst *CallInst::create(CallExpr *expr, BasicBlock *B,
-                           Instruction *function,
-                           ArrayRef<Instruction*> args) {
+CallInst *CallInst::create(CallExpr *expr,
+                           BasicBlock *B,
+                           CFGValue function,
+                           ArrayRef<CFGValue> args) {
   CFG &cfg = *B->cfg;
   void *Buffer = cfg.allocate(sizeof(CallInst) +
-                              args.size() * sizeof(Instruction*),
+                              args.size() * sizeof(CFGValue),
                               llvm::AlignOf<CallInst>::Alignment);
   return ::new(Buffer) CallInst(expr, B, function, args);
 }
 
 CallInst::CallInst(CallExpr *expr, BasicBlock *B,
-                   Instruction *function,
-                   ArrayRef<Instruction*> args)
+                   CFGValue function,
+                   ArrayRef<CFGValue> args)
   : Instruction(B, Call), NumArgs(args.size()), expr(expr),
     function(function) {
-  memcpy(getArgsStorage(), args.data(), args.size() * sizeof(Instruction*));
+  memcpy(getArgsStorage(), args.data(), args.size() * sizeof(CFGValue));
 }
 
 void UncondBranchInst::unregisterTarget() {

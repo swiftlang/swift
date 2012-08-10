@@ -18,6 +18,7 @@
 #ifndef SWIFT_CFGBASE_H
 #define SWIFT_CFGBASE_H
 
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/AlignOf.h"
 
@@ -53,6 +54,13 @@ public:
     return C.allocate(Bytes, Alignment);
   }
 };
+
+class Instruction;
+class CFGConstant;
+class BasicBlockArg;
+typedef llvm::PointerUnion3<Instruction*, CFGConstant*, BasicBlockArg*>
+        CFGValue;
+
 } // end swift namespace
 
 #endif

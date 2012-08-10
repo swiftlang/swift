@@ -46,7 +46,6 @@ public:
     Invalid,
     Call,
     DeclRef,
-    IntegerLit,
     ThisApply,
     TypeOf,
     UncondBranch,
@@ -91,38 +90,34 @@ private:
   /// arguments.
   CallInst(CallExpr *expr,
            BasicBlock *B,
-           Instruction *function,
-           ArrayRef<Instruction*> args);
+           CFGValue function,
+           ArrayRef<CFGValue> args);
 
   CallInst() = delete;
-
-  Instruction **getArgsStorage() {
-    return reinterpret_cast<Instruction**>(this + 1);
-  }
-
+  CFGValue *getArgsStorage() { return reinterpret_cast<CFGValue*>(this + 1); }
   unsigned NumArgs;
+
 public:
   static CallInst *create(CallExpr *expr,
                           BasicBlock *B,
-                          Instruction *function,
-                          ArrayRef<Instruction*> args);
+                          CFGValue function,
+                          ArrayRef<CFGValue> args);
 
   /// The backing expression for the call.
   CallExpr *expr;
 
   /// The instruction representing the called function.
-  Instruction *function;
+  CFGValue function;
 
   /// The arguments referenced by this CallInst.
-  MutableArrayRef<Instruction*> arguments() {
-    return MutableArrayRef<Instruction*>(getArgsStorage(), NumArgs);
+  MutableArrayRef<CFGValue> arguments() {
+    return MutableArrayRef<CFGValue>(getArgsStorage(), NumArgs);
   }
 
   /// The arguments referenced by this CallInst.
-  ArrayRef<Instruction*> arguments() const {
+  ArrayRef<CFGValue> arguments() const {
     return const_cast<CallInst*>(this)->arguments();
   }
-
 
   static bool classof(const Instruction *I) { return I->kind == Call; }
 };
@@ -134,21 +129,10 @@ public:
   DeclRefExpr *expr;
 
   DeclRefInst(DeclRefExpr *expr, BasicBlock *B)
-    : Instruction(B, DeclRef), expr(expr) {}
+    : Instruction(B, DeclRef),
+      expr(expr) {}
 
   static bool classof(const Instruction *I) { return I->kind == DeclRef; }
-};
-
-class IntegerLiteralInst : public Instruction {
-  IntegerLiteralInst() = delete;
-public:
-  /// The backing IntegerLiteralExpr in the AST.
-  IntegerLiteralExpr *literal;
-
-  IntegerLiteralInst(IntegerLiteralExpr *IE, BasicBlock *B) :
-    Instruction(B, IntegerLit), literal(IE) {}
-
-  static bool classof(const Instruction *I) { return I->kind == IntegerLit; }
 };
 
 class ThisApplyInst : public Instruction {
@@ -158,17 +142,19 @@ public:
   ThisApplyExpr *expr;
 
   /// The instruction representing the called function.
-  Instruction *function;
+  CFGValue function;
 
   /// The instruction representing the argument expression.
-  Instruction *argument;
+  CFGValue argument;
 
   ThisApplyInst(ThisApplyExpr *expr,
-                Instruction *function,
-                Instruction *argument,
+                CFGValue function,
+                CFGValue argument,
                 BasicBlock *B)
-    : Instruction(B, ThisApply), expr(expr),
-      function(function), argument(argument) {}
+    : Instruction(B, ThisApply),
+      expr(expr),
+      function(function),
+      argument(argument) {}
 
   static bool classof(const Instruction *I) { return I->kind == ThisApply; }
 };
