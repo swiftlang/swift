@@ -32,25 +32,6 @@
 
 using namespace swift;
 
-/// Check an expression whose result is not being used at all.
-void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
-  // Complain about l-values that are neither loaded nor stored.
-  if (E->getType()->is<LValueType>()) {
-    diagnose(E->getLoc(), diag::expression_unused_lvalue)
-      << E->getSourceRange();
-    return;
-  }
-
-  // Complain about functions that aren't called.
-  // TODO: What about tuples which contain functions by-value that are
-  // dead?
-  if (E->getType()->is<AnyFunctionType>()) {
-    diagnose(E->getLoc(), diag::expression_unused_function)
-      << E->getSourceRange();
-    return;
-  }
-}
-
 /// \brief Check for circular inheritance of protocols.
 ///
 /// \param Path The circular path through the protocol inheritance hierarchy,
