@@ -13,17 +13,64 @@ def send_to_screen(screen_name, arg0=None, command='stuff'):
     p = subprocess.Popen(args)
     p.communicate()
 
+def load_as_transcript(f):
+    def add_block():
+        # If so, add the current block after trimming leading and trailing blank
+        # lines.
+        while current_block and current_block[0].isspace():
+            current_block.pop(0)
+        while current_block and current_block[-1].isspace():
+            current_block.pop()
+
+        # Add the block if it is non-empty.
+        if current_block:
+            # Form the joined script..
+            script = ''.join(current_block)
+
+            # Strip off any trailing newline.
+            if script.endswith('\n'):
+                script = script[:-1]
+            demo_script.append({ 'command' :  script})
+
+            # Clear the block.
+            del current_block[:]
+
+    f.seek(0)
+
+    demo_script = []
+    current_block = []
+    for ln in f:
+        # Check if this is a block delimiter.
+        if ln.strip() == '>>>':
+            add_block()
+            continue
+
+        # Otherwise, add the line to the current block.
+        current_block.append(ln)
+
+    return demo_script
+
 def main():
     parser = optparse.OptionParser("""\
 usage: %%prog [options] <demo script>
 
-Run a command line demo script using 'screen'. The script file should be a JSON
-document listing the commands to run, as in::
+Run a command line demo script using 'screen'. The script file should be either
+a JSON document listing the commands to run, as in::
 
   [
     { "command" : "ls" },
     { "command" : "echo Hello" }
   ]
+
+or, alternately, it should be a text filed delimited by '>>>', as in::
+
+  >>>
+  ls
+
+  >>>
+  echo Hello
+
+where leading and trailing blank lines around each block will be discarded.
 
 The script requires the 'screen' session to have been started in another window,
 for example::
@@ -46,8 +93,11 @@ for example::
 
     # Read in the demo script.
     with open(path) as f:
-        demo_script = json.load(f)
-
+        try:
+            demo_script = json.load(f)
+        except ValueError:
+            demo_script = load_as_transcript(f)
+        
     # Validate the entries.
     for item in demo_script:
         command = str(item.get('command'))
@@ -75,7 +125,8 @@ for example::
         if item is not demo_script[-1]:
             raw_input('press enter to continue to next command...')
 
-    # Notify screen that the demo is over.
+    # Notify screen that the demo is over, after a small wait period.
+    time.sleep(0.1)
     send('Demo session is over.', command='wall')
 
 if __name__ == '__main__':
