@@ -1525,9 +1525,8 @@ namespace {
           HasUnresolvedLiterals = true;
       
         // func{} defaults to return () if we can't infer a result type.
-        if (auto FE = dyn_cast<FuncExpr>(E))
-          if (FE->getBodyResultType()->isUnresolvedType())
-            HasUnresolvedLiterals = true;
+        if (isa<FuncExpr>(E))
+          HasUnresolvedLiterals = true;
       }
       return E;
     }
@@ -1609,12 +1608,10 @@ bool TypeChecker::resolveUnresolvedLiterals(Expr *&E) {
         return TC.coerceToType(Lit, TC.getDefaultLiteralType(Lit));
         
       // func{} defaults to return () if we can't infer a result type.
-      if (auto FE = dyn_cast<FuncExpr>(E))
-        if (FE->getBodyResultType()->isUnresolvedType()) {
-          FE->getBodyResultTypeLoc() = TypeLoc(TC.Context.TheEmptyTupleType);
-          TC.semaFuncExpr(FE, false, true);
-          return FE;
-        }
+      if (auto FE = dyn_cast<FuncExpr>(E)) {
+        TC.semaFuncExpr(FE, false, false);
+        return FE;
+      }
       return E;
     }
     
@@ -1700,10 +1697,15 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
 
 void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass,
                                bool allowUnknownTypes) {
+  if (FE->getType() && !FE->getType()->isUnresolvedType())
+    return;
+
   bool badType = false;
-  if (validateType(FE->getBodyResultTypeLoc(), isFirstPass)) {
-    FE->getBodyResultTypeLoc().setInvalidType(Context);
-    badType = true;
+  if (FE->getBodyResultTypeLoc().getType()) {
+    if (validateType(FE->getBodyResultTypeLoc(), isFirstPass)) {
+      FE->getBodyResultTypeLoc().setInvalidType(Context);
+      badType = true;
+    }
   }
 
   for (Pattern *P : FE->getParamPatterns()) {
@@ -1720,7 +1722,13 @@ void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass,
     return;
   }
 
-  Type funcTy = FE->getBodyResultType();
+  Type funcTy = FE->getBodyResultTypeLoc().getType();
+  if (!funcTy) {
+    if (allowUnknownTypes)
+      funcTy = UnstructuredUnresolvedType::get(Context);
+    else
+      funcTy = TupleType::getEmpty(Context);
+  }
 
   // FIXME: it would be nice to have comments explaining what this is all about.
   auto patterns = FE->getParamPatterns();

@@ -626,11 +626,6 @@ NullablePtr<Expr> Parser::parseExprFunc() {
   } else if (parseFunctionSignature(Params, RetTy)) {
     return 0;
   }
-
-  // If an explicit return type was not specified, use an Unresolved type.
-  if (RetTy.getType().isNull())
-    RetTy = TypeLoc(UnstructuredUnresolvedType::get(Context));
-
   
   // The arguments to the func are defined in their own scope.
   Scope FuncBodyScope(this, /*AllowLookup=*/true);

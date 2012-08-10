@@ -770,7 +770,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
       // Start the function.
       Type GetterRetTy = ElementTy;
-      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, TypeLoc(GetterRetTy),
+      FuncExpr *GetFn = actOnFuncExprStart(GetLoc,
+                                           TypeLoc::withoutLoc(GetterRetTy),
                                            Params);
       
       // Establish the new context.
@@ -873,7 +874,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       
       Pattern *ValuePattern
         = new (Context) TypedPattern(new (Context) NamedPattern(Value),
-                                     TypeLoc(ElementTy));
+                                     TypeLoc::withoutLoc(ElementTy));
       
       TupleElts.push_back(TuplePatternElt(ValuePattern, /*Init=*/nullptr));
       Pattern *ValueParamsPattern
@@ -886,7 +887,9 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
     // Start the function.
     Type SetterRetTy = TupleType::getEmpty(Context);
-    FuncExpr *SetFn = actOnFuncExprStart(SetLoc, TypeLoc(SetterRetTy), Params);
+    FuncExpr *SetFn = actOnFuncExprStart(SetLoc,
+                                         TypeLoc::withoutLoc(SetterRetTy),
+                                         Params);
     
     // Establish the new context.
     ContextChange CC(*this, SetFn);
@@ -1078,8 +1081,7 @@ Pattern *Parser::buildImplicitThisParameter() {
     = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
                             Type(), CurDeclContext);
   Pattern *P = new (Context) NamedPattern(D);
-  return new (Context) TypedPattern(P,
-                         TypeLoc(UnstructuredUnresolvedType::get(Context)));
+  return new (Context) TypedPattern(P, TypeLoc());
 }
 
 /// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
@@ -1141,9 +1143,6 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   if (parseFunctionSignature(Params, FuncRetTy))
     return 0;
 
-  if (FuncRetTy.getType().isNull())
-    FuncRetTy = TypeLoc(TupleType::getEmpty(Context));
-  
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name
   // duplication.

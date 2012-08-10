@@ -218,7 +218,7 @@ getGenericParam(ASTContext &Context) {
     = ArchetypeType::getNew(Context, nullptr, GenericName, ArrayRef<Type>(), 0);
   auto GenericTyDecl =
       new (Context) TypeAliasDecl(SourceLoc(), GenericName,
-                                  SourceLoc(), TypeLoc(Archetype),
+                                  SourceLoc(), TypeLoc::withoutLoc(Archetype),
                                   Context.TheBuiltinModule,
                                   MutableArrayRef<TypeLoc>());
   Type GenericTy = GenericTyDecl->getAliasType();

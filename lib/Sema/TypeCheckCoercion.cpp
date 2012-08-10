@@ -1291,20 +1291,16 @@ CoercedResult SemaCoerce::visitFuncExpr(FuncExpr *E) {
   // If we're inferring an incompatible result type, diagnose it.
   if (!FT->getResult()->is<UnstructuredUnresolvedType>()) {
     // FIXME: isEquals is almost certainly the wrong predicate here.
-    if (!E->getBodyResultType()->is<UnstructuredUnresolvedType>() &&
-        !E->getBodyResultType()->is<ErrorType>() &&
-        !E->getBodyResultType()->isEqual(FT->getResult())) {
+    Type ExplicitResultTy = E->getBodyResultTypeLoc().getType();
+    if (ExplicitResultTy &&
+        !ExplicitResultTy->is<ErrorType>() &&
+        !ExplicitResultTy->isEqual(FT->getResult())) {
       diagnose(E->getStartLoc(), diag::funcexpr_incompatible_result,
-               E->getBodyResultType(), FT->getResult())
+               ExplicitResultTy, FT->getResult())
         << E->getSourceRange();
       return nullptr;
     }
-    
-    // Infer result information if we're applying result types.
-    if (Flags & CF_Apply)
-      E->getBodyResultTypeLoc() = TypeLoc(FT->getResult());
   }
-  
 
   // The pattern that specifies the arguments of the FuncExpr must be missing
   // some type information.  e.g. 'a' in "func(a,b : Int) {}".  Try to resolve

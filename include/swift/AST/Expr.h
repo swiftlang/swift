@@ -1442,7 +1442,6 @@ public:
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *S) { Body = S; }
 
-  Type getBodyResultType() const { return FnRetType.getType(); }
   TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
 
   // Implement isa/cast/dyncast/etc.

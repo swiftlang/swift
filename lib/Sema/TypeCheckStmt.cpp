@@ -116,7 +116,12 @@ public:
       return 0;
     }
 
-    Type ResultTy = TheFunc->getBodyResultType();
+    Type ResultTy = TheFunc->getType();
+    if (ResultTy->is<ErrorType>())
+      return 0;
+    for (unsigned i = 0, e = TheFunc->getParamPatterns().size(); i != e; ++i)
+      ResultTy = ResultTy->castTo<AnyFunctionType>()->getResult();
+
     if (!RS->hasResult()) {
       if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context)))
         TC.diagnose(RS->getReturnLoc(), diag::return_expr_missing);
@@ -494,10 +499,6 @@ void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
     for (auto P : FE->getParamPatterns())
       coerceToType(P, ErrorType::get(Context), false);
   }
-  // If we failed to infer a return type for the FuncExpr, force it to
-  // ErrorType.
-  if (FE->getBodyResultType()->isUnresolvedType())
-    FE->getBodyResultTypeLoc().setInvalidType(Context);
   
   BraceStmt *BS = FE->getBody();
   if (!BS)

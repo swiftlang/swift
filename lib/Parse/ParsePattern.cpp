@@ -157,7 +157,8 @@ NullablePtr<Pattern> Parser::parsePatternTuple() {
       Type subTy = subpattern->getTypeLoc().getType();
       elts.back().setVarargBaseType(subTy);
       // FIXME: This is wrong for TypeLoc info.
-      subpattern->getTypeLoc() = TypeLoc(ArraySliceType::get(subTy, Context));
+      subpattern->getTypeLoc() =
+          TypeLoc::withoutLoc(ArraySliceType::get(subTy, Context));
     }
 
     if (Tok.isNot(tok::r_paren)) {

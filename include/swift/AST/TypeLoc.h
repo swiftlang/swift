@@ -35,7 +35,15 @@ private:
 public:
   TypeLoc() {}
   TypeLoc(Type T, SourceRange Range) : T(T), Range(Range) {}
+
+private:
   explicit TypeLoc(Type T) : T(T) {}
+
+public:
+  // FIXME: We generally shouldn't need to build TypeLocs without a location.
+  static TypeLoc withoutLoc(Type T) {
+    return TypeLoc(T);
+  }
 
   SourceRange getSourceRange() const {
     return Range;

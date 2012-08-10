@@ -128,7 +128,7 @@ public:
       auto TypeParam = GP.getAsTypeParam();
 
       TypeParam->getUnderlyingTypeLoc()
-        = TypeLoc(Builder.getArchetype(TypeParam));
+        = TypeLoc::withoutLoc(Builder.getArchetype(TypeParam));
     }
     GenericParams->setAllArchetypes(
       TC.Context.AllocateCopy(Builder.getAllArchetypes()));
@@ -276,7 +276,7 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     if (!IsSecondPass) {
       // FIXME: Need to fix the validateType API for typealias.
-      TypeLoc FakeTypeLoc(TAD->getDeclaredType());
+      TypeLoc FakeTypeLoc = TypeLoc::withoutLoc(TAD->getDeclaredType());
       TC.validateType(FakeTypeLoc, IsFirstPass);
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         checkInherited(TAD, TAD->getInherited());
@@ -345,7 +345,8 @@ public:
                                                      VarD->getName(),
                                                      Type(), ValueCD);
             Pattern *P = new (TC.Context) NamedPattern(ArgD);
-            P = new (TC.Context) TypedPattern(P, TypeLoc(VarD->getType()));
+            TypeLoc Ty = TypeLoc::withoutLoc(VarD->getType());
+            P = new (TC.Context) TypedPattern(P, Ty);
             PatternElts.push_back(TuplePatternElt(P));
             TupleElts.push_back(TupleTypeElt(VarD->getType(),
                                              VarD->getName()));
@@ -416,10 +417,10 @@ public:
       if (auto assocType = dyn_cast<TypeAliasDecl>(member)) {
         TypeLoc underlyingTy;
         if (assocType == thisDecl)
-          underlyingTy = TypeLoc(thisArchetype);
+          underlyingTy = TypeLoc::withoutLoc(thisArchetype);
         else
-          underlyingTy = TypeLoc(thisArchetype->getNestedType(
-                                   assocType->getName()));
+          underlyingTy = TypeLoc::withoutLoc(thisArchetype->getNestedType(
+                                               assocType->getName()));
         assocType->getUnderlyingTypeLoc() = underlyingTy;
       }
     }

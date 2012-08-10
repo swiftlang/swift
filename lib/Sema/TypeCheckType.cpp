@@ -158,7 +158,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     IdentifierType *DNT = cast<IdentifierType>(T);
     if (DNT->Components.back().Value.is<Type>()) {
       // FIXME: Refactor this to avoid fake TypeLoc
-      TypeLoc TempLoc{ DNT->getMappedType() };
+      TypeLoc TempLoc = TypeLoc::withoutLoc(DNT->getMappedType());
       IsInvalid = validateType(TempLoc, isFirstPass);
       break;
     }
@@ -470,7 +470,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     for (Type Arg : BGT->getGenericArgs()) {
       // FIXME: Extract real typeloc info?  Should we be validating this type
       // in the first place?
-      TypeLoc TempLoc{ Arg };
+      TypeLoc TempLoc = TypeLoc::withoutLoc(Arg);
       if (validateType(TempLoc, isFirstPass)) {
         IsInvalid = true;
         break;
