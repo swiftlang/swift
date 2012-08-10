@@ -275,7 +275,9 @@ public:
   
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     if (!IsSecondPass) {
-      TC.validateType(TAD->getUnderlyingTypeLoc(), IsFirstPass);
+      // FIXME: Need to fix the validateType API for typealias.
+      TypeLoc FakeTypeLoc(TAD->getDeclaredType());
+      TC.validateType(FakeTypeLoc, IsFirstPass);
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         checkInherited(TAD, TAD->getInherited());
     }
@@ -364,29 +366,7 @@ public:
 
   void visitClassDecl(ClassDecl *CD) {
     if (!IsSecondPass) {
-      auto inherited = CD->getInherited();
-      TypeLoc baseClass;
-      if (!inherited.empty()) {
-        // Make sure we have a valid type before we inspect it.
-        if (TC.validateType(inherited[0], IsFirstPass))
-          inherited[0].setInvalidType(TC.Context);
-
-        // Check for a class type or a bound generic type referring to a class;
-        // those are the only allowed types for a base class.
-        if (inherited[0].getType()->is<ClassType>())
-          baseClass = inherited[0];
-        if (auto BGT = inherited[0].getType()->getAs<BoundGenericType>()) {
-          if (isa<ClassDecl>(BGT->getDecl()))
-            baseClass = inherited[0];
-        }
-
-        if (baseClass.getType()) {
-          CD->setBaseClassLoc(baseClass);
-          inherited = inherited.slice(1);
-          CD->setInherited(inherited);
-        }
-        checkInherited(CD, inherited);
-      }
+      checkInherited(CD, CD->getInherited());
 
       if (auto gp = CD->getGenericParams()) {
         gp->setOuterParameters(

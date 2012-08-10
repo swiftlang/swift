@@ -459,7 +459,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     MetaTypeType *Meta = cast<MetaTypeType>(T);
     // FIXME: Extract real typeloc info?  Should we be validating this type
     // in the first place?
-    TypeLoc TempLoc{ Meta, Loc.getSourceRange() };
+    TypeLoc TempLoc{ Meta->getInstanceType(), Loc.getSourceRange() };
     IsInvalid = validateType(TempLoc, isFirstPass);
     break;
   }

@@ -398,7 +398,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   // After this loop finishes, we can perform normal member lookup.
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(TU->Decls[i])) {
-      IdentifierType *DNT = dyn_cast<IdentifierType>(ED->getExtendedType());
+      IdentifierType *DNT = cast<IdentifierType>(ED->getExtendedType());
       while (true) {
         if (Binder.resolveIdentifierType(DNT, TU)) {
           for (auto &C : DNT->Components)
@@ -428,8 +428,73 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
           }
         }
       }
+    } else if (ClassDecl *CD = dyn_cast<ClassDecl>(TU->Decls[i])) {
+      auto inherited = CD->getInherited();
+      if (!inherited.empty()) {
+        IdentifierType *DNT = cast<IdentifierType>(inherited[0].getType());
+        Type foundType;
+        while (true) {
+          if (Binder.resolveIdentifierType(DNT, TU)) {
+            for (auto &C : DNT->Components)
+              C.Value = TU->Ctx.TheErrorType;
+
+            foundType = Type();
+            break;
+          } else {
+            // We need to make sure the extended type is canonical. There are
+            // two possibilities here:
+            // 1. The type is already canonical, because it's either a NominalType
+            // or comes from an imported module.
+            // 2. The type is a NameAliasType from the current module, which
+            // we need to resolve immediately because we can't leave a
+            // non-canonical type here in the AST.
+            foundType = DNT->Components.back().Value.get<Type>();
+            if (foundType->hasCanonicalTypeComputed())
+              break;
+
+            TypeAliasDecl *TAD = cast<NameAliasType>(foundType)->getDecl();
+            DNT = dyn_cast<IdentifierType>(TAD->getUnderlyingType());
+
+            if (!DNT) {
+              if (isa<ProtocolCompositionType>(TAD->getUnderlyingType())) {
+                // We don't need to resolve ProtocolCompositionTypes here; it's
+                // enough to know that the type in question isn't a class type.
+                foundType = Type();
+                break;
+              }
+              // FIXME: Handling for other types?
+              Binder.diagnose(CD->getLoc(), diag::non_nominal_extension,
+                              false, inherited[0].getType());
+              inherited[0].setInvalidType(Binder.Context);
+              foundType = Type();
+              break;
+            }
+          }
+        }
+
+        if (!foundType)
+          continue;
+
+        // Check for a class type or a bound generic type referring to a class;
+        // those are the only allowed types for a base class.
+        TypeLoc baseClass;
+        if (foundType->is<ClassType>())
+          baseClass = inherited[0];
+        if (auto BGT = foundType->getAs<BoundGenericType>()) {
+          if (isa<ClassDecl>(BGT->getDecl()))
+            baseClass = inherited[0];
+        }
+
+        if (baseClass.getType()) {
+          CD->setBaseClassLoc(baseClass);
+          inherited = inherited.slice(1);
+          CD->setInherited(inherited);
+        }
+      }
     }
   }
+
+  // FIXME: Check for cycles in class inheritance here?
 
   TU->ASTStage = TranslationUnit::NameBound;
   verify(TU);
