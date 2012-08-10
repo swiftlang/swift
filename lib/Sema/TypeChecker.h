@@ -328,6 +328,9 @@ public:
   Expr *semaUnresolvedDotExpr(UnresolvedDotExpr *E);
   void typeCheckIgnoredExpr(Expr *E);
   void typeCheckFunctionBody(FuncExpr *FE);
+  void typeCheckConstructorBody(ConstructorDecl *CD);
+  void typeCheckDestructorBody(DestructorDecl *DD);
+  void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
   void typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD);
   void REPLCheckPatternBinding(PatternBindingDecl *D);
