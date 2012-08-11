@@ -46,6 +46,7 @@ public:
     Invalid,
     Call,
     DeclRef,
+    IntegerLit,
     ThisApply,
     TypeOf,
     UncondBranch,
@@ -133,6 +134,18 @@ public:
       expr(expr) {}
 
   static bool classof(const Instruction *I) { return I->kind == DeclRef; }
+};
+
+class IntegerLiteralInst : public Instruction {
+  IntegerLiteralInst() = delete;
+public:
+  // The backing IntegerLiteralExpr in the AST.
+  IntegerLiteralExpr *literal;
+
+  IntegerLiteralInst(IntegerLiteralExpr *IE, BasicBlock *B) :
+    Instruction(B, IntegerLit), literal(IE) {}
+
+  static bool classof(const Instruction *I) { return I->kind == IntegerLit; }
 };
 
 class ThisApplyInst : public Instruction {

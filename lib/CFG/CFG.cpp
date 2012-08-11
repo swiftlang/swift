@@ -192,7 +192,7 @@ void CFGBuilder::visitThisApplyExpr(ThisApplyExpr *E) {
 }
 
 void CFGBuilder::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-  //addInst(E, new (C) IntegerLiteralInst(E, currentBlock()));
+  addInst(E, new (C) IntegerLiteralInst(E, currentBlock()));
 }
 
 void CFGBuilder::visitParenExpr(ParenExpr *E) {
