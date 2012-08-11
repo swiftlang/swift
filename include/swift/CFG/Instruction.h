@@ -79,7 +79,7 @@ public:
   void dump() const;
 
   /// Pretty-print the Instruction to the designated stream.
-  void print(llvm::raw_ostream &OS) const;
+  void print(llvm::raw_ostream &OS, CFGPrintContext &PC) const;
 
   static bool classof(const Instruction *I) { return true; }
 };

@@ -19,9 +19,23 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/OwningPtr.h"
 
+namespace swift {
+class CFGPrintContext {
+public:
+  raw_ostream &printID(raw_ostream &OS, const Instruction *I);
+  raw_ostream &printID(raw_ostream &OS, const BasicBlock *B);
+  raw_ostream &printID(raw_ostream &OS, const BasicBlockArg *BBarg);
+  raw_ostream &printID(raw_ostream &OS, const CFGConstant *C);
+  raw_ostream &printID(raw_ostream &OS, const CFGValue &V);
+
+};
+}
+
 using namespace swift;
 
-static raw_ostream &printID(raw_ostream &OS, const BasicBlock *Block) {
+raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
+                                      const BasicBlock *Block)
+{
   static const BasicBlock *lastQueried = 0;
   static unsigned lastCalculated = 0;
 
@@ -45,7 +59,9 @@ static raw_ostream &printID(raw_ostream &OS, const BasicBlock *Block) {
   return OS;
 }
 
-static raw_ostream &printID(raw_ostream &OS, const Instruction *Inst) {
+raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
+                                      const Instruction *Inst)
+{
   BasicBlock *Block = Inst->basicBlock;
   unsigned count = 1;
   for (const Instruction &I : Block->instructions) {
@@ -57,17 +73,23 @@ static raw_ostream &printID(raw_ostream &OS, const Instruction *Inst) {
   return OS;
 }
 
-static raw_ostream &printID(raw_ostream &OS, const CFGConstant *Const) {
+raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
+                                      const CFGConstant *Const)
+{
   OS << "Constant (unsupported)\n";
   return OS;
 }
 
-static raw_ostream &printID(raw_ostream &OS, const BasicBlockArg *BBArg) {
+raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
+                                      const BasicBlockArg *BBArg)
+{
   OS << "BBArg (unsupported)\n";
   return OS;
 }
 
-static raw_ostream &printID(raw_ostream &OS, const CFGValue &Val) {
+raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
+                                      const CFGValue &Val)
+{
   if (const Instruction *Inst = Val.dyn_cast<Instruction*>())
     printID(OS, Inst);
   else if (const CFGConstant *Const = Val.dyn_cast<CFGConstant*>())
@@ -81,8 +103,8 @@ static raw_ostream &printID(raw_ostream &OS, const CFGValue &Val) {
 // Pretty-printing for Instructions.
 //===----------------------------------------------------------------------===//
 
-void Instruction::print(raw_ostream &OS) const {
-  printID(OS, this) << ": (";
+void Instruction::print(raw_ostream &OS, CFGPrintContext &PC) const {
+  PC.printID(OS, this) << ": (";
 
   switch (kind) {
     case Invalid:
@@ -91,13 +113,13 @@ void Instruction::print(raw_ostream &OS) const {
     case Call: {
       const CallInst &CE = *cast<CallInst>(this);
       OS << "Call fn=";
-      printID(OS, CE.function);
+      PC.printID(OS, CE.function);
       auto args = CE.arguments();
       if (!args.empty()) {
         OS << " args={";
         for (auto arg : args) {
           OS << ' ';
-          printID(OS, arg);
+          PC.printID(OS, arg);
         }
         OS << '}';
       }
@@ -111,9 +133,9 @@ void Instruction::print(raw_ostream &OS) const {
     case ThisApply: {
       const ThisApplyInst &TAI = *cast<ThisApplyInst>(this);
       OS << "ThisApply fn=";
-      printID(OS, TAI.function);
+      PC.printID(OS, TAI.function);
       OS << " arg=";
-      printID(OS, TAI.argument);
+      PC.printID(OS, TAI.argument);
       break;
     }
     case TypeOf: {
@@ -136,20 +158,26 @@ void Instruction::print(raw_ostream &OS) const {
   OS << ")\n";
 }
 
-void Instruction::dump() const { print(llvm::errs()); }
+void Instruction::dump() const {
+  CFGPrintContext PC;
+  print(llvm::errs(), PC);
+}
 
 //===----------------------------------------------------------------------===//
 // Pretty-printing for BasicBlocks.
 //===----------------------------------------------------------------------===//
 
 /// Pretty-print the BasicBlock.
-void BasicBlock::dump() const { print(llvm::errs()); }
+void BasicBlock::dump() const {
+  CFGPrintContext PC;
+  print(llvm::errs(), PC);
+}
 
 /// Pretty-print the BasicBlock with the designated stream.
-void BasicBlock::print(raw_ostream &OS) const {
+void BasicBlock::print(raw_ostream &OS, CFGPrintContext &PC) const {
   OS << "[Block " << (void*) this << "]\n";
   for (const Instruction &I : instructions)
-    I.print(OS);
+    I.print(OS, PC);
   OS << "Preds:";
   for (const BasicBlock *B : preds())
     OS << ' ' << (void*) B;
@@ -173,9 +201,10 @@ raw_ostream &operator<<(raw_ostream &OS, const ::swift::BasicBlock &B) {
 namespace {
 class DumpVisitor : public ASTVisitor<DumpVisitor> {
 public:
-  DumpVisitor(llvm::raw_ostream &OS) : OS(OS) {}
+  DumpVisitor(llvm::raw_ostream &OS, CFGPrintContext &PC) : OS(OS), PC(PC) {}
 
   raw_ostream &OS;
+  CFGPrintContext &PC;
 
   void visitFuncDecl(FuncDecl *FD) {
     FuncExpr *FE = FD->getBody();
@@ -185,23 +214,29 @@ public:
       return;
 
     OS << "(func_decl " << FD->getName() << '\n';
-    C->print(OS);
+    C->print(OS, PC);
     OS << ")\n";
   }
 };
 }
 
 void CFG::dump(TranslationUnit *TU) {
-  for (Decl *D : TU->Decls) { DumpVisitor(llvm::errs()).visit(D); }
+  for (Decl *D : TU->Decls) {
+    CFGPrintContext PC;
+    DumpVisitor(llvm::errs(), PC).visit(D);
+  }
 }
 
 /// Pretty-print the basic block.
-void CFG::dump() const { print(llvm::errs()); }
+void CFG::dump() const {
+  CFGPrintContext PC;
+  print(llvm::errs(), PC);
+}
 
 /// Pretty-print the basi block with the designated stream.
-void CFG::print(llvm::raw_ostream &OS) const {
+void CFG::print(llvm::raw_ostream &OS, CFGPrintContext &PC) const {
   for (const BasicBlock &B : blocks) {
-    B.print(OS);
+    B.print(OS, PC);
   }
 }
 

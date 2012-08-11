@@ -56,7 +56,7 @@ public:
   void dump() const;
 
   /// Pretty-print the BasicBlock with the designated stream.
-  void print(llvm::raw_ostream &OS) const;
+  void print(llvm::raw_ostream &OS, CFGPrintContext &PC) const;
 
   void addPred(BasicBlock *B) { Preds.push_back(B); }
 
