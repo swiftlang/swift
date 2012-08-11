@@ -80,7 +80,8 @@ public:
   void dump() const;
 
   /// Pretty-print the Instruction to the designated stream.
-  void print(llvm::raw_ostream &OS, CFGPrintContext &PC) const;
+  void print(llvm::raw_ostream &OS, CFGPrintContext &PC,
+             unsigned Indent = 0) const;
 
   static bool classof(const Instruction *I) { return true; }
 };

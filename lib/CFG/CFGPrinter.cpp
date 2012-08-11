@@ -17,15 +17,17 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/CFG/CFG.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/OwningPtr.h"
 
 namespace swift {
 class CFGPrintContext {
+  typedef llvm::DenseMap<const BasicBlock *, unsigned> BlocksToIdsTy;
+  llvm::OwningPtr<BlocksToIdsTy> BlocksToIDs;
 public:
   raw_ostream &printID(raw_ostream &OS, const Instruction *I);
   raw_ostream &printID(raw_ostream &OS, const BasicBlock *B);
   raw_ostream &printID(raw_ostream &OS, const BasicBlockArg *BBarg);
-  raw_ostream &printID(raw_ostream &OS, const CFGConstant *C);
   raw_ostream &printID(raw_ostream &OS, const CFGValue &V);
 
 };
@@ -36,26 +38,19 @@ using namespace swift;
 raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
                                       const BasicBlock *Block)
 {
-  static const BasicBlock *lastQueried = 0;
-  static unsigned lastCalculated = 0;
-
-  unsigned count = 1;
-
-  if (lastQueried == Block) {
-    count = lastCalculated;
-  }
-  else {
-    CFG *C = Block->cfg;
-    for (BasicBlock &B : C->blocks) {
-      if (&B == Block)
-        break;
-      ++count;
-    }
-    lastQueried = Block;
-    lastCalculated = count;
+  // Lazily initialize the Blocks-to-IDs mapping.
+  if (!BlocksToIDs) {
+    BlocksToIDs.reset(new BlocksToIdsTy());
+    BlocksToIdsTy &Map = *BlocksToIDs;
+    unsigned idx = 0;
+    for (const BasicBlock &B : Block->cfg->blocks) { Map[&B] = idx++; }
   }
 
-  OS << count;
+  BlocksToIdsTy &Map = *BlocksToIDs;
+  auto I = Map.find(Block);
+  assert(I != Map.end());
+
+  OS << "BB" << I->second;
   return OS;
 }
 
@@ -69,14 +64,8 @@ raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
       break;
     ++count;
   }
+  OS << '%';
   printID(OS, Block) << '.' << count;
-  return OS;
-}
-
-raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
-                                      const CFGConstant *Const)
-{
-  OS << "Constant (unsupported)\n";
   return OS;
 }
 
@@ -92,8 +81,6 @@ raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
 {
   if (const Instruction *Inst = Val.dyn_cast<Instruction*>())
     printID(OS, Inst);
-  else if (const CFGConstant *Const = Val.dyn_cast<CFGConstant*>())
-    printID(OS, Const);
   else
     printID(OS, Val.get<BasicBlockArg*>());
   return OS;
@@ -103,8 +90,11 @@ raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
 // Pretty-printing for Instructions.
 //===----------------------------------------------------------------------===//
 
-void Instruction::print(raw_ostream &OS, CFGPrintContext &PC) const {
-  PC.printID(OS, this) << ": (";
+void Instruction::print(raw_ostream &OS,
+                        CFGPrintContext &PC,
+                        unsigned Indent) const {
+  OS.indent(Indent);
+  PC.printID(OS, this) << " = ";
 
   switch (kind) {
     case Invalid:
@@ -112,35 +102,47 @@ void Instruction::print(raw_ostream &OS, CFGPrintContext &PC) const {
       break;
     case Call: {
       const CallInst &CE = *cast<CallInst>(this);
-      OS << "Call fn=";
+      OS << "Call(fn=";
       PC.printID(OS, CE.function);
       auto args = CE.arguments();
       if (!args.empty()) {
-        OS << " args={";
+        bool first = true;
+        OS << ",args=(";
         for (auto arg : args) {
-          OS << ' ';
+          if (first)
+            first = false;
+          else
+            OS << ' ';
           PC.printID(OS, arg);
         }
-        OS << '}';
+        OS << ')';
       }
+      OS << ')';
       break;
     }
     case DeclRef: {
       const DeclRefInst &DI = *cast<DeclRefInst>(this);
-      OS << "DeclRef decl=" << DI.expr->getDecl()->getName();
+      OS << "DeclRef(decl=" << DI.expr->getDecl()->getName() << ')';
+      break;
+    }
+    case IntegerLit: {
+      const IntegerLiteralInst &ILE = *cast<IntegerLiteralInst>(this);
+      const auto &lit = ILE.literal->getValue();
+      OS << "Integer(val=" << lit << ",width=" << lit.getBitWidth() << ')';
       break;
     }
     case ThisApply: {
       const ThisApplyInst &TAI = *cast<ThisApplyInst>(this);
-      OS << "ThisApply fn=";
+      OS << "ThisApply(fn=";
       PC.printID(OS, TAI.function);
-      OS << " arg=";
+      OS << ",arg=";
       PC.printID(OS, TAI.argument);
+      OS << ')';
       break;
     }
     case TypeOf: {
       const TypeOfInst &TOI = *cast<TypeOfInst>(this);
-      OS << "TypeOf type=" << TOI.expr->getType().getString();
+      OS << "TypeOf(type=" << TOI.expr->getType().getString() << ')';
       break;
     }
     case UncondBranch: {
@@ -155,7 +157,7 @@ void Instruction::print(raw_ostream &OS, CFGPrintContext &PC) const {
       break;
     }
   }
-  OS << ")\n";
+  OS << '\n';
 }
 
 void Instruction::dump() const {
@@ -174,16 +176,26 @@ void BasicBlock::dump() const {
 }
 
 /// Pretty-print the BasicBlock with the designated stream.
-void BasicBlock::print(raw_ostream &OS, CFGPrintContext &PC) const {
-  OS << "[Block " << (void*) this << "]\n";
+void BasicBlock::print(raw_ostream &OS,
+                       CFGPrintContext &PC,
+                       unsigned Indent) const {
+  OS.indent(Indent);
+  PC.printID(OS, this) << ":\n";
+  Indent += 2;
+
   for (const Instruction &I : instructions)
-    I.print(OS, PC);
-  OS << "Preds:";
-  for (const BasicBlock *B : preds())
-    OS << ' ' << (void*) B;
-  OS << "\nSuccs:";
-  for (const BasicBlock *B : succs())
-    OS << ' ' << (void*) B;
+    I.print(OS, PC, Indent);
+  OS.indent(Indent) << "Preds:";
+  for (const BasicBlock *B : preds()) {
+    OS << ' ';
+    PC.printID(OS, B);
+  }
+  OS << '\n';
+  OS.indent(Indent) << "Succs:";
+  for (const BasicBlock *B : succs()) {
+    OS << ' ';
+    PC.printID(OS, B);
+  }
   OS << '\n';
 }
 
@@ -213,9 +225,9 @@ public:
     if (!C)
       return;
 
-    OS << "(func_decl " << FD->getName() << '\n';
-    C->print(OS, PC);
-    OS << ")\n";
+    OS << "func_decl " << FD->getName() << '\n';
+    C->print(OS, PC, 2);
+    OS << "\n";
   }
 };
 }
@@ -234,9 +246,10 @@ void CFG::dump() const {
 }
 
 /// Pretty-print the basi block with the designated stream.
-void CFG::print(llvm::raw_ostream &OS, CFGPrintContext &PC) const {
+void CFG::print(llvm::raw_ostream &OS, CFGPrintContext &PC,
+                unsigned Indent) const {
   for (const BasicBlock &B : blocks) {
-    B.print(OS, PC);
+    B.print(OS, PC, Indent);
   }
 }
 

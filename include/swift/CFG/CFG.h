@@ -55,7 +55,7 @@ public:
   static void dump(TranslationUnit *TU);
 
   /// Pretty-print the CFG with the designated stream.
-  void print(raw_ostream &OS, CFGPrintContext &PC) const;
+  void print(raw_ostream &OS, CFGPrintContext &PC, unsigned Indent = 0) const;
 
   /// \brief Provides a custom implementation of the iterator class to have the
   /// same interface as Function::iterator - iterator returns BasicBlock

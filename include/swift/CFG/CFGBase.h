@@ -59,10 +59,8 @@ public:
 };
 
 class Instruction;
-class CFGConstant;
 class BasicBlockArg;
-typedef llvm::PointerUnion3<Instruction*, CFGConstant*, BasicBlockArg*>
-        CFGValue;
+typedef llvm::PointerUnion<Instruction*, BasicBlockArg*> CFGValue;
 
 } // end swift namespace
 
