@@ -16,33 +16,8 @@
 
 #include "swift/CFG/BasicBlock.h"
 #include "swift/CFG/CFG.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
 BasicBlock::BasicBlock(CFG *C) : cfg(C) { cfg->blocks.push_back(this); }
 BasicBlock::~BasicBlock() {}
-
-/// Pretty-print the BasicBlock.
-void BasicBlock::dump() const { print(llvm::errs()); }
-
-/// Pretty-print the BasicBlock with the designated stream.
-void BasicBlock::print(raw_ostream &OS) const {
-  OS << "[Block " << (void*) this << "]\n";
-  for (const Instruction &I : instructions)
-    I.print(OS);
-  OS << "Preds:";
-  for (const BasicBlock *B : preds())
-    OS << ' ' << (void*) B;
-  OS << "\nSuccs:";
-  for (const BasicBlock *B : succs())
-    OS << ' ' << (void*) B;
-  OS << '\n';
-}
-
-namespace llvm {
-raw_ostream &operator<<(raw_ostream &OS, const ::swift::BasicBlock &B) {
-  OS << 'B' << (void*) &B;
-  return OS;
-}
-} // end namespace llvm

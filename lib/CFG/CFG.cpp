@@ -13,9 +13,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/CFG/CFG.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -25,45 +23,6 @@ CFG::~CFG() {
   // FIXME: if all parts of BasicBlock are BumpPtrAllocated, this shouldn't
   // eventually be needed.
   for(BasicBlock &B : blocks) { B.~BasicBlock(); }
-}
-
-//===----------------------------------------------------------------------===//
-// CFG pretty-printing.
-//===----------------------------------------------------------------------===//
-
-namespace {
-class DumpVisitor : public ASTVisitor<DumpVisitor> {
-public:
-  DumpVisitor(llvm::raw_ostream &OS) : OS(OS) {}
-
-  raw_ostream &OS;
-
-  void visitFuncDecl(FuncDecl *FD) {
-    FuncExpr *FE = FD->getBody();
-    llvm::OwningPtr<CFG> C(CFG::constructCFG(FE->getBody()));
-
-    if (!C)
-      return;
-
-    OS << "(func_decl " << FD->getName() << '\n';
-    C->print(OS);
-    OS << ")\n";
-  }
-};
-}
-
-void CFG::dump(TranslationUnit *TU) {
-  for (Decl *D : TU->Decls) { DumpVisitor(llvm::errs()).visit(D); }
-}
-
-/// Pretty-print the basic block.
-void CFG::dump() const { print(llvm::errs()); }
-
-/// Pretty-print the basi block with the designated stream.
-void CFG::print(llvm::raw_ostream &OS) const {
-  for (const BasicBlock &B : blocks) {
-    B.print(OS);
-  }
 }
 
 //===----------------------------------------------------------------------===//

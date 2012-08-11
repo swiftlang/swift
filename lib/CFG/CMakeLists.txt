@@ -1,6 +1,7 @@
 add_swift_library(swiftCFG
   BasicBlock.cpp
   CFG.cpp
+  CFGPrinter.cpp
   Instruction.cpp
   DEPENDS swiftAST)
 
