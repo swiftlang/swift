@@ -943,7 +943,7 @@ TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc) {
   assert(!Decls.empty() && "Must have at least one declaration");
 
-  if (Decls.size() == 1) {
+  if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
     return new (Context) DeclRefExpr(Decls[0], NameLoc,
                                      Decls[0]->getTypeOfReference());
   }

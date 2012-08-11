@@ -141,6 +141,12 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
   // Determine the type of the base of this subscript expression.
   Type BaseTy = SE->getBase()->getType()->getRValueType();
 
+  // If the base is unresolved, we can't do anything now.
+  if (BaseTy->isUnresolvedType()) {
+    SE->setType(UnstructuredUnresolvedType::get(Context));
+    return SE;
+  }
+
   // Look for subscript operators in the base type.
   // FIXME: hard-coding of the name __subscript is ueber-lame.
   MemberLookup Lookup(BaseTy, Context.getIdentifier("__subscript"), TU);

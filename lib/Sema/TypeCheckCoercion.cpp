@@ -255,6 +255,9 @@ public:
     return CoercionResult::Unknowable;
   }
   CoercedResult visitMemberRefExpr(MemberRefExpr *E) {
+    if (E->getType()->isUnresolvedType())
+      return CoercionResult::Unknowable;
+
     return failed(E); // FIXME: Is this reachable?
   }
   CoercedResult visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
@@ -281,7 +284,10 @@ public:
     return failed(E);
   }
   CoercedResult visitSubscriptExpr(SubscriptExpr *E) {
-    return failed(E); // FIXME: Is this reachable?
+    if (E->getType()->isUnresolvedType())
+      return CoercionResult::Unknowable;
+
+    return failed(E);
   }
   CoercedResult visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
     return failed(E); // FIXME: Is this reachable?
