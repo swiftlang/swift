@@ -142,25 +142,48 @@ static void emitValueConstructor(IRGenModule &IGM,
   IGF.emitConstructorBody(ctor);
 }
 
-LValue swift::irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
-                                                    MemberRefExpr *E) {
-  LValue lvalue = IGF.emitLValue(E->getBase());
-  LValueType *lvalTy = E->getBase()->getType()->castTo<LValueType>();
-  StructType *T = lvalTy->getObjectType()->castTo<StructType>();
-  const StructTypeInfo &info = IGF.getFragileTypeInfo(T).as<StructTypeInfo>();
-
-  // FIXME: This field index computation is an ugly hack.
-  unsigned FieldIndex = 0;
-  for (Decl *D : T->getDecl()->getMembers()) {
-    if (D == E->getDecl())
-      break;
-    if (isa<VarDecl>(D) && !cast<VarDecl>(D)->isProperty())
-      ++FieldIndex;
+static unsigned getFieldIndex(StructDecl *baseStruct, VarDecl *target) {
+  // FIXME: This is an ugly hack.
+  unsigned index = 0;
+  for (Decl *member : baseStruct->getMembers()) {
+    if (member == target) return index;
+    if (auto var = dyn_cast<VarDecl>(member))
+      if (!var->isProperty())
+        ++index;
   }
+  llvm_unreachable("didn't find field in type!");
+}
 
-  const StructFieldInfo &field = info.getFields()[FieldIndex];
-  lvalue.add<PhysicalStructMember>(field);
+static LValue emitPhysicalStructMemberLValue(IRGenFunction &IGF,
+                                             Expr *base,
+                                             StructDecl *baseStruct,
+                                             const StructTypeInfo &baseTI,
+                                             VarDecl *field) {
+  LValue lvalue = IGF.emitLValue(base);
+  unsigned fieldIndex = getFieldIndex(baseStruct, field);
+  auto &fieldI = baseTI.getFields()[fieldIndex];
+  lvalue.add<PhysicalStructMember>(fieldI);
   return lvalue;
+}
+
+LValue irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
+                                             MemberRefExpr *E) {
+  auto lvalueType = E->getBase()->getType()->castTo<LValueType>();
+  auto baseType = lvalueType->getObjectType()->castTo<StructType>();
+  auto &baseTI = IGF.getFragileTypeInfo(baseType).as<StructTypeInfo>();
+  return ::emitPhysicalStructMemberLValue(IGF, E->getBase(),
+                                          baseType->getDecl(), baseTI,
+                                          E->getDecl());
+}
+
+LValue irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
+                                             GenericMemberRefExpr *E) {
+  auto lvalueType = E->getBase()->getType()->castTo<LValueType>();
+  auto baseType = lvalueType->getObjectType()->castTo<BoundGenericType>();
+  auto &baseTI = IGF.getFragileTypeInfo(baseType).as<StructTypeInfo>();
+  return ::emitPhysicalStructMemberLValue(IGF, E->getBase(),
+                                          cast<StructDecl>(baseType->getDecl()),
+                                          baseTI, cast<VarDecl>(E->getDecl()));
 }
 
 

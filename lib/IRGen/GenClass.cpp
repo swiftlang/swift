@@ -85,28 +85,53 @@ namespace {
   };
 }  // end anonymous namespace.
 
-LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
-                                            MemberRefExpr *E) {
-  const ClassTypeInfo &classTI =
-    IGF.getFragileTypeInfo(E->getBase()->getType()).as<ClassTypeInfo>();
+static unsigned getFieldIndex(ClassDecl *base, VarDecl *target) {
+  // FIXME: This is an ugly hack.
+  unsigned index = 0;
+  for (Decl *member : base->getMembers()) {
+    if (member == target) return index;
+    if (auto var = dyn_cast<VarDecl>(member))
+      if (!var->isProperty())
+        ++index;
+  }
+  llvm_unreachable("didn't find field in type!");
+}
+
+static LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
+                                            Expr *base,
+                                            ClassDecl *classDecl,
+                                            const ClassTypeInfo &classTI,
+                                            VarDecl *field) {
   Explosion explosion(ExplosionKind::Maximal);
   // FIXME: Can we avoid the retain/release here in some cases?
-  IGF.emitRValue(E->getBase(), explosion);
+  IGF.emitRValue(base, explosion);
   ManagedValue baseVal = explosion.claimNext();
 
   // FIXME: This field index computation is an ugly hack.
-  unsigned FieldIndex = 0;
-  for (Decl *D : classTI.getClass()->getMembers()) {
-    if (D == E->getDecl())
-      break;
-    if (isa<VarDecl>(D) && !cast<VarDecl>(D)->isProperty())
-      ++FieldIndex;
-  }
+  unsigned fieldIndex = getFieldIndex(classDecl, field);
 
   Address baseAddr(baseVal.getValue(), classTI.getHeapAlignment(IGF.IGM));
-  const ElementLayout &element = classTI.getElements(IGF.IGM)[FieldIndex];
+  auto &element = classTI.getElements(IGF.IGM)[fieldIndex];
   Address memberAddr = element.project(IGF, baseAddr);
   return IGF.emitAddressLValue(OwnedAddress(memberAddr, baseVal.getValue()));
+}
+
+LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
+                                            MemberRefExpr *E) {
+  auto baseType = E->getBase()->getType()->castTo<ClassType>();
+  auto &baseTI = IGF.getFragileTypeInfo(baseType).as<ClassTypeInfo>();
+  return ::emitPhysicalClassMemberLValue(IGF, E->getBase(),
+                                         baseType->getDecl(), baseTI,
+                                         E->getDecl());
+}
+
+LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
+                                            GenericMemberRefExpr *E) {
+  auto baseType = E->getBase()->getType()->castTo<BoundGenericType>();
+  auto &baseTI = IGF.getFragileTypeInfo(baseType).as<ClassTypeInfo>();
+  return ::emitPhysicalClassMemberLValue(IGF, E->getBase(),
+                                         cast<ClassDecl>(baseType->getDecl()),
+                                         baseTI, cast<VarDecl>(E->getDecl()));
 }
 
 namespace {

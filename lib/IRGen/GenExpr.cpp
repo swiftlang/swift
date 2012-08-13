@@ -237,21 +237,6 @@ namespace {
                              isOnHeap(E->getType()), Out);
     }
 
-    void visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
-      IGF.unimplemented(E->getLBracketLoc(), "existential subscripts");
-      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
-    }
-
-    void visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
-      IGF.unimplemented(E->getLBracketLoc(), "archetype subscripts");
-      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
-    }
-
-    void visitGenericSubscriptExpr(GenericSubscriptExpr *E) {
-      IGF.unimplemented(E->getLBracketLoc(), "generic subscripts");
-      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
-    }
-
     void visitTupleShuffleExpr(TupleShuffleExpr *E) {
       emitTupleShuffle(IGF, E, Out);
     }
@@ -329,27 +314,32 @@ namespace {
       IGF.emitLValueAsScalar(emitMemberRefLValue(IGF, E),
                              isOnHeap(E->getType()), Out);
     }
-    
-    void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
-      if (isa<VarDecl>(E->getDecl()) || isa<SubscriptDecl>(E->getDecl())) {
-        assert(E->getType()->is<LValueType>());
-        return IGF.emitLValueAsScalar(emitExistentialMemberRefLValue(IGF, E),
-                                      isOnHeap(E->getType()), Out);
-      }
 
-      assert(!E->getType()->is<LValueType>());
-      emitExistentialMemberRef(IGF, E, Out);
+    bool isLValueMember(ValueDecl *D) {
+      return isa<VarDecl>(D) || isa<SubscriptDecl>(D);
     }
 
-    void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
-      IGF.unimplemented(E->getLoc(), "archetype member reference");
-      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
+#define FOR_MEMBER_KIND(KIND)                                              \
+    void visit##KIND##MemberRefExpr(KIND##MemberRefExpr *E) {              \
+      if (isLValueMember(E->getDecl())) {                                  \
+        assert(E->getType()->is<LValueType>());                            \
+        return IGF.emitLValueAsScalar(emit##KIND##MemberRefLValue(IGF, E), \
+                                      isOnHeap(E->getType()), Out);        \
+      }                                                                    \
+                                                                           \
+      assert(!E->getType()->is<LValueType>());                             \
+      emit##KIND##MemberRef(IGF, E, Out);                                  \
+    }                                                                      \
+    void visit##KIND##SubscriptExpr(KIND##SubscriptExpr *E) {              \
+      assert(E->getType()->is<LValueType>());                              \
+      return IGF.emitLValueAsScalar(emit##KIND##SubscriptLValue(IGF, E),   \
+                                    isOnHeap(E->getType()), Out);          \
     }
 
-    void visitGenericMemberRefExpr(GenericMemberRefExpr *E) {
-      IGF.unimplemented(E->getLoc(), "generic member reference");
-      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
-    }
+    FOR_MEMBER_KIND(Existential)
+    FOR_MEMBER_KIND(Archetype)
+    FOR_MEMBER_KIND(Generic)
+#undef FOR_MEMBER_KIND
 
     void visitCapturingExpr(CapturingExpr *E) {
       emitClosure(IGF, E, Out);
@@ -475,39 +465,22 @@ namespace {
       return emitMemberRefLValue(IGF, E);
     }
     
-    LValue visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
-      return emitExistentialMemberRefLValue(IGF, E);
-    }
-
     LValue visitSubscriptExpr(SubscriptExpr *E) {
       return emitSubscriptLValue(IGF, E);
     }
 
-    LValue visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
-      IGF.unimplemented(E->getLBracketLoc(), "existential subscripts");
-      return IGF.emitFakeLValue(E->getType());
+#define FOR_MEMBER_KIND(KIND)                                              \
+    LValue visit##KIND##MemberRefExpr(KIND##MemberRefExpr *E) {            \
+      return emit##KIND##MemberRefLValue(IGF, E);                          \
+    }                                                                      \
+    LValue visit##KIND##SubscriptExpr(KIND##SubscriptExpr *E) {            \
+      return emit##KIND##SubscriptLValue(IGF, E);                          \
     }
 
-    LValue visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
-      IGF.unimplemented(E->getLBracketLoc(), "archetype subscripts");
-      return IGF.emitFakeLValue(E->getType());
-    }
-
-    LValue visitGenericSubscriptExpr(GenericSubscriptExpr *E) {
-      IGF.unimplemented(E->getLBracketLoc(), "generic subscripts");
-      return IGF.emitFakeLValue(E->getType());
-    }
-
-    LValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
-      IGF.unimplemented(E->getLoc(), "archetype member reference");
-      return IGF.emitFakeLValue(E->getType());
-    }
-
-    LValue visitGenericMemberRefExpr(GenericMemberRefExpr *E) {
-      IGF.unimplemented(E->getLoc(), "generic member reference");
-      return IGF.emitFakeLValue(E->getType());
-    }
-
+    FOR_MEMBER_KIND(Existential)
+    FOR_MEMBER_KIND(Archetype)
+    FOR_MEMBER_KIND(Generic)
+#undef FOR_MEMBER_KIND
   };
 }
 

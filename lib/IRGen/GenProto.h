@@ -25,8 +25,10 @@ namespace llvm {
 
 namespace swift {
   class ArchetypeMemberRefExpr;
+  class ArchetypeSubscriptExpr;
   class ErasureExpr;
   class ExistentialMemberRefExpr;
+  class ExistentialSubscriptExpr;
   class FuncDecl;
   class GenericParamList;
 
@@ -55,6 +57,22 @@ namespace irgen {
   /// Emit an existential member reference as an l-value.
   LValue emitExistentialMemberRefLValue(IRGenFunction &IGF,
                                         ExistentialMemberRefExpr *E);
+
+  /// Emit an existential subscript reference as an l-value.
+  LValue emitExistentialSubscriptLValue(IRGenFunction &IGF,
+                                        ExistentialSubscriptExpr *E);
+
+  /// Emit an archetype member reference into an explosion.
+  void emitArchetypeMemberRef(IRGenFunction &IGF, ArchetypeMemberRefExpr *E,
+                              Explosion &out);
+
+  /// Emit an archetype member reference as an l-value.
+  LValue emitArchetypeMemberRefLValue(IRGenFunction &IGF,
+                                      ArchetypeMemberRefExpr *E);
+
+  /// Emit an archetype subscript reference as an l-value.
+  LValue emitArchetypeSubscriptLValue(IRGenFunction &IGF,
+                                      ArchetypeSubscriptExpr *E);
 
   /// Emit an existential member reference as a callee.
   CallEmission prepareExistentialMemberRefCall(IRGenFunction &IGF,

@@ -2890,11 +2890,17 @@ void irgen::emitExistentialMemberRef(IRGenFunction &IGF,
 LValue irgen::emitExistentialMemberRefLValue(IRGenFunction &IGF,
                                              ExistentialMemberRefExpr *E) {
 
-  ValueDecl *decl = E->getDecl();
-  assert(isa<VarDecl>(decl) || isa<SubscriptDecl>(decl));
-
+  VarDecl *var = cast<VarDecl>(E->getDecl());
   IGF.unimplemented(E->getLoc(),
                     "using existential member reference as l-value");
+  return IGF.emitFakeLValue(E->getType());
+}
+
+/// Emit an expression which accesses a subscript out of an existential type.
+LValue irgen::emitExistentialSubscriptLValue(IRGenFunction &IGF,
+                                             ExistentialSubscriptExpr *E) {
+  IGF.unimplemented(E->getLoc(),
+                    "using existential subscript as l-value");
   return IGF.emitFakeLValue(E->getType());
 }
 
@@ -3078,3 +3084,31 @@ AbstractCallee irgen::getAbstractProtocolCallee(IRGenFunction &IGF,
                         1, 1, false);
 }
 
+/// Emit an expression which accesses a member out of an archetype.
+void irgen::emitArchetypeMemberRef(IRGenFunction &IGF,
+                                   ArchetypeMemberRefExpr *E,
+                                   Explosion &out) {
+  // The l-value case should have been weeded out.
+  assert(!E->getType()->is<LValueType>());
+
+  // The remaining case is to construct an implicit closure.
+  // Just refuse to do this for now.
+  assert(E->getType()->is<FunctionType>());
+  IGF.unimplemented(E->getLoc(),
+              "forming implicit closure over existential member reference");
+  IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), out);
+}
+
+/// Emit an expression which accesses a member out of an archetype.
+LValue irgen::emitArchetypeMemberRefLValue(IRGenFunction &IGF,
+                                           ArchetypeMemberRefExpr *E) {
+  IGF.unimplemented(E->getLoc(), "l-value member reference into archetype");
+  return IGF.emitFakeLValue(E->getType());
+}
+
+/// Emit an expression which accesses a subscript out of an archetype.
+LValue irgen::emitArchetypeSubscriptLValue(IRGenFunction &IGF,
+                                           ArchetypeSubscriptExpr *E) {
+  IGF.unimplemented(E->getLoc(), "l-value subscript into archetype");
+  return IGF.emitFakeLValue(E->getType());
+}

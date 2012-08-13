@@ -27,6 +27,8 @@
 #include "CallEmission.h"
 #include "GenClass.h"
 #include "GenInit.h"
+#include "GenPoly.h"
+#include "GenProto.h"
 #include "GenStruct.h"
 #include "GenType.h"
 #include "GetterSetter.h"
@@ -583,8 +585,8 @@ void MemberGetterSetterBase::addIndexValues(IRGenFunction &IGF,
 }
 
 namespace {
-  /// A class for implementing getters and setters on top of a
-  /// concrete getter or setter, with no substitution required.
+  /// A common base class for logical Vars or Subscripts that provide
+  /// known, global accessors.
   class ConcreteMemberGetterSetterBase : public MemberGetterSetterBase {
   protected:
     ConcreteMemberGetterSetterBase(ValueDecl *target,
@@ -595,65 +597,87 @@ namespace {
                                thisSize) {
     }
 
-  public:
+    /// Returns the substituted object type.
+    virtual CanType getSubstObjectType() const = 0;
+
+    /// Returns the substituted index type.
+    virtual CanType getSubstIndexType() const = 0;
+
+    /// Returns the substitutions in effect.
+    virtual ArrayRef<Substitution> getSubstitutions() const = 0;
+
+    /// Add the 'self' argument.
+    virtual void addSelfArg(CallEmission &emission, Address base,
+                            ShouldPreserveValues shouldPreserve) const = 0;
+
+    /// Prepare the getter.  Subclasses shouldn't need to override this.
     CallEmission prepareGetter(IRGenFunction &IGF,
                                Address base,
                                ExplosionKind maxExplosion,
                                ShouldPreserveValues shouldPreserve) const {
       // For now, always be pessimistic.
       ExplosionKind explosionLevel = ExplosionKind::Minimal;
-
-      auto target = getTarget();
-      FormalType formal = IGF.IGM.getTypeOfGetter(target);
-      llvm::Constant *fn =
-        IGF.IGM.getAddrOfGetter(target, formal, explosionLevel);
-      Callee callee = Callee::forKnownFunction(formal.getCC(), formal.getType(),
-                                               getSubstObjectType(),
-                                               ArrayRef<Substitution>(),
-                                               fn, ManagedValue(nullptr),
-                                               explosionLevel,
-                                               formal.getNaturalUncurryLevel());
+      Callee callee = getGetter(IGF, explosionLevel);
 
       CallEmission emission(IGF, callee);
       addArgs(emission, base, shouldPreserve);
       return emission;
     }
 
+    /// Prepare the setter.  Subclasses shouldn't need to override this.
     CallEmission prepareSetter(IRGenFunction &IGF,
                                Address base,
                                ExplosionKind maxExplosion,
                                ShouldPreserveValues shouldPreserve) const {
       // For now, always be pessimistic.
       ExplosionKind explosionLevel = ExplosionKind::Minimal;
-
-      Type substResultType = TupleType::getEmpty(IGF.IGM.Context);
-
-      auto target = getTarget();
-      FormalType formal = IGF.IGM.getTypeOfSetter(target);
-      llvm::Constant *fn =
-        IGF.IGM.getAddrOfSetter(target, formal, explosionLevel);
-      Callee callee = Callee::forKnownFunction(formal.getCC(), formal.getType(),
-                                               substResultType,
-                                               ArrayRef<Substitution>(),
-                                               fn, ManagedValue(nullptr),
-                                               explosionLevel,
-                                               formal.getNaturalUncurryLevel());
+      Callee callee = getSetter(IGF, explosionLevel);
 
       CallEmission emission(IGF, callee);
       addArgs(emission, base, shouldPreserve);
       return emission;
     }
 
-    Type getSubstObjectType() const {
-      ValueDecl *target = getTarget();
-      if (auto subscript = dyn_cast<SubscriptDecl>(target))
-        return subscript->getElementType();
-      return cast<VarDecl>(target)->getType();
+  private:
+    void addArgs(CallEmission &emission, Address base,
+                 ShouldPreserveValues shouldPreserve) const {
+      // Defer to the derived class for how to emit the 'self' argument.
+      addSelfArg(emission, base, shouldPreserve);
+
+      // Add the index argument if necessary.
+      addIndexArg(emission, shouldPreserve);
     }
 
-    virtual void addSelfArg(CallEmission &emission, Address base,
-                            ShouldPreserveValues shouldPreserve) const = 0;
+    Callee getGetter(IRGenFunction &IGF, ExplosionKind explosionLevel) const {
+      auto target = getTarget();
+      FormalType formal = IGF.IGM.getTypeOfGetter(target);
+      llvm::Constant *fn =
+        IGF.IGM.getAddrOfGetter(target, formal, explosionLevel);
 
+      return Callee::forKnownFunction(formal.getCC(), formal.getType(),
+                                      getSubstObjectType(),
+                                      getSubstitutions(),
+                                      fn, ManagedValue(nullptr),
+                                      explosionLevel,
+                                      formal.getNaturalUncurryLevel());
+    }
+
+    Callee getSetter(IRGenFunction &IGF, ExplosionKind explosionLevel) const {
+      auto target = getTarget();
+      FormalType formal = IGF.IGM.getTypeOfSetter(target);
+      llvm::Constant *fn =
+        IGF.IGM.getAddrOfSetter(target, formal, explosionLevel);
+
+      Type substResultType = TupleType::getEmpty(IGF.IGM.Context);
+      return Callee::forKnownFunction(formal.getCC(), formal.getType(),
+                                      substResultType,
+                                      getSubstitutions(),
+                                      fn, ManagedValue(nullptr),
+                                      explosionLevel,
+                                      formal.getNaturalUncurryLevel());
+    }
+
+    /// Add the index argument.
     void addIndexArg(CallEmission &emission,
                      ShouldPreserveValues shouldPreserve) const {
       auto subscript = dyn_cast<SubscriptDecl>(getTarget());
@@ -664,24 +688,48 @@ namespace {
 
       Explosion index(emission.getCurExplosionLevel());
       addIndexValues(emission.IGF, index, shouldPreserve,
-                     origIndexType, origIndexType, ArrayRef<Substitution>());
+                     origIndexType,
+                     getSubstIndexType(),
+                     getSubstitutions());
       emission.addArg(index);
-    }
-
-    void addArgs(CallEmission &emission, Address base,
-                 ShouldPreserveValues shouldPreserve) const {
-      // Defer to the derived class for how to emit the 'self' argument.
-      addSelfArg(emission, base, shouldPreserve);
-
-      // Add the index argument if necessary.
-      addIndexArg(emission, shouldPreserve);
     }
   };
 
-  struct DirectMemberGetterSetter
-      : MemberGetterSetter<DirectMemberGetterSetter,
-                           ConcreteMemberGetterSetterBase> {
+  /// A common base class for logical members of non-generic types.
+  class NonGenericMemberGetterSetterBase
+      : public ConcreteMemberGetterSetterBase {
+  protected:
+    NonGenericMemberGetterSetterBase(ValueDecl *target,
+                                     unsigned numBaseValues,
+                                     unsigned numIndexValues,
+                                     size_t thisSize)
+      : ConcreteMemberGetterSetterBase(target, numBaseValues, numIndexValues,
+                                       thisSize) {}
 
+    ArrayRef<Substitution> getSubstitutions() const final {
+      return ArrayRef<Substitution>();
+    }
+
+    CanType getSubstObjectType() const final {
+      ValueDecl *target = getTarget();
+      if (auto subscript = dyn_cast<SubscriptDecl>(target))
+        return subscript->getElementType()->getCanonicalType();
+      return cast<VarDecl>(target)->getType()->getCanonicalType();
+    }
+
+    CanType getSubstIndexType() const final {
+      auto subscript = cast<SubscriptDecl>(getTarget());
+      return subscript->getIndices()->getType()->getCanonicalType();
+    }
+  };
+
+  /// A getter/setter lvalue for accesses into non-generic reference
+  /// types (or, more generally, anything where we're meant to pass
+  /// the self object by value).
+  class DirectMemberGetterSetter
+      : public MemberGetterSetter<DirectMemberGetterSetter,
+                                  NonGenericMemberGetterSetterBase> {
+  public:
     DirectMemberGetterSetter(SubscriptDecl *target, Explosion &baseArgs,
                              Explosion &indexArgs)
         : MemberGetterSetter(target, baseArgs.size(), indexArgs.size()) {
@@ -694,6 +742,7 @@ namespace {
       initBaseValues(baseArgs);
     }
 
+  protected:
     void addSelfArg(CallEmission &emission, Address base,
                     ShouldPreserveValues shouldPreserve) const {
       Explosion selfArg(emission.getCurExplosionLevel());
@@ -707,10 +756,13 @@ namespace {
     }
   };
 
-  struct IndirectMemberGetterSetter
-      : MemberGetterSetter<IndirectMemberGetterSetter,
-                           ConcreteMemberGetterSetterBase> {
-
+  /// A getter/setter lvalue for accesses into non-generic struct types
+  /// (or, more generally, anything where we're meant to pass the self
+  /// object by reference).
+  class IndirectMemberGetterSetter
+      : public MemberGetterSetter<IndirectMemberGetterSetter,
+                                  NonGenericMemberGetterSetterBase> {
+  public:
     IndirectMemberGetterSetter(SubscriptDecl *target, Explosion &indexArgs)
         : MemberGetterSetter(target, 0, indexArgs.size()) {
       initIndexValues(indexArgs);
@@ -720,6 +772,7 @@ namespace {
         : MemberGetterSetter(target, 0) {
     }
 
+  protected:
     void addSelfArg(CallEmission &emission, Address base,
                     ShouldPreserveValues shouldPreserve) const {
       Explosion selfArg(emission.getCurExplosionLevel());
@@ -728,10 +781,153 @@ namespace {
     }
   };
 
-  struct GlobalGetterSetter
-      : MemberGetterSetter<GlobalGetterSetter,
-                           ConcreteMemberGetterSetterBase> {
+  /// A common base class for logical members of generic types.
+  class GenericMemberGetterSetterBase : public ConcreteMemberGetterSetterBase {
+    ArrayRef<Substitution> Subs;
+    CanType SubstBaseType;
+    CanType SubstIndexType;
+    CanType SubstResultType;
 
+  public:
+    void setExpr(GenericMemberRefExpr *E) {
+      Subs = E->getSubstitutions();
+      SubstBaseType = E->getBase()->getType()->getCanonicalType();
+      SubstResultType = E->getType()->castTo<LValueType>()->getObjectType()
+                         ->getCanonicalType();
+    }
+
+    void setExpr(GenericSubscriptExpr *E) {
+      Subs = E->getSubstitutions();
+      SubstBaseType = E->getBase()->getType()->getCanonicalType();
+      SubstResultType = E->getType()->castTo<LValueType>()->getObjectType()
+                         ->getCanonicalType();
+      SubstIndexType = E->getIndex()->getType()->getCanonicalType();
+    }
+    
+  protected:
+    GenericMemberGetterSetterBase(ValueDecl *target,
+                                  unsigned numBaseValues,
+                                  unsigned numIndexValues,
+                                  size_t thisSize)
+      : ConcreteMemberGetterSetterBase(target, numBaseValues, numIndexValues,
+                                       thisSize) {}
+
+    void emitGenericArguments(IRGenFunction &IGF, Explosion &out) const {
+      auto &generics =
+        *getTarget()->getDeclContext()->getGenericParamsOfContext();
+      return emitPolymorphicArguments(IGF, generics,
+                                      getSubstitutions(),
+                                      out);
+    }
+
+    ArrayRef<Substitution> getSubstitutions() const final {
+      assert(!Subs.empty());
+      return Subs;
+    }
+
+    CanType getSubstObjectType() const final {
+      assert(SubstResultType);
+      return SubstResultType;
+    }
+
+    CanType getSubstIndexType() const final {
+      assert(SubstIndexType);
+      return SubstIndexType;
+    }
+
+    CanType getSubstBaseType() const {
+      assert(SubstBaseType);
+      return SubstBaseType;
+    }
+  };
+
+  /// A getter/setter lvalue for accesses into generic reference types.
+  ///
+  /// Clients must call setExpr() in order to fully construct an
+  /// instance of this class.
+  class GenericDirectMemberGetterSetter
+      : public MemberGetterSetter<GenericDirectMemberGetterSetter,
+                                  GenericMemberGetterSetterBase> {
+  public:
+    GenericDirectMemberGetterSetter(SubscriptDecl *target, Explosion &baseArgs,
+                                    Explosion &indexArgs)
+        : MemberGetterSetter(target, baseArgs.size(), indexArgs.size()) {
+      initBaseValues(baseArgs);
+      initIndexValues(indexArgs);
+    }
+
+    GenericDirectMemberGetterSetter(VarDecl *target, Explosion &baseArgs)
+        : MemberGetterSetter(target, baseArgs.size()) {
+      initBaseValues(baseArgs);
+    }
+
+  protected:
+    void addSelfArg(CallEmission &emission, Address base,
+                    ShouldPreserveValues shouldPreserve) const {
+      Explosion selfArg(emission.getCurExplosionLevel());
+
+      // The generic arguments are bound at this level.
+      emitGenericArguments(emission.IGF, selfArg);
+
+      // Collect the new base values.
+      CanType origBaseType =
+        getTarget()->getDeclContext()->getDeclaredTypeOfContext()
+                   ->getCanonicalType();
+      addBaseValues(emission.IGF, selfArg, shouldPreserve,
+                    origBaseType, getSubstBaseType(),
+                    getSubstitutions());
+
+      emission.addArg(selfArg);
+    }
+  };
+
+  /// A getter/setter lvalue for accesses into generic value types.
+  ///
+  /// Clients must call setExpr() in order to fully construct an
+  /// instance of this class.
+  class GenericIndirectMemberGetterSetter
+      : public MemberGetterSetter<GenericIndirectMemberGetterSetter,
+                                  GenericMemberGetterSetterBase> {
+  public:
+    GenericIndirectMemberGetterSetter(SubscriptDecl *target,
+                                      Explosion &indexArgs)
+        : MemberGetterSetter(target, 0, indexArgs.size()) {
+      initIndexValues(indexArgs);
+    }
+
+    GenericIndirectMemberGetterSetter(VarDecl *target)
+        : MemberGetterSetter(target, 0) {
+    }
+
+  protected:
+    void addSelfArg(CallEmission &emission, Address base,
+                    ShouldPreserveValues shouldPreserve) const {
+      Explosion selfArg(emission.getCurExplosionLevel());
+
+      // The generic arguments are bound at this level.
+      emitGenericArguments(emission.IGF, selfArg);
+
+#ifndef NDEBUG
+      CanType origBaseType = CanType(
+        cast<PolymorphicFunctionType>(emission.getCallee().getOrigFormalType())
+          ->getInput());
+      assert(!differsByAbstraction(emission.IGF.IGM, origBaseType,
+                                   getSubstBaseType(),
+                                   AbstractionDifference::Argument));
+#endif
+      // No transformation required on l-value.
+      selfArg.addUnmanaged(base.getAddress());
+
+      emission.addArg(selfArg);
+    }
+  };
+
+  /// A getter/setter lvalue for accesses to global variables with
+  /// setters or getters.
+  class GlobalGetterSetter
+      : public MemberGetterSetter<GlobalGetterSetter,
+                                  NonGenericMemberGetterSetterBase> {
+  public:
     GlobalGetterSetter(SubscriptDecl *target, Explosion &indexArgs)
         : MemberGetterSetter(target, 0, indexArgs.size()) {
       initIndexValues(indexArgs);
@@ -741,44 +937,93 @@ namespace {
         : MemberGetterSetter(target, 0) {
     }
 
+  protected:
     void addSelfArg(CallEmission &emission, Address base,
                     ShouldPreserveValues shouldPreserve) const {
     }
   };
 }
 
-/// Emit an l-value for the given member reference.
-LValue irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
-  VarDecl *var = E->getDecl();
+static LValue emitLogicalClassMemberLValue(IRGenFunction &IGF,
+                                           MemberRefExpr *E) {
+  // Emit the base value.
+  Explosion base(ExplosionKind::Maximal);
+  IGF.emitRValue(E->getBase(), base);
 
-  if (!E->getBase()->getType()->is<LValueType>()) {
-    assert(var->getDeclContext()->getDeclaredTypeOfContext()->is<ClassType>());
-    if (!isVarAccessLogical(IGF, var)) {
-      return emitPhysicalClassMemberLValue(IGF, E);
-    }
+  // Build the logical lvalue.
+  LValue lvalue;
+  lvalue.addWithExtra<DirectMemberGetterSetter>(E->getDecl(), base);
+  return lvalue;
+}
 
-    // Emit the base value.
-    Explosion base(ExplosionKind::Maximal);
-    IGF.emitRValue(E->getBase(), base);
-
-    // Build the logical lvalue.
-    LValue lvalue;
-    lvalue.addWithExtra<DirectMemberGetterSetter>(var, base);
-    return lvalue;
-  }
-
-  if (!isVarAccessLogical(IGF, var)) {
-    assert(isa<StructDecl>(var->getDeclContext()));
-    return emitPhysicalStructMemberLValue(IGF, E);
-  }
+static LValue emitLogicalStructMemberLValue(IRGenFunction &IGF,
+                                            MemberRefExpr *E) {
 
   // Emit the base l-value.
   LValue lvalue = IGF.emitLValue(E->getBase());
 
   // Push a logical member reference.
-  lvalue.add<IndirectMemberGetterSetter>(var);
+  lvalue.add<IndirectMemberGetterSetter>(E->getDecl());
 
   return lvalue;
+}
+
+static LValue emitLogicalClassMemberLValue(IRGenFunction &IGF,
+                                           GenericMemberRefExpr *E) {
+  // Emit the base value.
+  Explosion base(ExplosionKind::Maximal);
+  IGF.emitRValue(E->getBase(), base);
+
+  // Build the logical lvalue.
+  LValue lvalue;
+  lvalue.addWithExtra<GenericDirectMemberGetterSetter>(
+                                                 cast<VarDecl>(E->getDecl()),
+                                                       base)
+    .setExpr(E);
+  return lvalue;
+}
+
+static LValue emitLogicalStructMemberLValue(IRGenFunction &IGF,
+                                            GenericMemberRefExpr *E) {
+
+  // Emit the base l-value.
+  LValue lvalue = IGF.emitLValue(E->getBase());
+
+  // Push a logical member reference.
+  lvalue.add<GenericIndirectMemberGetterSetter>(cast<VarDecl>(E->getDecl()))
+    .setExpr(E);
+
+  return lvalue;
+}
+
+template <class T>
+static LValue emitAnyMemberRefLValue(IRGenFunction &IGF, T *E) {
+  VarDecl *var = cast<VarDecl>(E->getDecl());
+  Type baseType = E->getBase()->getType();
+  if (!baseType->is<LValueType>()) {
+    if (!isVarAccessLogical(IGF, var)) {
+      return emitPhysicalClassMemberLValue(IGF, E);
+    } else {
+      return emitLogicalClassMemberLValue(IGF, E);
+    }
+  } else {
+    if (!isVarAccessLogical(IGF, var)) {
+      return emitPhysicalStructMemberLValue(IGF, E);
+    } else {
+      return emitLogicalStructMemberLValue(IGF, E);
+    }
+  }
+}
+
+/// Emit an l-value for the given member reference.
+LValue irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
+  return emitAnyMemberRefLValue(IGF, E);
+}
+
+/// Emit an l-value which accesses a member out of a generic type.
+LValue irgen::emitGenericMemberRefLValue(IRGenFunction &IGF,
+                                         GenericMemberRefExpr *E) {
+  return emitAnyMemberRefLValue(IGF, E);
 }
 
 /// Try to emit the given member-reference as an address.
@@ -807,27 +1052,28 @@ LValue IRGenFunction::getGlobal(VarDecl *var) {
   return emitAddressLValue(addr);
 }
 
-/// Emit an l-value for the given subscripted reference.
-LValue irgen::emitSubscriptLValue(IRGenFunction &IGF, SubscriptExpr *E) {
-  if (!E->getBase()->getType()->is<LValueType>()) {
-    // Emit the base value.
-    Explosion base(ExplosionKind::Maximal);
-    IGF.emitRValue(E->getBase(), base);
+static LValue emitLogicalClassSubscriptLValue(IRGenFunction &IGF,
+                                              SubscriptExpr *E) {
+  // Emit the base value.
+  Explosion base(ExplosionKind::Maximal);
+  IGF.emitRValue(E->getBase(), base);
 
-    // Emit the index.
-    Explosion index(ExplosionKind::Maximal);
-    IGF.emitRValue(E->getIndex(), index);
+  // Emit the index.
+  Explosion index(ExplosionKind::Maximal);
+  IGF.emitRValue(E->getIndex(), index);
 
-    // Build the logical lvalue.
-    LValue lvalue;
-    lvalue.addWithExtra<DirectMemberGetterSetter>(E->getDecl(), base, index);
-    return lvalue;
-  }
-  
+  // Build the logical lvalue.
+  LValue lvalue;
+  lvalue.addWithExtra<DirectMemberGetterSetter>(E->getDecl(), base, index);
+  return lvalue;
+}
+
+static LValue emitLogicalStructSubscriptLValue(IRGenFunction &IGF,
+                                               SubscriptExpr *E) {
   // Emit the base l-value.
   LValue lvalue = IGF.emitLValue(E->getBase());
 
-  // Emit the index.  GetterSetterComponent requires this to be
+  // Emit the index.  IndirectMemberGetterSetter requires this to be
   // maximal; in theory it might be better to try to match the
   // getter/setter, but that would require some significant
   // complexity.
@@ -838,4 +1084,77 @@ LValue irgen::emitSubscriptLValue(IRGenFunction &IGF, SubscriptExpr *E) {
   lvalue.addWithExtra<IndirectMemberGetterSetter>(E->getDecl(), index);
 
   return lvalue;
+}
+
+static LValue emitLogicalClassSubscriptLValue(IRGenFunction &IGF,
+                                              GenericSubscriptExpr *E) {
+  // Emit the base value.
+  Explosion base(ExplosionKind::Maximal);
+  IGF.emitRValue(E->getBase(), base);
+
+  // Emit the index.
+  Explosion index(ExplosionKind::Maximal);
+  IGF.emitRValue(E->getIndex(), index);
+
+  // Build the logical lvalue.
+  LValue lvalue;
+  lvalue.addWithExtra<GenericDirectMemberGetterSetter>(E->getDecl(),
+                                                       base, index)
+    .setExpr(E);
+  return lvalue;
+}
+
+static LValue emitLogicalStructSubscriptLValue(IRGenFunction &IGF,
+                                               GenericSubscriptExpr *E) {
+  // Emit the base l-value.
+  LValue lvalue = IGF.emitLValue(E->getBase());
+
+  // Emit the index.  IndirectMemberGetterSetter requires this to be
+  // maximal; in theory it might be better to try to match the
+  // getter/setter, but that would require some significant
+  // complexity.
+  Explosion index(ExplosionKind::Maximal);
+  IGF.emitRValue(E->getIndex(), index);
+
+  // Subscript accesses are always logical (for now).
+  lvalue.addWithExtra<GenericIndirectMemberGetterSetter>(E->getDecl(), index)
+    .setExpr(E);
+
+  return lvalue;
+}
+
+
+template <class T>
+static LValue emitAnySubscriptLValue(IRGenFunction &IGF, T *E) {
+  if (!E->getBase()->getType()->template is<LValueType>()) {
+    return emitLogicalClassSubscriptLValue(IGF, E);
+  } else {
+    return emitLogicalStructSubscriptLValue(IGF, E);
+  }
+}
+
+/// Emit an l-value for the given subscripted reference.
+LValue irgen::emitSubscriptLValue(IRGenFunction &IGF, SubscriptExpr *E) {
+  return emitAnySubscriptLValue(IGF, E);
+}
+
+/// Emit an l-value for the given subscripted reference.
+LValue irgen::emitGenericSubscriptLValue(IRGenFunction &IGF,
+                                         GenericSubscriptExpr *E) {
+  return emitAnySubscriptLValue(IGF, E);
+}
+
+/// Emit an expression which accesses a member out of a generic type.
+void irgen::emitGenericMemberRef(IRGenFunction &IGF,
+                                 GenericMemberRefExpr *E,
+                                 Explosion &out) {
+  // The l-value case should have been weeded out.
+  assert(!E->getType()->is<LValueType>());
+
+  // The remaining case is to construct an implicit closure.
+  // Just refuse to do this for now.
+  assert(E->getType()->is<FunctionType>());
+  IGF.unimplemented(E->getLoc(),
+              "forming implicit closure over generic member reference");
+  IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), out);  
 }

@@ -18,6 +18,8 @@
 #define SWIFT_IRGEN_GENLVALUE_H
 
 namespace swift {
+  class GenericMemberRefExpr;
+  class GenericSubscriptExpr;
   class MemberRefExpr;
   class RequalifyExpr;
   class SubscriptExpr;
@@ -42,6 +44,18 @@ namespace irgen {
 
   /// Emit an l-value for a subscripting.
   LValue emitSubscriptLValue(IRGenFunction &IGF, SubscriptExpr *E);
+
+  /// Emit a generic member reference into an explosion.
+  void emitGenericMemberRef(IRGenFunction &IGF, GenericMemberRefExpr *E,
+                            Explosion &out);
+
+  /// Emit a generic member reference as an l-value.
+  LValue emitGenericMemberRefLValue(IRGenFunction &IGF,
+                                    GenericMemberRefExpr *E);
+
+  /// Emit a generic subscript reference as an l-value.
+  LValue emitGenericSubscriptLValue(IRGenFunction &IGF,
+                                    GenericSubscriptExpr *E);
 
   /// Try to emit a member reference as an address.
   Optional<Address> tryEmitMemberRefAsAddress(IRGenFunction &IGF,

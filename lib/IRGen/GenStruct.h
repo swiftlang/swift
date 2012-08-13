@@ -18,6 +18,7 @@
 #define SWIFT_IRGEN_GENSTRUCT_H
 
 namespace swift {
+  class GenericMemberRefExpr;
   class MemberRefExpr;
 
 namespace irgen {
@@ -25,6 +26,8 @@ namespace irgen {
   class IRGenFunction;
 
   LValue emitPhysicalStructMemberLValue(IRGenFunction &IGF, MemberRefExpr *E);
+  LValue emitPhysicalStructMemberLValue(IRGenFunction &IGF,
+                                        GenericMemberRefExpr *E);
 
 } // end namespace irgen
 } // end namespace swift
