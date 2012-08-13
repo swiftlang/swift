@@ -97,6 +97,7 @@ bool TypeBase::hasReferenceSemantics() {
   case TypeKind::Array:
   case TypeKind::ProtocolComposition:
   case TypeKind::LValue:
+  case TypeKind::TypeVariable:
     return false;
 
   case TypeKind::BuiltinObjectPointer:
@@ -222,6 +223,7 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
   case TypeKind::UnboundGeneric:
   case TypeKind::BoundGeneric:
   case TypeKind::DeducibleGenericParam:
+  case TypeKind::TypeVariable:
     return this;
 
   case TypeKind::NameAlias:
@@ -1195,3 +1197,4 @@ void DeducibleGenericParamType::print(raw_ostream &OS) const {
 void SubstitutedType::print(raw_ostream &OS) const {
   getReplacementType()->print(OS);
 }
+

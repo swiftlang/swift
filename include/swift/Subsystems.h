@@ -53,7 +53,11 @@ namespace swift {
   /// walks the AST to resolve types and diagnose problems therein. StartElem
   /// indicates where to start for incremental type checking in the
   /// main module.
-  void performTypeChecking(TranslationUnit *TU, unsigned StartElem = 0);
+  ///
+  /// \param dumpConstraints Dump the constraints of any expressions in
+  /// top-level code declarations.
+  void performTypeChecking(TranslationUnit *TU, unsigned StartElem = 0,
+                           bool dumpConstraints = false);
 
   /// performCaptureAnalysis - Analyse the AST and mark local declarations
   /// and expressions which can capture them so they can be emitted more

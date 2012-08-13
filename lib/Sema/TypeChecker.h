@@ -330,7 +330,8 @@ public:
   void typeCheckFunctionBody(FuncExpr *FE);
   void typeCheckConstructorBody(ConstructorDecl *CD);
   void typeCheckDestructorBody(DestructorDecl *DD);
-  void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
+  void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD,
+                                 bool dumpConstraints);
 
   void typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD);
   void REPLCheckPatternBinding(PatternBindingDecl *D);
@@ -428,6 +429,10 @@ public:
                           ConformanceMap &Conformance,
                           SourceLoc ComplainLoc,
                           TypeSubstitutionMap *RecordSubstitutions = nullptr);
+
+  /// \brief Dump the constraint system generated from the given (unchecked)
+  /// expression.
+  void dumpConstraints(Expr *expr);
 
   /// \name Overload resolution
   ///

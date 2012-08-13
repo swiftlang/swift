@@ -6,6 +6,7 @@ add_swift_library(swiftSema
   TypeChecker.cpp
   TypeChecker.h
   TypeCheckCoercion.cpp
+  TypeCheckConstraints.cpp
   TypeCheckExpr.cpp
   TypeCheckDecl.cpp
   TypeCheckOverload.cpp

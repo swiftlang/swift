@@ -93,6 +93,7 @@ TYPE(ProtocolComposition, Type)
 TYPE(LValue, Type)
 TYPE(UnboundGeneric, Type)
 TYPE(BoundGeneric, Type)
+UNCHECKED_TYPE(TypeVariable, Type)
 
 #undef TYPE_RANGE
 #undef UNCHECKED_TYPE

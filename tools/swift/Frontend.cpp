@@ -77,14 +77,15 @@ swift::buildSingleTranslationUnit(ASTContext &Context, unsigned BufferID,
 bool swift::appendToMainTranslationUnit(TranslationUnit *TU, unsigned BufferID,
                                         unsigned CurTUElem,
                                         unsigned &BufferOffset,
-                                        unsigned BufferEndOffset) {
+                                        unsigned BufferEndOffset,
+                                        bool dumpConstraints) {
   bool FoundAnySideEffects = false;
   do {
     FoundAnySideEffects |= parseIntoTranslationUnit(TU, BufferID,
                                                     &BufferOffset,
                                                     BufferEndOffset);
     performNameBinding(TU, CurTUElem);
-    performTypeChecking(TU, CurTUElem);
+    performTypeChecking(TU, CurTUElem, dumpConstraints);
     CurTUElem = TU->Decls.size();
   } while (BufferOffset != BufferEndOffset);
   return FoundAnySideEffects;

@@ -212,7 +212,8 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
 /// walks the AST to resolve types and diagnose problems therein.
 ///
 /// FIXME: This should be moved out to somewhere else.
-void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
+void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem,
+                                bool dumpConstraints) {
   TypeChecker TC(*TU);
 
   struct ExprPrePassWalker : private ASTWalker {
@@ -458,7 +459,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       // Immediately perform global name-binding etc.
       prePass.doWalk(TLCD);
-      TC.typeCheckTopLevelCodeDecl(TLCD);
+      TC.typeCheckTopLevelCodeDecl(TLCD, dumpConstraints);
     } else {
       prePass.doWalk(D);
       TC.typeCheckDecl(D, /*isFirstPass*/false);

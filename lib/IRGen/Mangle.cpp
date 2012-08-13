@@ -356,6 +356,8 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   case TypeKind::DeducibleGenericParam:
   case TypeKind::UnboundGeneric:
     llvm_unreachable("mangling unresolved type");
+  case TypeKind::TypeVariable:
+    llvm_unreachable("mangling type variable");
 
   case TypeKind::Module:
     llvm_unreachable("Cannot mangle module type yet");

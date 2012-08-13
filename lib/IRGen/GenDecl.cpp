@@ -150,7 +150,9 @@ static bool isLocalLinkageType(Type type) {
   case TypeKind::UnstructuredUnresolved:
   case TypeKind::DeducibleGenericParam:
     llvm_unreachable("unresolved type in IRGen");
-
+  case TypeKind::TypeVariable:
+    llvm_unreachable("type variable in IRgen");
+      
   case TypeKind::MetaType:
     return isLocalLinkageType(cast<MetaTypeType>(base)->getInstanceType());
   case TypeKind::Module:

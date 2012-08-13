@@ -144,6 +144,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
   case TypeKind::Protocol:
   case TypeKind::Substituted:
   case TypeKind::DeducibleGenericParam:
+  case TypeKind::TypeVariable:
     // Nothing to validate.
     break;
 

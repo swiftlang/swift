@@ -1465,6 +1465,51 @@ public:
   }
 };
 
+/// \brief A type variable used during type checking.
+class TypeVariableType : public TypeBase {
+  TypeVariableType(ASTContext &C)
+    : TypeBase(TypeKind::TypeVariable, &C, true) { }
+
+  class Implementation;
+  
+public:
+  /// \brief Create a new type variable whose implementation is constructed
+  /// with the given arguments.
+  template<typename ...Args>
+  static TypeVariableType *getNew(ASTContext &C, Args &&...args);
+
+  /// \brief Retrieve the implementation data corresponding to this type
+  /// variable.
+  ///
+  /// The contents of the implementation data for this type are hidden in the
+  /// details of the constraint solver used for type checking.
+  Implementation &getImpl() {
+    return *reinterpret_cast<Implementation *>(this + 1);
+  }
+
+  /// \brief Retrieve the implementation data corresponding to this type
+  /// variable.
+  ///
+  /// The contents of the implementation data for this type are hidden in the
+  /// details of the constraint solver used for type checking.
+  const Implementation &getImpl() const {
+    return *reinterpret_cast<const Implementation *>(this + 1);
+  }
+
+  /// \brief Access the implementation object for this type variable.
+  Implementation *operator->() {
+    return reinterpret_cast<Implementation *>(this + 1);
+  }
+
+  void print(raw_ostream &OS) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeVariableType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::TypeVariable;
+  }
+};
+
 inline bool TypeBase::isUnresolvedType() const {
   return TypeBits.TypeBase.Unresolved;
 }

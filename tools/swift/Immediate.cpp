@@ -305,7 +305,8 @@ void swift::REPL(ASTContext &Context) {
 
   swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
                                      CurBufferOffset,
-                                     CurBufferEndOffset);
+                                     CurBufferEndOffset,
+                                     /*dumpConstraints=*/false);
   if (Context.hadError())
     return;
 
@@ -314,6 +315,7 @@ void swift::REPL(ASTContext &Context) {
   if (llvm::sys::Process::StandardInIsUserInput())
     printf("%s", "Welcome to swift.  Type ':help' for assistance.\n");
 
+  bool dumpConstraints = false;
   while (1) {
     // Read one line.
     e.PromptContinuationLevel = BraceCount;
@@ -367,6 +369,8 @@ void swift::REPL(ASTContext &Context) {
                          " the REPL input\n"
                      "  :dump_source - dump the user input (ignoring"
                          " lines with errors)\n"
+                     "  :dump_constraints <expr> - dump the constraints for "
+                     "   the given expression"
                      "API documentation etc. will be here eventually.\n");
       } else if (L.peekNextToken().getText() == "quit" ||
                  L.peekNextToken().getText() == "exit") {
@@ -377,13 +381,24 @@ void swift::REPL(ASTContext &Context) {
         TU->dump();
       } else if (L.peekNextToken().getText() == "dump_source") {
         llvm::errs() << DumpSource;
+      } else if (L.peekNextToken().getText() == "dump_constraints") {
+        dumpConstraints = true;
       } else {
         printf("%s", "Unknown interpreter escape; try :help\n");
       }
-      CurBufferOffset = CurBufferEndOffset;
-      CurChunkLines = 0;
-      LastValidLineEnd = CurBuffer;
-      continue;
+
+      if (!dumpConstraints) {
+        CurBufferOffset = CurBufferEndOffset;
+        CurChunkLines = 0;
+        LastValidLineEnd = CurBuffer;
+        continue;
+      }
+
+      // Continue parsing after the directive.
+      L.lex(Tok);
+      L.lex(Tok);
+      CurBufferOffset = CurBufferOffset
+                      + (Tok.getLoc().Value.getPointer() - Line);
     }
     do {
       if (Tok.is(tok::l_brace) || Tok.is(tok::l_paren) ||
@@ -406,7 +421,10 @@ void swift::REPL(ASTContext &Context) {
     bool ShouldRun =
         swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
                                            CurBufferOffset,
-                                           CurBufferEndOffset);
+                                           CurBufferEndOffset,
+                                           dumpConstraints);
+
+    dumpConstraints = false;
 
     if (Context.hadError()) {
       Context.Diags.resetHadAnyError();
