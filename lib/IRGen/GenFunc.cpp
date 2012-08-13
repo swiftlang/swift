@@ -2139,6 +2139,25 @@ void CallEmission::addArg(Expr *arg) {
   addArg(argE);
 }
 
+/// Load from the given address to produce an argument.
+void CallEmission::addMaterializedArg(Address substAddr, bool asTake) {
+  // If we're calling something with polymorphic type, we'd better have
+  // substitutions.
+  auto subs = getSubstitutions();
+  assert(subs.empty() && "can't handle substituted dematerialization now!");
+
+  auto fnType = cast<FunctionType>(CurOrigType);
+  auto &argTI = IGF.getFragileTypeInfo(fnType->getInput());
+
+  Explosion argE(CurCallee.getExplosionLevel());
+  if (asTake) {
+    argTI.loadAsTake(IGF, substAddr, argE);
+  } else {
+    argTI.load(IGF, substAddr, argE);
+  }
+  addArg(argE);
+}
+
 /// Create a CallEmission for an arbitrary expression.
 /// Note that this currently bypasses specialization and builtin
 /// emission, so don't attempt to emit such things.

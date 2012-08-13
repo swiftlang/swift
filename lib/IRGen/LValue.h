@@ -34,6 +34,12 @@ namespace irgen {
 class PhysicalPathComponent;
 class LogicalPathComponent;
 
+/// An enumeration indicating whether to "preserve" a value or "consume" it.
+enum ShouldPreserveValues : bool {
+  ConsumeValues = false,
+  PreserveValues = true
+};
+
 /// An l-value path component represents a chunk of the access path to
 /// an object.  Path components may be either "physical" or "logical".
 /// A physical path involves elementary address manipulations; these
@@ -122,50 +128,37 @@ protected:
 public:
   /// Perform a store operation with a value produced by the given
   /// expression.
-  ///
-  /// \param preserve - if true, more operations on this lvalue
-  ///    are forthcoming
   virtual void storeRValue(IRGenFunction &IGF, Expr *rvalue,
-                           Address base, bool preserve) const = 0;
+                           Address base,
+                           ShouldPreserveValues preserve) const = 0;
 
   /// Perform a store operation with a value held in memory.
-  ///
-  /// \param preserve - if true, more operations on this lvalue
-  ///    are forthcoming
   virtual void storeMaterialized(IRGenFunction &IGF, Address temp,
-                                 Address base, bool preserve) const = 0;
+                                 Address base,
+                                 ShouldPreserveValues preserve) const = 0;
 
   /// Perform a store operation with a value from the given explosion.
-  ///
-  /// \param preserve - if true, more operations on this lvalue
-  ///    are forthcoming
   virtual void storeExplosion(IRGenFunction &IGF, Explosion &value,
-                              Address base, bool preserve) const = 0;
+                              Address base,
+                              ShouldPreserveValues preserve) const = 0;
 
   /// Perform a load operation from this path into the given
   /// explosion.
-  ///
-  /// \param preserve - if true, more operations on this lvalue
-  ///    are forthcoming
   virtual void loadExplosion(IRGenFunction &IGF, Address base,
-                             Explosion &exp, bool preserve) const = 0;
+                             Explosion &exp,
+                             ShouldPreserveValues preserve) const = 0;
 
   /// Perform a load operation from this path into memory
   /// at a given address.
-  ///
-  /// \param preserve - if true, more operations on this lvalue
-  ///    are forthcoming
   virtual void loadMaterialized(IRGenFunction &IGF, Address base,
-                                Address temp, bool preserve) const = 0;
+                                Address temp,
+                                ShouldPreserveValues preserve) const = 0;
 
   /// Perform a load operation from this path into temporary
   /// memory.
-  ///
-  /// \param preserve - if true, more operations on this lvalue
-  ///    are forthcoming
   virtual OwnedAddress loadAndMaterialize(IRGenFunction &IGF,
                                           OnHeap_t onHeap, Address base,
-                                          bool preserve) const = 0;
+                                    ShouldPreserveValues preserve) const = 0;
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {

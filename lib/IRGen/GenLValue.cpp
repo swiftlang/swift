@@ -85,12 +85,12 @@ void IRGenFunction::emitLoad(const LValue &lvalue, const TypeInfo &type,
     // If this is the last component, load it and return that as the result.
     if (i == e)
       return component.asLogical().loadExplosion(*this, address, explosion,
-                                                 /*preserve*/ false);
+                                                 ConsumeValues);
 
     // Otherwise, load and materialize the result into memory.
     address = component.asLogical().loadAndMaterialize(*this, NotOnHeap,
                                                        address,
-                                                       /*preserve*/ false);
+                                                       ConsumeValues);
   }
 
   return type.load(*this, address, explosion);
@@ -115,12 +115,12 @@ void swift::irgen::emitLoadAsInit(IRGenFunction &IGF, const LValue &lvalue,
     // If this is the last component, load it and return that as the result.
     if (i == e)
       return component.asLogical().loadMaterialized(IGF, baseAddress, dest,
-                                                    /*preserve*/ false);
+                                                    ConsumeValues);
 
     // Otherwise, load and materialize the result into memory.
     baseAddress = component.asLogical().loadAndMaterialize(IGF, NotOnHeap,
                                                            baseAddress,
-                                                           /*preserve*/ false);
+                                                           ConsumeValues);
   }
 
   return destTI.initializeWithCopy(IGF, dest, baseAddress);  
@@ -199,21 +199,21 @@ static void emitAssignRecursive(IRGenFunction &IGF,
   // If this is the final component, just do a logical store.
   if (pathStart == pathEnd) {
     if (finalExpr)
-      return component.storeRValue(IGF, finalExpr, base, /*preserve*/ false);
+      return component.storeRValue(IGF, finalExpr, base, ConsumeValues);
     return component.storeExplosion(IGF, *finalExplosion, base,
-                                    /*preserve*/ false);
+                                    ConsumeValues);
   }
 
   // Otherwise, load and materialize into a temporary.
   Address temp = component.loadAndMaterialize(IGF, NotOnHeap, base,
-                                              /*preserve*/ true);
+                                              PreserveValues);
 
   // Recursively perform the store.
   emitAssignRecursive(IGF, temp, finalType, finalExpr, finalExplosion,
                       pathStart, pathEnd);
 
   // Store the temporary back.
-  component.storeMaterialized(IGF, temp, base, /*preserve*/ false);
+  component.storeMaterialized(IGF, temp, base, ConsumeValues);
 }
                            
 
@@ -247,7 +247,7 @@ static OwnedAddress emitMaterializeWithWriteback(IRGenFunction &IGF,
       // FIXME: we only need to materialize the *final* logical value
       // to the heap.
       address = component.asLogical().loadAndMaterialize(IGF, onHeap, address,
-                                                         /*preserve*/ false);
+                                                         ConsumeValues);
     } else {
       address = component.asPhysical().offset(IGF, address);
     }
@@ -638,13 +638,13 @@ namespace {
 
     /// Add the base values to the given explosion.
     void addBaseValues(IRGenFunction &IGF, Explosion &out,
-                       bool preserve) const {
+                       ShouldPreserveValues shouldPreserve) const {
       // The stored index values come from a maximal explosion.
       ArrayRef<ManagedValue> storedValues(getBaseValuesBuffer(),
                                           Target.getBaseExplosionSize());
 
       // Just copy them in straight if the target is maximal.
-      if (!preserve && out.getKind() == ExplosionKind::Maximal)
+      if (!shouldPreserve && out.getKind() == ExplosionKind::Maximal)
         return out.add(storedValues);
 
       // Otherwise, reexplode.
@@ -653,7 +653,7 @@ namespace {
 
       Type byvalType = Target.getByvalType();
       const TypeInfo &byvalTI = IGF.getFragileTypeInfo(byvalType);
-      if (preserve) {
+      if (shouldPreserve) {
         byvalTI.copy(IGF, storedExplosion, out);
       } else {
         byvalTI.reexplode(IGF, storedExplosion, out);
@@ -662,13 +662,13 @@ namespace {
 
     /// Add the index values to the given explosion.
     void addIndexValues(IRGenFunction &IGF, Explosion &out,
-                        bool preserve) const {
+                        ShouldPreserveValues shouldPreserve) const {
       // The stored index values come from a maximal explosion.
       ArrayRef<ManagedValue> storedValues(getIndexValuesBuffer(),
                                           Target.getIndexExplosionSize());
 
       // Just copy them in straight if the target is maximal.
-      if (!preserve && out.getKind() == ExplosionKind::Maximal)
+      if (!shouldPreserve && out.getKind() == ExplosionKind::Maximal)
         return out.add(storedValues);
 
       // Otherwise, reexplode.
@@ -677,7 +677,7 @@ namespace {
 
       Type indexType = Target.getIndexType();
       const TypeInfo &indexTI = IGF.getFragileTypeInfo(indexType);
-      if (preserve) {
+      if (shouldPreserve) {
         indexTI.copy(IGF, storedExplosion, out);
       } else {
         indexTI.reexplode(IGF, storedExplosion, out);
@@ -685,106 +685,84 @@ namespace {
     }
 
     void addSelfArg(IRGenFunction &IGF, CallEmission &emission,
-                    Address base, bool preserve) const {
+                    Address base, ShouldPreserveValues shouldPreserve) const {
       if (Target.isByrefMember()) {
         Explosion selfArg(emission.getCurExplosionLevel());
         selfArg.addUnmanaged(base.getAddress());
         emission.addArg(selfArg);
       } else if (Target.isByvalMember()) {
         Explosion selfArg(emission.getCurExplosionLevel());
-        addBaseValues(IGF, selfArg, preserve);
+        addBaseValues(IGF, selfArg, shouldPreserve);
         emission.addArg(selfArg);
       }
     }
 
     void addIndexArg(IRGenFunction &IGF, CallEmission &emission,
-                     bool preserve) const {
+                     ShouldPreserveValues shouldPreserve) const {
       if (Target.isSubscript()) {
         Explosion index(emission.getCurExplosionLevel());
-        addIndexValues(IGF, index, preserve);
+        addIndexValues(IGF, index, shouldPreserve);
         emission.addArg(index);
       }
     }
 
-    /// A helper routine for performing code common to all store paths.
-    void store(IRGenFunction &IGF, const Callee &setter, Address base,
-               Explosion &rawValue, const TypeInfo &valueTI,
-               bool preserve) const {
-      CallEmission emission(IGF, setter);
-
-      // A byref member requires 'self' as its first argument.
-      addSelfArg(IGF, emission, base, preserve);
-
-      // Add the index argument in a subscript.
-      addIndexArg(IGF, emission, preserve);
-
-      // Add the value argument.
-      emission.addArg(rawValue);
-
-      // Make the call.
+    CallEmission prepareSetter(IRGenFunction &IGF,
+                               Address base,
+                               ExplosionKind maxExplosion,
+                               ShouldPreserveValues shouldPreserve) const {
+      CallEmission emission(IGF, Target.getSetter(IGF, maxExplosion));
+      addSelfArg(IGF, emission, base, shouldPreserve);
+      addIndexArg(IGF, emission, shouldPreserve);
+      return emission;
+    }
+                               
+    CallEmission prepareGetter(IRGenFunction &IGF,
+                               Address base,
+                               ExplosionKind maxExplosion,
+                               ShouldPreserveValues shouldPreserve) const {
+      CallEmission emission(IGF, Target.getGetter(IGF, maxExplosion));
+      addSelfArg(IGF, emission, base, shouldPreserve);
+      addIndexArg(IGF, emission, shouldPreserve);
+      return emission;
+    }
+                               
+    void storeRValue(IRGenFunction &IGF, Expr *rvalue,
+                     Address base, ShouldPreserveValues shouldPreserve) const {
+      CallEmission emission = prepareSetter(IGF, base, ExplosionKind::Maximal,
+                                            shouldPreserve);
+      emission.addArg(rvalue);
       emission.emitVoid();
     }
 
-    void storeRValue(IRGenFunction &IGF, Expr *rvalue,
-                     Address base, bool preserve) const {
-      Callee setter = Target.getSetter(IGF, ExplosionKind::Maximal);
-
-      // Emit the r-value at the natural level of the setter we found.
-      Explosion value(setter.getExplosionLevel());
-      IGF.emitRValue(rvalue, value);
-      
-      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
-      store(IGF, setter, base, value, valueTI, preserve);
-    }
-
     void storeMaterialized(IRGenFunction &IGF, Address temp,
-                           Address base, bool preserve) const {
-      Callee setter = Target.getSetter(IGF, ExplosionKind::Maximal);
-
-      // Explode the value at the natural level of the setter we found.
-      Explosion value(setter.getExplosionLevel());
-      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
-      valueTI.load(IGF, temp, value);
-
-      store(IGF, setter, base, value, valueTI, preserve);
+                           Address base,
+                           ShouldPreserveValues shouldPreserve) const {
+      CallEmission emission = prepareSetter(IGF, base, ExplosionKind::Maximal,
+                                            shouldPreserve);
+      emission.addMaterializedArg(temp, /*asTake*/ false);
+      emission.emitVoid();
     }
 
     void storeExplosion(IRGenFunction &IGF, Explosion &value,
-                        Address base, bool preserve) const {
-      Callee setter = Target.getSetter(IGF, ExplosionKind::Maximal);
-      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
-      store(IGF, setter, base, value, valueTI, preserve);
+                        Address base, ShouldPreserveValues shouldPreserve) const {
+      CallEmission emission = prepareSetter(IGF, base, ExplosionKind::Maximal,
+                                            shouldPreserve);
+      emission.addArg(value);
+      emission.emitVoid();
     }
 
     void loadExplosion(IRGenFunction &IGF, Address base, Explosion &out,
-                       bool preserve) const {
-      Callee getter = Target.getGetter(IGF, out.getKind());
-      CallEmission emission(IGF, getter);
-
-      // Byref members need a 'self' argument.
-      addSelfArg(IGF, emission, base, preserve);
-
-      // The next argument is the "index", when present.
-      addIndexArg(IGF, emission, preserve);
-
-      // The last argument is always an empty tuple.
+                       ShouldPreserveValues shouldPreserve) const {
+      CallEmission emission = prepareGetter(IGF, base, ExplosionKind::Maximal,
+                                            shouldPreserve);
       emission.addEmptyArg();
-
       emission.emitToExplosion(out);
     }
 
     void loadMaterialized(IRGenFunction &IGF, Address base, Address temp,
-                          bool preserve) const {
-      Callee getter = Target.getGetter(IGF, ExplosionKind::Maximal);
-      CallEmission emission(IGF, getter);
-
-      // Byref members need a 'self' argument.
-      addSelfArg(IGF, emission, base, preserve);
-
-      // The next argument is the "index", for subscripts.
-      addIndexArg(IGF, emission, preserve);
-
-      // The last argument is always an empty tuple.
+                          ShouldPreserveValues shouldPreserve) const {
+      CallEmission emission = prepareGetter(IGF, base, ExplosionKind::Maximal,
+                                            shouldPreserve);
       emission.addEmptyArg();
 
       const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
@@ -792,7 +770,8 @@ namespace {
     }
 
     OwnedAddress loadAndMaterialize(IRGenFunction &IGF, OnHeap_t onHeap,
-                                    Address base, bool preserve) const {
+                                    Address base,
+                                    ShouldPreserveValues shouldPreserve) const {
       Initialization init;
       InitializedObject object = init.getObjectForTemporary();
 
@@ -804,7 +783,7 @@ namespace {
                                                    valueTI, "temporary");
 
       // Load into the new memory.
-      GetterSetterComponent::loadMaterialized(IGF, base, addr, preserve);
+      GetterSetterComponent::loadMaterialized(IGF, base, addr, shouldPreserve);
 
       // The load is complete;  mark the memory as initialized.
       init.markInitialized(IGF, object);

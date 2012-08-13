@@ -94,6 +94,7 @@ public:
 
   void addArg(Explosion &arg);
   void addArg(Expr *arg);
+  void addMaterializedArg(Address substValue, bool asTake);
   void addEmptyArg();
 
   void emitToMemory(Address addr, const TypeInfo &substResultTI);
