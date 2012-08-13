@@ -117,6 +117,7 @@ public:
 
   /// Add a value to the end of this exploded r-value.
   void add(ManagedValue value) {
+    assert(value.getValue() && "adding null value to explosion");
     assert(NextValue == 0 && "adding to partially-claimed explosion?");
     Values.push_back(value);
   }
@@ -127,6 +128,10 @@ public:
   }
 
   void add(llvm::ArrayRef<ManagedValue> values) {
+#ifndef NDEBUG
+    for (auto value : values)
+      assert(value.getValue() && "adding null value to explosion");
+#endif
     assert(NextValue == 0 && "adding to partially-claimed explosion?");
     Values.append(values.begin(), values.end());
   }
