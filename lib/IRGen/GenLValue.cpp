@@ -715,18 +715,11 @@ namespace {
       // A byref member requires 'self' as its first argument.
       addSelfArg(IGF, emission, base, preserve);
 
-      // Add the value argument.
-      // In a subscript, this is a tuple of the subscript and the value.
-      if (Target.isSubscript()) {
-        Explosion value(setter.getExplosionLevel());
-        addIndexValues(IGF, value, preserve);
-        valueTI.reexplode(IGF, rawValue, value);
-        emission.addArg(value);
+      // Add the index argument in a subscript.
+      addIndexArg(IGF, emission, preserve);
 
-      // Otherwise, it's just the original value.
-      } else {
-        emission.addArg(rawValue);
-      }
+      // Add the value argument.
+      emission.addArg(rawValue);
 
       // Make the call.
       emission.emitVoid();

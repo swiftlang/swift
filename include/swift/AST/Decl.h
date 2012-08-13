@@ -1114,7 +1114,11 @@ public:
 
   /// isGetterOrSetter - Determine whether this is a getter or a setter vs.
   /// a normal function.
-  bool isGetterOrSetter() const { return GetOrSetDecl.getPointer() != 0; }
+  bool isGetterOrSetter() const { return getGetterOrSetterDecl() != 0; }
+
+  /// getGetterOrSetterDecl - Return the declaration for which this function
+  /// is a getter or setter, if it is one.
+  Decl *getGetterOrSetterDecl() const { return GetOrSetDecl.getPointer(); }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }

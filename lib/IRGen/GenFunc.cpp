@@ -2870,7 +2870,10 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
 /// Emit the definition for the given instance method.
 void IRGenModule::emitInstanceMethod(FuncDecl *func) {
   assert(!func->isStatic());
-  emitFunction(*this, func, 1);
+  unsigned startingUncurry = 1;
+  if (dyn_cast_or_null<SubscriptDecl>(func->getGetterOrSetterDecl()))
+    startingUncurry++;
+  emitFunction(*this, func, startingUncurry);
 }
 
 /// Emit the definition for the given static method.

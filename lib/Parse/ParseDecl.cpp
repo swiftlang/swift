@@ -753,17 +753,23 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       // Set up a function declaration for the getter and parse its body.
       
       // Create the parameter list(s) for the getter.
-      llvm::SmallVector<Pattern *, 2> Params;
+      llvm::SmallVector<Pattern *, 3> Params;
       
       // Add the implicit 'this' to Params, if needed.
       if (HasContainerType)
         Params.push_back(buildImplicitThisParameter());
+
+      // Add the index clause if necessary.
+      if (Indices) {
+        SmallVector<TuplePatternElt, 2> TupleElts;
+        cloneTuplePatternElts(Context, *Indices, TupleElts);
+        Params.push_back(TuplePattern::create(Context, SourceLoc(), TupleElts,
+                                              SourceLoc()));
+      }
       
       // Add a no-parameters clause.
-      SmallVector<TuplePatternElt, 2> TupleElts;
-      if (Indices)
-        cloneTuplePatternElts(Context, *Indices, TupleElts);
-      Params.push_back(TuplePattern::create(Context, SourceLoc(), TupleElts,
+      Params.push_back(TuplePattern::create(Context, SourceLoc(),
+                                            ArrayRef<TuplePatternElt>(),
                                             SourceLoc()));
 
       Scope FnBodyScope(this, /*AllowLookup=*/true);
@@ -853,33 +859,35 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     // Set up a function declaration for the setter and parse its body.
     
     // Create the parameter list(s) for the setter.
-    llvm::SmallVector<Pattern *, 2> Params;
+    llvm::SmallVector<Pattern *, 3> Params;
     
     // Add the implicit 'this' to Params, if needed.
     if (HasContainerType)
       Params.push_back(buildImplicitThisParameter());
+
+    // Add the index parameters, if necessary.
+    if (Indices) {
+      SmallVector<TuplePatternElt, 2> TupleElts;
+      cloneTuplePatternElts(Context, *Indices, TupleElts);
+      Params.push_back(TuplePattern::create(Context, SourceLoc(), TupleElts,
+                                            SourceLoc()));
+    }
     
     // Add the parameter. If no name was specified, the name defaults to
     // 'value'.
     if (SetName.empty())
       SetName = Context.getIdentifier("value");
-    
     {
-      SmallVector<TuplePatternElt, 2> TupleElts;
-      if (Indices)
-        cloneTuplePatternElts(Context, *Indices, TupleElts);
-      
       VarDecl *Value = new (Context) VarDecl(SetNameLoc, SetName, ElementTy,
                                              CurDeclContext);
       
       Pattern *ValuePattern
         = new (Context) TypedPattern(new (Context) NamedPattern(Value),
                                      TypeLoc::withoutLoc(ElementTy));
-      
-      TupleElts.push_back(TuplePatternElt(ValuePattern, /*Init=*/nullptr));
+      TuplePatternElt ValueElt(ValuePattern);
       Pattern *ValueParamsPattern
-      = TuplePattern::create(Context, SetNameParens.Start, TupleElts,
-                             SetNameParens.End);
+        = TuplePattern::create(Context, SetNameParens.Start, ValueElt,
+                               SetNameParens.End);
       Params.push_back(ValueParamsPattern);
     }
 

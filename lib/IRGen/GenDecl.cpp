@@ -543,6 +543,16 @@ static AbstractCC addOwnerArgument(ASTContext &ctx, ValueDecl *value,
   llvm_unreachable("bad decl context");
 }
 
+/// Add the 'index' argument to a getter or setter.
+static void addIndexArgument(ASTContext &Context, ValueDecl *value,
+                      Type &formalType, unsigned &uncurryLevel) {
+  if (SubscriptDecl *sub = dyn_cast<SubscriptDecl>(value)) {
+    formalType = FunctionType::get(sub->getIndices()->getType(),
+                                   formalType, Context);
+    uncurryLevel++;
+  }
+}
+
 static Type getObjectType(ValueDecl *decl) {
   if (SubscriptDecl *sub = dyn_cast<SubscriptDecl>(decl))
     return sub->getElementType();
@@ -558,14 +568,9 @@ FormalType IRGenModule::getTypeOfGetter(ValueDecl *value) {
   // where T is the value type of the object and S is the index type
   // (this clause is skipped for a non-subscript getter).
   unsigned uncurryLevel = 0;
-  Type formalType = getObjectType(value);
-  formalType = FunctionType::get(TupleType::getEmpty(Context),
-                                 formalType, Context);
-  if (SubscriptDecl *sub = dyn_cast<SubscriptDecl>(value)) {
-    formalType = FunctionType::get(sub->getIndices()->getType(),
-                                   formalType, Context);
-    uncurryLevel++;
-  }
+  Type formalType = FunctionType::get(TupleType::getEmpty(Context),
+                                      getObjectType(value), Context);
+  addIndexArgument(Context, value, formalType, uncurryLevel);
   AbstractCC cc = addOwnerArgument(Context, value, formalType, uncurryLevel);
 
   return FormalType(formalType, cc, uncurryLevel);
@@ -602,21 +607,15 @@ llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
 /// variable or subscripted object.
 FormalType IRGenModule::getTypeOfSetter(ValueDecl *value) {
   // The formal type of a setter function is one of:
-  //   (S, T) -> () (for a nontype member)
-  //   A -> (S, T) -> () (for a type member)
+  //   S -> T -> () (for a nontype member)
+  //   A -> S -> T -> () (for a type member)
   // where T is the value type of the object and S is the index type
-  // (using just T for a non-subscript setter).
+  // (this clause is skipped for a non-subscript setter).
   unsigned uncurryLevel = 0;
   Type argType = getObjectType(value);
-  if (SubscriptDecl *sub = dyn_cast<SubscriptDecl>(value)) {
-    TupleTypeElt elts[2];
-    elts[0] = TupleTypeElt(sub->getIndices()->getType(), Identifier());
-    elts[1] = TupleTypeElt(argType, Identifier());
-    argType = TupleType::get(elts, Context);
-  }
   Type formalType = FunctionType::get(argType, TupleType::getEmpty(Context),
                                       Context);
-
+  addIndexArgument(Context, value, formalType, uncurryLevel);
   auto cc = addOwnerArgument(Context, value, formalType, uncurryLevel);
 
   return FormalType(formalType, cc, uncurryLevel);
