@@ -137,6 +137,8 @@ public:
   llvm::PointerType *isSingleIndirectValue(Type T, ExplosionKind kind);
   llvm::PointerType *requiresIndirectResult(Type T, ExplosionKind kind);
 
+  bool isResilient(Decl *decl) { return false; }
+
 private:
   TypeConverter &Types;
   friend class TypeConverter;

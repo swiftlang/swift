@@ -433,9 +433,7 @@ void swift::irgen::emitRequalify(IRGenFunction &IGF, RequalifyExpr *E,
 /// Must accesses to the given variable be performed as a
 /// logical access?
 static bool isVarAccessLogical(IRGenFunction &IGF, VarDecl *var) {
-  // For now, the answer is yes only if the variable is a property.
-  // FIXME: resilience
-  return var->isProperty();
+  return var->isProperty() || IGF.IGM.isResilient(var);
 }
 
 void GetterSetter::storeRValue(IRGenFunction &IGF, Expr *rvalue, Address base,
@@ -1153,7 +1151,7 @@ void irgen::emitGenericMemberRef(IRGenFunction &IGF,
 
   // The remaining case is to construct an implicit closure.
   // Just refuse to do this for now.
-  assert(E->getType()->is<FunctionType>());
+  assert(E->getType()->is<AnyFunctionType>());
   IGF.unimplemented(E->getLoc(),
               "forming implicit closure over generic member reference");
   IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), out);  

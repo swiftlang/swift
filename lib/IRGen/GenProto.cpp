@@ -2880,7 +2880,7 @@ void irgen::emitExistentialMemberRef(IRGenFunction &IGF,
 
   // The remaining case is to construct an implicit closure.
   // Just refuse to do this for now.
-  assert(E->getType()->is<FunctionType>());
+  assert(E->getType()->is<AnyFunctionType>());
   IGF.unimplemented(E->getLoc(),
               "forming implicit closure over existential member reference");
   IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), out);
@@ -2890,7 +2890,6 @@ void irgen::emitExistentialMemberRef(IRGenFunction &IGF,
 LValue irgen::emitExistentialMemberRefLValue(IRGenFunction &IGF,
                                              ExistentialMemberRefExpr *E) {
 
-  VarDecl *var = cast<VarDecl>(E->getDecl());
   IGF.unimplemented(E->getLoc(),
                     "using existential member reference as l-value");
   return IGF.emitFakeLValue(E->getType());
@@ -3093,7 +3092,7 @@ void irgen::emitArchetypeMemberRef(IRGenFunction &IGF,
 
   // The remaining case is to construct an implicit closure.
   // Just refuse to do this for now.
-  assert(E->getType()->is<FunctionType>());
+  assert(E->getType()->is<AnyFunctionType>());
   IGF.unimplemented(E->getLoc(),
               "forming implicit closure over existential member reference");
   IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), out);

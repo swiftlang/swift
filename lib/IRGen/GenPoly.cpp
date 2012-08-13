@@ -269,6 +269,79 @@ bool irgen::differsByAbstraction(IRGenModule &IGM,
   return DiffersByAbstraction(IGM, diffKind).visit(origTy, substTy);
 }
 
+/// A class for testing whether a type directly stores an archetype.
+struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
+                         irgen::TypeVisitor<EmbedsArchetype, bool> {
+  IRGenModule &IGM;
+  EmbedsArchetype(IRGenModule &IGM) : IGM(IGM) {}
+
+  using irgen::DeclVisitor<EmbedsArchetype, bool>::visit;
+  using irgen::TypeVisitor<EmbedsArchetype, bool>::visit;
+
+  bool visitTupleType(TupleType *type) {
+    for (auto &field : type->getFields())
+      if (visit(CanType(field.getType())))
+        return true;
+    return false;
+  }
+  bool visitArchetypeType(ArchetypeType *type) {
+    return true;
+  }
+  bool visitBoundGenericType(BoundGenericType *type) {
+    return visit(type->getDecl());
+  }
+#define FOR_NOMINAL_TYPE(Kind)                 \
+  bool visit##Kind##Type(Kind##Type *type) {   \
+    return visit##Kind##Decl(type->getDecl()); \
+  }
+  FOR_NOMINAL_TYPE(Protocol)
+  FOR_NOMINAL_TYPE(Struct)
+  FOR_NOMINAL_TYPE(Class)
+  FOR_NOMINAL_TYPE(OneOf)
+#undef FOR_NOMINAL_TYPE
+
+  bool visitArrayType(ArrayType *type) {
+    return visit(CanType(type->getBaseType()));
+  }
+
+  // All these types are leaves, in the sense that they don't directly
+  // store any other types.
+  bool visitBuiltinType(BuiltinType *type) { return false; }
+  bool visitMetaTypeType(MetaTypeType *type) { return false; }
+  bool visitModuleType(ModuleType *type) { return false; }
+  bool visitAnyFunctionType(AnyFunctionType *type) { return false; }
+  bool visitLValueType(LValueType *type) { return false; }
+  bool visitProtocolCompositionType(ProtocolCompositionType *type) {
+    return false;
+  }
+
+  bool visitProtocolDecl(ProtocolDecl *decl) { return false; }
+  bool visitClassDecl(ClassDecl *decl) { return false; }
+  bool visitStructDecl(StructDecl *decl) {
+    if (IGM.isResilient(decl)) return true;
+    return visitMembers(decl->getMembers());
+  }
+  bool visitOneOfDecl(OneOfDecl *decl) {
+    if (IGM.isResilient(decl)) return true;
+    return visitMembers(decl->getMembers());
+  }
+  bool visitVarDecl(VarDecl *var) {
+    if (var->isProperty()) return false;
+    return visit(var->getType()->getCanonicalType());
+  }
+  bool visitOneOfElementDecl(OneOfElementDecl *decl) {
+    return visit(decl->getType()->getCanonicalType());
+  }
+  bool visitDecl(Decl *decl) { return false; }
+
+  bool visitMembers(ArrayRef<Decl*> members) {
+    for (auto member : members)
+      if (visit(member))
+        return true;
+    return false;
+  }
+};
+
 namespace {
   /// A visitor for emitting substituted r-values.
   class SubstRValueReemitter : public SubstTypeVisitor<SubstRValueReemitter> {
@@ -337,7 +410,10 @@ namespace {
         return In.transferInto(Out, 1);
 
       // Otherwise, this gets more complicated.
-      IGF.unimplemented(SourceLoc(), "remapping bound generic value types");
+      if (EmbedsArchetype(IGF.IGM).visitBoundGenericType(origTy))
+        IGF.unimplemented(SourceLoc(),
+               "remapping bound generic value types with archetype members");
+
       // FIXME: This is my first shot at implementing this, but it doesn't
       // handle cases which actually need remapping.
       In.transferInto(Out, IGF.IGM.getExplosionSize(origTy, In.getKind()));
@@ -361,8 +437,9 @@ namespace {
 
     void visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
       // There's actually nothing to do here right now, but eventually
-      // we'll actually implement metatypes with representations.
-      IGF.unimplemented(SourceLoc(), "remapping metatypes");
+      // some metatypes may actually get representations.
+      assert(IGF.IGM.getSchema(origTy, In.getKind()).empty());
+      assert(IGF.IGM.getSchema(substTy, Out.getKind()).empty());
     }
 
     void visitTupleType(TupleType *origTy, TupleType *substTy) {

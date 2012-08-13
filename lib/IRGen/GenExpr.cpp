@@ -319,6 +319,10 @@ namespace {
       return isa<VarDecl>(D) || isa<SubscriptDecl>(D);
     }
 
+    bool isTypeMember(ValueDecl *D) {
+      return isa<TypeDecl>(D);
+    }
+
 #define FOR_MEMBER_KIND(KIND)                                              \
     void visit##KIND##MemberRefExpr(KIND##MemberRefExpr *E) {              \
       if (isLValueMember(E->getDecl())) {                                  \
@@ -326,6 +330,8 @@ namespace {
         return IGF.emitLValueAsScalar(emit##KIND##MemberRefLValue(IGF, E), \
                                       isOnHeap(E->getType()), Out);        \
       }                                                                    \
+      if (isTypeMember(E->getDecl()))                                      \
+        return;                                                            \
                                                                            \
       assert(!E->getType()->is<LValueType>());                             \
       emit##KIND##MemberRef(IGF, E, Out);                                  \
