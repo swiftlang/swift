@@ -28,8 +28,10 @@ namespace irgen {
 
 /// A plan for emitting a series of calls.
 class CallEmission {
+public:
   IRGenFunction &IGF;
 
+private:
   /// The builtin/specialiarguments to pass to the call.
   llvm::SmallVector<llvm::Value*, 8> Args;
 
@@ -64,8 +66,6 @@ class CallEmission {
   /// RemainingArgsForCallee, at least between calls.
   bool EmittedCall;
 
-  const Callee &getCallee() const { return CurCallee; }
-
   void forceCallee();
   void setFromCallee();
   void emitToUnmappedMemory(Address addr);
@@ -77,6 +77,8 @@ public:
     setFromCallee();
   }
   ~CallEmission();
+
+  const Callee &getCallee() const { return CurCallee; }
 
   static CallEmission forExpr(IRGenFunction &IGF, Expr *fn,
                               ExplosionKind outputLevel,

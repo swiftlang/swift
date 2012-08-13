@@ -29,6 +29,7 @@
 #include "GenInit.h"
 #include "GenStruct.h"
 #include "GenType.h"
+#include "GetterSetter.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Explosion.h"
@@ -435,373 +436,325 @@ static bool isVarAccessLogical(IRGenFunction &IGF, VarDecl *var) {
   return var->isProperty();
 }
 
+void GetterSetter::storeRValue(IRGenFunction &IGF, Expr *rvalue, Address base,
+                               ShouldPreserveValues shouldPreserve) const {
+  CallEmission emission = prepareSetter(IGF, base, ExplosionKind::Maximal,
+                                        shouldPreserve);
+  emission.addArg(rvalue);
+  emission.emitVoid();
+}
+
+void GetterSetter::storeMaterialized(IRGenFunction &IGF, Address temp,
+                                     Address base,
+                                 ShouldPreserveValues shouldPreserve) const {
+  CallEmission emission = prepareSetter(IGF, base, ExplosionKind::Maximal,
+                                        shouldPreserve);
+  emission.addMaterializedArg(temp, /*asTake*/ false);
+  emission.emitVoid();
+}
+
+void GetterSetter::storeExplosion(IRGenFunction &IGF,
+                                  Explosion &value, Address base,
+                                  ShouldPreserveValues shouldPreserve) const {
+  CallEmission emission = prepareSetter(IGF, base, ExplosionKind::Maximal,
+                                        shouldPreserve);
+  emission.addArg(value);
+  emission.emitVoid();
+}
+
+void GetterSetter::loadExplosion(IRGenFunction &IGF, Address base,
+                                 Explosion &out,
+                                 ShouldPreserveValues shouldPreserve) const {
+  CallEmission emission = prepareGetter(IGF, base, ExplosionKind::Maximal,
+                                        shouldPreserve);
+  emission.addEmptyArg();
+  emission.emitToExplosion(out);
+}
+
+void GetterSetter::loadMaterialized(IRGenFunction &IGF, Address base,
+                                    Address temp,
+                                    ShouldPreserveValues shouldPreserve) const {
+  CallEmission emission = prepareGetter(IGF, base, ExplosionKind::Maximal,
+                                        shouldPreserve);
+  emission.addEmptyArg();
+
+  const TypeInfo &valueTI =
+    IGF.getFragileTypeInfo(emission.getCallee().getSubstResultType());
+  emission.emitToMemory(temp, valueTI);
+}
+
+OwnedAddress
+GetterSetter::loadAndMaterialize(IRGenFunction &IGF,
+                                 OnHeap_t onHeap, Address base,
+                                 ShouldPreserveValues shouldPreserve) const {
+  CallEmission emission = prepareGetter(IGF, base, ExplosionKind::Maximal,
+                                        shouldPreserve);
+  emission.addEmptyArg();
+
+  Initialization init;
+  InitializedObject object = init.getObjectForTemporary();
+
+  const TypeInfo &valueTI =
+    IGF.getFragileTypeInfo(emission.getCallee().getSubstResultType());
+  init.registerObject(IGF, object, onHeap, valueTI);
+
+  // Emit a local allocation for the object.
+  OwnedAddress addr = init.emitLocalAllocation(IGF, object, onHeap,
+                                               valueTI, "temporary");
+
+  // Load into the new memory.
+  emission.emitToMemory(addr, valueTI);
+
+  // The load is complete;  mark the memory as initialized.
+  init.markInitialized(IGF, object);
+
+  return addr;
+}
+
+void MemberGetterSetterBase::initBaseValues(Explosion &values) {
+  unsigned numValues = values.size();
+  assert(numValues == NumBaseValues);
+  std::memcpy(getBaseValuesBuffer(), values.claimAll().data(),
+              sizeof(ManagedValue) * numValues);
+}
+
+void MemberGetterSetterBase::initIndexValues(Explosion &values) {
+  unsigned numValues = values.size();
+  assert(numValues == NumIndexValues);
+  std::memcpy(getIndexValuesBuffer(), values.claimAll().data(),
+              sizeof(ManagedValue) * numValues);
+}
+
+/// Given a bunch of stored values of the substituted type, emitted at
+/// maximal explosion, add them to the given explosion as values of
+/// the original type.
+static void addStored(IRGenFunction &IGF, ArrayRef<ManagedValue> storedValues,
+                      Explosion &out, ShouldPreserveValues shouldPreserve,
+                      CanType origType, CanType substType,
+                      ArrayRef<Substitution> subs) {
+  // In the simplest case, just add them straight.
+  if (!shouldPreserve &&
+      out.getKind() == ExplosionKind::Maximal &&
+      origType == substType) {
+    return out.add(storedValues);
+  }
+
+  // Otherwise, we need to reexplode and potentially map.
+  Explosion storedExplosion(ExplosionKind::Maximal);
+  storedExplosion.add(storedValues);
+
+  // FIXME: re-emit under substitution!
+  const TypeInfo &byvalTI = IGF.getFragileTypeInfo(substType);
+  if (shouldPreserve) {
+    byvalTI.copy(IGF, storedExplosion, out);
+  } else {
+    byvalTI.reexplode(IGF, storedExplosion, out);
+  }
+}
+
+/// Add the base values to the given explosion.
+void MemberGetterSetterBase::addBaseValues(IRGenFunction &IGF,
+                                           Explosion &out,
+                                           ShouldPreserveValues shouldPreserve,
+                                           CanType origBaseType,
+                                           CanType substBaseType,
+                                           ArrayRef<Substitution> subs) const {
+  // The stored index values come from a maximal explosion.
+  ArrayRef<ManagedValue> storedValues(getBaseValuesBuffer(),
+                                      NumBaseValues);
+
+  addStored(IGF, storedValues, out, shouldPreserve,
+            origBaseType, substBaseType, subs);
+}
+
+/// Add the index values to the given explosion.
+void MemberGetterSetterBase::addIndexValues(IRGenFunction &IGF,
+                                            Explosion &out,
+                                            ShouldPreserveValues shouldPreserve,
+                                            CanType origIndexType,
+                                            CanType substIndexType,
+                                            ArrayRef<Substitution> subs) const {
+  // The stored index values come from a maximal explosion.
+  ArrayRef<ManagedValue> storedValues(getIndexValuesBuffer(),
+                                      NumIndexValues);
+
+  addStored(IGF, storedValues, out, shouldPreserve,
+            origIndexType, substIndexType, subs);
+}
+
 namespace {
-  class GetterSetterTarget {
-  public:
-    enum Kind {
-      IndependentVar, ByrefMemberVar, ByvalMemberVar,
-      ByrefMemberSubscript, ByvalMemberSubscript
-    };
-    static bool isSubscriptKind(Kind kind) {
-      return kind == ByrefMemberSubscript ||
-             kind == ByvalMemberSubscript;
-    }
-    static bool isByrefMemberKind(Kind kind) {
-      return kind == ByrefMemberVar ||
-             kind == ByrefMemberSubscript;
-    }
-    static bool isByvalMemberKind(Kind kind) {
-      return kind == ByvalMemberVar ||
-             kind == ByvalMemberSubscript;
-    }
-    static bool isMemberKind(Kind kind) {
-      return kind != IndependentVar;
-    }
-
-  private:
-    GetterSetterTarget(Kind kind, ValueDecl *decl, unsigned baseSize = 0,
-                       unsigned indexSize = 0)
-      : Target(decl), TargetKind(kind), BaseExplosionSize(baseSize),
-        IndexExplosionSize(indexSize) {
-      assert(!isSubscript() || isa<SubscriptDecl>(decl));
-      assert(!isVar() || isa<VarDecl>(decl));
-      assert(isByvalMember() || baseSize == 0);
-      assert(isSubscript() || indexSize == 0);
+  /// A class for implementing getters and setters on top of a
+  /// concrete getter or setter, with no substitution required.
+  class ConcreteMemberGetterSetterBase : public MemberGetterSetterBase {
+  protected:
+    ConcreteMemberGetterSetterBase(ValueDecl *target,
+                                   unsigned numBaseValues,
+                                   unsigned numIndexValues,
+                                   size_t thisSize)
+      : MemberGetterSetterBase(target, numBaseValues, numIndexValues,
+                               thisSize) {
     }
 
   public:
-    static GetterSetterTarget forByrefMemberVar(VarDecl *var) {
-      return GetterSetterTarget(Kind::ByrefMemberVar, var);
-    }
-    static GetterSetterTarget forByvalMemberVar(VarDecl *var,
-                                                unsigned baseSize) {
-      return GetterSetterTarget(Kind::ByvalMemberVar, var, baseSize);
-    }
-    static GetterSetterTarget forIndependentVar(VarDecl *var) {
-      return GetterSetterTarget(Kind::IndependentVar, var);
-    }
-    static GetterSetterTarget
-    forByrefMemberSubscript(SubscriptDecl *subscript,
-                            unsigned indexSize) {
-      return GetterSetterTarget(Kind::ByrefMemberSubscript,
-                                subscript, /*baseSize*/ 0, indexSize);
-    }
-    static GetterSetterTarget
-    forByvalMemberSubscript(SubscriptDecl *subscript,
-                            unsigned baseSize,
-                            unsigned indexSize) {
-      return GetterSetterTarget(Kind::ByvalMemberSubscript,
-                                subscript, baseSize, indexSize);
-    }
-
-    // FIXME
-    ArrayRef<Substitution> getSubstitutions() const {
-      return ArrayRef<Substitution>();
-    }
-
-    Kind getKind() const { return TargetKind; }
-    bool isSubscript() const { return isSubscriptKind(getKind()); }
-    bool isVar() const { return !isSubscript(); }
-    bool isByrefMember() const { return isByrefMemberKind(getKind()); }
-    bool isByvalMember() const { return isByvalMemberKind(getKind()); }
-    bool isMember() const { return isMemberKind(getKind()); }
-
-    ValueDecl *getDecl() const { return Target; }
-    VarDecl *getVarDecl() const {
-      assert(!isSubscript());
-      return cast<VarDecl>(getDecl());
-    }
-    SubscriptDecl *getSubscriptDecl() const {
-      assert(isSubscript());
-      return cast<SubscriptDecl>(getDecl());
-    }
-
-    /// Returns the size of the byval base as a maximal explosion.
-    unsigned getBaseExplosionSize() const {
-      assert(isByvalMember());
-      return BaseExplosionSize;
-    }
-
-    /// Returns the size of the index value as a maximal explosion.
-    unsigned getIndexExplosionSize() const {
-      assert(isSubscript());
-      return IndexExplosionSize;
-    }
-
-    /// Find the formal type of this object.
-    Type getType() const {
-      if (isSubscript())
-        return getSubscriptDecl()->getElementType();
-      return getVarDecl()->getType();
-    }
-
-    Type getByvalType() const {
-      return getDecl()->getDeclContext()->getDeclaredTypeOfContext();
-    }
-
-    Type getIndexType() const {
-      return getSubscriptDecl()->getIndices()->getType();
-    }
-
-    /// Find the address of the getter function.
-    Callee getGetter(IRGenFunction &IGF, ExplosionKind explosionLevel) const {
+    CallEmission prepareGetter(IRGenFunction &IGF,
+                               Address base,
+                               ExplosionKind maxExplosion,
+                               ShouldPreserveValues shouldPreserve) const {
       // For now, always be pessimistic.
-      explosionLevel = ExplosionKind::Minimal;
+      ExplosionKind explosionLevel = ExplosionKind::Minimal;
 
-      FormalType formal = IGF.IGM.getTypeOfGetter(getDecl());
+      auto target = getTarget();
+      FormalType formal = IGF.IGM.getTypeOfGetter(target);
       llvm::Constant *fn =
-        IGF.IGM.getAddrOfGetter(getDecl(), formal, explosionLevel);
-      return Callee::forKnownFunction(formal.getCC(), formal.getType(),
-                                      getType(), getSubstitutions(),
-                                      fn, ManagedValue(nullptr),
-                                      explosionLevel,
-                                      formal.getNaturalUncurryLevel());
-    }
+        IGF.IGM.getAddrOfGetter(target, formal, explosionLevel);
+      Callee callee = Callee::forKnownFunction(formal.getCC(), formal.getType(),
+                                               getSubstObjectType(),
+                                               ArrayRef<Substitution>(),
+                                               fn, ManagedValue(nullptr),
+                                               explosionLevel,
+                                               formal.getNaturalUncurryLevel());
 
-    /// Find the address of the getter function.
-    Callee getSetter(IRGenFunction &IGF, ExplosionKind explosionLevel) const {
-      // For now, always be pessimistic.
-      explosionLevel = ExplosionKind::Minimal;
-
-      FormalType formal = IGF.IGM.getTypeOfSetter(getDecl());
-      llvm::Constant *fn =
-        IGF.IGM.getAddrOfSetter(getDecl(), formal, explosionLevel);
-
-      Type voidTy = TupleType::getEmpty(IGF.IGM.Context);
-      return Callee::forKnownFunction(formal.getCC(), formal.getType(),
-                                      voidTy, getSubstitutions(),
-                                      fn, ManagedValue(nullptr),
-                                      explosionLevel,
-                                      formal.getNaturalUncurryLevel());
-    }
-
-  private:
-    ValueDecl* Target;
-    Kind TargetKind;
-    unsigned BaseExplosionSize;
-    unsigned IndexExplosionSize;
-  };
-
-  class GetterSetterComponent : public LogicalPathComponent {
-    GetterSetterTarget Target;
-
-    const ManagedValue *getBaseValuesBuffer() const {
-      return reinterpret_cast<const ManagedValue*>(this + 1);
-    }
-    ManagedValue *getBaseValuesBuffer() {
-      return reinterpret_cast<ManagedValue*>(this + 1);
-    }
-    const ManagedValue *getIndexValuesBuffer() const {
-      auto values = reinterpret_cast<const ManagedValue*>(this + 1);
-      if (Target.isByvalMember())
-        values += Target.getBaseExplosionSize();
-      return values;
-    }
-    ManagedValue *getIndexValuesBuffer() {
-      auto values = reinterpret_cast<ManagedValue*>(this + 1);
-      if (Target.isByvalMember())
-        values += Target.getBaseExplosionSize();
-      return values;
-    }
-
-  public:
-    GetterSetterComponent(GetterSetterTarget &&target) : Target(target) {}
-
-    /// Required by LValue::addWithExtra.
-    static size_t extra_storage_size(const GetterSetterTarget &target) {
-      assert(target.isByvalMember() || target.isSubscript());
-      size_t size = 0;
-      if (target.isByvalMember())
-        size += sizeof(ManagedValue) * target.getBaseExplosionSize();
-      if (target.isSubscript())
-        size += sizeof(ManagedValue) * target.getIndexExplosionSize();
-      return size;
-    }
-
-    void initBaseValues(Explosion &values) {
-      assert(values.getKind() == ExplosionKind::Maximal &&
-             "cannot store non-maximal index explosion in "
-             "GetterSetterComponent!");
-      assert(values.size() == Target.getBaseExplosionSize());
-      std::memcpy(getBaseValuesBuffer(), values.claimAll().data(),
-                  sizeof(ManagedValue) * Target.getBaseExplosionSize());
-    }
-
-    void initIndexValues(Explosion &values) {
-      assert(values.getKind() == ExplosionKind::Maximal &&
-             "cannot store non-maximal index explosion in "
-             "GetterSetterComponent!");
-      assert(values.size() == Target.getIndexExplosionSize());
-      std::memcpy(getIndexValuesBuffer(), values.claimAll().data(),
-                  sizeof(ManagedValue) * Target.getIndexExplosionSize());
-    }
-
-    /// Add the base values to the given explosion.
-    void addBaseValues(IRGenFunction &IGF, Explosion &out,
-                       ShouldPreserveValues shouldPreserve) const {
-      // The stored index values come from a maximal explosion.
-      ArrayRef<ManagedValue> storedValues(getBaseValuesBuffer(),
-                                          Target.getBaseExplosionSize());
-
-      // Just copy them in straight if the target is maximal.
-      if (!shouldPreserve && out.getKind() == ExplosionKind::Maximal)
-        return out.add(storedValues);
-
-      // Otherwise, reexplode.
-      Explosion storedExplosion(ExplosionKind::Maximal);
-      storedExplosion.add(storedValues);
-
-      Type byvalType = Target.getByvalType();
-      const TypeInfo &byvalTI = IGF.getFragileTypeInfo(byvalType);
-      if (shouldPreserve) {
-        byvalTI.copy(IGF, storedExplosion, out);
-      } else {
-        byvalTI.reexplode(IGF, storedExplosion, out);
-      }
-    }
-
-    /// Add the index values to the given explosion.
-    void addIndexValues(IRGenFunction &IGF, Explosion &out,
-                        ShouldPreserveValues shouldPreserve) const {
-      // The stored index values come from a maximal explosion.
-      ArrayRef<ManagedValue> storedValues(getIndexValuesBuffer(),
-                                          Target.getIndexExplosionSize());
-
-      // Just copy them in straight if the target is maximal.
-      if (!shouldPreserve && out.getKind() == ExplosionKind::Maximal)
-        return out.add(storedValues);
-
-      // Otherwise, reexplode.
-      Explosion storedExplosion(ExplosionKind::Maximal);
-      storedExplosion.add(storedValues);
-
-      Type indexType = Target.getIndexType();
-      const TypeInfo &indexTI = IGF.getFragileTypeInfo(indexType);
-      if (shouldPreserve) {
-        indexTI.copy(IGF, storedExplosion, out);
-      } else {
-        indexTI.reexplode(IGF, storedExplosion, out);
-      }
-    }
-
-    void addSelfArg(IRGenFunction &IGF, CallEmission &emission,
-                    Address base, ShouldPreserveValues shouldPreserve) const {
-      if (Target.isByrefMember()) {
-        Explosion selfArg(emission.getCurExplosionLevel());
-        selfArg.addUnmanaged(base.getAddress());
-        emission.addArg(selfArg);
-      } else if (Target.isByvalMember()) {
-        Explosion selfArg(emission.getCurExplosionLevel());
-        addBaseValues(IGF, selfArg, shouldPreserve);
-        emission.addArg(selfArg);
-      }
-    }
-
-    void addIndexArg(IRGenFunction &IGF, CallEmission &emission,
-                     ShouldPreserveValues shouldPreserve) const {
-      if (Target.isSubscript()) {
-        Explosion index(emission.getCurExplosionLevel());
-        addIndexValues(IGF, index, shouldPreserve);
-        emission.addArg(index);
-      }
+      CallEmission emission(IGF, callee);
+      addArgs(emission, base, shouldPreserve);
+      return emission;
     }
 
     CallEmission prepareSetter(IRGenFunction &IGF,
                                Address base,
                                ExplosionKind maxExplosion,
                                ShouldPreserveValues shouldPreserve) const {
-      CallEmission emission(IGF, Target.getSetter(IGF, maxExplosion));
-      addSelfArg(IGF, emission, base, shouldPreserve);
-      addIndexArg(IGF, emission, shouldPreserve);
+      // For now, always be pessimistic.
+      ExplosionKind explosionLevel = ExplosionKind::Minimal;
+
+      Type substResultType = TupleType::getEmpty(IGF.IGM.Context);
+
+      auto target = getTarget();
+      FormalType formal = IGF.IGM.getTypeOfSetter(target);
+      llvm::Constant *fn =
+        IGF.IGM.getAddrOfSetter(target, formal, explosionLevel);
+      Callee callee = Callee::forKnownFunction(formal.getCC(), formal.getType(),
+                                               substResultType,
+                                               ArrayRef<Substitution>(),
+                                               fn, ManagedValue(nullptr),
+                                               explosionLevel,
+                                               formal.getNaturalUncurryLevel());
+
+      CallEmission emission(IGF, callee);
+      addArgs(emission, base, shouldPreserve);
       return emission;
     }
-                               
-    CallEmission prepareGetter(IRGenFunction &IGF,
-                               Address base,
-                               ExplosionKind maxExplosion,
-                               ShouldPreserveValues shouldPreserve) const {
-      CallEmission emission(IGF, Target.getGetter(IGF, maxExplosion));
-      addSelfArg(IGF, emission, base, shouldPreserve);
-      addIndexArg(IGF, emission, shouldPreserve);
-      return emission;
-    }
-                               
-    void storeRValue(IRGenFunction &IGF, Expr *rvalue,
-                     Address base, ShouldPreserveValues shouldPreserve) const {
-      CallEmission emission = prepareSetter(IGF, base, ExplosionKind::Maximal,
-                                            shouldPreserve);
-      emission.addArg(rvalue);
-      emission.emitVoid();
+
+    Type getSubstObjectType() const {
+      ValueDecl *target = getTarget();
+      if (auto subscript = dyn_cast<SubscriptDecl>(target))
+        return subscript->getElementType();
+      return cast<VarDecl>(target)->getType();
     }
 
-    void storeMaterialized(IRGenFunction &IGF, Address temp,
-                           Address base,
-                           ShouldPreserveValues shouldPreserve) const {
-      CallEmission emission = prepareSetter(IGF, base, ExplosionKind::Maximal,
-                                            shouldPreserve);
-      emission.addMaterializedArg(temp, /*asTake*/ false);
-      emission.emitVoid();
+    virtual void addSelfArg(CallEmission &emission, Address base,
+                            ShouldPreserveValues shouldPreserve) const = 0;
+
+    void addIndexArg(CallEmission &emission,
+                     ShouldPreserveValues shouldPreserve) const {
+      auto subscript = dyn_cast<SubscriptDecl>(getTarget());
+      if (!subscript) return;
+
+      CanType origIndexType =
+        subscript->getIndices()->getType()->getCanonicalType();
+
+      Explosion index(emission.getCurExplosionLevel());
+      addIndexValues(emission.IGF, index, shouldPreserve,
+                     origIndexType, origIndexType, ArrayRef<Substitution>());
+      emission.addArg(index);
     }
 
-    void storeExplosion(IRGenFunction &IGF, Explosion &value,
-                        Address base, ShouldPreserveValues shouldPreserve) const {
-      CallEmission emission = prepareSetter(IGF, base, ExplosionKind::Maximal,
-                                            shouldPreserve);
-      emission.addArg(value);
-      emission.emitVoid();
+    void addArgs(CallEmission &emission, Address base,
+                 ShouldPreserveValues shouldPreserve) const {
+      // Defer to the derived class for how to emit the 'self' argument.
+      addSelfArg(emission, base, shouldPreserve);
+
+      // Add the index argument if necessary.
+      addIndexArg(emission, shouldPreserve);
+    }
+  };
+
+  struct DirectMemberGetterSetter
+      : MemberGetterSetter<DirectMemberGetterSetter,
+                           ConcreteMemberGetterSetterBase> {
+
+    DirectMemberGetterSetter(SubscriptDecl *target, Explosion &baseArgs,
+                             Explosion &indexArgs)
+        : MemberGetterSetter(target, baseArgs.size(), indexArgs.size()) {
+      initBaseValues(baseArgs);
+      initIndexValues(indexArgs);
     }
 
-    void loadExplosion(IRGenFunction &IGF, Address base, Explosion &out,
-                       ShouldPreserveValues shouldPreserve) const {
-      CallEmission emission = prepareGetter(IGF, base, ExplosionKind::Maximal,
-                                            shouldPreserve);
-      emission.addEmptyArg();
-      emission.emitToExplosion(out);
+    DirectMemberGetterSetter(VarDecl *target, Explosion &baseArgs)
+        : MemberGetterSetter(target, baseArgs.size()) {
+      initBaseValues(baseArgs);
     }
 
-    void loadMaterialized(IRGenFunction &IGF, Address base, Address temp,
-                          ShouldPreserveValues shouldPreserve) const {
-      CallEmission emission = prepareGetter(IGF, base, ExplosionKind::Maximal,
-                                            shouldPreserve);
-      emission.addEmptyArg();
+    void addSelfArg(CallEmission &emission, Address base,
+                    ShouldPreserveValues shouldPreserve) const {
+      Explosion selfArg(emission.getCurExplosionLevel());
 
-      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
-      emission.emitToMemory(temp, valueTI);
+      CanType origBaseType =
+        getTarget()->getDeclContext()->getDeclaredTypeOfContext()
+                   ->getCanonicalType();
+      addBaseValues(emission.IGF, selfArg, shouldPreserve,
+                    origBaseType, origBaseType, ArrayRef<Substitution>());
+      emission.addArg(selfArg);      
+    }
+  };
+
+  struct IndirectMemberGetterSetter
+      : MemberGetterSetter<IndirectMemberGetterSetter,
+                           ConcreteMemberGetterSetterBase> {
+
+    IndirectMemberGetterSetter(SubscriptDecl *target, Explosion &indexArgs)
+        : MemberGetterSetter(target, 0, indexArgs.size()) {
+      initIndexValues(indexArgs);
     }
 
-    OwnedAddress loadAndMaterialize(IRGenFunction &IGF, OnHeap_t onHeap,
-                                    Address base,
-                                    ShouldPreserveValues shouldPreserve) const {
-      Initialization init;
-      InitializedObject object = init.getObjectForTemporary();
+    IndirectMemberGetterSetter(VarDecl *target)
+        : MemberGetterSetter(target, 0) {
+    }
 
-      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
-      init.registerObject(IGF, object, onHeap, valueTI);
+    void addSelfArg(CallEmission &emission, Address base,
+                    ShouldPreserveValues shouldPreserve) const {
+      Explosion selfArg(emission.getCurExplosionLevel());
+      selfArg.addUnmanaged(base.getAddress());
+      emission.addArg(selfArg);
+    }
+  };
 
-      // Emit a local allocation for the object.
-      OwnedAddress addr = init.emitLocalAllocation(IGF, object, onHeap,
-                                                   valueTI, "temporary");
+  struct GlobalGetterSetter
+      : MemberGetterSetter<GlobalGetterSetter,
+                           ConcreteMemberGetterSetterBase> {
 
-      // Load into the new memory.
-      GetterSetterComponent::loadMaterialized(IGF, base, addr, shouldPreserve);
+    GlobalGetterSetter(SubscriptDecl *target, Explosion &indexArgs)
+        : MemberGetterSetter(target, 0, indexArgs.size()) {
+      initIndexValues(indexArgs);
+    }
 
-      // The load is complete;  mark the memory as initialized.
-      init.markInitialized(IGF, object);
+    GlobalGetterSetter(VarDecl *target)
+        : MemberGetterSetter(target, 0) {
+    }
 
-      return addr;
+    void addSelfArg(CallEmission &emission, Address base,
+                    ShouldPreserveValues shouldPreserve) const {
     }
   };
 }
 
 /// Emit an l-value for the given member reference.
-LValue swift::irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
+LValue irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
   VarDecl *var = E->getDecl();
 
-  if (E->getBase()->getType()->hasReferenceSemantics()) {
+  if (!E->getBase()->getType()->is<LValueType>()) {
+    assert(var->getDeclContext()->getDeclaredTypeOfContext()->is<ClassType>());
     if (!isVarAccessLogical(IGF, var)) {
-      if (isa<ClassDecl>(var->getDeclContext()))
-        return emitPhysicalClassMemberLValue(IGF, E);
-      llvm_unreachable("Unexpected physical lvalue MemberRefExpr");
+      return emitPhysicalClassMemberLValue(IGF, E);
     }
 
     // Emit the base value.
@@ -810,25 +763,20 @@ LValue swift::irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
 
     // Build the logical lvalue.
     LValue lvalue;
-    GetterSetterComponent &component =
-      lvalue.addWithExtra<GetterSetterComponent>(
-              GetterSetterTarget::forByvalMemberVar(var, base.size()));
-    component.initBaseValues(base);
+    lvalue.addWithExtra<DirectMemberGetterSetter>(var, base);
     return lvalue;
   }
 
   if (!isVarAccessLogical(IGF, var)) {
-    if (isa<StructDecl>(var->getDeclContext()))
-      return emitPhysicalStructMemberLValue(IGF, E);
-
-    llvm_unreachable("Unexpected physical lvalue MemberRefExpr");
+    assert(isa<StructDecl>(var->getDeclContext()));
+    return emitPhysicalStructMemberLValue(IGF, E);
   }
 
   // Emit the base l-value.
   LValue lvalue = IGF.emitLValue(E->getBase());
 
   // Push a logical member reference.
-  lvalue.add<GetterSetterComponent>(GetterSetterTarget::forByrefMemberVar(var));
+  lvalue.add<IndirectMemberGetterSetter>(var);
 
   return lvalue;
 }
@@ -850,8 +798,7 @@ LValue IRGenFunction::getGlobal(VarDecl *var) {
   // GetterSetterComponent.
   if (isVarAccessLogical(*this, var)) {
     LValue lvalue;
-    lvalue.add<GetterSetterComponent>(
-                                 GetterSetterTarget::forIndependentVar(var));
+    lvalue.add<GlobalGetterSetter>(var);
     return lvalue;
   }
 
@@ -861,8 +808,8 @@ LValue IRGenFunction::getGlobal(VarDecl *var) {
 }
 
 /// Emit an l-value for the given subscripted reference.
-LValue swift::irgen::emitSubscriptLValue(IRGenFunction &IGF, SubscriptExpr *E) {
-  if (E->getBase()->getType()->hasReferenceSemantics()) {
+LValue irgen::emitSubscriptLValue(IRGenFunction &IGF, SubscriptExpr *E) {
+  if (!E->getBase()->getType()->is<LValueType>()) {
     // Emit the base value.
     Explosion base(ExplosionKind::Maximal);
     IGF.emitRValue(E->getBase(), base);
@@ -873,13 +820,7 @@ LValue swift::irgen::emitSubscriptLValue(IRGenFunction &IGF, SubscriptExpr *E) {
 
     // Build the logical lvalue.
     LValue lvalue;
-    GetterSetterComponent &component =
-      lvalue.addWithExtra<GetterSetterComponent>(
-                GetterSetterTarget::forByvalMemberSubscript(E->getDecl(),
-                                                            base.size(),
-                                                            index.size()));
-    component.initBaseValues(base);
-    component.initIndexValues(index);
+    lvalue.addWithExtra<DirectMemberGetterSetter>(E->getDecl(), base, index);
     return lvalue;
   }
   
@@ -894,11 +835,7 @@ LValue swift::irgen::emitSubscriptLValue(IRGenFunction &IGF, SubscriptExpr *E) {
   IGF.emitRValue(E->getIndex(), index);
 
   // Subscript accesses are always logical (for now).
-  GetterSetterComponent &component =
-    lvalue.addWithExtra<GetterSetterComponent>(
-                GetterSetterTarget::forByrefMemberSubscript(E->getDecl(),
-                                                            index.size()));
-  component.initIndexValues(index);
+  lvalue.addWithExtra<IndirectMemberGetterSetter>(E->getDecl(), index);
 
   return lvalue;
 }

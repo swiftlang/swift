@@ -41,6 +41,7 @@ add_swift_library(swiftIRGen
   GenTuple.h
   GenType.cpp
   GenType.h
+  GetterSetter.h
   HeapTypeInfo.h
   IndirectTypeInfo.h
   IRBuilder.h
