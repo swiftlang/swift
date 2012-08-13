@@ -512,7 +512,7 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(Type concreteType,
 }
 
 static Type addOwnerArgument(ASTContext &ctx, DeclContext *DC, Type resultType) {
-  Type argType = DC->getDeclaredTypeOfContext();
+  Type argType = DC->getDeclaredTypeInContext();
   if (!argType->hasReferenceSemantics()) {
     argType = LValueType::get(argType, LValueType::Qual::DefaultForMemberAccess,
                               ctx);

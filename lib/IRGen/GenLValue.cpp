@@ -748,7 +748,7 @@ namespace {
       Explosion selfArg(emission.getCurExplosionLevel());
 
       CanType origBaseType =
-        getTarget()->getDeclContext()->getDeclaredTypeOfContext()
+        getTarget()->getDeclContext()->getDeclaredTypeInContext()
                    ->getCanonicalType();
       addBaseValues(emission.IGF, selfArg, shouldPreserve,
                     origBaseType, origBaseType, ArrayRef<Substitution>());
@@ -866,16 +866,16 @@ namespace {
                     ShouldPreserveValues shouldPreserve) const {
       Explosion selfArg(emission.getCurExplosionLevel());
 
-      // The generic arguments are bound at this level.
-      emitGenericArguments(emission.IGF, selfArg);
-
       // Collect the new base values.
       CanType origBaseType =
-        getTarget()->getDeclContext()->getDeclaredTypeOfContext()
+        getTarget()->getDeclContext()->getDeclaredTypeInContext()
                    ->getCanonicalType();
       addBaseValues(emission.IGF, selfArg, shouldPreserve,
                     origBaseType, getSubstBaseType(),
                     getSubstitutions());
+
+      // The generic arguments are bound at this level.
+      emitGenericArguments(emission.IGF, selfArg);
 
       emission.addArg(selfArg);
     }
@@ -904,19 +904,19 @@ namespace {
                     ShouldPreserveValues shouldPreserve) const {
       Explosion selfArg(emission.getCurExplosionLevel());
 
-      // The generic arguments are bound at this level.
-      emitGenericArguments(emission.IGF, selfArg);
-
 #ifndef NDEBUG
-      CanType origBaseType = CanType(
+      CanType origBaseType =
         cast<PolymorphicFunctionType>(emission.getCallee().getOrigFormalType())
-          ->getInput());
+          ->getInput()->getCanonicalType();
       assert(!differsByAbstraction(emission.IGF.IGM, origBaseType,
                                    getSubstBaseType(),
                                    AbstractionDifference::Argument));
 #endif
       // No transformation required on l-value.
       selfArg.addUnmanaged(base.getAddress());
+
+      // The generic arguments are bound at this level.
+      emitGenericArguments(emission.IGF, selfArg);
 
       emission.addArg(selfArg);
     }

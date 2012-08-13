@@ -219,12 +219,12 @@ namespace {
     bool visitBoundGenericType(BoundGenericType *origTy,
                                BoundGenericType *substTy) {
       assert(origTy->getDecl() == substTy->getDecl());
-      if (origTy->hasReferenceSemantics())
-        return false;
 
-      // Not really sure what to do here?
-      IGM.unimplemented(SourceLoc(),
-              "testing differ-by-abstraction for bound generic value types");
+      // Bound generic types with reference semantics will never
+      // differ by abstraction.  Bound generic types with value
+      // semantics might someday, if we want things like Optional<T>
+      // to have an efficient representation.  For now, though, they
+      // don't.
       return false;
     }
 
