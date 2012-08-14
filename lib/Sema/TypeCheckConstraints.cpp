@@ -849,7 +849,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
                                       outputTy, Context);
 
       // FIXME: Allow conversions to function type? That seems completely
-      // unnecessary.
+      // unnecessary... except perhaps for the metatype case mentioned above.
       CS.addConstraint(ConstraintKind::Equal, expr->getFn()->getType(), funcTy);
 
       // The argument type must be convertible to the input type.

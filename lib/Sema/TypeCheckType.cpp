@@ -522,65 +522,22 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
   return false;
 }
 
-/// \brief Substitute the given archetypes for their substitution types
-/// within the given type.
-///
-/// \returns The substituted type, or null if the substitution failed.
-///
-/// FIXME: We probably want to have both silent and loud failure modes. However,
-/// the only possible failure now is from array slice types, which occur
-/// simply because we don't have Slice<T> yet.
-Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
-  if (auto Original = dyn_cast<SubstitutableType>(T)) {
-    TypeSubstitutionMap::const_iterator Known = Substitutions.find(Original);
-    if (Known != Substitutions.end() && Known->second)
-      return SubstitutedType::get(Original, Known->second, Context);
+Type TypeChecker::transformType(Type type,
+                                const std::function<Type(Type)> &fn) {
+  // Try transforming this type.
+  Type transformed = fn(type);
+  if (!transformed)
+    return nullptr;
 
-    auto Parent = Original->getParent();
-    if (!Parent)
-      return T;
+  // If the client changed the type, we're done.
+  if (transformed.getPointer() != type.getPointer())
+    return transformed;
 
-    // Substitute into the parent type.
-    Type SubstParent = substType(Parent, Substitutions);
-    if (!SubstParent)
-      return Type();
-
-    // If the parent didn't change, we won't change.
-    if (SubstParent.getPointer() == Parent)
-      return T;
-
-    // If the parent is a deducible generic parameter, build a new child
-    // generic parameter and record it.
-    if (auto DeducibleParent = SubstParent->getAs<DeducibleGenericParamType>()){
-      auto OriginalArchetype = dyn_cast<ArchetypeType>(Original);
-      if (!OriginalArchetype)
-        return T;
-
-      auto NewChild
-        = DeducibleGenericParamType::getNew(Context, DeducibleParent,
-                                            OriginalArchetype);
-      Substitutions[Original] = NewChild;
-      return NewChild;
-    }
-
-    // If the parent is an archetype, extract the child archetype with the
-    // given name.
-    if (auto ArchetypeParent = SubstParent->getAs<ArchetypeType>()) {
-      return ArchetypeParent->getNestedType(Original->getName());
-    }
-
-    // Retrieve the type with the given name.
-    // FIXME: Shouldn't we be using protocol-conformance information here?
-    MemberLookup ML(SubstParent, Original->getName(), TU, /*TypeLookup*/true);
-    assert(ML.Results.size() && "No type lookup results?");
-    TypeDecl *TD = cast<TypeDecl>(ML.Results.back().D);
-    return substMemberTypeWithBase(TD->getDeclaredType(), TD, SubstParent);
-  }
-
-  switch (T->getKind()) {
+  // Recursive into chilfren of this type.
+  switch (type->getKind()) {
 #define ALWAYS_CANONICAL_TYPE(Id, Parent) \
-  case TypeKind::Id:                    \
-    return T;
+  case TypeKind::Id:                      \
+    return type;
 #define UNCHECKED_TYPE(Id, Parent) ALWAYS_CANONICAL_TYPE(Id, Parent)
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
@@ -588,40 +545,43 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
   case TypeKind::OneOf:
   case TypeKind::Struct:
   case TypeKind::Class: {
-    auto nominalTy = cast<NominalType>(T);
+    auto nominalTy = cast<NominalType>(type);
     if (auto parentTy = nominalTy->getParent()) {
-      parentTy = substType(parentTy, Substitutions);
+      parentTy = transformType(parentTy, fn);
+      if (!parentTy)
+        return Type();
+      
       if (parentTy.getPointer() != nominalTy->getParent().getPointer())
         return NominalType::get(nominalTy->getDecl(), parentTy, Context);
     }
-    return T;
+    return type;
   }
 
   case TypeKind::UnboundGeneric: {
-    auto unbound = cast<UnboundGenericType>(T);
+    auto unbound = cast<UnboundGenericType>(type);
     Type substParentTy;
     if (auto parentTy = unbound->getParent()) {
-      substParentTy = substType(parentTy, Substitutions);
+      substParentTy = transformType(parentTy, fn);
       if (!substParentTy)
         return Type();
 
       if (substParentTy.getPointer() == parentTy.getPointer())
-        return T;
+        return type;
     } else {
       // Substitutions only affect the parent.
-      return T;
+      return type;
     }
 
     return UnboundGenericType::get(unbound->getDecl(), substParentTy, Context);
   }
 
   case TypeKind::BoundGeneric: {
-    auto BGT = cast<BoundGenericType>(T);
+    auto BGT = cast<BoundGenericType>(type);
     SmallVector<Type, 4> SubstArgs;
     bool AnyChanged = false;
     Type substParentTy;
     if (auto parentTy = BGT->getParent()) {
-      substParentTy = substType(parentTy, Substitutions);
+      substParentTy = transformType(parentTy, fn);
       if (!substParentTy)
         return Type();
 
@@ -630,7 +590,7 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     }
 
     for (Type Arg : BGT->getGenericArgs()) {
-      Type SubstArg = substType(Arg, Substitutions);
+      Type SubstArg = transformType(Arg, fn);
       if (!SubstArg)
         return Type();
       SubstArgs.push_back(SubstArg);
@@ -639,75 +599,75 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     }
 
     if (!AnyChanged)
-      return T;
+      return type;
 
     return BoundGenericType::get(BGT->getDecl(), substParentTy, SubstArgs);
   }
 
   case TypeKind::MetaType: {
-    auto Meta = cast<MetaTypeType>(T);
-    auto UnderlyingTy = substType(Meta->getInstanceType(),
-                                  Substitutions);
+    auto Meta = cast<MetaTypeType>(type);
+    auto UnderlyingTy = transformType(Meta->getInstanceType(),
+                                  fn);
     if (!UnderlyingTy)
       return Type();
-    
+
     if (UnderlyingTy.getPointer() == Meta->getInstanceType().getPointer())
-      return T;
+      return type;
 
     return MetaTypeType::get(UnderlyingTy, Context);
   }
 
   case TypeKind::NameAlias: {
-    auto Alias = cast<NameAliasType>(T);
-    auto UnderlyingTy = substType(Alias->getDecl()->getUnderlyingType(),
-                                  Substitutions);
+    auto Alias = cast<NameAliasType>(type);
+    auto UnderlyingTy = transformType(Alias->getDecl()->getUnderlyingType(),
+                                  fn);
     if (!UnderlyingTy)
       return Type();
-    
+
     if (UnderlyingTy.getPointer()
           == Alias->getDecl()->getUnderlyingType().getPointer())
-      return T;
+      return type;
 
-    return SubstitutedType::get(T, UnderlyingTy, Context);
+    return SubstitutedType::get(type, UnderlyingTy, Context);
   }
-      
+
   case TypeKind::Identifier: {
-    auto Id = cast<IdentifierType>(T);
+    auto Id = cast<IdentifierType>(type);
     if (!Id->isMapped())
-      return T;
-    
-    auto MappedTy = substType(Id->getMappedType(), Substitutions);
+      return type;
+
+    auto MappedTy = transformType(Id->getMappedType(), fn);
     if (!MappedTy)
       return Type();
-    
+
     if (MappedTy.getPointer() == Id->getMappedType().getPointer())
-      return T;
-    
-    return SubstitutedType::get(T, MappedTy, Context);
+      return type;
+
+    return SubstitutedType::get(type, MappedTy, Context);
   }
-      
+
   case TypeKind::Paren: {
-    auto Paren = cast<ParenType>(T);
-    Type Underlying = substType(Paren->getUnderlyingType(), Substitutions);
-    if (!Underlying)
+    auto paren = cast<ParenType>(type);
+    Type underlying = transformType(paren->getUnderlyingType(), fn);
+    if (!underlying)
       return Type();
-    
-    if (Underlying.getPointer() == Paren->getUnderlyingType().getPointer())
-      return T;
-    
-    return ParenType::get(Context, Underlying);
+
+    if (underlying.getPointer() == paren->getUnderlyingType().getPointer())
+      return type;
+
+    return ParenType::get(Context, underlying);
   }
 
   case TypeKind::Tuple: {
-    auto Tuple = cast<TupleType>(T);
+    auto Tuple = cast<TupleType>(type);
     bool AnyChanged = false;
     SmallVector<TupleTypeElt, 4> Elements;
     unsigned Index = 0;
     for (auto Elt : Tuple->getFields()) {
-      Type EltTy = substType(Elt.getType(), Substitutions);
+      Type EltTy = transformType(Elt.getType(), fn);
       if (!EltTy)
         return Type();
-            
+
       // FIXME: Substitute into default arguments rather than simply dropping
       // them.
 
@@ -717,7 +677,7 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
         ++Index;
         continue;
       }
-      
+
       // If this is the first change we've seen, copy all of the previous
       // elements.
       if (!AnyChanged) {
@@ -728,110 +688,110 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
                                           /*Init=*/nullptr,
                                           FromElt.getVarargBaseTy()));
         }
-        
+
         AnyChanged = true;
       }
 
       // Substitute into the base type of a variadic tuple.
       Type VarargBaseTy;
       if (Elt.isVararg()) {
-        VarargBaseTy = substType(Elt.getVarargBaseTy(), Substitutions);
+        VarargBaseTy = transformType(Elt.getVarargBaseTy(), fn);
         if (!VarargBaseTy)
           return Type();
       }
-      
+
       // Add the new tuple element, with the new type, no initializer,
       Elements.push_back(TupleTypeElt(EltTy, Elt.getName(), /*Init=*/nullptr,
                                       VarargBaseTy));
       ++Index;
     }
-    
+
     if (!AnyChanged)
-      return T;
-    
+      return type;
+
     return TupleType::get(Elements, Context);
   }
-      
+
   case TypeKind::Substituted: {
-    auto SubstAT = cast<SubstitutedType>(T);
-    auto Subst = substType(SubstAT->getReplacementType(), Substitutions);
+    auto SubstAT = cast<SubstitutedType>(type);
+    auto Subst = transformType(SubstAT->getReplacementType(), fn);
     if (!Subst)
       return Type();
-    
+
     if (Subst.getPointer() == SubstAT->getReplacementType().getPointer())
-      return T;
-    
+      return type;
+
     return SubstitutedType::get(SubstAT->getOriginal(), Subst, Context);
   }
-      
+
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction: {
-    auto Function = cast<AnyFunctionType>(T);
-    auto InputTy = substType(Function->getInput(), Substitutions);
+    auto Function = cast<AnyFunctionType>(type);
+    auto InputTy = transformType(Function->getInput(), fn);
     if (!InputTy)
       return Type();
-    auto ResultTy = substType(Function->getResult(), Substitutions);
+    auto ResultTy = transformType(Function->getResult(), fn);
     if (!ResultTy)
       return Type();
-    
+
     if (InputTy.getPointer() == Function->getInput().getPointer() &&
         ResultTy.getPointer() == Function->getResult().getPointer())
-      return T;
-    
-    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(T)) {
+      return type;
+
+    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(type)) {
       return PolymorphicFunctionType::get(InputTy, ResultTy,
                                           &polyFn->getGenericParams(),
                                           Context);
     } else {
-      auto fn = cast<FunctionType>(T);
+      auto fn = cast<FunctionType>(type);
       return FunctionType::get(InputTy, ResultTy, fn->isAutoClosure(),
                                Context);
     }
   }
-      
+
   case TypeKind::Array: {
-    auto Array = cast<ArrayType>(T);
-    auto BaseTy = substType(Array->getBaseType(), Substitutions);
+    auto Array = cast<ArrayType>(type);
+    auto BaseTy = transformType(Array->getBaseType(), fn);
     if (!BaseTy)
       return Type();
-    
+
     if (BaseTy.getPointer() == Array->getBaseType().getPointer())
-      return T;
-    
+      return type;
+
     return ArrayType::get(BaseTy, Array->getSize(), Context);
   }
-      
+
   case TypeKind::ArraySlice: {
-    auto Slice = cast<ArraySliceType>(T);
-    auto BaseTy = substType(Slice->getBaseType(), Substitutions);
+    auto Slice = cast<ArraySliceType>(type);
+    auto BaseTy = transformType(Slice->getBaseType(), fn);
     if (!BaseTy)
       return Type();
-    
+
     if (BaseTy.getPointer() == Slice->getBaseType().getPointer())
-      return T;
-    
+      return type;
+
     return getArraySliceType(SourceLoc(), BaseTy);
   }
-      
+
   case TypeKind::LValue: {
-    auto LValue = cast<LValueType>(T);
-    auto ObjectTy = substType(LValue->getObjectType(), Substitutions);
+    auto LValue = cast<LValueType>(type);
+    auto ObjectTy = transformType(LValue->getObjectType(), fn);
     if (!ObjectTy)
       return Type();
-    
+
     if (ObjectTy.getPointer() == LValue->getObjectType().getPointer())
-      return T;
-    
+      return type;
+
     return LValueType::get(ObjectTy, LValue->getQualifiers(), Context);
   }
-      
+
   case TypeKind::ProtocolComposition: {
-    auto PC = cast<ProtocolCompositionType>(T);
+    auto PC = cast<ProtocolCompositionType>(type);
     SmallVector<Type, 4> Protocols;
     bool AnyChanged = false;
     unsigned Index = 0;
     for (auto Proto : PC->getProtocols()) {
-      auto SubstProto = substType(Proto, Substitutions);
+      auto SubstProto = transformType(Proto, fn);
       if (!SubstProto)
         return Type();
       
@@ -851,13 +811,66 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     }
     
     if (!AnyChanged)
-      return T;
-
+      return type;
+    
     return ProtocolCompositionType::get(Context, Protocols);
   }
   }
   
-  llvm_unreachable("Unhandled type in substitution");
+  llvm_unreachable("Unhandled type in transformation");
+}
+
+Type TypeChecker::substType(Type origType, TypeSubstitutionMap &Substitutions) {
+  return transformType(origType,
+                       [&](Type type) -> Type {
+    auto substOrig = dyn_cast<SubstitutableType>(type);
+    if (!substOrig)
+      return type;
+
+    TypeSubstitutionMap::const_iterator Known = Substitutions.find(substOrig);
+    if (Known != Substitutions.end() && Known->second)
+      return SubstitutedType::get(substOrig, Known->second, Context);
+
+    auto parent = substOrig->getParent();
+    if (!parent)
+      return type;
+
+    // Substitute into the parent type.
+    Type SubstParent = substType(parent, Substitutions);
+    if (!SubstParent)
+      return Type();
+
+    // If the parent didn't change, we won't change.
+    if (SubstParent.getPointer() == parent)
+      return type;
+
+    // If the parent is a deducible generic parameter, build a new child
+    // generic parameter and record it.
+    if (auto DeducibleParent = SubstParent->getAs<DeducibleGenericParamType>()){
+      auto OriginalArchetype = dyn_cast<ArchetypeType>(substOrig);
+      if (!OriginalArchetype)
+        return type;
+
+      auto NewChild
+        = DeducibleGenericParamType::getNew(Context, DeducibleParent,
+                                            OriginalArchetype);
+      Substitutions[substOrig] = NewChild;
+      return NewChild;
+    }
+
+    // If the parent is an archetype, extract the child archetype with the
+    // given name.
+    if (auto ArchetypeParent = SubstParent->getAs<ArchetypeType>()) {
+      return ArchetypeParent->getNestedType(substOrig->getName());
+    }
+     
+    // Retrieve the type with the given name.
+    // FIXME: Shouldn't we be using protocol-conformance information here?
+    MemberLookup ML(SubstParent, substOrig->getName(), TU, /*TypeLookup*/true);
+    assert(ML.Results.size() && "No type lookup results?");
+    TypeDecl *TD = cast<TypeDecl>(ML.Results.back().D);
+    return substMemberTypeWithBase(TD->getDeclaredType(), TD, SubstParent);
+  });
 }
 
 Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,

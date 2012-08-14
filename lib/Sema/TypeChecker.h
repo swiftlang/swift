@@ -19,6 +19,7 @@
 
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
+#include <functional>
 
 namespace swift {
 
@@ -299,6 +300,21 @@ public:
 
   bool validateType(TypeLoc &Loc, bool isFirstPass);
 
+  /// \brief Transform the given type by applying the given function to
+  /// each type node. If the function returns null, the transformation aborts.
+  /// If it leaves the given type unchanged, then the transformation will be
+  /// applied to all of the child types. If any of those types change, their
+  /// parent node will be rebuilt.
+  Type transformType(Type type, const std::function<Type(Type)> &fn);
+
+  /// \brief Substitute the given archetypes for their substitution types
+  /// within the given type.
+  ///
+  /// \returns The substituted type, or null if the substitution failed.
+  ///
+  /// FIXME: We probably want to have both silent and loud failure modes. However,
+  /// the only possible failure now is from array slice types, which occur
+  /// simply because we don't have Slice<T> yet.
   Type substType(Type T, TypeSubstitutionMap &Substitutions);
 
   /// \brief Replace the type \c T of a protocol member \c Member given the
