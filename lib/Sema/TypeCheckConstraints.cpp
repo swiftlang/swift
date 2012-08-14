@@ -64,6 +64,9 @@ class TypeVariableType::Implementation {
   /// any.
   Expr *TheExpr;
 
+  /// \brief The archetype that this type variable describes.
+  ArchetypeType *Archetype;
+
   /// \brief The fixed type of this type variable, once it has been assigned.
   Type Fixed;
 
@@ -81,7 +84,7 @@ class TypeVariableType::Implementation {
 
 public:
   explicit Implementation(unsigned ID, Expr *TheExpr)
-    : ID(ID), TheExpr(TheExpr), Literal(LiteralKind::None)
+    : ID(ID), TheExpr(TheExpr), Archetype(nullptr), Literal(LiteralKind::None)
   {
     if (TheExpr) {
       // If we have a literal expression, determine the literal kind.
@@ -95,12 +98,19 @@ public:
     }
   }
 
+  explicit Implementation(unsigned ID, ArchetypeType *Archetype)
+    : ID(ID), TheExpr(nullptr), Archetype(Archetype),
+      Literal(LiteralKind::None) { }
+
   /// \brief Retrieve the unique ID corresponding to this type variable.
   unsigned getID() const { return ID; }
   
   /// \brief Retrieve the expression that will be assigned this particular
   /// type, if any.
   Expr *getExpr() const { return TheExpr; }
+
+  /// \brief Retrieve the archetype that this type variable replaced.
+  ArchetypeType *getArchetype() const { return Archetype; }
 
   /// \brief Retrieve the fixed type to which this type variable has been
   /// assigned, or a null type if this type variable has not yet been
@@ -389,6 +399,14 @@ namespace {
                                                    member));
     }
 
+    /// \brief "Open" the given type by replacing any occurrences of archetypes
+    /// (including those implicit in unbound generic types) with fresh type
+    /// variables.
+    ///
+    /// \param type The type to open.
+    /// \returns The opened type, or \c type if there are no archetypes in it.
+    Type openType(Type type);
+
     /// \brief Retrieve the type of a reference to the given value declaration.
     ///
     /// For references to polymorphic function types, this routine "opens up"
@@ -449,16 +467,59 @@ OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
   return ::new (mem) OverloadSet(choices);
 }
 
-Type ConstraintSystem::getTypeOfReference(ValueDecl *value) {
-  // Determine the type of the value.
-  auto valueTy = value->getTypeOfReference();
-  auto polyFn = valueTy->getAs<PolymorphicFunctionType>();
-  if (!polyFn)
-    return valueTy;
+Type ConstraintSystem::openType(Type startingType) {
+  llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
 
-  // FIXME: For polymorphic function types, we need to "open up" the function
-  // type by replacing each archetype with a fresh type variable.
-  llvm_unreachable("constraints for polymorphic function types unimplemented");
+  auto getTypeVariable = [&](ArchetypeType *archetype) -> TypeVariableType * {
+    // Check whether we already have a replacement for this archetype.
+    auto known = replacements.find(archetype);
+    if (known != replacements.end())
+      return known->second;
+
+    // Create a new type variable to replace this archetype.
+    auto tv = createTypeVariable(archetype);
+    tv->getImpl().setConformsTo(archetype->getConformsTo());
+    // FIXME: Associated types!
+    replacements[archetype] = tv;
+    return tv;
+  };
+
+  std::function<Type(Type)> replaceArchetypes;
+  replaceArchetypes = [&](Type type) -> Type {
+    // Replace archetypes with fresh type variables.
+    if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+      return getTypeVariable(archetype);
+    }
+
+    // Create type variables for all of the archetypes in a polymorphic
+    // function type.
+    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(type)) {
+      for (auto archetype : polyFn->getGenericParams().getAllArchetypes())
+        (void)getTypeVariable(archetype);
+
+      // Transform the input and output types.
+      Type inputTy = TC.transformType(polyFn->getInput(), replaceArchetypes);
+      if (!inputTy)
+        return Type();
+
+      Type resultTy = TC.transformType(polyFn->getResult(), replaceArchetypes);
+      if (!resultTy)
+        return Type();
+
+      // Build the resulting (non-polymorphic) function type.
+      return FunctionType::get(inputTy, resultTy, TC.Context);
+    }
+
+    // FIXME: Unbound generic types.
+    return type;
+  };
+  
+  return TC.transformType(startingType, replaceArchetypes);
+}
+
+Type ConstraintSystem::getTypeOfReference(ValueDecl *value) {
+  // Determine the type of the value, opening up that type if necessary.
+  return openType(value->getTypeOfReference());
 }
 
 Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value) {

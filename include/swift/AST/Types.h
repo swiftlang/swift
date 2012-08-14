@@ -605,7 +605,7 @@ public:
   /// of TheDecl. For types nested within generic types, however, this will
   /// involve \c BoundGenericType nodes that provide context for the nested
   /// type, e.g., the bound type Dictionary<String, Int>.Inner would be
-  /// represented as an UnoundGenericType with Dictionary<String, Int> as its
+  /// represented as an UnboundGenericType with Dictionary<String, Int> as its
   /// parent type.
   Type getParent() const { return Parent; }
 
