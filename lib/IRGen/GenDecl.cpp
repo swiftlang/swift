@@ -233,14 +233,23 @@ static bool isLocalLinkageType(Type type) {
 }
 
 bool LinkEntity::isLocalLinkage() const {
-  if (getKind() == Kind::Destructor) {
+  switch (getKind()) {
+  // Destructors always have internal linkage.
+  case Kind::Destructor:
     return true;
-  }
-  if (getKind() == Kind::ValueWitness) {
+
+  // Value witnesses depend on the linkage of their type.
+  case Kind::ValueWitness:
     return isLocalLinkageType(getType());
+
+  case Kind::Function:
+  case Kind::Getter:
+  case Kind::Setter:
+  case Kind::ClassMetadata:
+  case Kind::Other:
+    return isLocalLinkageDecl(getDecl());
   }
-  assert(isDeclKind(getKind()));
-  return isLocalLinkageDecl(getDecl());
+  llvm_unreachable("bad link entity kind");
 }
 
 LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
