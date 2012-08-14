@@ -376,8 +376,8 @@ private:
   void emitGlobalDecl(Decl *D);
 
 //--- Type emission ------------------------------------------------------------
-
-public:
+private:
+  friend class GenProto;
   llvm::DenseMap<std::pair<const void*, unsigned>, llvm::Value*>
       ArchetypeValueWitnessMap;
 };

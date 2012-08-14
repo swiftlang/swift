@@ -54,7 +54,39 @@
 
 using namespace swift;
 using namespace irgen;
-namespace swift { namespace irgen { class GenProto; } }
+
+namespace swift {
+namespace irgen {
+  /// A little helper to give this file some privileged access.
+  /// The amount of code in this class is intentionally very small.
+  class GenProto {
+  public:
+    static llvm::DenseMap<TypeBase*, llvm::Constant*> &
+    getTrivialWitnessTablesCache(IRGenModule &IGM) {
+      return IGM.Types.TrivialWitnessTables;
+    }
+
+    static llvm::Value *getArchetypeValueWitness(IRGenFunction &IGF,
+                                                 const void *archetypeTI,
+                                                 unsigned which) {
+      auto &map = IGF.ArchetypeValueWitnessMap;
+      auto key = std::make_pair(archetypeTI, which);
+      assert(map.count(key) && "IGF has no wtable set for archetype");
+      return map.find(key)->second;
+    }
+
+    static void setArchetypeValueWitness(IRGenFunction &IGF,
+                                         const void *archetypeTI,
+                                         unsigned which,
+                                         llvm::Value *wtable) {
+      auto &map = IGF.ArchetypeValueWitnessMap;
+      auto key = std::make_pair(archetypeTI, which);
+      assert(!map.count(key) && "IGF already has wtable set for archetype");
+      map.insert(std::make_pair(key, wtable));
+    }
+  };
+}
+}
 
 /// A fixed-size buffer is always 16 bytes and pointer-aligned.
 /// If we align them more, we'll need to introduce padding to
@@ -850,11 +882,6 @@ namespace {
   class ArchetypeTypeInfo :
       public IndirectTypeInfo<ArchetypeTypeInfo, TypeInfo> {
 
-    /// The "value" witness-table pointer registered with this type.
-    /// This is set even when there are no protocols associated with
-    /// the type.
-    mutable llvm::Value *ValueWTable = nullptr;
-
     /// The number of protocols that this archetype ascribes to.
     unsigned NumProtocols;
 
@@ -888,15 +915,24 @@ namespace {
 
     /// Return the witness table that's been set for this type.
     llvm::Value *getWitnessTable(IRGenFunction &IGF, unsigned which) const {
-      return IGF.ArchetypeValueWitnessMap[std::make_pair(this, which)];
+      assert(which < NumProtocols);
+      return GenProto::getArchetypeValueWitness(IGF, this, which);
     }
+
     void setWitnessTable(IRGenFunction &IGF, unsigned which,
                          llvm::Value *wtable) const {
-      IGF.ArchetypeValueWitnessMap[std::make_pair(this, which)] = wtable;
+      assert(which < NumProtocols);
+      GenProto::setArchetypeValueWitness(IGF, this, which, wtable);
     }
 
     llvm::Value *getValueWitnessTable(IRGenFunction &IGF) const {
-      return IGF.ArchetypeValueWitnessMap[std::make_pair(this, 0U)];
+      // This can be called in any of the cases.
+      return GenProto::getArchetypeValueWitness(IGF, this, 0U);
+    }
+
+    void setValueWitnessTable(IRGenFunction &IGF, llvm::Value *wtable) const {
+      assert(NumProtocols == 0);
+      GenProto::setArchetypeValueWitness(IGF, this, 0U, wtable);
     }
 
     /// Create an uninitialized archetype object.
@@ -2352,15 +2388,6 @@ static llvm::Constant *buildWitnessTable(IRGenModule &IGM,
   return llvm::ConstantExpr::getInBoundsGetElementPtr(var, indices);
 }
 
-/// A little helper to give this file some privileged access.
-class irgen::GenProto {
-public:
-  static llvm::DenseMap<TypeBase*, llvm::Constant*> &
-  getTrivialWitnessTablesCache(IRGenModule &IGM) {
-    return IGM.Types.TrivialWitnessTables;
-  }
-};
-
 /// Get or create the trivial witness table for a type.
 static llvm::Constant *
 getTrivialWitnessTable(IRGenModule &IGM, Type concreteType,
@@ -2540,7 +2567,7 @@ void IRGenFunction::bindArchetype(ArchetypeType *type,
   assert(wtables.size() >= 1);
   auto &ti = getFragileTypeInfo(type).as<ArchetypeTypeInfo>();
   if (ti.getProtocols().empty()) {
-    ti.setWitnessTable(*this, 0, wtables[0]);
+    ti.setValueWitnessTable(*this, wtables[0]);
   } else {
     for (unsigned i = 0, e = ti.getProtocols().size(); i != e; ++i)
       ti.setWitnessTable(*this, i, wtables[i]);
@@ -2569,7 +2596,7 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
     if (protocols.empty()) {
       llvm::Value *wtable = in.claimUnmanagedNext();
       wtable->setName(archetype->getFullName());
-      archetypeTI.setWitnessTable(IGF, 0, wtable);
+      archetypeTI.setValueWitnessTable(IGF, wtable);
       continue;
     }
 
@@ -2619,7 +2646,7 @@ void irgen::setValueWitnessTables(IRGenFunction &IGF,
       IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
     llvm::Value *wtable = tables.claimUnmanagedNext();
     wtable->setName(archetype->getFullName());
-    archetypeTI.setWitnessTable(IGF, 0, wtable);
+    archetypeTI.setValueWitnessTable(IGF, wtable);
   }
 }
 
