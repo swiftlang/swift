@@ -847,6 +847,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       
       // The function argument has some type (T1) -> T2 for fresh variables
       // T1 and T2.
+      // FIXME: What if the function argument is a metatype?
       auto inputTy = CS.createTypeVariable(expr);
       auto outputTy = CS.createTypeVariable(expr);
       auto funcTy = FunctionType::get(ParenType::get(Context, inputTy),
