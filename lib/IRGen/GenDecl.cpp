@@ -268,6 +268,10 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
   return result;
 }
 
+static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
+  return cast<llvm::PointerType>(ptrTy)->getElementType() == objTy;
+}
+
 /// Get or create an LLVM function with these linkage rules.
 llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
                                          llvm::FunctionType *fnType,
@@ -276,8 +280,7 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
   llvm::GlobalValue *existing = IGM.Module.getNamedGlobal(getName());
   if (existing) {
     if (isa<llvm::Function>(existing) &&
-        cast<llvm::PointerType>(existing->getType())->getElementType()
-          == fnType)
+        isPointerTo(existing->getType(), fnType))
       return cast<llvm::Function>(existing);
 
     IGM.error(SourceLoc(),
@@ -295,6 +298,31 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
   if (!attrs.empty())
     fn->setAttributes(llvm::AttrListPtr::get(attrs));
   return fn;
+}
+
+/// Get or create an LLVM global variable with these linkage rules.
+llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
+                                               llvm::Type *storageType) {
+  llvm::GlobalValue *existing = IGM.Module.getNamedGlobal(getName());
+  if (existing) {
+    if (isa<llvm::GlobalVariable>(existing) &&
+        isPointerTo(existing->getType(), storageType))
+      return cast<llvm::GlobalVariable>(existing);
+
+    IGM.error(SourceLoc(),
+              "program too clever: function collides with existing symbol "
+                + getName());
+
+    // Note that this will implicitly unique if the .unique name is also taken.
+    existing->setName(getName() + ".unique");
+  }
+
+  llvm::GlobalVariable *var
+    = new llvm::GlobalVariable(IGM.Module, storageType, /*constant*/ false,
+                               getLinkage(), /*initializer*/ nullptr,
+                               getName());
+  var->setVisibility(getVisibility());
+  return var;
 }
 
 /// Emit a global declaration.
@@ -362,7 +390,8 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
 /// declaration.  The address value is always an llvm::GlobalVariable*.
 Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
   // Check whether we've cached this.
-  llvm::GlobalVariable *&entry = GlobalVars[var];
+  LinkEntity entity = LinkEntity::forNonFunction(var);
+  llvm::GlobalVariable *&entry = GlobalVars[entity];
   if (entry) {
     llvm::GlobalVariable *gv = cast<llvm::GlobalVariable>(entry);
     return Address(gv, Alignment(gv->getAlignment()));
@@ -371,11 +400,8 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
   const TypeInfo &type = getFragileTypeInfo(var->getType());
 
   // Okay, we need to rebuild it.
-  LinkInfo link = LinkInfo::get(*this, LinkEntity::forNonFunction(var));
-  llvm::GlobalVariable *addr
-    = new llvm::GlobalVariable(Module, type.StorageType, /*constant*/ false,
-                               link.getLinkage(), /*initializer*/ nullptr,
-                               link.getName());
+  LinkInfo link = LinkInfo::get(*this, entity);
+  auto addr = link.createVariable(*this, type.StorageType);
   addr->setVisibility(link.getVisibility());
 
   Alignment align = type.StorageAlignment;
@@ -474,6 +500,55 @@ llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, cc, attrs);
   return entry;
+}
+
+/// Fetch the declaration of the metadata (or metadata template) for a
+/// class.  If the definition type is specified, the result will
+/// always be a GlobalVariable of the given type.
+llvm::Constant *IRGenModule::getAddrOfClassMetadata(ClassDecl *cd,
+                                                    llvm::Type *storageType) {
+  LinkEntity entity = LinkEntity::forClassMetadata(cd);
+
+  // Check whether we've cached this.
+  llvm::GlobalVariable *&entry = GlobalVars[entity];
+  if (entry) {
+    // If we're looking to define something, we may need to replace a
+    // forward declaration.
+    if (storageType) {
+      assert(entry->getType() == HeapMetadataPtrTy);
+
+      // If the type is right, we're done.
+      if (storageType == HeapMetadataStructTy)
+        return entry;
+
+      // Fall out to the case below.
+
+    // Otherwise, we have a previous declaration or definition which
+    // we need to ensure has the right type.
+    } else {
+      return llvm::ConstantExpr::getBitCast(entry, HeapMetadataPtrTy);
+    }
+  }
+
+  // If we're not defining the metadata now, use the generic metadata
+  // struct type as the storage type for the external declaration.
+  if (!storageType) storageType = HeapMetadataStructTy;
+
+  // Build the variable.
+  LinkInfo link = LinkInfo::get(*this, entity);
+  auto var = link.createVariable(*this, storageType);
+
+  // If we have an existing entry, destroy it, replacing it with the
+  // new variable.
+  if (entry) {
+    auto castVar = llvm::ConstantExpr::getBitCast(var, HeapMetadataPtrTy);
+    entry->replaceAllUsesWith(castVar);
+    entry->eraseFromParent();
+  }
+
+  // Update the entry and return.
+  entry = var;
+  return var;
 }
 
 /// Fetch the declaration of the given known function.

@@ -89,6 +89,7 @@ namespace {
 
   public:
     Mangler(raw_ostream &buffer) : Buffer(buffer) {}
+    void mangleDeclContext(DeclContext *ctx);
     void mangleDeclName(ValueDecl *decl, IncludeType includeType);
     void mangleDeclType(ValueDecl *decl, ExplosionKind kind,
                         unsigned uncurryingLevel);
@@ -101,7 +102,6 @@ namespace {
     void mangleProtocolList(ArrayRef<ProtocolDecl*> protocols);
     void mangleProtocolList(ArrayRef<Type> protocols);
     void mangleProtocolName(ProtocolDecl *protocol);
-    void mangleDeclContext(DeclContext *ctx);
     void mangleIdentifier(Identifier ident);
     void mangleGetterOrSetterContext(FuncDecl *fn);
     void manglePolymorphicType(const GenericParamList *genericParams, Type T,
@@ -294,7 +294,11 @@ void Mangler::mangleDeclName(ValueDecl *decl, IncludeType includeType) {
   // decl ::= context identifier
   mangleDeclContext(decl->getDeclContext());
 
-  mangleIdentifier(decl->getName());
+  if (isa<ConstructorDecl>(decl)) {
+    Buffer << 'C';
+  } else {
+    mangleIdentifier(decl->getName());
+  }
 
   if (includeType == IncludeType::No) return;
 
@@ -666,7 +670,16 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     buffer << "L";
 
   Mangler mangler(buffer);
-  mangler.mangleDeclName(getDecl(), IncludeType::No);
+  switch (getKind()) {
+  case Kind::ClassMetadata:
+  case Kind::Destructor:
+    mangler.mangleDeclContext(cast<ClassDecl>(getDecl()));
+    break;
+
+  default:
+    mangler.mangleDeclName(getDecl(), IncludeType::No);
+    break;
+  }
 
   // Mangle in a type as well.  Note that we have to mangle the type
   // on all kinds of declarations, even variables, because at the
@@ -674,16 +687,14 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   if (ValueDecl *valueDecl = dyn_cast<ValueDecl>(getDecl()))
     mangler.mangleDeclType(valueDecl, getExplosionKind(), getUncurryLevel());
 
-  // Add a getter/setter suffix if applicable.
+  // Add a suffix if applicable.
   switch (getKind()) {
   case Kind::Function: break;
   case Kind::Other: break;
   case Kind::Getter: buffer << "g"; break;
   case Kind::Setter: buffer << "s"; break;
-  case Kind::Destructor: buffer << "10destructor"; break;
+  case Kind::Destructor: buffer << "D"; break; // for 'destructor'
+  case Kind::ClassMetadata: buffer << 'H'; break; // for 'heap'
   case Kind::ValueWitness: llvm_unreachable("filtered out!");
   }
-
-  // TODO: mangle generics information here.
-  // Unless this should be in mangleDeclName?
 }

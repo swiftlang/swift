@@ -186,6 +186,19 @@ const TypeInfo &TypeConverter::getFragileTypeInfo(Type sugaredTy) {
   return *result;
 }
 
+/// A convenience implementation of getFragileTypeInfo that starts
+/// from a class declaration.
+const TypeInfo &TypeConverter::getFragileTypeInfo(ClassDecl *theClass) {
+  // If we have generic parameters, use the bound-generics conversion
+  // routine.  This does an extra level of caching based on the common
+  // class decl.
+  if (theClass->getGenericParams())
+    return *convertBoundGenericType(theClass);
+
+  // Otherwise, use the declared type.
+  return getFragileTypeInfo(theClass->getDeclaredType());
+}
+
 const TypeInfo *TypeConverter::convertType(CanType canTy) {
   llvm::LLVMContext &Ctx = IGM.getLLVMContext();
   TypeBase *ty = canTy.getPointer();

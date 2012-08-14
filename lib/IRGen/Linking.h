@@ -65,7 +65,33 @@ class LinkEntity {
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
 
   enum class Kind {
-    Function, Getter, Setter, ValueWitness, Destructor, Other
+    /// A function.
+    /// The pointer is a FuncDecl*.
+    Function,
+
+    /// The getter for an entity.
+    /// The pointer is a VarDecl* or SubscriptDecl*.
+    Getter,
+
+    /// The setter for an entity.
+    /// The pointer is a VarDecl* or SubscriptDecl*.
+    Setter,
+
+    /// A value witness for a type.
+    /// The pointer is a canonical TypeBase*.
+    ValueWitness,
+
+    /// The destructor for a class.
+    /// The pointer is a ClassDecl*.
+    Destructor,
+
+    /// The metadata or metadata template for a class.
+    /// The pointer is a ClassDecl*.
+    ClassMetadata,
+
+    /// Some other kind of declaration.
+    /// The pointer is a Decl*.
+    Other
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -139,6 +165,12 @@ public:
     return entity;
   }
 
+  static LinkEntity forClassMetadata(ClassDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ClassMetadata, decl, ExplosionKind::Minimal, 0);
+    return entity;
+  }
+
   static LinkEntity forValueWitness(Type concreteType, ValueWitness witness) {
     assert(concreteType->isCanonical());
     LinkEntity entity;
@@ -203,6 +235,10 @@ public:
                                  llvm::FunctionType *fnType,
                                  llvm::CallingConv::ID cc,
                                  ArrayRef<llvm::AttributeWithIndex> attrs);
+
+
+  llvm::GlobalVariable *createVariable(IRGenModule &IGM,
+                                       llvm::Type *objectType);
 };
 
 } // end namespace irgen

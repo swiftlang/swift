@@ -27,6 +27,7 @@
 
 #include "Explosion.h"
 #include "GenFunc.h"
+#include "GenProto.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -162,15 +163,12 @@ namespace {
   };
 }
 
-static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD) {
+/// Emit the destructor for a class.
+///
+/// \param DD - the optional explicit destructor declaration
+static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
+                                DestructorDecl *DD) {
   llvm::Function *fn = IGM.getAddrOfDestructor(CD);
-
-  DestructorDecl *DD = nullptr;
-  for (Decl *member : CD->getMembers()) {
-    DD = dyn_cast<DestructorDecl>(member);
-    if (DD)
-      break;
-  }
 
   IRGenFunction IGF(IGM, Type(), nullptr,
                     ExplosionKind::Minimal, 0, fn, Prologue::Bare);
@@ -228,24 +226,75 @@ static llvm::Function *createSizeFn(IRGenModule &IGM,
   return fn;
 }
 
-static llvm::Constant *getClassMetadataVar(IRGenModule &IGM,
-                                           ClassDecl *CD,
-                                           const HeapLayout &layout) {
-  // FIXME: Should this var have a standard mangling?  If not,
-  // should we unique it?
-  llvm::SmallVector<llvm::Constant*, 2> fields;
+enum { NumStandardMetadataFields = 2 };
+static void addStandardMetadata(IRGenModule &IGM,
+                                ClassDecl *CD,
+                                const HeapLayout &layout,
+                                SmallVectorImpl<llvm::Constant*> &fields) {
+  assert(fields.empty());
   fields.push_back(IGM.getAddrOfDestructor(CD));
   fields.push_back(createSizeFn(IGM, layout));
+  assert(fields.size() == NumStandardMetadataFields);
+}
 
-  llvm::Constant *init =
-    llvm::ConstantStruct::get(IGM.HeapMetadataStructTy, fields);
+/// Emit the heap metadata or metadata template for a class.
+void IRGenModule::emitClassMetadata(ClassDecl *classDecl) {
+  // Construct the layout for the type.
+  auto &classTI = Types.getFragileTypeInfo(classDecl).as<ClassTypeInfo>();
+  auto &layout = classTI.getLayout(*this);
 
-  llvm::GlobalVariable *var =
-    new llvm::GlobalVariable(IGM.Module, IGM.HeapMetadataStructTy,
-                             /*constant*/ true,
-                             llvm::GlobalVariable::InternalLinkage, init,
-                             "metadata");
-  return var;
+  // Build the metadata initializer.
+  SmallVector<llvm::Constant*, NumStandardMetadataFields + 8> fields;
+
+  // Standard metadata.
+  addStandardMetadata(*this, classDecl, layout, fields);
+
+  // Stuff for the class:
+
+  // FIXME: virtual methods, other class members.
+
+  // Generics layout.
+  if (auto generics = classDecl->getGenericParams()) {
+    // Add a zeroed field for each entry in the generic signature.
+    SmallVector<llvm::Type*, 4> signature;
+    expandPolymorphicSignature(*this, *generics, signature);
+    for (auto type : signature) {
+      fields.push_back(llvm::Constant::getNullValue(type));
+    }
+  }
+
+  llvm::Constant *init;
+  if (fields.size() == NumStandardMetadataFields) {
+    init = llvm::ConstantStruct::get(HeapMetadataStructTy, fields);
+  } else {
+    init = llvm::ConstantStruct::getAnon(fields);
+  }
+
+  auto var = cast<llvm::GlobalVariable>(
+                         getAddrOfClassMetadata(classDecl, init->getType()));
+  var->setConstant(true);
+  var->setInitializer(init);
+}
+
+/// Returns a metadata reference for a constructor.
+static llvm::Constant *getClassMetadataForConstructor(IRGenFunction &IGF,
+                                                      ConstructorDecl *ctor,
+                                                      ClassDecl *theClass) {
+  // Grab a reference to the metadata or metadata template.
+  auto metadata = IGF.IGM.getAddrOfClassMetadata(theClass);
+  assert(metadata->getType() == IGF.IGM.HeapMetadataPtrTy);
+
+  // If we don't have generic parameters, that's all we need.
+  // TODO: fragility might force us to indirect this, and startup
+  // performance might force us to do a lazy check.
+  if (!theClass->getGenericParams()) {
+    return metadata;
+  }
+
+  // Okay, we need to call swift_getGenericMetadata.
+  // Construct our metadata plug-in.
+  // TODO
+  return metadata;
 }
 
 static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
@@ -273,7 +322,7 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   FullExpr scope(IGF);
   // Allocate the class.
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
-  llvm::Value *metadata = getClassMetadataVar(IGF.IGM, curClass, layout);
+  llvm::Value *metadata = getClassMetadataForConstructor(IGF, CD, curClass);
   llvm::Value *size = layout.emitSize(IGF);
   llvm::Value *align = layout.emitAlign(IGF);
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, align,
@@ -291,6 +340,11 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
 
 /// emitStructType - Emit all the declarations associated with this oneof type.
 void IRGenModule::emitClassDecl(ClassDecl *D) {
+  // Emit the class metadata.
+  emitClassMetadata(D);
+
+  bool emittedDtor = false;
+
   // FIXME: This is mostly copy-paste from emitExtension;
   // figure out how to refactor! 
   for (Decl *member : D->getMembers()) {
@@ -343,14 +397,18 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       continue;
     }
     case DeclKind::Destructor: {
-      // We generate a destructor for every class, regardless of whether
-      // there is a DestructorDecl.
+      assert(!emittedDtor && "two destructors in class?");
+      emittedDtor = true;
+      emitClassDestructor(*this, D, cast<DestructorDecl>(member));
       continue;
     }
     }
     llvm_unreachable("bad extension member kind");
   }
-  emitClassDestructor(*this, D);
+
+  // Emit a defaulted class destructor if we didn't see one explicitly.
+  if (!emittedDtor)
+    emitClassDestructor(*this, D, nullptr);
 }
 
 const TypeInfo *TypeConverter::convertClassType(ClassDecl *D) {

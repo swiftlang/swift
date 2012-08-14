@@ -146,7 +146,7 @@ private:
 
 //--- Globals ---------------------------------------------------------------
 private:
-  llvm::DenseMap<Decl*, llvm::GlobalVariable*> GlobalVars;
+  llvm::DenseMap<LinkEntity, llvm::GlobalVariable*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
 
   void mangleGlobalInitializer(raw_ostream &buffer, TranslationUnit *D);
@@ -217,6 +217,11 @@ public:
   llvm::Function *getAddrOfValueWitness(Type concreteType, ValueWitness index);
   llvm::Function *getAddrOfConstructor(ConstructorDecl *D, ExplosionKind kind);
   llvm::Function *getAddrOfDestructor(ClassDecl *D);
+  llvm::Constant *getAddrOfClassMetadata(ClassDecl *D,
+                                         llvm::Type *definitionType = nullptr);
+
+private:
+  void emitClassMetadata(ClassDecl *D);
 };
 
 } // end namespace irgen
