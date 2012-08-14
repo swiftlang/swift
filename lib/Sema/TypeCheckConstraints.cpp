@@ -586,7 +586,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       auto tv = CS.createTypeVariable(E);
       ArrayRef<ValueDecl*> decls = E->getDecls();
       SmallVector<OverloadChoice *, 4> choices;
-      auto baseTy = E->getBase()->getType(); // FIXME: Do we record types here?
+      auto baseTy = E->getBase()->getType();
       for (unsigned i = 0, n = decls.size(); i != n; ++i) {
         // Create a new derived constraint system that captures the
         // additional requirements introduced by selecting this particular
@@ -646,7 +646,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       // The base must have a member of the given name, such that accessing
       // that member through the base returns a value convertible to the type
       // of this expression.
-      auto baseTy = expr->getBase()->getType(); // FIXME: Do we record types?
+      auto baseTy = expr->getBase()->getType();
       auto tv = CS.createTypeVariable(expr);
       CS.addMemberConstraint(ConstraintKind::Conversion, baseTy,
                              expr->getName(), tv);
@@ -658,7 +658,6 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitParenExpr(ParenExpr *expr) {
-      // FIXME: Do we record types?
       return expr->getSubExpr()->getType();
     }
 
@@ -668,7 +667,6 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       SmallVector<TupleTypeElt, 4> elements;
       elements.reserve(expr->getNumElements());
       for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
-        // FIXME: Do we record types?
         elements.push_back(TupleTypeElt(expr->getElement(i)->getType(),
                                         expr->getElementName(i)));
       }
@@ -692,14 +690,12 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
 
       // Add the constraint for a subscript declaration.
       // FIXME: lame name!
-      // FIXME: Do we record types?
       auto baseTy = expr->getBase()->getType();
       CS.addMemberConstraint(ConstraintKind::Equal, baseTy,
                              Context.getIdentifier("__subscript"), fnTy);
       
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
-      // FIXME: Do we record types?
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getIndex()->getType(),
                        inputTv);
@@ -823,7 +819,6 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitAddressOfExpr(AddressOfExpr *expr) {
-      // FIXME: Do we record types?
       return expr->getSubExpr()->getType();
     }
 
