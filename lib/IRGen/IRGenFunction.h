@@ -224,12 +224,9 @@ private:
   std::vector<JumpDest> BreakDestStack;
   std::vector<JumpDest> ContinueDestStack;
 
+  friend class Cleanup; // just so that it can befriend initCleanup
   friend class Scope;
-
-public:
   Cleanup &initCleanup(Cleanup &cleanup, size_t allocSize, CleanupState state);
-private:
-  
   void setCleanupState(Cleanup &cleanup, CleanupState state);
 
 //--- Function prologue and epilogue -------------------------------------------
