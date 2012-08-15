@@ -49,6 +49,11 @@ namespace {
   class OverloadChoice;
 }
 
+//===--------------------------------------------------------------------===//
+// Type variable implementation.
+//===--------------------------------------------------------------------===//
+#pragma mark Type variable implementation
+
 /// \brief The implementation object for a type variable used within the
 /// constraint-solving type checker.
 ///
@@ -145,7 +150,7 @@ public:
   LiteralKind getLiteralKind() const ;
 
   void print(llvm::raw_ostream &Out) {
-    Out << "T" << ID;
+    Out << "$T" << ID;
     if (!ConformsTo.empty()) {
       Out << " :";
       bool first = true;
@@ -191,8 +196,13 @@ TypeVariableType *TypeVariableType::getNew(ASTContext &C, Args &&...args) {
 }
 
 void TypeVariableType::print(raw_ostream &OS) const {
-  OS << "T" << getImpl().getID();
+  OS << "$T" << getImpl().getID();
 }
+
+//===--------------------------------------------------------------------===//
+// Constraints
+//===--------------------------------------------------------------------===//
+#pragma mark Constraints
 
 namespace {
   /// \brief Describes the kind of constraint placed on two type variables,
@@ -237,6 +247,15 @@ namespace {
       : Kind(Kind), First(First), Second(Second), Member(Member) { }
 
     // FIXME: Need some context information here.
+
+    /// \brief Determine the kind of constraint.
+    ConstraintKind getKind() const { return Kind; }
+
+    /// \brief Retrieve the first type in the constraint.
+    Type getFirstType() const { return First; }
+
+    /// \brief Retrieve the second type in the constraint.
+    Type getSecondType() const { return Second; }
 
     void print(llvm::raw_ostream &Out) {
       First->print(Out);
@@ -331,6 +350,26 @@ namespace {
     /// \brief Create a new overload set, using (and copying) the given choices.
     static OverloadSet *getNew(ConstraintSystem &CS,
                                ArrayRef<OverloadChoice *> choices);
+  };
+
+  //===--------------------------------------------------------------------===//
+  // Constraint system
+  //===--------------------------------------------------------------------===//
+#pragma mark Constraint system
+
+  /// \brief The kind of type matching to perform in matchTypes().
+  enum class TypeMatchKind : char {
+    /// \brief Require the types to match exactly.
+    SameType,
+    /// \brief Require the first type to be a "trivial" subtype of the second
+    /// type or be an exact match.
+    TrivialSubtype,
+    /// \brief Require the first type to be a subtype of the second type
+    /// (or be an exact match or trivial subtype).
+    Subtype,
+    /// \brief Requires the first type to be convertible to the second type,
+    /// which includes exact matches and both forms of subtyping.
+    Conversion
   };
 
   /// \brief Describes a system of constraints on type variables, the
@@ -450,6 +489,80 @@ namespace {
     /// \brief Generate constraints for the given (unchecked) expression.
     void generateConstraints(Expr *E);
 
+    /// \brief The result of attempting to resolve a constraint or set of
+    /// constraints.
+    enum class SolutionKind : char {
+      /// \brief The constraint has been solved completely, and provides no
+      /// more information.
+      Solved,
+      /// \brief The constraint could not be solved at this point.
+      Unsolved,
+      /// \brief The constraint uncovers an inconsistency in the system.
+      Error
+    };
+
+  private:
+    /// \brief Flags that direct type matching.
+    enum TypeMatchFlags {
+      TMF_None = 0,
+
+      /// \brief Indicates that we are in a context where we should be
+      /// generating constraints for any unsolvable problems.
+      ///
+      /// This flag is automatically introduced when type matching destructures
+      /// a type constructor (tuple, function type, etc.), solving that
+      /// constraint while potentially generating others.
+      TMF_GenerateConstraints = 0x01
+    };
+
+    /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
+    SolutionKind matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
+                                 TypeMatchKind kind, unsigned flags,
+                                 bool &trivial);
+
+    /// \brief Subroutine of \c matchTypes(), which matches up two function
+    /// types.
+    SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
+                                    TypeMatchKind kind, unsigned flags,
+                                    bool &trivial);
+
+    /// \brief Attempt to match up types \c type1 and \c type2, which in effect
+    /// is solving the given type constraint between these two types.
+    ///
+    /// \param type1 The first type, which is on the left of the type relation.
+    ///
+    /// \param type2 The second type, which is on the right of the type relation.
+    ///
+    /// \param kind The kind of type match being performed, e.g., exact match,
+    /// trivial subtyping, subtyping, or conversion.
+    ///
+    /// \param flags A set of flags composed from the TMF_* constants, which
+    /// indicates how
+    ///
+    /// \param trivial Will be set false if any non-trivial subtyping or
+    /// conversion is applied.
+    ///
+    /// \returns the result of attempting to solve this constraint.
+    SolutionKind matchTypes(Type type1, Type type2, TypeMatchKind kind,
+                            unsigned flags, bool &trivial);
+
+    /// \brief Simplify the given constaint.
+    SolutionKind simplifyConstraint(const Constraint &constraint);
+
+  public:
+    /// \brief Simplify the system of constraints, by breaking down complex
+    /// constraints into simpler constraints.
+    ///
+    /// The result of simplification is a constraint system that consisting of
+    /// only simple constraints relating type variables to each other or
+    /// directly to fixed types. There are no constraints that involve
+    /// type constructors on both sides. the simplified constraint system may,
+    /// of course, include type variables for which we have constraints but
+    /// no fixed type. Such type variables are left to the solver to bind.
+    ///
+    /// \returns true if an error occurred, false otherwise.
+    bool simplify();
+
     void dump();
   };
 }
@@ -554,14 +667,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value) {
   addConstraint(ConstraintKind::Subtype, baseTy, ownerTy);
 
   // Determine the type of the member.
-  auto memberTy = value->getTypeOfReference();
-  auto polyFn = memberTy->getAs<PolymorphicFunctionType>();
-  if (!polyFn)
-    return memberTy;
-
-  // FIXME: For polymorphic function types, we need to "open up" the function
-  // type by replacing each archetype with a fresh type variable.
-  llvm_unreachable("constraints for polymorphic function types unimplemented");
+  return openType(value->getTypeOfReference());
 }
 
 /// \brief Retrieve the name bound by the given (immediate) pattern.
@@ -581,6 +687,11 @@ static Identifier findPatternName(Pattern *pattern) {
 
   llvm_unreachable("Unhandled pattern kind");  
 }
+
+//===--------------------------------------------------------------------===//
+// Constraint generation
+//===--------------------------------------------------------------------===//
+#pragma mark Constraint generation
 
 void ConstraintSystem::generateConstraints(Expr *expr) {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
@@ -967,6 +1078,411 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
   expr->walk(CW);
 }
 
+//===--------------------------------------------------------------------===//
+// Constraint simplification
+//===--------------------------------------------------------------------===//
+#pragma mark Constraint simplification
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
+                                  TypeMatchKind kind, unsigned flags,
+                                  bool &trivial) {
+  // FIXME: When we're allowed to perform conversions, we can end up
+  // shuffling here. Compute that shuffle.
+  if (tuple1->getFields().size() != tuple2->getFields().size())
+    return SolutionKind::Error;
+
+  SolutionKind result = SolutionKind::Solved;
+  unsigned subFlags = flags | TMF_GenerateConstraints;
+  for (unsigned i = 0, n = tuple1->getFields().size(); i != n; ++i) {
+    const auto &elt1 = tuple1->getFields()[i];
+    const auto &elt2 = tuple2->getFields()[i];
+
+    // FIXME: Any unlabeled cases we care about?
+    if (elt1.getName() != elt2.getName())
+      return SolutionKind::Error;
+
+    if (elt1.isVararg() != elt2.isVararg())
+      return SolutionKind::Error;
+
+    switch (matchTypes(elt1.getType(), elt2.getType(), kind, subFlags,
+                       trivial)) {
+    case SolutionKind::Error:
+      return SolutionKind::Error;
+
+    case SolutionKind::Solved:
+      break;
+
+    case SolutionKind::Unsolved:
+      result = SolutionKind::Unsolved;
+      break;
+    }
+  }
+
+  return result;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
+                                     TypeMatchKind kind, unsigned flags,
+                                     bool &trivial) {
+  // An [auto_closure] function type can be a subtype of a
+  // non-[auto_closure] function type.
+  if (func1->isAutoClosure() != func2->isAutoClosure()) {
+    if (func2->isAutoClosure())
+      return SolutionKind::Error;
+
+    if (kind < TypeMatchKind::TrivialSubtype)
+      return SolutionKind::Error;
+  }
+
+  // Determine how we match up the input/result types.
+  TypeMatchKind subKind;
+  switch (kind) {
+  case TypeMatchKind::SameType:
+  case TypeMatchKind::TrivialSubtype:
+    subKind = kind;
+    break;
+
+  case TypeMatchKind::Subtype:
+    subKind = TypeMatchKind::TrivialSubtype;
+    break;
+
+  case TypeMatchKind::Conversion:
+    subKind = TypeMatchKind::Subtype;
+    break;
+  }
+
+  unsigned subFlags = flags | TMF_GenerateConstraints;
+  // Input types can be contravariant (or equal).
+  SolutionKind result = matchTypes(func2->getInput(), func2->getInput(),
+                                   subKind, subFlags, trivial);
+  if (result == SolutionKind::Error)
+    return SolutionKind::Error;
+
+  // Result type can be covariant (or equal).
+  switch (matchTypes(func1->getResult(), func2->getResult(), subKind,
+                     subFlags, trivial)) {
+  case SolutionKind::Error:
+    return SolutionKind::Error;
+
+  case SolutionKind::Solved:
+    break;
+
+  case SolutionKind::Unsolved:
+    result = SolutionKind::Unsolved;
+    break;
+  }
+
+  return result;
+}
+
+/// \brief Map a type-matching kind to a constraint kind.
+static ConstraintKind getConstraintKind(TypeMatchKind kind) {
+  switch (kind) {
+  case TypeMatchKind::SameType:
+    return ConstraintKind::Equal;
+
+  case TypeMatchKind::TrivialSubtype:
+    return ConstraintKind::TrivialSubtype;
+
+  case TypeMatchKind::Subtype:
+    return ConstraintKind::Subtype;
+
+  case TypeMatchKind::Conversion:
+    return ConstraintKind::Conversion;
+  }
+
+  llvm_unreachable("unhandled type matching kind");
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
+                             unsigned flags, bool &trivial) {
+  // If we have type variables that have been bound to fixed types, look through
+  // to the fixed type.
+  auto typeVar1 = type1->getAs<TypeVariableType>();
+  if (typeVar1 && typeVar1->getImpl().getFixedType()) {
+    type1 = typeVar1->getImpl().getFixedType();
+    typeVar1 = nullptr;
+  }
+
+  auto typeVar2 = type2->getAs<TypeVariableType>();
+  if (typeVar2 && typeVar2->getImpl().getFixedType()) {
+    type2 = typeVar2->getImpl().getFixedType();
+    typeVar2 = nullptr;
+  }
+
+  // If the types are equivalent, we're done.
+  if (type1->isEqual(type2))
+    return SolutionKind::Solved;
+
+  // If either (or both) types are type variables, unify the type variables.
+  if (typeVar1 || typeVar2) {
+    switch (kind) {
+    case TypeMatchKind::SameType:
+      if (typeVar1 && typeVar2) {
+        // FIXME: Union-find magic to merge these type variables.
+        return SolutionKind::Solved;
+      }
+
+      // Provide a fixed type for the type variable.
+      if (typeVar1)
+        typeVar1->getImpl().assignType(type2);
+      else
+        typeVar2->getImpl().assignType(type1);
+      return SolutionKind::Solved;
+
+    case TypeMatchKind::TrivialSubtype:
+    case TypeMatchKind::Subtype:
+    case TypeMatchKind::Conversion:
+      if (flags & TMF_GenerateConstraints) {
+        // Add a new constraint between these types. We consider the current
+        // type-matching problem to the "solved" by this addition, because
+        // this new constraint will be solved at a later point.
+        // Obviously, this must not happen at the top level, or the algorithm
+        // would not terminate.
+        addConstraint(getConstraintKind(kind), type1, type2);
+        return SolutionKind::Solved;
+      }
+
+      // We couldn't solve this constraint.
+      return SolutionKind::Unsolved;
+    }
+
+    llvm_unreachable("Unhandled type-variable matching");
+  }
+
+  // Decompose parallel structure.
+  auto canType1 = type1->getCanonicalType();
+  auto canType2 = type2->getCanonicalType();
+  unsigned subFlags = flags | TMF_GenerateConstraints;
+  if (canType1->getKind() == canType2->getKind()) {
+    switch (canType1->getKind()) {
+#define SUGARED_TYPE(id, parent) case TypeKind::id:
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+      llvm_unreachable("Sugared type masquerading as canonical");
+
+#define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+    case TypeKind::Error:
+      return SolutionKind::Error;
+
+    case TypeKind::UnstructuredUnresolved:
+      llvm_unreachable("Unstructured unresolved type");
+
+    case TypeKind::TypeVariable:
+      llvm_unreachable("Type variables handled above");
+
+    case TypeKind::Tuple: {
+      auto tuple1 = cast<TupleType>(canType1);
+      auto tuple2 = cast<TupleType>(canType2);
+      return matchTupleTypes(tuple1, tuple2, kind, flags, trivial);
+    }
+
+    case TypeKind::OneOf:
+    case TypeKind::Struct:
+    case TypeKind::Class: {
+      auto nominal1 = cast<NominalType>(canType1);
+      auto nominal2 = cast<NominalType>(canType2);
+      // FIXME: subtyping for classes!
+      if (nominal1->getDecl() == nominal2->getDecl()) {
+        return SolutionKind::Error;
+
+        assert((bool)nominal1->getParent() == (bool)nominal2->getParent() &&
+               "Mismatched parents of nominal types");
+
+        if (!nominal1->getParent())
+          return SolutionKind::Solved;
+
+        // Match up the parents, exactly.
+        return matchTypes(nominal1->getParent(), nominal2->getParent(),
+                          TypeMatchKind::SameType, subFlags, trivial);
+      }
+      break;
+    }
+
+    case TypeKind::MetaType: {
+      auto meta1 = cast<MetaTypeType>(canType1);
+      auto meta2 = cast<MetaTypeType>(canType2);
+      // FIXME: Subtyping among metatypes, for classes only?
+      return matchTypes(meta1->getInstanceType(), meta2->getInstanceType(),
+                        TypeMatchKind::SameType, subFlags, trivial);
+    }
+
+    case TypeKind::Function: {
+      auto func1 = cast<FunctionType>(canType1);
+      auto func2 = cast<FunctionType>(canType2);
+      return matchFunctionTypes(func1, func2, kind, flags, trivial);
+    }
+
+    case TypeKind::PolymorphicFunction:
+      llvm_unreachable("Polymorphic function type should have been opened");
+
+    case TypeKind::Array: {
+      auto array1 = cast<ArrayType>(canType1);
+      auto array2 = cast<ArrayType>(canType2);
+      return matchTypes(array1->getBaseType(), array2->getBaseType(),
+                        TypeMatchKind::SameType, subFlags, trivial);
+    }
+
+    case TypeKind::ProtocolComposition:
+      // Existential types handled below.
+      break;
+
+    case TypeKind::LValue: {
+      auto lvalue1 = cast<LValueType>(canType1);
+      auto lvalue2 = cast<LValueType>(canType2);
+      if (lvalue1->getQualifiers() != lvalue2->getQualifiers() &&
+          !(kind >= TypeMatchKind::TrivialSubtype &&
+            lvalue1->getQualifiers() < lvalue2->getQualifiers()))
+        return SolutionKind::Error;
+
+      return matchTypes(lvalue1->getObjectType(), lvalue2->getObjectType(),
+                        TypeMatchKind::SameType, subFlags, trivial);
+    }
+
+    case TypeKind::UnboundGeneric:
+      llvm_unreachable("Unbound generic type should have been opened");
+
+    case TypeKind::BoundGeneric: {
+      auto bound1 = cast<BoundGenericType>(canType1);
+      auto bound2 = cast<BoundGenericType>(canType2);
+      
+      // FIXME: subtyping for generic classes!
+      if (bound1->getDecl() == bound2->getDecl()) {
+        // Match up the parents, exactly, if there are parents.
+        SolutionKind result = SolutionKind::Solved;
+        assert((bool)bound1->getParent() == (bool)bound2->getParent() &&
+               "Mismatched parents of bound generics");
+        if (bound1->getParent()) {
+          switch (matchTypes(bound1->getParent(), bound2->getParent(),
+                             TypeMatchKind::SameType, subFlags, trivial)) {
+          case SolutionKind::Error:
+            return SolutionKind::Error;
+
+          case SolutionKind::Solved:
+            break;
+
+          case SolutionKind::Unsolved:
+            result = SolutionKind::Unsolved;
+            break;
+          }
+        }
+
+        // Match up the generic arguments, exactly.
+        // FIXME: If this fails, do we have to look for a subtype?
+        auto args1 = bound1->getGenericArgs();
+        auto args2 = bound2->getGenericArgs();
+        assert(args1.size() == args2.size() && "Mismatched generic args");
+        for (unsigned i = 0, n = args1.size(); i != n; ++i) {
+          switch (matchTypes(args1[i], args2[i], TypeMatchKind::SameType,
+                             subFlags, trivial)) {
+          case SolutionKind::Error:
+            return SolutionKind::Error;
+
+          case SolutionKind::Solved:
+            break;
+
+          case SolutionKind::Unsolved:
+            result = SolutionKind::Unsolved;
+            break;
+          }
+        }
+
+        return result;
+      }
+      break;
+    }
+    }
+  }
+
+  // FIXME: Single type vs. tuple-of-one.
+  // FIXME: Auto-closure.
+  // FIXME: Materialization
+  // FIXME: Loading values.
+
+  if (kind >= TypeMatchKind::Conversion) {
+    // An lvalue of type T2 can be converted to a value of type T1 so long as
+    // T2 is convertible to T1 (by loading the value).
+    if (auto lvalue2 = type2->getAs<LValueType>()) {
+      return matchTypes(type1, lvalue2->getObjectType(), kind, subFlags,
+                        trivial);
+    }
+  }
+
+  // FIXME: Check existential types.
+  // FIXME: Subtyping for class types.
+  // FIXME: User-defined conversions.
+
+  return SolutionKind::Error;
+}
+
+/// \brief Retrieve the type-matching kind corresponding to the given
+/// constraint kind.
+static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
+  switch (kind) {
+  case ConstraintKind::Equal: return TypeMatchKind::SameType;
+  case ConstraintKind::TrivialSubtype: return TypeMatchKind::TrivialSubtype;
+  case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
+  case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
+  }
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
+  switch (constraint.getKind()) {
+  case ConstraintKind::Equal:
+  case ConstraintKind::TrivialSubtype:
+  case ConstraintKind::Subtype:
+  case ConstraintKind::Conversion: {
+    // For relational constraints, match up the types.
+    bool trivial = true;
+    return matchTypes(constraint.getFirstType(), constraint.getSecondType(),
+                      getTypeMatchKind(constraint.getKind()), TMF_None,
+                      trivial);
+  }
+  }
+}
+
+bool ConstraintSystem::simplify() {
+  bool solvedAny = false;
+  do {
+    // Loop through all of the thus-far-unsolved constraints, attempting to
+    // simplify each one.
+    SmallVector<Constraint *, 16> existingConstraints;
+    existingConstraints.swap(Constraints);
+    solvedAny = false;
+    for (auto constraint : existingConstraints) {
+      switch (simplifyConstraint(*constraint)) {
+      case SolutionKind::Error:
+        return true;
+
+      case SolutionKind::Solved:
+        // Implicitly drop this solved constraint.
+        solvedAny = true;
+        break;
+
+      case SolutionKind::Unsolved:
+        // Since this constraint was not solved, add it to the list of
+        // remaining constraints.
+        Constraints.push_back(constraint);
+        break;
+      }
+    }
+  } while (solvedAny);
+
+  // We've solved all of the constraints we can.
+  return false;
+}
+
+//===--------------------------------------------------------------------===//
+// Debugging
+//===--------------------------------------------------------------------===//
+#pragma mark Debugging
+
 void ConstraintSystem::dump() {
   llvm::raw_ostream &out = llvm::errs();
 
@@ -988,8 +1504,16 @@ void ConstraintSystem::dump() {
 void TypeChecker::dumpConstraints(Expr *expr) {
   ConstraintSystem CS(*this);
   CS.generateConstraints(expr);
-  llvm::errs() << "---Constraints for the given expression---\n";
+  llvm::errs() << "---Initial constraints for the given expression---\n";
   expr->dump();
   llvm::errs() << "\n";
   CS.dump();
+  llvm::errs() << "---Simplified constraints---\n";
+  bool error = CS.simplify();
+  CS.dump();
+
+  llvm::errs() << "\nConstraint system is "
+               << (error? "ill-formed" : "still viable")
+               << "\n";
 }
+
