@@ -208,6 +208,143 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   llvm_unreachable("Can't represent lookup result");
 }
 
+static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD) {
+  if (!CD->hasBaseClass())
+    return;
+
+  Type Base = CD->getBaseClass();
+  llvm::DenseMap<Identifier, std::vector<ValueDecl*>> FoundDecls;
+  llvm::SmallPtrSet<ValueDecl*, 16> OverriddenDecls;
+  for (Decl *MemberD : CD->getMembers()) {
+    ValueDecl *MemberVD = dyn_cast<ValueDecl>(MemberD);
+    if (!MemberVD)
+      continue;
+    if (isa<DestructorDecl>(MemberVD) || isa<ConstructorDecl>(MemberVD))
+      continue;
+    if (MemberVD->getName().empty())
+      continue;
+    auto FoundDeclResult = FoundDecls.insert({ MemberVD->getName(),
+                                               std::vector<ValueDecl*>() });
+    auto& CurDecls = FoundDeclResult.first->second;
+    if (FoundDeclResult.second) {
+      MemberLookup Lookup(Base, MemberVD->getName(), TC.TU);
+      for (auto BaseMember : Lookup.Results)
+        CurDecls.push_back(BaseMember.D);
+    }
+    if (!CurDecls.empty()) {
+      if (isa<TypeDecl>(MemberVD)) {
+        // Duplicate type declaration; this gets diagnosed earlier.
+        // FIXME: That doesn't actually happen at the moment.
+        continue;
+      }
+
+      ValueDecl *OverriddenDecl = nullptr;
+
+      // First, check for an exact type match.
+      for (unsigned i = 0, e = CurDecls.size(); i != e; ++i) {
+        if (isa<TypeDecl>(CurDecls[i])) {
+          // Overriding type declaration; this gets diagnosed earlier.
+          // FIXME: That doesn't actually happen at the moment.
+          break;
+        }
+        if (MemberVD->getKind() != CurDecls[i]->getKind())
+          continue;
+        bool isTypeEqual = false;
+        if (isa<FuncDecl>(MemberVD)) {
+          AnyFunctionType *MemberFTy =
+              MemberVD->getType()->getAs<AnyFunctionType>();
+          AnyFunctionType *OtherFTy =
+              CurDecls[i]->getType()->getAs<AnyFunctionType>();
+          if (MemberFTy && OtherFTy)
+            isTypeEqual = MemberFTy->getResult()->isEqual(OtherFTy->getResult());
+        } else {
+          isTypeEqual = MemberVD->getType()->isEqual(CurDecls[i]->getType());
+        }
+        if (isTypeEqual) {
+          if (CurDecls[i]->getDeclContext() == MemberVD->getDeclContext()) {
+            // Duplicate declaration, diagnosed elsewhere
+            // FIXME: That doesn't actually happen at the moment.
+            continue;
+          }
+          if (OverriddenDecl) {
+            // Two decls from the base class have the same type; this will
+            // trigger an error elsewhere.
+            // FIXME: That doesn't actually happen at the moment.
+            continue;
+          }
+          OverriddenDecl = CurDecls[i];
+        }
+      }
+
+      // Then, check for a subtyping relationship.
+      // FIXME: Need to check exact match for all members before checking
+      // subtyping for any member.
+      if (!OverriddenDecl) {
+        for (unsigned i = 0, e = CurDecls.size(); i != e; ++i) {
+          if (CurDecls[i]->getDeclContext() == MemberVD->getDeclContext()) {
+            // We ignore sub-typing on the same class.
+            continue;
+          }
+          if (MemberVD->getKind() != CurDecls[i]->getKind())
+            continue;
+          bool isSubtype = false;
+          if (isa<FuncDecl>(MemberVD)) {
+            AnyFunctionType *MemberFTy =
+                MemberVD->getType()->getAs<AnyFunctionType>();
+            AnyFunctionType *OtherFTy =
+                CurDecls[i]->getType()->getAs<AnyFunctionType>();
+            if (MemberFTy && OtherFTy) {
+              bool Trivial;
+              isSubtype = TC.isSubtypeOf(MemberFTy->getResult(),
+                                         OtherFTy->getResult(),
+                                         Trivial) && Trivial;
+            }
+          } else {
+            bool Trivial;
+            isSubtype = TC.isSubtypeOf(MemberVD->getType(),
+                                       CurDecls[i]->getType(),
+                                       Trivial) && Trivial;
+          }
+          if (isSubtype) {
+            if (OverriddenDecl) {
+              TC.diagnose(MemberVD->getLoc(),
+                          diag::override_multiple_decls_base);
+              continue;
+            }
+            OverriddenDecl = CurDecls[i];
+          }
+        }
+      }
+      if (OverriddenDecl) {
+        if (!OverriddenDecls.insert(OverriddenDecl)) {
+          TC.diagnose(MemberVD->getLoc(),
+                      diag::override_multiple_decls_derived);
+          continue;
+        }
+        if (OverriddenDecl->getDeclContext()->getContextKind() ==
+            DeclContextKind::ExtensionDecl) {
+          TC.diagnose(MemberVD->getLoc(), diag::override_decl_extension);
+          continue;
+        }
+        if (auto FD = dyn_cast<FuncDecl>(MemberVD)) {
+          FD->setOverriddenDecl(cast<FuncDecl>(OverriddenDecl));
+        } else if (auto VD = dyn_cast<VarDecl>(MemberVD)) {
+          VD->setOverriddenDecl(cast<VarDecl>(OverriddenDecl));
+        } else if (auto SD = dyn_cast<SubscriptDecl>(MemberVD)) {
+          SD->setOverriddenDecl(cast<SubscriptDecl>(OverriddenDecl));
+        } else {
+          llvm_unreachable("Unexpected decl");
+        }
+        continue;
+      }
+      // FIXME: This isn't quite right: if the derived class overrides all
+      // the base class decls, we should allow additional overloads.
+      TC.diagnose(MemberVD->getLoc(), diag::overload_base_decl);
+    }
+  }
+}
+
+
 /// performTypeChecking - Once parsing and namebinding are complete, these
 /// walks the AST to resolve types and diagnose problems therein.
 ///
@@ -373,6 +510,43 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem,
       }
     }
   }
+
+  // Check for correct overriding in classes.  We have to do this after the
+  // first pass so we have valid types, but before the second pass because
+  // it affects name lookup.  The loop here is a bit complicated because we
+  // can't check a class before we've checked its base.
+  {
+    llvm::SmallPtrSet<ClassDecl *, 16> CheckedClasses;
+    llvm::SmallVector<ClassDecl *, 16> QueuedClasses;
+    for (unsigned i = 0, e = StartElem; i != e; ++i) {
+      ClassDecl *CD = dyn_cast<ClassDecl>(TU->Decls[i]);
+      if (CD)
+        CheckedClasses.insert(CD);
+    }
+    for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
+      ClassDecl *CD = dyn_cast<ClassDecl>(TU->Decls[i]);
+      if (!CD)
+        continue;
+      if (!CheckedClasses.insert(CD))
+        continue;
+      QueuedClasses.push_back(CD);
+      while (!QueuedClasses.empty()) {
+        CD = QueuedClasses.back();
+        if (CD->hasBaseClass()) {
+          // FIXME: Generic bases
+          ClassDecl *Base = CD->getBaseClass()->castTo<ClassType>()->getDecl();
+          if (CheckedClasses.insert(Base)) {
+            QueuedClasses.push_back(Base);
+            continue;
+          }
+        }
+        checkClassOverrides(TC, CD);
+        QueuedClasses.pop_back();
+      }
+    }
+  }
+
+  // At this point, we can perform general name lookup into any type.
 
   // We don't know the types of all the global declarations in the first
   // pass, which means we can't completely analyze everything. Perform the

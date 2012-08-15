@@ -33,7 +33,6 @@ namespace swift {
   class ASTContext;
   class ASTWalker;
   class Type;
-  class ClassType;
   class Expr;
   class FuncDecl;
   class FuncExpr;
@@ -41,16 +40,12 @@ namespace swift {
   class Component;
   class DeclAttributes;
   class OneOfElementDecl;
-  class OneOfType;
   class NameAliasType;
-  class NominalType;
   class Pattern;
   class ProtocolType;
   enum class Resilience : unsigned char;
   class TypeAliasDecl;
   class Stmt;
-  class StructType;
-  class TupleType;
   class ValueDecl;
   
 enum class DeclKind {
@@ -989,11 +984,12 @@ private:
   };
   
   GetSetRecord *GetSet;
-  
+  VarDecl *OverriddenDecl;
+
 public:
   VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, DeclContext *DC)
     : ValueDecl(DeclKind::Var, DC, Name, Ty),
-      VarLoc(VarLoc), GetSet() {}
+      VarLoc(VarLoc), GetSet(), OverriddenDecl(nullptr) {}
 
   SourceLoc getLoc() const { return VarLoc; }
   SourceLoc getStartLoc() const { return VarLoc; }
@@ -1014,6 +1010,9 @@ public:
   /// \brief Retrieve the setter used to mutate the value of this variable.
   FuncDecl *getSetter() const { return GetSet? GetSet->Set : nullptr; }
 
+  VarDecl *getOverriddenDecl() const { return OverriddenDecl; }
+  void setOverriddenDecl(VarDecl *over) { OverriddenDecl = over; }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
   static bool classof(const VarDecl *D) { return true; }
@@ -1028,14 +1027,15 @@ class FuncDecl : public ValueDecl {
   GenericParamList *GenericParams;
   FuncExpr *Body;
   llvm::PointerIntPair<Decl *, 1, bool> GetOrSetDecl;
-  
+  FuncDecl *OverriddenDecl;
+
 public:
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
            SourceLoc NameLoc, GenericParamList *GenericParams, Type Ty,
            FuncExpr *Body, DeclContext *DC)
     : ValueDecl(DeclKind::Func, DC, Name, Ty), StaticLoc(StaticLoc),
       FuncLoc(FuncLoc), NameLoc(NameLoc), GenericParams(GenericParams),
-      Body(Body) { }
+      Body(Body), OverriddenDecl(nullptr) { }
   
   bool isStatic() const {
     return StaticLoc.isValid() || getName().isOperator();
@@ -1119,7 +1119,10 @@ public:
   /// getGetterOrSetterDecl - Return the declaration for which this function
   /// is a getter or setter, if it is one.
   Decl *getGetterOrSetterDecl() const { return GetOrSetDecl.getPointer(); }
-  
+
+  FuncDecl *getOverriddenDecl() const { return OverriddenDecl; }
+  void setOverriddenDecl(FuncDecl *over) { OverriddenDecl = over; }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
   static bool classof(const FuncDecl *D) { return true; }
@@ -1196,7 +1199,8 @@ class SubscriptDecl : public ValueDecl {
   SourceRange Braces;
   FuncDecl *Get;
   FuncDecl *Set;
-  
+  SubscriptDecl *OverriddenDecl;
+
 public:
   SubscriptDecl(Identifier NameHack, SourceLoc SubscriptLoc, Pattern *Indices,
                 SourceLoc ArrowLoc, TypeLoc ElementTy,
@@ -1205,7 +1209,7 @@ public:
     : ValueDecl(DeclKind::Subscript, Parent, NameHack, Type()),
       SubscriptLoc(SubscriptLoc),
       ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy),
-      Braces(Braces), Get(Get), Set(Set) { }
+      Braces(Braces), Get(Get), Set(Set), OverriddenDecl(nullptr) { }
   
   SourceLoc getStartLoc() const { return SubscriptLoc; }
   SourceLoc getLoc() const;
@@ -1232,7 +1236,10 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Subscript;
   }
-  
+
+  SubscriptDecl *getOverriddenDecl() const { return OverriddenDecl; }
+  void setOverriddenDecl(SubscriptDecl *over) { OverriddenDecl = over; }
+
   static bool classof(const SubscriptDecl *D) { return true; }
 };
 

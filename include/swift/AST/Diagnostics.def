@@ -758,6 +758,16 @@ ERROR(requires_generic_param_equal,sema_tcd,none,
       "same-type requirement makes generic parameters %0 and %1 equivalent",
       (Identifier, Identifier))
 
+ERROR(override_multiple_decls_base,sema_tcd,none,
+      "declaration cannot override more than one base class declaration", ())
+ERROR(override_multiple_decls_derived,sema_tcd,none,
+      "declaration cannot be overridden by more than one derived class "
+      "declaration", ())
+ERROR(override_decl_extension,sema_tcd,none,
+      "declarations from extensions cannot be overridden yet", ())
+ERROR(overload_base_decl,sema_tcd,none,
+      "cannot overload a declaration from a base class", ())
+
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------

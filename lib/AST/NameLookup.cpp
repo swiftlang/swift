@@ -199,10 +199,11 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
     return;
   }
 
+  llvm::SmallPtrSet<ValueDecl*, 8> OverriddenMethods;
   do {
     // Look in for members of a nominal type.
     SmallVector<ValueDecl*, 8> ExtensionMethods;
-    lookupMembers(BaseTy, M, ExtensionMethods);
+    lookupMembers(BaseTy, M, OverriddenMethods, ExtensionMethods);
 
     for (ValueDecl *VD : ExtensionMethods) {
       if (TypeDecl *TAD = dyn_cast<TypeDecl>(VD)) {
@@ -243,10 +244,8 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
 }
 
 void MemberLookup::lookupMembers(Type BaseType, Module &M,
+                                 llvm::SmallPtrSet<ValueDecl*, 8> &Overridden,
                                  SmallVectorImpl<ValueDecl*> &Result) {
-  assert(Results.empty() &&
-         "This expects that the input list is empty, could be generalized");
-
   NominalTypeDecl *D;
   ArrayRef<ValueDecl*> BaseMembers;
   SmallVector<ValueDecl*, 2> BaseMembersStorage;
@@ -262,8 +261,20 @@ void MemberLookup::lookupMembers(Type BaseType, Module &M,
   }
 
   for (Decl* Member : D->getMembers()) {
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
-      BaseMembersStorage.push_back(VD);
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
+      if (auto FD = dyn_cast<FuncDecl>(VD)) {
+        if (FD->getOverriddenDecl())
+          Overridden.insert(FD->getOverriddenDecl());
+      } else if (auto VarD = dyn_cast<VarDecl>(VD)) {
+        if (VarD->getOverriddenDecl())
+          Overridden.insert(VarD->getOverriddenDecl());
+      } else if (auto SD = dyn_cast<SubscriptDecl>(VD)) {
+        if (SD->getOverriddenDecl())
+          Overridden.insert(SD->getOverriddenDecl());
+      }
+      if (!Overridden.count(VD))
+        BaseMembersStorage.push_back(VD);
+    }
   }
   if (D->getGenericParams())
     for (auto param : *D->getGenericParams())
