@@ -108,19 +108,12 @@ public:
   /// This routine performs path compression, so that future representive
   /// queries are more efficient.
   TypeVariableType *getRepresentative() {
-    // Find the representation.
-    auto rep = getTypeVariable();
-    while (rep->getImpl().FixedOrParent.is<TypeVariableType *>())
-      rep = rep->getImpl().FixedOrParent.get<TypeVariableType *>();
+    if (!FixedOrParent.is<TypeVariableType *>())
+      return getTypeVariable();
 
-    // Perform path compression.
-    auto current = getTypeVariable();
-    while (current != rep) {
-      auto next = current->getImpl().FixedOrParent.get<TypeVariableType *>();
-      current->getImpl().FixedOrParent = rep;
-      current = next;
-    }
-
+    auto rep = FixedOrParent.get<TypeVariableType *>()->getImpl()
+                 .getRepresentative();
+    FixedOrParent = rep;
     return rep;
   }
 
