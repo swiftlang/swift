@@ -17,6 +17,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/NameLookup.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
@@ -209,7 +210,13 @@ namespace {
     /// FIXME: This kind of constraint will eventually go away, when we can
     /// express the notion of 'converts to a particular literal kind' as a
     /// protocol, rather than a convention.
-    Literal
+    Literal,
+    /// \brief The first type has a member with the given name, and the
+    /// type of that member, when referenced as a value, is the second type.
+    ValueMember,
+    /// \brief The first type has a type member with the given name, and the
+    /// type of that member, when referenced as a type, is the second type.
+    TypeMember
   };
 
   /// \brief A constraint between two type variables.
@@ -237,7 +244,26 @@ namespace {
 
   public:
     Constraint(ConstraintKind Kind, Type First, Type Second, Identifier Member)
-      : Kind(Kind), First(First), Second(Second), Member(Member) { }
+      : Kind(Kind), First(First), Second(Second), Member(Member)
+    {
+      switch (Kind) {
+      case ConstraintKind::Equal:
+      case ConstraintKind::TrivialSubtype:
+      case ConstraintKind::Subtype:
+      case ConstraintKind::Conversion:
+        assert(Member.empty() && "Relational constraint cannot have a member");
+        break;
+
+      case ConstraintKind::Literal:
+        llvm_unreachable("Wrong constructor for literal constraint");
+        break;
+
+      case ConstraintKind::TypeMember:
+      case ConstraintKind::ValueMember:
+        assert(!Member.empty() && "Member constraint has no member");
+        break;
+      }
+    }
 
     Constraint(Type type, LiteralKind literal)
       : Kind(ConstraintKind::Literal), First(type), Literal(literal) { }
@@ -257,6 +283,13 @@ namespace {
       return Second;
     }
 
+    /// \brief Retrieve the name of the member for a member constraint.
+    Identifier getMember() const {
+      assert(Kind == ConstraintKind::ValueMember ||
+             Kind == ConstraintKind::TypeMember);
+      return Member;
+    }
+
     /// \brief Determine the kind of literal for a literal constraint.
     LiteralKind getLiteralKind() const {
       assert(Kind == ConstraintKind::Literal && "Not a literal constraint!");
@@ -273,9 +306,13 @@ namespace {
       case ConstraintKind::Literal:
         Out << " is an " << getLiteralKindName(getLiteralKind()) << " literal";
         return;
+      case ConstraintKind::ValueMember:
+        Out << "[." << Member.str() << ": value] == ";
+        break;
+      case ConstraintKind::TypeMember:
+        Out << "[." << Member.str() << ": type] == ";
+        break;
       }
-      if (!Member.empty())
-        Out << "'" << Member.str() << "' ";
 
       Second->print(Out);
     }
@@ -443,14 +480,22 @@ namespace {
       Constraints.push_back(new (*this) Constraint(type, kind));
     }
 
-    /// \brief Add a member constraint to the constraint system.
-    /// FIXME: Document in a more sane manner.
-    void addMemberConstraint(ConstraintKind kind, Type first,
-                             Identifier member, Type second) {
-      assert(first);
-      assert(second);
-      Constraints.push_back(new (*this) Constraint(kind, first, second,
-                                                   member));
+    /// \brief Add a value member constraint to the constraint system.
+    void addValueMemberConstraint(Type baseTy, Identifier name, Type memberTy) {
+      assert(baseTy);
+      assert(memberTy);
+      assert(!name.empty());
+      Constraints.push_back(new (*this) Constraint(ConstraintKind::ValueMember,
+                                                   baseTy, memberTy, name));
+    }
+
+    /// \brief Add a type member constraint to the constraint system.
+    void addTypeMemberConstraint(Type baseTy, Identifier name, Type memberTy) {
+      assert(baseTy);
+      assert(memberTy);
+      assert(!name.empty());
+      Constraints.push_back(new (*this) Constraint(ConstraintKind::ValueMember,
+                                                   baseTy, memberTy, name));
     }
 
     /// \brief "Open" the given type by replacing any occurrences of archetypes
@@ -474,7 +519,11 @@ namespace {
     /// For references to polymorphic function types, this routine "opens up"
     /// the type by replacing each instance of an archetype with a fresh type
     /// variable.
-    Type getTypeOfMemberReference(Type baseTy, ValueDecl *decl);
+    ///
+    /// \param isTypeReference Indicates that we want to refer to the declared
+    /// type of the type declaration rather than referring to it as a value.
+    Type getTypeOfMemberReference(Type baseTy, ValueDecl *decl,
+                                  bool isTypeReference);
 
     /// \brief Add a new overload set to the list of unresolved overload
     /// sets.
@@ -564,6 +613,10 @@ namespace {
     /// \brief Attempt to simplify the given literal constraint.
     SolutionKind simplifyLiteralConstraint(Type type, LiteralKind kind);
 
+    /// \brief Attempt to simplify the given member constraint.
+    SolutionKind simplifyMemberConstraint(Type baseTy, Identifier name,
+                                          bool isTypeMember, Type memberTy);
+
     /// \brief Simplify the given constaint.
     SolutionKind simplifyConstraint(const Constraint &constraint);
 
@@ -601,38 +654,50 @@ OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
 Type ConstraintSystem::openType(Type startingType) {
   llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
 
-  auto getTypeVariable = [&](ArchetypeType *archetype) -> TypeVariableType * {
-    // Check whether we already have a replacement for this archetype.
-    auto known = replacements.find(archetype);
-    if (known != replacements.end())
-      return known->second;
+  struct GetTypeVariable {
+    ConstraintSystem &CS;
+    llvm::DenseMap<ArchetypeType *, TypeVariableType *> &Replacements;
 
-    // Create a new type variable to replace this archetype.
-    auto tv = createTypeVariable(archetype);
+    TypeVariableType *operator()(ArchetypeType *archetype) const {
+      // Check whether we already have a replacement for this archetype.
+      auto known = Replacements.find(archetype);
+      if (known != Replacements.end())
+        return known->second;
 
-    // The type variable must be a subtype of the composition of all of
-    // its protocol conformance requirements.
-    auto conformsTo = archetype->getConformsTo();
-    if (!conformsTo.empty()) {
-      // FIXME: Can we do this more efficiently, since we know that the
-      // protocol list has already been minimized?
-      SmallVector<Type, 4> conformsToTypes;
-      conformsToTypes.reserve(conformsTo.size());
-      std::transform(conformsTo.begin(), conformsTo.end(),
-                     std::back_inserter(conformsToTypes),
-                     [](ProtocolDecl *proto) {
-                       return proto->getDeclaredType();
-                     });
+      // Create a new type variable to replace this archetype.
+      auto tv = CS.createTypeVariable(archetype);
 
-      auto composition = ProtocolCompositionType::get(TC.Context,
-                                                      conformsToTypes);
-      addConstraint(ConstraintKind::Subtype, tv, composition);
+      // The type variable must be a subtype of the composition of all of
+      // its protocol conformance requirements.
+      auto conformsTo = archetype->getConformsTo();
+      if (!conformsTo.empty()) {
+        // FIXME: Can we do this more efficiently, since we know that the
+        // protocol list has already been minimized?
+        SmallVector<Type, 4> conformsToTypes;
+        conformsToTypes.reserve(conformsTo.size());
+        std::transform(conformsTo.begin(), conformsTo.end(),
+                       std::back_inserter(conformsToTypes),
+                       [](ProtocolDecl *proto) {
+                         return proto->getDeclaredType();
+                       });
+
+        auto composition = ProtocolCompositionType::get(CS.TC.Context,
+                                                        conformsToTypes);
+        CS.addConstraint(ConstraintKind::Subtype, tv, composition);
+      }
+
+      // Record the type variable that corresponds to this archetype.
+      Replacements[archetype] = tv;
+
+      // Build archetypes for each of the nested types.
+      for (auto nested : archetype->getNestedTypes()) {
+        auto nestedTv = (*this)(nested.second);
+        CS.addTypeMemberConstraint(tv, nested.first, nestedTv);
+      }
+
+      return tv;
     }
-
-    // FIXME: Associated types!
-    replacements[archetype] = tv;
-    return tv;
-  };
+  } getTypeVariable{*this, replacements};
 
   std::function<Type(Type)> replaceArchetypes;
   replaceArchetypes = [&](Type type) -> Type {
@@ -672,11 +737,15 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value) {
   return openType(value->getTypeOfReference());
 }
 
-Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value) {
+Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
+                                                bool isTypeReference) {
   // Figure out the instance type used for the base.
   baseTy = baseTy->getRValueType();
-  if (auto baseMeta = baseTy->getAs<MetaTypeType>())
+  bool isInstance = true;
+  if (auto baseMeta = baseTy->getAs<MetaTypeType>()) {
     baseTy = baseMeta->getInstanceType();
+    isInstance = false;
+  }
 
   // Figure out the type of the owner.
   auto owner = value->getDeclContext();
@@ -704,7 +773,20 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value) {
   addConstraint(ConstraintKind::Subtype, baseTy, ownerTy);
 
   // Determine the type of the member.
-  return openType(value->getTypeOfReference());
+  // FIXME: Subscript references are special. Deal with them.
+  Type type;
+  if (isTypeReference)
+    type = cast<TypeDecl>(value)->getDeclaredType();
+  else
+    type = value->getTypeOfReference();
+  type = openType(type);
+
+  // Skip the 'this' argument if it's already been bound by the base.
+  if (auto func = dyn_cast<FuncDecl>(value)) {
+    if (func->isStatic() || isInstance)
+      type = type->castTo<AnyFunctionType>()->getResult();
+  }
+  return type;
 }
 
 /// \brief Retrieve the name bound by the given (immediate) pattern.
@@ -841,7 +923,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
 
         // Bind the type variable to the type of a reference to this member
         // within the derived constraint system.
-        auto refTy = derivedCS->getTypeOfMemberReference(baseTy, decl);
+        auto refTy = derivedCS->getTypeOfMemberReference(baseTy, decl, false);
         derivedCS->addConstraint(ConstraintKind::Equal, refTy, tv);
       }
       
@@ -878,9 +960,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
 
       // The type must be a oneof type that has an element of the given name.
       // That named member has the type 'tv'.
-      CS.addMemberConstraint(ConstraintKind::Equal, tv, expr->getName(),
-                             tv);
-
+      CS.addValueMemberConstraint(tv, expr->getName(), tv);
       return tv;
     }
 
@@ -890,8 +970,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       // of this expression.
       auto baseTy = expr->getBase()->getType();
       auto tv = CS.createTypeVariable(expr);
-      CS.addMemberConstraint(ConstraintKind::Conversion, baseTy,
-                             expr->getName(), tv);
+      CS.addValueMemberConstraint(baseTy, expr->getName(), tv);
       return tv;
     }
 
@@ -933,8 +1012,8 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       // Add the constraint for a subscript declaration.
       // FIXME: lame name!
       auto baseTy = expr->getBase()->getType();
-      CS.addMemberConstraint(ConstraintKind::Equal, baseTy,
-                             Context.getIdentifier("__subscript"), fnTy);
+      CS.addValueMemberConstraint(baseTy, Context.getIdentifier("__subscript"),
+                                  fnTy);
       
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
@@ -1540,6 +1619,88 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind) {
            : SolutionKind::Error;
 }
 
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyMemberConstraint(Type baseTy, Identifier name,
+                                           bool isTypeMember, Type memberTy) {
+  // Resolve the base type, if we can. If we can't resolve the base type,
+  // then we can't solve this constraint.
+  if (auto tv = baseTy->getAs<TypeVariableType>()) {
+    auto fixed = tv->getImpl().getFixedType();
+    if (!fixed)
+      return SolutionKind::Unsolved;
+
+    // Continue with the fixed type.
+    baseTy = fixed;
+  }
+
+  // If the base type is a tuple type, look for the named or indexed member
+  // of the tuple.
+  if (auto baseTuple = baseTy->getRValueType()->getAs<TupleType>()) {
+    StringRef nameStr = name.str();
+    int fieldIdx = -1;
+    if (nameStr[0] == '$') {
+      // Resolve a number reference into the tuple type.
+      unsigned Value = 0;
+      if (!nameStr.substr(1).getAsInteger(10, Value) &&
+          Value < baseTuple->getFields().size())
+        fieldIdx = Value;
+    } else {
+      baseTuple->getNamedElementId(name);
+    }
+
+    if (fieldIdx == -1)
+      return SolutionKind::Error;
+
+    // Determine the type of a reference to this tuple element.
+    auto fieldType = baseTuple->getElementType(fieldIdx);
+    // FIXME: What if we later find out that memberTy is an lvalue type?
+    // Do we have to worry about lvalue types of lvalue types forming?
+    if (!memberTy->is<LValueType>()) {
+      if (auto baseLv = baseTy->getAs<LValueType>()) {
+        fieldType = LValueType::get(fieldType, baseLv->getQualifiers(),
+                                    TC.Context);
+      }
+    }
+
+    addConstraint(ConstraintKind::Equal, fieldType, memberTy);
+    return SolutionKind::Solved;
+  }
+
+  // FIXME: If the base type still involves type variables, we want this
+  // constraint to be unsolved. This effectively requires us to solve the
+  // left-hand side of a dot expression before we look for members.
+
+  // Look for members within the base.
+  MemberLookup lookup(baseTy, name, TC.TU);
+  if (!lookup.isSuccess()) {
+    return SolutionKind::Error;
+  }
+
+  // Can't refer to a property without an object instance.
+  // FIXME: Subscripts have a similar restriction. Check it here.
+  bool isMetatypeBase = baseTy->getRValueType()->is<MetaTypeType>();
+  if (isMetatypeBase && lookup.Results.size() == 1 &&
+      lookup.Results[0].Kind == MemberLookupResult::MemberProperty) {
+    return SolutionKind::Error;
+  }
+
+  // If we only have a single result, compute the type of a reference to
+  // that declaration and equate it with the member type.
+  if (lookup.Results.size() == 1) {
+    if (isTypeMember && !isa<TypeDecl>(lookup.Results[0].D))
+      return SolutionKind::Error;
+    
+    auto refType = getTypeOfMemberReference(baseTy, lookup.Results[0].D,
+                                            isTypeMember);
+    addConstraint(ConstraintKind::Equal, refType, memberTy);
+    return SolutionKind::Solved;
+  }
+
+  // We have multiple results.
+  // FIXME: Implement this.
+  llvm_unreachable("Overloaded member lookup results");
+}
+
 /// \brief Retrieve the type-matching kind corresponding to the given
 /// constraint kind.
 static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
@@ -1550,7 +1711,11 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
       
   case ConstraintKind::Literal:
-      llvm_unreachable("Literals don't involve type matches");
+    llvm_unreachable("Literals don't involve type matches");
+
+  case ConstraintKind::ValueMember:
+  case ConstraintKind::TypeMember:
+    llvm_unreachable("Member constraints don't involve type matches");
   }
 }
 
@@ -1568,9 +1733,17 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                       trivial);
   }
 
-  case ConstraintKind::Literal: {
+  case ConstraintKind::Literal:
     return simplifyLiteralConstraint(constraint.getFirstType(),
                                      constraint.getLiteralKind());
+
+  case ConstraintKind::ValueMember:
+  case ConstraintKind::TypeMember: {
+    bool isTypeMember = constraint.getKind() == ConstraintKind::TypeMember;
+    return simplifyMemberConstraint(constraint.getFirstType(),
+                                    constraint.getMember(),
+                                    isTypeMember,
+                                    constraint.getSecondType());
   }
   }
 }
