@@ -37,14 +37,16 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
 inline void operator delete(void *, const ConstraintSystem &cs, size_t) {}
 
 namespace {
-  /// \brief The kind of literal that a type variable must be.
-  enum class LiteralKind : char {
-    None,
-    Integer,
-    Float,
-    Character,
-    String
-  };
+  /// \brief Retrieve the name of a literal kind.
+  static StringRef getLiteralKindName(LiteralKind kind) {
+    switch (kind) {
+    case LiteralKind::Int: return "integer";
+    case LiteralKind::Float: return "float";
+    case LiteralKind::Char: return "character";
+    case LiteralKind::UTFString: return "UTF-8 string";
+    case LiteralKind::ASCIIString: return "ASCII string";
+    }
+  }
 
   class OverloadChoice;
 }
@@ -76,33 +78,14 @@ class TypeVariableType::Implementation {
   /// of this type variable if it has been unified with another type variable.
   PointerUnion<TypeBase *, TypeVariableType *> FixedOrParent;
 
-  /// \brief The kind of literal this must be, if any.
-  /// FIXME: We'd rather replace this with a protocol conformance
-  /// requirement.
-  LiteralKind Literal;
-
 public:
   explicit Implementation(unsigned ID, Expr *TheExpr)
     : ID(ID), TheExpr(TheExpr), Archetype(nullptr),
-      FixedOrParent(static_cast<TypeBase *>(nullptr)),
-      Literal(LiteralKind::None)
-  {
-    if (TheExpr) {
-      // If we have a literal expression, determine the literal kind.
-      switch (TheExpr->getKind()) {
-      case ExprKind::IntegerLiteral: Literal = LiteralKind::Integer; break;
-      case ExprKind::FloatLiteral: Literal = LiteralKind::Float; break;
-      case ExprKind::CharacterLiteral: Literal = LiteralKind::Character; break;
-      case ExprKind::StringLiteral: Literal = LiteralKind::String; break;
-      default: break;
-      }
-    }
-  }
+      FixedOrParent(static_cast<TypeBase *>(nullptr)) { }
 
   explicit Implementation(unsigned ID, ArchetypeType *Archetype)
     : ID(ID), TheExpr(nullptr), Archetype(Archetype),
-      FixedOrParent(static_cast<TypeBase *>(nullptr)),
-      Literal(LiteralKind::None) { }
+      FixedOrParent(static_cast<TypeBase *>(nullptr)) { }
 
   /// \brief Retrieve the unique ID corresponding to this type variable.
   unsigned getID() const { return ID; }
@@ -169,10 +152,6 @@ public:
     rep->getImpl().FixedOrParent = T.getPointer();
   }
 
-  /// \brief Determine what kind of literal will be used to initialize
-  /// this variable.
-  LiteralKind getLiteralKind() const ;
-
   void print(llvm::raw_ostream &Out) {
     Out << "$T" << ID;
 
@@ -182,14 +161,6 @@ public:
     if (rep != getTypeVariable()) {
       Out << " equivalent to $T" << rep->getImpl().ID;
       return;
-    }
-
-    switch (Literal) {
-    case LiteralKind::None: break;
-    case LiteralKind::Integer: Out << " IntegerLiteral"; break;
-    case LiteralKind::Float: Out << " FloatLiteral"; break;
-    case LiteralKind::Character: Out << " CharacterLiteral"; break;
-    case LiteralKind::String: Out << " StringLiteral"; break;
     }
 
     if (auto fixed = getFixedType())
@@ -224,8 +195,7 @@ void TypeVariableType::print(raw_ostream &OS) const {
 #pragma mark Constraints
 
 namespace {
-  /// \brief Describes the kind of constraint placed on two type variables,
-  /// arranged by decreasing strictness.
+  /// \brief Describes the kind of constraint placed on one or more types.
   enum class ConstraintKind : char {
     /// \brief The two types must be bound to the same type. This is the only
     /// symmetric constraint.
@@ -239,7 +209,14 @@ namespace {
     /// second type is expected.
     Subtype,
     /// \brief The first type is convertible to the second type.
-    Conversion
+    Conversion,
+    /// \brief The first type is the type of a literal. There is no second
+    /// type.
+    ///
+    /// FIXME: This kind of constraint will eventually go away, when we can
+    /// express the notion of 'converts to a particular literal kind' as a
+    /// protocol, rather than a convention.
+    Literal
   };
 
   /// \brief A constraint between two type variables.
@@ -257,6 +234,10 @@ namespace {
     /// being related to the second type.
     Identifier Member;
 
+    /// \brief For a literal-type constraint, the kind of literal we're
+    /// expecting.
+    LiteralKind Literal;
+
     /// \brief Constraints are always allocated within a given constraint
     /// system.
     void *operator new(size_t) = delete;
@@ -264,6 +245,9 @@ namespace {
   public:
     Constraint(ConstraintKind Kind, Type First, Type Second, Identifier Member)
       : Kind(Kind), First(First), Second(Second), Member(Member) { }
+
+    Constraint(Type type, LiteralKind literal)
+      : Kind(ConstraintKind::Literal), First(type), Literal(literal) { }
 
     // FIXME: Need some context information here.
 
@@ -274,7 +258,17 @@ namespace {
     Type getFirstType() const { return First; }
 
     /// \brief Retrieve the second type in the constraint.
-    Type getSecondType() const { return Second; }
+    Type getSecondType() const {
+      assert(Kind != ConstraintKind::Literal &&
+             "No second type for literal constraints");
+      return Second;
+    }
+
+    /// \brief Determine the kind of literal for a literal constraint.
+    LiteralKind getLiteralKind() const {
+      assert(Kind == ConstraintKind::Literal && "Not a literal constraint!");
+      return Literal;
+    }
 
     void print(llvm::raw_ostream &Out) {
       First->print(Out);
@@ -283,6 +277,9 @@ namespace {
       case ConstraintKind::TrivialSubtype: Out << " <t "; break;
       case ConstraintKind::Subtype: Out << " < "; break;
       case ConstraintKind::Conversion: Out << " << "; break;
+      case ConstraintKind::Literal:
+        Out << " is an " << getLiteralKindName(getLiteralKind()) << " literal";
+        return;
       }
       if (!Member.empty())
         Out << "'" << Member.str() << "' ";
@@ -447,6 +444,12 @@ namespace {
                                                    Identifier()));
     }
 
+    ///\ brief Add a literal constraint to the constraint system.
+    void addLiteralConstraint(Type type, LiteralKind kind) {
+      assert(type && "missing type for literal constraint");
+      Constraints.push_back(new (*this) Constraint(type, kind));
+    }
+
     /// \brief Add a member constraint to the constraint system.
     /// FIXME: Document in a more sane manner.
     void addMemberConstraint(ConstraintKind kind, Type first,
@@ -564,6 +567,9 @@ namespace {
     /// \returns the result of attempting to solve this constraint.
     SolutionKind matchTypes(Type type1, Type type2, TypeMatchKind kind,
                             unsigned flags, bool &trivial);
+
+    /// \brief Attempt to simplify the given literal constraint.
+    SolutionKind simplifyLiteralConstraint(Type type, LiteralKind kind);
 
     /// \brief Simplify the given constaint.
     SolutionKind simplifyConstraint(const Constraint &constraint);
@@ -743,10 +749,43 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       return nullptr;
     }
 
-    Type visitLiteralExpr(LiteralExpr *E) {
-      // Literal expressions require that their type support the
-      // (informal) protocol for the corresponding literal type.
-      return CS.createTypeVariable(E);
+    Type visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
+      auto tv = CS.createTypeVariable(expr);
+      CS.addLiteralConstraint(tv, LiteralKind::Int);
+      return tv;
+    }
+
+    Type visitFloatLiteralExpr(FloatLiteralExpr *expr) {
+      auto tv = CS.createTypeVariable(expr);
+      CS.addLiteralConstraint(tv, LiteralKind::Float);
+      return tv;
+    }
+
+    Type visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
+      auto tv = CS.createTypeVariable(expr);
+      CS.addLiteralConstraint(tv, LiteralKind::Char);
+      return tv;
+    }
+
+    Type visitStringLiteralExpr(StringLiteralExpr *expr) {
+      auto tv = CS.createTypeVariable(expr);
+      LiteralKind kind = LiteralKind::ASCIIString;
+      if (std::find_if(expr->getValue().begin(), expr->getValue().end(),
+                       [](char c) { return c > 127; })
+            != expr->getValue().end())
+        kind = LiteralKind::UTFString;
+      CS.addLiteralConstraint(tv, kind);
+      return tv;
+    }
+
+    Type
+    visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
+      auto tv = CS.createTypeVariable(expr);
+      CS.addLiteralConstraint(tv, LiteralKind::UTFString);
+      for (auto segment : expr->getSegments()) {
+        CS.addConstraint(ConstraintKind::Conversion, segment->getType(), tv);
+      }
+      return tv;
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
@@ -1491,6 +1530,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   return SolutionKind::Error;
 }
 
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind) {
+  if (auto tv = type->getAs<TypeVariableType>()) {
+    auto fixed = tv->getImpl().getFixedType();
+    if (!fixed)
+      return SolutionKind::Unsolved;
+
+    // Continue with the fixed type.
+    type = fixed;
+  }
+
+  return TC.isLiteralCompatibleType(type, SourceLoc(), kind,
+                                    /*Complain=*/false).first
+           ? SolutionKind::Solved // FIXME: trivially solved
+           : SolutionKind::Error;
+}
+
 /// \brief Retrieve the type-matching kind corresponding to the given
 /// constraint kind.
 static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
@@ -1499,6 +1555,9 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::TrivialSubtype: return TypeMatchKind::TrivialSubtype;
   case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
+      
+  case ConstraintKind::Literal:
+      llvm_unreachable("Literals don't involve type matches");
   }
 }
 
@@ -1514,6 +1573,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return matchTypes(constraint.getFirstType(), constraint.getSecondType(),
                       getTypeMatchKind(constraint.getKind()), TMF_None,
                       trivial);
+  }
+
+  case ConstraintKind::Literal: {
+    return simplifyLiteralConstraint(constraint.getFirstType(),
+                                     constraint.getLiteralKind());
   }
   }
 }

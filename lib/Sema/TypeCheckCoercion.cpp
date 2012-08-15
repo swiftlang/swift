@@ -145,21 +145,10 @@ enum CoercionFlags {
 /// type (possibly recursively) and (optionally) returns the new/updated 
 /// expression.
 class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
-  enum class LiteralType {
-    Int, Float, Char, UTFString, ASCIIString
-  };
-  static bool isStringLiteral(LiteralType LitTy) {
-    return LitTy == LiteralType::UTFString ||
-           LitTy == LiteralType::ASCIIString;
+  static bool isStringLiteral(LiteralKind LitTy) {
+    return LitTy == LiteralKind::UTFString ||
+           LitTy == LiteralKind::ASCIIString;
   }
-  
-  /// \brief Determine whether the given type is compatible with an integer
-  /// or floating-point literal and what function would perform the conversion.
-  ///
-  /// \returns The function that will perform the conversion, along with the
-  /// type of the argument of this function.
-  std::pair<FuncDecl*, Type> isLiteralCompatibleType(Type Ty, SourceLoc Loc, 
-                                                     LiteralType LitTy);
 
   CoercionContext &CC;
   TypeChecker &TC;
@@ -630,14 +619,12 @@ public:
   
 } // end anonymous namespace.
 
-/// isLiteralCompatibleType - Check to see if the specified type has a properly
-/// defined literal conversion function, emiting an error and returning null if
-/// not.  If everything looks kosher, return the conversion function and the
-/// argument type that it expects.
-std::pair<FuncDecl*, Type> 
-SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
+std::pair<FuncDecl*, Type>
+TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
+                                     bool Complain) {
   if (Ty->is<LValueType>()) {
-    diagnose(Loc, diag::type_not_compatible_literal, Ty);
+    if (Complain)
+      diagnose(Loc, diag::type_not_compatible_literal, Ty);
     return std::pair<FuncDecl*, Type>();
   }
 
@@ -647,32 +634,35 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
   const char *MethodName = 0;
   const char *AltMethodName = 0;
   switch (LitTy) {
-  case LiteralType::Int:    MethodName = "convertFromIntegerLiteral"; break;
-  case LiteralType::Float:  MethodName = "convertFromFloatLiteral"; break;
-  case LiteralType::Char:   MethodName = "convertFromCharacterLiteral"; break;
-  case LiteralType::UTFString: MethodName = "convertFromStringLiteral"; break;
-  case LiteralType::ASCIIString:
+  case LiteralKind::Int:    MethodName = "convertFromIntegerLiteral"; break;
+  case LiteralKind::Float:  MethodName = "convertFromFloatLiteral"; break;
+  case LiteralKind::Char:   MethodName = "convertFromCharacterLiteral"; break;
+  case LiteralKind::UTFString: MethodName = "convertFromStringLiteral"; break;
+  case LiteralKind::ASCIIString:
     MethodName = "convertFromASCIIStringLiteral";
     AltMethodName = "convertFromStringLiteral";
     break;
   }
   assert(MethodName && "Didn't know LitTy");
 
-  MemberLookup PrimaryLookup(Ty, TC.Context.getIdentifier(MethodName), TC.TU);
+  MemberLookup PrimaryLookup(Ty, Context.getIdentifier(MethodName), TU);
   Optional<MemberLookup> AltLookup;
   if (AltMethodName && !PrimaryLookup.isSuccess())
-    AltLookup.emplace(Ty, TC.Context.getIdentifier(AltMethodName), TC.TU);
+    AltLookup.emplace(Ty, Context.getIdentifier(AltMethodName), TU);
   MemberLookup &Lookup = AltLookup ? AltLookup.getValue() : PrimaryLookup;
 
   if (!Lookup.isSuccess()) {
-    diagnose(Loc, diag::type_not_compatible_literal, Ty);
+    if (Complain)
+      diagnose(Loc, diag::type_not_compatible_literal, Ty);
     return std::pair<FuncDecl*, Type>();
   }
 
   if (Lookup.Results.size() != 1) {
-    diagnose(Loc, diag::type_ambiguous_literal_conversion, Ty, MethodName);
-    for (MemberLookupResult Res : Lookup.Results)
-      diagnose(Res.D->getLoc(), diag::found_candidate);
+    if (Complain) {
+      diagnose(Loc, diag::type_ambiguous_literal_conversion, Ty, MethodName);
+      for (MemberLookupResult Res : Lookup.Results)
+        diagnose(Res.D->getLoc(), diag::found_candidate);
+    }
     return std::pair<FuncDecl*, Type>();
   }
   
@@ -680,8 +670,9 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
   MemberLookupResult LookupResult = Lookup.Results[0];
   if (LookupResult.Kind != MemberLookupResult::MetatypeMember ||
       !isa<FuncDecl>(LookupResult.D)) {
-    diagnose(LookupResult.D->getLoc(), diag::type_literal_conversion_not_static,
-             Ty, MethodName);
+    if (Complain)
+      diagnose(LookupResult.D->getLoc(),
+               diag::type_literal_conversion_not_static, Ty, MethodName);
     return std::pair<FuncDecl*, Type>();
   }
   FuncDecl *Method = cast<FuncDecl>(LookupResult.D);
@@ -693,9 +684,11 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
   
   // The result of the convert function must be the destination type.
   if (!FT->getResult()->isEqual(Ty)) {
-    diagnose(Method->getLoc(), 
-             diag::literal_conversion_wrong_return_type, Ty, MethodName);
-    diagnose(Loc, diag::while_converting_literal, Ty);
+    if (Loc.isValid()) {
+      diagnose(Method->getLoc(),
+               diag::literal_conversion_wrong_return_type, Ty, MethodName);
+      diagnose(Loc, diag::while_converting_literal, Ty);
+    }
     return std::pair<FuncDecl*, Type>();
   }
   
@@ -736,19 +729,19 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
   if (DestTy->isExistentialType())
     return CoercionResult::Unknowable;
 
-  LiteralType LitTy;
+  LiteralKind LitTy;
   if (isa<IntegerLiteralExpr>(E))
-    LitTy = LiteralType::Int;
+    LitTy = LiteralKind::Int;
   else if (isa<FloatLiteralExpr>(E))
-    LitTy = LiteralType::Float;
+    LitTy = LiteralKind::Float;
   else if (isa<CharacterLiteralExpr>(E))
-    LitTy = LiteralType::Char;
+    LitTy = LiteralKind::Char;
   else {
     StringLiteralExpr *StringE = cast<StringLiteralExpr>(E);
-    LitTy = LiteralType::ASCIIString;
+    LitTy = LiteralKind::ASCIIString;
     for (unsigned char c : StringE->getValue()) {
       if (c > 127) {
-        LitTy = LiteralType::UTFString;
+        LitTy = LiteralKind::UTFString;
         break;
       }
     }
@@ -757,7 +750,7 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
   // Check the destination type to see if it is compatible with literals,
   // diagnosing the failure if not.
   std::pair<FuncDecl*, Type> LiteralInfo 
-    = isLiteralCompatibleType(DestTy, E->getLoc(), LitTy);
+    = TC.isLiteralCompatibleType(DestTy, E->getLoc(), LitTy, Flags & CF_Apply);
   FuncDecl *Method = LiteralInfo.first;
   Type ArgType = LiteralInfo.second;
   if (!Method)
@@ -770,7 +763,7 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
   Expr *Intermediate;
   BuiltinIntegerType *BIT;
   BuiltinFloatType *BFT;
-  if (LitTy == LiteralType::Int &&
+  if (LitTy == LiteralKind::Int &&
       (BIT = ArgType->getAs<BuiltinIntegerType>())) {
     // If this is a direct use of the builtin integer type, use the integer size
     // to diagnose excess precision issues.
@@ -801,7 +794,7 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
     if (Flags & CF_Apply)
       E->setType(ArgType);
     Intermediate = E;
-  } else if (LitTy == LiteralType::Float &&
+  } else if (LitTy == LiteralKind::Float &&
              (BFT = ArgType->getAs<BuiltinFloatType>())) {
     // If this is a direct use of a builtin floating point type, use the
     // floating point type to do the syntax verification.
@@ -841,7 +834,7 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
     if (Flags & CF_Apply)
       E->setType(ArgType);
     Intermediate = E;
-  } else if (LitTy == LiteralType::Char &&
+  } else if (LitTy == LiteralKind::Char &&
              ArgType->is<BuiltinIntegerType>() &&
              ArgType->getAs<BuiltinIntegerType>()->getBitWidth() == 32) {
     // Nothing to do.
@@ -851,20 +844,21 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
   } else {
     // Check to see if this is the chaining case, where ArgType itself has a
     // conversion from a Builtin type.
-    LiteralInfo = isLiteralCompatibleType(ArgType, E->getLoc(), LitTy);
+    LiteralInfo = TC.isLiteralCompatibleType(ArgType, E->getLoc(), LitTy,
+                                             Flags & CF_Apply);
     if (LiteralInfo.first == 0) {
       diagnose(Method->getLoc(),
                diag::while_processing_literal_conversion_function, DestTy);
       return nullptr;
     }
     
-    if (LitTy == LiteralType::Int &&
+    if (LitTy == LiteralKind::Int &&
         LiteralInfo.second->is<BuiltinIntegerType>()) {
       // ok.
-    } else if (LitTy == LiteralType::Float &&
+    } else if (LitTy == LiteralKind::Float &&
                LiteralInfo.second->is<BuiltinFloatType>()) {
       // ok.
-    } else if (LitTy == LiteralType::Char &&
+    } else if (LitTy == LiteralKind::Char &&
                LiteralInfo.second->is<BuiltinIntegerType>() &&
          LiteralInfo.second->getAs<BuiltinIntegerType>()->getBitWidth() == 32) {
       // ok.

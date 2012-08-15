@@ -68,6 +68,11 @@ public:
   }
 };
 
+/// \brief Describes the kind of a literal.
+enum class LiteralKind {
+  Int, Float, Char, UTFString, ASCIIString
+};
+
 /// \brief A mapping from substitutable types to the protocol-conformance
 /// mappings for those types.
 typedef llvm::DenseMap<SubstitutableType *,
@@ -445,6 +450,15 @@ public:
                           ConformanceMap &Conformance,
                           SourceLoc ComplainLoc,
                           TypeSubstitutionMap *RecordSubstitutions = nullptr);
+
+  /// \brief Determine whether the given type is compatible with an integer
+  /// or floating-point literal and what function would perform the conversion.
+  ///
+  /// \returns The function that will perform the conversion, along with the
+  /// type of the argument of this function.
+  std::pair<FuncDecl*, Type> isLiteralCompatibleType(Type Ty, SourceLoc Loc,
+                                                     LiteralKind LitTy,
+                                                     bool Complain);
 
   /// \brief Dump the constraint system generated from the given (unchecked)
   /// expression.
