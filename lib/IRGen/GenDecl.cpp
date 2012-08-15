@@ -66,9 +66,22 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   llvm::Function *fn;
   if (tunit->Kind == TranslationUnit::Main ||
       tunit->Kind == TranslationUnit::Repl) {
-    // For the main module, just emit main().
-    fn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
-                                "main", &Module);
+    // Emit a top-level code function...
+    fn = llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
+                                "top_level_code", &Module);
+
+    // and call it from main().
+    // FIXME: We should squirrel away argc and argv where relevant; maybe
+    // other startup initialization?
+    // FIXME: We should only emit this in non-JIT modes.
+    llvm::Function *mainFn =
+        llvm::Function::Create(llvm::FunctionType::get(Int32Ty, false),
+                               llvm::GlobalValue::ExternalLinkage,
+                               "main", &Module);
+    IRGenFunction mainIGF(*this, nullptr, nullptr, ExplosionKind::Minimal,
+                          /*uncurry*/ 0, mainFn, Prologue::Bare);
+    mainIGF.Builder.CreateCall(fn);
+    mainIGF.Builder.CreateRet(mainIGF.Builder.getInt32(0));
   } else {
     // Otherwise, create a global initializer.
     // FIXME: This is completely, utterly, wrong.
