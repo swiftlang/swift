@@ -72,8 +72,9 @@ class TypeVariableType::Implementation {
   /// \brief The archetype that this type variable describes.
   ArchetypeType *Archetype;
 
-  /// \brief The fixed type of this type variable, once it has been assigned.
-  Type Fixed;
+  /// \brief Either the fixed type assigned to this type variable, or the parent
+  /// of this type variable if it has been unified with another type variable.
+  PointerUnion<TypeBase *, TypeVariableType *> FixedOrParent;
 
   /// \brief If the type variable is known to have one of several given types,
   /// those types are listed here.
@@ -89,7 +90,9 @@ class TypeVariableType::Implementation {
 
 public:
   explicit Implementation(unsigned ID, Expr *TheExpr)
-    : ID(ID), TheExpr(TheExpr), Archetype(nullptr), Literal(LiteralKind::None)
+    : ID(ID), TheExpr(TheExpr), Archetype(nullptr),
+      FixedOrParent(static_cast<TypeBase *>(nullptr)),
+      Literal(LiteralKind::None)
   {
     if (TheExpr) {
       // If we have a literal expression, determine the literal kind.
@@ -105,6 +108,7 @@ public:
 
   explicit Implementation(unsigned ID, ArchetypeType *Archetype)
     : ID(ID), TheExpr(nullptr), Archetype(Archetype),
+      FixedOrParent(static_cast<TypeBase *>(nullptr)),
       Literal(LiteralKind::None) { }
 
   /// \brief Retrieve the unique ID corresponding to this type variable.
@@ -117,15 +121,59 @@ public:
   /// \brief Retrieve the archetype that this type variable replaced.
   ArchetypeType *getArchetype() const { return Archetype; }
 
+  /// \brief Retrieve the type variable associated with this implementation.
+  TypeVariableType *getTypeVariable() {
+    return reinterpret_cast<TypeVariableType *>(this) - 1;
+  }
+
+  /// \brief Return the representative of the set of equivalent type variables.
+  /// Two variables
+  ///
+  /// This routine performs path compression, so that future representive
+  /// queries are more efficient.
+  TypeVariableType *getRepresentative() {
+    // Find the representation.
+    auto rep = getTypeVariable();
+    while (rep->getImpl().FixedOrParent.is<TypeVariableType *>())
+      rep = rep->getImpl().FixedOrParent.get<TypeVariableType *>();
+
+    // Perform path compression.
+    auto current = getTypeVariable();
+    while (current != rep) {
+      auto next = current->getImpl().FixedOrParent.get<TypeVariableType *>();
+      current->getImpl().FixedOrParent = rep;
+      current = next;
+    }
+
+    return rep;
+  }
+
+  /// \brief Set the representative for this equivalence set of type variables,
+  /// merge the equivalence sets of the two type variables.
+  ///
+  /// Note that both \c this and \c newRep must be the representatives of their
+  /// equivalence classes, and must be distinct.
+  void mergeEquivalenceClasses(TypeVariableType *newRep) {
+    assert(getTypeVariable() == getRepresentative()
+           && "this is not the representative");
+    assert(newRep == newRep->getImpl().getRepresentative()
+           && "newRep is not the representative");
+    assert(getTypeVariable() != newRep && "cannot merge type with itself");
+    FixedOrParent = newRep;
+  }
+
   /// \brief Retrieve the fixed type to which this type variable has been
   /// assigned, or a null type if this type variable has not yet been
-  /// assigned.
-  Type getFixedType() const { return Fixed; }
+  /// assigned a type.
+  Type getFixedType() {
+    return getRepresentative()->getImpl().FixedOrParent.get<TypeBase *>();
+  }
 
   /// \brief Assign a type to this particular type variable.
   void assignType(Type T) {
-    assert(Fixed.isNull() && "Already assigned a type!");
-    Fixed = T;
+    auto rep = getRepresentative();
+    assert(rep->getImpl().FixedOrParent.isNull() && "Already assigned a type!");
+    rep->getImpl().FixedOrParent = T.getPointer();
   }
 
   /// \brief For an intersection type, returns a non-empty array of
@@ -151,6 +199,15 @@ public:
 
   void print(llvm::raw_ostream &Out) {
     Out << "$T" << ID;
+
+    // If this type variable is not the representative for its equivalence
+    // class, just print the representative and we're done.
+    auto rep = getRepresentative();
+    if (rep != getTypeVariable()) {
+      Out << " equivalent to $T" << rep->getImpl().ID;
+      return;
+    }
+
     if (!ConformsTo.empty()) {
       Out << " :";
       bool first = true;
@@ -173,8 +230,8 @@ public:
     case LiteralKind::String: Out << " StringLiteral"; break;
     }
 
-    if (Fixed)
-      Out << " as " << Fixed.getString();
+    if (auto fixed = getFixedType())
+      Out << " as " << fixed.getString();
   }
 };
 
@@ -1012,13 +1069,12 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
     Type visitApplyExpr(ApplyExpr *expr) {
       ASTContext &Context = CS.getASTContext();
       
-      // The function argument has some type (T1) -> T2 for fresh variables
+      // The function argument has some type T1 -> T2 for fresh variables
       // T1 and T2.
       // FIXME: What if the function argument is a metatype?
       auto inputTy = CS.createTypeVariable(expr);
       auto outputTy = CS.createTypeVariable(expr);
-      auto funcTy = FunctionType::get(ParenType::get(Context, inputTy),
-                                      outputTy, Context);
+      auto funcTy = FunctionType::get(inputTy, outputTy, Context);
 
       // FIXME: Allow conversions to function type? That seems completely
       // unnecessary... except perhaps for the metatype case mentioned above.
@@ -1155,7 +1211,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   unsigned subFlags = flags | TMF_GenerateConstraints;
   // Input types can be contravariant (or equal).
-  SolutionKind result = matchTypes(func2->getInput(), func2->getInput(),
+  SolutionKind result = matchTypes(func2->getInput(), func1->getInput(),
                                    subKind, subFlags, trivial);
   if (result == SolutionKind::Error)
     return SolutionKind::Error;
@@ -1214,6 +1270,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   }
 
   // If the types are equivalent, we're done.
+  // FIXME: This gets complicated when dealing with type variables, because
+  // they can get unified via same-type requirements, breaking the canonical
+  // type system in amusing and horrible ways.
   if (type1->isEqual(type2))
     return SolutionKind::Solved;
 
@@ -1222,7 +1281,29 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     switch (kind) {
     case TypeMatchKind::SameType:
       if (typeVar1 && typeVar2) {
-        // FIXME: Union-find magic to merge these type variables.
+        auto rep1 = typeVar1->getImpl().getRepresentative();
+        auto rep2 = typeVar2->getImpl().getRepresentative();
+        if (rep1 == rep2) {
+          // We already merged these two types, so this constraint is
+          // trivially solved.
+          // FIXME: Report "trivially solved", so the simplify() routine
+          // doesn't loop through constraints more than once.
+          return SolutionKind::Solved;
+        }
+
+        // Merge the equivalence classes corresponding to these two type
+        // variables.
+        // FIXME: We need to merge all of the interesting information about
+        // the type variable into the parent equivalent class. Or, come up
+        // with a completely different representation, e.g., by moving all of
+        // this information into constraints.
+        // FIXME: We either need to make sure that we only merge "up" the
+        // constraint system stack, so that type variables introduced in
+        // child constraint systems will point at type variables introduced in
+        // parent constraint systems (and not the other way around!), or
+        // (worse) we need to keep the representative pointers within the
+        // constrait system itself.
+        rep1->getImpl().mergeEquivalenceClasses(rep2);
         return SolutionKind::Solved;
       }
 
@@ -1399,12 +1480,21 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
-  // FIXME: Single type vs. tuple-of-one.
   // FIXME: Auto-closure.
   // FIXME: Materialization
-  // FIXME: Loading values.
 
   if (kind >= TypeMatchKind::Conversion) {
+    // A scalar value can be converted to a non-empty tuple with at most one
+    // non-defaulted element.
+    if (auto tuple2 = type2->getAs<TupleType>()) {
+      int scalarFieldIdx = tuple2->getFieldForScalarInit();
+      if (scalarFieldIdx >= 0) {
+        // FIXME: Handle variadic fields here.
+        auto scalarFieldTy = tuple2->getElementType((unsigned)scalarFieldIdx);
+        return matchTypes(type1, scalarFieldTy, kind, subFlags, trivial);
+      }
+    }
+
     // An lvalue of type T2 can be converted to a value of type T1 so long as
     // T2 is convertible to T1 (by loading the value).
     if (auto lvalue2 = type2->getAs<LValueType>()) {
