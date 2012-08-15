@@ -403,6 +403,19 @@ static void emitInitializeWithCopyCall(IRGenFunction &IGF,
   call->setDoesNotThrow();
 }
 
+/// Emit a call to do an 'initializeWithTake' operation.
+static void emitInitializeWithTakeCall(IRGenFunction &IGF,
+                                       llvm::Value *witnessTable,
+                                       llvm::Value *destObject,
+                                       llvm::Value *srcObject) {
+  llvm::Value *copyFn = loadValueWitness(IGF, witnessTable,
+                                         ValueWitness::InitializeWithTake);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, witnessTable);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setDoesNotThrow();
+}
+
 /// Emit a call to do an 'assignWithCopy' operation.
 static void emitAssignWithCopyCall(IRGenFunction &IGF,
                                    llvm::Value *witnessTable,
@@ -410,6 +423,19 @@ static void emitAssignWithCopyCall(IRGenFunction &IGF,
                                    llvm::Value *srcObject) {
   llvm::Value *copyFn = loadValueWitness(IGF, witnessTable,
                                          ValueWitness::AssignWithCopy);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, witnessTable);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setDoesNotThrow();
+}
+
+/// Emit a call to do an 'assignWithTake' operation.
+static void emitAssignWithTakeCall(IRGenFunction &IGF,
+                                   llvm::Value *witnessTable,
+                                   llvm::Value *destObject,
+                                   llvm::Value *srcObject) {
+  llvm::Value *copyFn = loadValueWitness(IGF, witnessTable,
+                                         ValueWitness::AssignWithTake);
   llvm::CallInst *call =
     IGF.Builder.CreateCall3(copyFn, destObject, srcObject, witnessTable);
   call->setCallingConv(IGF.IGM.RuntimeCC);
@@ -987,9 +1013,20 @@ namespace {
                              dest.getAddress(), src.getAddress());
     }
 
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
+      emitAssignWithTakeCall(IGF, getValueWitnessTable(IGF),
+                             dest.getAddress(), src.getAddress());
+    }
+
     void initializeWithCopy(IRGenFunction &IGF,
                             Address dest, Address src) const {
       emitInitializeWithCopyCall(IGF, getValueWitnessTable(IGF),
+                                 dest.getAddress(), src.getAddress());
+    }
+
+    void initializeWithTake(IRGenFunction &IGF,
+                            Address dest, Address src) const {
+      emitInitializeWithTakeCall(IGF, getValueWitnessTable(IGF),
                                  dest.getAddress(), src.getAddress());
     }
 
