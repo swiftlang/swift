@@ -76,10 +76,6 @@ class TypeVariableType::Implementation {
   /// of this type variable if it has been unified with another type variable.
   PointerUnion<TypeBase *, TypeVariableType *> FixedOrParent;
 
-  /// \brief If the type variable is known to have one of several given types,
-  /// those types are listed here.
-  ArrayRef<Type> Intersection;
-
   /// \brief The protocols to which this type variable must conform.
   ArrayRef<ProtocolDecl *> ConformsTo;
 
@@ -175,13 +171,6 @@ public:
     assert(rep->getImpl().FixedOrParent.isNull() && "Already assigned a type!");
     rep->getImpl().FixedOrParent = T.getPointer();
   }
-
-  /// \brief For an intersection type, returns a non-empty array of
-  /// types with which the current type intersections.
-  ArrayRef<Type> getIntersection() const { return Intersection; }
-
-  /// \brief Provide the set of intersection types for this type variable.
-  void setIntersection(ArrayRef<Type> IS) { Intersection = IS; }
 
   /// \brief Retrieve the set of protocols to which this type variable
   /// must conform.
