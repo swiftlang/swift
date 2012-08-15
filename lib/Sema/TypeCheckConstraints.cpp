@@ -76,9 +76,6 @@ class TypeVariableType::Implementation {
   /// of this type variable if it has been unified with another type variable.
   PointerUnion<TypeBase *, TypeVariableType *> FixedOrParent;
 
-  /// \brief The protocols to which this type variable must conform.
-  ArrayRef<ProtocolDecl *> ConformsTo;
-
   /// \brief The kind of literal this must be, if any.
   /// FIXME: We'd rather replace this with a protocol conformance
   /// requirement.
@@ -172,16 +169,6 @@ public:
     rep->getImpl().FixedOrParent = T.getPointer();
   }
 
-  /// \brief Retrieve the set of protocols to which this type variable
-  /// must conform.
-  ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
-
-  /// \brief Provide the set of protocols to which this type variable must
-  /// conform.
-  void setConformsTo(ArrayRef<ProtocolDecl *> ConformsTo) {
-    this->ConformsTo = ConformsTo;
-  }
-
   /// \brief Determine what kind of literal will be used to initialize
   /// this variable.
   LiteralKind getLiteralKind() const ;
@@ -195,20 +182,6 @@ public:
     if (rep != getTypeVariable()) {
       Out << " equivalent to $T" << rep->getImpl().ID;
       return;
-    }
-
-    if (!ConformsTo.empty()) {
-      Out << " :";
-      bool first = true;
-      for (auto proto : ConformsTo) {
-        if (first) {
-          first = false;
-        } else {
-          Out << ", ";
-        }
-
-        Out << proto->getName().str();
-      }
     }
 
     switch (Literal) {
@@ -637,7 +610,26 @@ Type ConstraintSystem::openType(Type startingType) {
 
     // Create a new type variable to replace this archetype.
     auto tv = createTypeVariable(archetype);
-    tv->getImpl().setConformsTo(archetype->getConformsTo());
+
+    // The type variable must be a subtype of the composition of all of
+    // its protocol conformance requirements.
+    auto conformsTo = archetype->getConformsTo();
+    if (!conformsTo.empty()) {
+      // FIXME: Can we do this more efficiently, since we know that the
+      // protocol list has already been minimized?
+      SmallVector<Type, 4> conformsToTypes;
+      conformsToTypes.reserve(conformsTo.size());
+      std::transform(conformsTo.begin(), conformsTo.end(),
+                     std::back_inserter(conformsToTypes),
+                     [](ProtocolDecl *proto) {
+                       return proto->getDeclaredType();
+                     });
+
+      auto composition = ProtocolCompositionType::get(TC.Context,
+                                                      conformsToTypes);
+      addConstraint(ConstraintKind::Subtype, tv, composition);
+    }
+
     // FIXME: Associated types!
     replacements[archetype] = tv;
     return tv;
