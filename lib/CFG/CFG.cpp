@@ -164,15 +164,15 @@ CFGValue CFGBuilder::visitCallExpr(CallExpr *E) {
   Expr *Arg = ignoreParens(E->getArg());
   Expr *Fn = E->getFn();
   CFGValue FnV = visit(Fn);
+  CFGValue ArgV = visit(Arg);
 
-  if (TupleExpr *TU = dyn_cast<TupleExpr>(Arg)) {
-    for (auto arg : TU->getElements()) {
-      Args.push_back(visit(arg));
-    }
-    return addInst(E, CallInst::create(E, currentBlock(), FnV, Args));
+  // FIXME: should we even bother constructing the TupleExpr?  Should
+  // arguments be marshaled with a singled TupleExpr, or as separate arguments?
+  TupleInst *TU = dyn_cast_or_null<TupleInst>(ArgV.dyn_cast<Instruction*>());
+  if (TU) {
+    return addInst(E, CallInst::create(E, currentBlock(), FnV, TU->elements()));
   }
 
-  CFGValue ArgV = visit(Arg);
   return addInst(E, CallInst::create(E, currentBlock(), getInst(Fn),
                                      ArrayRef<CFGValue>(&ArgV, 1)));
 }
