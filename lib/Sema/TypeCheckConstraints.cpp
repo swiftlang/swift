@@ -692,7 +692,10 @@ namespace {
     /// \param solved Set into which every fully-solved constraint will be
     /// added, allowing the caller to remove such constraints from the list
     /// later.
-    void simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
+    ///
+    /// \returns true if any new constraints were introduced when simplifying
+    /// the type variable constraints.
+    bool simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
                                     SmallPtrSet<Constraint *, 4> &solved);
 
   public:
@@ -1965,9 +1968,10 @@ namespace {
   };
 }
 
-void
+bool
 ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
                                          SmallPtrSet<Constraint *, 4> &solved) {
+  bool addedConstraints = false;
   bool foundEquality = false;
 
   // First, sort the constraints so that we can visit the various kinds of
@@ -2036,6 +2040,7 @@ ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
         (bound->is<NominalType>() || bound->is<BoundGenericType>())) {
       addConstraint(ConstraintKind::Equal, tvc.TypeVar, bound);
       foundEquality = true;
+      addedConstraints = true;
     }
   }
 
@@ -2059,12 +2064,15 @@ ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
   // used for the resulting relation.
   // FIXME: Actually implement this, taking care to avoid introducing cycles
   // in simplify().
+
+
+  return addedConstraints;
 }
 
 bool ConstraintSystem::simplify() {
   bool firstLoop = true;
   bool solvedAny;
-  SmallPtrSet<Constraint *, 4> externallySolvedConstraints;
+  SmallPtrSet<Constraint *, 4> typeVarResolved;
   do {
     // Loop through all of the thus-far-unsolved constraints, attempting to
     // simplify each one.
@@ -2074,7 +2082,7 @@ bool ConstraintSystem::simplify() {
     for (auto constraint : existingConstraints) {
       // If we have already solved this constraint externally, just silently
       // drop it.
-      if (externallySolvedConstraints.count(constraint))
+      if (typeVarResolved.count(constraint))
         continue;
 
       switch (simplifyConstraint(*constraint)) {
@@ -2109,14 +2117,25 @@ bool ConstraintSystem::simplify() {
     // From the remaining constraints, collect the constraints for each of
     // the representative (non-fixed) type variables.
     SmallVector<TypeVariableConstraints, 32> typeVarConstraints;
-    externallySolvedConstraints.clear();
+    typeVarResolved.clear();
     collectConstraintsForTypeVariables(typeVarConstraints);
     for (auto &tvc : typeVarConstraints) {
-      simplifyTypeVarConstraints(tvc, externallySolvedConstraints);
+      if (simplifyTypeVarConstraints(tvc, typeVarResolved))
+        solvedAny = true;
     }
     typeVarConstraints.clear();
-    if (!externallySolvedConstraints.empty())
-      solvedAny = true;
+
+    // If we solved any constraints via type variable constraints and we aren't
+    // going to go through the constraint list again, just remove these
+    // constraints from the list.
+    if (!typeVarResolved.empty() && !solvedAny) {
+      Constraints.erase(std::remove_if(Constraints.begin(),
+                                       Constraints.end(),
+                                       [&](Constraint *con) {
+                                         return typeVarResolved.count(con) > 0;
+                                       }),
+                         Constraints.end());
+    }
 
     firstLoop = false;
   } while (solvedAny);
