@@ -128,6 +128,7 @@ public:
   void visitCallExpr(CallExpr *E);
   void visitDeclRefExpr(DeclRefExpr *E);
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E);
+  void visitLoadExpr(LoadExpr *E);
   void visitParenExpr(ParenExpr *E);
   void visitThisApplyExpr(ThisApplyExpr *E);
   void visitTupleExpr(TupleExpr *E);
@@ -193,6 +194,11 @@ void CFGBuilder::visitThisApplyExpr(ThisApplyExpr *E) {
 
 void CFGBuilder::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
   addInst(E, new (C) IntegerLiteralInst(E, currentBlock()));
+}
+
+void CFGBuilder::visitLoadExpr(LoadExpr *E) {
+  visit(E->getSubExpr());
+  addInst(E, new (C) LoadInst(E, getInst(E->getSubExpr()), currentBlock()));
 }
 
 void CFGBuilder::visitParenExpr(ParenExpr *E) {

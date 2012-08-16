@@ -131,6 +131,13 @@ void Instruction::print(raw_ostream &OS,
       OS << "Integer(val=" << lit << ",width=" << lit.getBitWidth() << ')';
       break;
     }
+    case Load: {
+      const LoadInst &LI = *cast<LoadInst>(this);
+      OS << "Load(lvalue=";
+      PC.printID(OS, LI.lvalue);
+      OS << ')';
+      break;
+    }
     case ThisApply: {
       const ThisApplyInst &TAI = *cast<ThisApplyInst>(this);
       OS << "ThisApply(fn=";

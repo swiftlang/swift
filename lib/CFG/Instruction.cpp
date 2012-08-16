@@ -41,6 +41,7 @@ void Instruction::validate() const {
     case Call:
     case DeclRef:
     case IntegerLit:
+    case Load:
     case ThisApply:
     case TypeOf:
       return;
@@ -64,6 +65,7 @@ TermInst::Successors TermInst::successors() {
     case Call:
     case DeclRef:
     case IntegerLit:
+    case Load:
     case ThisApply:
     case TypeOf:
       llvm_unreachable("Only TermInst's are allowed");

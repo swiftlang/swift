@@ -33,6 +33,7 @@ class BasicBlock;
 class CallExpr;
 class DeclRefExpr;
 class IntegerLiteralExpr;
+class LoadExpr;
 class ThisApplyExpr;
 class TypeOfExpr;
 
@@ -47,6 +48,7 @@ public:
     Call,
     DeclRef,
     IntegerLit,
+    Load,
     ThisApply,
     TypeOf,
     UncondBranch,
@@ -164,6 +166,31 @@ public:
     Instruction(B, IntegerLit), literal(IE) {}
 
   static bool classof(const Instruction *I) { return I->kind == IntegerLit; }
+};
+
+/// Represents a load from a memory location.
+class LoadInst : public Instruction {
+  LoadInst() = delete;
+public:
+  /// The backing LoadExpr in the AST.
+  LoadExpr *expr;
+
+  /// The lvalue (memory address) to use for the load.
+  CFGValue lvalue;
+
+  /// Constructs a LoadInst.
+  ///
+  /// \param expr The backing LoadExpr in the AST.
+  ///
+  /// \param lvalue The CFGValue representing the lvalue (address) to
+  ///        use for the load.
+  ///
+  /// \param The basic block that will contain the instruction.
+  ///
+  LoadInst(LoadExpr *expr, CFGValue lvalue, BasicBlock *B) :
+    Instruction(B, Load), expr(expr), lvalue(lvalue) {}
+
+  static bool classof(const Instruction *I) { return I->kind == Load; }
 };
 
 /// Represents an abstract application that provides the 'this' pointer for
