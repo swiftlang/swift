@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
@@ -27,6 +28,7 @@
 #include <utility>
 
 using namespace swift;
+using llvm::SmallPtrSet;
 
 namespace {
   class ConstraintSystem;
@@ -219,6 +221,20 @@ namespace {
     TypeMember
   };
 
+  /// \brief Classification of the different kinds of constraints.
+  enum class ConstraintClassification : char {
+    /// \brief A relational constraint, which relates two types.
+    Relational,
+
+    /// \brief A literal constraint, which specifies that a type must be
+    /// able to be created from a particular kind of literal.
+    Literal,
+
+    /// \brief A member constraint, which names a member of a type and assigns
+    /// it a reference type.
+    Member
+  };
+
   /// \brief A constraint between two type variables.
   class Constraint {
     /// \brief The kind of constraint.
@@ -272,6 +288,25 @@ namespace {
 
     /// \brief Determine the kind of constraint.
     ConstraintKind getKind() const { return Kind; }
+
+    /// \brief Determine the classification of this constraint, providing
+    /// a broader categorization than \c getKind().
+    ConstraintClassification getClassification() const {
+      switch (Kind) {
+      case ConstraintKind::Equal:
+      case ConstraintKind::TrivialSubtype:
+      case ConstraintKind::Subtype:
+      case ConstraintKind::Conversion:
+        return ConstraintClassification::Relational;
+
+      case ConstraintKind::Literal:
+        return ConstraintClassification::Literal;
+
+      case ConstraintKind::ValueMember:
+      case ConstraintKind::TypeMember:
+        return ConstraintClassification::Member;
+      }
+    }
 
     /// \brief Retrieve the first type in the constraint.
     Type getFirstType() const { return First; }
@@ -396,6 +431,19 @@ namespace {
     /// \brief Create a new overload set, using (and copying) the given choices.
     static OverloadSet *getNew(ConstraintSystem &CS,
                                ArrayRef<OverloadChoice *> choices);
+  };
+
+  /// \brief A representative type variable with the list of constraints
+  /// that apply to it.
+  struct TypeVariableConstraints {
+    TypeVariableConstraints(TypeVariableType *typeVar) : TypeVar(typeVar) {}
+
+    /// \brief The representative type variable.
+    TypeVariableType *TypeVar;
+
+    /// \brief The set of constraints directly applicable to the type
+    /// variable T.
+    SmallVector<Constraint *, 4> Constraints;
   };
 
   //===--------------------------------------------------------------------===//
@@ -610,6 +658,13 @@ namespace {
     SolutionKind matchTypes(Type type1, Type type2, TypeMatchKind kind,
                             unsigned flags, bool &trivial);
 
+    /// \brief Simplify a type, by replacing type variables with either their
+    /// fixed types (if available) or their representatives.
+    ///
+    /// The resulting types can be compared canonically, so long as additional
+    /// type equivalence requirements aren't introduced between comparisons.
+    Type simplifyType(Type type);
+
     /// \brief Attempt to simplify the given literal constraint.
     SolutionKind simplifyLiteralConstraint(Type type, LiteralKind kind);
 
@@ -619,6 +674,25 @@ namespace {
 
     /// \brief Simplify the given constaint.
     SolutionKind simplifyConstraint(const Constraint &constraint);
+
+    /// \brief Walks through the list of constraints, collecting the constraints
+    /// that directly apply to each representative type variable.
+    ///
+    /// \param typeVarConstraints will be populated with a list of
+    /// representative type variables and the constraints that apply directly
+    /// to them.
+    void collectConstraintsForTypeVariables(
+           SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints);
+
+    /// \brief Simplify the constraints on the given type variable.
+    ///
+    /// \param tvc The type variable and its constraints.
+    ///
+    /// \param solved Set into which every fully-solved constraint will be
+    /// added, allowing the caller to remove such constraints from the list
+    /// later.
+    void simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
+                                    SmallPtrSet<Constraint *, 4> &solved);
 
   public:
     /// \brief Simplify the system of constraints, by breaking down complex
@@ -1246,9 +1320,13 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     const auto &elt1 = tuple1->getFields()[i];
     const auto &elt2 = tuple2->getFields()[i];
 
-    // FIXME: Any unlabeled cases we care about?
-    if (elt1.getName() != elt2.getName())
+    // FIXME: Totally wrong for conversions. We're assuming that they act
+    // like subtypes.
+    if (elt1.getName() != elt2.getName() &&
+        !(kind >= TypeMatchKind::TrivialSubtype &&
+          (elt1.getName().empty() || elt2.getName().empty()))) {
       return SolutionKind::Error;
+    }
 
     if (elt1.isVararg() != elt2.isVararg())
       return SolutionKind::Error;
@@ -1587,10 +1665,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
     }
 
-    // An lvalue of type T2 can be converted to a value of type T1 so long as
-    // T2 is convertible to T1 (by loading the value).
-    if (auto lvalue2 = type2->getAs<LValueType>()) {
-      return matchTypes(type1, lvalue2->getObjectType(), kind, subFlags,
+    // An lvalue of type T1 can be converted to a value of type T2 so long as
+    // T1 is convertible to T2 (by loading the value).
+    if (auto lvalue1 = type1->getAs<LValueType>()) {
+      return matchTypes(lvalue1->getObjectType(), type2, kind, subFlags,
                         trivial);
     }
   }
@@ -1600,6 +1678,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // FIXME: User-defined conversions.
 
   return SolutionKind::Error;
+}
+
+Type ConstraintSystem::simplifyType(Type type) {
+  return TC.transformType(type,
+                          [](Type type) -> Type {
+            if (auto tvt = type->getAs<TypeVariableType>()) {
+              tvt = tvt->getImpl().getRepresentative();
+              if (auto fixed = tvt->getImpl().getFixedType())
+                return fixed;
+
+              return tvt;
+            }
+            return type;
+         });
 }
 
 ConstraintSystem::SolutionKind
@@ -1748,8 +1840,188 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   }
 }
 
+void ConstraintSystem::collectConstraintsForTypeVariables(
+       SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints) {
+  typeVarConstraints.clear();
+
+  // First, collect all of the constraints that relate directly to a
+  // type variable.
+  llvm::DenseMap<TypeVariableType *, unsigned> typeVarConstraintsMap;
+  for (auto constraint : Constraints) {
+    if (auto firstTV = constraint->getFirstType()->getAs<TypeVariableType>()) {
+      // Retrieve the representative.
+      firstTV = firstTV->getImpl().getRepresentative();
+
+      // Find the entry in the constraints output vector that corresponds to
+      // this type variable.
+      unsigned& constraintsIdx = typeVarConstraintsMap[firstTV];
+      if (!constraintsIdx) {
+        typeVarConstraints.push_back(TypeVariableConstraints(firstTV));
+        constraintsIdx = typeVarConstraints.size();
+      }
+
+      // Record the constraint.
+      typeVarConstraints[constraintsIdx - 1].Constraints.push_back(constraint);
+    }
+
+    switch (constraint->getKind()) {
+    case ConstraintKind::Equal:
+    case ConstraintKind::TrivialSubtype:
+    case ConstraintKind::Subtype:
+    case ConstraintKind::Conversion:
+      break;
+
+    case ConstraintKind::Literal:
+    case ConstraintKind::ValueMember:
+    case ConstraintKind::TypeMember:
+      // We don't care about the second type (or there isn't one).
+      continue;
+    }
+
+    auto secondTV = constraint->getSecondType()->getAs<TypeVariableType>();
+    if (!secondTV)
+      continue;
+
+    // Retrieve the representative.
+    secondTV = secondTV->getImpl().getRepresentative();
+
+    // Find the entry in the constraints output vector that corresponds to
+    // this type variable.
+    unsigned& constraintsIdx = typeVarConstraintsMap[secondTV];
+    if (!constraintsIdx) {
+      typeVarConstraints.push_back(TypeVariableConstraints(secondTV));
+      constraintsIdx = typeVarConstraints.size();
+    }
+
+    // Record the constraint.
+    typeVarConstraints[constraintsIdx - 1].Constraints.push_back(constraint);
+  }
+}
+
+namespace {
+  /// \brief Provide a partial ordering between two constraints.
+  ///
+  /// The ordering depends on the the classification of constraints:
+  ///   - For relational constraints, the constraints are ordered by strength,
+  ///     e.g., == precedes < and < precedes <<.
+  ///
+  ///   - For literal constraints, we order by literal kind.
+  ///
+  ///   - For member constraints, we order by member name (lexicographically)
+  ///     and, for equivalently-named constraints, with value members
+  ///     preceding type members.
+  class OrderConstraintForTypeVariable {
+  public:
+    bool operator()(Constraint *lhs, Constraint *rhs) const {
+      // If the classifications differ, order by classification.
+      auto lhsClass = lhs->getClassification();
+      auto rhsClass = rhs->getClassification();
+      if (lhsClass != rhsClass)
+        return lhsClass < rhsClass;
+
+      switch (lhsClass) {
+      case ConstraintClassification::Relational: {
+        // Order based on the relational constraint kind.
+        return lhs->getKind() < rhs->getKind();
+      }
+
+      case ConstraintClassification::Literal:
+        // For literals, order by literal kind.
+        return lhs->getLiteralKind() < rhs->getLiteralKind();
+
+      case ConstraintClassification::Member:
+        // For members, order first by member name.
+        if (lhs->getMember() != rhs->getMember()) {
+          return lhs->getMember().str() < rhs->getMember().str();
+        }
+
+        // Order by type vs. value member. Value members come first.
+        return lhs->getKind() < rhs->getKind();
+      }
+    }
+  };
+
+  /// \brief Maintains the set of type variable constraints
+  struct RelationalTypeVarConstraints {
+    RelationalTypeVarConstraints() : Below(), Above() { }
+    
+    Constraint *Below;
+    Type TypeBelow;
+    Constraint *Above;
+    Type TypeAbove;
+  };
+}
+
+void
+ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
+                                         SmallPtrSet<Constraint *, 4> &solved) {
+  // First, sort the constraints so that we can visit the various kinds of
+  // constraints in the order we want to.
+  std::stable_sort(tvc.Constraints.begin(), tvc.Constraints.end(),
+                   OrderConstraintForTypeVariable());
+
+  // Collect the relational constraints above and below each simplified type,
+  // dropping any redundant constraints in the process.
+  llvm::DenseMap<CanType, Constraint *> constraintsBelow;
+  llvm::DenseMap<CanType, Constraint *> constraintsAbove;
+  SmallVector<std::pair<Type, Constraint *>, 4> typesBelow;
+  SmallVector<std::pair<Type, Constraint *>, 4> typesAbove;
+  auto currentConstraint = tvc.Constraints.begin(),
+          lastConstraint = tvc.Constraints.end();
+  for (; currentConstraint != lastConstraint &&
+         (*currentConstraint)->getClassification()
+           == ConstraintClassification::Relational;
+       ++currentConstraint) {
+    // Determine whether we have a constraint below (vs. a constraint above)
+    // this type variable.
+    bool constraintIsBelow = false;
+    if (auto firstTV = (*currentConstraint)->getFirstType()
+                         ->getAs<TypeVariableType>()) {
+      constraintIsBelow = (firstTV->getImpl().getRepresentative() !=
+                             tvc.TypeVar);
+    }
+
+    // Compute the type bound, and simplify it.
+    Type bound = constraintIsBelow? (*currentConstraint)->getFirstType()
+                                  : (*currentConstraint)->getSecondType();
+    bound = simplifyType(bound);
+
+    auto &constraints = constraintIsBelow? constraintsBelow : constraintsAbove;
+    auto *&constraint = constraints[bound->getCanonicalType()];
+
+    if (constraint) {
+      // We already have a constraint that provides either the same relation
+      // or a tighter relation, because the sort orders relational constraints
+      // in order of nonincreasing strictness.
+      assert((constraint->getKind() < (*currentConstraint)->getKind()) &&
+             "Improper ordering of constraints");
+      solved.insert(*currentConstraint);
+      continue;
+    }
+
+    // Record this constraint.
+    constraint = *currentConstraint;
+    if (constraintIsBelow)
+      typesBelow.push_back(std::make_pair(bound, constraint));
+    else
+      typesAbove.push_back(std::make_pair(bound, constraint));
+  }
+  constraintsBelow.clear();
+  constraintsAbove.clear();
+
+  // Introduce transitive constraints, e.g.,
+  //
+  //   X < T and T << Y => X << Y
+  //
+  // When the two relation kinds differ, as above, the weaker constraint is
+  // used for the resulting relation.
+  // FIXME: Actually implement this, taking care to avoid introducing cycles
+  // in simplify().
+}
+
 bool ConstraintSystem::simplify() {
-  bool solvedAny = false;
+  bool solvedAny;
+  SmallPtrSet<Constraint *, 4> externallySolvedConstraints;
   do {
     // Loop through all of the thus-far-unsolved constraints, attempting to
     // simplify each one.
@@ -1757,6 +2029,11 @@ bool ConstraintSystem::simplify() {
     existingConstraints.swap(Constraints);
     solvedAny = false;
     for (auto constraint : existingConstraints) {
+      // If we have already solved this constraint externally, just silently
+      // drop it.
+      if (externallySolvedConstraints.count(constraint))
+        continue;
+
       switch (simplifyConstraint(*constraint)) {
       case SolutionKind::Error:
         return true;
@@ -1773,6 +2050,19 @@ bool ConstraintSystem::simplify() {
         break;
       }
     }
+    existingConstraints.clear();
+
+    // From the remaining constraints, collect the constraints for each of
+    // the representative (non-fixed) type variables.
+    SmallVector<TypeVariableConstraints, 32> typeVarConstraints;
+    externallySolvedConstraints.clear();
+    collectConstraintsForTypeVariables(typeVarConstraints);
+    for (auto &tvc : typeVarConstraints) {
+      simplifyTypeVarConstraints(tvc, externallySolvedConstraints);
+    }
+    typeVarConstraints.clear();
+    if (!externallySolvedConstraints.empty())
+      solvedAny = true;
   } while (solvedAny);
 
   // We've solved all of the constraints we can.
@@ -1787,14 +2077,14 @@ bool ConstraintSystem::simplify() {
 void ConstraintSystem::dump() {
   llvm::raw_ostream &out = llvm::errs();
 
-  out << "---Type Variables---\n";
+  out << "Type Variables:\n";
   for (auto tv : TypeVariables) {
     out.indent(2);
     tv->getImpl().print(out);
     out << "\n";
   }
 
-  out << "\n---Constraints---\n";
+  out << "\nConstraints:\n";
   for (auto constraint : Constraints) {
     out.indent(2);
     constraint->print(out);
@@ -1804,9 +2094,9 @@ void ConstraintSystem::dump() {
 
 void TypeChecker::dumpConstraints(Expr *expr) {
   ConstraintSystem CS(*this);
-  CS.generateConstraints(expr);
   llvm::errs() << "---Initial constraints for the given expression---\n";
   expr->dump();
+  CS.generateConstraints(expr);
   llvm::errs() << "\n";
   CS.dump();
   llvm::errs() << "---Simplified constraints---\n";
