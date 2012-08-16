@@ -35,7 +35,7 @@ static Expr *ignoreParens(Expr *Ex) {
 }
 
 namespace {
-class CFGBuilder : public ASTVisitor<CFGBuilder> {
+class CFGBuilder : public ASTVisitor<CFGBuilder, CFGValue> {
   /// Mapping from expressions to instructions.
   llvm::DenseMap<Expr *, Instruction *> ExprToInst;
 
@@ -59,8 +59,9 @@ public:
     return Block;
   }
 
-  void addInst(Expr *Ex, Instruction *I) {
+  CFGValue addInst(Expr *Ex, Instruction *I) {
     ExprToInst[Ex] = I;
+    return I;
   }
 
   Instruction *getInst(Expr *Ex) {
@@ -121,18 +122,17 @@ public:
   // Expressions.
   //===--------------------------------------------------------------------===//
 
-  void visitExpr(Expr *E) {
-    assert(false && "Not yet implemented");
+  CFGValue visitExpr(Expr *E) {
+    llvm_unreachable("Not yet implemented");
   }
 
-  void visitCallExpr(CallExpr *E);
-  void visitDeclRefExpr(DeclRefExpr *E);
-  void visitIntegerLiteralExpr(IntegerLiteralExpr *E);
-  void visitLoadExpr(LoadExpr *E);
-  void visitParenExpr(ParenExpr *E);
-  void visitThisApplyExpr(ThisApplyExpr *E);
-  void visitTupleExpr(TupleExpr *E);
-  void visitTypeOfExpr(TypeOfExpr *E);
+  CFGValue visitCallExpr(CallExpr *E);
+  CFGValue visitDeclRefExpr(DeclRefExpr *E);
+  CFGValue visitIntegerLiteralExpr(IntegerLiteralExpr *E);
+  CFGValue visitLoadExpr(LoadExpr *E);
+  CFGValue visitParenExpr(ParenExpr *E);
+  CFGValue visitThisApplyExpr(ThisApplyExpr *E);
+  CFGValue visitTypeOfExpr(TypeOfExpr *E);
   
 };
 } // end anonymous namespace
@@ -152,63 +152,53 @@ void CFGBuilder::visitBraceStmt(BraceStmt *S) {
   for (const BraceStmt::ExprStmtOrDecl &ESD : S->elements()) {
     assert(!ESD.is<Decl*>() && "FIXME: Handle Decls");
     if (Stmt *S = ESD.dyn_cast<Stmt*>())
-      return visit(S);
+      visit(S);
     if (Expr *E = ESD.dyn_cast<Expr*>())
-      return visit(E);
+      visit(E);
   }
 }
 
-void CFGBuilder::visitCallExpr(CallExpr *E) {
+CFGValue CFGBuilder::visitCallExpr(CallExpr *E) {
   llvm::SmallVector<CFGValue, 10> Args;
   Expr *Arg = ignoreParens(E->getArg());
   Expr *Fn = E->getFn();
-  visit(Fn);
+  CFGValue FnV = visit(Fn);
 
   if (TupleExpr *TU = dyn_cast<TupleExpr>(Arg)) {
-      for (auto arg : TU->getElements()) {
-        visit(arg);
-        Args.push_back(getInst(arg));
-      }
-    addInst(E, CallInst::create(E, currentBlock(), getInst(Fn), Args));
+    for (auto arg : TU->getElements()) {
+      Args.push_back(visit(arg));
+    }
+    return addInst(E, CallInst::create(E, currentBlock(), FnV, Args));
   }
-  else {
-    visit(Arg);
-    CFGValue ArgI = getInst(Arg);
-    addInst(E, CallInst::create(E, currentBlock(), getInst(Fn),
-                                ArrayRef<CFGValue>(&ArgI, 1)));
-  }
+
+  CFGValue ArgV = visit(Arg);
+  return addInst(E, CallInst::create(E, currentBlock(), getInst(Fn),
+                                     ArrayRef<CFGValue>(&ArgV, 1)));
 }
 
-void CFGBuilder::visitDeclRefExpr(DeclRefExpr *E) {
-  addInst(E, new (C) DeclRefInst(E, currentBlock()));
+CFGValue CFGBuilder::visitDeclRefExpr(DeclRefExpr *E) {
+  return addInst(E, new (C) DeclRefInst(E, currentBlock()));
 }
 
-void CFGBuilder::visitThisApplyExpr(ThisApplyExpr *E) {
-  visit(E->getFn());
-  visit(E->getArg());
-  addInst(E, new (C) ThisApplyInst(E,
-                                   getInst(E->getFn()),
-                                   getInst(E->getArg()),
-                                   currentBlock()));
+CFGValue CFGBuilder::visitThisApplyExpr(ThisApplyExpr *E) {
+  CFGValue FnV = visit(E->getFn());
+  CFGValue ArgV = visit(E->getArg());
+  return addInst(E, new (C) ThisApplyInst(E, FnV, ArgV, currentBlock()));
 }
 
-void CFGBuilder::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-  addInst(E, new (C) IntegerLiteralInst(E, currentBlock()));
+CFGValue CFGBuilder::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+  return addInst(E, new (C) IntegerLiteralInst(E, currentBlock()));
 }
 
-void CFGBuilder::visitLoadExpr(LoadExpr *E) {
-  visit(E->getSubExpr());
-  addInst(E, new (C) LoadInst(E, getInst(E->getSubExpr()), currentBlock()));
+CFGValue CFGBuilder::visitLoadExpr(LoadExpr *E) {
+  CFGValue SubV = visit(E->getSubExpr());
+  return addInst(E, new (C) LoadInst(E, SubV, currentBlock()));
 }
 
-void CFGBuilder::visitParenExpr(ParenExpr *E) {
-  visit(E->getSubExpr());
+CFGValue CFGBuilder::visitParenExpr(ParenExpr *E) {
+  return visit(E->getSubExpr());
 }
 
-void CFGBuilder::visitTupleExpr(TupleExpr *E) {
-  for (auto &I : E->getElements()) visit(I);
-}
-
-void CFGBuilder::visitTypeOfExpr(TypeOfExpr *E) {
-  addInst(E, new (C) TypeOfInst(E, currentBlock()));
+CFGValue CFGBuilder::visitTypeOfExpr(TypeOfExpr *E) {
+  return addInst(E, new (C) TypeOfInst(E, currentBlock()));
 }
