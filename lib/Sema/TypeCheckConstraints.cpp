@@ -1489,9 +1489,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
       // Provide a fixed type for the type variable.
       if (typeVar1)
-        typeVar1->getImpl().assignType(type2);
+        typeVar1->getImpl().assignType(type2->getRValueType());
       else
-        typeVar2->getImpl().assignType(type1);
+        typeVar2->getImpl().assignType(type1->getRValueType());
       return SolutionKind::Solved;
 
     case TypeMatchKind::TrivialSubtype:
