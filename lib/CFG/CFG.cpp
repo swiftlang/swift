@@ -132,6 +132,7 @@ public:
   CFGValue visitLoadExpr(LoadExpr *E);
   CFGValue visitParenExpr(ParenExpr *E);
   CFGValue visitThisApplyExpr(ThisApplyExpr *E);
+  CFGValue visitTupleExpr(TupleExpr *E);
   CFGValue visitTypeOfExpr(TypeOfExpr *E);
   
 };
@@ -197,6 +198,14 @@ CFGValue CFGBuilder::visitLoadExpr(LoadExpr *E) {
 
 CFGValue CFGBuilder::visitParenExpr(ParenExpr *E) {
   return visit(E->getSubExpr());
+}
+
+CFGValue CFGBuilder::visitTupleExpr(TupleExpr *E) {
+  llvm::SmallVector<CFGValue, 10> ArgsV;
+  for (auto &I : E->getElements()) {
+    ArgsV.push_back(visit(I));
+  }
+  return addInst(E, TupleInst::create(E, ArgsV, currentBlock()));
 }
 
 CFGValue CFGBuilder::visitTypeOfExpr(TypeOfExpr *E) {

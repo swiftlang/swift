@@ -159,6 +159,7 @@ void Instruction::print(raw_ostream &OS,
         PC.printID(OS, Elem);
       }
       OS << ')';
+      break;
     }
     case TypeOf: {
       const TypeOfInst &TOI = *cast<TypeOfInst>(this);
