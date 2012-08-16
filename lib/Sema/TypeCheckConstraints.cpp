@@ -75,18 +75,17 @@ class TypeVariableType::Implementation {
   /// \brief The archetype that this type variable describes.
   ArchetypeType *Archetype;
 
-  /// \brief Either the fixed type assigned to this type variable, or the parent
-  /// of this type variable if it has been unified with another type variable.
-  PointerUnion<TypeBase *, TypeVariableType *> FixedOrParent;
+  /// \brief The parent of this type variable if it has been unified with
+  /// another type variable, or null if it is the representative of its
+  /// equivalence class.
+  TypeVariableType *Parent;
 
 public:
   explicit Implementation(unsigned ID, Expr *TheExpr)
-    : ID(ID), TheExpr(TheExpr), Archetype(nullptr),
-      FixedOrParent(static_cast<TypeBase *>(nullptr)) { }
+    : ID(ID), TheExpr(TheExpr), Archetype(nullptr), Parent(nullptr) { }
 
   explicit Implementation(unsigned ID, ArchetypeType *Archetype)
-    : ID(ID), TheExpr(nullptr), Archetype(Archetype),
-      FixedOrParent(static_cast<TypeBase *>(nullptr)) { }
+    : ID(ID), TheExpr(nullptr), Archetype(Archetype), Parent(nullptr) { }
 
   /// \brief Retrieve the unique ID corresponding to this type variable.
   unsigned getID() const { return ID; }
@@ -109,12 +108,11 @@ public:
   /// This routine performs path compression, so that future representive
   /// queries are more efficient.
   TypeVariableType *getRepresentative() {
-    if (!FixedOrParent.is<TypeVariableType *>())
+    if (!Parent)
       return getTypeVariable();
 
-    auto rep = FixedOrParent.get<TypeVariableType *>()->getImpl()
-                 .getRepresentative();
-    FixedOrParent = rep;
+    auto rep = Parent->getImpl().getRepresentative();
+    Parent = rep;
     return rep;
   }
 
@@ -129,22 +127,7 @@ public:
     assert(newRep == newRep->getImpl().getRepresentative()
            && "newRep is not the representative");
     assert(getTypeVariable() != newRep && "cannot merge type with itself");
-    FixedOrParent = newRep;
-  }
-
-  /// \brief Retrieve the fixed type to which this type variable has been
-  /// assigned, or a null type if this type variable has not yet been
-  /// assigned a type.
-  Type getFixedType() {
-    return getRepresentative()->getImpl().FixedOrParent.get<TypeBase *>();
-  }
-
-  /// \brief Assign a type to this particular type variable.
-  void assignType(Type T) {
-    assert(!T->is<LValueType>() && "Type variable with lvalue type!");
-    auto rep = getRepresentative();
-    assert(rep->getImpl().FixedOrParent.isNull() && "Already assigned a type!");
-    rep->getImpl().FixedOrParent = T.getPointer();
+    Parent = newRep;
   }
 
   void print(llvm::raw_ostream &Out) {
@@ -157,9 +140,6 @@ public:
       Out << " equivalent to $T" << rep->getImpl().ID;
       return;
     }
-
-    if (auto fixed = getFixedType())
-      Out << " as " << fixed.getString();
   }
 };
 
@@ -477,6 +457,7 @@ namespace {
     SmallVector<Constraint *, 16> Constraints;
     SmallVector<OverloadSet *, 4> UnresolvedOverloadSets;
     SmallVector<std::unique_ptr<ConstraintSystem>, 2> Children;
+    llvm::DenseMap<TypeVariableType *, Type> FixedTypes;
 
     unsigned assignTypeVariableID() {
       ConstraintSystem *topCS = this;
@@ -543,6 +524,28 @@ namespace {
       assert(!name.empty());
       Constraints.push_back(new (*this) Constraint(ConstraintKind::ValueMember,
                                                    baseTy, memberTy, name));
+    }
+
+    /// \brief Retrieve the fixed type corresponding to the given type variable,
+    /// or a null type if there is no fixed type.
+    Type getFixedType(TypeVariableType *typeVar) {
+      typeVar = typeVar->getImpl().getRepresentative();
+      auto known = FixedTypes.find(typeVar);
+      if (known == FixedTypes.end()) {
+        if (Parent)
+          return Parent->getFixedType(typeVar);
+
+        return Type();
+      }
+
+      return known->second;
+    }
+
+    /// \brief Assign a fixed type to the given type variable.
+    void assignFixedType(TypeVariableType *typeVar, Type type) {
+      typeVar = typeVar->getImpl().getRepresentative();
+      assert(!FixedTypes[typeVar] && "Already have a type assignment!");
+      FixedTypes[typeVar] = type;
     }
 
     /// \brief "Open" the given type by replacing any occurrences of archetypes
@@ -1441,15 +1444,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
   auto typeVar1 = type1->getAs<TypeVariableType>();
-  if (typeVar1 && typeVar1->getImpl().getFixedType()) {
-    type1 = typeVar1->getImpl().getFixedType();
-    typeVar1 = nullptr;
+  if (typeVar1) {
+    if (auto fixed = getFixedType(typeVar1)) {
+      type1 = fixed;
+      typeVar1 = nullptr;
+    }
   }
 
   auto typeVar2 = type2->getAs<TypeVariableType>();
-  if (typeVar2 && typeVar2->getImpl().getFixedType()) {
-    type2 = typeVar2->getImpl().getFixedType();
-    typeVar2 = nullptr;
+  if (typeVar2) {
+    if (auto fixed = getFixedType(typeVar2)) {
+      type2 = fixed;
+      typeVar2 = nullptr;
+    }
   }
 
   // If the types are equivalent, we're done.
@@ -1473,26 +1480,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         }
 
         // Merge the equivalence classes corresponding to these two type
-        // variables.
-        // FIXME: We need to merge all of the interesting information about
-        // the type variable into the parent equivalent class. Or, come up
-        // with a completely different representation, e.g., by moving all of
-        // this information into constraints.
-        // FIXME: We either need to make sure that we only merge "up" the
-        // constraint system stack, so that type variables introduced in
-        // child constraint systems will point at type variables introduced in
-        // parent constraint systems (and not the other way around!), or
-        // (worse) we need to keep the representative pointers within the
-        // constrait system itself.
-        rep1->getImpl().mergeEquivalenceClasses(rep2);
+        // variables. Always merge 'up' the constraint stack, so that our
+        // representative has the smallest ID within the equivalence class. This
+        // ensures that the representative won't be further down the solution
+        // stack than anything it is merged with.
+        if (rep1->getImpl().getID() < rep2->getImpl().getID())
+          rep1->getImpl().mergeEquivalenceClasses(rep2);
+        else
+          rep2->getImpl().mergeEquivalenceClasses(rep1);
         return SolutionKind::Solved;
       }
 
       // Provide a fixed type for the type variable.
       if (typeVar1)
-        typeVar1->getImpl().assignType(type2->getRValueType());
+        assignFixedType(typeVar1, type2->getRValueType());
       else
-        typeVar2->getImpl().assignType(type1->getRValueType());
+        assignFixedType(typeVar2, type1->getRValueType());
       return SolutionKind::Solved;
 
     case TypeMatchKind::TrivialSubtype:
@@ -1701,10 +1704,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
 Type ConstraintSystem::simplifyType(Type type) {
   return TC.transformType(type,
-                          [](Type type) -> Type {
+                          [&](Type type) -> Type {
             if (auto tvt = type->getAs<TypeVariableType>()) {
               tvt = tvt->getImpl().getRepresentative();
-              if (auto fixed = tvt->getImpl().getFixedType())
+              if (auto fixed = getFixedType(tvt))
                 return fixed;
 
               return tvt;
@@ -1716,7 +1719,7 @@ Type ConstraintSystem::simplifyType(Type type) {
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind) {
   if (auto tv = type->getAs<TypeVariableType>()) {
-    auto fixed = tv->getImpl().getFixedType();
+    auto fixed = getFixedType(tv);
     if (!fixed)
       return SolutionKind::Unsolved;
 
@@ -1736,7 +1739,7 @@ ConstraintSystem::simplifyMemberConstraint(Type baseTy, Identifier name,
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
   if (auto tv = baseTy->getAs<TypeVariableType>()) {
-    auto fixed = tv->getImpl().getFixedType();
+    auto fixed = getFixedType(tv);
     if (!fixed)
       return SolutionKind::Unsolved;
 
@@ -2178,6 +2181,12 @@ void ConstraintSystem::dump() {
   for (auto tv : TypeVariables) {
     out.indent(2);
     tv->getImpl().print(out);
+    if (tv->getImpl().getRepresentative() == tv) {
+      if (auto fixed = getFixedType(tv)) {
+        out << " as ";
+        fixed->print(out);
+      }
+    }
     out << "\n";
   }
 
