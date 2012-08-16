@@ -86,6 +86,7 @@ public:
   static bool classof(const Instruction *I) { return true; }
 };
 
+/// Represents a call to a function.
 class CallInst : public Instruction {
 private:
   /// Construct a CallInst from a given call expression and the provided
@@ -124,31 +125,49 @@ public:
   static bool classof(const Instruction *I) { return I->kind == Call; }
 };
 
+/// Represents a reference to a declaration, essentially evaluating to
+/// its lvalue.
 class DeclRefInst : public Instruction {
   DeclRefInst() = delete;
 public:
   /// The backing DeclRefExpr in the AST.
   DeclRefExpr *expr;
 
-  DeclRefInst(DeclRefExpr *expr, BasicBlock *B)
+  /// Construct a DeclRefInst.
+  ///
+  /// \param DR A backpointer to the original DeclRefExpr.
+  ///
+  /// \param B The basic block that will contain the instruction.
+  ///
+  DeclRefInst(DeclRefExpr *DR, BasicBlock *B)
     : Instruction(B, DeclRef),
-      expr(expr) {}
+      expr(DR) {}
 
   static bool classof(const Instruction *I) { return I->kind == DeclRef; }
 };
 
+/// Encapsulates an integer constant, as defined originally by an
+/// an IntegerLiteralExpr.
 class IntegerLiteralInst : public Instruction {
   IntegerLiteralInst() = delete;
 public:
   // The backing IntegerLiteralExpr in the AST.
   IntegerLiteralExpr *literal;
 
+  /// Constructs an IntegerLiteralInst.
+  ///
+  /// \param IE A backpointer to the original IntegerLiteralExpr.
+  ///
+  /// \param B The basic block that will contain the instruction.
+  ///
   IntegerLiteralInst(IntegerLiteralExpr *IE, BasicBlock *B) :
     Instruction(B, IntegerLit), literal(IE) {}
 
   static bool classof(const Instruction *I) { return I->kind == IntegerLit; }
 };
 
+/// Represents an abstract application that provides the 'this' pointer for
+/// a curried method.
 class ThisApplyInst : public Instruction {
   ThisApplyInst() = delete;
 public:
@@ -161,6 +180,12 @@ public:
   /// The instruction representing the argument expression.
   CFGValue argument;
 
+  /// Construct a ThisApplyInst.
+  ///
+  /// \param expr A backpointer to the original ThisApplyExpr.
+  ///
+  /// \param B The basic block that will contain the instruction.
+  ///
   ThisApplyInst(ThisApplyExpr *expr,
                 CFGValue function,
                 CFGValue argument,
@@ -173,12 +198,19 @@ public:
   static bool classof(const Instruction *I) { return I->kind == ThisApply; }
 };
 
+/// Represents the production of an instance of a given metatype.
 class TypeOfInst : public Instruction {
   TypeOfInst() = delete;
 public:
   /// The backing TypeOfExpr in the AST.
   TypeOfExpr *expr;
 
+  /// Constructs a TypeOfInst.
+  ///
+  /// \param expr A backpointer to the original TypeOfExpr.
+  ///
+  /// \param B The basic block that will contain the instruction.
+  ///
   TypeOfInst(TypeOfExpr *expr, BasicBlock *B)
     : Instruction(B, TypeOf), expr(expr) {}
 
