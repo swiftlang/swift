@@ -1886,7 +1886,9 @@ namespace {
     Type SignatureTy;
     Type SignatureResultTy;
     Type ImplResultTy;
+    SmallVector<AnyFunctionType *, 4> ImplTyAtUncurry;
     unsigned UncurryLevel;
+    ArrayRef<Substitution> Substitutions;
 
     /// The return value needs to be returned via a fixed-size buffer.
     bool HasAbstractedResult;
@@ -1979,8 +1981,10 @@ namespace {
 
   public:
     WitnessBuilder(IRGenModule &IGM, llvm::Constant *impl,
-                   Type implTy, Type sigTy, unsigned uncurryLevel)
-      : IGM(IGM), ImplPtr(impl), UncurryLevel(uncurryLevel) {
+                   Type implTy, Type sigTy, unsigned uncurryLevel,
+                   ArrayRef<Substitution> subs)
+      : IGM(IGM), ImplPtr(impl), UncurryLevel(uncurryLevel),
+        Substitutions(subs) {
 
       implTy = implTy->getUnlabeledType(IGM.Context)->getCanonicalType();
       ImplTy = implTy;
@@ -1991,8 +1995,10 @@ namespace {
       // Find abstract parameters.
       HasAbstractedArg = false;
       for (unsigned i = 0; i != uncurryLevel + 1; ++i) {
-        FunctionType *sigFnTy = cast<FunctionType>(sigTy);
-        FunctionType *implFnTy = cast<FunctionType>(implTy);
+        AnyFunctionType *sigFnTy = cast<AnyFunctionType>(sigTy);
+        AnyFunctionType *implFnTy = cast<AnyFunctionType>(implTy);
+        ImplTyAtUncurry.push_back(implFnTy);
+
         sigTy = sigFnTy->getResult();
         implTy = implFnTy->getResult();
 
@@ -2166,7 +2172,7 @@ namespace {
       // correctly.
       CallEmission emission(IGF,
           Callee::forFreestandingFunction(ImplTy, ImplResultTy,
-                                          ArrayRef<Substitution>(), ImplPtr,
+                                          Substitutions, ImplPtr,
                                           ExplosionKind::Minimal,
                                           UncurryLevel));
 
@@ -2181,6 +2187,9 @@ namespace {
 
         forwardArgs(IGF, outerArgs, innerArg,
                     ArrayRef<Arg>(&Args[clauseBegin], clauseEnd - clauseBegin));
+        if (auto polyFn = dyn_cast<PolymorphicFunctionType>(ImplTyAtUncurry[i]))
+          emitPolymorphicArguments(IGF, polyFn->getGenericParams(),
+                                   Substitutions, innerArg);
       }
       for (unsigned i = innerArgs.size(); i != 0; --i)
         emission.addArg(innerArgs[i-1]);
@@ -2311,7 +2320,28 @@ namespace {
     Type ConcreteType;
     const TypeInfo &ConcreteTI;
     const ProtocolConformance &Conformance;
-    
+    ArrayRef<Substitution> Substitutions;
+
+    void computeSubstitutionsForType() {
+      // FIXME: This is a bit of a hack; the AST doesn't directly encode
+      // substitutions for the conformance of a generic type to a
+      // protocol, so we have to dig them out.
+      Type ty = ConcreteType;
+      while (ty) {
+        if (auto nomTy = ty->getAs<NominalType>())
+          ty = nomTy->getParent();
+        else
+          break;
+      }
+      if (ty) {
+        if (auto boundTy = ty->getAs<BoundGenericType>()) {
+          Substitutions = boundTy->getSubstitutions();
+        } else {
+          assert(!ty || !ty->isSpecialized());
+        }
+      }
+    }
+
   public:
     WitnessTableBuilder(IRGenModule &IGM,
                         SmallVectorImpl<llvm::Constant*> &table,
@@ -2320,7 +2350,9 @@ namespace {
                         const ProtocolConformance &conformance)
       : WitnessVisitor(IGM), Table(table), Packing(packing),
         ConcreteType(concreteType), ConcreteTI(concreteTI),
-        Conformance(conformance) {}
+        Conformance(conformance) {
+      computeSubstitutionsForType();
+    }
 
     /// A base protocol is witnessed by a pointer to the conformance
     /// of this type to that protocol.
@@ -2378,7 +2410,8 @@ namespace {
 
     llvm::Constant *getWitness(llvm::Constant *fn, Type fnTy, Type ifaceTy,
                                unsigned uncurryLevel) {
-      return WitnessBuilder(IGM, fn, fnTy, ifaceTy, uncurryLevel).get();
+      return WitnessBuilder(IGM, fn, fnTy, ifaceTy, uncurryLevel,
+                            Substitutions).get();
     }
   };
 }
