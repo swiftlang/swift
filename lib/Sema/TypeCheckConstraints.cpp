@@ -37,8 +37,6 @@ namespace {
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment = 8);
 
-inline void operator delete(void *, const ConstraintSystem &cs, size_t) {}
-
 namespace {
   /// \brief Retrieve the name of a literal kind.
   static StringRef getLiteralKindName(LiteralKind kind) {
