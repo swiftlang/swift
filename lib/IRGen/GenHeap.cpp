@@ -214,9 +214,12 @@ loadValueWitnessTables(IRGenFunction &IGF,
     return;
 
   Explosion tables(ExplosionKind::Maximal);
-  llvm::Value *tablesPtr = IGF.Builder.CreateConstInBoundsGEP1_32(header, 2);
+  llvm::Value *tablesPtr;
+  tablesPtr = IGF.Builder.CreateBitCast(header, IGF.IGM.Int8PtrTy);
+  tablesPtr = IGF.Builder.CreateConstInBoundsGEP1_32(tablesPtr, 24);
   llvm::Type *tablesPtrTy = IGF.IGM.WitnessTablePtrTy->getPointerTo();
   tablesPtr = IGF.Builder.CreateBitCast(tablesPtr, tablesPtrTy);
+
   for (unsigned i = 0, e = witnessTypes.size(); i != e; ++i) {
     llvm::Value *table = IGF.Builder.CreateConstInBoundsGEP1_32(tablesPtr, i);
     table = IGF.Builder.CreateLoad(table, IGF.IGM.getPointerAlignment());
@@ -226,6 +229,31 @@ loadValueWitnessTables(IRGenFunction &IGF,
       IGF,
       llvm::makeArrayRef(&*witnessTypes.begin(), &*witnessTypes.end()),
       tables);
+}
+
+static void
+storeValueWitnessTables(IRGenFunction &IGF,
+                        llvm::Value *header,
+                        const llvm::SetVector<ArchetypeType*> &witnessTypes) {
+  if (witnessTypes.empty())
+    return;
+
+  Explosion tables(ExplosionKind::Maximal);
+  llvm::Value *tablesPtr;
+  tablesPtr = IGF.Builder.CreateBitCast(header, IGF.IGM.Int8PtrTy);
+  tablesPtr = IGF.Builder.CreateConstInBoundsGEP1_32(tablesPtr, 24);
+  llvm::Type *tablesPtrTy = IGF.IGM.WitnessTablePtrTy->getPointerTo();
+  tablesPtr = IGF.Builder.CreateBitCast(tablesPtr, tablesPtrTy);
+
+  getValueWitnessTables(
+      IGF,
+      llvm::makeArrayRef(&*witnessTypes.begin(), &*witnessTypes.end()),
+      tables);
+  for (unsigned i = 0, e = witnessTypes.size(); i != e; ++i) {
+    llvm::Value *table = IGF.Builder.CreateConstInBoundsGEP1_32(tablesPtr, i);
+    llvm::Value *tableVal = tables.claimUnmanagedNext();
+    IGF.Builder.CreateStore(tableVal, table, IGF.IGM.getPointerAlignment());
+  }
 }
 
 /// Create the destructor function for an array layout.
@@ -466,6 +494,8 @@ ManagedValue ArrayHeapLayout::emitAlloc(IRGenFunction &IGF,
   // Perform the allocation.
   llvm::Value *alloc =
     IGF.emitAllocObjectCall(metadata, size, align, "array.alloc");
+
+  storeValueWitnessTables(IGF, alloc, WitnessTypes);
 
   // Find the begin pointer.
   llvm::Value *beginPtr = getBeginPointer(IGF, alloc);
