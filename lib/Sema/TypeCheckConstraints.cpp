@@ -602,6 +602,9 @@ namespace {
     /// \brief The result of attempting to resolve a constraint or set of
     /// constraints.
     enum class SolutionKind : char {
+      /// \brief The constraint has been trivially solved, by not introducing
+      /// any additional constraints.
+      TriviallySolved,
       /// \brief The constraint has been solved completely, and provides no
       /// more information.
       Solved,
@@ -1312,7 +1315,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   if (tuple1->getFields().size() != tuple2->getFields().size())
     return SolutionKind::Error;
 
-  SolutionKind result = SolutionKind::Solved;
+  SolutionKind result = SolutionKind::TriviallySolved;
   unsigned subFlags = flags | TMF_GenerateConstraints;
   for (unsigned i = 0, n = tuple1->getFields().size(); i != n; ++i) {
     const auto &elt1 = tuple1->getFields()[i];
@@ -1334,7 +1337,11 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     case SolutionKind::Error:
       return SolutionKind::Error;
 
+    case SolutionKind::TriviallySolved:
+      break;
+
     case SolutionKind::Solved:
+      result = SolutionKind::Solved;
       break;
 
     case SolutionKind::Unsolved:
@@ -1390,7 +1397,11 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case SolutionKind::Error:
     return SolutionKind::Error;
 
+  case SolutionKind::TriviallySolved:
+    break;
+
   case SolutionKind::Solved:
+    result = SolutionKind::Solved;
     break;
 
   case SolutionKind::Unsolved:
@@ -1442,7 +1453,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // they can get unified via same-type requirements, breaking the canonical
   // type system in amusing and horrible ways.
   if (type1->isEqual(type2))
-    return SolutionKind::Solved;
+    return SolutionKind::TriviallySolved;
 
   // If either (or both) types are type variables, unify the type variables.
   if (typeVar1 || typeVar2) {
@@ -1454,9 +1465,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         if (rep1 == rep2) {
           // We already merged these two types, so this constraint is
           // trivially solved.
-          // FIXME: Report "trivially solved", so the simplify() routine
-          // doesn't loop through constraints more than once.
-          return SolutionKind::Solved;
+          return SolutionKind::TriviallySolved;
         }
 
         // Merge the equivalence classes corresponding to these two type
@@ -1544,7 +1553,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                "Mismatched parents of nominal types");
 
         if (!nominal1->getParent())
-          return SolutionKind::Solved;
+          return SolutionKind::TriviallySolved;
 
         // Match up the parents, exactly.
         return matchTypes(nominal1->getParent(), nominal2->getParent(),
@@ -1603,7 +1612,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // FIXME: subtyping for generic classes!
       if (bound1->getDecl() == bound2->getDecl()) {
         // Match up the parents, exactly, if there are parents.
-        SolutionKind result = SolutionKind::Solved;
+        SolutionKind result = SolutionKind::TriviallySolved;
         assert((bool)bound1->getParent() == (bool)bound2->getParent() &&
                "Mismatched parents of bound generics");
         if (bound1->getParent()) {
@@ -1612,7 +1621,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           case SolutionKind::Error:
             return SolutionKind::Error;
 
+          case SolutionKind::TriviallySolved:
+            break;
+
           case SolutionKind::Solved:
+            result = SolutionKind::Solved;
             break;
 
           case SolutionKind::Unsolved:
@@ -1632,7 +1645,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           case SolutionKind::Error:
             return SolutionKind::Error;
 
+          case SolutionKind::TriviallySolved:
+            break;
+
           case SolutionKind::Solved:
+            result = SolutionKind::Solved;
             break;
 
           case SolutionKind::Unsolved:
@@ -2045,6 +2062,7 @@ ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
 }
 
 bool ConstraintSystem::simplify() {
+  bool firstLoop = true;
   bool solvedAny;
   SmallPtrSet<Constraint *, 4> externallySolvedConstraints;
   do {
@@ -2063,6 +2081,10 @@ bool ConstraintSystem::simplify() {
       case SolutionKind::Error:
         return true;
 
+      case SolutionKind::TriviallySolved:
+        // Implicitly drop this solved constraint.
+        break;
+          
       case SolutionKind::Solved:
         // Implicitly drop this solved constraint.
         solvedAny = true;
@@ -2077,6 +2099,13 @@ bool ConstraintSystem::simplify() {
     }
     existingConstraints.clear();
 
+    // If we didn't actually solve anything real and this isn't the first time
+    // through the loop, bail out now so we don't do the work of checking
+    // specific constraints on type variables.
+    if (!solvedAny && !firstLoop) {
+      break;
+    }
+
     // From the remaining constraints, collect the constraints for each of
     // the representative (non-fixed) type variables.
     SmallVector<TypeVariableConstraints, 32> typeVarConstraints;
@@ -2088,6 +2117,8 @@ bool ConstraintSystem::simplify() {
     typeVarConstraints.clear();
     if (!externallySolvedConstraints.empty())
       solvedAny = true;
+
+    firstLoop = false;
   } while (solvedAny);
 
   // We've solved all of the constraints we can.
