@@ -350,7 +350,7 @@ namespace {
       Second->print(Out);
     }
 
-    void dump() { print(llvm::errs()); }
+    void dump() LLVM_ATTRIBUTE_USED { print(llvm::errs()); }
 
     void *operator new(size_t bytes, ConstraintSystem& cs,
                        size_t alignment = alignof(Constraint)) {
@@ -1944,15 +1944,15 @@ namespace {
     RelationalTypeVarConstraints() : Below(), Above() { }
     
     Constraint *Below;
-    Type TypeBelow;
     Constraint *Above;
-    Type TypeAbove;
   };
 }
 
 void
 ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
                                          SmallPtrSet<Constraint *, 4> &solved) {
+  bool foundEquality = false;
+
   // First, sort the constraints so that we can visit the various kinds of
   // constraints in the order we want to.
   std::stable_sort(tvc.Constraints.begin(), tvc.Constraints.end(),
@@ -1960,8 +1960,7 @@ ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
 
   // Collect the relational constraints above and below each simplified type,
   // dropping any redundant constraints in the process.
-  llvm::DenseMap<CanType, Constraint *> constraintsBelow;
-  llvm::DenseMap<CanType, Constraint *> constraintsAbove;
+  llvm::DenseMap<CanType, RelationalTypeVarConstraints> typeVarConstraints;
   SmallVector<std::pair<Type, Constraint *>, 4> typesBelow;
   SmallVector<std::pair<Type, Constraint *>, 4> typesAbove;
   auto currentConstraint = tvc.Constraints.begin(),
@@ -1973,10 +1972,10 @@ ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
     // Determine whether we have a constraint below (vs. a constraint above)
     // this type variable.
     bool constraintIsBelow = false;
-    if (auto firstTV = (*currentConstraint)->getFirstType()
-                         ->getAs<TypeVariableType>()) {
-      constraintIsBelow = (firstTV->getImpl().getRepresentative() !=
-                             tvc.TypeVar);
+    if (auto secondTV = (*currentConstraint)->getSecondType()
+                           ->getAs<TypeVariableType>()) {
+      constraintIsBelow = (secondTV->getImpl().getRepresentative()
+                             == tvc.TypeVar);
     }
 
     // Compute the type bound, and simplify it.
@@ -1984,28 +1983,56 @@ ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
                                   : (*currentConstraint)->getSecondType();
     bound = simplifyType(bound);
 
-    auto &constraints = constraintIsBelow? constraintsBelow : constraintsAbove;
-    auto *&constraint = constraints[bound->getCanonicalType()];
+    Constraint *(RelationalTypeVarConstraints::*which)
+      = constraintIsBelow? &RelationalTypeVarConstraints::Below
+                         : &RelationalTypeVarConstraints::Above;
+    auto &typeVarConstraint = typeVarConstraints[bound->getCanonicalType()];
 
-    if (constraint) {
+    if (typeVarConstraint.*which) {
       // We already have a constraint that provides either the same relation
       // or a tighter relation, because the sort orders relational constraints
       // in order of nonincreasing strictness.
-      assert((constraint->getKind() < (*currentConstraint)->getKind()) &&
+      assert(((typeVarConstraint.*which)->getKind()
+                < (*currentConstraint)->getKind()) &&
              "Improper ordering of constraints");
       solved.insert(*currentConstraint);
       continue;
     }
 
     // Record this constraint.
-    constraint = *currentConstraint;
+    typeVarConstraint.*which = *currentConstraint;
     if (constraintIsBelow)
-      typesBelow.push_back(std::make_pair(bound, constraint));
+      typesBelow.push_back(std::make_pair(bound, *currentConstraint));
     else
-      typesAbove.push_back(std::make_pair(bound, constraint));
+      typesAbove.push_back(std::make_pair(bound, *currentConstraint));
+
+    // If a type variable T is bounded both above and below by a nominal type X
+    // (or specialization of one), then we can conclude that X == T, e.g.,
+    //
+    //   X < T and T < X => T == X
+    //
+    // Note that this rule does not apply in general because tuple types
+    // allow one to add or drop labels essentially at will, so there are
+    // multiple types T for which X < T and T < X. With nominal types,
+    // we prohibit cyclic conversions and subtyping relationships.
+    if (typeVarConstraint.Below && typeVarConstraint.Above &&
+        (bound->is<NominalType>() || bound->is<BoundGenericType>())) {
+      addConstraint(ConstraintKind::Equal, tvc.TypeVar, bound);
+      foundEquality = true;
+    }
   }
-  constraintsBelow.clear();
-  constraintsAbove.clear();
+
+  // If we determined an equality constraint, all of the relational constraints
+  // are now solved.
+  if (foundEquality) {
+    for (auto rtv : typeVarConstraints) {
+      if (rtv.second.Above)
+        solved.insert(rtv.second.Above);
+      if (rtv.second.Below)
+        solved.insert(rtv.second.Below);
+    }
+  }
+  typeVarConstraints.clear();
 
   // Introduce transitive constraints, e.g.,
   //
