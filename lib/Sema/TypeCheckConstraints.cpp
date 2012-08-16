@@ -141,6 +141,7 @@ public:
 
   /// \brief Assign a type to this particular type variable.
   void assignType(Type T) {
+    assert(!T->is<LValueType>() && "Type variable with lvalue type!");
     auto rep = getRepresentative();
     assert(rep->getImpl().FixedOrParent.isNull() && "Already assigned a type!");
     rep->getImpl().FixedOrParent = T.getPointer();
