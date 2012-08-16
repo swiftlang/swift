@@ -35,6 +35,7 @@ class DeclRefExpr;
 class IntegerLiteralExpr;
 class LoadExpr;
 class ThisApplyExpr;
+class TupleExpr;
 class TypeOfExpr;
 
 /// This is the root class for all instructions that can be used as the contents
@@ -50,6 +51,7 @@ public:
     IntegerLit,
     Load,
     ThisApply,
+    Tuple,
     TypeOf,
     UncondBranch,
     TERM_INST_BEGIN = UncondBranch,
@@ -223,6 +225,41 @@ public:
       argument(argument) {}
 
   static bool classof(const Instruction *I) { return I->kind == ThisApply; }
+};
+
+/// Represents a constructed tuple.
+class TupleInst : public Instruction {
+  TupleInst() = delete;
+
+  CFGValue *getElementsStorage() {
+    return reinterpret_cast<CFGValue*>(this + 1);
+  }
+  unsigned NumArgs;
+
+  /// Private constructor.  Because of the storage requirements of
+  /// TupleInst, object creation goes through 'create()'.
+  TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elements, BasicBlock *B);
+
+public:
+  /// The backing TupleExpr in the AST.
+  TupleExpr *expr;
+
+  /// The elements referenced by this TupleInst.
+  MutableArrayRef<CFGValue> elements() {
+    return MutableArrayRef<CFGValue>(getElementsStorage(), NumArgs);
+  }
+
+  /// The elements referenced by this TupleInst.
+  ArrayRef<CFGValue> elements() const {
+    return const_cast<TupleInst*>(this)->elements();
+  }
+
+  /// Construct a TupleInst.
+  static TupleInst *create(TupleExpr *Expr,
+                           ArrayRef<CFGValue> Elements,
+                           BasicBlock *B);
+
+  static bool classof(const Instruction *I) { return I->kind == Tuple; }
 };
 
 /// Represents the production of an instance of a given metatype.

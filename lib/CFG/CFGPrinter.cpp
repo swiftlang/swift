@@ -147,6 +147,19 @@ void Instruction::print(raw_ostream &OS,
       OS << ')';
       break;
     }
+    case Tuple: {
+      const TupleInst &TI = *cast<TupleInst>(this);
+      OS << "Tuple(";
+      bool isFirst = true;
+      for (const auto &Elem : TI.elements()) {
+        if (isFirst)
+          isFirst = false;
+        else
+          OS << ',';
+        PC.printID(OS, Elem);
+      }
+      OS << ')';
+    }
     case TypeOf: {
       const TypeOfInst &TOI = *cast<TypeOfInst>(this);
       OS << "TypeOf(type=" << TOI.expr->getType().getString() << ')';

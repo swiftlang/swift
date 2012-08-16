@@ -43,6 +43,7 @@ void Instruction::validate() const {
     case IntegerLit:
     case Load:
     case ThisApply:
+    case Tuple:
     case TypeOf:
       return;
     case UncondBranch: {
@@ -67,6 +68,7 @@ TermInst::Successors TermInst::successors() {
     case IntegerLit:
     case Load:
     case ThisApply:
+    case Tuple:
     case TypeOf:
       llvm_unreachable("Only TermInst's are allowed");
     case UncondBranch: {
@@ -93,6 +95,21 @@ CallInst::CallInst(CallExpr *expr, BasicBlock *B,
   : Instruction(B, Call), NumArgs(args.size()), expr(expr),
     function(function) {
   memcpy(getArgsStorage(), args.data(), args.size() * sizeof(CFGValue));
+}
+
+TupleInst *TupleInst::create(TupleExpr *Expr,
+                             ArrayRef<CFGValue> Elements,
+                             BasicBlock *B) {
+  CFG &cfg = *B->cfg;
+  void *Buffer = cfg.allocate(sizeof(TupleInst) +
+                              Elements.size() * sizeof(CFGValue),
+                              llvm::AlignOf<TupleInst>::Alignment);
+  return ::new(Buffer) TupleInst(Expr, Elements, B);
+}
+
+TupleInst::TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elems, BasicBlock *B)
+  : Instruction(B, Tuple),  NumArgs(Elems.size()), expr(Expr) {
+  memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(CFGValue));
 }
 
 void UncondBranchInst::unregisterTarget() {
