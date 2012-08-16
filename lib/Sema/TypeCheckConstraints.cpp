@@ -2065,6 +2065,22 @@ ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
   // FIXME: Actually implement this, taking care to avoid introducing cycles
   // in simplify().
 
+  // Remove redundant literal constraints.
+  Constraint *prevLit = nullptr;
+  for (; currentConstraint != lastConstraint &&
+       (*currentConstraint)->getClassification()
+         == ConstraintClassification::Literal;
+       ++currentConstraint) {
+    if (!prevLit) {
+      prevLit = *currentConstraint;
+      continue;
+    }
+
+    // We have a redundant literal constraint; remove the latter constraint.
+    if (prevLit->getLiteralKind() == (*currentConstraint)->getLiteralKind()) {
+      solved.insert(*currentConstraint);
+    }
+  }
 
   return addedConstraints;
 }
