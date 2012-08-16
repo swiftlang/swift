@@ -2082,6 +2082,11 @@ ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
     }
   }
 
+  // FIXME: If we see multiple type-member constraints, we can equate the
+  // right-hand types.
+  // FIXME: If we see a value member constraint and a type-member constraint
+  // with the same name, we can relate the first to the metatype of the
+  // second.
   return addedConstraints;
 }
 
