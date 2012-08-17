@@ -266,21 +266,22 @@ void CFGBuilder::visitIfStmt(IfStmt *S) {
 //===--------------------------------------------------------------------===//
 
 CFGValue CFGBuilder::visitCallExpr(CallExpr *E) {
-  llvm::SmallVector<CFGValue, 10> Args;
   Expr *Arg = ignoreParens(E->getArg());
   Expr *Fn = E->getFn();
   CFGValue FnV = visit(Fn);
-  CFGValue ArgV = visit(Arg);
+  llvm::SmallVector<CFGValue, 10> ArgsV;
 
-  // FIXME: should we even bother constructing the TupleExpr?  Should
-  // arguments be marshaled with a singled TupleExpr, or as separate arguments?
-  TupleInst *TU = dyn_cast_or_null<TupleInst>(ArgV.dyn_cast<Instruction*>());
-  if (TU) {
-    return addInst(E, CallInst::create(E, currentBlock(), FnV, TU->elements()));
+  // Special case Arg being a TupleExpr, to inline the arguments and
+  // not create another instruction.
+  if (TupleExpr *TU = dyn_cast<TupleExpr>(Arg)) {
+    for (auto arg : TU->getElements())
+      ArgsV.push_back(visit(arg));
+  }
+  else {
+    ArgsV.push_back(visit(Arg));
   }
 
-  return addInst(E, CallInst::create(E, currentBlock(), FnV,
-                                     ArrayRef<CFGValue>(&ArgV, 1)));
+  return addInst(E, CallInst::create(E, currentBlock(), FnV, ArgsV));
 }
 
 CFGValue CFGBuilder::visitDeclRefExpr(DeclRefExpr *E) {
