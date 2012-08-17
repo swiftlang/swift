@@ -141,8 +141,10 @@ namespace {
       // If we've checked types already, do some extra verification.
       // FIXME: The check for HadError should be pushed down into the
       // verifyChecked implementations.
-      if (TU->ASTStage >= TranslationUnit::TypeChecked && !HadError)
+      if (TU->ASTStage >= TranslationUnit::TypeChecked && !HadError) {
         verifyChecked(node);
+        // checkBoundGenericTypes(node);
+      }
 
       // Always continue.
       return node;
@@ -705,6 +707,102 @@ namespace {
 
     void printQualifiers(LValueType::Qual qs) {
       if (qs & LValueType::Qual::NonHeap) Out << "|nonheap";
+    }
+
+    void checkBoundGenericTypes(Type type) {
+      if (!type)
+        return;
+
+      switch (type->getKind()) {
+#define ALWAYS_CANONICAL_TYPE(Id, Parent) \
+      case TypeKind::Id:
+#define UNCHECKED_TYPE(Id, Parent) ALWAYS_CANONICAL_TYPE(Id, Parent)
+#define TYPE(Id, Parent)
+#include "swift/AST/TypeNodes.def"
+      case TypeKind::NameAlias:
+      case TypeKind::ProtocolComposition:
+        return;
+        
+      case TypeKind::OneOf:
+      case TypeKind::Struct:
+      case TypeKind::Class:
+        return checkBoundGenericTypes(cast<NominalType>(type)->getParent());
+
+      case TypeKind::UnboundGeneric:
+        return checkBoundGenericTypes(
+                 cast<UnboundGenericType>(type)->getParent());
+
+      case TypeKind::BoundGeneric: {
+        auto BGT = cast<BoundGenericType>(type);
+        if (!BGT->hasSubstitutions()) {
+          Out << "BoundGenericType without substitutions!\n";
+          abort();
+        }
+
+        checkBoundGenericTypes(BGT->getParent());
+        for (Type Arg : BGT->getGenericArgs())
+          checkBoundGenericTypes(Arg);
+        return;
+      }
+
+      case TypeKind::MetaType:
+        return checkBoundGenericTypes(
+                                cast<MetaTypeType>(type)->getInstanceType());
+
+
+      case TypeKind::Identifier: {
+        auto Id = cast<IdentifierType>(type);
+        if (!Id->isMapped())
+          return;
+
+        return checkBoundGenericTypes(Id->getMappedType());
+      }
+
+      case TypeKind::Paren:
+        return checkBoundGenericTypes(
+                                  cast<ParenType>(type)->getUnderlyingType());
+
+      case TypeKind::Tuple:
+        for (auto elt : cast<TupleType>(type)->getFields())
+          checkBoundGenericTypes(elt.getType());
+        return;
+        
+      case TypeKind::Substituted:
+        return checkBoundGenericTypes(
+                          cast<SubstitutedType>(type)->getReplacementType());
+
+      case TypeKind::Function:
+      case TypeKind::PolymorphicFunction: {
+        auto function = cast<AnyFunctionType>(type);
+        checkBoundGenericTypes(function->getInput());
+        return checkBoundGenericTypes(function->getResult());
+      }
+
+      case TypeKind::Array:
+        return checkBoundGenericTypes(cast<ArrayType>(type)->getBaseType());
+        
+      case TypeKind::ArraySlice:
+        return checkBoundGenericTypes(
+                                  cast<ArraySliceType>(type)->getBaseType());
+
+      case TypeKind::LValue:
+        return checkBoundGenericTypes(
+                                    cast<LValueType>(type)->getObjectType());
+      }
+    }
+
+    void checkBoundGenericTypes(Expr *E) {
+      checkBoundGenericTypes(E->getType());
+    }
+
+    void checkBoundGenericTypes(Stmt *S) {
+    }
+
+    void checkBoundGenericTypes(Decl *D) {
+    }
+
+    void checkBoundGenericTypes(ValueDecl *D) {
+      checkBoundGenericTypes(D->getType());
     }
   };
 }

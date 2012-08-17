@@ -533,7 +533,7 @@ Type TypeChecker::transformType(Type type,
   if (transformed.getPointer() != type.getPointer())
     return transformed;
 
-  // Recursive into chilfren of this type.
+  // Recursive into children of this type.
   switch (type->getKind()) {
 #define ALWAYS_CANONICAL_TYPE(Id, Parent) \
   case TypeKind::Id:                      \
