@@ -163,6 +163,10 @@ namespace {
   };
 }
 
+static void bindDestructorArchetypes(IRGenFunction &IGF, Address thisValue,
+                                     ClassDecl *CD,
+                                     const GenericParamList &generics);
+
 /// Emit the destructor for a class.
 ///
 /// \param DD - the optional explicit destructor declaration
@@ -178,6 +182,17 @@ static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
       IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();
   llvm::Value *thisValue = fn->arg_begin();
   thisValue = IGF.Builder.CreateBitCast(thisValue, info.getStorageType());
+
+  // Bind generic parameters.  This is only really necessary if we
+  // have either (1) an explicit destructor or (2) something dependent
+  // to destroy implicitly.
+  assert((!DD || DD->getDeclContext() == CD) &&
+         "destructor not defined in main class decl; archetypes might be off");
+  if (auto generics = CD->getGenericParamsOfContext()) {
+    Address thisAsAddr = Address(thisValue, info.getHeapAlignment(IGF.IGM));
+    bindDestructorArchetypes(IGF, thisAsAddr, CD, *generics);
+  }
+
   // FIXME: If the class is generic, we need some way to get at the
   // witness table.
 
@@ -271,15 +286,11 @@ namespace {
     /// section should be enough.
     void addGenericClassFields(ClassDecl *theClass,
                                const GenericParamList &generics) {
-      asImpl().beginGenerics(theClass, generics);
-
       SmallVector<llvm::Type*, 4> signature;
       expandPolymorphicSignature(IGM, generics, signature);
       for (auto type : signature) {
-        asImpl().addGenericWitness(type);
+        asImpl().addGenericWitness(theClass, type);
       }
-
-      asImpl().endGenerics(theClass, generics);
     }
   };
 
@@ -306,10 +317,7 @@ namespace {
       Fields.push_back(createSizeFn(this->IGM, Layout));
     }
 
-    void beginGenerics(ClassDecl *theClass, const GenericParamList &generics) {}
-    void endGenerics(ClassDecl *theClass, const GenericParamList &generics) {}
-
-    void addGenericWitness(llvm::Type *witnessType) {
+    void addGenericWitness(ClassDecl *forClass, llvm::Type *witnessType) {
       Fields.push_back(llvm::Constant::getNullValue(witnessType));
     }
 
@@ -410,10 +418,10 @@ namespace {
     /// The algorithm we use here is really wrong: we're treating all
     /// the witness tables as if they were arguments, then just
     /// copying them in-place.
-    void addGenericWitness(llvm::Type *witnessTy) {
+    void addGenericWitness(ClassDecl *forClass, llvm::Type *witnessTy) {
       assert(witnessTy->isPointerTy());
       FillOps.push_back(FillOp(NumGenericWitnesses++, getNextIndex()));
-      super::addGenericWitness(witnessTy);
+      super::addGenericWitness(forClass, witnessTy);
     }
 
   private:
@@ -675,4 +683,68 @@ const TypeInfo *TypeConverter::convertClassType(ClassDecl *D) {
   llvm::PointerType *irType = ST->getPointerTo();
   return new ClassTypeInfo(irType, IGM.getPointerSize(),
                            IGM.getPointerAlignment(), D);
+}
+
+
+namespace {
+  /// Really lame way of computing the offset of the metadata for a
+  /// destructor.
+  class DestructorMetadataDiscovery
+    : public MetadataLayout<DestructorMetadataDiscovery> {
+
+    typedef MetadataLayout<DestructorMetadataDiscovery> super;
+    IRGenFunction &IGF;
+    Address Metadata;
+    unsigned NextIndex = 0;
+    Explosion &Out;
+
+  public:
+    DestructorMetadataDiscovery(IRGenFunction &IGF, ClassDecl *theClass,
+                                Address metadata, Explosion &out)
+      : super(IGM, theClass), IGF(IGF), Metadata(metadata), Out(out) {}
+
+  public:
+    void addDestructorFunction() {
+      NextIndex++;
+    }
+
+    void addSizeFunction() {
+      NextIndex++;
+    }
+
+    void addGenericWitness(ClassDecl *forClass, llvm::Type *witnessType) {
+      // Ignore witnesses for base classes.
+      if (forClass != TargetClass) {
+        NextIndex++;
+        return;
+      }
+
+      // Otherwise, load this index.
+      Address elt = IGF.Builder.CreateConstArrayGEP(Metadata, NextIndex++,
+                                                    IGM.getPointerSize());
+      llvm::Value *wtable = IGF.Builder.CreateLoad(elt);
+      Out.addUnmanaged(wtable);
+    }
+  };
+}
+
+/// Bind the archetypes for this destructor declaration.
+static void bindDestructorArchetypes(IRGenFunction &IGF, Address thisValue,
+                                     ClassDecl *CD,
+                                     const GenericParamList &generics) {
+  // Reinterpret 'this' as a pointer to a table of witness tables.
+  llvm::Type *wtablePtrPtrPtrTy =
+    IGF.IGM.WitnessTablePtrTy->getPointerTo()->getPointerTo();
+
+  // Pull out that table of witness tables.
+  thisValue = IGF.Builder.CreateBitCast(thisValue, wtablePtrPtrPtrTy);
+  auto metadataPtr = IGF.Builder.CreateLoad(thisValue, "metadata");
+  Address metadata(metadataPtr, IGF.IGM.getPointerAlignment());
+
+  // Find the witnesses in the metadata.
+  Explosion witnesses(ExplosionKind::Maximal);
+  DestructorMetadataDiscovery(IGF, CD, metadata, witnesses).layout();
+
+  // Bind the archetypes.
+  emitPolymorphicParameters(IGF, generics, witnesses);
 }

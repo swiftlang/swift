@@ -199,6 +199,15 @@ public:
     return Address(addr, address.getAlignment().alignmentAtOffset(size));
   }
 
+  /// Given a pointer to an array element, GEP to the array element
+  /// N elements past it.  The type is not changed.
+  Address CreateConstArrayGEP(Address base, unsigned index, Size eltSize,
+                              const llvm::Twine &name = "") {
+    auto addr = CreateConstInBoundsGEP1_32(base.getAddress(), index, name);
+    return Address(addr,
+                   base.getAlignment().alignmentAtOffset(eltSize * index));
+  }
+
   using IRBuilderBase::CreateBitCast;
   Address CreateBitCast(Address address, llvm::Type *type,
                         const llvm::Twine &name = "") {
