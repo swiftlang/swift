@@ -42,6 +42,7 @@ void Instruction::validate() const {
     case DeclRef:
     case IntegerLit:
     case Load:
+    case Return:
     case ThisApply:
     case Tuple:
     case TypeOf:
@@ -69,6 +70,7 @@ TermInst::Successors TermInst::successors() {
     case DeclRef:
     case IntegerLit:
     case Load:
+    case Return:
     case ThisApply:
     case Tuple:
     case TypeOf:

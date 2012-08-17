@@ -110,6 +110,22 @@ public:
     return I->second;
   }
 
+  void finishUp() {
+    if (!PendingMerges.empty()) {
+      assert(Block == 0);
+      new (C) ReturnInst(currentBlock());
+      return;
+    }
+    // Check if the last block has a Return.
+    if (!Block)
+      return;
+
+    if (Block->instructions.empty() ||
+        !isa<ReturnInst>(Block->instructions.back())) {
+      new (C) ReturnInst(Block);
+    }
+  }
+
   //===--------------------------------------------------------------------===//
   // Statements.
   //===--------------------------------------------------------------------===//
@@ -125,8 +141,10 @@ public:
   }
 
   void visitReturnStmt(ReturnStmt *S) {
-    visit(S->getResult());
-    //assert(false && "Not yet implemented");
+    CFGValue ArgV = S->hasResult() ? visit(S->getResult()) : (Instruction*) 0;
+    (void) new (C) ReturnInst(S, ArgV, currentBlock());
+    // Treat the current block as "complete" with no successors.
+    Block = 0;
   }
 
   void visitIfStmt(IfStmt *S);
@@ -181,7 +199,11 @@ CFG *CFG::constructCFG(Stmt *S) {
   llvm::OwningPtr<CFG> C(new CFG());
   CFGBuilder builder(*C);
   builder.visit(S);
-  return builder.badCFG ? nullptr : C.take();
+  if (!builder.badCFG) {
+    builder.finishUp();
+    return C.take();
+  }
+  return nullptr;
 }
 
 void CFGBuilder::visitBraceStmt(BraceStmt *S) {

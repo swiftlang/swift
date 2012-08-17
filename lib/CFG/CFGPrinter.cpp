@@ -156,6 +156,16 @@ void Instruction::print(raw_ostream &OS,
       OS << ')';
       break;
     }
+    case Return: {
+      const ReturnInst &RI = *cast<ReturnInst>(this);
+      OS << "Return";
+      if (RI.returnValue) {
+        OS << '(';
+        PC.printID(OS, RI.returnValue);
+        OS << ')';
+      }
+      break;
+    };
     case ThisApply: {
       const ThisApplyInst &TAI = *cast<ThisApplyInst>(this);
       OS << "ThisApply(fn=";

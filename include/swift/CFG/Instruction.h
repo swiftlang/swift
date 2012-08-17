@@ -34,6 +34,7 @@ class CallExpr;
 class DeclRefExpr;
 class IntegerLiteralExpr;
 class LoadExpr;
+class ReturnStmt;
 class Stmt;
 class ThisApplyExpr;
 class TupleExpr;
@@ -51,6 +52,7 @@ public:
     DeclRef,
     IntegerLit,
     Load,
+    Return,
     ThisApply,
     Tuple,
     TypeOf,
@@ -195,6 +197,39 @@ public:
     Instruction(B, Load), expr(expr), lvalue(lvalue) {}
 
   static bool classof(const Instruction *I) { return I->kind == Load; }
+};
+
+class ReturnInst : public Instruction {
+  ReturnInst() = delete;
+public:
+  /// The backing ReturnStmt (if any) in the AST.  If this was an
+  /// implicit return, this value will be null.
+  ReturnStmt *returnStmt;
+
+  /// The value to be returned (if any).  This can be null if it
+  /// is an implicit return.
+  CFGValue returnValue;
+
+  /// Constructs a ReturnInst representing an \b explicit return.
+  ///
+  /// \param returnStmt The backing return statement in the AST.
+  ///
+  /// \param returnValue The value to be returned.
+  ///
+  /// \param The basic block that will contain the instruction.
+  ///
+  ReturnInst(ReturnStmt *returnStmt, CFGValue returnValue, BasicBlock *B)
+    : Instruction(B, Return),
+      returnStmt(returnStmt),
+      returnValue(returnValue) {}
+
+  /// Constructs a ReturnInst representing an \b implicit return.
+  ///
+  /// \param The basic block that will contain the instruction.
+  ///
+  ReturnInst(BasicBlock *B) : ReturnInst(0, (Instruction*)0, B) {}
+
+  static bool classof(const Instruction *I) { return I->kind == Return; }
 };
 
 /// Represents an abstract application that provides the 'this' pointer for
