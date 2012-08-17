@@ -61,6 +61,11 @@ public:
 
   void addPred(BasicBlock *B) { Preds.push_back(B); }
 
+  // Return true if the block has a terminator.
+  bool hasTerminator() const {
+    return !instructions.empty() && isa<TermInst>(instructions.back());
+  }
+
   typedef llvm::ArrayRef<BasicBlock *> Predecessors;
   typedef llvm::ArrayRef<BasicBlock *> Successors;
 

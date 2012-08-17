@@ -36,6 +36,9 @@ static Expr *ignoreParens(Expr *Ex) {
 
 namespace {
 class CFGBuilder : public ASTVisitor<CFGBuilder, CFGValue> {
+  typedef std::vector<BasicBlock *> BlocksVector;
+  BlocksVector PendingMerges;
+
   /// Mapping from expressions to instructions.
   llvm::DenseMap<Expr *, Instruction *> ExprToInst;
 
@@ -47,6 +50,7 @@ class CFGBuilder : public ASTVisitor<CFGBuilder, CFGValue> {
 
 public:
   CFGBuilder(CFG &C) : Block(0), C(C), badCFG(false) {}
+  ~CFGBuilder() {}
 
   /// A flag indicating whether or not there were problems
   /// constructing the CFG.
@@ -54,8 +58,30 @@ public:
 
   /// The current basic block being constructed.
   BasicBlock *currentBlock() {
-    if (!Block)
+    if (!Block) {
       Block = new (C) BasicBlock(&C);
+
+      // Flush out all pending merges.  These are basic blocks waiting
+      // for a successor.
+      for (auto PredBlock : PendingMerges) {
+        UncondBranchInst *UB = new (C) UncondBranchInst(PredBlock);
+        UB->setTarget(Block, ArrayRef<CFGValue>());
+      }
+      PendingMerges.clear();
+    }
+    return Block;
+  }
+
+  void clearCurrentBlock() {
+    Block = 0;
+  }
+  
+  /// Reset the currently active basic block by creating a new one.
+  BasicBlock *createFreshBlock() {
+    if (Block && !Block->hasTerminator()) {
+      PendingMerges.push_back(Block);
+    }
+    Block = new (C) BasicBlock(&C);
     return Block;
   }
 
@@ -89,9 +115,7 @@ public:
     //assert(false && "Not yet implemented");
   }
 
-  void visitIfStmt(IfStmt *S) {
-    assert(false && "Not yet implemented");
-  }
+  void visitIfStmt(IfStmt *S);
 
   void visitWhileStmt(WhileStmt *S) {
     assert(false && "Not yet implemented");
@@ -158,6 +182,49 @@ void CFGBuilder::visitBraceStmt(BraceStmt *S) {
       visit(E);
   }
 }
+
+//===--------------------------------------------------------------------===//
+// Control-flow.
+//===--------------------------------------------------------------------===//
+
+void CFGBuilder::visitIfStmt(IfStmt *S) {
+  // ** FIXME ** Handle the condition.  We need to handle more of the
+  // statements first.
+
+  // The condition should be the last value evaluated just before the
+  // terminator.
+  //  CFGValue CondV = visit(S->getCond());
+
+  // Save the current block.  We will use it to construct the
+  // CondBranchInst.
+  BasicBlock *IfTermBlock = currentBlock();
+
+  // Reset the state for the current block.
+  clearCurrentBlock();
+
+  // Create a new basic block for the first target.
+  BasicBlock *Target1 = createFreshBlock();
+  visit(S->getThenStmt());
+
+  // ** FIXME ** Handle case where there is no 'else'.  Requires
+  // fixing up the second target later.
+
+  // Create a new basic block for the second target.  The first target's
+  // blocks will get added the "pending" list.
+  BasicBlock *Target2 = createFreshBlock();
+  visit(S->getElseStmt());
+
+  // Finally, hook up the block with the condition to the target blocks.
+  CFGValue Branch = new (C) CondBranchInst(S, (Instruction*) 0, Target1,
+                                           Target2, IfTermBlock);
+  (void) Branch;
+  Target1->addPred(IfTermBlock);
+  Target2->addPred(IfTermBlock);
+}
+
+//===--------------------------------------------------------------------===//
+// Expressions.
+//===--------------------------------------------------------------------===//
 
 CFGValue CFGBuilder::visitCallExpr(CallExpr *E) {
   llvm::SmallVector<CFGValue, 10> Args;
