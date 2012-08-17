@@ -34,6 +34,7 @@ class CallExpr;
 class DeclRefExpr;
 class IntegerLiteralExpr;
 class LoadExpr;
+class Stmt;
 class ThisApplyExpr;
 class TupleExpr;
 class TypeOfExpr;
@@ -53,9 +54,10 @@ public:
     ThisApply,
     Tuple,
     TypeOf,
+    CondBranch,
     UncondBranch,
-    TERM_INST_BEGIN = UncondBranch,
-    TERM_INST_END = TERM_INST_BEGIN
+    TERM_INST_BEGIN = CondBranch,
+    TERM_INST_END = UncondBranch
   };
 
   /// The kind of the Instruction.
@@ -305,12 +307,77 @@ public:
   }
 };
 
+class CondBranchInst : public TermInst {
+  BasicBlock *Branches[2];
+  struct BlockArgs { unsigned numArgs; CFGValue *args; } Args[2];
+public:
+  /// The branching statement in the AST.
+  Stmt *branchStmt;
+
+  /// The condition value used for the branch.
+  CFGValue condition;
+
+  struct BranchInfo {
+    /// The destination basic block for a branch.
+    BasicBlock *block;
+
+    /// The argument values for the target basic block.
+    MutableArrayRef<CFGValue> arguments;
+
+    BranchInfo(BasicBlock *B, MutableArrayRef<CFGValue> A)
+      : block(B), arguments(A) {}
+  };
+
+  /// Return the branch target and arguments for a given branch.
+  BranchInfo getBranchInfo(unsigned branch) {
+    assert(branch < 2);
+    return BranchInfo(Branches[branch], getArguments(branch));
+  }
+
+  /// Return the block arguments for the specified branch.
+  MutableArrayRef<CFGValue> getArguments(unsigned branch) {
+    assert(branch < 2);
+    return MutableArrayRef<CFGValue>(Args[branch].args, Args[branch].numArgs);
+  }
+
+  /// Return the block arguments for the specified branch.
+  ArrayRef<CFGValue> getArguments(unsigned branch) const {
+    assert(branch < 2);
+    return ArrayRef<CFGValue>(Args[branch].args, Args[branch].numArgs);
+  }
+
+  /// The branch targets.
+  MutableArrayRef<BasicBlock*> branches() {
+    return MutableArrayRef<BasicBlock*>(Branches, 2);
+  }
+
+  /// The branch targets.
+  ArrayRef<BasicBlock*> branches() const {
+    return ArrayRef<BasicBlock*>(Branches, 2);
+  }
+
+  CondBranchInst(Stmt *BranchStmt,
+                 CFGValue condition,
+                 BasicBlock *Target1,
+                 BasicBlock *Target2,
+                 BasicBlock *B)
+    : TermInst(B, CondBranch), branchStmt(BranchStmt), condition(condition) {
+        Branches[0] = Target1;
+        Branches[1] = Target2;
+        memset(&Args, sizeof(Args), 0);
+      }
+
+  static bool classof(const Instruction *I) {
+    return I->kind == CondBranch;
+  }
+};
+
 class UncondBranchInst : public TermInst {
 public:
-  typedef llvm::ArrayRef<unsigned> ArgsTy;
+  typedef llvm::ArrayRef<CFGValue> ArgsTy;
 
 protected:
-  unsigned *Args;
+  CFGValue *Args;
   unsigned NumArgs;
   BasicBlock *TargetBlock;
 
@@ -332,7 +399,7 @@ public:
   const ArgsTy blockArgs() const { return ArgsTy(Args, NumArgs); }
 
   /// Set the target block (with the matching arguments) for this branch.
-  void setTarget(BasicBlock *Target, const ArgsTy BlockArgs);
+  void setTarget(BasicBlock *Target, ArgsTy BlockArgs);
 
   static bool classof(const Instruction *I) {
     return I->kind == UncondBranch;

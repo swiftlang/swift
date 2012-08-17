@@ -46,6 +46,8 @@ void Instruction::validate() const {
     case Tuple:
     case TypeOf:
       return;
+    case CondBranch:
+      break;
     case UncondBranch: {
       const UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
       assert(!basicBlock->instructions.empty() &&
@@ -71,6 +73,10 @@ TermInst::Successors TermInst::successors() {
     case Tuple:
     case TypeOf:
       llvm_unreachable("Only TermInst's are allowed");
+    case CondBranch: {
+      CondBranchInst &CBI = *cast<CondBranchInst>(this);
+      return Successors(CBI.branches());
+    }
     case UncondBranch: {
       UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
       return Successors(&UBI.targetBlock());
@@ -118,7 +124,7 @@ void UncondBranchInst::unregisterTarget() {
 
 }
 
-void UncondBranchInst::setTarget(BasicBlock *NewTarget, const ArgsTy BlockArgs){
+void UncondBranchInst::setTarget(BasicBlock *NewTarget, ArgsTy BlockArgs){
   if (TargetBlock != NewTarget) {
     unregisterTarget();
     TargetBlock = NewTarget;
@@ -132,6 +138,6 @@ void UncondBranchInst::setTarget(BasicBlock *NewTarget, const ArgsTy BlockArgs){
 
   // Copy the arguments over to our holding buffer.
   NumArgs = BlockArgs.size();
-  Args = new (basicBlock->cfg) unsigned[NumArgs];
+  Args = new (basicBlock->cfg) CFGValue[NumArgs];
   ArgsTy(Args, NumArgs) = BlockArgs;
 }

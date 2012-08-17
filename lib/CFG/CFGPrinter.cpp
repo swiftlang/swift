@@ -120,6 +120,17 @@ void Instruction::print(raw_ostream &OS,
       OS << ')';
       break;
     }
+    case CondBranch: {
+      const CondBranchInst &BI = *cast<CondBranchInst>(this);
+      //      OS << "cond_br(cond=";
+      //      PC.printID(OS, BI.condition);
+      OS << ",branches=(";
+      PC.printID(OS,BI.branches()[0]);
+      OS << ',';
+      PC.printID(OS,BI.branches()[1]);
+      OS << "))\n";
+      break;
+    }
     case DeclRef: {
       const DeclRefInst &DI = *cast<DeclRefInst>(this);
       OS << "DeclRef(decl=" << DI.expr->getDecl()->getName() << ')';
