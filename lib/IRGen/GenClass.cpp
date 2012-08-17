@@ -226,15 +226,93 @@ static llvm::Function *createSizeFn(IRGenModule &IGM,
   return fn;
 }
 
-enum { NumStandardMetadataFields = 2 };
-static void addStandardMetadata(IRGenModule &IGM,
-                                ClassDecl *CD,
-                                const HeapLayout &layout,
-                                SmallVectorImpl<llvm::Constant*> &fields) {
-  assert(fields.empty());
-  fields.push_back(IGM.getAddrOfDestructor(CD));
-  fields.push_back(createSizeFn(IGM, layout));
-  assert(fields.size() == NumStandardMetadataFields);
+namespace {
+  /// A CRTP class for laying out class metadata.
+  template <class Impl> class MetadataLayout {
+    Impl &asImpl() { return *static_cast<Impl*>(this); }
+
+  protected:
+    enum { NumStandardMetadataFields = 2 };
+
+    IRGenModule &IGM;
+
+    /// The most-derived class.
+    ClassDecl *const TargetClass;
+
+    MetadataLayout(IRGenModule &IGM, ClassDecl *targetClass)
+      : IGM(IGM), TargetClass(targetClass) {}
+
+  public:
+    void layout() {
+      // Common fields.
+      asImpl().addDestructorFunction();
+      asImpl().addSizeFunction();
+
+      // Class-specific fields.
+      addClassFields(TargetClass);
+    }
+
+  private:
+    void addClassFields(ClassDecl *theClass) {
+      // TODO: base class
+
+      // TODO: virtual methods
+
+      if (auto generics = theClass->getGenericParams()) {
+        addGenericClassFields(theClass, *generics);
+      }
+    }
+
+    /// Add fields related to the generics of this class declaration.
+    /// TODO: don't add new fields that are implied by base class
+    /// fields.  e.g., if B<T> extends A<T>, the witness for T in A's
+    /// section should be enough.
+    void addGenericClassFields(ClassDecl *theClass,
+                               const GenericParamList &generics) {
+      asImpl().beginGenerics(theClass, generics);
+
+      SmallVector<llvm::Type*, 4> signature;
+      expandPolymorphicSignature(IGM, generics, signature);
+      for (auto type : signature) {
+        asImpl().addGenericWitness(type);
+      }
+
+      asImpl().endGenerics(theClass, generics);
+    }
+  };
+
+  class MetadataBuilder : public MetadataLayout<MetadataBuilder> {
+    SmallVector<llvm::Constant*, 8> Fields;
+    const HeapLayout &Layout;
+
+  public:
+    MetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
+                    const HeapLayout &layout)
+      : MetadataLayout(IGM, theClass), Layout(layout) {}
+
+    void addDestructorFunction() {
+      Fields.push_back(IGM.getAddrOfDestructor(TargetClass));
+    }
+
+    void addSizeFunction() {
+      Fields.push_back(createSizeFn(IGM, Layout));
+    }
+
+    void beginGenerics(ClassDecl *theClass, const GenericParamList &generics) {}
+    void endGenerics(ClassDecl *theClass, const GenericParamList &generics) {}
+
+    void addGenericWitness(llvm::Type *witnessType) {
+      Fields.push_back(llvm::Constant::getNullValue(witnessType));
+    }
+
+    llvm::Constant *getInit() {
+      if (Fields.size() == NumStandardMetadataFields) {
+        return llvm::ConstantStruct::get(IGM.HeapMetadataStructTy, Fields);
+      } else {
+        return llvm::ConstantStruct::getAnon(Fields);
+      }
+    }
+  };
 }
 
 /// Emit the heap metadata or metadata template for a class.
@@ -243,32 +321,9 @@ void IRGenModule::emitClassMetadata(ClassDecl *classDecl) {
   auto &classTI = Types.getFragileTypeInfo(classDecl).as<ClassTypeInfo>();
   auto &layout = classTI.getLayout(*this);
 
-  // Build the metadata initializer.
-  SmallVector<llvm::Constant*, NumStandardMetadataFields + 8> fields;
-
-  // Standard metadata.
-  addStandardMetadata(*this, classDecl, layout, fields);
-
-  // Stuff for the class:
-
-  // FIXME: virtual methods, other class members.
-
-  // Generics layout.
-  if (auto generics = classDecl->getGenericParams()) {
-    // Add a zeroed field for each entry in the generic signature.
-    SmallVector<llvm::Type*, 4> signature;
-    expandPolymorphicSignature(*this, *generics, signature);
-    for (auto type : signature) {
-      fields.push_back(llvm::Constant::getNullValue(type));
-    }
-  }
-
-  llvm::Constant *init;
-  if (fields.size() == NumStandardMetadataFields) {
-    init = llvm::ConstantStruct::get(HeapMetadataStructTy, fields);
-  } else {
-    init = llvm::ConstantStruct::getAnon(fields);
-  }
+  MetadataBuilder builder(*this, classDecl, layout);
+  builder.layout();
+  llvm::Constant *init = builder.getInit();
 
   auto var = cast<llvm::GlobalVariable>(
                          getAddrOfClassMetadata(classDecl, init->getType()));
