@@ -360,12 +360,7 @@ public:
                  CFGValue condition,
                  BasicBlock *Target1,
                  BasicBlock *Target2,
-                 BasicBlock *B)
-    : TermInst(B, CondBranch), branchStmt(BranchStmt), condition(condition) {
-        Branches[0] = Target1;
-        Branches[1] = Target2;
-        memset(&Args, sizeof(Args), 0);
-      }
+                 BasicBlock *B);
 
   static bool classof(const Instruction *I) {
     return I->kind == CondBranch;

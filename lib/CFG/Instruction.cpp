@@ -103,6 +103,18 @@ CallInst::CallInst(CallExpr *expr, BasicBlock *B,
   memcpy(getArgsStorage(), args.data(), args.size() * sizeof(CFGValue));
 }
 
+CondBranchInst::CondBranchInst(Stmt *BranchStmt,
+                               CFGValue condition,
+                               BasicBlock *Target1,
+                               BasicBlock *Target2,
+                               BasicBlock *B)
+  : TermInst(B, CondBranch), branchStmt(BranchStmt), condition(condition) {
+    Branches[0] = Target1;
+    Branches[1] = Target2;
+    memset(&Args, sizeof(Args), 0);
+    for (auto branch : branches()) { if (branch) branch->addPred(B); }
+}
+
 TupleInst *TupleInst::create(TupleExpr *Expr,
                              ArrayRef<CFGValue> Elements,
                              BasicBlock *B) {
