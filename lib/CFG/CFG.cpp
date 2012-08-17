@@ -104,12 +104,6 @@ public:
     return I;
   }
 
-  Instruction *getInst(Expr *Ex) {
-    auto I = ExprToInst.find(Ex);
-    assert(I != ExprToInst.end());
-    return I->second;
-  }
-
   void finishUp() {
     if (!PendingMerges.empty()) {
       assert(Block == 0);
@@ -285,7 +279,7 @@ CFGValue CFGBuilder::visitCallExpr(CallExpr *E) {
     return addInst(E, CallInst::create(E, currentBlock(), FnV, TU->elements()));
   }
 
-  return addInst(E, CallInst::create(E, currentBlock(), getInst(Fn),
+  return addInst(E, CallInst::create(E, currentBlock(), FnV,
                                      ArrayRef<CFGValue>(&ArgV, 1)));
 }
 
