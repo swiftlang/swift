@@ -64,23 +64,37 @@ public:
       // Flush out all pending merges.  These are basic blocks waiting
       // for a successor.
       for (auto PredBlock : PendingMerges) {
-        UncondBranchInst *UB = new (C) UncondBranchInst(PredBlock);
-        UB->setTarget(Block, ArrayRef<CFGValue>());
+        // If the block has no terminator, we need to add an unconditional
+        // jump to the block we are creating.
+        if (!PredBlock->hasTerminator()) {
+          UncondBranchInst *UB = new (C) UncondBranchInst(PredBlock);
+          UB->setTarget(Block, ArrayRef<CFGValue>());
+          continue;
+        }
+        // If the block already has a CondBranch terminator, then it means
+        // we are fixing up one of the branch targets because it wasn't
+        // available when the instruction was created.
+        CondBranchInst &CBI =
+          cast<CondBranchInst>(PredBlock->instructions.back());
+        assert(CBI.branches()[0]);
+        assert(!CBI.branches()[1]);
+        CBI.branches()[1] = Block;
+        Block->addPred(PredBlock);
       }
       PendingMerges.clear();
     }
     return Block;
   }
 
-  void clearCurrentBlock() {
+  void addCurrentBlockToPending() {
+    if (Block && !Block->hasTerminator()) {
+      PendingMerges.push_back(Block);
+    }
     Block = 0;
   }
   
   /// Reset the currently active basic block by creating a new one.
   BasicBlock *createFreshBlock() {
-    if (Block && !Block->hasTerminator()) {
-      PendingMerges.push_back(Block);
-    }
     Block = new (C) BasicBlock(&C);
     return Block;
   }
@@ -194,32 +208,41 @@ void CFGBuilder::visitIfStmt(IfStmt *S) {
   // The condition should be the last value evaluated just before the
   // terminator.
   //  CFGValue CondV = visit(S->getCond());
+  CFGValue CondV = (Instruction*) 0;
 
   // Save the current block.  We will use it to construct the
   // CondBranchInst.
   BasicBlock *IfTermBlock = currentBlock();
 
   // Reset the state for the current block.
-  clearCurrentBlock();
+  Block = 0;
 
   // Create a new basic block for the first target.
   BasicBlock *Target1 = createFreshBlock();
   visit(S->getThenStmt());
+  addCurrentBlockToPending();
 
-  // ** FIXME ** Handle case where there is no 'else'.  Requires
-  // fixing up the second target later.
-
-  // Create a new basic block for the second target.  The first target's
-  // blocks will get added the "pending" list.
-  BasicBlock *Target2 = createFreshBlock();
-  visit(S->getElseStmt());
+  // Handle an (optional) 'else'.  If no 'else' is found, the false branch
+  // will be fixed up later.
+  BasicBlock *Target2 = nullptr;
+  if (Stmt *Else = S->getElseStmt()) {
+    // Create a new basic block for the second target.  The first target's
+    // blocks will get added the "pending" list.
+    Target2 = createFreshBlock();
+    visit(Else);
+    addCurrentBlockToPending();
+  }
+  else {
+    // If we have no 'else', we need to fix up the branch later.
+    PendingMerges.push_back(IfTermBlock);
+  }
 
   // Finally, hook up the block with the condition to the target blocks.
-  CFGValue Branch = new (C) CondBranchInst(S, (Instruction*) 0, Target1,
-                                           Target2, IfTermBlock);
+  CFGValue Branch = new (C) CondBranchInst(S, CondV,
+                                           Target1,
+                                           Target2 /* may be null*/,
+                                           IfTermBlock);
   (void) Branch;
-  Target1->addPred(IfTermBlock);
-  Target2->addPred(IfTermBlock);
 }
 
 //===--------------------------------------------------------------------===//
