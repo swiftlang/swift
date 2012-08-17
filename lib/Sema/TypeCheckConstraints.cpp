@@ -344,49 +344,32 @@ namespace {
   /// \brief Describes a particular choice of a declaration from within a
   /// reference to an overloaded name.
   class OverloadChoice {
-    /// \brief The overloaded expression from which we're making a selection.
-    OverloadSetRefExpr *E;
+    /// \brief The base type to be used when referencing the declaration.
+    Type Base;
 
-    /// \brief The index into the list of candidates, which specifies which
-    /// overload candidate this choice represents.
-    unsigned Index;
-
-    /// \brief The constraint system in which this overload choice was selected.
-    ConstraintSystem *Constraints;
+    /// \brief The declaration that we're referencing.
+    ValueDecl *Value;
 
     /// \brief Overload choices are always allocated within a given constraint
     /// system.
     void *operator new(size_t) = delete;
 
   public:
-    OverloadChoice(OverloadSetRefExpr *expr, unsigned index,
-                   ConstraintSystem *constraints)
-      : E(expr), Index(index), Constraints(constraints) { }
+    OverloadChoice(Type base, ValueDecl *value) : Base(base), Value(value) { }
 
-    /// \brief Retrieve the overloaded expression that this choice concerns.
-    OverloadSetRefExpr *getExpr() const { return E; }
-
-    /// \brief Retrieve the index into the overloaded expression that this
-    /// choice represents.
-    unsigned getIndex() const { return Index; }
+    /// \brief Retrieve the base type used to refer to the declaration.
+    Type getBaseType() const { return Base; }
 
     /// \brief Retrieve the declaraton that corresponds to this overload choice.
-    ValueDecl *getDecl() const { return E->getDecls()[Index]; }
-
-    /// \brief Retrieve the constraint system implied by this overload choice.
-    ConstraintSystem *getConstraints() const { return Constraints; }
-
-    void *operator new(size_t bytes, ConstraintSystem& cs,
-                       size_t alignment = alignof(Constraint)) {
-      return ::operator new (bytes, cs, alignment);
-    }
-
-    inline void operator delete(void *, const ConstraintSystem &cs, size_t) {}
+    ValueDecl *getDecl() const { return Value; }
   };
 
   /// \brief An overload set, which is a set of overloading choices from which
   /// only one can be selected.
   class OverloadSet {
+    /// \brief The expression or constraint that introduced the overload choice.
+    llvm::PointerUnion<Expr *, const Constraint *> ExprOrConstraint;
+
     /// \brief The number of choices in the overload set.
     unsigned NumChoices;
     
@@ -394,23 +377,29 @@ namespace {
     /// system.
     void *operator new(size_t) = delete;
 
-    OverloadSet(ArrayRef<OverloadChoice *> choices)
-      : NumChoices(choices.size())
+    OverloadSet(llvm::PointerUnion<Expr *, const Constraint *> from,
+                ArrayRef<OverloadChoice> choices)
+      : ExprOrConstraint(from), NumChoices(choices.size())
     {
-      memmove(this+1, choices.data(), sizeof(OverloadChoice *)*choices.size());
+      memmove(this+1, choices.data(), sizeof(OverloadChoice)*choices.size());
     }
 
   public:
     /// \brief Retrieve the set of choices provided by this overload set.
-    ArrayRef<OverloadChoice *> getChoices() const {
-      return { reinterpret_cast<OverloadChoice * const *>(this + 1),
+    ArrayRef<OverloadChoice> getChoices() const {
+      return { reinterpret_cast<const OverloadChoice *>(this + 1),
                NumChoices };
     }
 
     /// \brief Create a new overload set, using (and copying) the given choices.
+    static OverloadSet *getNew(ConstraintSystem &CS, Expr *expr,
+                               ArrayRef<OverloadChoice> choices);
+
+    /// \brief Create a new overload set, using (and copying) the given choices.
     static OverloadSet *getNew(ConstraintSystem &CS,
-                               ArrayRef<OverloadChoice *> choices);
-  };
+                               const Constraint *constraint,
+                               ArrayRef<OverloadChoice> choices);
+};
 
   /// \brief A representative type variable with the list of constraints
   /// that apply to it.
@@ -674,8 +663,7 @@ namespace {
     SolutionKind simplifyLiteralConstraint(Type type, LiteralKind kind);
 
     /// \brief Attempt to simplify the given member constraint.
-    SolutionKind simplifyMemberConstraint(Type baseTy, Identifier name,
-                                          bool isTypeMember, Type memberTy);
+    SolutionKind simplifyMemberConstraint(const Constraint &constraint);
 
     /// \brief Simplify the given constaint.
     SolutionKind simplifyConstraint(const Constraint &constraint);
@@ -725,12 +713,21 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
   return cs.getAllocator().Allocate(bytes, alignment);
 }
 
-OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
-                                 ArrayRef<OverloadChoice *> choices) {
+OverloadSet *OverloadSet::getNew(ConstraintSystem &CS, Expr *expr,
+                                 ArrayRef<OverloadChoice> choices) {
   unsigned size = sizeof(OverloadSet)
-                + sizeof(OverloadChoice *) * choices.size();
+                + sizeof(OverloadChoice) * choices.size();
   void *mem = CS.getAllocator().Allocate(size, alignof(OverloadSet));
-  return ::new (mem) OverloadSet(choices);
+  return ::new (mem) OverloadSet(expr, choices);
+}
+
+OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
+                                 const Constraint *constraint,
+                                 ArrayRef<OverloadChoice> choices) {
+  unsigned size = sizeof(OverloadSet)
+  + sizeof(OverloadChoice) * choices.size();
+  void *mem = CS.getAllocator().Allocate(size, alignof(OverloadSet));
+  return ::new (mem) OverloadSet(constraint, choices);
 }
 
 Type ConstraintSystem::openType(Type startingType) {
@@ -956,61 +953,36 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       llvm_unreachable("Already type-checked");
     }
 
-    Type visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) {
+    Type visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *expr) {
       // For a reference to an overloaded declaration, we create a type variable
-      // that will be equal to different types in different child constraint
-      // systems, one per overloaded declaration.
-      auto tv = CS.createTypeVariable(E);
-      ArrayRef<ValueDecl*> decls = E->getDecls();
-      SmallVector<OverloadChoice *, 4> choices;
+      // that will be equal to different types depending on which overload
+      // is selected.
+      auto tv = CS.createTypeVariable(expr);
+      ArrayRef<ValueDecl*> decls = expr->getDecls();
+      SmallVector<OverloadChoice, 4> choices;
       for (unsigned i = 0, n = decls.size(); i != n; ++i) {
-        // Create a new derived constraint system that captures the
-        // additional requirements introduced by selecting this particular
-        // overload.
-        auto derivedCS = CS.createDerivedConstraintSystem();
-        auto ovl = new (CS) OverloadChoice(E, i, derivedCS);
-        choices.push_back(ovl);
-
-        // Bind the type variable to the type of a reference to this declaration
-        // within the derived constraint system.
-        auto refTy = derivedCS->getTypeOfReference(decls[i]);
-        derivedCS->addConstraint(ConstraintKind::Equal, refTy, tv);
+        choices.push_back(OverloadChoice(Type(), decls[i]));
       }
 
       // Record this overload set.
-      CS.addOverloadSet(OverloadSet::getNew(CS, choices));
+      CS.addOverloadSet(OverloadSet::getNew(CS, expr, choices));
       return tv;
     }
 
-    Type visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *E) {
+    Type visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
       // For a reference to an overloaded declaration, we create a type variable
-      // that will be equal to different types in different child constraint
-      // systems, one per overloaded declaration.
-      // FIXME: Will this ever even happen? We'd need to resolve the 
-      // base expression to a type before we ever get an overlaoded
-      // member reference expression.
-      auto tv = CS.createTypeVariable(E);
-      ArrayRef<ValueDecl*> decls = E->getDecls();
-      SmallVector<OverloadChoice *, 4> choices;
-      auto baseTy = E->getBase()->getType();
+      // that will be equal to different types depending on which overload
+      // is selected.
+      auto tv = CS.createTypeVariable(expr);
+      ArrayRef<ValueDecl*> decls = expr->getDecls();
+      SmallVector<OverloadChoice, 4> choices;
+      auto baseTy = expr->getBase()->getType();
       for (unsigned i = 0, n = decls.size(); i != n; ++i) {
-        // Create a new derived constraint system that captures the
-        // additional requirements introduced by selecting this particular
-        // overload.
-        auto derivedCS = CS.createDerivedConstraintSystem();
-        auto ovl = new (CS) OverloadChoice(E, i, derivedCS);
-        choices.push_back(ovl);
-
-        auto decl = decls[i];
-
-        // Bind the type variable to the type of a reference to this member
-        // within the derived constraint system.
-        auto refTy = derivedCS->getTypeOfMemberReference(baseTy, decl, false);
-        derivedCS->addConstraint(ConstraintKind::Equal, refTy, tv);
+        choices.push_back(OverloadChoice(baseTy, decls[i]));
       }
       
       // Record this overload set.
-      CS.addOverloadSet(OverloadSet::getNew(CS, choices));
+      CS.addOverloadSet(OverloadSet::getNew(CS, expr, choices));
       return tv;
     }
 
@@ -1734,10 +1706,10 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind) {
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyMemberConstraint(Type baseTy, Identifier name,
-                                           bool isTypeMember, Type memberTy) {
+ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
+  Type baseTy = constraint.getFirstType();
   if (auto tv = baseTy->getAs<TypeVariableType>()) {
     auto fixed = getFixedType(tv);
     if (!fixed)
@@ -1749,6 +1721,8 @@ ConstraintSystem::simplifyMemberConstraint(Type baseTy, Identifier name,
 
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
+  Identifier name = constraint.getMember();
+  Type memberTy = constraint.getSecondType();
   if (auto baseTuple = baseTy->getRValueType()->getAs<TupleType>()) {
     StringRef nameStr = name.str();
     int fieldIdx = -1;
@@ -1800,6 +1774,7 @@ ConstraintSystem::simplifyMemberConstraint(Type baseTy, Identifier name,
 
   // If we only have a single result, compute the type of a reference to
   // that declaration and equate it with the member type.
+  bool isTypeMember = constraint.getKind() == ConstraintKind::TypeMember;
   if (lookup.Results.size() == 1) {
     if (isTypeMember && !isa<TypeDecl>(lookup.Results[0].D))
       return SolutionKind::Error;
@@ -1810,9 +1785,13 @@ ConstraintSystem::simplifyMemberConstraint(Type baseTy, Identifier name,
     return SolutionKind::Solved;
   }
 
-  // We have multiple results.
-  // FIXME: Implement this.
-  llvm_unreachable("Overloaded member lookup results");
+  // We have multiple results. Introduce a new overload set.
+  SmallVector<OverloadChoice, 4> choices;
+  for (auto &result : lookup.Results) {
+    choices.push_back(OverloadChoice(baseTy, result.D));
+  }
+  addOverloadSet(OverloadSet::getNew(*this, &constraint, choices));
+  return SolutionKind::Solved;
 }
 
 /// \brief Retrieve the type-matching kind corresponding to the given
@@ -1852,13 +1831,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                      constraint.getLiteralKind());
 
   case ConstraintKind::ValueMember:
-  case ConstraintKind::TypeMember: {
-    bool isTypeMember = constraint.getKind() == ConstraintKind::TypeMember;
-    return simplifyMemberConstraint(constraint.getFirstType(),
-                                    constraint.getMember(),
-                                    isTypeMember,
-                                    constraint.getSecondType());
-  }
+  case ConstraintKind::TypeMember:
+    return simplifyMemberConstraint(constraint);
   }
 }
 
@@ -2165,7 +2139,7 @@ bool ConstraintSystem::simplify() {
     firstLoop = false;
   } while (solvedAny);
 
-  // We've solved all of the constraints we can.
+  // We've simplified all of the constraints we can.
   return false;
 }
 
@@ -2201,8 +2175,8 @@ void ConstraintSystem::dump() {
 void TypeChecker::dumpConstraints(Expr *expr) {
   ConstraintSystem CS(*this);
   llvm::errs() << "---Initial constraints for the given expression---\n";
-  expr->dump();
   CS.generateConstraints(expr);
+  expr->dump();
   llvm::errs() << "\n";
   CS.dump();
   llvm::errs() << "---Simplified constraints---\n";
