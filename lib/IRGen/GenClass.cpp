@@ -227,13 +227,14 @@ static llvm::Function *createSizeFn(IRGenModule &IGM,
 }
 
 namespace {
-  /// A CRTP class for laying out class metadata.
+  enum { NumStandardMetadataFields = 2 };
+
+  /// A CRTP class for laying out class metadata.  Note that this does
+  /// *not* handle the metadata template stuff.
   template <class Impl> class MetadataLayout {
     Impl &asImpl() { return *static_cast<Impl*>(this); }
 
   protected:
-    enum { NumStandardMetadataFields = 2 };
-
     IRGenModule &IGM;
 
     /// The most-derived class.
@@ -249,16 +250,17 @@ namespace {
       asImpl().addSizeFunction();
 
       // Class-specific fields.
-      addClassFields(TargetClass);
+      asImpl().addClassFields(TargetClass);
     }
 
-  private:
+  protected:
+    /// Add fields associated with the given class and its bases.
     void addClassFields(ClassDecl *theClass) {
       // TODO: base class
 
       // TODO: virtual methods
 
-      if (auto generics = theClass->getGenericParams()) {
+      if (auto generics = theClass->getGenericParamsOfContext()) {
         addGenericClassFields(theClass, *generics);
       }
     }
@@ -281,21 +283,27 @@ namespace {
     }
   };
 
-  class MetadataBuilder : public MetadataLayout<MetadataBuilder> {
-    SmallVector<llvm::Constant*, 8> Fields;
-    const HeapLayout &Layout;
+  template <class Impl>
+  class MetadataBuilderBase : public MetadataLayout<Impl> {
+    typedef MetadataLayout<Impl> super;
+
+  protected:
+    SmallVector<llvm::Constant *, 8> Fields;
+    const HeapLayout &Layout;    
+
+    MetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
+                        const HeapLayout &layout)
+      : super(IGM, theClass), Layout(layout) {}
+
+    unsigned getNextIndex() const { return Fields.size(); }
 
   public:
-    MetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                    const HeapLayout &layout)
-      : MetadataLayout(IGM, theClass), Layout(layout) {}
-
     void addDestructorFunction() {
-      Fields.push_back(IGM.getAddrOfDestructor(TargetClass));
+      Fields.push_back(this->IGM.getAddrOfDestructor(this->TargetClass));
     }
 
     void addSizeFunction() {
-      Fields.push_back(createSizeFn(IGM, Layout));
+      Fields.push_back(createSizeFn(this->IGM, Layout));
     }
 
     void beginGenerics(ClassDecl *theClass, const GenericParamList &generics) {}
@@ -307,10 +315,147 @@ namespace {
 
     llvm::Constant *getInit() {
       if (Fields.size() == NumStandardMetadataFields) {
+        return llvm::ConstantStruct::get(this->IGM.HeapMetadataStructTy,
+                                         Fields);
+      } else {
+        return llvm::ConstantStruct::getAnon(Fields);
+      }
+    }
+  };
+
+  class MetadataBuilder : public MetadataBuilderBase<MetadataBuilder> {
+  public:
+    MetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
+                    const HeapLayout &layout)
+      : MetadataBuilderBase(IGM, theClass, layout) {}
+
+    llvm::Constant *getInit() {
+      if (Fields.size() == NumStandardMetadataFields) {
         return llvm::ConstantStruct::get(IGM.HeapMetadataStructTy, Fields);
       } else {
         return llvm::ConstantStruct::getAnon(Fields);
       }
+    }
+  };
+
+  /// A builder for metadata templates.
+  class MetadataTemplateBuilder :
+    public MetadataBuilderBase<MetadataTemplateBuilder> {
+
+    typedef MetadataBuilderBase super;
+
+    /// The generics clause for the type we're emitting.
+    const GenericParamList &ClassGenerics;
+    
+    /// The number of generic witnesses in the type we're emitting.
+    /// This is not really something we need to track.
+    unsigned NumGenericWitnesses = 0;
+
+    struct FillOp {
+      unsigned FromIndex;
+      unsigned ToIndex;
+
+      FillOp() = default;
+      FillOp(unsigned from, unsigned to) : FromIndex(from), ToIndex(to) {}
+    };
+
+    SmallVector<FillOp, 8> FillOps;
+
+    enum { TemplateHeaderFieldCount = 5 };
+
+  public:
+    MetadataTemplateBuilder(IRGenModule &IGM, ClassDecl *theClass,
+                            const HeapLayout &layout,
+                            const GenericParamList &classGenerics)
+      : super(IGM, theClass, layout), ClassGenerics(classGenerics) {}
+
+    void layout() {
+      // Leave room for the header.
+      Fields.append(TemplateHeaderFieldCount, nullptr);
+
+      // Lay out the template data.
+      super::layout();
+
+      // Fill in the header:
+
+      //   uint32_t NumArguments;
+
+      // TODO: ultimately, this should be the number of actual template
+      // arguments, not the number of value witness tables required.
+      Fields[0] = llvm::ConstantInt::get(IGM.Int32Ty, NumGenericWitnesses);
+
+      //   uint32_t NumFillOps;
+      Fields[1] = llvm::ConstantInt::get(IGM.Int32Ty, FillOps.size());
+
+      //   size_t MetadataSize;
+      // We compute this assuming that every entry in the metadata table
+      // is a pointer.
+      Size size = getNextIndex() * IGM.getPointerSize();
+      Fields[2] = llvm::ConstantInt::get(IGM.SizeTy, size.getValue());
+
+      //   void *PrivateData[8];
+      Fields[3] = getPrivateDataInit();
+
+      //   struct SwiftGenericHeapMetadataFillOp FillOps[NumArguments];
+      Fields[4] = getFillOpsInit();
+
+      assert(TemplateHeaderFieldCount == 5);
+    }
+
+    /// Ignore the preallocated header.
+    unsigned getNextIndex() const {
+      return super::getNextIndex() - TemplateHeaderFieldCount;
+    }
+
+    /// The algorithm we use here is really wrong: we're treating all
+    /// the witness tables as if they were arguments, then just
+    /// copying them in-place.
+    void addGenericWitness(llvm::Type *witnessTy) {
+      assert(witnessTy->isPointerTy());
+      FillOps.push_back(FillOp(NumGenericWitnesses++, getNextIndex()));
+      super::addGenericWitness(witnessTy);
+    }
+
+  private:
+    static llvm::Constant *makeArray(llvm::Type *eltTy,
+                                     ArrayRef<llvm::Constant*> elts) {
+      auto arrayTy = llvm::ArrayType::get(eltTy, elts.size());
+      return llvm::ConstantArray::get(arrayTy, elts);
+    }
+
+    /// Produce the initializer for the private-data field of the
+    /// template header.
+    llvm::Constant *getPrivateDataInit() {
+      // Spec'ed to be 8 pointers wide.  An arbitrary choice; should
+      // work out an ideal size with the runtime folks.
+      auto null = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+      
+      llvm::Constant *privateData[8] = {
+        null, null, null, null, null, null, null, null
+      };
+      return makeArray(IGM.Int8PtrTy, privateData);
+    }
+
+    llvm::Constant *getFillOpsInit() {
+      // Construct the type of individual operations.
+      llvm::Type *opMemberTys[] = { IGM.Int32Ty, IGM.Int32Ty };
+      auto fillOpTy =
+        llvm::StructType::get(IGM.getLLVMContext(), opMemberTys, false);
+
+      // Build the array of fill-ops.
+      SmallVector<llvm::Constant*, 4> fillOps(FillOps.size());
+      for (size_t i = 0, e = FillOps.size(); i != e; ++i) {
+        fillOps[i] = getFillOpInit(FillOps[i], fillOpTy);
+      }
+      return makeArray(fillOpTy, fillOps);
+    }
+
+    llvm::Constant *getFillOpInit(const FillOp &op, llvm::StructType *opTy) {
+      llvm::Constant *members[] = {
+        llvm::ConstantInt::get(IGM.Int32Ty, op.FromIndex),
+        llvm::ConstantInt::get(IGM.Int32Ty, op.ToIndex)
+      };
+      return llvm::ConstantStruct::get(opTy, members);
     }
   };
 }
@@ -321,9 +466,17 @@ void IRGenModule::emitClassMetadata(ClassDecl *classDecl) {
   auto &classTI = Types.getFragileTypeInfo(classDecl).as<ClassTypeInfo>();
   auto &layout = classTI.getLayout(*this);
 
-  MetadataBuilder builder(*this, classDecl, layout);
-  builder.layout();
-  llvm::Constant *init = builder.getInit();
+  // TODO: classes nested within generic types
+  llvm::Constant *init;
+  if (auto *generics = classDecl->getGenericParamsOfContext()) {
+    MetadataTemplateBuilder builder(*this, classDecl, layout, *generics);
+    builder.layout();
+    init = builder.getInit();
+  } else {
+    MetadataBuilder builder(*this, classDecl, layout);
+    builder.layout();
+    init = builder.getInit();
+  }
 
   auto var = cast<llvm::GlobalVariable>(
                          getAddrOfClassMetadata(classDecl, init->getType()));
@@ -332,9 +485,9 @@ void IRGenModule::emitClassMetadata(ClassDecl *classDecl) {
 }
 
 /// Returns a metadata reference for a constructor.
-static llvm::Constant *getClassMetadataForConstructor(IRGenFunction &IGF,
-                                                      ConstructorDecl *ctor,
-                                                      ClassDecl *theClass) {
+static llvm::Value *getClassMetadataForConstructor(IRGenFunction &IGF,
+                                                   ConstructorDecl *ctor,
+                                                   ClassDecl *theClass) {
   // Grab a reference to the metadata or metadata template.
   auto metadata = IGF.IGM.getAddrOfClassMetadata(theClass);
   assert(metadata->getType() == IGF.IGM.HeapMetadataPtrTy);
@@ -342,14 +495,65 @@ static llvm::Constant *getClassMetadataForConstructor(IRGenFunction &IGF,
   // If we don't have generic parameters, that's all we need.
   // TODO: fragility might force us to indirect this, and startup
   // performance might force us to do a lazy check.
-  if (!theClass->getGenericParams()) {
+  auto classGenerics = theClass->getGenericParamsOfContext();
+  if (!classGenerics) {
     return metadata;
   }
 
   // Okay, we need to call swift_getGenericMetadata.
-  // Construct our metadata plug-in.
-  // TODO
-  return metadata;
+
+  // Grab the substitutions.
+#if 0
+  CanType thisTy = ctor->getImplicitThisDecl()->getType()->getCanonicalType();
+  auto boundGeneric = cast<BoundGenericType>(thisTy);
+  assert(boundGeneric->getDecl() == theClass);
+  auto subs = boundGeneric->getSubstitutions();
+  // HAHA, there are no substitutions here, you fool.
+#else
+  // Just assume that the archetypes are identical on the
+  // current context.
+  auto &ctorGenerics =
+    cast<PolymorphicFunctionType>(ctor->getType())->getGenericParams();
+  unsigned numArchetypes = ctorGenerics.getAllArchetypes().size();
+  assert(numArchetypes == classGenerics->getAllArchetypes().size());
+  SmallVector<Substitution, 4> subs;
+  for (unsigned i = 0; i != numArchetypes; ++i) {
+    Substitution sub;
+    sub.Archetype = classGenerics->getAllArchetypes()[i];
+    sub.Replacement = ctorGenerics.getAllArchetypes()[i];
+    // conformances not required
+    subs.push_back(sub);
+  }
+#endif
+
+  // Compile all the generic arguments we need.
+  Explosion genericArgs(ExplosionKind::Maximal);
+  emitPolymorphicArguments(IGF, *classGenerics, subs, genericArgs);
+
+  // Slam that information directly into the generic arguments buffer.
+  // TODO: sort actual arguments to the front.
+  auto wtableArrayTy = llvm::ArrayType::get(IGF.IGM.WitnessTablePtrTy,
+                                            genericArgs.size());
+  Address argumentsBuffer = IGF.createAlloca(wtableArrayTy,
+                                             IGF.IGM.getPointerAlignment(),
+                                             "generic.arguments");
+  for (unsigned i = 0, e = genericArgs.size(); i != e; ++i) {
+    Address elt = IGF.Builder.CreateStructGEP(argumentsBuffer, i,
+                                              IGF.IGM.getPointerSize() * i);
+    IGF.Builder.CreateStore(genericArgs.claimUnmanagedNext(), elt);
+  }
+
+  // Cast to void*.
+  llvm::Value *arguments =
+    IGF.Builder.CreateBitCast(argumentsBuffer.getAddress(),
+                              IGF.IGM.Int8PtrTy);
+
+  // Make the call.
+  auto result = IGF.Builder.CreateCall2(IGF.IGM.getGetGenericMetadataFn(),
+                                        metadata, arguments);
+  result->setDoesNotThrow();
+
+  return result;
 }
 
 static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {

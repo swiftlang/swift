@@ -166,6 +166,8 @@ public:
   llvm::Constant *getObjCRetainFn();
   llvm::Constant *getObjCReleaseFn();
 
+  llvm::Constant *getGetGenericMetadataFn();
+
 private:
   llvm::Function *MemCpyFn;
   llvm::Constant *AllocObjectFn;
@@ -178,6 +180,7 @@ private:
   llvm::Constant *RawDeallocFn;
   llvm::Constant *SlowAllocFn;
   llvm::Constant *SlowRawDeallocFn;
+  llvm::Constant *GetGenericMetadataFn = nullptr;
 
 //--- Generic ---------------------------------------------------------------
 public:

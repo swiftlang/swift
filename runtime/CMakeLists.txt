@@ -25,6 +25,7 @@ set(SHARED_LIBRARY ON)
 add_swift_library(swift_runtime
   FastEntryPoints.s
   Alloc.cpp
+  Metadata.cpp
   Stubs.cpp
   ObjCBridge.mm
   ${CMAKE_BINARY_DIR}/lib/swift.swift)
