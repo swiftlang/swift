@@ -25,7 +25,8 @@ class CFGPrintContext {
   typedef llvm::DenseMap<const BasicBlock *, unsigned> BlocksToIdsTy;
   llvm::OwningPtr<BlocksToIdsTy> BlocksToIDs;
 public:
-  raw_ostream &printID(raw_ostream &OS, const Instruction *I);
+  raw_ostream &printID(raw_ostream &OS, const Instruction *I,
+                       bool includeBBPrefix = true);
   raw_ostream &printID(raw_ostream &OS, const BasicBlock *B);
   raw_ostream &printID(raw_ostream &OS, const BasicBlockArg *BBarg);
   raw_ostream &printID(raw_ostream &OS, const CFGValue &V);
@@ -50,12 +51,13 @@ raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
   auto I = Map.find(Block);
   assert(I != Map.end());
 
-  OS << "BB" << I->second;
+  OS << "b" << I->second;
   return OS;
 }
 
 raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
-                                      const Instruction *Inst)
+                                      const Instruction *Inst,
+                                      bool includeBBPrefix)
 {
   BasicBlock *Block = Inst->basicBlock;
   unsigned count = 1;
@@ -65,7 +67,11 @@ raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
     ++count;
   }
   OS << '%';
-  printID(OS, Block) << '.' << count;
+  if (includeBBPrefix) {
+    printID(OS, Block);
+    OS << '.';
+  }
+  OS << "i" << count;
   return OS;
 }
 
@@ -94,7 +100,7 @@ void Instruction::print(raw_ostream &OS,
                         CFGPrintContext &PC,
                         unsigned Indent) const {
   OS.indent(Indent);
-  PC.printID(OS, this) << " = ";
+  PC.printID(OS, this, false) << " = ";
 
   switch (kind) {
     case Invalid:
@@ -122,13 +128,14 @@ void Instruction::print(raw_ostream &OS,
     }
     case CondBranch: {
       const CondBranchInst &BI = *cast<CondBranchInst>(this);
-      //      OS << "cond_br(cond=";
+      OS << "cond_br(cond=";
+      OS << "?";
       //      PC.printID(OS, BI.condition);
       OS << ",branches=(";
       PC.printID(OS,BI.branches()[0]);
       OS << ',';
       PC.printID(OS,BI.branches()[1]);
-      OS << "))\n";
+      OS << "))";
       break;
     }
     case DeclRef: {
@@ -179,7 +186,8 @@ void Instruction::print(raw_ostream &OS,
     }
     case UncondBranch: {
       const UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
-      OS << "br " << UBI.targetBlock();
+      OS << "br ";
+      PC.printID(OS, &UBI.targetBlock());
       const UncondBranchInst::ArgsTy Args = UBI.blockArgs();
       if (!Args.empty()) {
         OS << '(';
