@@ -301,6 +301,7 @@ public:
       // generic parameters from outer scopes), we can canonicalize our type.
       OOD->overwriteType(OOD->getType()->getCanonicalType());
       OOD->overwriteDeclaredType(OOD->getDeclaredType()->getCanonicalType());
+      TC.validateTypeSimple(OOD->getDeclaredTypeInContext());
     }
     
     for (Decl *member : OOD->getMembers())
@@ -325,6 +326,7 @@ public:
       // generic parameters from outer scopes), we can canonicalize our type.
       SD->overwriteType(SD->getType()->getCanonicalType());
       SD->overwriteDeclaredType(SD->getDeclaredType()->getCanonicalType());
+      TC.validateTypeSimple(SD->getDeclaredTypeInContext());
     }
 
     ConstructorDecl *ValueCD = cast<ConstructorDecl>(SD->getMembers().back());
@@ -379,6 +381,7 @@ public:
       // generic parameters from outer scopes), we can canonicalize our type.
       CD->overwriteType(CD->getType()->getCanonicalType());
       CD->overwriteDeclaredType(CD->getDeclaredType()->getCanonicalType());
+      TC.validateTypeSimple(CD->getDeclaredTypeInContext());
     }
 
     for (Decl *Member : CD->getMembers())
@@ -444,6 +447,7 @@ public:
     // Before anything else, set up the 'this' argument correctly.
     GenericParamList *outerGenericParams = nullptr;
     if (Type thisType = FD->computeThisType(&outerGenericParams)) {
+      TC.validateTypeSimple(thisType);
       TypedPattern *thisPattern =
         cast<TypedPattern>(body->getParamPatterns()[0]);
       if (thisPattern->hasType()) {
@@ -543,6 +547,7 @@ public:
 
     GenericParamList *outerGenericParams = nullptr;
     Type ThisTy = CD->computeThisType(&outerGenericParams);
+    TC.validateTypeSimple(ThisTy);
     CD->getImplicitThisDecl()->setType(ThisTy);
 
     if (auto gp = CD->getGenericParams()) {
@@ -585,6 +590,7 @@ public:
 
     GenericParamList *outerGenericParams = nullptr;
     Type ThisTy = DD->computeThisType(&outerGenericParams);
+    TC.validateTypeSimple(ThisTy);
     Type FnTy;
     if (outerGenericParams)
       FnTy = PolymorphicFunctionType::get(ThisTy,

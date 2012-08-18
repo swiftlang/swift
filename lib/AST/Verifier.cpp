@@ -143,7 +143,7 @@ namespace {
       // verifyChecked implementations.
       if (TU->ASTStage >= TranslationUnit::TypeChecked && !HadError) {
         verifyChecked(node);
-        // checkBoundGenericTypes(node);
+        checkBoundGenericTypes(node);
       }
 
       // Always continue.

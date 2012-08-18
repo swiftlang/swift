@@ -74,8 +74,11 @@ class TypeBase {
   struct TypeBaseBits {
     /// Unresolved - Whether this type is unresolved.
     unsigned Unresolved : 1;
+
+    /// \brief What pass # has been applied to this type.
+    unsigned ValidatedToPass : 2;
   };
-  static const unsigned NumTypeBaseBits = 1;
+  static const unsigned NumTypeBaseBits = 3;
   
   union {
     TypeBaseBits TypeBase;
@@ -89,6 +92,7 @@ protected:
       CanonicalType = CanTypeCtx;
     
     setUnresolved(Unresolved);
+    TypeBits.TypeBase.ValidatedToPass = 0;
   }
 
   /// \brief Mark this type as unresolved.
@@ -181,6 +185,13 @@ public:
   /// For example, the types Vector<Int> and Vector<Int>.Element are both
   /// specialized, but the type Vector is not.
   bool isSpecialized();
+
+  /// \brief The last type-checking pass that has been run to validate this
+  /// type.
+  unsigned getValidated() const { return TypeBits.TypeBase.ValidatedToPass; }
+
+  /// \brief Mark this type as having been validated already to the given pass.
+  void setValidated(unsigned Pass) { TypeBits.TypeBase.ValidatedToPass = Pass; }
 
   /// getUnlabeledType - Retrieve a version of this type with all labels
   /// removed at every level. For example, given a tuple type 

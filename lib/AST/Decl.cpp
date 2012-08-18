@@ -52,7 +52,7 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   }
 }
 
-Type DeclContext::getDeclaredTypeInContext() const {
+Type DeclContext::getDeclaredTypeInContext() {
   switch (getContextKind()) {
     case DeclContextKind::BuiltinModule:
     case DeclContextKind::CapturingExpr:
@@ -339,7 +339,10 @@ Type TypeDecl::getDeclaredType() const {
   return cast<NominalTypeDecl>(this)->getDeclaredType();
 }
 
-Type NominalTypeDecl::getDeclaredTypeInContext() const {
+Type NominalTypeDecl::getDeclaredTypeInContext() {
+  if (DeclaredTyInContext)
+    return DeclaredTyInContext;
+  
   Type Ty = getDeclaredType();
   if (UnboundGenericType *UGT = Ty->getAs<UnboundGenericType>()) {
     // If we have an unbound generic type, bind the type to the archetypes
@@ -351,7 +354,8 @@ Type NominalTypeDecl::getDeclaredTypeInContext() const {
     Ty = BoundGenericType::get(D, getDeclContext()->getDeclaredTypeInContext(),
                                GenericArgs);
   }
-  return Ty;
+  DeclaredTyInContext = Ty;
+  return DeclaredTyInContext;
 }
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
@@ -582,10 +586,7 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
     // If we have an unbound generic type, bind the type to the archetypes
     // in the type's definition.
     NominalTypeDecl *D = UGT->getDecl();
-    SmallVector<Type, 4> GenericArgs;
-    for (auto Param : *D->getGenericParams())
-      GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
-    ContainerType = BoundGenericType::get(D, UGT->getParent(), GenericArgs);
+    ContainerType = getDeclContext()->getDeclaredTypeInContext();
 
     if (OuterGenericParams)
       *OuterGenericParams = D->getGenericParams();
@@ -660,10 +661,7 @@ ConstructorDecl::computeThisType(GenericParamList **OuterGenericParams) const {
     // If we have an unbound generic type, bind the type to the archetypes
     // in the type's definition.
     NominalTypeDecl *D = UGT->getDecl();
-    SmallVector<Type, 4> GenericArgs;
-    for (auto Param : *D->getGenericParams())
-      GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
-    ContainerType = BoundGenericType::get(D, UGT->getParent(), GenericArgs);
+    ContainerType = getDeclContext()->getDeclaredTypeInContext();
 
     if (OuterGenericParams)
       *OuterGenericParams = D->getGenericParams();
@@ -688,10 +686,7 @@ DestructorDecl::computeThisType(GenericParamList **OuterGenericParams) const {
     // If we have an unbound generic type, bind the type to the archetypes
     // in the type's definition.
     NominalTypeDecl *D = UGT->getDecl();
-    SmallVector<Type, 4> GenericArgs;
-    for (auto Param : *D->getGenericParams())
-      GenericArgs.push_back(Param.getAsTypeParam()->getDeclaredType());
-    ContainerType = BoundGenericType::get(D, UGT->getParent(), GenericArgs);
+    ContainerType = getDeclContext()->getDeclaredTypeInContext();
 
     if (OuterGenericParams)
       *OuterGenericParams = D->getGenericParams();

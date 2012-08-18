@@ -200,6 +200,7 @@ TypeChecker::checkPolymorphicApply(PolymorphicFunctionType *PolyFn,
   Type SubstFunctionTy = substType(FunctionTy, CC.Substitutions);
   if (!SubstFunctionTy)
     return OverloadCandidate();
+  validateTypeSimple(SubstFunctionTy);
 
   FunctionTy = SubstFunctionTy->castTo<AnyFunctionType>();
 
@@ -318,6 +319,7 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
   }
 
 
+  validateTypeSimple(SrcTy);
   OverloadCandidate::SubstitutionInfoType SubstitutionInfo
     = { std::move(LocalCC.Substitutions), std::move(LocalCC.Conformance) };
   return OverloadCandidate(nullptr, SrcTy, std::move(SubstitutionInfo));
@@ -377,6 +379,7 @@ Type TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
     T = FunctionType::get(polyFn->getInput(), polyFn->getResult(), Context);
   }
 
+  validateTypeSimple(T);
   return T;
 }
 
@@ -577,6 +580,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     FunctionTy = FunctionType::get(FunctionTy->getInput(),
                                    FunctionTy->getResult(),
                                    Context);
+    validateTypeSimple(FunctionTy);
 
     if (!operatorDeducibleParams.empty()) {
       // For an operator found in a protocol, use the type inferred for 'This'
@@ -707,6 +711,9 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
       EffectiveDestTy = substType(EffectiveDestTy, GlobalCC.Substitutions);
       if (!EffectiveDestTy)
         continue;
+
+      validateTypeSimple(SrcTy);
+      validateTypeSimple(EffectiveDestTy);
     }
 
     if (DestLV) {

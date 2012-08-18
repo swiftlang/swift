@@ -305,6 +305,17 @@ public:
 
   bool validateType(TypeLoc &Loc, bool isFirstPass);
 
+  /// \brief Validate the given type, which has no location information
+  /// and shall not fail.
+  /// FIXME: This concept seems a bit broken.
+  void validateTypeSimple(Type T) {
+    TypeLoc TL(T, SourceRange());
+    bool result = validateType(TL, false);
+    assert((!result || Context.Diags.hadAnyError()) &&
+           "Validation cannot fail in well-formed code!");
+    (void)result;
+  }
+
   /// \brief Transform the given type by applying the given function to
   /// each type node. If the function returns null, the transformation aborts.
   /// If it leaves the given type unchanged, then the transformation will be

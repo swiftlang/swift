@@ -2243,6 +2243,7 @@ CoercedExpr TypeChecker::coerceToType(Expr *E, Type DestTy, CoercionKind Kind,
 
     // Substitute the deduced arguments into the type.
     DestTy = substType(DestTy, CC->Substitutions);
+    validateTypeSimple(DestTy);
     if (!DestTy)
       return CoercedExpr(*this, CoercionResult::Failed, E, DestTy);
   }
@@ -2296,6 +2297,8 @@ CoercionResult TypeChecker::isCoercibleToType(Expr *E, Type Ty,
     Ty = substType(Ty, CC->Substitutions);
     if (!Ty)
       return CoercionResult::Failed;
+
+    validateTypeSimple(Ty);
   }
 
   // If we've completed our substitutions, finalize them by gathering

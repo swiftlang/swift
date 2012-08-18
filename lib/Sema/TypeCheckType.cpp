@@ -73,6 +73,7 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
   if (sliceTy->hasCanonicalTypeComputed()) return sliceTy;
   if (buildArraySliceType(*this, sliceTy, loc)) return Type();
   sliceTy->getCanonicalType();
+  validateTypeSimple(sliceTy->getImplementationType());
   return sliceTy;
 }
 
@@ -117,11 +118,25 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
   TypeBase *T = InTy.getPointer();
   // FIXME: Verify that these aren't circular and infinite size.
   
-  // If a type has a canonical type, then it is known safe.
-  if (T->hasCanonicalTypeComputed()) return false;
+  // If we've already validated this type, don't do so again.
+  unsigned pass = isFirstPass? 1 : 2;
+  if (T->getValidated() >= pass) return false;
+
+  // \brief RAII object that sets the validation pass on the type when it
+  // goes out of scope.
+  class SetValidation {
+    Type T;
+    unsigned Pass;
+
+  public:
+    SetValidation(Type T, unsigned Pass) : T(T), Pass(Pass) { }
+    ~SetValidation() {
+      if (Pass > T->getValidated())
+        T->setValidated(Pass);
+    }
+  } setValidation(T, pass);
 
   bool IsInvalid = false;
-  
   switch (T->getKind()) {
   case TypeKind::Error:
     // Error already diagnosed.
@@ -142,11 +157,16 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
       
   case TypeKind::Module:
   case TypeKind::Protocol:
-  case TypeKind::Substituted:
   case TypeKind::DeducibleGenericParam:
   case TypeKind::TypeVariable:
     // Nothing to validate.
     break;
+
+  case TypeKind::Substituted: {
+    TypeLoc TL(cast<SubstitutedType>(T)->getReplacementType(),
+               Loc.getSourceRange());
+    return validateType(TL, isFirstPass);
+  }
 
   case TypeKind::NameAlias: {
     TypeAliasDecl *D = cast<NameAliasType>(T)->getDecl();
@@ -298,8 +318,9 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
         if (Ty) {
           // FIXME: Refactor this to avoid fake TypeLoc
           TypeLoc TempLoc{ Ty, Loc.getSourceRange() };
-          if (validateType(TempLoc, isFirstPass))
+          if (validateType(TempLoc, isFirstPass)) {
             return true;
+          }
 
           if (BaseTy)
             Ty = substMemberTypeWithBase(Ty, TD, BaseTy);
@@ -434,8 +455,9 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     TypeLoc TempLoc{ AT->getBaseType(), Loc.getSourceRange() };
     IsInvalid = validateType(TempLoc, isFirstPass);
     // FIXME: diagnose non-materializability of element type?
-    if (!IsInvalid)
+    if (!IsInvalid && !AT->hasImplementationType()) {
       IsInvalid = buildArraySliceType(*this, AT, Loc.getSourceRange().Start);
+    }
     break;
   }
       
@@ -509,12 +531,6 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
   if (IsInvalid)
     return true;
 
-  // Now that we decided that this type is ok, get the canonical type for it so
-  // that we never reanalyze it again.
-  // If it is ever a performance win to avoid computing canonical types, we can
-  // just keep a SmallPtrSet of analyzed Types in TypeChecker.
-  InTy->getCanonicalType();
-  
   // FIXME: This isn't good enough: top-level stuff can have these as well and
   // their types need to be resolved at the end of name binding.  Perhaps we
   // should require them to have explicit types even if they have values and 
@@ -892,7 +908,9 @@ Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
       Substitutions[ParamTy->castTo<ArchetypeType>()] = Args[i];
     }
 
-    return substType(T, Substitutions);
+    T = substType(T, Substitutions);
+    validateTypeSimple(T);
+    return T;
   }
 
   auto BaseArchetype = BaseTy->getRValueType()->getAs<ArchetypeType>();
@@ -909,5 +927,7 @@ Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
   TypeSubstitutionMap Substitutions;
   Substitutions[ThisDecl->getDeclaredType()->castTo<ArchetypeType>()]
     = BaseArchetype;
-  return substType(T, Substitutions);
+  T = substType(T, Substitutions);
+  validateTypeSimple(T);
+  return T;
 }

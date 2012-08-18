@@ -290,6 +290,7 @@ Expr *TypeChecker::semaSubscriptExpr(ExistentialSubscriptExpr *E) {
   Type SubstIndexType = substType(IndexType, Substitutions);
   if (!SubstIndexType)
     return nullptr;
+  validateTypeSimple(SubstIndexType);
 
   // FIXME: For now, we don't allow any associated types to show up. We
   // may relax this restriction later.
@@ -321,7 +322,8 @@ Expr *TypeChecker::semaSubscriptExpr(ExistentialSubscriptExpr *E) {
     E->setType(ErrorType::get(Context));
     return nullptr;
   }
-  
+  validateTypeSimple(SubstValueType);
+
   // FIXME: For now, we don't allow any associated types to show up. We
   // may relax this restriction later.
   if (!SubstValueType->isEqual(ValueType)) {
@@ -810,6 +812,7 @@ public:
 
     // FIXME: For now, we don't allow any associated types to show up. We
     // may relax this restriction later.
+    TC.validateTypeSimple(SubstMemberTy);
     if (!SubstMemberTy->isEqual(MemberTy)) {
       TC.diagnose(E->getDotLoc(), diag::existential_member_assoc_types,
                   E->getDecl()->getName(), Proto->getDeclaredType(),

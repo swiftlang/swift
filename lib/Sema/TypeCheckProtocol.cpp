@@ -254,6 +254,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     // in the witnesses we've collected for our archetypes.
     Type RequiredTy = TC.substType(getInstanceUsageType(Requirement,TC.Context),
                                    TypeMapping)->getUnlabeledType(TC.Context);
+    TC.validateTypeSimple(RequiredTy);
+
     if (Requirement->getName().isOperator()) {
       // Operator lookup is always global.
       UnqualifiedLookup Lookup(Requirement->getName(), &TC.TU);
@@ -522,6 +524,8 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
         }
       }
     }
+
+    validateTypeSimple(T);
 
     // Add any nested archetypes to the archetype stack.
     for (auto Nested : archetype->getNestedTypes()) {

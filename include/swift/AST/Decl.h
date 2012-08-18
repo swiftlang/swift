@@ -774,6 +774,7 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
 
 protected:
   Type DeclaredTy;
+  Type DeclaredTyInContext;
   
 public:
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
@@ -795,9 +796,11 @@ public:
   /// getDeclaredType - Retrieve the type declared by this entity.
   Type getDeclaredType() const { return DeclaredTy; }
 
-  void overwriteDeclaredType(Type DT) { DeclaredTy = DT; }
-
-  Type getDeclaredTypeInContext() const;
+  Type getDeclaredTypeInContext();
+  
+  void overwriteDeclaredType(Type DT) {
+    DeclaredTy = DT;
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
