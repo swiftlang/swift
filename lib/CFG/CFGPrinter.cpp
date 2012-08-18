@@ -197,7 +197,7 @@ void Instruction::print(raw_ostream &OS,
     case UncondBranch: {
       const UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
       OS << "br ";
-      PC.printID(OS, &UBI.targetBlock());
+      PC.printID(OS, UBI.targetBlock());
       const UncondBranchInst::ArgsTy Args = UBI.blockArgs();
       if (!Args.empty()) {
         OS << '(';

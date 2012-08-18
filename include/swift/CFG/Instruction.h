@@ -419,10 +419,7 @@ public:
     TargetBlock(nullptr) {}
 
   /// The jump target for the branch.
-  BasicBlock &targetBlock() { return *TargetBlock; }
-
-  /// The jump target for the branch.
-  const BasicBlock &targetBlock() const { return *TargetBlock; }
+  BasicBlock *targetBlock() const { return TargetBlock; }
 
   /// The temporary arguments to the target blocks.
   ArgsTy blockArgs() { return ArgsTy(Args, NumArgs); }

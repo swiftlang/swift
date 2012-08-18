@@ -54,7 +54,7 @@ void Instruction::validate() const {
       assert(!basicBlock->instructions.empty() &&
              &*basicBlock->instructions.rbegin() == this &&
              "UncondBranchInst must appear at end of BasicBlock");
-      const BasicBlock &targetBlock = UBI.targetBlock();
+      const BasicBlock &targetBlock = *UBI.targetBlock();
       assert(std::find(targetBlock.preds().begin(), targetBlock.preds().end(),
                        basicBlock) &&
              "BasicBlock of UncondBranchInst must be a predecessor of target");
@@ -81,7 +81,7 @@ TermInst::Successors TermInst::successors() {
     }
     case UncondBranch: {
       UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
-      return Successors(&UBI.targetBlock());
+      return Successors(UBI.targetBlock());
     }
   }
 }
