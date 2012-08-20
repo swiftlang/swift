@@ -1010,7 +1010,8 @@ private:
 class ArraySliceType : public TypeBase {
   // ArraySliceTypes are never canonical.
   ArraySliceType(Type base)
-    : TypeBase(TypeKind::ArraySlice, nullptr, /*Unresolved=*/false),
+    : TypeBase(TypeKind::ArraySlice, nullptr,
+               /*Unresolved=*/base->isUnresolvedType()),
       Base(base) {}
 
   Type Base;
