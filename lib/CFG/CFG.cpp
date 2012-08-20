@@ -188,9 +188,7 @@ public:
 
   void visitWhileStmt(WhileStmt *S);
 
-  void visitDoWhileStmt(DoWhileStmt *S) {
-    assert(false && "Not yet implemented");
-  }
+  void visitDoWhileStmt(DoWhileStmt *S);
 
   void visitForStmt(ForStmt *S) {
     assert(false && "Not yet implemented");
@@ -272,6 +270,57 @@ void CFGBuilder::visitContinueStmt(ContinueStmt *S) {
   // FIXME: we need to be able to include the ContinueStmt in the jump.
   new (C) UncondBranchInst(ContinueBlock);
   Block = 0;
+}
+
+void CFGBuilder::visitDoWhileStmt(DoWhileStmt *S) {
+  // Set up a vector to record blocks that 'break'.
+  BlocksVector BlocksThatBreak;
+  BreakStack.push_back(&BlocksThatBreak);
+
+  // Set up a vector to record blocks that 'continue'.
+  BlocksVector BlocksThatContinue;
+  ContinueStack.push_back(&BlocksThatContinue);
+
+  // Create a new basic block for the body.
+  addCurrentBlockToPending();
+  BasicBlock *BodyBlock = currentBlock();
+
+  // Push a new context to record pending blocks.  These will
+  // get linked up the condition block.
+  BlocksVector PendingWithinLoop;
+  PendingMergesStack.push_back(&PendingWithinLoop);
+
+  // Now visit the loop body.
+  visit(S->getBody());
+  addCurrentBlockToPending();
+
+  // Create the condition block.
+  BasicBlock *ConditionBlock = currentBlock();
+  CFGValue CondV = (Instruction*) 0;
+  //  visit(S->getCond());
+
+  assert(ConditionBlock == Block);
+  Block = 0;
+
+  // Pop the pending merges.
+  assert(PendingMergesStack.back() == &PendingWithinLoop);
+  flushPending(ConditionBlock);
+  PendingMergesStack.pop_back();
+
+  // Pop the 'break' context.
+  popBreakStack(BlocksThatBreak);
+
+  // Pop the 'continue' context.
+  popContinueStack(BlocksThatContinue, ConditionBlock);
+
+  // Finally, hook up the block with the condition to the target blocks.
+  CFGValue Branch = new (C) CondBranchInst(S, CondV,
+                                           BodyBlock,
+                                           0, /* will be fixed up later */
+                                           ConditionBlock);
+  (void) Branch;
+
+  pendingMerges().push_back(ConditionBlock);
 }
 
 void CFGBuilder::visitIfStmt(IfStmt *S) {
