@@ -143,6 +143,26 @@ public:
     }
   }
 
+  void popBreakStack(BlocksVector &BlocksThatBreak) {
+    assert(BreakStack.back() == &BlocksThatBreak);
+    for (auto BreakBlock : BlocksThatBreak) {
+      pendingMerges().push_back(BreakBlock);
+    }
+    BreakStack.pop_back();
+  }
+
+  void popContinueStack(BlocksVector &BlocksThatContinue,
+                        BasicBlock *TargetBlock) {
+    assert(ContinueStack.back() == &BlocksThatContinue);
+    for (auto ContinueBlock : BlocksThatContinue) {
+      assert(ContinueBlock->hasTerminator());
+      UncondBranchInst &UB =
+      cast<UncondBranchInst>(ContinueBlock->instructions.back());
+      UB.setTarget(TargetBlock, ArrayRef<CFGValue>());
+    }
+    ContinueStack.pop_back();
+  }
+
   //===--------------------------------------------------------------------===//
   // Statements.
   //===--------------------------------------------------------------------===//
@@ -330,10 +350,7 @@ void CFGBuilder::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block for the body.
   BasicBlock *BodyBlock = createFreshBlock();
   visit(S->getBody());
-  if (Block) {
-    pendingMerges().push_back(Block);
-    Block = 0;
-  }
+  addCurrentBlockToPending();
 
   // Pop the pending merges.
   assert(PendingMergesStack.back() == &PendingWithinLoop);
@@ -341,21 +358,10 @@ void CFGBuilder::visitWhileStmt(WhileStmt *S) {
   PendingMergesStack.pop_back();
 
   // Pop the 'break' context.
-  assert(BreakStack.back() == &BlocksThatBreak);
-  for (auto BreakBlock : BlocksThatBreak) {
-    pendingMerges().push_back(BreakBlock);
-  }
-  BreakStack.pop_back();
+  popBreakStack(BlocksThatBreak);
 
   // Pop the 'continue' context.
-  assert(ContinueStack.back() == &BlocksThatContinue);
-  for (auto ContinueBlock : BlocksThatContinue) {
-    assert(ContinueBlock->hasTerminator());
-    UncondBranchInst &UB =
-      cast<UncondBranchInst>(ContinueBlock->instructions.back());
-    UB.setTarget(ConditionBlock, ArrayRef<CFGValue>());
-  }
-  ContinueStack.pop_back();
+  popContinueStack(BlocksThatContinue, ConditionBlock);
 
   // Finally, hook up the block with the condition to the target blocks.
   CFGValue Branch = new (C) CondBranchInst(S, CondV,
