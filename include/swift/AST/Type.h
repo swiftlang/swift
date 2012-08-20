@@ -73,7 +73,14 @@ public:
   bool operator!=(CanType T) const { return !operator==(T); }
 
 };
-  
+
+template <class X> inline bool
+isa(const Type&) = delete; // Use TypeBase::is instead.
+template <class X> inline typename llvm::cast_retty<X, Type>::ret_type
+cast(const Type&) = delete; // Use TypeBase::castTo instead.
+template <class X> inline typename llvm::cast_retty<X, Type>::ret_type
+dyn_cast(const Type&) = delete; // Use TypeBase::getAs instead.
+
 } // end namespace swift
 
 namespace llvm {
@@ -145,7 +152,6 @@ namespace llvm {
       return swift::CanType((swift::TypeBase*)P);
     }
   };
-
 } // end namespace llvm
 
 #endif

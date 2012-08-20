@@ -563,7 +563,7 @@ public:
 
   SemaCoerce(CoercionContext &CC, Type DestTy, unsigned Flags)
     : CC(CC), TC(CC.TC), DestTy(DestTy), Flags(Flags) {
-    assert(!isa<UnstructuredUnresolvedType>(DestTy));
+    assert(!DestTy->is<UnstructuredUnresolvedType>());
   }
   
   CoercedResult doIt(Expr *E) {
@@ -1593,7 +1593,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     
     // Find the appropriate injection function.
     ArraySliceType *sliceType =
-        cast<ArraySliceType>(DestTy->getFields().back().getType());
+        cast<ArraySliceType>(DestTy->getFields().back().getType().getPointer());
     Type boundType = BuiltinIntegerType::get(64, TC.Context);
     injectionFn = TC.buildArrayInjectionFnRef(sliceType, boundType,
                                               E->getStartLoc());
@@ -1825,7 +1825,7 @@ static bool recordDeduction(CoercionContext &CC, SourceLoc Loc,
 /// coerceToType.  It produces diagnostics and returns null on failure.
 CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
                                        CoercionContext &CC, unsigned Flags) {
-  assert(!isa<UnstructuredUnresolvedType>(DestTy) &&
+  assert(!DestTy->is<UnstructuredUnresolvedType>() &&
          "Result of conversion can't be unresolved");
 
   // Don't bother trying to perform a conversion to or from error type.

@@ -380,7 +380,7 @@ void IRGenModule::getSchema(Type type, ExplosionSchema &schema) {
   // As an optimization, avoid actually building a TypeInfo for any
   // obvious TupleTypes.  This assumes that a TupleType's explosion
   // schema is always the concatenation of its component's schemata.
-  if (TupleType *tuple = dyn_cast<TupleType>(type)) {
+  if (TupleType *tuple = type->getAs<TupleType>()) {
     for (const TupleTypeElt &field : tuple->getFields())
       getSchema(field.getType(), schema);
     return;
@@ -395,7 +395,7 @@ unsigned IRGenModule::getExplosionSize(Type type, ExplosionKind kind) {
   // As an optimization, avoid actually building a TypeInfo for any
   // obvious TupleTypes.  This assumes that a TupleType's explosion
   // schema is always the concatenation of its component's schemata.
-  if (TupleType *tuple = dyn_cast<TupleType>(type)) {
+  if (TupleType *tuple = type->getAs<TupleType>()) {
     unsigned count = 0;
     for (const TupleTypeElt &field : tuple->getFields())
       count += getExplosionSize(field.getType(), kind);

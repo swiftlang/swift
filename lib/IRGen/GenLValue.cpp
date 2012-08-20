@@ -904,8 +904,8 @@ namespace {
 
 #ifndef NDEBUG
       CanType origBaseType =
-        cast<PolymorphicFunctionType>(emission.getCallee().getOrigFormalType())
-          ->getInput()->getCanonicalType();
+        emission.getCallee().getOrigFormalType()
+          ->castTo<PolymorphicFunctionType>()->getInput()->getCanonicalType();
       assert(!differsByAbstraction(emission.IGF.IGM, origBaseType,
                                    getSubstBaseType(),
                                    AbstractionDifference::Argument));

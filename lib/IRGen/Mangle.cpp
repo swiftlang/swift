@@ -285,7 +285,7 @@ void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
   Buffer << '_';
 
   if (mangleAsFunction)
-    mangleFunctionType(cast<AnyFunctionType>(T), explosion, uncurryLevel);
+    mangleFunctionType(T->castTo<AnyFunctionType>(), explosion, uncurryLevel);
   else
     mangleType(T, explosion, uncurryLevel);
 }
@@ -369,7 +369,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   // We don't care about these types being a bit verbose because we
   // don't expect them to come up that often in API names.
   case TypeKind::BuiltinFloat:
-    switch (cast<BuiltinFloatType>(type)->getFPKind()) {
+    switch (cast<BuiltinFloatType>(base)->getFPKind()) {
     case BuiltinFloatType::IEEE16: Buffer << "Bf16_"; return;
     case BuiltinFloatType::IEEE32: Buffer << "Bf32_"; return;
     case BuiltinFloatType::IEEE64: Buffer << "Bf64_"; return;
@@ -379,7 +379,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     }
     llvm_unreachable("bad floating-point kind");
   case TypeKind::BuiltinInteger:
-    Buffer << "Bi" << cast<BuiltinIntegerType>(type)->getBitWidth() << '_';
+    Buffer << "Bi" << cast<BuiltinIntegerType>(base)->getBitWidth() << '_';
     return;
   case TypeKind::BuiltinRawPointer:
     Buffer << "Bp";

@@ -788,7 +788,7 @@ public:
     // Determine the type of the member.
     Type MemberTy = E->getDecl()->getType();
     if (isa<FuncDecl>(E->getDecl())) {
-      if (auto FuncTy = dyn_cast<AnyFunctionType>(MemberTy))
+      if (auto FuncTy = MemberTy->getAs<AnyFunctionType>())
         MemberTy = FuncTy->getResult();
     } else {
       MemberTy = LValueType::get(MemberTy,
@@ -849,7 +849,7 @@ public:
     if (!E->isBaseIgnored()) {
       if (auto Method = dyn_cast<FuncDecl>(E->getDecl())) {
         if (!isMetatypeBase || Method->isStatic()) {
-          if (auto FuncTy = dyn_cast<AnyFunctionType>(MemberTy))
+          if (auto FuncTy = MemberTy->getAs<AnyFunctionType>())
             MemberTy = FuncTy->getResult();
         }
       } else {
@@ -1018,7 +1018,7 @@ public:
       return E;
 
     // Find the appropriate injection function.
-    ArraySliceType *sliceType = cast<ArraySliceType>(resultType);
+    ArraySliceType *sliceType = cast<ArraySliceType>(resultType.getPointer());
 
     // Check that the injection member reference has the appropriate
     // function type.
@@ -1253,7 +1253,7 @@ Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
 
 static Type makeSimilarLValue(Type objectType, Type lvalueType,
                               ASTContext &Context) {
-  LValueType::Qual qs = cast<LValueType>(lvalueType)->getQualifiers();
+  LValueType::Qual qs = lvalueType->castTo<LValueType>()->getQualifiers();
   return LValueType::get(objectType, qs, Context);
 }
 

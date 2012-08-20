@@ -713,7 +713,9 @@ namespace {
       if (!type)
         return;
 
-      switch (type->getKind()) {
+      TypeBase *typePtr = type.getPointer();
+
+      switch (typePtr->getKind()) {
 #define ALWAYS_CANONICAL_TYPE(Id, Parent) \
       case TypeKind::Id:
 #define UNCHECKED_TYPE(Id, Parent) ALWAYS_CANONICAL_TYPE(Id, Parent)
@@ -726,14 +728,14 @@ namespace {
       case TypeKind::OneOf:
       case TypeKind::Struct:
       case TypeKind::Class:
-        return checkBoundGenericTypes(cast<NominalType>(type)->getParent());
+        return checkBoundGenericTypes(cast<NominalType>(typePtr)->getParent());
 
       case TypeKind::UnboundGeneric:
         return checkBoundGenericTypes(
-                 cast<UnboundGenericType>(type)->getParent());
+                 cast<UnboundGenericType>(typePtr)->getParent());
 
       case TypeKind::BoundGeneric: {
-        auto BGT = cast<BoundGenericType>(type);
+        auto BGT = cast<BoundGenericType>(typePtr);
         if (!BGT->hasSubstitutions()) {
           Out << "BoundGenericType without substitutions!\n";
           abort();
@@ -747,11 +749,11 @@ namespace {
 
       case TypeKind::MetaType:
         return checkBoundGenericTypes(
-                                cast<MetaTypeType>(type)->getInstanceType());
+                               cast<MetaTypeType>(typePtr)->getInstanceType());
 
 
       case TypeKind::Identifier: {
-        auto Id = cast<IdentifierType>(type);
+        auto Id = cast<IdentifierType>(typePtr);
         if (!Id->isMapped())
           return;
 
@@ -760,34 +762,34 @@ namespace {
 
       case TypeKind::Paren:
         return checkBoundGenericTypes(
-                                  cast<ParenType>(type)->getUnderlyingType());
+                                cast<ParenType>(typePtr)->getUnderlyingType());
 
       case TypeKind::Tuple:
-        for (auto elt : cast<TupleType>(type)->getFields())
+        for (auto elt : cast<TupleType>(typePtr)->getFields())
           checkBoundGenericTypes(elt.getType());
         return;
         
       case TypeKind::Substituted:
         return checkBoundGenericTypes(
-                          cast<SubstitutedType>(type)->getReplacementType());
+                         cast<SubstitutedType>(typePtr)->getReplacementType());
 
       case TypeKind::Function:
       case TypeKind::PolymorphicFunction: {
-        auto function = cast<AnyFunctionType>(type);
+        auto function = cast<AnyFunctionType>(typePtr);
         checkBoundGenericTypes(function->getInput());
         return checkBoundGenericTypes(function->getResult());
       }
 
       case TypeKind::Array:
-        return checkBoundGenericTypes(cast<ArrayType>(type)->getBaseType());
+        return checkBoundGenericTypes(cast<ArrayType>(typePtr)->getBaseType());
         
       case TypeKind::ArraySlice:
         return checkBoundGenericTypes(
-                                  cast<ArraySliceType>(type)->getBaseType());
+                                 cast<ArraySliceType>(typePtr)->getBaseType());
 
       case TypeKind::LValue:
         return checkBoundGenericTypes(
-                                    cast<LValueType>(type)->getObjectType());
+                                   cast<LValueType>(typePtr)->getObjectType());
       }
     }
 

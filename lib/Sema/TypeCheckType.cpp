@@ -550,6 +550,7 @@ Type TypeChecker::transformType(Type type,
     return transformed;
 
   // Recursive into children of this type.
+  TypeBase *base = type.getPointer();
   switch (type->getKind()) {
 #define ALWAYS_CANONICAL_TYPE(Id, Parent) \
   case TypeKind::Id:                      \
@@ -561,7 +562,7 @@ Type TypeChecker::transformType(Type type,
   case TypeKind::OneOf:
   case TypeKind::Struct:
   case TypeKind::Class: {
-    auto nominalTy = cast<NominalType>(type);
+    auto nominalTy = cast<NominalType>(base);
     if (auto parentTy = nominalTy->getParent()) {
       parentTy = transformType(parentTy, fn);
       if (!parentTy)
@@ -574,7 +575,7 @@ Type TypeChecker::transformType(Type type,
   }
 
   case TypeKind::UnboundGeneric: {
-    auto unbound = cast<UnboundGenericType>(type);
+    auto unbound = cast<UnboundGenericType>(base);
     Type substParentTy;
     if (auto parentTy = unbound->getParent()) {
       substParentTy = transformType(parentTy, fn);
@@ -592,7 +593,7 @@ Type TypeChecker::transformType(Type type,
   }
 
   case TypeKind::BoundGeneric: {
-    auto BGT = cast<BoundGenericType>(type);
+    auto BGT = cast<BoundGenericType>(base);
     SmallVector<Type, 4> SubstArgs;
     bool AnyChanged = false;
     Type substParentTy;
@@ -621,7 +622,7 @@ Type TypeChecker::transformType(Type type,
   }
 
   case TypeKind::MetaType: {
-    auto Meta = cast<MetaTypeType>(type);
+    auto Meta = cast<MetaTypeType>(base);
     auto UnderlyingTy = transformType(Meta->getInstanceType(),
                                   fn);
     if (!UnderlyingTy)
@@ -634,7 +635,7 @@ Type TypeChecker::transformType(Type type,
   }
 
   case TypeKind::NameAlias: {
-    auto Alias = cast<NameAliasType>(type);
+    auto Alias = cast<NameAliasType>(base);
     auto UnderlyingTy = transformType(Alias->getDecl()->getUnderlyingType(),
                                   fn);
     if (!UnderlyingTy)
@@ -648,7 +649,7 @@ Type TypeChecker::transformType(Type type,
   }
 
   case TypeKind::Identifier: {
-    auto Id = cast<IdentifierType>(type);
+    auto Id = cast<IdentifierType>(base);
     if (!Id->isMapped())
       return type;
 
@@ -663,7 +664,7 @@ Type TypeChecker::transformType(Type type,
   }
 
   case TypeKind::Paren: {
-    auto paren = cast<ParenType>(type);
+    auto paren = cast<ParenType>(base);
     Type underlying = transformType(paren->getUnderlyingType(), fn);
     if (!underlying)
       return Type();
@@ -675,7 +676,7 @@ Type TypeChecker::transformType(Type type,
   }
 
   case TypeKind::Tuple: {
-    auto Tuple = cast<TupleType>(type);
+    auto Tuple = cast<TupleType>(base);
     bool AnyChanged = false;
     SmallVector<TupleTypeElt, 4> Elements;
     unsigned Index = 0;
@@ -729,7 +730,7 @@ Type TypeChecker::transformType(Type type,
   }
 
   case TypeKind::Substituted: {
-    auto SubstAT = cast<SubstitutedType>(type);
+    auto SubstAT = cast<SubstitutedType>(base);
     auto Subst = transformType(SubstAT->getReplacementType(), fn);
     if (!Subst)
       return Type();
@@ -742,7 +743,7 @@ Type TypeChecker::transformType(Type type,
 
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction: {
-    auto Function = cast<AnyFunctionType>(type);
+    auto Function = cast<AnyFunctionType>(base);
     auto InputTy = transformType(Function->getInput(), fn);
     if (!InputTy)
       return Type();
@@ -754,19 +755,19 @@ Type TypeChecker::transformType(Type type,
         ResultTy.getPointer() == Function->getResult().getPointer())
       return type;
 
-    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(type)) {
+    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(base)) {
       return PolymorphicFunctionType::get(InputTy, ResultTy,
                                           &polyFn->getGenericParams(),
                                           Context);
     } else {
-      auto fn = cast<FunctionType>(type);
+      auto fn = cast<FunctionType>(base);
       return FunctionType::get(InputTy, ResultTy, fn->isAutoClosure(),
                                Context);
     }
   }
 
   case TypeKind::Array: {
-    auto Array = cast<ArrayType>(type);
+    auto Array = cast<ArrayType>(base);
     auto BaseTy = transformType(Array->getBaseType(), fn);
     if (!BaseTy)
       return Type();
@@ -778,7 +779,7 @@ Type TypeChecker::transformType(Type type,
   }
 
   case TypeKind::ArraySlice: {
-    auto Slice = cast<ArraySliceType>(type);
+    auto Slice = cast<ArraySliceType>(base);
     auto BaseTy = transformType(Slice->getBaseType(), fn);
     if (!BaseTy)
       return Type();
@@ -790,7 +791,7 @@ Type TypeChecker::transformType(Type type,
   }
 
   case TypeKind::LValue: {
-    auto LValue = cast<LValueType>(type);
+    auto LValue = cast<LValueType>(base);
     auto ObjectTy = transformType(LValue->getObjectType(), fn);
     if (!ObjectTy)
       return Type();
@@ -802,7 +803,7 @@ Type TypeChecker::transformType(Type type,
   }
 
   case TypeKind::ProtocolComposition: {
-    auto PC = cast<ProtocolCompositionType>(type);
+    auto PC = cast<ProtocolCompositionType>(base);
     SmallVector<Type, 4> Protocols;
     bool AnyChanged = false;
     unsigned Index = 0;
@@ -839,7 +840,7 @@ Type TypeChecker::transformType(Type type,
 Type TypeChecker::substType(Type origType, TypeSubstitutionMap &Substitutions) {
   return transformType(origType,
                        [&](Type type) -> Type {
-    auto substOrig = dyn_cast<SubstitutableType>(type);
+    auto substOrig = dyn_cast<SubstitutableType>(type.getPointer());
     if (!substOrig)
       return type;
 

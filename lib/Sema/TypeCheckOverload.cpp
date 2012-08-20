@@ -29,7 +29,7 @@ static Identifier getFirstOverloadedIdentifier(const Expr *Fn) {
 }
 
 static bool displayOperandType(Type T) {
-  return !T->isUnresolvedType() && !isa<ErrorType>(T);
+  return !T->isUnresolvedType() && !T->is<ErrorType>();
 }
 
 void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,

@@ -521,7 +521,7 @@ static llvm::Value *getClassMetadataForConstructor(IRGenFunction &IGF,
   // Just assume that the archetypes are identical on the
   // current context.
   auto &ctorGenerics =
-    cast<PolymorphicFunctionType>(ctor->getType())->getGenericParams();
+    ctor->getType()->castTo<PolymorphicFunctionType>()->getGenericParams();
   unsigned numArchetypes = ctorGenerics.getAllArchetypes().size();
   assert(numArchetypes == classGenerics->getAllArchetypes().size());
   SmallVector<Substitution, 4> subs;

@@ -560,7 +560,7 @@ namespace {
     bool visitPolymorphicFunctionType(PolymorphicFunctionType *T) {
       for (auto &param : T->getGenericParams().getParams()) {
         auto type = param.getAsTypeParam()->getUnderlyingType();
-        BoundTypes.insert(cast<ArchetypeType>(type));
+        BoundTypes.insert(type->castTo<ArchetypeType>());
       }
       return visit(CanType(T->getInput())) || visit(CanType(T->getResult()));
     }

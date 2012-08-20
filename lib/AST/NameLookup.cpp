@@ -38,7 +38,7 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
           Result.push_back(VD);
           if (!IsTypeLookup)
             CurModuleTypes.insert(VD->getType()->getCanonicalType());
-          CurModuleHasTypeDecl |= isa<MetaTypeType>(VD->getType());
+          CurModuleHasTypeDecl |= isa<TypeDecl>(VD);
         }
       }
     }
@@ -50,7 +50,7 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
         Result.push_back(VD);
         if (!IsTypeLookup)
           CurModuleTypes.insert(VD->getType()->getCanonicalType());
-        CurModuleHasTypeDecl |= isa<MetaTypeType>(VD->getType());
+        CurModuleHasTypeDecl |= isa<TypeDecl>(VD);
       }
     }
   }

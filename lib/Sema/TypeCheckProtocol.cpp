@@ -25,7 +25,7 @@ static Type getInstanceUsageType(ValueDecl *Value, ASTContext &Context) {
   Type Ty = Value->getType();
   if (FuncDecl *Func = dyn_cast<FuncDecl>(Value)) {
     if (Func->getDeclContext()->isTypeContext()) {
-      if (auto FuncTy = dyn_cast<AnyFunctionType>(Func->getType()))
+      if (auto FuncTy = Func->getType()->getAs<AnyFunctionType>())
         return FuncTy->getResult()->getUnlabeledType(Context);
     }
   }

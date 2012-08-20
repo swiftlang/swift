@@ -2670,7 +2670,7 @@ namespace {
       unsigned clauseIndex = Clauses.size();
       Clauses.push_back(Clause());
 
-      AnyFunctionType *fn = cast<AnyFunctionType>(fnType);
+      AnyFunctionType *fn = fnType->castTo<AnyFunctionType>();
       accumulateClauses(fn->getResult(), maxUncurryLevel - 1);
 
       Clauses[clauseIndex].DataTypesBeginIndex = AllDataTypes.size();

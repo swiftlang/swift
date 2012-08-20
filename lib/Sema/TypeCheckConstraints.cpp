@@ -781,13 +781,13 @@ Type ConstraintSystem::openType(Type startingType) {
   std::function<Type(Type)> replaceArchetypes;
   replaceArchetypes = [&](Type type) -> Type {
     // Replace archetypes with fresh type variables.
-    if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+    if (auto archetype = type->getAs<ArchetypeType>()) {
       return getTypeVariable(archetype);
     }
 
     // Create type variables for all of the archetypes in a polymorphic
     // function type.
-    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(type)) {
+    if (auto polyFn = type->getAs<PolymorphicFunctionType>()) {
       for (auto archetype : polyFn->getGenericParams().getAllArchetypes())
         (void)getTypeVariable(archetype);
 

@@ -398,7 +398,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   // After this loop finishes, we can perform normal member lookup.
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(TU->Decls[i])) {
-      IdentifierType *DNT = cast<IdentifierType>(ED->getExtendedType());
+      auto DNT = cast<IdentifierType>(ED->getExtendedType().getPointer());
       while (true) {
         if (Binder.resolveIdentifierType(DNT, TU)) {
           for (auto &C : DNT->Components)
@@ -417,8 +417,9 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
           if (FoundType->hasCanonicalTypeComputed())
             break;
 
-          TypeAliasDecl *TAD = cast<NameAliasType>(FoundType)->getDecl();
-          DNT = dyn_cast<IdentifierType>(TAD->getUnderlyingType());
+          TypeAliasDecl *TAD =
+              cast<NameAliasType>(FoundType.getPointer())->getDecl();
+          DNT = dyn_cast<IdentifierType>(TAD->getUnderlyingType().getPointer());
 
           if (!DNT) {
             Binder.diagnose(ED->getLoc(), diag::non_nominal_extension,
@@ -431,7 +432,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
     } else if (ClassDecl *CD = dyn_cast<ClassDecl>(TU->Decls[i])) {
       auto inherited = CD->getInherited();
       if (!inherited.empty()) {
-        IdentifierType *DNT = cast<IdentifierType>(inherited[0].getType());
+        auto DNT = cast<IdentifierType>(inherited[0].getType().getPointer());
         Type foundType;
         while (true) {
           if (Binder.resolveIdentifierType(DNT, TU)) {
@@ -452,11 +453,13 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
             if (foundType->hasCanonicalTypeComputed())
               break;
 
-            TypeAliasDecl *TAD = cast<NameAliasType>(foundType)->getDecl();
-            DNT = dyn_cast<IdentifierType>(TAD->getUnderlyingType());
+            TypeAliasDecl *TAD =
+                cast<NameAliasType>(foundType.getPointer())->getDecl();
+            Type curUnderlying = TAD->getUnderlyingType();
+            DNT = dyn_cast<IdentifierType>(curUnderlying.getPointer());
 
             if (!DNT) {
-              if (isa<ProtocolCompositionType>(TAD->getUnderlyingType())) {
+              if (isa<ProtocolCompositionType>(curUnderlying.getPointer())) {
                 // We don't need to resolve ProtocolCompositionTypes here; it's
                 // enough to know that the type in question isn't a class type.
                 foundType = Type();

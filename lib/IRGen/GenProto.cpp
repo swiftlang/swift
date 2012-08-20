@@ -1995,8 +1995,8 @@ namespace {
       // Find abstract parameters.
       HasAbstractedArg = false;
       for (unsigned i = 0; i != uncurryLevel + 1; ++i) {
-        AnyFunctionType *sigFnTy = cast<AnyFunctionType>(sigTy);
-        AnyFunctionType *implFnTy = cast<AnyFunctionType>(implTy);
+        AnyFunctionType *sigFnTy = sigTy->castTo<AnyFunctionType>();
+        AnyFunctionType *implFnTy = implTy->castTo<AnyFunctionType>();
         ImplTyAtUncurry.push_back(implFnTy);
 
         sigTy = sigFnTy->getResult();
@@ -2014,7 +2014,7 @@ namespace {
     /// Add entries to Args for all the abstraction points in this type.
     void collectNestedArgs(Type param) {
       Args.push_back(Arg(Arg::Nested));
-      if (TupleType *tuple = dyn_cast<TupleType>(param)) {
+      if (TupleType *tuple = param->getAs<TupleType>()) {
         for (auto &field : tuple->getFields())
           collectNestedArgs(field.getType());
       }
@@ -2023,12 +2023,12 @@ namespace {
     /// Find the abstract parameters.
     void findAbstractParameters(Type impl, Type sig) {
       // Walk recursively into tuples.
-      if (auto sigTuple = dyn_cast<TupleType>(sig)) {
+      if (auto sigTuple = sig->getAs<TupleType>()) {
         // The tuple itself is a potential point of abstraction.
         Args.push_back(Arg(Arg::DecomposedTuple));
 
         auto sigFields = sigTuple->getFields();
-        auto implFields = cast<TupleType>(impl)->getFields();
+        auto implFields = impl->castTo<TupleType>()->getFields();
         assert(sigFields.size() == implFields.size());
 
         for (unsigned i = 0, e = sigFields.size(); i != e; ++i)
@@ -2038,7 +2038,7 @@ namespace {
       }
 
       // Check whether we're directly matching an archetype.
-      if (isa<ArchetypeType>(sig)) {
+      if (sig->is<ArchetypeType>()) {
         // Count all the nested types.
         collectNestedArgs(impl);
 
@@ -2064,11 +2064,11 @@ namespace {
 
       // Check for an l-value.  In some cases, we need an
       // lvalue-to-rvalue abstraction.
-      if (isa<LValueType>(sig)) {
+      if (sig->is<LValueType>()) {
         const TypeInfo &implTI = IGM.getFragileTypeInfo(impl);
 
         // If we've got l-values on both sides, we can just directly convert.
-        if (isa<LValueType>(impl)) {
+        if (impl->is<LValueType>()) {
           auto ptrTy = cast<llvm::PointerType>(implTI.getStorageType());
           Args.push_back(Arg(Arg::Bitcast, ptrTy));
 
@@ -2087,7 +2087,7 @@ namespace {
       // The basic function representation doesn't change just because
       // you involved an archetype, but we might need to translate
       // function values to make the types work.
-      if (isa<FunctionType>(sig)) {
+      if (sig->is<FunctionType>()) {
         if (!sig->isEqual(impl)) {
           IGM.unimplemented(SourceLoc(), "can't rewrite function values!");
         }

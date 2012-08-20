@@ -217,7 +217,7 @@ ArchetypeBuilder::~ArchetypeBuilder() {
 }
 
 auto ArchetypeBuilder::resolveType(Type T) -> PotentialArchetype * {
-  auto IdType = dyn_cast<IdentifierType>(T);
+  auto IdType = dyn_cast<IdentifierType>(T.getPointer());
   if (!IdType)
     return nullptr;
 
