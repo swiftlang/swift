@@ -41,6 +41,7 @@ class CFGBuilder : public ASTVisitor<CFGBuilder, CFGValue> {
   BlocksVector BasePendingMerges;
   llvm::SmallVector<BlocksVector *, 4> PendingMergesStack;
   llvm::SmallVector<BlocksVector *, 4> BreakStack;
+  llvm::SmallVector<BlocksVector *, 4> ContinueStack;
 
   /// Mapping from expressions to instructions.
   llvm::DenseMap<Expr *, Instruction *> ExprToInst;
@@ -182,9 +183,7 @@ public:
 
   void visitBreakStmt(BreakStmt *S);
 
-  void visitContinueStmt(ContinueStmt *S) {
-    assert(false && "Not yet implemented");
-  }
+  void visitContinueStmt(ContinueStmt *S);
 
   //===--------------------------------------------------------------------===//
   // Expressions.
@@ -242,6 +241,17 @@ void CFGBuilder::visitBreakStmt(BreakStmt *S) {
 
   // FIXME: we need to be able to include the BreakStmt in the jump.
   new (C) UncondBranchInst(BreakBlock);
+  Block = 0;
+}
+
+void CFGBuilder::visitContinueStmt(ContinueStmt *S) {
+  assert(!ContinueStack.empty());
+  BasicBlock *ContinueBlock = currentBlock();
+  ContinueStack.back()->push_back(ContinueBlock);
+
+  // FIXME: we need to be able to include the ContinueStmt in the jump.
+  new (C) UncondBranchInst(ContinueBlock);
+  Block = 0;
 }
 
 void CFGBuilder::visitIfStmt(IfStmt *S) {
@@ -304,9 +314,13 @@ void CFGBuilder::visitWhileStmt(WhileStmt *S) {
   assert(ConditionBlock == Block);
   Block = 0;
 
-  // Set up a vector to record blocks that break.
+  // Set up a vector to record blocks that 'break'.
   BlocksVector BlocksThatBreak;
   BreakStack.push_back(&BlocksThatBreak);
+
+  // Set up a vector to record blocks that 'continue'.
+  BlocksVector BlocksThatContinue;
+  ContinueStack.push_back(&BlocksThatContinue);
 
   // Push a new context to record pending blocks.  These will
   // get linked up the condition block.
@@ -316,19 +330,32 @@ void CFGBuilder::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block for the body.
   BasicBlock *BodyBlock = createFreshBlock();
   visit(S->getBody());
+  if (Block) {
+    pendingMerges().push_back(Block);
+    Block = 0;
+  }
 
   // Pop the pending merges.
   assert(PendingMergesStack.back() == &PendingWithinLoop);
   flushPending(ConditionBlock);
   PendingMergesStack.pop_back();
 
-  // Pop the break context.
+  // Pop the 'break' context.
   assert(BreakStack.back() == &BlocksThatBreak);
   for (auto BreakBlock : BlocksThatBreak) {
     pendingMerges().push_back(BreakBlock);
   }
   BreakStack.pop_back();
 
+  // Pop the 'continue' context.
+  assert(ContinueStack.back() == &BlocksThatContinue);
+  for (auto ContinueBlock : BlocksThatContinue) {
+    assert(ContinueBlock->hasTerminator());
+    UncondBranchInst &UB =
+      cast<UncondBranchInst>(ContinueBlock->instructions.back());
+    UB.setTarget(ConditionBlock, ArrayRef<CFGValue>());
+  }
+  ContinueStack.pop_back();
 
   // Finally, hook up the block with the condition to the target blocks.
   CFGValue Branch = new (C) CondBranchInst(S, CondV,
