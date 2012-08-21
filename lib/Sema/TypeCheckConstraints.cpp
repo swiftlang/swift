@@ -2226,6 +2226,40 @@ bool ConstraintSystem::simplify() {
 //===--------------------------------------------------------------------===//
 #pragma mark Constraint solving
 
+/// \brief Resolve an overload set in the given constraint system by
+/// producing a set of child constraint systems, each of which picks a specific
+/// overload from that set. Those child constraint systems that do not fail
+/// during simplification will be added to the stack of constraint systems
+/// being considered.
+static void resolveOverloadSet(ConstraintSystem &cs,
+                               OverloadSet *ovl,
+                               SmallVectorImpl<ConstraintSystem *> &stack) {
+  auto choices = ovl->getChoices();
+  for (unsigned i = 0, n = choices.size(); i != n; ++i) {
+    auto idx = n-i-1;
+    auto &choice = ovl->getChoices()[idx];
+    auto childCS = cs.createDerivedConstraintSystem(idx);
+
+    // Bind the overload set's type to the type of a reference to the
+    // specific declaration choice.
+    Type refType;
+    if (choice.getBaseType())
+      refType = childCS->getTypeOfMemberReference(choice.getBaseType(),
+                                                  choice.getDecl(),
+                                                  /*FIXME:*/false);
+    else
+      refType = childCS->getTypeOfReference(choice.getDecl());
+    childCS->addConstraint(ConstraintKind::Equal, ovl->getBoundType(),
+                           refType);
+
+    // Simplify the child system. Assuming it's still valid, add it to
+    // the stack to be dealt with later.
+    // FIXME: If it's not still valid, keep it around for diagnostics.
+    if (!childCS->simplify())
+      stack.push_back(childCS);
+  }
+}
+
 bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
   assert(&getTopConstraintSystem() == this &&"Can only solve at the top level");
 
@@ -2242,31 +2276,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     // If there are any unresolved overload sets, create child systems in
     // which we resolve the overload set to each option.
     if (!cs->UnresolvedOverloadSets.empty()) {
-      auto ovl = cs->UnresolvedOverloadSets.front();
-      auto choices = ovl->getChoices();
-      for (unsigned i = 0, n = choices.size(); i != n; ++i) {
-        auto idx = n-i-1;
-        auto &choice = ovl->getChoices()[idx];
-        auto childCS = cs->createDerivedConstraintSystem(idx);
-
-        // Bind the overload set's type to the type of a reference to the
-        // specific declaration choice.
-        Type refType;
-        if (choice.getBaseType())
-          refType = childCS->getTypeOfMemberReference(choice.getBaseType(),
-                                                      choice.getDecl(),
-                                                      /*FIXME:*/false);
-        else
-          refType = childCS->getTypeOfReference(choice.getDecl());
-        childCS->addConstraint(ConstraintKind::Equal, ovl->getBoundType(),
-                               refType);
-
-        // Simplify the child system. Assuming it's still valid, add it to
-        // the stack to be dealt with later.
-        // FIXME: If it's not still valid, keep it around for diagnostics.
-        if (!childCS->simplify())
-          stack.push_back(childCS);
-      }
+      resolveOverloadSet(*cs, cs->UnresolvedOverloadSets.front(), stack);
       continue;
     }
 
