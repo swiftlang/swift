@@ -469,6 +469,10 @@ namespace {
     OverloadSet *InOverloadSet;
     unsigned OverloadChoiceIdx;
 
+    /// \brief The type variable for which we are assuming a given particular
+    /// type.
+    TypeVariableType *assumedTypeVar;
+
     // Valid everywhere
     SmallVector<TypeVariableType *, 16> TypeVariables;
     SmallVector<Constraint *, 16> Constraints;
@@ -489,14 +493,41 @@ namespace {
     ConstraintSystem(TypeChecker &TC)
       : TC(TC), Parent(nullptr), TypeCounter(0), OverloadSetCounter(0) {}
 
+    /// \brief Creates a child constraint system, inheriting the constraints
+    /// of its parent.
+    ///
+    /// \param parent The parent constraint system.
+    ///
+    /// \param overloadChoiceIdx The index into the parent's first unresolved
+    /// overload set, which indices which overload choice this child system
+    /// explores.
     ConstraintSystem(ConstraintSystem *parent, unsigned overloadChoiceIdx)
       : TC(parent->TC), Parent(parent),
         InOverloadSet(parent->UnresolvedOverloadSets.front()),
         OverloadChoiceIdx(overloadChoiceIdx),
+        assumedTypeVar(),
         // FIXME: Lazily copy from parent system.
         Constraints(parent->Constraints),
         UnresolvedOverloadSets(parent->UnresolvedOverloadSets.begin()+1,
                                parent->UnresolvedOverloadSets.end())
+    {
+    }
+
+    /// \brief Creates a child constraint system, inheriting the constraints
+    /// of its parent.
+    ///
+    /// \param parent The parent constraint system.
+    ///
+    /// \param typeVar The type variable whose binding we will be exploring
+    /// within this child system.
+    ConstraintSystem(ConstraintSystem *parent, TypeVariableType *typeVar)
+      : TC(parent->TC), Parent(parent),
+        InOverloadSet(),
+        OverloadChoiceIdx(0),
+        assumedTypeVar(typeVar),
+        // FIXME: Lazily copy from parent system.
+        Constraints(parent->Constraints),
+        UnresolvedOverloadSets(parent->UnresolvedOverloadSets)
     {
     }
 
@@ -530,8 +561,9 @@ namespace {
     /// \brief Create a new constraint system that is derived from this
     /// constraint system, referencing the rules of the parent system but
     /// also introducing its own (likely dependent) constraints.
-    ConstraintSystem *createDerivedConstraintSystem(unsigned overloadChoiceIdx){
-      auto result = new ConstraintSystem(this, overloadChoiceIdx);
+    template<typename ...Args>
+    ConstraintSystem *createDerivedConstraintSystem(Args &&...args){
+      auto result = new ConstraintSystem(this, std::forward<Args>(args)...);
       Children.push_back(std::unique_ptr<ConstraintSystem>(result));
       return result;
     }
@@ -1916,6 +1948,50 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   }
 }
 
+namespace {
+  /// \brief Provide a partial ordering between two constraints.
+  ///
+  /// The ordering depends on the the classification of constraints:
+  ///   - For relational constraints, the constraints are ordered by strength,
+  ///     e.g., == precedes < and < precedes <<.
+  ///
+  ///   - For literal constraints, we order by literal kind.
+  ///
+  ///   - For member constraints, we order by member name (lexicographically)
+  ///     and, for equivalently-named constraints, with value members
+  ///     preceding type members.
+  class OrderConstraintForTypeVariable {
+  public:
+    bool operator()(Constraint *lhs, Constraint *rhs) const {
+      // If the classifications differ, order by classification.
+      auto lhsClass = lhs->getClassification();
+      auto rhsClass = rhs->getClassification();
+      if (lhsClass != rhsClass)
+        return lhsClass < rhsClass;
+
+      switch (lhsClass) {
+      case ConstraintClassification::Relational: {
+        // Order based on the relational constraint kind.
+        return lhs->getKind() < rhs->getKind();
+      }
+
+      case ConstraintClassification::Literal:
+        // For literals, order by literal kind.
+        return lhs->getLiteralKind() < rhs->getLiteralKind();
+
+      case ConstraintClassification::Member:
+        // For members, order first by member name.
+        if (lhs->getMember() != rhs->getMember()) {
+          return lhs->getMember().str() < rhs->getMember().str();
+        }
+
+        // Order by type vs. value member. Value members come first.
+        return lhs->getKind() < rhs->getKind();
+      }
+    }
+  };
+}
+
 void ConstraintSystem::collectConstraintsForTypeVariables(
        SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints) {
   typeVarConstraints.clear();
@@ -1972,51 +2048,15 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
     // Record the constraint.
     typeVarConstraints[constraintsIdx - 1].Constraints.push_back(constraint);
   }
+
+  // Sort the type variable constraints.
+  for (auto &tvc : typeVarConstraints) {
+    std::stable_sort(tvc.Constraints.begin(), tvc.Constraints.end(),
+                     OrderConstraintForTypeVariable());
+  }
 }
 
 namespace {
-  /// \brief Provide a partial ordering between two constraints.
-  ///
-  /// The ordering depends on the the classification of constraints:
-  ///   - For relational constraints, the constraints are ordered by strength,
-  ///     e.g., == precedes < and < precedes <<.
-  ///
-  ///   - For literal constraints, we order by literal kind.
-  ///
-  ///   - For member constraints, we order by member name (lexicographically)
-  ///     and, for equivalently-named constraints, with value members
-  ///     preceding type members.
-  class OrderConstraintForTypeVariable {
-  public:
-    bool operator()(Constraint *lhs, Constraint *rhs) const {
-      // If the classifications differ, order by classification.
-      auto lhsClass = lhs->getClassification();
-      auto rhsClass = rhs->getClassification();
-      if (lhsClass != rhsClass)
-        return lhsClass < rhsClass;
-
-      switch (lhsClass) {
-      case ConstraintClassification::Relational: {
-        // Order based on the relational constraint kind.
-        return lhs->getKind() < rhs->getKind();
-      }
-
-      case ConstraintClassification::Literal:
-        // For literals, order by literal kind.
-        return lhs->getLiteralKind() < rhs->getLiteralKind();
-
-      case ConstraintClassification::Member:
-        // For members, order first by member name.
-        if (lhs->getMember() != rhs->getMember()) {
-          return lhs->getMember().str() < rhs->getMember().str();
-        }
-
-        // Order by type vs. value member. Value members come first.
-        return lhs->getKind() < rhs->getKind();
-      }
-    }
-  };
-
   /// \brief Maintains the set of type variable constraints
   struct RelationalTypeVarConstraints {
     RelationalTypeVarConstraints() : Below(), Above() { }
@@ -2126,11 +2166,6 @@ ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
                                          SmallPtrSet<Constraint *, 4> &solved) {
   bool addedConstraints = false;
   bool foundEquality = false;
-
-  // First, sort the constraints so that we can visit the various kinds of
-  // constraints in the order we want to.
-  std::stable_sort(tvc.Constraints.begin(), tvc.Constraints.end(),
-                   OrderConstraintForTypeVariable());
 
   // Collect the relational constraints above and below each simplified type,
   // dropping any redundant constraints in the process.
@@ -2322,6 +2357,96 @@ static void resolveOverloadSet(ConstraintSystem &cs,
   }
 }
 
+/// \brief Find the lower and upper bounds on a type variable.
+static std::pair<Type, Type>
+findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc) {
+  // Collect the relational constraints above and below the type variable.
+  // FIXME: We perform this operation multiple times. It would be better to
+  // keep this information online, generated either as constraints are
+  // added or as part of simplification.
+  SmallVector<std::pair<Type, Constraint *>, 4> typesBelow;
+  SmallVector<std::pair<Type, Constraint *>, 4> typesAbove;
+  collectTypesAboveAndBelow(cs, tvc, typesBelow, typesAbove, nullptr, nullptr);
+
+  std::pair<Type, Type> bounds;
+
+  if (!typesBelow.empty()) {
+    if (typesBelow.size() == 1) {
+      bounds.first = typesBelow.front().first;
+    } else {
+      // FIXME: Compute the meet of the types in typesBelow.
+    }
+  }
+
+  if (!typesAbove.empty()) {
+    if (typesAbove.size() == 1) {
+      bounds.second = typesAbove.front().first;
+    } else {
+      // FIXME: Compute the join of the types in typesAbove.
+    }
+  }
+
+  return bounds;
+}
+
+/// \brief Given the direct constraints placed on the type variables within
+/// a given constraint system, resolve the constraints for a type variable.
+///
+/// \returns true if we weren't able to resolve any type variables.
+static bool
+resolveTypeVariable(ConstraintSystem &cs,
+  SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints,
+  SmallVectorImpl<ConstraintSystem *> &stack) {
+
+  // Find a type variable with a lower bound, because those are the most
+  // interesting.
+  TypeVariableConstraints *tvcWithUpper = nullptr;
+  Type tvcUpper;
+  for (auto &tvc : typeVarConstraints) {
+    auto bounds = findTypeVariableBounds(cs, tvc);
+
+    // If we have a lower bound, introduce a child constraint system binding
+    // this type variable to that lower bound.
+    if (bounds.first) {
+      auto childCS = cs.createDerivedConstraintSystem(tvc.TypeVar);
+      childCS->addConstraint(ConstraintKind::Equal, tvc.TypeVar, bounds.first);
+
+      // Simplify the resulting system.
+      if (!childCS->simplify())
+        stack.push_back(childCS);
+      
+      // FIXME: We need a contingency plan here. If there's no solution here,
+      // we should try supertypes of the lower bound.
+      return false;
+    }
+
+    // If there is an upper bound, record that (but don't use it yet).
+    if (bounds.second && !tvcWithUpper) {
+      tvcWithUpper = &tvc;
+      tvcUpper = bounds.second;
+    }
+  }
+
+  // If we had an upper bound, introduce a child constraint system binding
+  // this type variable to that upper bound.
+  // FIXME: This type may be too specific, but we'd really rather not
+  // go on a random search for subtypes that might work.
+  if (tvcWithUpper) {
+    auto childCS = cs.createDerivedConstraintSystem(tvcWithUpper->TypeVar);
+    childCS->addConstraint(ConstraintKind::Equal, tvcWithUpper->TypeVar,
+                           tvcUpper);
+    // Simplify the resulting system.
+    if (!childCS->simplify())
+      stack.push_back(childCS);
+
+    // FIXME: We still need a contingency plan here, which tries binding a
+    // different variable.
+    return false;
+  }
+
+  return true;
+}
+
 bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
   assert(&getTopConstraintSystem() == this &&"Can only solve at the top level");
 
@@ -2356,10 +2481,10 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
       continue;
     }
 
-    // Attempt to solve for the constrained type variable that is most likely
-    // to prune the number of constraint systems, creating child systems
-    // for each potential solution.
-    // FIXME: Do something like this
+    // Attempt to find a solution by constraining a type variable based on
+    // the types that are below or above it.
+    if (!resolveTypeVariable(*cs, typeVarConstraints, stack))
+      continue;
 
     // FIXME: If the only type variable constraints we have left are literal
     // constraints, try substituting in default values.
@@ -2390,15 +2515,21 @@ void ConstraintSystem::dump() {
 
     out << "Assumptions:\n";
     for (auto p = path.rbegin(), pe = path.rend(); p != pe; ++p) {
-      auto &choice = InOverloadSet->getChoices()[OverloadChoiceIdx];
+      auto cs = *p;
       out.indent(2);
-      out << "  selected overload set #" << InOverloadSet->getID()
-          << " choice #" << OverloadChoiceIdx << " for ";
-      if (choice.getBaseType())
-        out << choice.getBaseType()->getString() << ".";
-      out << choice.getDecl()->getName().str() << ": "
-          << InOverloadSet->getBoundType()->getString() << " == "
-          << choice.getDecl()->getTypeOfReference()->getString() << "\n";
+      if (cs->InOverloadSet) {
+        auto &choice = cs->InOverloadSet->getChoices()[cs->OverloadChoiceIdx];
+        out << "  selected overload set #" << cs->InOverloadSet->getID()
+            << " choice #" << cs->OverloadChoiceIdx << " for ";
+        if (choice.getBaseType())
+          out << choice.getBaseType()->getString() << ".";
+        out << choice.getDecl()->getName().str() << ": "
+            << cs->InOverloadSet->getBoundType()->getString() << " == "
+            << choice.getDecl()->getTypeOfReference()->getString() << "\n";
+        continue;
+      }
+      out << "  assuming " << cs->assumedTypeVar->getString() << " == "
+          << cs->getFixedType(cs->assumedTypeVar) << "\n";
     }
     out << "\n";
   }
