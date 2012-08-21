@@ -367,6 +367,9 @@ namespace {
   /// \brief An overload set, which is a set of overloading choices from which
   /// only one can be selected.
   class OverloadSet {
+    /// \brief ID number that uniquely identifies this overload set.
+    unsigned ID;
+
     /// \brief The expression or constraint that introduced the overload choice.
     llvm::PointerUnion<Expr *, const Constraint *> ExprOrConstraint;
 
@@ -380,16 +383,20 @@ namespace {
     /// system.
     void *operator new(size_t) = delete;
 
-    OverloadSet(llvm::PointerUnion<Expr *, const Constraint *> from,
+    OverloadSet(unsigned ID,
+                llvm::PointerUnion<Expr *, const Constraint *> from,
                 Type boundType,
                 ArrayRef<OverloadChoice> choices)
-      : ExprOrConstraint(from), NumChoices(choices.size()),
+      : ID(ID), ExprOrConstraint(from), NumChoices(choices.size()),
         BoundType(boundType)
     {
       memmove(this+1, choices.data(), sizeof(OverloadChoice)*choices.size());
     }
 
   public:
+    /// \brief Retrieve the ID associated with this overload set.
+    unsigned getID() const { return ID; }
+    
     /// \brief Retrieve the set of choices provided by this overload set.
     ArrayRef<OverloadChoice> getChoices() const {
       return { reinterpret_cast<const OverloadChoice *>(this + 1),
@@ -456,9 +463,11 @@ namespace {
     // ---Only valid in the top-level constraint system---
     llvm::BumpPtrAllocator Allocator;
     unsigned TypeCounter;
-
+    unsigned OverloadSetCounter;
+    
     // ---Only valid in the top-level constraint system---
-    unsigned overloadChoiceIdx;
+    OverloadSet *InOverloadSet;
+    unsigned OverloadChoiceIdx;
 
     // Valid everywhere
     SmallVector<TypeVariableType *, 16> TypeVariables;
@@ -471,19 +480,24 @@ namespace {
       return getTopConstraintSystem().TypeCounter++;
     }
 
+    unsigned assignOverloadSetID() {
+      return getTopConstraintSystem().OverloadSetCounter++;
+    }
+    friend class OverloadSet;
+
   public:
     ConstraintSystem(TypeChecker &TC)
-      : TC(TC), Parent(nullptr), TypeCounter(0) {}
+      : TC(TC), Parent(nullptr), TypeCounter(0), OverloadSetCounter(0) {}
 
     ConstraintSystem(ConstraintSystem *parent, unsigned overloadChoiceIdx)
       : TC(parent->TC), Parent(parent),
-        overloadChoiceIdx(overloadChoiceIdx),
+        InOverloadSet(parent->UnresolvedOverloadSets.front()),
+        OverloadChoiceIdx(overloadChoiceIdx),
         // FIXME: Lazily copy from parent system.
         Constraints(parent->Constraints),
         UnresolvedOverloadSets(parent->UnresolvedOverloadSets.begin()+1,
                                parent->UnresolvedOverloadSets.end())
     {
-      // FIXME: Lazily copy from parent system.
     }
 
     /// \brief Retrieve the type checker associated with this constraint system.
@@ -775,7 +789,8 @@ OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
   unsigned size = sizeof(OverloadSet)
                 + sizeof(OverloadChoice) * choices.size();
   void *mem = CS.getAllocator().Allocate(size, alignof(OverloadSet));
-  return ::new (mem) OverloadSet(expr, boundType, choices);
+  return ::new (mem) OverloadSet(CS.assignOverloadSetID(), expr, boundType,
+                                 choices);
 }
 
 OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
@@ -785,7 +800,8 @@ OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
   unsigned size = sizeof(OverloadSet)
   + sizeof(OverloadChoice) * choices.size();
   void *mem = CS.getAllocator().Allocate(size, alignof(OverloadSet));
-  return ::new (mem) OverloadSet(constraint, boundType, choices);
+  return ::new (mem) OverloadSet(CS.assignOverloadSetID(), constraint,
+                                 boundType, choices);
 }
 
 Type ConstraintSystem::openType(Type startingType) {
@@ -2275,6 +2291,27 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
 void ConstraintSystem::dump() {
   llvm::raw_ostream &out = llvm::errs();
 
+  if (Parent) {
+    SmallVector<ConstraintSystem *, 4> path;;
+    for (auto cs = this; cs->Parent; cs = cs->Parent) {
+      path.push_back(cs);
+    }
+
+    out << "Assumptions:\n";
+    for (auto p = path.rbegin(), pe = path.rend(); p != pe; ++p) {
+      auto &choice = InOverloadSet->getChoices()[OverloadChoiceIdx];
+      out.indent(2);
+      out << "  selected overload set #" << InOverloadSet->getID()
+          << " choice #" << OverloadChoiceIdx << " for ";
+      if (choice.getBaseType())
+        out << choice.getBaseType()->getString() << ".";
+      out << choice.getDecl()->getName().str() << ": "
+          << InOverloadSet->getBoundType()->getString() << " == "
+          << choice.getDecl()->getTypeOfReference()->getString() << "\n";
+    }
+    out << "\n";
+  }
+
   out << "Type Variables:\n";
   for (auto cs = this; cs; cs = cs->Parent) {
     for (auto tv : cs->TypeVariables) {
@@ -2299,9 +2336,8 @@ void ConstraintSystem::dump() {
 
   if (!UnresolvedOverloadSets.empty()) {
     out << "\nUnresolved overload sets:\n";
-    unsigned idx = 0;
     for (auto overload : UnresolvedOverloadSets) {
-      out.indent(2) << "set #" << ++idx << " binds "
+      out.indent(2) << "set #" << overload->getID() << " binds "
         << overload->getBoundType()->getString() << ":\n";
       for (auto choice : overload->getChoices()) {
         out.indent(4);
