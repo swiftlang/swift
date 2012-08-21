@@ -714,6 +714,7 @@ namespace {
     SolutionKind matchTypes(Type type1, Type type2, TypeMatchKind kind,
                             unsigned flags, bool &trivial);
 
+  public:
     /// \brief Simplify a type, by replacing type variables with either their
     /// fixed types (if available) or their representatives.
     ///
@@ -721,6 +722,7 @@ namespace {
     /// type equivalence requirements aren't introduced between comparisons.
     Type simplifyType(Type type);
 
+  private:
     /// \brief Attempt to simplify the given literal constraint.
     SolutionKind simplifyLiteralConstraint(Type type, LiteralKind kind);
 
@@ -2024,6 +2026,101 @@ namespace {
   };
 }
 
+/// \brief Collect the set of types that are bound "below" and "above" the
+/// given type variable T.
+///
+/// A type X is above T if there is a constraint
+/// T <t X, T < X, or T << X, whereas it is below T if there is a constraint
+/// X <t T, X < T, X << T.
+///
+/// \param cs The constraint system in which these constraints occur.
+///
+/// \param tvc The type variable and its constraints. The constraints must
+/// already have been sorted with the predicate
+/// \c OrderConstraintForTypeVariable.
+///
+/// \param typesBelow Will be populated with a set of type/constraint pairs
+/// describing the types that are "below" the type variable. The list of types
+/// is uniqued, and the corresponding constraint will be the most strict
+/// constraint for that particular type.
+///
+/// \param typesAbove Will be populated with a set of type/constraint pairs
+/// describing the types that are "above" the type variable. The list of types
+/// is uniqued, and the corresponding constraint will be the most strict
+/// constraint for that particular type.
+///
+/// \param onRedundant An optional callback that will be invoked when we
+/// uncover a redundant constraint.
+///
+/// \param onAboveAndBelow An optional callback that will be invoked when
+/// a given type occurs both above and below the type variable.
+///
+/// \returns An iterator into the list of constraints on this type variable
+/// that points just past the last relational constraint.
+static SmallVectorImpl<Constraint *>::iterator
+collectTypesAboveAndBelow(ConstraintSystem &cs,
+  TypeVariableConstraints &tvc,
+  SmallVectorImpl<std::pair<Type, Constraint *>> &typesBelow,
+  SmallVectorImpl<std::pair<Type, Constraint *>> &typesAbove,
+  std::function<void(Constraint *)> onRedundant,
+  std::function<void(Type, Constraint *, Constraint *)> onAboveAndBelow)
+{
+  // Collect the relational constraints above and below each simplified type,
+  // dropping any redundant constraints in the process.
+  llvm::DenseMap<CanType, RelationalTypeVarConstraints> typeVarConstraints;
+  auto curCons = tvc.Constraints.begin(),
+  lastConstraint = tvc.Constraints.end();
+  for (; curCons != lastConstraint &&
+       (*curCons)->getClassification()  == ConstraintClassification::Relational;
+       ++curCons) {
+    // Determine whether we have a constraint below (vs. a constraint above)
+    // this type variable.
+    bool constraintIsBelow = false;
+    if (auto secondTV = (*curCons)->getSecondType()
+            ->getAs<TypeVariableType>()) {
+      constraintIsBelow = (secondTV->getImpl().getRepresentative()
+                            == tvc.TypeVar);
+    }
+
+    // Compute the type bound, and simplify it.
+    Type bound = constraintIsBelow? (*curCons)->getFirstType()
+                                  : (*curCons)->getSecondType();
+    bound = cs.simplifyType(bound);
+
+    Constraint *(RelationalTypeVarConstraints::*which)
+      = constraintIsBelow? &RelationalTypeVarConstraints::Below
+                         : &RelationalTypeVarConstraints::Above;
+    auto &typeVarConstraint = typeVarConstraints[bound->getCanonicalType()];
+
+    if (typeVarConstraint.*which) {
+      // We already have a constraint that provides either the same relation
+      // or a tighter relation, because the sort orders relational constraints
+      // in order of nonincreasing strictness.
+      assert(((typeVarConstraint.*which)->getKind()
+              < (*curCons)->getKind()) &&
+             "Improper ordering of constraints");
+      if (onRedundant)
+        onRedundant(*curCons);
+      continue;
+    }
+
+    // Record this constraint.
+    typeVarConstraint.*which = *curCons;
+    if (constraintIsBelow)
+      typesBelow.push_back(std::make_pair(bound, *curCons));
+    else
+      typesAbove.push_back(std::make_pair(bound, *curCons));
+
+    // If a type variable T is bounded both above and below by a nominal type X
+    // (or specialization of one), tell the caller.
+    if (typeVarConstraint.Below && typeVarConstraint.Above &&
+        onAboveAndBelow)
+      onAboveAndBelow(bound, typeVarConstraint.Above, typeVarConstraint.Below);
+  }
+
+  return curCons;
+}
+
 bool
 ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
                                          SmallPtrSet<Constraint *, 4> &solved) {
@@ -2037,80 +2134,45 @@ ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
 
   // Collect the relational constraints above and below each simplified type,
   // dropping any redundant constraints in the process.
-  llvm::DenseMap<CanType, RelationalTypeVarConstraints> typeVarConstraints;
   SmallVector<std::pair<Type, Constraint *>, 4> typesBelow;
   SmallVector<std::pair<Type, Constraint *>, 4> typesAbove;
-  auto currentConstraint = tvc.Constraints.begin(),
-          lastConstraint = tvc.Constraints.end();
-  for (; currentConstraint != lastConstraint &&
-         (*currentConstraint)->getClassification()
-           == ConstraintClassification::Relational;
-       ++currentConstraint) {
-    // Determine whether we have a constraint below (vs. a constraint above)
-    // this type variable.
-    bool constraintIsBelow = false;
-    if (auto secondTV = (*currentConstraint)->getSecondType()
-                           ->getAs<TypeVariableType>()) {
-      constraintIsBelow = (secondTV->getImpl().getRepresentative()
-                             == tvc.TypeVar);
-    }
 
-    // Compute the type bound, and simplify it.
-    Type bound = constraintIsBelow? (*currentConstraint)->getFirstType()
-                                  : (*currentConstraint)->getSecondType();
-    bound = simplifyType(bound);
-
-    Constraint *(RelationalTypeVarConstraints::*which)
-      = constraintIsBelow? &RelationalTypeVarConstraints::Below
-                         : &RelationalTypeVarConstraints::Above;
-    auto &typeVarConstraint = typeVarConstraints[bound->getCanonicalType()];
-
-    if (typeVarConstraint.*which) {
-      // We already have a constraint that provides either the same relation
-      // or a tighter relation, because the sort orders relational constraints
-      // in order of nonincreasing strictness.
-      assert(((typeVarConstraint.*which)->getKind()
-                < (*currentConstraint)->getKind()) &&
-             "Improper ordering of constraints");
-      solved.insert(*currentConstraint);
-      continue;
-    }
-
-    // Record this constraint.
-    typeVarConstraint.*which = *currentConstraint;
-    if (constraintIsBelow)
-      typesBelow.push_back(std::make_pair(bound, *currentConstraint));
-    else
-      typesAbove.push_back(std::make_pair(bound, *currentConstraint));
-
-    // If a type variable T is bounded both above and below by a nominal type X
-    // (or specialization of one), then we can conclude that X == T, e.g.,
-    //
-    //   X < T and T < X => T == X
-    //
-    // Note that this rule does not apply in general because tuple types
-    // allow one to add or drop labels essentially at will, so there are
-    // multiple types T for which X < T and T < X. With nominal types,
-    // we prohibit cyclic conversions and subtyping relationships.
-    if (typeVarConstraint.Below && typeVarConstraint.Above &&
-        (bound->is<NominalType>() || bound->is<BoundGenericType>())) {
-      addConstraint(ConstraintKind::Equal, tvc.TypeVar, bound);
-      foundEquality = true;
-      addedConstraints = true;
-    }
-  }
+  auto lastConstraint = tvc.Constraints.end();
+  auto currentConstraint
+    = collectTypesAboveAndBelow(*this, tvc, typesBelow, typesAbove,
+                                [&](Constraint *redundant) {
+                                  solved.insert(redundant);
+                                },
+        [&](Type bound,
+            Constraint *above,
+            Constraint *below) {
+          // If a type variable T is bounded both above and below by a nominal
+          // type X (or specialization of one), then we can conclude that
+          // X == T, e.g.,
+          //
+          //   X < T and T < X => T == X
+          //
+          // Note that this rule does not apply in general because tuple types
+          // allow one to add or drop labels essentially at will, so there are
+          // multiple types T for which X < T and T < X. With nominal types,
+          // we prohibit cyclic conversions and subtyping relationships.
+          if (bound->is<NominalType>() || bound->is<BoundGenericType>()) {
+            addConstraint(ConstraintKind::Equal, tvc.TypeVar, bound);
+            foundEquality = true;
+            addedConstraints = true;
+          }
+        });
 
   // If we determined an equality constraint, all of the relational constraints
   // are now solved.
   if (foundEquality) {
-    for (auto rtv : typeVarConstraints) {
-      if (rtv.second.Above)
-        solved.insert(rtv.second.Above);
-      if (rtv.second.Below)
-        solved.insert(rtv.second.Below);
+    for (auto at : typesAbove) {
+        solved.insert(at.second);
+    }
+    for (auto bt : typesBelow) {
+      solved.insert(bt.second);
     }
   }
-  typeVarConstraints.clear();
 
   // Introduce transitive constraints, e.g.,
   //
@@ -2280,8 +2342,27 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
       continue;
     }
 
-    // FIXME: If we have any unbound type variables that have constraints
-    // on them, deal with them now.
+    // Collect the list of constraints that apply directly to each of the
+    // type variables. This list will be used in subsequent solution attempts.
+    SmallVector<TypeVariableConstraints, 16> typeVarConstraints;
+    cs->collectConstraintsForTypeVariables(typeVarConstraints);
+
+    // If there are no remaining type constraints, we're stuck. Just call
+    // this constraint system viable.
+    // FIXME: If all type variables were bound, we actually have a solution.
+    // Record that.
+    if (typeVarConstraints.empty()) {
+      viable.push_back(cs);
+      continue;
+    }
+
+    // Attempt to solve for the constrained type variable that is most likely
+    // to prune the number of constraint systems, creating child systems
+    // for each potential solution.
+    // FIXME: Do something like this
+
+    // FIXME: If the only type variable constraints we have left are literal
+    // constraints, try substituting in default values.
 
     // We don't know how to do anything else with this system. Call it
     // viable.
