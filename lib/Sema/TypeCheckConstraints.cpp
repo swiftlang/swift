@@ -372,14 +372,19 @@ namespace {
 
     /// \brief The number of choices in the overload set.
     unsigned NumChoices;
+
+    /// \brief The type bound by this overload set.
+    Type BoundType;
     
     /// \brief Overload sets are always allocated within a given constraint
     /// system.
     void *operator new(size_t) = delete;
 
     OverloadSet(llvm::PointerUnion<Expr *, const Constraint *> from,
+                Type boundType,
                 ArrayRef<OverloadChoice> choices)
-      : ExprOrConstraint(from), NumChoices(choices.size())
+      : ExprOrConstraint(from), NumChoices(choices.size()),
+        BoundType(boundType)
     {
       memmove(this+1, choices.data(), sizeof(OverloadChoice)*choices.size());
     }
@@ -391,12 +396,19 @@ namespace {
                NumChoices };
     }
 
+    /// \brief Retrieve the type that is bound (via a same-type
+    /// constraint) by this overload set.
+    Type getBoundType() const { return BoundType; }
+
     /// \brief Create a new overload set, using (and copying) the given choices.
-    static OverloadSet *getNew(ConstraintSystem &CS, Expr *expr,
+    static OverloadSet *getNew(ConstraintSystem &CS,
+                               Type boundType,
+                               Expr *expr,
                                ArrayRef<OverloadChoice> choices);
 
     /// \brief Create a new overload set, using (and copying) the given choices.
     static OverloadSet *getNew(ConstraintSystem &CS,
+                               Type boundType,
                                const Constraint *constraint,
                                ArrayRef<OverloadChoice> choices);
 };
@@ -440,8 +452,15 @@ namespace {
   class ConstraintSystem {
     TypeChecker &TC;
     ConstraintSystem *Parent;
+
+    // ---Only valid in the top-level constraint system---
     llvm::BumpPtrAllocator Allocator;
     unsigned TypeCounter;
+
+    // ---Only valid in the top-level constraint system---
+    unsigned overloadChoiceIdx;
+
+    // Valid everywhere
     SmallVector<TypeVariableType *, 16> TypeVariables;
     SmallVector<Constraint *, 16> Constraints;
     SmallVector<OverloadSet *, 4> UnresolvedOverloadSets;
@@ -449,27 +468,56 @@ namespace {
     llvm::DenseMap<TypeVariableType *, Type> FixedTypes;
 
     unsigned assignTypeVariableID() {
-      ConstraintSystem *topCS = this;
-      while (topCS->Parent)
-        topCS = topCS->Parent;
-      return topCS->TypeCounter++;
+      return getTopConstraintSystem().TypeCounter++;
     }
 
   public:
-    ConstraintSystem(TypeChecker &TC, ConstraintSystem *Parent = nullptr)
-      : TC(TC), Parent(Parent), TypeCounter(0) { }
+    ConstraintSystem(TypeChecker &TC)
+      : TC(TC), Parent(nullptr), TypeCounter(0) {}
 
-    /// \brief Retrieve the type checker assciated 
+    ConstraintSystem(ConstraintSystem *parent, unsigned overloadChoiceIdx)
+      : TC(parent->TC), Parent(parent),
+        overloadChoiceIdx(overloadChoiceIdx),
+        // FIXME: Lazily copy from parent system.
+        Constraints(parent->Constraints),
+        UnresolvedOverloadSets(parent->UnresolvedOverloadSets.begin()+1,
+                               parent->UnresolvedOverloadSets.end())
+    {
+      // FIXME: Lazily copy from parent system.
+    }
+
+    /// \brief Retrieve the type checker associated with this constraint system.
     TypeChecker &getTypeChecker() const { return TC; }
 
     /// \brief Retrieve the AST context.
     ASTContext &getASTContext() const { return TC.Context; }
 
+    /// \brief Retrieve the top-level constraint system.
+    ConstraintSystem &getTopConstraintSystem() {
+      ConstraintSystem *cs = this;
+      while (cs->Parent)
+        cs = cs->Parent;
+      return *cs;
+    }
+
+    /// \brief Retrieve the depth of this constraint system, i.e., the
+    /// number of hops from this constraint system to the top-level constraint
+    /// system.
+    unsigned getConstraintSystemDepth() const {
+      unsigned depth = 0;
+      const ConstraintSystem *cs = this;
+      while (cs->Parent) {
+        ++depth;
+        cs = cs->Parent;
+      }
+      return depth;
+    }
+
     /// \brief Create a new constraint system that is derived from this
     /// constraint system, referencing the rules of the parent system but
     /// also introducing its own (likely dependent) constraints.
-    ConstraintSystem *createDerivedConstraintSystem() {
-      auto result = new ConstraintSystem(TC, this);
+    ConstraintSystem *createDerivedConstraintSystem(unsigned overloadChoiceIdx){
+      auto result = new ConstraintSystem(this, overloadChoiceIdx);
       Children.push_back(std::unique_ptr<ConstraintSystem>(result));
       return result;
     }
@@ -704,6 +752,13 @@ namespace {
     /// \returns true if an error occurred, false otherwise.
     bool simplify();
 
+    /// \brief Solve the system of constraints.
+    ///
+    /// \param viable The set of constraint systems that are still viable.
+    ///
+    /// \returns true if an error occurred, false otherwise.
+    bool solve(SmallVectorImpl<ConstraintSystem *> &viable);
+
     void dump();
   };
 }
@@ -713,21 +768,24 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
   return cs.getAllocator().Allocate(bytes, alignment);
 }
 
-OverloadSet *OverloadSet::getNew(ConstraintSystem &CS, Expr *expr,
+OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
+                                 Type boundType,
+                                 Expr *expr,
                                  ArrayRef<OverloadChoice> choices) {
   unsigned size = sizeof(OverloadSet)
                 + sizeof(OverloadChoice) * choices.size();
   void *mem = CS.getAllocator().Allocate(size, alignof(OverloadSet));
-  return ::new (mem) OverloadSet(expr, choices);
+  return ::new (mem) OverloadSet(expr, boundType, choices);
 }
 
 OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
+                                 Type boundType,
                                  const Constraint *constraint,
                                  ArrayRef<OverloadChoice> choices) {
   unsigned size = sizeof(OverloadSet)
   + sizeof(OverloadChoice) * choices.size();
   void *mem = CS.getAllocator().Allocate(size, alignof(OverloadSet));
-  return ::new (mem) OverloadSet(constraint, choices);
+  return ::new (mem) OverloadSet(constraint, boundType, choices);
 }
 
 Type ConstraintSystem::openType(Type startingType) {
@@ -965,7 +1023,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       }
 
       // Record this overload set.
-      CS.addOverloadSet(OverloadSet::getNew(CS, expr, choices));
+      CS.addOverloadSet(OverloadSet::getNew(CS, tv, expr, choices));
       return tv;
     }
 
@@ -982,7 +1040,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       }
       
       // Record this overload set.
-      CS.addOverloadSet(OverloadSet::getNew(CS, expr, choices));
+      CS.addOverloadSet(OverloadSet::getNew(CS, tv, expr, choices));
       return tv;
     }
 
@@ -1647,9 +1705,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // FIXME: Auto-closure.
   // FIXME: Materialization
 
-  if (kind >= TypeMatchKind::Conversion) {
+  if (kind >= TypeMatchKind::Subtype) {
     // A scalar value can be converted to a non-empty tuple with at most one
     // non-defaulted element.
+    // FIXME: Subtyping shouldn't allow filling in default arguments?
     if (auto tuple2 = type2->getAs<TupleType>()) {
       int scalarFieldIdx = tuple2->getFieldForScalarInit();
       if (scalarFieldIdx >= 0) {
@@ -1659,6 +1718,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
     }
 
+  }
+
+  if (kind >= TypeMatchKind::Conversion) {
     // An lvalue of type T1 can be converted to a value of type T2 so long as
     // T1 is convertible to T2 (by loading the value).
     if (auto lvalue1 = type1->getAs<LValueType>()) {
@@ -1701,7 +1763,7 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind) {
 
   return TC.isLiteralCompatibleType(type, SourceLoc(), kind,
                                     /*Complain=*/false).first
-           ? SolutionKind::Solved // FIXME: trivially solved
+           ? SolutionKind::TriviallySolved
            : SolutionKind::Error;
 }
 
@@ -1790,7 +1852,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   for (auto &result : lookup.Results) {
     choices.push_back(OverloadChoice(baseTy, result.D));
   }
-  addOverloadSet(OverloadSet::getNew(*this, &constraint, choices));
+  addOverloadSet(OverloadSet::getNew(*this, memberTy, &constraint, choices));
   return SolutionKind::Solved;
 }
 
@@ -2144,6 +2206,68 @@ bool ConstraintSystem::simplify() {
 }
 
 //===--------------------------------------------------------------------===//
+// Constraint solving
+//===--------------------------------------------------------------------===//
+#pragma mark Constraint solving
+
+bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
+  assert(&getTopConstraintSystem() == this &&"Can only solve at the top level");
+
+  // Seed the constraint system stack with ourselves.
+  SmallVector<ConstraintSystem *, 16> stack;
+  stack.push_back(this);
+
+  // If there are any unresolved overload sets, create child systems in
+  // which we resolve the next overload set.
+  while (!stack.empty()) {
+    auto cs = stack.back();
+    stack.pop_back();
+
+    // If there are any unresolved overload sets, create child systems in
+    // which we resolve the overload set to each option.
+    if (!cs->UnresolvedOverloadSets.empty()) {
+      auto ovl = cs->UnresolvedOverloadSets.front();
+      auto choices = ovl->getChoices();
+      for (unsigned i = 0, n = choices.size(); i != n; ++i) {
+        auto idx = n-i-1;
+        auto &choice = ovl->getChoices()[idx];
+        auto childCS = cs->createDerivedConstraintSystem(idx);
+
+        // Bind the overload set's type to the type of a reference to the
+        // specific declaration choice.
+        Type refType;
+        if (choice.getBaseType())
+          refType = childCS->getTypeOfMemberReference(choice.getBaseType(),
+                                                      choice.getDecl(),
+                                                      /*FIXME:*/false);
+        else
+          refType = childCS->getTypeOfReference(choice.getDecl());
+        childCS->addConstraint(ConstraintKind::Equal, ovl->getBoundType(),
+                               refType);
+
+        // Simplify the child system. Assuming it's still valid, add it to
+        // the stack to be dealt with later.
+        // FIXME: If it's not still valid, keep it around for diagnostics.
+        if (!childCS->simplify())
+          stack.push_back(childCS);
+      }
+      continue;
+    }
+
+    // FIXME: If we have any unbound type variables that have constraints
+    // on them, deal with them now.
+
+    // We don't know how to do anything else with this system. Call it
+    // viable.
+    viable.push_back(cs);
+  }
+
+  // FIXME: Having more than one child system left at the end means there
+  // is an ambiguity. Diagnose it.
+  return viable.size() == 0;
+}
+
+//===--------------------------------------------------------------------===//
 // Debugging
 //===--------------------------------------------------------------------===//
 #pragma mark Debugging
@@ -2152,23 +2276,41 @@ void ConstraintSystem::dump() {
   llvm::raw_ostream &out = llvm::errs();
 
   out << "Type Variables:\n";
-  for (auto tv : TypeVariables) {
-    out.indent(2);
-    tv->getImpl().print(out);
-    if (tv->getImpl().getRepresentative() == tv) {
-      if (auto fixed = getFixedType(tv)) {
-        out << " as ";
-        fixed->print(out);
+  for (auto cs = this; cs; cs = cs->Parent) {
+    for (auto tv : cs->TypeVariables) {
+      out.indent(2);
+      tv->getImpl().print(out);
+      if (tv->getImpl().getRepresentative() == tv) {
+        if (auto fixed = getFixedType(tv)) {
+          out << " as ";
+          fixed->print(out);
+        }
       }
+      out << "\n";
     }
-    out << "\n";
   }
-
+  
   out << "\nConstraints:\n";
   for (auto constraint : Constraints) {
     out.indent(2);
     constraint->print(out);
     out << "\n";
+  }
+
+  if (!UnresolvedOverloadSets.empty()) {
+    out << "\nUnresolved overload sets:\n";
+    unsigned idx = 0;
+    for (auto overload : UnresolvedOverloadSets) {
+      out.indent(2) << "set #" << ++idx << " binds "
+        << overload->getBoundType()->getString() << ":\n";
+      for (auto choice : overload->getChoices()) {
+        out.indent(4);
+        if (choice.getBaseType())
+          out << choice.getBaseType()->getString() << ".";
+        out << choice.getDecl()->getName().str() << ": ";
+        out << choice.getDecl()->getTypeOfReference()->getString() << '\n';
+      }
+    }
   }
 }
 
@@ -2183,6 +2325,22 @@ void TypeChecker::dumpConstraints(Expr *expr) {
   bool error = CS.simplify();
   CS.dump();
 
+  if (!error) {
+    llvm::errs() << "---Solved constraints---\n";
+    SmallVector<ConstraintSystem *, 4> viable;
+    error = CS.solve(viable);
+    CS.dump();
+
+    if (!error) {
+      llvm::errs() << "---Viable constraint systems---\n";
+      unsigned idx = 0;
+      for (auto cs : viable) {
+        llvm::errs() << "---System #" << ++idx << "---\n";
+        cs->dump();
+      }
+    }
+  }
+  
   llvm::errs() << "\nConstraint system is "
                << (error? "ill-formed" : "still viable")
                << "\n";
