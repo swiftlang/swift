@@ -1411,27 +1411,183 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                   TypeMatchKind kind, unsigned flags,
                                   bool &trivial) {
-  // FIXME: When we're allowed to perform conversions, we can end up
-  // shuffling here. Compute that shuffle.
-  if (tuple1->getFields().size() != tuple2->getFields().size())
-    return SolutionKind::Error;
-
-  SolutionKind result = SolutionKind::TriviallySolved;
   unsigned subFlags = flags | TMF_GenerateConstraints;
-  for (unsigned i = 0, n = tuple1->getFields().size(); i != n; ++i) {
-    const auto &elt1 = tuple1->getFields()[i];
+
+  // Equality and subtyping have fairly strict requirements on tuple matching,
+  // requiring
+  if (kind < TypeMatchKind::Conversion) {
+    if (tuple1->getFields().size() != tuple2->getFields().size())
+      return SolutionKind::Error;
+
+    SolutionKind result = SolutionKind::TriviallySolved;
+    for (unsigned i = 0, n = tuple1->getFields().size(); i != n; ++i) {
+      const auto &elt1 = tuple1->getFields()[i];
+      const auto &elt2 = tuple2->getFields()[i];
+
+      // If the names don't match, we may have a conflict.
+      if (elt1.getName() != elt2.getName()) {
+        // Same-type requirements require exact name matches.
+        if (kind == TypeMatchKind::SameType)
+          return SolutionKind::Error;
+
+        // For subtyping constraints, just make sure that this name isn't
+        // used at some other position.
+        if (!elt2.getName().empty()) {
+          int matched = tuple1->getNamedElementId(elt2.getName());
+          if (matched != -1)
+            return SolutionKind::Error;
+        }
+      }
+
+      // Variadic bit must match.
+      if (elt1.isVararg() != elt2.isVararg())
+        return SolutionKind::Error;
+
+      // Compare the element types.
+      switch (matchTypes(elt1.getType(), elt2.getType(), kind, subFlags,
+                         trivial)) {
+      case SolutionKind::Error:
+        return SolutionKind::Error;
+
+      case SolutionKind::TriviallySolved:
+        break;
+
+      case SolutionKind::Solved:
+        result = SolutionKind::Solved;
+        break;
+
+      case SolutionKind::Unsolved:
+        result = SolutionKind::Unsolved;
+        break;
+      }
+    }
+    return result;
+  }
+
+  assert(kind == TypeMatchKind::Conversion);
+
+  // Compute the element shuffles for conversions.
+  enum {
+    unassigned = -1,
+    defaultValue = -2,
+    variadic = -3
+  };
+  SmallVector<int, 16> elementSources(tuple2->getFields().size(), unassigned);
+  SmallVector<bool, 16> consumed(tuple1->getFields().size(), false);
+  SmallVector<unsigned, 4> variadicArguments;
+  
+  // Match up any named elements.
+  for (unsigned i = 0, n = tuple2->getFields().size(); i != n; ++i) {
     const auto &elt2 = tuple2->getFields()[i];
 
-    // FIXME: Totally wrong for conversions. We're assuming that they act
-    // like subtypes.
-    if (elt1.getName() != elt2.getName() &&
-        !(kind >= TypeMatchKind::TrivialSubtype &&
-          (elt1.getName().empty() || elt2.getName().empty()))) {
+    // Skip unnamed elements.
+    if (elt2.getName().empty())
+      continue;
+
+    // Find the corresponding named element.
+    int matched = tuple1->getNamedElementId(elt2.getName());
+    if (matched == -1)
+      continue;
+
+    // If this is not a conversion constraint, shuffles are not permitted.
+    if (i != (unsigned)matched && kind < TypeMatchKind::Conversion) {
       return SolutionKind::Error;
     }
 
-    if (elt1.isVararg() != elt2.isVararg())
+    // Record this match.
+    elementSources[i] = matched;
+    consumed[matched] = true;
+  }
+
+  // Resolve any unmatched elements.
+  unsigned next1 = 0, last1 = tuple1->getFields().size();
+  auto skipToNextUnnamedInput = [&] {
+    while (next1 != last1 &&
+           (consumed[next1] || !tuple1->getFields()[next1].getName().empty()))
+      ++next1;
+  };
+  skipToNextUnnamedInput();
+
+  for (unsigned i = 0, n = tuple2->getFields().size(); i != n; ++i) {
+    // Check whether we already found a value for this element.
+    if (elementSources[i] != unassigned)
+      continue;
+
+    const auto &elt2 = tuple2->getFields()[i];
+
+    // Variadic tuple elements match the rest of the input elements.
+    if (elt2.isVararg()) {
+      // Collect the remaining (unnamed) inputs.
+      while (next1 != last1) {
+        variadicArguments.push_back(next1);
+        consumed[next1] = true;
+        skipToNextUnnamedInput();
+      }
+      elementSources[i] = variadic;
+      break;
+    }
+
+    // If there aren't any more inputs, we can use a default argument.
+    if (next1 == last1) {
+      if (elt2.hasInit()) {
+        elementSources[i] = defaultValue;
+        continue;
+      }
+
       return SolutionKind::Error;
+    }
+
+    elementSources[i] = next1;
+    consumed[next1] = true;
+    skipToNextUnnamedInput();
+  }
+
+  // Check whether there were any unused input values.
+  // FIXME: Could short-circuit this check, above, by not skipping named
+  // input values.
+  if (std::find(consumed.begin(), consumed.end(), false) != consumed.end())
+    return SolutionKind::Error;
+
+  // Check conversion constraints on the individual elements.
+  SolutionKind result = SolutionKind::TriviallySolved;
+  for (unsigned i = 0, n = tuple2->getFields().size(); i != n; ++i) {
+    int source = elementSources[i];
+    const auto &elt2 = tuple2->getFields()[i];
+
+    assert(source != unassigned && "Cannot have unassigned source here");
+
+    // Default values always work.
+    if (source == defaultValue) {
+      assert(elt2.hasInit() && "Bogus default value source");
+      continue;
+    }
+
+    // For variadic elements, check the list of variadic arguments.
+    if (source == variadic) {
+      assert(elt2.isVararg() && "Bogus variadic argument source");
+      Type variadicBaseType = elt2.getVarargBaseTy();
+      for (unsigned variadicSrc : variadicArguments) {
+        switch (matchTypes(tuple1->getElementType(variadicSrc),
+                           variadicBaseType, kind, subFlags, trivial)) {
+        case SolutionKind::Error:
+          return SolutionKind::Error;
+
+        case SolutionKind::TriviallySolved:
+          break;
+
+        case SolutionKind::Solved:
+          result = SolutionKind::Solved;
+          break;
+
+        case SolutionKind::Unsolved:
+          result = SolutionKind::Unsolved;
+          break;
+        }
+      }
+      continue;
+    }
+
+    const auto &elt1 = tuple1->getFields()[source];
 
     switch (matchTypes(elt1.getType(), elt2.getType(), kind, subFlags,
                        trivial)) {
