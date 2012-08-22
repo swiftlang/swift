@@ -807,6 +807,11 @@ namespace {
     /// \returns true if an error occurred, false otherwise.
     bool solve(SmallVectorImpl<ConstraintSystem *> &viable);
 
+    /// \brief Determine whether this constraint system is fully solved, meaning
+    /// that all type variables are either bound to fixed types or have only
+    /// protocol constraints remaining on them.
+    bool isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables);
+
     void dump();
   };
 }
@@ -2499,6 +2504,54 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
   return viable.size() == 0;
 }
 
+bool
+ConstraintSystem::isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables) {
+  // Look for any unresolved overload sets.
+  if (!UnresolvedOverloadSets.empty())
+    return false;
+
+  // Look for any free type variables.
+  for (auto tv : TypeVariables) {
+    // We only care about the representatives.
+    if (tv->getImpl().getRepresentative() != tv)
+      continue;
+
+    if (auto fixed = getFixedType(tv)) {
+      if (fixed->hasTypeVariable())
+        return false;
+      
+      continue;
+    }
+
+    freeVariables.push_back(tv);
+  }
+
+  // Look for any remaining constraints.
+  for (auto con : Constraints) {
+    // First type must be a type variable...
+    auto tv = con->getFirstType()->getAs<TypeVariableType>();
+    if (!tv)
+      return false;
+
+    // ... that has not been bound to a fixed type.
+    tv = tv->getImpl().getRepresentative();
+    if (getFixedType(tv))
+      return false;
+
+    // This must be a subtyping or conversion constraint.
+    if (con->getKind() != ConstraintKind::Subtype &&
+        con->getKind() != ConstraintKind::Conversion)
+      return false;
+
+    // The second type must be existential.
+    if (!con->getSecondType()->isExistentialType())
+      return false;
+  }
+
+  assert(!freeVariables.empty() || Constraints.empty());
+  return true;
+}
+
 //===--------------------------------------------------------------------===//
 // Debugging
 //===--------------------------------------------------------------------===//
@@ -2570,6 +2623,21 @@ void ConstraintSystem::dump() {
       }
     }
   }
+
+  SmallVector<TypeVariableType *, 4> freeVariables;
+  if (isSolved(freeVariables)) {
+    if (freeVariables.empty()) {
+      llvm::errs() << "SOLVED (completely)\n";
+    } else {
+      llvm::errs() << "SOLVED (with free variables):";
+      for (auto fv : freeVariables) {
+        llvm::errs() << ' ' << fv->getString();
+      }
+      llvm::errs() << '\n';
+    }
+  } else {
+    llvm::errs() << "UNSOLVED\n";
+  }
 }
 
 void TypeChecker::dumpConstraints(Expr *expr) {
@@ -2583,7 +2651,8 @@ void TypeChecker::dumpConstraints(Expr *expr) {
   bool error = CS.simplify();
   CS.dump();
 
-  if (!error) {
+  SmallVector<TypeVariableType *, 4> freeVariables;
+  if (!error && !CS.isSolved(freeVariables)) {
     llvm::errs() << "---Solved constraints---\n";
     SmallVector<ConstraintSystem *, 4> viable;
     error = CS.solve(viable);
@@ -2593,14 +2662,10 @@ void TypeChecker::dumpConstraints(Expr *expr) {
       llvm::errs() << "---Viable constraint systems---\n";
       unsigned idx = 0;
       for (auto cs : viable) {
-        llvm::errs() << "---System #" << ++idx << "---\n";
+        llvm::errs() << "---Child system #" << ++idx << "---\n";
         cs->dump();
       }
     }
   }
-  
-  llvm::errs() << "\nConstraint system is "
-               << (error? "ill-formed" : "still viable")
-               << "\n";
 }
 
