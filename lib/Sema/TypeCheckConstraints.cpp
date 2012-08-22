@@ -37,21 +37,6 @@ namespace {
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment = 8);
 
-namespace {
-  /// \brief Retrieve the name of a literal kind.
-  static StringRef getLiteralKindName(LiteralKind kind) {
-    switch (kind) {
-    case LiteralKind::Int: return "integer";
-    case LiteralKind::Float: return "float";
-    case LiteralKind::Char: return "character";
-    case LiteralKind::UTFString: return "UTF-8 string";
-    case LiteralKind::ASCIIString: return "ASCII string";
-    }
-  }
-
-  class OverloadChoice;
-}
-
 //===--------------------------------------------------------------------===//
 // Type variable implementation.
 //===--------------------------------------------------------------------===//
@@ -318,7 +303,29 @@ namespace {
       case ConstraintKind::Subtype: Out << " < "; break;
       case ConstraintKind::Conversion: Out << " << "; break;
       case ConstraintKind::Literal:
-        Out << " is an " << getLiteralKindName(getLiteralKind()) << " literal";
+        Out << " is ";
+        switch (getLiteralKind()) {
+        case LiteralKind::ASCIIString:
+          Out << "an ASCII string";
+          break;
+
+        case LiteralKind::Char:
+          Out << "a character";
+          break;
+
+        case LiteralKind::Float:
+          Out << "a floating-point";
+          break;
+
+        case LiteralKind::Int:
+          Out << "an integer";
+          break;
+
+        case LiteralKind::UTFString:
+          Out << "a UTF-8 string";
+          break;
+        }
+        Out << " literal";
         return;
       case ConstraintKind::ValueMember:
         Out << "[." << Member.str() << ": value] == ";
