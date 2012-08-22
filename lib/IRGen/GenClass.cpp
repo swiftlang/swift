@@ -701,7 +701,7 @@ namespace {
   public:
     DestructorMetadataDiscovery(IRGenFunction &IGF, ClassDecl *theClass,
                                 Address metadata, Explosion &out)
-      : super(IGM, theClass), IGF(IGF), Metadata(metadata), Out(out) {}
+      : super(IGF.IGM, theClass), IGF(IGF), Metadata(metadata), Out(out) {}
 
   public:
     void addDestructorFunction() {
