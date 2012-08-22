@@ -466,6 +466,7 @@ namespace {
   class ConstraintSystem {
     TypeChecker &TC;
     ConstraintSystem *Parent;
+    Constraint *failedConstraint;
 
     // ---Only valid in the top-level constraint system---
     llvm::BumpPtrAllocator Allocator;
@@ -498,7 +499,8 @@ namespace {
 
   public:
     ConstraintSystem(TypeChecker &TC)
-      : TC(TC), Parent(nullptr), TypeCounter(0), OverloadSetCounter(0) {}
+      : TC(TC), Parent(nullptr), failedConstraint(nullptr),
+        TypeCounter(0), OverloadSetCounter(0) {}
 
     /// \brief Creates a child constraint system, inheriting the constraints
     /// of its parent.
@@ -509,7 +511,7 @@ namespace {
     /// overload set, which indices which overload choice this child system
     /// explores.
     ConstraintSystem(ConstraintSystem *parent, unsigned overloadChoiceIdx)
-      : TC(parent->TC), Parent(parent),
+      : TC(parent->TC), Parent(parent), failedConstraint(nullptr),
         InOverloadSet(parent->UnresolvedOverloadSets.front()),
         OverloadChoiceIdx(overloadChoiceIdx),
         assumedTypeVar(),
@@ -528,7 +530,7 @@ namespace {
     /// \param typeVar The type variable whose binding we will be exploring
     /// within this child system.
     ConstraintSystem(ConstraintSystem *parent, TypeVariableType *typeVar)
-      : TC(parent->TC), Parent(parent),
+      : TC(parent->TC), Parent(parent), failedConstraint(nullptr),
         InOverloadSet(),
         OverloadChoiceIdx(0),
         assumedTypeVar(typeVar),
@@ -2273,6 +2275,7 @@ bool ConstraintSystem::simplify() {
 
       switch (simplifyConstraint(*constraint)) {
       case SolutionKind::Error:
+        failedConstraint = constraint;
         return true;
 
       case SolutionKind::TriviallySolved:
@@ -2525,6 +2528,10 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
 
 bool
 ConstraintSystem::isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables) {
+  // Look for a failed constraint.
+  if (failedConstraint)
+    return false;
+  
   // Look for any unresolved overload sets.
   if (!UnresolvedOverloadSets.empty())
     return false;
