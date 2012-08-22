@@ -208,13 +208,48 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   llvm_unreachable("Can't represent lookup result");
 }
 
+static void overrideDecl(TypeChecker &TC,
+                         llvm::SmallPtrSet<ValueDecl*, 16> &OverriddenDecls,
+                         ValueDecl *MemberVD, ValueDecl *OverriddenDecl) {
+  if (!OverriddenDecls.insert(OverriddenDecl)) {
+    TC.diagnose(MemberVD->getLoc(),
+                diag::override_multiple_decls_derived);
+    return;
+  }
+  if (OverriddenDecl->getDeclContext()->getContextKind() ==
+      DeclContextKind::ExtensionDecl) {
+    TC.diagnose(MemberVD->getLoc(), diag::override_decl_extension);
+    return;
+  }
+  if (auto FD = dyn_cast<FuncDecl>(MemberVD)) {
+    FD->setOverriddenDecl(cast<FuncDecl>(OverriddenDecl));
+  } else if (auto VD = dyn_cast<VarDecl>(MemberVD)) {
+    VD->setOverriddenDecl(cast<VarDecl>(OverriddenDecl));
+  } else if (auto SD = dyn_cast<SubscriptDecl>(MemberVD)) {
+    SD->setOverriddenDecl(cast<SubscriptDecl>(OverriddenDecl));
+  } else {
+    llvm_unreachable("Unexpected decl");
+  }
+}
+
 static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD) {
   if (!CD->hasBaseClass())
     return;
 
+  // The overall process of checking a method which might override
+  // a base class method with the same name has three phases:
+  // 1. If there's an exact match, the method overrides
+  // the base class method.
+  // 2. If there's a subtyping relationship with a single method not yet
+  // overriden, the method overrides that base class method.  It's an error
+  // if there are multiple potential base class methods.
+  // 3. If all the base class methods with a given name have been overridden,
+  // the method introduces a new overload.
+
   Type Base = CD->getBaseClass();
   llvm::DenseMap<Identifier, std::vector<ValueDecl*>> FoundDecls;
-  llvm::SmallPtrSet<ValueDecl*, 16> OverriddenDecls;
+  llvm::SmallPtrSet<ValueDecl*, 16> ExactOverriddenDecls;
+  llvm::SmallVector<ValueDecl*, 16> PossiblyOverridingDecls;
   for (Decl *MemberD : CD->getMembers()) {
     ValueDecl *MemberVD = dyn_cast<ValueDecl>(MemberD);
     if (!MemberVD)
@@ -276,70 +311,77 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD) {
         }
       }
 
-      // Then, check for a subtyping relationship.
-      // FIXME: Need to check exact match for all members before checking
-      // subtyping for any member.
-      if (!OverriddenDecl) {
-        for (unsigned i = 0, e = CurDecls.size(); i != e; ++i) {
-          if (CurDecls[i]->getDeclContext() == MemberVD->getDeclContext()) {
-            // We ignore sub-typing on the same class.
-            continue;
-          }
-          if (MemberVD->getKind() != CurDecls[i]->getKind())
-            continue;
-          bool isSubtype = false;
-          if (isa<FuncDecl>(MemberVD)) {
-            AnyFunctionType *MemberFTy =
-                MemberVD->getType()->getAs<AnyFunctionType>();
-            AnyFunctionType *OtherFTy =
-                CurDecls[i]->getType()->getAs<AnyFunctionType>();
-            if (MemberFTy && OtherFTy) {
-              bool Trivial;
-              isSubtype = TC.isSubtypeOf(MemberFTy->getResult(),
-                                         OtherFTy->getResult(),
-                                         Trivial) && Trivial;
-            }
-          } else {
-            bool Trivial;
-            isSubtype = TC.isSubtypeOf(MemberVD->getType(),
-                                       CurDecls[i]->getType(),
-                                       Trivial) && Trivial;
-          }
-          if (isSubtype) {
-            if (OverriddenDecl) {
-              TC.diagnose(MemberVD->getLoc(),
-                          diag::override_multiple_decls_base);
-              continue;
-            }
-            OverriddenDecl = CurDecls[i];
-          }
-        }
-      }
       if (OverriddenDecl) {
-        if (!OverriddenDecls.insert(OverriddenDecl)) {
-          TC.diagnose(MemberVD->getLoc(),
-                      diag::override_multiple_decls_derived);
-          continue;
-        }
-        if (OverriddenDecl->getDeclContext()->getContextKind() ==
-            DeclContextKind::ExtensionDecl) {
-          TC.diagnose(MemberVD->getLoc(), diag::override_decl_extension);
-          continue;
-        }
-        if (auto FD = dyn_cast<FuncDecl>(MemberVD)) {
-          FD->setOverriddenDecl(cast<FuncDecl>(OverriddenDecl));
-        } else if (auto VD = dyn_cast<VarDecl>(MemberVD)) {
-          VD->setOverriddenDecl(cast<VarDecl>(OverriddenDecl));
-        } else if (auto SD = dyn_cast<SubscriptDecl>(MemberVD)) {
-          SD->setOverriddenDecl(cast<SubscriptDecl>(OverriddenDecl));
-        } else {
-          llvm_unreachable("Unexpected decl");
-        }
+        overrideDecl(TC, ExactOverriddenDecls, MemberVD, OverriddenDecl);
+      } else {
+        PossiblyOverridingDecls.push_back(MemberVD);
+      }
+    }
+  }
+
+  llvm::SmallVector<ValueDecl*, 16> PossiblyOverloadingDecls;
+  llvm::SmallPtrSet<ValueDecl*, 16> SubtypeOverriddenDecls;
+  for (auto MemberVD : PossiblyOverridingDecls) {
+    // Then, check for a subtyping relationship.
+    auto& CurDecls = FoundDecls[MemberVD->getName()];
+    ValueDecl *OverriddenDecl = nullptr;
+    for (unsigned i = 0, e = CurDecls.size(); i != e; ++i) {
+      if (CurDecls[i]->getDeclContext() == MemberVD->getDeclContext()) {
+        // We ignore sub-typing on the same class.
         continue;
       }
-      // FIXME: This isn't quite right: if the derived class overrides all
-      // the base class decls, we should allow additional overloads.
+      if (ExactOverriddenDecls.count(CurDecls[i]))
+        continue;
+      if (MemberVD->getKind() != CurDecls[i]->getKind())
+        continue;
+      bool isSubtype = false;
+      if (isa<FuncDecl>(MemberVD)) {
+        AnyFunctionType *MemberFTy =
+            MemberVD->getType()->getAs<AnyFunctionType>();
+        AnyFunctionType *OtherFTy =
+            CurDecls[i]->getType()->getAs<AnyFunctionType>();
+        if (MemberFTy && OtherFTy) {
+          bool Trivial;
+          isSubtype = TC.isSubtypeOf(MemberFTy->getResult(),
+                                     OtherFTy->getResult(),
+                                     Trivial) && Trivial;
+        }
+      } else {
+        bool Trivial;
+        isSubtype = TC.isSubtypeOf(MemberVD->getType(),
+                                   CurDecls[i]->getType(),
+                                   Trivial) && Trivial;
+      }
+      if (isSubtype) {
+        if (OverriddenDecl) {
+          TC.diagnose(MemberVD->getLoc(),
+                      diag::override_multiple_decls_base);
+          continue;
+        }
+        OverriddenDecl = CurDecls[i];
+      }
+      if (OverriddenDecl) {
+        overrideDecl(TC, SubtypeOverriddenDecls, MemberVD, OverriddenDecl);
+      } else {
+        PossiblyOverloadingDecls.push_back(MemberVD);
+      }
+    }
+  }
+
+  for (auto MemberVD : PossiblyOverloadingDecls) {
+    // Check if this is a new overload.
+    auto& CurDecls = FoundDecls[MemberVD->getName()];
+    for (unsigned i = 0, e = CurDecls.size(); i != e; ++i) {
+      if (CurDecls[i]->getDeclContext() == MemberVD->getDeclContext()) {
+        // We ignore sub-typing on the same class.
+        continue;
+      }
+      if (ExactOverriddenDecls.count(CurDecls[i]))
+        continue;
+      if (SubtypeOverriddenDecls.count(CurDecls[i]))
+        continue;
       TC.diagnose(MemberVD->getLoc(), diag::overload_base_decl);
+      break;
     }
   }
 }

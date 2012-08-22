@@ -151,24 +151,41 @@ Unlike structs, member functions and properties are overridable (and use
 dynamic dispatch) by default.  Overriding can be disabled with the "final"
 attribute.
 
-In a derived class, if you define a member with the same name as a member
-of its base class, the base class member is overridden by default.  If the
-kind and type doesn't match (what exactly "match" means TBD), it's an error.
-This implies that it's impossible to hide a base class member without explicit
-markings.
+In a derived class, if a member function or variable is defined with the
+same name and kind as a member of its base class, or a subscript operator
+is defined, it can override a member of the base class. The rules for resolving
+a set of derived class members with the same name against the set of base
+class members with that name are as follows:
+  1. If there's a derived class member whose type and kind exactly match the
+     base class member, the member overrides the that base class member.
+  2. If there's a subtyping relationship with a single base class member 
+     which is not overridden by any other member by rule 1, the method
+     overrides that base class method.  It's an error if there are
+     multiple potential base class methods, or multiple methods which would
+     override a single base class method.
+  3. If all the base class methods have been overridden by rules 1 and 2,
+     the method introduces a new overload.
+  4. Otherwise, the member declaration is invalid.
+      
+Defining a type with the same name as a base class member is not allowed.
 
-This model requires two attributes to control it when the default isn't correct:
-"shadow" and "overload".  "overload" means that the member of the
-derived class is an overload of the base class member;
-all the members from the base class and the derived class are part of overload
-resolution.  Each member which adds a new overload needs the "overload"
-attribute.  "shadow" means that the derived class is intentionally shadowing
-the base class name; the name from the base class is never found by name lookup
-on the derived class.  If any member with a given name has the "shadow"
-attribute, every member with that name must have it.  (Note that this means
-either none of the base class members with a given name are shadowed, or
-all of them are; more sophisticated models are possible, but this seems like
-a reasonable compromise in terms of complexity.)
+FIXME: Revisit "shadow" and "overload" attributes when we start looking at
+resiliency.
+
+.. This model requires two attributes to control it when the default isn't 
+   correct: "shadow" and "overload".  A member with either of these attributes
+   never overrides a base class method.  "overload" means that the member of
+   the derived class is an overload of the base class member;
+   all the members from the base class and the derived class are part of
+   overload resolution.  Each member which adds a new overload needs the
+   "overload" attribute.  "shadow" means that the derived class is
+   intentionally shadowing the base class name; the name from the base class
+   is never found by name lookup on the derived class.  If any member with a
+   given name has the "shadow" attribute, every member with that name must
+   have it.  (Note that this means either none of the base class members with
+   a given name are shadowed, or all of them are; more sophisticated models
+   are possible, but this seems like a reasonable compromise in terms of
+   complexity.)
 
 FIXME: is adding an override for a method from a base class allowed in a
 stable API? 
