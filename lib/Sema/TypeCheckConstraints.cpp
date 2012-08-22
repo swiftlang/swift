@@ -2375,6 +2375,18 @@ findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc) {
 
   std::pair<Type, Type> bounds;
 
+  // Only consider concrete above/below that don't involve type variables.
+  // FIXME: Do we really need this restriction?
+  auto pairHasTypeVariable = [](std::pair<Type, Constraint *> tc) {
+    return tc.first->hasTypeVariable();
+  };
+  typesBelow.erase(std::remove_if(typesBelow.begin(), typesBelow.end(),
+                                  pairHasTypeVariable),
+                   typesBelow.end());
+  typesAbove.erase(std::remove_if(typesAbove.begin(), typesAbove.end(),
+                                  pairHasTypeVariable),
+                   typesAbove.end());
+
   if (!typesBelow.empty()) {
     if (typesBelow.size() == 1) {
       bounds.first = typesBelow.front().first;
