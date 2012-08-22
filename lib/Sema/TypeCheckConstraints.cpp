@@ -2142,7 +2142,7 @@ collectTypesAboveAndBelow(ConstraintSystem &cs,
       // or a tighter relation, because the sort orders relational constraints
       // in order of nonincreasing strictness.
       assert(((typeVarConstraint.*which)->getKind()
-              < (*curCons)->getKind()) &&
+              <= (*curCons)->getKind()) &&
              "Improper ordering of constraints");
       if (onRedundant)
         onRedundant(*curCons);
@@ -2581,6 +2581,7 @@ void ConstraintSystem::dump() {
             << choice.getDecl()->getTypeOfReference()->getString() << "\n";
         continue;
       }
+
       out << "  assuming " << cs->assumedTypeVar->getString() << " == "
           << cs->getFixedType(cs->assumedTypeVar) << "\n";
     }
