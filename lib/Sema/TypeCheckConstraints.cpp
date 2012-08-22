@@ -2306,6 +2306,9 @@ collectTypesAboveAndBelow(ConstraintSystem &cs,
       // We already have a constraint that provides either the same relation
       // or a tighter relation, because the sort orders relational constraints
       // in order of nonincreasing strictness.
+      // 
+      // FIXME: If the type may end up being a tuple type, then a conversion
+      // constraint is not redundant with a subtyping constraint.
       assert(((typeVarConstraint.*which)->getKind()
               <= (*curCons)->getKind()) &&
              "Improper ordering of constraints");
