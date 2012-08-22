@@ -2652,7 +2652,10 @@ void TypeChecker::dumpConstraints(Expr *expr) {
   CS.dump();
 
   SmallVector<TypeVariableType *, 4> freeVariables;
-  if (!error && !CS.isSolved(freeVariables)) {
+  unsigned numSolved = 0;
+  if (CS.isSolved(freeVariables))
+    ++numSolved;
+  if (!error && numSolved == 0) {
     llvm::errs() << "---Solved constraints---\n";
     SmallVector<ConstraintSystem *, 4> viable;
     error = CS.solve(viable);
@@ -2664,8 +2667,18 @@ void TypeChecker::dumpConstraints(Expr *expr) {
       for (auto cs : viable) {
         llvm::errs() << "---Child system #" << ++idx << "---\n";
         cs->dump();
+        freeVariables.clear();
+        if (cs->isSolved(freeVariables))
+          ++numSolved;
       }
     }
   }
+
+  if (numSolved == 0)
+    llvm::errs() << "No solution found.\n";
+  else if (numSolved == 1)
+    llvm::errs() << "Unique solution found.\n";
+  else
+    llvm::errs()<< "Found " << numSolved << " potential solutions.\n";
 }
 
