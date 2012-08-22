@@ -140,8 +140,9 @@ BuiltinIntegerType *BuiltinIntegerType::get(unsigned BitWidth, ASTContext &C) {
 
 ParenType *ParenType::get(ASTContext &C, Type underlying) {
   ParenType *&Result = C.Impl.ParenTypes[underlying];
+  bool hasTypeVariable = underlying->hasTypeVariable();
   if (Result == 0)
-    Result = new (C) ParenType(underlying);
+    Result = new (C) ParenType(underlying, hasTypeVariable);
   return Result;
 }
 
@@ -161,10 +162,17 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
 /// getTupleType - Return the uniqued tuple type with the specified elements.
 TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
   bool HasAnyDefaultValues = false;
+  bool HasTypeVariable = false;
   for (const TupleTypeElt &Elt : Fields) {
     if (Elt.hasInit()) {
       HasAnyDefaultValues = true;
-      break;
+      if (HasTypeVariable)
+        break;
+    }
+    if (Elt.getType() && Elt.getType()->hasTypeVariable()) {
+      HasTypeVariable = true;
+      if (HasAnyDefaultValues)
+        break;
     }
   }
 
@@ -192,7 +200,8 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
 
   Fields = ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
   
-  TupleType *New = new (C) TupleType(Fields, IsCanonical ? &C : 0);
+  TupleType *New = new (C) TupleType(Fields, IsCanonical ? &C : 0,
+                                     HasTypeVariable);
   if (!HasAnyDefaultValues)
     C.Impl.TupleTypes.InsertNode(New, InsertPos);
 
@@ -210,13 +219,13 @@ UnboundGenericType* UnboundGenericType::get(NominalTypeDecl *TheDecl,
                                             ASTContext &C) {
   llvm::FoldingSetNodeID ID;
   UnboundGenericType::Profile(ID, TheDecl, Parent);
-
   void *InsertPos = 0;
   if (auto unbound = C.Impl.UnboundGenericTypes.FindNodeOrInsertPos(ID,
                                                                     InsertPos))
     return unbound;
 
-  auto result = new (C) UnboundGenericType(TheDecl, Parent, C);
+  bool hasTypeVariable = Parent && Parent->hasTypeVariable();
+  auto result = new (C) UnboundGenericType(TheDecl, Parent, C, hasTypeVariable);
   C.Impl.UnboundGenericTypes.InsertNode(result, InsertPos);
   return result;
 }
@@ -234,12 +243,16 @@ void BoundGenericType::Profile(llvm::FoldingSetNodeID &ID,
 BoundGenericType::BoundGenericType(NominalTypeDecl *TheDecl,
                                    Type Parent,
                                    ArrayRef<Type> GenericArgs,
-                                   ASTContext *C)
-  : TypeBase(TypeKind::BoundGeneric, C, /*Unresolved=*/false),
+                                   ASTContext *C,
+                                   bool HasTypeVariable)
+  : TypeBase(TypeKind::BoundGeneric, C, /*Unresolved=*/false,
+             HasTypeVariable),
     TheDecl(TheDecl), Parent(Parent), GenericArgs(GenericArgs)
 {
   // Determine whether this type is unresolved.
-  for (Type Arg : GenericArgs) {
+  if (Parent && Parent->isUnresolvedType())
+    setUnresolved();
+  else for (Type Arg : GenericArgs) {
     if (Arg->isUnresolvedType()) {
       setUnresolved();
       break;
@@ -259,19 +272,28 @@ BoundGenericType* BoundGenericType::get(NominalTypeDecl *TheDecl,
           C.Impl.BoundGenericTypes.FindNodeOrInsertPos(ID, InsertPos))
     return BGT;
 
+  bool HasTypeVariable = Parent && Parent->hasTypeVariable();
   ArrayRef<Type> ArgsCopy = C.AllocateCopy(GenericArgs);
   bool IsCanonical = !Parent || Parent->isCanonical();
-  if (IsCanonical) {
+  if (IsCanonical || !HasTypeVariable) {
     for (Type Arg : GenericArgs) {
       if (!Arg->isCanonical()) {
         IsCanonical = false;
-        break;
+        if (HasTypeVariable)
+          break;
+      }
+
+      if (Arg->hasTypeVariable()) {
+        HasTypeVariable = true;
+        if (!IsCanonical)
+          break;
       }
     }
   }
   
   BoundGenericType *New = new (C) BoundGenericType(TheDecl, Parent, ArgsCopy,
-                                                   IsCanonical ? &C : 0);
+                                                   IsCanonical ? &C : 0,
+                                                   HasTypeVariable);
   C.Impl.BoundGenericTypes.InsertNode(New, InsertPos);
 
   return New;
@@ -293,8 +315,9 @@ NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, ASTContext &C) {
   }
 }
 
-OneOfType::OneOfType(OneOfDecl *TheDecl, Type Parent, ASTContext &C)
-  : NominalType(TypeKind::OneOf, &C, TheDecl, Parent) { }
+OneOfType::OneOfType(OneOfDecl *TheDecl, Type Parent, ASTContext &C,
+                     bool HasTypeVariable)
+  : NominalType(TypeKind::OneOf, &C, TheDecl, Parent, HasTypeVariable) { }
 
 OneOfType *OneOfType::get(OneOfDecl *D, Type Parent, ASTContext &C) {
   llvm::FoldingSetNodeID id;
@@ -304,7 +327,8 @@ OneOfType *OneOfType::get(OneOfDecl *D, Type Parent, ASTContext &C) {
   if (auto oneOfTy = C.Impl.OneOfTypes.FindNodeOrInsertPos(id, insertPos))
     return oneOfTy;
 
-  auto oneOfTy = new (C) OneOfType(D, Parent, C);
+  bool hasTypeVariable = Parent && Parent->hasTypeVariable();
+  auto oneOfTy = new (C) OneOfType(D, Parent, C, hasTypeVariable);
   C.Impl.OneOfTypes.InsertNode(oneOfTy, insertPos);
   return oneOfTy;
 }
@@ -314,8 +338,9 @@ void OneOfType::Profile(llvm::FoldingSetNodeID &ID, OneOfDecl *D, Type Parent) {
   ID.AddPointer(Parent.getPointer());
 }
 
-StructType::StructType(StructDecl *TheDecl, Type Parent, ASTContext &C)
-  : NominalType(TypeKind::Struct, &C, TheDecl, Parent) { }
+StructType::StructType(StructDecl *TheDecl, Type Parent, ASTContext &C,
+                       bool HasTypeVariable)
+  : NominalType(TypeKind::Struct, &C, TheDecl, Parent, HasTypeVariable) { }
 
 StructType *StructType::get(StructDecl *D, Type Parent, ASTContext &C) {
   llvm::FoldingSetNodeID id;
@@ -325,7 +350,8 @@ StructType *StructType::get(StructDecl *D, Type Parent, ASTContext &C) {
   if (auto structTy = C.Impl.StructTypes.FindNodeOrInsertPos(id, insertPos))
     return structTy;
 
-  auto structTy = new (C) StructType(D, Parent, C);
+  bool hasTypeVariable = Parent && Parent->hasTypeVariable();
+  auto structTy = new (C) StructType(D, Parent, C, hasTypeVariable);
   C.Impl.StructTypes.InsertNode(structTy, insertPos);
   return structTy;
 }
@@ -335,8 +361,9 @@ void StructType::Profile(llvm::FoldingSetNodeID &ID, StructDecl *D, Type Parent)
   ID.AddPointer(Parent.getPointer());
 }
 
-ClassType::ClassType(ClassDecl *TheDecl, Type Parent, ASTContext &C)
-  : NominalType(TypeKind::Class, &C, TheDecl, Parent) { }
+ClassType::ClassType(ClassDecl *TheDecl, Type Parent, ASTContext &C,
+                     bool HasTypeVariable)
+  : NominalType(TypeKind::Class, &C, TheDecl, Parent, HasTypeVariable) { }
 
 ClassType *ClassType::get(ClassDecl *D, Type Parent, ASTContext &C) {
   llvm::FoldingSetNodeID id;
@@ -346,7 +373,8 @@ ClassType *ClassType::get(ClassDecl *D, Type Parent, ASTContext &C) {
   if (auto classTy = C.Impl.ClassTypes.FindNodeOrInsertPos(id, insertPos))
     return classTy;
 
-  auto classTy = new (C) ClassType(D, Parent, C);
+  bool hasTypeVariable = Parent && Parent->hasTypeVariable();
+  auto classTy = new (C) ClassType(D, Parent, C, hasTypeVariable);
   C.Impl.ClassTypes.InsertNode(classTy, insertPos);
   return classTy;
 }
@@ -391,11 +419,13 @@ MetaTypeType *MetaTypeType::get(Type T, ASTContext &C) {
   MetaTypeType *&Entry = C.Impl.MetaTypeTypes[T];
   if (Entry) return Entry;
 
-  return Entry = new (C) MetaTypeType(T, T->isCanonical() ? &C : 0);
+  bool hasTypeVariable = T->hasTypeVariable();
+  return Entry = new (C) MetaTypeType(T, T->isCanonical() ? &C : 0,
+                                      hasTypeVariable);
 }
 
-MetaTypeType::MetaTypeType(Type T, ASTContext *C)
-  : TypeBase(TypeKind::MetaType, C, T->isUnresolvedType()),
+MetaTypeType::MetaTypeType(Type T, ASTContext *C, bool HasTypeVariable)
+  : TypeBase(TypeKind::MetaType, C, T->isUnresolvedType(), HasTypeVariable),
     InstanceType(T) {
 }
 
@@ -417,17 +447,21 @@ FunctionType *FunctionType::get(Type Input, Type Result, bool isAutoClosure,
                                         std::make_pair(Result, 
                                                        (char)isAutoClosure))];
   if (Entry) return Entry;
-  
-  return Entry = new (C) FunctionType(Input, Result, isAutoClosure);
+
+  bool hasTypeVariable = Input->hasTypeVariable() || Result->hasTypeVariable();
+  return Entry = new (C) FunctionType(Input, Result, isAutoClosure,
+                                      hasTypeVariable);
 }
 
 // If the input and result types are canonical, then so is the result.
-FunctionType::FunctionType(Type input, Type output, bool isAutoClosure)
+FunctionType::FunctionType(Type input, Type output, bool isAutoClosure,
+                           bool hasTypeVariable)
   : AnyFunctionType(TypeKind::Function,
              (input->isCanonical() && output->isCanonical()) ?
                &input->getASTContext() : 0,
              input, output,
-             (input->isUnresolvedType() || output->isUnresolvedType())),
+             (input->isUnresolvedType() || output->isUnresolvedType()),
+             hasTypeVariable),
     AutoClosure(isAutoClosure) { }
 
 
@@ -446,8 +480,12 @@ PolymorphicFunctionType::PolymorphicFunctionType(Type input, Type output,
   : AnyFunctionType(TypeKind::PolymorphicFunction,
                     (input->isCanonical() && output->isCanonical()) ?&C : 0,
                     input, output,
-                    (input->isUnresolvedType() || output->isUnresolvedType())),
-    Params(params) { }
+                    (input->isUnresolvedType() || output->isUnresolvedType()),
+                    /*HasTypeVariable=*/false),
+    Params(params)
+{
+  assert(!input->hasTypeVariable() && !output->hasTypeVariable());
+}
 
 /// Return a uniqued array type with the specified base type and the
 /// specified size.
@@ -457,13 +495,14 @@ ArrayType *ArrayType::get(Type BaseType, uint64_t Size, ASTContext &C) {
   ArrayType *&Entry = C.Impl.ArrayTypes[std::make_pair(BaseType, Size)];
   if (Entry) return Entry;
 
-  return Entry = new (C) ArrayType(BaseType, Size);
+  bool hasTypeVariable = BaseType->hasTypeVariable();
+  return Entry = new (C) ArrayType(BaseType, Size, hasTypeVariable);
 }
 
-ArrayType::ArrayType(Type base, uint64_t size)
+ArrayType::ArrayType(Type base, uint64_t size, bool hasTypeVariable)
   : TypeBase(TypeKind::Array, 
              base->isCanonical() ? &base->getASTContext() : 0,
-             base->isUnresolvedType()),
+             base->isUnresolvedType(), hasTypeVariable),
     Base(base), Size(size) {}
 
 
@@ -472,19 +511,23 @@ ArraySliceType *ArraySliceType::get(Type base, ASTContext &C) {
   ArraySliceType *&entry = C.Impl.ArraySliceTypes[base];
   if (entry) return entry;
 
-  return entry = new (C) ArraySliceType(base);
+  bool hasTypeVariable = base->hasTypeVariable();
+  return entry = new (C) ArraySliceType(base, hasTypeVariable);
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, ASTContext &Ctx)
-  : NominalType(TypeKind::Protocol, &Ctx, TheDecl, /*Parent=*/Type()) { }
+  : NominalType(TypeKind::Protocol, &Ctx, TheDecl, /*Parent=*/Type(),
+                /*HasTypeVariable=*/false) { }
 
 LValueType *LValueType::get(Type objectTy, Qual quals, ASTContext &C) {
   auto key = std::make_pair(objectTy, quals.getOpaqueData());
   auto it = C.Impl.LValueTypes.find(key);
   if (it != C.Impl.LValueTypes.end()) return it->second;
 
+  bool hasTypeVariable = objectTy->hasTypeVariable();
   ASTContext *canonicalContext = (objectTy->isCanonical() ? &C : nullptr);
-  LValueType *type = new (C) LValueType(objectTy, quals, canonicalContext);
+  LValueType *type = new (C) LValueType(objectTy, quals, canonicalContext,
+                                        hasTypeVariable);
   C.Impl.LValueTypes.insert(std::make_pair(key, type));
   return type;
 }
@@ -493,8 +536,10 @@ LValueType *LValueType::get(Type objectTy, Qual quals, ASTContext &C) {
 SubstitutedType *SubstitutedType::get(Type Original, Type Replacement,
                                       ASTContext &C) {
   SubstitutedType *&Known = C.Impl.SubstitutedTypes[{Original, Replacement}];
-  if (!Known)
-    Known = new (C) SubstitutedType(Original, Replacement);
+  if (!Known) {
+    bool hasTypeVariable = Replacement->hasTypeVariable();
+    Known = new (C) SubstitutedType(Original, Replacement, hasTypeVariable);
+  }
   return Known;
 }
 
