@@ -210,6 +210,10 @@ public:
   /// (possibly generic) class.
   ClassDecl *getClassOrBoundGenericClass();
 
+  /// \brief If this is a nominal type or a bound generic nominal type,
+  /// returns the (possibly generic) nominal type declaration.
+  NominalTypeDecl *getNominalOrBoundGenericNominal();
+
   /// getUnlabeledType - Retrieve a version of this type with all labels
   /// removed at every level. For example, given a tuple type 
   /// \code

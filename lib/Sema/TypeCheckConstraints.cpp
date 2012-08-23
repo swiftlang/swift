@@ -66,6 +66,9 @@ class TypeVariableType::Implementation {
   TypeVariableType *Parent;
 
 public:
+  explicit Implementation(unsigned ID)
+    : ID(ID), TheExpr(nullptr), Archetype(nullptr), Parent(nullptr) { }
+
   explicit Implementation(unsigned ID, Expr *TheExpr)
     : ID(ID), TheExpr(TheExpr), Archetype(nullptr), Parent(nullptr) { }
 
@@ -2011,8 +2014,36 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
+  // A nominal type can be converted to another type via a user-defined
+  // conversion function.
+  if (kind == TypeMatchKind::Conversion &&
+      type1->getNominalOrBoundGenericNominal()) {
+    auto &context = getASTContext();
+    auto name = context.getIdentifier("__conversion");
+    MemberLookup lookup(type1, name, TC.TU);
+    if (lookup.isSuccess()) {
+      auto inputTV = createTypeVariable();
+      auto outputTV = createTypeVariable();
 
-  // FIXME: User-defined conversions.
+      // The conversion function will have function type TI -> TO, for fresh
+      // type variables TI and TO.
+      // FIXME: lame name!
+      addValueMemberConstraint(type1, name,
+                               FunctionType::get(inputTV, outputTV, context));
+
+      // A conversion function must accept an empty parameter list ().
+      addConstraint(ConstraintKind::Conversion, TupleType::getEmpty(context),
+                    inputTV);
+
+      // The output of the conversion function must be a subtype of the
+      // type we're trying to convert to. The use of subtyping here eliminates
+      // multiple-step user-defined conversions, which also eliminates concerns
+      // about cyclic conversions causing infinite loops in the constraint
+      // solver.
+      addConstraint(ConstraintKind::Subtype, outputTV, type2);
+      return SolutionKind::Solved;
+    }
+  }
 
   return SolutionKind::Error;
 }

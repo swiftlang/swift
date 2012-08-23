@@ -213,6 +213,16 @@ ClassDecl *TypeBase::getClassOrBoundGenericClass() {
   return nullptr;
 }
 
+NominalTypeDecl *TypeBase::getNominalOrBoundGenericNominal() {
+  if (auto nominalTy = getAs<NominalType>())
+    return nominalTy->getDecl();
+
+  if (auto boundTy = getAs<BoundGenericType>())
+    return boundTy->getDecl();
+
+  return nullptr;
+}
+
 Type TypeBase::getUnlabeledType(ASTContext &Context) {
   switch (getKind()) {
   case TypeKind::Error: 
