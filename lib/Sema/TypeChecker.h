@@ -311,8 +311,7 @@ public:
   void validateTypeSimple(Type T) {
     TypeLoc TL(T, SourceRange());
     bool result = validateType(TL, false);
-    assert((!result || Context.Diags.hadAnyError()) &&
-           "Validation cannot fail in well-formed code!");
+    assert(!result && "Validation cannot fail!");
     (void)result;
   }
 

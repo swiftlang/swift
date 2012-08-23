@@ -119,22 +119,19 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
   // FIXME: Verify that these aren't circular and infinite size.
   
   // If we've already validated this type, don't do so again.
-  unsigned pass = isFirstPass? 1 : 2;
-  if (T->getValidated() >= pass) return false;
+  if (T->getValidated()) return false;
 
   // \brief RAII object that sets the validation pass on the type when it
   // goes out of scope.
   class SetValidation {
     Type T;
-    unsigned Pass;
 
   public:
-    SetValidation(Type T, unsigned Pass) : T(T), Pass(Pass) { }
+    SetValidation(Type T) : T(T) { }
     ~SetValidation() {
-      if (Pass > T->getValidated())
-        T->setValidated(Pass);
+      T->setValidated();
     }
-  } setValidation(T, pass);
+  } setValidation(T);
 
   bool IsInvalid = false;
   switch (T->getKind()) {

@@ -478,15 +478,10 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
         if (!foundType)
           continue;
 
-        // Check for a class type or a bound generic type referring to a class;
-        // those are the only allowed types for a base class.
+        // Check that the base type is a class.
         TypeLoc baseClass;
-        if (foundType->is<ClassType>())
+        if (foundType->getClassOrBoundGenericClass())
           baseClass = inherited[0];
-        if (auto BGT = foundType->getAs<BoundGenericType>()) {
-          if (isa<ClassDecl>(BGT->getDecl()))
-            baseClass = inherited[0];
-        }
 
         if (baseClass.getType()) {
           CD->setBaseClassLoc(baseClass);

@@ -78,8 +78,8 @@ class TypeBase {
     /// \brief Whether this type has a type variable somewhere in it.
     unsigned HasTypeVariable : 1;
 
-    /// \brief What pass # has been applied to this type.
-    unsigned ValidatedToPass : 2;
+    /// \brief Whether this type has been validated.
+    unsigned Validated : 1;
   };
   static const unsigned NumTypeBaseBits = 4;
   
@@ -97,7 +97,7 @@ protected:
     
     setUnresolved(Unresolved);
     setHasTypeVariable(HasTypeVariable);
-    TypeBits.TypeBase.ValidatedToPass = 0;
+    TypeBits.TypeBase.Validated = false;
   }
 
   /// \brief Mark this type as unresolved.
@@ -200,12 +200,11 @@ public:
   /// specialized, but the type Vector is not.
   bool isSpecialized();
 
-  /// \brief The last type-checking pass that has been run to validate this
-  /// type.
-  unsigned getValidated() const { return TypeBits.TypeBase.ValidatedToPass; }
+  /// \brief Whether this type has been validated yet.
+  bool getValidated() const { return TypeBits.TypeBase.Validated; }
 
-  /// \brief Mark this type as having been validated already to the given pass.
-  void setValidated(unsigned Pass) { TypeBits.TypeBase.ValidatedToPass = Pass; }
+  /// \brief Mark this type as having been validated already.
+  void setValidated() { TypeBits.TypeBase.Validated = true; }
 
   /// \brief If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.
