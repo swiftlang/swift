@@ -932,3 +932,52 @@ Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
   validateTypeSimple(T);
   return T;
 }
+
+Type TypeChecker::getSuperClassOf(Type type) {
+
+  Type baseTy;
+  Type specializedTy;
+  if (auto classTy = type->getAs<ClassType>()) {
+    baseTy = classTy->getDecl()->getBaseClass();
+    if (auto parentTy = classTy->getParent()) {
+      if (parentTy->isSpecialized())
+        specializedTy = parentTy;
+    }
+  } else if (auto boundTy = type->getAs<BoundGenericType>()) {
+    if (auto classDecl = dyn_cast<ClassDecl>(boundTy->getDecl())) {
+      baseTy = classDecl->getBaseClass();
+      specializedTy = type;
+    }
+  } else {
+    // No other types have base classes.
+    return nullptr;
+  }
+
+  if (!specializedTy || !baseTy)
+    return baseTy;
+
+  // If the type is specialized, we need to gather all of the substitutions.
+  // We've already dealt with the top level, but continue gathering
+  // specializations from the parent types.
+  TypeSubstitutionMap substitutions;
+  while (specializedTy) {
+    if (auto nominalTy = specializedTy->getAs<NominalType>()) {
+      specializedTy = nominalTy->getParent();
+      continue;
+    }
+
+    // Introduce substitutions for each of the generic parameters/arguments.
+    auto boundTy = specializedTy->castTo<BoundGenericType>();
+    auto gp = boundTy->getDecl()->getGenericParams()->getParams();
+    for (unsigned i = 0, n = boundTy->getGenericArgs().size(); i != n; ++i) {
+      auto archetype
+        = gp[i].getAsTypeParam()->getDeclaredType()->castTo<ArchetypeType>();
+      substitutions[archetype] = boundTy->getGenericArgs()[i];
+    }
+
+    specializedTy = boundTy->getParent();
+  }
+
+  // Perform substitutions into the base type.
+  return substType(baseTy, substitutions);
+}

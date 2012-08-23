@@ -203,6 +203,16 @@ bool TypeBase::isSpecialized() {
   }
 }
 
+ClassDecl *TypeBase::getClassOrBoundGenericClass() {
+  if (auto classTy = getAs<ClassType>())
+    return classTy->getDecl();
+
+  if (auto boundTy = getAs<BoundGenericType>())
+    return dyn_cast<ClassDecl>(boundTy->getDecl());
+
+  return nullptr;
+}
+
 Type TypeBase::getUnlabeledType(ASTContext &Context) {
   switch (getKind()) {
   case TypeKind::Error: 

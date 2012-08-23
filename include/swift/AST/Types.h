@@ -207,6 +207,10 @@ public:
   /// \brief Mark this type as having been validated already to the given pass.
   void setValidated(unsigned Pass) { TypeBits.TypeBase.ValidatedToPass = Pass; }
 
+  /// \brief If this is a class type or a bound generic class type, returns the
+  /// (possibly generic) class.
+  ClassDecl *getClassOrBoundGenericClass();
+
   /// getUnlabeledType - Retrieve a version of this type with all labels
   /// removed at every level. For example, given a tuple type 
   /// \code

@@ -1949,6 +1949,28 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
     }
 
+    // A class (or bound generic class) is a subtype of another class
+    // (or bound generic class) if it is derived from that class.
+    if (type1->getClassOrBoundGenericClass() &&
+        type2->getClassOrBoundGenericClass()) {
+      auto classDecl2 = type2->getClassOrBoundGenericClass();
+      for (auto super1 = TC.getSuperClassOf(type1); super1;
+           super1 = TC.getSuperClassOf(super1)) {
+        if (super1->getClassOrBoundGenericClass() != classDecl2)
+          continue;
+        
+        switch (auto result = matchTypes(super1, type2, TypeMatchKind::SameType,
+                                         subFlags, trivial)) {
+        case SolutionKind::Error:
+          continue;
+
+        case SolutionKind::Solved:
+        case SolutionKind::TriviallySolved:
+        case SolutionKind::Unsolved:
+          return result;
+        }
+      }
+    }
   }
 
   if (kind == TypeMatchKind::Conversion) {

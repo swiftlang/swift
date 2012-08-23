@@ -337,6 +337,10 @@ public:
   /// type of the base of a member access, \c BaseTy.
   Type substMemberTypeWithBase(Type T, ValueDecl *Member, Type BaseTy);
 
+  /// \brief Retrieve the superclass type of the given type, or a null type if
+  /// the type has no supertype.
+  Type getSuperClassOf(Type type);
+
   bool isSubtypeOf(Type T1, Type T2, bool &Trivial,
                    CoercionContext *CC = nullptr);
   bool isSubtypeOf(Type T1, Type T2, CoercionContext *CC = nullptr) {
