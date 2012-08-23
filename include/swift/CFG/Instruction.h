@@ -23,10 +23,6 @@
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
 
-namespace llvm {
-  class raw_ostream;
-}
-
 namespace swift {
 
 class BasicBlock;
@@ -86,7 +82,7 @@ public:
   void dump() const;
 
   /// Pretty-print the Instruction to the designated stream.
-  void print(llvm::raw_ostream &OS, CFGPrintContext &PC,
+  void print(raw_ostream &OS, CFGPrintContext &PC,
              unsigned Indent = 0) const;
 
   static bool classof(const Instruction *I) { return true; }

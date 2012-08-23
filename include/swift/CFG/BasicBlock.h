@@ -18,8 +18,6 @@
 #define SWIFT_BASICBLOCK_H
 
 #include "swift/CFG/Instruction.h"
-#include "llvm/Support/Casting.h"
-#include "llvm/ADT/ArrayRef.h"
 
 namespace llvm {
   template<class GraphType> struct GraphTraits;

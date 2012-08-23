@@ -14,11 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/CFG/Instruction.h"
 #include "swift/AST/AST.h"
 #include "swift/CFG/CFG.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/APInt.h"
-
 using namespace swift;
 
 Instruction::Instruction(BasicBlock *B, Kind K)
@@ -37,50 +37,50 @@ void Instruction::validate() const {
     validateNonTerm();
 
   switch (kind) {
-    case Call:
-    case DeclRef:
-    case IntegerLit:
-    case Load:
-    case Return:
-    case ThisApply:
-    case Tuple:
-    case TypeOf:
-      return;
-    case CondBranch:
-      break;
-    case UncondBranch: {
-      const UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
-      assert(!basicBlock->instructions.empty() &&
-             &*basicBlock->instructions.rbegin() == this &&
-             "UncondBranchInst must appear at end of BasicBlock");
-      const BasicBlock &targetBlock = *UBI.targetBlock();
-      assert(std::find(targetBlock.preds().begin(), targetBlock.preds().end(),
-                       basicBlock) &&
-             "BasicBlock of UncondBranchInst must be a predecessor of target");
-      (void)targetBlock;
-    }
+  case Call:
+  case DeclRef:
+  case IntegerLit:
+  case Load:
+  case Return:
+  case ThisApply:
+  case Tuple:
+  case TypeOf:
+    return;
+  case CondBranch:
+    break;
+  case UncondBranch: {
+    const UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
+    assert(!basicBlock->instructions.empty() &&
+           &*basicBlock->instructions.rbegin() == this &&
+           "UncondBranchInst must appear at end of BasicBlock");
+    const BasicBlock &targetBlock = *UBI.targetBlock();
+    assert(std::find(targetBlock.preds().begin(), targetBlock.preds().end(),
+                     basicBlock) &&
+           "BasicBlock of UncondBranchInst must be a predecessor of target");
+    (void)targetBlock;
+  }
   }
 }
 
 TermInst::Successors TermInst::successors() {
   switch (kind) {
-    case Call:
-    case DeclRef:
-    case IntegerLit:
-    case Load:
-    case Return:
-    case ThisApply:
-    case Tuple:
-    case TypeOf:
-      llvm_unreachable("Only TermInst's are allowed");
-    case CondBranch: {
-      CondBranchInst &CBI = *cast<CondBranchInst>(this);
-      return Successors(CBI.branches());
-    }
-    case UncondBranch: {
-      UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
-      return Successors(UBI.targetBlock());
-    }
+  case Call:
+  case DeclRef:
+  case IntegerLit:
+  case Load:
+  case Return:
+  case ThisApply:
+  case Tuple:
+  case TypeOf:
+    llvm_unreachable("Only TermInst's are allowed");
+  case CondBranch: {
+    CondBranchInst &CBI = *cast<CondBranchInst>(this);
+    return Successors(CBI.branches());
+  }
+  case UncondBranch: {
+    UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
+    return Successors(UBI.targetBlock());
+  }
   }
 }
 
@@ -136,7 +136,7 @@ void UncondBranchInst::unregisterTarget() {
 
 }
 
-void UncondBranchInst::setTarget(BasicBlock *NewTarget, ArgsTy BlockArgs){
+void UncondBranchInst::setTarget(BasicBlock *NewTarget, ArgsTy BlockArgs) {
   if (TargetBlock != NewTarget) {
     unregisterTarget();
     TargetBlock = NewTarget;

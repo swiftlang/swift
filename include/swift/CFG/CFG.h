@@ -17,7 +17,6 @@
 #ifndef SWIFT_CFG_H
 #define SWIFT_CFG_H
 
-#include "swift/CFG/Instruction.h"
 #include "swift/CFG/BasicBlock.h"
 
 namespace swift {

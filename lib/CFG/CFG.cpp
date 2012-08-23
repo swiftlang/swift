@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/CFG/CFG.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/CFG/CFG.h"
 #include "llvm/ADT/OwningPtr.h"
 
 using namespace swift;
@@ -22,7 +22,7 @@ CFG::CFG() {}
 CFG::~CFG() {
   // FIXME: if all parts of BasicBlock are BumpPtrAllocated, this shouldn't
   // eventually be needed.
-  for(BasicBlock &B : blocks) { B.~BasicBlock(); }
+  for (BasicBlock &B : blocks) { B.~BasicBlock(); }
 }
 
 //===----------------------------------------------------------------------===//

@@ -12,10 +12,11 @@
 //
 // This file defines the logic to pretty-print CFGs, Instructions, etc.
 //
+//===----------------------------------------------------------------------===//
 
+#include "swift/CFG/CFG.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/CFG/CFG.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/OwningPtr.h"
@@ -37,8 +38,7 @@ public:
 using namespace swift;
 
 raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
-                                      const BasicBlock *Block)
-{
+                                      const BasicBlock *Block) {
   // Lazily initialize the Blocks-to-IDs mapping.
   if (!BlocksToIDs) {
     BlocksToIDs.reset(new BlocksToIdsTy());
@@ -57,8 +57,7 @@ raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
 
 raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
                                       const Instruction *Inst,
-                                      bool includeBBPrefix)
-{
+                                      bool includeBBPrefix) {
   BasicBlock *Block = Inst->basicBlock;
   unsigned count = 1;
   for (const Instruction &I : Block->instructions) {
@@ -76,15 +75,13 @@ raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
 }
 
 raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
-                                      const BasicBlockArg *BBArg)
-{
+                                      const BasicBlockArg *BBArg) {
   OS << "BBArg (unsupported)\n";
   return OS;
 }
 
 raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
-                                      const CFGValue &Val)
-{
+                                      const CFGValue &Val) {
   if (const Instruction *Inst = Val.dyn_cast<Instruction*>())
     printID(OS, Inst);
   else
@@ -96,8 +93,7 @@ raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
 // Pretty-printing for Instructions.
 //===----------------------------------------------------------------------===//
 
-void Instruction::print(raw_ostream &OS,
-                        CFGPrintContext &PC,
+void Instruction::print(raw_ostream &OS, CFGPrintContext &PC,
                         unsigned Indent) const {
   OS.indent(Indent);
   PC.printID(OS, this, false) << " = ";
@@ -223,8 +219,7 @@ void BasicBlock::dump() const {
 }
 
 /// Pretty-print the BasicBlock with the designated stream.
-void BasicBlock::print(raw_ostream &OS,
-                       CFGPrintContext &PC,
+void BasicBlock::print(raw_ostream &OS, CFGPrintContext &PC,
                        unsigned Indent) const {
   OS.indent(Indent);
   PC.printID(OS, this) << ":\n";
@@ -295,8 +290,7 @@ void CFG::dump() const {
 /// Pretty-print the basi block with the designated stream.
 void CFG::print(llvm::raw_ostream &OS, CFGPrintContext &PC,
                 unsigned Indent) const {
-  for (const BasicBlock &B : blocks) {
+  for (const BasicBlock &B : blocks)
     B.print(OS, PC, Indent);
-  }
 }
 
