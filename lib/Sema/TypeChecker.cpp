@@ -575,8 +575,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem,
       while (!QueuedClasses.empty()) {
         CD = QueuedClasses.back();
         if (CD->hasBaseClass()) {
-          // FIXME: Generic bases
-          ClassDecl *Base = CD->getBaseClass()->castTo<ClassType>()->getDecl();
+          ClassDecl *Base = CD->getBaseClass()->getClassOrBoundGenericClass();
           if (CheckedClasses.insert(Base)) {
             QueuedClasses.push_back(Base);
             continue;

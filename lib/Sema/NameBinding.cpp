@@ -294,6 +294,14 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
   if (ValueDecl *Last = Components.back().Value.dyn_cast<ValueDecl*>()) {
     auto GenericArgs = Components.back().GenericArgs;
     if (!GenericArgs.empty()) {
+      if (auto NTD = dyn_cast<NominalTypeDecl>(Last)) {
+        SmallVector<Type, 4> GenericArgTypes;
+        for (TypeLoc T : GenericArgs)
+          GenericArgTypes.push_back(T.getType());
+        Components.back().Value = BoundGenericType::get(NTD, Type(),
+                                                        GenericArgTypes);
+        return false;
+      }
       // FIXME: Need better diagnostic here
     } else if (auto TD = dyn_cast<TypeDecl>(Last)) {
       Components.back().Value = TD->getDeclaredType();
@@ -407,15 +415,24 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
           break;
         } else {
           // We need to make sure the extended type is canonical. There are
-          // two possibilities here:
+          // three possibilities here:
           // 1. The type is already canonical, because it's either a NominalType
           // or comes from an imported module.
           // 2. The type is a NameAliasType from the current module, which
           // we need to resolve immediately because we can't leave a
           // non-canonical type here in the AST.
+          // 3. The type is a BoundGenericType; it's illegal to extend
+          // such a type.
           Type FoundType = DNT->Components.back().Value.get<Type>();
           if (FoundType->hasCanonicalTypeComputed())
             break;
+
+          if (isa<BoundGenericType>(FoundType.getPointer())) {
+            Binder.diagnose(ED->getLoc(), diag::non_nominal_extension,
+                            false, ED->getExtendedType());
+            ED->getExtendedTypeLoc().setInvalidType(Binder.Context);
+            break;
+          }
 
           TypeAliasDecl *TAD =
               cast<NameAliasType>(FoundType.getPointer())->getDecl();
@@ -443,14 +460,20 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
             break;
           } else {
             // We need to make sure the extended type is canonical. There are
-            // two possibilities here:
+            // three possibilities here:
             // 1. The type is already canonical, because it's either a NominalType
             // or comes from an imported module.
             // 2. The type is a NameAliasType from the current module, which
             // we need to resolve immediately because we can't leave a
             // non-canonical type here in the AST.
+            // 3. The type is a BoundGenericType; such a type isn't going to be
+            // canonical, but name lookup doesn't actually care about generic
+            // arguments, so we can ignore the fact that they're unresolved.
             foundType = DNT->Components.back().Value.get<Type>();
             if (foundType->hasCanonicalTypeComputed())
+              break;
+
+            if (isa<BoundGenericType>(foundType.getPointer()))
               break;
 
             TypeAliasDecl *TAD =
