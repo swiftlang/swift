@@ -1257,6 +1257,19 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
       return valueTI.load(IGF, addr, out);
     }
   }
+
+  if (BuiltinName == "destroy") {
+    // The type of the operation has to be grabbed from the substitutions.
+    Type valueTy = emission.getSubstitutions()[0].Replacement;
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+
+    llvm::Value *addrValue = args.claimUnmanagedNext();
+    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
+    valueTI.destroy(IGF, addr);
+
+    emission.setVoidResult();
+    return;
+  }
   
   if (BuiltinName == "assign") {
     // The type of the operation is the type of the first argument of
@@ -1292,7 +1305,9 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return valueTI.initialize(IGF, args, addr);
   }
 
-  if (BuiltinName == "sizeof") {
+  // FIXME: 'strideof' guarantees that it returns something that's a
+  // multiple of the alignment.
+  if (BuiltinName == "sizeof" || BuiltinName == "strideof") {
     Type valueTy = emission.getSubstitutions()[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
     emission.setScalarUnmanagedSubstResult(valueTI.getSizeOnly(IGF));
@@ -1303,6 +1318,22 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     Type valueTy = emission.getSubstitutions()[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
     emission.setScalarUnmanagedSubstResult(valueTI.getAlignmentOnly(IGF));
+    return;
+  }
+
+  if (BuiltinName == "allocRaw") {
+    auto size = args.claimUnmanagedNext();
+    auto align = args.claimUnmanagedNext();
+    auto result = IGF.emitAllocRawCall(size, align, "builtin-allocRaw");
+    emission.setScalarUnmanagedSubstResult(result);
+    return;
+  }
+
+  if (BuiltinName == "deallocRaw") {
+    auto pointer = args.claimUnmanagedNext();
+    auto size = args.claimUnmanagedNext();
+    IGF.emitDeallocRawCall(pointer, size);
+    emission.setVoidResult();
     return;
   }
 
@@ -1657,9 +1688,20 @@ void CallEmission::emitToExplosion(Explosion &out) {
     emitToMemory(temp, substResultTI);
     init.markInitialized(IGF, obj);
 
-    substResultTI.loadAsTake(IGF, temp, out);
-    if (cleanup.isValid())
-      IGF.setCleanupState(cleanup, CleanupState::Dead);
+    // If the subst result is passed as an aggregate, don't uselessly
+    // copy the temporary.
+    auto substSchema = substResultTI.getSchema(out.getKind());
+    if (substSchema.isSingleAggregate()) {
+      auto substType = substSchema.begin()->getAggregateType()->getPointerTo();
+      temp = IGF.Builder.CreateBitCast(temp, substType);
+      out.add(ManagedValue(temp.getAddress(), cleanup));
+
+    // Otherwise, we need to load.  Do a take-load and deactivate the cleanup.
+    } else {
+      substResultTI.loadAsTake(IGF, temp, out);
+      if (cleanup.isValid())
+        IGF.setCleanupState(cleanup, CleanupState::Dead);
+    }
     return;
   }
 

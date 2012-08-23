@@ -200,7 +200,7 @@ public:
                           Address src) const {
     // If we're POD, use the generic routine.
     if (isPOD(ResilienceScope::Local))
-      return TypeInfo::initializeWithCopy(IGF, dest, src);
+      return FixedTypeInfo::initializeWithCopy(IGF, dest, src);
 
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;

@@ -160,12 +160,12 @@ public:
   /// Perform a "take-initialization" from the given object.  A
   /// take-initialization is like a C++ move-initialization, except that
   /// the old object is actually no longer permitted to be destroyed.
-  void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                          Address srcAddr) const;
+  virtual void initializeWithTake(IRGenFunction &IGF, Address destAddr,
+                                  Address srcAddr) const = 0;
 
   /// Perform a copy-initialization from the given object.
   virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                                  Address srcAddr) const;
+                                  Address srcAddr) const = 0;
 
   /// Consume a bunch of values which have exploded at one explosion
   /// level and produce them at another.

@@ -48,8 +48,9 @@ ExplosionSchema TypeInfo::getSchema(ExplosionKind kind) const {
 /// Copy a value from one object to a new object, directly taking
 /// responsibility for anything it might have.  This is like C++
 /// move-initialization, except the old object will not be destroyed.
-void TypeInfo::initializeWithTake(IRGenFunction &IGF,
-                                  Address destAddr, Address srcAddr) const {
+void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
+                                       Address destAddr,
+                                       Address srcAddr) const {
   // Prefer loads and stores if we won't make a million of them.
   // Maybe this should also require the scalars to have a fixed offset.
   ExplosionSchema schema = getSchema(ExplosionKind::Maximal);
@@ -66,8 +67,9 @@ void TypeInfo::initializeWithTake(IRGenFunction &IGF,
 
 /// Copy a value from one object to a new object.  This is just the
 /// default implementation.
-void TypeInfo::initializeWithCopy(IRGenFunction &IGF,
-                                  Address destAddr, Address srcAddr) const {
+void FixedTypeInfo::initializeWithCopy(IRGenFunction &IGF,
+                                       Address destAddr,
+                                       Address srcAddr) const {
   // Use memcpy if that's legal.
   if (isPOD(ResilienceScope::Local)) {
     return initializeWithTake(IGF, destAddr, srcAddr);

@@ -262,6 +262,28 @@ static ValueDecl *getStoreOperation(ASTContext &Context, Identifier Id) {
                                 Context.TheBuiltinModule);
 }
 
+static ValueDecl *getDestroyOperation(ASTContext &Context, Identifier id) {
+  Type genericTy;
+  GenericParamList *paramList;
+  std::tie(genericTy, paramList) = getGenericParam(Context);
+
+  TupleTypeElt argElts[] = {
+    TupleTypeElt(MetaTypeType::get(genericTy, Context), Identifier()),
+    TupleTypeElt(Context.TheRawPointerType, Identifier())
+  };
+  Type argTy = TupleType::get(argElts, Context);
+  Type fnTy = PolymorphicFunctionType::get(argTy, TupleType::getEmpty(Context),
+                                           paramList, Context);
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), id, SourceLoc(),
+                                paramList, fnTy, /*init*/ nullptr,
+                                Context.TheBuiltinModule);
+}
+
+static Type getPointerSizeType(ASTContext &Context) {
+  // FIXME: Size of a pointer here?
+  return BuiltinIntegerType::get(64, Context);
+}
+
 static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context, Identifier Id) {
   Type GenericTy;
   GenericParamList *ParamList;
@@ -271,12 +293,38 @@ static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context, Identifier Id) 
     TupleTypeElt(MetaTypeType::get(GenericTy, Context), Identifier()),
   };
   Type Arg = TupleType::get(ArgElts, Context);
-  // FIXME: Size of a pointer here?
   Type FnTy = PolymorphicFunctionType::get(Arg,
-                                           BuiltinIntegerType::get(64, Context),
+                                           getPointerSizeType(Context),
                                            ParamList, Context);
   return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, SourceLoc(),
                                 ParamList, FnTy, /*init*/ nullptr,
+                                Context.TheBuiltinModule);
+}
+
+static ValueDecl *getAllocOperation(ASTContext &Context, Identifier id) {
+  Type ptrSizeTy = getPointerSizeType(Context);
+  TupleTypeElt argElts[] = {
+    TupleTypeElt(ptrSizeTy, Identifier()),
+    TupleTypeElt(ptrSizeTy, Identifier())
+  };
+  Type argTy = TupleType::get(argElts, Context);
+  Type fnTy = FunctionType::get(argTy, Context.TheRawPointerType, Context);
+
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), id, SourceLoc(),
+                                nullptr, fnTy, /*init*/ nullptr,
+                                Context.TheBuiltinModule);
+}
+
+static ValueDecl *getDeallocOperation(ASTContext &Context, Identifier id) {
+  TupleTypeElt argElts[] = {
+    TupleTypeElt(Context.TheRawPointerType, Identifier()),
+    TupleTypeElt(getPointerSizeType(Context), Identifier())
+  };
+  Type argTy = TupleType::get(argElts, Context);
+  Type fnTy = FunctionType::get(argTy, TupleType::getEmpty(Context), Context);
+
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), id, SourceLoc(),
+                                nullptr, fnTy, /*init*/ nullptr,
                                 Context.TheBuiltinModule);
 }
 
@@ -325,8 +373,12 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 #define BUILTIN_LOAD(id, name) OverloadedBuiltinKind::Special,
 #define BUILTIN_ASSIGN(id, name) OverloadedBuiltinKind::Special,
 #define BUILTIN_INIT(id, name) OverloadedBuiltinKind::Special,
+#define BUILTIN_DESTROY(id, name) OverloadedBuiltinKind::Special,
 #define BUILTIN_SIZEOF(id, name) OverloadedBuiltinKind::Special,
+#define BUILTIN_STRIDEOF(id, name) OverloadedBuiltinKind::Special,
 #define BUILTIN_ALIGNOF(id, name) OverloadedBuiltinKind::Special,
+#define BUILTIN_ALLOCRAW(id, name) OverloadedBuiltinKind::Special,
+#define BUILTIN_DEALLOCRAW(id, name) OverloadedBuiltinKind::Special,
 #define BUILTIN_CASTOBJECTPOINTER(id, name) OverloadedBuiltinKind::Special,
 #include "swift/AST/Builtins.def"
 };
@@ -498,14 +550,25 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
     if (!Types.empty()) return nullptr;
     return getLoadOperation(Context, Id);
 
+  case BuiltinValueKind::Destroy:
+    if (!Types.empty()) return nullptr;
+    return getDestroyOperation(Context, Id);
+
   case BuiltinValueKind::Assign:
   case BuiltinValueKind::Init:
     if (!Types.empty()) return nullptr;
     return getStoreOperation(Context, Id);
 
   case BuiltinValueKind::Sizeof:
+  case BuiltinValueKind::Strideof:
   case BuiltinValueKind::Alignof:
     return getSizeOrAlignOfOperation(Context, Id);
+
+  case BuiltinValueKind::AllocRaw:
+    return getAllocOperation(Context, Id);
+
+  case BuiltinValueKind::DeallocRaw:
+    return getDeallocOperation(Context, Id);
 
   case BuiltinValueKind::CastToObjectPointer:
   case BuiltinValueKind::CastFromObjectPointer:

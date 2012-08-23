@@ -110,6 +110,13 @@ BUILTIN_LOAD(Load, "load")
 BUILTIN_LOAD(Move, "move")
 #undef BUILTIN_LOAD
 
+/// Destroy has type (metatype<T>, Builtin.RawPointer) -> ()
+#ifndef BUILTIN_DESTROY
+#define BUILTIN_DESTROY(Id, Name) BUILTIN(Id, Name)
+#endif
+BUILTIN_DESTROY(Destroy, "destroy")
+#undef BUILTIN_DESTROY
+
 /// Assign has type (T, Builtin.RawPointer) -> ()
 #ifndef BUILTIN_ASSIGN
 #define BUILTIN_ASSIGN(Id, Name) BUILTIN(Id, Name)
@@ -131,12 +138,33 @@ BUILTIN_INIT(Init, "init")
 BUILTIN_SIZEOF(Sizeof, "sizeof")
 #undef BUILTIN_SIZEOF
 
+/// Strideof has type (metatype<T>) -> Int64
+#ifndef BUILTIN_STRIDEOF
+#define BUILTIN_STRIDEOF(Id, Name) BUILTIN(Id, Name)
+#endif
+BUILTIN_STRIDEOF(Strideof, "strideof")
+#undef BUILTIN_STRIDEOF
+
 /// Alignof has type (metatype<T>) -> Int64
 #ifndef BUILTIN_ALIGNOF
 #define BUILTIN_ALIGNOF(Id, Name) BUILTIN(Id, Name)
 #endif
 BUILTIN_ALIGNOF(Alignof, "alignof")
 #undef BUILTIN_ALIGNOF
+
+/// AllocRaw has type (Int64, Int64) -> Builtin.RawPointer
+#ifndef BUILTIN_ALLOCRAW
+#define BUILTIN_ALLOCRAW(Id, Name) BUILTIN(Id, Name)
+#endif
+BUILTIN_ALLOCRAW(AllocRaw, "allocRaw")
+#undef BUILTIN_ALLOCRAW
+
+/// DeallocRaw has type (Builtin.RawPointer, Int64) -> ()
+#ifndef BUILTIN_DEALLOCRAW
+#define BUILTIN_DEALLOCRAW(Id, Name) BUILTIN(Id, Name)
+#endif
+BUILTIN_DEALLOCRAW(DeallocRaw, "deallocRaw")
+#undef BUILTIN_DEALLOCRAW
 
 /// CastToObjectPointer has type (T) -> Builtin.ObjectPointer.
 /// CastFromObjectPointer has type (Builtin.ObjectPointer) -> T.

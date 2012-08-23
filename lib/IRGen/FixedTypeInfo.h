@@ -37,6 +37,14 @@ public:
                         OnHeap_t onHeap,
                         const llvm::Twine &name) const;
 
+  // We can give these reasonable default implementations.
+
+  void initializeWithTake(IRGenFunction &IGF, Address destAddr,
+                          Address srcAddr) const;
+
+  void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
+                          Address srcAddr) const;
+
   // TODO: move the StorageSize etc. members here.
 };
 

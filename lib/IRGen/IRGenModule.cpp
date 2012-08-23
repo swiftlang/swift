@@ -145,8 +145,9 @@ llvm::Constant *IRGenModule::getSlowAllocFn() {
   if (SlowAllocFn) return SlowAllocFn;
 
   /// void *swift_slowAlloc(size_t size, size_t flags);
+  llvm::Type *argTypes[] = { SizeTy, SizeTy };
   llvm::FunctionType *fnType =
-    llvm::FunctionType::get(Int8PtrTy, SizeTy, false);
+    llvm::FunctionType::get(Int8PtrTy, argTypes, false);
   SlowAllocFn = createRuntimeFunction(*this, "swift_slowAlloc", fnType);
   return SlowAllocFn;
 }
