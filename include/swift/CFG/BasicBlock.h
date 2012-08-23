@@ -124,8 +124,7 @@ raw_ostream &operator<<(raw_ostream &, const swift::BasicBlock &B);
 
 template <>
 struct ilist_traits<::swift::BasicBlock> :
-public ilist_default_traits<::swift::BasicBlock>
-{
+public ilist_default_traits<::swift::BasicBlock> {
   typedef ::swift::BasicBlock BasicBlock;
 
 private:

@@ -68,9 +68,6 @@ private:
   void operator=(const Instruction &) = delete;
   void operator delete(void *Ptr, size_t)  = delete;
 
-  /// Helper method for validating non-terminator Instructions.
-  void validateNonTerm() const;
-
 protected:
   Instruction(BasicBlock *B, Kind K);
 
@@ -93,9 +90,7 @@ class CallInst : public Instruction {
 private:
   /// Construct a CallInst from a given call expression and the provided
   /// arguments.
-  CallInst(CallExpr *expr,
-           BasicBlock *B,
-           CFGValue function,
+  CallInst(CallExpr *expr, BasicBlock *B, CFGValue function,
            ArrayRef<CFGValue> args);
 
   CallInst() = delete;
@@ -103,9 +98,7 @@ private:
   unsigned NumArgs;
 
 public:
-  static CallInst *create(CallExpr *expr,
-                          BasicBlock *B,
-                          CFGValue function,
+  static CallInst *create(CallExpr *expr, BasicBlock *B, CFGValue function,
                           ArrayRef<CFGValue> args);
 
   /// The backing expression for the call.
@@ -142,8 +135,7 @@ public:
   /// \param B The basic block that will contain the instruction.
   ///
   DeclRefInst(DeclRefExpr *DR, BasicBlock *B)
-    : Instruction(B, DeclRef),
-      expr(DR) {}
+    : Instruction(B, DeclRef), expr(DR) {}
 
   static bool classof(const Instruction *I) { return I->kind == DeclRef; }
 };
@@ -163,7 +155,8 @@ public:
   /// \param B The basic block that will contain the instruction.
   ///
   IntegerLiteralInst(IntegerLiteralExpr *IE, BasicBlock *B) :
-    Instruction(B, IntegerLit), literal(IE) {}
+    Instruction(B, IntegerLit), literal(IE) {
+  }
 
   static bool classof(const Instruction *I) { return I->kind == IntegerLit; }
 };
@@ -439,8 +432,7 @@ namespace llvm {
 
 template <>
 struct ilist_traits<::swift::Instruction> :
-  public ilist_default_traits<::swift::Instruction>
-{
+  public ilist_default_traits<::swift::Instruction> {
   typedef ::swift::Instruction Instruction;
 
 private:
