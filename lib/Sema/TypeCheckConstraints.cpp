@@ -1927,15 +1927,26 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // FIXME: Materialization
 
   if (kind >= TypeMatchKind::Subtype) {
-    // A scalar value can be converted to a non-empty tuple with at most one
-    // non-defaulted element.
-    // FIXME: Subtyping shouldn't allow filling in default arguments?
     if (auto tuple2 = type2->getAs<TupleType>()) {
-      int scalarFieldIdx = tuple2->getFieldForScalarInit();
-      if (scalarFieldIdx >= 0) {
-        // FIXME: Handle variadic fields here.
-        auto scalarFieldTy = tuple2->getElementType((unsigned)scalarFieldIdx);
-        return matchTypes(type1, scalarFieldTy, kind, subFlags, trivial);
+      // A scalar type is a subtype of a one-element, non-variadic tuple
+      // containing a single element if the scalar type is a subtype of
+      // the type of that tuple's element.
+      if (tuple2->getFields().size() == 1 &&
+          !tuple2->getFields()[0].isVararg()) {
+        return matchTypes(type1, tuple2->getElementType(0), kind, subFlags,
+                          trivial);
+      }
+
+      // A scalar type can be converted to a tuple so long as there is at
+      // most one non-defaulted element.
+      if (kind == TypeMatchKind::Conversion) {
+        int scalarFieldIdx = tuple2->getFieldForScalarInit();
+        if (scalarFieldIdx >= 0) {
+          const auto &elt = tuple2->getFields()[scalarFieldIdx];
+          auto scalarFieldTy = elt.isVararg()? elt.getVarargBaseTy()
+                                             : elt.getType();
+          return matchTypes(type1, scalarFieldTy, kind, subFlags, trivial);
+        }
       }
     }
 
