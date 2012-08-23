@@ -1803,7 +1803,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::Class: {
       auto nominal1 = cast<NominalType>(canType1);
       auto nominal2 = cast<NominalType>(canType2);
-      // FIXME: subtyping for classes!
       if (nominal1->getDecl() == nominal2->getDecl()) {
         return SolutionKind::Error;
 
@@ -2009,7 +2008,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   }
 
 
-  // FIXME: Subtyping for class types.
   // FIXME: User-defined conversions.
 
   return SolutionKind::Error;
