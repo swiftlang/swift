@@ -423,8 +423,10 @@ void swift::REPL(ASTContext &Context) {
                                            CurBufferOffset,
                                            CurBufferEndOffset,
                                            dumpConstraints);
-
-    dumpConstraints = false;
+    if (dumpConstraints) {
+      dumpConstraints = false;
+      ShouldRun = false;
+    }
 
     if (Context.hadError()) {
       Context.Diags.resetHadAnyError();
