@@ -1923,7 +1923,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
-  // FIXME: Auto-closure.
   // FIXME: Materialization
 
   if (kind >= TypeMatchKind::Subtype) {
@@ -1952,12 +1951,21 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   }
 
-  if (kind >= TypeMatchKind::Conversion) {
+  if (kind == TypeMatchKind::Conversion) {
     // An lvalue of type T1 can be converted to a value of type T2 so long as
     // T1 is convertible to T2 (by loading the value).
     if (auto lvalue1 = type1->getAs<LValueType>()) {
       return matchTypes(lvalue1->getObjectType(), type2, kind, subFlags,
                         trivial);
+    }
+
+    // An expression can be converted to an auto-closure function type, creating
+    // an implicit closure.
+   if (auto function2 = type2->getAs<FunctionType>()) {
+      if (function2->isAutoClosure()) {
+        trivial = false;
+        return matchTypes(type1, function2->getResult(), kind, flags, trivial);
+      }
     }
   }
 
