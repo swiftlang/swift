@@ -16,7 +16,6 @@
 
 #include "swift/CFG/BasicBlock.h"
 #include "swift/CFG/CFG.h"
-
 using namespace swift;
 
 BasicBlock::BasicBlock(CFG *C) : cfg(C) { cfg->blocks.push_back(this); }

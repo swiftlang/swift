@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_CFGBASE_H
-#define SWIFT_CFGBASE_H
+#ifndef SWIFT_CFG_CFGBASE_H
+#define SWIFT_CFG_CFGBASE_H
 
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Allocator.h"

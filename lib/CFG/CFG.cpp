@@ -14,7 +14,6 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "llvm/ADT/OwningPtr.h"
-
 using namespace swift;
 
 CFG::CFG() {}
@@ -30,7 +29,8 @@ CFG::~CFG() {
 //===----------------------------------------------------------------------===//
 
 static Expr *ignoreParens(Expr *Ex) {
-  while (ParenExpr *P = dyn_cast<ParenExpr>(Ex)) { Ex = P->getSubExpr(); }
+  while (ParenExpr *P = dyn_cast<ParenExpr>(Ex))
+    Ex = P->getSubExpr();
   return Ex;
 }
 

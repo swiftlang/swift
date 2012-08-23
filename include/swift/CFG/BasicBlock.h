@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASICBLOCK_H
-#define SWIFT_BASICBLOCK_H
+#ifndef SWIFT_CFG_BASICBLOCK_H
+#define SWIFT_CFG_BASICBLOCK_H
 
 #include "swift/CFG/Instruction.h"
 

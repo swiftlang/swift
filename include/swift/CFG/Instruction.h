@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_INSTRUCTION_H
-#define SWIFT_INSTRUCTION_H
+#ifndef SWIFT_CFG_INSTRUCTION_H
+#define SWIFT_CFG_INSTRUCTION_H
 
 #include "swift/Basic/LLVM.h"
 #include "swift/CFG/CFGBase.h"
