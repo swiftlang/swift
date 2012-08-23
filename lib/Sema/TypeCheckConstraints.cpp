@@ -868,8 +868,9 @@ Type ConstraintSystem::openType(Type startingType) {
       // Create a new type variable to replace this archetype.
       auto tv = CS.createTypeVariable(archetype);
 
-      // The type variable must be a subtype of the composition of all of
-      // its protocol conformance requirements.
+      // The type variable must be convertible of the composition of all of
+      // its protocol conformance requirements, i.e., it must conform to
+      // each of those protocols.
       auto conformsTo = archetype->getConformsTo();
       if (!conformsTo.empty()) {
         // FIXME: Can we do this more efficiently, since we know that the
@@ -884,7 +885,7 @@ Type ConstraintSystem::openType(Type startingType) {
 
         auto composition = ProtocolCompositionType::get(CS.TC.Context,
                                                         conformsToTypes);
-        CS.addConstraint(ConstraintKind::Subtype, tv, composition);
+        CS.addConstraint(ConstraintKind::Conversion, tv, composition);
       }
 
       // Record the type variable that corresponds to this archetype.
@@ -1949,7 +1950,24 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
-  // FIXME: Check existential types.
+  // For a subtyping relation involving two existential types, or a conversion
+  // from any type, check whether the first type conforms to each of
+  if (kind == TypeMatchKind::Conversion ||
+      (kind == TypeMatchKind::Subtype && type1->isExistentialType())) {
+    SmallVector<ProtocolDecl *, 4> protocols;
+    // FIXME: Do we even care about the !hasTypeVariable() optimization here?
+    if (!type1->hasTypeVariable() && type2->isExistentialType(protocols)) {
+      for (auto proto : protocols) {
+        if (!TC.conformsToProtocol(type1, proto))
+          return SolutionKind::Error;
+      }
+
+      trivial = false;
+      return SolutionKind::Solved;
+    }
+  }
+
+
   // FIXME: Subtyping for class types.
   // FIXME: User-defined conversions.
 
