@@ -1822,9 +1822,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::MetaType: {
       auto meta1 = cast<MetaTypeType>(canType1);
       auto meta2 = cast<MetaTypeType>(canType2);
-      // FIXME: Subtyping among metatypes, for classes only?
+
+      // metatype<B> < metatype<A> if A < B and both A and B are classes.
+      TypeMatchKind subKind = TypeMatchKind::SameType;
+      if (kind != TypeMatchKind::SameType &&
+          meta1->getInstanceType()->getClassOrBoundGenericClass() &&
+          meta2->getInstanceType()->getClassOrBoundGenericClass())
+        subKind = std::max(kind, TypeMatchKind::Subtype);
+      
       return matchTypes(meta1->getInstanceType(), meta2->getInstanceType(),
-                        TypeMatchKind::SameType, subFlags, trivial);
+                        subKind, subFlags, trivial);
     }
 
     case TypeKind::Function: {
