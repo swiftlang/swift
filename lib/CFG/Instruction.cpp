@@ -33,11 +33,10 @@ void Instruction::validateNonTerm() const {
 }
 
 void Instruction::validate() const {
-  if (kind > Invalid && kind < TERM_INST_BEGIN)
+  if (kind < TERM_INST_BEGIN)
     validateNonTerm();
 
   switch (kind) {
-    case Invalid:
     case Call:
     case DeclRef:
     case IntegerLit:
@@ -65,7 +64,6 @@ void Instruction::validate() const {
 
 TermInst::Successors TermInst::successors() {
   switch (kind) {
-    case Invalid:
     case Call:
     case DeclRef:
     case IntegerLit:

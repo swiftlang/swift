@@ -41,13 +41,11 @@ class TupleExpr;
 class TypeOfExpr;
 
 /// This is the root class for all instructions that can be used as the contents
-/// of a Swift BasicBlock.  They cannot be used as terminators for BasicBlocks;
-/// for those we have TermInst.
+/// of a Swift BasicBlock.
 class Instruction : public llvm::ilist_node<Instruction>,
                     public CFGAllocated<Instruction> {
 public:
   enum Kind {
-    Invalid,
     Call,
     DeclRef,
     IntegerLit,
@@ -70,7 +68,7 @@ public:
 
 private:
   friend struct llvm::ilist_sentinel_traits<Instruction>;
-  Instruction() : kind(Invalid), basicBlock(0) {}
+  Instruction() = delete;
   void operator=(const Instruction &) = delete;
   void operator delete(void *Ptr, size_t)  = delete;
 

@@ -103,9 +103,6 @@ void Instruction::print(raw_ostream &OS,
   PC.printID(OS, this, false) << " = ";
 
   switch (kind) {
-    case Invalid:
-      OS << "Invalid";
-      break;
     case Call: {
       const CallInst &CE = *cast<CallInst>(this);
       OS << "Call(fn=";
