@@ -1873,7 +1873,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       auto bound1 = cast<BoundGenericType>(canType1);
       auto bound2 = cast<BoundGenericType>(canType2);
       
-      // FIXME: subtyping for generic classes!
       if (bound1->getDecl() == bound2->getDecl()) {
         // Match up the parents, exactly, if there are parents.
         SolutionKind result = SolutionKind::TriviallySolved;
@@ -1899,7 +1898,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         }
 
         // Match up the generic arguments, exactly.
-        // FIXME: If this fails, do we have to look for a subtype?
         auto args1 = bound1->getGenericArgs();
         auto args2 = bound2->getGenericArgs();
         assert(args1.size() == args2.size() && "Mismatched generic args");
@@ -2002,7 +2000,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   if (kind == TypeMatchKind::Conversion ||
       (kind == TypeMatchKind::Subtype && type1->isExistentialType())) {
     SmallVector<ProtocolDecl *, 4> protocols;
-    // FIXME: Do we even care about the !hasTypeVariable() optimization here?
     if (!type1->hasTypeVariable() && type2->isExistentialType(protocols)) {
       for (auto proto : protocols) {
         if (!TC.conformsToProtocol(type1, proto))
