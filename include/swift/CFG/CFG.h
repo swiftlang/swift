@@ -75,9 +75,6 @@ public:
 
   /// Pretty-print the CFG with the designated stream.
   void print(raw_ostream &OS) const;
-
-  /// Dump the CFGs of an entire translation unit.
-  static void dump(TranslationUnit *TU);
 };
 
 } // end swift namespace

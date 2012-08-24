@@ -15,8 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/CFG/CFGVisitor.h"
-#include "swift/AST/AST.h"
-#include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/OwningPtr.h"
@@ -246,35 +247,3 @@ void CFG::print(llvm::raw_ostream &OS) const {
     Printer.print(&B);
 }
 
-
-//===----------------------------------------------------------------------===//
-// CFG pretty-printing.
-//===----------------------------------------------------------------------===//
-
-namespace {
-class DumpVisitor : public ASTVisitor<DumpVisitor> {
-public:
-  DumpVisitor(llvm::raw_ostream &OS) : OS(OS) {}
-
-  raw_ostream &OS;
-
-  void visitFuncDecl(FuncDecl *FD) {
-    FuncExpr *FE = FD->getBody();
-    llvm::OwningPtr<CFG> C(CFG::constructCFG(FE->getBody()));
-
-    if (!C)
-      return;
-
-    OS << "func_decl " << FD->getName() << '\n';
-    C->print(OS);
-    OS << "\n";
-  }
-};
-}
-
-
-// FIXME: This should moved to the driver.
-void CFG::dump(TranslationUnit *TU) {
-  for (Decl *D : TU->Decls)
-    DumpVisitor(llvm::errs()).visit(D);
-}
