@@ -37,7 +37,7 @@ private:
 
   // Intentionally marked private so that we need to use 'constructCFG()'
   // to construct a CFG.
-  CFG();
+  CFG() {}
 public:
   ~CFG();
 

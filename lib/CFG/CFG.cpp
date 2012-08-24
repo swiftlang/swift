@@ -11,20 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/CFG/CFG.h"
+#include "swift/CFG/CFGBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "llvm/ADT/OwningPtr.h"
 using namespace swift;
 
-CFG::CFG() {}
-
-CFG::~CFG() {
-  // FIXME: if all parts of BasicBlock are BumpPtrAllocated, this shouldn't
-  // eventually be needed.
-  for (BasicBlock &B : BlockList) {
-    B.~BasicBlock();
-  }
-}
+CFG::~CFG() {}
 
 //===----------------------------------------------------------------------===//
 // CFG construction.
@@ -48,9 +41,6 @@ class Builder : public ASTVisitor<Builder, CFGValue> {
   llvm::SmallVector<BlocksVector *, 4> PendingMergesStack;
   llvm::SmallVector<BlocksVector *, 4> BreakStack;
   llvm::SmallVector<BlocksVector *, 4> ContinueStack;
-
-  /// Mapping from expressions to instructions.
-  llvm::DenseMap<Expr *, Instruction *> ExprToInst;
 
   /// The current basic block being constructed.
   BasicBlock *Block;
@@ -124,11 +114,6 @@ public:
   BasicBlock *createFreshBlock() {
     Block = new (C) BasicBlock(&C);
     return Block;
-  }
-
-  CFGValue addInst(Expr *Ex, Instruction *I) {
-    ExprToInst[Ex] = I;
-    return I;
   }
 
   void finishUp() {
@@ -243,11 +228,12 @@ void Builder::visitBraceStmt(BraceStmt *S) {
   // We should consider whether or not the scopes they introduce are
   // represented in the CFG.
   for (const BraceStmt::ExprStmtOrDecl &ESD : S->getElements()) {
-    assert(!ESD.is<Decl*>() && "FIXME: Handle Decls");
     if (Stmt *S = ESD.dyn_cast<Stmt*>())
       visit(S);
-    if (Expr *E = ESD.dyn_cast<Expr*>())
+    else if (Expr *E = ESD.dyn_cast<Expr*>())
       visit(E);
+    else
+      assert(0 && "FIXME: Handle Decls");
   }
 }
 
@@ -445,26 +431,26 @@ CFGValue Builder::visitCallExpr(CallExpr *E) {
     ArgsV.push_back(visit(Arg));
   }
 
-  return addInst(E, CallInst::create(E, currentBlock(), FnV, ArgsV));
+  return CallInst::create(E, currentBlock(), FnV, ArgsV);
 }
 
 CFGValue Builder::visitDeclRefExpr(DeclRefExpr *E) {
-  return addInst(E, new (C) DeclRefInst(E, currentBlock()));
+  return new (C) DeclRefInst(E, currentBlock());
 }
 
 CFGValue Builder::visitThisApplyExpr(ThisApplyExpr *E) {
   CFGValue FnV = visit(E->getFn());
   CFGValue ArgV = visit(E->getArg());
-  return addInst(E, new (C) ThisApplyInst(E, FnV, ArgV, currentBlock()));
+  return new (C) ThisApplyInst(E, FnV, ArgV, currentBlock());
 }
 
 CFGValue Builder::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-  return addInst(E, new (C) IntegerLiteralInst(E, currentBlock()));
+  return new (C) IntegerLiteralInst(E, currentBlock());
 }
 
 CFGValue Builder::visitLoadExpr(LoadExpr *E) {
   CFGValue SubV = visit(E->getSubExpr());
-  return addInst(E, new (C) LoadInst(E, SubV, currentBlock()));
+  return new (C) LoadInst(E, SubV, currentBlock());
 }
 
 CFGValue Builder::visitParenExpr(ParenExpr *E) {
@@ -476,9 +462,9 @@ CFGValue Builder::visitTupleExpr(TupleExpr *E) {
   for (auto &I : E->getElements()) {
     ArgsV.push_back(visit(I));
   }
-  return addInst(E, TupleInst::create(E, ArgsV, currentBlock()));
+  return TupleInst::create(E, ArgsV, currentBlock());
 }
 
 CFGValue Builder::visitTypeOfExpr(TypeOfExpr *E) {
-  return addInst(E, new (C) TypeOfInst(E, currentBlock()));
+  return new (C) TypeOfInst(E, currentBlock());
 }
