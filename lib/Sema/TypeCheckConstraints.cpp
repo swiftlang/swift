@@ -1506,6 +1506,16 @@ SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
       result.push_back(functionTy->getResult());
   }
 
+  if (type->getClassOrBoundGenericClass()) {
+    // FIXME: Can also weaken to the set of protocol constraints, but only
+    // if there are any protocols that the type conforms to but the superclass
+    // does not.
+
+    // If there is a superclass, it is a direct supertype.
+    if (auto superclass = TC.getSuperClassOf(type))
+      result.push_back(superclass);
+  }
+
   // FIXME: lots of other cases to consider!
   return result;
 }
@@ -2757,7 +2767,9 @@ findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc) {
     if (typesBelow.size() == 1) {
       bounds.first = typesBelow.front().first;
     } else {
-      // FIXME: Compute the meet of the types in typesBelow.
+      // FIXME: Compute the meet of the types in typesBelow. We'll miss
+      // potential solutions with the current approach.
+      bounds.first = typesBelow.front().first;
     }
   }
 
@@ -2765,7 +2777,9 @@ findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc) {
     if (typesAbove.size() == 1) {
       bounds.second = typesAbove.front().first;
     } else {
-      // FIXME: Compute the join of the types in typesAbove.
+      // FIXME: Compute the join of the types in typesAbove. We'll miss
+      // potential solutions with the current approach.
+      bounds.second = typesAbove.front().first;
     }
   }
 
