@@ -471,6 +471,10 @@ namespace {
     ConstraintSystem *Parent;
     Constraint *failedConstraint;
 
+    /// \brief The number of child systems that are still active, i.e., haven't
+    /// been found to be unsolvable.
+    unsigned numActiveChildren;
+
     // ---Only valid in the top-level constraint system---
     llvm::BumpPtrAllocator Allocator;
     unsigned TypeCounter;
@@ -502,7 +506,7 @@ namespace {
 
   public:
     ConstraintSystem(TypeChecker &TC)
-      : TC(TC), Parent(nullptr), failedConstraint(nullptr),
+      : TC(TC), Parent(nullptr), failedConstraint(nullptr), numActiveChildren(),
         TypeCounter(0), OverloadSetCounter(0) {}
 
     /// \brief Creates a child constraint system, inheriting the constraints
@@ -515,6 +519,7 @@ namespace {
     /// explores.
     ConstraintSystem(ConstraintSystem *parent, unsigned overloadChoiceIdx)
       : TC(parent->TC), Parent(parent), failedConstraint(nullptr),
+        numActiveChildren(),
         InOverloadSet(parent->UnresolvedOverloadSets.front()),
         OverloadChoiceIdx(overloadChoiceIdx),
         assumedTypeVar(),
@@ -534,8 +539,7 @@ namespace {
     /// within this child system.
     ConstraintSystem(ConstraintSystem *parent, TypeVariableType *typeVar)
       : TC(parent->TC), Parent(parent), failedConstraint(nullptr),
-        InOverloadSet(),
-        OverloadChoiceIdx(0),
+        numActiveChildren(), InOverloadSet(), OverloadChoiceIdx(0),
         assumedTypeVar(typeVar),
         // FIXME: Lazily copy from parent system.
         Constraints(parent->Constraints),
@@ -577,9 +581,25 @@ namespace {
     ConstraintSystem *createDerivedConstraintSystem(Args &&...args){
       auto result = new ConstraintSystem(this, std::forward<Args>(args)...);
       Children.push_back(std::unique_ptr<ConstraintSystem>(result));
+      ++numActiveChildren;
       return result;
     }
 
+  private:
+    /// \brief Indicates that the given child constraint system is inactive
+    /// (i.e., unsolvable).
+    void markChildInactive(ConstraintSystem *childCS) {
+      assert(numActiveChildren > 0);
+      --numActiveChildren;
+    }
+
+    /// \brief Indicates that this constraint system is unsolvable.
+    void markUnsolvable() {
+      if (Parent)
+        Parent->markChildInactive(this);
+    }
+
+  public:
     /// \brief Create a new type variable.
     template<typename ...Args>
     TypeVariableType *createTypeVariable(Args &&...args) {
@@ -2527,6 +2547,7 @@ bool ConstraintSystem::simplify() {
       switch (simplifyConstraint(*constraint)) {
       case SolutionKind::Error:
         failedConstraint = constraint;
+        markUnsolvable();
         return true;
 
       case SolutionKind::TriviallySolved:
