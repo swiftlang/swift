@@ -41,7 +41,7 @@ static bool hasTerminator(BasicBlock *BB) {
 }
 
 namespace {
-class CFGBuilder : public ASTVisitor<CFGBuilder, CFGValue> {
+class Builder : public ASTVisitor<Builder, CFGValue> {
   typedef llvm::SmallVector<BasicBlock *, 4> BlocksVector;
 
   BlocksVector BasePendingMerges;
@@ -59,11 +59,11 @@ class CFGBuilder : public ASTVisitor<CFGBuilder, CFGValue> {
   CFG &C;
 
 public:
-  CFGBuilder(CFG &C) : Block(0), C(C), badCFG(false) {
+  Builder(CFG &C) : Block(0), C(C), badCFG(false) {
     PendingMergesStack.push_back(&BasePendingMerges);
   }
 
-  ~CFGBuilder() {}
+  ~Builder() {}
 
   /// A flag indicating whether or not there were problems
   /// constructing the CFG.
@@ -227,7 +227,7 @@ public:
 CFG *CFG::constructCFG(Stmt *S) {
   // FIXME: implement CFG construction.
   llvm::OwningPtr<CFG> C(new CFG());
-  CFGBuilder builder(*C);
+  Builder builder(*C);
   builder.visit(S);
   if (!builder.badCFG) {
     builder.finishUp();
@@ -238,7 +238,7 @@ CFG *CFG::constructCFG(Stmt *S) {
   return nullptr;
 }
 
-void CFGBuilder::visitBraceStmt(BraceStmt *S) {
+void Builder::visitBraceStmt(BraceStmt *S) {
   // BraceStmts do not need to be explicitly represented in the CFG.
   // We should consider whether or not the scopes they introduce are
   // represented in the CFG.
@@ -255,7 +255,7 @@ void CFGBuilder::visitBraceStmt(BraceStmt *S) {
 // Control-flow.
 //===--------------------------------------------------------------------===//
 
-void CFGBuilder::visitBreakStmt(BreakStmt *S) {
+void Builder::visitBreakStmt(BreakStmt *S) {
   assert(!BreakStack.empty());
   BasicBlock *BreakBlock = currentBlock();
   BreakStack.back()->push_back(BreakBlock);
@@ -265,7 +265,7 @@ void CFGBuilder::visitBreakStmt(BreakStmt *S) {
   Block = 0;
 }
 
-void CFGBuilder::visitContinueStmt(ContinueStmt *S) {
+void Builder::visitContinueStmt(ContinueStmt *S) {
   assert(!ContinueStack.empty());
   BasicBlock *ContinueBlock = currentBlock();
   ContinueStack.back()->push_back(ContinueBlock);
@@ -275,7 +275,7 @@ void CFGBuilder::visitContinueStmt(ContinueStmt *S) {
   Block = 0;
 }
 
-void CFGBuilder::visitDoWhileStmt(DoWhileStmt *S) {
+void Builder::visitDoWhileStmt(DoWhileStmt *S) {
   // Set up a vector to record blocks that 'break'.
   BlocksVector BlocksThatBreak;
   BreakStack.push_back(&BlocksThatBreak);
@@ -326,7 +326,7 @@ void CFGBuilder::visitDoWhileStmt(DoWhileStmt *S) {
   pendingMerges().push_back(ConditionBlock);
 }
 
-void CFGBuilder::visitIfStmt(IfStmt *S) {
+void Builder::visitIfStmt(IfStmt *S) {
   // ** FIXME ** Handle the condition.  We need to handle more of the
   // statements first.
 
@@ -370,7 +370,7 @@ void CFGBuilder::visitIfStmt(IfStmt *S) {
   (void) Branch;
 }
 
-void CFGBuilder::visitWhileStmt(WhileStmt *S) {
+void Builder::visitWhileStmt(WhileStmt *S) {
   // The condition needs to be in its own basic block so that
   // it can be the loop-back target.  We thus finish up the currently
   // active block.  It will get linked to the new block once we
@@ -429,7 +429,7 @@ void CFGBuilder::visitWhileStmt(WhileStmt *S) {
 // Expressions.
 //===--------------------------------------------------------------------===//
 
-CFGValue CFGBuilder::visitCallExpr(CallExpr *E) {
+CFGValue Builder::visitCallExpr(CallExpr *E) {
   Expr *Arg = ignoreParens(E->getArg());
   Expr *Fn = E->getFn();
   CFGValue FnV = visit(Fn);
@@ -448,30 +448,30 @@ CFGValue CFGBuilder::visitCallExpr(CallExpr *E) {
   return addInst(E, CallInst::create(E, currentBlock(), FnV, ArgsV));
 }
 
-CFGValue CFGBuilder::visitDeclRefExpr(DeclRefExpr *E) {
+CFGValue Builder::visitDeclRefExpr(DeclRefExpr *E) {
   return addInst(E, new (C) DeclRefInst(E, currentBlock()));
 }
 
-CFGValue CFGBuilder::visitThisApplyExpr(ThisApplyExpr *E) {
+CFGValue Builder::visitThisApplyExpr(ThisApplyExpr *E) {
   CFGValue FnV = visit(E->getFn());
   CFGValue ArgV = visit(E->getArg());
   return addInst(E, new (C) ThisApplyInst(E, FnV, ArgV, currentBlock()));
 }
 
-CFGValue CFGBuilder::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+CFGValue Builder::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
   return addInst(E, new (C) IntegerLiteralInst(E, currentBlock()));
 }
 
-CFGValue CFGBuilder::visitLoadExpr(LoadExpr *E) {
+CFGValue Builder::visitLoadExpr(LoadExpr *E) {
   CFGValue SubV = visit(E->getSubExpr());
   return addInst(E, new (C) LoadInst(E, SubV, currentBlock()));
 }
 
-CFGValue CFGBuilder::visitParenExpr(ParenExpr *E) {
+CFGValue Builder::visitParenExpr(ParenExpr *E) {
   return visit(E->getSubExpr());
 }
 
-CFGValue CFGBuilder::visitTupleExpr(TupleExpr *E) {
+CFGValue Builder::visitTupleExpr(TupleExpr *E) {
   llvm::SmallVector<CFGValue, 10> ArgsV;
   for (auto &I : E->getElements()) {
     ArgsV.push_back(visit(I));
@@ -479,6 +479,6 @@ CFGValue CFGBuilder::visitTupleExpr(TupleExpr *E) {
   return addInst(E, TupleInst::create(E, ArgsV, currentBlock()));
 }
 
-CFGValue CFGBuilder::visitTypeOfExpr(TypeOfExpr *E) {
+CFGValue Builder::visitTypeOfExpr(TypeOfExpr *E) {
   return addInst(E, new (C) TypeOfInst(E, currentBlock()));
 }
