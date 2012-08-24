@@ -47,6 +47,9 @@ public:
   /// be constructed.
   static CFG *constructCFG(Stmt *S);
 
+  /// verify - Run the IR verifier to make sure that the CFG follows invariants.
+  void verify() const;
+  
   /// Pretty-print the CFG.
   void dump() const;
 

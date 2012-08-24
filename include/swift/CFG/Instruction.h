@@ -46,13 +46,14 @@ public:
     DeclRef,
     IntegerLit,
     Load,
-    Return,
     ThisApply,
     Tuple,
     TypeOf,
+    // Terminators.
+    Return,
     CondBranch,
     UncondBranch,
-    TERM_INST_BEGIN = CondBranch,
+    TERM_INST_BEGIN = Return,
     TERM_INST_END = UncondBranch
   };
 
@@ -72,8 +73,6 @@ protected:
   Instruction(BasicBlock *B, Kind K);
 
 public:
-  /// Check that Instruction invariants are preserved.
-  void validate() const;
 
   /// Pretty-print the Instruction.
   void dump() const;

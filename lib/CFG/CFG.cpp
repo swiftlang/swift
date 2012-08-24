@@ -230,6 +230,8 @@ CFG *CFG::constructCFG(Stmt *S) {
   builder.visit(S);
   if (!builder.badCFG) {
     builder.finishUp();
+    
+    C->verify();
     return C.take();
   }
   return nullptr;

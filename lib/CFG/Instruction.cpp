@@ -26,44 +26,6 @@ Instruction::Instruction(BasicBlock *B, Kind K)
   B->instructions.push_back(this);
 }
 
-void Instruction::validate() const {
-  // Check that non-terminators look ok.
-  if (!isa<TermInst>(this)) {
-    assert(!basicBlock->instructions.empty() &&
-           "Can't be in a parent block if it is empty");
-    assert(&*basicBlock->instructions.rbegin() != this &&
-           "Non-terminators cannot be the last in a block");
-  } else {
-    assert(&*basicBlock->instructions.rbegin() == this &&
-           "Terminator must be the last in block");
-  }
-
-  switch (kind) {
-  case Call:
-  case DeclRef:
-  case IntegerLit:
-  case Load:
-  case Return:
-  case ThisApply:
-  case Tuple:
-  case TypeOf:
-    return;
-  case CondBranch:
-    break;
-  case UncondBranch: {
-    // FIXME: Generalize this to support all terminators in the generic
-    // terminator case.  Just diff "successors()" of the TermInst vs the block.
-    // why redundantly store block terminators in the first place?
-    
-    const UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
-    const BasicBlock &targetBlock = *UBI.targetBlock();
-    assert(std::find(targetBlock.preds().begin(), targetBlock.preds().end(),
-                     basicBlock) &&
-           "BasicBlock of UncondBranchInst must be a predecessor of target");
-    (void)targetBlock;
-  }
-  }
-}
 
 TermInst::Successors TermInst::successors() {
   switch (kind) {
@@ -71,11 +33,12 @@ TermInst::Successors TermInst::successors() {
   case DeclRef:
   case IntegerLit:
   case Load:
-  case Return:
   case ThisApply:
   case Tuple:
   case TypeOf:
     llvm_unreachable("Only TermInst's are allowed");
+  case Return:
+    return Successors();
   case CondBranch: {
     CondBranchInst &CBI = *cast<CondBranchInst>(this);
     return Successors(CBI.branches());
