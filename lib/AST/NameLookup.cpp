@@ -430,13 +430,13 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitBraceStmt(BraceStmt *S) {
     if (!IntersectsRange(S->getSourceRange()))
       return;
-    for (auto elem : S->elements()) {
+    for (auto elem : S->getElements()) {
       if (Stmt *S = elem.dyn_cast<Stmt*>())
         visit(S);
     }
     if (MatchingValue)
       return;
-    for (auto elem : S->elements()) {
+    for (auto elem : S->getElements()) {
       if (Decl *D = elem.dyn_cast<Decl*>()) {
         if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
           checkValueDecl(VD);

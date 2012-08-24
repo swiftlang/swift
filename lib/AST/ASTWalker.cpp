@@ -335,7 +335,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   }
   
   Stmt *visitBraceStmt(BraceStmt *BS) {
-    for (auto &Elem : BS->elements()) {
+    for (auto &Elem : BS->getElements()) {
       if (Expr *SubExpr = Elem.dyn_cast<Expr*>()) {
         if (Expr *E2 = doIt(SubExpr))
           Elem = E2;

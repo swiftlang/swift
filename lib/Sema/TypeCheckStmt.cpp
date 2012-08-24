@@ -452,7 +452,7 @@ public:
 } // end anonymous namespace
   
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
-  for (auto &elem : BS->elements()) {
+  for (auto &elem : BS->getElements()) {
     if (Expr *SubExpr = elem.dyn_cast<Expr*>()) {
       if (typeCheckExpr(SubExpr)) continue;
       TC.typeCheckIgnoredExpr(SubExpr);

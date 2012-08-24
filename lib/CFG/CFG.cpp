@@ -242,7 +242,7 @@ void CFGBuilder::visitBraceStmt(BraceStmt *S) {
   // BraceStmts do not need to be explicitly represented in the CFG.
   // We should consider whether or not the scopes they introduce are
   // represented in the CFG.
-  for (const BraceStmt::ExprStmtOrDecl &ESD : S->elements()) {
+  for (const BraceStmt::ExprStmtOrDecl &ESD : S->getElements()) {
     assert(!ESD.is<Decl*>() && "FIXME: Handle Decls");
     if (Stmt *S = ESD.dyn_cast<Stmt*>())
       visit(S);

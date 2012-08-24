@@ -75,7 +75,7 @@ void IRGenFunction::emitBraceStmt(BraceStmt *BS) {
   // Enter a new scope.
   Scope BraceScope(*this);
 
-  for (auto Elt : BS->elements()) {
+  for (auto Elt : BS->getElements()) {
     assert(Builder.hasValidIP());
 
     if (Expr *E = Elt.dyn_cast<Expr*>()) {

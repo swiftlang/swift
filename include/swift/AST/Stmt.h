@@ -151,13 +151,13 @@ public:
   SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
 
   /// The elements contained within the BraceStmt.
-  MutableArrayRef<ExprStmtOrDecl> elements() {
+  MutableArrayRef<ExprStmtOrDecl> getElements() {
     return MutableArrayRef<ExprStmtOrDecl>(getElementsStorage(), NumElements);
   }
 
   /// The elements contained within the BraceStmt (const version).
-  ArrayRef<ExprStmtOrDecl> elements() const {
-    return const_cast<BraceStmt*>(this)->elements();
+  ArrayRef<ExprStmtOrDecl> getElements() const {
+    return const_cast<BraceStmt*>(this)->getElements();
   }
 
   // Implement isa/cast/dyncast/etc.
