@@ -31,7 +31,7 @@ TermInst::Successors TermInst::successors() {
   switch (getKind()) {
   case InstKind::Call:
   case InstKind::DeclRef:
-  case InstKind::IntegerLit:
+  case InstKind::IntegerLiteral:
   case InstKind::Load:
   case InstKind::ThisApply:
   case InstKind::Tuple:

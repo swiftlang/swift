@@ -39,7 +39,7 @@ class TypeOfExpr;
 enum class InstKind {
   Call,
   DeclRef,
-  IntegerLit,
+  IntegerLiteral,
   Load,
   ThisApply,
   Tuple,
@@ -160,11 +160,11 @@ public:
   /// \param B The basic block that will contain the instruction.
   ///
   IntegerLiteralInst(IntegerLiteralExpr *IE, BasicBlock *B) :
-    Instruction(B, InstKind::IntegerLit), literal(IE) {
+    Instruction(B, InstKind::IntegerLiteral), literal(IE) {
   }
 
   static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::IntegerLit;
+    return I->getKind() == InstKind::IntegerLiteral;
   }
 };
 

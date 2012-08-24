@@ -137,7 +137,7 @@ void Instruction::print(raw_ostream &OS, CFGPrintContext &PC,
     OS << "DeclRef(decl=" << DI.expr->getDecl()->getName() << ')';
     break;
   }
-  case InstKind::IntegerLit: {
+  case InstKind::IntegerLiteral: {
     const IntegerLiteralInst &ILE = *cast<IntegerLiteralInst>(this);
     const auto &lit = ILE.literal->getValue();
     OS << "Integer(val=" << lit << ",width=" << lit.getBitWidth() << ')';

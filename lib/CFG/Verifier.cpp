@@ -34,7 +34,7 @@ static void verifyInst(const Instruction *I) {
   switch (I->getKind()) {
   case InstKind::Call:
   case InstKind::DeclRef:
-  case InstKind::IntegerLit:
+  case InstKind::IntegerLiteral:
   case InstKind::Load:
   case InstKind::Return:
   case InstKind::ThisApply:
