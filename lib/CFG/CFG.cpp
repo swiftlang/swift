@@ -55,6 +55,11 @@ public:
 
   ~Builder() {}
 
+  // FIXME: Move to ivar once currentBlock goes away.
+  CFGBuilder getBuilder() {
+    return CFGBuilder(currentBlock());
+  }
+
   /// A flag indicating whether or not there were problems
   /// constructing the CFG.
   bool badCFG;
@@ -435,7 +440,7 @@ CFGValue Builder::visitCallExpr(CallExpr *E) {
 }
 
 CFGValue Builder::visitDeclRefExpr(DeclRefExpr *E) {
-  return new (C) DeclRefInst(E, currentBlock());
+  return getBuilder().createDeclRef(E);
 }
 
 CFGValue Builder::visitThisApplyExpr(ThisApplyExpr *E) {

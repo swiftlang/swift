@@ -100,6 +100,12 @@ public:
 
   /// Pretty-print the BasicBlock with the designated stream.
   void print(llvm::raw_ostream &OS) const;
+
+
+  /// getSublistAccess() - returns pointer to member of instruction list
+  static InstListType BasicBlock::*getSublistAccess() {
+    return &BasicBlock::InstList;
+  }
 };
 
 } // end swift namespace

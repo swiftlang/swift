@@ -47,10 +47,12 @@ enum class InstKind {
 /// of a Swift BasicBlock.
 class Instruction :
 public llvm::ilist_node<Instruction>, public CFGAllocated<Instruction> {
+  friend struct llvm::ilist_traits<Instruction>;
   /// The kind of the Instruction.
   const InstKind Kind;
 
-  /// A backreference to the containing basic block.
+  /// A backreference to the containing basic block.  This is maintained by
+  // ilist_traits<Instruction>.
   BasicBlock *ParentBB;
 
   friend struct llvm::ilist_sentinel_traits<Instruction>;
@@ -59,7 +61,10 @@ public llvm::ilist_node<Instruction>, public CFGAllocated<Instruction> {
   void operator delete(void *Ptr, size_t)  = delete;
 
 protected:
-  Instruction(BasicBlock *B, InstKind K);
+  // FIXME: Remove ctor.
+  Instruction(BasicBlock *B, InstKind Kind);
+
+  Instruction(InstKind Kind) : Kind(Kind), ParentBB(0) {}
 
 public:
 
@@ -123,8 +128,7 @@ public:
   ///
   /// \param B The basic block that will contain the instruction.
   ///
-  DeclRefInst(DeclRefExpr *DR, BasicBlock *B)
-    : Instruction(B, InstKind::DeclRef), expr(DR) {}
+  DeclRefInst(DeclRefExpr *DR) : Instruction(InstKind::DeclRef), expr(DR) {}
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::DeclRef;
@@ -427,6 +431,8 @@ struct ilist_traits<::swift::Instruction> :
 private:
   mutable ilist_half_node<Instruction> Sentinel;
 
+  swift::BasicBlock *getContainingBlock();
+
 public:
   Instruction *createSentinel() const {
     return static_cast<Instruction*>(&Sentinel);
@@ -437,6 +443,12 @@ public:
   Instruction *ensureHead(Instruction*) const { return createSentinel(); }
   static void noteHead(Instruction*, Instruction*) {}
   static void deleteNode(Instruction *V) {}
+
+  void addNodeToList(Instruction *I);
+  void removeNodeFromList(Instruction *I);
+  void transferNodesFromList(ilist_traits<Instruction> &L2,
+                             ilist_iterator<Instruction> first,
+                             ilist_iterator<Instruction> last);
 
 private:
   void createNode(const Instruction &);

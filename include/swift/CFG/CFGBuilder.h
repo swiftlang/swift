@@ -63,8 +63,24 @@ public:
   void setInsertionPoint(BasicBlock *BB) {
     setInsertionPoint(BB, BB->end());
   }
-    
 
+  DeclRefInst *createDeclRef(DeclRefExpr *DR) {
+    return insert(new DeclRefInst(DR));
+  }
+
+
+private:
+  /// insert - This is a template to avoid losing type info on the result.
+  template <typename T>
+  T *insert(T *TheInst) {
+    insertImpl(TheInst);
+    return TheInst;
+  }
+
+  void insertImpl(Instruction *TheInst) {
+    if (BB == 0) return;
+    BB->getInsts().insert(InsertPt, TheInst);
+  }
 };
 
 } // end swift namespace

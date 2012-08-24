@@ -21,8 +21,54 @@
 #include "llvm/ADT/APInt.h"
 using namespace swift;
 
+//===----------------------------------------------------------------------===//
+// ilist_traits<Instruction> Implementation
+//===----------------------------------------------------------------------===//
+
+// The trait object is embedded into a basic block.  Use dirty hacks to
+// reconstruct the BB from the 'this' pointer of the trait.
+BasicBlock *llvm::ilist_traits<Instruction>::getContainingBlock() {
+  typedef iplist<Instruction> BasicBlock::*Sublist;
+ size_t Offset(size_t(&((BasicBlock*)0->*BasicBlock::getSublistAccess())));
+  iplist<Instruction>* Anchor(static_cast<iplist<Instruction>*>(this));
+  return reinterpret_cast<BasicBlock*>(reinterpret_cast<char*>(Anchor)-Offset);
+}
+
+
+void llvm::ilist_traits<Instruction>::addNodeToList(Instruction *I) {
+  assert(I->ParentBB == 0 && "Already in a list!");
+  I->ParentBB = getContainingBlock();
+}
+
+void llvm::ilist_traits<Instruction>::removeNodeFromList(Instruction *I) {
+  // When an instruction is removed from a BB, clear the parent pointer.
+  assert(I->ParentBB && "Not in a list!");
+  I->ParentBB = 0;
+}
+
+void llvm::ilist_traits<Instruction>::
+transferNodesFromList(llvm::ilist_traits<Instruction> &L2,
+                      llvm::ilist_iterator<Instruction> first,
+                      llvm::ilist_iterator<Instruction> last) {
+  // If transfering instructions within the same basic block, no reason to
+  // update their parent pointers.
+  BasicBlock *ThisParent = getContainingBlock();
+  if (ThisParent == L2.getContainingBlock()) return;
+
+  // Just transferring between blocks in the same function, simply update the
+  // parent fields in the instructions...
+  for (; first != last; ++first)
+    first->ParentBB = ThisParent;
+}
+
+
+//===----------------------------------------------------------------------===//
+// Instruction Implementation
+//===----------------------------------------------------------------------===//
+
+
 Instruction::Instruction(BasicBlock *B, InstKind Kind)
-  : Kind(Kind), ParentBB(B) {
+  : Kind(Kind), ParentBB(0) {
   B->getInsts().push_back(this);
 }
 
