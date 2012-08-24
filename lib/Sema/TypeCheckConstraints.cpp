@@ -468,25 +468,38 @@ namespace {
   /// Constraint systems are typically generated given an (untyped) expression.
   class ConstraintSystem {
     TypeChecker &TC;
-    ConstraintSystem *Parent;
-    Constraint *failedConstraint;
+    ConstraintSystem *Parent = nullptr;
+    Constraint *failedConstraint = nullptr;
 
+    // ---Track the state space we've already explored---
     /// \brief The number of child systems that are still active, i.e., haven't
     /// been found to be unsolvable.
-    unsigned numActiveChildren;
+    unsigned NumActiveChildren = 0;
+
+    /// \brief Keeps track of the attempted type variable bindings we have
+    /// performed in child systems.
+    llvm::DenseMap<TypeVariableType *, llvm::SmallPtrSet<CanType, 16>>
+      ExploredTypeBindings;
+
+    /// \brief Keeps track of type variable bindings we should try next,
+    /// assuming that none of the current set of type bindings pans out.
+    ///
+    /// These bindings tend to be for supertypes of type variable bindings
+    /// we've already attempted.
+    SmallVector<std::pair<TypeVariableType *, Type>, 16> PotentialBindings;
 
     // ---Only valid in the top-level constraint system---
     llvm::BumpPtrAllocator Allocator;
-    unsigned TypeCounter;
-    unsigned OverloadSetCounter;
+    unsigned TypeCounter = 0;
+    unsigned OverloadSetCounter = 0;
     
     // ---Only valid in the top-level constraint system---
-    OverloadSet *InOverloadSet;
+    OverloadSet *InOverloadSet = nullptr;
     unsigned OverloadChoiceIdx;
 
     /// \brief The type variable for which we are assuming a given particular
     /// type.
-    TypeVariableType *assumedTypeVar;
+    TypeVariableType *assumedTypeVar = nullptr;
 
     // Valid everywhere
     SmallVector<TypeVariableType *, 16> TypeVariables;
@@ -506,8 +519,7 @@ namespace {
 
   public:
     ConstraintSystem(TypeChecker &TC)
-      : TC(TC), Parent(nullptr), failedConstraint(nullptr), numActiveChildren(),
-        TypeCounter(0), OverloadSetCounter(0) {}
+      : TC(TC) {}
 
     /// \brief Creates a child constraint system, inheriting the constraints
     /// of its parent.
@@ -518,11 +530,9 @@ namespace {
     /// overload set, which indices which overload choice this child system
     /// explores.
     ConstraintSystem(ConstraintSystem *parent, unsigned overloadChoiceIdx)
-      : TC(parent->TC), Parent(parent), failedConstraint(nullptr),
-        numActiveChildren(),
+      : TC(parent->TC), Parent(parent),
         InOverloadSet(parent->UnresolvedOverloadSets.front()),
         OverloadChoiceIdx(overloadChoiceIdx),
-        assumedTypeVar(),
         // FIXME: Lazily copy from parent system.
         Constraints(parent->Constraints),
         UnresolvedOverloadSets(parent->UnresolvedOverloadSets.begin()+1,
@@ -538,9 +548,7 @@ namespace {
     /// \param typeVar The type variable whose binding we will be exploring
     /// within this child system.
     ConstraintSystem(ConstraintSystem *parent, TypeVariableType *typeVar)
-      : TC(parent->TC), Parent(parent), failedConstraint(nullptr),
-        numActiveChildren(), InOverloadSet(), OverloadChoiceIdx(0),
-        assumedTypeVar(typeVar),
+      : TC(parent->TC), Parent(parent), assumedTypeVar(typeVar),
         // FIXME: Lazily copy from parent system.
         Constraints(parent->Constraints),
         UnresolvedOverloadSets(parent->UnresolvedOverloadSets)
@@ -574,6 +582,10 @@ namespace {
       return depth;
     }
 
+    /// \brief Determine whether this constraint system has any active
+    /// child constraint systems.
+    bool hasActiveChildren() const { return NumActiveChildren > 0; }
+
     /// \brief Create a new constraint system that is derived from this
     /// constraint system, referencing the rules of the parent system but
     /// also introducing its own (likely dependent) constraints.
@@ -581,17 +593,14 @@ namespace {
     ConstraintSystem *createDerivedConstraintSystem(Args &&...args){
       auto result = new ConstraintSystem(this, std::forward<Args>(args)...);
       Children.push_back(std::unique_ptr<ConstraintSystem>(result));
-      ++numActiveChildren;
+      ++NumActiveChildren;
       return result;
     }
 
   private:
     /// \brief Indicates that the given child constraint system is inactive
     /// (i.e., unsolvable).
-    void markChildInactive(ConstraintSystem *childCS) {
-      assert(numActiveChildren > 0);
-      --numActiveChildren;
-    }
+    void markChildInactive(ConstraintSystem *childCS);
 
     /// \brief Indicates that this constraint system is unsolvable.
     void markUnsolvable() {
@@ -661,6 +670,27 @@ namespace {
       typeVar = typeVar->getImpl().getRepresentative();
       assert(!FixedTypes[typeVar] && "Already have a type assignment!");
       FixedTypes[typeVar] = type;
+    }
+
+    /// \brief Determine whether we have already explored type bindings for
+    /// the given type variable via child systems.
+    bool haveExploredTypeVar(TypeVariableType *typeVar) {
+      return ExploredTypeBindings.count(typeVar) > 0;
+    }
+
+    /// \brief Add a new potential binding of a type variable to a particular
+    /// type, to be explored by a child system.
+    void addPotentialBinding(TypeVariableType *typeVar, Type binding) {
+      PotentialBindings.push_back({typeVar, binding});
+    }
+
+    /// \brief Indicate a design to explore a specific binding for the given
+    /// type variable.
+    ///
+    /// \returns true if this type variable binding should be explored,
+    /// or false if it has already been explored.
+    bool exploreBinding(TypeVariableType *typeVar, Type binding) {
+      return ExploredTypeBindings[typeVar].insert(binding->getCanonicalType());
     }
 
     /// \brief "Open" the given type by replacing any occurrences of archetypes
@@ -734,6 +764,12 @@ namespace {
     };
 
   private:
+    /// \brief Enumerates all of the 'direct' supertypes of the given type.
+    ///
+    /// The direct supertype S of a type T is a supertype of T (e.g., T < S)
+    /// such that there is no type U where T < U and U < S.
+    SmallVector<Type, 4> enumerateDirectSupertypes(Type type);
+
     /// \brief Flags that direct type matching.
     enum TypeMatchFlags {
       TMF_None = 0,
@@ -873,6 +909,25 @@ OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
   void *mem = CS.getAllocator().Allocate(size, alignof(OverloadSet));
   return ::new (mem) OverloadSet(CS.assignOverloadSetID(), constraint,
                                  boundType, choices);
+}
+
+void ConstraintSystem::markChildInactive(ConstraintSystem *childCS) {
+  assert(NumActiveChildren > 0);
+  --NumActiveChildren;
+
+  // If the child system made an assumption about a type variable that
+  // didn't pan out, try weaker assumptions.
+  if (auto typeVar = childCS->assumedTypeVar) {
+    auto boundTy = childCS->getFixedType(typeVar);
+    auto supertypes = enumerateDirectSupertypes(boundTy);
+    auto &explored = ExploredTypeBindings[typeVar];
+    for (auto supertype : supertypes) {
+      if (explored.count(supertype->getCanonicalType()) > 0)
+        continue;
+
+      PotentialBindings.push_back( { typeVar, supertype } );
+    }
+  }
 }
 
 Type ConstraintSystem::openType(Type startingType) {
@@ -1424,6 +1479,25 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
   ConstraintGenerator CG(*this);
   ConstraintWalker CW(CG);
   expr->walk(CW);
+}
+
+SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
+  SmallVector<Type, 4> result;
+
+  if (auto tupleTy = type->getAs<TupleType>()) {
+    // A one-element tuple can be viewed as a scalar by dropping the label.
+    // FIXME: There is a way more general property here, where we can drop
+    // one label from the tuple, maintaining the rest.
+    if (tupleTy->getFields().size() == 1) {
+      auto &elt = tupleTy->getFields()[0];
+      if (!elt.isVararg() && !elt.getName().empty()) {
+        result.push_back(elt.getType());
+      }
+    }
+  }
+  
+  // FIXME: lots of other cases to consider!
+  return result;
 }
 
 //===--------------------------------------------------------------------===//
@@ -2689,34 +2763,28 @@ findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc) {
 }
 
 /// \brief Given the direct constraints placed on the type variables within
-/// a given constraint system, resolve the constraints for a type variable.
-///
-/// \returns true if we weren't able to resolve any type variables.
-static bool
+/// a given constraint system, create potential bindings that resolve the
+/// constraints for a type variable.
+static void
 resolveTypeVariable(ConstraintSystem &cs,
-  SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints,
-  SmallVectorImpl<ConstraintSystem *> &stack) {
+  SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints) {
 
   // Find a type variable with a lower bound, because those are the most
   // interesting.
   TypeVariableConstraints *tvcWithUpper = nullptr;
   Type tvcUpper;
   for (auto &tvc : typeVarConstraints) {
+    // If we already explored type bindings for this type variable, skip it.
+    if (cs.haveExploredTypeVar(tvc.TypeVar))
+      continue;
+
     auto bounds = findTypeVariableBounds(cs, tvc);
 
     // If we have a lower bound, introduce a child constraint system binding
     // this type variable to that lower bound.
     if (bounds.first) {
-      auto childCS = cs.createDerivedConstraintSystem(tvc.TypeVar);
-      childCS->addConstraint(ConstraintKind::Equal, tvc.TypeVar, bounds.first);
-
-      // Simplify the resulting system.
-      if (!childCS->simplify())
-        stack.push_back(childCS);
-      
-      // FIXME: We need a contingency plan here. If there's no solution here,
-      // we should try supertypes of the lower bound.
-      return false;
+      cs.addPotentialBinding(tvc.TypeVar, bounds.first);
+      return;
     }
 
     // If there is an upper bound, record that (but don't use it yet).
@@ -2731,19 +2799,12 @@ resolveTypeVariable(ConstraintSystem &cs,
   // FIXME: This type may be too specific, but we'd really rather not
   // go on a random search for subtypes that might work.
   if (tvcWithUpper) {
-    auto childCS = cs.createDerivedConstraintSystem(tvcWithUpper->TypeVar);
-    childCS->addConstraint(ConstraintKind::Equal, tvcWithUpper->TypeVar,
-                           tvcUpper);
-    // Simplify the resulting system.
-    if (!childCS->simplify())
-      stack.push_back(childCS);
-
-    // FIXME: We still need a contingency plan here, which tries binding a
-    // different variable.
-    return false;
+    cs.addPotentialBinding(tvcWithUpper->TypeVar, tvcUpper);
+    return;
   }
 
-  return true;
+  // FIXME: Attempt to resolve literal constraints by dropping in the default
+  // literal types.
 }
 
 bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
@@ -2763,34 +2824,62 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     // which we resolve the overload set to each option.
     if (!cs->UnresolvedOverloadSets.empty()) {
       resolveOverloadSet(*cs, cs->UnresolvedOverloadSets.front(), stack);
+
+      // When we've resolved an overload set, we are done with this constraint
+      // system: everything else will be handled by .
       continue;
     }
 
-    // Collect the list of constraints that apply directly to each of the
-    // type variables. This list will be used in subsequent solution attempts.
-    SmallVector<TypeVariableConstraints, 16> typeVarConstraints;
-    cs->collectConstraintsForTypeVariables(typeVarConstraints);
-
-    // If there are no remaining type constraints, we're stuck. Just call
-    // this constraint system viable.
-    // FIXME: If all type variables were bound, we actually have a solution.
-    // Record that.
-    if (typeVarConstraints.empty()) {
-      viable.push_back(cs);
+    // If there are any children of this system that are still active,
+    // then we found a potential solution. There is no need to explore
+    // alternatives based on this constraint system.
+    if (cs->hasActiveChildren())
       continue;
+
+    // If we have not queued up potential bindings (or have exhausted all of
+    // our potential bindings thus far), try to generate new bindings.
+    if (cs->PotentialBindings.empty()) {
+      // Collect the list of constraints that apply directly to each of the
+      // type variables. This list will be used in subsequent solution attempts.
+      // FIXME: Tons of redundant computation here. We need to keep this
+      // data online.
+      SmallVector<TypeVariableConstraints, 16> typeVarConstraints;
+      cs->collectConstraintsForTypeVariables(typeVarConstraints);
+
+      // If there are no remaining type constraints, this system is either
+      // solved or underconstrained. 
+      if (typeVarConstraints.empty()) {
+        viable.push_back(cs);
+        continue;
+      }
+
+      // Pick a type constraing to resolve into a potential binding.
+      resolveTypeVariable(*cs, typeVarConstraints);
     }
 
-    // Attempt to find a solution by constraining a type variable based on
-    // the types that are below or above it.
-    if (!resolveTypeVariable(*cs, typeVarConstraints, stack))
-      continue;
+    // If there are no potential bindings, we have nothing else we can
+    // explore. Consider this system dead.
+    if (cs->PotentialBindings.empty()) {
+      cs->markUnsolvable();
+      break;
+    }
 
-    // FIXME: If the only type variable constraints we have left are literal
-    // constraints, try substituting in default values.
+    // Push this constraint system back onto the stack to be reconsidered if
+    // none of the child systems created below succeed.
+    stack.push_back(cs);
 
-    // We don't know how to do anything else with this system. Call it
-    // viable.
-    viable.push_back(cs);
+    // Create child systems for each of the potential bindings.
+    auto potentialBindings = std::move(cs->PotentialBindings);
+    cs->PotentialBindings.clear();
+    for (auto binding : potentialBindings) {
+      if (cs->exploreBinding(binding.first, binding.second)) {
+        auto childCS = cs->createDerivedConstraintSystem(binding.first);
+        childCS->addConstraint(ConstraintKind::Equal, binding.first,
+                               binding.second);
+        if (!childCS->simplify())
+          stack.push_back(childCS);
+      }
+    }
   }
 
   // FIXME: Having more than one child system left at the end means there
