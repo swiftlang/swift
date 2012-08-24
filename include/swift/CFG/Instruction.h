@@ -36,43 +36,45 @@ class ThisApplyExpr;
 class TupleExpr;
 class TypeOfExpr;
 
+enum class InstKind {
+  Call,
+  DeclRef,
+  IntegerLit,
+  Load,
+  ThisApply,
+  Tuple,
+  TypeOf,
+  // Terminators.
+  Return,
+  CondBranch,
+  UncondBranch,
+  TERM_INST_BEGIN = Return,
+  TERM_INST_END = UncondBranch
+};
+
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift BasicBlock.
 class Instruction : public llvm::ilist_node<Instruction>,
                     public CFGAllocated<Instruction> {
-public:
-  enum Kind {
-    Call,
-    DeclRef,
-    IntegerLit,
-    Load,
-    ThisApply,
-    Tuple,
-    TypeOf,
-    // Terminators.
-    Return,
-    CondBranch,
-    UncondBranch,
-    TERM_INST_BEGIN = Return,
-    TERM_INST_END = UncondBranch
-  };
-
   /// The kind of the Instruction.
-  const Kind kind;
+  const InstKind Kind;
 
   /// A backreference to the containing basic block.
-  BasicBlock *basicBlock;
+  BasicBlock *ParentBB;
 
-private:
   friend struct llvm::ilist_sentinel_traits<Instruction>;
   Instruction() = delete;
   void operator=(const Instruction &) = delete;
   void operator delete(void *Ptr, size_t)  = delete;
 
 protected:
-  Instruction(BasicBlock *B, Kind K);
+  Instruction(BasicBlock *B, InstKind K);
 
 public:
+
+  InstKind getKind() const { return Kind; }
+  const BasicBlock *getParent() const { return ParentBB; }
+  BasicBlock *getParent() { return ParentBB; }
 
   /// Pretty-print the Instruction.
   void dump() const;
@@ -116,7 +118,9 @@ public:
     return const_cast<CallInst*>(this)->arguments();
   }
 
-  static bool classof(const Instruction *I) { return I->kind == Call; }
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::Call;
+  }
 };
 
 /// Represents a reference to a declaration, essentially evaluating to
@@ -134,9 +138,11 @@ public:
   /// \param B The basic block that will contain the instruction.
   ///
   DeclRefInst(DeclRefExpr *DR, BasicBlock *B)
-    : Instruction(B, DeclRef), expr(DR) {}
+    : Instruction(B, InstKind::DeclRef), expr(DR) {}
 
-  static bool classof(const Instruction *I) { return I->kind == DeclRef; }
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::DeclRef;
+  }
 };
 
 /// Encapsulates an integer constant, as defined originally by an
@@ -154,10 +160,12 @@ public:
   /// \param B The basic block that will contain the instruction.
   ///
   IntegerLiteralInst(IntegerLiteralExpr *IE, BasicBlock *B) :
-    Instruction(B, IntegerLit), literal(IE) {
+    Instruction(B, InstKind::IntegerLit), literal(IE) {
   }
 
-  static bool classof(const Instruction *I) { return I->kind == IntegerLit; }
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::IntegerLit;
+  }
 };
 
 /// Represents a load from a memory location.
@@ -180,9 +188,11 @@ public:
   /// \param The basic block that will contain the instruction.
   ///
   LoadInst(LoadExpr *expr, CFGValue lvalue, BasicBlock *B) :
-    Instruction(B, Load), expr(expr), lvalue(lvalue) {}
+    Instruction(B, InstKind::Load), expr(expr), lvalue(lvalue) {}
 
-  static bool classof(const Instruction *I) { return I->kind == Load; }
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::Load;
+  }
 };
 
 class ReturnInst : public Instruction {
@@ -205,8 +215,7 @@ public:
   /// \param The basic block that will contain the instruction.
   ///
   ReturnInst(ReturnStmt *returnStmt, CFGValue returnValue, BasicBlock *B)
-    : Instruction(B, Return),
-      returnStmt(returnStmt),
+    : Instruction(B, InstKind::Return), returnStmt(returnStmt),
       returnValue(returnValue) {}
 
   /// Constructs a ReturnInst representing an \b implicit return.
@@ -215,7 +224,9 @@ public:
   ///
   ReturnInst(BasicBlock *B) : ReturnInst(0, (Instruction*)0, B) {}
 
-  static bool classof(const Instruction *I) { return I->kind == Return; }
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::Return;
+  }
 };
 
 /// Represents an abstract application that provides the 'this' pointer for
@@ -238,16 +249,14 @@ public:
   ///
   /// \param B The basic block that will contain the instruction.
   ///
-  ThisApplyInst(ThisApplyExpr *expr,
-                CFGValue function,
-                CFGValue argument,
-                BasicBlock *B)
-    : Instruction(B, ThisApply),
-      expr(expr),
-      function(function),
+  ThisApplyInst(ThisApplyExpr *expr, CFGValue function,
+                CFGValue argument, BasicBlock *B)
+    : Instruction(B, InstKind::ThisApply), expr(expr), function(function),
       argument(argument) {}
 
-  static bool classof(const Instruction *I) { return I->kind == ThisApply; }
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::ThisApply;
+  }
 };
 
 /// Represents a constructed tuple.
@@ -278,11 +287,12 @@ public:
   }
 
   /// Construct a TupleInst.
-  static TupleInst *create(TupleExpr *Expr,
-                           ArrayRef<CFGValue> Elements,
+  static TupleInst *create(TupleExpr *Expr, ArrayRef<CFGValue> Elements,
                            BasicBlock *B);
 
-  static bool classof(const Instruction *I) { return I->kind == Tuple; }
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::Tuple;
+  }
 };
 
 /// Represents the production of an instance of a given metatype.
@@ -290,7 +300,7 @@ class TypeOfInst : public Instruction {
   TypeOfInst() = delete;
 public:
   /// The backing TypeOfExpr in the AST.
-  TypeOfExpr *expr;
+  TypeOfExpr *Expr;
 
   /// Constructs a TypeOfInst.
   ///
@@ -298,10 +308,12 @@ public:
   ///
   /// \param B The basic block that will contain the instruction.
   ///
-  TypeOfInst(TypeOfExpr *expr, BasicBlock *B)
-    : Instruction(B, TypeOf), expr(expr) {}
+  TypeOfInst(TypeOfExpr *Expr, BasicBlock *B)
+    : Instruction(B, InstKind::TypeOf), Expr(Expr) {}
 
-  static bool classof(const Instruction *I) { return I->kind == TypeOf; }
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::TypeOf;
+  }
 };
 
 //===----------------------------------------------------------------------===//
@@ -311,7 +323,7 @@ public:
 /// This class defines a "terminating instruction" for a BasicBlock.
 class TermInst : public Instruction {
 public:
-  TermInst(BasicBlock *B, Kind K) : Instruction(B, K) {}
+  TermInst(BasicBlock *B, InstKind K) : Instruction(B, K) {}
 
   typedef llvm::ArrayRef<BasicBlock *> Successors;
 
@@ -324,7 +336,8 @@ public:
   }
 
   static bool classof(const Instruction *I) {
-    return I->kind >= TERM_INST_BEGIN && I->kind <= TERM_INST_END;
+    return I->getKind() >= InstKind::TERM_INST_BEGIN &&
+           I->getKind() <= InstKind::TERM_INST_END;
   }
 };
 
@@ -384,7 +397,7 @@ public:
                  BasicBlock *B);
 
   static bool classof(const Instruction *I) {
-    return I->kind == CondBranch;
+    return I->getKind() == InstKind::CondBranch;
   }
 };
 
@@ -401,7 +414,7 @@ public:
   /// Construct an UncondBranchInst that will become the terminator
   /// for the specified BasicBlock.
   UncondBranchInst(BasicBlock *BB) :
-    TermInst(BB, UncondBranch), Args(nullptr), NumArgs(0),
+    TermInst(BB, InstKind::UncondBranch), Args(nullptr), NumArgs(0),
     TargetBlock(nullptr) {}
 
   /// The jump target for the branch.
@@ -415,7 +428,7 @@ public:
   void setTarget(BasicBlock *Target, ArgsTy BlockArgs);
 
   static bool classof(const Instruction *I) {
-    return I->kind == UncondBranch;
+    return I->getKind() == InstKind::UncondBranch;
   }
 
 private:

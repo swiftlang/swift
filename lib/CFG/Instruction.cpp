@@ -21,29 +21,29 @@
 #include "llvm/ADT/APInt.h"
 using namespace swift;
 
-Instruction::Instruction(BasicBlock *B, Kind K)
-  : kind(K), basicBlock(B) {
+Instruction::Instruction(BasicBlock *B, InstKind Kind)
+  : Kind(Kind), ParentBB(B) {
   B->instructions.push_back(this);
 }
 
 
 TermInst::Successors TermInst::successors() {
-  switch (kind) {
-  case Call:
-  case DeclRef:
-  case IntegerLit:
-  case Load:
-  case ThisApply:
-  case Tuple:
-  case TypeOf:
+  switch (getKind()) {
+  case InstKind::Call:
+  case InstKind::DeclRef:
+  case InstKind::IntegerLit:
+  case InstKind::Load:
+  case InstKind::ThisApply:
+  case InstKind::Tuple:
+  case InstKind::TypeOf:
     llvm_unreachable("Only TermInst's are allowed");
-  case Return:
+  case InstKind::Return:
     return Successors();
-  case CondBranch: {
+  case InstKind::CondBranch: {
     CondBranchInst &CBI = *cast<CondBranchInst>(this);
     return Successors(CBI.branches());
   }
-  case UncondBranch: {
+  case InstKind::UncondBranch: {
     UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
     return Successors(UBI.targetBlock());
   }
@@ -64,7 +64,7 @@ CallInst *CallInst::create(CallExpr *expr,
 CallInst::CallInst(CallExpr *expr, BasicBlock *B,
                    CFGValue function,
                    ArrayRef<CFGValue> args)
-  : Instruction(B, Call), NumArgs(args.size()), expr(expr),
+  : Instruction(B, InstKind::Call), NumArgs(args.size()), expr(expr),
     function(function) {
   memcpy(getArgsStorage(), args.data(), args.size() * sizeof(CFGValue));
 }
@@ -74,11 +74,12 @@ CondBranchInst::CondBranchInst(Stmt *BranchStmt,
                                BasicBlock *Target1,
                                BasicBlock *Target2,
                                BasicBlock *B)
-  : TermInst(B, CondBranch), branchStmt(BranchStmt), condition(condition) {
-    Branches[0] = Target1;
-    Branches[1] = Target2;
-    memset(&Args, sizeof(Args), 0);
-    for (auto branch : branches()) { if (branch) branch->addPred(B); }
+  : TermInst(B, InstKind::CondBranch),
+    branchStmt(BranchStmt), condition(condition) {
+  Branches[0] = Target1;
+  Branches[1] = Target2;
+  memset(&Args, sizeof(Args), 0);
+  for (auto branch : branches()) { if (branch) branch->addPred(B); }
 }
 
 TupleInst *TupleInst::create(TupleExpr *Expr,
@@ -92,7 +93,7 @@ TupleInst *TupleInst::create(TupleExpr *Expr,
 }
 
 TupleInst::TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elems, BasicBlock *B)
-  : Instruction(B, Tuple),  NumArgs(Elems.size()), expr(Expr) {
+  : Instruction(B, InstKind::Tuple),  NumArgs(Elems.size()), expr(Expr) {
   memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(CFGValue));
 }
 
@@ -100,13 +101,14 @@ void UncondBranchInst::unregisterTarget() {
   if (!TargetBlock)
     return;
 
+  // ?
 }
 
 void UncondBranchInst::setTarget(BasicBlock *NewTarget, ArgsTy BlockArgs) {
   if (TargetBlock != NewTarget) {
     unregisterTarget();
     TargetBlock = NewTarget;
-    TargetBlock->addPred(basicBlock);
+    TargetBlock->addPred(getParent());
   }
 
   // FIXME: check that TargetBlock's # args agrees with BlockArgs.
@@ -116,6 +118,6 @@ void UncondBranchInst::setTarget(BasicBlock *NewTarget, ArgsTy BlockArgs) {
 
   // Copy the arguments over to our holding buffer.
   NumArgs = BlockArgs.size();
-  Args = new (basicBlock->cfg) CFGValue[NumArgs];
+  Args = new (getParent()->cfg) CFGValue[NumArgs];
   ArgsTy(Args, NumArgs) = BlockArgs;
 }

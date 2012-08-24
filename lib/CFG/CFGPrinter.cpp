@@ -58,7 +58,7 @@ raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
 raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
                                       const Instruction *Inst,
                                       bool includeBBPrefix) {
-  BasicBlock *Block = Inst->basicBlock;
+  const BasicBlock *Block = Inst->getParent();
   unsigned count = 1;
   for (const Instruction &I : Block->instructions) {
     if (&I == Inst)
@@ -98,107 +98,107 @@ void Instruction::print(raw_ostream &OS, CFGPrintContext &PC,
   OS.indent(Indent);
   PC.printID(OS, this, false) << " = ";
 
-  switch (kind) {
-    case Call: {
-      const CallInst &CE = *cast<CallInst>(this);
-      OS << "Call(fn=";
-      PC.printID(OS, CE.function);
-      auto args = CE.arguments();
-      if (!args.empty()) {
-        bool first = true;
-        OS << ",args=(";
-        for (auto arg : args) {
-          if (first)
-            first = false;
-          else
-            OS << ' ';
-          PC.printID(OS, arg);
-        }
-        OS << ')';
-      }
-      OS << ')';
-      break;
-    }
-    case CondBranch: {
-      const CondBranchInst &BI = *cast<CondBranchInst>(this);
-      OS << "cond_br(cond=";
-      OS << "?";
-      //      PC.printID(OS, BI.condition);
-      OS << ",branches=(";
-      PC.printID(OS,BI.branches()[0]);
-      OS << ',';
-      PC.printID(OS,BI.branches()[1]);
-      OS << "))";
-      break;
-    }
-    case DeclRef: {
-      const DeclRefInst &DI = *cast<DeclRefInst>(this);
-      OS << "DeclRef(decl=" << DI.expr->getDecl()->getName() << ')';
-      break;
-    }
-    case IntegerLit: {
-      const IntegerLiteralInst &ILE = *cast<IntegerLiteralInst>(this);
-      const auto &lit = ILE.literal->getValue();
-      OS << "Integer(val=" << lit << ",width=" << lit.getBitWidth() << ')';
-      break;
-    }
-    case Load: {
-      const LoadInst &LI = *cast<LoadInst>(this);
-      OS << "Load(lvalue=";
-      PC.printID(OS, LI.lvalue);
-      OS << ')';
-      break;
-    }
-    case Return: {
-      const ReturnInst &RI = *cast<ReturnInst>(this);
-      OS << "Return";
-      if (RI.returnValue) {
-        OS << '(';
-        PC.printID(OS, RI.returnValue);
-        OS << ')';
-      }
-      break;
-    };
-    case ThisApply: {
-      const ThisApplyInst &TAI = *cast<ThisApplyInst>(this);
-      OS << "ThisApply(fn=";
-      PC.printID(OS, TAI.function);
-      OS << ",arg=";
-      PC.printID(OS, TAI.argument);
-      OS << ')';
-      break;
-    }
-    case Tuple: {
-      const TupleInst &TI = *cast<TupleInst>(this);
-      OS << "Tuple(";
-      bool isFirst = true;
-      for (const auto &Elem : TI.elements()) {
-        if (isFirst)
-          isFirst = false;
+  switch (getKind()) {
+  case InstKind::Call: {
+    const CallInst &CE = *cast<CallInst>(this);
+    OS << "Call(fn=";
+    PC.printID(OS, CE.function);
+    auto args = CE.arguments();
+    if (!args.empty()) {
+      bool first = true;
+      OS << ",args=(";
+      for (auto arg : args) {
+        if (first)
+          first = false;
         else
-          OS << ',';
-        PC.printID(OS, Elem);
+          OS << ' ';
+        PC.printID(OS, arg);
       }
       OS << ')';
-      break;
     }
-    case TypeOf: {
-      const TypeOfInst &TOI = *cast<TypeOfInst>(this);
-      OS << "TypeOf(type=" << TOI.expr->getType().getString() << ')';
-      break;
+    OS << ')';
+    break;
+  }
+  case InstKind::CondBranch: {
+    const CondBranchInst &BI = *cast<CondBranchInst>(this);
+    OS << "cond_br(cond=";
+    OS << "?";
+    //      PC.printID(OS, BI.condition);
+    OS << ",branches=(";
+    PC.printID(OS,BI.branches()[0]);
+    OS << ',';
+    PC.printID(OS,BI.branches()[1]);
+    OS << "))";
+    break;
+  }
+  case InstKind::DeclRef: {
+    const DeclRefInst &DI = *cast<DeclRefInst>(this);
+    OS << "DeclRef(decl=" << DI.expr->getDecl()->getName() << ')';
+    break;
+  }
+  case InstKind::IntegerLit: {
+    const IntegerLiteralInst &ILE = *cast<IntegerLiteralInst>(this);
+    const auto &lit = ILE.literal->getValue();
+    OS << "Integer(val=" << lit << ",width=" << lit.getBitWidth() << ')';
+    break;
+  }
+  case InstKind::Load: {
+    const LoadInst &LI = *cast<LoadInst>(this);
+    OS << "Load(lvalue=";
+    PC.printID(OS, LI.lvalue);
+    OS << ')';
+    break;
+  }
+  case InstKind::Return: {
+    const ReturnInst &RI = *cast<ReturnInst>(this);
+    OS << "Return";
+    if (RI.returnValue) {
+      OS << '(';
+      PC.printID(OS, RI.returnValue);
+      OS << ')';
     }
-    case UncondBranch: {
-      const UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
-      OS << "br ";
-      PC.printID(OS, UBI.targetBlock());
-      const UncondBranchInst::ArgsTy Args = UBI.blockArgs();
-      if (!Args.empty()) {
-        OS << '(';
-        for (auto Arg : Args) { OS << "%" << Arg; }
-        OS << ')';
-      }
-      break;
+    break;
+  };
+  case InstKind::ThisApply: {
+    const ThisApplyInst &TAI = *cast<ThisApplyInst>(this);
+    OS << "ThisApply(fn=";
+    PC.printID(OS, TAI.function);
+    OS << ",arg=";
+    PC.printID(OS, TAI.argument);
+    OS << ')';
+    break;
+  }
+  case InstKind::Tuple: {
+    const TupleInst &TI = *cast<TupleInst>(this);
+    OS << "Tuple(";
+    bool isFirst = true;
+    for (const auto &Elem : TI.elements()) {
+      if (isFirst)
+        isFirst = false;
+      else
+        OS << ',';
+      PC.printID(OS, Elem);
     }
+    OS << ')';
+    break;
+  }
+  case InstKind::TypeOf: {
+    const TypeOfInst &TOI = *cast<TypeOfInst>(this);
+    OS << "TypeOf(type=" << TOI.Expr->getType().getString() << ')';
+    break;
+  }
+  case InstKind::UncondBranch: {
+    const UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
+    OS << "br ";
+    PC.printID(OS, UBI.targetBlock());
+    const UncondBranchInst::ArgsTy Args = UBI.blockArgs();
+    if (!Args.empty()) {
+      OS << '(';
+      for (auto Arg : Args) { OS << "%" << Arg; }
+      OS << ')';
+    }
+    break;
+  }
   }
   OS << '\n';
 }

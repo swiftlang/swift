@@ -18,39 +18,40 @@
 using namespace swift;
 
 static void verifyInst(const Instruction *I) {
+  const BasicBlock *BB = I->getParent();
   // Check that non-terminators look ok.
   if (!isa<TermInst>(I)) {
-    assert(!I->basicBlock->instructions.empty() &&
+    assert(!BB->instructions.empty() &&
            "Can't be in a parent block if it is empty");
-    assert(&*I->basicBlock->instructions.rbegin() != I &&
+    assert(&*BB->instructions.rbegin() != I &&
            "Non-terminators cannot be the last in a block");
   } else {
-    assert(&*I->basicBlock->instructions.rbegin() == I &&
+    assert(&*BB->instructions.rbegin() == I &&
            "Terminator must be the last in block");
   }
   
   // FIXME: This should switch to an InstVisitor.
-  switch (I->kind) {
-  case Instruction::Call:
-  case Instruction::DeclRef:
-  case Instruction::IntegerLit:
-  case Instruction::Load:
-  case Instruction::Return:
-  case Instruction::ThisApply:
-  case Instruction::Tuple:
-  case Instruction::TypeOf:
+  switch (I->getKind()) {
+  case InstKind::Call:
+  case InstKind::DeclRef:
+  case InstKind::IntegerLit:
+  case InstKind::Load:
+  case InstKind::Return:
+  case InstKind::ThisApply:
+  case InstKind::Tuple:
+  case InstKind::TypeOf:
     return;
-  case Instruction::CondBranch:
+  case InstKind::CondBranch:
     break;
-  case Instruction::UncondBranch: {
+  case InstKind::UncondBranch: {
     // FIXME: Generalize this to support all terminators in the generic
     // terminator case.  Just diff "successors()" of the TermInst vs the block.
     // why redundantly store block terminators in the first place?
     
     const UncondBranchInst &UBI = *cast<UncondBranchInst>(I);
     const BasicBlock &targetBlock = *UBI.targetBlock();
-    assert(std::find(targetBlock.preds().begin(), targetBlock.preds().end(),
-                     I->basicBlock) &&
+    assert(std::find(targetBlock.preds().begin(),
+                     targetBlock.preds().end(), BB) &&
            "BasicBlock of UncondBranchInst must be a predecessor of target");
     (void)targetBlock;
   }
