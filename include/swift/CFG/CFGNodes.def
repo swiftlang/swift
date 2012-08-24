@@ -1,0 +1,56 @@
+//===--- CFGNodes.def - Swift CFG Metaprogramming ---------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with CFG nodes.
+//
+//===----------------------------------------------------------------------===//
+
+/// INST(Id, Parent)
+///   The expression enumerator value is an InstKind.  The node's class name is
+///   Id##Inst, and the name of its base class (in the Instruction hierarchy) is
+///   Parent.
+#ifndef INST
+#define INST(Id, Parent)
+#endif
+
+/// An abstract instruction is an abstract base class in the hierarchy;
+/// it is never a most-derived type, and it does not have an enumerator in
+/// InstKind.
+///
+/// Most metaprograms do not care about abstract expressions, so the default
+/// is to ignore them.
+#ifndef ABSTRACT_INST
+#define ABSTRACT_INST(Id, Parent)
+#endif
+
+/// A convenience for determining the range of instructions.  These will always
+/// appear immediately after the last member.
+#ifndef INST_RANGE
+#define INST_RANGE(Id, First, Last)
+#endif
+
+INST(Call, Instruction)
+INST(DeclRef, Instruction)
+INST(IntegerLiteral, Instruction)
+INST(Load, Instruction)
+INST(ThisApply, Instruction)
+INST(Tuple, Instruction)
+INST(TypeOf, Instruction)
+ABSTRACT_INST(Term, Instruction)
+  INST(Return, TermInst)
+  INST(CondBranch, TermInst)
+  INST(UncondBranch, TermInst)
+  INST_RANGE(Term, Return, UncondBranch)
+
+#undef INST_RANGE
+#undef ABSTRACT_INST
+#undef INST

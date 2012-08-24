@@ -37,19 +37,10 @@ class TupleExpr;
 class TypeOfExpr;
 
 enum class InstKind {
-  Call,
-  DeclRef,
-  IntegerLiteral,
-  Load,
-  ThisApply,
-  Tuple,
-  TypeOf,
-  // Terminators.
-  Return,
-  CondBranch,
-  UncondBranch,
-  TERM_INST_BEGIN = Return,
-  TERM_INST_END = UncondBranch
+#define INST(Id, Parent) Id,
+#define INST_RANGE(Id, FirstId, LastId) \
+  First_##Id##Inst = FirstId, Last_##Id##Inst = LastId,
+#include "swift/CFG/CFGNodes.def"
 };
 
 /// This is the root class for all instructions that can be used as the contents
@@ -302,8 +293,8 @@ public:
   }
 
   static bool classof(const Instruction *I) {
-    return I->getKind() >= InstKind::TERM_INST_BEGIN &&
-           I->getKind() <= InstKind::TERM_INST_END;
+    return I->getKind() >= InstKind::First_TermInst &&
+           I->getKind() <= InstKind::Last_TermInst;
   }
 };
 
