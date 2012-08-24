@@ -59,11 +59,6 @@ public:
 
   void addPred(BasicBlock *B) { Preds.push_back(B); }
 
-  // Return true if the block has a terminator.
-  bool hasTerminator() const {
-    return !instructions.empty() && isa<TermInst>(instructions.back());
-  }
-
   typedef llvm::ArrayRef<BasicBlock *> Predecessors;
   typedef llvm::ArrayRef<BasicBlock *> Successors;
 
@@ -73,14 +68,15 @@ public:
   Predecessors preds() { return Preds; }
   const Predecessors preds() const { return Preds; }
 
+  TermInst *getTerminator() {
+    assert(!instructions.empty() && "Can't get successors for malformed block");
+    return cast<TermInst>(&instructions.back());
+  }
+
   /// The successors of a BasicBlock are defined either explicitly as
   /// a single successor as the branch targets of the terminator instruction.
   Successors succs() {
-    if (instructions.empty())
-      return nullptr;
-    if (TermInst *TI = dyn_cast<TermInst>(&instructions.back()))
-      return TI->successors();
-    return Successors();
+    return getTerminator()->successors();
   }
   const Successors succs() const {
     return const_cast<BasicBlock*>(this)->succs();

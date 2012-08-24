@@ -34,6 +34,10 @@ static Expr *ignoreParens(Expr *Ex) {
   return Ex;
 }
 
+static bool hasTerminator(BasicBlock *BB) {
+  return !BB->instructions.empty() && isa<TermInst>(BB->instructions.back());
+}
+
 namespace {
 class CFGBuilder : public ASTVisitor<CFGBuilder, CFGValue> {
   typedef llvm::SmallVector<BasicBlock *, 4> BlocksVector;
@@ -72,7 +76,7 @@ public:
     for (auto PredBlock : pendingMerges()) {
       // If the block has no terminator, we need to add an unconditional
       // jump to the block we are creating.
-      if (!PredBlock->hasTerminator()) {
+      if (!hasTerminator(PredBlock)) {
         UncondBranchInst *UB = new (C) UncondBranchInst(PredBlock);
         UB->setTarget(TargetBlock, ArrayRef<CFGValue>());
         continue;
@@ -109,9 +113,8 @@ public:
   }
 
   void addCurrentBlockToPending() {
-    if (Block && !Block->hasTerminator()) {
+    if (Block && !hasTerminator(Block))
       pendingMerges().push_back(Block);
-    }
     Block = 0;
   }
   
@@ -155,10 +158,8 @@ public:
                         BasicBlock *TargetBlock) {
     assert(ContinueStack.back() == &BlocksThatContinue);
     for (auto ContinueBlock : BlocksThatContinue) {
-      assert(ContinueBlock->hasTerminator());
-      UncondBranchInst &UB =
-      cast<UncondBranchInst>(ContinueBlock->instructions.back());
-      UB.setTarget(TargetBlock, ArrayRef<CFGValue>());
+      auto UB = cast<UncondBranchInst>(ContinueBlock->getTerminator());
+      UB->setTarget(TargetBlock, ArrayRef<CFGValue>());
     }
     ContinueStack.pop_back();
   }
