@@ -195,40 +195,6 @@ public:
   }
 };
 
-class ReturnInst : public Instruction {
-  ReturnInst() = delete;
-public:
-  /// The backing ReturnStmt (if any) in the AST.  If this was an
-  /// implicit return, this value will be null.
-  ReturnStmt *returnStmt;
-
-  /// The value to be returned (if any).  This can be null if it
-  /// is an implicit return.
-  CFGValue returnValue;
-
-  /// Constructs a ReturnInst representing an \b explicit return.
-  ///
-  /// \param returnStmt The backing return statement in the AST.
-  ///
-  /// \param returnValue The value to be returned.
-  ///
-  /// \param The basic block that will contain the instruction.
-  ///
-  ReturnInst(ReturnStmt *returnStmt, CFGValue returnValue, BasicBlock *B)
-    : Instruction(B, InstKind::Return), returnStmt(returnStmt),
-      returnValue(returnValue) {}
-
-  /// Constructs a ReturnInst representing an \b implicit return.
-  ///
-  /// \param The basic block that will contain the instruction.
-  ///
-  ReturnInst(BasicBlock *B) : ReturnInst(0, (Instruction*)0, B) {}
-
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::Return;
-  }
-};
-
 /// Represents an abstract application that provides the 'this' pointer for
 /// a curried method.
 class ThisApplyInst : public Instruction {
@@ -338,6 +304,40 @@ public:
   static bool classof(const Instruction *I) {
     return I->getKind() >= InstKind::TERM_INST_BEGIN &&
            I->getKind() <= InstKind::TERM_INST_END;
+  }
+};
+
+class ReturnInst : public TermInst {
+  ReturnInst() = delete;
+public:
+  /// The backing ReturnStmt (if any) in the AST.  If this was an
+  /// implicit return, this value will be null.
+  ReturnStmt *returnStmt;
+
+  /// The value to be returned (if any).  This can be null if it
+  /// is an implicit return.
+  CFGValue returnValue;
+
+  /// Constructs a ReturnInst representing an \b explicit return.
+  ///
+  /// \param returnStmt The backing return statement in the AST.
+  ///
+  /// \param returnValue The value to be returned.
+  ///
+  /// \param The basic block that will contain the instruction.
+  ///
+  ReturnInst(ReturnStmt *returnStmt, CFGValue returnValue, BasicBlock *B)
+    : TermInst(B, InstKind::Return), returnStmt(returnStmt),
+  returnValue(returnValue) {}
+
+  /// Constructs a ReturnInst representing an \b implicit return.
+  ///
+  /// \param The basic block that will contain the instruction.
+  ///
+  ReturnInst(BasicBlock *B) : ReturnInst(0, (Instruction*)0, B) {}
+
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::Return;
   }
 };
 
