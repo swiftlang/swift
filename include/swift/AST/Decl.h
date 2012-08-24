@@ -907,6 +907,7 @@ public:
 
   bool hasBaseClass() { return BaseClass.getType(); }
   Type getBaseClass() { return BaseClass.getType(); }
+  TypeLoc &getBaseClassLoc() { return BaseClass; }
   void setBaseClassLoc(TypeLoc base) { BaseClass = base; }
 
   // Implement isa/cast/dyncast/etc.

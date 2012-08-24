@@ -2101,16 +2101,15 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
 
   // A value of class type can be converted to a value of the type of its
   // base class.
-  if (auto PotentialDerived = E->getType()->getAs<ClassType>()) {
-    if (auto PotentialBase = DestTy->getAs<ClassType>()) {
-      bool Trivial;
-      if (TC.isSubtypeOf(PotentialDerived, PotentialBase, Trivial, &CC)) {
-        if (!(Flags & CF_Apply))
-          return DestTy;
+  if (E->getType()->getClassOrBoundGenericClass() &&
+      DestTy->getClassOrBoundGenericClass()) {
+    bool Trivial;
+    if (TC.isSubtypeOf(E->getType(), DestTy, Trivial, &CC)) {
+      if (!(Flags & CF_Apply))
+        return DestTy;
 
-        return coerced(new (TC.Context) DerivedToBaseExpr(E, DestTy),
-                        Flags);
-      }
+      return coerced(new (TC.Context) DerivedToBaseExpr(E, DestTy),
+                     Flags);
     }
   }
 
@@ -2425,20 +2424,16 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
   }
 
   if (Flags & ST_AllowSubtype) {
-    if (auto PotentialDerived = T1->getAs<ClassType>()) {
-      if (auto PotentialBase = T2->getAs<ClassType>()) {
-        // If have two distinct class types; check if DerivedClass is actually
-        // derived from BaseClass.
-        while (PotentialDerived->getDecl() != PotentialBase->getDecl()) {
-          Type CurBase = PotentialDerived->getDecl()->getBaseClass();
-          if (!CurBase)
-            break;
-          if (CurBase->isEqual(PotentialBase))
-            return true;
-          PotentialDerived = CurBase->getAs<ClassType>();
-          if (!PotentialDerived)
-            break;
-        }
+    // Check for a base-class/super-class relationship.
+    if (T1->getClassOrBoundGenericClass() &&
+        T2->getClassOrBoundGenericClass()) {
+      auto classDecl2 = T2->getClassOrBoundGenericClass();
+      for (auto super1 = TC.getSuperClassOf(T1); super1;
+           super1 = TC.getSuperClassOf(super1)) {
+        if (super1->getClassOrBoundGenericClass() != classDecl2)
+          continue;
+        
+        return matchTypes(TC, super1, T2, ST_None, Trivial, CC);
       }
     }
   }

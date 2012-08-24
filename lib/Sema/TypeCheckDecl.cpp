@@ -369,6 +369,9 @@ public:
 
   void visitClassDecl(ClassDecl *CD) {
     if (!IsSecondPass) {
+      if (CD->hasBaseClass())
+        TC.validateType(CD->getBaseClassLoc(), IsFirstPass);
+
       checkInherited(CD, CD->getInherited());
 
       if (auto gp = CD->getGenericParams()) {
