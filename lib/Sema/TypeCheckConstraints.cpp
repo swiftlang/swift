@@ -1490,9 +1490,10 @@ SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
     // one label from the tuple, maintaining the rest.
     if (tupleTy->getFields().size() == 1) {
       auto &elt = tupleTy->getFields()[0];
-      if (!elt.isVararg() && !elt.getName().empty()) {
+      if (elt.isVararg()) // FIXME: Should we keep the name?
+        result.push_back(elt.getVarargBaseTy());
+      else if (!elt.getName().empty())
         result.push_back(elt.getType());
-      }
     }
   }
 
