@@ -232,6 +232,16 @@ static void overrideDecl(TypeChecker &TC,
   }
 }
 
+static Type getBaseMemberDeclType(TypeChecker &TC,
+                                  ValueDecl *D, Type Base) {
+  ClassDecl *BaseDecl =
+      D->getDeclContext()->getDeclaredTypeInContext()
+      ->getClassOrBoundGenericClass();
+  while (Base->getClassOrBoundGenericClass() != BaseDecl)
+    Base = TC.getSuperClassOf(Base);
+  return TC.substMemberTypeWithBase(D->getType(), nullptr, Base);
+}
+
 static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD) {
   if (!CD->hasBaseClass())
     return;
@@ -285,15 +295,15 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD) {
         if (MemberVD->getKind() != CurDecls[i]->getKind())
           continue;
         bool isTypeEqual = false;
+        Type BaseMemberTy = getBaseMemberDeclType(TC, CurDecls[i], Base);
         if (isa<FuncDecl>(MemberVD)) {
           AnyFunctionType *MemberFTy =
               MemberVD->getType()->getAs<AnyFunctionType>();
-          AnyFunctionType *OtherFTy =
-              CurDecls[i]->getType()->getAs<AnyFunctionType>();
+          AnyFunctionType *OtherFTy = BaseMemberTy->castTo<AnyFunctionType>();
           if (MemberFTy && OtherFTy)
             isTypeEqual = MemberFTy->getResult()->isEqual(OtherFTy->getResult());
         } else {
-          isTypeEqual = MemberVD->getType()->isEqual(CurDecls[i]->getType());
+          isTypeEqual = MemberVD->getType()->isEqual(BaseMemberTy);
         }
         if (isTypeEqual) {
           if (CurDecls[i]->getDeclContext() == MemberVD->getDeclContext()) {
@@ -335,11 +345,11 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD) {
       if (MemberVD->getKind() != CurDecls[i]->getKind())
         continue;
       bool isSubtype = false;
+      Type BaseMemberTy = getBaseMemberDeclType(TC, CurDecls[i], Base);
       if (isa<FuncDecl>(MemberVD)) {
         AnyFunctionType *MemberFTy =
             MemberVD->getType()->getAs<AnyFunctionType>();
-        AnyFunctionType *OtherFTy =
-            CurDecls[i]->getType()->getAs<AnyFunctionType>();
+        AnyFunctionType *OtherFTy = BaseMemberTy->getAs<AnyFunctionType>();
         if (MemberFTy && OtherFTy) {
           bool Trivial;
           isSubtype = TC.isSubtypeOf(MemberFTy->getResult(),
@@ -349,7 +359,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD) {
       } else {
         bool Trivial;
         isSubtype = TC.isSubtypeOf(MemberVD->getType(),
-                                   CurDecls[i]->getType(),
+                                   BaseMemberTy,
                                    Trivial) && Trivial;
       }
       if (isSubtype) {
