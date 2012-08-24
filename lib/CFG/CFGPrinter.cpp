@@ -57,17 +57,16 @@ public:
   }
 
   void print(const BasicBlock *BB) {
-    OS << getID(BB) << ":\n";
+    OS << getID(BB) << ":\t";
+
+    OS << " ; Preds:";
+    for (const BasicBlock *B : BB->getPreds())
+      OS << ' ' << getID(B);
+    OS << '\n';
 
     for (const Instruction &I : *BB)
       print(&I);
 
-    OS << "  Preds:";
-    for (const BasicBlock *B : BB->getPreds())
-      OS << ' ' << getID(B);
-    OS << "\n  Succs:";
-    for (const BasicBlock *B : BB->getSuccs())
-      OS << ' ' << getID(B);
     OS << '\n';
   }
 
