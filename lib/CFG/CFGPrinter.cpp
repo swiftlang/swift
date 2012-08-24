@@ -51,7 +51,7 @@ class CFGPrinter : public CFGVisitor<CFGPrinter> {
   llvm::DenseMap<const Instruction*, unsigned> InstructionToIDMap;
   ID getID(const Instruction *I);
   ID getID(const BasicBlockArg *BBarg);
-  ID getID(const CFGValue &V);
+  ID getID(CFGValue V);
 
 public:
   CFGPrinter(raw_ostream &OS) : OS(OS) {
@@ -85,63 +85,60 @@ public:
   }
 
   void visitCallInst(CallInst *CI) {
-    OS << "Call(fn=" << getID(CI->function);
-    auto args = CI->arguments();
-    if (!args.empty()) {
-      bool first = true;
-      OS << ",args=(";
-      for (auto arg : args) {
-        if (first)
-          first = false;
-        else
-          OS << ' ';
-        OS << getID(arg);
-      }
-      OS << ')';
+    OS << "call " << getID(CI->function) << '(';
+    bool first = true;
+    for (auto arg : CI->arguments()) {
+      if (first)
+        first = false;
+      else
+        OS << ", ";
+      OS << getID(arg);
     }
     OS << ')';
   }
 
   void visitDeclRefInst(DeclRefInst *DRI) {
-    OS << "DeclRef(decl=" << DRI->expr->getDecl()->getName() << ')';
+    OS << "declref " << DRI->expr->getDecl()->getName()
+       << ", type=" << DRI->expr->getDecl()->getType().getString();
   }
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     const auto &lit = ILI->literal->getValue();
-    OS << "Integer(val=" << lit << ",width=" << lit.getBitWidth() << ')';
+    OS << "integerliteral " << lit << ", width=" << lit.getBitWidth();
   }
   void visitLoadInst(LoadInst *LI) {
-    OS << "Load(lvalue=" << getID(LI->lvalue) << ')';
+    OS << "load " << getID(LI->lvalue);
   }
   void visitThisApplyInst(ThisApplyInst *TAI) {
-    OS << "ThisApply(fn=" << getID(TAI->function) << ",arg="
+    OS << "thisapply "<< getID(TAI->function) << '('
        << getID(TAI->argument) << ')';
   }
   void visitTupleInst(TupleInst *TI) {
-    OS << "Tuple(";
+    OS << "tuple (";
     bool isFirst = true;
     for (const auto &Elem : TI->elements()) {
       if (isFirst)
         isFirst = false;
       else
-        OS << ',';
+        OS << ", ";
       OS << getID(Elem);
     }
     OS << ')';
   }
   void visitTypeOfInst(TypeOfInst *TOI) {
-    OS << "TypeOf(type=" << TOI->Expr->getType().getString() << ')';
+    OS << "typeof " << TOI->Expr->getType().getString();
   }
 
   void visitReturnInst(ReturnInst *RI) {
-    OS << "Return";
-    if (RI->returnValue) {
+    OS << "return ";
+    if (RI->returnValue)
       OS << '(' << getID(RI->returnValue) << ')';
-    }
   }
 
   void visitUncondBranchInst(UncondBranchInst *UBI) {
     OS << "br " << getID(UBI->targetBlock());
     const UncondBranchInst::ArgsTy Args = UBI->blockArgs();
+
+    // FIXME: Args should move to terminator generic stuff.
     if (!Args.empty()) {
       OS << '(';
       for (auto Arg : Args) { OS << "%" << Arg; }
@@ -150,12 +147,8 @@ public:
   }
 
   void visitCondBranchInst(CondBranchInst *CBI) {
-    OS << "cond_br(cond=";
-    OS << "?";
-    //      printID(BI.condition);
-    OS << ",branches=(" << getID(CBI->branches()[0]);
-    OS << ',' << getID(CBI->branches()[1]);
-    OS << "))";
+    OS << "condbranch " << /*getID(CBI->condition) <<*/ "???, "
+       << getID(CBI->branches()[0]) << ',' << getID(CBI->branches()[1]);
   }
 };
 } // end anonymous namespace
@@ -191,7 +184,7 @@ ID CFGPrinter::getID(const BasicBlockArg *BBArg) {
   return R;
 }
 
-ID CFGPrinter::getID(const CFGValue &Val) {
+ID CFGPrinter::getID(CFGValue Val) {
   if (const Instruction *Inst = Val.dyn_cast<Instruction*>())
     return getID(Inst);
   return getID(Val.get<BasicBlockArg*>());
