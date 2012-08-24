@@ -44,7 +44,7 @@ raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
     BlocksToIDs.reset(new BlocksToIdsTy());
     BlocksToIdsTy &Map = *BlocksToIDs;
     unsigned idx = 0;
-    for (const BasicBlock &B : Block->getParent()->blocks)
+    for (const BasicBlock &B : *Block->getParent())
       Map[&B] = idx++;
   }
 
@@ -291,7 +291,7 @@ void CFG::dump() const {
 /// Pretty-print the basi block with the designated stream.
 void CFG::print(llvm::raw_ostream &OS, CFGPrintContext &PC,
                 unsigned Indent) const {
-  for (const BasicBlock &B : blocks)
+  for (const BasicBlock &B : *this)
     B.print(OS, PC, Indent);
 }
 

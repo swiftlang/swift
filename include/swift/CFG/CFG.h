@@ -29,16 +29,15 @@ class CFG : public CFGBase {
 public:
   typedef llvm::iplist<BasicBlock> BlockListType;
 
-  /// The collection of all BasicBlocks in the CFG.
-  BlockListType blocks;
-
 private:
   friend class BasicBlock;
 
-  // Intentionally marked private so that we need to use 'build()'
+  /// The collection of all BasicBlocks in the CFG.
+  BlockListType BlockList;
+
+  // Intentionally marked private so that we need to use 'constructCFG()'
   // to construct a CFG.
   CFG();
-
 public:
   ~CFG();
 
@@ -46,6 +45,27 @@ public:
   /// to 'delete' this object.  This can return nullptr if the CFG cannot
   /// be constructed.
   static CFG *constructCFG(Stmt *S);
+
+  //===--------------------------------------------------------------------===//
+  // Block List Access
+  //===--------------------------------------------------------------------===//
+
+  BlockListType &getBlocks() { return BlockList; }
+  const BlockListType &getBlocks() const { return BlockList; }
+
+  typedef BlockListType::iterator iterator;
+  typedef BlockListType::const_iterator const_iterator;
+
+  bool empty() { return BlockList.empty(); }
+  iterator begin() { return BlockList.begin(); }
+  iterator end() { return BlockList.end(); }
+  const_iterator begin() const { return BlockList.begin(); }
+  const_iterator end() const { return BlockList.end(); }
+
+
+  //===--------------------------------------------------------------------===//
+  // Miscellaneous
+  //===--------------------------------------------------------------------===//
 
   /// verify - Run the IR verifier to make sure that the CFG follows invariants.
   void verify() const;
@@ -58,67 +78,6 @@ public:
 
   /// Pretty-print the CFG with the designated stream.
   void print(raw_ostream &OS, CFGPrintContext &PC, unsigned Indent = 0) const;
-
-  /// \brief Provides a custom implementation of the iterator class to have the
-  /// same interface as Function::iterator - iterator returns BasicBlock
-  /// (not a pointer to BasicBlock).
-  class graph_iterator {
-  public:
-    typedef const BasicBlock value_type;
-    typedef value_type& reference;
-    typedef value_type* pointer;
-    typedef BlockListType::iterator ImplTy;
-
-    graph_iterator(const ImplTy &i) : I(i) {}
-
-    bool operator==(const graph_iterator &X) const { return I == X.I; }
-    bool operator!=(const graph_iterator &X) const { return I != X.I; }
-    reference operator*() const { return *I; }
-    pointer operator->() const { return  &*I; }
-    operator BasicBlock*() { return  &*I; }
-
-    graph_iterator &operator++() { ++I; return *this; }
-    graph_iterator &operator--() { --I; return *this; }
-
-  private:
-    ImplTy I;
-  };
-  
-  class const_graph_iterator {
-  public:
-    typedef const BasicBlock value_type;
-    typedef value_type& reference;
-    typedef value_type* pointer;
-    typedef BlockListType::const_iterator ImplTy;
-
-    const_graph_iterator(const ImplTy &i) : I(i) {}
-
-    bool operator==(const const_graph_iterator &X) const { return I == X.I; }
-    bool operator!=(const const_graph_iterator &X) const { return I != X.I; }
-
-    reference operator*() const { return *I; }
-    pointer operator->() const { return  &*I; }
-    operator const BasicBlock*() const { return  &*I; }
-
-    const_graph_iterator &operator++() { ++I; return *this; }
-    const_graph_iterator &operator--() { --I; return *this; }
-
-  private:
-    ImplTy I;
-  };
-
-  graph_iterator nodes_begin() {
-    return graph_iterator(blocks.begin());
-  }
-  graph_iterator nodes_end() {
-    return graph_iterator(blocks.end());
-  }
-  const_graph_iterator nodes_begin() const {
-    return const_graph_iterator(blocks.begin());
-  }
-  const_graph_iterator nodes_end() const {
-    return const_graph_iterator(blocks.end());
-  }
 };
 
 } // end swift namespace
@@ -126,13 +85,14 @@ public:
 namespace llvm {
 
 template <> struct GraphTraits<::swift::CFG *>
-  : public GraphTraits<::swift::BasicBlock *>
-{
-  static NodeType *getEntryNode(::swift::CFG *C) { return &C->blocks.front(); }
+  : public GraphTraits<::swift::BasicBlock *> {
+  static NodeType *getEntryNode(::swift::CFG *C) {
+    return &C->getBlocks().front();
+  }
   typedef ::swift::CFG::BlockListType::iterator nodes_iterator;
-  static nodes_iterator nodes_begin(::swift::CFG *C) {return C->blocks.begin();}
-  static nodes_iterator nodes_end(::swift::CFG *C) { return C->blocks.end(); }
-  static unsigned size(::swift::CFG *C) { return C->blocks.size(); }
+  static nodes_iterator nodes_begin(::swift::CFG *C) { return C->begin(); }
+  static nodes_iterator nodes_end(::swift::CFG *C) { return C->end(); }
+  static unsigned size(::swift::CFG *C) { return C->getBlocks().size(); }
 };
 
 } // end llvm namespace

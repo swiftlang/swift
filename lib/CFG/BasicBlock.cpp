@@ -19,6 +19,6 @@
 using namespace swift;
 
 BasicBlock::BasicBlock(CFG *ParentCFG) : ParentCFG(ParentCFG) {
-  ParentCFG->blocks.push_back(this);
+  ParentCFG->getBlocks().push_back(this);
 }
 BasicBlock::~BasicBlock() {}

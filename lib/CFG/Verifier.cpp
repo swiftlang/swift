@@ -23,10 +23,10 @@ static void verifyInst(const Instruction *I) {
   if (!isa<TermInst>(I)) {
     assert(!BB->empty() &&
            "Can't be in a parent block if it is empty");
-    assert(&*BB->getInstList().rbegin() != I &&
+    assert(&*BB->getInsts().rbegin() != I &&
            "Non-terminators cannot be the last in a block");
   } else {
-    assert(&*BB->getInstList().rbegin() == I &&
+    assert(&*BB->getInsts().rbegin() == I &&
            "Terminator must be the last in block");
   }
   
@@ -64,7 +64,7 @@ static void verifyInst(const Instruction *I) {
 
 /// verify - Run the IR verifier to make sure that the CFG follows invariants.
 void CFG::verify() const {
-  for (auto &BB : blocks)
+  for (auto &BB : *this)
     for (auto &I : BB)
       verifyInst(&I);
   

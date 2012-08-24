@@ -23,7 +23,7 @@ using namespace swift;
 
 Instruction::Instruction(BasicBlock *B, InstKind Kind)
   : Kind(Kind), ParentBB(B) {
-  B->getInstList().push_back(this);
+  B->getInsts().push_back(this);
 }
 
 

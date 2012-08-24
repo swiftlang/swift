@@ -21,7 +21,9 @@ CFG::CFG() {}
 CFG::~CFG() {
   // FIXME: if all parts of BasicBlock are BumpPtrAllocated, this shouldn't
   // eventually be needed.
-  for (BasicBlock &B : blocks) { B.~BasicBlock(); }
+  for (BasicBlock &B : BlockList) {
+    B.~BasicBlock();
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -35,7 +37,7 @@ static Expr *ignoreParens(Expr *Ex) {
 }
 
 static bool hasTerminator(BasicBlock *BB) {
-  return !BB->empty() && isa<TermInst>(BB->getInstList().back());
+  return !BB->empty() && isa<TermInst>(BB->getInsts().back());
 }
 
 namespace {
@@ -140,7 +142,7 @@ public:
     if (!Block)
       return;
 
-    if (Block->empty() || !isa<ReturnInst>(Block->getInstList().back()))
+    if (Block->empty() || !isa<ReturnInst>(Block->getInsts().back()))
       new (C) ReturnInst(Block);
   }
 

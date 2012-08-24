@@ -54,8 +54,8 @@ public:
   // Instruction List Inspection and Manipulation
   //===--------------------------------------------------------------------===//
 
-  InstListType &getInstList() { return InstList; }
-  const InstListType &getInstList() const { return InstList; }
+  InstListType &getInsts() { return InstList; }
+  const InstListType &getInsts() const { return InstList; }
 
   typedef InstListType::iterator iterator;
   typedef InstListType::const_iterator const_iterator;
