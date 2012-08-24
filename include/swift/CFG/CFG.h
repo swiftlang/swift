@@ -73,11 +73,11 @@ public:
   /// Pretty-print the CFG.
   void dump() const;
 
+  /// Pretty-print the CFG with the designated stream.
+  void print(raw_ostream &OS) const;
+
   /// Dump the CFGs of an entire translation unit.
   static void dump(TranslationUnit *TU);
-
-  /// Pretty-print the CFG with the designated stream.
-  void print(raw_ostream &OS, CFGPrintContext &PC, unsigned Indent = 0) const;
 };
 
 } // end swift namespace

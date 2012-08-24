@@ -99,8 +99,7 @@ public:
   void dump() const;
 
   /// Pretty-print the BasicBlock with the designated stream.
-  void print(llvm::raw_ostream &OS, CFGPrintContext &PC,
-             unsigned Indent = 0) const;
+  void print(llvm::raw_ostream &OS) const;
 };
 
 } // end swift namespace

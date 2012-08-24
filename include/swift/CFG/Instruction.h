@@ -69,10 +69,7 @@ public:
 
   /// Pretty-print the Instruction.
   void dump() const;
-
-  /// Pretty-print the Instruction to the designated stream.
-  void print(raw_ostream &OS, CFGPrintContext &PC,
-             unsigned Indent = 0) const;
+  void print(raw_ostream &OS) const;
 
   static bool classof(const Instruction *I) { return true; }
 };

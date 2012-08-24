@@ -33,9 +33,6 @@ public:
   }
 };
 
-/// A detail class used for CFG pretty-printing.
-class CFGPrintContext;
-
 template <typename DERIVED>
 class CFGAllocated {
 public:

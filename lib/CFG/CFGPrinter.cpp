@@ -20,6 +20,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/OwningPtr.h"
+using namespace swift;
 
 namespace swift {
 class CFGPrintContext {
@@ -35,7 +36,6 @@ public:
 };
 }
 
-using namespace swift;
 
 raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
                                       const BasicBlock *Block) {
@@ -91,14 +91,47 @@ raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
 }
 
 //===----------------------------------------------------------------------===//
-// Pretty-printing for Instructions.
+// Pretty-printing
 //===----------------------------------------------------------------------===//
 
+namespace {
+/// CFGPrinter class - This is the internal implementation details of printing
+/// for CFG structures.
 class CFGPrinter : public CFGVisitor<CFGPrinter> {
   raw_ostream &OS;
   CFGPrintContext &PC;
 public:
   CFGPrinter(raw_ostream &OS, CFGPrintContext &PC) : OS(OS), PC(PC) {
+  }
+
+  void print(const BasicBlock *BB) {
+    PC.printID(OS, BB) << ":\n";
+
+    for (const Instruction &I : *BB)
+      print(&I);
+
+    OS << "  Preds:";
+    for (const BasicBlock *B : BB->getPreds()) {
+      OS << ' ';
+      PC.printID(OS, B);
+    }
+    OS << '\n';
+    OS << "  Succs:";
+    for (const BasicBlock *B : BB->getSuccs()) {
+      OS << ' ';
+      PC.printID(OS, B);
+    }
+    OS << '\n';
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Instruction Printing Logic
+
+  void print(const Instruction *I) {
+    OS << "  ";
+    PC.printID(OS, I, false) << " = ";
+    visit(const_cast<Instruction*>(I));
+    OS << '\n';
   }
 
   void visitInstruction(Instruction *I) {
@@ -190,54 +223,34 @@ public:
     OS << "))";
   }
 };
-
-
-void Instruction::print(raw_ostream &OS, CFGPrintContext &PC,
-                        unsigned Indent) const {
-  OS.indent(Indent);
-  PC.printID(OS, this, false) << " = ";
-  CFGPrinter(OS, PC).visit(const_cast<Instruction*>(this));
-  OS << '\n';
-}
+} // end anonymous namespace
 
 void Instruction::dump() const {
-  CFGPrintContext PC;
-  print(llvm::errs(), PC);
+  print(llvm::errs());
 }
 
+void Instruction::print(raw_ostream &OS) const {
+  CFGPrintContext PC;
+  CFGPrinter(OS, PC).print(this);
+}
+
+
 //===----------------------------------------------------------------------===//
-// Pretty-printing for BasicBlocks.
+// Pretty-printing for BasicBlock
 //===----------------------------------------------------------------------===//
 
 /// Pretty-print the BasicBlock.
 void BasicBlock::dump() const {
-  CFGPrintContext PC;
-  print(llvm::errs(), PC);
+  print(llvm::errs());
 }
 
 /// Pretty-print the BasicBlock with the designated stream.
-void BasicBlock::print(raw_ostream &OS, CFGPrintContext &PC,
-                       unsigned Indent) const {
-  OS.indent(Indent);
-  PC.printID(OS, this) << ":\n";
-  Indent += 2;
-
-  for (const Instruction &I : *this)
-    I.print(OS, PC, Indent);
-  OS.indent(Indent) << "Preds:";
-  for (const BasicBlock *B : getPreds()) {
-    OS << ' ';
-    PC.printID(OS, B);
-  }
-  OS << '\n';
-  OS.indent(Indent) << "Succs:";
-  for (const BasicBlock *B : getSuccs()) {
-    OS << ' ';
-    PC.printID(OS, B);
-  }
-  OS << '\n';
+void BasicBlock::print(raw_ostream &OS) const {
+  CFGPrintContext PC;
+  CFGPrinter(OS, PC).print(this);
 }
 
+// FIXME: This is wrong.
 namespace llvm {
 raw_ostream &operator<<(raw_ostream &OS, const ::swift::BasicBlock &B) {
   OS << 'B' << (void*) &B;
@@ -246,16 +259,33 @@ raw_ostream &operator<<(raw_ostream &OS, const ::swift::BasicBlock &B) {
 } // end namespace llvm
 
 //===----------------------------------------------------------------------===//
+// Pretty-printing for CFG
+//===----------------------------------------------------------------------===//
+
+/// Pretty-print the basic block.
+void CFG::dump() const {
+  print(llvm::errs());
+}
+
+/// Pretty-print the basi block with the designated stream.
+void CFG::print(llvm::raw_ostream &OS) const {
+  CFGPrintContext PC;
+  CFGPrinter Printer(OS, PC);
+  for (const BasicBlock &B : *this)
+    Printer.print(&B);
+}
+
+
+//===----------------------------------------------------------------------===//
 // CFG pretty-printing.
 //===----------------------------------------------------------------------===//
 
 namespace {
 class DumpVisitor : public ASTVisitor<DumpVisitor> {
 public:
-  DumpVisitor(llvm::raw_ostream &OS, CFGPrintContext &PC) : OS(OS), PC(PC) {}
+  DumpVisitor(llvm::raw_ostream &OS) : OS(OS) {}
 
   raw_ostream &OS;
-  CFGPrintContext &PC;
 
   void visitFuncDecl(FuncDecl *FD) {
     FuncExpr *FE = FD->getBody();
@@ -265,29 +295,15 @@ public:
       return;
 
     OS << "func_decl " << FD->getName() << '\n';
-    C->print(OS, PC, 2);
+    C->print(OS);
     OS << "\n";
   }
 };
 }
 
+
+// FIXME: This should moved to the driver.
 void CFG::dump(TranslationUnit *TU) {
-  for (Decl *D : TU->Decls) {
-    CFGPrintContext PC;
-    DumpVisitor(llvm::errs(), PC).visit(D);
-  }
+  for (Decl *D : TU->Decls)
+    DumpVisitor(llvm::errs()).visit(D);
 }
-
-/// Pretty-print the basic block.
-void CFG::dump() const {
-  CFGPrintContext PC;
-  print(llvm::errs(), PC);
-}
-
-/// Pretty-print the basi block with the designated stream.
-void CFG::print(llvm::raw_ostream &OS, CFGPrintContext &PC,
-                unsigned Indent) const {
-  for (const BasicBlock &B : *this)
-    B.print(OS, PC, Indent);
-}
-
