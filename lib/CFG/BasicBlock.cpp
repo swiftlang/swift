@@ -18,5 +18,7 @@
 #include "swift/CFG/CFG.h"
 using namespace swift;
 
-BasicBlock::BasicBlock(CFG *C) : cfg(C) { cfg->blocks.push_back(this); }
+BasicBlock::BasicBlock(CFG *ParentCFG) : ParentCFG(ParentCFG) {
+  ParentCFG->blocks.push_back(this);
+}
 BasicBlock::~BasicBlock() {}

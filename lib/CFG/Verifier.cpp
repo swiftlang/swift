@@ -21,12 +21,12 @@ static void verifyInst(const Instruction *I) {
   const BasicBlock *BB = I->getParent();
   // Check that non-terminators look ok.
   if (!isa<TermInst>(I)) {
-    assert(!BB->instructions.empty() &&
+    assert(!BB->empty() &&
            "Can't be in a parent block if it is empty");
-    assert(&*BB->instructions.rbegin() != I &&
+    assert(&*BB->getInstList().rbegin() != I &&
            "Non-terminators cannot be the last in a block");
   } else {
-    assert(&*BB->instructions.rbegin() == I &&
+    assert(&*BB->getInstList().rbegin() == I &&
            "Terminator must be the last in block");
   }
   
@@ -50,8 +50,8 @@ static void verifyInst(const Instruction *I) {
     
     const UncondBranchInst &UBI = *cast<UncondBranchInst>(I);
     const BasicBlock &targetBlock = *UBI.targetBlock();
-    assert(std::find(targetBlock.preds().begin(),
-                     targetBlock.preds().end(), BB) &&
+    assert(std::find(targetBlock.getPreds().begin(),
+                     targetBlock.getPreds().end(), BB) &&
            "BasicBlock of UncondBranchInst must be a predecessor of target");
     (void)targetBlock;
   }
@@ -65,7 +65,7 @@ static void verifyInst(const Instruction *I) {
 /// verify - Run the IR verifier to make sure that the CFG follows invariants.
 void CFG::verify() const {
   for (auto &BB : blocks)
-    for (auto &I : BB.instructions)
+    for (auto &I : BB)
       verifyInst(&I);
   
 }

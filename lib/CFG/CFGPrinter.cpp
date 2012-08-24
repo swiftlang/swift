@@ -44,7 +44,8 @@ raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
     BlocksToIDs.reset(new BlocksToIdsTy());
     BlocksToIdsTy &Map = *BlocksToIDs;
     unsigned idx = 0;
-    for (const BasicBlock &B : Block->cfg->blocks) { Map[&B] = idx++; }
+    for (const BasicBlock &B : Block->getParent()->blocks)
+      Map[&B] = idx++;
   }
 
   BlocksToIdsTy &Map = *BlocksToIDs;
@@ -60,7 +61,7 @@ raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
                                       bool includeBBPrefix) {
   const BasicBlock *Block = Inst->getParent();
   unsigned count = 1;
-  for (const Instruction &I : Block->instructions) {
+  for (const Instruction &I : *Block) {
     if (&I == Inst)
       break;
     ++count;
@@ -225,16 +226,16 @@ void BasicBlock::print(raw_ostream &OS, CFGPrintContext &PC,
   PC.printID(OS, this) << ":\n";
   Indent += 2;
 
-  for (const Instruction &I : instructions)
+  for (const Instruction &I : *this)
     I.print(OS, PC, Indent);
   OS.indent(Indent) << "Preds:";
-  for (const BasicBlock *B : preds()) {
+  for (const BasicBlock *B : getPreds()) {
     OS << ' ';
     PC.printID(OS, B);
   }
   OS << '\n';
   OS.indent(Indent) << "Succs:";
-  for (const BasicBlock *B : succs()) {
+  for (const BasicBlock *B : getSuccs()) {
     OS << ' ';
     PC.printID(OS, B);
   }

@@ -54,8 +54,8 @@ enum class InstKind {
 
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift BasicBlock.
-class Instruction : public llvm::ilist_node<Instruction>,
-                    public CFGAllocated<Instruction> {
+class Instruction :
+public llvm::ilist_node<Instruction>, public CFGAllocated<Instruction> {
   /// The kind of the Instruction.
   const InstKind Kind;
 

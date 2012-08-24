@@ -23,7 +23,7 @@ using namespace swift;
 
 Instruction::Instruction(BasicBlock *B, InstKind Kind)
   : Kind(Kind), ParentBB(B) {
-  B->instructions.push_back(this);
+  B->getInstList().push_back(this);
 }
 
 
@@ -54,10 +54,10 @@ CallInst *CallInst::create(CallExpr *expr,
                            BasicBlock *B,
                            CFGValue function,
                            ArrayRef<CFGValue> args) {
-  CFG &cfg = *B->cfg;
-  void *Buffer = cfg.allocate(sizeof(CallInst) +
-                              args.size() * sizeof(CFGValue),
-                              llvm::AlignOf<CallInst>::Alignment);
+  CFG &C = *B->getParent();
+  void *Buffer = C.allocate(sizeof(CallInst) +
+                            args.size() * sizeof(CFGValue),
+                            llvm::AlignOf<CallInst>::Alignment);
   return ::new(Buffer) CallInst(expr, B, function, args);
 }
 
@@ -85,10 +85,10 @@ CondBranchInst::CondBranchInst(Stmt *BranchStmt,
 TupleInst *TupleInst::create(TupleExpr *Expr,
                              ArrayRef<CFGValue> Elements,
                              BasicBlock *B) {
-  CFG &cfg = *B->cfg;
-  void *Buffer = cfg.allocate(sizeof(TupleInst) +
-                              Elements.size() * sizeof(CFGValue),
-                              llvm::AlignOf<TupleInst>::Alignment);
+  CFG &C = *B->getParent();
+  void *Buffer = C.allocate(sizeof(TupleInst) +
+                            Elements.size() * sizeof(CFGValue),
+                            llvm::AlignOf<TupleInst>::Alignment);
   return ::new(Buffer) TupleInst(Expr, Elements, B);
 }
 
@@ -118,6 +118,6 @@ void UncondBranchInst::setTarget(BasicBlock *NewTarget, ArgsTy BlockArgs) {
 
   // Copy the arguments over to our holding buffer.
   NumArgs = BlockArgs.size();
-  Args = new (getParent()->cfg) CFGValue[NumArgs];
+  Args = new (getParent()->getParent()) CFGValue[NumArgs];
   ArgsTy(Args, NumArgs) = BlockArgs;
 }

@@ -24,40 +24,53 @@ namespace llvm {
 }
 
 namespace swift {
-
 class CFG;
 
-class BasicBlock : public llvm::ilist_node<BasicBlock>,
-                   public CFGAllocated<BasicBlock>  {
+class BasicBlock :
+public llvm::ilist_node<BasicBlock>, public CFGAllocated<BasicBlock> {
 public:
   typedef llvm::iplist<Instruction> InstListType;
-
-  /// The ordered set of instructions in the BasicBlock.
-  InstListType instructions;
-
-  /// A backreference to the containing CFG.
-  CFG * const cfg;
-
 private:
-  friend struct llvm::ilist_sentinel_traits<BasicBlock>;
-  BasicBlock() : cfg(0) {}
-  void operator=(const BasicBlock &) =delete;
-  void operator delete(void *Ptr, size_t) = delete;
+  /// A backreference to the containing CFG.
+  CFG * const ParentCFG;
+  /// The ordered set of instructions in the BasicBlock.
+  InstListType InstList;
 
-  std::vector<BasicBlock *> Preds;
+  std::vector<BasicBlock *> PredList;
+
+  friend struct llvm::ilist_sentinel_traits<BasicBlock>;
+  BasicBlock() : ParentCFG(0) {}
+  void operator=(const BasicBlock &) = delete;
+  void operator delete(void *Ptr, size_t) = delete;
 
 public:
   BasicBlock(CFG *C);
   ~BasicBlock();
 
-  /// Pretty-print the BasicBlock.
-  void dump() const;
+  CFG *getParent() { return ParentCFG; }
+  const CFG *getParent() const { return ParentCFG; }
 
-  /// Pretty-print the BasicBlock with the designated stream.
-  void print(llvm::raw_ostream &OS, CFGPrintContext &PC,
-             unsigned Indent = 0) const;
+  //===--------------------------------------------------------------------===//
+  // Instruction List Inspection and Manipulation
+  //===--------------------------------------------------------------------===//
 
-  void addPred(BasicBlock *B) { Preds.push_back(B); }
+  InstListType &getInstList() { return InstList; }
+  const InstListType &getInstList() const { return InstList; }
+
+  typedef InstListType::iterator iterator;
+  typedef InstListType::const_iterator const_iterator;
+
+  bool empty() const { return InstList.empty(); }
+  iterator begin() { return InstList.begin(); }
+  iterator end() { return InstList.end(); }
+  const_iterator begin() const { return InstList.begin(); }
+  const_iterator end() const { return InstList.end(); }
+
+  //===--------------------------------------------------------------------===//
+  // Predecessors and Successors
+  //===--------------------------------------------------------------------===//
+
+  void addPred(BasicBlock *B) { PredList.push_back(B); }
 
   typedef llvm::ArrayRef<BasicBlock *> Predecessors;
   typedef llvm::ArrayRef<BasicBlock *> Successors;
@@ -65,22 +78,29 @@ public:
   /// The predecessors of a BasicBlock are currently represented internally
   /// using an std::vector.  This will be optimized later, as most BasicBlocks
   /// will have only a single predecessor.
-  Predecessors preds() { return Preds; }
-  const Predecessors preds() const { return Preds; }
+  Predecessors getPreds() const { return PredList; }
 
   TermInst *getTerminator() {
-    assert(!instructions.empty() && "Can't get successors for malformed block");
-    return cast<TermInst>(&instructions.back());
+    assert(!InstList.empty() && "Can't get successors for malformed block");
+    return cast<TermInst>(&InstList.back());
+  }
+
+  const TermInst *getTerminator() const {
+    return const_cast<BasicBlock*>(this)->getTerminator();
   }
 
   /// The successors of a BasicBlock are defined either explicitly as
   /// a single successor as the branch targets of the terminator instruction.
-  Successors succs() {
+  Successors getSuccs() const {
     return getTerminator()->successors();
   }
-  const Successors succs() const {
-    return const_cast<BasicBlock*>(this)->succs();
-  }
+
+  /// Pretty-print the BasicBlock.
+  void dump() const;
+
+  /// Pretty-print the BasicBlock with the designated stream.
+  void print(llvm::raw_ostream &OS, CFGPrintContext &PC,
+             unsigned Indent = 0) const;
 };
 
 } // end swift namespace
@@ -92,10 +112,10 @@ template <> struct GraphTraits<::swift::BasicBlock*> {
   typedef ::swift::BasicBlock::Successors::iterator ChildIteratorType;
   static NodeType *getEntryNode(::swift::BasicBlock *BB) { return BB; }
   static inline ChildIteratorType child_begin(NodeType *N) {
-    return N->succs().begin();
+    return N->getSuccs().begin();
   }
   static inline ChildIteratorType child_end(NodeType *N) {
-    return N->succs().end();
+    return N->getSuccs().end();
   }
 };
 
@@ -104,10 +124,10 @@ template <> struct GraphTraits<const ::swift::BasicBlock*> {
   typedef ::swift::BasicBlock::Successors::const_iterator ChildIteratorType;
   static NodeType *getEntryNode(const ::swift::BasicBlock *BB) { return BB; }
   static inline ChildIteratorType child_begin(NodeType *N) {
-    return N->succs().begin();
+    return N->getSuccs().begin();
   }
   static inline ChildIteratorType child_end(NodeType *N) {
-    return N->succs().end();
+    return N->getSuccs().end();
   }
 
 };

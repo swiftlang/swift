@@ -35,7 +35,7 @@ static Expr *ignoreParens(Expr *Ex) {
 }
 
 static bool hasTerminator(BasicBlock *BB) {
-  return !BB->instructions.empty() && isa<TermInst>(BB->instructions.back());
+  return !BB->empty() && isa<TermInst>(BB->getInstList().back());
 }
 
 namespace {
@@ -81,7 +81,7 @@ public:
         UB->setTarget(TargetBlock, ArrayRef<CFGValue>());
         continue;
       }
-      TermInst &Term = cast<TermInst>(PredBlock->instructions.back());
+      TermInst &Term = *PredBlock->getTerminator();
       if (UncondBranchInst *UBI = dyn_cast<UncondBranchInst>(&Term)) {
         assert(UBI->targetBlock() == nullptr);
         UBI->setTarget(TargetBlock, ArrayRef<CFGValue>());
@@ -140,10 +140,8 @@ public:
     if (!Block)
       return;
 
-    if (Block->instructions.empty() ||
-        !isa<ReturnInst>(Block->instructions.back())) {
+    if (Block->empty() || !isa<ReturnInst>(Block->getInstList().back()))
       new (C) ReturnInst(Block);
-    }
   }
 
   void popBreakStack(BlocksVector &BlocksThatBreak) {
