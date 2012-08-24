@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/CFG/CFG.h"
+#include "swift/CFG/CFGVisitor.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "llvm/Support/raw_ostream.h"
@@ -94,17 +94,21 @@ raw_ostream &CFGPrintContext::printID(raw_ostream &OS,
 // Pretty-printing for Instructions.
 //===----------------------------------------------------------------------===//
 
-void Instruction::print(raw_ostream &OS, CFGPrintContext &PC,
-                        unsigned Indent) const {
-  OS.indent(Indent);
-  PC.printID(OS, this, false) << " = ";
+class CFGPrinter : public CFGVisitor<CFGPrinter> {
+  raw_ostream &OS;
+  CFGPrintContext &PC;
+public:
+  CFGPrinter(raw_ostream &OS, CFGPrintContext &PC) : OS(OS), PC(PC) {
+  }
 
-  switch (getKind()) {
-  case InstKind::Call: {
-    const CallInst &CE = *cast<CallInst>(this);
+  void visitInstruction(Instruction *I) {
+    assert(0 && "CFGPrinter not implemented for this instruction!");
+  }
+
+  void visitCallInst(CallInst *CI) {
     OS << "Call(fn=";
-    PC.printID(OS, CE.function);
-    auto args = CE.arguments();
+    PC.printID(OS, CI->function);
+    auto args = CI->arguments();
     if (!args.empty()) {
       bool first = true;
       OS << ",args=(";
@@ -118,62 +122,31 @@ void Instruction::print(raw_ostream &OS, CFGPrintContext &PC,
       OS << ')';
     }
     OS << ')';
-    break;
   }
-  case InstKind::CondBranch: {
-    const CondBranchInst &BI = *cast<CondBranchInst>(this);
-    OS << "cond_br(cond=";
-    OS << "?";
-    //      PC.printID(OS, BI.condition);
-    OS << ",branches=(";
-    PC.printID(OS,BI.branches()[0]);
-    OS << ',';
-    PC.printID(OS,BI.branches()[1]);
-    OS << "))";
-    break;
+
+  void visitDeclRefInst(DeclRefInst *DRI) {
+    OS << "DeclRef(decl=" << DRI->expr->getDecl()->getName() << ')';
   }
-  case InstKind::DeclRef: {
-    const DeclRefInst &DI = *cast<DeclRefInst>(this);
-    OS << "DeclRef(decl=" << DI.expr->getDecl()->getName() << ')';
-    break;
-  }
-  case InstKind::IntegerLiteral: {
-    const IntegerLiteralInst &ILE = *cast<IntegerLiteralInst>(this);
-    const auto &lit = ILE.literal->getValue();
+  void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
+    const auto &lit = ILI->literal->getValue();
     OS << "Integer(val=" << lit << ",width=" << lit.getBitWidth() << ')';
-    break;
   }
-  case InstKind::Load: {
-    const LoadInst &LI = *cast<LoadInst>(this);
+  void visitLoadInst(LoadInst *LI) {
     OS << "Load(lvalue=";
-    PC.printID(OS, LI.lvalue);
+    PC.printID(OS, LI->lvalue);
     OS << ')';
-    break;
   }
-  case InstKind::Return: {
-    const ReturnInst &RI = *cast<ReturnInst>(this);
-    OS << "Return";
-    if (RI.returnValue) {
-      OS << '(';
-      PC.printID(OS, RI.returnValue);
-      OS << ')';
-    }
-    break;
-  };
-  case InstKind::ThisApply: {
-    const ThisApplyInst &TAI = *cast<ThisApplyInst>(this);
+  void visitThisApplyInst(ThisApplyInst *TAI) {
     OS << "ThisApply(fn=";
-    PC.printID(OS, TAI.function);
+    PC.printID(OS, TAI->function);
     OS << ",arg=";
-    PC.printID(OS, TAI.argument);
+    PC.printID(OS, TAI->argument);
     OS << ')';
-    break;
   }
-  case InstKind::Tuple: {
-    const TupleInst &TI = *cast<TupleInst>(this);
+  void visitTupleInst(TupleInst *TI) {
     OS << "Tuple(";
     bool isFirst = true;
-    for (const auto &Elem : TI.elements()) {
+    for (const auto &Elem : TI->elements()) {
       if (isFirst)
         isFirst = false;
       else
@@ -181,26 +154,49 @@ void Instruction::print(raw_ostream &OS, CFGPrintContext &PC,
       PC.printID(OS, Elem);
     }
     OS << ')';
-    break;
   }
-  case InstKind::TypeOf: {
-    const TypeOfInst &TOI = *cast<TypeOfInst>(this);
-    OS << "TypeOf(type=" << TOI.Expr->getType().getString() << ')';
-    break;
+  void visitTypeOfInst(TypeOfInst *TOI) {
+    OS << "TypeOf(type=" << TOI->Expr->getType().getString() << ')';
   }
-  case InstKind::UncondBranch: {
-    const UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
+
+  void visitReturnInst(ReturnInst *RI) {
+    OS << "Return";
+    if (RI->returnValue) {
+      OS << '(';
+      PC.printID(OS, RI->returnValue);
+      OS << ')';
+    }
+  }
+
+  void visitUncondBranchInst(UncondBranchInst *UBI) {
     OS << "br ";
-    PC.printID(OS, UBI.targetBlock());
-    const UncondBranchInst::ArgsTy Args = UBI.blockArgs();
+    PC.printID(OS, UBI->targetBlock());
+    const UncondBranchInst::ArgsTy Args = UBI->blockArgs();
     if (!Args.empty()) {
       OS << '(';
       for (auto Arg : Args) { OS << "%" << Arg; }
       OS << ')';
     }
-    break;
   }
+
+  void visitCondBranchInst(CondBranchInst *CBI) {
+    OS << "cond_br(cond=";
+    OS << "?";
+    //      PC.printID(OS, BI.condition);
+    OS << ",branches=(";
+    PC.printID(OS, CBI->branches()[0]);
+    OS << ',';
+    PC.printID(OS, CBI->branches()[1]);
+    OS << "))";
   }
+};
+
+
+void Instruction::print(raw_ostream &OS, CFGPrintContext &PC,
+                        unsigned Indent) const {
+  OS.indent(Indent);
+  PC.printID(OS, this, false) << " = ";
+  CFGPrinter(OS, PC).visit(const_cast<Instruction*>(this));
   OS << '\n';
 }
 
