@@ -82,7 +82,6 @@ private:
   CallInst(CallExpr *expr, BasicBlock *B, CFGValue function,
            ArrayRef<CFGValue> args);
 
-  CallInst() = delete;
   CFGValue *getArgsStorage() { return reinterpret_cast<CFGValue*>(this + 1); }
   unsigned NumArgs;
 
@@ -114,7 +113,6 @@ public:
 /// Represents a reference to a declaration, essentially evaluating to
 /// its lvalue.
 class DeclRefInst : public Instruction {
-  DeclRefInst() = delete;
 public:
   /// The backing DeclRefExpr in the AST.
   DeclRefExpr *expr;
@@ -136,7 +134,6 @@ public:
 /// Encapsulates an integer constant, as defined originally by an
 /// an IntegerLiteralExpr.
 class IntegerLiteralInst : public Instruction {
-  IntegerLiteralInst() = delete;
 public:
   // The backing IntegerLiteralExpr in the AST.
   IntegerLiteralExpr *literal;
@@ -158,7 +155,6 @@ public:
 
 /// Represents a load from a memory location.
 class LoadInst : public Instruction {
-  LoadInst() = delete;
 public:
   /// The backing LoadExpr in the AST.
   LoadExpr *expr;
@@ -186,7 +182,6 @@ public:
 /// Represents an abstract application that provides the 'this' pointer for
 /// a curried method.
 class ThisApplyInst : public Instruction {
-  ThisApplyInst() = delete;
 public:
   /// The backing ThisApplyExpr in the AST.
   ThisApplyExpr *expr;
@@ -215,7 +210,6 @@ public:
 
 /// Represents a constructed tuple.
 class TupleInst : public Instruction {
-  TupleInst() = delete;
 
   CFGValue *getElementsStorage() {
     return reinterpret_cast<CFGValue*>(this + 1);
@@ -251,7 +245,6 @@ public:
 
 /// Represents the production of an instance of a given metatype.
 class TypeOfInst : public Instruction {
-  TypeOfInst() = delete;
 public:
   /// The backing TypeOfExpr in the AST.
   TypeOfExpr *Expr;
@@ -296,7 +289,6 @@ public:
 };
 
 class ReturnInst : public TermInst {
-  ReturnInst() = delete;
 public:
   /// The backing ReturnStmt (if any) in the AST.  If this was an
   /// implicit return, this value will be null.
@@ -390,15 +382,11 @@ public:
 };
 
 class UncondBranchInst : public TermInst {
-public:
-  typedef llvm::ArrayRef<CFGValue> ArgsTy;
-
-protected:
   CFGValue *Args;
   unsigned NumArgs;
   BasicBlock *TargetBlock;
-
 public:
+
   /// Construct an UncondBranchInst that will become the terminator
   /// for the specified BasicBlock.
   UncondBranchInst(BasicBlock *BB) :
@@ -409,6 +397,7 @@ public:
   BasicBlock *targetBlock() const { return TargetBlock; }
 
   /// The temporary arguments to the target blocks.
+  typedef llvm::ArrayRef<CFGValue> ArgsTy;
   ArgsTy blockArgs() { return ArgsTy(Args, NumArgs); }
   const ArgsTy blockArgs() const { return ArgsTy(Args, NumArgs); }
 
