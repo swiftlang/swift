@@ -23,9 +23,21 @@
 #include "llvm/ADT/OwningPtr.h"
 using namespace swift;
 
-//===----------------------------------------------------------------------===//
-// Pretty-printing
-//===----------------------------------------------------------------------===//
+struct ID {
+  enum {
+    BasicBlock, LocalVal
+  } Kind;
+  unsigned Number;
+};
+
+raw_ostream &operator<<(raw_ostream &OS, ID i) {
+  switch (i.Kind) {
+  case ID::BasicBlock: OS << "b"; break;
+  case ID::LocalVal: OS << '%'; break;
+  }
+  return OS << i.Number;
+}
+
 
 namespace {
 /// CFGPrinter class - This is the internal implementation details of printing
@@ -33,10 +45,10 @@ namespace {
 class CFGPrinter : public CFGVisitor<CFGPrinter> {
   raw_ostream &OS;
 
-  typedef llvm::DenseMap<const BasicBlock *, unsigned> BlocksToIdsTy;
-  llvm::OwningPtr<BlocksToIdsTy> BlocksToIDs;
+  llvm::DenseMap<const BasicBlock *, unsigned> BlocksToIDsMap;
+  ID getID(const BasicBlock *B);
+
   raw_ostream &printID(const Instruction *I, bool includeBBPrefix = true);
-  raw_ostream &printID(const BasicBlock *B);
   raw_ostream &printID(const BasicBlockArg *BBarg);
   raw_ostream &printID(const CFGValue &V);
 
@@ -45,22 +57,17 @@ public:
   }
 
   void print(const BasicBlock *BB) {
-    printID(BB) << ":\n";
+    OS << getID(BB) << ":\n";
 
     for (const Instruction &I : *BB)
       print(&I);
 
     OS << "  Preds:";
-    for (const BasicBlock *B : BB->getPreds()) {
-      OS << ' ';
-      printID(B);
-    }
-    OS << '\n';
-    OS << "  Succs:";
-    for (const BasicBlock *B : BB->getSuccs()) {
-      OS << ' ';
-      printID(B);
-    }
+    for (const BasicBlock *B : BB->getPreds())
+      OS << ' ' << getID(B);
+    OS << "\n  Succs:";
+    for (const BasicBlock *B : BB->getSuccs())
+      OS << ' ' << getID(B);
     OS << '\n';
   }
 
@@ -142,8 +149,7 @@ public:
   }
 
   void visitUncondBranchInst(UncondBranchInst *UBI) {
-    OS << "br ";
-    printID(UBI->targetBlock());
+    OS << "br " << getID(UBI->targetBlock());
     const UncondBranchInst::ArgsTy Args = UBI->blockArgs();
     if (!Args.empty()) {
       OS << '(';
@@ -156,31 +162,23 @@ public:
     OS << "cond_br(cond=";
     OS << "?";
     //      printID(BI.condition);
-    OS << ",branches=(";
-    printID(CBI->branches()[0]);
-    OS << ',';
-    printID(CBI->branches()[1]);
+    OS << ",branches=(" << getID(CBI->branches()[0]);
+    OS << ',' << getID(CBI->branches()[1]);
     OS << "))";
   }
 };
 } // end anonymous namespace
 
-raw_ostream &CFGPrinter::printID(const BasicBlock *Block) {
+ID CFGPrinter::getID(const BasicBlock *Block) {
   // Lazily initialize the Blocks-to-IDs mapping.
-  if (!BlocksToIDs) {
-    BlocksToIDs.reset(new BlocksToIdsTy());
-    BlocksToIdsTy &Map = *BlocksToIDs;
+  if (BlocksToIDsMap.empty()) {
     unsigned idx = 0;
     for (const BasicBlock &B : *Block->getParent())
-      Map[&B] = idx++;
+      BlocksToIDsMap[&B] = idx++;
   }
 
-  BlocksToIdsTy &Map = *BlocksToIDs;
-  auto I = Map.find(Block);
-  assert(I != Map.end());
-
-  OS << "b" << I->second;
-  return OS;
+  ID R = { ID::BasicBlock, BlocksToIDsMap[Block] };
+  return R;
 }
 
 raw_ostream &CFGPrinter::printID(const Instruction *Inst,
@@ -193,10 +191,8 @@ raw_ostream &CFGPrinter::printID(const Instruction *Inst,
     ++count;
   }
   OS << '%';
-  if (includeBBPrefix) {
-    printID(Block);
-    OS << '.';
-  }
+  if (includeBBPrefix)
+    OS << getID(Block) << '.';
   OS << "i" << count;
   return OS;
 }
