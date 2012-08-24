@@ -25,15 +25,15 @@ using namespace swift;
 
 struct ID {
   enum {
-    BasicBlock, LocalVal
+    BasicBlock, SSAValue
   } Kind;
   unsigned Number;
 };
 
 raw_ostream &operator<<(raw_ostream &OS, ID i) {
   switch (i.Kind) {
-  case ID::BasicBlock: OS << "b"; break;
-  case ID::LocalVal: OS << '%'; break;
+  case ID::BasicBlock: OS << "bb"; break;
+  case ID::SSAValue: OS << '%'; break;
   }
   return OS << i.Number;
 }
@@ -45,12 +45,13 @@ namespace {
 class CFGPrinter : public CFGVisitor<CFGPrinter> {
   raw_ostream &OS;
 
-  llvm::DenseMap<const BasicBlock *, unsigned> BlocksToIDsMap;
+  llvm::DenseMap<const BasicBlock *, unsigned> BlocksToIDMap;
   ID getID(const BasicBlock *B);
 
-  raw_ostream &printID(const Instruction *I, bool includeBBPrefix = true);
-  raw_ostream &printID(const BasicBlockArg *BBarg);
-  raw_ostream &printID(const CFGValue &V);
+  llvm::DenseMap<const Instruction*, unsigned> InstructionToIDMap;
+  ID getID(const Instruction *I);
+  ID getID(const BasicBlockArg *BBarg);
+  ID getID(const CFGValue &V);
 
 public:
   CFGPrinter(raw_ostream &OS) : OS(OS) {
@@ -74,8 +75,7 @@ public:
   // Instruction Printing Logic
 
   void print(const Instruction *I) {
-    OS << "  ";
-    printID(I, false) << " = ";
+    OS << "  " << getID(I) << " = ";
     visit(const_cast<Instruction*>(I));
     OS << '\n';
   }
@@ -85,8 +85,7 @@ public:
   }
 
   void visitCallInst(CallInst *CI) {
-    OS << "Call(fn=";
-    printID(CI->function);
+    OS << "Call(fn=" << getID(CI->function);
     auto args = CI->arguments();
     if (!args.empty()) {
       bool first = true;
@@ -96,7 +95,7 @@ public:
           first = false;
         else
           OS << ' ';
-        printID(arg);
+        OS << getID(arg);
       }
       OS << ')';
     }
@@ -111,16 +110,11 @@ public:
     OS << "Integer(val=" << lit << ",width=" << lit.getBitWidth() << ')';
   }
   void visitLoadInst(LoadInst *LI) {
-    OS << "Load(lvalue=";
-    printID(LI->lvalue);
-    OS << ')';
+    OS << "Load(lvalue=" << getID(LI->lvalue) << ')';
   }
   void visitThisApplyInst(ThisApplyInst *TAI) {
-    OS << "ThisApply(fn=";
-    printID(TAI->function);
-    OS << ",arg=";
-    printID(TAI->argument);
-    OS << ')';
+    OS << "ThisApply(fn=" << getID(TAI->function) << ",arg="
+       << getID(TAI->argument) << ')';
   }
   void visitTupleInst(TupleInst *TI) {
     OS << "Tuple(";
@@ -130,7 +124,7 @@ public:
         isFirst = false;
       else
         OS << ',';
-      printID(Elem);
+      OS << getID(Elem);
     }
     OS << ')';
   }
@@ -141,9 +135,7 @@ public:
   void visitReturnInst(ReturnInst *RI) {
     OS << "Return";
     if (RI->returnValue) {
-      OS << '(';
-      printID(RI->returnValue);
-      OS << ')';
+      OS << '(' << getID(RI->returnValue) << ')';
     }
   }
 
@@ -170,43 +162,39 @@ public:
 
 ID CFGPrinter::getID(const BasicBlock *Block) {
   // Lazily initialize the Blocks-to-IDs mapping.
-  if (BlocksToIDsMap.empty()) {
+  if (BlocksToIDMap.empty()) {
     unsigned idx = 0;
     for (const BasicBlock &B : *Block->getParent())
-      BlocksToIDsMap[&B] = idx++;
+      BlocksToIDMap[&B] = idx++;
   }
 
-  ID R = { ID::BasicBlock, BlocksToIDsMap[Block] };
+  ID R = { ID::BasicBlock, BlocksToIDMap[Block] };
   return R;
 }
 
-raw_ostream &CFGPrinter::printID(const Instruction *Inst,
-                                 bool includeBBPrefix) {
-  const BasicBlock *Block = Inst->getParent();
-  unsigned count = 1;
-  for (const Instruction &I : *Block) {
-    if (&I == Inst)
-      break;
-    ++count;
+ID CFGPrinter::getID(const Instruction *Inst) {
+  // Lazily initialize the instruction -> ID mapping.
+  if (InstructionToIDMap.empty()) {
+    unsigned idx = 0;
+    for (auto &BB : *Inst->getParent()->getParent())
+      for (auto &I : BB)
+        InstructionToIDMap[&I] = idx++;
   }
-  OS << '%';
-  if (includeBBPrefix)
-    OS << getID(Block) << '.';
-  OS << "i" << count;
-  return OS;
+
+  ID R = { ID::SSAValue, InstructionToIDMap[Inst] };
+  return R;
 }
 
-raw_ostream &CFGPrinter::printID(const BasicBlockArg *BBArg) {
-  OS << "BBArg (unsupported)\n";
-  return OS;
+ID CFGPrinter::getID(const BasicBlockArg *BBArg) {
+  // FIXME: Not implemented yet.
+  ID R = { ID::SSAValue, ~0U };
+  return R;
 }
 
-raw_ostream &CFGPrinter::printID(const CFGValue &Val) {
+ID CFGPrinter::getID(const CFGValue &Val) {
   if (const Instruction *Inst = Val.dyn_cast<Instruction*>())
-    printID(Inst);
-  else
-    printID(Val.get<BasicBlockArg*>());
-  return OS;
+    return getID(Inst);
+  return getID(Val.get<BasicBlockArg*>());
 }
 
 //===----------------------------------------------------------------------===//
