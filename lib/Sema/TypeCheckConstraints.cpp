@@ -1495,7 +1495,17 @@ SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
       }
     }
   }
-  
+
+  if (auto functionTy = type->getAs<FunctionType>()) {
+    // FIXME: Can weaken input type, but we really don't want to get in the
+    // business of strengthening the result type.
+
+    // An [auto_closure] function type can be viewed as scalar of the result
+    // type.
+    if (functionTy->isAutoClosure())
+      result.push_back(functionTy->getResult());
+  }
+
   // FIXME: lots of other cases to consider!
   return result;
 }
