@@ -70,14 +70,14 @@ public:
       // If the block has no terminator, we need to add an unconditional
       // jump to the block we are creating.
       if (!hasTerminator(PredBlock)) {
-        UncondBranchInst *UB = new (C) UncondBranchInst(PredBlock);
-        UB->setTarget(TargetBlock, ArrayRef<CFGValue>());
+        UncondBranchInst *UB = new (C) UncondBranchInst(42, PredBlock);
+        UB->setTarget(TargetBlock, ArrayRef<CFGValue>(), C);
         continue;
       }
       TermInst &Term = *PredBlock->getTerminator();
       if (UncondBranchInst *UBI = dyn_cast<UncondBranchInst>(&Term)) {
         assert(UBI->targetBlock() == nullptr);
-        UBI->setTarget(TargetBlock, ArrayRef<CFGValue>());
+        UBI->setTarget(TargetBlock, ArrayRef<CFGValue>(), C);
         continue;
       }
 
@@ -145,7 +145,7 @@ public:
     assert(ContinueStack.back() == &BlocksThatContinue);
     for (auto ContinueBlock : BlocksThatContinue) {
       auto UB = cast<UncondBranchInst>(ContinueBlock->getTerminator());
-      UB->setTarget(TargetBlock, ArrayRef<CFGValue>());
+      UB->setTarget(TargetBlock, ArrayRef<CFGValue>(), C);
     }
     ContinueStack.pop_back();
   }
@@ -243,7 +243,7 @@ void Builder::visitBreakStmt(BreakStmt *S) {
   BreakStack.back()->push_back(BreakBlock);
 
   // FIXME: we need to be able to include the BreakStmt in the jump.
-  new (C) UncondBranchInst(BreakBlock);
+  new (C) UncondBranchInst(42, BreakBlock);
   Block = 0;
 }
 
@@ -253,7 +253,7 @@ void Builder::visitContinueStmt(ContinueStmt *S) {
   ContinueStack.back()->push_back(ContinueBlock);
 
   // FIXME: we need to be able to include the ContinueStmt in the jump.
-  new (C) UncondBranchInst(ContinueBlock);
+  new (C) UncondBranchInst(42, ContinueBlock);
   Block = 0;
 }
 

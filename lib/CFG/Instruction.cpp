@@ -122,6 +122,18 @@ CondBranchInst::CondBranchInst(Stmt *BranchStmt,
   for (auto branch : branches()) { if (branch) branch->addPred(B); }
 }
 
+CondBranchInst::CondBranchInst(Stmt *BranchStmt,
+                               CFGValue condition,
+                               BasicBlock *Target1,
+                               BasicBlock *Target2)
+  : TermInst(InstKind::CondBranch), branchStmt(BranchStmt),
+    condition(condition) {
+  Branches[0] = Target1;
+  Branches[1] = Target2;
+  memset(&Args, sizeof(Args), 0);
+}
+
+
 TupleInst *TupleInst::create(TupleExpr *Expr, ArrayRef<CFGValue> Elements,
                              CFG &C) {
   void *Buffer = C.allocate(sizeof(TupleInst) +
@@ -142,7 +154,9 @@ void UncondBranchInst::unregisterTarget() {
   // ?
 }
 
-void UncondBranchInst::setTarget(BasicBlock *NewTarget, ArgsTy BlockArgs) {
+void UncondBranchInst::setTarget(BasicBlock *NewTarget, ArgsTy BlockArgs,
+                                 CFG &C) {
+  // FIXME: This isn't right if the args are changing.
   if (TargetBlock != NewTarget) {
     unregisterTarget();
     TargetBlock = NewTarget;
@@ -154,8 +168,13 @@ void UncondBranchInst::setTarget(BasicBlock *NewTarget, ArgsTy BlockArgs) {
   if (BlockArgs.empty())
     return;
 
+  assert(0 && "FIXME: Unimplemented");
+  
+#if 0
   // Copy the arguments over to our holding buffer.
   NumArgs = BlockArgs.size();
+  // FIXME: Allocate memory from CFG.
   Args = new (getParent()->getParent()) CFGValue[NumArgs];
   ArgsTy(Args, NumArgs) = BlockArgs;
+#endif
 }

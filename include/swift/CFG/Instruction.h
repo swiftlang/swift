@@ -272,7 +272,10 @@ public:
 /// This class defines a "terminating instruction" for a BasicBlock.
 class TermInst : public Instruction {
 public:
+  // FIXME: Remove ctor.
   TermInst(BasicBlock *B, InstKind K) : Instruction(B, K) {}
+  
+  TermInst(InstKind K) : Instruction(K) {}
 
   typedef llvm::ArrayRef<BasicBlock *> Successors;
 
@@ -300,17 +303,21 @@ public:
   /// is an implicit return.
   CFGValue returnValue;
 
+  // FIXME: Remove Ctor.
+  ReturnInst(ReturnStmt *returnStmt, CFGValue returnValue, BasicBlock *B)
+  : TermInst(B, InstKind::Return), returnStmt(returnStmt),
+  returnValue(returnValue) {}
+
+  
   /// Constructs a ReturnInst representing an \b explicit return.
   ///
   /// \param returnStmt The backing return statement in the AST.
   ///
   /// \param returnValue The value to be returned.
   ///
-  /// \param The basic block that will contain the instruction.
-  ///
-  ReturnInst(ReturnStmt *returnStmt, CFGValue returnValue, BasicBlock *B)
-    : TermInst(B, InstKind::Return), returnStmt(returnStmt),
-  returnValue(returnValue) {}
+  ReturnInst(ReturnStmt *returnStmt, CFGValue returnValue)
+    : TermInst(InstKind::Return), returnStmt(returnStmt),
+      returnValue(returnValue) {}
 
   /// Constructs a ReturnInst representing an \b implicit return.
   ///
@@ -325,6 +332,7 @@ public:
 
 class CondBranchInst : public TermInst {
   BasicBlock *Branches[2];
+  // FIXME: Use ArrayRef?
   struct BlockArgs { unsigned numArgs; CFGValue *args; } Args[2];
 public:
   /// The branching statement in the AST.
@@ -372,11 +380,15 @@ public:
     return ArrayRef<BasicBlock*>(Branches, 2);
   }
 
+  // FIXME: Remove ctor.
   CondBranchInst(Stmt *BranchStmt,
                  CFGValue condition,
                  BasicBlock *Target1,
                  BasicBlock *Target2,
                  BasicBlock *B);
+
+  CondBranchInst(Stmt *BranchStmt, CFGValue Cond,
+                 BasicBlock *Target1, BasicBlock *Target2);
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::CondBranch;
@@ -384,27 +396,32 @@ public:
 };
 
 class UncondBranchInst : public TermInst {
-  CFGValue *Args;
-  unsigned NumArgs;
+  llvm::ArrayRef<CFGValue> Arguments;
   BasicBlock *TargetBlock;
 public:
+  typedef ArrayRef<CFGValue> ArgsTy;
 
   /// Construct an UncondBranchInst that will become the terminator
   /// for the specified BasicBlock.
-  UncondBranchInst(BasicBlock *BB) :
-    TermInst(BB, InstKind::UncondBranch), Args(nullptr), NumArgs(0),
-    TargetBlock(nullptr) {}
+  
+  // FIXME: Remove ctor.
+  UncondBranchInst(int X, BasicBlock *BB) :
+    TermInst(BB, InstKind::UncondBranch), TargetBlock(nullptr) {}
 
+  UncondBranchInst(BasicBlock *TargetBlock, ArgsTy BlockArgs, CFG &C)
+    : TermInst(InstKind::UncondBranch), TargetBlock(nullptr) {
+    setTarget(TargetBlock, BlockArgs, C);
+  }
+  
   /// The jump target for the branch.
   BasicBlock *targetBlock() const { return TargetBlock; }
 
   /// The temporary arguments to the target blocks.
-  typedef llvm::ArrayRef<CFGValue> ArgsTy;
-  ArgsTy blockArgs() { return ArgsTy(Args, NumArgs); }
-  const ArgsTy blockArgs() const { return ArgsTy(Args, NumArgs); }
+  ArgsTy blockArgs() { return Arguments; }
+  const ArgsTy blockArgs() const { return Arguments; }
 
   /// Set the target block (with the matching arguments) for this branch.
-  void setTarget(BasicBlock *Target, ArgsTy BlockArgs);
+  void setTarget(BasicBlock *Target, ArgsTy BlockArgs, CFG &C);
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::UncondBranch;

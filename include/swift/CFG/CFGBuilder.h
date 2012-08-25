@@ -93,6 +93,20 @@ public:
   TypeOfInst *createTypeOf(TypeOfExpr *Expr) {
     return insert(new TypeOfInst(Expr));
   }
+  
+  ReturnInst *createReturn(ReturnStmt *Stmt, CFGValue ReturnValue) {
+    return insert(new ReturnInst(Stmt, ReturnValue));
+  }
+  
+  CondBranchInst *createCondBranch(Stmt *BranchStmt, CFGValue Cond,
+                                   BasicBlock *Target1, BasicBlock *Target2) {
+    return insert(new CondBranchInst(BranchStmt, Cond, Target1, Target2));
+  }
+  
+  UncondBranchInst *createUncondBranch(BasicBlock *TargetBlock,
+                                       ArrayRef<CFGValue> BlockArgs, CFG &C) {
+    return insert(new UncondBranchInst(TargetBlock, BlockArgs, C));
+  }
 
 private:
   /// insert - This is a template to avoid losing type info on the result.
