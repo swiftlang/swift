@@ -56,20 +56,20 @@ InstRetTy visit##CLASS##Inst(CLASS##Inst *I) {             \
 }
 #include "swift/CFG/CFGNodes.def"
 
-  void visit(BasicBlock *BB) {
+  void visitBB(BasicBlock *BB) {
     for (auto &I : *BB)
-      visit(I);
+      visit(&I);
   }
-  void visit(BasicBlock &BB) {
-    visit(&BB);
+  void visitBB(BasicBlock &BB) {
+    visitBB(&BB);
   }
 
-  void visit(CFG *C) {
+  void visitCFG(CFG *C) {
     for (auto &BB : *C)
-      visit(BB);
+      visitBB(BB);
   }
-  void visit(CFG &C) {
-    visit(&C);
+  void visitCFG(CFG &C) {
+    visitBB(&C);
   }
 };
 
