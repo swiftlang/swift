@@ -69,7 +69,8 @@ public:
     
     const BasicBlock &targetBlock = *UBI->targetBlock();
     assert(std::find(targetBlock.getPreds().begin(),
-                     targetBlock.getPreds().end(), UBI->getParent()) &&
+                     targetBlock.getPreds().end(), UBI->getParent()) !=
+                     targetBlock.getPreds().end() &&
            "BasicBlock of UncondBranchInst must be a predecessor of target");
     (void)targetBlock;
   }
