@@ -25,6 +25,7 @@
 
 namespace swift {
 
+class CFG;
 class BasicBlock;
 class CallExpr;
 class DeclRefExpr;
@@ -84,15 +85,14 @@ class CallInst : public Instruction {
 private:
   /// Construct a CallInst from a given call expression and the provided
   /// arguments.
-  CallInst(CallExpr *expr, BasicBlock *B, CFGValue function,
-           ArrayRef<CFGValue> args);
+  CallInst(CallExpr *expr, CFGValue function, ArrayRef<CFGValue> args);
 
   CFGValue *getArgsStorage() { return reinterpret_cast<CFGValue*>(this + 1); }
   unsigned NumArgs;
 
 public:
-  static CallInst *create(CallExpr *expr, BasicBlock *B, CFGValue function,
-                          ArrayRef<CFGValue> args);
+  static CallInst *create(CallExpr *expr, CFGValue function,
+                          ArrayRef<CFGValue> args, CFG &C);
 
   /// The backing expression for the call.
   CallExpr *expr;
@@ -148,8 +148,8 @@ public:
   ///
   /// \param B The basic block that will contain the instruction.
   ///
-  IntegerLiteralInst(IntegerLiteralExpr *IE, BasicBlock *B) :
-    Instruction(B, InstKind::IntegerLiteral), literal(IE) {
+  IntegerLiteralInst(IntegerLiteralExpr *IE)
+    : Instruction(InstKind::IntegerLiteral), literal(IE) {
   }
 
   static bool classof(const Instruction *I) {
@@ -175,8 +175,8 @@ public:
   ///
   /// \param The basic block that will contain the instruction.
   ///
-  LoadInst(LoadExpr *expr, CFGValue lvalue, BasicBlock *B) :
-    Instruction(B, InstKind::Load), expr(expr), lvalue(lvalue) {}
+  LoadInst(LoadExpr *expr, CFGValue lvalue) :
+    Instruction(InstKind::Load), expr(expr), lvalue(lvalue) {}
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::Load;
@@ -202,10 +202,10 @@ public:
   ///
   /// \param B The basic block that will contain the instruction.
   ///
-  ThisApplyInst(ThisApplyExpr *expr, CFGValue function,
-                CFGValue argument, BasicBlock *B)
-    : Instruction(B, InstKind::ThisApply), expr(expr), function(function),
-      argument(argument) {}
+  ThisApplyInst(ThisApplyExpr *expr, CFGValue function, CFGValue argument)
+    : Instruction(InstKind::ThisApply), expr(expr), function(function),
+      argument(argument) {
+  }
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::ThisApply;
@@ -222,7 +222,7 @@ class TupleInst : public Instruction {
 
   /// Private constructor.  Because of the storage requirements of
   /// TupleInst, object creation goes through 'create()'.
-  TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elements, BasicBlock *B);
+  TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elements);
 
 public:
   /// The backing TupleExpr in the AST.
@@ -239,8 +239,7 @@ public:
   }
 
   /// Construct a TupleInst.
-  static TupleInst *create(TupleExpr *Expr, ArrayRef<CFGValue> Elements,
-                           BasicBlock *B);
+  static TupleInst *create(TupleExpr *Expr, ArrayRef<CFGValue> Elements,CFG &C);
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::Tuple;
@@ -259,8 +258,7 @@ public:
   ///
   /// \param B The basic block that will contain the instruction.
   ///
-  TypeOfInst(TypeOfExpr *Expr, BasicBlock *B)
-    : Instruction(B, InstKind::TypeOf), Expr(Expr) {}
+  TypeOfInst(TypeOfExpr *Expr) : Instruction(InstKind::TypeOf), Expr(Expr) {}
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::TypeOf;

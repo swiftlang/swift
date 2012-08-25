@@ -55,8 +55,7 @@ transferNodesFromList(llvm::ilist_traits<Instruction> &L2,
   BasicBlock *ThisParent = getContainingBlock();
   if (ThisParent == L2.getContainingBlock()) return;
 
-  // Just transferring between blocks in the same function, simply update the
-  // parent fields in the instructions...
+  // Update the parent fields in the instructions.
   for (; first != last; ++first)
     first->ParentBB = ThisParent;
 }
@@ -96,21 +95,16 @@ TermInst::Successors TermInst::successors() {
   }
 }
 
-CallInst *CallInst::create(CallExpr *expr,
-                           BasicBlock *B,
-                           CFGValue function,
-                           ArrayRef<CFGValue> args) {
-  CFG &C = *B->getParent();
+CallInst *CallInst::create(CallExpr *expr, CFGValue function,
+                           ArrayRef<CFGValue> args, CFG &C) {
   void *Buffer = C.allocate(sizeof(CallInst) +
                             args.size() * sizeof(CFGValue),
                             llvm::AlignOf<CallInst>::Alignment);
-  return ::new(Buffer) CallInst(expr, B, function, args);
+  return ::new(Buffer) CallInst(expr, function, args);
 }
 
-CallInst::CallInst(CallExpr *expr, BasicBlock *B,
-                   CFGValue function,
-                   ArrayRef<CFGValue> args)
-  : Instruction(B, InstKind::Call), NumArgs(args.size()), expr(expr),
+CallInst::CallInst(CallExpr *expr, CFGValue function, ArrayRef<CFGValue> args)
+  : Instruction(InstKind::Call), NumArgs(args.size()), expr(expr),
     function(function) {
   memcpy(getArgsStorage(), args.data(), args.size() * sizeof(CFGValue));
 }
@@ -128,18 +122,16 @@ CondBranchInst::CondBranchInst(Stmt *BranchStmt,
   for (auto branch : branches()) { if (branch) branch->addPred(B); }
 }
 
-TupleInst *TupleInst::create(TupleExpr *Expr,
-                             ArrayRef<CFGValue> Elements,
-                             BasicBlock *B) {
-  CFG &C = *B->getParent();
+TupleInst *TupleInst::create(TupleExpr *Expr, ArrayRef<CFGValue> Elements,
+                             CFG &C) {
   void *Buffer = C.allocate(sizeof(TupleInst) +
                             Elements.size() * sizeof(CFGValue),
                             llvm::AlignOf<TupleInst>::Alignment);
-  return ::new(Buffer) TupleInst(Expr, Elements, B);
+  return ::new(Buffer) TupleInst(Expr, Elements);
 }
 
-TupleInst::TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elems, BasicBlock *B)
-  : Instruction(B, InstKind::Tuple),  NumArgs(Elems.size()), expr(Expr) {
+TupleInst::TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elems)
+  : Instruction(InstKind::Tuple),  NumArgs(Elems.size()), expr(Expr) {
   memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(CFGValue));
 }
 

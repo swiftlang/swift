@@ -22,21 +22,22 @@ class CFGBuilder {
   /// BB - If this is non-null, the instruction is inserted in the specified
   /// basic block, at the specified InsertPt.  If null, created instructions
   /// are not auto-inserted.
+  CFG &C;
   BasicBlock *BB;
   BasicBlock::iterator InsertPt;
 public:
 
-  CFGBuilder() : BB(0) {}
+  CFGBuilder(CFG &C) : C(C), BB(0) {}
 
-  CFGBuilder(Instruction *I) {
+  CFGBuilder(Instruction *I, CFG &C) : C(C) {
     setInsertionPoint(I);
   }
 
-  CFGBuilder(BasicBlock *BB) {
+  CFGBuilder(BasicBlock *BB, CFG &C) : C(C) {
     setInsertionPoint(BB);
   }
 
-  CFGBuilder(BasicBlock *BB, BasicBlock::iterator InsertPt) {
+  CFGBuilder(BasicBlock *BB, BasicBlock::iterator InsertPt, CFG &C) : C(C) {
     setInsertionPoint(BB, InsertPt);
   }
 
@@ -64,10 +65,34 @@ public:
     setInsertionPoint(BB, BB->end());
   }
 
-  DeclRefInst *createDeclRef(DeclRefExpr *DR) {
-    return insert(new DeclRefInst(DR));
+  CallInst *createCall(CallExpr *Expr, CFGValue Fn, ArrayRef<CFGValue> Args) {
+    return insert(CallInst::create(Expr, Fn, Args, C));
   }
 
+  DeclRefInst *createDeclRef(DeclRefExpr *Expr) {
+    return insert(new DeclRefInst(Expr));
+  }
+
+  IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *Expr) {
+    return insert(new IntegerLiteralInst(Expr));
+  }
+
+  LoadInst *createLoad(LoadExpr *Expr, CFGValue LV) {
+    return insert(new LoadInst(Expr, LV));
+  }
+
+  ThisApplyInst *createThisApply(ThisApplyExpr *Expr, CFGValue Fn,
+                                 CFGValue Arg) {
+    return insert(new ThisApplyInst(Expr, Fn, Arg));
+  }
+
+  TupleInst *createTuple(TupleExpr *Expr, ArrayRef<CFGValue> Elements) {
+    return insert(TupleInst::create(Expr, Elements, C));
+  }
+
+  TypeOfInst *createTypeOf(TypeOfExpr *Expr) {
+    return insert(new TypeOfInst(Expr));
+  }
 
 private:
   /// insert - This is a template to avoid losing type info on the result.

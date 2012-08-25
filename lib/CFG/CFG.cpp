@@ -57,7 +57,7 @@ public:
 
   // FIXME: Move to ivar once currentBlock goes away.
   CFGBuilder getBuilder() {
-    return CFGBuilder(currentBlock());
+    return CFGBuilder(currentBlock(), C);
   }
 
   /// A flag indicating whether or not there were problems
@@ -431,31 +431,30 @@ CFGValue Builder::visitCallExpr(CallExpr *E) {
   if (TupleExpr *TU = dyn_cast<TupleExpr>(Arg)) {
     for (auto arg : TU->getElements())
       ArgsV.push_back(visit(arg));
-  }
-  else {
+  } else {
     ArgsV.push_back(visit(Arg));
   }
 
-  return CallInst::create(E, currentBlock(), FnV, ArgsV);
+  return getBuilder().createCall(E, FnV, ArgsV);
 }
 
 CFGValue Builder::visitDeclRefExpr(DeclRefExpr *E) {
   return getBuilder().createDeclRef(E);
 }
 
-CFGValue Builder::visitThisApplyExpr(ThisApplyExpr *E) {
-  CFGValue FnV = visit(E->getFn());
-  CFGValue ArgV = visit(E->getArg());
-  return new (C) ThisApplyInst(E, FnV, ArgV, currentBlock());
-}
-
 CFGValue Builder::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-  return new (C) IntegerLiteralInst(E, currentBlock());
+  return getBuilder().createIntegerLiteral(E);
 }
 
 CFGValue Builder::visitLoadExpr(LoadExpr *E) {
   CFGValue SubV = visit(E->getSubExpr());
-  return new (C) LoadInst(E, SubV, currentBlock());
+  return getBuilder().createLoad(E, SubV);
+}
+
+CFGValue Builder::visitThisApplyExpr(ThisApplyExpr *E) {
+  CFGValue FnV = visit(E->getFn());
+  CFGValue ArgV = visit(E->getArg());
+  return getBuilder().createThisApply(E, FnV, ArgV);
 }
 
 CFGValue Builder::visitParenExpr(ParenExpr *E) {
@@ -464,12 +463,11 @@ CFGValue Builder::visitParenExpr(ParenExpr *E) {
 
 CFGValue Builder::visitTupleExpr(TupleExpr *E) {
   llvm::SmallVector<CFGValue, 10> ArgsV;
-  for (auto &I : E->getElements()) {
+  for (auto &I : E->getElements())
     ArgsV.push_back(visit(I));
-  }
-  return TupleInst::create(E, ArgsV, currentBlock());
+  return getBuilder().createTuple(E, ArgsV);
 }
 
 CFGValue Builder::visitTypeOfExpr(TypeOfExpr *E) {
-  return new (C) TypeOfInst(E, currentBlock());
+  return getBuilder().createTypeOf(E);
 }
