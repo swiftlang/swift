@@ -215,7 +215,6 @@ public:
 } // end anonymous namespace
 
 CFG *CFG::constructCFG(Stmt *S) {
-  // FIXME: implement CFG construction.
   llvm::OwningPtr<CFG> C(new CFG());
   Builder builder(*C);
   builder.visit(S);
