@@ -49,7 +49,7 @@ class Builder : public ASTVisitor<Builder, CFGValue> {
   CFG &C;
 
 public:
-  Builder(CFG &C) : Block(0), C(C), badCFG(false) {
+  Builder(CFG &C) : Block(0), C(C) {
     PendingMergesStack.push_back(&BasePendingMerges);
   }
 
@@ -59,10 +59,6 @@ public:
   CFGBuilder getBuilder() {
     return CFGBuilder(currentBlock(), C);
   }
-
-  /// A flag indicating whether or not there were problems
-  /// constructing the CFG.
-  bool badCFG;
 
   BlocksVector &pendingMerges() {
     assert(!PendingMergesStack.empty());
@@ -186,8 +182,7 @@ public:
   }
 
   void visitForEachStmt(ForEachStmt *S) {
-    badCFG = true;
-    return;
+    assert(false && "Not yet implemented");
   }
 
   void visitBreakStmt(BreakStmt *S);
@@ -218,13 +213,10 @@ CFG *CFG::constructCFG(Stmt *S) {
   llvm::OwningPtr<CFG> C(new CFG());
   Builder builder(*C);
   builder.visit(S);
-  if (!builder.badCFG) {
-    builder.finishUp();
+  builder.finishUp();
     
-    C->verify();
-    return C.take();
-  }
-  return nullptr;
+  C->verify();
+  return C.take();
 }
 
 void Builder::visitBraceStmt(BraceStmt *S) {
