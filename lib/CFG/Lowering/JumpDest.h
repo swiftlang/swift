@@ -14,15 +14,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_CFG_LOWERING_JUMPDEST_H
-#define SWIFT_CFG_LOWERING_JUMPDEST_H
+#ifndef JUMPDEST_H
+#define JUMPDEST_H
 
 #include "swift/Basic/DiverseStack.h"
 
 namespace swift {
   class BasicBlock;
   
-namespace CFGLowering {
+namespace Lowering {
 
 /// FIXME: Temporary.
 typedef int Cleanup;
@@ -44,7 +44,7 @@ public:
   CleanupsDepth getDepth() const { return Depth; }
 };
 
-} // end namespace CFGLowering
+} // end namespace Lowering
 } // end namespace swift
 
 #endif

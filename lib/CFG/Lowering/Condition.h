@@ -21,7 +21,7 @@ namespace swift {
   class CFGBuilder;
   class BasicBlock;
   
-namespace CFGLowering {
+namespace Lowering {
 
 /// A condition is the result of evaluating a boolean expression as
 /// control flow.
@@ -63,7 +63,7 @@ public:
   void complete(CFGBuilder &B);
 };
 
-} // end namespace CFGLowering
+} // end namespace Lowering
 } // end namespace swift
   
 #endif

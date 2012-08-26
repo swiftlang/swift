@@ -14,7 +14,7 @@
 #include "swift/CFG/CFG.h"
 #include "swift/CFG/CFGBuilder.h"
 using namespace swift;
-using namespace CFGLowering;
+using namespace Lowering;
 
 /// emitBlock - Each basic block is individually new'd, then them emitted with
 /// this function.  Since each block is implicitly added to the CFG's list of

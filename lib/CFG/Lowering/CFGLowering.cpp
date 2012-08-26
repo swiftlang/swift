@@ -1,4 +1,4 @@
-//===--- Lowering.cpp - Implements Lowering of ASTs -> CFGs ----------------==//
+//===--- CFGLowering.cpp - Implements Lowering of ASTs -> CFGs -------------==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/CFG/CFG.h"
+#include "CFGLowering.h"
 #include "Condition.h"
-#include "JumpDest.h"
-#include "swift/CFG/CFGBuilder.h"
 #include "swift/AST/AST.h"
-#include "swift/AST/ASTVisitor.h"
 using namespace swift;
-using namespace CFGLowering;
+using namespace Lowering;
 
 /// emitBlock - Each basic block is individually new'd, then them emitted with
 /// this function.  Since each block is implicitly added to the CFG's list of
@@ -69,122 +66,6 @@ static Expr *ignoreParens(Expr *Ex) {
   return Ex;
 }
 
-namespace {
-class Builder : public ASTVisitor<Builder, CFGValue> {
-  /// The CFG being constructed.
-  CFG &C;
-  
-  /// B - The CFGBuilder used to construct the CFG.  It is what maintains the
-  /// notion of the current block being emitted into.
-  CFGBuilder B;
-  
-  std::vector<JumpDest> BreakDestStack;
-  std::vector<JumpDest> ContinueDestStack;
-
-  /// Cleanups - Currently active cleanups in this scope tree.
-  DiverseStack<Cleanup, 128> Cleanups;
-
-public:
-  Builder(CFG &C) : C(C), B(new (C) BasicBlock(&C), C) {
-  }
-  
-  ~Builder() {
-    // If we have an unterminated block, just emit a dummy return for the
-    // default return.
-    if (B.getInsertionBB() != nullptr) {
-      // FIXME: Should use empty tuple for "void" return.
-      B.createReturn(0, CFGValue());
-      B.clearInsertionPoint();
-    }
-  }
-  
-  /// Retun a stable reference to the current cleanup.
-  CleanupsDepth getCleanupsDepth() const {
-    return Cleanups.stable_begin();
-  }
-
-  //===--------------------------------------------------------------------===//
-  // Statements.
-  //===--------------------------------------------------------------------===//
-  
-  /// emitCondition - Emit a boolean expression as a control-flow condition.
-  ///
-  /// \param TheStmt - The statement being lowered, for source information on
-  ///        the branch.
-  /// \param E - The expression to be evaluated as a condition.
-  /// \param hasFalseCode - true if the false branch doesn't just lead
-  ///        to the fallthrough.
-  /// \param invertValue - true if this routine should invert the value before
-  ///        testing true/false.
-  Condition emitCondition(Stmt *TheStmt, Expr *E,
-                          bool hasFalseCode = true, bool invertValue = false);
-  
-  
-  /// emitBranch - Emit a branch to the given jump destination, threading out
-  /// through any cleanups we might need to run.  Leaves the insertion point in
-  /// the current block.
-  void emitBranch(JumpDest D);
-  
-  //===--------------------------------------------------------------------===//
-  // Statements.
-  //===--------------------------------------------------------------------===//
-  
-  /// Construct the CFG components for the given BraceStmt.
-  void visitBraceStmt(BraceStmt *S);
-  
-  /// SemiStmts are ignored for CFG construction.
-  void visitSemiStmt(SemiStmt *S) {}
-  
-  void visitAssignStmt(AssignStmt *S) {
-    assert(false && "Not yet implemented");
-  }
-  
-  void visitReturnStmt(ReturnStmt *S) {
-    // FIXME: Should use empty tuple for "void" return.
-    CFGValue ArgV = S->hasResult() ? visit(S->getResult()) : (Instruction*) 0;
-    B.createReturn(S, ArgV);
-    B.clearInsertionPoint();
-  }
-  
-  void visitIfStmt(IfStmt *S);
-  
-  void visitWhileStmt(WhileStmt *S);
-  
-  void visitDoWhileStmt(DoWhileStmt *S);
-  
-  void visitForStmt(ForStmt *S) {
-    assert(false && "Not yet implemented");
-  }
-  
-  void visitForEachStmt(ForEachStmt *S) {
-    assert(false && "Not yet implemented");
-  }
-  
-  void visitBreakStmt(BreakStmt *S);
-  
-  void visitContinueStmt(ContinueStmt *S);
-  
-  //===--------------------------------------------------------------------===//
-  // Expressions.
-  //===--------------------------------------------------------------------===//
-  
-  CFGValue visitExpr(Expr *E) {
-    E->dump();
-    llvm_unreachable("Not yet implemented");
-  }
-  
-  CFGValue visitCallExpr(CallExpr *E);
-  CFGValue visitDeclRefExpr(DeclRefExpr *E);
-  CFGValue visitIntegerLiteralExpr(IntegerLiteralExpr *E);
-  CFGValue visitLoadExpr(LoadExpr *E);
-  CFGValue visitParenExpr(ParenExpr *E);
-  CFGValue visitThisApplyExpr(ThisApplyExpr *E);
-  CFGValue visitTupleExpr(TupleExpr *E);
-  CFGValue visitTypeOfExpr(TypeOfExpr *E);
-  
-};
-} // end anonymous namespace
-
 /// emitCondition - Emit a boolean expression as a control-flow condition.
 ///
 /// \param TheStmt - The statement being lowered, for source information on the
@@ -194,8 +75,8 @@ public:
 ///        to the fallthrough.
 /// \param invertValue - true if this routine should invert the value before
 ///        testing true/false.
-Condition Builder::emitCondition(Stmt *TheStmt, Expr *E,
-                                 bool hasFalseCode, bool invertValue) {
+Condition CFGLowering::emitCondition(Stmt *TheStmt, Expr *E,
+                                     bool hasFalseCode, bool invertValue) {
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
   
@@ -237,7 +118,7 @@ Condition Builder::emitCondition(Stmt *TheStmt, Expr *E,
 /// emitBranch - Emit a branch to the given jump destination, threading out
 /// through any cleanups we might need to run.  Leaves the insertion point in
 /// the current block.
-void Builder::emitBranch(JumpDest Dest) {
+void CFGLowering::emitBranch(JumpDest Dest) {
   assert(B.hasValidInsertionPoint() && "Inserting branch in invalid spot");
   assert(Cleanups.empty() && "FIXME: Implement cleanup support");
   B.createBranch(Dest.getBlock());
@@ -249,7 +130,7 @@ void Builder::emitBranch(JumpDest Dest) {
 // Statements
 //===--------------------------------------------------------------------===//
 
-void Builder::visitBraceStmt(BraceStmt *S) {
+void CFGLowering::visitBraceStmt(BraceStmt *S) {
   // BraceStmts do not need to be explicitly represented in the CFG.
   // We should consider whether or not the scopes they introduce are
   // represented in the CFG.
@@ -263,17 +144,17 @@ void Builder::visitBraceStmt(BraceStmt *S) {
   }
 }
 
-void Builder::visitBreakStmt(BreakStmt *S) {
+void CFGLowering::visitBreakStmt(BreakStmt *S) {
   emitBranch(BreakDestStack.back());
   B.clearInsertionPoint();
 }
 
-void Builder::visitContinueStmt(ContinueStmt *S) {
+void CFGLowering::visitContinueStmt(ContinueStmt *S) {
   emitBranch(ContinueDestStack.back());
   B.clearInsertionPoint();
 }
 
-void Builder::visitIfStmt(IfStmt *S) {
+void CFGLowering::visitIfStmt(IfStmt *S) {
   Condition Cond = emitCondition(S, S->getCond(), S->getElseStmt() != nullptr);
   
   if (Cond.hasTrue()) {
@@ -292,7 +173,7 @@ void Builder::visitIfStmt(IfStmt *S) {
   Cond.complete(B);
 }
 
-void Builder::visitWhileStmt(WhileStmt *S) {
+void CFGLowering::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (C) BasicBlock(&C, "while");
   B.createBranch(LoopBB);
@@ -328,7 +209,7 @@ void Builder::visitWhileStmt(WhileStmt *S) {
   ContinueDestStack.pop_back();
 }
 
-void Builder::visitDoWhileStmt(DoWhileStmt *S) {
+void CFGLowering::visitDoWhileStmt(DoWhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (C) BasicBlock(&C, "dowhile");
   B.createBranch(LoopBB);
@@ -370,7 +251,7 @@ void Builder::visitDoWhileStmt(DoWhileStmt *S) {
 // Expressions
 //===--------------------------------------------------------------------===//
 
-CFGValue Builder::visitCallExpr(CallExpr *E) {
+CFGValue CFGLowering::visitCallExpr(CallExpr *E) {
   Expr *Arg = ignoreParens(E->getArg());
   Expr *Fn = E->getFn();
   CFGValue FnV = visit(Fn);
@@ -388,37 +269,37 @@ CFGValue Builder::visitCallExpr(CallExpr *E) {
   return B.createCall(E, FnV, ArgsV);
 }
 
-CFGValue Builder::visitDeclRefExpr(DeclRefExpr *E) {
+CFGValue CFGLowering::visitDeclRefExpr(DeclRefExpr *E) {
   return B.createDeclRef(E);
 }
 
-CFGValue Builder::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+CFGValue CFGLowering::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
   return B.createIntegerLiteral(E);
 }
 
-CFGValue Builder::visitLoadExpr(LoadExpr *E) {
+CFGValue CFGLowering::visitLoadExpr(LoadExpr *E) {
   CFGValue SubV = visit(E->getSubExpr());
   return B.createLoad(E, SubV);
 }
 
-CFGValue Builder::visitThisApplyExpr(ThisApplyExpr *E) {
+CFGValue CFGLowering::visitThisApplyExpr(ThisApplyExpr *E) {
   CFGValue FnV = visit(E->getFn());
   CFGValue ArgV = visit(E->getArg());
   return B.createThisApply(E, FnV, ArgV);
 }
 
-CFGValue Builder::visitParenExpr(ParenExpr *E) {
+CFGValue CFGLowering::visitParenExpr(ParenExpr *E) {
   return visit(E->getSubExpr());
 }
 
-CFGValue Builder::visitTupleExpr(TupleExpr *E) {
+CFGValue CFGLowering::visitTupleExpr(TupleExpr *E) {
   llvm::SmallVector<CFGValue, 10> ArgsV;
   for (auto &I : E->getElements())
     ArgsV.push_back(visit(I));
   return B.createTuple(E, ArgsV);
 }
 
-CFGValue Builder::visitTypeOfExpr(TypeOfExpr *E) {
+CFGValue CFGLowering::visitTypeOfExpr(TypeOfExpr *E) {
   return B.createTypeOf(E);
 }
 
@@ -428,7 +309,7 @@ CFGValue Builder::visitTypeOfExpr(TypeOfExpr *E) {
 
 CFG *CFG::constructCFG(Stmt *S) {
   CFG *C = new CFG();
-  Builder(*C).visit(S);
+  CFGLowering(*C).visit(S);
   
   C->verify();
   return C;
