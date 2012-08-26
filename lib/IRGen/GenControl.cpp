@@ -137,12 +137,6 @@ Condition IRGenFunction::emitCondition(Expr *E, bool hasFalseCode,
 
   // Otherwise, the condition requires a conditional branch.
   } else {
-    // If requested, invert the value.
-    if (invertValue)
-      V = Builder.CreateXor(V,
-                            llvm::Constant::getIntegerValue(IGM.Int1Ty,
-                                                            llvm::APInt(1, 1)));
-    
     contBB = createBasicBlock("condition.cont");
     trueBB = createBasicBlock("if.true");
 
@@ -154,7 +148,10 @@ Condition IRGenFunction::emitCondition(Expr *E, bool hasFalseCode,
       falseDestBB = contBB;
     }
 
-    Builder.CreateCondBr(V, trueBB, falseDestBB);
+    if (invertValue)
+      Builder.CreateCondBr(V, falseDestBB, trueBB);
+    else
+      Builder.CreateCondBr(V, trueBB, falseDestBB);
   }
 
   return Condition(trueBB, falseBB, contBB);
