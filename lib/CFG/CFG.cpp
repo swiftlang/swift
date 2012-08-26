@@ -30,11 +30,31 @@ using namespace swift;
 /// emitted block.
 static void emitBlock(CFGBuilder &B, BasicBlock *BB) {
   CFG *C = BB->getParent();
+  // If this is a fall through into BB, emit the fall through branch.
+  if (B.hasValidInsertionPoint())
+    B.createUncondBranch(BB);
+
+  // Start inserting into that block.
+  B.setInsertionPoint(BB);
+  
   // Move block to the end of the list.
   if (&C->getBlocks().back() != BB)
     C->getBlocks().splice(C->end(), C->getBlocks(), BB);
-  B.setInsertionPoint(BB);
 }
+
+/// emitOrDeleteBlock - If there are branches to the specified basic block,
+/// emit it per emitBlock.  If there aren't, then just delete the block - it
+/// turns out to have not been needed.
+static void emitOrDeleteBlock(CFGBuilder &B, BasicBlock *BB) {
+  if (BB->pred_empty()) {
+    // If the block is unused, we don't need it; just delete it.
+    BB->eraseFromParent();
+  } else {
+    // Otherwise, continue emitting code in BB.
+    emitBlock(B, BB);
+  }
+}
+
 
 //===----------------------------------------------------------------------===//
 // Control Flow Condition Management
@@ -377,13 +397,13 @@ void Builder::visitBraceStmt(BraceStmt *S) {
 }
 
 void Builder::visitBreakStmt(BreakStmt *S) {
-  
+  //emitBranch(BreakDestStack.back());
+  //B.clearInsertionPoint();
 }
 
 void Builder::visitContinueStmt(ContinueStmt *S) {
-}
-
-void Builder::visitDoWhileStmt(DoWhileStmt *S) {
+  //emitBranch(ContinueDestStack.back());
+  //B.clearInsertionPoint();
 }
 
 void Builder::visitIfStmt(IfStmt *S) {
@@ -406,8 +426,74 @@ void Builder::visitIfStmt(IfStmt *S) {
 }
 
 void Builder::visitWhileStmt(WhileStmt *S) {
-
+  // Create a new basic block and jump into it.
+  BasicBlock *LoopBB = new (C) BasicBlock(&C, "while");
+  B.createUncondBranch(LoopBB);
+  emitBlock(B, LoopBB);
+  
+  // Set the destinations for 'break' and 'continue'
+  BasicBlock *endBB = new (C) BasicBlock(&C, "while.end");
+//  BreakDestStack.emplace_back(endBB, getCleanupsDepth());
+//  ContinueDestStack.emplace_back(loopBB, getCleanupsDepth());
+  
+  // Evaluate the condition with the false edge leading directly
+  // to the continuation block.
+  Condition Cond = emitCondition(S, S->getCond(), /*hasFalseCode*/ false);
+  
+  // If there's a true edge, emit the body in it.
+  if (Cond.hasTrue()) {
+    Cond.enterTrue(B);
+    visit(S->getBody());
+    if (B.hasValidInsertionPoint()) {
+      B.createUncondBranch(LoopBB);
+      B.clearInsertionPoint();
+    }
+    Cond.exitTrue(B);
+  }
+  
+  // Complete the conditional execution.
+  Cond.complete(B);
+  
+  emitOrDeleteBlock(B, endBB);
+//  BreakDestStack.pop_back();
+//  ContinueDestStack.pop_back();
 }
+
+void Builder::visitDoWhileStmt(DoWhileStmt *S) {
+  // Create a new basic block and jump into it.
+  BasicBlock *LoopBB = new (C) BasicBlock(&C, "dowhile");
+  B.createUncondBranch(LoopBB);
+  emitBlock(B, LoopBB);
+  
+  // Set the destinations for 'break' and 'continue'
+  BasicBlock *endBB = new (C) BasicBlock(&C, "dowhile.end");
+//  BreakDestStack.emplace_back(endBB, getCleanupsDepth());
+//  ContinueDestStack.emplace_back(loopBB, getCleanupsDepth());
+  
+  // Emit the body, which is always evaluated the first time around.
+  visit(S->getBody());
+  
+  if (B.hasValidInsertionPoint()) {
+    // Evaluate the condition with the false edge leading directly
+    // to the continuation block.
+    Condition Cond = emitCondition(S, S->getCond(), /*hasFalseCode*/ false);
+    
+    Cond.enterTrue(B);
+    if (B.hasValidInsertionPoint()) {
+      B.createUncondBranch(LoopBB);
+      B.clearInsertionPoint();
+    }
+    Cond.exitTrue(B);
+    // Complete the conditional execution.
+    Cond.complete(B);
+  }
+  
+  emitOrDeleteBlock(B, endBB);
+//  BreakDestStack.pop_back();
+//  ContinueDestStack.pop_back();
+}
+
+
 
 //===--------------------------------------------------------------------===//
 // Expressions
