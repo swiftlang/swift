@@ -20,7 +20,53 @@ using namespace swift;
 CFG::~CFG() {}
 
 //===----------------------------------------------------------------------===//
-// CFG construction.
+// Control Flow Condition Management
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// A condition is the result of evaluating a boolean expression as
+/// control flow.
+class Condition {
+  // The blocks responsible for executing the true and false conditions.  A
+  // block is non-null if that branch is possible, but it's only an independent
+  // block if both branches are possible.
+  BasicBlock *TrueBB;
+  BasicBlock *FalseBB;
+  
+  /// ContBB - The continuation block if both branches are possible.
+  BasicBlock *ContBB;
+  
+public:
+  Condition(BasicBlock *TrueBB, BasicBlock *FalseBB, BasicBlock *ContBB)
+    : TrueBB(TrueBB), FalseBB(FalseBB), ContBB(ContBB) {}
+  
+  bool hasTrue() const { return TrueBB; }
+  bool hasFalse() const { return FalseBB; }
+  
+  /// Begin the emission of the true block.  This should only be
+  /// called if hasTrue() returns true.
+  void enterTrue();
+  
+  /// End the emission of the true block.  This must be called after
+  /// enterTrue but before anything else on this Condition.
+  void exitTrue();
+  
+  /// Begin the emission of the false block.  This should only be
+  /// called if hasFalse() returns true.
+  void enterFalse();
+  
+  /// End the emission of the true block.  This must be called after
+  /// exitFalse but before anything else on this Condition.
+  void exitFalse();
+  
+  /// Complete this conditional execution.  This should be called
+  /// only after all other calls on this Condition have been made.
+  void complete();
+};
+}
+
+//===----------------------------------------------------------------------===//
+// CFG construction
 //===----------------------------------------------------------------------===//
 
 static Expr *ignoreParens(Expr *Ex) {
