@@ -111,8 +111,8 @@ public:
     return insert(new CondBranchInst(BranchStmt, Cond, Target1, Target2));
   }
     
-  UncondBranchInst *createUncondBranch(BasicBlock *TargetBlock) {
-    return insert(new UncondBranchInst(TargetBlock));
+  BranchInst *createBranch(BasicBlock *TargetBlock) {
+    return insert(new BranchInst(TargetBlock));
   }
 
 

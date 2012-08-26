@@ -134,9 +134,9 @@ public:
       OS << '(' << getID(RI->returnValue) << ')';
   }
 
-  void visitUncondBranchInst(UncondBranchInst *UBI) {
+  void visitBranchInst(BranchInst *UBI) {
     OS << "br " << getID(UBI->getDestBB());
-    const UncondBranchInst::ArgsTy Args = UBI->blockArgs();
+    const BranchInst::ArgsTy Args = UBI->blockArgs();
 
     // FIXME: Args should move to terminator generic stuff.
     if (!Args.empty()) {

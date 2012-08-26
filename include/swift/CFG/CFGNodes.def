@@ -47,9 +47,9 @@ INST(Tuple, Instruction)
 INST(TypeOf, Instruction)
 ABSTRACT_INST(Term, Instruction)
   INST(Return, TermInst)
+  INST(Branch, TermInst)
   INST(CondBranch, TermInst)
-  INST(UncondBranch, TermInst)
-  INST_RANGE(Term, Return, UncondBranch)
+  INST_RANGE(Term, Return, CondBranch)
 
 #undef INST_RANGE
 #undef ABSTRACT_INST

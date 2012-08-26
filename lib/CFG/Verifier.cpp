@@ -62,14 +62,14 @@ public:
   void visitReturnInst(ReturnInst *RI) {
   }
   
-  void visitUncondBranchInst(UncondBranchInst *UBI) {
+  void visitBranchInst(BranchInst *BI) {
     // FIXME: Generalize this to support all terminators in the generic
     // terminator case.  Just diff "successors()" of the TermInst vs the block.
     // why redundantly store block terminators in the first place?
     
-    const BasicBlock &targetBlock = *UBI->getDestBB();
+    const BasicBlock &targetBlock = *BI->getDestBB();
     assert(std::find(targetBlock.pred_begin(),
-                     targetBlock.pred_end(), UBI->getParent()) !=
+                     targetBlock.pred_end(), BI->getParent()) !=
                      targetBlock.pred_end() &&
            "BasicBlock of UncondBranchInst must be a predecessor of target");
     (void)targetBlock;

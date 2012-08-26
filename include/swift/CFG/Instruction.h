@@ -330,6 +330,34 @@ public:
   }
 };
 
+/// BranchInst - An unconditional branch.
+class BranchInst : public TermInst {
+  llvm::ArrayRef<CFGValue> Arguments;
+  CFGSuccessor DestBB;
+public:
+  typedef ArrayRef<CFGValue> ArgsTy;
+  
+  /// Construct an BranchInst that will branches to the specified block.
+  BranchInst(BasicBlock *DestBB)
+  : TermInst(InstKind::Branch), DestBB(this, DestBB) {
+  }
+  
+  /// The jump target for the branch.
+  BasicBlock *getDestBB() const { return DestBB; }
+  
+  /// The temporary arguments to the target blocks.
+  ArgsTy blockArgs() { return Arguments; }
+  const ArgsTy blockArgs() const { return Arguments; }
+  
+  SuccessorListTy getSuccessors() {
+    return DestBB;
+  }
+  
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::Branch;
+  }
+};
+
 class CondBranchInst : public TermInst {
   CFGSuccessor DestBBs[2];
   // FIXME: Use ArrayRef?
@@ -362,33 +390,6 @@ public:
   }
 };
 
-class UncondBranchInst : public TermInst {
-  llvm::ArrayRef<CFGValue> Arguments;
-  CFGSuccessor DestBB;
-public:
-  typedef ArrayRef<CFGValue> ArgsTy;
-
-  /// Construct an UncondBranchInst that will become the terminator
-  /// for the specified BasicBlock.
-  UncondBranchInst(BasicBlock *DestBB)
-    : TermInst(InstKind::UncondBranch), DestBB(this, DestBB) {
-  }
-  
-  /// The jump target for the branch.
-  BasicBlock *getDestBB() const { return DestBB; }
-
-  /// The temporary arguments to the target blocks.
-  ArgsTy blockArgs() { return Arguments; }
-  const ArgsTy blockArgs() const { return Arguments; }
-
-  SuccessorListTy getSuccessors() {
-    return DestBB;
-  }
-
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::UncondBranch;
-  }
-};
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//

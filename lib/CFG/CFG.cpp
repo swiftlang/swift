@@ -32,7 +32,7 @@ static void emitBlock(CFGBuilder &B, BasicBlock *BB) {
   CFG *C = BB->getParent();
   // If this is a fall through into BB, emit the fall through branch.
   if (B.hasValidInsertionPoint())
-    B.createUncondBranch(BB);
+    B.createBranch(BB);
 
   // Start inserting into that block.
   B.setInsertionPoint(BB);
@@ -136,7 +136,7 @@ void Condition::exitTrue(CFGBuilder &B) {
   // Otherwise, resume into the continuation block.  This branch might
   // be folded by exitFalse if it turns out that that point is
   // unreachable.
-  B.createUncondBranch(ContBB);
+  B.createBranch(ContBB);
   
   // Coming out of exitTrue, we can be in one of three states:
   //   - a valid non-terminal IP, but only if there is no continuation
@@ -185,14 +185,14 @@ void Condition::exitFalse(CFGBuilder &B) {
     assert(PI == ContBB->pred_end() && "Only expect one branch to the ContBB");
     
     // Insert before the uncond branch and zap it.
-    auto *Br = cast<UncondBranchInst>(ContPred->getTerminator());
+    auto *Br = cast<BranchInst>(ContPred->getTerminator());
     B.setInsertionPoint(Br->getParent());
     Br->eraseFromParent();
     assert(ContBB->pred_empty() &&"Zapping the branch should make ContBB dead");
     
     // Otherwise, branch to the continuation block and start inserting there.
   } else {
-    B.createUncondBranch(ContBB);
+    B.createBranch(ContBB);
   }
 }
 
@@ -428,7 +428,7 @@ void Builder::visitIfStmt(IfStmt *S) {
 void Builder::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (C) BasicBlock(&C, "while");
-  B.createUncondBranch(LoopBB);
+  B.createBranch(LoopBB);
   emitBlock(B, LoopBB);
   
   // Set the destinations for 'break' and 'continue'
@@ -445,7 +445,7 @@ void Builder::visitWhileStmt(WhileStmt *S) {
     Cond.enterTrue(B);
     visit(S->getBody());
     if (B.hasValidInsertionPoint()) {
-      B.createUncondBranch(LoopBB);
+      B.createBranch(LoopBB);
       B.clearInsertionPoint();
     }
     Cond.exitTrue(B);
@@ -462,7 +462,7 @@ void Builder::visitWhileStmt(WhileStmt *S) {
 void Builder::visitDoWhileStmt(DoWhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (C) BasicBlock(&C, "dowhile");
-  B.createUncondBranch(LoopBB);
+  B.createBranch(LoopBB);
   emitBlock(B, LoopBB);
   
   // Set the destinations for 'break' and 'continue'
@@ -480,7 +480,7 @@ void Builder::visitDoWhileStmt(DoWhileStmt *S) {
     
     Cond.enterTrue(B);
     if (B.hasValidInsertionPoint()) {
-      B.createUncondBranch(LoopBB);
+      B.createBranch(LoopBB);
       B.clearInsertionPoint();
     }
     Cond.exitTrue(B);

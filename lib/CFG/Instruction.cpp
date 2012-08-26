@@ -94,8 +94,8 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
     return cast<ReturnInst>(this)->getSuccessors();
   case InstKind::CondBranch:
     return cast<CondBranchInst>(this)->getSuccessors();
-  case InstKind::UncondBranch:
-    return cast<UncondBranchInst>(this)->getSuccessors();
+  case InstKind::Branch:
+    return cast<BranchInst>(this)->getSuccessors();
   }
 }
 
