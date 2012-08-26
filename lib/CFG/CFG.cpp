@@ -1,4 +1,4 @@
-//===--- CFG.cpp - Defines the CFG data structure ----------------*- C++ -*-==//
+//===--- CFG.cpp - Defines the CFG data structure --------------------------==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -76,7 +76,7 @@ public:
       }
       TermInst &Term = *PredBlock->getTerminator();
       if (UncondBranchInst *UBI = dyn_cast<UncondBranchInst>(&Term)) {
-        assert(UBI->targetBlock() == nullptr);
+        assert(UBI->getDestBB() == nullptr);
         UBI->setTarget(TargetBlock, ArrayRef<CFGValue>(), C);
         continue;
       }
@@ -85,10 +85,9 @@ public:
       // we are fixing up one of the branch targets because it wasn't
       // available when the instruction was created.
       CondBranchInst &CBI = cast<CondBranchInst>(Term);
-      assert(CBI.branches()[0]);
-      assert(!CBI.branches()[1]);
-      CBI.branches()[1] = TargetBlock;
-      TargetBlock->addPred(PredBlock);
+      assert(CBI.getTrueBB());
+      assert(!CBI.getFalseBB());
+      CBI.setFalseBB(TargetBlock);
     }
     pendingMerges().clear();
   }

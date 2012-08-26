@@ -1,4 +1,4 @@
-//===--- Instruction.cpp - Instructions for high-level CFGs ------*- C++ -*-==//
+//===--- Instruction.cpp - Instructions for high-level CFGs ----------------==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -72,7 +72,7 @@ Instruction::Instruction(BasicBlock *B, InstKind Kind)
 }
 
 
-TermInst::Successors TermInst::successors() {
+TermInst::SuccessorListTy TermInst::getSuccessors() {
   switch (getKind()) {
   case InstKind::Call:
   case InstKind::DeclRef:
@@ -83,15 +83,11 @@ TermInst::Successors TermInst::successors() {
   case InstKind::TypeOf:
     llvm_unreachable("Only TermInst's are allowed");
   case InstKind::Return:
-    return Successors();
-  case InstKind::CondBranch: {
-    CondBranchInst &CBI = *cast<CondBranchInst>(this);
-    return Successors(CBI.branches());
-  }
-  case InstKind::UncondBranch: {
-    UncondBranchInst &UBI = *cast<UncondBranchInst>(this);
-    return Successors(UBI.targetBlock());
-  }
+    return cast<ReturnInst>(this)->getSuccessors();
+  case InstKind::CondBranch:
+    return cast<CondBranchInst>(this)->getSuccessors();
+  case InstKind::UncondBranch:
+    return cast<UncondBranchInst>(this)->getSuccessors();
   }
 }
 
@@ -109,28 +105,27 @@ CallInst::CallInst(CallExpr *expr, CFGValue function, ArrayRef<CFGValue> args)
   memcpy(getArgsStorage(), args.data(), args.size() * sizeof(CFGValue));
 }
 
-CondBranchInst::CondBranchInst(Stmt *BranchStmt,
-                               CFGValue condition,
-                               BasicBlock *Target1,
-                               BasicBlock *Target2,
+CondBranchInst::CondBranchInst(Stmt *BranchStmt, CFGValue condition,
+                               BasicBlock *Target1, BasicBlock *Target2,
                                BasicBlock *B)
   : TermInst(B, InstKind::CondBranch),
     branchStmt(BranchStmt), condition(condition) {
-  Branches[0] = Target1;
-  Branches[1] = Target2;
-  memset(&Args, sizeof(Args), 0);
-  for (auto branch : branches()) { if (branch) branch->addPred(B); }
+  DestBBs[0].init(this);
+  DestBBs[1].init(this);
+  if (Target1) DestBBs[0] = Target1;
+  if (Target2) DestBBs[1] = Target2;
 }
 
-CondBranchInst::CondBranchInst(Stmt *BranchStmt,
-                               CFGValue condition,
-                               BasicBlock *Target1,
-                               BasicBlock *Target2)
+CondBranchInst::CondBranchInst(Stmt *BranchStmt, CFGValue condition,
+                               BasicBlock *TrueBB, BasicBlock *FalseBB)
   : TermInst(InstKind::CondBranch), branchStmt(BranchStmt),
     condition(condition) {
-  Branches[0] = Target1;
-  Branches[1] = Target2;
-  memset(&Args, sizeof(Args), 0);
+  DestBBs[0].init(this);
+  DestBBs[1].init(this);
+  DestBBs[0] = TrueBB;
+  DestBBs[1] = FalseBB;
+      
+  // FIXME: Args?
 }
 
 
@@ -147,24 +142,13 @@ TupleInst::TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elems)
   memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(CFGValue));
 }
 
-void UncondBranchInst::unregisterTarget() {
-  if (!TargetBlock)
-    return;
-
-  // ?
-}
 
 void UncondBranchInst::setTarget(BasicBlock *NewTarget, ArgsTy BlockArgs,
                                  CFG &C) {
-  // FIXME: This isn't right if the args are changing.
-  if (TargetBlock != NewTarget) {
-    unregisterTarget();
-    TargetBlock = NewTarget;
-    TargetBlock->addPred(getParent());
-  }
+  DestBB = NewTarget;
 
   // FIXME: check that TargetBlock's # args agrees with BlockArgs.
-
+  // FIXME: This isn't right if the args are changing.
   if (BlockArgs.empty())
     return;
 

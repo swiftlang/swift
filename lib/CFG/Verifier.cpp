@@ -1,4 +1,4 @@
-//===--- Verifier - Verification of Swift CFGs -------------------*- C++ -*-==//
+//===--- Verifier - Verification of Swift CFGs -----------------------------==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -67,10 +67,10 @@ public:
     // terminator case.  Just diff "successors()" of the TermInst vs the block.
     // why redundantly store block terminators in the first place?
     
-    const BasicBlock &targetBlock = *UBI->targetBlock();
-    assert(std::find(targetBlock.getPreds().begin(),
-                     targetBlock.getPreds().end(), UBI->getParent()) !=
-                     targetBlock.getPreds().end() &&
+    const BasicBlock &targetBlock = *UBI->getDestBB();
+    assert(std::find(targetBlock.pred_begin(),
+                     targetBlock.pred_end(), UBI->getParent()) !=
+                     targetBlock.pred_end() &&
            "BasicBlock of UncondBranchInst must be a predecessor of target");
     (void)targetBlock;
   }

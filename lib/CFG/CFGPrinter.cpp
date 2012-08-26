@@ -1,4 +1,4 @@
-//===--- CFGPrinter.cpp - Pretty-printing of CFGs ----------------*- C++ -*-==//
+//===--- CFGPrinter.cpp - Pretty-printing of CFGs --------------------------==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -61,8 +61,8 @@ public:
     OS << getID(BB) << ":\t";
 
     OS << " ; Preds:";
-    for (const BasicBlock *B : BB->getPreds())
-      OS << ' ' << getID(B);
+    for (auto BBI = BB->pred_begin(), E = BB->pred_end(); BBI != E; ++BBI)
+      OS << ' ' << getID(*BBI);
     OS << '\n';
 
     for (const Instruction &I : *BB)
@@ -135,7 +135,7 @@ public:
   }
 
   void visitUncondBranchInst(UncondBranchInst *UBI) {
-    OS << "br " << getID(UBI->targetBlock());
+    OS << "br " << getID(UBI->getDestBB());
     const UncondBranchInst::ArgsTy Args = UBI->blockArgs();
 
     // FIXME: Args should move to terminator generic stuff.
@@ -148,7 +148,7 @@ public:
 
   void visitCondBranchInst(CondBranchInst *CBI) {
     OS << "condbranch " << /*getID(CBI->condition) <<*/ "???, "
-       << getID(CBI->branches()[0]) << ',' << getID(CBI->branches()[1]);
+       << getID(CBI->getTrueBB()) << ',' << getID(CBI->getFalseBB());
   }
 };
 } // end anonymous namespace

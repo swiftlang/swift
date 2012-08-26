@@ -24,16 +24,21 @@ class CFG;
 
 class BasicBlock :
 public llvm::ilist_node<BasicBlock>, public CFGAllocated<BasicBlock> {
+  friend class CFGSuccessor;
 public:
   typedef llvm::iplist<Instruction> InstListType;
 private:
   /// A backreference to the containing CFG.
   CFG * const ParentCFG;
+  
+  /// PrevList - This is a list of all of the terminator operands that are
+  /// branching to this block, forming the predecessor list.  This is
+  /// automatically managed by the CFGSuccessor class.
+  CFGSuccessor *PredList;
+  
   /// The ordered set of instructions in the BasicBlock.
   InstListType InstList;
-
-  std::vector<BasicBlock *> PredList;
-
+  
   friend struct llvm::ilist_sentinel_traits<BasicBlock>;
   BasicBlock() : ParentCFG(0) {}
   void operator=(const BasicBlock &) = delete;
@@ -62,33 +67,30 @@ public:
   const_iterator begin() const { return InstList.begin(); }
   const_iterator end() const { return InstList.end(); }
 
-  //===--------------------------------------------------------------------===//
-  // Predecessors and Successors
-  //===--------------------------------------------------------------------===//
-
-  void addPred(BasicBlock *B) { PredList.push_back(B); }
-
-  typedef llvm::ArrayRef<BasicBlock *> Predecessors;
-  typedef llvm::ArrayRef<BasicBlock *> Successors;
-
-  /// The predecessors of a BasicBlock are currently represented internally
-  /// using an std::vector.  This will be optimized later, as most BasicBlocks
-  /// will have only a single predecessor.
-  Predecessors getPreds() const { return PredList; }
-
   TermInst *getTerminator() {
     assert(!InstList.empty() && "Can't get successors for malformed block");
     return cast<TermInst>(&InstList.back());
   }
-
+  
   const TermInst *getTerminator() const {
     return const_cast<BasicBlock*>(this)->getTerminator();
   }
 
+  //===--------------------------------------------------------------------===//
+  // Predecessors and Successors
+  //===--------------------------------------------------------------------===//
+
+  typedef CFGSuccessorIterator pred_iterator;
+  
+  pred_iterator pred_begin() const { return pred_iterator(PredList); }
+  pred_iterator pred_end() const { return pred_iterator(); }
+     
+  typedef ArrayRef<CFGSuccessor> Successors;
+
   /// The successors of a BasicBlock are defined either explicitly as
   /// a single successor as the branch targets of the terminator instruction.
   Successors getSuccs() const {
-    return getTerminator()->successors();
+    return getTerminator()->getSuccessors();
   }
 
   /// Pretty-print the BasicBlock.

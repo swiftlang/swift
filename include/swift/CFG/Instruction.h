@@ -19,6 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/CFG/CFGBase.h"
+#include "swift/CFG/CFGSuccessor.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
@@ -277,14 +278,14 @@ public:
   
   TermInst(InstKind K) : Instruction(K) {}
 
-  typedef llvm::ArrayRef<BasicBlock *> Successors;
+  typedef llvm::ArrayRef<CFGSuccessor> SuccessorListTy;
 
   /// The successor basic blocks of this terminator.
-  Successors successors();
+  SuccessorListTy getSuccessors();
 
   /// The successor basic blocks of this terminator.
-  const Successors successors() const {
-    return const_cast<TermInst*>(this)->successors();
+  const SuccessorListTy getSuccessors() const {
+    return const_cast<TermInst*>(this)->getSuccessors();
   }
 
   static bool classof(const Instruction *I) {
@@ -305,8 +306,8 @@ public:
 
   // FIXME: Remove Ctor.
   ReturnInst(ReturnStmt *returnStmt, CFGValue returnValue, BasicBlock *B)
-  : TermInst(B, InstKind::Return), returnStmt(returnStmt),
-  returnValue(returnValue) {}
+    : TermInst(B, InstKind::Return), returnStmt(returnStmt),
+      returnValue(returnValue) {}
 
   
   /// Constructs a ReturnInst representing an \b explicit return.
@@ -317,7 +318,8 @@ public:
   ///
   ReturnInst(ReturnStmt *returnStmt, CFGValue returnValue)
     : TermInst(InstKind::Return), returnStmt(returnStmt),
-      returnValue(returnValue) {}
+      returnValue(returnValue) {
+  }
 
   /// Constructs a ReturnInst representing an \b implicit return.
   ///
@@ -325,13 +327,19 @@ public:
   ///
   ReturnInst(BasicBlock *B) : ReturnInst(0, (Instruction*)0, B) {}
 
+  SuccessorListTy getSuccessors() {
+    // No Successors.
+    return SuccessorListTy();
+  }
+
+  
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::Return;
   }
 };
 
 class CondBranchInst : public TermInst {
-  BasicBlock *Branches[2];
+  CFGSuccessor DestBBs[2];
   // FIXME: Use ArrayRef?
   struct BlockArgs { unsigned numArgs; CFGValue *args; } Args[2];
 public:
@@ -341,45 +349,6 @@ public:
   /// The condition value used for the branch.
   CFGValue condition;
 
-  struct BranchInfo {
-    /// The destination basic block for a branch.
-    BasicBlock *block;
-
-    /// The argument values for the target basic block.
-    MutableArrayRef<CFGValue> arguments;
-
-    BranchInfo(BasicBlock *B, MutableArrayRef<CFGValue> A)
-      : block(B), arguments(A) {}
-  };
-
-  /// Return the branch target and arguments for a given branch.
-  BranchInfo getBranchInfo(unsigned branch) {
-    assert(branch < 2);
-    return BranchInfo(Branches[branch], getArguments(branch));
-  }
-
-  /// Return the block arguments for the specified branch.
-  MutableArrayRef<CFGValue> getArguments(unsigned branch) {
-    assert(branch < 2);
-    return MutableArrayRef<CFGValue>(Args[branch].args, Args[branch].numArgs);
-  }
-
-  /// Return the block arguments for the specified branch.
-  ArrayRef<CFGValue> getArguments(unsigned branch) const {
-    assert(branch < 2);
-    return ArrayRef<CFGValue>(Args[branch].args, Args[branch].numArgs);
-  }
-
-  /// The branch targets.
-  MutableArrayRef<BasicBlock*> branches() {
-    return MutableArrayRef<BasicBlock*>(Branches, 2);
-  }
-
-  /// The branch targets.
-  ArrayRef<BasicBlock*> branches() const {
-    return ArrayRef<BasicBlock*>(Branches, 2);
-  }
-
   // FIXME: Remove ctor.
   CondBranchInst(Stmt *BranchStmt,
                  CFGValue condition,
@@ -388,8 +357,21 @@ public:
                  BasicBlock *B);
 
   CondBranchInst(Stmt *BranchStmt, CFGValue Cond,
-                 BasicBlock *Target1, BasicBlock *Target2);
+                 BasicBlock *TrueBB, BasicBlock *FalseBB);
 
+  
+  SuccessorListTy getSuccessors() {
+    return DestBBs;
+  }
+  
+  BasicBlock *getTrueBB() { return DestBBs[0]; }
+  const BasicBlock *getTrueBB() const { return DestBBs[0]; }
+  BasicBlock *getFalseBB() { return DestBBs[1]; }
+  const BasicBlock *getFalseBB() const { return DestBBs[1]; }
+  
+  void setTrueBB(BasicBlock *BB) { DestBBs[0] = BB; }
+  void setFalseBB(BasicBlock *BB) { DestBBs[1] = BB; }
+  
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::CondBranch;
   }
@@ -397,7 +379,7 @@ public:
 
 class UncondBranchInst : public TermInst {
   llvm::ArrayRef<CFGValue> Arguments;
-  BasicBlock *TargetBlock;
+  CFGSuccessor DestBB;
 public:
   typedef ArrayRef<CFGValue> ArgsTy;
 
@@ -406,29 +388,30 @@ public:
   
   // FIXME: Remove ctor.
   UncondBranchInst(int X, BasicBlock *BB) :
-    TermInst(BB, InstKind::UncondBranch), TargetBlock(nullptr) {}
+    TermInst(BB, InstKind::UncondBranch), DestBB(this) {}
 
-  UncondBranchInst(BasicBlock *TargetBlock, ArgsTy BlockArgs, CFG &C)
-    : TermInst(InstKind::UncondBranch), TargetBlock(nullptr) {
-    setTarget(TargetBlock, BlockArgs, C);
+  UncondBranchInst(BasicBlock *DestBB, ArgsTy BlockArgs, CFG &C)
+    : TermInst(InstKind::UncondBranch), DestBB(this, DestBB) {
+    assert(BlockArgs.empty() && "Must copy into bump-pointer");
   }
   
   /// The jump target for the branch.
-  BasicBlock *targetBlock() const { return TargetBlock; }
+  BasicBlock *getDestBB() const { return DestBB; }
 
   /// The temporary arguments to the target blocks.
   ArgsTy blockArgs() { return Arguments; }
   const ArgsTy blockArgs() const { return Arguments; }
 
   /// Set the target block (with the matching arguments) for this branch.
-  void setTarget(BasicBlock *Target, ArgsTy BlockArgs, CFG &C);
+  void setTarget(BasicBlock *DestBB, ArgsTy BlockArgs, CFG &C);
+
+  SuccessorListTy getSuccessors() {
+    return DestBB;
+  }
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::UncondBranch;
   }
-
-private:
-  void unregisterTarget();
 };
 } // end swift namespace
 

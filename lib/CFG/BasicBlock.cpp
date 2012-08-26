@@ -1,4 +1,4 @@
-//===--- BasicBlock.cpp - Basic blocks for high-level CFGs -------*- C++ -*-==//
+//===--- BasicBlock.cpp - Basic blocks for high-level CFGs -----------------==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -18,7 +18,7 @@
 #include "swift/CFG/CFG.h"
 using namespace swift;
 
-BasicBlock::BasicBlock(CFG *ParentCFG) : ParentCFG(ParentCFG) {
+BasicBlock::BasicBlock(CFG *ParentCFG) : ParentCFG(ParentCFG), PredList(0) {
   ParentCFG->getBlocks().push_back(this);
 }
 BasicBlock::~BasicBlock() {}
