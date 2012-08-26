@@ -19,10 +19,6 @@
 
 #include "swift/CFG/Instruction.h"
 
-namespace llvm {
-  template<class GraphType> struct GraphTraits;
-}
-
 namespace swift {
 class CFG;
 
@@ -112,32 +108,7 @@ public:
 
 namespace llvm {
 
-template <> struct GraphTraits<::swift::BasicBlock*> {
-  typedef ::swift::BasicBlock NodeType;
-  typedef ::swift::BasicBlock::Successors::iterator ChildIteratorType;
-  static NodeType *getEntryNode(::swift::BasicBlock *BB) { return BB; }
-  static inline ChildIteratorType child_begin(NodeType *N) {
-    return N->getSuccs().begin();
-  }
-  static inline ChildIteratorType child_end(NodeType *N) {
-    return N->getSuccs().end();
-  }
-};
-
-template <> struct GraphTraits<const ::swift::BasicBlock*> {
-  typedef const ::swift::BasicBlock NodeType;
-  typedef ::swift::BasicBlock::Successors::const_iterator ChildIteratorType;
-  static NodeType *getEntryNode(const ::swift::BasicBlock *BB) { return BB; }
-  static inline ChildIteratorType child_begin(NodeType *N) {
-    return N->getSuccs().begin();
-  }
-  static inline ChildIteratorType child_end(NodeType *N) {
-    return N->getSuccs().end();
-  }
-
-};
-
-raw_ostream &operator<<(raw_ostream &, const swift::BasicBlock &B);
+  raw_ostream &operator<<(raw_ostream &, const swift::BasicBlock &B);
 
 //===----------------------------------------------------------------------===//
 // ilist_traits for BasicBlock

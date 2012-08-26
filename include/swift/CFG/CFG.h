@@ -79,19 +79,4 @@ public:
 
 } // end swift namespace
 
-namespace llvm {
-
-template <> struct GraphTraits<::swift::CFG *>
-  : public GraphTraits<::swift::BasicBlock *> {
-  static NodeType *getEntryNode(::swift::CFG *C) {
-    return &C->getBlocks().front();
-  }
-  typedef ::swift::CFG::BlockListType::iterator nodes_iterator;
-  static nodes_iterator nodes_begin(::swift::CFG *C) { return C->begin(); }
-  static nodes_iterator nodes_end(::swift::CFG *C) { return C->end(); }
-  static unsigned size(::swift::CFG *C) { return C->getBlocks().size(); }
-};
-
-} // end llvm namespace
-
 #endif
