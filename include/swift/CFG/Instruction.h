@@ -63,9 +63,6 @@ public llvm::ilist_node<Instruction>, public CFGAllocated<Instruction> {
   void operator delete(void *Ptr, size_t)  = delete;
 
 protected:
-  // FIXME: Remove ctor.
-  Instruction(BasicBlock *B, InstKind Kind);
-
   Instruction(InstKind Kind) : Kind(Kind), ParentBB(0) {}
 
 public:
@@ -273,9 +270,6 @@ public:
 /// This class defines a "terminating instruction" for a BasicBlock.
 class TermInst : public Instruction {
 public:
-  // FIXME: Remove ctor.
-  TermInst(BasicBlock *B, InstKind K) : Instruction(B, K) {}
-  
   TermInst(InstKind K) : Instruction(K) {}
 
   typedef llvm::ArrayRef<CFGSuccessor> SuccessorListTy;
@@ -304,12 +298,6 @@ public:
   /// is an implicit return.
   CFGValue returnValue;
 
-  // FIXME: Remove Ctor.
-  ReturnInst(ReturnStmt *returnStmt, CFGValue returnValue, BasicBlock *B)
-    : TermInst(B, InstKind::Return), returnStmt(returnStmt),
-      returnValue(returnValue) {}
-
-  
   /// Constructs a ReturnInst representing an \b explicit return.
   ///
   /// \param returnStmt The backing return statement in the AST.
@@ -320,12 +308,6 @@ public:
     : TermInst(InstKind::Return), returnStmt(returnStmt),
       returnValue(returnValue) {
   }
-
-  /// Constructs a ReturnInst representing an \b implicit return.
-  ///
-  /// \param The basic block that will contain the instruction.
-  ///
-  ReturnInst(BasicBlock *B) : ReturnInst(0, (Instruction*)0, B) {}
 
   SuccessorListTy getSuccessors() {
     // No Successors.
@@ -348,13 +330,6 @@ public:
 
   /// The condition value used for the branch.
   CFGValue condition;
-
-  // FIXME: Remove ctor.
-  CondBranchInst(Stmt *BranchStmt,
-                 CFGValue condition,
-                 BasicBlock *Target1,
-                 BasicBlock *Target2,
-                 BasicBlock *B);
 
   CondBranchInst(Stmt *BranchStmt, CFGValue Cond,
                  BasicBlock *TrueBB, BasicBlock *FalseBB);
@@ -385,11 +360,6 @@ public:
 
   /// Construct an UncondBranchInst that will become the terminator
   /// for the specified BasicBlock.
-  
-  // FIXME: Remove ctor.
-  UncondBranchInst(int X, BasicBlock *BB) :
-    TermInst(BB, InstKind::UncondBranch), DestBB(this) {}
-
   UncondBranchInst(BasicBlock *DestBB, ArgsTy BlockArgs, CFG &C)
     : TermInst(InstKind::UncondBranch), DestBB(this, DestBB) {
     assert(BlockArgs.empty() && "Must copy into bump-pointer");
@@ -401,9 +371,6 @@ public:
   /// The temporary arguments to the target blocks.
   ArgsTy blockArgs() { return Arguments; }
   const ArgsTy blockArgs() const { return Arguments; }
-
-  /// Set the target block (with the matching arguments) for this branch.
-  void setTarget(BasicBlock *DestBB, ArgsTy BlockArgs, CFG &C);
 
   SuccessorListTy getSuccessors() {
     return DestBB;

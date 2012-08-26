@@ -66,12 +66,6 @@ transferNodesFromList(llvm::ilist_traits<Instruction> &L2,
 //===----------------------------------------------------------------------===//
 
 
-Instruction::Instruction(BasicBlock *B, InstKind Kind)
-  : Kind(Kind), ParentBB(0) {
-  B->getInsts().push_back(this);
-}
-
-
 TermInst::SuccessorListTy TermInst::getSuccessors() {
   switch (getKind()) {
   case InstKind::Call:
@@ -106,17 +100,6 @@ CallInst::CallInst(CallExpr *expr, CFGValue function, ArrayRef<CFGValue> args)
 }
 
 CondBranchInst::CondBranchInst(Stmt *BranchStmt, CFGValue condition,
-                               BasicBlock *Target1, BasicBlock *Target2,
-                               BasicBlock *B)
-  : TermInst(B, InstKind::CondBranch),
-    branchStmt(BranchStmt), condition(condition) {
-  DestBBs[0].init(this);
-  DestBBs[1].init(this);
-  if (Target1) DestBBs[0] = Target1;
-  if (Target2) DestBBs[1] = Target2;
-}
-
-CondBranchInst::CondBranchInst(Stmt *BranchStmt, CFGValue condition,
                                BasicBlock *TrueBB, BasicBlock *FalseBB)
   : TermInst(InstKind::CondBranch), branchStmt(BranchStmt),
     condition(condition) {
@@ -142,23 +125,3 @@ TupleInst::TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elems)
   memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(CFGValue));
 }
 
-
-void UncondBranchInst::setTarget(BasicBlock *NewTarget, ArgsTy BlockArgs,
-                                 CFG &C) {
-  DestBB = NewTarget;
-
-  // FIXME: check that TargetBlock's # args agrees with BlockArgs.
-  // FIXME: This isn't right if the args are changing.
-  if (BlockArgs.empty())
-    return;
-
-  assert(0 && "FIXME: Unimplemented");
-  
-#if 0
-  // Copy the arguments over to our holding buffer.
-  NumArgs = BlockArgs.size();
-  // FIXME: Allocate memory from CFG.
-  Args = new (getParent()->getParent()) CFGValue[NumArgs];
-  ArgsTy(Args, NumArgs) = BlockArgs;
-#endif
-}
