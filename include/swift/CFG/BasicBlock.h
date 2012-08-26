@@ -45,11 +45,16 @@ private:
   void operator delete(void *Ptr, size_t) = delete;
 
 public:
-  BasicBlock(CFG *C);
+  BasicBlock(CFG *C, const char *Name = "");
   ~BasicBlock();
 
   CFG *getParent() { return ParentCFG; }
   const CFG *getParent() const { return ParentCFG; }
+
+  /// eraseFromParent - This method unlinks 'this' from the containing CFG and
+  /// deletes it.
+  ///
+  void eraseFromParent();
 
   //===--------------------------------------------------------------------===//
   // Instruction List Inspection and Manipulation
@@ -82,6 +87,7 @@ public:
 
   typedef CFGSuccessorIterator pred_iterator;
   
+  bool pred_empty() const { return PredList == nullptr; }
   pred_iterator pred_begin() const { return pred_iterator(PredList); }
   pred_iterator pred_end() const { return pred_iterator(); }
      

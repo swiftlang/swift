@@ -65,6 +65,20 @@ transferNodesFromList(llvm::ilist_traits<Instruction> &L2,
 // Instruction Implementation
 //===----------------------------------------------------------------------===//
 
+/// removeFromParent - This method unlinks 'this' from the containing basic
+/// block, but does not delete it.
+///
+void Instruction::removeFromParent() {
+  getParent()->getInsts().remove(this);
+}
+
+/// eraseFromParent - This method unlinks 'this' from the containing basic
+/// block and deletes it.
+///
+void Instruction::eraseFromParent() {
+  getParent()->getInsts().erase(this);
+}
+
 
 TermInst::SuccessorListTy TermInst::getSuccessors() {
   switch (getKind()) {

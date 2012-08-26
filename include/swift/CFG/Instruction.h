@@ -60,7 +60,7 @@ public llvm::ilist_node<Instruction>, public CFGAllocated<Instruction> {
   friend struct llvm::ilist_sentinel_traits<Instruction>;
   Instruction() = delete;
   void operator=(const Instruction &) = delete;
-  void operator delete(void *Ptr, size_t)  = delete;
+  void operator delete(void *Ptr, size_t) = delete;
 
 protected:
   Instruction(InstKind Kind) : Kind(Kind), ParentBB(0) {}
@@ -71,6 +71,16 @@ public:
   const BasicBlock *getParent() const { return ParentBB; }
   BasicBlock *getParent() { return ParentBB; }
 
+  /// removeFromParent - This method unlinks 'this' from the containing basic
+  /// block, but does not delete it.
+  ///
+  void removeFromParent();
+  
+  /// eraseFromParent - This method unlinks 'this' from the containing basic
+  /// block and deletes it.
+  ///
+  void eraseFromParent();
+  
   /// Pretty-print the Instruction.
   void dump() const;
   void print(raw_ostream &OS) const;
@@ -360,9 +370,8 @@ public:
 
   /// Construct an UncondBranchInst that will become the terminator
   /// for the specified BasicBlock.
-  UncondBranchInst(BasicBlock *DestBB, ArgsTy BlockArgs, CFG &C)
+  UncondBranchInst(BasicBlock *DestBB)
     : TermInst(InstKind::UncondBranch), DestBB(this, DestBB) {
-    assert(BlockArgs.empty() && "Must copy into bump-pointer");
   }
   
   /// The jump target for the branch.

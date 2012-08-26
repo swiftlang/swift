@@ -45,13 +45,14 @@ public:
   // Insertion Point Management
   //===--------------------------------------------------------------------===//
 
+  bool hasValidInsertionPoint() const { return BB != nullptr; }
   BasicBlock *getInsertionBB() { return BB; }
   BasicBlock::iterator getInsertionPoint() { return InsertPt; }
   
   /// clearInsertionPoint - Clear the insertion point: created instructions will
   /// not be inserted into a block.
   void clearInsertionPoint() {
-    BB = 0;
+    BB = nullptr;
   }
 
   /// setInsertionPoint - Set the insertion point.
@@ -109,11 +110,11 @@ public:
                                    BasicBlock *Target1, BasicBlock *Target2) {
     return insert(new CondBranchInst(BranchStmt, Cond, Target1, Target2));
   }
-  
-  UncondBranchInst *createUncondBranch(BasicBlock *TargetBlock,
-                                       ArrayRef<CFGValue> BlockArgs, CFG &C) {
-    return insert(new UncondBranchInst(TargetBlock, BlockArgs, C));
+    
+  UncondBranchInst *createUncondBranch(BasicBlock *TargetBlock) {
+    return insert(new UncondBranchInst(TargetBlock));
   }
+
 
 private:
   /// insert - This is a template to avoid losing type info on the result.

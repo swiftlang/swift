@@ -18,7 +18,19 @@
 #include "swift/CFG/CFG.h"
 using namespace swift;
 
-BasicBlock::BasicBlock(CFG *ParentCFG) : ParentCFG(ParentCFG), PredList(0) {
+BasicBlock::BasicBlock(CFG *ParentCFG, const char *Name)
+  : ParentCFG(ParentCFG), PredList(0) {
   ParentCFG->getBlocks().push_back(this);
+    
+  // FIXME: Drop the name on the floor for now.
 }
 BasicBlock::~BasicBlock() {}
+
+
+
+/// eraseFromParent - This method unlinks 'this' from the containing CFG and
+/// deletes it.
+///
+void BasicBlock::eraseFromParent() {
+  getParent()->getBlocks().erase(this);
+}
