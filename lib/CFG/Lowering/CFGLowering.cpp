@@ -111,6 +111,7 @@ Condition CFGLowering::emitCondition(Stmt *TheStmt, Expr *E,
     B.createCondBranch(TheStmt, V, FalseDestBB, TrueBB);
   else
     B.createCondBranch(TheStmt, V, TrueBB, FalseDestBB);
+  B.clearInsertionPoint();
   
   return Condition(TrueBB, FalseBB, ContBB);
 }

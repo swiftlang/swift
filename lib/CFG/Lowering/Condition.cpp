@@ -45,7 +45,6 @@ static void emitBlock(CFGBuilder &B, BasicBlock *BB) {
 
 void Condition::enterTrue(CFGBuilder &B) {
   assert(TrueBB && "Cannot call enterTrue without a True block!");
-  assert(B.hasValidInsertionPoint());
   
   // TrueBB has already been inserted somewhere unless there's a
   // continuation block.
