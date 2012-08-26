@@ -41,6 +41,13 @@ public:
     setInsertionPoint(BB, InsertPt);
   }
 
+  //===--------------------------------------------------------------------===//
+  // Insertion Point Management
+  //===--------------------------------------------------------------------===//
+
+  BasicBlock *getInsertionBB() { return BB; }
+  BasicBlock::iterator getInsertionPoint() { return InsertPt; }
+  
   /// clearInsertionPoint - Clear the insertion point: created instructions will
   /// not be inserted into a block.
   void clearInsertionPoint() {

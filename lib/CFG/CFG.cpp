@@ -69,6 +69,7 @@ public:
 // CFG construction
 //===----------------------------------------------------------------------===//
 
+// FIXME: Why do we need this?
 static Expr *ignoreParens(Expr *Ex) {
   while (ParenExpr *P = dyn_cast<ParenExpr>(Ex))
     Ex = P->getSubExpr();
@@ -81,118 +82,27 @@ static bool hasTerminator(BasicBlock *BB) {
 
 namespace {
 class Builder : public ASTVisitor<Builder, CFGValue> {
-  typedef llvm::SmallVector<BasicBlock *, 4> BlocksVector;
-
-  BlocksVector BasePendingMerges;
-  llvm::SmallVector<BlocksVector *, 4> PendingMergesStack;
-  llvm::SmallVector<BlocksVector *, 4> BreakStack;
-  llvm::SmallVector<BlocksVector *, 4> ContinueStack;
-
-  /// The current basic block being constructed.
-  BasicBlock *Block;
-
   /// The CFG being constructed.
   CFG &C;
+  
+  /// B - The CFGBuilder used to construct the CFG.  It is what maintains the
+  /// notion of the current block being emitted into.
+  CFGBuilder B;
 
 public:
-  Builder(CFG &C) : Block(0), C(C) {
-    PendingMergesStack.push_back(&BasePendingMerges);
+  Builder(CFG &C) : C(C), B(new (C) BasicBlock(&C), C) {
   }
 
   ~Builder() {}
 
-  // FIXME: Move to ivar once currentBlock goes away.
-  CFGBuilder getBuilder() {
-    return CFGBuilder(currentBlock(), C);
-  }
-
-  BlocksVector &pendingMerges() {
-    assert(!PendingMergesStack.empty());
-    return *PendingMergesStack.back();
-  }
-
-  void flushPending(BasicBlock *TargetBlock) {
-    for (auto PredBlock : pendingMerges()) {
-      // If the block has no terminator, we need to add an unconditional
-      // jump to the block we are creating.
-      if (!hasTerminator(PredBlock)) {
-        UncondBranchInst *UB = new (C) UncondBranchInst(42, PredBlock);
-        UB->setTarget(TargetBlock, ArrayRef<CFGValue>(), C);
-        continue;
-      }
-      TermInst &Term = *PredBlock->getTerminator();
-      if (UncondBranchInst *UBI = dyn_cast<UncondBranchInst>(&Term)) {
-        assert(UBI->getDestBB() == nullptr);
-        UBI->setTarget(TargetBlock, ArrayRef<CFGValue>(), C);
-        continue;
-      }
-
-      // If the block already has a CondBranch terminator, then it means
-      // we are fixing up one of the branch targets because it wasn't
-      // available when the instruction was created.
-      CondBranchInst &CBI = cast<CondBranchInst>(Term);
-      assert(CBI.getTrueBB());
-      assert(!CBI.getFalseBB());
-      CBI.setFalseBB(TargetBlock);
-    }
-    pendingMerges().clear();
-  }
-
-  /// The current basic block being constructed.
-  BasicBlock *currentBlock() {
-    if (!Block) {
-      Block = new (C) BasicBlock(&C);
-
-      // Flush out all pending merges.  These are basic blocks waiting
-      // for a successor.
-      flushPending(Block);
-    }
-    return Block;
-  }
-
-  void addCurrentBlockToPending() {
-    if (Block && !hasTerminator(Block))
-      pendingMerges().push_back(Block);
-    Block = 0;
-  }
-  
-  /// Reset the currently active basic block by creating a new one.
-  BasicBlock *createFreshBlock() {
-    Block = new (C) BasicBlock(&C);
-    return Block;
-  }
-
   void finishUp() {
-    assert(PendingMergesStack.size() == 1);
-    if (!pendingMerges().empty()) {
-      assert(Block == 0);
-      new (C) ReturnInst(currentBlock());
-      return;
+    // If we have an unterminated block, just emit a dummy return for the
+    // default return.
+    if (B.getInsertionBB() != nullptr) {
+      // FIXME: Should use empty tuple for "void" return.
+      B.createReturn(0, CFGValue());
+      B.clearInsertionPoint();
     }
-    // Check if the last block has a Return.
-    if (!Block)
-      return;
-
-    if (Block->empty() || !isa<ReturnInst>(Block->getInsts().back()))
-      new (C) ReturnInst(Block);
-  }
-
-  void popBreakStack(BlocksVector &BlocksThatBreak) {
-    assert(BreakStack.back() == &BlocksThatBreak);
-    for (auto BreakBlock : BlocksThatBreak) {
-      pendingMerges().push_back(BreakBlock);
-    }
-    BreakStack.pop_back();
-  }
-
-  void popContinueStack(BlocksVector &BlocksThatContinue,
-                        BasicBlock *TargetBlock) {
-    assert(ContinueStack.back() == &BlocksThatContinue);
-    for (auto ContinueBlock : BlocksThatContinue) {
-      auto UB = cast<UncondBranchInst>(ContinueBlock->getTerminator());
-      UB->setTarget(TargetBlock, ArrayRef<CFGValue>(), C);
-    }
-    ContinueStack.pop_back();
   }
 
   //===--------------------------------------------------------------------===//
@@ -210,10 +120,10 @@ public:
   }
 
   void visitReturnStmt(ReturnStmt *S) {
+    // FIXME: Should use empty tuple for "void" return.
     CFGValue ArgV = S->hasResult() ? visit(S->getResult()) : (Instruction*) 0;
-    (void) new (C) ReturnInst(S, ArgV, currentBlock());
-    // Treat the current block as "complete" with no successors.
-    Block = 0;
+    B.createReturn(S, ArgV);
+    B.clearInsertionPoint();
   }
 
   void visitIfStmt(IfStmt *S);
@@ -239,6 +149,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   CFGValue visitExpr(Expr *E) {
+    E->dump();
     llvm_unreachable("Not yet implemented");
   }
 
@@ -283,74 +194,13 @@ void Builder::visitBraceStmt(BraceStmt *S) {
 //===--------------------------------------------------------------------===//
 
 void Builder::visitBreakStmt(BreakStmt *S) {
-  assert(!BreakStack.empty());
-  BasicBlock *BreakBlock = currentBlock();
-  BreakStack.back()->push_back(BreakBlock);
-
-  // FIXME: we need to be able to include the BreakStmt in the jump.
-  new (C) UncondBranchInst(42, BreakBlock);
-  Block = 0;
+  
 }
 
 void Builder::visitContinueStmt(ContinueStmt *S) {
-  assert(!ContinueStack.empty());
-  BasicBlock *ContinueBlock = currentBlock();
-  ContinueStack.back()->push_back(ContinueBlock);
-
-  // FIXME: we need to be able to include the ContinueStmt in the jump.
-  new (C) UncondBranchInst(42, ContinueBlock);
-  Block = 0;
 }
 
 void Builder::visitDoWhileStmt(DoWhileStmt *S) {
-  // Set up a vector to record blocks that 'break'.
-  BlocksVector BlocksThatBreak;
-  BreakStack.push_back(&BlocksThatBreak);
-
-  // Set up a vector to record blocks that 'continue'.
-  BlocksVector BlocksThatContinue;
-  ContinueStack.push_back(&BlocksThatContinue);
-
-  // Create a new basic block for the body.
-  addCurrentBlockToPending();
-  BasicBlock *BodyBlock = currentBlock();
-
-  // Push a new context to record pending blocks.  These will
-  // get linked up the condition block.
-  BlocksVector PendingWithinLoop;
-  PendingMergesStack.push_back(&PendingWithinLoop);
-
-  // Now visit the loop body.
-  visit(S->getBody());
-  addCurrentBlockToPending();
-
-  // Create the condition block.
-  BasicBlock *ConditionBlock = currentBlock();
-  CFGValue CondV = (Instruction*) 0;
-  //  visit(S->getCond());
-
-  assert(ConditionBlock == Block);
-  Block = 0;
-
-  // Pop the pending merges.
-  assert(PendingMergesStack.back() == &PendingWithinLoop);
-  flushPending(ConditionBlock);
-  PendingMergesStack.pop_back();
-
-  // Pop the 'break' context.
-  popBreakStack(BlocksThatBreak);
-
-  // Pop the 'continue' context.
-  popContinueStack(BlocksThatContinue, ConditionBlock);
-
-  // Finally, hook up the block with the condition to the target blocks.
-  CFGValue Branch = new (C) CondBranchInst(S, CondV,
-                                           BodyBlock,
-                                           0, /* will be fixed up later */
-                                           ConditionBlock);
-  (void) Branch;
-
-  pendingMerges().push_back(ConditionBlock);
 }
 
 void Builder::visitIfStmt(IfStmt *S) {
@@ -362,94 +212,11 @@ void Builder::visitIfStmt(IfStmt *S) {
   //  CFGValue CondV = visit(S->getCond());
   CFGValue CondV = (Instruction*) 0;
 
-  // Save the current block.  We will use it to construct the
-  // CondBranchInst.
-  BasicBlock *IfTermBlock = currentBlock();
-
-  // Reset the state for the current block.
-  Block = 0;
-
-  // Create a new basic block for the first target.
-  BasicBlock *Target1 = createFreshBlock();
-  visit(S->getThenStmt());
-  addCurrentBlockToPending();
-
-  // Handle an (optional) 'else'.  If no 'else' is found, the false branch
-  // will be fixed up later.
-  BasicBlock *Target2 = nullptr;
-  if (Stmt *Else = S->getElseStmt()) {
-    // Create a new basic block for the second target.  The first target's
-    // blocks will get added the "pending" list.
-    Target2 = createFreshBlock();
-    visit(Else);
-    addCurrentBlockToPending();
-  }
-  else {
-    // If we have no 'else', we need to fix up the branch later.
-    pendingMerges().push_back(IfTermBlock);
-  }
-
-  // Finally, hook up the block with the condition to the target blocks.
-  CFGValue Branch = new (C) CondBranchInst(S, CondV,
-                                           Target1,
-                                           Target2 /* may be null*/,
-                                           IfTermBlock);
-  (void) Branch;
+  (void)CondV;
 }
 
 void Builder::visitWhileStmt(WhileStmt *S) {
-  // The condition needs to be in its own basic block so that
-  // it can be the loop-back target.  We thus finish up the currently
-  // active block.  It will get linked to the new block once we
-  // create it.
-  addCurrentBlockToPending();
 
-  // Process the condition.  This will link up the previous block
-  // with the condition block.
-  BasicBlock *ConditionBlock = currentBlock();
-  CFGValue CondV = (Instruction*) 0;
-  //  visit(S->getCond());
-
-  assert(ConditionBlock == Block);
-  Block = 0;
-
-  // Set up a vector to record blocks that 'break'.
-  BlocksVector BlocksThatBreak;
-  BreakStack.push_back(&BlocksThatBreak);
-
-  // Set up a vector to record blocks that 'continue'.
-  BlocksVector BlocksThatContinue;
-  ContinueStack.push_back(&BlocksThatContinue);
-
-  // Push a new context to record pending blocks.  These will
-  // get linked up the condition block.
-  BlocksVector PendingWithinLoop;
-  PendingMergesStack.push_back(&PendingWithinLoop);
-
-  // Create a new basic block for the body.
-  BasicBlock *BodyBlock = createFreshBlock();
-  visit(S->getBody());
-  addCurrentBlockToPending();
-
-  // Pop the pending merges.
-  assert(PendingMergesStack.back() == &PendingWithinLoop);
-  flushPending(ConditionBlock);
-  PendingMergesStack.pop_back();
-
-  // Pop the 'break' context.
-  popBreakStack(BlocksThatBreak);
-
-  // Pop the 'continue' context.
-  popContinueStack(BlocksThatContinue, ConditionBlock);
-
-  // Finally, hook up the block with the condition to the target blocks.
-  CFGValue Branch = new (C) CondBranchInst(S, CondV,
-                                           BodyBlock,
-                                           0, /* will be fixed up later */
-                                           ConditionBlock);
-  (void) Branch;
-
-  pendingMerges().push_back(ConditionBlock);
 }
 
 //===--------------------------------------------------------------------===//
@@ -471,26 +238,26 @@ CFGValue Builder::visitCallExpr(CallExpr *E) {
     ArgsV.push_back(visit(Arg));
   }
 
-  return getBuilder().createCall(E, FnV, ArgsV);
+  return B.createCall(E, FnV, ArgsV);
 }
 
 CFGValue Builder::visitDeclRefExpr(DeclRefExpr *E) {
-  return getBuilder().createDeclRef(E);
+  return B.createDeclRef(E);
 }
 
 CFGValue Builder::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-  return getBuilder().createIntegerLiteral(E);
+  return B.createIntegerLiteral(E);
 }
 
 CFGValue Builder::visitLoadExpr(LoadExpr *E) {
   CFGValue SubV = visit(E->getSubExpr());
-  return getBuilder().createLoad(E, SubV);
+  return B.createLoad(E, SubV);
 }
 
 CFGValue Builder::visitThisApplyExpr(ThisApplyExpr *E) {
   CFGValue FnV = visit(E->getFn());
   CFGValue ArgV = visit(E->getArg());
-  return getBuilder().createThisApply(E, FnV, ArgV);
+  return B.createThisApply(E, FnV, ArgV);
 }
 
 CFGValue Builder::visitParenExpr(ParenExpr *E) {
@@ -501,9 +268,9 @@ CFGValue Builder::visitTupleExpr(TupleExpr *E) {
   llvm::SmallVector<CFGValue, 10> ArgsV;
   for (auto &I : E->getElements())
     ArgsV.push_back(visit(I));
-  return getBuilder().createTuple(E, ArgsV);
+  return B.createTuple(E, ArgsV);
 }
 
 CFGValue Builder::visitTypeOfExpr(TypeOfExpr *E) {
-  return getBuilder().createTypeOf(E);
+  return B.createTypeOf(E);
 }
