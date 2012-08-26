@@ -12,6 +12,7 @@
 
 #include "swift/CFG/CFG.h"
 #include "Condition.h"
+#include "JumpDest.h"
 #include "swift/CFG/CFGBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
@@ -69,98 +70,119 @@ static Expr *ignoreParens(Expr *Ex) {
 }
 
 namespace {
-  class Builder : public ASTVisitor<Builder, CFGValue> {
-    /// The CFG being constructed.
-    CFG &C;
-    
-    /// B - The CFGBuilder used to construct the CFG.  It is what maintains the
-    /// notion of the current block being emitted into.
-    CFGBuilder B;
-    
-  public:
-    Builder(CFG &C) : C(C), B(new (C) BasicBlock(&C), C) {
-    }
-    
-    ~Builder() {
-      // If we have an unterminated block, just emit a dummy return for the
-      // default return.
-      if (B.getInsertionBB() != nullptr) {
-        // FIXME: Should use empty tuple for "void" return.
-        B.createReturn(0, CFGValue());
-        B.clearInsertionPoint();
-      }
-    }
-    
-    /// emitCondition - Emit a boolean expression as a control-flow condition.
-    ///
-    /// \param TheStmt - The statement being lowered, for source information on
-    ///        the branch.
-    /// \param E - The expression to be evaluated as a condition.
-    /// \param hasFalseCode - true if the false branch doesn't just lead
-    ///        to the fallthrough.
-    /// \param invertValue - true if this routine should invert the value before
-    ///        testing true/false.
-    Condition emitCondition(Stmt *TheStmt, Expr *E,
-                            bool hasFalseCode = true, bool invertValue = false);
-    
-    //===--------------------------------------------------------------------===//
-    // Statements.
-    //===--------------------------------------------------------------------===//
-    
-    /// Construct the CFG components for the given BraceStmt.
-    void visitBraceStmt(BraceStmt *S);
-    
-    /// SemiStmts are ignored for CFG construction.
-    void visitSemiStmt(SemiStmt *S) {}
-    
-    void visitAssignStmt(AssignStmt *S) {
-      assert(false && "Not yet implemented");
-    }
-    
-    void visitReturnStmt(ReturnStmt *S) {
+class Builder : public ASTVisitor<Builder, CFGValue> {
+  /// The CFG being constructed.
+  CFG &C;
+  
+  /// B - The CFGBuilder used to construct the CFG.  It is what maintains the
+  /// notion of the current block being emitted into.
+  CFGBuilder B;
+  
+  std::vector<JumpDest> BreakDestStack;
+  std::vector<JumpDest> ContinueDestStack;
+
+  /// Cleanups - Currently active cleanups in this scope tree.
+  DiverseStack<Cleanup, 128> Cleanups;
+
+public:
+  Builder(CFG &C) : C(C), B(new (C) BasicBlock(&C), C) {
+  }
+  
+  ~Builder() {
+    // If we have an unterminated block, just emit a dummy return for the
+    // default return.
+    if (B.getInsertionBB() != nullptr) {
       // FIXME: Should use empty tuple for "void" return.
-      CFGValue ArgV = S->hasResult() ? visit(S->getResult()) : (Instruction*) 0;
-      B.createReturn(S, ArgV);
+      B.createReturn(0, CFGValue());
       B.clearInsertionPoint();
     }
-    
-    void visitIfStmt(IfStmt *S);
-    
-    void visitWhileStmt(WhileStmt *S);
-    
-    void visitDoWhileStmt(DoWhileStmt *S);
-    
-    void visitForStmt(ForStmt *S) {
-      assert(false && "Not yet implemented");
-    }
-    
-    void visitForEachStmt(ForEachStmt *S) {
-      assert(false && "Not yet implemented");
-    }
-    
-    void visitBreakStmt(BreakStmt *S);
-    
-    void visitContinueStmt(ContinueStmt *S);
-    
-    //===--------------------------------------------------------------------===//
-    // Expressions.
-    //===--------------------------------------------------------------------===//
-    
-    CFGValue visitExpr(Expr *E) {
-      E->dump();
-      llvm_unreachable("Not yet implemented");
-    }
-    
-    CFGValue visitCallExpr(CallExpr *E);
-    CFGValue visitDeclRefExpr(DeclRefExpr *E);
-    CFGValue visitIntegerLiteralExpr(IntegerLiteralExpr *E);
-    CFGValue visitLoadExpr(LoadExpr *E);
-    CFGValue visitParenExpr(ParenExpr *E);
-    CFGValue visitThisApplyExpr(ThisApplyExpr *E);
-    CFGValue visitTupleExpr(TupleExpr *E);
-    CFGValue visitTypeOfExpr(TypeOfExpr *E);
-    
-  };
+  }
+  
+  /// Retun a stable reference to the current cleanup.
+  CleanupsDepth getCleanupsDepth() const {
+    return Cleanups.stable_begin();
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Statements.
+  //===--------------------------------------------------------------------===//
+  
+  /// emitCondition - Emit a boolean expression as a control-flow condition.
+  ///
+  /// \param TheStmt - The statement being lowered, for source information on
+  ///        the branch.
+  /// \param E - The expression to be evaluated as a condition.
+  /// \param hasFalseCode - true if the false branch doesn't just lead
+  ///        to the fallthrough.
+  /// \param invertValue - true if this routine should invert the value before
+  ///        testing true/false.
+  Condition emitCondition(Stmt *TheStmt, Expr *E,
+                          bool hasFalseCode = true, bool invertValue = false);
+  
+  
+  /// emitBranch - Emit a branch to the given jump destination, threading out
+  /// through any cleanups we might need to run.  Leaves the insertion point in
+  /// the current block.
+  void emitBranch(JumpDest D);
+  
+  //===--------------------------------------------------------------------===//
+  // Statements.
+  //===--------------------------------------------------------------------===//
+  
+  /// Construct the CFG components for the given BraceStmt.
+  void visitBraceStmt(BraceStmt *S);
+  
+  /// SemiStmts are ignored for CFG construction.
+  void visitSemiStmt(SemiStmt *S) {}
+  
+  void visitAssignStmt(AssignStmt *S) {
+    assert(false && "Not yet implemented");
+  }
+  
+  void visitReturnStmt(ReturnStmt *S) {
+    // FIXME: Should use empty tuple for "void" return.
+    CFGValue ArgV = S->hasResult() ? visit(S->getResult()) : (Instruction*) 0;
+    B.createReturn(S, ArgV);
+    B.clearInsertionPoint();
+  }
+  
+  void visitIfStmt(IfStmt *S);
+  
+  void visitWhileStmt(WhileStmt *S);
+  
+  void visitDoWhileStmt(DoWhileStmt *S);
+  
+  void visitForStmt(ForStmt *S) {
+    assert(false && "Not yet implemented");
+  }
+  
+  void visitForEachStmt(ForEachStmt *S) {
+    assert(false && "Not yet implemented");
+  }
+  
+  void visitBreakStmt(BreakStmt *S);
+  
+  void visitContinueStmt(ContinueStmt *S);
+  
+  //===--------------------------------------------------------------------===//
+  // Expressions.
+  //===--------------------------------------------------------------------===//
+  
+  CFGValue visitExpr(Expr *E) {
+    E->dump();
+    llvm_unreachable("Not yet implemented");
+  }
+  
+  CFGValue visitCallExpr(CallExpr *E);
+  CFGValue visitDeclRefExpr(DeclRefExpr *E);
+  CFGValue visitIntegerLiteralExpr(IntegerLiteralExpr *E);
+  CFGValue visitLoadExpr(LoadExpr *E);
+  CFGValue visitParenExpr(ParenExpr *E);
+  CFGValue visitThisApplyExpr(ThisApplyExpr *E);
+  CFGValue visitTupleExpr(TupleExpr *E);
+  CFGValue visitTypeOfExpr(TypeOfExpr *E);
+  
+};
 } // end anonymous namespace
 
 /// emitCondition - Emit a boolean expression as a control-flow condition.
@@ -212,6 +234,15 @@ Condition Builder::emitCondition(Stmt *TheStmt, Expr *E,
   return Condition(TrueBB, FalseBB, ContBB);
 }
 
+/// emitBranch - Emit a branch to the given jump destination, threading out
+/// through any cleanups we might need to run.  Leaves the insertion point in
+/// the current block.
+void Builder::emitBranch(JumpDest Dest) {
+  assert(B.hasValidInsertionPoint() && "Inserting branch in invalid spot");
+  assert(Cleanups.empty() && "FIXME: Implement cleanup support");
+  B.createBranch(Dest.getBlock());
+  B.clearInsertionPoint();
+}
 
 
 //===--------------------------------------------------------------------===//
@@ -233,13 +264,13 @@ void Builder::visitBraceStmt(BraceStmt *S) {
 }
 
 void Builder::visitBreakStmt(BreakStmt *S) {
-  //emitBranch(BreakDestStack.back());
-  //B.clearInsertionPoint();
+  emitBranch(BreakDestStack.back());
+  B.clearInsertionPoint();
 }
 
 void Builder::visitContinueStmt(ContinueStmt *S) {
-  //emitBranch(ContinueDestStack.back());
-  //B.clearInsertionPoint();
+  emitBranch(ContinueDestStack.back());
+  B.clearInsertionPoint();
 }
 
 void Builder::visitIfStmt(IfStmt *S) {
@@ -265,12 +296,14 @@ void Builder::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (C) BasicBlock(&C, "while");
   B.createBranch(LoopBB);
+  B.clearInsertionPoint();
+  
   emitBlock(B, LoopBB);
   
   // Set the destinations for 'break' and 'continue'
-  BasicBlock *endBB = new (C) BasicBlock(&C, "while.end");
-  //  BreakDestStack.emplace_back(endBB, getCleanupsDepth());
-  //  ContinueDestStack.emplace_back(loopBB, getCleanupsDepth());
+  BasicBlock *EndBB = new (C) BasicBlock(&C, "while.end");
+  BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
+  ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth());
   
   // Evaluate the condition with the false edge leading directly
   // to the continuation block.
@@ -290,21 +323,23 @@ void Builder::visitWhileStmt(WhileStmt *S) {
   // Complete the conditional execution.
   Cond.complete(B);
   
-  emitOrDeleteBlock(B, endBB);
-  //  BreakDestStack.pop_back();
-  //  ContinueDestStack.pop_back();
+  emitOrDeleteBlock(B, EndBB);
+  BreakDestStack.pop_back();
+  ContinueDestStack.pop_back();
 }
 
 void Builder::visitDoWhileStmt(DoWhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (C) BasicBlock(&C, "dowhile");
   B.createBranch(LoopBB);
+  B.clearInsertionPoint();
+  
   emitBlock(B, LoopBB);
   
   // Set the destinations for 'break' and 'continue'
-  BasicBlock *endBB = new (C) BasicBlock(&C, "dowhile.end");
-  //  BreakDestStack.emplace_back(endBB, getCleanupsDepth());
-  //  ContinueDestStack.emplace_back(loopBB, getCleanupsDepth());
+  BasicBlock *EndBB = new (C) BasicBlock(&C, "dowhile.end");
+  BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
+  ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth());
   
   // Emit the body, which is always evaluated the first time around.
   visit(S->getBody());
@@ -324,9 +359,9 @@ void Builder::visitDoWhileStmt(DoWhileStmt *S) {
     Cond.complete(B);
   }
   
-  emitOrDeleteBlock(B, endBB);
-  //  BreakDestStack.pop_back();
-  //  ContinueDestStack.pop_back();
+  emitOrDeleteBlock(B, EndBB);
+  BreakDestStack.pop_back();
+  ContinueDestStack.pop_back();
 }
 
 
