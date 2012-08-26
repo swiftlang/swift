@@ -1,4 +1,4 @@
-##===- swift/lib/CFG/Makefile ------------------------------*- Makefile -*-===##
+##===- swift/lib/CFG/Lowering/Makefile ---------------------*- Makefile -*-===##
 # 
 # This source file is part of the Swift.org open source project
 #
@@ -10,12 +10,10 @@
 #
 ##===----------------------------------------------------------------------===##
 
-SWIFT_LEVEL := ../..
+SWIFT_LEVEL := ../../..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
-PARALLEL_DIRS = Lowering
-
-LIBRARYNAME := swiftCFG
+LIBRARYNAME := swiftCFGLowering
 
 include $(SWIFT_LEVEL)/Makefile
 
