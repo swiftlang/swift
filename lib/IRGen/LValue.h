@@ -19,7 +19,7 @@
 
 #include "Address.h"
 #include "IRGen.h"
-#include "DiverseList.h"
+#include "swift/Basic/DiverseList.h"
 
 namespace llvm {
   template <class T> class SmallVectorImpl;

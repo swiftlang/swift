@@ -7,9 +7,6 @@ add_swift_library(swiftIRGen
   Callee.h
   Cleanup.h
   Condition.h
-  DiverseList.h
-  DiverseStack.cpp
-  DiverseStack.h
   Explosion.h
   GenArray.cpp
   GenClass.cpp

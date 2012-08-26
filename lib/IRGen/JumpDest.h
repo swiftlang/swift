@@ -17,7 +17,7 @@
 #ifndef SWIFT_IRGEN_JUMPDEST_H
 #define SWIFT_IRGEN_JUMPDEST_H
 
-#include "DiverseStack.h"
+#include "swift/Basic/DiverseStack.h"
 
 namespace llvm {
   class BasicBlock;

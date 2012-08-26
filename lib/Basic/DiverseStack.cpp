@@ -15,10 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "DiverseList.h"
-#include "DiverseStack.h"
+#include "swift/Basic/DiverseList.h"
+#include "swift/Basic/DiverseStack.h"
 using namespace swift;
-using namespace irgen;
 
 void DiverseStackBase::pushNewStorageSlow(std::size_t needed) {
   bool wasInline = isAllocatedInline();

@@ -1,4 +1,4 @@
-//===--- DiverseList.h - List of variably-sized objects ---------*- C++ -*-===//
+//===--- DiverseStack.h - Stack of variably-sized objects -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,141 +10,141 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines a data structure for representing a list of
+// This file defines a data structure for representing a stack of
 // variably-sized objects.  It is a requirement that the object type
 // be trivially movable, meaning that it has a trivial move
 // constructor and a trivial destructor.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IRGEN_DIVERSELIST_H
-#define SWIFT_IRGEN_DIVERSELIST_H
+#ifndef SWIFT_IRGEN_DIVERSESTACK_H
+#define SWIFT_IRGEN_DIVERSESTACK_H
 
 #include <cassert>
 #include <cstring>
 #include <utility>
 
 namespace swift {
-namespace irgen {
 
-template <class T> class DiverseListImpl;
+template <class T> class DiverseStackImpl;
 
-/// DiverseList - A list of heterogenously-typed objects.
+/// DiverseStack - A stack of heterogenously-typed objects.
 ///
-/// \param T - A common base class of the objects in the list; must
+/// \param T - A common base class of the objects on the stack; must
 ///   provide an allocated_size() const method.
 /// \param InlineCapacity - the amount of inline storage to provide, in bytes
 template <class T, unsigned InlineCapacity>
-class DiverseList : public DiverseListImpl<T> {
+class DiverseStack : public DiverseStackImpl<T> {
   char InlineStorage[InlineCapacity];
 
 public:
-  DiverseList() : DiverseListImpl<T>(InlineStorage + InlineCapacity) {}
-  DiverseList(const DiverseList &other)
-    : DiverseListImpl<T>(other, InlineStorage + InlineCapacity) {}
-  DiverseList(const DiverseListImpl<T> &other)
-    : DiverseListImpl<T>(other, InlineStorage + InlineCapacity) {}
-  DiverseList(DiverseList<T, InlineCapacity> &&other)
-    : DiverseListImpl<T>(std::move(other), InlineStorage + InlineCapacity) {}
-  DiverseList(DiverseListImpl<T> &&other)
-    : DiverseListImpl<T>(std::move(other), InlineStorage + InlineCapacity) {}
+  DiverseStack() : DiverseStackImpl<T>(InlineStorage + InlineCapacity) {}
+  DiverseStack(const DiverseStack &other)
+    : DiverseStackImpl<T>(other, InlineStorage + InlineCapacity) {}
+  DiverseStack(const DiverseStackImpl<T> &other)
+    : DiverseStackImpl<T>(other, InlineStorage + InlineCapacity) {}
+  DiverseStack(DiverseStack<T, InlineCapacity> &&other)
+    : DiverseStackImpl<T>(std::move(other), InlineStorage + InlineCapacity) {}
+  DiverseStack(DiverseStackImpl<T> &&other)
+    : DiverseStackImpl<T>(std::move(other), InlineStorage + InlineCapacity) {}
 };
 
-/// A base class for DiverseListImpl.
-class DiverseListBase {
+/// A base class for DiverseStackImpl.
+class DiverseStackBase {
 public:
-  /// The first element in the list and the beginning of the allocation.
+  /// The top of the stack.
   char *Begin;
 
-  /// A pointer past the last element in the list.
+  /// The bottom of the stack, i.e. the end of the allocation.
   char *End;
 
-  /// A pointer past the end of the allocation.
-  char *EndOfAllocation;
+  /// The beginning of the allocation.
+  char *Allocated;
 
   bool isAllocatedInline() const {
-    return (Begin == reinterpret_cast<const char *>(this + 1));
+    return (Allocated == reinterpret_cast<const char *>(this + 1));
   }
 
   void checkValid() const {
+    assert(Allocated <= Begin);
     assert(Begin <= End);
-    assert(End <= EndOfAllocation);
   }
 
-  void initialize(char *endOfAllocation) {
-    EndOfAllocation = endOfAllocation;
-    Begin = End = reinterpret_cast<char*>(this + 1);
+  void initialize(char *end) {
+    Begin = End = end;
+    Allocated = reinterpret_cast<char*>(this + 1);
   }
-  void copyFrom(const DiverseListBase &other) {
+  void copyFrom(const DiverseStackBase &other) {
     // Ensure that we're large enough to store all the data.
     std::size_t size = static_cast<std::size_t>(other.End - other.Begin);
-    char *newStorage = addNewStorage(size);
-    std::memcpy(newStorage, other.Begin, size);
+    pushNewStorage(size);
+    std::memcpy(Begin, other.Begin, size);
   }
-  char *addNewStorage(std::size_t needed) {
+  void pushNewStorage(std::size_t needed) {
     checkValid();
-    if (std::size_t(EndOfAllocation - End) >= needed) {
-      char *newStorage = End;
-      End += needed;
-      return newStorage;
+    if (std::size_t(Begin - Allocated) >= needed) {
+      Begin -= needed;
     } else {
-      return addNewStorageSlow(needed);
+      pushNewStorageSlow(needed);
     }
   }
-  char *addNewStorageSlow(std::size_t needed);
+  void pushNewStorageSlow(std::size_t needed);
 
-  /// A stable iterator is the equivalent of an index into the list.
+  /// A stable iterator is the equivalent of an index into the stack.
   /// It's an iterator that stays stable across modification of the
-  /// list.
+  /// stack.
   class stable_iterator {
-    std::size_t Offset;
-    friend class DiverseListBase;
-    template <class T> friend class DiverseListImpl;
-    stable_iterator(std::size_t offset) : Offset(offset) {}
+    std::size_t Depth;
+    friend class DiverseStackBase;
+    template <class T> friend class DiverseStackImpl;
+    stable_iterator(std::size_t depth) : Depth(depth) {}
   public:
     stable_iterator() = default;
     friend bool operator==(stable_iterator a, stable_iterator b) {
-      return a.Offset == b.Offset;
+      return a.Depth == b.Depth;
     }
     friend bool operator!=(stable_iterator a, stable_iterator b) {
-      return a.Offset != b.Offset;
-    }    
+      return a.Depth != b.Depth;
+    }
+
+    static stable_iterator invalid() {
+      return stable_iterator((std::size_t) -1);
+    }
+    bool isValid() const {
+      return Depth != (std::size_t) -1;
+    }
   };
   stable_iterator stable_begin() const {
+    return stable_iterator(End - Begin);
+  }
+  static stable_iterator stable_end() {
     return stable_iterator(0);
   }
-  stable_iterator stable_end() {
-    return stable_iterator(std::size_t(End - Begin));
-  }
 
-protected:
-  ~DiverseListBase() {
+  void checkIterator(stable_iterator it) const {
+    assert(it.isValid() && "checking an invalid iterator");
     checkValid();
-    if (!isAllocatedInline())
-      delete[] Begin;
+    assert(it.Depth <= size_t(End - Begin));
   }
 };
 
-/// An "abstract" base class for DiverseList<T> which does not
-/// explicitly the preferred inline capacity.  Most of the
-/// implementation is on this class.
-template <class T> class DiverseListImpl : private DiverseListBase {
-  DiverseListImpl(const DiverseListImpl<T> &other) = delete;
-  DiverseListImpl(DiverseListImpl<T> &&other) = delete;
+template <class T> class DiverseStackImpl : private DiverseStackBase {
+  DiverseStackImpl(const DiverseStackImpl<T> &other) = delete;
+  DiverseStackImpl(DiverseStackImpl<T> &&other) = delete;
 
 protected:
-  DiverseListImpl(char *endOfAllocation) {
-    initialize(endOfAllocation);
+  DiverseStackImpl(char *end) {
+    initialize(end);
   }
 
-  DiverseListImpl(const DiverseListImpl<T> &other, char *endOfAllocation) {
-    initialize(endOfAllocation);
+  DiverseStackImpl(const DiverseStackImpl<T> &other, char *end) {
+    initialize(end);
     copyFrom(other);
   }
-  DiverseListImpl(DiverseListImpl<T> &&other, char *endOfAllocation) {
+  DiverseStackImpl(DiverseStackImpl<T> &&other, char *end) {
     // If the other is allocated inline, just initialize and copy.
     if (other.isAllocatedInline()) {
-      initialize(endOfAllocation);
+      initialize(end);
       copyFrom(other);
       return;
     }
@@ -152,34 +152,44 @@ protected:
     // Otherwise, steal its allocations.
     Begin = other.Begin;
     End = other.End;
-    EndOfAllocation = other.EndOfAllocation;
-    other.Begin = other.End = other.EndOfAllocation = (char*) (&other + 1);
+    Allocated = other.Allocated;
+    other.Begin = other.End = other.Allocated = (char*) (&other + 1);
     assert(other.isAllocatedInline());
   }
   
 public:
+  ~DiverseStackImpl() {
+    checkValid();
+    if (!isAllocatedInline())
+      delete[] Allocated;
+  }
+
   /// Query whether the stack is empty.
   bool empty() const {
     checkValid();
     return Begin == End;
   }
 
-  /// Return a reference to the first element in the list.
-  T &front() {
+  /// Return a reference to the top element on the stack.
+  T &top() {
     assert(!empty());
     return *reinterpret_cast<T*>(Begin);
   }
 
-  /// Return a reference to the first element in the list.
-  const T &front() const {
+  /// Return a reference to the top element on the stack.
+  const T &top() const {
     assert(!empty());
     return *reinterpret_cast<const T*>(Begin);
   }
 
+  using DiverseStackBase::stable_iterator;
+  using DiverseStackBase::stable_begin;
+  using DiverseStackBase::stable_end;
+
   class const_iterator;
   class iterator {
     char *Ptr;
-    friend class DiverseListImpl;
+    friend class DiverseStackImpl;
     friend class const_iterator;
     iterator(char *ptr) : Ptr(ptr) {}
 
@@ -208,22 +218,27 @@ public:
     friend bool operator==(iterator a, iterator b) { return a.Ptr == b.Ptr; }
     friend bool operator!=(iterator a, iterator b) { return a.Ptr != b.Ptr; }
   };
+
+  using DiverseStackBase::checkIterator;
+  void checkIterator(iterator it) const {
+    checkValid();
+    assert(Begin <= it.Ptr && it.Ptr <= End);
+  }
+
   iterator begin() { checkValid(); return iterator(Begin); }
   iterator end() { checkValid(); return iterator(End); }
   iterator find(stable_iterator it) {
-    checkValid();
-    assert(it.Offset <= End - Begin);
-    return iterator(Begin + it.Offset);
+    checkIterator(it);
+    return iterator(End - it.Depth);
   }
   stable_iterator stabilize(iterator it) const {
-    checkValid();
-    assert(Begin <= it.Ptr && it.Ptr <= End);
-    return stable_iterator(it.Ptr - Begin);
+    checkIterator(it);
+    return stable_iterator(End - it.Ptr);
   } 
 
   class const_iterator {
     const char *Ptr;
-    friend class DiverseListImpl;
+    friend class DiverseStackImpl;
     const_iterator(const char *ptr) : Ptr(ptr) {}
   public:
     const_iterator() = default;
@@ -257,33 +272,39 @@ public:
   };
   const_iterator begin() const { checkValid(); return const_iterator(Begin); }
   const_iterator end() const { checkValid(); return const_iterator(End); }
-  const_iterator find(stable_iterator it) const {
-    checkValid();
-    assert(it.Offset <= End - Begin);
-    return const_iterator(Begin + it.Offset);
-  }
-  stable_iterator stabilize(const_iterator it) const {
+  void checkIterator(const_iterator it) const {
     checkValid();
     assert(Begin <= it.Ptr && it.Ptr <= End);
-    return stable_iterator(it.Ptr - Begin);
+  }
+  const_iterator find(stable_iterator it) const {
+    checkIterator(it);
+    return const_iterator(End - it.Depth);
+  }
+  stable_iterator stabilize(const_iterator it) const {
+    checkIterator(it);
+    return stable_iterator(End - it.Ptr);
   }
 
-  /// Add a new object onto the end of the list.
-  template <class U, class... A> U &add(A && ...args) {
-    char *storage = addNewStorage(sizeof(U));
-    U &newObject = *::new (storage) U(::std::forward<A>(args)...);
-    return newObject;
+  /// Push a new object onto the stack.
+  template <class U, class... A> U &push(A && ...args) {
+    pushNewStorage(sizeof(U));
+    return *::new (Begin) U(::std::forward<A>(args)...);
   }
 
-  /// Add a new object onto the end of the list with some extra storage.
-  template <class U, class... A> U &addWithExtra(size_t extra, A && ...args) {
-    char *storage = addNewStorage(sizeof(U) + extra);
-    U &newObject = *::new (storage) U(::std::forward<A>(args)...);
-    return newObject;
+  /// Pop an object off the stack.
+  void pop() {
+    assert(!empty());
+    Begin += top().allocated_size();
+  }
+
+  /// Pop an object of known type off the stack.
+  template <class U> void pop() {
+    assert(!empty());
+    assert(sizeof(U) == top().allocated_size());
+    Begin += sizeof(U);
   }
 };
 
-} // end namespace irgen
 } // end namespace swift
 
 #endif

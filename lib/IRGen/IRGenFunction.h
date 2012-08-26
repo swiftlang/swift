@@ -22,7 +22,6 @@
 #include "swift/AST/Type.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/CallingConv.h"
-#include "DiverseStack.h"
 #include "IRBuilder.h"
 #include "JumpDest.h"
 
