@@ -2047,9 +2047,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   // FIXME: Materialization
 
-  if (kind >= TypeMatchKind::Subtype) {
+  if (kind >= TypeMatchKind::TrivialSubtype) {
     if (auto tuple2 = type2->getAs<TupleType>()) {
-      // A scalar type is a subtype of a one-element, non-variadic tuple
+      // A scalar type is a trivial subtype of a one-element, non-variadic tuple
       // containing a single element if the scalar type is a subtype of
       // the type of that tuple's element.
       if (tuple2->getFields().size() == 1 &&
@@ -2929,7 +2929,7 @@ ConstraintSystem::isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables) {
       continue;
 
     if (auto fixed = getFixedType(tv)) {
-      if (fixed->hasTypeVariable())
+      if (simplifyType(fixed)->hasTypeVariable())
         return false;
       
       continue;
