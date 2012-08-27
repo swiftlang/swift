@@ -1673,11 +1673,19 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType,
       SequenceFolder(TypeChecker &TC) : TC(TC) { }
 
       bool walkToExprPre(Expr *E) {
-        // Don't walk into function expressions.
-        return !isa<FuncExpr>(E);
+        // For FuncExprs, we just want to type-check the patterns as written,
+        // but not walk into the body. The body will by type-checked separately.
+        if (auto func = dyn_cast<FuncExpr>(E)) {
+          TC.semaFuncExpr(func, /*isFirstPass=*/false,
+                          /*allowUnknownTypes=*/true);
+          return false;
+        }
+
+        return true;
       }
 
       Expr *walkToExprPost(Expr *E) {
+        // Fold sequence expressions.
         if (auto seqExpr = dyn_cast<SequenceExpr>(E)) {
           return SemaExpressionTree(TC).visitSequenceExpr(seqExpr, false);
         }
