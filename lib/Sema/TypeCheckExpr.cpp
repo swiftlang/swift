@@ -1142,10 +1142,15 @@ public:
     return nullptr;
   }
 
-  Expr *makeBinOp(Expr *Op, Expr *LHS, Expr *RHS);
-  Expr *foldSequence(Expr *LHS, ArrayRef<Expr*> &S, unsigned MinPrecedence);
-  Expr *visitSequenceExpr(SequenceExpr *E);
-  
+  Expr *makeBinOp(Expr *Op, Expr *LHS, Expr *RHS, bool TypeCheckAST);
+  Expr *foldSequence(Expr *LHS, ArrayRef<Expr*> &S, unsigned MinPrecedence,
+                     bool TypeCheckAST);
+  Expr *visitSequenceExpr(SequenceExpr *E, bool TypeCheckAST);
+
+  Expr *visitSequenceExpr(SequenceExpr *E) {
+    return visitSequenceExpr(E, /*TypeCheckAST=*/true);
+  }
+
   void PreProcessBraceStmt(BraceStmt *BS);
   
   Expr *visitFuncExpr(FuncExpr *E) {
@@ -1376,7 +1381,8 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
   return InfixData(~0U, Associativity::Left);
 }
 
-Expr *SemaExpressionTree::makeBinOp(Expr *Op, Expr *LHS, Expr *RHS) {
+Expr *SemaExpressionTree::makeBinOp(Expr *Op, Expr *LHS, Expr *RHS,
+                                    bool TypeCheckAST) {
   if (!LHS || !RHS)
     return nullptr;
 
@@ -1385,17 +1391,22 @@ Expr *SemaExpressionTree::makeBinOp(Expr *Op, Expr *LHS, Expr *RHS) {
   auto ArgElts2 = TC.Context.AllocateCopy(MutableArrayRef<Expr*>(ArgElts));
   TupleExpr *Arg = new (TC.Context) TupleExpr(SourceLoc(), 
                                               ArgElts2, 0, SourceLoc());
-  if (TC.semaTupleExpr(Arg))
+  if (TypeCheckAST && TC.semaTupleExpr(Arg))
     return nullptr;
 
   // Build the operation.
-  return visit(new (TC.Context) BinaryExpr(Op, Arg));
+  auto result = new (TC.Context) BinaryExpr(Op, Arg);
+  if (!TypeCheckAST)
+    return result;
+
+  return visit(result);
 }
 
 /// foldSequence - Take a sequence of expressions and fold a prefix of
 /// it into a tree of BinaryExprs using precedence parsing.
 Expr *SemaExpressionTree::foldSequence(Expr *LHS, ArrayRef<Expr*> &S,
-                                       unsigned MinPrecedence) {
+                                       unsigned MinPrecedence,
+                                       bool TypeCheckAST) {
   // Invariant: S is even-sized.
   // Invariant: All elements at even indices are operator references.
   assert(!S.empty());
@@ -1430,7 +1441,7 @@ Expr *SemaExpressionTree::foldSequence(Expr *LHS, ArrayRef<Expr*> &S,
     // both left-associative, fold LHS and RHS immediately.
     if (Op1Info.getPrecedence() > Op2Info.getPrecedence() ||
         (Op1Info == Op2Info && Op1Info.isLeftAssociative())) {
-      LHS = makeBinOp(Op1, LHS, RHS);
+      LHS = makeBinOp(Op1, LHS, RHS, TypeCheckAST);
       RHS = S[1];
       Op1 = Op2;
       Op1Info = Op2Info;
@@ -1443,7 +1454,7 @@ Expr *SemaExpressionTree::foldSequence(Expr *LHS, ArrayRef<Expr*> &S,
     // higher-precedence operators starting from this point, then
     // repeat.
     if (Op1Info.getPrecedence() < Op2Info.getPrecedence()) {
-      RHS = foldSequence(RHS, S, Op1Info.getPrecedence() + 1);
+      RHS = foldSequence(RHS, S, Op1Info.getPrecedence() + 1, TypeCheckAST);
       continue;
     }
 
@@ -1452,14 +1463,14 @@ Expr *SemaExpressionTree::foldSequence(Expr *LHS, ArrayRef<Expr*> &S,
     // recursively fold operators starting from this point, then
     // immediately fold LHS and RHS.
     if (Op1Info == Op2Info && Op1Info.isRightAssociative()) {
-      RHS = foldSequence(RHS, S, Op1Info.getPrecedence());
-      LHS = makeBinOp(Op1, LHS, RHS);
+      RHS = foldSequence(RHS, S, Op1Info.getPrecedence(), TypeCheckAST);
+      LHS = makeBinOp(Op1, LHS, RHS, TypeCheckAST);
 
       // If we've drained the entire sequence, we're done.
       if (S.empty()) return LHS;
 
       // Otherwise, start all over with our new LHS.
-      return foldSequence(LHS, S, MinPrecedence);
+      return foldSequence(LHS, S, MinPrecedence, TypeCheckAST);
     }
 
     // If we ended up here, it's because we have two operators
@@ -1478,17 +1489,18 @@ Expr *SemaExpressionTree::foldSequence(Expr *LHS, ArrayRef<Expr*> &S,
     }
     
     // Recover by arbitrarily binding the first two.
-    LHS = makeBinOp(Op1, LHS, RHS);
-    return foldSequence(LHS, S, MinPrecedence);
+    LHS = makeBinOp(Op1, LHS, RHS, TypeCheckAST);
+    return foldSequence(LHS, S, MinPrecedence, TypeCheckAST);
   }
 
   // Fold LHS and RHS together and declare completion.
-  return makeBinOp(Op1, LHS, RHS);
+  return makeBinOp(Op1, LHS, RHS, TypeCheckAST);
 }
 
 /// foldSequence - Take a SequenceExpr and fold it into a tree of
 /// BinaryExprs using precedence parsing.
-Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E) {
+Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E,
+                                            bool TypeCheckAST) {
   ArrayRef<Expr*> Elts = E->getElements();
   assert(Elts.size() > 1 && "inadequate number of elements in sequence");
   assert((Elts.size() & 1) == 1 && "even number of elements in sequence");
@@ -1496,7 +1508,7 @@ Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E) {
   Expr *LHS = Elts[0];
   Elts = Elts.slice(1);
 
-  Expr *Result = foldSequence(LHS, Elts, /*min precedence*/ 0);
+  Expr *Result = foldSequence(LHS, Elts, /*min precedence*/ 0, TypeCheckAST);
   assert(Elts.empty());
   return Result;
 }
@@ -1647,7 +1659,58 @@ bool TypeChecker::resolveUnresolvedLiterals(Expr *&E) {
   return E == nullptr;
 }
 
-bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
+bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType,
+                                      bool useConstraintSolver) {
+  // If we're using the constraint solver, we take a different path through
+  // the type checker. Handle it here.
+  if (useConstraintSolver) {
+    // First, fold any sequence expressions. This is essentially the last
+    // stage of parsing, which occurs before type checking.
+    class SequenceFolder : public ASTWalker {
+      TypeChecker &TC;
+
+    public:
+      SequenceFolder(TypeChecker &TC) : TC(TC) { }
+
+      bool walkToExprPre(Expr *E) {
+        // Don't walk into function expressions.
+        return !isa<FuncExpr>(E);
+      }
+
+      Expr *walkToExprPost(Expr *E) {
+        if (auto seqExpr = dyn_cast<SequenceExpr>(E)) {
+          return SemaExpressionTree(TC).visitSequenceExpr(seqExpr, false);
+        }
+
+        return E;
+      }
+
+      bool walkToStmtPre(Stmt *S) {
+        // Never walk into statements.
+        return false;
+      }
+    };
+
+    E = E->walk(SequenceFolder(*this));
+    if (!E)
+      return true;
+
+    // Now, simply dump the constraints.
+    if (dumpConstraints(E)) {
+      // FIXME: Crappy diagnostic :)
+      diagnose(E->getLoc(), diag::constraint_type_check_fail)
+        << E->getSourceRange();
+      return true;
+    }
+
+    // FIXME: The constraint system was solved, but we can't apply the
+    // results to the given expression yet. Just complain and fail.
+    diagnose(E->getLoc(), diag::constraint_type_check_pass)
+      << E->getSourceRange();
+
+    return true;
+  }
+
   SemaExpressionTree SET(*this);
   E = SET.doIt(E);
 

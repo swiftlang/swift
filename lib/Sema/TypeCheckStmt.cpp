@@ -520,14 +520,10 @@ void TypeChecker::typeCheckDestructorBody(DestructorDecl *DD) {
 }
 
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD,
-                                            bool dumpConstraints) {
+                                            bool useConstraintSolver) {
   auto Elem = TLCD->getBody();
   if (Expr *E = Elem.dyn_cast<Expr*>()) {
-    if (dumpConstraints) {
-      this->dumpConstraints(E);
-    }
-
-    if (typeCheckExpression(E))
+    if (typeCheckExpression(E, Type(), useConstraintSolver))
       return;
     if (TU.Kind == TranslationUnit::Repl)
       typeCheckTopLevelReplExpr(E, TLCD);

@@ -28,5 +28,5 @@ namespace swift {
                                    unsigned CurTUElem,
                                    unsigned &BufferOffset,
                                    unsigned BufferEndOffset,
-                                   bool dumpConstraints);
+                                   bool useConstraintSolver);
 }

@@ -306,7 +306,7 @@ void swift::REPL(ASTContext &Context) {
   swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
                                      CurBufferOffset,
                                      CurBufferEndOffset,
-                                     /*dumpConstraints=*/false);
+                                     /*useConstraintSolver=*/false);
   if (Context.hadError())
     return;
 
@@ -315,7 +315,7 @@ void swift::REPL(ASTContext &Context) {
   if (llvm::sys::Process::StandardInIsUserInput())
     printf("%s", "Welcome to swift.  Type ':help' for assistance.\n");
 
-  bool dumpConstraints = false;
+  bool useConstraintSolver = false;
   while (1) {
     // Read one line.
     e.PromptContinuationLevel = BraceCount;
@@ -382,12 +382,12 @@ void swift::REPL(ASTContext &Context) {
       } else if (L.peekNextToken().getText() == "dump_source") {
         llvm::errs() << DumpSource;
       } else if (L.peekNextToken().getText() == "dump_constraints") {
-        dumpConstraints = true;
+        useConstraintSolver = true;
       } else {
         printf("%s", "Unknown interpreter escape; try :help\n");
       }
 
-      if (!dumpConstraints) {
+      if (!useConstraintSolver) {
         CurBufferOffset = CurBufferEndOffset;
         CurChunkLines = 0;
         LastValidLineEnd = CurBuffer;
@@ -422,9 +422,9 @@ void swift::REPL(ASTContext &Context) {
         swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
                                            CurBufferOffset,
                                            CurBufferEndOffset,
-                                           dumpConstraints);
-    if (dumpConstraints) {
-      dumpConstraints = false;
+                                           useConstraintSolver);
+    if (useConstraintSolver) {
+      useConstraintSolver = false;
       ShouldRun = false;
     }
 

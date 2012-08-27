@@ -3084,7 +3084,7 @@ void ConstraintSystem::dump() {
   }
 }
 
-void TypeChecker::dumpConstraints(Expr *expr) {
+bool TypeChecker::dumpConstraints(Expr *expr) {
   ConstraintSystem CS(*this);
   llvm::errs() << "---Initial constraints for the given expression---\n";
   CS.generateConstraints(expr);
@@ -3118,11 +3118,15 @@ void TypeChecker::dumpConstraints(Expr *expr) {
     }
   }
 
+  bool solved = false;
   if (numSolved == 0)
     llvm::errs() << "No solution found.\n";
-  else if (numSolved == 1)
+  else if (numSolved == 1) {
     llvm::errs() << "Unique solution found.\n";
-  else
+    solved = true;
+  } else
     llvm::errs()<< "Found " << numSolved << " potential solutions.\n";
+
+  return !solved;
 }
 

@@ -577,6 +577,11 @@ ERROR(invalid_anonymous_argument,sema,none,
       "use of invalid anonymous argument, %0 is larger than"
       " # arguments to bound function (%1)", (unsigned, unsigned))
 
+ERROR(constraint_type_check_fail,sema,none,
+      "expression does not type-check", ())
+ERROR(constraint_type_check_pass,sema,none,
+      "constraint-based type checker cannot handle well-typed expressions", ())
+
 //------------------------------------------------------------------------------
 // Name Binding
 //------------------------------------------------------------------------------

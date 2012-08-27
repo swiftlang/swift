@@ -366,7 +366,7 @@ public:
   void typeCheckConstructorBody(ConstructorDecl *CD);
   void typeCheckDestructorBody(DestructorDecl *DD);
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD,
-                                 bool dumpConstraints);
+                                 bool useConstraintSolver);
 
   void typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD);
   void REPLCheckPatternBinding(PatternBindingDecl *D);
@@ -383,7 +383,8 @@ public:
   /// that are involved in conformance requirements.
   void preCheckProtocol(ProtocolDecl *D);
 
-  bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
+  bool typeCheckExpression(Expr *&E, Type ConvertType = Type(),
+                           bool useConstraintSolver = false);
   bool typeCheckPattern(Pattern *P, bool isFirstPass, bool allowUnknownTypes);
   bool coerceToType(Pattern *P, Type Ty, bool isFirstPass);
   bool typeCheckCondition(Expr *&E);
@@ -476,7 +477,9 @@ public:
 
   /// \brief Dump the constraint system generated from the given (unchecked)
   /// expression.
-  void dumpConstraints(Expr *expr);
+  ///
+  /// \returns true if the constrain system couldn't be solved.
+  bool dumpConstraints(Expr *expr);
 
   /// \name Overload resolution
   ///

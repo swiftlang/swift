@@ -78,14 +78,14 @@ bool swift::appendToMainTranslationUnit(TranslationUnit *TU, unsigned BufferID,
                                         unsigned CurTUElem,
                                         unsigned &BufferOffset,
                                         unsigned BufferEndOffset,
-                                        bool dumpConstraints) {
+                                        bool useConstraintSolver) {
   bool FoundAnySideEffects = false;
   do {
     FoundAnySideEffects |= parseIntoTranslationUnit(TU, BufferID,
                                                     &BufferOffset,
                                                     BufferEndOffset);
     performNameBinding(TU, CurTUElem);
-    performTypeChecking(TU, CurTUElem, dumpConstraints);
+    performTypeChecking(TU, CurTUElem, useConstraintSolver);
     CurTUElem = TU->Decls.size();
   } while (BufferOffset != BufferEndOffset);
   return FoundAnySideEffects;
