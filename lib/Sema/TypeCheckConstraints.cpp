@@ -2169,7 +2169,7 @@ Type ConstraintSystem::simplifyType(Type type) {
             if (auto tvt = type->getAs<TypeVariableType>()) {
               tvt = tvt->getImpl().getRepresentative();
               if (auto fixed = getFixedType(tvt))
-                return fixed;
+                return simplifyType(fixed);
 
               return tvt;
             }
@@ -2878,7 +2878,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
         continue;
       }
 
-      // Pick a type constraing to resolve into a potential binding.
+      // Pick a type variable to resolve into a potential binding.
       resolveTypeVariable(*cs, typeVarConstraints);
     }
 
@@ -2886,7 +2886,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     // explore. Consider this system dead.
     if (cs->PotentialBindings.empty()) {
       cs->markUnsolvable();
-      break;
+      continue;
     }
 
     // Push this constraint system back onto the stack to be reconsidered if
