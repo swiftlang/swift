@@ -699,7 +699,23 @@ namespace {
     ///
     /// \param type The type to open.
     /// \returns The opened type, or \c type if there are no archetypes in it.
-    Type openType(Type type);
+    Type openType(Type type) {
+      llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
+      return openType(type, replacements);
+    }
+
+    /// \brief "Open" the given type by replacing any occurrences of archetypes
+    /// (including those implicit in unbound generic types) with fresh type
+    /// variables.
+    ///
+    /// \param type The type to open.
+    ///
+    /// \param replacements The mapping from opened archetypes to the type
+    /// variables to which they were opened.
+    ///
+    /// \returns The opened type, or \c type if there are no archetypes in it.
+    Type openType(Type type,
+           llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements);
 
     /// \brief Retrieve the type of a reference to the given value declaration.
     ///
@@ -930,9 +946,8 @@ void ConstraintSystem::markChildInactive(ConstraintSystem *childCS) {
   }
 }
 
-Type ConstraintSystem::openType(Type startingType) {
-  llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
-
+Type ConstraintSystem::openType(Type startingType,
+       llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements) {
   struct GetTypeVariable {
     ConstraintSystem &CS;
     llvm::DenseMap<ArchetypeType *, TypeVariableType *> &Replacements;
@@ -1005,7 +1020,21 @@ Type ConstraintSystem::openType(Type startingType) {
       return FunctionType::get(inputTy, resultTy, TC.Context);
     }
 
-    // FIXME: Unbound generic types.
+    // Open up unbound generic types, turning them into bound generic
+    // types with type variables for each parameter.
+    if (auto unbound = type->getAs<UnboundGenericType>()) {
+      auto parentTy = unbound->getParent();
+      if (parentTy)
+        parentTy = TC.transformType(parentTy, replaceArchetypes);
+
+      auto unboundDecl = unbound->getDecl();
+      SmallVector<Type, 4> arguments;
+      for (auto archetype : unboundDecl->getGenericParams()->getAllArchetypes())
+        arguments.push_back(getTypeVariable(archetype));
+
+      return BoundGenericType::get(unboundDecl, parentTy, arguments);
+    }
+
     return type;
   };
   
@@ -1043,10 +1072,12 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
       llvm_unreachable("unknown owner for type member");
   }
 
+  // The archetypes that have been opened up and replaced with type variables.
+  llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
+
+  // If the owner is specialized, we need to open up the types in the owner.
   if (ownerTy->isSpecialized()) {
-    // If the owner is specialized, we need to open up the types in the owner.
-    // FIXME: Implement this
-    llvm_unreachable("opening of generic types unimplemented");
+    ownerTy = openType(ownerTy, replacements);
   }
 
   // The base type must be a subtype of the owner type.
@@ -1059,7 +1090,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     type = cast<TypeDecl>(value)->getDeclaredType();
   else
     type = value->getTypeOfReference();
-  type = openType(type);
+  type = openType(type, replacements);
 
   // Skip the 'this' argument if it's already been bound by the base.
   if (auto func = dyn_cast<FuncDecl>(value)) {
