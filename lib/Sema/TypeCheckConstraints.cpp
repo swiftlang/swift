@@ -177,6 +177,10 @@ namespace {
     Subtype,
     /// \brief The first type is convertible to the second type.
     Conversion,
+    /// \brief The first type can be converted to the second type or can be
+    /// used as an argument to a constructor for the second (non-reference)
+    /// type.
+    Construction,
     /// \brief The first type is the type of a literal. There is no second
     /// type.
     ///
@@ -239,6 +243,7 @@ namespace {
       case ConstraintKind::TrivialSubtype:
       case ConstraintKind::Subtype:
       case ConstraintKind::Conversion:
+      case ConstraintKind::Construction:
         assert(Member.empty() && "Relational constraint cannot have a member");
         break;
 
@@ -270,6 +275,7 @@ namespace {
       case ConstraintKind::TrivialSubtype:
       case ConstraintKind::Subtype:
       case ConstraintKind::Conversion:
+      case ConstraintKind::Construction:
         return ConstraintClassification::Relational;
 
       case ConstraintKind::Literal:
@@ -312,6 +318,7 @@ namespace {
       case ConstraintKind::TrivialSubtype: Out << " <t "; break;
       case ConstraintKind::Subtype: Out << " < "; break;
       case ConstraintKind::Conversion: Out << " << "; break;
+      case ConstraintKind::Construction: Out << " <<C "; break;
       case ConstraintKind::Literal:
         Out << " is ";
         switch (getLiteralKind()) {
@@ -470,7 +477,10 @@ namespace {
     Subtype,
     /// \brief Requires the first type to be convertible to the second type,
     /// which includes exact matches and both forms of subtyping.
-    Conversion
+    Conversion,
+    /// \brief Requires the first type to either be convertible to the second
+    /// type or to be a suitable constructor argument for the second type.
+    Construction
   };
 
   /// \brief Describes a system of constraints on type variables, the
@@ -1163,6 +1173,8 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   if (auto func = dyn_cast<FuncDecl>(value)) {
     if (func->isStatic() || isInstance)
       type = type->castTo<AnyFunctionType>()->getResult();
+  } else if (isa<ConstructorDecl>(value) || isa<OneOfElementDecl>(value)) {
+    type = type->castTo<AnyFunctionType>()->getResult();
   }
   return adjustLValueForReference(type, value->getAttrs().isAssignment(),
                                   TC.Context);
@@ -1190,6 +1202,19 @@ static Identifier findPatternName(Pattern *pattern) {
 // Constraint generation
 //===--------------------------------------------------------------------===//
 #pragma mark Constraint generation
+
+/// \brief Determine whether the given type is constructible, meaning that
+/// a construction constraint on the type can enumerate constructors.
+static bool isConstructibleType(Type type) {
+  if (type->is<StructType>() || type->is<OneOfType>())
+    return true;
+
+  if (auto BGT = type->getAs<BoundGenericType>())
+    if (isa<StructDecl>(BGT->getDecl()) || isa<OneOfDecl>(BGT->getDecl()))
+      return true;
+
+  return false;
+}
 
 void ConstraintSystem::generateConstraints(Expr *expr) {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
@@ -1534,10 +1559,25 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
 
     Type visitApplyExpr(ApplyExpr *expr) {
       ASTContext &Context = CS.getASTContext();
-      
-      // The function argument has some type T1 -> T2 for fresh variables
+
+      // If the function subexpression has metatype type, this is a type
+      // coercion or construction.
+      // Note that matching the metatype type here, within constraint
+      // generation, naturally restricts the use of metatypes to whatever
+      // the constraint generator can eagerly evaluate.
+      // FIXME: Specify this as a syntactic restriction on the form that one
+      // can use for a coercion or type construction.
+      if (isa<CallExpr>(expr)) {
+        if (auto metaTy = expr->getFn()->getType()->getAs<MetaTypeType>()) {
+          auto instanceTy = metaTy->getInstanceType();
+          CS.addConstraint(ConstraintKind::Construction,
+                           expr->getArg()->getType(), instanceTy);
+          return instanceTy;
+        }
+      }
+
+      // The function subexpression has some type T1 -> T2 for fresh variables
       // T1 and T2.
-      // FIXME: What if the function argument is a metatype?
       auto inputTy = CS.createTypeVariable(expr);
       auto outputTy = CS.createTypeVariable(expr);
       auto funcTy = FunctionType::get(inputTy, outputTy, Context);
@@ -1720,7 +1760,8 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     return result;
   }
 
-  assert(kind == TypeMatchKind::Conversion);
+  assert(kind == TypeMatchKind::Conversion ||
+         kind == TypeMatchKind::Construction);
 
   // Compute the element shuffles for conversions.
   enum {
@@ -1845,8 +1886,8 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 
     const auto &elt1 = tuple1->getFields()[source];
 
-    switch (matchTypes(elt1.getType(), elt2.getType(), kind, subFlags,
-                       trivial)) {
+    switch (matchTypes(elt1.getType(), elt2.getType(),
+                       TypeMatchKind::Conversion, subFlags, trivial)) {
     case SolutionKind::Error:
       return SolutionKind::Error;
 
@@ -1896,6 +1937,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case TypeMatchKind::Conversion:
     subKind = TypeMatchKind::Subtype;
     break;
+
+  case TypeMatchKind::Construction:
+    subKind = TypeMatchKind::Conversion;
+    break;
   }
 
   unsigned subFlags = flags | TMF_GenerateConstraints;
@@ -1943,6 +1988,9 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 
   case TypeMatchKind::Conversion:
     return ConstraintKind::Conversion;
+
+  case TypeMatchKind::Construction:
+    return ConstraintKind::Construction;
   }
 
   llvm_unreachable("unhandled type matching kind");
@@ -2014,6 +2062,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeMatchKind::TrivialSubtype:
     case TypeMatchKind::Subtype:
     case TypeMatchKind::Conversion:
+    case TypeMatchKind::Construction:
       if (flags & TMF_GenerateConstraints) {
         // Add a new constraint between these types. We consider the current
         // type-matching problem to the "solved" by this addition, because
@@ -2024,11 +2073,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         return SolutionKind::Solved;
       }
 
-      // We couldn't solve this constraint.
-      return SolutionKind::Unsolved;
+      // We couldn't solve this constraint. If only one of the types is a type
+      // variable, perhaps we can do something with it below.
+      if (typeVar1 && typeVar2)
+        return SolutionKind::Unsolved;
+        
+      break;
     }
-
-    llvm_unreachable("Unhandled type-variable matching");
   }
 
   // Decompose parallel structure.
@@ -2191,7 +2242,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   // FIXME: Materialization
 
-  if (kind >= TypeMatchKind::TrivialSubtype) {
+  bool concrete = !typeVar1 && !typeVar2;
+  if (concrete && kind >= TypeMatchKind::TrivialSubtype) {
     if (auto tuple2 = type2->getAs<TupleType>()) {
       // A scalar type is a trivial subtype of a one-element, non-variadic tuple
       // containing a single element if the scalar type is a subtype of
@@ -2204,7 +2256,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
       // A scalar type can be converted to a tuple so long as there is at
       // most one non-defaulted element.
-      if (kind == TypeMatchKind::Conversion) {
+      if (kind >= TypeMatchKind::Conversion) {
         int scalarFieldIdx = tuple2->getFieldForScalarInit();
         if (scalarFieldIdx >= 0) {
           const auto &elt = tuple2->getFields()[scalarFieldIdx];
@@ -2239,7 +2291,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
-  if (kind == TypeMatchKind::Conversion) {
+  if (concrete && kind >= TypeMatchKind::Conversion) {
     // An lvalue of type T1 can be converted to a value of type T2 so long as
     // T1 is convertible to T2 (by loading the value).
     if (auto lvalue1 = type1->getAs<LValueType>()) {
@@ -2259,8 +2311,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   // For a subtyping relation involving two existential types, or a conversion
   // from any type, check whether the first type conforms to each of
-  if (kind == TypeMatchKind::Conversion ||
-      (kind == TypeMatchKind::Subtype && type1->isExistentialType())) {
+  if (concrete &&
+      (kind >= TypeMatchKind::Conversion ||
+       (kind == TypeMatchKind::Subtype && type1->isExistentialType()))) {
     SmallVector<ProtocolDecl *, 4> protocols;
     if (!type1->hasTypeVariable() && type2->isExistentialType(protocols)) {
       for (auto proto : protocols) {
@@ -2272,10 +2325,38 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return SolutionKind::Solved;
     }
   }
+  
+  // A type can be constructed by passing an argument to one of its
+  // constructors. This construction only applies to oneof and struct types
+  // (or generic versions of oneof or struct types).
+  if (kind == TypeMatchKind::Construction && isConstructibleType(type2)) {
+    ConstructorLookup constructors(type2, TC.TU);
+    if (constructors.isSuccess()) {
+      auto &context = getASTContext();
+      // FIXME: lame name
+      auto name = context.getIdentifier("constructor");
+      auto tv = createTypeVariable();
+
+      // The constructor will have function type T -> T2, for a fresh type
+      // variable T. Note that these constraints specifically require a
+      // match on the result type because the constructors for oneofs and struct
+      // types always return a value of exactly that type.
+      addValueMemberConstraint(type2, name,
+                               FunctionType::get(tv, type2, context));
+
+      // The first type must be convertible to the constructor's argument type.
+      addConstraint(ConstraintKind::Conversion, type1, tv);
+      
+      // FIXME: Do we want to consider conversion functions simultaneously with
+      // constructors? Right now, we prefer constructors if they exist.
+      return SolutionKind::Solved;
+    }
+  }
+
 
   // A nominal type can be converted to another type via a user-defined
   // conversion function.
-  if (kind == TypeMatchKind::Conversion &&
+  if (concrete && kind >= TypeMatchKind::Conversion &&
       type1->getNominalOrBoundGenericNominal()) {
     auto &context = getASTContext();
     auto name = context.getIdentifier("__conversion");
@@ -2303,6 +2384,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return SolutionKind::Solved;
     }
   }
+
+  // If one of the types is a type variable, we leave this unsolved.
+  if (typeVar1 || typeVar2)
+    return SolutionKind::Unsolved;
 
   return SolutionKind::Error;
 }
@@ -2391,6 +2476,31 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // constraint to be unsolved. This effectively requires us to solve the
   // left-hand side of a dot expression before we look for members.
 
+  if (name.str() == "constructor") {
+    // Constructors have their own approach to name lookup.
+    ConstructorLookup constructors(baseTy, TC.TU);
+    if (!constructors.isSuccess()) {
+      return SolutionKind::Error;
+    }
+
+    // If there is only a single result, compute the type of a reference to
+    // that constructor and equate it with the member type.
+    if (constructors.Results.size() == 1) {
+      auto refType = getTypeOfMemberReference(baseTy, constructors.Results[0],
+                                              /*isTypeReference=*/false);
+      addConstraint(ConstraintKind::Bind, memberTy, refType);
+      return SolutionKind::Solved;
+    }
+
+    // We have multiple results. Introduce a new overload set.
+    SmallVector<OverloadChoice, 4> choices;
+    for (auto constructor : constructors.Results) {
+      choices.push_back(OverloadChoice(baseTy, constructor));
+    }
+    addOverloadSet(OverloadSet::getNew(*this, memberTy, &constraint, choices));
+    return SolutionKind::Solved;
+  }
+
   // Look for members within the base.
   MemberLookup lookup(baseTy, name, TC.TU);
   if (!lookup.isSuccess()) {
@@ -2436,7 +2546,8 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::TrivialSubtype: return TypeMatchKind::TrivialSubtype;
   case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
-      
+  case ConstraintKind::Construction: return TypeMatchKind::Construction;
+
   case ConstraintKind::Literal:
     llvm_unreachable("Literals don't involve type matches");
 
@@ -2453,7 +2564,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Equal:
   case ConstraintKind::TrivialSubtype:
   case ConstraintKind::Subtype:
-  case ConstraintKind::Conversion: {
+  case ConstraintKind::Conversion:
+  case ConstraintKind::Construction: {
     // For relational constraints, match up the types.
     bool trivial = true;
     return matchTypes(constraint.getFirstType(), constraint.getSecondType(),
@@ -2545,6 +2657,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
     case ConstraintKind::TrivialSubtype:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
+    case ConstraintKind::Construction:
       break;
 
     case ConstraintKind::Literal:
