@@ -1240,7 +1240,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
 
     Type visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
       // For a reference to an overloaded declaration, we create a type variable
-      // that will be equal to different types depending on which overload
+      // that will be bound to different types depending on which overload
       // is selected.
       auto tv = CS.createTypeVariable(expr);
       ArrayRef<ValueDecl*> decls = expr->getDecls();
@@ -1466,9 +1466,16 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitAddressOfExpr(AddressOfExpr *expr) {
+      // The address-of operator produces an explicit lvalue [byref] T from a
+      // (potentially implicit) lvalue S. We model this with the constraint
+      //
+      //     [byref] T < S
+      //
+      // where T is a fresh type variable.
       auto tv = CS.createTypeVariable(expr);
       auto result = LValueType::get(tv, LValueType::Qual::DefaultForType,
                                     CS.getASTContext());
+
       CS.addConstraint(ConstraintKind::Subtype,
                        result,
                        expr->getSubExpr()->getType());
