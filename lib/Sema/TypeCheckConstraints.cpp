@@ -17,6 +17,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/NameLookup.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1050,28 +1051,60 @@ Type ConstraintSystem::openType(Type startingType,
   return TC.transformType(startingType, replaceArchetypes);
 }
 
-/// \brief Adjust the type of an lvalue formed when referencing a declaration
-/// by adding the 'implicit' bit and removing the 'nonheap' bit.
-static Type adjustLValueForReference(Type type, ASTContext &context) {
-  auto lv = type->getAs<LValueType>();
-  if (!lv)
-    return type;
+/// \brief Adjust lvalue types within the type of a reference to a declaration.
+///
+/// For an lvalue type, this routine adds the 'implicit' and 'nonheap' bits to
+/// the lvalue.
+///
+/// For the function type of an assignment operator, makes the first argument
+/// an implicit byref.
+static Type adjustLValueForReference(Type type, bool isAssignment,
+                                     ASTContext &context) {
+  LValueType::Qual quals = LValueType::Qual::NonHeap|LValueType::Qual::Implicit;
+  if (auto lv = type->getAs<LValueType>()) {
+    // FIXME: The introduction of 'non-heap' here is an artifact of the type
+    // checker's inability to model the address-of operator that carries the
+    // heap bit from its input to its output while removing the 'implicit' bit.
+    // When we actually apply the inferred types in a constraint system to a
+    // concrete expression, the 'implicit' bits will be dropped and the
+    // appropriate 'heap' bits will be re-introduced.
+    return LValueType::get(lv->getObjectType(), quals, context);
+  }
 
-  // FIXME: The introduction of 'non-heap' here is an artifact of the type
-  // checker's inability to model the address-of operator that carries the
-  // heap bit from its input to its output while removing the 'implicit' bit.
-  // When we actually apply the inferred types in a constraint system to a
-  // concrete expression, the 'implicit' bits will be dropped and the
-  // appropriate 'heap' bits will be re-introduced.
-  return LValueType::get(lv->getObjectType(),
-                         LValueType::Qual::NonHeap | LValueType::Qual::Implicit,
-                         context);
+  // For an assignment operator, the first parameter is an implicit byref.
+  if (isAssignment) {
+    if (auto funcTy = type->getAs<FunctionType>()) {
+      Type inputTy;
+      if (auto inputTupleTy = funcTy->getInput()->getAs<TupleType>()) {
+        if (inputTupleTy->getFields().size() > 0) {
+          auto &firstParam = inputTupleTy->getFields()[0];
+          auto firstParamTy
+            = adjustLValueForReference(firstParam.getType(), false, context);
+          SmallVector<TupleTypeElt, 2> elements;
+          elements.push_back(firstParam.getWithType(firstParamTy));
+          elements.append(inputTupleTy->getFields().begin() + 1,
+                          inputTupleTy->getFields().end());
+          inputTy = TupleType::get(elements, context);
+        } else {
+          inputTy = funcTy->getInput();
+        }
+      } else {
+        inputTy = adjustLValueForReference(funcTy->getInput(), false, context);
+      }
+
+      return FunctionType::get(inputTy, funcTy->getResult(),
+                               funcTy->isAutoClosure(), context);
+    }
+  }
+
+  return type;
 }
 
 Type ConstraintSystem::getTypeOfReference(ValueDecl *value) {
   // Determine the type of the value, opening up that type if necessary.
   return adjustLValueForReference(openType(value->getTypeOfReference()),
-                            TC.Context);
+                                  value->getAttrs().isAssignment(),
+                                  TC.Context);
 }
 
 Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
@@ -1131,7 +1164,8 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     if (func->isStatic() || isInstance)
       type = type->castTo<AnyFunctionType>()->getResult();
   }
-  return adjustLValueForReference(type, TC.Context);
+  return adjustLValueForReference(type, value->getAttrs().isAssignment(),
+                                  TC.Context);
 }
 
 /// \brief Retrieve the name bound by the given (immediate) pattern.
@@ -1215,7 +1249,8 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       // We may, alternatively, want to use a type variable in that case,
       // and possibly infer the type of the variable that way.
       return adjustLValueForReference(CS.getTypeOfReference(E->getDecl()),
-                                CS.getASTContext());
+                                      E->getDecl()->getAttrs().isAssignment(),
+                                      CS.getASTContext());
     }
 
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
@@ -2840,8 +2875,11 @@ static void resolveOverloadSet(ConstraintSystem &cs,
                                                   /*FIXME:*/false);
     else
       refType = childCS->getTypeOfReference(choice.getDecl());
+
+    bool isAssignment = choice.getDecl()->getAttrs().isAssignment();
     childCS->addConstraint(ConstraintKind::Bind, ovl->getBoundType(),
-                           adjustLValueForReference(refType, cs.getASTContext()));
+                           adjustLValueForReference(refType, isAssignment,
+                                                    cs.getASTContext()));
 
     // Simplify the child system. Assuming it's still valid, add it to
     // the stack to be dealt with later.
