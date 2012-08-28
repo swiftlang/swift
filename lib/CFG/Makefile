@@ -13,7 +13,7 @@
 SWIFT_LEVEL := ../..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
-PARALLEL_DIRS = Lowering
+PARALLEL_DIRS = CFGGen
 
 LIBRARYNAME := swiftCFG
 

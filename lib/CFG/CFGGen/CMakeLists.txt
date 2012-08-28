@@ -1,4 +1,4 @@
-add_swift_library(swiftCFGLowering
+add_swift_library(swiftCFGGen
   Condition.cpp
   CFGLowering.cpp
   DEPENDS swiftCFG)

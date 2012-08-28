@@ -1,4 +1,4 @@
-##===- swift/lib/CFG/Lowering/Makefile ---------------------*- Makefile -*-===##
+##===- swift/lib/CFG/CFGGen/Makefile -----------------------*- Makefile -*-===##
 # 
 # This source file is part of the Swift.org open source project
 #
@@ -13,7 +13,7 @@
 SWIFT_LEVEL := ../../..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
-LIBRARYNAME := swiftCFGLowering
+LIBRARYNAME := swiftCFGGen
 
 include $(SWIFT_LEVEL)/Makefile
 
