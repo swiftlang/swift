@@ -161,7 +161,10 @@ namespace {
   /// \brief Describes the kind of constraint placed on one or more types.
   enum class ConstraintKind : char {
     /// \brief The two types must be bound to the same type. This is the only
-    /// symmetric constraint.
+    /// truly symmetric constraint.
+    Bind,
+    /// \brief The two types must be bound to the same type, dropping
+    /// lvalueness when comparing a type variable to a type.
     Equal,
     /// \brief The first type is a "trivial" subtype of the second type,
     /// meaning that it is a subtype that is also guaranteed to have the same
@@ -230,6 +233,7 @@ namespace {
       : Kind(Kind), First(First), Second(Second), Member(Member)
     {
       switch (Kind) {
+      case ConstraintKind::Bind:
       case ConstraintKind::Equal:
       case ConstraintKind::TrivialSubtype:
       case ConstraintKind::Subtype:
@@ -260,6 +264,7 @@ namespace {
     /// a broader categorization than \c getKind().
     ConstraintClassification getClassification() const {
       switch (Kind) {
+      case ConstraintKind::Bind:
       case ConstraintKind::Equal:
       case ConstraintKind::TrivialSubtype:
       case ConstraintKind::Subtype:
@@ -301,6 +306,7 @@ namespace {
     void print(llvm::raw_ostream &Out) {
       First->print(Out);
       switch (Kind) {
+      case ConstraintKind::Bind: Out << " := "; break;
       case ConstraintKind::Equal: Out << " == "; break;
       case ConstraintKind::TrivialSubtype: Out << " <t "; break;
       case ConstraintKind::Subtype: Out << " < "; break;
@@ -450,7 +456,10 @@ namespace {
 
   /// \brief The kind of type matching to perform in matchTypes().
   enum class TypeMatchKind : char {
-    /// \brief Require the types to match exactly.
+    /// \brief Bind the types together directly.
+    BindType,
+    /// \brief Require the types to match exactly, but strips lvalueness from
+    /// a type when binding to a type variable.
     SameType,
     /// \brief Require the first type to be a "trivial" subtype of the second
     /// type or be an exact match.
@@ -1084,11 +1093,16 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   addConstraint(ConstraintKind::Subtype, baseTy, ownerTy);
 
   // Determine the type of the member.
-  // FIXME: Subscript references are special. Deal with them.
   Type type;
   if (isTypeReference)
     type = cast<TypeDecl>(value)->getDeclaredType();
-  else
+  else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
+    auto resultTy = LValueType::get(subscript->getElementType(),
+                                    LValueType::Qual::DefaultForMemberAccess,
+                                    TC.Context);
+    type = FunctionType::get(subscript->getIndices()->getType(), resultTy,
+                             TC.Context);
+  } else
     type = value->getTypeOfReference();
   type = openType(type, replacements);
 
@@ -1799,6 +1813,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // Determine how we match up the input/result types.
   TypeMatchKind subKind;
   switch (kind) {
+  case TypeMatchKind::BindType:
   case TypeMatchKind::SameType:
   case TypeMatchKind::TrivialSubtype:
     subKind = kind;
@@ -1844,6 +1859,9 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 /// \brief Map a type-matching kind to a constraint kind.
 static ConstraintKind getConstraintKind(TypeMatchKind kind) {
   switch (kind) {
+  case TypeMatchKind::BindType:
+    return ConstraintKind::Bind;
+
   case TypeMatchKind::SameType:
     return ConstraintKind::Equal;
 
@@ -1891,7 +1909,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // If either (or both) types are type variables, unify the type variables.
   if (typeVar1 || typeVar2) {
     switch (kind) {
-    case TypeMatchKind::SameType:
+    case TypeMatchKind::BindType:
+    case TypeMatchKind::SameType: {
       if (typeVar1 && typeVar2) {
         auto rep1 = typeVar1->getImpl().getRepresentative();
         auto rep2 = typeVar2->getImpl().getRepresentative();
@@ -1914,11 +1933,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
 
       // Provide a fixed type for the type variable.
+      bool wantRvalue = kind == TypeMatchKind::SameType;
       if (typeVar1)
-        assignFixedType(typeVar1, type2->getRValueType());
+        assignFixedType(typeVar1, wantRvalue ? type2->getRValueType() : type2);
       else
-        assignFixedType(typeVar2, type1->getRValueType());
+        assignFixedType(typeVar2, wantRvalue ? type1->getRValueType() : type1);
       return SolutionKind::Solved;
+    }
 
     case TypeMatchKind::TrivialSubtype:
     case TypeMatchKind::Subtype:
@@ -2323,7 +2344,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     
     auto refType = getTypeOfMemberReference(baseTy, lookup.Results[0].D,
                                             isTypeMember);
-    addConstraint(ConstraintKind::Equal, refType, memberTy);
+    addConstraint(ConstraintKind::Bind, memberTy, refType);
     return SolutionKind::Solved;
   }
 
@@ -2340,6 +2361,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 /// constraint kind.
 static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   switch (kind) {
+  case ConstraintKind::Bind: return TypeMatchKind::BindType;
   case ConstraintKind::Equal: return TypeMatchKind::SameType;
   case ConstraintKind::TrivialSubtype: return TypeMatchKind::TrivialSubtype;
   case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
@@ -2357,6 +2379,7 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   switch (constraint.getKind()) {
+  case ConstraintKind::Bind:
   case ConstraintKind::Equal:
   case ConstraintKind::TrivialSubtype:
   case ConstraintKind::Subtype:
@@ -2447,6 +2470,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
     }
 
     switch (constraint->getKind()) {
+    case ConstraintKind::Bind:
     case ConstraintKind::Equal:
     case ConstraintKind::TrivialSubtype:
     case ConstraintKind::Subtype:
@@ -2781,7 +2805,7 @@ static void resolveOverloadSet(ConstraintSystem &cs,
                                                   /*FIXME:*/false);
     else
       refType = childCS->getTypeOfReference(choice.getDecl());
-    childCS->addConstraint(ConstraintKind::Equal, ovl->getBoundType(),
+    childCS->addConstraint(ConstraintKind::Bind, ovl->getBoundType(),
                            refType);
 
     // Simplify the child system. Assuming it's still valid, add it to
