@@ -1,4 +1,4 @@
-//===--- CFGLowering.cpp - Implements Lowering of ASTs -> CFGs -------------==//
+//===--- CFGGen.cpp - Implements Lowering of ASTs -> CFGs -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CFGLowering.h"
+#include "CFGGen.h"
 #include "Condition.h"
 #include "swift/AST/AST.h"
 using namespace swift;
@@ -75,7 +75,7 @@ static Expr *ignoreParens(Expr *Ex) {
 ///        to the fallthrough.
 /// \param invertValue - true if this routine should invert the value before
 ///        testing true/false.
-Condition CFGLowering::emitCondition(Stmt *TheStmt, Expr *E,
+Condition CFGGen::emitCondition(Stmt *TheStmt, Expr *E,
                                      bool hasFalseCode, bool invertValue) {
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
@@ -119,7 +119,7 @@ Condition CFGLowering::emitCondition(Stmt *TheStmt, Expr *E,
 /// emitBranch - Emit a branch to the given jump destination, threading out
 /// through any cleanups we might need to run.  Leaves the insertion point in
 /// the current block.
-void CFGLowering::emitBranch(JumpDest Dest) {
+void CFGGen::emitBranch(JumpDest Dest) {
   assert(B.hasValidInsertionPoint() && "Inserting branch in invalid spot");
   assert(Cleanups.empty() && "FIXME: Implement cleanup support");
   B.createBranch(Dest.getBlock());
@@ -131,7 +131,7 @@ void CFGLowering::emitBranch(JumpDest Dest) {
 // Statements
 //===--------------------------------------------------------------------===//
 
-void CFGLowering::visitBraceStmt(BraceStmt *S) {
+void CFGGen::visitBraceStmt(BraceStmt *S) {
   // BraceStmts do not need to be explicitly represented in the CFG.
   // We should consider whether or not the scopes they introduce are
   // represented in the CFG.
@@ -145,17 +145,17 @@ void CFGLowering::visitBraceStmt(BraceStmt *S) {
   }
 }
 
-void CFGLowering::visitBreakStmt(BreakStmt *S) {
+void CFGGen::visitBreakStmt(BreakStmt *S) {
   emitBranch(BreakDestStack.back());
   B.clearInsertionPoint();
 }
 
-void CFGLowering::visitContinueStmt(ContinueStmt *S) {
+void CFGGen::visitContinueStmt(ContinueStmt *S) {
   emitBranch(ContinueDestStack.back());
   B.clearInsertionPoint();
 }
 
-void CFGLowering::visitIfStmt(IfStmt *S) {
+void CFGGen::visitIfStmt(IfStmt *S) {
   Condition Cond = emitCondition(S, S->getCond(), S->getElseStmt() != nullptr);
   
   if (Cond.hasTrue()) {
@@ -174,7 +174,7 @@ void CFGLowering::visitIfStmt(IfStmt *S) {
   Cond.complete(B);
 }
 
-void CFGLowering::visitWhileStmt(WhileStmt *S) {
+void CFGGen::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (C) BasicBlock(&C, "while");
   B.createBranch(LoopBB);
@@ -210,7 +210,7 @@ void CFGLowering::visitWhileStmt(WhileStmt *S) {
   ContinueDestStack.pop_back();
 }
 
-void CFGLowering::visitDoWhileStmt(DoWhileStmt *S) {
+void CFGGen::visitDoWhileStmt(DoWhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (C) BasicBlock(&C, "dowhile");
   B.createBranch(LoopBB);
@@ -252,7 +252,7 @@ void CFGLowering::visitDoWhileStmt(DoWhileStmt *S) {
 // Expressions
 //===--------------------------------------------------------------------===//
 
-CFGValue CFGLowering::visitCallExpr(CallExpr *E) {
+CFGValue CFGGen::visitCallExpr(CallExpr *E) {
   Expr *Arg = ignoreParens(E->getArg());
   Expr *Fn = E->getFn();
   CFGValue FnV = visit(Fn);
@@ -270,37 +270,37 @@ CFGValue CFGLowering::visitCallExpr(CallExpr *E) {
   return B.createCall(E, FnV, ArgsV);
 }
 
-CFGValue CFGLowering::visitDeclRefExpr(DeclRefExpr *E) {
+CFGValue CFGGen::visitDeclRefExpr(DeclRefExpr *E) {
   return B.createDeclRef(E);
 }
 
-CFGValue CFGLowering::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+CFGValue CFGGen::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
   return B.createIntegerLiteral(E);
 }
 
-CFGValue CFGLowering::visitLoadExpr(LoadExpr *E) {
+CFGValue CFGGen::visitLoadExpr(LoadExpr *E) {
   CFGValue SubV = visit(E->getSubExpr());
   return B.createLoad(E, SubV);
 }
 
-CFGValue CFGLowering::visitThisApplyExpr(ThisApplyExpr *E) {
+CFGValue CFGGen::visitThisApplyExpr(ThisApplyExpr *E) {
   CFGValue FnV = visit(E->getFn());
   CFGValue ArgV = visit(E->getArg());
   return B.createThisApply(E, FnV, ArgV);
 }
 
-CFGValue CFGLowering::visitParenExpr(ParenExpr *E) {
+CFGValue CFGGen::visitParenExpr(ParenExpr *E) {
   return visit(E->getSubExpr());
 }
 
-CFGValue CFGLowering::visitTupleExpr(TupleExpr *E) {
+CFGValue CFGGen::visitTupleExpr(TupleExpr *E) {
   llvm::SmallVector<CFGValue, 10> ArgsV;
   for (auto &I : E->getElements())
     ArgsV.push_back(visit(I));
   return B.createTuple(E, ArgsV);
 }
 
-CFGValue CFGLowering::visitTypeOfExpr(TypeOfExpr *E) {
+CFGValue CFGGen::visitTypeOfExpr(TypeOfExpr *E) {
   return B.createTypeOf(E);
 }
 
@@ -310,7 +310,7 @@ CFGValue CFGLowering::visitTypeOfExpr(TypeOfExpr *E) {
 
 CFG *CFG::constructCFG(Stmt *S) {
   CFG *C = new CFG();
-  CFGLowering(*C).visit(S);
+  CFGGen(*C).visit(S);
   
   C->verify();
   return C;

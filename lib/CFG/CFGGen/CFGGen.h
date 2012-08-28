@@ -1,4 +1,4 @@
-//===--- CFGLowering.h - Implements Lowering of ASTs -> CFGs ----*- C++ -*-===//
+//===--- CFGGen.h - Implements Lowering of ASTs -> CFGs ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CFGLOWERING_H
-#define CFGLOWERING_H
+#ifndef CFGGEN_H
+#define CFGGEN_H
 
 #include "JumpDest.h"
 #include "swift/CFG/CFG.h"
@@ -24,7 +24,7 @@ namespace swift {
 namespace Lowering {
   class Condition;
 
-class CFGLowering : public ASTVisitor<CFGLowering, CFGValue> {
+class CFGGen : public ASTVisitor<CFGGen, CFGValue> {
   /// The CFG being constructed.
   CFG &C;
   
@@ -34,15 +34,15 @@ class CFGLowering : public ASTVisitor<CFGLowering, CFGValue> {
   
   std::vector<JumpDest> BreakDestStack;
   std::vector<JumpDest> ContinueDestStack;
-  
+
   /// Cleanups - Currently active cleanups in this scope tree.
   DiverseStack<Cleanup, 128> Cleanups;
   
 public:
-  CFGLowering(CFG &C) : C(C), B(new (C) BasicBlock(&C), C) {
+  CFGGen(CFG &C) : C(C), B(new (C) BasicBlock(&C), C) {
   }
   
-  ~CFGLowering() {
+  ~CFGGen() {
     // If we have an unterminated block, just emit a dummy return for the
     // default return.
     if (B.getInsertionBB() != nullptr) {
