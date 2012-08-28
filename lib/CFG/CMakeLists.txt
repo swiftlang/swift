@@ -1,4 +1,4 @@
-add_subdirectory(Lowering)
+add_subdirectory(CFGGen)
 add_swift_library(swiftCFG
   BasicBlock.cpp
   CFG.cpp
