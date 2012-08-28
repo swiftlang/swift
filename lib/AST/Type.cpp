@@ -1153,6 +1153,7 @@ void LValueType::print(raw_ostream &OS) const {
     } while(false)
 
     OS << '(';
+    APPEND_QUAL(qs & Qual::Implicit, "implicit");
     APPEND_QUAL(!(qs & Qual::NonHeap), "heap");
     OS << ')';
 

@@ -1194,6 +1194,12 @@ public:
       /// vice-versa.
       NonHeap = 0x1,
 
+      /// An implicit lvalue is an lvalue that has not been explicitly written
+      /// in the source as '&'.
+      ///
+      /// This qualifier is only used by the (constraint-based) type checker.
+      Implicit = 0x2,
+
       /// The default for a [byref] type.
       DefaultForType = NonHeap,
 

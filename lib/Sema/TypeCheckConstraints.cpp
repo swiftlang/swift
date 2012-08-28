@@ -1050,9 +1050,28 @@ Type ConstraintSystem::openType(Type startingType,
   return TC.transformType(startingType, replaceArchetypes);
 }
 
+/// \brief Adjust the type of an lvalue formed when referencing a declaration
+/// by adding the 'implicit' bit and removing the 'nonheap' bit.
+static Type adjustLValueForReference(Type type, ASTContext &context) {
+  auto lv = type->getAs<LValueType>();
+  if (!lv)
+    return type;
+
+  // FIXME: The introduction of 'non-heap' here is an artifact of the type
+  // checker's inability to model the address-of operator that carries the
+  // heap bit from its input to its output while removing the 'implicit' bit.
+  // When we actually apply the inferred types in a constraint system to a
+  // concrete expression, the 'implicit' bits will be dropped and the
+  // appropriate 'heap' bits will be re-introduced.
+  return LValueType::get(lv->getObjectType(),
+                         LValueType::Qual::NonHeap | LValueType::Qual::Implicit,
+                         context);
+}
+
 Type ConstraintSystem::getTypeOfReference(ValueDecl *value) {
   // Determine the type of the value, opening up that type if necessary.
-  return openType(value->getTypeOfReference());
+  return adjustLValueForReference(openType(value->getTypeOfReference()),
+                            TC.Context);
 }
 
 Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
@@ -1098,7 +1117,8 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     type = cast<TypeDecl>(value)->getDeclaredType();
   else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
     auto resultTy = LValueType::get(subscript->getElementType(),
-                                    LValueType::Qual::DefaultForMemberAccess,
+                                    LValueType::Qual::DefaultForMemberAccess|
+                                    LValueType::Qual::Implicit,
                                     TC.Context);
     type = FunctionType::get(subscript->getIndices()->getType(), resultTy,
                              TC.Context);
@@ -1111,7 +1131,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     if (func->isStatic() || isInstance)
       type = type->castTo<AnyFunctionType>()->getResult();
   }
-  return type;
+  return adjustLValueForReference(type, TC.Context);
 }
 
 /// \brief Retrieve the name bound by the given (immediate) pattern.
@@ -1194,7 +1214,8 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       // FIXME: If the decl is in error, we get no information from this.
       // We may, alternatively, want to use a type variable in that case,
       // and possibly infer the type of the variable that way.
-      return CS.getTypeOfReference(E->getDecl());
+      return adjustLValueForReference(CS.getTypeOfReference(E->getDecl()),
+                                CS.getASTContext());
     }
 
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
@@ -1307,7 +1328,8 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       auto inputTv = CS.createTypeVariable(expr);
       auto outputTv = CS.createTypeVariable(expr);
       auto outputTy = LValueType::get(outputTv, 
-                                      LValueType::Qual::DefaultForMemberAccess,
+                                      LValueType::Qual::DefaultForMemberAccess|
+                                      LValueType::Qual::Implicit,
                                       Context);
       auto fnTy = FunctionType::get(inputTv, outputTy, Context);
 
@@ -1444,7 +1466,13 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitAddressOfExpr(AddressOfExpr *expr) {
-      return expr->getSubExpr()->getType();
+      auto tv = CS.createTypeVariable(expr);
+      auto result = LValueType::get(tv, LValueType::Qual::DefaultForType,
+                                    CS.getASTContext());
+      CS.addConstraint(ConstraintKind::Subtype,
+                       result,
+                       expr->getSubExpr()->getType());
+      return result;
     }
 
     Type visitNewArrayExpr(NewArrayExpr *expr) {
@@ -2806,7 +2834,7 @@ static void resolveOverloadSet(ConstraintSystem &cs,
     else
       refType = childCS->getTypeOfReference(choice.getDecl());
     childCS->addConstraint(ConstraintKind::Bind, ovl->getBoundType(),
-                           refType);
+                           adjustLValueForReference(refType, cs.getASTContext()));
 
     // Simplify the child system. Assuming it's still valid, add it to
     // the stack to be dealt with later.
