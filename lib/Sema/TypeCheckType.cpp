@@ -498,7 +498,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     }
 
     // Check protocol conformance.
-    if (!isFirstPass && !IsInvalid && !BGT->hasSubstitutions()) {
+    if (!IsInvalid && !BGT->hasSubstitutions()) {
       // FIXME: Record that we're checking substitutions, so we can't end up
       // with infinite recursion.
       TypeSubstitutionMap Substitutions;

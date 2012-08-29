@@ -634,9 +634,10 @@ public:
 
   void visitNewArrayExpr(NewArrayExpr *E) {
     printCommon(E, "new_array_expr")
-      << " elementType='" << E->getElementType() << "'";
+      << " elementType='" << E->getElementTypeLoc().getType() << "'";
     OS << '\n';
-    printRec(E->getInjectionFunction());
+    if (E->hasInjectionFunction())
+      printRec(E->getInjectionFunction());
     for (auto &bound : E->getBounds()) {
       OS << '\n';
       if (bound.Value)

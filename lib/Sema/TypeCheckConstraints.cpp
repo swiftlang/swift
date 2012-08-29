@@ -1617,10 +1617,27 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitNewArrayExpr(NewArrayExpr *expr) {
-      // FIXME: Eventually, we'll want to support unbound generic types in
-      // the type of the array-new expression, which requires opening up the
-      // unbound generic type here.
-      return expr->getType();
+      // Open up the element type.
+      auto resultTy = CS.openType(expr->getElementTypeLoc().getType());
+      auto &tc = CS.getTypeChecker();
+      for (unsigned i = expr->getBounds().size(); i != 1; --i) {
+        auto &bound = expr->getBounds()[i-1];
+        if (!bound.Value) {
+          resultTy = tc.getArraySliceType(bound.Brackets.Start, resultTy);
+          continue;
+        }
+
+        llvm_unreachable("Constant bounds in array new unsupported");
+      }
+
+      auto &outerBound = expr->getBounds()[0];
+      // FIXME: Add the constraint that the bound is an array bound.
+      resultTy = tc.getArraySliceType(outerBound.Brackets.Start, resultTy);
+
+      // FIXME: Will need to find/set the injection function, probably as
+      // part of applying the results of a constraint system to an expression.
+      // FIXME: Also set the element type.
+      return resultTy;
     }
 
     Type visitTypeOfExpr(TypeOfExpr *expr) {

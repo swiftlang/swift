@@ -980,7 +980,7 @@ public:
         continue;
       }
 
-      // Otherwise, build the approproiate constant array type.
+      // Otherwise, build the appropriate constant array type.
 
       // Force the array type to be constant.
       if (TC.typeCheckArrayBound(bound.Value, /*requireConstant*/ true))
@@ -1664,13 +1664,13 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType,
   // If we're using the constraint solver, we take a different path through
   // the type checker. Handle it here.
   if (useConstraintSolver) {
-    // First, fold any sequence expressions. This is essentially the last
-    // stage of parsing, which occurs before type checking.
-    class SequenceFolder : public ASTWalker {
+    // First, pre-check the expression, validating any types that occur in the
+    // expression and folding sequence expressions.
+    class PreCheckExpression : public ASTWalker {
       TypeChecker &TC;
 
     public:
-      SequenceFolder(TypeChecker &TC) : TC(TC) { }
+      PreCheckExpression(TypeChecker &TC) : TC(TC) { }
 
       bool walkToExprPre(Expr *E) {
         // For FuncExprs, we just want to type-check the patterns as written,
@@ -1690,6 +1690,15 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType,
           return SemaExpressionTree(TC).visitSequenceExpr(seqExpr, false);
         }
 
+        // Type check the type in an array new expression.
+        if (auto newArray = dyn_cast<NewArrayExpr>(E)) {
+          if (TC.validateType(newArray->getElementTypeLoc(),
+                              /*isFirstPass=*/false))
+            return nullptr;
+
+          return E;
+        }
+
         return E;
       }
 
@@ -1699,7 +1708,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType,
       }
     };
 
-    E = E->walk(SequenceFolder(*this));
+    E = E->walk(PreCheckExpression(*this));
     if (!E)
       return true;
 
