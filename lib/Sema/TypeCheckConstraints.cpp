@@ -365,27 +365,62 @@ namespace {
     inline void operator delete(void *, const ConstraintSystem &cs, size_t) {}
   };
 
-  /// \brief Describes a particular choice of a declaration from within a
-  /// reference to an overloaded name.
+  /// \brief The kind of overload choice.
+  enum class OverloadChoiceKind : char {
+    /// \brief The overload choice selects a particular declaration from a
+    /// set of declarations.
+    Decl,
+    /// \brief The overload choice equates the member type with the
+    /// base type. Used for unresolved member expressions like ".none" that
+    /// refer to oneof members with unit type.
+    BaseType,
+    /// \brief The overload choices equates the member type with a function
+    /// of arbitrary input type whose result type is the base type. Used for
+    /// unresolved member expressions like ".internal" that refer to oneof
+    /// members with non-unit type.
+    FunctionReturningBaseType
+  };
+
+  /// \brief Describes a particular choice within an overload set.
+  ///
+  /// 
   class OverloadChoice {
     /// \brief The base type to be used when referencing the declaration.
     Type Base;
 
-    /// \brief The declaration that we're referencing.
-    ValueDecl *Value;
+    /// \brief The kind of overload choice we're working with, along with
+    /// the declaration being selected (for an overload choice that picks a
+    /// declaration).
+    llvm::PointerIntPair<ValueDecl *, 2> ValueAndKind;
 
     /// \brief Overload choices are always allocated within a given constraint
     /// system.
     void *operator new(size_t) = delete;
 
   public:
-    OverloadChoice(Type base, ValueDecl *value) : Base(base), Value(value) { }
+    OverloadChoice(Type base, ValueDecl *value)
+      : Base(base), ValueAndKind(value, (unsigned)OverloadChoiceKind::Decl) { }
+
+    OverloadChoice(Type base, OverloadChoiceKind kind)
+      : Base(base), ValueAndKind(nullptr, (unsigned)kind)
+    {
+      assert(base && "Must have a base type for overload choice");
+      assert(kind != OverloadChoiceKind::Decl && "wrong constructor for decl");
+    }
 
     /// \brief Retrieve the base type used to refer to the declaration.
     Type getBaseType() const { return Base; }
 
+    /// \brief Determines the kind of overload choice this is.
+    OverloadChoiceKind getKind() const {
+      return (OverloadChoiceKind)ValueAndKind.getInt();
+    }
+
     /// \brief Retrieve the declaraton that corresponds to this overload choice.
-    ValueDecl *getDecl() const { return Value; }
+    ValueDecl *getDecl() const {
+      assert(getKind() == OverloadChoiceKind::Decl && "Not a declaration");
+      return ValueAndKind.getPointer();
+    }
   };
 
   /// \brief An overload set, which is a set of overloading choices from which
@@ -856,9 +891,27 @@ namespace {
     ///
     /// The resulting types can be compared canonically, so long as additional
     /// type equivalence requirements aren't introduced between comparisons.
-    Type simplifyType(Type type);
+    Type simplifyType(Type type){
+      llvm::SmallPtrSet<TypeVariableType *, 16> substituting;
+      return simplifyType(type, substituting);
+    }
 
   private:
+    /// \brief Simplify a type, by replacing type variables with either their
+    /// fixed types (if available) or their representatives.
+    ///
+    /// \param type the type to be simplified.
+    ///
+    /// \param substituting the set of type variables that we're already
+    /// substituting for. These type variables will not be substituted again,
+    /// to avoid infinite recursion.
+    ///
+    /// The resulting types can be compared canonically, so long as additional
+    /// type equivalence requirements aren't introduced between comparisons.
+    Type simplifyType(Type type,
+                      llvm::SmallPtrSet<TypeVariableType *, 16> &substituting);
+
+
     /// \brief Attempt to simplify the given literal constraint.
     SolutionKind simplifyLiteralConstraint(Type type, LiteralKind kind);
 
@@ -1339,12 +1392,30 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
-      auto tv = CS.createTypeVariable(expr);
+      auto oneofTy = CS.createTypeVariable(expr);
+      auto memberTy = CS.createTypeVariable(expr);
 
-      // The type must be a oneof type that has an element of the given name.
-      // That named member has the type 'tv'.
-      CS.addValueMemberConstraint(tv, expr->getName(), tv);
-      return tv;
+      // An unresolved member expression '.member' is modeled as a value member
+      // constraint
+      //
+      //   T0[.member] == T1
+      //
+      // for fresh type variables T0 and T1. Depending on whether the member
+      // will end up having unit type () or an actual type, T1 will either be
+      // T0 or will be T2 -> T0 for some fresh type variable T2. Since T0
+      // cannot be determined without picking one of these options, and we
+      // cannot know whether to select the value form (T0) or the function
+      // form (T2 -> T0) until T0 has been deduced, we cannot model this
+      // directly within the constraint system. Instead, we introduce a new
+      // overload set with two entries: one for T0 and one for T2 -> T0.
+      CS.addValueMemberConstraint(oneofTy, expr->getName(), memberTy);
+
+      OverloadChoice choices[2] = {
+        OverloadChoice(oneofTy, OverloadChoiceKind::BaseType),
+        OverloadChoice(oneofTy, OverloadChoiceKind::FunctionReturningBaseType),
+      };
+      CS.addOverloadSet(OverloadSet::getNew(CS, memberTy, expr, choices));
+      return memberTy;
     }
 
     Type visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
@@ -2392,13 +2463,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   return SolutionKind::Error;
 }
 
-Type ConstraintSystem::simplifyType(Type type) {
+Type ConstraintSystem::simplifyType(Type type,
+       llvm::SmallPtrSet<TypeVariableType *, 16> &substituting) {
   return TC.transformType(type,
                           [&](Type type) -> Type {
             if (auto tvt = type->getAs<TypeVariableType>()) {
               tvt = tvt->getImpl().getRepresentative();
-              if (auto fixed = getFixedType(tvt))
-                return simplifyType(fixed);
+              if (auto fixed = getFixedType(tvt)) {
+                if (substituting.insert(tvt)) {
+                  auto result = simplifyType(fixed, substituting);
+                  substituting.erase(tvt);
+                  return result;
+                }
+              }
 
               return tvt;
             }
@@ -2979,20 +3056,36 @@ static void resolveOverloadSet(ConstraintSystem &cs,
     auto &choice = ovl->getChoices()[idx];
     auto childCS = cs.createDerivedConstraintSystem(idx);
 
-    // Bind the overload set's type to the type of a reference to the
-    // specific declaration choice.
+    // Determie the type to which we'll bind the overload set's type.
     Type refType;
-    if (choice.getBaseType())
-      refType = childCS->getTypeOfMemberReference(choice.getBaseType(),
-                                                  choice.getDecl(),
-                                                  /*FIXME:*/false);
-    else
-      refType = childCS->getTypeOfReference(choice.getDecl());
+    switch (choice.getKind()) {
+    case OverloadChoiceKind::Decl: {
+      // Retrieve the type of a reference to the specific declaration choice.
+      if (choice.getBaseType())
+        refType = childCS->getTypeOfMemberReference(choice.getBaseType(),
+                                                    choice.getDecl(),
+                                                    /*FIXME:*/false);
+      else
+        refType = childCS->getTypeOfReference(choice.getDecl());
 
-    bool isAssignment = choice.getDecl()->getAttrs().isAssignment();
-    childCS->addConstraint(ConstraintKind::Bind, ovl->getBoundType(),
-                           adjustLValueForReference(refType, isAssignment,
-                                                    cs.getASTContext()));
+      bool isAssignment = choice.getDecl()->getAttrs().isAssignment();
+      refType = adjustLValueForReference(refType, isAssignment,
+                                         cs.getASTContext());
+      break;
+    }
+
+    case OverloadChoiceKind::BaseType:
+      refType = choice.getBaseType();
+      break;
+
+    case OverloadChoiceKind::FunctionReturningBaseType:
+      refType = FunctionType::get(childCS->createTypeVariable(),
+                                  choice.getBaseType(),
+                                  cs.getASTContext());
+      break;
+    }
+
+    childCS->addConstraint(ConstraintKind::Bind, ovl->getBoundType(), refType);
 
     // Simplify the child system. Assuming it's still valid, add it to
     // the stack to be dealt with later.
@@ -3249,11 +3342,24 @@ void ConstraintSystem::dump() {
         auto &choice = cs->InOverloadSet->getChoices()[cs->OverloadChoiceIdx];
         out << "  selected overload set #" << cs->InOverloadSet->getID()
             << " choice #" << cs->OverloadChoiceIdx << " for ";
-        if (choice.getBaseType())
-          out << choice.getBaseType()->getString() << ".";
-        out << choice.getDecl()->getName().str() << ": "
+        switch (choice.getKind()) {
+        case OverloadChoiceKind::Decl:
+          if (choice.getBaseType())
+            out << choice.getBaseType()->getString() << ".";
+          out << choice.getDecl()->getName().str() << ": "
             << cs->InOverloadSet->getBoundType()->getString() << " == "
             << choice.getDecl()->getTypeOfReference()->getString() << "\n";
+          break;
+
+        case OverloadChoiceKind::BaseType:
+          out << "base type " << choice.getBaseType()->getString() << "\n";
+          break;
+
+        case OverloadChoiceKind::FunctionReturningBaseType:
+          out << "function returning base type "
+              << choice.getBaseType()->getString() << "\n";
+          break;
+        }
         continue;
       }
 
@@ -3292,10 +3398,23 @@ void ConstraintSystem::dump() {
         << overload->getBoundType()->getString() << ":\n";
       for (auto choice : overload->getChoices()) {
         out.indent(4);
-        if (choice.getBaseType())
-          out << choice.getBaseType()->getString() << ".";
-        out << choice.getDecl()->getName().str() << ": ";
-        out << choice.getDecl()->getTypeOfReference()->getString() << '\n';
+        switch (choice.getKind()) {
+        case OverloadChoiceKind::Decl:
+          if (choice.getBaseType())
+            out << choice.getBaseType()->getString() << ".";
+          out << choice.getDecl()->getName().str() << ": ";
+          out << choice.getDecl()->getTypeOfReference()->getString() << '\n';
+          break;
+
+        case OverloadChoiceKind::BaseType:
+          out << "base type " << choice.getBaseType()->getString() << "\n";
+          break;
+
+        case OverloadChoiceKind::FunctionReturningBaseType:
+          out << "function returning base type "
+          << choice.getBaseType()->getString() << "\n";
+          break;
+        }
       }
     }
   }
