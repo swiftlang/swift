@@ -1317,7 +1317,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       auto tv = CS.createTypeVariable(expr);
       CS.addLiteralConstraint(tv, LiteralKind::UTFString);
       for (auto segment : expr->getSegments()) {
-        CS.addConstraint(ConstraintKind::Conversion, segment->getType(), tv);
+        CS.addConstraint(ConstraintKind::Construction, segment->getType(), tv);
       }
       return tv;
     }
