@@ -374,11 +374,14 @@ namespace {
     /// base type. Used for unresolved member expressions like ".none" that
     /// refer to oneof members with unit type.
     BaseType,
-    /// \brief The overload choices equates the member type with a function
+    /// \brief The overload choice equates the member type with a function
     /// of arbitrary input type whose result type is the base type. Used for
     /// unresolved member expressions like ".internal" that refer to oneof
     /// members with non-unit type.
-    FunctionReturningBaseType
+    FunctionReturningBaseType,
+    /// \brief The overload choice equates the member type with a function
+    /// from the base type to itself.
+    IdentityFunction
   };
 
   /// \brief Describes a particular choice within an overload set.
@@ -2560,9 +2563,31 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       return SolutionKind::Error;
     }
 
+    // Check whether we have an 'identity' constructor.
+    bool sawIdentityConstructor = false;
+    for (auto constructor : constructors.Results) {
+      if (auto funcTy = constructor->getType()->getAs<FunctionType>()) {
+        if ((funcTy = funcTy->getResult()->getAs<FunctionType>())) {
+          // Dig out the input type.
+          auto inputTy = funcTy->getInput();
+          if (auto inputTupleTy = inputTy->getAs<TupleType>()) {
+            int scalarIdx = inputTupleTy->getFieldForScalarInit();
+            if (scalarIdx >= 0) {
+              inputTy = inputTupleTy->getElementType(scalarIdx);
+            }
+          }
+
+          if (inputTy->isEqual(baseTy)) {
+            sawIdentityConstructor = true;
+            break;
+          }
+        }
+      }
+    }
+
     // If there is only a single result, compute the type of a reference to
     // that constructor and equate it with the member type.
-    if (constructors.Results.size() == 1) {
+    if (constructors.Results.size() == 1 && sawIdentityConstructor) {
       auto refType = getTypeOfMemberReference(baseTy, constructors.Results[0],
                                               /*isTypeReference=*/false);
       addConstraint(ConstraintKind::Bind, memberTy, refType);
@@ -2573,6 +2598,14 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     SmallVector<OverloadChoice, 4> choices;
     for (auto constructor : constructors.Results) {
       choices.push_back(OverloadChoice(baseTy, constructor));
+    }
+
+    // If we didn't see an "identity" constructor, then add an entry in the
+    // overload set for T -> T, where T is the base type. This entry acts as a
+    // stand-in for conversion of the argument to T.
+    if (!sawIdentityConstructor) {
+      choices.push_back(OverloadChoice(baseTy,
+                                       OverloadChoiceKind::IdentityFunction));
     }
     addOverloadSet(OverloadSet::getNew(*this, memberTy, &constraint, choices));
     return SolutionKind::Solved;
@@ -3083,6 +3116,10 @@ static void resolveOverloadSet(ConstraintSystem &cs,
                                   choice.getBaseType(),
                                   cs.getASTContext());
       break;
+    case OverloadChoiceKind::IdentityFunction:
+      refType = FunctionType::get(choice.getBaseType(), choice.getBaseType(),
+                                  cs.getASTContext());
+      break;
     }
 
     childCS->addConstraint(ConstraintKind::Bind, ovl->getBoundType(), refType);
@@ -3359,7 +3396,12 @@ void ConstraintSystem::dump() {
           out << "function returning base type "
               << choice.getBaseType()->getString() << "\n";
           break;
+        case OverloadChoiceKind::IdentityFunction:
+          out << "identity " << choice.getBaseType()->getString() << " -> "
+              << choice.getBaseType()->getString() << "\n";
+          break;
         }
+
         continue;
       }
 
@@ -3412,6 +3454,10 @@ void ConstraintSystem::dump() {
 
         case OverloadChoiceKind::FunctionReturningBaseType:
           out << "function returning base type "
+          << choice.getBaseType()->getString() << "\n";
+          break;
+        case OverloadChoiceKind::IdentityFunction:
+          out << "identity " << choice.getBaseType()->getString() << " -> "
           << choice.getBaseType()->getString() << "\n";
           break;
         }
