@@ -1699,6 +1699,15 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType,
           return E;
         }
 
+        // Type check the type in a new expression.
+        if (auto newRef = dyn_cast<NewReferenceExpr>(E)) {
+          if (TC.validateType(newRef->getElementTypeLoc(),
+                              /*isFirstPass=*/false))
+            return nullptr;
+
+          return E;
+        }
+        
         return E;
       }
 

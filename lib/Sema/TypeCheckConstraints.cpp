@@ -1640,6 +1640,35 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       return resultTy;
     }
 
+    Type visitNewReferenceExpr(NewReferenceExpr *expr) {
+      // Create a new object of some reference type.
+      auto instanceTy = CS.openType(expr->getElementTypeLoc().getType());
+
+      // One must be able to construct an object from the provided argument,
+      // or () if no argument was provided.
+      Type argTy;
+      if (auto arg = expr->getArg())
+        argTy = arg->getType();
+      else
+        argTy = TupleType::getEmpty(CS.getASTContext());
+
+      auto &context = CS.getASTContext();
+      // FIXME: lame name
+      auto name = context.getIdentifier("constructor");
+      auto tv = CS.createTypeVariable();
+
+      // The constructors will have type T -> instanceTy, for some fresh type
+      // variable T.
+      // FIXME: When we add support for class clusters, we'll need a new type
+      // variable for the return type that is a subtype of instanceTy.
+      CS.addValueMemberConstraint(instanceTy, name,
+                                  FunctionType::get(tv, instanceTy, context));
+
+      // The first type must be convertible to the constructor's argument type.
+      CS.addConstraint(ConstraintKind::Conversion, argTy, tv);
+      return instanceTy;
+    }
+
     Type visitTypeOfExpr(TypeOfExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -2581,30 +2610,36 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     }
 
     // Check whether we have an 'identity' constructor.
-    bool sawIdentityConstructor = false;
-    for (auto constructor : constructors.Results) {
-      if (auto funcTy = constructor->getType()->getAs<FunctionType>()) {
-        if ((funcTy = funcTy->getResult()->getAs<FunctionType>())) {
-          // Dig out the input type.
-          auto inputTy = funcTy->getInput();
-          if (auto inputTupleTy = inputTy->getAs<TupleType>()) {
-            int scalarIdx = inputTupleTy->getFieldForScalarInit();
-            if (scalarIdx >= 0) {
-              inputTy = inputTupleTy->getElementType(scalarIdx);
+    bool needIdentityConstructor = true;
+    if (baseTy->getClassOrBoundGenericClass()) {
+      // When we are constructing a class type, there is no coercion case
+      // to consider.
+      needIdentityConstructor = false;
+    } else {
+      for (auto constructor : constructors.Results) {
+        if (auto funcTy = constructor->getType()->getAs<FunctionType>()) {
+          if ((funcTy = funcTy->getResult()->getAs<FunctionType>())) {
+            // Dig out the input type.
+            auto inputTy = funcTy->getInput();
+            if (auto inputTupleTy = inputTy->getAs<TupleType>()) {
+              int scalarIdx = inputTupleTy->getFieldForScalarInit();
+              if (scalarIdx >= 0) {
+                inputTy = inputTupleTy->getElementType(scalarIdx);
+              }
             }
-          }
 
-          if (inputTy->isEqual(baseTy)) {
-            sawIdentityConstructor = true;
-            break;
+            if (inputTy->isEqual(baseTy)) {
+              needIdentityConstructor = false;
+              break;
+            }
           }
         }
       }
     }
-
+    
     // If there is only a single result, compute the type of a reference to
     // that constructor and equate it with the member type.
-    if (constructors.Results.size() == 1 && sawIdentityConstructor) {
+    if (constructors.Results.size() == 1 && !needIdentityConstructor) {
       auto refType = getTypeOfMemberReference(baseTy, constructors.Results[0],
                                               /*isTypeReference=*/false);
       addConstraint(ConstraintKind::Bind, memberTy, refType);
@@ -2617,10 +2652,10 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       choices.push_back(OverloadChoice(baseTy, constructor));
     }
 
-    // If we didn't see an "identity" constructor, then add an entry in the
+    // If we need an "identity" constructor, then add an entry in the
     // overload set for T -> T, where T is the base type. This entry acts as a
     // stand-in for conversion of the argument to T.
-    if (!sawIdentityConstructor) {
+    if (needIdentityConstructor) {
       choices.push_back(OverloadChoice(baseTy,
                                        OverloadChoiceKind::IdentityFunction));
     }
