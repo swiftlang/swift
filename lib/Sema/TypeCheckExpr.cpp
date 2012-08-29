@@ -1874,7 +1874,7 @@ static bool convertWithMethod(TypeChecker &TC, Expr *&E, Identifier method,
 
   // We allow up to two iterations here: one to convert to some
   // intermediate type, and one to convert from that to an acceptable
-  // type.  (The diagnostic here assumes normal cade which uses the
+  // type.  (The diagnostic here assumes normal case which uses the
   // swift standard library.)
   unsigned numConversionsRemaining = 2;
   Type origType = E->getType();
