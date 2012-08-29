@@ -682,8 +682,7 @@ Type TypeChecker::transformType(Type type,
       if (!EltTy)
         return Type();
 
-      // FIXME: Substitute into default arguments rather than simply dropping
-      // them.
+      // FIXME: Substitute into default arguments.
 
       // If nothing has changd, just keep going.
       if (!AnyChanged && !Elt.hasInit() &&
@@ -699,7 +698,7 @@ Type TypeChecker::transformType(Type type,
         for (unsigned I = 0; I != Index; ++I) {
           const TupleTypeElt &FromElt =Tuple->getFields()[I];
           Elements.push_back(TupleTypeElt(FromElt.getType(), FromElt.getName(),
-                                          /*Init=*/nullptr,
+                                          FromElt.getInit(),
                                           FromElt.getVarargBaseTy()));
         }
 
@@ -715,7 +714,7 @@ Type TypeChecker::transformType(Type type,
       }
 
       // Add the new tuple element, with the new type, no initializer,
-      Elements.push_back(TupleTypeElt(EltTy, Elt.getName(), /*Init=*/nullptr,
+      Elements.push_back(TupleTypeElt(EltTy, Elt.getName(), Elt.getInit(),
                                       VarargBaseTy));
       ++Index;
     }
