@@ -986,14 +986,9 @@ public:
       if (TC.typeCheckArrayBound(bound.Value, /*requireConstant*/ true))
         return nullptr;
 
-      // Compute the bound, and require a non-zero value.
+      // Compute the bound; we already checked that it was non-zero.
       IntegerLiteralExpr *lit = cast<IntegerLiteralExpr>(bound.Value);
       uint64_t size = lit->getValue().getZExtValue();
-      if (size == 0) {
-        TC.diagnose(lit->getLoc(), diag::new_array_bound_zero)
-          << lit->getSourceRange();
-        return nullptr;
-      }
 
       resultType = ArrayType::get(resultType, size, TC.Context);
     }
@@ -1696,6 +1691,23 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType,
                               /*isFirstPass=*/false))
             return nullptr;
 
+          // Check array bounds. They are subproblems that on't interact with
+          // the surrounding expression context.
+          for (unsigned i = newArray->getBounds().size(); i != 1; --i) {
+            auto &bound = newArray->getBounds()[i-1];
+            if (!bound.Value)
+              continue;
+
+            // All inner bounds must be constant.
+            if (TC.typeCheckArrayBound(bound.Value, /*requireConstant=*/true))
+              return nullptr;
+          }
+
+          // The outermost bound does not need to be constant.
+          if (TC.typeCheckArrayBound(newArray->getBounds()[0].Value,
+                                     /*requireConstant=*/false))
+            return nullptr;
+
           return E;
         }
 
@@ -1913,9 +1925,20 @@ static bool isBuiltinIntegerType(Type T) {
 /// Type check an array bound.
 bool TypeChecker::typeCheckArrayBound(Expr *&E, bool constantRequired) {
   // If it's an integer literal expression, just convert the type directly.
-  if (isa<IntegerLiteralExpr>(E)) {
+  if (auto lit = dyn_cast<IntegerLiteralExpr>(E->getSemanticsProvidingExpr())) {
     // FIXME: the choice of 64-bit is rather arbitrary.
     E->setType(BuiltinIntegerType::get(64, Context));
+
+    // Constant array bounds must be non-zero.
+    if (constantRequired) {
+      uint64_t size = lit->getValue().getZExtValue();
+      if (size == 0) {
+        diagnose(lit->getLoc(), diag::new_array_bound_zero)
+          << lit->getSourceRange();
+        return nullptr;
+      }
+    }
+
     return false;
   }
 

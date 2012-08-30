@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/NameLookup.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -1627,11 +1628,15 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
           continue;
         }
 
-        llvm_unreachable("Constant bounds in array new unsupported");
+        // FIXME: When we get a constant expression evaluator, we'll have
+        // to use it here.
+        auto literal = cast<IntegerLiteralExpr>(
+                         bound.Value->getSemanticsProvidingExpr());
+        resultTy = ArrayType::get(resultTy, literal->getValue().getZExtValue(),
+                                  tc.Context);
       }
 
       auto &outerBound = expr->getBounds()[0];
-      // FIXME: Add the constraint that the bound is an array bound.
       resultTy = tc.getArraySliceType(outerBound.Brackets.Start, resultTy);
 
       // FIXME: Will need to find/set the injection function, probably as
@@ -1741,7 +1746,17 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
         // do not participate in type checking.
         return isa<ExplicitClosureExpr>(expr);
       }
-      
+
+      // For new array expressions, we visit the node but not any of its
+      // children.
+      // FIXME: If new array expressions gain an initializer, we'll need to
+      // visit that first.
+      if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
+        auto type = CG.visitNewArrayExpr(newArray);
+        expr->setType(type);
+        return false;
+      }
+
       return true;
     }
 
