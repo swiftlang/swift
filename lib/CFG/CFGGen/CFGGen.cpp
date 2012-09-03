@@ -16,32 +16,6 @@
 using namespace swift;
 using namespace Lowering;
 
-/// emitBlock - Each basic block is individually new'd, then them emitted with
-/// this function.  Since each block is implicitly added to the CFG's list of
-/// blocks when created, the construction order is not particularly useful.
-///
-/// Instead, we want blocks to end up in the order that they are *emitted*.  The
-/// cheapest way to ensure this is to just move each block to the end of the
-/// block list when emitted: as later blocks are emitted, they'll be moved after
-/// this, giving us a block list order that matches emission order when the
-/// function is done.
-///
-/// This function also sets the insertion point of the builder to be the newly
-/// emitted block.
-static void emitBlock(CFGBuilder &B, BasicBlock *BB) {
-  CFG *C = BB->getParent();
-  // If this is a fall through into BB, emit the fall through branch.
-  if (B.hasValidInsertionPoint())
-    B.createBranch(BB);
-  
-  // Start inserting into that block.
-  B.setInsertionPoint(BB);
-  
-  // Move block to the end of the list.
-  if (&C->getBlocks().back() != BB)
-    C->getBlocks().splice(C->end(), C->getBlocks(), BB);
-}
-
 /// emitOrDeleteBlock - If there are branches to the specified basic block,
 /// emit it per emitBlock.  If there aren't, then just delete the block - it
 /// turns out to have not been needed.
@@ -51,7 +25,7 @@ static void emitOrDeleteBlock(CFGBuilder &B, BasicBlock *BB) {
     BB->eraseFromParent();
   } else {
     // Otherwise, continue emitting code in BB.
-    emitBlock(B, BB);
+    B.emitBlock(BB);
   }
 }
 
@@ -180,7 +154,7 @@ void CFGGen::visitWhileStmt(WhileStmt *S) {
   B.createBranch(LoopBB);
   B.clearInsertionPoint();
   
-  emitBlock(B, LoopBB);
+  B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
   BasicBlock *EndBB = new (C) BasicBlock(&C, "while.end");
@@ -216,7 +190,7 @@ void CFGGen::visitDoWhileStmt(DoWhileStmt *S) {
   B.createBranch(LoopBB);
   B.clearInsertionPoint();
   
-  emitBlock(B, LoopBB);
+  B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
   BasicBlock *EndBB = new (C) BasicBlock(&C, "dowhile.end");

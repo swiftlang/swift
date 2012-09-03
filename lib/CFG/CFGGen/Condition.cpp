@@ -16,33 +16,6 @@
 using namespace swift;
 using namespace Lowering;
 
-/// emitBlock - Each basic block is individually new'd, then them emitted with
-/// this function.  Since each block is implicitly added to the CFG's list of
-/// blocks when created, the construction order is not particularly useful.
-///
-/// Instead, we want blocks to end up in the order that they are *emitted*.  The
-/// cheapest way to ensure this is to just move each block to the end of the
-/// block list when emitted: as later blocks are emitted, they'll be moved after
-/// this, giving us a block list order that matches emission order when the
-/// function is done.
-///
-/// This function also sets the insertion point of the builder to be the newly
-/// emitted block.
-static void emitBlock(CFGBuilder &B, BasicBlock *BB) {
-  CFG *C = BB->getParent();
-  // If this is a fall through into BB, emit the fall through branch.
-  if (B.hasValidInsertionPoint())
-    B.createBranch(BB);
-
-  // Start inserting into that block.
-  B.setInsertionPoint(BB);
-  
-  // Move block to the end of the list.
-  if (&C->getBlocks().back() != BB)
-    C->getBlocks().splice(C->end(), C->getBlocks(), BB);
-}
-
-
 void Condition::enterTrue(CFGBuilder &B) {
   assert(TrueBB && "Cannot call enterTrue without a True block!");
   
@@ -50,7 +23,7 @@ void Condition::enterTrue(CFGBuilder &B) {
   // continuation block.
   if (!ContBB) return;
   
-  emitBlock(B, TrueBB);
+  B.emitBlock(TrueBB);
 }
 
 void Condition::exitTrue(CFGBuilder &B) {
@@ -94,7 +67,7 @@ void Condition::enterFalse(CFGBuilder &B) {
   
   // It's possible to have no insertion point here if the end of the
   // true case was unreachable.
-  emitBlock(B, FalseBB);
+  B.emitBlock(FalseBB);
 }
 
 void Condition::exitFalse(CFGBuilder &B) {
@@ -156,7 +129,7 @@ void Condition::complete(CFGBuilder &B) {
   }
   
   // Okay, we need to insert the continuation block.
-  emitBlock(B, ContBB);
+  B.emitBlock(ContBB);
 }
 
 

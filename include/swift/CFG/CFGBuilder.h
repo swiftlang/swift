@@ -73,6 +73,36 @@ public:
     setInsertionPoint(BB, BB->end());
   }
 
+  /// emitBlock - Each basic block is individually new'd, then them emitted with
+  /// this function.  Since each block is implicitly added to the CFG's list of
+  /// blocks when created, the construction order is not particularly useful.
+  ///
+  /// Instead, we want blocks to end up in the order that they are *emitted*.
+  /// The cheapest way to ensure this is to just move each block to the end of
+  /// the block list when emitted: as later blocks are emitted, they'll be moved
+  /// after this, giving us a block list order that matches emission order when
+  /// the function is done.
+  ///
+  /// This function also sets the insertion point of the builder to be the newly
+  /// emitted block.
+  void emitBlock(BasicBlock *BB) {
+    CFG *C = BB->getParent();
+    // If this is a fall through into BB, emit the fall through branch.
+    if (hasValidInsertionPoint())
+      createBranch(BB);
+    
+    // Start inserting into that block.
+    setInsertionPoint(BB);
+    
+    // Move block to the end of the list.
+    if (&C->getBlocks().back() != BB)
+      C->getBlocks().splice(C->end(), C->getBlocks(), BB);
+  }
+  
+  //===--------------------------------------------------------------------===//
+  // Instruction Creation Methods
+  //===--------------------------------------------------------------------===//
+
   CallInst *createCall(CallExpr *Expr, CFGValue Fn, ArrayRef<CFGValue> Args) {
     return insert(CallInst::create(Expr, Fn, Args, C));
   }
