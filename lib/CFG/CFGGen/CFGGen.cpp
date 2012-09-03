@@ -359,12 +359,6 @@ CFGValue CFGGen::visitLoadExpr(LoadExpr *E) {
   return B.createLoad(E, SubV);
 }
 
-CFGValue CFGGen::visitThisApplyExpr(ThisApplyExpr *E) {
-  CFGValue FnV = visit(E->getFn());
-  CFGValue ArgV = visit(E->getArg());
-  return B.createThisApply(E, FnV, ArgV);
-}
-
 CFGValue CFGGen::visitParenExpr(ParenExpr *E) {
   return visit(E->getSubExpr());
 }

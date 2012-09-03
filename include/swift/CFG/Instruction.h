@@ -34,7 +34,6 @@ class IntegerLiteralExpr;
 class LoadExpr;
 class ReturnStmt;
 class Stmt;
-class ThisApplyExpr;
 class TupleExpr;
 class TypeOfExpr;
 
@@ -190,35 +189,6 @@ public:
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::Load;
-  }
-};
-
-/// Represents an abstract application that provides the 'this' pointer for
-/// a curried method.
-class ThisApplyInst : public Instruction {
-public:
-  /// The backing ThisApplyExpr in the AST.
-  ThisApplyExpr *expr;
-
-  /// The instruction representing the called function.
-  CFGValue function;
-
-  /// The instruction representing the argument expression.
-  CFGValue argument;
-
-  /// Construct a ThisApplyInst.
-  ///
-  /// \param expr A backpointer to the original ThisApplyExpr.
-  ///
-  /// \param B The basic block that will contain the instruction.
-  ///
-  ThisApplyInst(ThisApplyExpr *expr, CFGValue function, CFGValue argument)
-    : Instruction(InstKind::ThisApply), expr(expr), function(function),
-      argument(argument) {
-  }
-
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::ThisApply;
   }
 };
 

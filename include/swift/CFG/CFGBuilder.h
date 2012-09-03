@@ -119,11 +119,6 @@ public:
     return insert(new LoadInst(Expr, LV));
   }
 
-  ThisApplyInst *createThisApply(ThisApplyExpr *Expr, CFGValue Fn,
-                                 CFGValue Arg) {
-    return insert(new ThisApplyInst(Expr, Fn, Arg));
-  }
-
   TupleInst *createTuple(TupleExpr *Expr, ArrayRef<CFGValue> Elements) {
     return insert(TupleInst::create(Expr, Elements, C));
   }

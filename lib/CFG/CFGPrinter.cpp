@@ -85,7 +85,7 @@ public:
   }
 
   void visitApplyInst(ApplyInst *AI) {
-    OS << "call " << getID(AI->getCallee()) << '(';
+    OS << "apply " << getID(AI->getCallee()) << '(';
     bool first = true;
     for (auto arg : AI->getArguments()) {
       if (first)
@@ -107,10 +107,6 @@ public:
   }
   void visitLoadInst(LoadInst *LI) {
     OS << "load " << getID(LI->lvalue);
-  }
-  void visitThisApplyInst(ThisApplyInst *TAI) {
-    OS << "thisapply "<< getID(TAI->function) << '('
-       << getID(TAI->argument) << ')';
   }
   void visitTupleInst(TupleInst *TI) {
     OS << "tuple (";

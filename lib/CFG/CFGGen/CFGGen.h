@@ -126,7 +126,6 @@ public:
   CFGValue visitIntegerLiteralExpr(IntegerLiteralExpr *E);
   CFGValue visitLoadExpr(LoadExpr *E);
   CFGValue visitParenExpr(ParenExpr *E);
-  CFGValue visitThisApplyExpr(ThisApplyExpr *E);
   CFGValue visitTupleExpr(TupleExpr *E);
   CFGValue visitTypeOfExpr(TypeOfExpr *E);
   

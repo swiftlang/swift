@@ -52,8 +52,6 @@ public:
   }
   void visitLoadInst(LoadInst *LI) {
   }
-  void visitThisApplyInst(ThisApplyInst *TAI) {
-  }
   void visitTupleInst(TupleInst *TI) {
   }
   void visitTypeOfInst(TypeOfInst *TOI) {
