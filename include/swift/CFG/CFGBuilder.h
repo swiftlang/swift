@@ -132,6 +132,10 @@ public:
     return insert(new TypeOfInst(Expr));
   }
   
+  //===--------------------------------------------------------------------===//
+  // Terminator Instruction Creation Methods
+  //===--------------------------------------------------------------------===//
+  
   ReturnInst *createReturn(ReturnStmt *Stmt, CFGValue ReturnValue) {
     return insertTerminator(new ReturnInst(Stmt, ReturnValue));
   }
@@ -146,6 +150,10 @@ public:
     return insertTerminator(new BranchInst(TargetBlock));
   }
 
+
+  //===--------------------------------------------------------------------===//
+  // Private Helper Methods
+  //===--------------------------------------------------------------------===//
 
 private:
   /// insert - This is a template to avoid losing type info on the result.

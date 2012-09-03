@@ -104,13 +104,9 @@ public:
   
   void visitDoWhileStmt(DoWhileStmt *S);
   
-  void visitForStmt(ForStmt *S) {
-    assert(false && "Not yet implemented");
-  }
+  void visitForStmt(ForStmt *S);
   
-  void visitForEachStmt(ForEachStmt *S) {
-    assert(false && "Not yet implemented");
-  }
+  void visitForEachStmt(ForEachStmt *S);
   
   void visitBreakStmt(BreakStmt *S);
   

@@ -147,8 +147,6 @@ void CFGGen::visitIfStmt(IfStmt *S) {
 void CFGGen::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (C) BasicBlock(&C, "while");
-  B.createBranch(LoopBB);
-  
   B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
@@ -164,9 +162,8 @@ void CFGGen::visitWhileStmt(WhileStmt *S) {
   if (Cond.hasTrue()) {
     Cond.enterTrue(B);
     visit(S->getBody());
-    if (B.hasValidInsertionPoint()) {
+    if (B.hasValidInsertionPoint())
       B.createBranch(LoopBB);
-    }
     Cond.exitTrue(B);
   }
   
@@ -181,8 +178,6 @@ void CFGGen::visitWhileStmt(WhileStmt *S) {
 void CFGGen::visitDoWhileStmt(DoWhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (C) BasicBlock(&C, "dowhile");
-  B.createBranch(LoopBB);
-  
   B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
@@ -199,13 +194,128 @@ void CFGGen::visitDoWhileStmt(DoWhileStmt *S) {
     Condition Cond = emitCondition(S, S->getCond(), /*hasFalseCode*/ false);
     
     Cond.enterTrue(B);
-    if (B.hasValidInsertionPoint()) {
+    if (B.hasValidInsertionPoint())
       B.createBranch(LoopBB);
-    }
+
     Cond.exitTrue(B);
     // Complete the conditional execution.
     Cond.complete(B);
   }
+  
+  emitOrDeleteBlock(B, EndBB);
+  BreakDestStack.pop_back();
+  ContinueDestStack.pop_back();
+}
+
+void CFGGen::visitForStmt(ForStmt *S) {
+  // Enter a new scope.
+  // FIXME
+  //Scope ForScope(*this);
+  
+  // Emit any local 'var' variables declared in the initializer.
+  // FIXME:
+  //for (auto D : S->getInitializerVarDecls())
+  //  emitLocal(D);
+  
+  if (Expr *E = S->getInitializer().dyn_cast<Expr*>()) {
+    // FIXME.
+    //FullExpr Scope(*this);
+    visit(E);
+  } else if (Stmt *AS = S->getInitializer().dyn_cast<AssignStmt*>()) {
+    visit(AS);
+  }
+  
+  // If we ever reach an unreachable point, stop emitting statements.
+  // This will need revision if we ever add goto.
+  if (!B.hasValidInsertionPoint()) return;
+  
+  // Create a new basic block and jump into it.
+  BasicBlock *LoopBB = new (C) BasicBlock(&C, "for.condition");
+  B.emitBlock(LoopBB);
+  
+  // Set the destinations for 'break' and 'continue'
+  BasicBlock *IncBB = new (C) BasicBlock(&C, "for.inc");
+  BasicBlock *EndBB = new (C) BasicBlock(&C, "for.end");
+  BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
+  ContinueDestStack.emplace_back(IncBB, getCleanupsDepth());
+  
+  // Evaluate the condition with the false edge leading directly
+  // to the continuation block.
+  Condition Cond = S->getCond().isNonNull() ?
+    emitCondition(S, S->getCond().get(), /*hasFalseCode*/ false) :
+    Condition(LoopBB, 0, 0);  // Infinite loop.
+  
+  // If there's a true edge, emit the body in it.
+  if (Cond.hasTrue()) {
+    Cond.enterTrue(B);
+    visit(S->getBody());
+    
+    emitOrDeleteBlock(B, IncBB);
+    
+    if (B.hasValidInsertionPoint() && !S->getIncrement().isNull()) {
+      if (Expr *E = S->getIncrement().dyn_cast<Expr*>()) {
+        // FIXME:
+        //FullExpr scope(*this);
+        visit(E);
+      } else if (Stmt *AS = S->getIncrement().dyn_cast<AssignStmt*>()) {
+        visit(AS);
+      }
+    }
+    
+    if (B.hasValidInsertionPoint())
+      B.createBranch(LoopBB);
+    Cond.exitTrue(B);
+  }
+  
+  // Complete the conditional execution.
+  Cond.complete(B);
+  
+  emitOrDeleteBlock(B, EndBB);
+  BreakDestStack.pop_back();
+  ContinueDestStack.pop_back();
+}
+
+void CFGGen::visitForEachStmt(ForEachStmt *S) {
+  // Emit the 'range' variable that we'll be using for iteration.
+  // FIXME: Scope, PBD.
+  //Scope OuterForScope(*this);
+  //emitPatternBindingDecl(S->getRange());
+  
+  // If we ever reach an unreachable point, stop emitting statements.
+  // This will need revision if we ever add goto.
+  if (!B.hasValidInsertionPoint()) return;
+  
+  // Create a new basic block and jump into it.
+  BasicBlock *LoopBB = new (C) BasicBlock(&C, "foreach.cond");
+  B.emitBlock(LoopBB);
+  
+  // Set the destinations for 'break' and 'continue'
+  BasicBlock *EndBB = new (C) BasicBlock(&C, "foreach.end");
+  BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
+  ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth());
+  
+  Condition Cond = emitCondition(S, S->getRangeEmpty(), /*hasFalseCode=*/false,
+                                 /*invertValue=*/true);
+  if (Cond.hasTrue()) {
+    Cond.enterTrue(B);
+    
+    // Emit the loop body.
+    // The declared variable(s) for the current element are destroyed
+    // at the end of each loop iteration.
+    {
+      //Scope InnerForScope(*this);
+      //emitPatternBindingDecl(S->getElementInit());
+      visit(S->getBody());
+    }
+    
+    // Loop back to the header.
+    if (B.hasValidInsertionPoint())
+      B.createBranch(LoopBB);
+    Cond.exitTrue(B);
+  }
+  
+  // Complete the conditional execution.
+  Cond.complete(B);
   
   emitOrDeleteBlock(B, EndBB);
   BreakDestStack.pop_back();
