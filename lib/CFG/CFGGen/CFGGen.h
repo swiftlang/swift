@@ -25,6 +25,8 @@ namespace Lowering {
   class Condition;
 
 class CFGGen : public ASTVisitor<CFGGen, CFGValue> {
+  friend class Scope;
+  
   /// The CFG being constructed.
   CFG &C;
   
@@ -37,9 +39,13 @@ class CFGGen : public ASTVisitor<CFGGen, CFGValue> {
 
   /// Cleanups - Currently active cleanups in this scope tree.
   DiverseStack<Cleanup, 128> Cleanups;
-  
+
+  CleanupsDepth InnermostScope;
+  void endScope(CleanupsDepth Depth);
+
 public:
-  CFGGen(CFG &C) : C(C), B(new (C) BasicBlock(&C), C) {
+  CFGGen(CFG &C)
+    : C(C), B(new (C) BasicBlock(&C), C), InnermostScope(Cleanups.stable_end()){
   }
   
   ~CFGGen() {

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CFGGen.h"
+#include "Scope.h"
 #include "Condition.h"
 #include "swift/AST/AST.h"
 using namespace swift;
@@ -209,8 +210,7 @@ void CFGGen::visitDoWhileStmt(DoWhileStmt *S) {
 
 void CFGGen::visitForStmt(ForStmt *S) {
   // Enter a new scope.
-  // FIXME
-  //Scope ForScope(*this);
+  Scope ForScope(*this);
   
   // Emit any local 'var' variables declared in the initializer.
   // FIXME:
@@ -218,8 +218,7 @@ void CFGGen::visitForStmt(ForStmt *S) {
   //  emitLocal(D);
   
   if (Expr *E = S->getInitializer().dyn_cast<Expr*>()) {
-    // FIXME.
-    //FullExpr Scope(*this);
+    FullExpr Scope(*this);
     visit(E);
   } else if (Stmt *AS = S->getInitializer().dyn_cast<AssignStmt*>()) {
     visit(AS);
@@ -254,8 +253,7 @@ void CFGGen::visitForStmt(ForStmt *S) {
     
     if (B.hasValidInsertionPoint() && !S->getIncrement().isNull()) {
       if (Expr *E = S->getIncrement().dyn_cast<Expr*>()) {
-        // FIXME:
-        //FullExpr scope(*this);
+        FullExpr Scope(*this);
         visit(E);
       } else if (Stmt *AS = S->getIncrement().dyn_cast<AssignStmt*>()) {
         visit(AS);
@@ -277,8 +275,8 @@ void CFGGen::visitForStmt(ForStmt *S) {
 
 void CFGGen::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'range' variable that we'll be using for iteration.
-  // FIXME: Scope, PBD.
-  //Scope OuterForScope(*this);
+  Scope OuterForScope(*this);
+  // FIXME: emitPatternBindingDecl
   //emitPatternBindingDecl(S->getRange());
   
   // If we ever reach an unreachable point, stop emitting statements.
@@ -303,7 +301,7 @@ void CFGGen::visitForEachStmt(ForEachStmt *S) {
     // The declared variable(s) for the current element are destroyed
     // at the end of each loop iteration.
     {
-      //Scope InnerForScope(*this);
+      Scope InnerForScope(*this);
       //emitPatternBindingDecl(S->getElementInit());
       visit(S->getBody());
     }
@@ -385,3 +383,45 @@ CFG *CFG::constructCFG(Stmt *S) {
   C->verify();
   return C;
 }
+
+/// Leave a scope, with all its cleanups.
+void CFGGen::endScope(CleanupsDepth depth) {
+  Cleanups.checkIterator(depth);
+
+  // Fast path: no cleanups to leave in this scope.
+  if (Cleanups.stable_begin() == depth) {
+    // FIXME.
+    //popAndEmitTopDeadCleanups(*this, Cleanups, InnermostScope);
+    return;
+  }
+
+#if 0 // FIXME: Cleanups.
+
+  // Thread a branch through the cleanups if there are any active
+  // cleanups and we have a valid insertion point.
+  BasicBlock *contBB = nullptr;
+  if (B.hasValidInsertionPoint() &&
+      hasAnyActiveCleanups(Cleanups.begin(), Cleanups.find(depth))) {
+    contBB = new (C) BasicBlock(&C, "cleanups.fallthrough");
+    emitBranch(JumpDest(contBB, depth));
+  }
+
+  // Iteratively mark cleanups dead and pop them.
+  // Maybe we'd get better results if we marked them all dead in one shot?
+  while (Cleanups.stable_begin() != depth) {
+    // Mark the cleanup dead.
+    if (!Cleanups.begin()->isDead())
+      setCleanupState(*Cleanups.begin(), CleanupState::Dead);
+
+    // Pop it.
+    popAndEmitTopCleanup(*this, Cleanups);
+  }
+
+  // Emit the continuation block if we made one.
+  if (contBB)
+    B.emitMergeableBlock(contBB);
+#endif
+}
+
+
+
