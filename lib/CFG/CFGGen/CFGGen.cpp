@@ -85,7 +85,6 @@ Condition CFGGen::emitCondition(Stmt *TheStmt, Expr *E,
     B.createCondBranch(TheStmt, V, FalseDestBB, TrueBB);
   else
     B.createCondBranch(TheStmt, V, TrueBB, FalseDestBB);
-  B.clearInsertionPoint();
   
   return Condition(TrueBB, FalseBB, ContBB);
 }
@@ -97,7 +96,6 @@ void CFGGen::emitBranch(JumpDest Dest) {
   assert(B.hasValidInsertionPoint() && "Inserting branch in invalid spot");
   assert(Cleanups.empty() && "FIXME: Implement cleanup support");
   B.createBranch(Dest.getBlock());
-  B.clearInsertionPoint();
 }
 
 
@@ -121,12 +119,10 @@ void CFGGen::visitBraceStmt(BraceStmt *S) {
 
 void CFGGen::visitBreakStmt(BreakStmt *S) {
   emitBranch(BreakDestStack.back());
-  B.clearInsertionPoint();
 }
 
 void CFGGen::visitContinueStmt(ContinueStmt *S) {
   emitBranch(ContinueDestStack.back());
-  B.clearInsertionPoint();
 }
 
 void CFGGen::visitIfStmt(IfStmt *S) {
@@ -152,7 +148,6 @@ void CFGGen::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (C) BasicBlock(&C, "while");
   B.createBranch(LoopBB);
-  B.clearInsertionPoint();
   
   B.emitBlock(LoopBB);
   
@@ -171,7 +166,6 @@ void CFGGen::visitWhileStmt(WhileStmt *S) {
     visit(S->getBody());
     if (B.hasValidInsertionPoint()) {
       B.createBranch(LoopBB);
-      B.clearInsertionPoint();
     }
     Cond.exitTrue(B);
   }
@@ -188,7 +182,6 @@ void CFGGen::visitDoWhileStmt(DoWhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (C) BasicBlock(&C, "dowhile");
   B.createBranch(LoopBB);
-  B.clearInsertionPoint();
   
   B.emitBlock(LoopBB);
   
@@ -208,7 +201,6 @@ void CFGGen::visitDoWhileStmt(DoWhileStmt *S) {
     Cond.enterTrue(B);
     if (B.hasValidInsertionPoint()) {
       B.createBranch(LoopBB);
-      B.clearInsertionPoint();
     }
     Cond.exitTrue(B);
     // Complete the conditional execution.

@@ -48,7 +48,6 @@ public:
     if (B.getInsertionBB() != nullptr) {
       // FIXME: Should use empty tuple for "void" return.
       B.createReturn(0, CFGValue());
-      B.clearInsertionPoint();
     }
   }
   
@@ -97,7 +96,6 @@ public:
     // FIXME: Should use empty tuple for "void" return.
     CFGValue ArgV = S->hasResult() ? visit(S->getResult()) : (Instruction*) 0;
     B.createReturn(S, ArgV);
-    B.clearInsertionPoint();
   }
   
   void visitIfStmt(IfStmt *S);

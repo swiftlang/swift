@@ -133,16 +133,17 @@ public:
   }
   
   ReturnInst *createReturn(ReturnStmt *Stmt, CFGValue ReturnValue) {
-    return insert(new ReturnInst(Stmt, ReturnValue));
+    return insertTerminator(new ReturnInst(Stmt, ReturnValue));
   }
   
   CondBranchInst *createCondBranch(Stmt *BranchStmt, CFGValue Cond,
                                    BasicBlock *Target1, BasicBlock *Target2) {
-    return insert(new CondBranchInst(BranchStmt, Cond, Target1, Target2));
+    return insertTerminator(new CondBranchInst(BranchStmt, Cond,
+                                               Target1, Target2));
   }
     
   BranchInst *createBranch(BasicBlock *TargetBlock) {
-    return insert(new BranchInst(TargetBlock));
+    return insertTerminator(new BranchInst(TargetBlock));
   }
 
 
@@ -151,6 +152,16 @@ private:
   template <typename T>
   T *insert(T *TheInst) {
     insertImpl(TheInst);
+    return TheInst;
+  }
+  
+  /// insertTerminator - This is the same as insert, but clears the insertion
+  /// point after doing the insertion.  This is used by terminators, since it
+  /// isn't valid to insert something after a terminator.
+  template <typename T>
+  T *insertTerminator(T *TheInst) {
+    insertImpl(TheInst);
+    clearInsertionPoint();
     return TheInst;
   }
 
