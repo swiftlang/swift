@@ -82,7 +82,7 @@ void Instruction::eraseFromParent() {
 
 TermInst::SuccessorListTy TermInst::getSuccessors() {
   switch (getKind()) {
-  case InstKind::Call:
+  case InstKind::Apply:
   case InstKind::DeclRef:
   case InstKind::IntegerLiteral:
   case InstKind::Load:
@@ -99,18 +99,18 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   }
 }
 
-CallInst *CallInst::create(ApplyExpr *expr, CFGValue function,
-                           ArrayRef<CFGValue> args, CFG &C) {
-  void *Buffer = C.allocate(sizeof(CallInst) +
-                            args.size() * sizeof(CFGValue),
-                            llvm::AlignOf<CallInst>::Alignment);
-  return ::new(Buffer) CallInst(expr, function, args);
+ApplyInst *ApplyInst::create(ApplyExpr *Expr, CFGValue Callee,
+                             ArrayRef<CFGValue> Args, CFG &C) {
+  void *Buffer = C.allocate(sizeof(ApplyInst) +
+                            Args.size() * sizeof(CFGValue),
+                            llvm::AlignOf<ApplyInst>::Alignment);
+  return ::new(Buffer) ApplyInst(Expr, Callee, Args);
 }
 
-CallInst::CallInst(ApplyExpr *expr, CFGValue function, ArrayRef<CFGValue> args)
-  : Instruction(InstKind::Call), NumArgs(args.size()), expr(expr),
-    function(function) {
-  memcpy(getArgsStorage(), args.data(), args.size() * sizeof(CFGValue));
+ApplyInst::ApplyInst(ApplyExpr *Expr, CFGValue Callee, ArrayRef<CFGValue> Args)
+  : Instruction(InstKind::Apply), Expr(Expr), Callee(Callee),
+    NumArgs(Args.size()) {
+  memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(CFGValue));
 }
 
 CondBranchInst::CondBranchInst(Stmt *BranchStmt, CFGValue condition,

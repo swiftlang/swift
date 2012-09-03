@@ -343,7 +343,7 @@ CFGValue CFGGen::visitApplyExpr(ApplyExpr *E) {
     ArgsV.push_back(visit(Arg));
   }
   
-  return B.createCall(E, FnV, ArgsV);
+  return B.createApply(E, FnV, ArgsV);
 }
 
 CFGValue CFGGen::visitDeclRefExpr(DeclRefExpr *E) {

@@ -43,7 +43,7 @@ public:
     ((CFGVisitor<CFGVerifier>*)this)->visit(I);
   }
   
-  void visitCallInst(CallInst *CI) {
+  void visitApplyInst(ApplyInst *AI) {
   }
   
   void visitDeclRefInst(DeclRefInst *DRI) {

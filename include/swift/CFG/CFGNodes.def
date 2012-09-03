@@ -38,7 +38,7 @@
 #define INST_RANGE(Id, First, Last)
 #endif
 
-INST(Call, Instruction)
+INST(Apply, Instruction)
 INST(DeclRef, Instruction)
 INST(IntegerLiteral, Instruction)
 INST(Load, Instruction)

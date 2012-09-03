@@ -84,10 +84,10 @@ public:
     assert(0 && "CFGPrinter not implemented for this instruction!");
   }
 
-  void visitCallInst(CallInst *CI) {
-    OS << "call " << getID(CI->function) << '(';
+  void visitApplyInst(ApplyInst *AI) {
+    OS << "call " << getID(AI->getCallee()) << '(';
     bool first = true;
-    for (auto arg : CI->arguments()) {
+    for (auto arg : AI->getArguments()) {
       if (first)
         first = false;
       else

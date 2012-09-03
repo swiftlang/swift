@@ -88,38 +88,40 @@ public:
   static bool classof(const Instruction *I) { return true; }
 };
 
-/// Represents a call to a function.
-class CallInst : public Instruction {
-private:
-  /// Construct a CallInst from a given call expression and the provided
-  /// arguments.
-  CallInst(ApplyExpr *expr, CFGValue function, ArrayRef<CFGValue> args);
+/// ApplyInst - Represents application of an argument to a function.
+class ApplyInst : public Instruction {
+  /// The backing expression for the call.
+  ApplyExpr *Expr;
+  
+  /// The instruction representing the called function.
+  CFGValue Callee;
 
-  CFGValue *getArgsStorage() { return reinterpret_cast<CFGValue*>(this + 1); }
   unsigned NumArgs;
+  CFGValue *getArgsStorage() { return reinterpret_cast<CFGValue*>(this + 1); }
+  
+  /// Construct an ApplyInst from a given call expression and the provided
+  /// arguments.
+  ApplyInst(ApplyExpr *Expr, CFGValue Callee, ArrayRef<CFGValue> Args);
 
 public:
-  static CallInst *create(ApplyExpr *expr, CFGValue function,
-                          ArrayRef<CFGValue> args, CFG &C);
+  static ApplyInst *create(ApplyExpr *Expr, CFGValue Callee,
+                          ArrayRef<CFGValue> Args, CFG &C);
 
-  /// The backing expression for the call.
-  ApplyExpr *expr;
-
-  /// The instruction representing the called function.
-  CFGValue function;
-
-  /// The arguments referenced by this CallInst.
-  MutableArrayRef<CFGValue> arguments() {
+  
+  CFGValue getCallee() { return Callee; }
+  
+  /// The arguments passed to this ApplyInst.
+  MutableArrayRef<CFGValue> getArguments() {
     return MutableArrayRef<CFGValue>(getArgsStorage(), NumArgs);
   }
 
-  /// The arguments referenced by this CallInst.
-  ArrayRef<CFGValue> arguments() const {
-    return const_cast<CallInst*>(this)->arguments();
+  /// The arguments passed to this ApplyInst.
+  ArrayRef<CFGValue> getArguments() const {
+    return const_cast<ApplyInst*>(this)->getArguments();
   }
 
   static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::Call;
+    return I->getKind() == InstKind::Apply;
   }
 };
 
