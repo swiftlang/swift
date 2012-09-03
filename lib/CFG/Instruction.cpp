@@ -99,7 +99,7 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   }
 }
 
-CallInst *CallInst::create(CallExpr *expr, CFGValue function,
+CallInst *CallInst::create(ApplyExpr *expr, CFGValue function,
                            ArrayRef<CFGValue> args, CFG &C) {
   void *Buffer = C.allocate(sizeof(CallInst) +
                             args.size() * sizeof(CFGValue),
@@ -107,7 +107,7 @@ CallInst *CallInst::create(CallExpr *expr, CFGValue function,
   return ::new(Buffer) CallInst(expr, function, args);
 }
 
-CallInst::CallInst(CallExpr *expr, CFGValue function, ArrayRef<CFGValue> args)
+CallInst::CallInst(ApplyExpr *expr, CFGValue function, ArrayRef<CFGValue> args)
   : Instruction(InstKind::Call), NumArgs(args.size()), expr(expr),
     function(function) {
   memcpy(getArgsStorage(), args.data(), args.size() * sizeof(CFGValue));

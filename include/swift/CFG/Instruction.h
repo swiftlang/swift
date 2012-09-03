@@ -28,7 +28,7 @@ namespace swift {
 
 class CFG;
 class BasicBlock;
-class CallExpr;
+class ApplyExpr;
 class DeclRefExpr;
 class IntegerLiteralExpr;
 class LoadExpr;
@@ -93,17 +93,17 @@ class CallInst : public Instruction {
 private:
   /// Construct a CallInst from a given call expression and the provided
   /// arguments.
-  CallInst(CallExpr *expr, CFGValue function, ArrayRef<CFGValue> args);
+  CallInst(ApplyExpr *expr, CFGValue function, ArrayRef<CFGValue> args);
 
   CFGValue *getArgsStorage() { return reinterpret_cast<CFGValue*>(this + 1); }
   unsigned NumArgs;
 
 public:
-  static CallInst *create(CallExpr *expr, CFGValue function,
+  static CallInst *create(ApplyExpr *expr, CFGValue function,
                           ArrayRef<CFGValue> args, CFG &C);
 
   /// The backing expression for the call.
-  CallExpr *expr;
+  ApplyExpr *expr;
 
   /// The instruction representing the called function.
   CFGValue function;

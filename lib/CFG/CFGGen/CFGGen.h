@@ -121,7 +121,7 @@ public:
     llvm_unreachable("Not yet implemented");
   }
   
-  CFGValue visitCallExpr(CallExpr *E);
+  CFGValue visitApplyExpr(ApplyExpr *E);
   CFGValue visitDeclRefExpr(DeclRefExpr *E);
   CFGValue visitIntegerLiteralExpr(IntegerLiteralExpr *E);
   CFGValue visitLoadExpr(LoadExpr *E);

@@ -103,7 +103,7 @@ public:
   // Instruction Creation Methods
   //===--------------------------------------------------------------------===//
 
-  CallInst *createCall(CallExpr *Expr, CFGValue Fn, ArrayRef<CFGValue> Args) {
+  CallInst *createCall(ApplyExpr *Expr, CFGValue Fn, ArrayRef<CFGValue> Args) {
     return insert(CallInst::create(Expr, Fn, Args, C));
   }
 

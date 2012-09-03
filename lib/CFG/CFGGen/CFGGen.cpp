@@ -328,7 +328,7 @@ void CFGGen::visitForEachStmt(ForEachStmt *S) {
 // Expressions
 //===--------------------------------------------------------------------===//
 
-CFGValue CFGGen::visitCallExpr(CallExpr *E) {
+CFGValue CFGGen::visitApplyExpr(ApplyExpr *E) {
   Expr *Arg = ignoreParens(E->getArg());
   Expr *Fn = E->getFn();
   CFGValue FnV = visit(Fn);
