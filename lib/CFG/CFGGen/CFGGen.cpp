@@ -105,15 +105,22 @@ void CFGGen::emitBranch(JumpDest Dest) {
 //===--------------------------------------------------------------------===//
 
 void CFGGen::visitBraceStmt(BraceStmt *S) {
-  // BraceStmts do not need to be explicitly represented in the CFG.
-  // We should consider whether or not the scopes they introduce are
-  // represented in the CFG.
-  for (const BraceStmt::ExprStmtOrDecl &ESD : S->getElements()) {
-    if (Stmt *S = ESD.dyn_cast<Stmt*>())
+  // Enter a new scope.
+  Scope BraceScope(*this);
+
+  for (auto &ESD : S->getElements()) {
+    assert(B.hasValidInsertionPoint());
+
+    if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
       visit(S);
-    else if (Expr *E = ESD.dyn_cast<Expr*>())
+    
+      // If we ever reach an unreachable point, stop emitting statements.
+      // This will need revision if we ever add goto.
+      if (!B.hasValidInsertionPoint()) return;
+    } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
+      FullExpr scope(*this);
       visit(E);
-    else
+    } else
       assert(0 && "FIXME: Handle Decls");
   }
 }
