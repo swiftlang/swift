@@ -26,6 +26,8 @@
 
 namespace swift {
 
+class ValueDecl;
+class Type;
 class CFG;
 class BasicBlock;
 class ApplyExpr;
@@ -127,17 +129,18 @@ public:
 /// Represents a reference to a declaration, essentially evaluating to
 /// its lvalue.
 class DeclRefInst : public Instruction {
-public:
   /// The backing DeclRefExpr in the AST.
-  DeclRefExpr *expr;
+  DeclRefExpr *Expr;
+public:
 
   /// Construct a DeclRefInst.
   ///
-  /// \param DR A backpointer to the original DeclRefExpr.
+  /// \param Expr A backpointer to the original DeclRefExpr.
   ///
-  /// \param B The basic block that will contain the instruction.
-  ///
-  DeclRefInst(DeclRefExpr *DR) : Instruction(InstKind::DeclRef), expr(DR) {}
+  DeclRefInst(DeclRefExpr *Expr) : Instruction(InstKind::DeclRef), Expr(Expr) {}
+
+  /// getDecl - Return the underlying declaration.
+  ValueDecl *getDecl() const;
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::DeclRef;
@@ -147,19 +150,20 @@ public:
 /// Encapsulates an integer constant, as defined originally by an
 /// an IntegerLiteralExpr.
 class IntegerLiteralInst : public Instruction {
-public:
   // The backing IntegerLiteralExpr in the AST.
-  IntegerLiteralExpr *literal;
+  IntegerLiteralExpr *Expr;
+public:
 
   /// Constructs an IntegerLiteralInst.
   ///
-  /// \param IE A backpointer to the original IntegerLiteralExpr.
+  /// \param Expr A backpointer to the original IntegerLiteralExpr.
   ///
-  /// \param B The basic block that will contain the instruction.
-  ///
-  IntegerLiteralInst(IntegerLiteralExpr *IE)
-    : Instruction(InstKind::IntegerLiteral), literal(IE) {
+  IntegerLiteralInst(IntegerLiteralExpr *Expr)
+    : Instruction(InstKind::IntegerLiteral), Expr(Expr) {
   }
+
+  /// getValue - Return the APInt for the underlying integer literal.
+  APInt getValue() const;
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::IntegerLiteral;
@@ -168,24 +172,24 @@ public:
 
 /// Represents a load from a memory location.
 class LoadInst : public Instruction {
-public:
   /// The backing LoadExpr in the AST.
-  LoadExpr *expr;
+  LoadExpr *Expr;
 
-  /// The lvalue (memory address) to use for the load.
-  CFGValue lvalue;
-
+  /// The LValue (memory address) to use for the load.
+  CFGValue LValue;
+public:
   /// Constructs a LoadInst.
   ///
-  /// \param expr The backing LoadExpr in the AST.
+  /// \param Expr The backing LoadExpr in the AST.
   ///
-  /// \param lvalue The CFGValue representing the lvalue (address) to
+  /// \param LValue The CFGValue representing the lvalue (address) to
   ///        use for the load.
   ///
-  /// \param The basic block that will contain the instruction.
-  ///
-  LoadInst(LoadExpr *expr, CFGValue lvalue) :
-    Instruction(InstKind::Load), expr(expr), lvalue(lvalue) {}
+  LoadInst(LoadExpr *Expr, CFGValue LValue) :
+    Instruction(InstKind::Load), Expr(Expr), LValue(LValue) {}
+
+
+  CFGValue getLValue() const { return LValue; }
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::Load;
@@ -194,6 +198,8 @@ public:
 
 /// Represents a constructed tuple.
 class TupleInst : public Instruction {
+  /// The backing TupleExpr in the AST.
+  TupleExpr *Expr;
 
   CFGValue *getElementsStorage() {
     return reinterpret_cast<CFGValue*>(this + 1);
@@ -205,17 +211,14 @@ class TupleInst : public Instruction {
   TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elements);
 
 public:
-  /// The backing TupleExpr in the AST.
-  TupleExpr *expr;
-
   /// The elements referenced by this TupleInst.
-  MutableArrayRef<CFGValue> elements() {
+  MutableArrayRef<CFGValue> getElements() {
     return MutableArrayRef<CFGValue>(getElementsStorage(), NumArgs);
   }
 
   /// The elements referenced by this TupleInst.
-  ArrayRef<CFGValue> elements() const {
-    return const_cast<TupleInst*>(this)->elements();
+  ArrayRef<CFGValue> getElements() const {
+    return const_cast<TupleInst*>(this)->getElements();
   }
 
   /// Construct a TupleInst.
@@ -226,19 +229,21 @@ public:
   }
 };
 
-/// Represents the production of an instance of a given metatype.
+/// TypeOfInst - Represents the production of an instance of a given metatype.
 class TypeOfInst : public Instruction {
-public:
   /// The backing TypeOfExpr in the AST.
   TypeOfExpr *Expr;
+public:
 
   /// Constructs a TypeOfInst.
   ///
-  /// \param expr A backpointer to the original TypeOfExpr.
-  ///
-  /// \param B The basic block that will contain the instruction.
+  /// \param Expr A backpointer to the original TypeOfExpr.
   ///
   TypeOfInst(TypeOfExpr *Expr) : Instruction(InstKind::TypeOf), Expr(Expr) {}
+
+  /// getMetaType - Return the type of the metatype that this instruction
+  /// returns.
+  Type getMetaType() const;
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::TypeOf;
@@ -271,25 +276,26 @@ public:
 };
 
 class ReturnInst : public TermInst {
-public:
   /// The backing ReturnStmt (if any) in the AST.  If this was an
   /// implicit return, this value will be null.
-  ReturnStmt *returnStmt;
+  ReturnStmt *Stmt;
 
   /// The value to be returned (if any).  This can be null if it
   /// is an implicit return.
-  CFGValue returnValue;
-
+  CFGValue ReturnValue;
+  
+public:
   /// Constructs a ReturnInst representing an \b explicit return.
   ///
   /// \param returnStmt The backing return statement in the AST.
   ///
   /// \param returnValue The value to be returned.
   ///
-  ReturnInst(ReturnStmt *returnStmt, CFGValue returnValue)
-    : TermInst(InstKind::Return), returnStmt(returnStmt),
-      returnValue(returnValue) {
+  ReturnInst(ReturnStmt *Stmt, CFGValue ReturnValue)
+    : TermInst(InstKind::Return), Stmt(Stmt), ReturnValue(ReturnValue) {
   }
+
+  CFGValue getReturnValue() const { return ReturnValue; }
 
   SuccessorListTy getSuccessors() {
     // No Successors.
@@ -316,10 +322,12 @@ public:
   
   /// The jump target for the branch.
   BasicBlock *getDestBB() const { return DestBB; }
-  
+
+#if 0
   /// The temporary arguments to the target blocks.
   ArgsTy blockArgs() { return Arguments; }
   const ArgsTy blockArgs() const { return Arguments; }
+#endif
   
   SuccessorListTy getSuccessors() {
     return DestBB;
@@ -331,20 +339,22 @@ public:
 };
 
 class CondBranchInst : public TermInst {
+  /// The branching statement in the AST.
+  Stmt *TheStmt;
+
+  /// The condition value used for the branch.
+  CFGValue Condition;
+
   CFGSuccessor DestBBs[2];
   // FIXME: Use ArrayRef?
   struct BlockArgs { unsigned numArgs; CFGValue *args; } Args[2];
 public:
-  /// The branching statement in the AST.
-  Stmt *branchStmt;
 
-  /// The condition value used for the branch.
-  CFGValue condition;
-
-  CondBranchInst(Stmt *BranchStmt, CFGValue Cond,
+  CondBranchInst(Stmt *TheStmt, CFGValue Condition,
                  BasicBlock *TrueBB, BasicBlock *FalseBB);
 
-  
+  CFGValue getCondition() const { return Condition; }
+
   SuccessorListTy getSuccessors() {
     return DestBBs;
   }

@@ -80,6 +80,23 @@ void Instruction::eraseFromParent() {
 }
 
 
+/// getDecl - Return the underlying declaration.
+ValueDecl *DeclRefInst::getDecl() const {
+  return Expr->getDecl();
+}
+
+/// getValue - Return the APInt for the underlying integer literal.
+APInt IntegerLiteralInst::getValue() const {
+  return Expr->getValue();
+}
+
+/// getMetaType - Return the type of the metatype that this instruction
+/// returns.
+Type TypeOfInst::getMetaType() const {
+  return Expr->getType();
+}
+
+
 TermInst::SuccessorListTy TermInst::getSuccessors() {
   switch (getKind()) {
   case InstKind::Apply:
@@ -112,10 +129,10 @@ ApplyInst::ApplyInst(ApplyExpr *Expr, CFGValue Callee, ArrayRef<CFGValue> Args)
   memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(CFGValue));
 }
 
-CondBranchInst::CondBranchInst(Stmt *BranchStmt, CFGValue condition,
+CondBranchInst::CondBranchInst(Stmt *TheStmt, CFGValue Condition,
                                BasicBlock *TrueBB, BasicBlock *FalseBB)
-  : TermInst(InstKind::CondBranch), branchStmt(BranchStmt),
-    condition(condition) {
+  : TermInst(InstKind::CondBranch), TheStmt(TheStmt),
+    Condition(Condition) {
   DestBBs[0].init(this);
   DestBBs[1].init(this);
   DestBBs[0] = TrueBB;
@@ -134,7 +151,7 @@ TupleInst *TupleInst::create(TupleExpr *Expr, ArrayRef<CFGValue> Elements,
 }
 
 TupleInst::TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elems)
-  : Instruction(InstKind::Tuple),  NumArgs(Elems.size()), expr(Expr) {
+  : Instruction(InstKind::Tuple), Expr(Expr), NumArgs(Elems.size()) {
   memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(CFGValue));
 }
 

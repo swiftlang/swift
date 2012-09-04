@@ -98,20 +98,20 @@ public:
   }
 
   void visitDeclRefInst(DeclRefInst *DRI) {
-    OS << "declref " << DRI->expr->getDecl()->getName()
-       << ", type=" << DRI->expr->getDecl()->getType().getString();
+    OS << "declref " << DRI->getDecl()->getName()
+       << ", type=" << DRI->getDecl()->getType().getString();
   }
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
-    const auto &lit = ILI->literal->getValue();
+    const auto &lit = ILI->getValue();
     OS << "integerliteral " << lit << ", width=" << lit.getBitWidth();
   }
   void visitLoadInst(LoadInst *LI) {
-    OS << "load " << getID(LI->lvalue);
+    OS << "load " << getID(LI->getLValue());
   }
   void visitTupleInst(TupleInst *TI) {
     OS << "tuple (";
     bool isFirst = true;
-    for (const auto &Elem : TI->elements()) {
+    for (const auto &Elem : TI->getElements()) {
       if (isFirst)
         isFirst = false;
       else
@@ -121,17 +121,18 @@ public:
     OS << ')';
   }
   void visitTypeOfInst(TypeOfInst *TOI) {
-    OS << "typeof " << TOI->Expr->getType().getString();
+    OS << "typeof " << TOI->getMetaType().getString();
   }
 
   void visitReturnInst(ReturnInst *RI) {
     OS << "return ";
-    if (RI->returnValue)
-      OS << '(' << getID(RI->returnValue) << ')';
+    if (RI->getReturnValue())
+      OS << '(' << getID(RI->getReturnValue()) << ')';
   }
 
   void visitBranchInst(BranchInst *UBI) {
     OS << "br " << getID(UBI->getDestBB());
+#if 0
     const BranchInst::ArgsTy Args = UBI->blockArgs();
 
     // FIXME: Args should move to terminator generic stuff.
@@ -140,6 +141,7 @@ public:
       for (auto Arg : Args) { OS << "%" << Arg; }
       OS << ')';
     }
+#endif
   }
 
   void visitCondBranchInst(CondBranchInst *CBI) {
