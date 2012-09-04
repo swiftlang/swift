@@ -24,7 +24,7 @@ namespace swift {
 namespace Lowering {
   class Condition;
 
-class CFGGen : public ASTVisitor<CFGGen, CFGValue> {
+class LLVM_LIBRARY_VISIBILITY CFGGen : public ASTVisitor<CFGGen, CFGValue> {
   /// The CFG being constructed.
   CFG &C;
   

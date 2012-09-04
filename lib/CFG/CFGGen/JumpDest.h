@@ -18,6 +18,7 @@
 #define JUMPDEST_H
 
 #include "swift/Basic/DiverseStack.h"
+#include "llvm/Support/Compiler.h"
 
 namespace swift {
   class BasicBlock;
@@ -33,7 +34,7 @@ typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
 /// The destination of a direct jump.  Swift currently does not
 /// support indirect branches or goto, so the jump mechanism only
 /// needs to worry about branches into scopes, not out of them.
-class JumpDest {
+class LLVM_LIBRARY_VISIBILITY JumpDest {
   BasicBlock *Block;
   CleanupsDepth Depth;
 public:

@@ -1,4 +1,4 @@
-//===--- Verifier - Verification of Swift CFGs -----------------------------==//
+//===--- Verifier.cpp - Verification of Swift CFGs ------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

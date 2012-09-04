@@ -23,7 +23,7 @@ namespace swift {
 namespace Lowering {
   class CFGGen;
 
-class CleanupManager {
+class LLVM_LIBRARY_VISIBILITY CleanupManager {
   friend class Scope;
 
   CFGGen &Gen;

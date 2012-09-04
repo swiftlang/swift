@@ -17,14 +17,14 @@
 #ifndef SCOPE_H
 #define SCOPE_H
 
-#include "Scope.h"
+#include "Cleanup.h"
 
 namespace swift {
 namespace Lowering {
 
 /// A Scope is a RAII object recording that a scope (e.g. a brace
 /// statement) has been entered.
-class Scope {
+class LLVM_LIBRARY_VISIBILITY Scope {
   CleanupManager &Cleanups;
   CleanupsDepth Depth;
   CleanupsDepth SavedInnermostScope;
@@ -64,7 +64,7 @@ public:
 /// for the temporaries in an expression, with the added complexity
 /// that (eventually, very likely) we have to deal with expressions
 /// that are only conditionally evaluated.
-class FullExpr : private Scope {
+class LLVM_LIBRARY_VISIBILITY FullExpr : private Scope {
 public:
   explicit FullExpr(CleanupManager &Cleanups) : Scope(Cleanups) {}
   using Scope::pop;

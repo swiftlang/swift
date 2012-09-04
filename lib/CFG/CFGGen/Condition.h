@@ -17,6 +17,8 @@
 #ifndef SWIFT_CFG_LOWERING_CONDITION_H
 #define SWIFT_CFG_LOWERING_CONDITION_H
 
+#include "llvm/Support/Compiler.h"
+
 namespace swift {
   class CFGBuilder;
   class BasicBlock;
@@ -25,7 +27,7 @@ namespace Lowering {
 
 /// A condition is the result of evaluating a boolean expression as
 /// control flow.
-class Condition {
+class LLVM_LIBRARY_VISIBILITY Condition {
   // The blocks responsible for executing the true and false conditions.  A
   // block is non-null if that branch is possible, but it's only an independent
   // block if both branches are possible.
