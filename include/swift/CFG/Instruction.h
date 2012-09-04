@@ -19,6 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/CFG/CFGBase.h"
+#include "swift/CFG/CFGLocation.h"
 #include "swift/CFG/CFGSuccessor.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist_node.h"
@@ -58,19 +59,38 @@ public llvm::ilist_node<Instruction>, public CFGAllocated<Instruction> {
   // ilist_traits<Instruction>.
   BasicBlock *ParentBB;
 
+  CFGLocation Loc;
+
   friend struct llvm::ilist_sentinel_traits<Instruction>;
   Instruction() = delete;
   void operator=(const Instruction &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
 
 protected:
-  Instruction(InstKind Kind) : Kind(Kind), ParentBB(0) {}
+  Instruction(InstKind Kind, CFGLocation Loc)
+    : Kind(Kind), ParentBB(0), Loc(Loc) {}
 
 public:
 
   InstKind getKind() const { return Kind; }
   const BasicBlock *getParent() const { return ParentBB; }
   BasicBlock *getParent() { return ParentBB; }
+
+
+  CFGLocation getLoc() const { return Loc; }
+
+  /// Return the AST expression that this instruction is produced from, or null
+  /// if it is implicitly generated.  Note that this is aborts on locations that
+  /// come from statements.
+  template<typename T>
+  T *getLocExpr() const { return cast_or_null<T>(Loc.template get<Expr*>()); }
+
+  /// Return the AST statement that this instruction is produced from, or null
+  /// if it is implicitly generated.  Note that this is aborts on locations that
+  /// come from statements.
+  template<typename T>
+  T *getLocStmt() const { return cast_or_null<T>(Loc.template get<Stmt*>()); }
+
 
   /// removeFromParent - This method unlinks 'this' from the containing basic
   /// block, but does not delete it.
@@ -91,9 +111,6 @@ public:
 
 /// ApplyInst - Represents application of an argument to a function.
 class ApplyInst : public Instruction {
-  /// The backing expression for the call.
-  ApplyExpr *Expr;
-  
   /// The instruction representing the called function.
   CFGValue Callee;
 
@@ -129,15 +146,15 @@ public:
 /// Represents a reference to a declaration, essentially evaluating to
 /// its lvalue.
 class DeclRefInst : public Instruction {
-  /// The backing DeclRefExpr in the AST.
-  DeclRefExpr *Expr;
 public:
 
   /// Construct a DeclRefInst.
   ///
   /// \param Expr A backpointer to the original DeclRefExpr.
   ///
-  DeclRefInst(DeclRefExpr *Expr) : Instruction(InstKind::DeclRef), Expr(Expr) {}
+  DeclRefInst(DeclRefExpr *E) : Instruction(InstKind::DeclRef, (Expr*)E) {}
+
+  DeclRefExpr *getExpr() const;
 
   /// getDecl - Return the underlying declaration.
   ValueDecl *getDecl() const;
@@ -150,18 +167,18 @@ public:
 /// Encapsulates an integer constant, as defined originally by an
 /// an IntegerLiteralExpr.
 class IntegerLiteralInst : public Instruction {
-  // The backing IntegerLiteralExpr in the AST.
-  IntegerLiteralExpr *Expr;
 public:
 
   /// Constructs an IntegerLiteralInst.
   ///
   /// \param Expr A backpointer to the original IntegerLiteralExpr.
   ///
-  IntegerLiteralInst(IntegerLiteralExpr *Expr)
-    : Instruction(InstKind::IntegerLiteral), Expr(Expr) {
+  IntegerLiteralInst(IntegerLiteralExpr *E)
+    : Instruction(InstKind::IntegerLiteral, (Expr*)E) {
   }
 
+  IntegerLiteralExpr *getExpr() const;
+  
   /// getValue - Return the APInt for the underlying integer literal.
   APInt getValue() const;
 
@@ -172,9 +189,6 @@ public:
 
 /// Represents a load from a memory location.
 class LoadInst : public Instruction {
-  /// The backing LoadExpr in the AST.
-  LoadExpr *Expr;
-
   /// The LValue (memory address) to use for the load.
   CFGValue LValue;
 public:
@@ -185,8 +199,8 @@ public:
   /// \param LValue The CFGValue representing the lvalue (address) to
   ///        use for the load.
   ///
-  LoadInst(LoadExpr *Expr, CFGValue LValue) :
-    Instruction(InstKind::Load), Expr(Expr), LValue(LValue) {}
+  LoadInst(LoadExpr *E, CFGValue LValue) :
+    Instruction(InstKind::Load, (Expr*)E), LValue(LValue) {}
 
 
   CFGValue getLValue() const { return LValue; }
@@ -198,9 +212,6 @@ public:
 
 /// Represents a constructed tuple.
 class TupleInst : public Instruction {
-  /// The backing TupleExpr in the AST.
-  TupleExpr *Expr;
-
   CFGValue *getElementsStorage() {
     return reinterpret_cast<CFGValue*>(this + 1);
   }
@@ -231,15 +242,15 @@ public:
 
 /// TypeOfInst - Represents the production of an instance of a given metatype.
 class TypeOfInst : public Instruction {
-  /// The backing TypeOfExpr in the AST.
-  TypeOfExpr *Expr;
 public:
 
   /// Constructs a TypeOfInst.
   ///
   /// \param Expr A backpointer to the original TypeOfExpr.
   ///
-  TypeOfInst(TypeOfExpr *Expr) : Instruction(InstKind::TypeOf), Expr(Expr) {}
+  TypeOfInst(TypeOfExpr *E) : Instruction(InstKind::TypeOf, (Expr*)E) {}
+
+  TypeOfExpr *getExpr() const;
 
   /// getMetaType - Return the type of the metatype that this instruction
   /// returns.
@@ -257,7 +268,7 @@ public:
 /// This class defines a "terminating instruction" for a BasicBlock.
 class TermInst : public Instruction {
 public:
-  TermInst(InstKind K) : Instruction(K) {}
+  TermInst(InstKind K, CFGLocation Loc) : Instruction(K, Loc) {}
 
   typedef llvm::ArrayRef<CFGSuccessor> SuccessorListTy;
 
@@ -275,11 +286,8 @@ public:
   }
 };
 
+/// ReturnInst - Representation of a ReturnStmt.
 class ReturnInst : public TermInst {
-  /// The backing ReturnStmt (if any) in the AST.  If this was an
-  /// implicit return, this value will be null.
-  ReturnStmt *Stmt;
-
   /// The value to be returned.  This is never null.
   CFGValue ReturnValue;
   
@@ -290,8 +298,8 @@ public:
   ///
   /// \param returnValue The value to be returned.
   ///
-  ReturnInst(ReturnStmt *Stmt, CFGValue ReturnValue)
-    : TermInst(InstKind::Return), Stmt(Stmt), ReturnValue(ReturnValue) {
+  ReturnInst(ReturnStmt *S, CFGValue ReturnValue)
+    : TermInst(InstKind::Return, (Stmt*)S), ReturnValue(ReturnValue) {
   }
 
   CFGValue getReturnValue() const { return ReturnValue; }
@@ -301,7 +309,6 @@ public:
     return SuccessorListTy();
   }
 
-  
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::Return;
   }
@@ -316,7 +323,7 @@ public:
   
   /// Construct an BranchInst that will branches to the specified block.
   BranchInst(BasicBlock *DestBB)
-  : TermInst(InstKind::Branch), DestBB(this, DestBB) {
+    : TermInst(InstKind::Branch, CFGLocation()), DestBB(this, DestBB) {
   }
   
   /// The jump target for the branch.
@@ -338,9 +345,6 @@ public:
 };
 
 class CondBranchInst : public TermInst {
-  /// The branching statement in the AST.
-  Stmt *TheStmt;
-
   /// The condition value used for the branch.
   CFGValue Condition;
 

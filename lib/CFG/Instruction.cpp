@@ -79,21 +79,33 @@ void Instruction::eraseFromParent() {
   getParent()->getInsts().erase(this);
 }
 
+DeclRefExpr *DeclRefInst::getExpr() const {
+  return getLocExpr<DeclRefExpr>();
+}
 
 /// getDecl - Return the underlying declaration.
 ValueDecl *DeclRefInst::getDecl() const {
-  return Expr->getDecl();
+  return getExpr()->getDecl();
+}
+
+IntegerLiteralExpr *IntegerLiteralInst::getExpr() const {
+  return getLocExpr<IntegerLiteralExpr>();
 }
 
 /// getValue - Return the APInt for the underlying integer literal.
 APInt IntegerLiteralInst::getValue() const {
-  return Expr->getValue();
+  return getExpr()->getValue();
+}
+
+
+TypeOfExpr *TypeOfInst::getExpr() const {
+  return getLocExpr<TypeOfExpr>();
 }
 
 /// getMetaType - Return the type of the metatype that this instruction
 /// returns.
 Type TypeOfInst::getMetaType() const {
-  return Expr->getType();
+  return getExpr()->getType();
 }
 
 
@@ -124,21 +136,17 @@ ApplyInst *ApplyInst::create(ApplyExpr *Expr, CFGValue Callee,
 }
 
 ApplyInst::ApplyInst(ApplyExpr *Expr, CFGValue Callee, ArrayRef<CFGValue> Args)
-  : Instruction(InstKind::Apply), Expr(Expr), Callee(Callee),
-    NumArgs(Args.size()) {
+  : Instruction(InstKind::Apply, Expr), Callee(Callee), NumArgs(Args.size()) {
   memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(CFGValue));
 }
 
 CondBranchInst::CondBranchInst(Stmt *TheStmt, CFGValue Condition,
                                BasicBlock *TrueBB, BasicBlock *FalseBB)
-  : TermInst(InstKind::CondBranch), TheStmt(TheStmt),
-    Condition(Condition) {
+  : TermInst(InstKind::CondBranch, TheStmt), Condition(Condition) {
   DestBBs[0].init(this);
   DestBBs[1].init(this);
   DestBBs[0] = TrueBB;
   DestBBs[1] = FalseBB;
-      
-  // FIXME: Args?
 }
 
 
@@ -151,7 +159,7 @@ TupleInst *TupleInst::create(TupleExpr *Expr, ArrayRef<CFGValue> Elements,
 }
 
 TupleInst::TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elems)
-  : Instruction(InstKind::Tuple), Expr(Expr), NumArgs(Elems.size()) {
+  : Instruction(InstKind::Tuple, Expr), NumArgs(Elems.size()) {
   memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(CFGValue));
 }
 
