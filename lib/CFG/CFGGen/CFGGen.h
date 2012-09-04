@@ -41,15 +41,8 @@ public:
   CFGGen(CFG &C)
     : C(C), B(new (C) BasicBlock(&C), C), Cleanups(*this) {
   }
-  
-  ~CFGGen() {
-    // If we have an unterminated block, just emit a dummy return for the
-    // default return.
-    if (B.hasValidInsertionPoint()) {
-      // FIXME: Should use empty tuple for "void" return.
-      B.createReturn(0, CFGValue());
-    }
-  }
+
+  ~CFGGen();
   
   /// Retun a stable reference to the current cleanup.
   CleanupsDepth getCleanupsDepth() const {

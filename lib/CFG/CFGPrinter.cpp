@@ -125,9 +125,7 @@ public:
   }
 
   void visitReturnInst(ReturnInst *RI) {
-    OS << "return ";
-    if (RI->getReturnValue())
-      OS << '(' << getID(RI->getReturnValue()) << ')';
+    OS << "return " << '(' << getID(RI->getReturnValue()) << ')';
   }
 
   void visitBranchInst(BranchInst *UBI) {

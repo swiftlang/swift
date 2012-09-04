@@ -90,6 +90,25 @@ Condition CFGGen::emitCondition(Stmt *TheStmt, Expr *E,
   return Condition(TrueBB, FalseBB, ContBB);
 }
 
+/// CFGGen destructor - called when the entire AST has been visited.  This
+/// handles "falling off the end of the function" logic.
+CFGGen::~CFGGen() {
+  // If the end of the function isn't reachable (e.g. it ended in an explicit
+  // return), then we're done.
+  if (!B.hasValidInsertionPoint())
+    return;
+
+  // If we have an unterminated block, just emit a "return ()" for the
+  // default return.
+
+  // FIXME: This is dubious at best, given that we want to find "lack of return
+  // in a function that returns non-()" as an error with the CFG.  We need to
+  // decide how to model this, we want blocks to always have terminators.  Maybe
+  // something like "unreachable" in LLVM parlance, which is useful for
+  // no-return function calls anyway.
+  auto EmptyTuple = B.createTuple(nullptr, ArrayRef<CFGValue>());
+  B.createReturn(nullptr, EmptyTuple);
+}
 
 //===--------------------------------------------------------------------===//
 // Statements
@@ -377,7 +396,7 @@ CFGValue CFGGen::visitTypeOfExpr(TypeOfExpr *E) {
 CFG *CFG::constructCFG(Stmt *S) {
   CFG *C = new CFG();
   CFGGen(*C).visit(S);
-  
+
   C->verify();
   return C;
 }

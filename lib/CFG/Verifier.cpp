@@ -58,6 +58,7 @@ public:
   }
   
   void visitReturnInst(ReturnInst *RI) {
+    assert(RI->getReturnValue() && "Return of null value is invalid");
   }
   
   void visitBranchInst(BranchInst *BI) {

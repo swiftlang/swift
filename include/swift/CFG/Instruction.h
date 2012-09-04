@@ -280,8 +280,7 @@ class ReturnInst : public TermInst {
   /// implicit return, this value will be null.
   ReturnStmt *Stmt;
 
-  /// The value to be returned (if any).  This can be null if it
-  /// is an implicit return.
+  /// The value to be returned.  This is never null.
   CFGValue ReturnValue;
   
 public:
