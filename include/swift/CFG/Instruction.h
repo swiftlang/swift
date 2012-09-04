@@ -346,8 +346,6 @@ class CondBranchInst : public TermInst {
   CFGValue Condition;
 
   CFGSuccessor DestBBs[2];
-  // FIXME: Use ArrayRef?
-  struct BlockArgs { unsigned numArgs; CFGValue *args; } Args[2];
 public:
 
   CondBranchInst(Stmt *TheStmt, CFGValue Condition,
