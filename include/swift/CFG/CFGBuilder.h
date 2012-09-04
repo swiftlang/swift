@@ -130,7 +130,11 @@ public:
   //===--------------------------------------------------------------------===//
   // Terminator Instruction Creation Methods
   //===--------------------------------------------------------------------===//
-  
+
+  UnreachableInst *createUnreachable() {
+    return insertTerminator(new UnreachableInst());
+  }
+
   ReturnInst *createReturn(ReturnStmt *Stmt, CFGValue ReturnValue) {
     return insertTerminator(new ReturnInst(Stmt, ReturnValue));
   }

@@ -45,10 +45,11 @@ INST(Load, Instruction)
 INST(Tuple, Instruction)
 INST(TypeOf, Instruction)
 ABSTRACT_INST(Term, Instruction)
+  INST(Unreachable, TermInst)
   INST(Return, TermInst)
   INST(Branch, TermInst)
   INST(CondBranch, TermInst)
-  INST_RANGE(Term, Return, CondBranch)
+  INST_RANGE(Term, Unreachable, CondBranch)
 
 #undef INST_RANGE
 #undef ABSTRACT_INST

@@ -286,6 +286,24 @@ public:
   }
 };
 
+/// UnreachableInst - Position in the code which would be undefined to reach.
+/// These are always implicitly generated, e.g. when falling off the end of a
+/// function or after a no-return function call.
+class UnreachableInst : public TermInst {
+public:
+  UnreachableInst() : TermInst(InstKind::Unreachable, CFGLocation()) {
+  }
+
+  SuccessorListTy getSuccessors() {
+    // No Successors.
+    return SuccessorListTy();
+  }
+
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::Unreachable;
+  }
+};
+
 /// ReturnInst - Representation of a ReturnStmt.
 class ReturnInst : public TermInst {
   /// The value to be returned.  This is never null.

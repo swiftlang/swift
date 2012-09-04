@@ -118,6 +118,8 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   case InstKind::Tuple:
   case InstKind::TypeOf:
     llvm_unreachable("Only TermInst's are allowed");
+  case InstKind::Unreachable:
+    return cast<UnreachableInst>(this)->getSuccessors();
   case InstKind::Return:
     return cast<ReturnInst>(this)->getSuccessors();
   case InstKind::CondBranch:

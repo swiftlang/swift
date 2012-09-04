@@ -98,16 +98,14 @@ CFGGen::~CFGGen() {
   if (!B.hasValidInsertionPoint())
     return;
 
-  // If we have an unterminated block, just emit a "return ()" for the
-  // default return.
+  // If we have an unterminated block, it is either an implicit return of an
+  // empty tuple, or a dynamically unreachable location.
+  // FIXME: When the function returns a "voidable" result, we should produce it.
+  // hoist some logic from IRGen into a common place.
+  B.createUnreachable();
 
-  // FIXME: This is dubious at best, given that we want to find "lack of return
-  // in a function that returns non-()" as an error with the CFG.  We need to
-  // decide how to model this, we want blocks to always have terminators.  Maybe
-  // something like "unreachable" in LLVM parlance, which is useful for
-  // no-return function calls anyway.
-  auto EmptyTuple = B.createTuple(nullptr, ArrayRef<CFGValue>());
-  B.createReturn(nullptr, EmptyTuple);
+  //auto EmptyTuple = B.createTuple(nullptr, ArrayRef<CFGValue>());
+  //B.createReturn(nullptr, EmptyTuple);
 }
 
 //===--------------------------------------------------------------------===//

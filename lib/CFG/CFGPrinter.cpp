@@ -124,6 +124,10 @@ public:
     OS << "typeof " << TOI->getMetaType().getString();
   }
 
+  void visitUnreachableInst(UnreachableInst *UI) {
+    OS << "unreachable";
+  }
+
   void visitReturnInst(ReturnInst *RI) {
     OS << "return " << '(' << getID(RI->getReturnValue()) << ')';
   }
