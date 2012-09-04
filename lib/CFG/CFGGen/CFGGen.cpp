@@ -372,6 +372,11 @@ CFGValue CFGGen::visitLoadExpr(LoadExpr *E) {
   return B.createLoad(E, SubV);
 }
 
+CFGValue CFGGen::visitRequalifyExpr(RequalifyExpr *E) {
+  CFGValue SubV = visit(E->getSubExpr());
+  return B.createRequalify(E, SubV);
+}
+
 CFGValue CFGGen::visitParenExpr(ParenExpr *E) {
   return visit(E->getSubExpr());
 }

@@ -37,6 +37,7 @@ class IntegerLiteralExpr;
 class LoadExpr;
 class ReturnStmt;
 class Stmt;
+class RequalifyExpr;
 class TupleExpr;
 class TypeOfExpr;
 
@@ -210,7 +211,22 @@ public:
   }
 };
 
-/// Represents a constructed tuple.
+
+/// RequalifyInst - Change the qualification on an l-value.  The new
+/// type always has the same object type as the old type with strictly
+/// "more" (i.e. a supertyped set of) qualifiers.
+class RequalifyInst : public Instruction {
+  CFGValue Operand;
+public:
+  RequalifyInst(RequalifyExpr *E, CFGValue Operand)
+    : Instruction(InstKind::Requalify, (Expr*)E), Operand(Operand) {}
+
+  CFGValue getOperand() const { return Operand; }
+
+};
+
+
+/// TupleInst - Represents a constructed tuple.
 class TupleInst : public Instruction {
   CFGValue *getElementsStorage() {
     return reinterpret_cast<CFGValue*>(this + 1);

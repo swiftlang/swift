@@ -119,6 +119,10 @@ public:
     return insert(new LoadInst(Expr, LV));
   }
 
+  RequalifyInst *createRequalify(RequalifyExpr *Expr, CFGValue Op) {
+    return insert(new RequalifyInst(Expr, Op));
+  }
+
   TupleInst *createTuple(TupleExpr *Expr, ArrayRef<CFGValue> Elements) {
     return insert(TupleInst::create(Expr, Elements, C));
   }

@@ -108,6 +108,9 @@ public:
   void visitLoadInst(LoadInst *LI) {
     OS << "load " << getID(LI->getLValue());
   }
+  void visitRequalifyInst(RequalifyInst *RI) {
+    OS << "requalify " << getID(RI->getOperand());
+  }
   void visitTupleInst(TupleInst *TI) {
     OS << "tuple (";
     bool isFirst = true;
