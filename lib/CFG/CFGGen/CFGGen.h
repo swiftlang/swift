@@ -13,7 +13,7 @@
 #ifndef CFGGEN_H
 #define CFGGEN_H
 
-#include "JumpDest.h"
+#include "Cleanup.h"
 #include "swift/CFG/CFG.h"
 #include "swift/CFG/CFGBuilder.h"
 #include "swift/AST/ASTVisitor.h"
@@ -25,8 +25,6 @@ namespace Lowering {
   class Condition;
 
 class CFGGen : public ASTVisitor<CFGGen, CFGValue> {
-  friend class Scope;
-  
   /// The CFG being constructed.
   CFG &C;
   
@@ -37,21 +35,17 @@ class CFGGen : public ASTVisitor<CFGGen, CFGValue> {
   std::vector<JumpDest> BreakDestStack;
   std::vector<JumpDest> ContinueDestStack;
 
-  /// Cleanups - Currently active cleanups in this scope tree.
-  DiverseStack<Cleanup, 128> Cleanups;
-
-  CleanupsDepth InnermostScope;
-  void endScope(CleanupsDepth Depth);
-
+  /// Cleanups - This records information about the currently active cleanups.
+  CleanupManager Cleanups;
 public:
   CFGGen(CFG &C)
-    : C(C), B(new (C) BasicBlock(&C), C), InnermostScope(Cleanups.stable_end()){
+    : C(C), B(new (C) BasicBlock(&C), C), Cleanups(*this) {
   }
   
   ~CFGGen() {
     // If we have an unterminated block, just emit a dummy return for the
     // default return.
-    if (B.getInsertionBB() != nullptr) {
+    if (B.hasValidInsertionPoint()) {
       // FIXME: Should use empty tuple for "void" return.
       B.createReturn(0, CFGValue());
     }
@@ -59,8 +53,10 @@ public:
   
   /// Retun a stable reference to the current cleanup.
   CleanupsDepth getCleanupsDepth() const {
-    return Cleanups.stable_begin();
+    return Cleanups.getCleanupsDepth();
   }
+  
+  CFGBuilder &getBuilder() { return B; }
   
   //===--------------------------------------------------------------------===//
   // Statements.
@@ -80,8 +76,7 @@ public:
   
   
   /// emitBranch - Emit a branch to the given jump destination, threading out
-  /// through any cleanups we might need to run.  Leaves the insertion point in
-  /// the current block.
+  /// through any cleanups we might need to run.
   void emitBranch(JumpDest D);
   
   //===--------------------------------------------------------------------===//

@@ -17,7 +17,7 @@
 #ifndef SCOPE_H
 #define SCOPE_H
 
-#include "CFGGen.h"
+#include "Scope.h"
 
 namespace swift {
 namespace Lowering {
@@ -25,27 +25,27 @@ namespace Lowering {
 /// A Scope is a RAII object recording that a scope (e.g. a brace
 /// statement) has been entered.
 class Scope {
-  CFGGen &Gen;
+  CleanupManager &Cleanups;
   CleanupsDepth Depth;
   CleanupsDepth SavedInnermostScope;
 
   void popImpl() {
-    Gen.Cleanups.checkIterator(Depth);
-    Gen.Cleanups.checkIterator(Gen.InnermostScope);
-    assert(Gen.InnermostScope == Depth && "popping scopes out of order");
+    Cleanups.Stack.checkIterator(Depth);
+    Cleanups.Stack.checkIterator(Cleanups.InnermostScope);
+    assert(Cleanups.InnermostScope == Depth && "popping scopes out of order");
 
-    Gen.InnermostScope = SavedInnermostScope;
-    Gen.endScope(Depth);
-    Gen.Cleanups.checkIterator(Gen.InnermostScope);
+    Cleanups.InnermostScope = SavedInnermostScope;
+    Cleanups.endScope(Depth);
+    Cleanups.Stack.checkIterator(Cleanups.InnermostScope);
   }
 
 public:
-  explicit Scope(CFGGen &Gen)
-    : Gen(Gen), Depth(Gen.getCleanupsDepth()),
-      SavedInnermostScope(Gen.InnermostScope) {
+  explicit Scope(CleanupManager &Cleanups)
+    : Cleanups(Cleanups), Depth(Cleanups.getCleanupsDepth()),
+      SavedInnermostScope(Cleanups.InnermostScope) {
     assert(Depth.isValid());
-    Gen.Cleanups.checkIterator(Gen.InnermostScope);
-    Gen.InnermostScope = Depth;
+    Cleanups.Stack.checkIterator(Cleanups.InnermostScope);
+    Cleanups.InnermostScope = Depth;
   }
 
   void pop() {
@@ -66,11 +66,11 @@ public:
 /// that are only conditionally evaluated.
 class FullExpr : private Scope {
 public:
-  explicit FullExpr(CFGGen &Gen) : Scope(Gen) {}
+  explicit FullExpr(CleanupManager &Cleanups) : Scope(Cleanups) {}
   using Scope::pop;
 };
 
-} // end namespace irgen
+} // end namespace Lowering
 } // end namespace swift
 
 #endif
