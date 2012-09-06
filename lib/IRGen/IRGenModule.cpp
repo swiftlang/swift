@@ -88,7 +88,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
                   ->getPointerTo(0);
 
   FixedBufferTy = nullptr;
-  for (unsigned i = 0; i != NumValueWitnesses; ++i)
+  for (unsigned i = 0; i != NumValueWitnessFunctions; ++i)
     ValueWitnessTys[i] = nullptr;
 
   ObjCPtrTy = llvm::StructType::create(getLLVMContext(), "objc_object")

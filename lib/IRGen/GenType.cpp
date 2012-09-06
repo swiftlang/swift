@@ -81,24 +81,36 @@ void FixedTypeInfo::initializeWithCopy(IRGenFunction &IGF,
   initialize(IGF, copy, destAddr);
 }
 
+static llvm::Constant *asSizeConstant(IRGenModule &IGM, Size size) {
+  return llvm::ConstantInt::get(IGM.SizeTy, size.getValue());
+}
+
 /// Return the size and alignment of this type.
-/// TODO: this needs to be potentially virtual.
 std::pair<llvm::Value*,llvm::Value*>
-TypeInfo::getSizeAndAlignment(IRGenFunction &IGF) const {
-  return std::make_pair(llvm::ConstantInt::get(IGF.IGM.SizeTy,
-                                               StorageSize.getValue()),
-                        llvm::ConstantInt::get(IGF.IGM.SizeTy,
-                                               StorageAlignment.getValue()));
+FixedTypeInfo::getSizeAndAlignment(IRGenFunction &IGF) const {
+  return std::make_pair(FixedTypeInfo::getSize(IGF),
+                        FixedTypeInfo::getAlignment(IGF));
 }
 
-// Eventually optimizable.
-llvm::Value *TypeInfo::getSizeOnly(IRGenFunction &IGF) const {
-  return getSizeAndAlignment(IGF).first;
+llvm::Value *FixedTypeInfo::getSize(IRGenFunction &IGF) const {
+  return FixedTypeInfo::getStaticSize(IGF.IGM);
+}
+llvm::Constant *FixedTypeInfo::getStaticSize(IRGenModule &IGM) const {
+  return asSizeConstant(IGM, StorageSize);
 }
 
-// Eventually optimizable.
-llvm::Value *TypeInfo::getAlignmentOnly(IRGenFunction &IGF) const {
-  return getSizeAndAlignment(IGF).second;
+llvm::Value *FixedTypeInfo::getAlignment(IRGenFunction &IGF) const {
+  return FixedTypeInfo::getStaticAlignment(IGF.IGM);
+}
+llvm::Constant *FixedTypeInfo::getStaticAlignment(IRGenModule &IGM) const {
+  return asSizeConstant(IGM, Size(StorageAlignment.getValue()));
+}
+
+llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF) const {
+  return FixedTypeInfo::getStaticStride(IGF.IGM);
+}
+llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
+  return asSizeConstant(IGM, StorageSize.roundUpToAlignment(StorageAlignment));
 }
 
 namespace {

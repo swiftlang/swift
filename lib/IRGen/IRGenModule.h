@@ -111,17 +111,17 @@ public:
   }
 
   llvm::Type *getFixedBufferTy();
-  llvm::PointerType *getValueWitnessTy(ValueWitness index);
+  llvm::Type *getValueWitnessTy(ValueWitness index);
 
   void unimplemented(SourceLoc, StringRef Message);
   void error(SourceLoc loc, const Twine &message);
 
 private:
   Size PtrSize;
-  llvm::Type *FixedBufferTy;           /// [16 x i8]
+  llvm::Type *FixedBufferTy;           /// [N x i8], where N == 3 * sizeof(void*)
 
-  enum { NumValueWitnesses = 13 };
-  llvm::PointerType *ValueWitnessTys[NumValueWitnesses]; /// pointer-to-functions
+  enum { NumValueWitnessFunctions = 12 };
+  llvm::PointerType *ValueWitnessTys[NumValueWitnessFunctions]; /// pointer-to-functions
 
 //--- Types -----------------------------------------------------------------
 public:

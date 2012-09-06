@@ -275,7 +275,7 @@ createArrayDtorFn(IRGenModule &IGM,
 
   loadValueWitnessTables(IGF, header, witnessTypes);
 
-  llvm::Value *elementSize = layout.getElementTypeInfo().getSizeOnly(IGF);
+  llvm::Value *elementSize = layout.getElementTypeInfo().getStride(IGF);
   if (!layout.getElementTypeInfo().isPOD(ResilienceScope::Local)) {
     llvm::Value *begin = layout.getBeginPointer(IGF, header);
     llvm::Value *end;
@@ -443,7 +443,7 @@ llvm::Value *ArrayHeapLayout::getAllocationSize(IRGenFunction &IGF,
   llvm::Value *size = properLength;
 
   // Scale that by the element stride, saturating at SIZE_MAX.
-  llvm::Value *elementStride = ElementTI.getSizeOnly(IGF);
+  llvm::Value *elementStride = ElementTI.getStride(IGF);
   if (canOverflow) {
     size = checkOverflow(IGF, llvm::Intrinsic::umul_with_overflow,
                          size, elementStride);

@@ -638,7 +638,11 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   case ValueWitness::InitializeBufferWithTake: return "Tk";
   case ValueWitness::InitializeWithTake: return "tk";
   case ValueWitness::ProjectBuffer: return "pr";
-  case ValueWitness::SizeAndAlignment: return "sa";
+
+  case ValueWitness::Size:
+  case ValueWitness::Alignment:
+  case ValueWitness::Stride:
+    llvm_unreachable("not a function witness");
   }
   llvm_unreachable("bad witness kind");
 }

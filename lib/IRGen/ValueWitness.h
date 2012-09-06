@@ -153,17 +153,30 @@ enum class ValueWitness : unsigned {
   /// that object.
   AllocateBuffer,
 
-  ///   typedef struct { size_t Size; size_t Align } layout_t;
-  ///   layout_t (*sizeAndAlignment)(W *self);
+  ///   size_t size;
   ///
-  /// Returns the required storage size and alignment of an object of
-  /// this type.
-  SizeAndAlignment
+  /// The required storage size of a single object of this type.
+  Size,
+
+  ///   size_t alignment;
+  ///
+  /// The required alignment of the first byte of this type.
+  Alignment,
+
+  ///   size_t stride;
+  ///
+  /// The required size per element of an array of this type.
+  Stride
 };
  
 enum {
-  NumValueWitnesses = unsigned(ValueWitness::SizeAndAlignment) + 1
+  NumValueWitnesses = unsigned(ValueWitness::Stride) + 1,
+  NumValueWitnessFunctions = NumValueWitnesses - 3
 };
+
+static inline bool isValueWitnessFunction(ValueWitness witness) {
+  return unsigned(witness) < NumValueWitnessFunctions;
+}
 
 } // end namespace irgen
 } // end namespace swift

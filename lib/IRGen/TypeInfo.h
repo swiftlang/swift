@@ -22,6 +22,7 @@
 
 
 namespace llvm {
+  class Constant;
   class Twine;
   class Type;
 }
@@ -29,6 +30,7 @@ namespace llvm {
 namespace swift {
 namespace irgen {
   class IRGenFunction;
+  class IRGenModule;
   class Initialization;
   class InitializedObject;
   class Address;
@@ -107,9 +109,22 @@ public:
 
   /// Return the size and alignment of this type.
   virtual std::pair<llvm::Value*,llvm::Value*>
-    getSizeAndAlignment(IRGenFunction &IGF) const;
-  llvm::Value *getSizeOnly(IRGenFunction &IGF) const;
-  llvm::Value *getAlignmentOnly(IRGenFunction &IGF) const;
+    getSizeAndAlignment(IRGenFunction &IGF) const = 0;
+  virtual llvm::Value *getSize(IRGenFunction &IGF) const = 0;
+  virtual llvm::Value *getAlignment(IRGenFunction &IGF) const = 0;
+  virtual llvm::Value *getStride(IRGenFunction &IGF) const = 0;
+
+  /// Return the statically-known size of this type, or null if it is
+  /// not known.
+  virtual llvm::Constant *getStaticSize(IRGenModule &IGM) const = 0;
+
+  /// Return the statically-known alignment of this type, or null if
+  /// it is not known.
+  virtual llvm::Constant *getStaticAlignment(IRGenModule &IGM) const = 0;
+
+  /// Return the statically-known stride size of this type, or null if
+  /// it is not known.
+  virtual llvm::Constant *getStaticStride(IRGenModule &IGM) const = 0;
 
   /// Add the information for exploding values of this type to the
   /// given schema.

@@ -1305,19 +1305,24 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return valueTI.initialize(IGF, args, addr);
   }
 
-  // FIXME: 'strideof' guarantees that it returns something that's a
-  // multiple of the alignment.
-  if (BuiltinName == "sizeof" || BuiltinName == "strideof") {
+  if (BuiltinName == "sizeof") {
     Type valueTy = emission.getSubstitutions()[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-    emission.setScalarUnmanagedSubstResult(valueTI.getSizeOnly(IGF));
+    emission.setScalarUnmanagedSubstResult(valueTI.getSize(IGF));
+    return;
+  }
+
+  if (BuiltinName == "strideof") {
+    Type valueTy = emission.getSubstitutions()[0].Replacement;
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    emission.setScalarUnmanagedSubstResult(valueTI.getStride(IGF));
     return;
   }
 
   if (BuiltinName == "alignof") {
     Type valueTy = emission.getSubstitutions()[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-    emission.setScalarUnmanagedSubstResult(valueTI.getAlignmentOnly(IGF));
+    emission.setScalarUnmanagedSubstResult(valueTI.getAlignment(IGF));
     return;
   }
 

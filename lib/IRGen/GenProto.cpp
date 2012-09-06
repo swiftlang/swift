@@ -107,11 +107,6 @@ llvm::Type *IRGenModule::getFixedBufferTy() {
   return FixedBufferTy;
 }
 
-static llvm::StructType *getSizeAndAlignmentResultType(IRGenModule &IGM) {
-  llvm::Type *resultElts[] = { IGM.SizeTy, IGM.SizeTy };
-  return llvm::StructType::get(IGM.getLLVMContext(), resultElts, false);
-}
-
 static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
                                                      ValueWitness index) {
   switch (index) {
@@ -169,23 +164,26 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
     return llvm::FunctionType::get(ptrTy, args, false);
   }
 
-  // typedef struct { size_t Size; size_t Align } layout_t;
-  // layout_t (*sizeAndAlignment)(W *self);
-  case ValueWitness::SizeAndAlignment: {
-    llvm::StructType *resultTy = getSizeAndAlignmentResultType(IGM);
-    return llvm::FunctionType::get(resultTy, IGM.WitnessTablePtrTy, false);
-  }
-
+  case ValueWitness::Size:
+  case ValueWitness::Alignment:
+  case ValueWitness::Stride:
+    llvm_unreachable("these witnesses aren't value witnesses!");
   }
   llvm_unreachable("bad value witness!");
 }
 
 /// Return the cached pointer-to-function type for the given value
 /// witness index.
-llvm::PointerType *IRGenModule::getValueWitnessTy(ValueWitness index) {
-  static_assert(IRGenModule::NumValueWitnesses == ::NumValueWitnesses,
+llvm::Type *IRGenModule::getValueWitnessTy(ValueWitness index) {
+  static_assert(IRGenModule::NumValueWitnessFunctions
+                  == ::NumValueWitnessFunctions,
                 "array on IGM has the wrong size");
 
+  /// All the non-function values are size_t's.
+  if (!isValueWitnessFunction(index))
+    return SizeTy;
+
+  assert(unsigned(index) < NumValueWitnessFunctions);
   auto &ty = ValueWitnessTys[unsigned(index)];
   if (ty) return ty;
 
@@ -219,8 +217,12 @@ static llvm::StringRef getValueWitnessLabel(ValueWitness index) {
     return "initializeWithCopy";
   case ValueWitness::InitializeWithTake:
     return "initializeWithTake";
-  case ValueWitness::SizeAndAlignment:
-    return "sizeAndAlignment";
+  case ValueWitness::Size:
+    return "size";
+  case ValueWitness::Alignment:
+    return "alignment";
+  case ValueWitness::Stride:
+    return "stride";
   }
   llvm_unreachable("bad value witness index");
 }
@@ -316,8 +318,13 @@ static llvm::Value *loadValueWitness(IRGenFunction &IGF,
                                      llvm::Value *table,
                                      ValueWitness index) {
   llvm::Value *witness = loadOpaqueWitness(IGF, table, index);
-  return IGF.Builder.CreateBitCast(witness, IGF.IGM.getValueWitnessTy(index),
-                                   getValueWitnessLabel(index));
+  auto label = getValueWitnessLabel(index);
+  auto type = IGF.IGM.getValueWitnessTy(index);
+  if (isValueWitnessFunction(index)) {
+    return IGF.Builder.CreateBitCast(witness, type, label);
+  } else {
+    return IGF.Builder.CreatePtrToInt(witness, type, label);
+  }
 }
 
 /// Given a call to a helper function that produces a result
@@ -1034,28 +1041,32 @@ namespace {
       emitDestroyCall(IGF, getValueWitnessTable(IGF), addr.getAddress());
     }
 
-    virtual std::pair<llvm::Value*,llvm::Value*>
+    std::pair<llvm::Value*,llvm::Value*>
     getSizeAndAlignment(IRGenFunction &IGF) const {
-      // Call the size an alignment witness.
-      llvm::Value *witnessTable = getValueWitnessTable(IGF);
-      llvm::Value *fn = loadValueWitness(IGF, witnessTable,
-                                         ValueWitness::SizeAndAlignment);
-      llvm::CallInst *call = IGF.Builder.CreateCall(fn, witnessTable);
-      call->setCallingConv(IGF.IGM.RuntimeCC);
-      call->setDoesNotThrow();
-
-      // Extract the size and alignment.
-      unsigned int Array[2] = { 0, 1 };
-      llvm::Value *size
-        = IGF.Builder.CreateExtractValue(call,
-                                         ArrayRef<unsigned int>(Array, 1),
-                                         "size");
-      llvm::Value *align
-        = IGF.Builder.CreateExtractValue(call,
-                                         ArrayRef<unsigned int>(Array + 1, 1),
-                                         "align");
+      llvm::Value *wtable = getValueWitnessTable(IGF);
+      auto size = loadValueWitness(IGF, wtable, ValueWitness::Size);
+      auto align = loadValueWitness(IGF, wtable, ValueWitness::Alignment);
       return std::make_pair(size, align);
     }
+
+    llvm::Value *getSize(IRGenFunction &IGF) const {
+      llvm::Value *wtable = getValueWitnessTable(IGF);
+      return loadValueWitness(IGF, wtable, ValueWitness::Size);
+    }
+
+    llvm::Value *getAlignment(IRGenFunction &IGF) const {
+      llvm::Value *wtable = getValueWitnessTable(IGF);
+      return loadValueWitness(IGF, wtable, ValueWitness::Alignment);
+    }
+
+    llvm::Value *getStride(IRGenFunction &IGF) const {
+      llvm::Value *wtable = getValueWitnessTable(IGF);
+      return loadValueWitness(IGF, wtable, ValueWitness::Stride);
+    }
+
+    llvm::Constant *getStaticSize(IRGenModule &IGM) const { return nullptr; }
+    llvm::Constant *getStaticAlignment(IRGenModule &IGM) const { return nullptr; }
+    llvm::Constant *getStaticStride(IRGenModule &IGM) const { return nullptr; }
   };
 
   /// Ways in which an object can fit into a fixed-size buffer.
@@ -1205,7 +1216,7 @@ static void emitDeallocateBuffer(IRGenFunction &IGF,
     Address slot =
       IGF.Builder.CreateBitCast(buffer, IGF.IGM.Int8PtrPtrTy);
     llvm::Value *addr = IGF.Builder.CreateLoad(slot, "storage");
-    IGF.emitDeallocRawCall(addr, type.getSizeOnly(IGF));
+    IGF.emitDeallocRawCall(addr, type.getSize(IGF));
     return;
   }
 
@@ -1330,11 +1341,13 @@ static Address getArgAsBuffer(IRGenFunction &IGF,
 }
 
 /// Build a specific value-witness function.
-static void buildValueWitness(IRGenModule &IGM,
-                              llvm::Function *fn,
-                              ValueWitness index,
-                              FixedPacking packing,
-                              const TypeInfo &type) {
+static void buildValueWitnessFunction(IRGenModule &IGM,
+                                      llvm::Function *fn,
+                                      ValueWitness index,
+                                      FixedPacking packing,
+                                      const TypeInfo &type) {
+  assert(isValueWitnessFunction(index));
+
   IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
                     ExplosionKind::Minimal, 0, fn, Prologue::Bare);
 
@@ -1443,17 +1456,10 @@ static void buildValueWitness(IRGenModule &IGM,
     return;
   }
 
-  case ValueWitness::SizeAndAlignment: {
-    auto sizeAndAlign = type.getSizeAndAlignment(IGF);
-
-    llvm::Type *pairTy = getSizeAndAlignmentResultType(IGF.IGM);
-    llvm::Value *result = llvm::UndefValue::get(pairTy);
-    result = IGF.Builder.CreateInsertValue(result, sizeAndAlign.first, 0);
-    result = IGF.Builder.CreateInsertValue(result, sizeAndAlign.second, 1);
-    IGF.Builder.CreateRet(result);
-    return;
-  }
-
+  case ValueWitness::Size:
+  case ValueWitness::Alignment:
+  case ValueWitness::Stride:
+    llvm_unreachable("these value witnesses aren't functions");
   }
   llvm_unreachable("bad value witness kind!");
 }
@@ -1746,43 +1752,6 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
   return fn;
 }
 
-/// Return a function which takes one pointer argument and returns a
-/// constant size and alignment.
-static llvm::Constant *getSizeAndAlignmentFunction(IRGenModule &IGM,
-                                                   const TypeInfo &type) {
-  llvm::Type *argTys[] = { IGM.WitnessTablePtrTy };
-  llvm::Type *resultTy = getSizeAndAlignmentResultType(IGM);
-  llvm::FunctionType *fnTy = llvm::FunctionType::get(resultTy, argTys, false);
-
-  // We need to unique by both size and alignment.  Note that we're
-  // assuming that it's safe to call a function that returns a pointer
-  // at a site that assumes the function returns void.
-  llvm::SmallString<40> name;
-  {
-    llvm::raw_svector_ostream nameStream(name);
-    nameStream << "__swift_sizeAndAlignment_";
-    nameStream << type.StorageSize.getValue();
-    nameStream << '_';
-    nameStream << type.StorageAlignment.getValue();
-  }
-
-  llvm::Constant *fn = IGM.Module.getOrInsertFunction(name, fnTy);
-  if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
-                      ExplosionKind::Minimal, 0, def, Prologue::Bare);
-    auto sizeAndAlign = type.getSizeAndAlignment(IGF);
-    assert(isa<llvm::ConstantInt>(sizeAndAlign.first));
-    assert(isa<llvm::ConstantInt>(sizeAndAlign.second));
-
-    llvm::Value *result = llvm::UndefValue::get(resultTy);
-    result = IGF.Builder.CreateInsertValue(result, sizeAndAlign.first, 0);
-    result = IGF.Builder.CreateInsertValue(result, sizeAndAlign.second, 1);
-    IGF.Builder.CreateRet(result);
-  }
-  return fn;
-}
-
-
 /// Find a witness to the fact that a type is a value type.
 /// Always returns an i8*.
 static llvm::Constant *getValueWitness(IRGenModule &IGM,
@@ -1864,8 +1833,30 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
       return asOpaquePtr(IGM, getReturnSelfFunction(IGM));
     goto standard;
 
-  case ValueWitness::SizeAndAlignment:
-    return asOpaquePtr(IGM, getSizeAndAlignmentFunction(IGM, concreteTI));
+  case ValueWitness::Size: {
+    if (auto value = concreteTI.getStaticSize(IGM))
+      return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
+
+    // Just fill in null here if the type can't be statically laid out.
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  }
+
+  case ValueWitness::Alignment: {
+    if (auto value = concreteTI.getStaticAlignment(IGM))
+      return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
+
+    // Just fill in null here if the type can't be statically laid out.
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  }
+
+  case ValueWitness::Stride: {
+    if (auto value = concreteTI.getStaticStride(IGM))
+      return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
+
+    // Just fill in null here if the type can't be statically laid out.
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  }
+
   }
   llvm_unreachable("bad value witness kind");
 
@@ -1873,7 +1864,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   llvm::Function *fn =
     IGM.getAddrOfValueWitness(concreteType, index);
   if (fn->empty())
-    buildValueWitness(IGM, fn, index, packing, concreteTI);
+    buildValueWitnessFunction(IGM, fn, index, packing, concreteTI);
   return asOpaquePtr(IGM, fn);
 }
 
