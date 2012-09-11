@@ -3531,6 +3531,95 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 }
 
 //===--------------------------------------------------------------------===//
+// High-level entry points.
+//===--------------------------------------------------------------------===//
+#pragma mark High-level entry points
+Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
+  // First, pre-check the expression, validating any types that occur in the
+  // expression and folding sequence expressions.
+  class PreCheckExpression : public ASTWalker {
+    TypeChecker &TC;
+
+  public:
+    PreCheckExpression(TypeChecker &tc) : TC(tc) { }
+
+    bool walkToExprPre(Expr *expr) {
+      // For FuncExprs, we just want to type-check the patterns as written,
+      // but not walk into the body. The body will by type-checked separately.
+      if (auto func = dyn_cast<FuncExpr>(expr)) {
+        TC.semaFuncExpr(func, /*isFirstPass=*/false,
+                        /*allowUnknownTypes=*/true);
+        return false;
+      }
+
+      return true;
+    }
+
+    Expr *walkToExprPost(Expr *expr) {
+      // Fold sequence expressions.
+      if (auto seqExpr = dyn_cast<SequenceExpr>(expr)) {
+        return TC.foldSequence(seqExpr);
+      }
+
+      // Type check the type in an array new expression.
+      if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
+        if (TC.validateType(newArray->getElementTypeLoc(),
+                            /*isFirstPass=*/false))
+          return nullptr;
+
+        // Check array bounds. They are subproblems that on't interact with
+        // the surrounding expression context.
+        for (unsigned i = newArray->getBounds().size(); i != 1; --i) {
+          auto &bound = newArray->getBounds()[i-1];
+          if (!bound.Value)
+            continue;
+
+          // All inner bounds must be constant.
+          if (TC.typeCheckArrayBound(bound.Value, /*requireConstant=*/true))
+            return nullptr;
+        }
+
+        // The outermost bound does not need to be constant.
+        if (TC.typeCheckArrayBound(newArray->getBounds()[0].Value,
+                                   /*requireConstant=*/false))
+          return nullptr;
+
+        return expr;
+      }
+
+      // Type check the type in a new expression.
+      if (auto newRef = dyn_cast<NewReferenceExpr>(expr)) {
+        if (TC.validateType(newRef->getElementTypeLoc(),
+                            /*isFirstPass=*/false))
+          return nullptr;
+
+        return expr;
+      }
+
+      return expr;
+    }
+
+    bool walkToStmtPre(Stmt *stmt) {
+      // Never walk into statements.
+      return false;
+    }
+  };
+
+  expr = expr->walk(PreCheckExpression(*this));
+  if (!expr)
+    return nullptr;
+
+  // Now, simply dump the constraints.
+  // FIXME: Need to get the results of applying the solution.
+  if (dumpConstraints(expr)) {
+    return nullptr;
+  }
+
+  return expr;
+
+}
+
+//===--------------------------------------------------------------------===//
 // Debugging
 //===--------------------------------------------------------------------===//
 #pragma mark Debugging

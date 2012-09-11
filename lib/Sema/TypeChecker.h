@@ -383,8 +383,14 @@ public:
   /// that are involved in conformance requirements.
   void preCheckProtocol(ProtocolDecl *D);
 
+  /// \brief Fold the given sequence expression into an (unchecked) expression
+  /// tree.
+  Expr *foldSequence(SequenceExpr *expr);
+
   bool typeCheckExpression(Expr *&E, Type ConvertType = Type(),
                            bool useConstraintSolver = false);
+  Expr *typeCheckExpressionConstraints(Expr *expr, Type convertType = Type());
+
   bool typeCheckPattern(Pattern *P, bool isFirstPass, bool allowUnknownTypes);
   bool coerceToType(Pattern *P, Type Ty, bool isFirstPass);
   bool typeCheckCondition(Expr *&E);
