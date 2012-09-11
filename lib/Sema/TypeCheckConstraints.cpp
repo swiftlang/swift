@@ -973,6 +973,10 @@ namespace {
     /// protocol constraints remaining on them.
     bool isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables);
 
+    /// \brief Apply the solution to the given expression, returning the
+    /// rewritten, fully-typed expression.
+    Expr *applySolution(Expr *expr);
+
     void dump();
   };
 }
@@ -3425,6 +3429,108 @@ ConstraintSystem::isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables) {
 }
 
 //===--------------------------------------------------------------------===//
+// Applying a solution to an expression
+//===--------------------------------------------------------------------===//
+#pragma mark Applying a solution to an expression.
+
+Expr *ConstraintSystem::applySolution(Expr *expr) {
+  class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
+    ConstraintSystem &CS;
+    
+  public:
+    ExprRewriter(ConstraintSystem &CS) : CS(CS) { }
+
+    ConstraintSystem &getConstraintSystem() const { return CS; }
+
+    Expr *visitExpr(Expr *expr) {
+      // FIXME: Temporary hack: use the existing type coercion logic for
+      // the basic case. We replace 
+      auto &tc = CS.getTypeChecker();
+      auto toType = CS.simplifyType(expr->getType());
+      auto fromType = CS.getTypeChecker().transformType(expr->getType(),
+                        [&](Type type) -> Type {
+                          if (type->is<TypeVariableType>())
+                            return UnstructuredUnresolvedType::get(tc.Context);
+                          return type;
+                        });
+      expr->setType(fromType);
+      return tc.coerceToType(expr, toType);
+    }
+
+    Expr *visitErrorExpr(ErrorExpr *expr) {
+      // Do nothing with error expressions.
+      return expr;
+    }
+
+    Expr *visitDeclRefExpr(DeclRefExpr *expr) {
+      // FIXME: Introduce SpecializeExpr here if needed.
+
+      // Simplify the type of this expression, replacing all of the type
+      // variables with their determined types.
+      auto type = CS.simplifyType(expr->getType());
+      expr->setType(type);
+      return expr;
+    }
+
+    Expr *visitExplicitClosureExpr(ExplicitClosureExpr *expr) {
+      auto type = CS.simplifyType(expr->getType());
+
+      // Convert the expression in the body to the result type of the explicit
+      // closure.
+      auto resultType = type->castTo<FunctionType>()->getResult();
+      auto &tc = CS.getTypeChecker();
+      if (Expr *body = tc.coerceToType(expr->getBody(), resultType))
+        expr->setBody(body);
+      expr->setType(type);
+      return expr;
+    }
+  };
+
+  class ExprWalker : public ASTWalker {
+    ExprRewriter &Rewriter;
+
+  public:
+    ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
+
+    virtual bool walkToExprPre(Expr *expr) {
+      if (auto closure = dyn_cast<ExplicitClosureExpr>(expr)) {
+        // Update the types of the $I variables with their simplified versions.
+        // We do this before walking into the body of the closure expression,
+        // so that the body will have proper types for its references to the
+        // $I variables.
+        auto &cs = Rewriter.getConstraintSystem();
+        for (auto var : closure->getParserVarDecls())
+          var->overwriteType(cs.simplifyType(var->getType()));
+
+        return true;
+      }
+
+      return true;
+    }
+
+    virtual Expr *walkToExprPost(Expr *expr) {
+      return Rewriter.visit(expr);
+    }
+
+    /// \brief Ignore statements.
+    virtual bool walkToStmtPre(Stmt *stmt) { return false; }
+
+    /// \brief Ignore declarations.
+    virtual bool walkToDeclPre(Decl *decl) { return false; }
+  };
+
+#ifndef NDEBUG
+  SmallVector<TypeVariableType *, 4> freeVariables;
+  assert(isSolved(freeVariables) && "Solution is not solved!");
+  assert(freeVariables.empty() && "Solution has free variables");
+#endif
+
+  ExprRewriter rewriter(*this);
+  ExprWalker walker(rewriter);
+  return expr->walk(walker);
+}
+
+//===--------------------------------------------------------------------===//
 // Debugging
 //===--------------------------------------------------------------------===//
 #pragma mark Debugging
@@ -3561,6 +3667,7 @@ bool TypeChecker::dumpConstraints(Expr *expr) {
 
   SmallVector<TypeVariableType *, 4> freeVariables;
   unsigned numSolved = 0;
+  ConstraintSystem *solution = nullptr;
   if (CS.isSolved(freeVariables))
     ++numSolved;
   if (!error && numSolved == 0) {
@@ -3576,8 +3683,11 @@ bool TypeChecker::dumpConstraints(Expr *expr) {
         llvm::errs() << "---Child system #" << ++idx << "---\n";
         cs->dump();
         freeVariables.clear();
-        if (cs->isSolved(freeVariables))
+        if (cs->isSolved(freeVariables)) {
           ++numSolved;
+          if (freeVariables.empty() && !solution)
+            solution = cs;
+        }
       }
     }
   }
@@ -3588,6 +3698,13 @@ bool TypeChecker::dumpConstraints(Expr *expr) {
   else if (numSolved == 1) {
     llvm::errs() << "Unique solution found.\n";
     solved = true;
+
+    if (solution) {
+      llvm::errs() << "---Type-checked expression---\n";
+      auto result = solution->applySolution(expr);
+      if (result)
+        result->dump();
+    }
   } else
     llvm::errs()<< "Found " << numSolved << " potential solutions.\n";
 
