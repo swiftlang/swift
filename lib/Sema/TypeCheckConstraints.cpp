@@ -1645,12 +1645,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       }
 
       auto &outerBound = expr->getBounds()[0];
-      resultTy = tc.getArraySliceType(outerBound.Brackets.Start, resultTy);
-
-      // FIXME: Will need to find/set the injection function, probably as
-      // part of applying the results of a constraint system to an expression.
-      // FIXME: Also set the element type.
-      return resultTy;
+      return tc.getArraySliceType(outerBound.Brackets.Start, resultTy);
     }
 
     Type visitNewReferenceExpr(NewReferenceExpr *expr) {
@@ -3485,12 +3480,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
       // FIXME: Introduce SpecializeExpr here if needed.
-
-      // Simplify the type of this expression, replacing all of the type
-      // variables with their determined types.
-      auto type = CS.simplifyType(expr->getType());
-      expr->setType(type);
-      return expr;
+      return visitExpr(expr);
     }
 
     Expr *visitApplyExpr(ApplyExpr *expr) {
@@ -3527,6 +3517,11 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     Expr *visitNewReferenceExpr(NewReferenceExpr *expr) {
       // FIXME: Actually implement this here.
       return CS.getTypeChecker().typeCheckNewReferenceExpr(expr);
+    }
+
+    Expr *visitNewArrayExpr(NewArrayExpr *expr) {
+      // FIXME: Actually implement this here.
+      return CS.getTypeChecker().typeCheckNewArrayExpr(expr);
     }
 
     Expr *visitExplicitClosureExpr(ExplicitClosureExpr *expr) {

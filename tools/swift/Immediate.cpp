@@ -315,8 +315,8 @@ void swift::REPL(ASTContext &Context) {
   if (llvm::sys::Process::StandardInIsUserInput())
     printf("%s", "Welcome to swift.  Type ':help' for assistance.\n");
 
-  bool useConstraintSolver = false;
   while (1) {
+    bool useConstraintSolver = false;
     bool debugConstraints = false;
 
     // Read one line.
@@ -432,7 +432,6 @@ void swift::REPL(ASTContext &Context) {
                                            CurBufferOffset,
                                            CurBufferEndOffset);
     if (useConstraintSolver) {
-      useConstraintSolver = false;
       ShouldRun = false;
     }
 
