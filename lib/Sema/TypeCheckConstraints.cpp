@@ -3520,8 +3520,34 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitNewArrayExpr(NewArrayExpr *expr) {
-      // FIXME: Actually implement this here.
-      return CS.getTypeChecker().typeCheckNewArrayExpr(expr);
+      auto &tc = CS.getTypeChecker();
+
+      // Dig out the element type of the new array expression.
+      auto resultType = CS.simplifyType(expr->getType());
+      auto elementType = resultType->castTo<BoundGenericType>()
+                            ->getGenericArgs()[0];
+      expr->setElementType(elementType);
+
+      // Make sure that the result type is a slice type, even if
+      // canonicalization mapped it down to Slice<T>.
+      auto sliceType = dyn_cast<ArraySliceType>(resultType.getPointer());
+      if (!sliceType) {
+        sliceType = ArraySliceType::get(elementType, tc.Context);
+        sliceType->setImplementationType(
+                                        resultType->castTo<BoundGenericType>());
+        resultType = sliceType;
+      }
+      expr->setType(resultType);
+
+      // Find the appropriate injection function.
+      Expr* injectionFn = tc.buildArrayInjectionFnRef(sliceType,
+                            expr->getBounds()[0].Value->getType(),
+                            expr->getNewLoc());
+      if (!injectionFn)
+        return nullptr;
+      expr->setInjectionFunction(injectionFn);
+
+      return expr;
     }
 
     Expr *visitExplicitClosureExpr(ExplicitClosureExpr *expr) {

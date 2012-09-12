@@ -1664,10 +1664,6 @@ Expr *TypeChecker::typeCheckNewReferenceExpr(NewReferenceExpr *expr) {
   return SemaExpressionTree(*this).visitNewReferenceExpr(expr);
 }
 
-Expr *TypeChecker::typeCheckNewArrayExpr(NewArrayExpr *expr) {
-  return SemaExpressionTree(*this).visitNewArrayExpr(expr);
-}
-
 bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   // If we're using the constraint solver, we take a different path through
   // the type checker. Handle it here.
