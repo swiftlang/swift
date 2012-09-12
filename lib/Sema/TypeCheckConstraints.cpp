@@ -3492,6 +3492,42 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return expr;
     }
 
+    Expr *visitApplyExpr(ApplyExpr *expr) {
+      auto &tc = CS.getTypeChecker();
+
+      // The function is always an rvalue.
+      auto fn = tc.convertToRValue(expr->getFn());
+      if (!fn)
+        return nullptr;
+      expr->setFn(fn);
+      
+      // For function application, convert the argument to the input type of
+      // the function.
+      // FIXME: Coerce object arguments somewhere.
+      if (auto fnType = fn->getType()->getAs<FunctionType>()) {
+        auto arg = CS.convertToType(expr->getArg(), fnType->getInput());
+        if (!arg) {
+          tc.diagnose(fn->getLoc(), diag::while_converting_function_argument,
+                      fnType->getInput())
+            << expr->getArg()->getSourceRange();
+
+          return nullptr;
+        }
+
+        expr->setArg(arg);
+        expr->setType(fnType->getResult());
+        return expr;
+      }
+
+      // FIXME: Implement support for metatypes here.
+      return tc.semaApplyExpr(expr);
+    }
+
+    Expr *visitNewReferenceExpr(NewReferenceExpr *expr) {
+      // FIXME: Actually implement this here.
+      return CS.getTypeChecker().typeCheckNewReferenceExpr(expr);
+    }
+
     Expr *visitExplicitClosureExpr(ExplicitClosureExpr *expr) {
       auto type = CS.simplifyType(expr->getType());
 
@@ -3710,11 +3746,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
     result->dump();
   }
 
-  // FIXME: We can't yet return anything sane, so always fail.
-  diagnose(expr->getLoc(), diag::constraint_type_check_pass)
-    << expr->getSourceRange();
-
-  return nullptr;
+  return result;
 }
 
 //===--------------------------------------------------------------------===//

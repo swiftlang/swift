@@ -579,8 +579,6 @@ ERROR(invalid_anonymous_argument,sema,none,
 
 ERROR(constraint_type_check_fail,sema,none,
       "expression does not type-check", ())
-ERROR(constraint_type_check_pass,sema,none,
-      "constraint-based type checker cannot handle well-typed expressions", ())
 
 //------------------------------------------------------------------------------
 // Name Binding

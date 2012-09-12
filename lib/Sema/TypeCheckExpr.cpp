@@ -1660,6 +1660,10 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr) {
                                                      /*TypeCheckAST=*/false);
 }
 
+Expr *TypeChecker::typeCheckNewReferenceExpr(NewReferenceExpr *expr) {
+  return SemaExpressionTree(*this).visitNewReferenceExpr(expr);
+}
+
 bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType,
                                       bool useConstraintSolver) {
   // If we're using the constraint solver, we take a different path through

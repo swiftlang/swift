@@ -223,7 +223,9 @@ namespace {
       checkSameType(dstObj, srcObj,
                     "objects of result and operand of RequalifyExpr");
       
-      if (!(srcQuals < dstQuals)) {
+      // FIXME: Should either properly check implicit here, or model the dropping
+      // of 'implicit' differently.
+      if (!(srcQuals < dstQuals) && !(srcQuals == dstQuals)) {
         Out << "bad qualifier sets for RequalifyExpr";
         E->print(Out);
         Out << "\n";
@@ -580,7 +582,7 @@ namespace {
     Type checkLValue(Type T, LValueType::Qual &Q, const char *what) {
       LValueType *LV = T->getAs<LValueType>();
       if (LV) {
-        Q = LV->getQualifiers();
+        Q = LV->getQualifiers() - LValueType::Qual(LValueType::Qual::Implicit);
         return LV->getObjectType();
       }
 

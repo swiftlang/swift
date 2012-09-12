@@ -1244,6 +1244,11 @@ public:
     /// Intersect a qualifier set into this qualifier set.
     Qual &operator&=(Qual r) { Bits &= r.Bits; return *this; }
 
+    /// \brief Remove qualifiers from a qualifier set.
+    friend Qual operator-(Qual l, Qual r) {
+      return Qual(l.Bits & ~r.Bits);
+    }
+
     /// Invert a qualifier set.  The state of the resulting
     /// non-boolean qualifiers is non-determined, except that they are
     /// is compatible with anything.

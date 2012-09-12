@@ -390,6 +390,11 @@ public:
   /// tree.
   Expr *foldSequence(SequenceExpr *expr);
 
+  /// \brief Type-check a NewReferenceExpr.
+  /// FIXME: This is temporary; the logic will move into the constraint
+  /// solver's application.
+  Expr *typeCheckNewReferenceExpr(NewReferenceExpr *expr);
+
   bool typeCheckExpression(Expr *&E, Type ConvertType = Type(),
                            bool useConstraintSolver = false);
   Expr *typeCheckExpressionConstraints(Expr *expr, Type convertType = Type());
