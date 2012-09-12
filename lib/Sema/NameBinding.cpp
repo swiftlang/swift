@@ -26,6 +26,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/system_error.h"
 #include "llvm/Support/Path.h"
 #include <algorithm>
@@ -147,6 +148,10 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
   unsigned BufferID =
     Context.SourceMgr.AddNewSourceBuffer(InputFile.take(),
                                          ModuleID.second.Value);
+
+  // FIXME: Turn off the constraint-based type checker for imported modules.
+  llvm::SaveAndRestore<bool> saveUseCS(Context.LangOpts.UseConstraintSolver,
+                                       false);
 
   // For now, treat all separate modules as unique components.
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
