@@ -973,6 +973,9 @@ namespace {
     /// protocol constraints remaining on them.
     bool isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables);
 
+    /// \brief Convert the expression to the given type.
+    Expr *convertToType(Expr *expr, Type toType);
+
     /// \brief Apply the solution to the given expression, returning the
     /// rewritten, fully-typed expression.
     Expr *applySolution(Expr *expr);
@@ -3444,6 +3447,11 @@ ConstraintSystem::isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables) {
 //===--------------------------------------------------------------------===//
 #pragma mark Applying a solution to an expression.
 
+Expr *ConstraintSystem::convertToType(Expr *expr, Type toType) {
+  // FIXME: Temporary hack that uses the existing coercion logic.
+  return TC.coerceToType(expr, toType);
+}
+
 Expr *ConstraintSystem::applySolution(Expr *expr) {
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
     ConstraintSystem &CS;
@@ -3455,7 +3463,8 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
     Expr *visitExpr(Expr *expr) {
       // FIXME: Temporary hack: use the existing type coercion logic for
-      // the basic case. We replace 
+      // the basic case. We replace the type variables with unstructured,
+      // unresolved types to ride off the existing coercion logic.
       auto &tc = CS.getTypeChecker();
       auto toType = CS.simplifyType(expr->getType());
       auto fromType = CS.getTypeChecker().transformType(expr->getType(),
@@ -3465,7 +3474,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
                           return type;
                         });
       expr->setType(fromType);
-      return tc.coerceToType(expr, toType);
+      return CS.convertToType(expr, toType);
     }
 
     Expr *visitErrorExpr(ErrorExpr *expr) {
@@ -3489,8 +3498,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // Convert the expression in the body to the result type of the explicit
       // closure.
       auto resultType = type->castTo<FunctionType>()->getResult();
-      auto &tc = CS.getTypeChecker();
-      if (Expr *body = tc.coerceToType(expr->getBody(), resultType))
+      if (Expr *body = CS.convertToType(expr->getBody(), resultType))
         expr->setBody(body);
       expr->setType(type);
       return expr;
@@ -3676,16 +3684,25 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
     return nullptr;
   }
 
+  auto solution = viable[0];
   if (DebugConstraintSolver) {
     log << "---Solution---\n";
-    viable[0]->dump();
+    solution->dump();
   }
 
   // Apply the solution to the expression.
-  auto result = viable[0]->applySolution(expr);
+  auto result = solution->applySolution(expr);
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
     return nullptr;
+  }
+
+  // If we're supposed to convert the expression to some particular type,
+  // do so now.
+  if (convertType) {
+    result = solution->convertToType(result, convertType);
+    if (!result)
+      return nullptr;
   }
 
   if (DebugConstraintSolver) {
