@@ -1672,8 +1672,6 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
     if (E->getType())
       return E->getType()->is<ErrorType>();
 
-    llvm::SaveAndRestore<bool> debug(getLangOpts().DebugConstraintSolver,
-                                     true);
     E = typeCheckExpressionConstraints(E, ConvertType);
     return E == nullptr;
   }

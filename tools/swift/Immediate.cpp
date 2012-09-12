@@ -317,6 +317,8 @@ void swift::REPL(ASTContext &Context) {
 
   bool useConstraintSolver = false;
   while (1) {
+    bool debugConstraints = false;
+
     // Read one line.
     e.PromptContinuationLevel = BraceCount;
     e.NeedPromptContinuation = BraceCount != 0 || HadLineContinuation;
@@ -383,6 +385,7 @@ void swift::REPL(ASTContext &Context) {
         llvm::errs() << DumpSource;
       } else if (L.peekNextToken().getText() == "dump_constraints") {
         useConstraintSolver = true;
+        debugConstraints = true;
       } else {
         printf("%s", "Unknown interpreter escape; try :help\n");
       }
@@ -418,8 +421,12 @@ void swift::REPL(ASTContext &Context) {
       continue;
 
     // Parse the current line(s).
-    llvm::SaveAndRestore<bool> setUseConstraintSolver(
-      TU->getASTContext().LangOpts.UseConstraintSolver, useConstraintSolver);
+    llvm::SaveAndRestore<bool> setUseCS(
+      TU->getASTContext().LangOpts.UseConstraintSolver,
+      TU->getASTContext().LangOpts.UseConstraintSolver || useConstraintSolver);
+    llvm::SaveAndRestore<bool> setDebugCS(
+      TU->getASTContext().LangOpts.DebugConstraintSolver,
+      TU->getASTContext().LangOpts.DebugConstraintSolver || debugConstraints);
     bool ShouldRun =
         swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
                                            CurBufferOffset,
