@@ -519,11 +519,10 @@ void TypeChecker::typeCheckDestructorBody(DestructorDecl *DD) {
   StmtChecker(*this, DD).typeCheckStmt(Body);
 }
 
-void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD,
-                                            bool useConstraintSolver) {
+void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   auto Elem = TLCD->getBody();
   if (Expr *E = Elem.dyn_cast<Expr*>()) {
-    if (typeCheckExpression(E, Type(), useConstraintSolver))
+    if (typeCheckExpression(E, Type()))
       return;
     if (TU.Kind == TranslationUnit::Repl)
       typeCheckTopLevelReplExpr(E, TLCD);

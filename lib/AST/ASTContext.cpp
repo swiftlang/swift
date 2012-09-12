@@ -58,8 +58,10 @@ ASTContext::Implementation::Implementation()
  : IdentifierTable(Allocator) {}
 ASTContext::Implementation::~Implementation() {}
 
-ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
+ASTContext::ASTContext(LangOptions &langOpts, llvm::SourceMgr &sourcemgr,
+                       DiagnosticEngine &Diags)
   : Impl(*new Implementation()),
+    LangOpts(langOpts),
     SourceMgr(sourcemgr),
     Diags(Diags),
     TheBuiltinModule(new (*this) BuiltinModule(getIdentifier("Builtin"),*this)),

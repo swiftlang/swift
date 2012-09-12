@@ -25,6 +25,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include <iterator>
 #include <memory>
 #include <utility>
@@ -3303,11 +3304,11 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
   assert(&getTopConstraintSystem() == this &&"Can only solve at the top level");
 
   // Simplify this constraint system.
-  if (TC.DebugConstraintSolver) {
+  if (TC.getLangOpts().DebugConstraintSolver) {
     llvm::errs() << "---Simplified constraints---\n";
   }
   bool error = simplify();
-  if (TC.DebugConstraintSolver) {
+  if (TC.getLangOpts().DebugConstraintSolver) {
     dump();
   }
   if (error)
@@ -3580,6 +3581,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
   assert(freeVariables.empty() && "Solution has free variables");
 #endif
 
+  // FIXME: Disable the constraint-based type checker here, because we depend
+  // heavily on the existing type checker.
+  llvm::SaveAndRestore<bool> savedUseCS(TC.getLangOpts().UseConstraintSolver,
+                                        false);
   ExprRewriter rewriter(*this);
   ExprWalker walker(rewriter);
   return expr->walk(walker);
@@ -3618,6 +3623,9 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
 
       // Type check the type in an array new expression.
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
+        llvm::SaveAndRestore<bool> savedUseCS(
+                                     TC.getLangOpts().UseConstraintSolver,
+                                     false);
         if (TC.validateType(newArray->getElementTypeLoc(),
                             /*isFirstPass=*/false))
           return nullptr;
@@ -3677,7 +3685,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
     cs.addConstraint(ConstraintKind::Conversion, expr->getType(), convertType);
   }
 
-  if (DebugConstraintSolver) {
+  if (getLangOpts().DebugConstraintSolver) {
     log << "---Initial constraints for the given expression---\n";
     expr->dump();
     log << "\n";
@@ -3687,7 +3695,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   // Attempt to solve the constraint system.
   SmallVector<ConstraintSystem *, 4> viable;
   if (cs.solve(viable)) {
-    if (DebugConstraintSolver) {
+    if (getLangOpts().DebugConstraintSolver) {
       llvm::errs() << "---Solved constraints---\n";
       cs.dump();
 
@@ -3721,7 +3729,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   }
 
   auto solution = viable[0];
-  if (DebugConstraintSolver) {
+  if (getLangOpts().DebugConstraintSolver) {
     log << "---Solution---\n";
     solution->dump();
   }
@@ -3741,7 +3749,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
       return nullptr;
   }
 
-  if (DebugConstraintSolver) {
+  if (getLangOpts().DebugConstraintSolver) {
     log << "---Type-checked expression---\n";
     result->dump();
   }

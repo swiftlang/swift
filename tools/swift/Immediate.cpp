@@ -34,6 +34,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/system_error.h"
@@ -305,8 +306,7 @@ void swift::REPL(ASTContext &Context) {
 
   swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
                                      CurBufferOffset,
-                                     CurBufferEndOffset,
-                                     /*useConstraintSolver=*/false);
+                                     CurBufferEndOffset);
   if (Context.hadError())
     return;
 
@@ -418,11 +418,12 @@ void swift::REPL(ASTContext &Context) {
       continue;
 
     // Parse the current line(s).
+    llvm::SaveAndRestore<bool> setUseConstraintSolver(
+      TU->getASTContext().LangOpts.UseConstraintSolver, useConstraintSolver);
     bool ShouldRun =
         swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
                                            CurBufferOffset,
-                                           CurBufferEndOffset,
-                                           useConstraintSolver);
+                                           CurBufferEndOffset);
     if (useConstraintSolver) {
       useConstraintSolver = false;
       ShouldRun = false;

@@ -1664,12 +1664,16 @@ Expr *TypeChecker::typeCheckNewReferenceExpr(NewReferenceExpr *expr) {
   return SemaExpressionTree(*this).visitNewReferenceExpr(expr);
 }
 
-bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType,
-                                      bool useConstraintSolver) {
+bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   // If we're using the constraint solver, we take a different path through
   // the type checker. Handle it here.
-  if (useConstraintSolver) {
-    llvm::SaveAndRestore<bool> debug(DebugConstraintSolver, true);
+  if (getLangOpts().UseConstraintSolver) {
+    // If this expression has already been type-checked, we're done.
+    if (E->getType())
+      return E->getType()->is<ErrorType>();
+
+    llvm::SaveAndRestore<bool> debug(getLangOpts().DebugConstraintSolver,
+                                     true);
     E = typeCheckExpressionConstraints(E, ConvertType);
     return E == nullptr;
   }

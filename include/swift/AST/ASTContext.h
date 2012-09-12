@@ -19,6 +19,7 @@
 
 #include "llvm/Support/DataTypes.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
@@ -82,9 +83,13 @@ public:
   Implementation &Impl;
 public:
   
-  ASTContext(llvm::SourceMgr &SourceMgr, DiagnosticEngine &Diags);
+  ASTContext(LangOptions &langOpts, llvm::SourceMgr &SourceMgr,
+             DiagnosticEngine &Diags);
   ~ASTContext();
-  
+
+  /// \brief The language options used for translation.
+  LangOptions &LangOpts;
+
   /// SourceMgr - The source manager object.
   llvm::SourceMgr &SourceMgr;
 

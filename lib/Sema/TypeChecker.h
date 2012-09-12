@@ -278,9 +278,6 @@ public:
   TranslationUnit &TU;
   ASTContext &Context;
 
-  bool UseConstraintSolver = false;
-  bool DebugConstraintSolver = false;
-
 private:  
   /// \brief The 'Enumerable' protocol, used by the for-each loop.
   ProtocolDecl *EnumerableProto;
@@ -296,6 +293,8 @@ private:
 public:
   TypeChecker(TranslationUnit &TU)
     : TU(TU), Context(TU.Ctx), EnumerableProto(0), RangeProto(0) {}
+
+  LangOptions &getLangOpts() const { return Context.LangOpts; }
   
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(ArgTypes... Args) {
@@ -368,8 +367,7 @@ public:
   void typeCheckFunctionBody(FuncExpr *FE);
   void typeCheckConstructorBody(ConstructorDecl *CD);
   void typeCheckDestructorBody(DestructorDecl *DD);
-  void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD,
-                                 bool useConstraintSolver);
+  void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
   void typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD);
   void REPLCheckPatternBinding(PatternBindingDecl *D);
@@ -395,8 +393,7 @@ public:
   /// solver's application.
   Expr *typeCheckNewReferenceExpr(NewReferenceExpr *expr);
 
-  bool typeCheckExpression(Expr *&E, Type ConvertType = Type(),
-                           bool useConstraintSolver = false);
+  bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
   Expr *typeCheckExpressionConstraints(Expr *expr, Type convertType = Type());
 
   bool typeCheckPattern(Pattern *P, bool isFirstPass, bool allowUnknownTypes);

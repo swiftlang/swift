@@ -27,6 +27,5 @@ namespace swift {
   bool appendToMainTranslationUnit(TranslationUnit *TU, unsigned BufferID,
                                    unsigned CurTUElem,
                                    unsigned &BufferOffset,
-                                   unsigned BufferEndOffset,
-                                   bool useConstraintSolver);
+                                   unsigned BufferEndOffset);
 }

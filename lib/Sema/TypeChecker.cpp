@@ -401,8 +401,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD) {
 /// walks the AST to resolve types and diagnose problems therein.
 ///
 /// FIXME: This should be moved out to somewhere else.
-void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem,
-                                bool useConstraintSolver) {
+void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   TypeChecker TC(*TU);
 
   struct ExprPrePassWalker : private ASTWalker {
@@ -684,7 +683,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem,
     if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       // Immediately perform global name-binding etc.
       prePass.doWalk(TLCD);
-      TC.typeCheckTopLevelCodeDecl(TLCD, useConstraintSolver);
+      TC.typeCheckTopLevelCodeDecl(TLCD);
     } else {
       prePass.doWalk(D);
       TC.typeCheckDecl(D, /*isFirstPass*/false);
