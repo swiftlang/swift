@@ -3299,6 +3299,17 @@ resolveTypeVariable(ConstraintSystem &cs,
 bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
   assert(&getTopConstraintSystem() == this &&"Can only solve at the top level");
 
+  // Simplify this constraint system.
+  if (TC.DebugConstraintSolver) {
+    llvm::errs() << "---Simplified constraints---\n";
+  }
+  bool error = simplify();
+  if (TC.DebugConstraintSolver) {
+    dump();
+  }
+  if (error)
+    return true;
+
   // Seed the constraint system stack with ourselves.
   SmallVector<ConstraintSystem *, 16> stack;
   stack.push_back(this);
@@ -3371,9 +3382,9 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     }
   }
 
-  // FIXME: Having more than one child system left at the end means there
-  // is an ambiguity. Diagnose it.
-  return viable.size() == 0;
+  SmallVector<TypeVariableType *, 4> freeVariables;
+  return viable.size() != 1 || !viable.front()->isSolved(freeVariables) ||
+         !freeVariables.empty();
 }
 
 bool
@@ -3605,18 +3616,88 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
     }
   };
 
+  // Pre-check the expression.
   expr = expr->walk(PreCheckExpression(*this));
   if (!expr)
     return nullptr;
 
-  // Now, simply dump the constraints.
-  // FIXME: Need to get the results of applying the solution.
-  if (dumpConstraints(expr)) {
+  llvm::raw_ostream &log = llvm::errs();
+
+  // Construct a constraint system from this expression.
+  ConstraintSystem cs(*this);
+  cs.generateConstraints(expr);
+
+  // If there is a type that we're expected to convert to, add the conversion
+  // constraint.
+  if (convertType) {
+    cs.addConstraint(ConstraintKind::Conversion, expr->getType(), convertType);
+  }
+
+  if (DebugConstraintSolver) {
+    log << "---Initial constraints for the given expression---\n";
+    expr->dump();
+    log << "\n";
+    cs.dump();
+  }
+
+  // Attempt to solve the constraint system.
+  SmallVector<ConstraintSystem *, 4> viable;
+  if (cs.solve(viable)) {
+    if (DebugConstraintSolver) {
+      llvm::errs() << "---Solved constraints---\n";
+      cs.dump();
+
+      unsigned numSolved = 0;
+      if (!viable.empty()) {
+        unsigned idx = 0;
+        for (auto cs : viable) {
+          SmallVector<TypeVariableType *, 4> freeVariables;
+          llvm::errs() << "---Child system #" << ++idx << "---\n";
+          cs->dump();
+          if (cs->isSolved(freeVariables)) {
+            ++numSolved;
+          }
+        }
+      }
+
+      if (numSolved == 0)
+        log << "No solution found.\n";
+      else if (numSolved == 1)
+        log << "Unique solution found.\n";
+      else {
+        log << "Found " << numSolved << " potential solutions.\n";
+      }
+    }
+
+    // FIXME: Crappy diagnostic.
+    diagnose(expr->getLoc(), diag::constraint_type_check_fail)
+      << expr->getSourceRange();
+
     return nullptr;
   }
 
-  return expr;
+  if (DebugConstraintSolver) {
+    log << "---Solution---\n";
+    viable[0]->dump();
+  }
 
+  // Apply the solution to the expression.
+  auto result = viable[0]->applySolution(expr);
+  if (!result) {
+    // Failure already diagnosed, above, as part of applying the solution.
+    return nullptr;
+  }
+
+  if (DebugConstraintSolver) {
+    log << "---Type-checked expression---\n";
+    result->dump();
+  }
+
+  // FIXME: We can't yet return anything sane, so always fail.
+  diagnose(expr->getLoc(), diag::constraint_type_check_pass)
+    << expr->getSourceRange();
+
+  return nullptr;
 }
 
 //===--------------------------------------------------------------------===//
@@ -3742,61 +3823,3 @@ void ConstraintSystem::dump() {
     llvm::errs() << "UNSOLVED\n";
   }
 }
-
-bool TypeChecker::dumpConstraints(Expr *expr) {
-  ConstraintSystem CS(*this);
-  llvm::errs() << "---Initial constraints for the given expression---\n";
-  CS.generateConstraints(expr);
-  expr->dump();
-  llvm::errs() << "\n";
-  CS.dump();
-  llvm::errs() << "---Simplified constraints---\n";
-  bool error = CS.simplify();
-  CS.dump();
-
-  SmallVector<TypeVariableType *, 4> freeVariables;
-  unsigned numSolved = 0;
-  ConstraintSystem *solution = nullptr;
-  if (CS.isSolved(freeVariables))
-    ++numSolved;
-  if (!error && numSolved == 0) {
-    llvm::errs() << "---Solved constraints---\n";
-    SmallVector<ConstraintSystem *, 4> viable;
-    error = CS.solve(viable);
-    CS.dump();
-
-    if (!error) {
-      llvm::errs() << "---Viable constraint systems---\n";
-      unsigned idx = 0;
-      for (auto cs : viable) {
-        llvm::errs() << "---Child system #" << ++idx << "---\n";
-        cs->dump();
-        freeVariables.clear();
-        if (cs->isSolved(freeVariables)) {
-          ++numSolved;
-          if (freeVariables.empty() && !solution)
-            solution = cs;
-        }
-      }
-    }
-  }
-
-  bool solved = false;
-  if (numSolved == 0)
-    llvm::errs() << "No solution found.\n";
-  else if (numSolved == 1) {
-    llvm::errs() << "Unique solution found.\n";
-    solved = true;
-
-    if (solution) {
-      llvm::errs() << "---Type-checked expression---\n";
-      auto result = solution->applySolution(expr);
-      if (result)
-        result->dump();
-    }
-  } else
-    llvm::errs()<< "Found " << numSolved << " potential solutions.\n";
-
-  return !solved;
-}
-

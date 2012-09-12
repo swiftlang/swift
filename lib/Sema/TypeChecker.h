@@ -277,7 +277,10 @@ class TypeChecker {
 public:
   TranslationUnit &TU;
   ASTContext &Context;
-    
+
+  bool UseConstraintSolver = false;
+  bool DebugConstraintSolver = false;
+
 private:  
   /// \brief The 'Enumerable' protocol, used by the for-each loop.
   ProtocolDecl *EnumerableProto;
@@ -480,12 +483,6 @@ public:
   std::pair<FuncDecl*, Type> isLiteralCompatibleType(Type Ty, SourceLoc Loc,
                                                      LiteralKind LitTy,
                                                      bool Complain);
-
-  /// \brief Dump the constraint system generated from the given (unchecked)
-  /// expression.
-  ///
-  /// \returns true if the constrain system couldn't be solved.
-  bool dumpConstraints(Expr *expr);
 
   /// \name Overload resolution
   ///

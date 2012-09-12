@@ -22,6 +22,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/SmallPtrSet.h"
 using namespace swift;
 
@@ -1664,23 +1665,9 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType,
   // If we're using the constraint solver, we take a different path through
   // the type checker. Handle it here.
   if (useConstraintSolver) {
-    auto result = typeCheckExpressionConstraints(E, ConvertType);
-    if (!result) {
-      // FIXME: Crappy diagnostic :)
-      diagnose(E->getLoc(), diag::constraint_type_check_fail)
-        << E->getSourceRange();
-      E = nullptr;
-      return true;
-    }
-
-    E = result;
-
-    // FIXME: The constraint system was solved, but we can't apply the
-    // results to the given expression yet. Just complain and fail.
-    diagnose(E->getLoc(), diag::constraint_type_check_pass)
-      << E->getSourceRange();
-    
-    return true;
+    llvm::SaveAndRestore<bool> debug(DebugConstraintSolver, true);
+    E = typeCheckExpressionConstraints(E, ConvertType);
+    return E == nullptr;
   }
 
   SemaExpressionTree SET(*this);
