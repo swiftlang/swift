@@ -443,11 +443,11 @@ namespace {
     /// \brief ID number that uniquely identifies this overload set.
     unsigned ID;
 
-    /// \brief The expression or constraint that introduced the overload choice.
-    llvm::PointerUnion<Expr *, const Constraint *> ExprOrConstraint;
-
     /// \brief The number of choices in the overload set.
     unsigned NumChoices;
+
+    /// \brief The expression or constraint that introduced the overload choice.
+    llvm::PointerUnion<Expr *, const Constraint *> ExprOrConstraint;
 
     /// \brief The type bound by this overload set.
     Type BoundType;
@@ -460,7 +460,7 @@ namespace {
                 llvm::PointerUnion<Expr *, const Constraint *> from,
                 Type boundType,
                 ArrayRef<OverloadChoice> choices)
-      : ID(ID), ExprOrConstraint(from), NumChoices(choices.size()),
+      : ID(ID), NumChoices(choices.size()), ExprOrConstraint(from),
         BoundType(boundType)
     {
       memmove(this+1, choices.data(), sizeof(OverloadChoice)*choices.size());
