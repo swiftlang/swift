@@ -93,12 +93,14 @@ namespace {
     void mangleDeclName(ValueDecl *decl, IncludeType includeType);
     void mangleDeclType(ValueDecl *decl, ExplosionKind kind,
                         unsigned uncurryingLevel);
+    void mangleEntity(ValueDecl *decl, ExplosionKind kind,
+                      unsigned uncurryingLevel);
+    void mangleNominalType(NominalTypeDecl *decl, ExplosionKind explosionKind);
     void mangleType(Type type, ExplosionKind kind, unsigned uncurryingLevel);
 
   private:
     void mangleFunctionType(AnyFunctionType *fn, ExplosionKind explosionKind,
                             unsigned uncurryingLevel);
-    void mangleNominalType(NominalTypeDecl *decl, ExplosionKind explosionKind);
     void mangleProtocolList(ArrayRef<ProtocolDecl*> protocols);
     void mangleProtocolList(ArrayRef<Type> protocols);
     void mangleProtocolName(ProtocolDecl *protocol);
@@ -620,6 +622,16 @@ void Mangler::mangleFunctionType(AnyFunctionType *fn,
              (uncurryLevel > 0 ? uncurryLevel - 1 : 0));
 }
 
+void Mangler::mangleEntity(ValueDecl *decl, ExplosionKind explosion,
+                           unsigned uncurryLevel) {
+  mangleDeclName(decl, IncludeType::No);
+
+  // Mangle in a type as well.  Note that we have to mangle the type
+  // on all kinds of declarations, even variables, because at the
+  // moment they can *all* be overloaded.
+  mangleDeclType(decl, explosion, uncurryLevel);
+}
+
 static StringRef mangleValueWitness(ValueWitness witness) {
   // The ones with at least one capital are the composite ops, and the
   // capitals correspond roughly to the positions of buffers (as
@@ -648,57 +660,72 @@ static StringRef mangleValueWitness(ValueWitness witness) {
 }
 
 void LinkEntity::mangle(raw_ostream &buffer) const {
-  // mangled-name ::= '_Tw' witness-kind type
-  if (getKind() == Kind::ValueWitness) {
-    buffer << "_Tw";
-    buffer << mangleValueWitness(getValueWitness());
-
-    Mangler mangler(buffer);
-    mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
-    return;
-  }
-
-  // Declarations with asm names just use that.
-  assert(isDeclKind(getKind()));
-  if (!getDecl()->getAttrs().AsmName.empty()) {
+  // As a special case, functions can have external asm names.
+  if (getKind() == Kind::Function &&
+      !getDecl()->getAttrs().AsmName.empty()) {
     buffer << getDecl()->getAttrs().AsmName;
     return;
   }
 
-  // mangled-name ::= '_T' identifier+ type?
-
-  // Add the prefix.
-  buffer << "_T"; // T is for Tigger
+  // Otherwise, everything gets the common prefix.
+  //   mangled-name ::= '_T' global
+  buffer << "_T";
 
   if (isLocalLinkage())
     buffer << "L";
 
   Mangler mangler(buffer);
+
   switch (getKind()) {
-  case Kind::ClassMetadata:
+
+  //   global ::= 'w' value-witness-kind type     // value witness
+  case Kind::ValueWitness:
+    buffer << 'w';
+    buffer << mangleValueWitness(getValueWitness());
+    mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
+    return;
+
+  //   global ::= 'M' directness type             // type metadata
+  //   global ::= 'MP' directness type            // type metadata pattern
+  case Kind::ClassMetadata: {
+    buffer << 'M';
+    ClassDecl *theClass = cast<ClassDecl>(getDecl());
+    if (theClass->getGenericParamsOfContext()) {
+      buffer << 'P';
+    }
+    buffer << 'd'; // always direct for now
+    mangler.mangleNominalType(theClass, ExplosionKind::Minimal);
+    return;
+  }
+
+  // For all the following, this rule was imposed above:
+  //   global ::= local-marker? entity            // some identifiable thing
+
+  //   entity ::= context 'D'                     // destructor
   case Kind::Destructor:
     mangler.mangleDeclContext(cast<ClassDecl>(getDecl()));
-    break;
+    buffer << 'D';
+    return;
 
-  default:
-    mangler.mangleDeclName(getDecl(), IncludeType::No);
-    break;
+  //   entity ::= declaration                     // other declaration
+  //   entity ::= context 'C' type                // constructor
+  // The latter case is essentially as if 'C' were the name of the function.
+  case Kind::Function:
+  case Kind::Other:
+    mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
+    return;
+
+  //   entity ::= declaration 'g'                 // getter
+  case Kind::Getter:
+    mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
+    buffer << 'g';
+    return;
+
+  //   entity ::= declaration 's'                 // setter
+  case Kind::Setter:
+    mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
+    buffer << 's';
+    return;
   }
-
-  // Mangle in a type as well.  Note that we have to mangle the type
-  // on all kinds of declarations, even variables, because at the
-  // moment they can *all* be overloaded.
-  if (ValueDecl *valueDecl = dyn_cast<ValueDecl>(getDecl()))
-    mangler.mangleDeclType(valueDecl, getExplosionKind(), getUncurryLevel());
-
-  // Add a suffix if applicable.
-  switch (getKind()) {
-  case Kind::Function: break;
-  case Kind::Other: break;
-  case Kind::Getter: buffer << "g"; break;
-  case Kind::Setter: buffer << "s"; break;
-  case Kind::Destructor: buffer << "D"; break; // for 'destructor'
-  case Kind::ClassMetadata: buffer << 'H'; break; // for 'heap'
-  case Kind::ValueWitness: llvm_unreachable("filtered out!");
-  }
+  llvm_unreachable("bad entity kind!");
 }

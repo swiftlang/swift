@@ -10,6 +10,8 @@ Mangling
 
 All Swift-mangled names begin with this prefix.
 
+  global ::= 'M' directness type             // type metadata
+  global ::= 'MP' directness type            // type metadata pattern
   global ::= 'w' value-witness-kind type     // value witness
   global ::= 'WV' type                       // value witness table
   global ::= local-marker? entity            // some identifiable thing
@@ -18,13 +20,20 @@ All Swift-mangled names begin with this prefix.
   entity ::= declaration 'g'                 // getter
   entity ::= declaration 's'                 // setter
   entity ::= declaration                     // other declaration
-  entity ::= context 'H'                     // class metadata
   declaration ::= context identifier type
   local-marker ::= 'L'
 
 Entity manglings all start with a nominal-type-kind ([COV]), an
 identifier ([0-9o]), or a substitution ([S]).  Global manglings start
-with any of those or [Ww].
+with any of those or [MWw].
+
+  directness ::= 'd'                         // direct
+  directness ::= 'i'                         // indirect
+
+A direct symbol resolves directly to the address of an object.  An
+indirect symbol resolves to the address of a pointer to the object.
+They are distinct manglings to make a certain class of bugs
+immediately obvious.
 
   context ::= module
   context ::= function
