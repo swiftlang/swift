@@ -59,34 +59,34 @@ extern "C" ValueWitnessTable _TWVVSs4POD8 = POD_VALUE_WITNESS_TABLE(uint64_t, 8)
 
 /// A function to initialize a buffer/variable by retaining the given
 /// pointer and then assigning it.
-static SwiftHeapObject **initWithRetain(SwiftHeapObject **dest,
-                                        SwiftHeapObject **src,
-                                        ValueWitnessTable *self) {
+static HeapObject **initWithRetain(HeapObject **dest,
+                                   HeapObject **src,
+                                   ValueWitnessTable *self) {
   *dest = swift_retain(*src);
   return dest;
 }
 
 /// A function to destroy a buffer/variable by releasing the value in it.
-static void destroyWithRelease(SwiftHeapObject **var,
+static void destroyWithRelease(HeapObject **var,
                                ValueWitnessTable *self) {
   swift_release(*var);
 }
 
 /// A function to assign to a variable by copying from an existing one.
-static SwiftHeapObject **assignWithRetain(SwiftHeapObject **dest,
-                                          SwiftHeapObject **src,
-                                          ValueWitnessTable *self) {
-  SwiftHeapObject *newValue = swift_retain(*src);
+static HeapObject **assignWithRetain(HeapObject **dest,
+                                     HeapObject **src,
+                                     ValueWitnessTable *self) {
+  HeapObject *newValue = swift_retain(*src);
   swift_release(*dest);
   *dest = newValue;
   return dest;
 }
 
 /// A function to assign to a variable by taking from an existing one.
-static SwiftHeapObject **assignWithoutRetain(SwiftHeapObject **dest,
-                                             SwiftHeapObject **src,
-                                             ValueWitnessTable *self) {
-  SwiftHeapObject *newValue = *src;
+static HeapObject **assignWithoutRetain(HeapObject **dest,
+                                        HeapObject **src,
+                                        ValueWitnessTable *self) {
+  HeapObject *newValue = *src;
   swift_release(*dest);
   *dest = newValue;
   return dest;

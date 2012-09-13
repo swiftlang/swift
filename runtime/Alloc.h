@@ -1,4 +1,4 @@
-//===--- Alloc.h - Swift Language Allocation ABI --------------------------===//
+//===--- Alloc.h - Swift Language Allocation ABI ---------------*- C++ -*--===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -21,32 +21,20 @@
 #include <cstdint>
 #include "FastEntryPoints.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace swift {
 
-typedef unsigned long SwiftAllocIndex;
+struct HeapMetadata;
 
 /// The Swift heap-object header.
-struct SwiftHeapObject {
+struct HeapObject {
   /// This is always a valid pointer to a metadata object.
-  struct SwiftHeapMetadata *metadata;
+  HeapMetadata *metadata;
 
   uint32_t refCount;
   /// The compiler assumes one "word" of runtime metadata
 #ifdef __LP64__
   uint32_t runtimePrivateData;
 #endif
-};
-
-/// The basic layout of a metadata object for a Swift heap object.
-struct SwiftHeapMetadata {
-  /// Returns the allocated size of the object, or 0 if the object
-  /// shouldn't be deallocated.
-  size_t (*destroy)(struct SwiftHeapObject *);
-
-  /// Returns the allocated size of the object.
-  size_t (*getSize)(struct SwiftHeapObject *);
 };
 
 /// Allocates a new heap object.  The returned memory may be
@@ -68,9 +56,9 @@ struct SwiftHeapMetadata {
 ///
 /// POSSIBILITIES: The argument order is fair game.  It may be useful
 /// to have a variant which guarantees zero-initialized memory.
-struct SwiftHeapObject *
-swift_allocObject(struct SwiftHeapMetadata *metadata,
-            size_t requiredSize, size_t requiredAlignment);
+extern "C" HeapObject *swift_allocObject(HeapMetadata *metadata,
+                                         size_t requiredSize,
+                                         size_t requiredAlignment);
 
 // Allocate plain old memory, this is the generalized entry point
 //
@@ -84,8 +72,7 @@ swift_allocObject(struct SwiftHeapMetadata *metadata,
 // For example, a 12 byte allocation with 8 byte alignment becomes 16.
 #define SWIFT_TRYALLOC 0x0001
 #define SWIFT_RAWALLOC 0x0002
-void *
-swift_slowAlloc(size_t bytes, uint64_t flags);
+extern "C" void *swift_slowAlloc(size_t bytes, uint64_t flags);
 
 // These exist as fast entry points for the above slow API.
 //
@@ -121,33 +108,28 @@ swift_slowAlloc(size_t bytes, uint64_t flags);
 //   else                     { __builtin_trap();          }
 // }
 // return swift_alloc(tinyIndex);
-void *
-swift_alloc(SwiftAllocIndex idx);
-void *
-swift_rawAlloc(SwiftAllocIndex idx);
-void *
-swift_tryAlloc(SwiftAllocIndex idx);
-void *
-swift_tryRawAlloc(SwiftAllocIndex idx);
+typedef unsigned long AllocIndex;
+
+extern "C" void *swift_alloc(AllocIndex idx);
+extern "C" void *swift_rawAlloc(AllocIndex idx);
+extern "C" void *swift_tryAlloc(AllocIndex idx);
+extern "C" void *swift_tryRawAlloc(AllocIndex idx);
 
 
 // Plain old memory deallocation
 //
 // Like swift allocation tiny index trick, but for deallocation
 // If bytes is knowable and fits within the tinyIndex rule:
-void
-swift_dealloc(void *ptr, SwiftAllocIndex idx);
+extern "C" void swift_dealloc(void *ptr, AllocIndex idx);
+
 // If bytes is knowable but is large OR if bytes is not knowable,
 // then use the slow entry point and pass zero:
-void
-swift_slowDealloc(void *ptr, size_t bytes);
+extern "C" void swift_slowDealloc(void *ptr, size_t bytes);
 
 // If the caller cannot promise to zero the object during destruction,
 // then call these corresponding APIs:
-void
-swift_rawDealloc(void *ptr, SwiftAllocIndex idx);
-void
-swift_slowRawDealloc(void *ptr, size_t bytes);
+extern "C" void swift_rawDealloc(void *ptr, AllocIndex idx);
+extern "C" void swift_slowRawDealloc(void *ptr, size_t bytes);
 
 /// Atomically increments the retain count of an object.
 ///
@@ -162,14 +144,10 @@ swift_slowRawDealloc(void *ptr, size_t bytes);
 ///      - maybe a variant that can assume a non-null object
 /// It may also prove worthwhile to have this use a custom CC
 /// which preserves a larger set of registers.
-struct SwiftHeapObject *
-swift_retain(struct SwiftHeapObject *object);
-void
-swift_retain_noresult(struct SwiftHeapObject *object);
+extern "C" HeapObject *swift_retain(HeapObject *object);
+extern "C" void swift_retain_noresult(HeapObject *object);
 
-static inline struct SwiftHeapObject *
-_swift_retain(struct SwiftHeapObject *object)
-{
+static inline HeapObject *_swift_retain(HeapObject *object) {
   if (object) {
     object->refCount += RC_INTERVAL;
   }
@@ -192,8 +170,7 @@ _swift_retain(struct SwiftHeapObject *object)
 ///      - a variant that can safely use non-atomic operations
 ///      - maybe a variant that can assume a non-null object
 /// It's unlikely that a custom CC would be beneficial here.
-void
-swift_release(struct SwiftHeapObject *object);
+extern "C" void swift_release(HeapObject *object);
 
 /// Deallocate the given memory; it was returned by swift_alloc
 /// but is otherwise in an unknown state.
@@ -205,11 +182,8 @@ swift_release(struct SwiftHeapObject *object);
 /// POSSIBILITIES: It may be useful to have a variant which
 /// requires the object to have been fully zeroed from offsets
 /// sizeof(SwiftHeapObject) to allocatedSize.
-void
-swift_deallocObject(struct SwiftHeapObject *object, size_t allocatedSize);
+extern "C" void swift_deallocObject(HeapObject *object, size_t allocatedSize);
 
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
+} // end namespace swift
 
 #endif /* SWIFT_ABI_ALLOC_H */

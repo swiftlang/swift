@@ -19,6 +19,8 @@
 #include <objc/runtime.h>
 #include "Alloc.h"
 
+using namespace swift;
+
 struct SwiftString;
 
 extern "C" {
@@ -40,7 +42,7 @@ swift_StringToNSString(SwiftString *string);
 struct SwiftString {
   const char *base;
   size_t len;
-  SwiftHeapObject *owner;
+  HeapObject *owner;
 };
 
 struct _NSSwiftString_s {

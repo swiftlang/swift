@@ -24,6 +24,8 @@ struct SwiftHeapMetadata;
 
 namespace swift {
 
+struct HeapObject;
+
 /// Storage for an arbitrary value.  In C/C++ terms, this is an
 /// 'object', because it is rooted in memory.
 ///
@@ -286,11 +288,11 @@ extern "C" ValueWitnessTable _TWVVSs4POD4;  // swift.POD4
 extern "C" ValueWitnessTable _TWVVSs4POD8;  // swift.POD8
 extern "C" ValueWitnessTable _TWVBo;        // Builtin.ObjectPointer
 
-enum { GenericTypeFlag = 0x4 };
-enum { BasicTypeKindMask = 0xF };
+enum : uint8_t { GenericTypeFlag = 0x80 };
 
-/// Types of Swift metadata.  This type is 8 bits wide.
-enum class TypeKind {
+/// Kinds of Swift metadata records.  Some of these are types, some
+/// aren't.
+enum class MetadataKind : uint8_t {
   /// A class type.
   Class         = 0,
   GenericClass  = unsigned(Class)  | GenericTypeFlag,
@@ -300,6 +302,7 @@ enum class TypeKind {
   GenericStruct = unsigned(Struct) | GenericTypeFlag,
 
   /// A oneof type.
+  /// If we add reference oneofs, that needs to go here.
   Oneof         = 2,
   GenericOneof  = unsigned(Oneof)  | GenericTypeFlag,
 
@@ -323,14 +326,24 @@ enum class TypeKind {
 };
 
 /// The common structure of all type metadata.
-struct TypeMetadata {
-  /// The kind: a TypeKind.
-  uint8_t Kind;
+struct Metadata {
+  /// The kind.
+  MetadataKind Kind;
 
-  /// Reserved.
+  // The rest of the first pointer-sized storage unit is reserved.
 
   /// A pointer to the value-witnesses for this type.
   ValueWitnessTable *ValueWitnesses;
+};
+
+/// The common structure of all metadata for heap-allocated types.
+struct HeapMetadata { // FIXME: make subclass of Metadata
+  /// Returns the allocated size of the object, or 0 if the object
+  /// shouldn't be deallocated.
+  size_t (*destroy)(HeapObject *);
+
+  /// Returns the allocated size of the object.
+  size_t (*getSize)(HeapObject *);
 };
 
 /// The descriptor for a nominal type.  This should be sharable
@@ -347,17 +360,14 @@ struct NominalTypeDescriptor {
   // Component descriptor.
 };
 
-/// The common structure of all nominal-type metadata.
-struct NominalTypeMetadata : public TypeMetadata {
-  /// An out-of-line description of the type.
-  NominalTypeDescriptor *Description;
-};
-
 /// The structure of all class metadata.  This structure
 /// is embedded directly within the class's heap metadata
 /// structure and therefore cannot be extended.
-struct ClassMetadata : public NominalTypeMetadata {
-  /// The metadata for the parent class.
+struct ClassMetadata : public HeapMetadata {
+  /// An out-of-line description of the type.
+  NominalTypeDescriptor *Description;
+
+  /// The metadata for the parent class.  This is null for the root class.
   ClassMetadata *ParentClass;
 };
 

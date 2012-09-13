@@ -15,11 +15,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "Alloc.h"
+#include "Metadata.h"
+#include <llvm/Support/Compiler.h>
 #include <llvm/Support/MathExtras.h>
 // We'll include this and do per-thread clean up once we actually have threads
 //#include <System/pthread_machdep.h>
 #include <cstdlib>
 #include <unistd.h>
+
+using namespace swift;
 
 struct AllocCacheEntry {
   struct AllocCacheEntry *next;
@@ -40,16 +44,16 @@ struct TSD {
   AllocCacheEntry *rawCache[ALLOC_CACHE_BUCKETS];
 } *tsd = 0;
 
-struct SwiftHeapObject *
-swift_allocObject(struct SwiftHeapMetadata *metadata,
+HeapObject *
+swift_allocObject(HeapMetadata *metadata,
                   size_t requiredSize,
                   size_t requiredAlignment) {
-  struct SwiftHeapObject *object;
+  HeapObject *object;
   static_assert(offsetof(TSD, cache) == SWIFT_TSD_ALLOC_BASE, "Fix ASM");
   static_assert(offsetof(TSD, rawCache) == SWIFT_TSD_RAW_ALLOC_BASE, "Fix ASM");
   (void)tsd;
   for (;;) {
-    object = reinterpret_cast<struct SwiftHeapObject *>(
+    object = reinterpret_cast<HeapObject *>(
       calloc(1, llvm::RoundUpToAlignment(requiredSize, requiredAlignment)));
     if (object) {
       break;
@@ -61,39 +65,38 @@ swift_allocObject(struct SwiftHeapMetadata *metadata,
   return object;
 }
 
-extern "C" void
-_swift_release_slow(struct SwiftHeapObject *object)
+// Forward-declare this, but define it after swift_release.
+extern "C" LLVM_LIBRARY_VISIBILITY
+void _swift_release_slow(HeapObject *object)
   __attribute__((noinline,used));
 
 void
-swift_retain_noresult(struct SwiftHeapObject *object) {
+swift_retain_noresult(HeapObject *object) {
   swift_retain(object);
 }
 
+// On x86-64 these are implemented in FastEntryPoints.s.
 #ifndef __x86_64__
-struct SwiftHeapObject *
-swift_retain(struct SwiftHeapObject *object) {
+HeapObject *swift_retain(HeapObject *object) {
   return _swift_retain(object);
 }
 
-void
-swift_release(struct SwiftHeapObject *object) {
+void swift_release(HeapObject *object) {
   if (object && ((object->refCount -= RC_INTERVAL) == 0)) {
     _swift_release_slow(object);
   }
 }
 #endif
 
-void
-_swift_release_slow(struct SwiftHeapObject *object) {
+// Declared extern "C" LLVM_LIBRARY_VISIBILITY above.
+void _swift_release_slow(HeapObject *object) {
   size_t allocSize = object->metadata->destroy(object);
   if (allocSize) {
     swift_deallocObject(object, allocSize);
   }
 }
 
-void
-swift_deallocObject(struct SwiftHeapObject *object, size_t allocatedSize) {
+void swift_deallocObject(HeapObject *object, size_t allocatedSize) {
   free(object);
 }
 
@@ -102,7 +105,7 @@ swift_deallocObject(struct SwiftHeapObject *object, size_t allocatedSize) {
 
 __attribute__((noinline,used))
 static void *
-_swift_slowAlloc_fixup(SwiftAllocIndex idx, uint64_t flags)
+_swift_slowAlloc_fixup(AllocIndex idx, uint64_t flags)
 {
   size_t sz;
 
@@ -132,8 +135,8 @@ _swift_slowAlloc_fixup(SwiftAllocIndex idx, uint64_t flags)
   return swift_slowAlloc(sz, flags);
 }
 
-extern "C" void
-_swift_refillThreadAllocCache(SwiftAllocIndex idx, uint64_t flags) {
+extern "C" LLVM_LIBRARY_VISIBILITY
+void _swift_refillThreadAllocCache(AllocIndex idx, uint64_t flags) {
   void *tmp = _swift_slowAlloc_fixup(idx, flags);
   if (!tmp) {
     return;
@@ -145,9 +148,7 @@ _swift_refillThreadAllocCache(SwiftAllocIndex idx, uint64_t flags) {
   }
 }
 
-void *
-swift_slowAlloc(size_t bytes, uint64_t flags)
-{
+void *swift_slowAlloc(size_t bytes, uint64_t flags) {
   void *r;
 
   do {
@@ -161,10 +162,9 @@ swift_slowAlloc(size_t bytes, uint64_t flags)
   return r;
 }
 
+// On x86-64 these are implemented in FastEntryPoints.s.
 #ifndef __x86_64__
-void *
-swift_alloc(SwiftAllocIndex idx)
-{
+void *swift_alloc(AllocIndex idx) {
   AllocCacheEntry *r = tsd->cache[idx];
   if (r) {
     tsd->cache[idx] = r->next;
@@ -173,9 +173,7 @@ swift_alloc(SwiftAllocIndex idx)
   return _swift_slowAlloc_fixup(idx, 0);
 }
 
-void *
-swift_rawAlloc(SwiftAllocIndex idx)
-{
+void *swift_rawAlloc(AllocIndex idx) {
   AllocCacheEntry *r = tsd->rawCache[idx];
   if (r) {
     tsd->rawCache[idx] = r->next;
@@ -184,9 +182,7 @@ swift_rawAlloc(SwiftAllocIndex idx)
   return _swift_slowAlloc_fixup(idx, SWIFT_RAWALLOC);
 }
 
-void *
-swift_tryAlloc(SwiftAllocIndex idx)
-{
+void *swift_tryAlloc(AllocIndex idx) {
   AllocCacheEntry *r = tsd->cache[idx];
   if (r) {
     tsd->cache[idx] = r->next;
@@ -195,9 +191,7 @@ swift_tryAlloc(SwiftAllocIndex idx)
   return _swift_slowAlloc_fixup(idx, SWIFT_TRYALLOC);
 }
 
-void *
-swift_tryRawAlloc(SwiftAllocIndex idx)
-{
+void *swift_tryRawAlloc(AllocIndex idx) {
   AllocCacheEntry *r = tsd->rawCache[idx];
   if (r) {
     tsd->rawCache[idx] = r->next;
@@ -206,18 +200,14 @@ swift_tryRawAlloc(SwiftAllocIndex idx)
   return _swift_slowAlloc_fixup(idx, SWIFT_TRYALLOC|SWIFT_RAWALLOC);
 }
 
-void
-swift_dealloc(void *ptr, SwiftAllocIndex idx)
-{
+void swift_dealloc(void *ptr, AllocIndex idx) {
   auto cur = static_cast<AllocCacheEntry *>(ptr);
   AllocCacheEntry *prev = tsd->cache[idx];
   cur->next = prev;
   tsd->cache[idx] = cur;
 }
 
-void
-swift_rawDealloc(void *ptr, SwiftAllocIndex idx)
-{
+void swift_rawDealloc(void *ptr, AllocIndex idx) {
   auto cur = static_cast<AllocCacheEntry *>(ptr);
   AllocCacheEntry *prev = tsd->rawCache[idx];
   cur->next = prev;
@@ -225,10 +215,8 @@ swift_rawDealloc(void *ptr, SwiftAllocIndex idx)
 }
 #endif
 
-void
-swift_slowDealloc(void *ptr, size_t bytes)
-{
-  SwiftAllocIndex idx;
+void swift_slowDealloc(void *ptr, size_t bytes) {
+  AllocIndex idx;
 
   if (bytes == 0) {
     // the caller either doesn't know the size
@@ -261,10 +249,8 @@ swift_slowDealloc(void *ptr, size_t bytes)
   swift_dealloc(ptr, idx);
 }
 
-void
-swift_slowRawDealloc(void *ptr, size_t bytes)
-{
-  SwiftAllocIndex idx;
+void swift_slowRawDealloc(void *ptr, size_t bytes) {
+  AllocIndex idx;
 
   if (bytes == 0) {
     // the caller either doesn't know the size
