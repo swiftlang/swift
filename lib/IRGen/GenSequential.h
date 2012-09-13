@@ -288,6 +288,9 @@ public:
     assert(astFields.size() == SeqTI->NumFields);
 
     if (astFields.empty()) {
+      SeqTI->setPOD(IsPOD);
+      SeqTI->MaximalExplosionSize = 0;
+      SeqTI->MinimalExplosionSize = 0;
       asImpl()->completeEmpty(SeqTI);
       return SeqTI;
     }
