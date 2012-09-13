@@ -282,10 +282,10 @@ struct ValueWitnessTable {
 };
 
 // Standard POD value-witness tables.
-extern "C" ValueWitnessTable _TWVVSs4POD1;  // swift.POD1
-extern "C" ValueWitnessTable _TWVVSs4POD2;  // swift.POD2
-extern "C" ValueWitnessTable _TWVVSs4POD4;  // swift.POD4
-extern "C" ValueWitnessTable _TWVVSs4POD8;  // swift.POD8
+extern "C" ValueWitnessTable _TWVBi8_;      // Builtin.Int8
+extern "C" ValueWitnessTable _TWVBi16_;     // Builtin.Int16
+extern "C" ValueWitnessTable _TWVBi32_;     // Builtin.Int32
+extern "C" ValueWitnessTable _TWVBi64_;     // Builtin.Int64
 extern "C" ValueWitnessTable _TWVBo;        // Builtin.ObjectPointer
 
 enum : uint8_t { GenericTypeFlag = 0x80 };

@@ -63,10 +63,10 @@ INSTANTIATE(uintptr_t);
   (value_witness_types::stride) (SIZE)                                  \
 }
 
-ValueWitnessTable swift::_TWVVSs4POD1 = POD_VALUE_WITNESS_TABLE(uint8_t, 1);
-ValueWitnessTable swift::_TWVVSs4POD2 = POD_VALUE_WITNESS_TABLE(uint16_t, 2);
-ValueWitnessTable swift::_TWVVSs4POD4 = POD_VALUE_WITNESS_TABLE(uint32_t, 4);
-ValueWitnessTable swift::_TWVVSs4POD8 = POD_VALUE_WITNESS_TABLE(uint64_t, 8);
+ValueWitnessTable swift::_TWVBi8_ = POD_VALUE_WITNESS_TABLE(uint8_t, 1);
+ValueWitnessTable swift::_TWVBi16_ = POD_VALUE_WITNESS_TABLE(uint16_t, 2);
+ValueWitnessTable swift::_TWVBi32_ = POD_VALUE_WITNESS_TABLE(uint32_t, 4);
+ValueWitnessTable swift::_TWVBi64_ = POD_VALUE_WITNESS_TABLE(uint64_t, 8);
 
 /// A function to initialize a buffer/variable by retaining the given
 /// pointer and then assigning it.
