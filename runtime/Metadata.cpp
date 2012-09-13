@@ -18,6 +18,8 @@
 #include <new>
 #include <string.h>
 
+using namespace swift;
+
 namespace {
   class MetadataCacheEntry {
     const MetadataCacheEntry *Next;
@@ -29,18 +31,18 @@ namespace {
     void *getArgumentsBuffer() { return this + 1; }
     const void *getArgumentsBuffer() const { return this + 1; }
 
-    SwiftHeapMetadata *getMetadataBuffer(SwiftGenericHeapMetadata *pattern) {
+    SwiftHeapMetadata *getMetadataBuffer(GenericHeapMetadata *pattern) {
       return reinterpret_cast<SwiftHeapMetadata *>(
                (reinterpret_cast<void**>(getArgumentsBuffer())
                 + pattern->NumArguments));
     }
     const SwiftHeapMetadata *
-    getMetadataBuffer(SwiftGenericHeapMetadata *pattern) const {
+    getMetadataBuffer(GenericHeapMetadata *pattern) const {
       return const_cast<MetadataCacheEntry*>(this)->getMetadataBuffer(pattern);
     }
 
     /// Does this cache entry match the given set of arguments?
-    bool matches(SwiftGenericHeapMetadata *pattern,
+    bool matches(GenericHeapMetadata *pattern,
                  const void *arguments) const {
       const void *storedArguments = getArgumentsBuffer();
 
@@ -51,7 +53,7 @@ namespace {
     }
     
     /// Allocate and return a new metadata object for the given pattern.
-    static const SwiftHeapMetadata *create(SwiftGenericHeapMetadata *pattern,
+    static const SwiftHeapMetadata *create(GenericHeapMetadata *pattern,
                                            const void *arguments);
   };
 
@@ -61,18 +63,18 @@ namespace {
     /// The head of a linked list of metadata cache entries.
     const MetadataCacheEntry *Head;
   };
-  MetadataCache &getCache(SwiftGenericHeapMetadata *metadata) {
+  MetadataCache &getCache(GenericHeapMetadata *metadata) {
     return *reinterpret_cast<MetadataCache*>(metadata->PrivateData);
   }
 }
 
 // Keep this assert even if you change the representation above.
 static_assert(sizeof(MetadataCache) <=
-              sizeof(SwiftGenericHeapMetadata::PrivateData),
+              sizeof(GenericHeapMetadata::PrivateData),
               "metadata cache is larger than the allowed space");
 
 const SwiftHeapMetadata *
-MetadataCacheEntry::create(SwiftGenericHeapMetadata *pattern,
+MetadataCacheEntry::create(GenericHeapMetadata *pattern,
                            const void *arguments) {
   // Allocate the new entry.
   void *buffer = operator new(sizeof(MetadataCacheEntry) +
@@ -108,7 +110,7 @@ MetadataCacheEntry::create(SwiftGenericHeapMetadata *pattern,
 
 /// The primary entrypoint.
 extern "C" const SwiftHeapMetadata *
-swift_getGenericMetadata(SwiftGenericHeapMetadata *pattern,
+swift_getGenericMetadata(GenericHeapMetadata *pattern,
                          const void *arguments) {
   // Check to see if an entry already exists for these arguments.
   for (auto entry = getCache(pattern).Head;
