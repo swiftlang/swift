@@ -231,13 +231,21 @@ namespace {
     /// expecting.
     LiteralKind Literal;
 
+    /// \brief For a constraint that was directly generated from an expression,
+    /// the expression from which it was generated.
+    ///
+    /// FIXME: We need more information for cases where a given expression
+    /// might have generated several constraints. Which one is it?
+    Expr *Anchor;
+
     /// \brief Constraints are always allocated within a given constraint
     /// system.
     void *operator new(size_t) = delete;
 
   public:
-    Constraint(ConstraintKind Kind, Type First, Type Second, Identifier Member)
-      : Kind(Kind), First(First), Second(Second), Member(Member)
+    Constraint(ConstraintKind Kind, Type First, Type Second, Identifier Member,
+               Expr *anchor)
+      : Kind(Kind), First(First), Second(Second), Member(Member), Anchor(anchor)
     {
       switch (Kind) {
       case ConstraintKind::Bind:
@@ -260,8 +268,9 @@ namespace {
       }
     }
 
-    Constraint(Type type, LiteralKind literal)
-      : Kind(ConstraintKind::Literal), First(type), Literal(literal) { }
+    Constraint(Type type, LiteralKind literal, Expr *anchor = nullptr)
+      : Kind(ConstraintKind::Literal), First(type), Literal(literal),
+        Anchor(anchor){ }
 
     // FIXME: Need some context information here.
 
@@ -311,6 +320,10 @@ namespace {
       assert(Kind == ConstraintKind::Literal && "Not a literal constraint!");
       return Literal;
     }
+
+    /// \brief Retrieve the expression that directly generated this
+    /// constraint.
+    Expr *getAnchorExpr() const { return Anchor; }
 
     void print(llvm::raw_ostream &Out) {
       First->print(Out);
@@ -398,10 +411,6 @@ namespace {
     /// declaration).
     llvm::PointerIntPair<ValueDecl *, 2> ValueAndKind;
 
-    /// \brief Overload choices are always allocated within a given constraint
-    /// system.
-    void *operator new(size_t) = delete;
-
   public:
     OverloadChoice(Type base, ValueDecl *value)
       : Base(base), ValueAndKind(value, (unsigned)OverloadChoiceKind::Decl) { }
@@ -458,6 +467,18 @@ namespace {
     }
 
   public:
+    /// \brief Retrieve the expression that introduced this overload set, or
+    /// null if it was not introduced by an expression.
+    Expr *getIntroducingExpr() const {
+      return ExprOrConstraint.dyn_cast<Expr *>();
+    }
+
+    /// \brief Retrieve the constraint that introduced this overload set, or
+    /// null if it was not introduced by a constraint.
+    const Constraint *getIntroducingConstraint() const {
+      return ExprOrConstraint.dyn_cast<const Constraint *>();
+    }
+
     /// \brief Retrieve the ID associated with this overload set.
     unsigned getID() const { return ID; }
     
@@ -482,7 +503,7 @@ namespace {
                                Type boundType,
                                const Constraint *constraint,
                                ArrayRef<OverloadChoice> choices);
-};
+  };
 
   /// \brief A representative type variable with the list of constraints
   /// that apply to it.
@@ -553,7 +574,7 @@ namespace {
     unsigned TypeCounter = 0;
     unsigned OverloadSetCounter = 0;
     
-    // ---Only valid in the top-level constraint system---
+    // ---Only valid in child constraint system---
     OverloadSet *InOverloadSet = nullptr;
     unsigned OverloadChoiceIdx;
 
@@ -565,6 +586,8 @@ namespace {
     SmallVector<TypeVariableType *, 16> TypeVariables;
     SmallVector<Constraint *, 16> Constraints;
     SmallVector<OverloadSet *, 4> UnresolvedOverloadSets;
+    llvm::DenseMap<Expr *, OverloadSet *> GeneratedOverloadSets;
+    llvm::DenseMap<Expr *, Decl *> DirectBoundDecls;
     SmallVector<std::unique_ptr<ConstraintSystem>, 2> Children;
     llvm::DenseMap<TypeVariableType *, Type> FixedTypes;
 
@@ -679,35 +702,41 @@ namespace {
     }
 
     /// \brief Add a constraint to the constraint system.
-    void addConstraint(ConstraintKind kind, Type first, Type second) {
+    void addConstraint(ConstraintKind kind, Type first, Type second,
+                       Expr *anchor = nullptr) {
       assert(first && "Missing first type");
       assert(second && "Missing first type");
       Constraints.push_back(new (*this) Constraint(kind, first, second,
-                                                   Identifier()));
+                                                   Identifier(), anchor));
     }
 
     ///\ brief Add a literal constraint to the constraint system.
-    void addLiteralConstraint(Type type, LiteralKind kind) {
+    void addLiteralConstraint(Type type, LiteralKind kind,
+                              Expr *anchor = nullptr) {
       assert(type && "missing type for literal constraint");
-      Constraints.push_back(new (*this) Constraint(type, kind));
+      Constraints.push_back(new (*this) Constraint(type, kind, anchor));
     }
 
     /// \brief Add a value member constraint to the constraint system.
-    void addValueMemberConstraint(Type baseTy, Identifier name, Type memberTy) {
+    void addValueMemberConstraint(Type baseTy, Identifier name, Type memberTy,
+                                  Expr *anchor = nullptr) {
       assert(baseTy);
       assert(memberTy);
       assert(!name.empty());
       Constraints.push_back(new (*this) Constraint(ConstraintKind::ValueMember,
-                                                   baseTy, memberTy, name));
+                                                   baseTy, memberTy, name,
+                                                   anchor));
     }
 
     /// \brief Add a type member constraint to the constraint system.
-    void addTypeMemberConstraint(Type baseTy, Identifier name, Type memberTy) {
+    void addTypeMemberConstraint(Type baseTy, Identifier name, Type memberTy,
+                                 Expr *anchor = nullptr) {
       assert(baseTy);
       assert(memberTy);
       assert(!name.empty());
       Constraints.push_back(new (*this) Constraint(ConstraintKind::ValueMember,
-                                                   baseTy, memberTy, name));
+                                                   baseTy, memberTy, name,
+                                                   anchor));
     }
 
     /// \brief Retrieve the fixed type corresponding to the given type variable,
@@ -800,6 +829,56 @@ namespace {
     /// sets.
     void addOverloadSet(OverloadSet *ovl) {
       UnresolvedOverloadSets.push_back(ovl);
+
+      // If we have an introducing expression, record it.
+      if (auto introducer = ovl->getIntroducingExpr()) {
+        GeneratedOverloadSets[introducer] = ovl;
+      } else if (auto constraint = ovl->getIntroducingConstraint()) {
+        if (auto anchor = constraint->getAnchorExpr()) {
+          GeneratedOverloadSets[anchor] = ovl;
+        }
+      }
+    }
+
+    /// \brief Find the overload set generated by the current expression, if
+    /// any.
+    OverloadSet *getGeneratedOverloadSet(Expr *expr) {
+      for (auto cs = this; cs; cs = cs->Parent) {
+        auto known = cs->GeneratedOverloadSets.find(expr);
+        if (known != cs->GeneratedOverloadSets.end())
+          return known->second;
+      }
+
+      return nullptr;
+    }
+
+    /// \brief Find the overload choice that was assumed by this constraint
+    /// system (or one of its parents).
+    Optional<OverloadChoice> getSelectedOverloadFromSet(OverloadSet *ovl) {
+      for (auto cs = this; cs->Parent; cs = cs->Parent) {
+        if (cs->InOverloadSet == ovl) {
+          return ovl->getChoices()[cs->OverloadChoiceIdx];
+        }
+      }
+
+      return Nothing;
+    }
+
+    /// \brief Find the declaration that we directly bound for an expression
+    /// that may have otherwise needed to go through overloading.
+    ///
+    /// FIXME: This feels like the totally wrong answer. It's a very minor
+    /// optimization that avoids building an overload set, but perhaps it
+    /// would be better to simply build the overload set then resolve it
+    /// immediately.
+    Decl *getDirectBoundDecl(Expr *expr) {
+      for (auto cs = this; cs; cs = cs->Parent) {
+        auto known = cs->DirectBoundDecls.find(expr);
+        if (known != cs->DirectBoundDecls.end())
+          return known->second;
+      }
+
+      return nullptr;
     }
 
     /// \brief Retrieve the allocator used by this constraint system.
@@ -1297,19 +1376,19 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
 
     Type visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
       auto tv = CS.createTypeVariable(expr);
-      CS.addLiteralConstraint(tv, LiteralKind::Int);
+      CS.addLiteralConstraint(tv, LiteralKind::Int, expr);
       return tv;
     }
 
     Type visitFloatLiteralExpr(FloatLiteralExpr *expr) {
       auto tv = CS.createTypeVariable(expr);
-      CS.addLiteralConstraint(tv, LiteralKind::Float);
+      CS.addLiteralConstraint(tv, LiteralKind::Float, expr);
       return tv;
     }
 
     Type visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
       auto tv = CS.createTypeVariable(expr);
-      CS.addLiteralConstraint(tv, LiteralKind::Char);
+      CS.addLiteralConstraint(tv, LiteralKind::Char, expr);
       return tv;
     }
 
@@ -1320,16 +1399,17 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
                        [](char c) { return c > 127; })
             != expr->getValue().end())
         kind = LiteralKind::UTFString;
-      CS.addLiteralConstraint(tv, kind);
+      CS.addLiteralConstraint(tv, kind, expr);
       return tv;
     }
 
     Type
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
       auto tv = CS.createTypeVariable(expr);
-      CS.addLiteralConstraint(tv, LiteralKind::UTFString);
+      CS.addLiteralConstraint(tv, LiteralKind::UTFString, expr);
       for (auto segment : expr->getSegments()) {
-        CS.addConstraint(ConstraintKind::Construction, segment->getType(), tv);
+        CS.addConstraint(ConstraintKind::Construction, segment->getType(), tv,
+                         expr);
       }
       return tv;
     }
@@ -1420,7 +1500,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       // form (T2 -> T0) until T0 has been deduced, we cannot model this
       // directly within the constraint system. Instead, we introduce a new
       // overload set with two entries: one for T0 and one for T2 -> T0.
-      CS.addValueMemberConstraint(oneofTy, expr->getName(), memberTy);
+      CS.addValueMemberConstraint(oneofTy, expr->getName(), memberTy, expr);
 
       OverloadChoice choices[2] = {
         OverloadChoice(oneofTy, OverloadChoiceKind::BaseType),
@@ -1436,7 +1516,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       // of this expression.
       auto baseTy = expr->getBase()->getType();
       auto tv = CS.createTypeVariable(expr);
-      CS.addValueMemberConstraint(baseTy, expr->getName(), tv);
+      CS.addValueMemberConstraint(baseTy, expr->getName(), tv, expr);
       return tv;
     }
 
@@ -1480,13 +1560,13 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       // FIXME: lame name!
       auto baseTy = expr->getBase()->getType();
       CS.addValueMemberConstraint(baseTy, Context.getIdentifier("__subscript"),
-                                  fnTy);
+                                  fnTy, expr);
       
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getIndex()->getType(),
-                       inputTv);
+                       inputTv, expr);
       return outputTy;
     }
 
@@ -1619,9 +1699,8 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       auto result = LValueType::get(tv, LValueType::Qual::DefaultForType,
                                     CS.getASTContext());
 
-      CS.addConstraint(ConstraintKind::Subtype,
-                       result,
-                       expr->getSubExpr()->getType());
+      CS.addConstraint(ConstraintKind::Subtype, result,
+                       expr->getSubExpr()->getType(), expr);
       return result;
     }
 
@@ -1670,10 +1749,11 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       // FIXME: When we add support for class clusters, we'll need a new type
       // variable for the return type that is a subtype of instanceTy.
       CS.addValueMemberConstraint(instanceTy, name,
-                                  FunctionType::get(tv, instanceTy, context));
+                                  FunctionType::get(tv, instanceTy, context),
+                                  expr);
 
       // The first type must be convertible to the constructor's argument type.
-      CS.addConstraint(ConstraintKind::Conversion, argTy, tv);
+      CS.addConstraint(ConstraintKind::Conversion, argTy, tv, expr);
       return instanceTy;
     }
 
@@ -1699,7 +1779,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
         if (auto metaTy = expr->getFn()->getType()->getAs<MetaTypeType>()) {
           auto instanceTy = metaTy->getInstanceType();
           CS.addConstraint(ConstraintKind::Construction,
-                           expr->getArg()->getType(), instanceTy);
+                           expr->getArg()->getType(), instanceTy, expr);
           return instanceTy;
         }
       }
@@ -1712,11 +1792,12 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
 
       // FIXME: Allow conversions to function type? That seems completely
       // unnecessary... except perhaps for the metatype case mentioned above.
-      CS.addConstraint(ConstraintKind::Equal, expr->getFn()->getType(), funcTy);
+      CS.addConstraint(ConstraintKind::Equal, expr->getFn()->getType(), funcTy,
+                       expr);
 
       // The argument type must be convertible to the input type.
       CS.addConstraint(ConstraintKind::Conversion, expr->getArg()->getType(),
-                       inputTy);
+                       inputTy, expr);
 
       return outputTy;
     }
@@ -1774,7 +1855,8 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
           .addConstraint(ConstraintKind::Conversion,
                          explicitClosure->getBody()->getType(),
                          explicitClosure->getType()->castTo<FunctionType>()
-                           ->getResult());
+                           ->getResult(),
+                         expr);
         return expr;
       }
 
@@ -2661,6 +2743,13 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       auto refType = getTypeOfMemberReference(baseTy, constructors.Results[0],
                                               /*isTypeReference=*/false);
       addConstraint(ConstraintKind::Bind, memberTy, refType);
+
+      // If this constraint was anchored by an expression, associate this
+      // declararation with that expression.
+      // FIXME: Feels like a total hack.
+      if (auto anchor = constraint.getAnchorExpr())
+        DirectBoundDecls[anchor] = constructors.Results[0];
+
       return SolutionKind::Solved;
     }
 
@@ -3515,8 +3604,42 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitNewReferenceExpr(NewReferenceExpr *expr) {
-      // FIXME: Actually implement this here.
-      return CS.getTypeChecker().typeCheckNewReferenceExpr(expr);
+      auto instanceTy = CS.simplifyType(expr->getType());
+      expr->setType(instanceTy);
+
+      // Find the constructor we selected for this expression.
+      ConstructorDecl *constructor = nullptr;
+      if (auto ovl = CS.getGeneratedOverloadSet(expr)) {
+        auto choice = CS.getSelectedOverloadFromSet(ovl).getValue();
+        constructor = cast<ConstructorDecl>(choice.getDecl());
+      } else {
+        constructor = cast<ConstructorDecl>(CS.getDirectBoundDecl(expr));
+      }
+
+      // Form the constructor call expression.
+      auto &tc = CS.getTypeChecker();
+      auto classMetaTy = MetaTypeType::get(instanceTy, tc.Context);
+      Expr *typeBase = new (tc.Context) TypeOfExpr(expr->getLoc(), classMetaTy);
+      Expr *ctorRef = new (tc.Context) DeclRefExpr(constructor, expr->getLoc(),
+                                         constructor->getTypeOfReference());
+      ctorRef = new (tc.Context) ConstructorRefCallExpr(ctorRef, typeBase);
+
+      // Extract (or create) the argument;
+      Expr *arg = expr->getArg();
+      if (!arg) {
+        arg = new (tc.Context) TupleExpr(expr->getLoc(),
+                                         MutableArrayRef<Expr *>(), nullptr,
+                                         expr->getLoc());
+        arg->setType(TupleType::getEmpty(tc.Context));
+      }
+
+      // FIXME: We need to know what happened to the constraints on the function
+      // and on the argument to perform the appropriate conversions,
+      // specializations, etc. For now, fall back to the existing type checker.
+      ctorRef = tc.recheckTypes(ctorRef);
+      expr->setFn(ctorRef);
+      expr->setArg(arg);
+      return tc.semaApplyExpr(expr);
     }
 
     Expr *visitNewArrayExpr(NewArrayExpr *expr) {
