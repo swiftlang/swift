@@ -45,9 +45,9 @@ struct TSD {
 } *tsd = 0;
 
 HeapObject *
-swift_allocObject(HeapMetadata *metadata,
-                  size_t requiredSize,
-                  size_t requiredAlignment) {
+swift::swift_allocObject(HeapMetadata *metadata,
+                         size_t requiredSize,
+                         size_t requiredAlignment) {
   HeapObject *object;
   static_assert(offsetof(TSD, cache) == SWIFT_TSD_ALLOC_BASE, "Fix ASM");
   static_assert(offsetof(TSD, rawCache) == SWIFT_TSD_RAW_ALLOC_BASE, "Fix ASM");
@@ -71,17 +71,17 @@ void _swift_release_slow(HeapObject *object)
   __attribute__((noinline,used));
 
 void
-swift_retain_noresult(HeapObject *object) {
+swift::swift_retain_noresult(HeapObject *object) {
   swift_retain(object);
 }
 
 // On x86-64 these are implemented in FastEntryPoints.s.
 #ifndef __x86_64__
-HeapObject *swift_retain(HeapObject *object) {
+HeapObject *swift::swift_retain(HeapObject *object) {
   return _swift_retain(object);
 }
 
-void swift_release(HeapObject *object) {
+void swift::swift_release(HeapObject *object) {
   if (object && ((object->refCount -= RC_INTERVAL) == 0)) {
     _swift_release_slow(object);
   }
@@ -96,7 +96,7 @@ void _swift_release_slow(HeapObject *object) {
   }
 }
 
-void swift_deallocObject(HeapObject *object, size_t allocatedSize) {
+void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize) {
   free(object);
 }
 
@@ -148,7 +148,7 @@ void _swift_refillThreadAllocCache(AllocIndex idx, uint64_t flags) {
   }
 }
 
-void *swift_slowAlloc(size_t bytes, uint64_t flags) {
+void *swift::swift_slowAlloc(size_t bytes, uint64_t flags) {
   void *r;
 
   do {
@@ -164,7 +164,7 @@ void *swift_slowAlloc(size_t bytes, uint64_t flags) {
 
 // On x86-64 these are implemented in FastEntryPoints.s.
 #ifndef __x86_64__
-void *swift_alloc(AllocIndex idx) {
+void *swift::swift_alloc(AllocIndex idx) {
   AllocCacheEntry *r = tsd->cache[idx];
   if (r) {
     tsd->cache[idx] = r->next;
@@ -173,7 +173,7 @@ void *swift_alloc(AllocIndex idx) {
   return _swift_slowAlloc_fixup(idx, 0);
 }
 
-void *swift_rawAlloc(AllocIndex idx) {
+void *swift::swift_rawAlloc(AllocIndex idx) {
   AllocCacheEntry *r = tsd->rawCache[idx];
   if (r) {
     tsd->rawCache[idx] = r->next;
@@ -182,7 +182,7 @@ void *swift_rawAlloc(AllocIndex idx) {
   return _swift_slowAlloc_fixup(idx, SWIFT_RAWALLOC);
 }
 
-void *swift_tryAlloc(AllocIndex idx) {
+void *swift::swift_tryAlloc(AllocIndex idx) {
   AllocCacheEntry *r = tsd->cache[idx];
   if (r) {
     tsd->cache[idx] = r->next;
@@ -191,7 +191,7 @@ void *swift_tryAlloc(AllocIndex idx) {
   return _swift_slowAlloc_fixup(idx, SWIFT_TRYALLOC);
 }
 
-void *swift_tryRawAlloc(AllocIndex idx) {
+void *swift::swift_tryRawAlloc(AllocIndex idx) {
   AllocCacheEntry *r = tsd->rawCache[idx];
   if (r) {
     tsd->rawCache[idx] = r->next;
@@ -200,14 +200,14 @@ void *swift_tryRawAlloc(AllocIndex idx) {
   return _swift_slowAlloc_fixup(idx, SWIFT_TRYALLOC|SWIFT_RAWALLOC);
 }
 
-void swift_dealloc(void *ptr, AllocIndex idx) {
+void swift::swift_dealloc(void *ptr, AllocIndex idx) {
   auto cur = static_cast<AllocCacheEntry *>(ptr);
   AllocCacheEntry *prev = tsd->cache[idx];
   cur->next = prev;
   tsd->cache[idx] = cur;
 }
 
-void swift_rawDealloc(void *ptr, AllocIndex idx) {
+void swift::swift_rawDealloc(void *ptr, AllocIndex idx) {
   auto cur = static_cast<AllocCacheEntry *>(ptr);
   AllocCacheEntry *prev = tsd->rawCache[idx];
   cur->next = prev;
@@ -215,7 +215,7 @@ void swift_rawDealloc(void *ptr, AllocIndex idx) {
 }
 #endif
 
-void swift_slowDealloc(void *ptr, size_t bytes) {
+void swift::swift_slowDealloc(void *ptr, size_t bytes) {
   AllocIndex idx;
 
   if (bytes == 0) {
@@ -249,7 +249,7 @@ void swift_slowDealloc(void *ptr, size_t bytes) {
   swift_dealloc(ptr, idx);
 }
 
-void swift_slowRawDealloc(void *ptr, size_t bytes) {
+void swift::swift_slowRawDealloc(void *ptr, size_t bytes) {
   AllocIndex idx;
 
   if (bytes == 0) {

@@ -34,6 +34,17 @@ template <class T> static T *copy(T *dest, T *src, ValueWitnessTable *self) {
   return dest;
 }
 
+// Work around a Xcode 4.5 bug (rdar://12288058) by explicitly
+// instantiating this function template at the types we'll need.
+#define INSTANTIATE(TYPE) \
+  template TYPE *copy<TYPE>(TYPE*, TYPE*, ValueWitnessTable*);
+INSTANTIATE(uint8_t);
+INSTANTIATE(uint16_t);
+INSTANTIATE(uint32_t);
+INSTANTIATE(uint64_t);
+INSTANTIATE(uintptr_t);
+#undef INSTANTIATE
+
 #define POD_VALUE_WITNESS_TABLE(TYPE, SIZE) { \
   (value_witness_types::destroyBuffer*) &doNothing,                     \
   (value_witness_types::initializeBufferWithCopyOfBuffer*) &copy<TYPE>, \
@@ -52,10 +63,10 @@ template <class T> static T *copy(T *dest, T *src, ValueWitnessTable *self) {
   (value_witness_types::stride) (SIZE)                                  \
 }
 
-extern "C" ValueWitnessTable _TWVVSs4POD1 = POD_VALUE_WITNESS_TABLE(uint8_t, 1);
-extern "C" ValueWitnessTable _TWVVSs4POD2 = POD_VALUE_WITNESS_TABLE(uint16_t, 2);
-extern "C" ValueWitnessTable _TWVVSs4POD4 = POD_VALUE_WITNESS_TABLE(uint32_t, 4);
-extern "C" ValueWitnessTable _TWVVSs4POD8 = POD_VALUE_WITNESS_TABLE(uint64_t, 8);
+ValueWitnessTable swift::_TWVVSs4POD1 = POD_VALUE_WITNESS_TABLE(uint8_t, 1);
+ValueWitnessTable swift::_TWVVSs4POD2 = POD_VALUE_WITNESS_TABLE(uint16_t, 2);
+ValueWitnessTable swift::_TWVVSs4POD4 = POD_VALUE_WITNESS_TABLE(uint32_t, 4);
+ValueWitnessTable swift::_TWVVSs4POD8 = POD_VALUE_WITNESS_TABLE(uint64_t, 8);
 
 /// A function to initialize a buffer/variable by retaining the given
 /// pointer and then assigning it.
@@ -93,7 +104,7 @@ static HeapObject **assignWithoutRetain(HeapObject **dest,
 }
 
 /// The basic value-witness table for Swift object pointers.
-extern "C" ValueWitnessTable _TWVBo = {
+ValueWitnessTable swift::_TWVBo = {
   (value_witness_types::destroyBuffer*) &destroyWithRelease,
   (value_witness_types::initializeBufferWithCopyOfBuffer*) &initWithRetain,
   (value_witness_types::projectBuffer*) &projectBuffer,
