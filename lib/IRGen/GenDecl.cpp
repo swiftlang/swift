@@ -253,12 +253,12 @@ bool LinkEntity::isLocalLinkage() const {
 
   // Value witnesses depend on the linkage of their type.
   case Kind::ValueWitness:
+  case Kind::TypeMetadata:
     return isLocalLinkageType(getType());
 
   case Kind::Function:
   case Kind::Getter:
   case Kind::Setter:
-  case Kind::ClassMetadata:
   case Kind::Other:
     return isLocalLinkageDecl(getDecl());
   }
@@ -527,9 +527,14 @@ llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
 /// Fetch the declaration of the metadata (or metadata template) for a
 /// class.  If the definition type is specified, the result will
 /// always be a GlobalVariable of the given type.
-llvm::Constant *IRGenModule::getAddrOfClassMetadata(ClassDecl *cd,
-                                                    llvm::Type *storageType) {
-  LinkEntity entity = LinkEntity::forClassMetadata(cd);
+llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
+                                                   bool isIndirect,
+                                                   bool isPattern,
+                                                   llvm::Type *storageType) {
+  assert(isPattern || !isa<UnboundGenericType>(concreteType));
+
+  LinkEntity entity =
+    LinkEntity::forTypeMetadata(concreteType, isIndirect, isPattern);
 
   // Check whether we've cached this.
   llvm::GlobalVariable *&entry = GlobalVars[entity];
@@ -537,10 +542,10 @@ llvm::Constant *IRGenModule::getAddrOfClassMetadata(ClassDecl *cd,
     // If we're looking to define something, we may need to replace a
     // forward declaration.
     if (storageType) {
-      assert(entry->getType() == HeapMetadataPtrTy);
+      assert(entry->getType() == TypeMetadataPtrTy);
 
       // If the type is right, we're done.
-      if (storageType == HeapMetadataStructTy)
+      if (storageType == TypeMetadataStructTy)
         return entry;
 
       // Fall out to the case below.
@@ -548,13 +553,13 @@ llvm::Constant *IRGenModule::getAddrOfClassMetadata(ClassDecl *cd,
     // Otherwise, we have a previous declaration or definition which
     // we need to ensure has the right type.
     } else {
-      return llvm::ConstantExpr::getBitCast(entry, HeapMetadataPtrTy);
+      return llvm::ConstantExpr::getBitCast(entry, TypeMetadataPtrTy);
     }
   }
 
   // If we're not defining the metadata now, use the generic metadata
   // struct type as the storage type for the external declaration.
-  if (!storageType) storageType = HeapMetadataStructTy;
+  if (!storageType) storageType = TypeMetadataStructTy;
 
   // Build the variable.
   LinkInfo link = LinkInfo::get(*this, entity);
@@ -563,7 +568,7 @@ llvm::Constant *IRGenModule::getAddrOfClassMetadata(ClassDecl *cd,
   // If we have an existing entry, destroy it, replacing it with the
   // new variable.
   if (entry) {
-    auto castVar = llvm::ConstantExpr::getBitCast(var, HeapMetadataPtrTy);
+    auto castVar = llvm::ConstantExpr::getBitCast(var, TypeMetadataPtrTy);
     entry->replaceAllUsesWith(castVar);
     entry->eraseFromParent();
   }

@@ -58,8 +58,12 @@ class LinkEntity {
     ExplosionLevelShift = 8, ExplosionLevelMask = 0xFF00,
     UncurryLevelShift = 16, UncurryLevelMask = 0xFF0000,
 
-    // This field appears in a type kind.
-    ValueWitnessShift = 8, ValueWitnessMask = 0xFF00
+    // This field appears in the ValueWitness kind.
+    ValueWitnessShift = 8, ValueWitnessMask = 0xFF00,
+
+    // These fields appear in the TypeMetadata kind.
+    IsIndirectShift = 8, IsIndirectMask = 0x0100,
+    IsPatternShift = 9, IsPatternMask = 0x0200,
   };
 #define LINKENTITY_SET_FIELD(field, value) (value << field##Shift)
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
@@ -86,8 +90,8 @@ class LinkEntity {
     Destructor,
 
     /// The metadata or metadata template for a class.
-    /// The pointer is a ClassDecl*.
-    ClassMetadata,
+    /// The pointer is a canonical TypeBase*.
+    TypeMetadata,
 
     /// Some other kind of declaration.
     /// The pointer is a Decl*.
@@ -112,7 +116,7 @@ class LinkEntity {
     return !isTypeKind(k);
   }
   static bool isTypeKind(Kind k) {
-    return k == Kind::ValueWitness;
+    return k == Kind::ValueWitness || k == Kind::TypeMetadata;
   }
 
   void setForDecl(Kind kind,
@@ -165,9 +169,13 @@ public:
     return entity;
   }
 
-  static LinkEntity forClassMetadata(ClassDecl *decl) {
+  static LinkEntity forTypeMetadata(CanType concreteType, bool isIndirect,
+                                    bool isPattern) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ClassMetadata, decl, ExplosionKind::Minimal, 0);
+    entity.Pointer = concreteType.getPointer();
+    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::TypeMetadata))
+                | LINKENTITY_SET_FIELD(IsIndirect, unsigned(isIndirect))
+                | LINKENTITY_SET_FIELD(IsPattern, unsigned(isPattern));
     return entity;
   }
 
@@ -196,13 +204,21 @@ public:
   }
 
   bool isValueWitness() const { return getKind() == Kind::ValueWitness; }
-  Type getType() const {
+  CanType getType() const {
     assert(isTypeKind(getKind()));
-    return reinterpret_cast<TypeBase*>(Pointer);
+    return CanType(reinterpret_cast<TypeBase*>(Pointer));
   }
   ValueWitness getValueWitness() const {
-    assert(isTypeKind(getKind()));
+    assert(getKind() == Kind::ValueWitness);
     return ValueWitness(LINKENTITY_GET_FIELD(Data, ValueWitness));
+  }
+  bool isMetadataIndirect() const {
+    assert(getKind() == Kind::TypeMetadata);
+    return LINKENTITY_GET_FIELD(Data, IsIndirect);
+  }
+  bool isMetadataPattern() const {
+    assert(getKind() == Kind::TypeMetadata);
+    return LINKENTITY_GET_FIELD(Data, IsPattern);
   }
 
 #undef LINKENTITY_GET_FIELD

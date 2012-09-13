@@ -67,6 +67,12 @@ IRGenModule::IRGenModule(ASTContext &Context,
   RefCountedPtrTy = RefCountedStructTy->getPointerTo(/*addrspace*/ 0);
   RefCountedNull = llvm::ConstantPointerNull::get(RefCountedPtrTy);
 
+  llvm::Type *typeMetadataElts[] = { Int8Ty, WitnessTablePtrTy };
+  TypeMetadataStructTy =
+    llvm::StructType::create(getLLVMContext(), typeMetadataElts,
+                             "swift.type");
+  TypeMetadataPtrTy = TypeMetadataStructTy->getPointerTo(/*addrspace*/ 0);
+
   DtorTy = llvm::FunctionType::get(SizeTy, RefCountedPtrTy, false);
   llvm::Type *dtorPtrTy = DtorTy->getPointerTo();
   llvm::Type *heapMetadataElts[] = { dtorPtrTy, dtorPtrTy };

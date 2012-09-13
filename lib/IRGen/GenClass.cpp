@@ -476,18 +476,27 @@ void IRGenModule::emitClassMetadata(ClassDecl *classDecl) {
 
   // TODO: classes nested within generic types
   llvm::Constant *init;
+  bool isPattern;
   if (auto *generics = classDecl->getGenericParamsOfContext()) {
     MetadataTemplateBuilder builder(*this, classDecl, layout, *generics);
     builder.layout();
     init = builder.getInit();
+    isPattern = true;
   } else {
     MetadataBuilder builder(*this, classDecl, layout);
     builder.layout();
     init = builder.getInit();
+    isPattern = false;
   }
 
+  // For now, all type metadata is directly stored.
+  bool isIndirect = false;
+
+  CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
   auto var = cast<llvm::GlobalVariable>(
-                         getAddrOfClassMetadata(classDecl, init->getType()));
+                         getAddrOfTypeMetadata(declaredType,
+                                               isIndirect, isPattern,
+                                               init->getType()));
   var->setConstant(true);
   var->setInitializer(init);
 }
@@ -496,14 +505,28 @@ void IRGenModule::emitClassMetadata(ClassDecl *classDecl) {
 static llvm::Value *getClassMetadataForConstructor(IRGenFunction &IGF,
                                                    ConstructorDecl *ctor,
                                                    ClassDecl *theClass) {
+  auto classGenerics = theClass->getGenericParamsOfContext();
+  bool isPattern = (classGenerics != nullptr);
+
+  bool isIndirect = false; // FIXME
+
   // Grab a reference to the metadata or metadata template.
-  auto metadata = IGF.IGM.getAddrOfClassMetadata(theClass);
-  assert(metadata->getType() == IGF.IGM.HeapMetadataPtrTy);
+  CanType declaredType = theClass->getDeclaredType()->getCanonicalType();
+  llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(declaredType,
+                                                        isIndirect, isPattern);
+
+  // If it's indirected, go ahead and load the true value to use.
+  // TODO: startup performance might force this to be some sort of
+  // lazy check.
+  if (isIndirect) {
+    auto addr = Address(metadata, IGF.IGM.getPointerAlignment());
+    metadata = IGF.Builder.CreateLoad(addr, "metadata.direct");
+  }
+
+  assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
+  metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.HeapMetadataPtrTy);
 
   // If we don't have generic parameters, that's all we need.
-  // TODO: fragility might force us to indirect this, and startup
-  // performance might force us to do a lazy check.
-  auto classGenerics = theClass->getGenericParamsOfContext();
   if (!classGenerics) {
     return metadata;
   }

@@ -40,6 +40,7 @@ namespace llvm {
 namespace swift {
   class ASTContext;
   class BraceStmt;
+  class CanType;
   class ClassDecl;
   class ConstructorDecl;
   class Decl;
@@ -100,6 +101,8 @@ public:
   llvm::FunctionType *DtorTy;          /// size_t (%swift.refcounted*)
   llvm::StructType *HeapMetadataStructTy; /// %swift.heapmetadata = type { ... }
   llvm::PointerType *HeapMetadataPtrTy;/// %swift.heapmetadata*
+  llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
+  llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
   llvm::PointerType *ObjCPtrTy;        /// %objc_object*
   llvm::PointerType *OpaquePtrTy;      /// %swift.opaque*
   llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
@@ -220,8 +223,9 @@ public:
   llvm::Function *getAddrOfValueWitness(Type concreteType, ValueWitness index);
   llvm::Function *getAddrOfConstructor(ConstructorDecl *D, ExplosionKind kind);
   llvm::Function *getAddrOfDestructor(ClassDecl *D);
-  llvm::Constant *getAddrOfClassMetadata(ClassDecl *D,
-                                         llvm::Type *definitionType = nullptr);
+  llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,
+                                        bool isIndirect, bool isPattern,
+                                        llvm::Type *definitionType = nullptr);
 
 private:
   void emitClassMetadata(ClassDecl *D);

@@ -687,14 +687,25 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   //   global ::= 'M' directness type             // type metadata
   //   global ::= 'MP' directness type            // type metadata pattern
-  case Kind::ClassMetadata: {
+  case Kind::TypeMetadata: {
     buffer << 'M';
-    ClassDecl *theClass = cast<ClassDecl>(getDecl());
-    if (theClass->getGenericParamsOfContext()) {
-      buffer << 'P';
+    bool isPattern = isMetadataPattern();
+    if (isPattern) buffer << 'P';
+    buffer << (isMetadataIndirect() ? 'i': 'd');
+    if (!isPattern) {
+      mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
+      return;
     }
-    buffer << 'd'; // always direct for now
-    mangler.mangleNominalType(theClass, ExplosionKind::Minimal);
+
+    // Patterns necessarily belong to generic nominal types or to
+    // nominal member types thereof.
+    NominalTypeDecl *theDecl;
+    if (auto unbound = dyn_cast<UnboundGenericType>(getType())) {
+      theDecl = unbound->getDecl();
+    } else {
+      theDecl = cast<NominalType>(getType())->getDecl();
+    }
+    mangler.mangleNominalType(theDecl, ExplosionKind::Minimal);
     return;
   }
 
