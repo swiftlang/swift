@@ -287,6 +287,7 @@ extern "C" ValueWitnessTable _TWVBi16_;     // Builtin.Int16
 extern "C" ValueWitnessTable _TWVBi32_;     // Builtin.Int32
 extern "C" ValueWitnessTable _TWVBi64_;     // Builtin.Int64
 extern "C" ValueWitnessTable _TWVBo;        // Builtin.ObjectPointer
+extern "C" ValueWitnessTable _TWVBO;        // Builtin.ObjCPointer
 
 enum : uint8_t { GenericTypeFlag = 0x80 };
 

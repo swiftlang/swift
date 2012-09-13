@@ -121,3 +121,62 @@ ValueWitnessTable swift::_TWVBo = {
   (value_witness_types::alignment) sizeof(void*),
   (value_witness_types::stride) sizeof(void*)
 };
+
+
+// What follows can reasonably be suppressed in builds that don't
+// need to support Objective-C.
+
+// ARC entrypoints.
+extern "C" void *objc_retain(void *);
+extern "C" void objc_release(void *);
+
+/// A function to initialize a buffer/variable by retaining the given
+/// pointer and then assigning it.
+static void **initWithObjCRetain(void **dest, void **src,
+                                 ValueWitnessTable *self) {
+  *dest = objc_retain(*src);
+  return dest;
+}
+
+/// A function to destroy a buffer/variable by releasing the value in it.
+static void destroyWithObjCRelease(void **var,
+                               ValueWitnessTable *self) {
+  objc_release(*var);
+}
+
+/// A function to assign to a variable by copying from an existing one.
+static void **assignWithObjCRetain(void **dest, void **src,
+                                   ValueWitnessTable *self) {
+  void *newValue = objc_retain(*src);
+  objc_release(*dest);
+  *dest = newValue;
+  return dest;
+}
+
+/// A function to assign to a variable by taking from an existing one.
+static void **assignWithoutObjCRetain(void **dest, void **src,
+                                      ValueWitnessTable *self) {
+  void *newValue = *src;
+  objc_release(*dest);
+  *dest = newValue;
+  return dest;
+}
+
+/// The basic value-witness table for ObjC object pointers.
+ValueWitnessTable swift::_TWVBO = {
+  (value_witness_types::destroyBuffer*) &destroyWithObjCRelease,
+  (value_witness_types::initializeBufferWithCopyOfBuffer*) &initWithObjCRetain,
+  (value_witness_types::projectBuffer*) &projectBuffer,
+  (value_witness_types::deallocateBuffer*) &doNothing,
+  (value_witness_types::destroy*) &destroyWithObjCRelease,
+  (value_witness_types::initializeBufferWithCopy*) &initWithObjCRetain,
+  (value_witness_types::initializeWithCopy*) &initWithObjCRetain,
+  (value_witness_types::assignWithCopy*) &assignWithObjCRetain,
+  (value_witness_types::initializeBufferWithTake*) &copy<uintptr_t>,
+  (value_witness_types::initializeWithTake*) &copy<uintptr_t>,
+  (value_witness_types::assignWithTake*) &assignWithoutObjCRetain,
+  (value_witness_types::allocateBuffer*) &projectBuffer,
+  (value_witness_types::size) sizeof(void*),
+  (value_witness_types::alignment) sizeof(void*),
+  (value_witness_types::stride) sizeof(void*)
+};
