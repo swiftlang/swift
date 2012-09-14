@@ -15,7 +15,7 @@ set(SWIFTLIB_SOURCES
 add_custom_command(
   OUTPUT ${CMAKE_BINARY_DIR}/lib/swift.swift
   COMMAND cat ${SWIFTLIB_SOURCES} > ${CMAKE_BINARY_DIR}/lib/swift.swift
-  DEPENDS ${SWIFTLIB_SOURCES}
+  DEPENDS ${SWIFTLIB_SOURCES} swift
   COMMENT "FIXME: Concatenating Swift runtime sources into swift.swift"
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
