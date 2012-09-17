@@ -3513,11 +3513,21 @@ Expr *ConstraintSystem::convertToType(Expr *expr, Type toType) {
 Expr *ConstraintSystem::applySolution(Expr *expr) {
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
     ConstraintSystem &CS;
-    
+
   public:
     ExprRewriter(ConstraintSystem &CS) : CS(CS) { }
 
     ConstraintSystem &getConstraintSystem() const { return CS; }
+
+    /// \brief Simplify the expression type and return the expression.
+    ///
+    /// This routine is used for 'simple' expressions that only need their
+    /// types simplified, with no further computation.
+    Expr *simplifyExprType(Expr *expr) {
+      auto toType = CS.simplifyType(expr->getType());
+      expr->setType(toType);
+      return expr;
+    }
 
     Expr *visitExpr(Expr *expr) {
       // FIXME: Temporary hack: use the existing type coercion logic for
@@ -3540,9 +3550,15 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return expr;
     }
 
+    // FIXME: Add specific entries for literal types.
+
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
       // FIXME: Introduce SpecializeExpr here if needed.
       return visitExpr(expr);
+    }
+
+    Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
+      llvm_unreachable("Already type-checked");
     }
 
     Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *expr) {
@@ -3552,10 +3568,155 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       assert(ovl && "No overload set associated with decl reference expr?");
       auto choice = CS.getSelectedOverloadFromSet(ovl).getValue();
       auto decl = choice.getDecl();
-      return visitExpr(new (context) DeclRefExpr(decl, expr->getLoc(),
-                                                 decl->getTypeOfReference()));
+      auto result = new (context) DeclRefExpr(decl, expr->getLoc(),
+                                              decl->getTypeOfReference());
+
+      // FIXME: Hack to get the SpecializeExpr we need here.
+      return visitExpr(result);
     }
 
+    Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
+      // Determine the declaration selected for this overloaded reference.
+      auto ovl = CS.getGeneratedOverloadSet(expr);
+      assert(ovl && "No overload set associated with decl reference expr?");
+      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto decl = choice.getDecl();
+
+      // FIXME: Falls back to the old type checker.
+      auto &tc = CS.getTypeChecker();
+      Expr *result = tc.buildMemberRefExpr(expr->getBase(), expr->getDotLoc(),
+                                           ArrayRef<ValueDecl *>(&decl, 1),
+                                           expr->getMemberLoc());
+      if (tc.typeCheckExpression(result))
+        return nullptr;
+
+      return visitExpr(result);
+    }
+
+    // FIXME: visitUnresolvedDeclRefExpr for typo correction
+
+    Expr *visitMemberRefExpr(MemberRefExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    Expr *visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    Expr *visitGenericMemberRefExpr(GenericMemberRefExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    // FIXME: visitUnresolvedMember
+    // FIXME: visitUnresolvedDot
+
+    Expr *visitParenExpr(ParenExpr *expr) {
+      return simplifyExprType(expr);
+    }
+
+    Expr *visitTupleExpr(TupleExpr *expr) {
+      return simplifyExprType(expr);
+    }
+
+    // FIXME: Subscript expression.
+
+    Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    Expr *visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    Expr *visitGenericSubscriptExpr(GenericSubscriptExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    Expr *visitTupleElementExpr(TupleElementExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    // FIXME: visitFuncExpr (to type-check the function)
+
+    Expr *visitExplicitClosureExpr(ExplicitClosureExpr *expr) {
+      auto type = CS.simplifyType(expr->getType());
+
+      // Convert the expression in the body to the result type of the explicit
+      // closure.
+      auto resultType = type->castTo<FunctionType>()->getResult();
+      if (Expr *body = CS.convertToType(expr->getBody(), resultType))
+        expr->setBody(body);
+      expr->setType(type);
+      return expr;
+    }
+
+    Expr *visitImplicitClosureExpr(ImplicitClosureExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    Expr *visitModuleExpr(ModuleExpr *expr) { return expr; }
+
+    Expr *visitAddressOfExpr(AddressOfExpr *expr) {
+      // Compute the type of the address-of expression.
+      // FIXME: Do we really need to compute this, or is this just a hack
+      // due to the presence of the 'nonheap' bit?
+      if (auto lv = expr->getType()->getAs<LValueType>()) {
+        expr->setType(LValueType::get(lv->getObjectType(),
+                                      lv->getQualifiers() - LValueType::Qual::Implicit,
+                                      CS.getASTContext()));
+        return expr;
+      }
+      
+      return simplifyExprType(expr);
+    }
+
+    Expr *visitNewArrayExpr(NewArrayExpr *expr) {
+      auto &tc = CS.getTypeChecker();
+
+      // Dig out the element type of the new array expression.
+      auto resultType = CS.simplifyType(expr->getType());
+      auto elementType = resultType->castTo<BoundGenericType>()
+                           ->getGenericArgs()[0];
+      expr->setElementType(elementType);
+
+      // Make sure that the result type is a slice type, even if
+      // canonicalization mapped it down to Slice<T>.
+      auto sliceType = dyn_cast<ArraySliceType>(resultType.getPointer());
+      if (!sliceType) {
+        sliceType = ArraySliceType::get(elementType, tc.Context);
+        sliceType->setImplementationType(
+                                       resultType->castTo<BoundGenericType>());
+        resultType = sliceType;
+      }
+      expr->setType(resultType);
+
+      // Find the appropriate injection function.
+      Expr* injectionFn = tc.buildArrayInjectionFnRef(sliceType,
+                            expr->getBounds()[0].Value->getType(),
+                            expr->getNewLoc());
+      if (!injectionFn)
+        return nullptr;
+      expr->setInjectionFunction(injectionFn);
+      
+      return expr;
+    }
+
+    Expr *visitTypeOfExpr(TypeOfExpr *expr) {
+      return simplifyExprType(expr);
+    }
+
+    Expr *visitOpaqueValueExpr(OpaqueValueExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+    
     Expr *visitApplyExpr(ApplyExpr *expr) {
       auto &tc = CS.getTypeChecker();
 
@@ -3623,47 +3784,14 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return tc.semaApplyExpr(expr);
     }
 
-    Expr *visitNewArrayExpr(NewArrayExpr *expr) {
-      auto &tc = CS.getTypeChecker();
+    // FIXME: Other subclasses of ApplyExpr?
 
-      // Dig out the element type of the new array expression.
-      auto resultType = CS.simplifyType(expr->getType());
-      auto elementType = resultType->castTo<BoundGenericType>()
-                            ->getGenericArgs()[0];
-      expr->setElementType(elementType);
-
-      // Make sure that the result type is a slice type, even if
-      // canonicalization mapped it down to Slice<T>.
-      auto sliceType = dyn_cast<ArraySliceType>(resultType.getPointer());
-      if (!sliceType) {
-        sliceType = ArraySliceType::get(elementType, tc.Context);
-        sliceType->setImplementationType(
-                                        resultType->castTo<BoundGenericType>());
-        resultType = sliceType;
-      }
-      expr->setType(resultType);
-
-      // Find the appropriate injection function.
-      Expr* injectionFn = tc.buildArrayInjectionFnRef(sliceType,
-                            expr->getBounds()[0].Value->getType(),
-                            expr->getNewLoc());
-      if (!injectionFn)
-        return nullptr;
-      expr->setInjectionFunction(injectionFn);
-
-      return expr;
+    Expr *visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
+      llvm_unreachable("Already type-checked");
     }
 
-    Expr *visitExplicitClosureExpr(ExplicitClosureExpr *expr) {
-      auto type = CS.simplifyType(expr->getType());
-
-      // Convert the expression in the body to the result type of the explicit
-      // closure.
-      auto resultType = type->castTo<FunctionType>()->getResult();
-      if (Expr *body = CS.convertToType(expr->getBody(), resultType))
-        expr->setBody(body);
-      expr->setType(type);
-      return expr;
+    Expr *visitCoerceExpr(CoerceExpr *expr) {
+      llvm_unreachable("Already type-checked");
     }
   };
 
@@ -3684,6 +3812,12 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
           var->overwriteType(cs.simplifyType(var->getType()));
 
         return true;
+      }
+
+      // For an array, just walk the expression itself; its children
+      if (isa<NewArrayExpr>(expr)) {
+        Rewriter.simplifyExprType(expr);
+        return false;
       }
 
       return true;
