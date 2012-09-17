@@ -3545,6 +3545,17 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return visitExpr(expr);
     }
 
+    Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *expr) {
+      // Determine the declaration selected for this overloaded reference.
+      auto &context = CS.getASTContext();
+      auto ovl = CS.getGeneratedOverloadSet(expr);
+      assert(ovl && "No overload set associated with decl reference expr?");
+      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto decl = choice.getDecl();
+      return visitExpr(new (context) DeclRefExpr(decl, expr->getLoc(),
+                                                 decl->getTypeOfReference()));
+    }
+
     Expr *visitApplyExpr(ApplyExpr *expr) {
       auto &tc = CS.getTypeChecker();
 
