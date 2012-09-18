@@ -455,9 +455,9 @@ public:
     if (!(Flags & CF_Apply))
       return DED->getType();
 
-    Expr *E = new (TC.Context) TypeOfExpr(UME->getColonLoc(),
+    Expr *E = new (TC.Context) TypeOfExpr(UME->getDotLoc(),
                                           MetaTypeType::get(DT, TC.Context));
-    E = TC.buildMemberRefExpr(E, SourceLoc(), DED, UME->getColonLoc());
+    E = TC.buildMemberRefExpr(E, SourceLoc(), DED, UME->getDotLoc());
     return coerced(TC.recheckTypes(E));
   }  
   

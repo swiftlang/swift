@@ -3621,7 +3621,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
       // The base expression is simply the metatype of a oneof type.
       auto &tc = CS.getTypeChecker();
-      auto base = new (tc.Context) TypeOfExpr(expr->getColonLoc(),
+      auto base = new (tc.Context) TypeOfExpr(expr->getDotLoc(),
                                               MetaTypeType::get(oneofTy,
                                                                 tc.Context));
 
@@ -3630,7 +3630,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       MemberLookup lookup(oneofTy, expr->getName(), tc.TU);
       assert(lookup.isSuccess() && "Failed lookup?");
       auto member = lookup.Results[0].D;
-      auto result = tc.buildMemberRefExpr(base, expr->getColonLoc(),
+      auto result = tc.buildMemberRefExpr(base, expr->getDotLoc(),
                                           ArrayRef<ValueDecl *>(&member, 1),
                                           expr->getNameLoc());
       return tc.recheckTypes(result);

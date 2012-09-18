@@ -606,24 +606,24 @@ public:
 /// member, which is to be resolved with context sensitive type information into
 /// bar.foo.  These always have unresolved type.
 class UnresolvedMemberExpr : public Expr {
-  SourceLoc ColonLoc;
+  SourceLoc DotLoc;
   SourceLoc NameLoc;
   Identifier Name;
 
 public:  
-  UnresolvedMemberExpr(SourceLoc colonLoc, SourceLoc nameLoc,
+  UnresolvedMemberExpr(SourceLoc dotLoc, SourceLoc nameLoc,
                        Identifier name)
     : Expr(ExprKind::UnresolvedMember),
-      ColonLoc(colonLoc), NameLoc(nameLoc), Name(name) {
+      DotLoc(dotLoc), NameLoc(nameLoc), Name(name) {
   }
 
   Identifier getName() const { return Name; }
   SourceLoc getNameLoc() const { return NameLoc; }
-  SourceLoc getColonLoc() const { return ColonLoc; }
+  SourceLoc getDotLoc() const { return DotLoc; }
 
   SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const { 
-    return SourceRange(ColonLoc, NameLoc); 
+    return SourceRange(DotLoc, NameLoc);
   }
   
   // Implement isa/cast/dyncast/etc.
