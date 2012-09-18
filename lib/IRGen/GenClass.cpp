@@ -27,6 +27,7 @@
 
 #include "Explosion.h"
 #include "GenFunc.h"
+#include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
@@ -501,75 +502,6 @@ void IRGenModule::emitClassMetadata(ClassDecl *classDecl) {
   var->setInitializer(init);
 }
 
-/// Returns a metadata reference for a constructor.
-llvm::Value *irgen::emitClassMetadataRef(IRGenFunction &IGF, ClassDecl *theClass,
-                                         CanType classType) {
-  auto classGenerics = theClass->getGenericParamsOfContext();
-
-  bool isPattern = (classGenerics != nullptr);
-  assert(!isPattern || isa<BoundGenericType>(classType));
-  assert(isPattern || isa<ClassType>(classType));
-
-  bool isIndirect = false; // FIXME
-
-  // Grab a reference to the metadata or metadata template.
-  CanType declaredType = theClass->getDeclaredType()->getCanonicalType();
-  llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(declaredType,
-                                                        isIndirect, isPattern);
-
-  // If it's indirected, go ahead and load the true value to use.
-  // TODO: startup performance might force this to be some sort of
-  // lazy check.
-  if (isIndirect) {
-    auto addr = Address(metadata, IGF.IGM.getPointerAlignment());
-    metadata = IGF.Builder.CreateLoad(addr, "metadata.direct");
-  }
-
-  assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
-  metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.HeapMetadataPtrTy);
-
-  // If we don't have generic parameters, that's all we need.
-  if (!classGenerics) {
-    return metadata;
-  }
-
-  // Okay, we need to call swift_getGenericMetadata.
-
-  // Grab the substitutions.
-  auto boundGeneric = cast<BoundGenericType>(classType);
-  assert(boundGeneric->getDecl() == theClass);
-  auto subs = boundGeneric->getSubstitutions();
-
-  // Compile all the generic arguments we need.
-  Explosion genericArgs(ExplosionKind::Maximal);
-  emitPolymorphicArguments(IGF, *classGenerics, subs, genericArgs);
-
-  // Slam that information directly into the generic arguments buffer.
-  // TODO: sort actual arguments to the front.
-  auto wtableArrayTy = llvm::ArrayType::get(IGF.IGM.WitnessTablePtrTy,
-                                            genericArgs.size());
-  Address argumentsBuffer = IGF.createAlloca(wtableArrayTy,
-                                             IGF.IGM.getPointerAlignment(),
-                                             "generic.arguments");
-  for (unsigned i = 0, e = genericArgs.size(); i != e; ++i) {
-    Address elt = IGF.Builder.CreateStructGEP(argumentsBuffer, i,
-                                              IGF.IGM.getPointerSize() * i);
-    IGF.Builder.CreateStore(genericArgs.claimUnmanagedNext(), elt);
-  }
-
-  // Cast to void*.
-  llvm::Value *arguments =
-    IGF.Builder.CreateBitCast(argumentsBuffer.getAddress(),
-                              IGF.IGM.Int8PtrTy);
-
-  // Make the call.
-  auto result = IGF.Builder.CreateCall2(IGF.IGM.getGetGenericMetadataFn(),
-                                        metadata, arguments);
-  result->setDoesNotThrow();
-
-  return result;
-}
-
 static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   llvm::Function *fn = IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
   auto thisDecl = CD->getImplicitThisDecl();
@@ -595,7 +527,9 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   FullExpr scope(IGF);
   // Allocate the class.
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
-  llvm::Value *metadata = emitClassMetadataRef(IGF, curClass, thisType);
+
+  llvm::Value *metadata = emitNominalMetadataRef(IGF, curClass, thisType);
+  metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.HeapMetadataPtrTy);
 
   llvm::Value *size = layout.emitSize(IGF);
   llvm::Value *align = layout.emitAlign(IGF);

@@ -152,6 +152,11 @@ public:
     return Size(value & ~int_type(align.getValue() - 1));
   }
 
+  bool isPowerOf2() const {
+    auto value = getValue();
+    return ((value & -value) == value);
+  }
+
   friend bool operator< (Size L, Size R) { return L.Value <  R.Value; }
   friend bool operator<=(Size L, Size R) { return L.Value <= R.Value; }
   friend bool operator> (Size L, Size R) { return L.Value >  R.Value; }

@@ -17,26 +17,13 @@
 #ifndef SWIFT_IRGEN_GENCLASS_H
 #define SWIFT_IRGEN_GENCLASS_H
 
-namespace llvm {
-  class Value;
-}
-
 namespace swift {
-  class CanType;
-  class ClassDecl;
   class GenericMemberRefExpr;
   class MemberRefExpr;
 
 namespace irgen {
   class IRGenFunction;
   class LValue;
-
-  /// Emit a reference to the type metadata for a class.
-  ///
-  /// \param classType - the actual class type, including any generic arguments
-  /// \return a value of HeapMetadataPtrTy
-  llvm::Value *emitClassMetadataRef(IRGenFunction &IGF, ClassDecl *theClass,
-                                    CanType classType);
 
   LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF, MemberRefExpr *E);
   LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,

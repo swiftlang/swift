@@ -17,15 +17,32 @@
 #ifndef SWIFT_IRGEN_GENMETA_H
 #define SWIFT_IRGEN_GENMETA_H
 
+namespace llvm {
+  class Value;
+}
+
 namespace swift {
-  class MetaTypeType;
+  class Type;
+  class CanType;
+  class NominalTypeDecl;
 
 namespace irgen {
   class Explosion;
   class IRGenFunction;
 
-  /// Emit a requalification expression as an r-value.
+  /// Emit a reference to the type metadata for a nominal type.
+  ///
+  /// \param classType - the actual type, including any generic arguments
+  /// \return a value of TypeMetadataPtrTy
+  llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
+                                      NominalTypeDecl *theDecl,
+                                      CanType classType);
+
+  /// Emit a declaration reference to a metatype object.
   void emitMetaTypeRef(IRGenFunction &IGF, Type type, Explosion &explosion);
+
+  /// Emit a reference to a piece of type metadata.
+  llvm::Value *emitTypeMetadataRef(IRGenFunction &IGF, Type type);
 
 } // end namespace irgen
 } // end namespace swift

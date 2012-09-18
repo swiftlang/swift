@@ -205,11 +205,11 @@ llvm::Constant *IRGenModule::getDeallocObjectFn() {
 llvm::Constant *IRGenModule::getGetGenericMetadataFn() {
   if (GetGenericMetadataFn) return GetGenericMetadataFn;
 
-  // heap_metadata_t *swift_getGenericMetadata(heap_metadata_t *pattern,
+  // type_metadata_t *swift_getGenericMetadata(type_metadata_t *pattern,
   //                                           const void *arguments);
-  llvm::Type *argTypes[] = { HeapMetadataPtrTy, Int8PtrTy };
+  llvm::Type *argTypes[] = { TypeMetadataPtrTy, Int8PtrTy };
   llvm::FunctionType *fnType =
-    llvm::FunctionType::get(HeapMetadataPtrTy, argTypes, false);
+    llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
   GetGenericMetadataFn =
     createRuntimeFunction(*this, "swift_getGenericMetadata", fnType);
   return GetGenericMetadataFn;
