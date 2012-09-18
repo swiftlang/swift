@@ -167,7 +167,6 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
                                 BaseTy, SE->getIndex(), Type(), Viable);
 
   if (Best) {
-    // FIXME: Deal with substitution here.
     SubscriptDecl *Sub = cast<SubscriptDecl>(Best.getDecl());
     if (BaseTy->isExistentialType()) {
       // We picked a subscript operator in an existential type; create the

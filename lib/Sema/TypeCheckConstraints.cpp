@@ -3664,8 +3664,53 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
-      // FIXME: Implement for real.
-      return fixupExpr(expr);
+      // Determine the declaration selected for this subscript operation.
+      auto ovl = CS.getGeneratedOverloadSet(expr);
+      assert(ovl && "No overload set associated with subscript expr?");
+      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto subscript = cast<SubscriptDecl>(choice.getDecl());
+
+      // FIXME: Falls back to existing type checker to actually populate
+      // these nodes.
+      auto &tc = CS.getTypeChecker();
+      auto baseTy = expr->getBase()->getType()->getRValueType();
+
+      // Subscripting an existential type.
+      if (baseTy->isExistentialType()) {
+        auto result
+          = new (tc.Context) ExistentialSubscriptExpr(expr->getBase(),
+                                                      expr->getLBracketLoc(),
+                                                      expr->getIndex(),
+                                                      expr->getRBracketLoc(),
+                                                      subscript);
+        return tc.semaSubscriptExpr(result);
+      }
+
+      // Subscripting an archetype.
+      if (baseTy->is<ArchetypeType>()) {
+        auto result
+          = new (tc.Context) ArchetypeSubscriptExpr(expr->getBase(),
+                                                    expr->getLBracketLoc(),
+                                                    expr->getIndex(),
+                                                    expr->getRBracketLoc(),
+                                                    subscript);
+        return tc.semaSubscriptExpr(result);
+      }
+
+      // Subscripting a specialization of a generic type.
+      if (baseTy->isSpecialized()) {
+        auto result
+          = new (tc.Context) GenericSubscriptExpr(expr->getBase(),
+                                                  expr->getLBracketLoc(),
+                                                  expr->getIndex(),
+                                                  expr->getRBracketLoc(),
+                                                  subscript);
+        return tc.semaSubscriptExpr(result);
+      }
+
+      // Subscripting a normal, nominal type.
+      expr->setDecl(subscript);
+      return tc.semaSubscriptExpr(expr);
     }
 
     Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *expr) {
