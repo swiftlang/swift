@@ -502,11 +502,13 @@ void IRGenModule::emitClassMetadata(ClassDecl *classDecl) {
 }
 
 /// Returns a metadata reference for a constructor.
-static llvm::Value *getClassMetadataForConstructor(IRGenFunction &IGF,
-                                                   ConstructorDecl *ctor,
-                                                   ClassDecl *theClass) {
+llvm::Value *irgen::emitClassMetadataRef(IRGenFunction &IGF, ClassDecl *theClass,
+                                         CanType classType) {
   auto classGenerics = theClass->getGenericParamsOfContext();
+
   bool isPattern = (classGenerics != nullptr);
+  assert(!isPattern || isa<BoundGenericType>(classType));
+  assert(isPattern || isa<ClassType>(classType));
 
   bool isIndirect = false; // FIXME
 
@@ -534,8 +536,7 @@ static llvm::Value *getClassMetadataForConstructor(IRGenFunction &IGF,
   // Okay, we need to call swift_getGenericMetadata.
 
   // Grab the substitutions.
-  CanType thisTy = ctor->getImplicitThisDecl()->getType()->getCanonicalType();
-  auto boundGeneric = cast<BoundGenericType>(thisTy);
+  auto boundGeneric = cast<BoundGenericType>(classType);
   assert(boundGeneric->getDecl() == theClass);
   auto subs = boundGeneric->getSubstitutions();
 
@@ -572,8 +573,8 @@ static llvm::Value *getClassMetadataForConstructor(IRGenFunction &IGF,
 static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   llvm::Function *fn = IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
   auto thisDecl = CD->getImplicitThisDecl();
-  const ClassTypeInfo &classTI =
-      IGM.getFragileTypeInfo(thisDecl->getType()).as<ClassTypeInfo>();
+  CanType thisType = thisDecl->getType()->getCanonicalType();
+  auto &classTI = IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();
   auto &layout = classTI.getLayout(IGM);
   ClassDecl *curClass = classTI.getClass();
 
@@ -594,7 +595,8 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   FullExpr scope(IGF);
   // Allocate the class.
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
-  llvm::Value *metadata = getClassMetadataForConstructor(IGF, CD, curClass);
+  llvm::Value *metadata = emitClassMetadataRef(IGF, curClass, thisType);
+
   llvm::Value *size = layout.emitSize(IGF);
   llvm::Value *align = layout.emitAlign(IGF);
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, align,
