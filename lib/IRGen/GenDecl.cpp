@@ -913,6 +913,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(llvm::StringRef data) {
   auto global = new llvm::GlobalVariable(Module, init->getType(), true,
                                          llvm::GlobalValue::PrivateLinkage,
                                          init);
+  global->setUnnamedAddr(true);
 
   // Drill down to make an i8*.
   auto zero = llvm::ConstantInt::get(SizeTy, 0);
