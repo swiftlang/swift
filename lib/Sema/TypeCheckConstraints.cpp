@@ -3514,6 +3514,28 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
     ConstraintSystem &CS;
 
+    /// \brief Hackish routine that coerces the given expression from the
+    /// 'unstructured' form of its pre-type-checked type down to the final
+    /// type that it will have after substitution.
+    ///
+    /// FIXME: This whole routine is a hack. We should deal with
+    /// polymorphism in a more reasonable way.
+    Expr *fixupExpr(Expr *expr) {
+      // FIXME: Temporary hack: use the existing type coercion logic for
+      // the basic case. We replace the type variables with unstructured,
+      // unresolved types to ride off the existing coercion logic.
+      auto &tc = CS.getTypeChecker();
+      auto toType = CS.simplifyType(expr->getType());
+      auto fromType = CS.getTypeChecker().transformType(expr->getType(),
+                                                        [&](Type type) -> Type {
+                                                          if (type->is<TypeVariableType>())
+                                                            return UnstructuredUnresolvedType::get(tc.Context);
+                                                          return type;
+                                                        });
+      expr->setType(fromType);
+      return CS.convertToType(expr, toType);
+    }
+    
   public:
     ExprRewriter(ConstraintSystem &CS) : CS(CS) { }
 
@@ -3529,32 +3551,20 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return expr;
     }
 
-    Expr *visitExpr(Expr *expr) {
-      // FIXME: Temporary hack: use the existing type coercion logic for
-      // the basic case. We replace the type variables with unstructured,
-      // unresolved types to ride off the existing coercion logic.
-      auto &tc = CS.getTypeChecker();
-      auto toType = CS.simplifyType(expr->getType());
-      auto fromType = CS.getTypeChecker().transformType(expr->getType(),
-                        [&](Type type) -> Type {
-                          if (type->is<TypeVariableType>())
-                            return UnstructuredUnresolvedType::get(tc.Context);
-                          return type;
-                        });
-      expr->setType(fromType);
-      return CS.convertToType(expr, toType);
-    }
-
     Expr *visitErrorExpr(ErrorExpr *expr) {
       // Do nothing with error expressions.
       return expr;
     }
 
+    Expr *visitLiteralExpr(LiteralExpr *expr) {
+      return fixupExpr(expr);
+    }
+    
     // FIXME: Add specific entries for literal types.
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
       // FIXME: Introduce SpecializeExpr here if needed.
-      return visitExpr(expr);
+      return fixupExpr(expr);
     }
 
     Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
@@ -3572,28 +3582,18 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
                                               decl->getTypeOfReference());
 
       // FIXME: Hack to get the SpecializeExpr we need here.
-      return visitExpr(result);
+      return fixupExpr(result);
     }
 
     Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
-      // Determine the declaration selected for this overloaded reference.
-      auto ovl = CS.getGeneratedOverloadSet(expr);
-      assert(ovl && "No overload set associated with decl reference expr?");
-      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue();
-      auto decl = choice.getDecl();
-
-      // FIXME: Falls back to the old type checker.
-      auto &tc = CS.getTypeChecker();
-      Expr *result = tc.buildMemberRefExpr(expr->getBase(), expr->getDotLoc(),
-                                           ArrayRef<ValueDecl *>(&decl, 1),
-                                           expr->getMemberLoc());
-      if (tc.typeCheckExpression(result))
-        return nullptr;
-
-      return visitExpr(result);
+      llvm_unreachable("Already type-checked");
     }
 
-    // FIXME: visitUnresolvedDeclRefExpr for typo correction
+    Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
+      // FIXME: We should have generated an overload set from this, in which
+      // case we can emit a typo-correction error here but recover well.
+      return nullptr;
+    }
 
     Expr *visitMemberRefExpr(MemberRefExpr *expr) {
       llvm_unreachable("Already type-checked");
@@ -3612,7 +3612,33 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     // FIXME: visitUnresolvedMember
-    // FIXME: visitUnresolvedDot
+
+    Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
+      // FIXME: Implement for real.
+      return fixupExpr(expr);
+    }
+
+    Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
+      // Determine the declaration selected for this overloaded reference.
+      auto ovl = CS.getGeneratedOverloadSet(expr);
+      assert(ovl && "No overload set associated with decl reference expr?");
+      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto decl = choice.getDecl();
+
+      // FIXME: Falls back to the old type checker.
+      auto &tc = CS.getTypeChecker();
+      Expr *result = tc.buildMemberRefExpr(expr->getBase(), expr->getDotLoc(),
+                                           ArrayRef<ValueDecl *>(&decl, 1),
+                                           expr->getNameLoc());
+      if (tc.typeCheckExpression(result))
+        return nullptr;
+
+      return fixupExpr(result);
+    }
+
+    Expr *visitSequenceExpr(SequenceExpr *expr) {
+      llvm_unreachable("Expression wasn't parsed?");
+    }
 
     Expr *visitParenExpr(ParenExpr *expr) {
       return simplifyExprType(expr);
@@ -3622,7 +3648,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return simplifyExprType(expr);
     }
 
-    // FIXME: Subscript expression.
+    Expr *visitSubscriptExpr(SubscriptExpr *expr) {
+      // FIXME: Implement for real.
+      return fixupExpr(expr);
+    }
 
     Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *expr) {
       llvm_unreachable("Already type-checked");
@@ -3644,7 +3673,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       llvm_unreachable("Already type-checked");
     }
 
-    // FIXME: visitFuncExpr (to type-check the function)
+    Expr *visitFuncExpr(FuncExpr *expr) {
+      // FIXME: Type-check the function now? Or queue for later?
+      return simplifyExprType(expr);
+    }
 
     Expr *visitExplicitClosureExpr(ExplicitClosureExpr *expr) {
       auto type = CS.simplifyType(expr->getType());
