@@ -74,6 +74,10 @@ namespace irgen {
   LValue emitArchetypeSubscriptLValue(IRGenFunction &IGF,
                                       ArchetypeSubscriptExpr *E);
 
+  /// Emit a reference to the metadata for an archetype.
+  llvm::Value *emitArchetypeMetadataRef(IRGenFunction &IGF,
+                                        ArchetypeType *type);
+
   /// Emit an existential member reference as a callee.
   CallEmission prepareExistentialMemberRefCall(IRGenFunction &IGF,
                                         ExistentialMemberRefExpr *E,

@@ -898,3 +898,28 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
   alloca->setAlignment(alignment.getValue());
   return Address(alloca, alignment);
 }
+
+/// Get or create a global string constant.
+///
+/// \returns an i8* with a null terminator; note that embedded nulls
+///   are okay
+llvm::Constant *IRGenModule::getAddrOfGlobalString(llvm::StringRef data) {
+  // Check whether this string already exists.
+  auto &entry = GlobalStrings[data];
+  if (entry) return entry;
+
+  // If not, create it.  This implicitly adds a trailing null.
+  auto init = llvm::ConstantDataArray::getString(LLVMContext, data);
+  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
+                                         llvm::GlobalValue::PrivateLinkage,
+                                         init);
+
+  // Drill down to make an i8*.
+  auto zero = llvm::ConstantInt::get(SizeTy, 0);
+  llvm::Constant *indices[] = { zero, zero };
+  auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(global, indices);
+
+  // Cache and return.
+  entry = address;
+  return address;
+}

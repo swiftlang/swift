@@ -2671,6 +2671,15 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
   }
 }
 
+/// Emit a reference to the metadata object for an archetype.
+llvm::Value *irgen::emitArchetypeMetadataRef(IRGenFunction &IGF,
+                                             ArchetypeType *type) {
+  // This should be easy to implement once we start passing metadata
+  // instead of value witnesses.
+  IGF.unimplemented(SourceLoc(), "metadata reference to archetype");
+  return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+}
+
 void irgen::getValueWitnessTableElements(Type T,
                                       llvm::SetVector<ArchetypeType*> &types) {
   // We need a value witness table for T

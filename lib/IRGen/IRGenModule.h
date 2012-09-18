@@ -20,6 +20,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/CallingConv.h"
 #include "IRGen.h"
 
@@ -33,6 +34,7 @@ namespace llvm {
   class Module;
   class PointerType;
   class StructType;
+  class StringRef;
   class TargetData;
   class Type;
 }
@@ -148,9 +150,13 @@ private:
   friend class GenProto;
 
 //--- Globals ---------------------------------------------------------------
+public:
+  llvm::Constant *getAddrOfGlobalString(llvm::StringRef string);
+
 private:
   llvm::DenseMap<LinkEntity, llvm::GlobalVariable*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
+  llvm::StringMap<llvm::Constant*> GlobalStrings;
 
   void mangleGlobalInitializer(raw_ostream &buffer, TranslationUnit *D);
 
@@ -170,6 +176,8 @@ public:
   llvm::Constant *getObjCReleaseFn();
 
   llvm::Constant *getGetGenericMetadataFn();
+  llvm::Constant *getGetTupleMetadataFn();
+  llvm::Constant *getGetFunctionMetadataFn();
 
 private:
   llvm::Function *MemCpyFn;
@@ -183,7 +191,9 @@ private:
   llvm::Constant *RawDeallocFn;
   llvm::Constant *SlowAllocFn;
   llvm::Constant *SlowRawDeallocFn;
+  llvm::Constant *GetFunctionMetadataFn = nullptr;
   llvm::Constant *GetGenericMetadataFn = nullptr;
+  llvm::Constant *GetTupleMetadataFn = nullptr;
 
 //--- Generic ---------------------------------------------------------------
 public:

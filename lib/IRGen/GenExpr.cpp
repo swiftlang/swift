@@ -72,14 +72,13 @@ static llvm::Value *emitCharacterLiteralExpr(IRGenFunction &IGF,
 /// Emit an string literal expression.
 static void emitStringLiteralExpr(IRGenFunction &IGF,
                                   StringLiteralExpr *E, 
-                                  Explosion &explosion) {
-  // CreateGlobalStringPtr adds our nul terminator.
-  if (E->getType()->is<BuiltinRawPointerType>()) {
-    explosion.addUnmanaged(IGF.Builder.CreateGlobalStringPtr(E->getValue()));
-  } else {
+                                  Explosion &out) {
+  auto ptr = IGF.IGM.getAddrOfGlobalString(E->getValue());
+  out.addUnmanaged(ptr);
+
+  if (!E->getType()->is<BuiltinRawPointerType>()) {
     assert(E->getType()->is<TupleType>());
-    explosion.addUnmanaged(IGF.Builder.CreateGlobalStringPtr(E->getValue()));
-    explosion.addUnmanaged(IGF.Builder.getInt64(E->getValue().size()));
+    out.addUnmanaged(IGF.Builder.getInt64(E->getValue().size()));
   }
 }
 

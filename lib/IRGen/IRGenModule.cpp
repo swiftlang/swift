@@ -215,6 +215,39 @@ llvm::Constant *IRGenModule::getGetGenericMetadataFn() {
   return GetGenericMetadataFn;
 }
 
+llvm::Constant *IRGenModule::getGetFunctionMetadataFn() {
+  if (GetFunctionMetadataFn) return GetFunctionMetadataFn;
+
+  // type_metadata_t *swift_getFunctionMetadata(type_metadata_t *arg,
+  //                                            type_metadata_t *result);
+  llvm::Type *argTypes[] = { TypeMetadataPtrTy, TypeMetadataPtrTy };
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
+  GetFunctionMetadataFn =
+    createRuntimeFunction(*this, "swift_getFunctionMetadata", fnType);
+  return GetFunctionMetadataFn;
+}
+
+llvm::Constant *IRGenModule::getGetTupleMetadataFn() {
+  if (GetTupleMetadataFn) return GetTupleMetadataFn;
+
+  // type_metadata_t *swift_getTupleMetadata(size_t numElements,
+  //                                         type_metadata_t * const *pattern,
+  //                                         const char *labels,
+  //                                         value_witness_table_t *proposed);
+  llvm::Type *argTypes[] = {
+    SizeTy,
+    TypeMetadataPtrTy->getPointerTo(0),
+    Int8PtrTy,
+    WitnessTablePtrTy
+  };
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
+  GetTupleMetadataFn =
+    createRuntimeFunction(*this, "swift_getTupleMetadata", fnType);
+  return GetTupleMetadataFn;
+}
+
 void IRGenModule::unimplemented(SourceLoc loc, StringRef message) {
   Context.Diags.diagnose(loc, diag::irgen_unimplemented, message);
 }

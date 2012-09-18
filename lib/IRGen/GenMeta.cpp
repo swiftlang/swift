@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "llvm/DerivedTypes.h"
+#include "llvm/ADT/SmallString.h"
 
 #include "Address.h"
 #include "FixedTypeInfo.h"
@@ -126,6 +127,205 @@ llvm::Value *irgen::emitNominalMetadataRef(IRGenFunction &IGF,
 
   return result;
 }
+
+/// Emit a string encoding the labels in the given tuple type.
+static llvm::Constant *getTupleLabelsString(IRGenModule &IGM,
+                                            TupleType *type) {
+  bool hasLabels = false;
+  llvm::SmallString<128> buffer;
+  for (auto &elt : type->getFields()) {
+    if (elt.hasName()) {
+      hasLabels = true;
+      buffer.append(elt.getName().str());
+    }
+
+    // Each label is space-terminated.
+    buffer += ' ';
+  }
+
+  // If there are no labels, use a null pointer.
+  if (!hasLabels) {
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  }
+
+  // Otherwise, create a new string literal.
+  // This method implicitly adds a null terminator.
+  return IGM.getAddrOfGlobalString(buffer);
+}
+
+namespace {
+  /// A visitor class for emitting a reference to a metatype object.
+  class EmitTypeMetadataRef
+    : public irgen::TypeVisitor<EmitTypeMetadataRef, llvm::Value *> {
+  private:
+    IRGenFunction &IGF;
+  public:
+    EmitTypeMetadataRef(IRGenFunction &IGF) : IGF(IGF) {}
+
+#define TREAT_AS_OPAQUE(KIND)                          \
+    llvm::Value *visit##KIND##Type(KIND##Type *type) { \
+      return visitOpaqueType(CanType(type));           \
+    }
+    TREAT_AS_OPAQUE(BuiltinInteger)
+    TREAT_AS_OPAQUE(BuiltinFloat)
+    TREAT_AS_OPAQUE(BuiltinRawPointer)
+#undef TREAT_AS_OPAQUE
+
+    llvm::Value *emitDirectMetadataRef(CanType type) {
+      return IGF.IGM.getAddrOfTypeMetadata(type,
+                                           /*indirect*/ false,
+                                           /*pattern*/ false);
+    }
+
+    /// The given type should use opaque type info.  We assume that
+    /// the runtime always provides an entry for such a type;  right
+    /// now, that mapping is as one of the integer types.
+    llvm::Value *visitOpaqueType(CanType type) {
+      IRGenModule &IGM = IGF.IGM;
+      const TypeInfo &opaqueTI = IGM.getFragileTypeInfo(type);
+      assert(opaqueTI.StorageSize ==
+             Size(opaqueTI.StorageAlignment.getValue()));
+      assert(opaqueTI.StorageSize.isPowerOf2());
+      auto numBits = 8 * opaqueTI.StorageSize.getValue();
+      auto intTy = BuiltinIntegerType::get(numBits, IGM.Context);
+      return emitDirectMetadataRef(CanType(intTy));
+    }
+
+    llvm::Value *visitBuiltinObjectPointerType(BuiltinObjectPointerType *type) {
+      return emitDirectMetadataRef(CanType(type));
+    }
+
+    llvm::Value *visitBuiltinObjCPointerType(BuiltinObjCPointerType *type) {
+      return emitDirectMetadataRef(CanType(type));
+    }
+
+    llvm::Value *visitNominalType(NominalType *type) {
+      return emitNominalMetadataRef(IGF, type->getDecl(), CanType(type));
+    }
+
+    llvm::Value *visitBoundGenericType(BoundGenericType *type) {
+      return emitNominalMetadataRef(IGF, type->getDecl(), CanType(type));
+    }
+
+    llvm::Value *visitTupleType(TupleType *type) {
+      auto elements = type->getFields();
+
+      // I think the sanest thing to do here is drop labels, but maybe
+      // that's not correct.  If so, that's really unfortunate in a
+      // lot of ways.
+
+      // Er, varargs bit?  Should that go in?
+
+      // For metadata purposes, we consider a singleton tuple to be
+      // isomorphic to its element type.
+      if (elements.size() == 1)
+        return visit(CanType(elements[0].getType()));
+
+      // TODO: use a caching entrypoint (with all information
+      // out-of-line) for non-dependent tuples.
+
+      // TODO: make a standard metadata for the empty tuple?
+
+      llvm::Value *pointerToFirst;
+
+      // If there are no elements, we can pass a bogus array pointer.
+      if (elements.empty()) {
+        auto metadataPtrPtrTy = IGF.IGM.TypeMetadataPtrTy->getPointerTo();
+        pointerToFirst = llvm::UndefValue::get(metadataPtrPtrTy);
+
+      // Otherwise, we need to fill out a temporary array to pass.
+      } else {
+        pointerToFirst = nullptr; // appease -Wuninitialized
+
+        auto arrayTy = llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy,
+                                            elements.size());
+        Address buffer = IGF.createAlloca(arrayTy, IGF.IGM.getPointerAlignment(),
+                                          "tuple-elements");
+        for (unsigned i = 0, e = elements.size(); i != e; ++i) {
+          // Find the metadata pointer for this element.
+          llvm::Value *eltMetadata = visit(CanType(elements[i].getType()));
+
+          // GEP to the appropriate element and store.
+          Address eltPtr = IGF.Builder.CreateStructGEP(buffer, i,
+                                                       IGF.IGM.getPointerSize());
+          IGF.Builder.CreateStore(eltMetadata, eltPtr);
+
+          // Remember the GEP to the first element.
+          if (i == 0) pointerToFirst = eltPtr.getAddress();
+        }
+      }
+
+      llvm::Value *args[] = {
+        llvm::ConstantInt::get(IGF.IGM.SizeTy, elements.size()),
+        pointerToFirst,
+        getTupleLabelsString(IGF.IGM, type),
+        llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
+      };
+
+      auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadataFn(), args);
+      call->setDoesNotThrow();
+      call->setCallingConv(IGF.IGM.RuntimeCC);
+
+      return call;
+    }
+
+    llvm::Value *visitPolymorphicFunctionType(PolymorphicFunctionType *type) {
+      IGF.unimplemented(SourceLoc(),
+                        "metadata ref for polymorphic function type");
+      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+    }
+
+    llvm::Value *visitFunctionType(FunctionType *type) {
+      // TODO: use a caching entrypoint (with all information
+      // out-of-line) for non-dependent functions.
+
+      auto argMetadata = visit(CanType(type->getInput()));
+      auto resultMetadata = visit(CanType(type->getResult()));
+
+      auto call = IGF.Builder.CreateCall2(IGF.IGM.getGetFunctionMetadataFn(),
+                                          argMetadata, resultMetadata);
+      call->setDoesNotThrow();
+      call->setCallingConv(IGF.IGM.RuntimeCC);
+
+      return call;
+    }
+
+    llvm::Value *visitArrayType(ArrayType *type) {
+      IGF.unimplemented(SourceLoc(), "metadata ref for array type");
+      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+    }
+
+    llvm::Value *visitMetaTypeType(MetaTypeType *type) {
+      IGF.unimplemented(SourceLoc(), "metadata ref for metatype type");
+      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+    }
+
+    llvm::Value *visitModuleType(ModuleType *type) {
+      IGF.unimplemented(SourceLoc(), "metadata ref for module type");
+      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+    }
+
+    llvm::Value *visitProtocolCompositionType(ProtocolCompositionType *type) {
+      IGF.unimplemented(SourceLoc(), "metadata ref for protocol comp type");
+      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+    }
+
+    llvm::Value *visitArchetypeType(ArchetypeType *type) {
+      return emitArchetypeMetadataRef(IGF, type);
+    }
+
+    llvm::Value *visitLValueType(LValueType *type) {
+      IGF.unimplemented(SourceLoc(), "metadata ref for l-value type");
+      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+    }
+  };
+}
+
+/// Produce the type metadata pointer for the given type.
+llvm::Value *irgen::emitTypeMetadataRef(IRGenFunction &IGF, Type type) {
+  return EmitTypeMetadataRef(IGF).visit(type->getCanonicalType());
+}
+
 /// Emit a DeclRefExpr which refers to a metatype.
 void irgen::emitMetaTypeRef(IRGenFunction &IGF, Type type,
                             Explosion &explosion) {
