@@ -3535,7 +3535,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       expr->setType(fromType);
       return CS.convertToType(expr, toType);
     }
-    
+
   public:
     ExprRewriter(ConstraintSystem &CS) : CS(CS) { }
 
@@ -3611,11 +3611,29 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       llvm_unreachable("Already type-checked");
     }
 
-    // FIXME: visitUnresolvedMember
-
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
-      // FIXME: Implement for real.
-      return fixupExpr(expr);
+      // Dig out the type of the 'oneof', which will either be the result
+      // type of this expression (for unit OneOfElements) or the result of
+      // the function type of this expression (for non-unit OneOfElements).
+      Type oneofTy = CS.simplifyType(expr->getType());
+      if (auto funcTy = oneofTy->getAs<FunctionType>())
+        oneofTy = funcTy->getResult();
+
+      // The base expression is simply the metatype of a oneof type.
+      auto &tc = CS.getTypeChecker();
+      auto base = new (tc.Context) TypeOfExpr(expr->getColonLoc(),
+                                              MetaTypeType::get(oneofTy,
+                                                                tc.Context));
+
+      // Find the member and build a reference to it.
+      // FIXME: Redundant member lookup.
+      MemberLookup lookup(oneofTy, expr->getName(), tc.TU);
+      assert(lookup.isSuccess() && "Failed lookup?");
+      auto member = lookup.Results[0].D;
+      auto result = tc.buildMemberRefExpr(base, expr->getColonLoc(),
+                                          ArrayRef<ValueDecl *>(&member, 1),
+                                          expr->getNameLoc());
+      return tc.recheckTypes(result);
     }
 
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
@@ -3627,13 +3645,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
       // FIXME: Falls back to the old type checker.
       auto &tc = CS.getTypeChecker();
-      Expr *result = tc.buildMemberRefExpr(expr->getBase(), expr->getDotLoc(),
-                                           ArrayRef<ValueDecl *>(&decl, 1),
-                                           expr->getNameLoc());
-      if (tc.typeCheckExpression(result))
-        return nullptr;
-
-      return fixupExpr(result);
+      auto result = tc.buildMemberRefExpr(expr->getBase(), expr->getDotLoc(),
+                                          ArrayRef<ValueDecl *>(&decl, 1),
+                                          expr->getNameLoc());
+      return tc.recheckTypes(result);
     }
 
     Expr *visitSequenceExpr(SequenceExpr *expr) {
