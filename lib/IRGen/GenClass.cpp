@@ -534,28 +534,10 @@ static llvm::Value *getClassMetadataForConstructor(IRGenFunction &IGF,
   // Okay, we need to call swift_getGenericMetadata.
 
   // Grab the substitutions.
-#if 0
   CanType thisTy = ctor->getImplicitThisDecl()->getType()->getCanonicalType();
   auto boundGeneric = cast<BoundGenericType>(thisTy);
   assert(boundGeneric->getDecl() == theClass);
   auto subs = boundGeneric->getSubstitutions();
-  // HAHA, there are no substitutions here, you fool.
-#else
-  // Just assume that the archetypes are identical on the
-  // current context.
-  auto &ctorGenerics =
-    ctor->getType()->castTo<PolymorphicFunctionType>()->getGenericParams();
-  unsigned numArchetypes = ctorGenerics.getAllArchetypes().size();
-  assert(numArchetypes == classGenerics->getAllArchetypes().size());
-  SmallVector<Substitution, 4> subs;
-  for (unsigned i = 0; i != numArchetypes; ++i) {
-    Substitution sub;
-    sub.Archetype = classGenerics->getAllArchetypes()[i];
-    sub.Replacement = ctorGenerics.getAllArchetypes()[i];
-    // conformances not required
-    subs.push_back(sub);
-  }
-#endif
 
   // Compile all the generic arguments we need.
   Explosion genericArgs(ExplosionKind::Maximal);
