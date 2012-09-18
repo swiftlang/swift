@@ -282,6 +282,8 @@ struct ValueWitnessTable {
 };
 
 // Standard POD value-witness tables.
+// The "Int" tables are used for arbitrary POD data with the matching
+// characteristics.
 extern "C" ValueWitnessTable _TWVBi8_;      // Builtin.Int8
 extern "C" ValueWitnessTable _TWVBi16_;     // Builtin.Int16
 extern "C" ValueWitnessTable _TWVBi32_;     // Builtin.Int32
@@ -336,6 +338,22 @@ struct Metadata {
   /// A pointer to the value-witnesses for this type.
   ValueWitnessTable *ValueWitnesses;
 };
+
+/// The common structure of opaque metadata.  Adds nothing.
+struct OpaqueMetadata {
+  // We have to represent this as a member so we can list-initialize it.
+  Metadata base;
+};
+
+// Standard POD opaque metadata.
+// The "Int" metadata are used for arbitrary POD data with the
+// matching characteristics.
+extern "C" OpaqueMetadata _TMdBi8_;      // Builtin.Int8
+extern "C" OpaqueMetadata _TMdBi16_;     // Builtin.Int16
+extern "C" OpaqueMetadata _TMdBi32_;     // Builtin.Int32
+extern "C" OpaqueMetadata _TMdBi64_;     // Builtin.Int64
+extern "C" OpaqueMetadata _TMdBo;        // Builtin.ObjectPointer
+extern "C" OpaqueMetadata _TMdBO;        // Builtin.ObjCPointer
 
 /// The common structure of all metadata for heap-allocated types.
 struct HeapMetadata { // FIXME: make subclass of Metadata

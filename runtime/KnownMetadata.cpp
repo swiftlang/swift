@@ -180,3 +180,13 @@ ValueWitnessTable swift::_TWVBO = {
   (value_witness_types::alignment) sizeof(void*),
   (value_witness_types::stride) sizeof(void*)
 };
+
+// Define some builtin opaque metadata.
+#define OPAQUE_METADATA(TYPE) \
+  OpaqueMetadata swift::_TMd##TYPE = { { MetadataKind::Opaque, &_TWV##TYPE } };
+OPAQUE_METADATA(Bi8_)
+OPAQUE_METADATA(Bi16_)
+OPAQUE_METADATA(Bi32_)
+OPAQUE_METADATA(Bi64_)
+OPAQUE_METADATA(Bo)
+OPAQUE_METADATA(BO)
