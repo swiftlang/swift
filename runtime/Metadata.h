@@ -20,8 +20,6 @@
 #include <cstddef>
 #include <cstdint>
 
-struct SwiftHeapMetadata;
-
 namespace swift {
 
 struct HeapObject;
@@ -78,7 +76,7 @@ namespace value_witness_types {
 ///   'buffer' is an initialized buffer
 /// Postconditions:
 ///   'buffer' is an unallocated buffer
-typedef void destroyBuffer(ValueBuffer *buffer, ValueWitnessTable *self);
+typedef void destroyBuffer(ValueBuffer *buffer, const ValueWitnessTable *self);
 
 /// Given an unallocated buffer, initialize it as a copy of the
 /// object in the source buffer.  This can be decomposed as:
@@ -95,7 +93,7 @@ typedef void destroyBuffer(ValueBuffer *buffer, ValueWitnessTable *self);
 ///   'src' is an initialized buffer
 typedef OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                       ValueBuffer *src,
-                                                      ValueWitnessTable *self);
+                                                const ValueWitnessTable *self);
 
 /// Given an allocated or initialized buffer, derive a pointer to
 /// the object.
@@ -103,7 +101,7 @@ typedef OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
 /// Invariants:
 ///   'buffer' is an allocated or initialized buffer
 typedef OpaqueValue *projectBuffer(ValueBuffer *buffer,
-                                   ValueWitnessTable *self);
+                                   const ValueWitnessTable *self);
 
 /// Given an allocated buffer, deallocate the object.
 ///
@@ -112,7 +110,7 @@ typedef OpaqueValue *projectBuffer(ValueBuffer *buffer,
 /// Postconditions:
 ///   'buffer' is an unallocated buffer
 typedef void deallocateBuffer(ValueBuffer *buffer,
-                              ValueWitnessTable *self);
+                              const ValueWitnessTable *self);
 
 /// Given an initialized object, destroy it.
 ///
@@ -121,7 +119,7 @@ typedef void deallocateBuffer(ValueBuffer *buffer,
 /// Postconditions:
 ///   'object' is an uninitialized object
 typedef void destroy(OpaqueValue *object,
-                     ValueWitnessTable *self);
+                     const ValueWitnessTable *self);
 
 /// Given an uninitialized buffer and an initialized object, allocate
 /// storage in the buffer and copy the value there.
@@ -136,7 +134,7 @@ typedef void destroy(OpaqueValue *object,
 ///   'src' is an initialized object
 typedef OpaqueValue *initializeBufferWithCopy(ValueBuffer *dest,
                                               OpaqueValue *src,
-                                              ValueWitnessTable *self);
+                                              const ValueWitnessTable *self);
 
 /// Given an uninitialized object and an initialized object, copy
 /// the value.
@@ -153,7 +151,7 @@ typedef OpaqueValue *initializeBufferWithCopy(ValueBuffer *dest,
 ///   'src' is an initialized object
 typedef OpaqueValue *initializeWithCopy(OpaqueValue *dest,
                                         OpaqueValue *src,
-                                        ValueWitnessTable *self);
+                                        const ValueWitnessTable *self);
 
 /// Given two initialized objects, copy the value from one to the
 /// other.
@@ -167,7 +165,7 @@ typedef OpaqueValue *initializeWithCopy(OpaqueValue *dest,
 ///   'src' is an initialized object
 typedef OpaqueValue *assignWithCopy(OpaqueValue *dest,
                                     OpaqueValue *src,
-                                    ValueWitnessTable *self);
+                                    const ValueWitnessTable *self);
 
 /// Given an uninitialized buffer and an initialized object, move
 /// the value from the object to the buffer, leaving the source object
@@ -185,7 +183,7 @@ typedef OpaqueValue *assignWithCopy(OpaqueValue *dest,
 ///   'src' is an uninitialized object
 typedef OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
                                               OpaqueValue *src,
-                                              ValueWitnessTable *self);
+                                              const ValueWitnessTable *self);
 
 /// Given an uninitialized object and an initialized object, move
 /// the value from one to the other, leaving the source object
@@ -208,7 +206,7 @@ typedef OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
 ///   'src' is an uninitialized object
 typedef OpaqueValue *initializeWithTake(OpaqueValue *dest,
                                         OpaqueValue *src,
-                                        ValueWitnessTable *self);
+                                        const ValueWitnessTable *self);
 
 /// Given an initialized object and an initialized object, move
 /// the value from one to the other, leaving the source object
@@ -230,7 +228,7 @@ typedef OpaqueValue *initializeWithTake(OpaqueValue *dest,
 ///   'dest' is an initialized object
 typedef OpaqueValue *assignWithTake(OpaqueValue *dest,
                                     OpaqueValue *src,
-                                    ValueWitnessTable *self);
+                                    const ValueWitnessTable *self);
 
 /// Given an uninitialized buffer, allocate an object.
 ///
@@ -241,7 +239,7 @@ typedef OpaqueValue *assignWithTake(OpaqueValue *dest,
 /// Postconditions:
 ///   'buffer' is an allocated buffer
 typedef OpaqueValue *allocateBuffer(ValueBuffer *buffer,
-                                    ValueWitnessTable *self);
+                                    const ValueWitnessTable *self);
 
 /// The number of bytes required to store an object of this type.
 /// This value may be zero.  This value is not necessarily a
@@ -258,38 +256,64 @@ typedef size_t stride;
 
 } // end namespace value_witness_types
 
+#define FOR_ALL_FUNCTION_VALUE_WITNESSES(MACRO) \
+  MACRO(destroyBuffer) \
+  MACRO(initializeBufferWithCopyOfBuffer) \
+  MACRO(projectBuffer) \
+  MACRO(deallocateBuffer) \
+  MACRO(destroy) \
+  MACRO(initializeBufferWithCopy) \
+  MACRO(initializeWithCopy) \
+  MACRO(assignWithCopy) \
+  MACRO(initializeBufferWithTake) \
+  MACRO(initializeWithTake) \
+  MACRO(assignWithTake) \
+  MACRO(allocateBuffer)
+
 /// A value-witness table.  A value witness table is built around
 /// the requirements of some specific type.  The information in
 /// a value-witness table is intended to be sufficient to lay out
 /// and manipulate values of an arbitrary type.
 struct ValueWitnessTable {
-  value_witness_types::destroyBuffer *destroyBuffer;
-  value_witness_types::initializeBufferWithCopyOfBuffer *
-    initializeBufferWithCopyOfBuffer;
-  value_witness_types::projectBuffer *projectBuffer;
-  value_witness_types::deallocateBuffer *deallocateBuffer;
-  value_witness_types::destroy *destroy;
-  value_witness_types::initializeBufferWithCopy *initializeBufferWithCopy;
-  value_witness_types::initializeWithCopy *initializeWithCopy;
-  value_witness_types::assignWithCopy *assignWithCopy;
-  value_witness_types::initializeBufferWithTake *initializeBufferWithTake;
-  value_witness_types::initializeWithTake *initializeWithTake;
-  value_witness_types::assignWithTake *assignWithTake;
-  value_witness_types::allocateBuffer *allocateBuffer;
+  // For the meaning of all of these witnesses, consult the comments
+  // on their associated typedefs, above.
+
+#define DECLARE_WITNESS(NAME) \
+  value_witness_types::NAME *NAME;
+  FOR_ALL_FUNCTION_VALUE_WITNESSES(DECLARE_WITNESS)
+#undef DECLARE_WITNESS
+
   value_witness_types::size size;
   value_witness_types::alignment alignment;
   value_witness_types::stride stride;
+
+  /// Are values of this type allocated inline?
+  bool isValueInline() const {
+    return (size <= sizeof(ValueBuffer) && alignment <= alignof(ValueBuffer));
+  }
 };
 
-// Standard POD value-witness tables.
+// Standard value-witness tables.
+
 // The "Int" tables are used for arbitrary POD data with the matching
-// characteristics.
-extern "C" ValueWitnessTable _TWVBi8_;      // Builtin.Int8
-extern "C" ValueWitnessTable _TWVBi16_;     // Builtin.Int16
-extern "C" ValueWitnessTable _TWVBi32_;     // Builtin.Int32
-extern "C" ValueWitnessTable _TWVBi64_;     // Builtin.Int64
-extern "C" ValueWitnessTable _TWVBo;        // Builtin.ObjectPointer
-extern "C" ValueWitnessTable _TWVBO;        // Builtin.ObjCPointer
+// size/alignment characteristics.
+extern "C" const ValueWitnessTable _TWVBi8_;      // Builtin.Int8
+extern "C" const ValueWitnessTable _TWVBi16_;     // Builtin.Int16
+extern "C" const ValueWitnessTable _TWVBi32_;     // Builtin.Int32
+extern "C" const ValueWitnessTable _TWVBi64_;     // Builtin.Int64
+
+// The object-pointer table can be used for arbitrary Swift refcounted
+// pointer types.
+extern "C" const ValueWitnessTable _TWVBo;        // Builtin.ObjectPointer
+
+// The ObjC-pointer table can be used for arbitrary ObjC pointer types.
+extern "C" const ValueWitnessTable _TWVBO;        // Builtin.ObjCPointer
+
+// The () -> () table can be used for arbitrary function types.
+extern "C" const ValueWitnessTable _TWVFT_T_;     // () -> ()
+
+// The () table can be used for arbitrary empty types.
+extern "C" const ValueWitnessTable _TWVT_;        // ()
 
 enum : uint8_t { GenericTypeFlag = 0x80 };
 
@@ -336,7 +360,7 @@ struct Metadata {
   // The rest of the first pointer-sized storage unit is reserved.
 
   /// A pointer to the value-witnesses for this type.
-  ValueWitnessTable *ValueWitnesses;
+  const ValueWitnessTable *ValueWitnesses;
 };
 
 /// The common structure of opaque metadata.  Adds nothing.
@@ -348,12 +372,12 @@ struct OpaqueMetadata {
 // Standard POD opaque metadata.
 // The "Int" metadata are used for arbitrary POD data with the
 // matching characteristics.
-extern "C" OpaqueMetadata _TMdBi8_;      // Builtin.Int8
-extern "C" OpaqueMetadata _TMdBi16_;     // Builtin.Int16
-extern "C" OpaqueMetadata _TMdBi32_;     // Builtin.Int32
-extern "C" OpaqueMetadata _TMdBi64_;     // Builtin.Int64
-extern "C" OpaqueMetadata _TMdBo;        // Builtin.ObjectPointer
-extern "C" OpaqueMetadata _TMdBO;        // Builtin.ObjCPointer
+extern "C" const OpaqueMetadata _TMdBi8_;      // Builtin.Int8
+extern "C" const OpaqueMetadata _TMdBi16_;     // Builtin.Int16
+extern "C" const OpaqueMetadata _TMdBi32_;     // Builtin.Int32
+extern "C" const OpaqueMetadata _TMdBi64_;     // Builtin.Int64
+extern "C" const OpaqueMetadata _TMdBo;        // Builtin.ObjectPointer
+extern "C" const OpaqueMetadata _TMdBO;        // Builtin.ObjCPointer
 
 /// The common structure of all metadata for heap-allocated types.
 struct HeapMetadata { // FIXME: make subclass of Metadata
@@ -384,11 +408,55 @@ struct NominalTypeDescriptor {
 /// structure and therefore cannot be extended.
 struct ClassMetadata : public HeapMetadata {
   /// An out-of-line description of the type.
-  NominalTypeDescriptor *Description;
+  const NominalTypeDescriptor *Description;
 
   /// The metadata for the parent class.  This is null for the root class.
-  ClassMetadata *ParentClass;
+  const ClassMetadata *ParentClass;
 };
+
+/// The structure of function type metadata.
+struct FunctionTypeMetadata : public Metadata {
+  /// The type metadata for the argument type.
+  const Metadata *ArgumentType;
+
+  /// The type metadata for the result type.
+  const Metadata *ResultType;
+};
+
+/// The structure of tuple type metadata.
+struct TupleTypeMetadata {
+  /// The base metadata.  This has to be its own thing so that we can
+  /// list-initialize it.
+  Metadata Base;
+
+  /// The number of elements.
+  size_t NumElements;
+
+  /// The labels string;  see swift_getTupleTypeMetadata.
+  const char *Labels;
+
+  struct Element {
+    /// The type of the element.
+    const Metadata *Type;
+
+    /// The offset of the tuple element within the tuple.
+    size_t Offset;
+
+    OpaqueValue *findIn(OpaqueValue *tuple) const {
+      return (OpaqueValue*) (((char*) tuple) + Offset);
+    }
+  };
+
+  Element *getElements() {
+    return reinterpret_cast<Element*>(this+1);
+  }
+  const Element *getElements() const {
+    return reinterpret_cast<const Element *>(this+1);
+  }
+};
+
+/// The standard metadata for the empty tuple type.
+extern "C" const TupleTypeMetadata _TMdT_;
 
 /// \brief The header in front of a generic metadata template.
 ///
@@ -396,7 +464,7 @@ struct ClassMetadata : public HeapMetadata {
 /// requires the minimal number of independent arguments.
 /// For example, we want to be able to allocate a generic class
 /// Dictionary<T,U> like so:
-///   extern GenericHeapMetadata Dictionary_metadata_header;
+///   extern GenericMetadata Dictionary_metadata_header;
 ///   void *arguments[] = { typeid(T), typeid(U) };
 ///   void *metadata = swift_fetchGenericMetadata(&Dictionary_metadata_header,
 ///                                               &arguments);
@@ -407,7 +475,7 @@ struct ClassMetadata : public HeapMetadata {
 ///
 /// Both the metadata header and the arguments buffer are guaranteed
 /// to be pointer-aligned.
-struct GenericHeapMetadata {
+struct GenericMetadata {
   /// The number of generic arguments that we need to unique on,
   /// in words.  The first 'NumArguments * sizeof(void*)' bytes of
   /// the arguments buffer are the key.
@@ -425,7 +493,7 @@ struct GenericHeapMetadata {
   void *PrivateData[8];
 
   // Here there is a variably-sized field:
-  // GenericHeapMetadataFillOp FillOps[NumArguments];
+  // GenericMetadataFillOp FillOps[NumArguments];
 
   // Here there is a variably-sized field:
   // char MetadataTemplate[MetadataSize];
@@ -452,10 +520,10 @@ struct GenericHeapMetadata {
   }
 };
 
-/// \brief Fetch a uniqued metadata object for a class.
+/// \brief Fetch a uniqued metadata object for a generic nominal type.
 ///
 /// The basic algorithm for fetching a metadata object is:
-///   func swift_fetchGenericMetadata(header, arguments) {
+///   func swift_getGenericMetadata(header, arguments) {
 ///     if (metadata = getExistingMetadata(&header.PrivateData,
 ///                                        arguments[0..header.NumArguments]))
 ///       return metadata
@@ -469,9 +537,43 @@ struct GenericHeapMetadata {
 ///                         metadata)
 ///     return metadata
 ///   }
-extern "C" const SwiftHeapMetadata *
-swift_getGenericMetadata(GenericHeapMetadata *pattern,
+extern "C" const Metadata *
+swift_getGenericMetadata(GenericMetadata *pattern,
                          const void *arguments);
+
+/// \brief Fetch a uniqued metadata for a function type.
+extern "C" const FunctionTypeMetadata *
+swift_getFunctionTypeMetadata(const Metadata *argMetadata,
+                              const Metadata *resultMetadata);
+
+/// \brief Fetch a uniqued metadata for a tuple type.
+///
+/// The labels argument is null if and only if there are no element
+/// labels in the tuple.  Otherwise, it is a null-terminated
+/// concatenation of space-terminated NFC-normalized UTF-8 strings,
+/// assumed to point to constant global memory.
+///
+/// That is, for the tuple type (a : Int, Int, c : Int), this
+/// argument should be:
+///   "a  c \0"
+///
+/// This representation allows label strings to be efficiently
+/// (1) uniqued within a linkage unit and (2) compared with strcmp.
+/// In other words, it's optimized for code size and uniquing
+/// efficiency, not for the convenience of actually consuming
+/// these strings.
+///
+/// \param elements - potentially invalid if numElements is zero;
+///   otherwise, an array of metadata pointers.
+/// \param labels - the labels string
+/// \param proposedWitnesses - an optional proposed set of value witnesses.
+///   This is useful when working with a non-dependent tuple type
+///   where the entrypoint is just being used to unique the metadata.
+extern "C" const TupleTypeMetadata *
+swift_getTupleTypeMetadata(size_t numElements,
+                           const Metadata * const *elements,
+                           const char *labels,
+                           const ValueWitnessTable *proposedWitnesses);
 
 } // end namespace swift
 
