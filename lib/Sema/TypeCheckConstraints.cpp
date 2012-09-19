@@ -3525,28 +3525,6 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
     ConstraintSystem &CS;
 
-    /// \brief Hackish routine that coerces the given expression from the
-    /// 'unstructured' form of its pre-type-checked type down to the final
-    /// type that it will have after substitution.
-    ///
-    /// FIXME: This whole routine is a hack. We should deal with
-    /// polymorphism in a more reasonable way.
-    Expr *fixupExpr(Expr *expr) {
-      // FIXME: Temporary hack: use the existing type coercion logic for
-      // the basic case. We replace the type variables with unstructured,
-      // unresolved types to ride off the existing coercion logic.
-      auto &tc = CS.getTypeChecker();
-      auto toType = CS.simplifyType(expr->getType());
-      auto fromType = CS.getTypeChecker().transformType(expr->getType(),
-                                                        [&](Type type) -> Type {
-                                                          if (type->is<TypeVariableType>())
-                                                            return UnstructuredUnresolvedType::get(tc.Context);
-                                                          return type;
-                                                        });
-      expr->setType(fromType);
-      return CS.convertToType(expr, toType);
-    }
-
     Expr *specialize(Expr *expr, PolymorphicFunctionType *polyFn,
                      Type openedType) {
       // Gather the substitutions from archetypes to concrete types, found
@@ -3604,7 +3582,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitLiteralExpr(LiteralExpr *expr) {
-      return fixupExpr(expr);
+      // FIXME: The existing literal coercion code should move here.
+      auto type = CS.simplifyType(expr->getType());
+      expr->setType(UnstructuredUnresolvedType::get(CS.getASTContext()));
+      return CS.convertToType(expr, type);
     }
     
     // FIXME: Add specific entries for literal types.
