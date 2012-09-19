@@ -751,6 +751,15 @@ Type TypeChecker::transformType(Type type,
         ResultTy.getPointer() == Function->getResult().getPointer())
       return type;
 
+    // Function types always parenthesized input types, but some clients
+    // (e.g., the type-checker) occasionally perform transformations that
+    // don't abide this. Fix up the input type appropriately.
+    if (!InputTy->hasTypeVariable() &&
+        !isa<ParenType>(InputTy.getPointer()) &&
+        !isa<TupleType>(InputTy.getPointer())) {
+      InputTy = ParenType::get(Context, InputTy);
+    }
+
     if (auto polyFn = dyn_cast<PolymorphicFunctionType>(base)) {
       return PolymorphicFunctionType::get(InputTy, ResultTy,
                                           &polyFn->getGenericParams(),
