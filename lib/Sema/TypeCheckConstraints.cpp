@@ -3547,6 +3547,42 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return CS.convertToType(expr, toType);
     }
 
+    Expr *specialize(Expr *expr, PolymorphicFunctionType *polyFn,
+                     Type openedType) {
+      // Gather the substitutions from archetypes to concrete types, found
+      // by identifying all of the type variables in the original type
+      auto &tc = CS.getTypeChecker();
+      TypeSubstitutionMap substitutions;
+      auto type = tc.transformType(openedType,
+                   [&](Type type) -> Type {
+                     if (auto tv = type->getAs<TypeVariableType>()) {
+                       auto archetype = tv->getImpl().getArchetype();
+                       auto simplified = CS.simplifyType(tv);
+                       substitutions[archetype] = simplified;
+
+                       return SubstitutedType::get(archetype, simplified,
+                                                   tc.Context);
+                     }
+
+                     return type;
+                   });
+
+      // Check that the substitutions we've produced actually work.
+      // FIXME: We'd like the type checker to ensure that this always
+      // succeeds.
+      ConformanceMap conformances;
+      if (tc.checkSubstitutions(substitutions, conformances, expr->getLoc(),
+                                &substitutions))
+        return nullptr;
+
+      // Build the specialization expression.
+      auto encodedSubs = tc.encodeSubstitutions(&polyFn->getGenericParams(),
+                                                substitutions, conformances,
+                                                /*ArchetypesAreOpen=*/false,
+                                                /*OnlyInnermostParams=*/true);
+      return new (tc.Context) SpecializeExpr(expr, type, encodedSubs);
+    }
+    
   public:
     ExprRewriter(ConstraintSystem &CS) : CS(CS) { }
 
@@ -3592,38 +3628,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
         return expr;
       }
 
-      // Gather the substitutions from archetypes to concrete types, found
-      // by identifying all of the type variables in the original type
-      auto &tc = CS.getTypeChecker();
-      TypeSubstitutionMap substitutions;
-      auto toType = tc.transformType(fromType,
-                      [&](Type type) -> Type {
-                        if (auto tv = type->getAs<TypeVariableType>()) {
-                          auto archetype = tv->getImpl().getArchetype();
-                          auto simplified = CS.simplifyType(tv);
-                          substitutions[archetype] = simplified;
-
-                          return SubstitutedType::get(archetype, simplified,
-                                                      tc.Context);
-                        }
-
-                        return type;
-                      });
-
-      // Check that the substitutions we've produced actually work.
-      // FIXME: We'd like the type checker to ensure that this always
-      // succeeds.
-      ConformanceMap conformances;
-      if (tc.checkSubstitutions(substitutions, conformances, expr->getLoc(),
-                                &substitutions))
-        return nullptr;
-
-      // Build the specialization expression.
-      auto encodedSubs = tc.encodeSubstitutions(&polyFn->getGenericParams(),
-                                                substitutions, conformances,
-                                                /*ArchetypesAreOpen=*/false,
-                                                /*OnlyInnermostParams=*/true);
-      return new (tc.Context) SpecializeExpr(expr, toType, encodedSubs);
+      return specialize(expr, polyFn, fromType);
     }
 
     Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
