@@ -21,6 +21,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
+#include "swift/ABI/MetadataValues.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 #include "llvm/GlobalVariable.h"
@@ -243,7 +244,7 @@ static llvm::Function *createSizeFn(IRGenModule &IGM,
 }
 
 namespace {
-  enum { NumStandardMetadataFields = 2 };
+  enum { NumStandardMetadataFields = 4 };
 
   /// A CRTP class for laying out class metadata.  Note that this does
   /// *not* handle the metadata template stuff.
@@ -262,6 +263,8 @@ namespace {
   public:
     void layout() {
       // Common fields.
+      asImpl().addMetadataFlags();
+      asImpl().addValueWitnessTable();
       asImpl().addDestructorFunction();
       asImpl().addSizeFunction();
 
@@ -310,6 +313,13 @@ namespace {
     unsigned getNextIndex() const { return Fields.size(); }
 
   public:
+    /// The runtime provides a value witness table for Builtin.ObjectPointer.
+    void addValueWitnessTable() {
+      auto type = CanType(this->IGM.Context.TheObjectPointerType);
+      auto wtable = this->IGM.getAddrOfValueWitnessTable(type);
+      Fields.push_back(wtable);
+    }
+
     void addDestructorFunction() {
       Fields.push_back(this->IGM.getAddrOfDestructor(this->TargetClass));
     }
@@ -337,6 +347,11 @@ namespace {
     MetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                     const HeapLayout &layout)
       : MetadataBuilderBase(IGM, theClass, layout) {}
+
+    void addMetadataFlags() {
+      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
+                                              unsigned(MetadataKind::Class)));
+    }
 
     llvm::Constant *getInit() {
       if (Fields.size() == NumStandardMetadataFields) {
@@ -409,6 +424,11 @@ namespace {
       Fields[4] = getFillOpsInit();
 
       assert(TemplateHeaderFieldCount == 5);
+    }
+
+    void addMetadataFlags() {
+      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
+                                       unsigned(MetadataKind::GenericClass)));
     }
 
     /// Ignore the preallocated header.
@@ -645,13 +665,11 @@ namespace {
       : super(IGF.IGM, theClass), IGF(IGF), Metadata(metadata), Out(out) {}
 
   public:
-    void addDestructorFunction() {
-      NextIndex++;
-    }
-
-    void addSizeFunction() {
-      NextIndex++;
-    }
+    // Metadata header fields that we have to skip over.
+    void addMetadataFlags() { NextIndex++; }
+    void addValueWitnessTable() { NextIndex++; }
+    void addDestructorFunction() { NextIndex++; }
+    void addSizeFunction() { NextIndex++; }
 
     void addGenericWitness(ClassDecl *forClass, llvm::Type *witnessType) {
       // Ignore witnesses for base classes.

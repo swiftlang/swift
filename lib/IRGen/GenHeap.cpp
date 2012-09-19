@@ -21,6 +21,7 @@
 #include "llvm/Intrinsics.h"
 
 #include "swift/Basic/SourceLoc.h"
+#include "swift/ABI/MetadataValues.h"
 
 #include "Cleanup.h"
 #include "Explosion.h"
@@ -103,7 +104,9 @@ static llvm::Function *createSizeFn(IRGenModule &IGM,
 
 void HeapLayout::buildMetadataInto(IRGenModule &IGM,
                     llvm::SmallVectorImpl<llvm::Constant*> &metadata) const {
-
+  metadata.push_back(llvm::ConstantInt::get(IGM.Int8Ty,
+                                 unsigned(MetadataKind::HeapLocalVariable)));
+  metadata.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
   metadata.push_back(createDtorFn(IGM, *this));
   metadata.push_back(createSizeFn(IGM, *this));
 }
@@ -122,7 +125,7 @@ static llvm::Constant *buildPrivateMetadataVar(IRGenModule &IGM,
 }
 
 llvm::Constant *HeapLayout::getPrivateMetadata(IRGenModule &IGM) const {
-  llvm::SmallVector<llvm::Constant*, 2> fields;
+  llvm::SmallVector<llvm::Constant*, 4> fields;
   buildMetadataInto(IGM, fields);
   return buildPrivateMetadataVar(IGM, fields);
 }
@@ -323,6 +326,9 @@ createArraySizeFn(IRGenModule &IGM,
 
 void ArrayHeapLayout::buildMetadataInto(IRGenModule &IGM,
                       llvm::SmallVectorImpl<llvm::Constant*> &fields) const {
+  fields.push_back(llvm::ConstantInt::get(IGM.Int8Ty,
+                                          unsigned(MetadataKind::HeapArray)));
+  fields.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
   fields.push_back(createArrayDtorFn(IGM, *this, WitnessTypes));
   fields.push_back(createArraySizeFn(IGM, *this, WitnessTypes));
 }

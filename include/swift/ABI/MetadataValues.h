@@ -54,10 +54,18 @@ enum class MetadataKind : uint8_t {
   PolyFunction  = 11,
 
   /// An existential type.
-  Existential   = 12
+  Existential   = 12,
 
   // Array types?
   // L-value types?
+
+  // After this point start the non-type metadata.
+
+  /// A heap-allocated local variable.
+  HeapLocalVariable = 64,
+
+  /// A heap-allocated array.
+  HeapArray = 65
 };
 
 }

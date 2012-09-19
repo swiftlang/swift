@@ -323,7 +323,10 @@ struct Metadata {
 
   // The rest of the first pointer-sized storage unit is reserved.
 
-  /// A pointer to the value-witnesses for this type.
+  /// A pointer to the value-witnesses for this type.  This is only
+  /// meaningful for type metadata; other kinds of metadata, such as
+  /// those for (e.g.) non-class heap allocations, may have an invalid
+  /// pointer here.
   const ValueWitnessTable *ValueWitnesses;
 };
 
@@ -376,6 +379,38 @@ struct ClassMetadata : public HeapMetadata {
 
   /// The metadata for the parent class.  This is null for the root class.
   const ClassMetadata *ParentClass;
+};
+
+/// The structure of metadata for heap-allocated local variables.
+/// This is non-type metadata.
+///
+/// It would be nice for tools to be able to dynamically discover the
+/// type of a heap-allocated local variable.  This should not require
+/// us to aggressively produce metadata for the type, though.  The
+/// obvious solution is to simply place the mangling of the type after
+/// the variable metadata.
+///
+/// One complication is that, in generic code, we don't want something
+/// as low-priority (sorry!) as the convenience of tools to force us
+/// to generate per-instantiation metadata for capturing variables.
+/// In these cases, the heap-destructor function will be using
+/// information stored in the allocated object (rather than in
+/// metadata) to actually do the work of destruction, but even then,
+/// that information needn't be metadata for the actual variable type;
+/// consider the case of local variable of type (T, Int).
+///
+/// Anyway, that's all something to consider later.
+struct HeapLocalVariableMetadata : public HeapMetadata {
+  // No extra fields for now.
+};
+
+/// The structure of metadata for heap-allocated arrays.
+/// This is non-type metadata.
+///
+/// The comments on HeapLocalVariableMetadata about tools wanting type
+/// discovery apply equally here.
+struct HeapArrayMetadata : public HeapMetadata {
+  // No extra fields for now.
 };
 
 /// The structure of function type metadata.
