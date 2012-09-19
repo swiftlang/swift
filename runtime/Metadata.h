@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include "swift/ABI/MetadataValues.h"
 
 namespace swift {
 
@@ -315,43 +316,6 @@ extern "C" const ValueWitnessTable _TWVFT_T_;     // () -> ()
 // The () table can be used for arbitrary empty types.
 extern "C" const ValueWitnessTable _TWVT_;        // ()
 
-enum : uint8_t { GenericTypeFlag = 0x80 };
-
-/// Kinds of Swift metadata records.  Some of these are types, some
-/// aren't.
-enum class MetadataKind : uint8_t {
-  /// A class type.
-  Class         = 0,
-  GenericClass  = unsigned(Class)  | GenericTypeFlag,
-
-  /// A struct type.
-  Struct        = 1,
-  GenericStruct = unsigned(Struct) | GenericTypeFlag,
-
-  /// A oneof type.
-  /// If we add reference oneofs, that needs to go here.
-  Oneof         = 2,
-  GenericOneof  = unsigned(Oneof)  | GenericTypeFlag,
-
-  /// A type whose value is not exposed in the metadata system.
-  Opaque        = 8,
-
-  /// A tuple.
-  Tuple         = 9,
-
-  /// A monomorphic function.
-  Function      = 10,
-
-  /// A polymorphic function.
-  PolyFunction  = 11,
-
-  /// An existential type.
-  Existential   = 12
-
-  // Array types?
-  // L-value types?
-};
-
 /// The common structure of all type metadata.
 struct Metadata {
   /// The kind.
@@ -380,9 +344,9 @@ extern "C" const OpaqueMetadata _TMdBo;        // Builtin.ObjectPointer
 extern "C" const OpaqueMetadata _TMdBO;        // Builtin.ObjCPointer
 
 /// The common structure of all metadata for heap-allocated types.
-struct HeapMetadata { // FIXME: make subclass of Metadata
-  /// Returns the allocated size of the object, or 0 if the object
-  /// shouldn't be deallocated.
+struct HeapMetadata : Metadata {
+  /// Destroy the object, returning the allocated size of the object
+  /// or 0 if the object shouldn't be deallocated.
   size_t (*destroy)(HeapObject *);
 
   /// Returns the allocated size of the object.
