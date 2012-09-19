@@ -574,7 +574,6 @@ namespace {
     unsigned TypeCounter = 0;
     unsigned OverloadSetCounter = 0;
     
-    // ---Only valid in child constraint system---
     llvm::DenseMap<OverloadSet *, unsigned> ResolvedOverloads;
 
     /// \brief The type variable for which we are assuming a given particular
@@ -617,8 +616,6 @@ namespace {
         UnresolvedOverloadSets(parent->UnresolvedOverloadSets.begin()+1,
                                parent->UnresolvedOverloadSets.end())
     {
-      ResolvedOverloads[parent->UnresolvedOverloadSets.front()] =
-        overloadChoiceIdx;
     }
 
     /// \brief Creates a child constraint system, inheriting the constraints
