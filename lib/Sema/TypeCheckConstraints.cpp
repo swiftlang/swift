@@ -3640,13 +3640,19 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       auto &context = CS.getASTContext();
       auto ovl = CS.getGeneratedOverloadSet(expr);
       assert(ovl && "No overload set associated with decl reference expr?");
-      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
+      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto choice = selected.first;
       auto decl = choice.getDecl();
       auto result = new (context) DeclRefExpr(decl, expr->getLoc(),
                                               decl->getTypeOfReference());
 
-      // FIXME: Hack to get the SpecializeExpr we need here.
-      return fixupExpr(result);
+      // For a polymorphic function type, we have to specialize our reference.
+      if (auto polyFn = expr->getType()->getAs<PolymorphicFunctionType>()) {
+        assert(false);
+        return specialize(result, polyFn, selected.second);
+      }
+
+      return result;
     }
 
     Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
