@@ -370,7 +370,7 @@ namespace {
       Second->print(Out);
     }
 
-    void dump() LLVM_ATTRIBUTE_USED { print(llvm::errs()); }
+    void dump() LLVM_ATTRIBUTE_USED { print(llvm::outs()); }
 
     void *operator new(size_t bytes, ConstraintSystem& cs,
                        size_t alignment = alignof(Constraint)) {
@@ -3373,7 +3373,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
 
   // Simplify this constraint system.
   if (TC.getLangOpts().DebugConstraintSolver) {
-    llvm::errs() << "---Simplified constraints---\n";
+    llvm::outs() << "---Simplified constraints---\n";
   }
   bool error = simplify();
   if (TC.getLangOpts().DebugConstraintSolver) {
@@ -4111,7 +4111,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   if (!expr)
     return nullptr;
 
-  llvm::raw_ostream &log = llvm::errs();
+  llvm::raw_ostream &log = llvm::outs();
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this);
@@ -4125,7 +4125,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
 
   if (getLangOpts().DebugConstraintSolver) {
     log << "---Initial constraints for the given expression---\n";
-    expr->dump();
+    expr->print(log);
     log << "\n";
     cs.dump();
   }
@@ -4134,7 +4134,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   SmallVector<ConstraintSystem *, 4> viable;
   if (cs.solve(viable)) {
     if (getLangOpts().DebugConstraintSolver) {
-      llvm::errs() << "---Solved constraints---\n";
+      llvm::outs() << "---Solved constraints---\n";
       cs.dump();
 
       unsigned numSolved = 0;
@@ -4142,7 +4142,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
         unsigned idx = 0;
         for (auto cs : viable) {
           SmallVector<TypeVariableType *, 4> freeVariables;
-          llvm::errs() << "---Child system #" << ++idx << "---\n";
+          llvm::outs() << "---Child system #" << ++idx << "---\n";
           cs->dump();
           if (cs->isSolved(freeVariables)) {
             ++numSolved;
@@ -4201,7 +4201,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
 #pragma mark Debugging
 
 void ConstraintSystem::dump() {
-  llvm::raw_ostream &out = llvm::errs();
+  llvm::raw_ostream &out = llvm::outs();
 
   if (Parent) {
     SmallVector<ConstraintSystem *, 4> path;;
@@ -4311,15 +4311,15 @@ void ConstraintSystem::dump() {
   SmallVector<TypeVariableType *, 4> freeVariables;
   if (isSolved(freeVariables)) {
     if (freeVariables.empty()) {
-      llvm::errs() << "SOLVED (completely)\n";
+      llvm::outs() << "SOLVED (completely)\n";
     } else {
-      llvm::errs() << "SOLVED (with free variables):";
+      llvm::outs() << "SOLVED (with free variables):";
       for (auto fv : freeVariables) {
-        llvm::errs() << ' ' << fv->getString();
+        llvm::outs() << ' ' << fv->getString();
       }
-      llvm::errs() << '\n';
+      llvm::outs() << '\n';
     }
   } else {
-    llvm::errs() << "UNSOLVED\n";
+    llvm::outs() << "UNSOLVED\n";
   }
 }
