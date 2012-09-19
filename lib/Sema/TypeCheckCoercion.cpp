@@ -2191,13 +2191,9 @@ static bool finalizeSubstitutions(CoercionContext &CC, SourceLoc ComplainLoc) {
   TypeChecker &TC = CC.TC;
 
   // Seed the archetype stack with the set of substitutions we asked for.
-  llvm::SmallPtrSet<ArchetypeType *, 8> KnownArchetypes;
-  SmallVector<ArchetypeType *, 8> ArchetypeStack;
   TypeSubstitutionMap TwoStepSubstitutions; // FIXME: Inefficient!
   for (auto &Sub : CC.Substitutions) {
     auto Archetype = Sub.first->getArchetype();
-    if (KnownArchetypes.insert(Archetype))
-      ArchetypeStack.push_back(Archetype);
     TwoStepSubstitutions[Archetype] = Sub.second;
   }
 

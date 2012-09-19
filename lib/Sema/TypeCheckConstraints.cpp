@@ -1597,9 +1597,16 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
                                  expr);
 
       case PatternKind::Any:
-      case PatternKind::Named:
         // For a pattern of unknown type, create a new type variable.
         return CS.createTypeVariable(expr);
+
+      case PatternKind::Named: {
+        // For a named pattern without a type, create a new type variable
+        // and use it as the type of the variable.
+        auto tv = CS.createTypeVariable(expr);
+        cast<NamedPattern>(pattern)->getDecl()->setType(tv);
+        return tv;
+      }
 
       case PatternKind::Typed:
         // For a typed pattern, simply return the type of the pattern.
@@ -2663,6 +2670,7 @@ Type ConstraintSystem::simplifyType(Type type,
 
               return tvt;
             }
+                            
             return type;
          });
 }
@@ -3563,8 +3571,56 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     // FIXME: Add specific entries for literal types.
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
-      // FIXME: Introduce SpecializeExpr here if needed.
-      return fixupExpr(expr);
+      // If the expression's type doesn't involve type variables, there is
+      // nothing to do.
+      auto fromType = expr->getType();
+      if (!fromType->hasTypeVariable())
+        return expr;
+
+      // Set the type of this expression to the actual type of the reference.
+      expr->setType(expr->getDecl()->getTypeOfReference());
+
+      // Check whether this is a polymorphic function type, which needs to
+      // be specialized.
+      auto polyFn = expr->getType()->getAs<PolymorphicFunctionType>();
+      if (!polyFn) {
+        // No polymorphic function; this a reference to a declaration with a
+        // deduced type, such as $0.
+        return expr;
+      }
+
+      // Gather the substitutions from archetypes to concrete types, found
+      // by identifying all of the type variables in the original type
+      auto &tc = CS.getTypeChecker();
+      TypeSubstitutionMap substitutions;
+      auto toType = tc.transformType(fromType,
+                      [&](Type type) -> Type {
+                        if (auto tv = type->getAs<TypeVariableType>()) {
+                          auto archetype = tv->getImpl().getArchetype();
+                          auto simplified = CS.simplifyType(tv);
+                          substitutions[archetype] = simplified;
+
+                          return SubstitutedType::get(archetype, simplified,
+                                                      tc.Context);
+                        }
+
+                        return type;
+                      });
+
+      // Check that the substitutions we've produced actually work.
+      // FIXME: We'd like the type checker to ensure that this always
+      // succeeds.
+      ConformanceMap conformances;
+      if (tc.checkSubstitutions(substitutions, conformances, expr->getLoc(),
+                                &substitutions))
+        return nullptr;
+
+      // Build the specialization expression.
+      auto encodedSubs = tc.encodeSubstitutions(&polyFn->getGenericParams(),
+                                                substitutions, conformances,
+                                                /*ArchetypesAreOpen=*/false,
+                                                /*OnlyInnermostParams=*/true);
+      return new (tc.Context) SpecializeExpr(expr, toType, encodedSubs);
     }
 
     Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
@@ -3733,7 +3789,42 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       llvm_unreachable("Already type-checked");
     }
 
+    void simplifyPatternTypes(Pattern *pattern) {
+      switch (pattern->getKind()) {
+      case PatternKind::Paren:
+        // Parentheses don't affect the type.
+        return simplifyPatternTypes(
+                                cast<ParenPattern>(pattern)->getSubPattern());
+
+      case PatternKind::Any:
+      case PatternKind::Typed:
+          return;
+
+      case PatternKind::Named: {
+        // Simplify the type of any variables.
+        auto var = cast<NamedPattern>(pattern)->getDecl();
+        var->overwriteType(CS.simplifyType(var->getType()));
+        return;
+      }
+
+      case PatternKind::Tuple: {
+        auto tuplePat = cast<TuplePattern>(pattern);
+        for (auto tupleElt : tuplePat->getFields()) {
+          simplifyPatternTypes(tupleElt.getPattern());
+        }
+        return;
+      }
+      }
+      
+      llvm_unreachable("Unhandled pattern kind");
+    }
+
     Expr *visitFuncExpr(FuncExpr *expr) {
+      // Simplify the types within the given pattern.
+      for (auto params : expr->getParamPatterns()) {
+        simplifyPatternTypes(params);
+      }
+      
       // FIXME: Type-check the function now? Or queue for later?
       return simplifyExprType(expr);
     }
@@ -3906,7 +3997,8 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
         return true;
       }
 
-      // For an array, just walk the expression itself; its children
+      // For an array, just walk the expression itself; its children have
+      // already been type-checked.
       if (isa<NewArrayExpr>(expr)) {
         Rewriter.simplifyExprType(expr);
         return false;
