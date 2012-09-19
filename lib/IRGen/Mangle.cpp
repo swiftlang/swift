@@ -685,6 +685,12 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
     return;
 
+  //   global ::= 'WV' type                       // value witness
+  case Kind::ValueWitnessTable:
+    buffer << "WV";
+    mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
+    return;
+
   //   global ::= 'M' directness type             // type metadata
   //   global ::= 'MP' directness type            // type metadata pattern
   case Kind::TypeMetadata: {

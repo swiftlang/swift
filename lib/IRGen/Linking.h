@@ -81,21 +81,27 @@ class LinkEntity {
     /// The pointer is a VarDecl* or SubscriptDecl*.
     Setter,
 
-    /// A value witness for a type.
-    /// The pointer is a canonical TypeBase*.
-    ValueWitness,
-
     /// The destructor for a class.
     /// The pointer is a ClassDecl*.
     Destructor,
 
-    /// The metadata or metadata template for a class.
-    /// The pointer is a canonical TypeBase*.
-    TypeMetadata,
-
     /// Some other kind of declaration.
     /// The pointer is a Decl*.
-    Other
+    Other,
+
+    // Everything following this is a type kind.
+
+    /// A value witness for a type.
+    /// The pointer is a canonical TypeBase*.
+    ValueWitness,
+
+    /// The value witness table for a type.
+    /// The pointer is a canonical TypeBase*.
+    ValueWitnessTable,
+
+    /// The metadata or metadata template for a class.
+    /// The pointer is a canonical TypeBase*.
+    TypeMetadata
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -116,7 +122,7 @@ class LinkEntity {
     return !isTypeKind(k);
   }
   static bool isTypeKind(Kind k) {
-    return k == Kind::ValueWitness || k == Kind::TypeMetadata;
+    return k >= Kind::ValueWitness;
   }
 
   void setForDecl(Kind kind,
@@ -185,6 +191,13 @@ public:
     entity.Pointer = concreteType.getPointer();
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::ValueWitness))
                 | LINKENTITY_SET_FIELD(ValueWitness, unsigned(witness));
+    return entity;
+  }
+
+  static LinkEntity forValueWitnessTable(CanType concreteType) {
+    LinkEntity entity;
+    entity.Pointer = concreteType.getPointer();
+    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::ValueWitnessTable));
     return entity;
   }
 

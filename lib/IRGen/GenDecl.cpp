@@ -253,6 +253,7 @@ bool LinkEntity::isLocalLinkage() const {
 
   // Value witnesses depend on the linkage of their type.
   case Kind::ValueWitness:
+  case Kind::ValueWitnessTable:
   case Kind::TypeMetadata:
     return isLocalLinkageType(getType());
 
@@ -424,7 +425,6 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
   // Okay, we need to rebuild it.
   LinkInfo link = LinkInfo::get(*this, entity);
   auto addr = link.createVariable(*this, type.StorageType);
-  addr->setVisibility(link.getVisibility());
 
   Alignment align = type.StorageAlignment;
   addr->setAlignment(align.getValue());
@@ -614,6 +614,24 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(Type concreteType,
                               ArrayRef<llvm::AttributeWithIndex>());
   return entry;
 }
+
+/// Returns the address of a value-witness table.
+llvm::Constant *IRGenModule::getAddrOfValueWitnessTable(CanType concreteType) {
+  LinkEntity entity = LinkEntity::forValueWitnessTable(concreteType);
+
+  llvm::GlobalVariable *&entry = GlobalVars[entity];
+  if (entry) return entry;
+
+  // Find the appropriate function type.
+  LinkInfo link = LinkInfo::get(*this, entity);
+  auto variable = link.createVariable(*this, WitnessTableTy);
+  variable->setConstant(true);
+
+  // Cache and return.
+  entry = variable;
+  return variable;
+}
+
 
 static Type addOwnerArgument(ASTContext &ctx, DeclContext *DC, Type resultType) {
   Type argType = DC->getDeclaredTypeInContext();

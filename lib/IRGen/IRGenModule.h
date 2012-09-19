@@ -91,7 +91,10 @@ public:
   llvm::IntegerType *Int32Ty;          /// i32
   llvm::IntegerType *Int64Ty;          /// i64
   llvm::IntegerType *SizeTy;           /// usually i32 or i64
-  llvm::PointerType *Int8PtrTy;        /// i8*
+  union {
+    llvm::PointerType *Int8PtrTy;      /// i8*
+    llvm::PointerType *WitnessTableTy;
+  };
   union {
     llvm::PointerType *Int8PtrPtrTy;   /// i8**
     llvm::PointerType *WitnessTablePtrTy;
@@ -231,6 +234,7 @@ public:
                                   ExplosionKind kind);
   llvm::Function *getAddrOfSetter(ValueDecl *D, ExplosionKind kind);
   llvm::Function *getAddrOfValueWitness(Type concreteType, ValueWitness index);
+  llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType);
   llvm::Function *getAddrOfConstructor(ConstructorDecl *D, ExplosionKind kind);
   llvm::Function *getAddrOfDestructor(ClassDecl *D);
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,

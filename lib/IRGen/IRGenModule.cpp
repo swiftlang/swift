@@ -75,7 +75,11 @@ IRGenModule::IRGenModule(ASTContext &Context,
 
   DtorTy = llvm::FunctionType::get(SizeTy, RefCountedPtrTy, false);
   llvm::Type *dtorPtrTy = DtorTy->getPointerTo();
-  llvm::Type *heapMetadataElts[] = { dtorPtrTy, dtorPtrTy };
+
+  // Note that heap metadata share a common prefix with type metadata.
+  llvm::Type *heapMetadataElts[] = {
+    Int8Ty, WitnessTablePtrTy, dtorPtrTy, dtorPtrTy
+  };
   HeapMetadataStructTy =
     llvm::StructType::create(getLLVMContext(), heapMetadataElts,
                              "swift.heapmetadata");
