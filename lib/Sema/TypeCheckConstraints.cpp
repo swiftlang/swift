@@ -573,8 +573,12 @@ namespace {
     llvm::BumpPtrAllocator Allocator;
     unsigned TypeCounter = 0;
     unsigned OverloadSetCounter = 0;
-    
-    llvm::DenseMap<OverloadSet *, unsigned> ResolvedOverloads;
+
+    /// \brief A mapping from each overload set that is resolved in this
+    /// constraint system to a pair (index, type), where index is the index of
+    /// the overload choice (within the overload set) and type is the type
+    /// implied by that overload.
+    llvm::DenseMap<OverloadSet *, std::pair<unsigned, Type>> ResolvedOverloads;
 
     /// \brief The type variable for which we are assuming a given particular
     /// type.
@@ -855,12 +859,14 @@ namespace {
     }
 
     /// \brief Find the overload choice that was assumed by this constraint
-    /// system (or one of its parents).
-    Optional<OverloadChoice> getSelectedOverloadFromSet(OverloadSet *ovl) {
+    /// system (or one of its parents), along with the type it was given.
+    Optional<std::pair<OverloadChoice, Type>>
+    getSelectedOverloadFromSet(OverloadSet *ovl) {
       for (auto cs = this; cs; cs = cs->Parent) {
         auto known = cs->ResolvedOverloads.find(ovl);
         if (known != cs->ResolvedOverloads.end()) {
-          return ovl->getChoices()[known->second];
+          return std::make_pair(ovl->getChoices()[known->second.first],
+                                known->second.second);
         }
       }
 
@@ -2648,7 +2654,7 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
   addConstraint(ConstraintKind::Bind, ovl->getBoundType(), refType);
 
   // Note that we have resolved this overload.
-  ResolvedOverloads[ovl] = idx;
+  ResolvedOverloads[ovl] = std::make_pair(idx, refType);
 }
 
 Type ConstraintSystem::simplifyType(Type type,
@@ -3629,7 +3635,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       auto &context = CS.getASTContext();
       auto ovl = CS.getGeneratedOverloadSet(expr);
       assert(ovl && "No overload set associated with decl reference expr?");
-      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
       auto decl = choice.getDecl();
       auto result = new (context) DeclRefExpr(decl, expr->getLoc(),
                                               decl->getTypeOfReference());
@@ -3693,7 +3699,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // Determine the declaration selected for this overloaded reference.
       auto ovl = CS.getGeneratedOverloadSet(expr);
       assert(ovl && "No overload set associated with decl reference expr?");
-      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
       auto decl = choice.getDecl();
 
       // FIXME: Falls back to the old type checker.
@@ -3720,7 +3726,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // Determine the declaration selected for this subscript operation.
       auto ovl = CS.getGeneratedOverloadSet(expr);
       assert(ovl && "No overload set associated with subscript expr?");
-      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
       auto subscript = cast<SubscriptDecl>(choice.getDecl());
 
       // FIXME: Falls back to existing type checker to actually populate
@@ -3935,7 +3941,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // Find the constructor we selected for this expression.
       auto ovl = CS.getGeneratedOverloadSet(expr);
       assert(ovl && "No overload set associated with new reference expr?");
-      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
       auto constructor = cast<ConstructorDecl>(choice.getDecl());
 
       // Form the constructor call expression.
@@ -4226,16 +4232,16 @@ void ConstraintSystem::dump() {
       // Otherwise, report the resolved overloads.
       assert(!cs->ResolvedOverloads.empty());
       for (auto ovl : cs->ResolvedOverloads) {
-        auto &choice = ovl.first->getChoices()[ovl.second];
+        auto &choice = ovl.first->getChoices()[ovl.second.first];
         out << "  selected overload set #" << ovl.first->getID()
-            << " choice #" << ovl.second << " for ";
+            << " choice #" << ovl.second.first << " for ";
         switch (choice.getKind()) {
         case OverloadChoiceKind::Decl:
           if (choice.getBaseType())
             out << choice.getBaseType()->getString() << ".";
           out << choice.getDecl()->getName().str() << ": "
             << ovl.first->getBoundType()->getString() << " == "
-            << choice.getDecl()->getTypeOfReference()->getString() << "\n";
+            << ovl.second.second->getString() << "\n";
           break;
 
         case OverloadChoiceKind::BaseType:
