@@ -545,9 +545,9 @@ namespace {
     NON_LOCATEABLE(ProtocolDecl)
                                                     
     // FIXME: Not really a ValueDecl.
-    NON_LOCATEABLE(SubscriptDecl);
-    NON_LOCATEABLE(ConstructorDecl);
-    NON_LOCATEABLE(DestructorDecl);
+    NON_LOCATEABLE(SubscriptDecl)
+    NON_LOCATEABLE(ConstructorDecl)
+    NON_LOCATEABLE(DestructorDecl)
                                                     
     // These we support.
     Optional<Address> visitVarDecl(VarDecl *D) {
@@ -612,7 +612,7 @@ namespace {
     NON_LOCATEABLE(GenericMemberRefExpr)
 
     // FIXME: We may want to specialize IR generation for array subscripts.
-    NON_LOCATEABLE(SubscriptExpr);
+    NON_LOCATEABLE(SubscriptExpr)
     NON_LOCATEABLE(ExistentialSubscriptExpr)
     NON_LOCATEABLE(ArchetypeSubscriptExpr)
     NON_LOCATEABLE(GenericSubscriptExpr)
