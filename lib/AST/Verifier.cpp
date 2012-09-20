@@ -206,7 +206,8 @@ namespace {
 
       checkSameType(resultObj, srcObj, "object types for AddressOfExpr");
 
-      if (LValueType::Qual() != srcQuals) {
+      if ((resultQuals | LValueType::Qual::Implicit) !=
+          (srcQuals | LValueType::Qual::Implicit)) {
         Out << "mismatched qualifiers";
         E->print(Out);
         Out << "\n";

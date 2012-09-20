@@ -3588,17 +3588,19 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return CS.convertToType(expr, type);
     }
     
-    // FIXME: Add specific entries for literal types.
+    // FIXME: Add specific entries for the various literal expressions.
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
       // If the expression's type doesn't involve type variables, there is
       // nothing to do.
       auto fromType = expr->getType();
-      if (!fromType->hasTypeVariable())
-        return expr;
 
       // Set the type of this expression to the actual type of the reference.
       expr->setType(expr->getDecl()->getTypeOfReference());
+
+      // If there is no variable in the original expression type, we're done.
+      if (!fromType->hasTypeVariable())
+        return expr;
 
       // Check whether this is a polymorphic function type, which needs to
       // be specialized.
@@ -3846,14 +3848,13 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // Compute the type of the address-of expression.
       // FIXME: Do we really need to compute this, or is this just a hack
       // due to the presence of the 'nonheap' bit?
-      if (auto lv = expr->getType()->getAs<LValueType>()) {
-        expr->setType(LValueType::get(lv->getObjectType(),
-                                      lv->getQualifiers() - LValueType::Qual::Implicit,
-                                      CS.getASTContext()));
-        return expr;
-      }
-      
-      return simplifyExprType(expr);
+      auto lv = expr->getSubExpr()->getType()->getAs<LValueType>();
+      assert(lv && "Subexpression is not an lvalue?");
+
+      auto destQuals = lv->getQualifiers() - LValueType::Qual::Implicit;
+      expr->setType(LValueType::get(lv->getObjectType(), destQuals,
+                                    CS.getASTContext()));
+      return expr;
     }
 
     Expr *visitNewArrayExpr(NewArrayExpr *expr) {
