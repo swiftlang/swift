@@ -422,21 +422,23 @@ public:
   }
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) {
     printCommon(E, "overloadeddeclref_expr")
+      << " name=" << E->getDecls()[0]->getName().str()
       << " #decls=" << E->getDecls().size();
-    for (Decl *D : E->getDecls()) {
+    for (ValueDecl *D : E->getDecls()) {
       OS << '\n';
-      printRec(D);
+      OS << "  type=" << D->getTypeOfReference().getString();
     }
     OS << ')';
   }
   void visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *E) {
     printCommon(E, "overloadedmemberref_expr")
+      << " name=" << E->getDecls()[0]->getName().str()
       << "#decls=" << E->getDecls().size() << "\n"
       << "base = ";
     printRec(E->getBase());
-    for (Decl *D : E->getDecls()) {
+    for (ValueDecl *D : E->getDecls()) {
       OS << '\n';
-      printRec(D);
+      OS << "  type=" << D->getTypeOfReference().getString();
     }
     OS << ')';
   }
