@@ -185,10 +185,6 @@ namespace {
     Construction,
     /// \brief The first type is the type of a literal. There is no second
     /// type.
-    ///
-    /// FIXME: This kind of constraint will eventually go away, when we can
-    /// express the notion of 'converts to a particular literal kind' as a
-    /// protocol, rather than a convention.
     Literal,
     /// \brief The first type has a member with the given name, and the
     /// type of that member, when referenced as a value, is the second type.
@@ -3364,8 +3360,30 @@ resolveTypeVariable(ConstraintSystem &cs,
     return;
   }
 
-  // FIXME: Attempt to resolve literal constraints by dropping in the default
-  // literal types.
+  // If there are any literal constraints, add the default literal values as
+  // potential bindings.
+  auto &tc = cs.getTypeChecker();
+  for (auto &tvc : typeVarConstraints) {
+    // If we already explored type bindings for this type variable, skip it.
+    if (cs.haveExploredTypeVar(tvc.TypeVar))
+      continue;
+
+    bool foundLiteral = false;
+    for (auto &constraint : tvc.Constraints) {
+      if (constraint->getClassification() != ConstraintClassification::Literal)
+        continue;
+
+      if (auto type = tc.getDefaultLiteralType(constraint->getLiteralKind())) {
+        cs.addPotentialBinding(tvc.TypeVar, type);
+        foundLiteral = true;
+      }
+    }
+
+    if (foundLiteral)
+      return;
+  }
+
+  // We're out of ideas.
 }
 
 bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {

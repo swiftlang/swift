@@ -1565,10 +1565,44 @@ static Type lookupGlobalType(TypeChecker &TC, StringRef name) {
   return TD->getDeclaredType();
 }
 
+/// \brief Retrieve the default literal type for the given literal kind.
+Type TypeChecker::getDefaultLiteralType(LiteralKind kind) {
+  Type *type;
+  const char *name;
+  switch (kind) {
+  case LiteralKind::Char:
+    type = &CharacterLiteralType;
+    name = "CharacterLiteralType";
+    break;
+
+  case LiteralKind::ASCIIString:
+  case LiteralKind::UTFString:
+    type = &StringLiteralType;
+    name = "StringLiteralType";
+      break;
+
+  case LiteralKind::Float:
+    type = &FloatLiteralType;
+    name = "FloatLiteralType";
+    break;
+
+  case LiteralKind::Int:
+    type = &IntLiteralType;
+    name = "IntegerLiteralType";
+    break;
+  }
+
+  // If we haven't found the type yet, look for it now.
+  if (!*type)
+    *type = lookupGlobalType(*this, name);
+
+  return *type;
+}
+
 Type TypeChecker::getDefaultLiteralType(LiteralExpr *E) {
   if (isa<IntegerLiteralExpr>(E)) {
     if (!IntLiteralType) {
-      IntLiteralType = lookupGlobalType(*this, "IntegerLiteralType");
+      IntLiteralType = getDefaultLiteralType(LiteralKind::Int);
       if (!IntLiteralType) {
         diagnose(E->getLoc(), diag::no_IntegerLiteralType_found);
         IntLiteralType = BuiltinIntegerType::get(32, Context);
@@ -1579,7 +1613,7 @@ Type TypeChecker::getDefaultLiteralType(LiteralExpr *E) {
   
   if (isa<FloatLiteralExpr>(E)) {
     if (!FloatLiteralType) {
-      FloatLiteralType = lookupGlobalType(*this, "FloatLiteralType");
+      FloatLiteralType = getDefaultLiteralType(LiteralKind::Float);
       if (!FloatLiteralType) {
         diagnose(E->getLoc(), diag::no_FloatLiteralType_found);
         FloatLiteralType = Context.TheIEEE64Type;
@@ -1590,7 +1624,7 @@ Type TypeChecker::getDefaultLiteralType(LiteralExpr *E) {
   
   if (isa<CharacterLiteralExpr>(E)) {
     if (!CharacterLiteralType) {
-      CharacterLiteralType = lookupGlobalType(*this, "CharacterLiteralType");
+      CharacterLiteralType = getDefaultLiteralType(LiteralKind::Char);
       if (!CharacterLiteralType) {
         diagnose(E->getLoc(), diag::no_CharacterLiteralType_found);
         CharacterLiteralType = BuiltinIntegerType::get(32, Context);
@@ -1602,7 +1636,7 @@ Type TypeChecker::getDefaultLiteralType(LiteralExpr *E) {
   assert((isa<StringLiteralExpr>(E) || isa<InterpolatedStringLiteralExpr>(E)) &&
          "Unknown literal type");
   if (!StringLiteralType) {
-    StringLiteralType = lookupGlobalType(*this, "StringLiteralType");
+    StringLiteralType = getDefaultLiteralType(LiteralKind::UTFString);
     if (!StringLiteralType) {
       diagnose(E->getLoc(), diag::no_StringLiteralType_found);
       StringLiteralType = Context.TheRawPointerType;

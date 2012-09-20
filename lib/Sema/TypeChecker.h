@@ -396,11 +396,14 @@ public:
   bool typeCheckCondition(Expr *&E);
   bool typeCheckArrayBound(Expr *&E, bool requireConstant);
   bool typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc, Expr *&Src);
-  
+
+  /// \brief Retrieve the default literal type for the given literal kind.
+  Type getDefaultLiteralType(LiteralKind kind);
+
   /// \brief Retrieve the default literal type for the given literal
   /// expression.
   Type getDefaultLiteralType(LiteralExpr *E);
-  
+
   /// resolveUnresolvedLiterals - Given an expression containing unresolved
   /// literals, resolve those unresolved literals to their default types and
   /// type-check the expression again.
