@@ -1050,7 +1050,7 @@ namespace {
     bool isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables);
 
     /// \brief Convert the expression to the given type.
-    Expr *convertToType(Expr *expr, Type toType);
+    Expr *convertToType(Expr *expr, Type toType, bool isAssignment = false);
 
     /// \brief Apply the solution to the given expression, returning the
     /// rewritten, fully-typed expression.
@@ -3516,9 +3516,29 @@ ConstraintSystem::isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables) {
 //===--------------------------------------------------------------------===//
 #pragma mark Applying a solution to an expression.
 
-Expr *ConstraintSystem::convertToType(Expr *expr, Type toType) {
+Expr *ConstraintSystem::convertToType(Expr *expr, Type toType,
+                                      bool isAssignment) {
   // FIXME: Temporary hack that uses the existing coercion logic.
-  return TC.coerceToType(expr, toType);
+  return TC.coerceToType(expr, toType,
+                         isAssignment? CoercionKind::Assignment
+                                     : CoercionKind::Normal);
+}
+
+/// \brief Determine whether the given expression refers to an assignment
+/// function.
+static bool isAssignmentFn(Expr *expr) {
+  expr = expr->getSemanticsProvidingExpr();
+  if (auto dre = dyn_cast<DeclRefExpr>(expr))
+    return dre->getDecl()->getAttrs().isAssignment();
+  if (auto dotCall = dyn_cast<DotSyntaxCallExpr>(expr))
+    return isAssignmentFn(dotCall->getFn());
+  if (auto emr = dyn_cast<ExistentialMemberRefExpr>(expr))
+    return emr->getDecl()->getAttrs().isAssignment();
+  if (auto amr = dyn_cast<ArchetypeMemberRefExpr>(expr))
+    return amr->getDecl()->getAttrs().isAssignment();
+  if (auto gmr = dyn_cast<GenericMemberRefExpr>(expr))
+    return gmr->getDecl()->getAttrs().isAssignment();
+  return false;
 }
 
 Expr *ConstraintSystem::applySolution(Expr *expr) {
@@ -3909,7 +3929,8 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // the function.
       // FIXME: Coerce object arguments somewhere.
       if (auto fnType = fn->getType()->getAs<FunctionType>()) {
-        auto arg = CS.convertToType(expr->getArg(), fnType->getInput());
+        auto arg = CS.convertToType(expr->getArg(), fnType->getInput(),
+                                    isAssignmentFn(fn));
         if (!arg) {
           tc.diagnose(fn->getLoc(), diag::while_converting_function_argument,
                       fnType->getInput())
