@@ -353,17 +353,17 @@ equal to this expression, but allow some holes".  But it's possible
 that it instead might be really badly confusing.  We'll see!  It'll be fun!
 
 This kindof forces us to have parallel pattern grammars for the two
-major clients::
+major clients:
 
-  * Match patterns are used in :code:`switch` and :code:`matches`, where
-    we're decomposing something with a real possibility of failing.
-    This means that expressions are okay in leaf positions, but that
-    name-bindings need to be explicitly advertised in some way to
-    reasonably disambiguate them from expressions.
-  * Exhaustive patterns are used in :code:`var` declarations
-    and function signatures.  They're not allowed to be non-exhaustive,
-    so having a match expression doesn't make any sense.  Name bindings
-    are common and so shouldn't be penalized.
+- Match patterns are used in :code:`switch` and :code:`matches`, where
+  we're decomposing something with a real possibility of failing.
+  This means that expressions are okay in leaf positions, but that
+  name-bindings need to be explicitly advertised in some way to
+  reasonably disambiguate them from expressions.
+- Exhaustive patterns are used in :code:`var` declarations
+  and function signatures.  They're not allowed to be non-exhaustive,
+  so having a match expression doesn't make any sense.  Name bindings
+  are common and so shouldn't be penalized.
 
 You might think that having a "pattern" as basic as :code:`foo` mean
 something different in two different contexts would be confusing, but
@@ -377,10 +377,14 @@ In general, a lot of these productions are the same, so I'm going to
 talk about *-patterns, with some specific special rules that only
 apply to specific pattern kinds.
 
+::
+
   *-pattern ::= '_'
 
 A single-underscore identifier is always an "ignore" pattern.  It
 matches anything, but does not bind it to a variable.
+
+::
 
   exhaustive-pattern ::= identifier
   match-pattern ::= '?' identifier
@@ -399,6 +403,8 @@ reference.  I considered using 'var' instead, but using punctuation
 means we don't need a space, which means this is much more compact in
 practice.
 
+::
+
   exhaustive-pattern ::= exhaustive-pattern ':' type
 
 In an exhaustive pattern, you can annotate an arbitrary sub-pattern
@@ -407,6 +413,8 @@ variable isn't always inferrable (or correctly inferrable), and types
 in function signatures are generally outright required.  It's not as
 useful in a match pattern, and the colon can be grammatically awkward
 there, so we disallow it.
+
+::
 
   match-pattern ::= match-pattern-identifier match-pattern-tuple?
   match-pattern-identifier ::= '.' identifier
@@ -453,6 +461,8 @@ I'm not totally sold on not allowing positional matching against
 struct elements; that seems unfortunate in cases where positionality
 is conventionally unambiguous, like with a point.
 
+::
+
   match-pattern ::= expression
 
 When ambiguous, match patterns are interpreted using a
@@ -483,6 +493,8 @@ against 0 before calling :code:`foo()`, that would be great.  Also, if
 a name is bound and then used directly as an expression later on, it
 would be nice to have some flexibility about which value is actually
 copied into the variable, but this is less critical.
+
+::
 
   *-pattern ::= *-pattern-tuple
   *-pattern-tuple ::= '(' *-pattern-tuple-element-list? '...'? ')'
