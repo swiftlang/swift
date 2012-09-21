@@ -540,6 +540,21 @@ namespace {
     Construction
   };
 
+  /// \brief The result of comparing two constraint systems that are a solutions
+  /// to the given set of constraints.
+  enum class SolutionCompareResult {
+    /// \brief The two solutions are incomparable, because, e.g., because one
+    /// solution has some better decisions and some worse decisions than the
+    /// other.
+    Incomparable,
+    /// \brief The two solutions are identical.
+    Identical,
+    /// \brief The first solution is better than the second.
+    Better,
+    /// \brief The second solution is better than the first.
+    Worse
+  };
+
   /// \brief Describes a system of constraints on type variables, the
   /// solution of which assigns concrete types to each of the type variables.
   /// Constraint systems are typically generated given an (untyped) expression.
@@ -1044,6 +1059,31 @@ namespace {
     /// that all type variables are either bound to fixed types or have only
     /// protocol constraints remaining on them.
     bool isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables);
+
+    /// \brief Determine whether this constraint system is fully solved, with
+    /// no free variables.
+    bool isSolved() {
+      SmallVector<TypeVariableType *, 4> freeVariables;
+      return isSolved(freeVariables) && freeVariables.empty();
+    }
+
+  private:
+    /// \brief Determine whether the given \p type matches the default literal
+    /// type for a literal constraint placed on the type variable \p tv.
+    bool typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
+                                             Type type);
+
+    // \brief Compare two solutions to the same set of constraints.
+    static SolutionCompareResult compareSolutions(ConstraintSystem &cs1,
+                                                  ConstraintSystem &cs2);
+
+  public:
+    /// \brief Given a set of viable constraint systems, find the best
+    /// solution.
+    ///
+    /// \returns the best solution, or null if there is no best solution.
+    static ConstraintSystem *
+    findBestSolution(SmallVectorImpl<ConstraintSystem *> &viable);
 
     /// \brief Convert the expression to the given type.
     Expr *convertToType(Expr *expr, Type toType, bool isAssignment = false);
@@ -3472,6 +3512,27 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     }
   }
 
+  // If there is more than one viable system, attempt to pick the best solution.
+  if (viable.size() > 1) {
+    if (auto best = findBestSolution(viable)) {
+      if (TC.getLangOpts().DebugConstraintSolver) {
+        unsigned idx = 0;
+        for (auto cs : viable) {
+          SmallVector<TypeVariableType *, 4> freeVariables;
+          llvm::outs() << "---Child system #" << ++idx;
+          if (cs == best) {
+            llvm::outs() << " (best)";
+          }
+          llvm::outs() << "---\n";
+          cs->dump();
+        }
+      }
+
+      viable.clear();
+      viable.push_back(best);
+    }
+  }
+
   SmallVector<TypeVariableType *, 4> freeVariables;
   return viable.size() != 1 || !viable.front()->isSolved(freeVariables) ||
          !freeVariables.empty();
@@ -3527,6 +3588,230 @@ ConstraintSystem::isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables) {
 
   assert(!freeVariables.empty() || Constraints.empty());
   return true;
+}
+
+//===--------------------------------------------------------------------===//
+// Ranking solutions
+//===--------------------------------------------------------------------===//
+#pragma mark Ranking solutions
+
+bool ConstraintSystem::typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
+                                                           Type type) {
+  tv = tv->getImpl().getRepresentative();
+
+  // FIXME:
+  for (auto constraint : Constraints) {
+    // We only care about literal constraints...
+    if (constraint->getClassification() != ConstraintClassification::Literal)
+      continue;
+
+    // on type variables...
+    auto constraintTV = constraint->getFirstType()->getAs<TypeVariableType>();
+    if (!constraintTV)
+      continue;
+
+    // that have the same representative as the type we care about.
+    if (constraintTV->getImpl().getRepresentative() != tv)
+      continue;
+
+    // If the type we were given matches the default literal type for this
+    // constraint, we found what we're looking for.
+    if (type->isEqual(TC.getDefaultLiteralType(constraint->getLiteralKind())))
+      return true;
+  }
+
+  return false;
+}
+
+/// \brief Updates a solution comparison result based on whether a given metric
+/// considers one solution set to be "at least as good as" the other.
+///
+/// \returns true if the caller should return the result immediately, because no
+/// additional information would change it.
+static bool updateSolutionCompareResult(SolutionCompareResult &result,
+                                        bool firstAsGoodAsSecond,
+                                        bool secondAsGoodAsFirst) {
+  if (firstAsGoodAsSecond && secondAsGoodAsFirst) {
+    result = SolutionCompareResult::Incomparable;
+    return true;
+  }
+
+  if (firstAsGoodAsSecond != secondAsGoodAsFirst) {
+    switch (result) {
+    case SolutionCompareResult::Incomparable:
+      return true;
+
+    case SolutionCompareResult::Identical:
+      result = firstAsGoodAsSecond? SolutionCompareResult::Better
+                                  : SolutionCompareResult::Worse;
+      break;
+
+    case SolutionCompareResult::Better:
+      if (secondAsGoodAsFirst)
+        result = SolutionCompareResult::Incomparable;
+      break;
+
+    case SolutionCompareResult::Worse:
+      if (firstAsGoodAsSecond)
+        result =  SolutionCompareResult::Incomparable;
+      break;
+    }
+  }
+
+  return false;
+}
+
+SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs1,
+                                                         ConstraintSystem &cs2){
+  // FIXME: Find least common ancestor. We don't need to look further than
+  // than for a decision.
+
+  // Compare the sets of bound type variables in the two systems.
+  // FIXME: This would be a good place to stop at the LCA.
+  bool disjointTypeVariables = false;
+  auto compareTypeVariables =
+    [&](ConstraintSystem *cs1, ConstraintSystem *cs2) -> SolutionCompareResult {
+      SolutionCompareResult result = SolutionCompareResult::Identical;
+      for (auto walkCS1 = cs1; walkCS1; walkCS1 = walkCS1->Parent) {
+        if (auto boundTV1 = walkCS1->assumedTypeVar) {
+          if (auto type2 = cs2->simplifyType(boundTV1)) {
+            auto type1 = cs1->simplifyType(boundTV1);
+
+            // If the types are equivalent, there's nothing more to do.
+            if (type1->isEqual(type2))
+              continue;
+
+            // If one type is a subtype of the other, but not vice-verse,
+            // we prefer the system with the more-constrained type.
+            bool trivial = false;
+            bool type1Better = cs1->matchTypes(type1, type2,
+                                               TypeMatchKind::Subtype,
+                                               TMF_None, trivial)
+                                 == SolutionKind::TriviallySolved;
+            bool type2Better = cs2->matchTypes(type2, type1,
+                                               TypeMatchKind::Subtype,
+                                               TMF_None, trivial)
+                                 == SolutionKind::TriviallySolved;
+            if (updateSolutionCompareResult(result, type1Better, type2Better))
+              return result;
+            if (type1Better || type2Better)
+              continue;
+
+            // If the type variable was bound by a literal constraint, and the
+            // type it is bound to happens to match the default literal
+            // constraint in one system but not the other, we prefer the one
+            // that matches the default.
+            // Note that the constraint will be available in the parent of
+            // the constraint system that assumed a value for the type variable
+            // (or, of course, in the original system, since these constraints
+            // are generated directly from the expression).
+            // FIXME: Make it efficient to find these constraints. This is
+            // silly.
+            bool defaultLit1
+              = walkCS1->Parent->typeMatchesDefaultLiteralConstraint(boundTV1,
+                                                                     type1);
+            bool defaultLit2
+              = walkCS1->Parent->typeMatchesDefaultLiteralConstraint(boundTV1,
+                                                                     type2);
+            if (updateSolutionCompareResult(result, defaultLit1, defaultLit2))
+              return result;
+            
+            continue;
+          }
+
+          // There's a type variable in one constraint system that isn't in the
+          // other.
+          // FIXME: We would love to be able to match up more type variables,
+          // perhaps by being more careful when we open types in peer systems.
+          disjointTypeVariables = true;
+        }
+      }
+
+      return result;
+    };
+
+  // Compare the type variables bound in the first system to the type variables
+  // bound in the second type system.
+  SolutionCompareResult result = compareTypeVariables(&cs1, &cs2);
+  
+  // FIXME: There might be variables bound in the second type system but not
+  // the first, but for now we don't really care.
+
+  // FIXME: Compare overload sets.
+
+  switch (result) {
+  case SolutionCompareResult::Incomparable:
+  case SolutionCompareResult::Better:
+  case SolutionCompareResult::Worse:
+    return result;
+
+  case SolutionCompareResult::Identical:
+    // FIXME: We haven't checked enough to conclude that two solutions are
+    // identical.
+    return SolutionCompareResult::Incomparable;
+  }
+}
+
+ConstraintSystem *
+ConstraintSystem::findBestSolution(SmallVectorImpl<ConstraintSystem *> &viable){
+  if (viable.empty())
+    return nullptr;
+  if (viable.size() == 1)
+    return viable[0]->isSolved()? viable[0] : nullptr;
+
+  // Find a potential best. 
+  ConstraintSystem *best = nullptr;
+  for (auto cs : viable) {
+    // Skip unsolved systems.
+    if (!cs->isSolved())
+      continue;
+    
+    if (!best) {
+      // Found the first solved system.
+      best = cs;
+      continue;
+    }
+
+    switch (compareSolutions(*cs, *best)) {
+    case SolutionCompareResult::Identical:
+      // FIXME: Might want to warn about this in debug builds, so we can
+      // find a way to eliminate the redundancy in the search space.
+    case SolutionCompareResult::Incomparable:
+    case SolutionCompareResult::Worse:
+      break;
+
+    case SolutionCompareResult::Better:
+      best = cs;
+      break;
+    }
+  }
+
+  if (!best)
+    return nullptr;
+
+  // Make sure that our current best is better than all of the solved systems.
+  for (auto cs : viable) {
+    if (best == cs || !cs->isSolved())
+      continue;
+
+    switch (compareSolutions(*best, *cs)) {
+    case SolutionCompareResult::Identical:
+      // FIXME: Might want to warn about this in debug builds, so we can
+      // find a way to eliminate the redundancy in the search space.
+      // Fall through
+    case SolutionCompareResult::Better:
+      break;
+
+    case SolutionCompareResult::Incomparable:
+    case SolutionCompareResult::Worse:
+      return nullptr;
+    }
+  }
+
+  // FIXME: If we lost our best, we should minimize the set of viable
+  // solutions.
+
+  return best;
 }
 
 //===--------------------------------------------------------------------===//
