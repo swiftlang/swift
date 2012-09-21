@@ -35,6 +35,7 @@
 #include "GenType.h"
 #include "IRGenModule.h"
 #include "ScalarTypeInfo.h"
+#include "StructMetadataLayout.h"
 #include "TypeVisitor.h"
 
 #include "GenMeta.h"
@@ -344,76 +345,11 @@ void irgen::emitMetaTypeRef(IRGenFunction &IGF, Type type,
 /*****************************************************************************/
 
 namespace {
-  template <class Impl>
-  class ClassMetadataBuilderBase : public ClassMetadataLayout<Impl> {
-    typedef ClassMetadataLayout<Impl> super;
-
-  protected:
-    SmallVector<llvm::Constant *, 8> Fields;
-    const HeapLayout &Layout;    
-
-    ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
-                             const HeapLayout &layout)
-      : super(IGM, theClass), Layout(layout) {}
-
-    unsigned getNextIndex() const { return Fields.size(); }
-
-  public:
-    /// The runtime provides a value witness table for Builtin.ObjectPointer.
-    void addValueWitnessTable() {
-      auto type = CanType(this->IGM.Context.TheObjectPointerType);
-      auto wtable = this->IGM.getAddrOfValueWitnessTable(type);
-      Fields.push_back(wtable);
-    }
-
-    void addDestructorFunction() {
-      Fields.push_back(this->IGM.getAddrOfDestructor(this->TargetClass));
-    }
-
-    void addSizeFunction() {
-      Fields.push_back(Layout.createSizeFn(this->IGM));
-    }
-
-    void addGenericWitness(ClassDecl *forClass, llvm::Type *witnessType) {
-      Fields.push_back(llvm::Constant::getNullValue(witnessType));
-    }
-
-    llvm::Constant *getInit() {
-      if (Fields.size() == NumHeapMetadataFields) {
-        return llvm::ConstantStruct::get(this->IGM.HeapMetadataStructTy,
-                                         Fields);
-      } else {
-        return llvm::ConstantStruct::getAnon(Fields);
-      }
-    }
-  };
-
-  class ClassMetadataBuilder :
-    public ClassMetadataBuilderBase<ClassMetadataBuilder> {
-  public:
-    ClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                         const HeapLayout &layout)
-      : ClassMetadataBuilderBase(IGM, theClass, layout) {}
-
-    void addMetadataFlags() {
-      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
-                                              unsigned(MetadataKind::Class)));
-    }
-
-    llvm::Constant *getInit() {
-      if (Fields.size() == NumHeapMetadataFields) {
-        return llvm::ConstantStruct::get(IGM.HeapMetadataStructTy, Fields);
-      } else {
-        return llvm::ConstantStruct::getAnon(Fields);
-      }
-    }
-  };
-
-  /// A builder for metadata templates.
-  class ClassMetadataTemplateBuilder :
-    public ClassMetadataBuilderBase<ClassMetadataTemplateBuilder> {
-
-    typedef ClassMetadataBuilderBase super;
+  /// An adapter class which turns a metadata layout class into a
+  /// generic metadata layout class.
+  template <class Impl, class Base>
+  class GenericMetadataBuilderBase : public Base {
+    typedef Base super;
 
     /// The generics clause for the type we're emitting.
     const GenericParamList &ClassGenerics;
@@ -434,12 +370,17 @@ namespace {
 
     enum { TemplateHeaderFieldCount = 5 };
 
-  public:
-    ClassMetadataTemplateBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                                 const HeapLayout &layout,
-                                 const GenericParamList &classGenerics)
-      : super(IGM, theClass, layout), ClassGenerics(classGenerics) {}
+  protected:
+    using super::IGM;
+    using super::Fields;
 
+    template <class... T>
+    GenericMetadataBuilderBase(IRGenModule &IGM, 
+                               const GenericParamList &generics,
+                               T &&...args)
+      : super(IGM, std::forward<T>(args)...), ClassGenerics(generics) {}
+
+  public:
     void layout() {
       // Leave room for the header.
       Fields.append(TemplateHeaderFieldCount, nullptr);
@@ -461,7 +402,7 @@ namespace {
       //   size_t MetadataSize;
       // We compute this assuming that every entry in the metadata table
       // is a pointer.
-      Size size = getNextIndex() * IGM.getPointerSize();
+      Size size = this->getNextIndex() * IGM.getPointerSize();
       Fields[2] = llvm::ConstantInt::get(IGM.SizeTy, size.getValue());
 
       //   void *PrivateData[8];
@@ -473,11 +414,6 @@ namespace {
       assert(TemplateHeaderFieldCount == 5);
     }
 
-    void addMetadataFlags() {
-      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
-                                       unsigned(MetadataKind::GenericClass)));
-    }
-
     /// Ignore the preallocated header.
     unsigned getNextIndex() const {
       return super::getNextIndex() - TemplateHeaderFieldCount;
@@ -486,10 +422,11 @@ namespace {
     /// The algorithm we use here is really wrong: we're treating all
     /// the witness tables as if they were arguments, then just
     /// copying them in-place.
-    void addGenericWitness(ClassDecl *forClass, llvm::Type *witnessTy) {
+    template <class... T>
+    void addGenericWitness(llvm::Type *witnessTy, T &&...args) {
       assert(witnessTy->isPointerTy());
       FillOps.push_back(FillOp(NumGenericWitnesses++, getNextIndex()));
-      super::addGenericWitness(forClass, witnessTy);
+      super::addGenericWitness(witnessTy, std::forward<T>(args)...);
     }
 
   private:
@@ -536,16 +473,115 @@ namespace {
   };
 }
 
-/// Emit the heap metadata or metadata template for a class.
-void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl) {
-  // Find the layout for the class.
-  auto &layout = getClassLayout(IGM, classDecl);
+// Classes
 
+namespace {
+  /// An adapter for laying out class metadata.
+  template <class Impl>
+  class ClassMetadataBuilderBase : public ClassMetadataLayout<Impl> {
+    typedef ClassMetadataLayout<Impl> super;
+
+  protected:
+    using super::IGM;
+    using super::TargetClass;
+    SmallVector<llvm::Constant *, 8> Fields;
+    const HeapLayout &Layout;    
+
+    ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
+                             const HeapLayout &layout)
+      : super(IGM, theClass), Layout(layout) {}
+
+    unsigned getNextIndex() const { return Fields.size(); }
+
+  public:
+    /// The runtime provides a value witness table for Builtin.ObjectPointer.
+    void addValueWitnessTable() {
+      auto type = CanType(this->IGM.Context.TheObjectPointerType);
+      auto wtable = this->IGM.getAddrOfValueWitnessTable(type);
+      Fields.push_back(wtable);
+    }
+
+    void addDestructorFunction() {
+      Fields.push_back(IGM.getAddrOfDestructor(TargetClass));
+    }
+
+    void addSizeFunction() {
+      Fields.push_back(Layout.createSizeFn(IGM));
+    }
+
+    void addNominalTypeDescriptor() {
+      // FIXME!
+      Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+    }
+
+    void addParent() {
+      // FIXME!
+      Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+    }
+
+    void addSuperClass() {
+      // FIXME!
+      Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+    }
+
+    void addGenericWitness(llvm::Type *witnessType, ClassDecl *forClass) {
+      Fields.push_back(llvm::Constant::getNullValue(witnessType));
+    }
+
+    llvm::Constant *getInit() {
+      return llvm::ConstantStruct::getAnon(Fields);
+    }
+  };
+
+  class ClassMetadataBuilder :
+    public ClassMetadataBuilderBase<ClassMetadataBuilder> {
+  public:
+    ClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
+                         const HeapLayout &layout)
+      : ClassMetadataBuilderBase(IGM, theClass, layout) {}
+
+    void addMetadataFlags() {
+      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
+                                              unsigned(MetadataKind::Class)));
+    }
+
+    llvm::Constant *getInit() {
+      if (Fields.size() == NumHeapMetadataFields) {
+        return llvm::ConstantStruct::get(IGM.HeapMetadataStructTy, Fields);
+      } else {
+        return llvm::ConstantStruct::getAnon(Fields);
+      }
+    }
+  };
+
+  /// A builder for metadata templates.
+  class GenericClassMetadataBuilder :
+    public GenericMetadataBuilderBase<GenericClassMetadataBuilder,
+                      ClassMetadataBuilderBase<GenericClassMetadataBuilder>> {
+
+    typedef GenericMetadataBuilderBase super;
+
+  public:
+    GenericClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
+                                const HeapLayout &layout,
+                                const GenericParamList &classGenerics)
+      : super(IGM, classGenerics, theClass, layout) {}
+
+    void addMetadataFlags() {
+      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
+                                       unsigned(MetadataKind::GenericClass)));
+    }
+  };
+}
+
+/// Emit the type metadata or metadata template for a class.
+void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
+                              const HeapLayout &layout) {
   // TODO: classes nested within generic types
   llvm::Constant *init;
   bool isPattern;
   if (auto *generics = classDecl->getGenericParamsOfContext()) {
-    ClassMetadataTemplateBuilder builder(IGM, classDecl, layout, *generics);
+    GenericClassMetadataBuilder builder(IGM, classDecl, layout, *generics);
     builder.layout();
     init = builder.getInit();
     isPattern = true;
@@ -560,6 +596,117 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl) {
   bool isIndirect = false;
 
   CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
+  auto var = cast<llvm::GlobalVariable>(
+                     IGM.getAddrOfTypeMetadata(declaredType,
+                                               isIndirect, isPattern,
+                                               init->getType()));
+  var->setConstant(true);
+  var->setInitializer(init);
+}
+
+// Structs
+
+namespace {
+  /// An adapter for laying out struct metadata.
+  template <class Impl>
+  class StructMetadataBuilderBase : public StructMetadataLayout<Impl> {
+    typedef StructMetadataLayout<Impl> super;
+
+  protected:
+    using super::IGM;
+    SmallVector<llvm::Constant *, 8> Fields;
+
+    StructMetadataBuilderBase(IRGenModule &IGM, StructDecl *theStruct)
+      : super(IGM, theStruct) {}
+
+    unsigned getNextIndex() const { return Fields.size(); }
+
+  public:
+    void addValueWitnessTable() {
+      // FIXME!
+      Fields.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
+    }
+
+    void addNominalTypeDescriptor() {
+      // FIXME!
+      Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+    }
+
+    void addParent() {
+      // FIXME!
+      Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+    }
+
+    void addGenericWitness(llvm::Type *witnessType) {
+      Fields.push_back(llvm::Constant::getNullValue(witnessType));
+    }
+
+    llvm::Constant *getInit() {
+      if (Fields.size() == NumHeapMetadataFields) {
+        return llvm::ConstantStruct::get(this->IGM.HeapMetadataStructTy,
+                                         Fields);
+      } else {
+        return llvm::ConstantStruct::getAnon(Fields);
+      }
+    }
+  };
+
+  class StructMetadataBuilder :
+    public StructMetadataBuilderBase<StructMetadataBuilder> {
+  public:
+    StructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct)
+      : StructMetadataBuilderBase(IGM, theStruct) {}
+
+    void addMetadataFlags() {
+      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
+                                              unsigned(MetadataKind::Struct)));
+    }
+
+    llvm::Constant *getInit() {
+      return llvm::ConstantStruct::getAnon(Fields);
+    }
+  };
+
+  /// A builder for metadata templates.
+  class GenericStructMetadataBuilder :
+    public GenericMetadataBuilderBase<GenericStructMetadataBuilder,
+                      StructMetadataBuilderBase<GenericStructMetadataBuilder>> {
+
+    typedef GenericMetadataBuilderBase super;
+
+  public:
+    GenericStructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct,
+                                const GenericParamList &classGenerics)
+      : super(IGM, classGenerics, theStruct) {}
+
+    void addMetadataFlags() {
+      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
+                                       unsigned(MetadataKind::GenericStruct)));
+    }
+  };
+}
+
+/// Emit the type metadata or metadata template for a struct.
+void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
+  // TODO: structs nested within generic types
+  llvm::Constant *init;
+  bool isPattern;
+  if (auto *generics = structDecl->getGenericParamsOfContext()) {
+    GenericStructMetadataBuilder builder(IGM, structDecl, *generics);
+    builder.layout();
+    init = builder.getInit();
+    isPattern = true;
+  } else {
+    StructMetadataBuilder builder(IGM, structDecl);
+    builder.layout();
+    init = builder.getInit();
+    isPattern = false;
+  }
+
+  // For now, all type metadata is directly stored.
+  bool isIndirect = false;
+
+  CanType declaredType = structDecl->getDeclaredType()->getCanonicalType();
   auto var = cast<llvm::GlobalVariable>(
                      IGM.getAddrOfTypeMetadata(declaredType,
                                                isIndirect, isPattern,

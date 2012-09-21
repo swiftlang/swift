@@ -151,7 +151,6 @@ private:
   TypeConverter &Types;
   friend class TypeConverter;
   friend class GenProto;
-  friend class GenClass;
 
 //--- Globals ---------------------------------------------------------------
 public:

@@ -43,19 +43,6 @@
 using namespace swift;
 using namespace irgen;
 
-namespace swift {
-namespace irgen {
-  /// A little helper to give this file some privileged access.
-  /// The amount of code in this class is intentionally very small.
-  class GenClass {
-  public:
-    static TypeConverter &getTypeConverter(IRGenModule &IGM) {
-      return IGM.Types;
-    }
-  };
-}
-}
-
 namespace {
   /// Layout information for class types.
   class ClassTypeInfo : public HeapTypeInfo {
@@ -99,13 +86,6 @@ namespace {
     }
   };
 }  // end anonymous namespace.
-
-const HeapLayout &irgen::getClassLayout(IRGenModule &IGM,
-                                        ClassDecl *classDecl) {
-  auto &types = GenClass::getTypeConverter(IGM);
-  auto &classTI = types.getFragileTypeInfo(classDecl).as<ClassTypeInfo>();
-  return classTI.getLayout(IGM);
-}
 
 static unsigned getFieldIndex(ClassDecl *base, VarDecl *target) {
   // FIXME: This is an ugly hack.
@@ -291,8 +271,11 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
 
 /// emitStructType - Emit all the declarations associated with this oneof type.
 void IRGenModule::emitClassDecl(ClassDecl *D) {
+  auto &classTI = Types.getFragileTypeInfo(D).as<ClassTypeInfo>();
+  auto &layout = classTI.getLayout(*this);
+
   // Emit the class metadata.
-  emitClassMetadata(*this, D);
+  emitClassMetadata(*this, D, layout);
 
   bool emittedDtor = false;
 
@@ -393,8 +376,11 @@ namespace {
     void addValueWitnessTable() { NextIndex++; }
     void addDestructorFunction() { NextIndex++; }
     void addSizeFunction() { NextIndex++; }
+    void addNominalTypeDescriptor() { NextIndex++; }
+    void addParent() { NextIndex++; }
+    void addSuperClass() { NextIndex++; }
 
-    void addGenericWitness(ClassDecl *forClass, llvm::Type *witnessType) {
+    void addGenericWitness(llvm::Type *witnessType, ClassDecl *forClass) {
       // Ignore witnesses for base classes.
       if (forClass != TargetClass) {
         NextIndex++;

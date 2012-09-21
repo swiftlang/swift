@@ -32,8 +32,6 @@ namespace irgen {
   LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
                                        GenericMemberRefExpr *E);
 
-  const HeapLayout &getClassLayout(IRGenModule &IGM, ClassDecl *theClass);
-
 } // end namespace irgen
 } // end namespace swift
 

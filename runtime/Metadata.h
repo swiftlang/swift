@@ -377,8 +377,19 @@ struct ClassMetadata : public HeapMetadata {
   /// An out-of-line description of the type.
   const NominalTypeDescriptor *Description;
 
-  /// The metadata for the parent class.  This is null for the root class.
-  const ClassMetadata *ParentClass;
+  /// The parent type of this member type, or null if this is not a
+  /// member type.
+  const Metadata *Parent;
+
+  /// The metadata for the super class.  This is null for the root class.
+  const ClassMetadata *SuperClass;
+
+  // After this come the class members, laid out as follows:
+  //   - class members for the base class (recursively)
+  //   - generic parameters for the parent (recursively)
+  //   - generic parameters for this class
+  //   - class variables (if we choose to support these)
+  //   - "tabulated" virtual methods
 };
 
 /// The structure of metadata for heap-allocated local variables.
@@ -411,6 +422,18 @@ struct HeapLocalVariableMetadata : public HeapMetadata {
 /// discovery apply equally here.
 struct HeapArrayMetadata : public HeapMetadata {
   // No extra fields for now.
+};
+
+/// The structure of type metadata for structs.
+struct StructMetadata : public Metadata {
+  /// An out-of-line description of the type.
+  const NominalTypeDescriptor *Description;
+
+  /// The parent type of this member type, or null if this is not a
+  /// member type.
+  const Metadata *Parent;
+
+  // This is followed by the generics information, if this type is generic.
 };
 
 /// The structure of function type metadata.

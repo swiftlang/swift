@@ -25,6 +25,7 @@
 #include "llvm/Function.h"
 
 #include "GenInit.h"
+#include "GenMeta.h"
 #include "GenSequential.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
@@ -189,6 +190,8 @@ LValue irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
 
 /// emitStructType - Emit all the declarations associated with this oneof type.
 void IRGenModule::emitStructDecl(StructDecl *st) {
+  emitStructMetadata(*this, st);
+
   // FIXME: This is mostly copy-paste from emitExtension;
   // figure out how to refactor! 
   for (Decl *member : st->getMembers()) {

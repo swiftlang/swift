@@ -17,9 +17,7 @@
 #ifndef SWIFT_IRGEN_CLASSMETADATALAYOUT_H
 #define SWIFT_IRGEN_CLASSMETADATALAYOUT_H
 
-#include "llvm/ADT/SmallVector.h"
-#include "swift/AST/Decl.h"
-#include "GenProto.h"
+#include "MetadataLayout.h"
 
 namespace swift {
 namespace irgen {
@@ -31,53 +29,61 @@ const unsigned NumHeapMetadataFields = 4;
 
 /// A CRTP class for laying out class metadata.  Note that this does
 /// *not* handle the metadata template stuff.
-template <class Impl> class ClassMetadataLayout {
-  Impl &asImpl() { return *static_cast<Impl*>(this); }
+template <class Impl> class ClassMetadataLayout : public MetadataLayout<Impl> {
+  typedef MetadataLayout<Impl> super;
 
 protected:
-  IRGenModule &IGM;
+  using super::IGM;
+  using super::asImpl;
 
   /// The most-derived class.
   ClassDecl *const TargetClass;
 
-  ClassMetadataLayout(IRGenModule &IGM, ClassDecl *targetClass)
-    : IGM(IGM), TargetClass(targetClass) {}
+  ClassMetadataLayout(IRGenModule &IGM, ClassDecl *target)
+    : super(IGM), TargetClass(target) {}
 
 public:
   void layout() {
-    // Common fields.
-    asImpl().addMetadataFlags();
-    asImpl().addValueWitnessTable();
+    // Metadata header.
+    super::layout();
+
+    // HeapMetadata header.
     asImpl().addDestructorFunction();
     asImpl().addSizeFunction();
 
-    // Class-specific fields.
-    asImpl().addClassFields(TargetClass);
+    // ClassMetadata header.
+    asImpl().addNominalTypeDescriptor();
+    asImpl().addParent();
+    asImpl().addSuperClass();
+
+    // Class members.
+    addClassMembers(TargetClass);
   }
 
-protected:
+private:
   /// Add fields associated with the given class and its bases.
-  void addClassFields(ClassDecl *theClass) {
-    // TODO: base class
+  void addClassMembers(ClassDecl *theClass) {
+    // Add any fields associated with the superclass.
+    if (Type base = theClass->getBaseClass()) {
+      addClassMembers(base->getClassOrBoundGenericClass());
+    }
 
-    // TODO: virtual methods
-
+    // Add space for the generic parameters, if applicable.
     if (auto generics = theClass->getGenericParamsOfContext()) {
       addGenericClassFields(theClass, *generics);
     }
+
+    // TODO: virtual methods
   }
 
+private:
   /// Add fields related to the generics of this class declaration.
   /// TODO: don't add new fields that are implied by base class
   /// fields.  e.g., if B<T> extends A<T>, the witness for T in A's
   /// section should be enough.
   void addGenericClassFields(ClassDecl *theClass,
                              const GenericParamList &generics) {
-    SmallVector<llvm::Type*, 4> signature;
-    expandPolymorphicSignature(IGM, generics, signature);
-    for (auto type : signature) {
-      asImpl().addGenericWitness(theClass, type);
-    }
+    this->addGenericFields(generics, theClass);
   }
 };
 

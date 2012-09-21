@@ -24,12 +24,16 @@ namespace llvm {
 namespace swift {
   class Type;
   class CanType;
+  class ClassDecl;
   class NominalTypeDecl;
+  class StructDecl;
 
 namespace irgen {
   class Explosion;
+  class HeapLayout;
   class IRGenFunction;
   class IRGenModule;
+  class StructLayout;
 
   /// Emit a reference to the type metadata for a nominal type.
   ///
@@ -46,7 +50,12 @@ namespace irgen {
   llvm::Value *emitTypeMetadataRef(IRGenFunction &IGF, Type type);
 
   /// Emit the metadata associated with the given class declaration.
-  void emitClassMetadata(IRGenModule &IGM, ClassDecl *theClass);
+  void emitClassMetadata(IRGenModule &IGM, ClassDecl *theClass,
+                         const HeapLayout &layout);
+
+  /// Emit the metadata associated with the given struct declaration.
+  void emitStructMetadata(IRGenModule &IGM, StructDecl *theStruct);
+
 
 } // end namespace irgen
 } // end namespace swift
