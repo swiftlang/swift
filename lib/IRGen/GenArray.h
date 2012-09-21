@@ -39,8 +39,10 @@ namespace irgen {
   /// Emit an r-value reference to a function.
   void emitNewArrayExpr(IRGenFunction &IGF, NewArrayExpr *E,
                         Explosion &explosion);
+
   void emitArrayInjectionCall(IRGenFunction &IGF, ManagedValue alloc,
-                              Address begin, Type sliceTy, Expr *injectionFn,
+                              Address begin, CanType sliceTy,
+                              Expr *injectionFn,
                               llvm::Value *length, Explosion &out);
 
 

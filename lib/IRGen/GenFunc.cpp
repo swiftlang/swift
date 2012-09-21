@@ -113,15 +113,15 @@ static unsigned getNaturalUncurryLevel(ValueDecl *val) {
 
 /// Given a function type, return the formal result type at the given
 /// uncurrying level.  For 'a -> b -> c', this is 'b' at 0 and 'c' at 1.
-static Type getResultType(Type type, unsigned uncurryLevel) {
+static CanType getResultType(CanType type, unsigned uncurryLevel) {
   do {
-    type = type->castTo<AnyFunctionType>()->getResult();
+    type = CanType(cast<AnyFunctionType>(type)->getResult());
   } while (uncurryLevel--);
   return type;
 }
 
 const TypeInfo &IRGenFunction::getResultTypeInfo() const {
-  Type resultType = getResultType(CurFuncType, CurUncurryLevel);
+  CanType resultType = getResultType(CurFuncType, CurUncurryLevel);
   return IGM.getFragileTypeInfo(resultType);
 }
 
@@ -223,8 +223,8 @@ namespace {
     bool isDirect() const { return CurState == State::Direct; }
     bool isIndirect() const { return CurState == State::Indirect; }
 
-    Callee getDirectValuesAsIndirectCallee(Type origFormalType,
-                                           Type substResultType,
+    Callee getDirectValuesAsIndirectCallee(CanType origFormalType,
+                                           CanType substResultType,
                                            ArrayRef<Substitution> subs) {
       assert(isDirect());
       Explosion &values = getDirectValues();
@@ -446,22 +446,24 @@ const TypeInfo *TypeConverter::convertFunctionType(AnyFunctionType *T) {
 ///
 /// This is all somewhat optimized for register-passing CCs; it
 /// probably makes extra work when the stack gets involved.
-static Type decomposeFunctionType(IRGenModule &IGM, AnyFunctionType *fn,
-                                  ExplosionKind explosionKind,
-                                  unsigned uncurryLevel,
-                                  SmallVectorImpl<llvm::Type*> &argTypes) {
+static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
+                                     ExplosionKind explosionKind,
+                                     unsigned uncurryLevel,
+                                     SmallVectorImpl<llvm::Type*> &argTypes) {
+  auto fn = cast<AnyFunctionType>(type);
+
   // Save up the formal parameter types in reverse order.
   llvm::SmallVector<AnyFunctionType*, 8> formalFnTypes(uncurryLevel + 1);
   formalFnTypes[uncurryLevel] = fn;
   while (uncurryLevel--) {
-    fn = fn->getResult()->castTo<AnyFunctionType>();
+    fn = cast<AnyFunctionType>(CanType(fn->getResult()));
     formalFnTypes[uncurryLevel] = fn;
   }
 
   // Explode the argument clusters in that reversed order.
   for (AnyFunctionType *fnTy : formalFnTypes) {
     ExplosionSchema schema(explosionKind);
-    IGM.getSchema(fnTy->getInput(), schema);
+    IGM.getSchema(CanType(fnTy->getInput()), schema);
 
     for (ExplosionSchema::Element &elt : schema) {
       if (elt.isAggregate())
@@ -474,7 +476,7 @@ static Type decomposeFunctionType(IRGenModule &IGM, AnyFunctionType *fn,
       expandPolymorphicSignature(IGM, polyTy->getGenericParams(), argTypes);
   }
 
-  return fn->getResult();
+  return CanType(fn->getResult());
 }
 
 Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
@@ -495,8 +497,9 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
   SmallVector<llvm::Type*, 16> argTypes;
   argTypes.push_back(nullptr);
 
-  Type formalResultType = decomposeFunctionType(IGM, FormalType, explosionKind,
-                                                uncurryLevel, argTypes);
+  CanType formalResultType = decomposeFunctionType(IGM, CanType(FormalType),
+                                                   explosionKind,
+                                                   uncurryLevel, argTypes);
 
   // Compute the result type.
   llvm::Type *resultType;
@@ -542,9 +545,9 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
 }
 
 llvm::FunctionType *
-IRGenModule::getFunctionType(Type type, ExplosionKind explosionKind,
+IRGenModule::getFunctionType(CanType type, ExplosionKind explosionKind,
                              unsigned curryingLevel, bool withData) {
-  assert(type->is<AnyFunctionType>());
+  assert(isa<AnyFunctionType>(type));
   const FuncTypeInfo &fnTypeInfo = getFragileTypeInfo(type).as<FuncTypeInfo>();
   Signature sig = fnTypeInfo.getSignature(*this, explosionKind,
                                           curryingLevel, withData);
@@ -601,7 +604,7 @@ ManagedValue Callee::getDataPointer(IRGenFunction &IGF) const {
 static llvm::Value *emitCastOfIndirectFunction(IRGenFunction &IGF,
                                                llvm::Value *fnPtr,
                                                ManagedValue dataPtr,
-                                               Type origFnType) {
+                                               CanType origFnType) {
   bool hasData = !isa<llvm::ConstantPointerNull>(dataPtr.getValue());
   auto fnPtrTy = IGF.IGM.getFunctionType(origFnType, ExplosionKind::Minimal,
                                          0, hasData)->getPointerTo();
@@ -614,8 +617,8 @@ static Callee emitIndirectCallee(IRGenFunction &IGF,
                                  llvm::Value *fnPtr,
                                  ManagedValue dataPtr,
                                  ArrayRef<Substitution> subs,
-                                 Type origFnType,
-                                 Type substResultType) {
+                                 CanType origFnType,
+                                 CanType substResultType) {
   // Cast the function pointer appropriately.
   fnPtr = emitCastOfIndirectFunction(IGF, fnPtr, dataPtr, origFnType);
 
@@ -626,7 +629,7 @@ static Callee emitIndirectCallee(IRGenFunction &IGF,
 /// Emit a reference to a function, using the best parameters possible
 /// up to given limits.
 static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
-                               Type substResultType,
+                               CanType substResultType,
                                ArrayRef<Substitution> subs,
                                ExplosionKind bestExplosion,
                                unsigned bestUncurry) {
@@ -641,13 +644,14 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
     if (bestUncurry != 1) {
       IGF.unimplemented(val->getLoc(), "uncurried reference to constructor");
       fnPtr = llvm::UndefValue::get(
-          IGF.IGM.getFunctionType(val->getType(), bestExplosion,
-                                  bestUncurry, /*needsData*/false));
+          IGF.IGM.getFunctionType(val->getType()->getCanonicalType(),
+                                  bestExplosion, bestUncurry,
+                                  /*needsData*/false));
     } else {
       fnPtr = IGF.IGM.getAddrOfConstructor(ctor, bestExplosion);
     }
-    return Callee::forFreestandingFunction(ctor->getType(), substResultType,
-                                           subs, fnPtr,
+    return Callee::forFreestandingFunction(ctor->getType()->getCanonicalType(),
+                                           substResultType, subs, fnPtr,
                                            bestExplosion, bestUncurry);
   }
 
@@ -656,13 +660,14 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
     if (bestUncurry != oneofelt->hasArgumentType() ? 1 : 0) {
       IGF.unimplemented(val->getLoc(), "uncurried reference to oneof element");
       fnPtr = llvm::UndefValue::get(
-          IGF.IGM.getFunctionType(val->getType(), bestExplosion,
-                                  bestUncurry, /*needsData*/false));
+          IGF.IGM.getFunctionType(val->getType()->getCanonicalType(),
+                                  bestExplosion, bestUncurry,
+                                  /*needsData*/false));
     } else {
       fnPtr = IGF.IGM.getAddrOfInjectionFunction(oneofelt);
     }
-    return Callee::forFreestandingFunction(oneofelt->getType(), substResultType,
-                                           subs, fnPtr,
+    return Callee::forFreestandingFunction(oneofelt->getType()->getCanonicalType(),
+                                           substResultType, subs, fnPtr,
                                            bestExplosion, bestUncurry);
   }
 
@@ -671,11 +676,12 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
     llvm::Constant *fnPtr =
       IGF.IGM.getAddrOfFunction(fn, bestExplosion, bestUncurry, /*data*/ false);
     if (fn->isInstanceMember()) {
-      return Callee::forMethod(fn->getType(), substResultType, subs, fnPtr,
+      return Callee::forMethod(fn->getType()->getCanonicalType(),
+                               substResultType, subs, fnPtr,
                                bestExplosion, bestUncurry);
     } else {
-      return Callee::forFreestandingFunction(fn->getType(), substResultType,
-                                             subs, fnPtr,
+      return Callee::forFreestandingFunction(fn->getType()->getCanonicalType(),
+                                             substResultType, subs, fnPtr,
                                              bestExplosion, bestUncurry);
     }
   }
@@ -687,8 +693,8 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
   if (isa<llvm::ConstantPointerNull>(data.getValue()))
     data = ManagedValue(nullptr);
   return Callee::forKnownFunction(AbstractCC::Freestanding,
-                                  fn->getType(), substResultType, subs,
-                                  fnPtr, data,
+                                  fn->getType()->getCanonicalType(),
+                                  substResultType, subs, fnPtr, data,
                                   bestExplosion, bestUncurry);
 }
 
@@ -697,16 +703,18 @@ namespace {
   /// function being applied.
   struct CallSite {
     CallSite(ApplyExpr *apply)
-      : Apply(apply), FnType(apply->getFn()->getType()) {}
+      : Apply(apply), FnType(apply->getFn()->getType()->getCanonicalType()) {}
 
     ApplyExpr *Apply;
 
     /// The function type that we're actually calling.  This is
     /// "un-substituted" if necessary.
-    Type FnType;
+    CanType FnType;
 
     Expr *getArg() const { return Apply->getArg(); }
-    Type getSubstResultType() const { return Apply->getType(); }
+    CanType getSubstResultType() const {
+      return Apply->getType()->getCanonicalType();
+    }
 
     void emit(IRGenFunction &IGF, ArrayRef<Substitution> subs,
               Explosion &out) const {
@@ -716,8 +724,8 @@ namespace {
       // be a polymorphic function type that we need to expand and
       // (2) we might need to evaluate the r-value differently.
       if (!subs.empty()) {
-        auto fnType = FnType->castTo<AnyFunctionType>();
-        IGF.emitRValueUnderSubstitutions(getArg(), fnType->getInput(),
+        auto fnType = cast<AnyFunctionType>(FnType);
+        IGF.emitRValueUnderSubstitutions(getArg(), CanType(fnType->getInput()),
                                          subs, out);
         if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType))
           emitPolymorphicArguments(IGF, polyFn->getGenericParams(), subs, out);
@@ -758,7 +766,7 @@ namespace {
       } Archetype;
     };
     Kind TheKind;
-    Type SubstResultType;
+    CanType SubstResultType;
     ArrayRef<Substitution> Substitutions;
     SmallVector<CallSite, 4> CallSites;
 
@@ -863,7 +871,7 @@ namespace {
       Substitutions = subs;
     }
 
-    void setSubstResultType(Type type) {
+    void setSubstResultType(CanType type) {
       SubstResultType = type;
     }
 
@@ -890,8 +898,8 @@ namespace {
 
     /// Change this to use a literal indirect source.
     void updateToIndirect(unsigned numCallSitesToDrop,
-                          Type origFormalType,
-                          Type substResultType,
+                          CanType origFormalType,
+                          CanType substResultType,
                           llvm::Value *fnPtr,
                           ManagedValue dataPtr) {
       // Drop the requested number of call sites.
@@ -936,7 +944,8 @@ namespace {
 void irgen::emitRValueForFunction(IRGenFunction &IGF, FuncDecl *fn,
                                   Explosion &explosion) {
   // Function pointers are always fully curried and use ExplosionKind::Minimal.
-  Type resultType = fn->getType()->castTo<AnyFunctionType>()->getResult();
+  CanType fnType = fn->getType()->getCanonicalType();
+  CanType resultType = CanType(cast<AnyFunctionType>(fnType)->getResult());
   Callee callee = emitDirectCallee(IGF, fn, resultType,
                                    ArrayRef<Substitution>(),
                                    ExplosionKind::Minimal, 0);
@@ -984,7 +993,7 @@ namespace {
 
   private:
     /// The substituted result type.  Only valid after claiming.
-    Type SubstResultType;
+    CanType SubstResultType;
 
     /// A temporary for when we have intermediate results.
     union FnTemp_t {
@@ -1039,7 +1048,7 @@ namespace {
       return result;
     }
 
-    Type getSubstResultType() const {
+    CanType getSubstResultType() const {
       assert(ArgsClaimed && "arguments not yet claimed!");
       return SubstResultType;
     }
@@ -1416,8 +1425,8 @@ CallEmission CalleeSource::prepareRootCall(IRGenFunction &IGF,
 
   case Kind::IndirectLiteral:
     return CallEmission(IGF, Callee::forIndirectCall(
-                                           IndirectLiteral.OrigFormalType,
-                                           IndirectLiteral.SubstResultType,
+                                   CanType(IndirectLiteral.OrigFormalType),
+                                   CanType(IndirectLiteral.SubstResultType),
                                            getSubstitutions(),
                                            IndirectLiteral.Fn,
                                            IndirectLiteral.Data));
@@ -1431,7 +1440,7 @@ CallEmission CalleeSource::prepareRootCall(IRGenFunction &IGF,
     ManagedValue dataPtr = fnValues.claimNext();
     return CallEmission(IGF, emitIndirectCallee(IGF, fnPtr, dataPtr,
                                                 getSubstitutions(),
-                                                fn->getType(),
+                                            fn->getType()->getCanonicalType(),
                                                 SubstResultType));
   }
 
@@ -1523,7 +1532,7 @@ CalleeSource CalleeSource::decompose(Expr *E) {
 
   // Remember the substituted result type, which is to say, the type
   // of the original expression.
-  source.setSubstResultType(E->getType());
+  source.setSubstResultType(E->getType()->getCanonicalType());
 
   return source;
 }
@@ -1532,7 +1541,7 @@ CalleeSource CalleeSource::decompose(Expr *E) {
 CallEmission irgen::prepareCall(IRGenFunction &IGF, Expr *fn,
                                 ExplosionKind bestExplosion,
                                 unsigned numExtraArgs,
-                                Type substResultType) {
+                                CanType substResultType) {
   CalleeSource source = CalleeSource::decompose(fn);
   source.setSubstResultType(substResultType);
   return source.prepareCall(IGF, numExtraArgs, bestExplosion);
@@ -1930,11 +1939,12 @@ void SpecializedCallEmission::completeAsIndirect(Explosion &fn) {
 
   // The function pointer we've got here should be totally substituted.
   // That's not necessarily optimal, but it's what we've got.
-  Type origFnType = getSubstResultType();
+  CanType origFnType = getSubstResultType();
   fnPtr = emitCastOfIndirectFunction(IGF, fnPtr, dataPtr, origFnType);
 
   // Update the CalleeSource.
-  Type substResultType = origFnType->castTo<FunctionType>()->getResult();
+  CanType substResultType =
+    CanType(cast<FunctionType>(origFnType)->getResult());
   Source.updateToIndirect(ArgsClaimed, origFnType, substResultType,
                           fnPtr, dataPtr);
 
@@ -2119,8 +2129,8 @@ void CallEmission::forceCallee() {
   ManagedValue dataPtr = fn.claimNext();
 
   // Set up for an indirect call.
-  auto substFnType = CurCallee.getSubstResultType()->castTo<AnyFunctionType>();
-  Type substResultType = substFnType->getResult();
+  auto substFnType = cast<AnyFunctionType>(CurCallee.getSubstResultType());
+  CanType substResultType = CanType(substFnType->getResult());
   CurCallee = emitIndirectCallee(IGF, fnPtr, dataPtr,
                                  CurCallee.getSubstitutions(),
                                  CurOrigType, substResultType);
@@ -2277,10 +2287,10 @@ irgen::tryEmitApplyAsAddress(IRGenFunction &IGF, ApplyExpr *E,
 /// Emit a nullary call to the given monomorphic function, using the
 /// standard calling-convention and so on, and explode the result.
 void IRGenFunction::emitNullaryCall(llvm::Value *fnPtr,
-                                    Type resultType,
+                                    CanType resultType,
                                     Explosion &resultExplosion) {
-  Type formalType = TupleType::getEmpty(IGM.Context);
-  formalType = FunctionType::get(formalType, resultType, IGM.Context);
+  CanType formalType = CanType(TupleType::getEmpty(IGM.Context));
+  formalType = CanType(FunctionType::get(formalType, resultType, IGM.Context));
 
   Callee callee =
     Callee::forKnownFunction(AbstractCC::Freestanding,
@@ -2420,7 +2430,8 @@ namespace {
 
     void visitAnyPattern(AnyPattern *pattern) {
       unsigned numIgnored =
-        IGF.IGM.getExplosionSize(pattern->getType(), Args.getKind());
+        IGF.IGM.getExplosionSize(pattern->getType()->getCanonicalType(),
+                                 Args.getKind());
       Args.claim(numIgnored);
     }
   };
@@ -2648,7 +2659,7 @@ namespace {
 
     struct Clause {
       unsigned DataTypesBeginIndex;
-      Type ForwardingFnType;
+      CanType ForwardingFnType;
     };
 
     /// The clauses of the function that we're actually going to curry.
@@ -2661,7 +2672,8 @@ namespace {
                 unsigned maxUncurryLevel)
       : IGM(IGM), Func(funcExpr), ExplosionLevel(explosionLevel),
         CurClause(minUncurryLevel) {
-      accumulateClauses(funcExpr->getType(), maxUncurryLevel);
+      accumulateClauses(funcExpr->getType()->getCanonicalType(),
+                        maxUncurryLevel);
     }
 
     void emitCurriedEntrypoint(llvm::Function *entrypoint,
@@ -2711,29 +2723,29 @@ namespace {
     /// we will have these results:
     ///   AllDataTypes = [E, C, D, A, B]
     ///   DataTypesStart = [ 0, 2, 3 ]
-    void accumulateClauses(Type fnType, unsigned maxUncurryLevel) {
+    void accumulateClauses(CanType fnType, unsigned maxUncurryLevel) {
       if (maxUncurryLevel == 0) return;
 
       unsigned clauseIndex = Clauses.size();
       Clauses.push_back(Clause());
 
-      AnyFunctionType *fn = fnType->castTo<AnyFunctionType>();
-      accumulateClauses(fn->getResult(), maxUncurryLevel - 1);
+      AnyFunctionType *fn = cast<AnyFunctionType>(fnType);
+      accumulateClauses(CanType(fn->getResult()), maxUncurryLevel - 1);
 
       Clauses[clauseIndex].DataTypesBeginIndex = AllDataTypes.size();
-      Clauses[clauseIndex].ForwardingFnType = fn->getResult();
+      Clauses[clauseIndex].ForwardingFnType = CanType(fn->getResult());
 
       if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fn))
         accumulatePolymorphicSignatureTypes(polyFn);
-      accumulateParameterDataTypes(fn->getInput());
+      accumulateParameterDataTypes(CanType(fn->getInput()));
     }
 
     /// Accumulate the given parameter type.
-    void accumulateParameterDataTypes(Type ty) {
+    void accumulateParameterDataTypes(CanType ty) {
       // As an optimization, expand tuples instead of grabbing their TypeInfo.
-      if (TupleType *tuple = ty->getAs<TupleType>()) {
+      if (TupleType *tuple = dyn_cast<TupleType>(ty)) {
         for (const TupleTypeElt &field : tuple->getFields())
-          accumulateParameterDataTypes(field.getType());
+          accumulateParameterDataTypes(CanType(field.getType()));
         return;
       }
 
@@ -2747,6 +2759,7 @@ namespace {
 
     /// Accumulate the polymorphic signature of a function.
     void accumulatePolymorphicSignatureTypes(PolymorphicFunctionType *fn) {
+      assert(fn->isCanonical());
       SmallVector<llvm::Type*, 4> types;
       expandPolymorphicSignature(IGM, fn->getGenericParams(), types);
       assert(!types.empty());
@@ -2787,8 +2800,9 @@ namespace {
                                       "emitting IR for curried entrypoint to",
                                       Func);
 
-      IRGenFunction IGF(IGM, Func->getType(), Func->getParamPatterns(),
-                        ExplosionLevel, CurClause, entrypoint, Prologue::Bare);
+      IRGenFunction IGF(IGM, Func->getType()->getCanonicalType(),
+                        Func->getParamPatterns(), ExplosionLevel,
+                        CurClause, entrypoint, Prologue::Bare);
 
       Explosion params = IGF.collectParameters();
 
@@ -2838,8 +2852,9 @@ namespace {
                                       "emitting IR for currying forwarder of",
                                       Func);
 
-      IRGenFunction IGF(IGM, Func->getType(), Func->getParamPatterns(),
-                        ExplosionLevel, CurClause, forwarder, Prologue::Bare);
+      IRGenFunction IGF(IGM, Func->getType()->getCanonicalType(),
+                        Func->getParamPatterns(), ExplosionLevel, CurClause,
+                        forwarder, Prologue::Bare);
 
       // Accumulate the function's immediate parameters.
       Explosion params = IGF.collectParameters();
@@ -2928,8 +2943,9 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
 
   // Finally, emit the uncurried entrypoint.
   PrettyStackTraceDecl stackTrace("emitting IR for", func);
-  IRGenFunction(IGM, funcExpr->getType(), funcExpr->getParamPatterns(),
-                explosionLevel, naturalUncurryLevel, entrypoint)
+  IRGenFunction(IGM, funcExpr->getType()->getCanonicalType(),
+                funcExpr->getParamPatterns(), explosionLevel,
+                naturalUncurryLevel, entrypoint)
     .emitFunctionTopLevel(funcExpr->getBody());
 }
 

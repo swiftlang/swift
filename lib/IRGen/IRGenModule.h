@@ -134,16 +134,17 @@ private:
 //--- Types -----------------------------------------------------------------
 public:
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *D);
+  const TypeInfo &getFragileTypeInfo(CanType T);
   const TypeInfo &getFragileTypeInfo(Type T);
   const TypeInfo &getWitnessTablePtrTypeInfo();
-  llvm::Type *getFragileType(Type T);
+  llvm::Type *getFragileType(CanType T);
   llvm::StructType *createNominalType(TypeDecl *D);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
-  void getSchema(Type T, ExplosionSchema &schema);
-  ExplosionSchema getSchema(Type T, ExplosionKind kind);
-  unsigned getExplosionSize(Type T, ExplosionKind kind);
-  llvm::PointerType *isSingleIndirectValue(Type T, ExplosionKind kind);
-  llvm::PointerType *requiresIndirectResult(Type T, ExplosionKind kind);
+  void getSchema(CanType T, ExplosionSchema &schema);
+  ExplosionSchema getSchema(CanType T, ExplosionKind kind);
+  unsigned getExplosionSize(CanType T, ExplosionKind kind);
+  llvm::PointerType *isSingleIndirectValue(CanType T, ExplosionKind kind);
+  llvm::PointerType *requiresIndirectResult(CanType T, ExplosionKind kind);
 
   bool isResilient(Decl *decl) { return false; }
 
@@ -217,7 +218,7 @@ public:
   void emitInstanceMethod(FuncDecl *D);
   void emitConstructor(ConstructorDecl *D);
 
-  llvm::FunctionType *getFunctionType(Type fnType, ExplosionKind kind,
+  llvm::FunctionType *getFunctionType(CanType fnType, ExplosionKind kind,
                                       unsigned uncurryLevel, bool withData);
 
   FormalType getTypeOfGetter(ValueDecl *D);
@@ -233,7 +234,8 @@ public:
   llvm::Function *getAddrOfSetter(ValueDecl *D, FormalType type,
                                   ExplosionKind kind);
   llvm::Function *getAddrOfSetter(ValueDecl *D, ExplosionKind kind);
-  llvm::Function *getAddrOfValueWitness(Type concreteType, ValueWitness index);
+  llvm::Function *getAddrOfValueWitness(CanType concreteType,
+                                        ValueWitness index);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType);
   llvm::Function *getAddrOfConstructor(ConstructorDecl *D, ExplosionKind kind);
   llvm::Function *getAddrOfDestructor(ClassDecl *D);

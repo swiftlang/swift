@@ -1348,7 +1348,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
                                       const TypeInfo &type) {
   assert(isValueWitnessFunction(index));
 
-  IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+  IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
                     ExplosionKind::Minimal, 0, fn, Prologue::Bare);
 
   auto argv = fn->arg_begin();
@@ -1502,7 +1502,7 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
   llvm::Constant *fn = IGM.Module.getOrInsertFunction(fnName, fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+    IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     auto it = def->arg_begin();
     Address dest(it++, getFixedBufferAlignment(IGM));
@@ -1627,7 +1627,7 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
     IGM.Module.getOrInsertFunction("__swift_assignWithCopy_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+    IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
@@ -1657,7 +1657,7 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
     IGM.Module.getOrInsertFunction("__swift_assignWithTake_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+    IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
@@ -1685,7 +1685,7 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
     IGM.Module.getOrInsertFunction("__swift_initWithCopy_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+    IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
@@ -1710,7 +1710,7 @@ static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
     IGM.Module.getOrInsertFunction("__swift_destroy_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+    IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     Address arg(def->arg_begin(), IGM.getPointerAlignment());
     IGF.emitRelease(IGF.Builder.CreateLoad(arg));
@@ -1741,7 +1741,7 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
 
   llvm::Constant *fn = IGM.Module.getOrInsertFunction(name, fnTy);
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+    IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     auto it = def->arg_begin();
     Address dest(it++, type.StorageAlignment);
@@ -1757,7 +1757,7 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
 static llvm::Constant *getValueWitness(IRGenModule &IGM,
                                        ValueWitness index,
                                        FixedPacking packing,
-                                       Type concreteType,
+                                       CanType concreteType,
                                        const TypeInfo &concreteTI) {
   // Try to use a standard function.
   switch (index) {
@@ -1873,10 +1873,10 @@ namespace {
   class WitnessBuilder {
     IRGenModule &IGM;
     llvm::Constant *ImplPtr;
-    Type ImplTy;
-    Type SignatureTy;
-    Type SignatureResultTy;
-    Type ImplResultTy;
+    CanType ImplTy;
+    CanType SignatureTy;
+    CanType SignatureResultTy;
+    CanType ImplResultTy;
     SmallVector<AnyFunctionType *, 4> ImplTyAtUncurry;
     unsigned UncurryLevel;
     ArrayRef<Substitution> Substitutions;
@@ -1972,7 +1972,7 @@ namespace {
 
   public:
     WitnessBuilder(IRGenModule &IGM, llvm::Constant *impl,
-                   Type implTy, Type sigTy, unsigned uncurryLevel,
+                   CanType implTy, CanType sigTy, unsigned uncurryLevel,
                    ArrayRef<Substitution> subs)
       : IGM(IGM), ImplPtr(impl), UncurryLevel(uncurryLevel),
         Substitutions(subs) {
@@ -1986,15 +1986,16 @@ namespace {
       // Find abstract parameters.
       HasAbstractedArg = false;
       for (unsigned i = 0; i != uncurryLevel + 1; ++i) {
-        AnyFunctionType *sigFnTy = sigTy->castTo<AnyFunctionType>();
-        AnyFunctionType *implFnTy = implTy->castTo<AnyFunctionType>();
+        AnyFunctionType *sigFnTy = cast<AnyFunctionType>(sigTy);
+        AnyFunctionType *implFnTy = cast<AnyFunctionType>(implTy);
         ImplTyAtUncurry.push_back(implFnTy);
 
-        sigTy = sigFnTy->getResult();
-        implTy = implFnTy->getResult();
+        sigTy = CanType(sigFnTy->getResult());
+        implTy = CanType(implFnTy->getResult());
 
         UncurryClauseBegin.push_back(Args.size());
-        findAbstractParameters(implFnTy->getInput(), sigFnTy->getInput());
+        findAbstractParameters(CanType(implFnTy->getInput()),
+                               CanType(sigFnTy->getInput()));
       }
 
       ImplResultTy = implTy;
@@ -2012,24 +2013,24 @@ namespace {
     }
 
     /// Find the abstract parameters.
-    void findAbstractParameters(Type impl, Type sig) {
+    void findAbstractParameters(CanType impl, CanType sig) {
       // Walk recursively into tuples.
-      if (auto sigTuple = sig->getAs<TupleType>()) {
+      if (auto sigTuple = dyn_cast<TupleType>(sig)) {
         // The tuple itself is a potential point of abstraction.
         Args.push_back(Arg(Arg::DecomposedTuple));
 
         auto sigFields = sigTuple->getFields();
-        auto implFields = impl->castTo<TupleType>()->getFields();
+        auto implFields = cast<TupleType>(impl)->getFields();
         assert(sigFields.size() == implFields.size());
 
         for (unsigned i = 0, e = sigFields.size(); i != e; ++i)
-          findAbstractParameters(implFields[i].getType(),
-                                 sigFields[i].getType());
+          findAbstractParameters(CanType(implFields[i].getType()),
+                                 CanType(sigFields[i].getType()));
         return;
       }
 
       // Check whether we're directly matching an archetype.
-      if (sig->is<ArchetypeType>()) {
+      if (isa<ArchetypeType>(sig)) {
         // Count all the nested types.
         collectNestedArgs(impl);
 
@@ -2055,11 +2056,11 @@ namespace {
 
       // Check for an l-value.  In some cases, we need an
       // lvalue-to-rvalue abstraction.
-      if (sig->is<LValueType>()) {
+      if (isa<LValueType>(sig)) {
         const TypeInfo &implTI = IGM.getFragileTypeInfo(impl);
 
         // If we've got l-values on both sides, we can just directly convert.
-        if (impl->is<LValueType>()) {
+        if (isa<LValueType>(impl)) {
           auto ptrTy = cast<llvm::PointerType>(implTI.getStorageType());
           Args.push_back(Arg(Arg::Bitcast, ptrTy));
 
@@ -2078,7 +2079,7 @@ namespace {
       // The basic function representation doesn't change just because
       // you involved an archetype, but we might need to translate
       // function values to make the types work.
-      if (sig->is<FunctionType>()) {
+      if (isa<FunctionType>(sig)) {
         if (!sig->isEqual(impl)) {
           IGM.unimplemented(SourceLoc(), "can't rewrite function values!");
         }
@@ -2089,26 +2090,26 @@ namespace {
 
       // We don't have a representation for metatypes yet, so no conversion
       // is required.
-      if (sig->is<MetaTypeType>()) {
-        assert(impl->is<MetaTypeType>());
+      if (isa<MetaTypeType>(sig)) {
+        assert(isa<MetaTypeType>(impl));
         Args.push_back(Arg(Arg::Direct, implTI));
         return;
       }
 
       // That's all the structural types, so the types really ought to
       // match perfectly now.
-      assert(sig->isEqual(impl));
+      assert(sig == impl);
       Args.push_back(Arg(Arg::Direct, implTI));
     }
 
     /// If the given type includes an archetype, we need an abstracted
     /// result because we have to return into a buffer.
-    bool hasAbstractResult(Type sig) {
-      if (auto tuple = sig->getAs<TupleType>())
+    bool hasAbstractResult(CanType sig) {
+      if (auto tuple = dyn_cast<TupleType>(sig))
         for (auto &field : tuple->getFields())
-          if (hasAbstractResult(field.getType()))
+          if (hasAbstractResult(CanType(field.getType())))
             return true;
-      return sig->is<ArchetypeType>();
+      return isa<ArchetypeType>(sig);
     }
 
     llvm::Constant *get() {
@@ -2133,7 +2134,7 @@ namespace {
       fn->setVisibility(llvm::Function::HiddenVisibility);
 
       // Start building it.
-      IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+      IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
                         ExplosionKind::Minimal, UncurryLevel, fn,
                         Prologue::Bare);
       emitThunk(IGF);
@@ -2308,7 +2309,7 @@ namespace {
   class WitnessTableBuilder : public WitnessVisitor<WitnessTableBuilder> {
     SmallVectorImpl<llvm::Constant*> &Table;
     FixedPacking Packing;
-    Type ConcreteType;
+    CanType ConcreteType;
     const TypeInfo &ConcreteTI;
     const ProtocolConformance &Conformance;
     ArrayRef<Substitution> Substitutions;
@@ -2337,7 +2338,7 @@ namespace {
     WitnessTableBuilder(IRGenModule &IGM,
                         SmallVectorImpl<llvm::Constant*> &table,
                         FixedPacking packing,
-                        Type concreteType, const TypeInfo &concreteTI,
+                        CanType concreteType, const TypeInfo &concreteTI,
                         const ProtocolConformance &conformance)
       : WitnessVisitor(IGM), Table(table), Packing(packing),
         ConcreteType(concreteType), ConcreteTI(concreteTI),
@@ -2364,25 +2365,30 @@ namespace {
 
     void addStaticMethod(FuncDecl *iface) {
       FuncDecl *impl = cast<FuncDecl>(Conformance.Mapping.find(iface)->second);
-      Table.push_back(getStaticMethodWitness(impl, iface->getType()));
+      Table.push_back(getStaticMethodWitness(impl,
+                                      iface->getType()->getCanonicalType()));
     }
 
     void addInstanceMethod(FuncDecl *iface) {
       FuncDecl *impl = cast<FuncDecl>(Conformance.Mapping.find(iface)->second);
-      Table.push_back(getInstanceMethodWitness(impl, iface->getType()));
+      Table.push_back(getInstanceMethodWitness(impl,
+                                      iface->getType()->getCanonicalType()));
     }
 
     /// Returns a function which calls the given implementation under
     /// the given interface.
-    llvm::Constant *getInstanceMethodWitness(FuncDecl *impl, Type ifaceType) {
+    llvm::Constant *getInstanceMethodWitness(FuncDecl *impl,
+                                             CanType ifaceType) {
       llvm::Constant *implPtr =
         IGM.getAddrOfFunction(impl, ExplosionKind::Minimal, 1, /*data*/ false);
-      return getWitness(implPtr, impl->getType(), ifaceType, 1);
+      return getWitness(implPtr, impl->getType()->getCanonicalType(),
+                        ifaceType, 1);
     }
 
     /// Returns a function which calls the given implementation under
     /// the given interface.
-    llvm::Constant *getStaticMethodWitness(FuncDecl *impl, Type ifaceType) {
+    llvm::Constant *getStaticMethodWitness(FuncDecl *impl,
+                                           CanType ifaceType) {
       if (impl->getDeclContext()->isModuleContext()) {
         llvm::Constant *implPtr =
           IGM.getAddrOfFunction(impl, ExplosionKind::Minimal, 0, /*data*/ false);
@@ -2391,16 +2397,17 @@ namespace {
         // LLVM representation happens to be the same.
         Type concreteMeta = MetaTypeType::get(ConcreteType, IGM.Context);
         Type implTy = 
-            FunctionType::get(concreteMeta, impl->getType(), IGM.Context);
-        return getWitness(implPtr, implTy, ifaceType, 1);
+          FunctionType::get(concreteMeta, impl->getType(), IGM.Context);
+        return getWitness(implPtr, implTy->getCanonicalType(), ifaceType, 1);
       }
       llvm::Constant *implPtr =
         IGM.getAddrOfFunction(impl, ExplosionKind::Minimal, 1, /*data*/ false);
-      return getWitness(implPtr, impl->getType(), ifaceType, 1);
+      return getWitness(implPtr, impl->getType()->getCanonicalType(),
+                        ifaceType, 1);
     }
 
-    llvm::Constant *getWitness(llvm::Constant *fn, Type fnTy, Type ifaceTy,
-                               unsigned uncurryLevel) {
+    llvm::Constant *getWitness(llvm::Constant *fn, CanType fnTy,
+                               CanType ifaceTy, unsigned uncurryLevel) {
       return WitnessBuilder(IGM, fn, fnTy, ifaceTy, uncurryLevel,
                             Substitutions).get();
     }
@@ -2409,7 +2416,7 @@ namespace {
 
 /// Collect the value witnesses for a particular type.
 static void addValueWitnesses(IRGenModule &IGM, FixedPacking packing,
-                              Type concreteType, const TypeInfo &concreteTI,
+                              CanType concreteType, const TypeInfo &concreteTI,
                               SmallVectorImpl<llvm::Constant*> &table) {
   for (unsigned i = 0; i != NumValueWitnesses; ++i) {
     table.push_back(getValueWitness(IGM, ValueWitness(i),
@@ -2424,7 +2431,7 @@ static void addValueWitnesses(IRGenModule &IGM, FixedPacking packing,
 ///   witness table
  /// \return a value of type IGM.WitnessTablePtrTy
 static llvm::Constant *buildWitnessTable(IRGenModule &IGM,
-                                         Type concreteType,
+                                         CanType concreteType,
                                          ProtocolDecl *protocol,
                                          ArrayRef<llvm::Constant*> witnesses) {
   assert(witnesses.size() >= NumValueWitnesses);
@@ -2451,12 +2458,12 @@ static llvm::Constant *buildWitnessTable(IRGenModule &IGM,
 
 /// Get or create the trivial witness table for a type.
 static llvm::Constant *
-getTrivialWitnessTable(IRGenModule &IGM, Type concreteType,
+getTrivialWitnessTable(IRGenModule &IGM, CanType concreteType,
                        const TypeInfo &concreteTI, FixedPacking packing) {
   auto &cache = GenProto::getTrivialWitnessTablesCache(IGM);
 
   // Check whether we've already made an entry for this.
-  TypeBase *key = concreteType->getCanonicalType().getPointer();
+  TypeBase *key = concreteType.getPointer();
   auto it = cache.find(key);
   if (it != cache.end())
     return it->second;
@@ -2518,7 +2525,7 @@ ProtocolInfo::~ProtocolInfo() {
 
 /// Find the conformance information for a protocol.
 const ConformanceInfo &
-ProtocolInfo::getConformance(IRGenModule &IGM, Type concreteType,
+ProtocolInfo::getConformance(IRGenModule &IGM, CanType concreteType,
                              const TypeInfo &concreteTI,
                              ProtocolDecl *protocol,
                              const ProtocolConformance &conformance) const {
@@ -2680,18 +2687,18 @@ llvm::Value *irgen::emitArchetypeMetadataRef(IRGenFunction &IGF,
   return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
 }
 
-void irgen::getValueWitnessTableElements(Type T,
+void irgen::getValueWitnessTableElements(CanType T,
                                       llvm::SetVector<ArchetypeType*> &types) {
   // We need a value witness table for T
-  if (auto archetype = T->getAs<ArchetypeType>()) {
+  if (auto archetype = dyn_cast<ArchetypeType>(T)) {
     types.insert(archetype);
     return;
   }
 
   // In (T, U). we need witness tables for T and U
-  if (auto tuple = T->getAs<TupleType>()) {
+  if (auto tuple = dyn_cast<TupleType>(T)) {
     for (auto element : tuple->getFields())
-      getValueWitnessTableElements(element.getType(), types);
+      getValueWitnessTableElements(CanType(element.getType()), types);
     return;
   }
 
@@ -2735,7 +2742,7 @@ void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
   for (const auto &sub : subs) {
     auto archetype = sub.Archetype;
     auto archetypeProtos = archetype->getConformsTo();
-    Type typeArg = sub.Replacement;
+    CanType typeArg = sub.Replacement->getCanonicalType();
     auto &argTI = IGF.getFragileTypeInfo(typeArg);
 
     // If the type argument is an archetype (FIXME: or is *dependent*
@@ -2810,7 +2817,7 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
   ArrayRef<ProtocolEntry> destEntries = destTI.getProtocols();
   assert(destEntries.size() == E->getConformances().size());
 
-  Type srcType = E->getSubExpr()->getType();
+  CanType srcType = E->getSubExpr()->getType()->getCanonicalType();
   if (srcType->isExistentialType()) {
     // Special case: we're converting from an existential type to another
     // existential type in some trivial manner (e.g., to an inherited protocol).
@@ -2884,7 +2891,7 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
 
   // We're converting from a concrete type to an existential type.
 
-  if (srcType->is<ArchetypeType>()) {
+  if (isa<ArchetypeType>(srcType)) {
     IGF.unimplemented(E->getLoc(), "erasure from an archetype");
     return;
   }
@@ -3007,7 +3014,7 @@ LValue irgen::emitExistentialSubscriptLValue(IRGenFunction &IGF,
 /// \param wtable - the witness table from which the witness was loaded
 /// \param thisObject - the object (if applicable) to call the method on
 static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
-                                              Type substResultType,
+                                              CanType substResultType,
                                               ArrayRef<Substitution> subs,
                                               llvm::Value *witness,
                                               llvm::Value *wtable,
@@ -3015,7 +3022,7 @@ static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   unsigned uncurryLevel = 1;
 
-  Type origFnType = fn->getType();
+  CanType origFnType = fn->getType()->getCanonicalType();
   llvm::FunctionType *fnTy =
     IGF.IGM.getFunctionType(origFnType, explosionLevel, uncurryLevel,
                             /*data*/ false);
@@ -3054,7 +3061,7 @@ static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
 CallEmission
 irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
                                        ExistentialMemberRefExpr *E,
-                                       Type substResultType,
+                                       CanType substResultType,
                                        ArrayRef<Substitution> subs,
                                        ExplosionKind maxExplosionLevel,
                                        unsigned maxUncurry) {
@@ -3120,7 +3127,7 @@ irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
 CallEmission
 irgen::prepareArchetypeMemberRefCall(IRGenFunction &IGF,
                                      ArchetypeMemberRefExpr *E,
-                                     Type substResultType,
+                                     CanType substResultType,
                                      ArrayRef<Substitution> subs,
                                      ExplosionKind maxExplosionLevel,
                                      unsigned maxUncurry) {
@@ -3139,13 +3146,13 @@ irgen::prepareArchetypeMemberRefCall(IRGenFunction &IGF,
   }
 
   // Find the archetype we're calling on.
-  Type baseTy = E->getBase()->getType();
+  CanType baseTy = E->getBase()->getType()->getCanonicalType();
   ArchetypeType *archetype;
-  if (auto baseLV = baseTy->getAs<LValueType>()) {
-    archetype = baseLV->getObjectType()->castTo<ArchetypeType>();
+  if (auto baseLV = dyn_cast<LValueType>(baseTy)) {
+    archetype = cast<ArchetypeType>(CanType(baseLV->getObjectType()));
   } else {
-    archetype = baseTy->castTo<MetaTypeType>()->getInstanceType()
-                  ->castTo<ArchetypeType>();
+    archetype = cast<ArchetypeType>(
+                     CanType(cast<MetaTypeType>(baseTy)->getInstanceType()));
   }
 
   // The protocol we're calling on.

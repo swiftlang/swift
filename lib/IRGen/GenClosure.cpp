@@ -205,7 +205,7 @@ static void emitLocalFunctionBody(IRGenFunction &definingIGF,
     return;
   }
 
-  IRGenFunction IGF(IGM, E->getType(), patterns,
+  IRGenFunction IGF(IGM, E->getType()->getCanonicalType(), patterns,
                     explosionLevel, uncurryLevel, fn,
                     info.requiresData() ? Prologue::StandardWithContext
                                         : Prologue::Standard);
@@ -281,8 +281,8 @@ void irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E, Explosion &out) {
 
   // Create the LLVM function declaration.
   llvm::FunctionType *fnType =
-    IGF.IGM.getFunctionType(E->getType(), explosionLevel, uncurryLevel,
-                            info.requiresData());
+    IGF.IGM.getFunctionType(E->getType()->getCanonicalType(),
+                            explosionLevel, uncurryLevel, info.requiresData());
   llvm::Function *fn =
     llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                            "closure", &IGF.IGM.Module);

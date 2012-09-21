@@ -64,7 +64,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     llvm::Function::Create(IGM.DtorTy, llvm::Function::InternalLinkage,
                            "objectdestroy", &IGM.Module);
 
-  IRGenFunction IGF(IGM, Type(), llvm::ArrayRef<Pattern*>(),
+  IRGenFunction IGF(IGM, CanType(), llvm::ArrayRef<Pattern*>(),
                     ExplosionKind::Minimal, 0, fn, Prologue::Bare);
 
   Address structAddr = layout.emitCastOfAlloc(IGF, fn->arg_begin());
@@ -89,7 +89,7 @@ llvm::Constant *HeapLayout::createSizeFn(IRGenModule &IGM) const {
     llvm::Function::Create(IGM.DtorTy, llvm::Function::InternalLinkage,
                            "objectsize", &IGM.Module);
 
-  IRGenFunction IGF(IGM, Type(), llvm::ArrayRef<Pattern*>(),
+  IRGenFunction IGF(IGM, CanType(), llvm::ArrayRef<Pattern*>(),
                     ExplosionKind::Minimal, 0, fn, Prologue::Bare);
 
   // Ignore the object pointer; we aren't a dynamically-sized array,
@@ -130,7 +130,7 @@ llvm::Constant *HeapLayout::getPrivateMetadata(IRGenModule &IGM) const {
 }
 
 /// Lay out an array on the heap.
-ArrayHeapLayout::ArrayHeapLayout(IRGenFunction &IGF, Type T)
+ArrayHeapLayout::ArrayHeapLayout(IRGenFunction &IGF, CanType T)
   : ElementTI(IGF.getFragileTypeInfo(T)) {
 
   // Add the heap header.
@@ -268,7 +268,7 @@ createArrayDtorFn(IRGenModule &IGM,
     llvm::Function::Create(IGM.DtorTy, llvm::Function::InternalLinkage,
                            "arraydestroy", &IGM.Module);
 
-  IRGenFunction IGF(IGM, Type(), llvm::ArrayRef<Pattern*>(),
+  IRGenFunction IGF(IGM, CanType(), llvm::ArrayRef<Pattern*>(),
                     ExplosionKind::Minimal, 0, fn, Prologue::Bare);
 
   llvm::Value *header = fn->arg_begin();
@@ -308,7 +308,7 @@ createArraySizeFn(IRGenModule &IGM,
     llvm::Function::Create(IGM.DtorTy, llvm::Function::InternalLinkage,
                            "arraysize", &IGM.Module);
 
-  IRGenFunction IGF(IGM, Type(), llvm::ArrayRef<Pattern*>(),
+  IRGenFunction IGF(IGM, CanType(), llvm::ArrayRef<Pattern*>(),
                     ExplosionKind::Minimal, 0, fn, Prologue::Bare);
 
   llvm::Value *header = fn->arg_begin();

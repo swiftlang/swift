@@ -54,7 +54,7 @@ static bool isTrivialGlobalInit(llvm::Function *fn) {
 void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                                       unsigned StartElem) {
   Type emptyTuple = TupleType::getEmpty(Context);
-  FunctionType *unitToUnit = FunctionType::get(emptyTuple, emptyTuple, Context);
+  auto unitToUnit = CanType(FunctionType::get(emptyTuple, emptyTuple, Context));
   Pattern *params[] = {
     TuplePattern::create(Context, SourceLoc(),
                          ArrayRef<TuplePatternElt>(), SourceLoc())
@@ -78,7 +78,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
         llvm::Function::Create(llvm::FunctionType::get(Int32Ty, false),
                                llvm::GlobalValue::ExternalLinkage,
                                "main", &Module);
-    IRGenFunction mainIGF(*this, nullptr, nullptr, ExplosionKind::Minimal,
+    IRGenFunction mainIGF(*this, CanType(), nullptr, ExplosionKind::Minimal,
                           /*uncurry*/ 0, mainFn, Prologue::Bare);
     mainIGF.Builder.CreateCall(fn);
     mainIGF.Builder.CreateRet(mainIGF.Builder.getInt32(0));
@@ -142,19 +142,19 @@ static bool isLocalLinkageDecl(Decl *D) {
   return false;
 }
 
-static bool isLocalLinkageType(Type type);
+static bool isLocalLinkageType(CanType type);
 static bool isLocalLinkageGenericClause(const GenericParamList &params) {
   // Type parameters are local-linkage if any of their constraining
   // types are.
   for (auto &param : params) {
     for (auto inherited : param.getAsTypeParam()->getInherited())
-      if (isLocalLinkageType(inherited.getType()))
+      if (isLocalLinkageType(CanType(inherited.getType())))
         return true;
   }
   return false;
 }
 
-static bool isLocalLinkageType(Type type) {
+static bool isLocalLinkageType(CanType type) {
   TypeBase *base = type.getPointer();
 
   switch (base->getKind()) {
@@ -167,7 +167,8 @@ static bool isLocalLinkageType(Type type) {
     llvm_unreachable("type variable in IRgen");
       
   case TypeKind::MetaType:
-    return isLocalLinkageType(cast<MetaTypeType>(base)->getInstanceType());
+    return isLocalLinkageType(CanType(cast<MetaTypeType>(base)
+                                        ->getInstanceType()));
   case TypeKind::Module:
     return false;
 
@@ -183,19 +184,20 @@ static bool isLocalLinkageType(Type type) {
   case TypeKind::BuiltinObjCPointer:
     return false;
 
-#define SUGARED_TYPE(id, parent) \
-  case TypeKind::id: \
-    return isLocalLinkageType(cast<id##Type>(base)->getDesugaredType());
+#define SUGARED_TYPE(id, parent)                \
+  case TypeKind::id:                            \
+    llvm_unreachable("type is not canonical!");
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
 
   case TypeKind::LValue:
-    return isLocalLinkageType(cast<LValueType>(base)->getObjectType());
+    return isLocalLinkageType(CanType(cast<LValueType>(base)
+                                        ->getObjectType()));
 
   case TypeKind::Tuple: {
     TupleType *tuple = cast<TupleType>(base);
     for (auto &field : tuple->getFields()) {
-      if (isLocalLinkageType(field.getType()))
+      if (isLocalLinkageType(CanType(field.getType())))
         return true;
     }
     return false;
@@ -209,7 +211,7 @@ static bool isLocalLinkageType(Type type) {
     if (isLocalLinkageDecl(BGT->getDecl()))
       return true;
     for (Type Arg : BGT->getGenericArgs()) {
-      if (isLocalLinkageType(Arg))
+      if (isLocalLinkageType(CanType(Arg)))
         return true;
     }
     return false;
@@ -229,16 +231,16 @@ static bool isLocalLinkageType(Type type) {
   }
   case TypeKind::Function: {
     AnyFunctionType *fn = cast<AnyFunctionType>(base);
-    return isLocalLinkageType(fn->getInput()) ||
-           isLocalLinkageType(fn->getResult());
+    return isLocalLinkageType(CanType(fn->getInput())) ||
+           isLocalLinkageType(CanType(fn->getResult()));
   }
 
   case TypeKind::Array:
-    return isLocalLinkageType(cast<ArrayType>(base)->getBaseType());
+    return isLocalLinkageType(CanType(cast<ArrayType>(base)->getBaseType()));
 
   case TypeKind::ProtocolComposition:
     for (Type t : cast<ProtocolCompositionType>(base)->getProtocols())
-      if (isLocalLinkageType(t))
+      if (isLocalLinkageType(CanType(t)))
         return true;
     return false;
   }
@@ -433,12 +435,12 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
   return Address(addr, align);
 }
 
-static bool hasIndirectResult(IRGenModule &IGM, Type type,
+static bool hasIndirectResult(IRGenModule &IGM, CanType type,
                               ExplosionKind explosionLevel,
                               unsigned uncurryLevel) {
   uncurryLevel++;
   while (uncurryLevel--) {
-    type = type->castTo<AnyFunctionType>()->getResult();
+    type = CanType(cast<AnyFunctionType>(type)->getResult());
   }
 
   ExplosionSchema schema(explosionLevel);
@@ -458,11 +460,13 @@ llvm::Function *IRGenModule::getAddrOfFunction(FuncDecl *func,
   if (entry) return cast<llvm::Function>(entry);
 
   llvm::FunctionType *fnType =
-    getFunctionType(func->getType(), kind, uncurryLevel, needsData);
+    getFunctionType(func->getType()->getCanonicalType(),
+                    kind, uncurryLevel, needsData);
 
   AbstractCC convention = getAbstractCC(func);
-  bool indirectResult = hasIndirectResult(*this, func->getType(),
-                                          kind, uncurryLevel);
+  bool indirectResult =
+    hasIndirectResult(*this, func->getType()->getCanonicalType(),
+                      kind, uncurryLevel);
 
   SmallVector<llvm::AttributeWithIndex, 4> attrs;
   auto cc = expandAbstractCC(*this, convention, indirectResult, attrs);
@@ -485,15 +489,17 @@ llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
-  bool indirectResult = hasIndirectResult(*this, D->getType(),
-                                          explosionLevel, uncurryLevel);
+  CanType formalType = D->getType()->getCanonicalType();
+
+  bool indirectResult =
+    hasIndirectResult(*this, formalType, explosionLevel, uncurryLevel);
 
   SmallVector<llvm::AttributeWithIndex, 1> attrs;
   auto cc = expandAbstractCC(*this, AbstractCC::Freestanding,
                              indirectResult, attrs);
 
   llvm::FunctionType *fnType =
-    getFunctionType(D->getType(), explosionLevel, uncurryLevel, /*data*/false);
+    getFunctionType(formalType, explosionLevel, uncurryLevel, /*data*/false);
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, cc, attrs);
   return entry;
@@ -509,11 +515,12 @@ llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
+  CanType formalType = cons->getType()->getCanonicalType();
   llvm::FunctionType *fnType =
-    getFunctionType(cons->getType(), kind, uncurryLevel, /*needsData*/false);
+    getFunctionType(formalType, kind, uncurryLevel, /*needsData*/false);
 
-  bool indirectResult = hasIndirectResult(*this, cons->getType(),
-                                          kind, uncurryLevel);
+  bool indirectResult =
+    hasIndirectResult(*this, formalType, kind, uncurryLevel);
 
   SmallVector<llvm::AttributeWithIndex, 4> attrs;
   auto cc = expandAbstractCC(*this, AbstractCC::Method, indirectResult,
@@ -596,9 +603,8 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd) {
 
 
 /// Returns the address of a value-witness function.
-llvm::Function *IRGenModule::getAddrOfValueWitness(Type concreteType,
+llvm::Function *IRGenModule::getAddrOfValueWitness(CanType concreteType,
                                                    ValueWitness index) {
-  concreteType = concreteType->getCanonicalType();
   LinkEntity entity = LinkEntity::forValueWitness(concreteType, index);
 
   llvm::Function *&entry = GlobalFuncs[entity];
@@ -633,19 +639,21 @@ llvm::Constant *IRGenModule::getAddrOfValueWitnessTable(CanType concreteType) {
 }
 
 
-static Type addOwnerArgument(ASTContext &ctx, DeclContext *DC, Type resultType) {
+static CanType addOwnerArgument(ASTContext &ctx, DeclContext *DC,
+                                CanType resultType) {
   Type argType = DC->getDeclaredTypeInContext();
   if (!argType->hasReferenceSemantics()) {
     argType = LValueType::get(argType, LValueType::Qual::DefaultForMemberAccess,
                               ctx);
   }
   if (auto params = DC->getGenericParamsOfContext())
-    return PolymorphicFunctionType::get(argType, resultType, params, ctx);
-  return FunctionType::get(argType, resultType, ctx);
+    return PolymorphicFunctionType::get(argType, resultType, params, ctx)
+             ->getCanonicalType();
+  return CanType(FunctionType::get(CanType(argType), resultType, ctx));
 }
 
 static AbstractCC addOwnerArgument(ASTContext &ctx, ValueDecl *value,
-                                   Type &resultType, unsigned &uncurryLevel) {
+                                   CanType &resultType, unsigned &uncurryLevel) {
   DeclContext *DC = value->getDeclContext();
   switch (DC->getContextKind()) {
   case DeclContextKind::TranslationUnit:
@@ -667,18 +675,18 @@ static AbstractCC addOwnerArgument(ASTContext &ctx, ValueDecl *value,
 
 /// Add the 'index' argument to a getter or setter.
 static void addIndexArgument(ASTContext &Context, ValueDecl *value,
-                      Type &formalType, unsigned &uncurryLevel) {
+                             CanType &formalType, unsigned &uncurryLevel) {
   if (SubscriptDecl *sub = dyn_cast<SubscriptDecl>(value)) {
     formalType = FunctionType::get(sub->getIndices()->getType(),
-                                   formalType, Context);
+                                   formalType, Context)->getCanonicalType();
     uncurryLevel++;
   }
 }
 
-static Type getObjectType(ValueDecl *decl) {
+static CanType getObjectType(ValueDecl *decl) {
   if (SubscriptDecl *sub = dyn_cast<SubscriptDecl>(decl))
-    return sub->getElementType();
-  return decl->getType();
+    return sub->getElementType()->getCanonicalType();
+  return decl->getType()->getCanonicalType();
 }
 
 /// getTypeOfGetter - Return the formal type of a getter for a
@@ -690,8 +698,8 @@ FormalType IRGenModule::getTypeOfGetter(ValueDecl *value) {
   // where T is the value type of the object and S is the index type
   // (this clause is skipped for a non-subscript getter).
   unsigned uncurryLevel = 0;
-  Type formalType = FunctionType::get(TupleType::getEmpty(Context),
-                                      getObjectType(value), Context);
+  CanType formalType = CanType(FunctionType::get(TupleType::getEmpty(Context),
+                                              getObjectType(value), Context));
   addIndexArgument(Context, value, formalType, uncurryLevel);
   AbstractCC cc = addOwnerArgument(Context, value, formalType, uncurryLevel);
 
@@ -734,9 +742,10 @@ FormalType IRGenModule::getTypeOfSetter(ValueDecl *value) {
   // where T is the value type of the object and S is the index type
   // (this clause is skipped for a non-subscript setter).
   unsigned uncurryLevel = 0;
-  Type argType = getObjectType(value);
-  Type formalType = FunctionType::get(argType, TupleType::getEmpty(Context),
-                                      Context);
+  CanType argType = getObjectType(value);
+  CanType formalType = CanType(FunctionType::get(argType,
+                                                 TupleType::getEmpty(Context),
+                                                 Context));
   addIndexArgument(Context, value, formalType, uncurryLevel);
   auto cc = addOwnerArgument(Context, value, formalType, uncurryLevel);
 

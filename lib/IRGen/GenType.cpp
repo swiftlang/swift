@@ -167,23 +167,30 @@ const TypeInfo &TypeConverter::getWitnessTablePtrTypeInfo() {
 
 /// Get the fragile type information for the given type.
 const TypeInfo &IRGenFunction::getFragileTypeInfo(Type T) {
+  return IGM.getFragileTypeInfo(T->getCanonicalType());
+}
+
+/// Get the fragile type information for the given type.
+const TypeInfo &IRGenFunction::getFragileTypeInfo(CanType T) {
   return IGM.getFragileTypeInfo(T);
 }
 
 /// Get the fragile IR type for the given type.
-llvm::Type *IRGenModule::getFragileType(Type T) {
+llvm::Type *IRGenModule::getFragileType(CanType T) {
   return getFragileTypeInfo(T).StorageType;
 }
 
 /// Get the fragile type information for the given type.
 const TypeInfo &IRGenModule::getFragileTypeInfo(Type T) {
+  return Types.getFragileTypeInfo(T->getCanonicalType());
+}
+
+/// Get the fragile type information for the given type.
+const TypeInfo &IRGenModule::getFragileTypeInfo(CanType T) {
   return Types.getFragileTypeInfo(T);
 }
 
-const TypeInfo &TypeConverter::getFragileTypeInfo(Type sugaredTy) {
-  assert(!sugaredTy.isNull());
-  CanType canonicalTy = sugaredTy->getCanonicalType();
-
+const TypeInfo &TypeConverter::getFragileTypeInfo(CanType canonicalTy) {
   auto entry = Types.find(canonicalTy.getPointer());
   if (entry != Types.end())
     return *entry->second;
@@ -210,7 +217,7 @@ const TypeInfo &TypeConverter::getFragileTypeInfo(ClassDecl *theClass) {
     return *convertBoundGenericType(theClass);
 
   // Otherwise, use the declared type.
-  return getFragileTypeInfo(theClass->getDeclaredType());
+  return getFragileTypeInfo(theClass->getDeclaredType()->getCanonicalType());
 }
 
 const TypeInfo *TypeConverter::convertType(CanType canTy) {
@@ -383,20 +390,20 @@ IRGenModule::createNominalType(ProtocolCompositionType *type) {
 }
 
 /// Compute the explosion schema for the given type.
-ExplosionSchema IRGenModule::getSchema(Type type, ExplosionKind kind) {
+ExplosionSchema IRGenModule::getSchema(CanType type, ExplosionKind kind) {
   ExplosionSchema schema(kind);
   getSchema(type, schema);
   return schema;
 }
 
 /// Compute the explosion schema for the given type.
-void IRGenModule::getSchema(Type type, ExplosionSchema &schema) {
+void IRGenModule::getSchema(CanType type, ExplosionSchema &schema) {
   // As an optimization, avoid actually building a TypeInfo for any
   // obvious TupleTypes.  This assumes that a TupleType's explosion
   // schema is always the concatenation of its component's schemata.
-  if (TupleType *tuple = type->getAs<TupleType>()) {
+  if (TupleType *tuple = dyn_cast<TupleType>(type)) {
     for (const TupleTypeElt &field : tuple->getFields())
-      getSchema(field.getType(), schema);
+      getSchema(CanType(field.getType()), schema);
     return;
   }
 
@@ -405,14 +412,14 @@ void IRGenModule::getSchema(Type type, ExplosionSchema &schema) {
 }
 
 /// Compute the explosion schema for the given type.
-unsigned IRGenModule::getExplosionSize(Type type, ExplosionKind kind) {
+unsigned IRGenModule::getExplosionSize(CanType type, ExplosionKind kind) {
   // As an optimization, avoid actually building a TypeInfo for any
   // obvious TupleTypes.  This assumes that a TupleType's explosion
   // schema is always the concatenation of its component's schemata.
-  if (TupleType *tuple = type->getAs<TupleType>()) {
+  if (TupleType *tuple = dyn_cast<TupleType>(type)) {
     unsigned count = 0;
     for (const TupleTypeElt &field : tuple->getFields())
-      count += getExplosionSize(field.getType(), kind);
+      count += getExplosionSize(CanType(field.getType()), kind);
     return count;
   }
 
@@ -422,9 +429,9 @@ unsigned IRGenModule::getExplosionSize(Type type, ExplosionKind kind) {
 
 /// Determine whether this type is a single value that is passed
 /// indirectly at the given level.
-llvm::PointerType *IRGenModule::isSingleIndirectValue(Type type,
+llvm::PointerType *IRGenModule::isSingleIndirectValue(CanType type,
                                                       ExplosionKind kind) {
-  if (type->is<ArchetypeType>()) return OpaquePtrTy;
+  if (isa<ArchetypeType>(type)) return OpaquePtrTy;
 
   ExplosionSchema schema(kind);
   getSchema(type, schema);
@@ -434,7 +441,7 @@ llvm::PointerType *IRGenModule::isSingleIndirectValue(Type type,
 }
 
 /// Determine whether this type requires an indirect result.
-llvm::PointerType *IRGenModule::requiresIndirectResult(Type type,
+llvm::PointerType *IRGenModule::requiresIndirectResult(CanType type,
                                                        ExplosionKind kind) {
   auto &ti = getFragileTypeInfo(type);
   ExplosionSchema schema = ti.getSchema(kind);

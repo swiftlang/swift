@@ -26,6 +26,7 @@ namespace llvm {
 namespace swift {
   class ArchetypeMemberRefExpr;
   class ArchetypeSubscriptExpr;
+  class CanType;
   class ErasureExpr;
   class ExistentialMemberRefExpr;
   class ExistentialSubscriptExpr;
@@ -83,7 +84,7 @@ namespace irgen {
   /// Emit an existential member reference as a callee.
   CallEmission prepareExistentialMemberRefCall(IRGenFunction &IGF,
                                         ExistentialMemberRefExpr *E,
-                                        Type substResultType,
+                                        CanType substResultType,
                                         ArrayRef<Substitution> subs,
                                         ExplosionKind maxExplosionLevel,
                                         unsigned maxUncurry);
@@ -91,7 +92,7 @@ namespace irgen {
   /// Emit an existential member reference as a callee.
   CallEmission prepareArchetypeMemberRefCall(IRGenFunction &IGF,
                                       ArchetypeMemberRefExpr *E,
-                                      Type substResultType,
+                                      CanType substResultType,
                                       ArrayRef<Substitution> subs,
                                       ExplosionKind maxExplosionLevel,
                                       unsigned maxUncurry);
@@ -119,7 +120,7 @@ namespace irgen {
                                 ArrayRef<Substitution> subs,
                                 Explosion &args);
 
-  void getValueWitnessTableElements(Type T,
+  void getValueWitnessTableElements(CanType T,
                                   llvm::SetVector<ArchetypeType*> &archetypes);
   void getValueWitnessTables(IRGenFunction &IGF,
                              ArrayRef<ArchetypeType*> archetypes,

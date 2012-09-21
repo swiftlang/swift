@@ -175,7 +175,7 @@ static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
                                 DestructorDecl *DD) {
   llvm::Function *fn = IGM.getAddrOfDestructor(CD);
 
-  IRGenFunction IGF(IGM, Type(), nullptr,
+  IRGenFunction IGF(IGM, CanType(), nullptr,
                     ExplosionKind::Minimal, 0, fn, Prologue::Bare);
 
   Type thisType = CD->getDeclaredTypeInContext();
@@ -238,7 +238,7 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
     CD->getArguments()
   };
   pats[0]->setType(MetaTypeType::get(thisDecl->getType(), IGM.Context));
-  IRGenFunction IGF(IGM, CD->getType(), pats,
+  IRGenFunction IGF(IGM, CD->getType()->getCanonicalType(), pats,
                     ExplosionKind::Minimal, 1, fn, Prologue::Standard);
 
   // Emit the "this" variable

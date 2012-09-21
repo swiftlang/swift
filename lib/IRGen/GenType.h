@@ -85,7 +85,7 @@ class TypeConverter {
 public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
-  const TypeInfo &getFragileTypeInfo(Type T);
+  const TypeInfo &getFragileTypeInfo(CanType T);
   const TypeInfo &getFragileTypeInfo(ClassDecl *D);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);

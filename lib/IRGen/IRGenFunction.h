@@ -117,7 +117,7 @@ public:
   IRGenModule &IGM;
   IRBuilder Builder;
 
-  Type CurFuncType;
+  CanType CurFuncType;
   ArrayRef<Pattern*> CurFuncParamPatterns;
   llvm::Function *CurFn;
   ExplosionKind CurExplosionLevel;
@@ -125,7 +125,7 @@ public:
   Prologue CurPrologue;
   llvm::Value *ContextPtr;
 
-  IRGenFunction(IRGenModule &IGM, Type t, ArrayRef<Pattern*> p,
+  IRGenFunction(IRGenModule &IGM, CanType t, ArrayRef<Pattern*> p,
                 ExplosionKind explosion,
                 unsigned uncurryLevel, llvm::Function *fn,
                 Prologue prologue = Prologue::Standard);
@@ -250,6 +250,7 @@ public:
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getFragileTypeInfo(Type T);
+  const TypeInfo &getFragileTypeInfo(CanType T);
   void emitMemCpy(llvm::Value *dest, llvm::Value *src,
                   Size size, Alignment align);
   void emitMemCpy(Address dest, Address src, Size size);
@@ -314,7 +315,7 @@ public:
 
   void emitRValueAsInit(Expr *E, Address addr, const TypeInfo &type);
   void emitRValue(Expr *E, Explosion &explosion);
-  void emitRValueUnderSubstitutions(Expr *E, Type destType,
+  void emitRValueUnderSubstitutions(Expr *E, CanType destType,
                                     ArrayRef<Substitution> subs,
                                     Explosion &explosion);
 
@@ -328,7 +329,7 @@ public:
 
   OwnedAddress getAddrForParameter(VarDecl *param, Explosion &paramValues);
 
-  void emitNullaryCall(llvm::Value *fn, Type resultType, Explosion &result);
+  void emitNullaryCall(llvm::Value *fn, CanType resultType, Explosion &result);
 
   Condition emitCondition(Expr *E, bool hasFalseCode, bool invertValue = false);
 

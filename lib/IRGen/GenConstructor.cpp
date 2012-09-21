@@ -37,7 +37,7 @@ void IRGenModule::emitConstructor(ConstructorDecl *CD) {
     CD->getArguments()
   };
   pats[0]->setType(MetaTypeType::get(thisDecl->getType(), Context));
-  IRGenFunction IGF(*this, CD->getType(), pats,
+  IRGenFunction IGF(*this, CD->getType()->getCanonicalType(), pats,
                     ExplosionKind::Minimal, 1, fn, Prologue::Standard);
   const TypeInfo &type = getFragileTypeInfo(thisDecl->getType());
 

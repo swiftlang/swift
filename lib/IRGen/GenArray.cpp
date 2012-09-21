@@ -107,18 +107,18 @@ void swift::irgen::emitNewArrayExpr(IRGenFunction &IGF, NewArrayExpr *E,
   }
 
   Expr *init = nullptr;
-  ArrayHeapLayout layout(IGF, E->getElementType());
+  ArrayHeapLayout layout(IGF, E->getElementType()->getCanonicalType());
 
   Address begin;
   ManagedValue alloc =
     layout.emitAlloc(IGF, length, begin, init, "new-array");
 
-  emitArrayInjectionCall(IGF, alloc, begin, E->getType(),
+  emitArrayInjectionCall(IGF, alloc, begin, E->getType()->getCanonicalType(),
                          E->getInjectionFunction(), length, out);
 }
 
 void irgen::emitArrayInjectionCall(IRGenFunction &IGF, ManagedValue alloc,
-                                   Address begin, Type sliceTy,
+                                   Address begin, CanType sliceTy,
                                    Expr *injectionFn, llvm::Value *length,
                                    Explosion &out) {
   // Emit the allocation.

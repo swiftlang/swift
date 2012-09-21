@@ -81,13 +81,13 @@ static bool differsByAbstraction(IRGenModule &IGM,
 
   // If the abstract type doesn't pass indirectly, the substituted
   // type doesn't either.
-  if (!IGM.requiresIndirectResult(origTy->getResult(),
+  if (!IGM.requiresIndirectResult(CanType(origTy->getResult()),
                                   ExplosionKind::Minimal))
     return false;
 
   // Otherwise, if the substituted type doesn't pass indirectly,
   // we've got a mismatch.
-  return !IGM.requiresIndirectResult(substTy->getResult(),
+  return !IGM.requiresIndirectResult(CanType(substTy->getResult()),
                                      ExplosionKind::Minimal);
 }
 
@@ -416,7 +416,8 @@ namespace {
 
       // FIXME: This is my first shot at implementing this, but it doesn't
       // handle cases which actually need remapping.
-      In.transferInto(Out, IGF.IGM.getExplosionSize(origTy, In.getKind()));
+      auto n = IGF.IGM.getExplosionSize(CanType(origTy), In.getKind());
+      In.transferInto(Out, n);
     }
 
     void visitAnyFunctionType(AnyFunctionType *origTy,
@@ -438,8 +439,8 @@ namespace {
     void visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
       // There's actually nothing to do here right now, but eventually
       // some metatypes may actually get representations.
-      assert(IGF.IGM.getSchema(origTy, In.getKind()).empty());
-      assert(IGF.IGM.getSchema(substTy, Out.getKind()).empty());
+      assert(IGF.IGM.getSchema(CanType(origTy), In.getKind()).empty());
+      assert(IGF.IGM.getSchema(CanType(substTy), Out.getKind()).empty());
     }
 
     void visitTupleType(TupleType *origTy, TupleType *substTy) {
@@ -611,12 +612,12 @@ static void emitUnderSubstitutions(IRGenFunction &IGF, Expr *E,
 }
 
 /// Emit a value under substitution rules.
-void IRGenFunction::emitRValueUnderSubstitutions(Expr *E, Type expectedType,
+void IRGenFunction::emitRValueUnderSubstitutions(Expr *E, CanType expectedType,
                                                  ArrayRef<Substitution> subs,
                                                  Explosion &out) {
   // It's convenient to call this with no substitutions sometimes.
   // Just ignore that now.
   if (subs.empty()) return emitRValue(E, out);
 
-  emitUnderSubstitutions(*this, E, expectedType->getCanonicalType(), subs, out);
+  emitUnderSubstitutions(*this, E, expectedType, subs, out);
 }

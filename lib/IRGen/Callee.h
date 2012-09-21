@@ -95,10 +95,10 @@ namespace irgen {
     unsigned UncurryLevel;
 
     /// The unsubstituted function type being called.
-    Type OrigFormalType;
+    CanType OrigFormalType;
 
     /// The substituted result type of the function being called.
-    Type SubstResultType;
+    CanType SubstResultType;
 
     /// The pointer to the actual function.
     llvm::Value *FnPtr;
@@ -116,8 +116,8 @@ namespace irgen {
 
     /// Prepare a callee for a known freestanding function that
     /// requires no data pointer.
-    static Callee forFreestandingFunction(Type origFormalType,
-                                          Type substResultType,
+    static Callee forFreestandingFunction(CanType origFormalType,
+                                          CanType substResultType,
                                           ArrayRef<Substitution> subs,
                                           llvm::Constant *fn,
                                           ExplosionKind explosionLevel,
@@ -131,7 +131,7 @@ namespace irgen {
     /// Prepare a callee for a known instance method.  Methods never
     /// require a data pointer.  The formal type here should
     /// include the 'this' clause.
-    static Callee forMethod(Type origFormalType, Type substResultType,
+    static Callee forMethod(CanType origFormalType, CanType substResultType,
                             ArrayRef<Substitution> subs,
                             llvm::Constant *fn,
                             ExplosionKind explosionLevel,
@@ -144,7 +144,8 @@ namespace irgen {
 
     /// Prepare a callee for a known function with a known data pointer.
     static Callee forKnownFunction(AbstractCC convention,
-                                   Type origFormalType, Type substResultType,
+                                   CanType origFormalType,
+                                   CanType substResultType,
                                    ArrayRef<Substitution> subs,
                                    llvm::Value *fn, ManagedValue data,
                                    ExplosionKind explosionLevel,
@@ -170,7 +171,8 @@ namespace irgen {
     }
 
     /// Prepare a callee for an indirect call to a function.
-    static Callee forIndirectCall(Type origFormalType, Type substResultType,
+    static Callee forIndirectCall(CanType origFormalType,
+                                  CanType substResultType,
                                   ArrayRef<Substitution> subs,
                                   llvm::Value *fn, ManagedValue data) {
       if (isa<llvm::ConstantPointerNull>(data.getValue()))
@@ -182,8 +184,8 @@ namespace irgen {
 
     AbstractCC getConvention() const { return Convention; }
 
-    Type getOrigFormalType() const { return OrigFormalType; }
-    Type getSubstResultType() const { return SubstResultType; }
+    CanType getOrigFormalType() const { return OrigFormalType; }
+    CanType getSubstResultType() const { return SubstResultType; }
 
     bool hasSubstitutions() const { return !Substitutions.empty(); }
     ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }

@@ -666,7 +666,7 @@ namespace {
       llvm::Constant *fn =
         IGF.IGM.getAddrOfSetter(target, formal, explosionLevel);
 
-      Type substResultType = TupleType::getEmpty(IGF.IGM.Context);
+      CanType substResultType = CanType(TupleType::getEmpty(IGF.IGM.Context));
       return Callee::forKnownFunction(formal.getCC(), formal.getType(),
                                       substResultType,
                                       getSubstitutions(),

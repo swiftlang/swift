@@ -111,7 +111,7 @@ public:
 CallEmission prepareCall(IRGenFunction &IGF, Expr *fn,
                          ExplosionKind bestLevel,
                          unsigned numArgs,
-                         Type substResultType);
+                         CanType substResultType);
 
 }
 }

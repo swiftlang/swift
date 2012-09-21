@@ -185,8 +185,7 @@ public:
     return entity;
   }
 
-  static LinkEntity forValueWitness(Type concreteType, ValueWitness witness) {
-    assert(concreteType->isCanonical());
+  static LinkEntity forValueWitness(CanType concreteType, ValueWitness witness) {
     LinkEntity entity;
     entity.Pointer = concreteType.getPointer();
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::ValueWitness))

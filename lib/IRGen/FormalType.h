@@ -26,16 +26,16 @@ namespace irgen {
 
 /// The formal type of a function.
 class FormalType {
-  Type Ty;
+  CanType Ty;
   AbstractCC CC;
   unsigned NaturalUncurry;
 
 public:
-  FormalType(Type type, AbstractCC cc, unsigned naturalUncurry)
+  FormalType(CanType type, AbstractCC cc, unsigned naturalUncurry)
     : Ty(type), CC(cc), NaturalUncurry(naturalUncurry) {}
 
   /// Return the natural, unsubstituted type of this function.
-  Type getType() const { return Ty; }
+  CanType getType() const { return Ty; }
 
   /// Return the abstract calling convention of this function.
   AbstractCC getCC() const { return CC; }

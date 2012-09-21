@@ -111,7 +111,7 @@ static void emitValueConstructor(IRGenModule &IGM,
     ctor->getArguments()
   };
   pats[0]->setType(MetaTypeType::get(thisDecl->getType(), IGM.Context));
-  IRGenFunction IGF(IGM, ctor->getType(), pats,
+  IRGenFunction IGF(IGM, ctor->getType()->getCanonicalType(), pats,
                     ExplosionKind::Minimal, 1, fn, Prologue::Standard);
 
   const StructTypeInfo &thisTI =

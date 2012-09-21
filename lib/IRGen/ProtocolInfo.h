@@ -23,10 +23,10 @@
 #include "ValueWitness.h"
 
 namespace swift {
+  class CanType;
   class Decl;
   class ProtocolConformance;
   class ProtocolDecl;
-  class Type;
 
 namespace irgen {
   class ConformanceInfo; // private to GenProto.cpp
@@ -147,7 +147,7 @@ class ProtocolInfo {
 
 public:
   const ConformanceInfo &getConformance(IRGenModule &IGM,
-                                        Type concreteType,
+                                        CanType concreteType,
                                         const TypeInfo &concreteTI,
                                         ProtocolDecl *protocol,
                                         const ProtocolConformance &conf) const;

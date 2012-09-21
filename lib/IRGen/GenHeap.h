@@ -68,7 +68,7 @@ class ArrayHeapLayout {
   llvm::SetVector<ArchetypeType*> WitnessTypes;
 
 public:
-  ArrayHeapLayout(IRGenFunction &IGF, Type T);
+  ArrayHeapLayout(IRGenFunction &IGF, CanType T);
 
   const TypeInfo &getElementTypeInfo() const { return ElementTI; }
 

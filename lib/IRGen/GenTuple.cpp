@@ -259,7 +259,7 @@ void swift::irgen::emitScalarToTuple(IRGenFunction &IGF, ScalarToTupleExpr *E,
 #endif
 
   llvm::ArrayRef<TupleTypeElt> outerFields =
-    E->getType()->castTo<TupleType>()->getFields();
+    cast<TupleType>(E->getType()->getCanonicalType())->getFields();
 
   unsigned destIndex = 0;
   for (const TupleTypeElt &outerField : outerFields) {
@@ -276,10 +276,10 @@ void swift::irgen::emitScalarToTuple(IRGenFunction &IGF, ScalarToTupleExpr *E,
     if (E->getVarargsInjectionFunction()) {
       llvm::Value *length = IGF.Builder.getInt64(1);
       const TypeInfo &elementTI =
-          IGF.getFragileTypeInfo(outerField.getVarargBaseTy());
+        IGF.getFragileTypeInfo(CanType(outerField.getVarargBaseTy()));
 
       Expr *init = nullptr;
-      ArrayHeapLayout layout(IGF, outerField.getVarargBaseTy());
+      ArrayHeapLayout layout(IGF, CanType(outerField.getVarargBaseTy()));
 
       // Allocate the array.
       // FIXME: This includes an unnecessary memset.
@@ -291,7 +291,7 @@ void swift::irgen::emitScalarToTuple(IRGenFunction &IGF, ScalarToTupleExpr *E,
 
       // Perform the call which generates the slice value.
       emitArrayInjectionCall(IGF, alloc, begin,
-                             outerField.getType(),
+                             CanType(outerField.getType()),
                              E->getVarargsInjectionFunction(), length,
                              outerTupleExplosion);
 
@@ -334,7 +334,7 @@ void swift::irgen::emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
   }
 
   llvm::ArrayRef<TupleTypeElt> outerFields =
-    E->getType()->castTo<TupleType>()->getFields();
+    cast<TupleType>(E->getType()->getCanonicalType())->getFields();
 
   auto shuffleIndexIterator = E->getElementMapping().begin();
   for (const TupleTypeElt &outerField : outerFields) {
@@ -355,10 +355,10 @@ void swift::irgen::emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
       llvm::Value *length = IGF.Builder.getInt64(numElems);
 
       const TypeInfo &elementTI =
-          IGF.getFragileTypeInfo(outerField.getVarargBaseTy());
+        IGF.getFragileTypeInfo(CanType(outerField.getVarargBaseTy()));
 
       Expr *init = nullptr;
-      ArrayHeapLayout layout(IGF, outerField.getVarargBaseTy());
+      ArrayHeapLayout layout(IGF, CanType(outerField.getVarargBaseTy()));
 
       // Allocate the array.
       // FIXME: This includes an unnecessary memset.
@@ -370,7 +370,7 @@ void swift::irgen::emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
 
       // Perform the call which generates the slice value.
       emitArrayInjectionCall(IGF, alloc, begin,
-                             outerField.getType(),
+                             outerField.getType()->getCanonicalType(),
                              E->getVarargsInjectionFunction(), length,
                              outerTupleExplosion);
 

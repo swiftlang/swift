@@ -366,7 +366,7 @@ const TypeInfo *TypeConverter::convertOneOfType(OneOfDecl *oneof) {
       oneofTI->StorageAlignment = Alignment(1);
       oneofTI->Singleton = nullptr;
     } else {
-      const TypeInfo &eltTI = getFragileTypeInfo(eltType);
+      const TypeInfo &eltTI = getFragileTypeInfo(eltType->getCanonicalType());
       assert(eltTI.isComplete());
       storageType = eltTI.StorageType;
       oneofTI->StorageSize = eltTI.StorageSize;
@@ -419,7 +419,7 @@ const TypeInfo *TypeConverter::convertOneOfType(OneOfDecl *oneof) {
 
     // Compute layout for the type, and ignore variants with
     // zero-size data.
-    const TypeInfo &eltTInfo = getFragileTypeInfo(eltType);
+    const TypeInfo &eltTInfo = getFragileTypeInfo(eltType->getCanonicalType());
     assert(eltTInfo.isComplete());
     if (eltTInfo.isEmpty(ResilienceScope::Local)) continue;
 
@@ -456,7 +456,7 @@ static void emitInjectionFunction(IRGenModule &IGM,
                                   llvm::Function *fn,
                                   OneOfElementDecl *elt) {
   ExplosionKind explosionKind = ExplosionKind::Minimal;
-  IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(), explosionKind,
+  IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(), explosionKind,
                     /*uncurry level*/ 0, fn, Prologue::Bare);
   if (elt->hasArgumentType()) {
     // FIXME: Implement!

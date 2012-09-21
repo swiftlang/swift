@@ -26,7 +26,7 @@
 using namespace swift;
 using namespace irgen;
 
-IRGenFunction::IRGenFunction(IRGenModule &IGM, Type t, ArrayRef<Pattern*> p,
+IRGenFunction::IRGenFunction(IRGenModule &IGM, CanType t, ArrayRef<Pattern*> p,
                              ExplosionKind explosionLevel,
                              unsigned uncurryLevel, llvm::Function *Fn,
                              Prologue prologue)
