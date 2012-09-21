@@ -388,6 +388,10 @@ CFGValue CFGGen::visitTupleExpr(TupleExpr *E) {
   return B.createTuple(E, ArgsV);
 }
 
+CFGValue CFGGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
+  return B.createScalarToTuple(E, visit(E->getSubExpr()));
+}
+
 CFGValue CFGGen::visitTypeOfExpr(TypeOfExpr *E) {
   return B.createTypeOf(E);
 }

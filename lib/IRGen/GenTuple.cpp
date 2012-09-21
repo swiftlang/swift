@@ -239,6 +239,82 @@ LValue swift::irgen::emitTupleElementLValue(IRGenFunction &IGF,
   return tupleLV;
 }
 
+void swift::irgen::emitScalarToTuple(IRGenFunction &IGF, ScalarToTupleExpr *E,
+                                     Explosion &outerTupleExplosion) {
+  Expr *innerExpr = E->getSubExpr();
+  const TypeInfo &innerType = IGF.getFragileTypeInfo(innerExpr->getType());
+
+  // Emit the inner tuple.  We prefer to emit it as an address.
+  Explosion innerExplosion(outerTupleExplosion.getKind());
+  Address innerAddr;
+#if 0
+  // FIXME: This currently explodes because of a bug in GenFunc.
+  if (auto addr = IGF.tryEmitAsAddress(innerExpr, innerType)) {
+    innerAddr = addr.getValue();
+  } else {
+    IGF.emitRValue(innerExpr, innerExplosion);
+  }
+#else
+  IGF.emitRValue(innerExpr, innerExplosion);
+#endif
+
+  llvm::ArrayRef<TupleTypeElt> outerFields =
+    E->getType()->castTo<TupleType>()->getFields();
+
+  unsigned destIndex = 0;
+  for (const TupleTypeElt &outerField : outerFields) {
+    // If we have a field with a default value, emit that value.
+    if (destIndex++ != E->getScalarField()) {
+      assert(outerField.hasInit() && "no default initializer for field!");
+      IGF.emitRValue(outerField.getInit()->getExpr(), outerTupleExplosion);
+      continue;
+    }
+
+    // If we have a varargs injection function, use it.
+    // FIXME: This code is duplicated; refactor with emitTupleShuffle once it
+    // stabilizes.
+    if (E->getVarargsInjectionFunction()) {
+      llvm::Value *length = IGF.Builder.getInt64(1);
+      const TypeInfo &elementTI =
+          IGF.getFragileTypeInfo(outerField.getVarargBaseTy());
+
+      Expr *init = nullptr;
+      ArrayHeapLayout layout(IGF, outerField.getVarargBaseTy());
+
+      // Allocate the array.
+      // FIXME: This includes an unnecessary memset.
+      // FIXME: It would be nice if we could eventually avoid heap-allocating
+      // this array.
+      Address begin;
+      ManagedValue alloc =
+        layout.emitAlloc(IGF, length, begin, init, "new-array");
+
+      // Perform the call which generates the slice value.
+      emitArrayInjectionCall(IGF, alloc, begin,
+                             outerField.getType(),
+                             E->getVarargsInjectionFunction(), length,
+                             outerTupleExplosion);
+
+      if (innerAddr.isValid()) {
+        // If we have an l-value, copy from that.
+        elementTI.initializeWithCopy(IGF, begin, innerAddr);
+      } else {
+        // Otherwise, store the r-value down.
+        elementTI.initialize(IGF, innerExplosion, begin);
+      }
+      break;
+    }
+
+    if (innerAddr.isValid()) {
+      // If we're loading from an l-value, project from that.
+      innerType.load(IGF, innerAddr, outerTupleExplosion);
+    } else {
+      // Otherwise, project the r-value down.
+      outerTupleExplosion.add(innerExplosion.claimAll());
+    }
+  }
+}
+
 /// emitTupleShuffle - Emit a tuple-shuffle expression
 /// as an exploded r-value.
 void swift::irgen::emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,

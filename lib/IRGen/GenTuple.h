@@ -47,6 +47,10 @@ namespace irgen {
                         Explosion &explosion);
 
   /// Emit a scalar-to-tuple conversion as an r-value.
+  void emitScalarToTuple(IRGenFunction &IGF, ScalarToTupleExpr *E,
+                         Explosion &explosion);
+
+  /// Emit a tuple shuffle conversion as an r-value.
   void emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
                         Explosion &explosion);
 

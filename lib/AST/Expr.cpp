@@ -601,6 +601,13 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitScalarToTupleExpr(ScalarToTupleExpr *E) {
+    printCommon(E, "scalar_to_tuple_expr");
+    OS << " field=" << E->getScalarField();
+    OS << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
 
   void visitAddressOfExpr(AddressOfExpr *E) {
     printCommon(E, "address_of_expr") << '\n';

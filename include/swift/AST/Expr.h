@@ -1293,6 +1293,31 @@ public:
   }
 };
 
+/// ScalarToTupleExpr - Convert a scalar to tuple type.
+class ScalarToTupleExpr : public ImplicitConversionExpr {
+  unsigned ScalarField;
+
+  /// If we're doing a varargs shuffle, this is the function to build the
+  /// destination slice type.
+  Expr *InjectionFn;
+
+public:
+  ScalarToTupleExpr(Expr *subExpr, Type type, unsigned ScalarField,
+                    Expr *InjectionFn = nullptr)
+    : ImplicitConversionExpr(ExprKind::ScalarToTuple, subExpr, type),
+      ScalarField(ScalarField), InjectionFn(InjectionFn) {}
+
+  unsigned getScalarField() { return ScalarField; }
+
+  Expr *getVarargsInjectionFunction() { return InjectionFn; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ScalarToTupleExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ScalarToTuple;
+  }
+};
+
 /// AddressOfExpr - Using the builtin unary '&' operator, convert the
 /// given l-value into an explicit l-value.
 class AddressOfExpr : public Expr {

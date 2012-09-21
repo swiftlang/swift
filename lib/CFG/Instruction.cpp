@@ -116,6 +116,7 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   case InstKind::IntegerLiteral:
   case InstKind::Load:
   case InstKind::Requalify:
+  case InstKind::ScalarToTuple:
   case InstKind::Tuple:
   case InstKind::TypeOf:
     llvm_unreachable("Only TermInst's are allowed");

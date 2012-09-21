@@ -111,6 +111,9 @@ public:
   void visitRequalifyInst(RequalifyInst *RI) {
     OS << "requalify " << getID(RI->getOperand());
   }
+  void visitScalarToTupleInst(ScalarToTupleInst *SI) {
+    OS << "scalartotuple " << getID(SI->getOperand());
+  }
   void visitTupleInst(TupleInst *TI) {
     OS << "tuple (";
     bool isFirst = true;

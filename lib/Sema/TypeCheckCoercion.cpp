@@ -1668,8 +1668,19 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   }
 
   Type ScalarType = Field.getType();
-  if (Field.isVararg())
+  Expr *injectionFn = nullptr;
+  if (Field.isVararg()) {
     ScalarType = Field.getVarargBaseTy();
+
+    // Find the appropriate injection function.
+    ArraySliceType *sliceType =
+        cast<ArraySliceType>(Field.getType().getPointer());
+    Type boundType = BuiltinIntegerType::get(64, TC.Context);
+    injectionFn = TC.buildArrayInjectionFnRef(sliceType, boundType,
+                                              E->getStartLoc());
+    if (!injectionFn)
+      return nullptr;
+  }
   CoercedResult ERes = coerceToType(E, ScalarType, CC, SubFlags);
   if (!ERes)
     return ERes;
@@ -1677,17 +1688,10 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   if (!(Flags & CF_Apply))
     return Type(DestTy);
 
-  // At this point, we know the conversion is going to succeed;
-  // convertTupleToTupleType is just being reused for convenience.
-  Expr * Exprs[] = { ERes.getExpr() };
-  MutableArrayRef<Expr *> TupleSubExprs =
-      TC.Context.AllocateCopy(MutableArrayRef<Expr*>(Exprs));
-  TupleExpr *TE = new (TC.Context) TupleExpr(SourceLoc(), TupleSubExprs,
-                                             nullptr, SourceLoc());
-  TupleType *SrcTT = TupleType::get(TupleTypeElt(ScalarType, Identifier()),
-                                    TC.Context);
-  TE->setType(SrcTT);
-  return convertTupleToTupleType(TE, 1, DestTy, CC, Flags);
+  return CoercedResult(new (TC.Context) ScalarToTupleExpr(ERes.getExpr(),
+                                                          DestTy,
+                                                          ScalarField,
+                                                          injectionFn));
 }
 
 /// \brief Coerce the object argument for a member reference (.) or function

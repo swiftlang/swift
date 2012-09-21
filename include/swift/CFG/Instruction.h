@@ -38,6 +38,7 @@ class LoadExpr;
 class ReturnStmt;
 class Stmt;
 class RequalifyExpr;
+class ScalarToTupleExpr;
 class TupleExpr;
 class TypeOfExpr;
 
@@ -275,6 +276,17 @@ public:
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::TypeOf;
   }
+};
+
+/// ScalarToTupleInst - Convert a scalar to a tuple.
+class ScalarToTupleInst : public Instruction {
+  CFGValue Operand;
+public:
+  ScalarToTupleInst(ScalarToTupleExpr *E, CFGValue Operand)
+    : Instruction(InstKind::ScalarToTuple, (Expr*)E), Operand(Operand) {}
+
+  CFGValue getOperand() const { return Operand; }
+
 };
 
 //===----------------------------------------------------------------------===//

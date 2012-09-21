@@ -127,6 +127,10 @@ public:
     return insert(TupleInst::create(Expr, Elements, C));
   }
 
+  ScalarToTupleInst *createScalarToTuple(ScalarToTupleExpr *Expr, CFGValue Op) {
+    return insert(new ScalarToTupleInst(Expr, Op));
+  }
+
   TypeOfInst *createTypeOf(TypeOfExpr *Expr) {
     return insert(new TypeOfInst(Expr));
   }
