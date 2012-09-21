@@ -1240,7 +1240,7 @@ Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
   // target-specific size_t type?
   argTypes[2] = TupleTypeElt(lenTy, Identifier());
 
-  TupleType *input = TupleType::get(argTypes, Context);
+  Type input = TupleType::get(argTypes, Context);
 
   // The result is just the slice type.
   Type result = sliceType;

@@ -162,9 +162,13 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
-TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
+Type TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
+  if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName())
+    return ParenType::get(C, Fields[0].getType());
+
   bool HasAnyDefaultValues = false;
   bool HasTypeVariable = false;
+
   for (const TupleTypeElt &Elt : Fields) {
     if (Elt.hasInit()) {
       HasAnyDefaultValues = true;

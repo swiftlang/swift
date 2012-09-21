@@ -397,7 +397,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, TypeLoc &Result) {
     Elements.back() = TupleTypeElt(FullTy, Name, Init, BaseTy);
   }
 
-  TupleType *TT = TupleType::get(Elements, Context);
+  TupleType *TT = TupleType::get(Elements, Context)->castTo<TupleType>();
   if (HadExpr)
     TypesWithDefaultValues.emplace_back(TT, CurDeclContext);
   Result = { TT, SourceRange(LPLoc, Tok.getLoc()) };

@@ -3833,7 +3833,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
       case PatternKind::Any:
       case PatternKind::Typed:
-          return;
+        return;
 
       case PatternKind::Named: {
         // Simplify the type of any variables.
@@ -3855,21 +3855,53 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitFuncExpr(FuncExpr *expr) {
-      // Simplify the types within the given pattern.
-      for (auto params : expr->getParamPatterns()) {
-        simplifyPatternTypes(params);
-      }
-      
       // FIXME: Type-check the function now? Or queue for later?
-      return simplifyExprType(expr);
+      simplifyExprType(expr);
+
+      // Coerce the FuncExpr's pattern, in case we resolved something.
+      Type input = expr->getType()->castTo<FunctionType>()->getInput();
+      if (CS.TC.coerceToType(expr->getParamPatterns()[0], input, false))
+        return nullptr;
+
+      return expr;
     }
 
     Expr *visitExplicitClosureExpr(ExplicitClosureExpr *expr) {
-      auto type = CS.simplifyType(expr->getType());
+      auto type = CS.simplifyType(expr->getType())->castTo<FunctionType>();
+
+      // Count the number of arguments.
+      unsigned numInputArgs = 1;
+      TupleType *inputTT = type->getInput()->getAs<TupleType>();
+      if (inputTT)
+        numInputArgs = inputTT->getFields().size();
+
+      // Build up the set of VarDecls (building more if necessary).
+      std::vector<VarDecl*> argVars(expr->getParserVarDecls().begin(),
+                                    expr->getParserVarDecls().end());
+      Pattern *argPat;
+      SourceLoc loc = expr->getLoc();
+      expr->GenerateVarDecls(numInputArgs, argVars, CS.getASTContext());
+
+      // Build the patterns and update the variable types.
+      if (inputTT) {
+        std::vector<TuplePatternElt> argElts;
+        for (unsigned i = 0; i < numInputArgs; ++i) {
+          argVars[i]->overwriteType(inputTT->getElementType(i));
+          auto p = new (CS.getASTContext()) NamedPattern(argVars[i]);
+          p->setType(inputTT->getElementType(i));
+          argElts.emplace_back(p);
+        }
+        argPat = TuplePattern::create(CS.getASTContext(), loc, argElts, loc);
+      } else {
+        argVars[0]->overwriteType(type->getInput());
+        argPat = new (CS.getASTContext()) NamedPattern(argVars[0]);
+      }
+      argPat->setType(type->getInput());
+      expr->setPattern(argPat);
 
       // Convert the expression in the body to the result type of the explicit
       // closure.
-      auto resultType = type->castTo<FunctionType>()->getResult();
+      auto resultType = type->getResult();
       if (Expr *body = CS.convertToType(expr->getBody(), resultType))
         expr->setBody(body);
       expr->setType(type);

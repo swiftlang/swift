@@ -565,7 +565,10 @@ class TupleType : public TypeBase, public llvm::FoldingSetNode {
   
 public:
   /// get - Return the uniqued tuple type with the specified elements.
-  static TupleType *get(ArrayRef<TupleTypeElt> Fields, ASTContext &C);
+  /// Returns a ParenType instead if there is exactly one element which
+  /// is unlabeled and not varargs, so it doesn't accidentally construct
+  /// a tuple which is impossible to write.
+  static Type get(ArrayRef<TupleTypeElt> Fields, ASTContext &C);
 
   /// getEmpty - Return the empty tuple type '()'.
   static Type getEmpty(ASTContext &C);

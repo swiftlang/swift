@@ -539,8 +539,9 @@ CanType TypeBase::getCanonicalType() {
                                      field.getInit(),
                                      canVarargBaseTy));
     }
-    
-    Result = TupleType::get(CanElts, CanElts[0].getType()->getASTContext());
+
+    ASTContext &C = CanElts[0].getType()->getASTContext();
+    Result = TupleType::get(CanElts, C)->castTo<TupleType>();
     break;
   }
     
