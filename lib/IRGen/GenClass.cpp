@@ -26,6 +26,7 @@
 #include "llvm/Function.h"
 #include "llvm/GlobalVariable.h"
 
+#include "ClassMetadataLayout.h"
 #include "Explosion.h"
 #include "GenFunc.h"
 #include "GenMeta.h"
@@ -246,68 +247,16 @@ static llvm::Function *createSizeFn(IRGenModule &IGM,
 namespace {
   enum { NumStandardMetadataFields = 4 };
 
-  /// A CRTP class for laying out class metadata.  Note that this does
-  /// *not* handle the metadata template stuff.
-  template <class Impl> class MetadataLayout {
-    Impl &asImpl() { return *static_cast<Impl*>(this); }
-
-  protected:
-    IRGenModule &IGM;
-
-    /// The most-derived class.
-    ClassDecl *const TargetClass;
-
-    MetadataLayout(IRGenModule &IGM, ClassDecl *targetClass)
-      : IGM(IGM), TargetClass(targetClass) {}
-
-  public:
-    void layout() {
-      // Common fields.
-      asImpl().addMetadataFlags();
-      asImpl().addValueWitnessTable();
-      asImpl().addDestructorFunction();
-      asImpl().addSizeFunction();
-
-      // Class-specific fields.
-      asImpl().addClassFields(TargetClass);
-    }
-
-  protected:
-    /// Add fields associated with the given class and its bases.
-    void addClassFields(ClassDecl *theClass) {
-      // TODO: base class
-
-      // TODO: virtual methods
-
-      if (auto generics = theClass->getGenericParamsOfContext()) {
-        addGenericClassFields(theClass, *generics);
-      }
-    }
-
-    /// Add fields related to the generics of this class declaration.
-    /// TODO: don't add new fields that are implied by base class
-    /// fields.  e.g., if B<T> extends A<T>, the witness for T in A's
-    /// section should be enough.
-    void addGenericClassFields(ClassDecl *theClass,
-                               const GenericParamList &generics) {
-      SmallVector<llvm::Type*, 4> signature;
-      expandPolymorphicSignature(IGM, generics, signature);
-      for (auto type : signature) {
-        asImpl().addGenericWitness(theClass, type);
-      }
-    }
-  };
-
   template <class Impl>
-  class MetadataBuilderBase : public MetadataLayout<Impl> {
-    typedef MetadataLayout<Impl> super;
+  class ClassMetadataBuilderBase : public ClassMetadataLayout<Impl> {
+    typedef ClassMetadataLayout<Impl> super;
 
   protected:
     SmallVector<llvm::Constant *, 8> Fields;
     const HeapLayout &Layout;    
 
-    MetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
-                        const HeapLayout &layout)
+    ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
+                             const HeapLayout &layout)
       : super(IGM, theClass), Layout(layout) {}
 
     unsigned getNextIndex() const { return Fields.size(); }
@@ -342,11 +291,12 @@ namespace {
     }
   };
 
-  class MetadataBuilder : public MetadataBuilderBase<MetadataBuilder> {
+  class ClassMetadataBuilder :
+    public ClassMetadataBuilderBase<ClassMetadataBuilder> {
   public:
-    MetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                    const HeapLayout &layout)
-      : MetadataBuilderBase(IGM, theClass, layout) {}
+    ClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
+                         const HeapLayout &layout)
+      : ClassMetadataBuilderBase(IGM, theClass, layout) {}
 
     void addMetadataFlags() {
       Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
@@ -363,10 +313,10 @@ namespace {
   };
 
   /// A builder for metadata templates.
-  class MetadataTemplateBuilder :
-    public MetadataBuilderBase<MetadataTemplateBuilder> {
+  class ClassMetadataTemplateBuilder :
+    public ClassMetadataBuilderBase<ClassMetadataTemplateBuilder> {
 
-    typedef MetadataBuilderBase super;
+    typedef ClassMetadataBuilderBase super;
 
     /// The generics clause for the type we're emitting.
     const GenericParamList &ClassGenerics;
@@ -388,9 +338,9 @@ namespace {
     enum { TemplateHeaderFieldCount = 5 };
 
   public:
-    MetadataTemplateBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                            const HeapLayout &layout,
-                            const GenericParamList &classGenerics)
+    ClassMetadataTemplateBuilder(IRGenModule &IGM, ClassDecl *theClass,
+                                 const HeapLayout &layout,
+                                 const GenericParamList &classGenerics)
       : super(IGM, theClass, layout), ClassGenerics(classGenerics) {}
 
     void layout() {
@@ -499,12 +449,12 @@ void IRGenModule::emitClassMetadata(ClassDecl *classDecl) {
   llvm::Constant *init;
   bool isPattern;
   if (auto *generics = classDecl->getGenericParamsOfContext()) {
-    MetadataTemplateBuilder builder(*this, classDecl, layout, *generics);
+    ClassMetadataTemplateBuilder builder(*this, classDecl, layout, *generics);
     builder.layout();
     init = builder.getInit();
     isPattern = true;
   } else {
-    MetadataBuilder builder(*this, classDecl, layout);
+    ClassMetadataBuilder builder(*this, classDecl, layout);
     builder.layout();
     init = builder.getInit();
     isPattern = false;
@@ -651,9 +601,9 @@ namespace {
   /// Really lame way of computing the offset of the metadata for a
   /// destructor.
   class DestructorMetadataDiscovery
-    : public MetadataLayout<DestructorMetadataDiscovery> {
+    : public ClassMetadataLayout<DestructorMetadataDiscovery> {
 
-    typedef MetadataLayout<DestructorMetadataDiscovery> super;
+    typedef ClassMetadataLayout<DestructorMetadataDiscovery> super;
     IRGenFunction &IGF;
     Address Metadata;
     unsigned NextIndex = 0;

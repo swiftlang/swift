@@ -34,6 +34,7 @@ namespace swift {
 
 namespace irgen {
   class AbstractCallee;
+  class Address;
   class Arg;
   class Explosion;
   enum class ExplosionKind : unsigned;
@@ -41,6 +42,7 @@ namespace irgen {
   class IRGenFunction;
   class IRGenModule;
   class LValue;
+  class TypeInfo;
   enum class ValueWitness : unsigned;
 
   /// Emit an erasure expression into an explosion.
