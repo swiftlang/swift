@@ -26,6 +26,9 @@ namespace irgen {
 
 class IRGenModule;
 
+/// The number of fields in a HeapMetadata object.
+const unsigned NumHeapMetadataFields = 4;
+
 /// A CRTP class for laying out class metadata.  Note that this does
 /// *not* handle the metadata template stuff.
 template <class Impl> class ClassMetadataLayout {

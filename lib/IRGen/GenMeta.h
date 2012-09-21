@@ -29,6 +29,7 @@ namespace swift {
 namespace irgen {
   class Explosion;
   class IRGenFunction;
+  class IRGenModule;
 
   /// Emit a reference to the type metadata for a nominal type.
   ///
@@ -43,6 +44,9 @@ namespace irgen {
 
   /// Emit a reference to a piece of type metadata.
   llvm::Value *emitTypeMetadataRef(IRGenFunction &IGF, Type type);
+
+  /// Emit the metadata associated with the given class declaration.
+  void emitClassMetadata(IRGenModule &IGM, ClassDecl *theClass);
 
 } // end namespace irgen
 } // end namespace swift

@@ -84,8 +84,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
 
 /// Create the size function for a layout.
 /// TODO: give this some reasonable name and possibly linkage.
-static llvm::Function *createSizeFn(IRGenModule &IGM,
-                                    const HeapLayout &layout) {
+llvm::Constant *HeapLayout::createSizeFn(IRGenModule &IGM) const {
   llvm::Function *fn =
     llvm::Function::Create(IGM.DtorTy, llvm::Function::InternalLinkage,
                            "objectsize", &IGM.Module);
@@ -96,7 +95,7 @@ static llvm::Function *createSizeFn(IRGenModule &IGM,
   // Ignore the object pointer; we aren't a dynamically-sized array,
   // so it's pointless.
 
-  llvm::Value *size = layout.emitSize(IGF);
+  llvm::Value *size = emitSize(IGF);
   IGF.Builder.CreateRet(size);
 
   return fn;
@@ -108,7 +107,7 @@ void HeapLayout::buildMetadataInto(IRGenModule &IGM,
                                  unsigned(MetadataKind::HeapLocalVariable)));
   metadata.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
   metadata.push_back(createDtorFn(IGM, *this));
-  metadata.push_back(createSizeFn(IGM, *this));
+  metadata.push_back(createSizeFn(IGM));
 }
 
 static llvm::Constant *buildPrivateMetadataVar(IRGenModule &IGM,

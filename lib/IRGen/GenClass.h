@@ -18,16 +18,21 @@
 #define SWIFT_IRGEN_GENCLASS_H
 
 namespace swift {
+  class ClassDecl;
   class GenericMemberRefExpr;
   class MemberRefExpr;
 
 namespace irgen {
+  class HeapLayout;
   class IRGenFunction;
+  class IRGenModule;
   class LValue;
 
   LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF, MemberRefExpr *E);
   LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
                                        GenericMemberRefExpr *E);
+
+  const HeapLayout &getClassLayout(IRGenModule &IGM, ClassDecl *theClass);
 
 } // end namespace irgen
 } // end namespace swift

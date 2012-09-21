@@ -47,6 +47,9 @@ public:
   void buildMetadataInto(IRGenModule &IGM,
                    llvm::SmallVectorImpl<llvm::Constant*> &metadata) const;
 
+  /// Build a size function for this layout.
+  llvm::Constant *createSizeFn(IRGenModule &IGM) const;
+
   /// As a convenience, build a metadata object with internal linkage
   /// consisting solely of the standard heap metadata.
   llvm::Constant *getPrivateMetadata(IRGenModule &IGM) const;

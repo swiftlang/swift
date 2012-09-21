@@ -151,6 +151,7 @@ private:
   TypeConverter &Types;
   friend class TypeConverter;
   friend class GenProto;
+  friend class GenClass;
 
 //--- Globals ---------------------------------------------------------------
 public:
@@ -240,9 +241,6 @@ public:
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,
                                         bool isIndirect, bool isPattern,
                                         llvm::Type *definitionType = nullptr);
-
-private:
-  void emitClassMetadata(ClassDecl *D);
 };
 
 } // end namespace irgen
