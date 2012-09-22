@@ -236,8 +236,7 @@ struct EditLineWrapper {
 
     PromptedForLine = true;
     return PromptString.c_str();
-  };
-        
+  }
 
   ~EditLineWrapper() {
     el_end(e);
