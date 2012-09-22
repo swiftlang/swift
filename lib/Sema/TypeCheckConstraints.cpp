@@ -1295,6 +1295,10 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value) {
 
 Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                                 bool isTypeReference) {
+  // If the base is a module type, just use the type of the decl.
+  if (baseTy->is<ModuleType>())
+    return getTypeOfReference(value);
+
   // Figure out the instance type used for the base.
   baseTy = baseTy->getRValueType();
   bool isInstance = true;
