@@ -177,6 +177,19 @@ instantiateGenericMetadata(GenericMetadata *pattern,
 }
 
 /// The primary entrypoint.
+const void *
+swift::swift_dynamicCast(const void *object, const ClassMetadata *targetType) {
+  const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
+  do {
+    if (isa == targetType) {
+      return object;
+    }
+    isa = isa->SuperClass;
+  } while (targetType);
+  return NULL;
+}
+
+/// The primary entrypoint.
 const Metadata *
 swift::swift_getGenericMetadata(GenericMetadata *pattern,
                                 const void *arguments) {

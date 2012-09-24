@@ -542,6 +542,11 @@ struct GenericMetadata {
   }
 };
 
+/// \brief Simple proof of concept dynamic_cast API
+extern "C" const void *
+swift_dynamicCast(const void *object, const ClassMetadata *targetType);
+
+
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
 ///
 /// The basic algorithm for fetching a metadata object is:
