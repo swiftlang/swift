@@ -21,34 +21,37 @@
 
 namespace swift {
 namespace irgen {
-  
+
 /// irgen::TypeVisitor - This is a specialization of
 /// swift::TypeVisitor which works only on canonical types and
 /// which automatically ignores certain AST node kinds.
-template<typename ImplClass, typename RetTy = void> 
-class TypeVisitor : public swift::TypeVisitor<ImplClass, RetTy> {
+template<typename ImplClass, typename RetTy = void, typename... Args>
+class TypeVisitor : public swift::TypeVisitor<ImplClass, RetTy, Args...> {
 public:
 
-  RetTy visit(CanType T) {
-    return swift::TypeVisitor<ImplClass, RetTy>::visit(Type(T));
+  template <class... As> RetTy visit(CanType type, Args... args) {
+    return swift::TypeVisitor<ImplClass, RetTy, Args...>
+                            ::visit(Type(type), std::forward<Args>(args)...);
   }
 
 #define TYPE(Id, Parent)
 #define UNCHECKED_TYPE(Id, Parent) \
-  RetTy visit##Id##Type(Id##Type *T) { \
+  template <class... As> RetTy visit##Id##Type(Id##Type *T, Args... args) { \
     llvm_unreachable(#Id "Type should not survive to IR-gen"); \
   }
 #define SUGARED_TYPE(Id, Parent) \
-  RetTy visit##Id##Type(Id##Type *T) { \
+  template <class... As> RetTy visit##Id##Type(Id##Type *T, Args... args) { \
     llvm_unreachable(#Id "Type should not survive canonicalization"); \
   }
 #include "swift/AST/TypeNodes.def"
 
-  RetTy visitDeducibleGenericParamType(DeducibleGenericParamType *T) {
+  RetTy visitDeducibleGenericParamType(DeducibleGenericParamType *T,
+                                       Args... args) {
     llvm_unreachable("DeducibleGenericParamType should not survive Sema");
   }
 
-  RetTy visitUnboundGenericType(UnboundGenericType *T) {
+  template <class... As>
+  RetTy visitUnboundGenericType(UnboundGenericType *T, Args... args) {
     llvm_unreachable("UnboundGenericType should not survive Sema");
   }
 };
