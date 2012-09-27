@@ -381,6 +381,16 @@ static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                         wtable);
 }
 
+/// Standard, inefficient witness table for tuples.
+static const ValueWitnessTable tuple_witnesses = {
+#define TUPLE_WITNESS(NAME) &tuple_##NAME,
+  FOR_ALL_FUNCTION_VALUE_WITNESSES(TUPLE_WITNESS)
+#undef TUPLE_WITNESS
+  0,
+  0,
+  0
+};
+
 const TupleTypeMetadata *
 swift::swift_getTupleTypeMetadata(size_t numElements,
                                   const Metadata * const *elements,
@@ -431,8 +441,11 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
   witnesses->alignment = alignment;
   witnesses->stride = llvm::RoundUpToAlignment(size, alignment);
 
+  // Copy the function witnesses in, either from the proposed
+  // witnesses or from the standard table.
+  if (!proposedWitnesses) proposedWitnesses = &tuple_witnesses;
 #define ASSIGN_TUPLE_WITNESS(NAME) \
-  witnesses->NAME = &tuple_##NAME;
+  witnesses->NAME = proposedWitnesses->NAME;
   FOR_ALL_FUNCTION_VALUE_WITNESSES(ASSIGN_TUPLE_WITNESS)
 #undef ASSIGN_TUPLE_WITNESS
 
