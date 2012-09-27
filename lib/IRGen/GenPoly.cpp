@@ -32,6 +32,12 @@
 using namespace swift;
 using namespace irgen;
 
+/// Ways in which we can test two types differ by abstraction.
+enum class AbstractionDifference : bool {
+  Memory,
+  Explosion
+};
+
 /// Emit the given expression as a temporary, casting the address to
 /// the given pointer type at the last minute.
 static void emitAsCastTemporary(IRGenFunction &IGF, Expr *E,
@@ -60,35 +66,43 @@ static void emitAsCastTemporary(IRGenFunction &IGF, Expr *E,
 /// function types.  See the comment below.
 static bool differsByAbstraction(IRGenModule &IGM,
                                  AnyFunctionType *origTy,
-                                 AnyFunctionType *substTy) {
+                                 AnyFunctionType *substTy,
+                                 ExplosionKind explosionLevel) {
   assert(origTy->isCanonical());
   assert(substTy->isCanonical());
 
-  // Arguments use a different rule for archetypes.
-  if (differsByAbstraction(IGM, CanType(origTy->getInput()),
-                           CanType(substTy->getInput()),
-                           AbstractionDifference::Argument))
+  // Note that our type-system does not allow types to differ by
+  // polymorphism.
+
+  // Arguments will be exploded.
+  if (differsByAbstractionInExplosion(IGM, CanType(origTy->getInput()),
+                                      CanType(substTy->getInput()),
+                                      explosionLevel))
     return true;
 
-  // Results consider ordinary rules...
-  if (differsByAbstraction(IGM, CanType(origTy->getResult()),
-                           CanType(substTy->getResult()),
-                           AbstractionDifference::Memory))
-    return true;
+  // For the result, consider whether it will be passed in memory or
+  // exploded.
+  CanType origResult = CanType(origTy->getResult());
+  CanType substResult = CanType(substTy->getResult());
+  if (origResult == substResult) return false;
 
-  // ...and then we also have to decide whether the substituted
-  // makes us stop passing something indirectly.
+  // If the abstract type isn't passed indirectly, the substituted
+  // type won't be, either.
+  if (!IGM.requiresIndirectResult(origResult, explosionLevel)) {
+    assert(!IGM.requiresIndirectResult(substResult, explosionLevel));
+    // In this case, we must consider whether the exploded difference
+    // will matter.
+    return differsByAbstractionInExplosion(IGM, origResult, substResult,
+                                           explosionLevel);
+  }
 
-  // If the abstract type doesn't pass indirectly, the substituted
-  // type doesn't either.
-  if (!IGM.requiresIndirectResult(CanType(origTy->getResult()),
-                                  ExplosionKind::Minimal))
-    return false;
-
-  // Otherwise, if the substituted type doesn't pass indirectly,
+  // Otherwise, if the substituted type isn't passed indirectly,
   // we've got a mismatch.
-  return !IGM.requiresIndirectResult(CanType(substTy->getResult()),
-                                     ExplosionKind::Minimal);
+  if (!IGM.requiresIndirectResult(substResult, explosionLevel))
+    return true;
+
+  // Otherwise, we're passing indirectly, so use memory rules.
+  return differsByAbstractionInMemory(IGM, origResult, substResult);
 }
 
 /// Does the representation of the first type "differ by abstraction"
@@ -183,10 +197,12 @@ namespace {
   class DiffersByAbstraction
       : public SubstTypeVisitor<DiffersByAbstraction, bool> {
     IRGenModule &IGM;
+    ExplosionKind ExplosionLevel;
     AbstractionDifference DiffKind;
   public:
-    DiffersByAbstraction(IRGenModule &IGM, AbstractionDifference kind)
-      : IGM(IGM), DiffKind(kind) {}
+    DiffersByAbstraction(IRGenModule &IGM, ExplosionKind explosionLevel,
+                         AbstractionDifference kind)
+      : IGM(IGM), ExplosionLevel(explosionLevel), DiffKind(kind) {}
 
     bool visit(CanType origTy, CanType substTy) {
       if (origTy == substTy) return false;
@@ -208,7 +224,7 @@ namespace {
       // For function arguments, consider whether the substituted type
       // is passed indirectly under the abstract-call convention.
       // We only ever care about the abstract-call convention.
-      return !IGM.isSingleIndirectValue(substTy, ExplosionKind::Minimal);
+      return !IGM.isSingleIndirectValue(substTy, ExplosionLevel);
     }
 
     bool visitArrayType(ArrayType *origTy, ArrayType *substTy) {
@@ -232,15 +248,16 @@ namespace {
     /// into this.
     bool visitAnyFunctionType(AnyFunctionType *origTy,
                               AnyFunctionType *substTy) {
-      return differsByAbstraction(IGM, origTy, substTy);
+      return differsByAbstraction(IGM, origTy, substTy,
+                                  ExplosionKind::Minimal);
     }
 
     // L-values go by the object type;  note that we ask the ordinary
     // question, not the argument question.
     bool visitLValueType(LValueType *origTy, LValueType *substTy) {
-      return differsByAbstraction(IGM, CanType(origTy->getObjectType()),
-                                  CanType(substTy->getObjectType()),
-                                  AbstractionDifference::Memory);
+      return differsByAbstractionInMemory(IGM,
+                                          CanType(origTy->getObjectType()),
+                                          CanType(substTy->getObjectType()));
     }
 
     bool visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
@@ -251,7 +268,12 @@ namespace {
       return false;
     }
 
-    /// Tuples are considered element-wise.
+    /// Whether we're checking for memory or for an explosion, tuples
+    /// are considered element-wise.
+    ///
+    /// TODO: unless the original tuple contains a variadic explosion,
+    /// in which case that portion of the tuple is passed indirectly
+    /// in an explosion!
     bool visitTupleType(TupleType *origTy, TupleType *substTy) {
       assert(origTy->getFields().size() == substTy->getFields().size());
       for (unsigned i = 0, e = origTy->getFields().size(); i != e; ++i)
@@ -263,10 +285,19 @@ namespace {
   };
 }
 
-bool irgen::differsByAbstraction(IRGenModule &IGM,
-                                 CanType origTy, CanType substTy,
-                                 AbstractionDifference diffKind) {
-  return DiffersByAbstraction(IGM, diffKind).visit(origTy, substTy);
+bool irgen::differsByAbstractionInMemory(IRGenModule &IGM,
+                                         CanType origTy, CanType substTy) {
+  return DiffersByAbstraction(IGM, ExplosionKind::Minimal,
+                              AbstractionDifference::Memory)
+           .visit(origTy, substTy);
+}
+
+bool irgen::differsByAbstractionInExplosion(IRGenModule &IGM,
+                                            CanType origTy, CanType substTy,
+                                            ExplosionKind explosionLevel) {
+  return DiffersByAbstraction(IGM, explosionLevel,
+                              AbstractionDifference::Explosion)
+           .visit(origTy, substTy);
 }
 
 /// A class for testing whether a type directly stores an archetype.
@@ -422,16 +453,16 @@ namespace {
 
     void visitAnyFunctionType(AnyFunctionType *origTy,
                               AnyFunctionType *substTy) {
-      if (differsByAbstraction(IGF.IGM, origTy, substTy))
+      if (differsByAbstraction(IGF.IGM, origTy, substTy,
+                               ExplosionKind::Minimal))
         IGF.unimplemented(SourceLoc(), "remapping bound function type");
       In.transferInto(Out, 2);
     }
 
     void visitLValueType(LValueType *origTy, LValueType *substTy) {
-      if (differsByAbstraction(IGF.IGM,
-                               CanType(origTy->getObjectType()),
-                               CanType(substTy->getObjectType()),
-                               AbstractionDifference::Memory))
+      if (differsByAbstractionInMemory(IGF.IGM,
+                                       CanType(origTy->getObjectType()),
+                                       CanType(substTy->getObjectType())))
         IGF.unimplemented(SourceLoc(), "remapping l-values");
       In.transferInto(Out, 1);
     }

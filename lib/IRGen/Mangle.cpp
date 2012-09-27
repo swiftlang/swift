@@ -671,9 +671,6 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   //   mangled-name ::= '_T' global
   buffer << "_T";
 
-  if (isLocalLinkage())
-    buffer << "L";
-
   Mangler mangler(buffer);
 
   switch (getKind()) {
@@ -715,11 +712,19 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     return;
   }
 
+  //   global ::= 'Wo' entity
+  case Kind::WitnessTableOffset:
+    buffer << "Wo";
+    mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
+    return;
+
+
   // For all the following, this rule was imposed above:
   //   global ::= local-marker? entity            // some identifiable thing
 
   //   entity ::= context 'D'                     // destructor
   case Kind::Destructor:
+    if (isLocalLinkage()) buffer << 'L';
     mangler.mangleDeclContext(cast<ClassDecl>(getDecl()));
     buffer << 'D';
     return;
@@ -729,17 +734,20 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   // The latter case is essentially as if 'C' were the name of the function.
   case Kind::Function:
   case Kind::Other:
+    if (isLocalLinkage()) buffer << 'L';
     mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
     return;
 
   //   entity ::= declaration 'g'                 // getter
   case Kind::Getter:
+    if (isLocalLinkage()) buffer << 'L';
     mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
     buffer << 'g';
     return;
 
   //   entity ::= declaration 's'                 // setter
   case Kind::Setter:
+    if (isLocalLinkage()) buffer << 'L';
     mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
     buffer << 's';
     return;

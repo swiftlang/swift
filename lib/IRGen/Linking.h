@@ -85,6 +85,11 @@ class LinkEntity {
     /// The pointer is a ClassDecl*.
     Destructor,
 
+    /// The offset to apply to a witness table or metadata object
+    /// in order to find the information for a declaration.  The
+    /// pointer is a ValueDecl*.
+    WitnessTableOffset,
+
     /// Some other kind of declaration.
     /// The pointer is a Decl*.
     Other,
@@ -152,6 +157,15 @@ public:
 
     LinkEntity entity;
     entity.setForDecl(Kind::Other, decl, ExplosionKind(0), 0);
+    return entity;
+  }
+
+  static LinkEntity forWitnessTableOffset(ValueDecl *decl,
+                                          ExplosionKind explosionKind,
+                                          unsigned uncurryLevel) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::WitnessTableOffset, decl,
+                      explosionKind, uncurryLevel);
     return entity;
   }
 

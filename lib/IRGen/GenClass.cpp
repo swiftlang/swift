@@ -379,6 +379,8 @@ namespace {
     void addNominalTypeDescriptor() { NextIndex++; }
     void addParent() { NextIndex++; }
     void addSuperClass() { NextIndex++; }
+    void addMethod(FuncDecl *fn, ExplosionKind explosionLevel,
+                   unsigned uncurryLevel) { NextIndex++; }
 
     void addGenericWitness(llvm::Type *witnessType, ClassDecl *forClass) {
       // Ignore witnesses for base classes.

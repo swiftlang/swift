@@ -1629,8 +1629,7 @@ static ResultDifference computeResultDifference(IRGenModule &IGM,
   if (origResultType == substResultType)
     return ResultDifference::Identical;
 
-  if (differsByAbstraction(IGM, origResultType, substResultType,
-                           AbstractionDifference::Memory))
+  if (differsByAbstractionInMemory(IGM, origResultType, substResultType))
     return ResultDifference::Divergent;
 
   return ResultDifference::Aliasable;

@@ -906,9 +906,10 @@ namespace {
       CanType origBaseType =
         emission.getCallee().getOrigFormalType()
           ->castTo<PolymorphicFunctionType>()->getInput()->getCanonicalType();
-      assert(!differsByAbstraction(emission.IGF.IGM, origBaseType,
-                                   getSubstBaseType(),
-                                   AbstractionDifference::Argument));
+      assert(!differsByAbstractionInExplosion(emission.IGF.IGM,
+                                              origBaseType,
+                                              getSubstBaseType(),
+                                              selfArg.getKind()));
 #endif
       // No transformation required on l-value.
       selfArg.addUnmanaged(base.getAddress());

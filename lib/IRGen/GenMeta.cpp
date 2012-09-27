@@ -31,6 +31,7 @@
 #include "FixedTypeInfo.h"
 #include "GenClass.h"
 #include "GenHeap.h"
+#include "GenPoly.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenModule.h"
@@ -487,11 +488,45 @@ namespace {
     SmallVector<llvm::Constant *, 8> Fields;
     const HeapLayout &Layout;    
 
+    /// A mapping from functions to their final overriders.
+    llvm::DenseMap<FuncDecl*,FuncDecl*> FinalOverriders;
+
     ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
                              const HeapLayout &layout)
-      : super(IGM, theClass), Layout(layout) {}
+      : super(IGM, theClass), Layout(layout) {
+
+      computeFinalOverriders();
+    }
 
     unsigned getNextIndex() const { return Fields.size(); }
+
+    /// Compute a map of all the final overriders for the class.
+    void computeFinalOverriders() {
+      // Walk up the whole class hierarchy.
+      ClassDecl *cls = TargetClass;
+      do {
+        // Make sure that each function has its final overrider set.
+        for (auto member : cls->getMembers()) {
+          auto fn = dyn_cast<FuncDecl>(member);
+          if (!fn) continue;
+
+          // Check whether we already have an entry for this function.
+          auto &finalOverrider = FinalOverriders[fn];
+
+          // If not, the function is its own final overrider.
+          if (!finalOverrider) finalOverrider = fn;
+
+          // If the function directly overrides something, update the
+          // overridden function's entry.
+          if (auto overridden = fn->getOverriddenDecl())
+            FinalOverriders.insert(std::make_pair(overridden, finalOverrider));
+
+        }
+
+        
+      } while (cls->hasBaseClass() &&
+               (cls = cls->getBaseClass()->getClassOrBoundGenericClass()));
+    }
 
   public:
     /// The runtime provides a value witness table for Builtin.ObjectPointer.
@@ -522,6 +557,31 @@ namespace {
     void addSuperClass() {
       // FIXME!
       Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+    }
+
+    void addMethod(FuncDecl *fn, ExplosionKind explosionLevel,
+                   unsigned uncurryLevel) {
+      // If this function is associated with the target class, go
+      // ahead and emit the witness offset variable.
+      if (fn->getDeclContext() == TargetClass) {
+        Address offsetVar = IGM.getAddrOfWitnessTableOffset(fn, explosionLevel,
+                                                            uncurryLevel);
+        auto global = cast<llvm::GlobalVariable>(offsetVar.getAddress());
+
+        auto offset = Fields.size() * IGM.getPointerSize();
+        auto offsetV = llvm::ConstantInt::get(IGM.SizeTy, offset.getValue());
+        global->setInitializer(offsetV);
+      }
+
+      // Find the final overrider, which we should already have computed.
+      auto it = FinalOverriders.find(fn);
+      assert(it != FinalOverriders.end());
+      FuncDecl *finalOverrider = it->second;
+
+      // Add the appropriate method to the module.
+      Fields.push_back(IGM.getAddrOfFunction(finalOverrider, explosionLevel,
+                                             uncurryLevel,
+                                             /*with data*/ false));
     }
 
     void addGenericWitness(llvm::Type *witnessType, ClassDecl *forClass) {
@@ -602,6 +662,161 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                                                init->getType()));
   var->setConstant(true);
   var->setInitializer(init);
+}
+
+namespace {
+  /// A visitor for checking whether two types are compatible.
+  ///
+  /// It's guaranteed that 'override' is subtype-related to a
+  /// substitution of 'overridden'; this is because dependent
+  /// overrides are not allowed by the language.
+  class IsIncompatibleOverride :
+      public irgen::TypeVisitor<IsIncompatibleOverride, bool, CanType> {
+
+    IRGenModule &IGM;
+    ExplosionKind ExplosionLevel;
+    bool AsExplosion;
+
+  public:
+    IsIncompatibleOverride(IRGenModule &IGM, ExplosionKind explosionLevel,
+                           bool asExplosion)
+      : IGM(IGM), ExplosionLevel(explosionLevel), AsExplosion(asExplosion) {}
+
+    bool visit(CanType overridden, CanType override) {
+      if (override == overridden) return false;
+
+      return TypeVisitor::visit(overridden, override);
+    }
+
+    /// Differences in class types must be subtyping related.
+    bool visitClassType(ClassType *overridden, CanType override) {
+      assert(override->getClassOrBoundGenericClass());
+      return false;
+    }
+
+    /// Differences in bound generic class types must be subtyping related.
+    bool visitBoundGenericType(BoundGenericType *overridden, CanType override) {
+      if (isa<ClassDecl>(overridden->getDecl())) {
+        assert(override->getClassOrBoundGenericClass());
+        return false;
+      }
+      return visitType(overridden, override);
+    }
+
+    bool visitTupleType(TupleType *overridden, CanType overrideTy) {
+      TupleType *override = cast<TupleType>(overrideTy);
+      assert(overridden->getFields().size() == override->getFields().size());
+      for (unsigned i = 0, e = overridden->getFields().size(); i != e; ++i) {
+        if (visit(CanType(overridden->getElementType(i)),
+                  CanType(override->getElementType(i))))
+          return true;
+      }
+      return false;
+    }
+
+    /// Any other difference (unless we add implicit
+    /// covariance/contravariance to generic types?) must be a
+    /// substitution difference.
+    bool visitType(TypeBase *overridden, CanType override) {
+      if (AsExplosion)
+        return differsByAbstractionInExplosion(IGM, CanType(overridden),
+                                               override, ExplosionLevel);
+      return differsByAbstractionInMemory(IGM, CanType(overridden), override);
+    }
+  };
+}
+
+static bool isIncompatibleOverrideArgument(IRGenModule &IGM,
+                                           CanType overrideTy,
+                                           CanType overriddenTy,
+                                           ExplosionKind explosionLevel) {
+  return IsIncompatibleOverride(IGM, explosionLevel, /*as explosion*/ true)
+    .visit(overriddenTy, overrideTy);  
+}
+
+static bool isIncompatibleOverrideResult(IRGenModule &IGM,
+                                         CanType overrideTy,
+                                         CanType overriddenTy,
+                                         ExplosionKind explosionLevel) {
+  // Fast path.
+  if (overrideTy == overriddenTy) return false;
+
+  bool asExplosion;
+
+  // If the overridden type isn't returned indirectly, the overriding
+  // type won't be, either, and we need to check as an explosion.
+  if (!IGM.requiresIndirectResult(overriddenTy, explosionLevel)) {
+    assert(!IGM.requiresIndirectResult(overrideTy, explosionLevel));
+    asExplosion = true;
+
+  // Otherwise, if the overriding type isn't returned indirectly,
+  // there's an abstration mismatch and the types are incompatible.
+  } else if (!IGM.requiresIndirectResult(overrideTy, explosionLevel)) {
+    return true;
+
+  // Otherwise, both are returning indirectly and we need to check as
+  // memory.
+  } else {
+    asExplosion = false;
+  }
+
+  return IsIncompatibleOverride(IGM, explosionLevel, asExplosion)
+    .visit(overriddenTy, overrideTy);
+}
+
+/// Is the given method called in the same way that the overridden
+/// method is?
+static bool isCompatibleOverride(IRGenModule &IGM, FuncDecl *override,
+                                 FuncDecl *overridden,
+                                 ExplosionKind explosionLevel,
+                                 unsigned uncurryLevel) {
+  CanType overrideTy = override->getType()->getCanonicalType();
+  CanType overriddenTy = overridden->getType()->getCanonicalType();
+
+  // Check arguments for compatibility.
+  for (++uncurryLevel; uncurryLevel; --uncurryLevel) {
+    // Fast path.
+    if (overrideTy == overriddenTy) return true;
+
+    // Note that we're intentionally ignoring any differences in
+    // polymorphism --- at the first level that's because that should
+    // all be encapsulated in the self argument, and at the later
+    // levels because that shouldn't be a legal override.
+    auto overrideFnTy = cast<AnyFunctionType>(overrideTy);
+    auto overriddenFnTy = cast<AnyFunctionType>(overriddenTy);
+
+    if (isIncompatibleOverrideArgument(IGM,
+                                       CanType(overrideFnTy->getInput()),
+                                       CanType(overriddenFnTy->getInput()),
+                                       explosionLevel))
+      return false;
+
+    overrideTy = CanType(overrideFnTy->getResult());
+    overriddenTy = CanType(overriddenFnTy->getResult());
+  }
+
+  return isIncompatibleOverrideResult(IGM, overrideTy, overriddenTy,
+                                      explosionLevel);
+}
+
+/// Does the given method require an override entry in the class v-table?
+bool irgen::doesMethodRequireOverrideEntry(IRGenModule &IGM, FuncDecl *fn,
+                                           ExplosionKind explosionLevel,
+                                           unsigned uncurryLevel) {
+  // Check each of the overridden declarations in turn.
+  FuncDecl *overridden = fn->getOverriddenDecl();
+  do {
+    assert(overridden);
+
+    // If we ever find something we compatibly override, we're done.
+    if (isCompatibleOverride(IGM, fn, overridden,
+                             explosionLevel, uncurryLevel))
+      return false;
+
+  } while ((overridden = overridden->getOverriddenDecl()));
+
+  // Otherwise, we need a new entry.
+  return true;
 }
 
 // Structs

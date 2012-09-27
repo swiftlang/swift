@@ -234,6 +234,8 @@ public:
   llvm::Function *getAddrOfSetter(ValueDecl *D, FormalType type,
                                   ExplosionKind kind);
   llvm::Function *getAddrOfSetter(ValueDecl *D, ExplosionKind kind);
+  Address getAddrOfWitnessTableOffset(ValueDecl *D, ExplosionKind kind,
+                                      unsigned uncurryLevel);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
                                         ValueWitness index);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType);

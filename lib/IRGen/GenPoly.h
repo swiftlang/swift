@@ -29,17 +29,14 @@ namespace irgen {
   enum class ExplosionKind : unsigned;
   class IRGenModule;
 
-  /// Ways in which we can test two types differ by abstraction.
-  enum class AbstractionDifference : bool {
-    Memory,
-    Argument
-  };
+  /// Do the given types differ by abstraction when laid out as memory?
+  bool differsByAbstractionInMemory(IRGenModule &IGM,
+                                    CanType origTy, CanType substTy);
 
-  /// Do the given types differ by abstraction?  See the comment
-  /// on the implementation.
-  bool differsByAbstraction(IRGenModule &IGM,
-                            CanType origTy, CanType substTy,
-                            AbstractionDifference diffKind);
+  /// Do the given types differ by abstraction when passed in an explosion?
+  bool differsByAbstractionInExplosion(IRGenModule &IGM,
+                                       CanType origTy, CanType substTy,
+                                       ExplosionKind explosionLevel);
 
 } // end namespace irgen
 } // end namespace swift

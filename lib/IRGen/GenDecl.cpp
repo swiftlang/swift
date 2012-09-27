@@ -259,6 +259,7 @@ bool LinkEntity::isLocalLinkage() const {
   case Kind::TypeMetadata:
     return isLocalLinkageType(getType());
 
+  case Kind::WitnessTableOffset:
   case Kind::Function:
   case Kind::Getter:
   case Kind::Setter:
@@ -777,6 +778,32 @@ llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, convention, attrs);
   return entry;
+}
+
+/// getAddrOfWitnessTableOffset - Get the address of the global
+/// variable which contains an offset within a witness table for the
+/// value associated with the given declaration.
+Address IRGenModule::getAddrOfWitnessTableOffset(ValueDecl *D,
+                                                 ExplosionKind kind,
+                                                 unsigned uncurryLevel) {
+  LinkEntity entity = LinkEntity::forWitnessTableOffset(D, kind, uncurryLevel);
+
+  // Check whether it's already cached.
+  llvm::GlobalVariable *&entry = GlobalVars[entity];
+  if (entry) {
+    return Address(entry, Alignment(entry->getAlignment()));
+  }
+
+  // Otherwise, we need to create it.  It's always a ptrdiff_t.
+  LinkInfo link = LinkInfo::get(*this, entity);
+  auto addr = link.createVariable(*this, SizeTy);
+  addr->setConstant(true);
+
+  Alignment align = getPointerAlignment();
+  addr->setAlignment(align.getValue());
+
+  entry = addr;
+  return Address(addr, align);
 }
 
 /// Emit a type extension.
