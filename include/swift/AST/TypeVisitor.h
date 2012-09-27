@@ -23,16 +23,17 @@
 namespace swift {
   
 /// TypeVisitor - This is a simple visitor class for Swift types.
-template<typename ImplClass, typename RetTy = void> 
+template<typename ImplClass, typename RetTy = void, typename... Args> 
 class TypeVisitor {
 public:
 
-  RetTy visit(Type T) {
+  template <class... As> RetTy visit(Type T, Args... args) {
     switch (T->getKind()) {
 #define TYPE(CLASS, PARENT) \
     case TypeKind::CLASS: \
       return static_cast<ImplClass*>(this) \
-        ->visit##CLASS##Type(static_cast<CLASS##Type*>(T.getPointer()));
+        ->visit##CLASS##Type(static_cast<CLASS##Type*>(T.getPointer()), \
+                             ::std::forward<Args>(args)...);
 #include "swift/AST/TypeNodes.def"
     }
     llvm_unreachable("Not reachable, all cases handled");
@@ -43,9 +44,11 @@ public:
   // the base behavior and handle all subclasses if they desire.  Since this is
   // a template, it will only instantiate cases that are used and thus we still
   // require full coverage of the AST nodes by the visitor.
-#define ABSTRACT_TYPE(CLASS, PARENT)                         \
-  RetTy visit##CLASS##Type(CLASS##Type *T) {                 \
-     return static_cast<ImplClass*>(this)->visit##PARENT(T); \
+#define ABSTRACT_TYPE(CLASS, PARENT)                           \
+  template <class... As>                                       \
+  RetTy visit##CLASS##Type(CLASS##Type *T, Args... args) {     \
+     return static_cast<ImplClass*>(this)                      \
+              ->visit##PARENT(T, std::forward<Args>(args)...); \
   }
 #define TYPE(CLASS, PARENT) ABSTRACT_TYPE(CLASS, PARENT)
 #include "swift/AST/TypeNodes.def"
