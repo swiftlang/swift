@@ -67,6 +67,7 @@ namespace irgen {
   class Condition;
   class Explosion;
   enum class ExplosionKind : unsigned;
+  class FunctionRef;
   class HeapLayout;
   class IRGenModule;
   class LinkEntity;
@@ -347,9 +348,7 @@ public:
                         IRGenFunction *definingIGF);
   void emitLocalFunction(FuncDecl *func);
 
-  llvm::Function *getAddrOfLocalFunction(FuncDecl *func,
-                                         ExplosionKind explosionLevel,
-                                         unsigned uncurryLevel);
+  llvm::Function *getAddrOfLocalFunction(FunctionRef func);
 
   void bindArchetype(ArchetypeType *type, ArrayRef<llvm::Value*> wtables);
 

@@ -68,6 +68,7 @@
 #include "CallingConvention.h"
 #include "CallEmission.h"
 #include "Explosion.h"
+#include "FunctionRef.h"
 #include "GenHeap.h"
 #include "GenInit.h"
 #include "GenPoly.h"
@@ -672,9 +673,10 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
   }
 
   FuncDecl *fn = cast<FuncDecl>(val);
+  FunctionRef fnRef = FunctionRef(fn, bestExplosion, bestUncurry);
   if (!fn->getDeclContext()->isLocalContext()) {
     llvm::Constant *fnPtr =
-      IGF.IGM.getAddrOfFunction(fn, bestExplosion, bestUncurry, /*data*/ false);
+      IGF.IGM.getAddrOfFunction(fnRef, /*data*/ false);
     if (fn->isInstanceMember()) {
       return Callee::forMethod(fn->getType()->getCanonicalType(),
                                substResultType, subs, fnPtr,
@@ -686,7 +688,7 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
     }
   }
 
-  auto fnPtr = IGF.getAddrOfLocalFunction(fn, bestExplosion, bestUncurry);
+  auto fnPtr = IGF.getAddrOfLocalFunction(fnRef);
   Explosion e(ExplosionKind::Maximal);
   IGF.emitRetain(IGF.getLocalFuncData(fn), e);
   ManagedValue data = e.claimNext();
@@ -2920,8 +2922,8 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
   } else if (Decl *var = func->getSetterDecl()) {
     entrypoint = IGM.getAddrOfSetter(cast<ValueDecl>(var), explosionLevel);
   } else {
-    entrypoint = IGM.getAddrOfFunction(func, explosionLevel,
-                                       startingUncurryLevel, needsData);
+    auto fnRef = FunctionRef(func, explosionLevel, startingUncurryLevel);
+    entrypoint = IGM.getAddrOfFunction(fnRef, needsData);
   }
 
   CurriedData curriedData(IGM, funcExpr, explosionLevel,
@@ -2932,7 +2934,7 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
   for (unsigned uncurryLevel = startingUncurryLevel;
          uncurryLevel != naturalUncurryLevel; ++uncurryLevel) {
     llvm::Function *nextEntrypoint =
-      IGM.getAddrOfFunction(func, explosionLevel, uncurryLevel + 1,
+      IGM.getAddrOfFunction(FunctionRef(func, explosionLevel, uncurryLevel + 1),
                             needsData);
 
     curriedData.emitCurriedEntrypoint(entrypoint, nextEntrypoint);

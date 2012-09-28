@@ -64,9 +64,11 @@ namespace swift {
 
 namespace irgen {
   class Address;
+  class CodeRef;
   enum class ExplosionKind : unsigned;
   class ExplosionSchema;
   class FormalType;
+  class FunctionRef;
   class LinkEntity;
   class Options;
   class ProtocolInfo;
@@ -225,8 +227,7 @@ public:
   FormalType getTypeOfSetter(ValueDecl *D);
 
   Address getAddrOfGlobalVariable(VarDecl *D);
-  llvm::Function *getAddrOfFunction(FuncDecl *D, ExplosionKind kind,
-                                    unsigned uncurryLevel, bool needsData);
+  llvm::Function *getAddrOfFunction(FunctionRef ref, bool needsData);
   llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);
   llvm::Function *getAddrOfGetter(ValueDecl *D, FormalType type,
                                   ExplosionKind kind);
@@ -234,8 +235,8 @@ public:
   llvm::Function *getAddrOfSetter(ValueDecl *D, FormalType type,
                                   ExplosionKind kind);
   llvm::Function *getAddrOfSetter(ValueDecl *D, ExplosionKind kind);
-  Address getAddrOfWitnessTableOffset(ValueDecl *D, ExplosionKind kind,
-                                      unsigned uncurryLevel);
+  Address getAddrOfWitnessTableOffset(CodeRef code);
+  Address getAddrOfWitnessTableOffset(VarDecl *field);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
                                         ValueWitness index);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType);

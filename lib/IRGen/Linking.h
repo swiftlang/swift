@@ -25,6 +25,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/CallingConv.h"
 #include "llvm/GlobalValue.h"
+#include "FunctionRef.h"
 #include "IRGen.h"
 
 namespace llvm {
@@ -130,7 +131,7 @@ class LinkEntity {
     return k >= Kind::ValueWitness;
   }
 
-  void setForDecl(Kind kind,
+  void setForDecl(Kind kind, 
                   ValueDecl *decl, ExplosionKind explosionKind,
                   unsigned uncurryLevel) {
     assert(isDeclKind(kind));
@@ -140,15 +141,23 @@ class LinkEntity {
          | LINKENTITY_SET_FIELD(UncurryLevel, uncurryLevel);
   }
 
+  static Kind getKindForFunction(FunctionRef::Kind fn) {
+    switch (fn) {
+    case FunctionRef::Kind::Function: return Kind::Function;
+    case FunctionRef::Kind::Getter: return Kind::Getter;
+    case FunctionRef::Kind::Setter: return Kind::Setter;
+    }
+    llvm_unreachable("bad FunctionRef kind");
+  }
+
   LinkEntity() = default;
 
 public:
-  static LinkEntity forFunction(ValueDecl *fn, ExplosionKind explosionKind,
-                                unsigned uncurryLevel) {
-    assert(isFunction(fn));
+  static LinkEntity forFunction(CodeRef fn) {
 
     LinkEntity entity;
-    entity.setForDecl(Kind::Function, fn, explosionKind, uncurryLevel);
+    entity.setForDecl(getKindForFunction(fn.getKind()), fn.getDecl(),
+                      fn.getExplosionLevel(), fn.getUncurryLevel());
     return entity;
   }
 
@@ -166,20 +175,6 @@ public:
     LinkEntity entity;
     entity.setForDecl(Kind::WitnessTableOffset, decl,
                       explosionKind, uncurryLevel);
-    return entity;
-  }
-
-  static LinkEntity forGetter(ValueDecl *decl, ExplosionKind explosionKind) {
-    assert(hasGetterSetter(decl));
-    LinkEntity entity;
-    entity.setForDecl(Kind::Getter, decl, explosionKind, 0);
-    return entity;
-  }
-
-  static LinkEntity forSetter(ValueDecl *decl, ExplosionKind explosionKind) {
-    assert(hasGetterSetter(decl));
-    LinkEntity entity;
-    entity.setForDecl(Kind::Setter, decl, explosionKind, 0);
     return entity;
   }
 

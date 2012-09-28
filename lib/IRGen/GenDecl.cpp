@@ -450,24 +450,22 @@ static bool hasIndirectResult(IRGenModule &IGM, CanType type,
 }
 
 /// Fetch the declaration of the given known function.
-llvm::Function *IRGenModule::getAddrOfFunction(FuncDecl *func,
-                                               ExplosionKind kind,
-                                               unsigned uncurryLevel,
+llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
                                                bool needsData) {
-  LinkEntity entity = LinkEntity::forFunction(func, kind, uncurryLevel);
+  LinkEntity entity = LinkEntity::forFunction(fn);
 
   // Check whether we've cached this.
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
   llvm::FunctionType *fnType =
-    getFunctionType(func->getType()->getCanonicalType(),
-                    kind, uncurryLevel, needsData);
+    getFunctionType(fn.getDecl()->getType()->getCanonicalType(),
+                    fn.getExplosionLevel(), fn.getUncurryLevel(), needsData);
 
-  AbstractCC convention = getAbstractCC(func);
+  AbstractCC convention = getAbstractCC(fn.getDecl());
   bool indirectResult =
-    hasIndirectResult(*this, func->getType()->getCanonicalType(),
-                      kind, uncurryLevel);
+    hasIndirectResult(*this, fn.getDecl()->getType()->getCanonicalType(),
+                      fn.getExplosionLevel(), fn.getUncurryLevel());
 
   SmallVector<llvm::AttributeWithIndex, 4> attrs;
   auto cc = expandAbstractCC(*this, convention, indirectResult, attrs);
@@ -484,8 +482,9 @@ llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   unsigned uncurryLevel = 0;
 
-  LinkEntity entity = LinkEntity::forFunction(D, ExplosionKind::Minimal,
-                                              uncurryLevel);
+  LinkEntity entity =
+    LinkEntity::forFunction(CodeRef::forOneOfElement(D, ExplosionKind::Minimal,
+                                                     uncurryLevel));
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
@@ -510,7 +509,8 @@ llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
 llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
                                                   ExplosionKind kind) {
   unsigned uncurryLevel = 1;
-  LinkEntity entity = LinkEntity::forFunction(cons, kind, uncurryLevel);
+  LinkEntity entity =
+    LinkEntity::forFunction(CodeRef::forConstructor(cons, kind, uncurryLevel));
 
   // Check whether we've cached this.
   llvm::Function *&entry = GlobalFuncs[entity];
@@ -717,7 +717,8 @@ llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
 llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
                                              FormalType formal,
                                              ExplosionKind explosionLevel) {
-  LinkEntity entity = LinkEntity::forGetter(value, explosionLevel);
+  LinkEntity entity =
+    LinkEntity::forFunction(CodeRef::forGetter(value, explosionLevel, 0));
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return entry;
@@ -763,7 +764,8 @@ llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
 llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
                                              FormalType formal,
                                              ExplosionKind explosionLevel) {
-  LinkEntity entity = LinkEntity::forSetter(value, explosionLevel);
+  LinkEntity entity =
+    LinkEntity::forFunction(CodeRef::forSetter(value, explosionLevel, 0));
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return entry;
@@ -780,30 +782,45 @@ llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
   return entry;
 }
 
-/// getAddrOfWitnessTableOffset - Get the address of the global
-/// variable which contains an offset within a witness table for the
-/// value associated with the given declaration.
-Address IRGenModule::getAddrOfWitnessTableOffset(ValueDecl *D,
-                                                 ExplosionKind kind,
-                                                 unsigned uncurryLevel) {
-  LinkEntity entity = LinkEntity::forWitnessTableOffset(D, kind, uncurryLevel);
-
+static Address getAddrOfWitnessTableOffset(IRGenModule &IGM,
+                    llvm::DenseMap<LinkEntity, llvm::GlobalVariable*> &cache,
+                                           LinkEntity entity) {
   // Check whether it's already cached.
-  llvm::GlobalVariable *&entry = GlobalVars[entity];
+  llvm::GlobalVariable *&entry = cache[entity];
   if (entry) {
     return Address(entry, Alignment(entry->getAlignment()));
   }
 
   // Otherwise, we need to create it.  It's always a ptrdiff_t.
-  LinkInfo link = LinkInfo::get(*this, entity);
-  auto addr = link.createVariable(*this, SizeTy);
+  LinkInfo link = LinkInfo::get(IGM, entity);
+  auto addr = link.createVariable(IGM, IGM.SizeTy);
   addr->setConstant(true);
 
-  Alignment align = getPointerAlignment();
+  Alignment align = IGM.getPointerAlignment();
   addr->setAlignment(align.getValue());
 
   entry = addr;
   return Address(addr, align);
+}
+                                           
+
+/// getAddrOfWitnessTableOffset - Get the address of the global
+/// variable which contains an offset within a witness table for the
+/// value associated with the given function.
+Address IRGenModule::getAddrOfWitnessTableOffset(CodeRef code) {
+  LinkEntity entity =
+    LinkEntity::forWitnessTableOffset(code.getDecl(), code.getExplosionLevel(),
+                                      code.getUncurryLevel());
+  return ::getAddrOfWitnessTableOffset(*this, GlobalVars, entity);
+}
+
+/// getAddrOfWitnessTableOffset - Get the address of the global
+/// variable which contains an offset within a witness table for the
+/// value associated with the given member variable..
+Address IRGenModule::getAddrOfWitnessTableOffset(VarDecl *field) {
+  LinkEntity entity =
+    LinkEntity::forWitnessTableOffset(field, ExplosionKind::Minimal, 0);
+  return ::getAddrOfWitnessTableOffset(*this, GlobalVars, entity);
 }
 
 /// Emit a type extension.

@@ -41,6 +41,7 @@
 #include "Cleanup.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
+#include "FunctionRef.h"
 #include "GenHeap.h"
 #include "GenType.h"
 #include "IndirectTypeInfo.h"
@@ -2380,7 +2381,8 @@ namespace {
     llvm::Constant *getInstanceMethodWitness(FuncDecl *impl,
                                              CanType ifaceType) {
       llvm::Constant *implPtr =
-        IGM.getAddrOfFunction(impl, ExplosionKind::Minimal, 1, /*data*/ false);
+        IGM.getAddrOfFunction(FunctionRef(impl, ExplosionKind::Minimal, 1),
+                              /*data*/ false);
       return getWitness(implPtr, impl->getType()->getCanonicalType(),
                         ifaceType, 1);
     }
@@ -2391,7 +2393,8 @@ namespace {
                                            CanType ifaceType) {
       if (impl->getDeclContext()->isModuleContext()) {
         llvm::Constant *implPtr =
-          IGM.getAddrOfFunction(impl, ExplosionKind::Minimal, 0, /*data*/ false);
+          IGM.getAddrOfFunction(FunctionRef(impl, ExplosionKind::Minimal, 0),
+                                /*data*/ false);
         // FIXME: This is an ugly hack: we're pretending that the function
         // has a different type from its actual type.  This works because the
         // LLVM representation happens to be the same.
@@ -2401,7 +2404,8 @@ namespace {
         return getWitness(implPtr, implTy->getCanonicalType(), ifaceType, 1);
       }
       llvm::Constant *implPtr =
-        IGM.getAddrOfFunction(impl, ExplosionKind::Minimal, 1, /*data*/ false);
+        IGM.getAddrOfFunction(FunctionRef(impl, ExplosionKind::Minimal, 1),
+                              /*data*/ false);
       return getWitness(implPtr, impl->getType()->getCanonicalType(),
                         ifaceType, 1);
     }

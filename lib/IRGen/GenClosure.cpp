@@ -27,6 +27,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Explosion.h"
+#include "FunctionRef.h"
 #include "GenHeap.h"
 #include "GenInit.h"
 #include "LValue.h"
@@ -320,17 +321,15 @@ void IRGenFunction::emitLocalFunction(FuncDecl *func) {
 /// function which has the function and all its captured declarations
 /// mapped.
 llvm::Function *
-IRGenFunction::getAddrOfLocalFunction(FuncDecl *func,
-                                      ExplosionKind explosionLevel,
-                                      unsigned uncurryLevel) {
+IRGenFunction::getAddrOfLocalFunction(FunctionRef fnRef) {
+  FuncDecl *func = cast<FuncDecl>(fnRef.getDecl());
   assert(func->getBody() && "local function without a body!");
 
   llvm::Value *data = getLocalFuncData(func);
   bool needsData = !isa<llvm::ConstantPointerNull>(data);
 
   // Find the function pointer.
-  llvm::Function *fn = IGM.getAddrOfFunction(func, explosionLevel,
-                                             uncurryLevel, needsData);
+  llvm::Function *fn = IGM.getAddrOfFunction(fnRef, needsData);
 
   // If we already have a function body, we're set.
   if (!fn->empty()) return fn;
@@ -344,14 +343,16 @@ IRGenFunction::getAddrOfLocalFunction(FuncDecl *func,
   assert(info.requiresData() == needsData);
 
   if (!needsData) {
-    emitLocalFunctionBody(*definingIGF, fn, func->getBody(), explosionLevel,
-                          uncurryLevel, info, nullptr);
+    emitLocalFunctionBody(*definingIGF, fn, func->getBody(),
+                          fnRef.getExplosionLevel(), fnRef.getUncurryLevel(),
+                          info, nullptr);
   } else {
     HeapLayout layout = getHeapLayout(IGM, info);
 
     // Emit the function body.
-    emitLocalFunctionBody(*definingIGF, fn, func->getBody(), explosionLevel,
-                          uncurryLevel, info, &layout);
+    emitLocalFunctionBody(*definingIGF, fn, func->getBody(),
+                          fnRef.getExplosionLevel(), fnRef.getUncurryLevel(),
+                          info, &layout);
   }
 
   return fn;

@@ -559,13 +559,11 @@ namespace {
       Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
     }
 
-    void addMethod(FuncDecl *fn, ExplosionKind explosionLevel,
-                   unsigned uncurryLevel) {
+    void addMethod(FunctionRef fn) {
       // If this function is associated with the target class, go
       // ahead and emit the witness offset variable.
-      if (fn->getDeclContext() == TargetClass) {
-        Address offsetVar = IGM.getAddrOfWitnessTableOffset(fn, explosionLevel,
-                                                            uncurryLevel);
+      if (fn.getDecl()->getDeclContext() == TargetClass) {
+        Address offsetVar = IGM.getAddrOfWitnessTableOffset(fn);
         auto global = cast<llvm::GlobalVariable>(offsetVar.getAddress());
 
         auto offset = Fields.size() * IGM.getPointerSize();
@@ -574,14 +572,15 @@ namespace {
       }
 
       // Find the final overrider, which we should already have computed.
-      auto it = FinalOverriders.find(fn);
+      auto it = FinalOverriders.find(fn.getDecl());
       assert(it != FinalOverriders.end());
       FuncDecl *finalOverrider = it->second;
 
+      fn = FunctionRef(finalOverrider, fn.getExplosionLevel(),
+                       fn.getUncurryLevel());
+
       // Add the appropriate method to the module.
-      Fields.push_back(IGM.getAddrOfFunction(finalOverrider, explosionLevel,
-                                             uncurryLevel,
-                                             /*with data*/ false));
+      Fields.push_back(IGM.getAddrOfFunction(fn, /*with data*/ false));
     }
 
     void addGenericWitness(llvm::Type *witnessType, ClassDecl *forClass) {

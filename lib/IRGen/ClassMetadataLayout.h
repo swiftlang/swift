@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_CLASSMETADATALAYOUT_H
 #define SWIFT_IRGEN_CLASSMETADATALAYOUT_H
 
+#include "FunctionRef.h"
 #include "IRGen.h"
 #include "MetadataLayout.h"
 
@@ -125,7 +126,7 @@ private:
     }
 
     // Both static and non-static functions go in the metadata.
-    asImpl().addMethod(fn, explosionLevel, uncurryLevel);
+    asImpl().addMethod(FunctionRef(fn, explosionLevel, uncurryLevel));
   }
 };
 
