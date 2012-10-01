@@ -34,13 +34,6 @@ static void emitOrDeleteBlock(CFGBuilder &B, BasicBlock *BB) {
 // CFG construction
 //===----------------------------------------------------------------------===//
 
-// FIXME: Why do we need this?
-static Expr *ignoreParens(Expr *Ex) {
-  while (ParenExpr *P = dyn_cast<ParenExpr>(Ex))
-    Ex = P->getSubExpr();
-  return Ex;
-}
-
 /// emitCondition - Emit a boolean expression as a control-flow condition.
 ///
 /// \param TheStmt - The statement being lowered, for source information on the
@@ -310,7 +303,7 @@ void CFGGen::visitForEachStmt(ForEachStmt *S) {
     // at the end of each loop iteration.
     {
       Scope InnerForScope(Cleanups);
-      //emitPatternBindingDecl(S->getElementInit());
+      //FIXME: emitPatternBindingDecl(S->getElementInit());
       visit(S->getBody());
     }
     
@@ -341,18 +334,16 @@ void CFGGen::visitContinueStmt(ContinueStmt *S) {
 //===--------------------------------------------------------------------===//
 
 CFGValue CFGGen::visitApplyExpr(ApplyExpr *E) {
-  Expr *Arg = ignoreParens(E->getArg());
-  Expr *Fn = E->getFn();
-  CFGValue FnV = visit(Fn);
+  CFGValue FnV = visit(E->getFn());
   llvm::SmallVector<CFGValue, 10> ArgsV;
   
   // Special case Arg being a TupleExpr, to inline the arguments and
   // not create another instruction.
-  if (TupleExpr *TU = dyn_cast<TupleExpr>(Arg)) {
+  if (TupleExpr *TU = dyn_cast<TupleExpr>(E->getArg())) {
     for (auto arg : TU->getElements())
       ArgsV.push_back(visit(arg));
   } else {
-    ArgsV.push_back(visit(Arg));
+    ArgsV.push_back(visit(E->getArg()));
   }
   
   return B.createApply(E, FnV, ArgsV);
