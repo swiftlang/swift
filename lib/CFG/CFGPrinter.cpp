@@ -153,7 +153,7 @@ public:
   }
 
   void visitCondBranchInst(CondBranchInst *CBI) {
-    OS << "condbranch " << /*getID(CBI->condition) <<*/ "???, "
+    OS << "condbranch " << getID(CBI->getCondition()) << ", "
        << getID(CBI->getTrueBB()) << ',' << getID(CBI->getFalseBB());
   }
 };

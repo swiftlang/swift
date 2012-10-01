@@ -51,7 +51,7 @@ static Expr *ignoreParens(Expr *Ex) {
 /// \param invertValue - true if this routine should invert the value before
 ///        testing true/false.
 Condition CFGGen::emitCondition(Stmt *TheStmt, Expr *E,
-                                     bool hasFalseCode, bool invertValue) {
+                                bool hasFalseCode, bool invertValue) {
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
   
@@ -59,10 +59,9 @@ Condition CFGGen::emitCondition(Stmt *TheStmt, Expr *E,
   CFGValue V;
   {
     FullExpr Scope(Cleanups);
-    //    V = emitAsPrimitiveScalar(E);
-    V = (Instruction*)0;
+    V = visit(E);
   }
-  //  assert(V->getType()->isIntegerTy(1));
+  //  FIXME: assert(V->getType()->isIntegerTy(1));
   
   // Check for a constant condition.
 #if 0 // FIXME: Implement optimization

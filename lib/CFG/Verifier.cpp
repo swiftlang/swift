@@ -65,6 +65,8 @@ public:
   }
   
   void visitCondBranchInst(CondBranchInst *CBI) {
+    assert(CBI->getCondition() &&
+           "Condition of conditional branch can't be missing");
   }
 };
 } // end anonymous namespace
