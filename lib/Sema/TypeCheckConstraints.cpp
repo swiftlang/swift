@@ -63,20 +63,15 @@ class TypeVariableType::Implementation {
   /// \brief The archetype that this type variable describes.
   ArchetypeType *Archetype;
 
-  /// \brief The parent of this type variable if it has been unified with
-  /// another type variable, or null if it is the representative of its
-  /// equivalence class.
-  TypeVariableType *Parent;
-
 public:
   explicit Implementation(unsigned ID)
-    : ID(ID), TheExpr(nullptr), Archetype(nullptr), Parent(nullptr) { }
+    : ID(ID), TheExpr(nullptr), Archetype(nullptr) { }
 
   explicit Implementation(unsigned ID, Expr *TheExpr)
-    : ID(ID), TheExpr(TheExpr), Archetype(nullptr), Parent(nullptr) { }
+    : ID(ID), TheExpr(TheExpr), Archetype(nullptr) { }
 
   explicit Implementation(unsigned ID, ArchetypeType *Archetype)
-    : ID(ID), TheExpr(nullptr), Archetype(Archetype), Parent(nullptr) { }
+    : ID(ID), TheExpr(nullptr), Archetype(Archetype) { }
 
   /// \brief Retrieve the unique ID corresponding to this type variable.
   unsigned getID() const { return ID; }
@@ -93,44 +88,8 @@ public:
     return reinterpret_cast<TypeVariableType *>(this) - 1;
   }
 
-  /// \brief Return the representative of the set of equivalent type variables.
-  /// Two variables
-  ///
-  /// This routine performs path compression, so that future representive
-  /// queries are more efficient.
-  TypeVariableType *getRepresentative() {
-    if (!Parent)
-      return getTypeVariable();
-
-    auto rep = Parent->getImpl().getRepresentative();
-    Parent = rep;
-    return rep;
-  }
-
-  /// \brief Set the representative for this equivalence set of type variables,
-  /// merge the equivalence sets of the two type variables.
-  ///
-  /// Note that both \c this and \c newRep must be the representatives of their
-  /// equivalence classes, and must be distinct.
-  void mergeEquivalenceClasses(TypeVariableType *newRep) {
-    assert(getTypeVariable() == getRepresentative()
-           && "this is not the representative");
-    assert(newRep == newRep->getImpl().getRepresentative()
-           && "newRep is not the representative");
-    assert(getTypeVariable() != newRep && "cannot merge type with itself");
-    Parent = newRep;
-  }
-
   void print(llvm::raw_ostream &Out) {
     Out << "$T" << ID;
-
-    // If this type variable is not the representative for its equivalence
-    // class, just print the representative and we're done.
-    auto rep = getRepresentative();
-    if (rep != getTypeVariable()) {
-      Out << " equivalent to $T" << rep->getImpl().ID;
-      return;
-    }
   }
 };
 
@@ -601,6 +560,7 @@ namespace {
     SmallVector<OverloadSet *, 4> UnresolvedOverloadSets;
     llvm::DenseMap<Expr *, OverloadSet *> GeneratedOverloadSets;
     SmallVector<std::unique_ptr<ConstraintSystem>, 2> Children;
+    llvm::DenseMap<TypeVariableType *, TypeVariableType *> Representatives;
     llvm::DenseMap<TypeVariableType *, Type> FixedTypes;
 
     unsigned assignTypeVariableID() {
@@ -749,10 +709,56 @@ namespace {
                                                    anchor));
     }
 
+    /// \brief Retrieve the representative of the equivalence class containing
+    /// this type variable.
+    TypeVariableType *getRepresentative(TypeVariableType *typeVar) {
+      // FIXME: Optimize the case where the type variable was introduced
+      // in the current constraint system, so that most type variable 
+      // equivalences can be handled via direct pointer jumps rather than
+      // via a hash table lookup.
+      for (auto cs = this; cs; cs = cs->Parent) {
+        auto known = cs->Representatives.find(typeVar);
+        if (known != cs->Representatives.end()) {
+          // Find the representative of the representative.
+          auto rep = getRepresentative(known->second);
+
+          // Path compression: record the representative for this variable.
+          cs->Representatives[typeVar] = rep;
+          return rep;
+        }
+      }
+
+      return typeVar;
+    }
+
+    /// \brief Merge the equivalence sets of the two type variables.
+    ///
+    /// Note that both \c typeVar1 and \c typeVar2 must be the
+    /// representatives of their equivalence classes, and must be
+    /// distinct.
+    void mergeEquivalenceClasses(TypeVariableType *typeVar1,
+                                 TypeVariableType *typeVar2) {
+      assert(typeVar1 == getRepresentative(typeVar1) &&
+             "typeVar1 is not the representative");
+      assert(typeVar2 == getRepresentative(typeVar2) &&
+             "typeVar2 is not the representative");
+      assert(typeVar1 != typeVar2 && "cannot merge type with itself");
+
+      // Merge the equivalence classes corresponding to these two type
+      // variables. Always merge 'up' the constraint stack, so that our
+      // representative has the smallest ID within the equivalence class. This
+      // ensures that the representative won't be further down the solution
+      // stack than anything it is merged with.
+      if (typeVar1->getImpl().getID() > typeVar2->getImpl().getID())
+        Representatives[typeVar2] = typeVar1;
+      else
+        Representatives[typeVar1] = typeVar2;
+    }
+
     /// \brief Retrieve the fixed type corresponding to the given type variable,
     /// or a null type if there is no fixed type.
     Type getFixedType(TypeVariableType *typeVar) {
-      typeVar = typeVar->getImpl().getRepresentative();
+      typeVar = getRepresentative(typeVar);
       auto known = FixedTypes.find(typeVar);
       if (known == FixedTypes.end()) {
         if (Parent)
@@ -766,7 +772,7 @@ namespace {
 
     /// \brief Assign a fixed type to the given type variable.
     void assignFixedType(TypeVariableType *typeVar, Type type) {
-      typeVar = typeVar->getImpl().getRepresentative();
+      typeVar = getRepresentative(typeVar);
       assert(!FixedTypes[typeVar] && "Already have a type assignment!");
       FixedTypes[typeVar] = type;
     }
@@ -2293,23 +2299,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeMatchKind::BindType:
     case TypeMatchKind::SameType: {
       if (typeVar1 && typeVar2) {
-        auto rep1 = typeVar1->getImpl().getRepresentative();
-        auto rep2 = typeVar2->getImpl().getRepresentative();
+        auto rep1 = getRepresentative(typeVar1);
+        auto rep2 = getRepresentative(typeVar2);
         if (rep1 == rep2) {
           // We already merged these two types, so this constraint is
           // trivially solved.
           return SolutionKind::TriviallySolved;
         }
 
-        // Merge the equivalence classes corresponding to these two type
-        // variables. Always merge 'up' the constraint stack, so that our
-        // representative has the smallest ID within the equivalence class. This
-        // ensures that the representative won't be further down the solution
-        // stack than anything it is merged with.
-        if (rep1->getImpl().getID() < rep2->getImpl().getID())
-          rep1->getImpl().mergeEquivalenceClasses(rep2);
-        else
-          rep2->getImpl().mergeEquivalenceClasses(rep1);
+        // Merge the equivalence classes corresponding to these two variables.
+        mergeEquivalenceClasses(rep1, rep2);
         return SolutionKind::Solved;
       }
 
@@ -2702,7 +2701,7 @@ Type ConstraintSystem::simplifyType(Type type,
   return TC.transformType(type,
                           [&](Type type) -> Type {
             if (auto tvt = type->getAs<TypeVariableType>()) {
-              tvt = tvt->getImpl().getRepresentative();
+              tvt = getRepresentative(tvt);
               if (auto fixed = getFixedType(tvt)) {
                 if (substituting.insert(tvt)) {
                   auto result = simplifyType(fixed, substituting);
@@ -2965,7 +2964,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
   for (auto constraint : Constraints) {
     if (auto firstTV = constraint->getFirstType()->getAs<TypeVariableType>()) {
       // Retrieve the representative.
-      firstTV = firstTV->getImpl().getRepresentative();
+      firstTV = getRepresentative(firstTV);
 
       // Find the entry in the constraints output vector that corresponds to
       // this type variable.
@@ -3000,7 +2999,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       continue;
 
     // Retrieve the representative.
-    secondTV = secondTV->getImpl().getRepresentative();
+    secondTV = getRepresentative(secondTV);
 
     // Find the entry in the constraints output vector that corresponds to
     // this type variable.
@@ -3083,8 +3082,7 @@ collectTypesAboveAndBelow(ConstraintSystem &cs,
     bool constraintIsBelow = false;
     if (auto secondTV = (*curCons)->getSecondType()
             ->getAs<TypeVariableType>()) {
-      constraintIsBelow = (secondTV->getImpl().getRepresentative()
-                            == tvc.TypeVar);
+      constraintIsBelow = (cs.getRepresentative(secondTV) == tvc.TypeVar);
     }
 
     // Compute the type bound, and simplify it.
@@ -3555,7 +3553,7 @@ ConstraintSystem::isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables) {
   // Look for any free type variables.
   for (auto tv : TypeVariables) {
     // We only care about the representatives.
-    if (tv->getImpl().getRepresentative() != tv)
+    if (getRepresentative(tv) != tv)
       continue;
 
     if (auto fixed = getFixedType(tv)) {
@@ -3576,7 +3574,7 @@ ConstraintSystem::isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables) {
       return false;
 
     // ... that has not been bound to a fixed type.
-    tv = tv->getImpl().getRepresentative();
+    tv = getRepresentative(tv);
     if (getFixedType(tv))
       return false;
 
@@ -3601,7 +3599,7 @@ ConstraintSystem::isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables) {
 
 bool ConstraintSystem::typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
                                                            Type type) {
-  tv = tv->getImpl().getRepresentative();
+  tv = getRepresentative(tv);
 
   // FIXME:
   for (auto constraint : Constraints) {
@@ -3615,7 +3613,7 @@ bool ConstraintSystem::typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
       continue;
 
     // that have the same representative as the type we care about.
-    if (constraintTV->getImpl().getRepresentative() != tv)
+    if (getRepresentative(constraintTV) != tv)
       continue;
 
     // If the type we were given matches the default literal type for this
@@ -4620,11 +4618,15 @@ void ConstraintSystem::dump() {
     for (auto tv : cs->TypeVariables) {
       out.indent(2);
       tv->getImpl().print(out);
-      if (tv->getImpl().getRepresentative() == tv) {
+      auto rep = getRepresentative(tv);
+      if (rep == tv) {
         if (auto fixed = getFixedType(tv)) {
           out << " as ";
           fixed->print(out);
         }
+      } else {
+        out << " equivalent to ";
+        rep->print(out);
       }
       out << "\n";
     }
