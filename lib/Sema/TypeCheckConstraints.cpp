@@ -1367,8 +1367,11 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     ownerTy = openType(ownerTy, ownerGenericParams, replacements);
   }
 
-  // The base type must be a subtype of the owner type.
-  addConstraint(ConstraintKind::Subtype, baseTy, ownerTy);
+  // The base type must be convertible to the owner type. For most cases,
+  // subtyping suffices. However, the owner might be a protocol and the base a
+  // type that implements that protocol, if which case we need to model this
+  // with a conversion constraint.
+  addConstraint(ConstraintKind::Conversion, baseTy, ownerTy);
 
   // Determine the type of the member.
   Type type;
