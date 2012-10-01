@@ -4624,10 +4624,14 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
         }
 
         // The outermost bound does not need to be constant.
+        auto boundExpr = newArray->getBounds()[0].Value;
+        if (TC.typeCheckExpression(boundExpr))
+          return nullptr;
+        newArray->getBounds()[0].Value = boundExpr;
         if (TC.typeCheckArrayBound(newArray->getBounds()[0].Value,
                                    /*requireConstant=*/false))
           return nullptr;
-
+        
         return expr;
       }
 
