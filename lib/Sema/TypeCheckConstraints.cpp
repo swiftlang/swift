@@ -1518,7 +1518,9 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitMemberRefExpr(MemberRefExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      return CS.getTypeOfMemberReference(expr->getBase()->getType(),
+                                         expr->getDecl(),
+                                         /*isTypeReference=*/false);
     }
 
     Type visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
@@ -4016,7 +4018,8 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitMemberRefExpr(MemberRefExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      // FIXME: Falls back to the old type checker.
+      return CS.getTypeChecker().recheckTypes(expr);
     }
 
     Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
