@@ -119,6 +119,10 @@ public:
     return insert(new LoadInst(Expr, LV));
   }
 
+  MaterializeInst *createMaterialize(MaterializeExpr *Expr, CFGValue LV) {
+    return insert(new MaterializeInst(Expr, LV));
+  }
+
   RequalifyInst *createRequalify(RequalifyExpr *Expr, CFGValue Op) {
     return insert(new RequalifyInst(Expr, Op));
   }

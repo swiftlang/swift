@@ -108,6 +108,9 @@ public:
   void visitLoadInst(LoadInst *LI) {
     OS << "load " << getID(LI->getLValue());
   }
+  void visitMaterializeInst(MaterializeInst *MI) {
+    OS << "materialize " << getID(MI->getOperand());
+  }
   void visitRequalifyInst(RequalifyInst *RI) {
     OS << "requalify " << getID(RI->getOperand());
   }

@@ -119,6 +119,7 @@ public:
   CFGValue visitDeclRefExpr(DeclRefExpr *E);
   CFGValue visitIntegerLiteralExpr(IntegerLiteralExpr *E);
   CFGValue visitLoadExpr(LoadExpr *E);
+  CFGValue visitMaterializeExpr(MaterializeExpr *E);
   CFGValue visitRequalifyExpr(RequalifyExpr *E);
   CFGValue visitParenExpr(ParenExpr *E);
   CFGValue visitTupleExpr(TupleExpr *E);

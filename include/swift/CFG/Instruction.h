@@ -35,6 +35,7 @@ class ApplyExpr;
 class DeclRefExpr;
 class IntegerLiteralExpr;
 class LoadExpr;
+class MaterializeExpr;
 class ReturnStmt;
 class Stmt;
 class RequalifyExpr;
@@ -190,6 +191,7 @@ public:
 };
 
 /// Represents a load from a memory location.
+/// FIXME: Need a new "implicit conversion instruction" base class.
 class LoadInst : public Instruction {
   /// The LValue (memory address) to use for the load.
   CFGValue LValue;
@@ -212,10 +214,23 @@ public:
   }
 };
 
+/// MaterializeInst - Turn an r-value into an l-value by placing it in
+/// temporary memory.
+/// FIXME: Need a new "implicit conversion instruction" base class.
+class MaterializeInst : public Instruction {
+  CFGValue Operand;
+public:
+  MaterializeInst(MaterializeExpr *E, CFGValue Operand)
+    : Instruction(InstKind::Materialize, (Expr*)E), Operand(Operand) {}
+
+  CFGValue getOperand() const { return Operand; }
+};
+
 
 /// RequalifyInst - Change the qualification on an l-value.  The new
 /// type always has the same object type as the old type with strictly
 /// "more" (i.e. a supertyped set of) qualifiers.
+/// FIXME: Need a new "implicit conversion instruction" base class.
 class RequalifyInst : public Instruction {
   CFGValue Operand;
 public:
@@ -223,7 +238,6 @@ public:
     : Instruction(InstKind::Requalify, (Expr*)E), Operand(Operand) {}
 
   CFGValue getOperand() const { return Operand; }
-
 };
 
 
