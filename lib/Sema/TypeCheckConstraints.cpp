@@ -814,7 +814,7 @@ namespace {
     /// \returns The opened type, or \c type if there are no archetypes in it.
     Type openType(Type type) {
       llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
-      return openType(type, replacements);
+      return openType(type, nullptr, replacements);
     }
 
     /// \brief "Open" the given type by replacing any occurrences of archetypes
@@ -823,11 +823,15 @@ namespace {
     ///
     /// \param type The type to open.
     ///
+    /// \param params The generic parameter list that we're opening, or NULL
+    /// if there is no known generic parameter list.
+    ///
     /// \param replacements The mapping from opened archetypes to the type
     /// variables to which they were opened.
     ///
     /// \returns The opened type, or \c type if there are no archetypes in it.
     Type openType(Type type,
+           GenericParamList *params,
            llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements);
 
     /// \brief Retrieve the type of a reference to the given value declaration.
@@ -1102,6 +1106,9 @@ namespace {
     /// \brief Convert the expression to the given type.
     Expr *convertToType(Expr *expr, Type toType, bool isAssignment = false);
 
+    /// \brief Convert the object argumet to the given type.
+    Expr *convertObjectArgumentToType(Expr *expr, Type toType);
+
     /// \brief Apply the solution to the given expression, returning the
     /// rewritten, fully-typed expression.
     Expr *applySolution(Expr *expr);
@@ -1156,7 +1163,7 @@ void ConstraintSystem::markChildInactive(ConstraintSystem *childCS) {
   }
 }
 
-Type ConstraintSystem::openType(Type startingType,
+Type ConstraintSystem::openType(Type startingType, GenericParamList *params,
        llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements) {
   struct GetTypeVariable {
     ConstraintSystem &CS;
@@ -1204,11 +1211,22 @@ Type ConstraintSystem::openType(Type startingType,
     }
   } getTypeVariable{*this, replacements};
 
+  // If we have a generic parameter list that we're opening, create type
+  // variables for each archetype.
+  if (params) {
+    for (auto archetype : params->getAllArchetypes())
+      (void)getTypeVariable(archetype);
+  }
+
   std::function<Type(Type)> replaceArchetypes;
   replaceArchetypes = [&](Type type) -> Type {
     // Replace archetypes with fresh type variables.
     if (auto archetype = type->getAs<ArchetypeType>()) {
-      return getTypeVariable(archetype);
+      auto known = replacements.find(archetype);
+      if (known != replacements.end())
+        return known->second;
+
+      return archetype;
     }
 
     // Create type variables for all of the archetypes in a polymorphic
@@ -1323,17 +1341,21 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // Figure out the type of the owner.
   auto owner = value->getDeclContext();
+  GenericParamList *ownerGenericParams = nullptr;
   Type ownerTy;
   if (auto nominalOwner = dyn_cast<NominalTypeDecl>(owner)) {
     ownerTy = nominalOwner->getDeclaredTypeInContext();
+    ownerGenericParams = nominalOwner->getGenericParamsOfContext();
   } else {
     auto extensionOwner = cast<ExtensionDecl>(owner);
     auto extendedTy = extensionOwner->getExtendedType();
-    if (auto nominal = extendedTy->getAs<NominalType>())
+    if (auto nominal = extendedTy->getAs<NominalType>()) {
       ownerTy = nominal->getDecl()->getDeclaredTypeInContext();
-    else if (auto unbound = extendedTy->getAs<UnboundGenericType>())
+      ownerGenericParams = nominal->getDecl()->getGenericParamsOfContext();
+    } else if (auto unbound = extendedTy->getAs<UnboundGenericType>()) {
       ownerTy = unbound->getDecl()->getDeclaredTypeInContext();
-    else
+      ownerGenericParams = unbound->getDecl()->getGenericParamsOfContext();
+    } else
       llvm_unreachable("unknown owner for type member");
   }
 
@@ -1342,7 +1364,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // If the owner is specialized, we need to open up the types in the owner.
   if (ownerTy->isSpecialized()) {
-    ownerTy = openType(ownerTy, replacements);
+    ownerTy = openType(ownerTy, ownerGenericParams, replacements);
   }
 
   // The base type must be a subtype of the owner type.
@@ -1361,7 +1383,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                              TC.Context);
   } else
     type = value->getTypeOfReference();
-  type = openType(type, replacements);
+  type = openType(type, nullptr, replacements);
 
   // Skip the 'this' argument if it's already been bound by the base.
   if (auto func = dyn_cast<FuncDecl>(value)) {
@@ -1409,6 +1431,33 @@ static bool isConstructibleType(Type type) {
 
   return false;
 }
+
+/// \brief Skip any implicit conversions applied to this expression.
+static Expr *skipImplicitConversions(Expr *expr) {
+  while (auto ice = dyn_cast<ImplicitConversionExpr>(expr))
+    expr = ice->getSubExpr();
+  return expr;
+}
+
+/// \brief Find the declaration directly referenced by this expression.
+static ValueDecl *findReferencedDecl(Expr *expr, SourceLoc &loc) {
+  do {
+    expr = expr->getSemanticsProvidingExpr();
+
+    if (auto ice = dyn_cast<ImplicitConversionExpr>(expr)) {
+      expr = ice->getSubExpr();
+      continue;
+    }
+
+    if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
+      loc = dre->getLoc();
+      return dre->getDecl();
+    }
+
+    return nullptr;
+  } while (true);
+}
+
 
 void ConstraintSystem::generateConstraints(Expr *expr) {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
@@ -1518,9 +1567,10 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitMemberRefExpr(MemberRefExpr *expr) {
-      return CS.getTypeOfMemberReference(expr->getBase()->getType(),
-                                         expr->getDecl(),
-                                         /*isTypeReference=*/false);
+      auto tv = CS.createTypeVariable(expr);
+      OverloadChoice choice(expr->getBase()->getType(), expr->getDecl());
+      CS.addOverloadSet(OverloadSet::getNew(CS, tv, expr, { &choice, 1 }));
+      return tv;
     }
 
     Type visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
@@ -1532,7 +1582,10 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitGenericMemberRefExpr(GenericMemberRefExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      auto tv = CS.createTypeVariable(expr);
+      OverloadChoice choice(expr->getBase()->getType(), expr->getDecl());
+      CS.addOverloadSet(OverloadSet::getNew(CS, tv, expr, { &choice, 1 }));
+      return tv;
     }
 
     Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
@@ -1867,6 +1920,46 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
     }
   };
 
+  /// \brief AST walker that "sanitizes" an expression for the
+  /// constraint-based type checker.
+  ///
+  /// This is only necessary because Sema fills in too much type information
+  /// before the type-checker runs, causing redundant work.
+  class SanitizeExpr : public ASTWalker {
+    TypeChecker &TC;
+  public:
+    SanitizeExpr(TypeChecker &tc) : TC(tc) { }
+
+    virtual bool walkToExprPre(Expr *expr) {
+      // Don't recurse into array-new expressions.
+      return !isa<NewArrayExpr>(expr);
+    }
+
+    virtual Expr *walkToExprPost(Expr *expr) {
+      if (auto implicit = dyn_cast<ImplicitConversionExpr>(expr)) {
+        // Skip implicit conversions completely.
+        return implicit->getSubExpr();
+      }
+
+      if (auto dotCall = dyn_cast<DotSyntaxCallExpr>(expr)) {
+        // A DotSyntaxCallExpr is a member reference that has already been
+        // type-checked down to a call; turn it back into an overloaded
+        // member reference expression.
+        SourceLoc memberLoc;
+        if (auto member = findReferencedDecl(dotCall->getFn(), memberLoc)) {
+          auto base = skipImplicitConversions(dotCall->getArg());
+          auto members
+            = TC.Context.AllocateCopy(ArrayRef<ValueDecl *>(&member, 1));
+          return new (TC.Context) OverloadedMemberRefExpr(base,
+                                   dotCall->getDotLoc(), members, memberLoc,
+                                   UnstructuredUnresolvedType::get(TC.Context));
+        }
+      }
+      
+      return expr;
+    }
+  };
+
   class ConstraintWalker : public ASTWalker {
     ConstraintGenerator &CG;
 
@@ -1927,6 +2020,9 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
     /// \brief Ignore declarations.
     virtual bool walkToDeclPre(Decl *decl) { return false; }
   };
+
+  // Remove implicit conversions from the expression.
+  expr = expr->walk(SanitizeExpr(getTypeChecker()));
 
   // Walk the expression, generating constraints.
   ConstraintGenerator CG(*this);
@@ -3873,6 +3969,11 @@ Expr *ConstraintSystem::convertToType(Expr *expr, Type toType,
                                      : CoercionKind::Normal);
 }
 
+Expr *ConstraintSystem::convertObjectArgumentToType(Expr *expr, Type toType) {
+  // FIXME: Temporary hack that uses the existing coercion logic.
+  return TC.coerceObjectArgument(expr, toType);
+}
+
 /// \brief Determine whether the given expression refers to an assignment
 /// function.
 static bool isAssignmentFn(Expr *expr) {
@@ -3929,7 +4030,29 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
                                                 /*OnlyInnermostParams=*/true);
       return new (tc.Context) SpecializeExpr(expr, type, encodedSubs);
     }
-    
+
+    /// \brief Build a new member reference with the given base and member.
+    Expr *buildMemberRef(Expr *base, SourceLoc dotLoc, ValueDecl *member,
+                         SourceLoc memberLoc, Type openedType) {
+      // FIXME: Falls back to the old type checker.
+
+      auto &tc = CS.getTypeChecker();
+      auto result = tc.buildMemberRefExpr(base, dotLoc, { &member, 1 },
+                                          memberLoc);
+      if (!result)
+        return nullptr;
+
+      result = tc.recheckTypes(result);
+      if (!result)
+        return nullptr;
+
+      if (auto polyFn = result->getType()->getAs<PolymorphicFunctionType>()) {
+        return specialize(result, polyFn, openedType);
+      }
+
+      return result;
+    }
+
   public:
     ExprRewriter(ConstraintSystem &CS) : CS(CS) { }
 
@@ -4008,7 +4131,12 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      auto ovl = CS.getGeneratedOverloadSet(expr);
+      assert(ovl && "No overload set associated with decl reference expr?");
+      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
+      return buildMemberRef(expr->getBase(), expr->getDotLoc(),
+                            selected.first.getDecl(), expr->getMemberLoc(),
+                            selected.second);
     }
 
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
@@ -4031,7 +4159,12 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitGenericMemberRefExpr(GenericMemberRefExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      auto ovl = CS.getGeneratedOverloadSet(expr);
+      assert(ovl && "No overload set associated with decl reference expr?");
+      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
+      return buildMemberRef(expr->getBase(), expr->getDotLoc(),
+                            selected.first.getDecl(), expr->getNameLoc(),
+                            selected.second);
     }
 
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
@@ -4063,15 +4196,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // Determine the declaration selected for this overloaded reference.
       auto ovl = CS.getGeneratedOverloadSet(expr);
       assert(ovl && "No overload set associated with decl reference expr?");
-      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
-      auto decl = choice.getDecl();
-
-      // FIXME: Falls back to the old type checker.
-      auto &tc = CS.getTypeChecker();
-      auto result = tc.buildMemberRefExpr(expr->getBase(), expr->getDotLoc(),
-                                          ArrayRef<ValueDecl *>(&decl, 1),
-                                          expr->getNameLoc());
-      return tc.recheckTypes(result);
+      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
+      return buildMemberRef(expr->getBase(), expr->getDotLoc(),
+                            selected.first.getDecl(), expr->getNameLoc(),
+                            selected.second);
     }
 
     Expr *visitSequenceExpr(SequenceExpr *expr) {
@@ -4309,20 +4437,31 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       
       // For function application, convert the argument to the input type of
       // the function.
-      // FIXME: Coerce object arguments somewhere.
       if (auto fnType = fn->getType()->getAs<FunctionType>()) {
-        auto arg = CS.convertToType(expr->getArg(), fnType->getInput(),
-                                    isAssignmentFn(fn));
+        auto origArg = expr->getArg();
+        Expr *arg = nullptr;
+        if (isa<DotSyntaxCallExpr>(expr))
+          arg = CS.convertObjectArgumentToType(origArg, fnType->getInput());
+        else
+          arg = CS.convertToType(origArg, fnType->getInput(),
+                                 isAssignmentFn(fn));
+
         if (!arg) {
           tc.diagnose(fn->getLoc(), diag::while_converting_function_argument,
                       fnType->getInput())
-            << expr->getArg()->getSourceRange();
+            << origArg->getSourceRange();
 
           return nullptr;
         }
 
+        auto origType = expr->getType();
         expr->setArg(arg);
         expr->setType(fnType->getResult());
+
+        if (auto polyFn = expr->getType()->getAs<PolymorphicFunctionType>()) {
+          return specialize(expr, polyFn, origType);
+        }
+
         return expr;
       }
 
