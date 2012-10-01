@@ -749,7 +749,7 @@ namespace {
       // representative has the smallest ID within the equivalence class. This
       // ensures that the representative won't be further down the solution
       // stack than anything it is merged with.
-      if (typeVar1->getImpl().getID() > typeVar2->getImpl().getID())
+      if (typeVar1->getImpl().getID() < typeVar2->getImpl().getID())
         Representatives[typeVar2] = typeVar1;
       else
         Representatives[typeVar1] = typeVar2;
