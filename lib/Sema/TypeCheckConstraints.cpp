@@ -2875,21 +2875,21 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
-  Type baseTy = constraint.getFirstType();
+  Type baseTy = constraint.getFirstType()->getRValueType();
   if (auto tv = baseTy->getAs<TypeVariableType>()) {
     auto fixed = getFixedType(tv);
     if (!fixed)
       return SolutionKind::Unsolved;
 
     // Continue with the fixed type.
-    baseTy = fixed;
+    baseTy = fixed->getRValueType();
   }
 
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
   Identifier name = constraint.getMember();
   Type memberTy = constraint.getSecondType();
-  if (auto baseTuple = baseTy->getRValueType()->getAs<TupleType>()) {
+  if (auto baseTuple = baseTy->getAs<TupleType>()) {
     StringRef nameStr = name.str();
     int fieldIdx = -1;
     if (nameStr[0] == '$') {
