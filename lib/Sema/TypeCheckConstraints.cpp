@@ -128,6 +128,8 @@ namespace {
     /// \brief The two types must be bound to the same type, dropping
     /// lvalueness when comparing a type variable to a type.
     Equal,
+    /// \brief The first type is the rvalue of the second type.
+    EqualRvalue,
     /// \brief The first type is a "trivial" subtype of the second type,
     /// meaning that it is a subtype that is also guaranteed to have the same
     // in-memory representation.
@@ -205,6 +207,7 @@ namespace {
       switch (Kind) {
       case ConstraintKind::Bind:
       case ConstraintKind::Equal:
+      case ConstraintKind::EqualRvalue:
       case ConstraintKind::TrivialSubtype:
       case ConstraintKind::Subtype:
       case ConstraintKind::Conversion:
@@ -238,6 +241,7 @@ namespace {
       switch (Kind) {
       case ConstraintKind::Bind:
       case ConstraintKind::Equal:
+      case ConstraintKind::EqualRvalue:
       case ConstraintKind::TrivialSubtype:
       case ConstraintKind::Subtype:
       case ConstraintKind::Conversion:
@@ -285,6 +289,7 @@ namespace {
       switch (Kind) {
       case ConstraintKind::Bind: Out << " := "; break;
       case ConstraintKind::Equal: Out << " == "; break;
+      case ConstraintKind::EqualRvalue: Out << " ==R "; break;
       case ConstraintKind::TrivialSubtype: Out << " <t "; break;
       case ConstraintKind::Subtype: Out << " < "; break;
       case ConstraintKind::Conversion: Out << " << "; break;
@@ -485,6 +490,9 @@ namespace {
     /// \brief Require the types to match exactly, but strips lvalueness from
     /// a type when binding to a type variable.
     SameType,
+    /// \brief Require the type of the first to match the rvalue type of the
+    /// second.
+    SameTypeRvalue,
     /// \brief Require the first type to be a "trivial" subtype of the second
     /// type or be an exact match.
     TrivialSubtype,
@@ -1833,16 +1841,13 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
         }
       }
 
-      // The function subexpression has some type T1 -> T2 for fresh variables
-      // T1 and T2.
+      // The function subexpression has some rvalue type T1 -> T2 for fresh
+      // variables T1 and T2.
       auto inputTy = CS.createTypeVariable(expr);
       auto outputTy = CS.createTypeVariable(expr);
       auto funcTy = FunctionType::get(inputTy, outputTy, Context);
-
-      // FIXME: Allow conversions to function type? That seems completely
-      // unnecessary... except perhaps for the metatype case mentioned above.
-      CS.addConstraint(ConstraintKind::Equal, expr->getFn()->getType(), funcTy,
-                       expr);
+      CS.addConstraint(ConstraintKind::EqualRvalue, funcTy,
+                       expr->getFn()->getType(), expr);
 
       // The argument type must be convertible to the input type.
       CS.addConstraint(ConstraintKind::Conversion, expr->getArg()->getType(),
@@ -2195,6 +2200,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   switch (kind) {
   case TypeMatchKind::BindType:
   case TypeMatchKind::SameType:
+  case TypeMatchKind::SameTypeRvalue:
   case TypeMatchKind::TrivialSubtype:
     subKind = kind;
     break;
@@ -2249,6 +2255,9 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
   case TypeMatchKind::SameType:
     return ConstraintKind::Equal;
 
+  case TypeMatchKind::SameTypeRvalue:
+    return ConstraintKind::EqualRvalue;
+
   case TypeMatchKind::TrivialSubtype:
     return ConstraintKind::TrivialSubtype;
 
@@ -2293,6 +2302,35 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   if (type1->isEqual(type2))
     return SolutionKind::TriviallySolved;
 
+  // If we have a same-type-as-rvalue constraint, and the right-hand side
+  // has a form that is either definitely an lvalue or definitely an rvalue,
+  // force the right-hand side to be an rvalue and
+  if (kind == TypeMatchKind::SameTypeRvalue) {
+    if (auto lvalue2 = type2->getAs<LValueType>()) {
+      // The right-hand side is an lvalue type. Strip off the lvalue and
+      // call this a normal 'same-type' constraint.
+      type2 = lvalue2->getObjectType();
+      kind = TypeMatchKind::SameType;
+      flags |= TMF_GenerateConstraints;
+    } else if (!type2->is<TypeVariableType>()) {
+      // The right-hand side is guaranteed to be an rvalue type. Call this
+      // a normal same-type constraint.
+      kind = TypeMatchKind::SameType;
+      flags |= TMF_GenerateConstraints;
+    }
+
+    if (auto func2 = type2->getAs<FunctionType>()) {
+      // The right-hand side is a function type, which is guaranteed to be
+      // an rvalue type. Call this a normal same-type constraint, and
+      // strip off the [auto_closure], which is not part of the type.
+      if (func2->isAutoClosure())
+        type2 = FunctionType::get(func2->getInput(), func2->getResult(),
+                                  TC.Context);
+      kind = TypeMatchKind::SameType;
+      flags |= TMF_GenerateConstraints;
+    }
+  }
+
   // If either (or both) types are type variables, unify the type variables.
   if (typeVar1 || typeVar2) {
     switch (kind) {
@@ -2321,6 +2359,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return SolutionKind::Solved;
     }
 
+    case TypeMatchKind::SameTypeRvalue:
     case TypeMatchKind::TrivialSubtype:
     case TypeMatchKind::Subtype:
     case TypeMatchKind::Conversion:
@@ -2870,6 +2909,7 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   switch (kind) {
   case ConstraintKind::Bind: return TypeMatchKind::BindType;
   case ConstraintKind::Equal: return TypeMatchKind::SameType;
+  case ConstraintKind::EqualRvalue: return TypeMatchKind::SameTypeRvalue;
   case ConstraintKind::TrivialSubtype: return TypeMatchKind::TrivialSubtype;
   case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
@@ -2889,6 +2929,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   switch (constraint.getKind()) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
+  case ConstraintKind::EqualRvalue:
   case ConstraintKind::TrivialSubtype:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
@@ -2981,6 +3022,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
     switch (constraint->getKind()) {
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
+    case ConstraintKind::EqualRvalue:
     case ConstraintKind::TrivialSubtype:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
