@@ -397,6 +397,20 @@ public:
   bool typeCheckArrayBound(Expr *&E, bool requireConstant);
   bool typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc, Expr *&Src);
 
+
+  /// \brief Type check an assignment expression using the constraint-based
+  /// type checker.
+  ///
+  /// \param dest The destination expression.
+  /// \param equalLoc The location of the '='.
+  /// \param src The source expression.
+  ///
+  /// \returns a converted (dest, src) expression pair, or (nullptr, nullptr)
+  /// if the assignment failed to type-check.
+  std::pair<Expr *, Expr *> typeCheckAssignmentConstraints(Expr *dest,
+                                                           SourceLoc equalLoc,
+                                                           Expr *src);
+
   /// \brief Retrieve the default literal type for the given literal kind.
   Type getDefaultLiteralType(LiteralKind kind);
 

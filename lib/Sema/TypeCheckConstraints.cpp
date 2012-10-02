@@ -4793,10 +4793,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 //===--------------------------------------------------------------------===//
 // High-level entry points.
 //===--------------------------------------------------------------------===//
-#pragma mark High-level entry points
-Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
-  // First, pre-check the expression, validating any types that occur in the
-  // expression and folding sequence expressions.
+namespace {
   class PreCheckExpression : public ASTWalker {
     TypeChecker &TC;
 
@@ -4850,7 +4847,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
         if (TC.typeCheckArrayBound(newArray->getBounds()[0].Value,
                                    /*requireConstant=*/false))
           return nullptr;
-        
+
         return expr;
       }
 
@@ -4871,6 +4868,12 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
       return false;
     }
   };
+}
+
+#pragma mark High-level entry points
+Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
+  // First, pre-check the expression, validating any types that occur in the
+  // expression and folding sequence expressions.
 
   // Pre-check the expression.
   expr = expr->walk(PreCheckExpression(*this));
@@ -4959,6 +4962,171 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   }
 
   return result;
+}
+
+/// \brief Compute the rvalue type of the given expression, which is the
+/// destination of an assignment statement.
+static Type computeAssignDestType(ConstraintSystem &cs, Expr *dest,
+                                  SourceLoc equalLoc) {
+  if (TupleExpr *TE = dyn_cast<TupleExpr>(dest)) {
+    auto &ctx = cs.getASTContext();
+    SmallVector<TupleTypeElt, 4> destTupleTypes;
+    for (unsigned i = 0; i != TE->getNumElements(); ++i) {
+      Expr *subExpr = TE->getElement(i);
+      Type elemTy = computeAssignDestType(cs, subExpr, equalLoc);
+      if (!elemTy)
+        return Type();
+      destTupleTypes.push_back(TupleTypeElt(elemTy, TE->getElementName(i)));
+    }
+
+    return TupleType::get(destTupleTypes, ctx);
+  }
+
+  Type destTy = cs.simplifyType(dest->getType());
+  if (LValueType *destLV = destTy->getAs<LValueType>()) {
+    // If the destination is an lvalue, we're good; get it's object type.
+    destTy = destLV->getObjectType();
+  } else if (auto typeVar = destTy->getAs<TypeVariableType>()) {
+    // The destination is a type variable. This type variable must be an
+    // lvalue type, which we enforce via a subtyping relationship with
+    // [byref(implicit)] T, where T is a fresh type variable that will be
+    // the object type of this particular expression type.
+    auto objectTv = cs.createTypeVariable(dest);
+    auto refTv = LValueType::get(objectTv,
+                                 LValueType::Qual(LValueType::Qual::Implicit|
+                                                  LValueType::Qual::NonHeap),
+                                 cs.getASTContext());
+    cs.addConstraint(ConstraintKind::Subtype, typeVar, refTv);
+    destTy = objectTv;
+  } else {
+    if (!destTy->is<ErrorType>())
+      cs.getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_lvalue)
+        << dest->getSourceRange();
+
+    return Type();
+  }
+  
+  return destTy;
+}
+
+std::pair<Expr *, Expr *>
+TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
+                                            SourceLoc equalLoc,
+                                            Expr *src) {
+  // First, pre-check the destination and source, validating any types that
+  // occur in the expression and folding sequence expressions.
+
+  // Pre-check the destination.
+  dest = dest->walk(PreCheckExpression(*this));
+  if (!dest)
+    return std::make_pair(nullptr, nullptr);
+
+  // Pre-check the source.
+  src = src->walk(PreCheckExpression(*this));
+  if (!src)
+    return { nullptr, nullptr };
+
+  llvm::raw_ostream &log = llvm::outs();
+
+  // Construct a constraint system from the destination and source.
+  ConstraintSystem cs(*this);
+  cs.generateConstraints(dest);
+  cs.generateConstraints(src);
+
+  // Compute the type to which the source must be converted to allow assignment
+  // to the destination.
+  auto destTy = computeAssignDestType(cs, dest, equalLoc);
+  if (!destTy)
+    return { nullptr, nullptr };
+
+  // The source must be convertible to the destination.
+  cs.addConstraint(ConstraintKind::Conversion, src->getType(), destTy);
+
+  if (getLangOpts().DebugConstraintSolver) {
+    log << "---Initial constraints for the given assignment---\n";
+    log << "Destination expression:\n";
+    dest->print(log);
+    log << "\n";
+    log << "Source expression:\n";
+    src->print(log);
+    log << "\n";
+    cs.dump();
+  }
+
+  // Attempt to solve the constraint system.
+  SmallVector<ConstraintSystem *, 4> viable;
+  if (cs.solve(viable)) {
+    if (getLangOpts().DebugConstraintSolver) {
+      llvm::outs() << "---Solved constraints---\n";
+      cs.dump();
+
+      unsigned numSolved = 0;
+      if (!viable.empty()) {
+        unsigned idx = 0;
+        for (auto cs : viable) {
+          SmallVector<TypeVariableType *, 4> freeVariables;
+          llvm::outs() << "---Child system #" << ++idx << "---\n";
+          cs->dump();
+          if (cs->isSolved(freeVariables)) {
+            ++numSolved;
+          }
+        }
+      }
+
+      if (numSolved == 0)
+        log << "No solution found.\n";
+      else if (numSolved == 1)
+        log << "Unique solution found.\n";
+      else {
+        log << "Found " << numSolved << " potential solutions.\n";
+      }
+    }
+
+    // FIXME: Crappy diagnostic.
+    diagnose(equalLoc, diag::constraint_assign_type_check_fail)
+      << dest->getSourceRange() << src->getSourceRange();
+
+    return { nullptr, nullptr };
+  }
+
+  auto solution = viable[0];
+  if (getLangOpts().DebugConstraintSolver) {
+    log << "---Solution---\n";
+    solution->dump();
+  }
+
+  // Apply the solution to the destination.
+  dest = solution->applySolution(dest);
+  if (!dest) {
+    // Failure already diagnosed, above, as part of applying the solution.
+    return { nullptr, nullptr };
+  }
+
+  // Apply the solution to the source.
+  src = solution->applySolution(src);
+  if (!src) {
+    // Failure already diagnosed, above, as part of applying the solution.
+    return { nullptr, nullptr };
+  }
+
+  // Convert the source to the simplified destination type.
+  src = solution->convertToType(src, solution->simplifyType(destTy));
+  if (!src) {
+    // Failure already diagnosed, above, as part of applying the solution.
+    return { nullptr, nullptr };
+  }
+
+  if (getLangOpts().DebugConstraintSolver) {
+    log << "---Type-checked expressions---\n";
+    log << "Destination expression:\n";
+    dest->print(log);
+    log << "\n";
+    log << "Source expression:\n";
+    src->print(log);
+    log << "\n";
+  }
+
+  return { dest, src };
 }
 
 //===--------------------------------------------------------------------===//

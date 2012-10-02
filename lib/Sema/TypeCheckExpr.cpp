@@ -24,6 +24,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/STLExtras.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -1960,6 +1961,11 @@ static Type ComputeAssignDestTy(TypeChecker &TC, Expr *Dest,
 
 bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
                                       Expr *&Src) {
+  if (getLangOpts().UseConstraintSolver) {
+    llvm::tie(Dest, Src) = typeCheckAssignmentConstraints(Dest, EqualLoc, Src);
+    return !Dest || !Src;
+  }
+
   SemaExpressionTree SET(*this);
   
   // Type check the destination.
