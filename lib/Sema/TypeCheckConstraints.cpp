@@ -1998,7 +1998,8 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
       // FIXME: Specify this as a syntactic restriction on the form that one
       // can use for a coercion or type construction.
       if (isa<CallExpr>(expr)) {
-        if (auto metaTy = expr->getFn()->getType()->getAs<MetaTypeType>()) {
+        auto fnTy = CS.simplifyType(expr->getFn()->getType());
+        if (auto metaTy = fnTy->getAs<MetaTypeType>()) {
           auto instanceTy = metaTy->getInstanceType();
           CS.addConstraint(ConstraintKind::Construction,
                            expr->getArg()->getType(), instanceTy, expr);
