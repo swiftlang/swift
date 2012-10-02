@@ -842,7 +842,7 @@ namespace {
     /// \returns The opened type, or \c type if there are no archetypes in it.
     Type openType(Type type) {
       llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
-      return openType(type, nullptr, replacements);
+      return openType(type, { }, replacements);
     }
 
     /// \brief "Open" the given type by replacing any occurrences of archetypes
@@ -851,15 +851,13 @@ namespace {
     ///
     /// \param type The type to open.
     ///
-    /// \param params The generic parameter list that we're opening, or NULL
-    /// if there is no known generic parameter list.
+    /// \param archetypes The set of archetypes we're opening.
     ///
     /// \param replacements The mapping from opened archetypes to the type
     /// variables to which they were opened.
     ///
     /// \returns The opened type, or \c type if there are no archetypes in it.
-    Type openType(Type type,
-           GenericParamList *params,
+    Type openType(Type type, ArrayRef<ArchetypeType *> archetypes,
            llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements);
 
     /// \brief Retrieve the type of a reference to the given value declaration.
@@ -1191,7 +1189,9 @@ void ConstraintSystem::markChildInactive(ConstraintSystem *childCS) {
   }
 }
 
-Type ConstraintSystem::openType(Type startingType, GenericParamList *params,
+Type ConstraintSystem::openType(
+       Type startingType,
+       ArrayRef<ArchetypeType *> archetypes,
        llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements) {
   struct GetTypeVariable {
     ConstraintSystem &CS;
@@ -1239,12 +1239,9 @@ Type ConstraintSystem::openType(Type startingType, GenericParamList *params,
     }
   } getTypeVariable{*this, replacements};
 
-  // If we have a generic parameter list that we're opening, create type
-  // variables for each archetype.
-  if (params) {
-    for (auto archetype : params->getAllArchetypes())
-      (void)getTypeVariable(archetype);
-  }
+  // Create type variables for each archetype we're opening.
+  for (auto archetype : archetypes)
+    (void)getTypeVariable(archetype);
 
   std::function<Type(Type)> replaceArchetypes;
   replaceArchetypes = [&](Type type) -> Type {
@@ -1392,7 +1389,10 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // If the owner is specialized, we need to open up the types in the owner.
   if (ownerTy->isSpecialized()) {
-    ownerTy = openType(ownerTy, ownerGenericParams, replacements);
+    ArrayRef<ArchetypeType *> openArchetypes;
+    if (ownerGenericParams)
+      openArchetypes = ownerGenericParams->getAllArchetypes();
+    ownerTy = openType(ownerTy, openArchetypes, replacements);
   }
 
   // The base type must be convertible to the owner type. For most cases,
@@ -1414,7 +1414,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                              TC.Context);
   } else
     type = value->getTypeOfReference();
-  type = openType(type, nullptr, replacements);
+  type = openType(type, { }, replacements);
 
   // Skip the 'this' argument if it's already been bound by the base.
   if (auto func = dyn_cast<FuncDecl>(value)) {
