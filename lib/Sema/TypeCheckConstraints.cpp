@@ -341,7 +341,7 @@ namespace {
   };
 
   /// \brief The kind of overload choice.
-  enum class OverloadChoiceKind : char {
+  enum class OverloadChoiceKind : int {
     /// \brief The overload choice selects a particular declaration from a
     /// set of declarations.
     Decl,
@@ -356,7 +356,11 @@ namespace {
     FunctionReturningBaseType,
     /// \brief The overload choice equates the member type with a function
     /// from the base type to itself.
-    IdentityFunction
+    IdentityFunction,
+    /// \brief The overload choice indexes into a tuple. Index zero will
+    /// have the value of this enumerator, index one will have the value of this
+    /// enumerator + 1, and so on. Thus, this enumerator must always be last.
+    TupleIndex
   };
 
   /// \brief Describes a particular choice within an overload set.
@@ -373,6 +377,7 @@ namespace {
   public:
     OverloadChoice(Type base, ValueDecl *value) : Base(base) {
       DeclOrKind = reinterpret_cast<uintptr_t>(value);
+      assert((DeclOrKind & (uintptr_t)0x01) == 0 && "Badly aligned decl");
     }
 
     OverloadChoice(Type base, OverloadChoiceKind kind)
@@ -382,13 +387,27 @@ namespace {
       assert(kind != OverloadChoiceKind::Decl && "wrong constructor for decl");
     }
 
+    OverloadChoice(Type base, unsigned index)
+      : Base(base),
+        DeclOrKind(((uintptr_t)index
+                    + (uintptr_t)OverloadChoiceKind::TupleIndex) << 1
+                   | (uintptr_t)0x01) {
+      assert(base->getRValueType()->is<TupleType>() && "Must have tuple type");
+    }
+
     /// \brief Retrieve the base type used to refer to the declaration.
     Type getBaseType() const { return Base; }
 
     /// \brief Determines the kind of overload choice this is.
     OverloadChoiceKind getKind() const {
-      if (DeclOrKind & 0x01)
-        return (OverloadChoiceKind)(DeclOrKind >> 1);
+      if (DeclOrKind & 0x01) {
+        uintptr_t value = DeclOrKind >> 1;
+        if (value >= (uintptr_t)OverloadChoiceKind::TupleIndex)
+          return OverloadChoiceKind::TupleIndex;
+
+        return (OverloadChoiceKind)value;
+      }
+      
       return OverloadChoiceKind::Decl;
     }
 
@@ -396,6 +415,13 @@ namespace {
     ValueDecl *getDecl() const {
       assert(getKind() == OverloadChoiceKind::Decl && "Not a declaration");
       return reinterpret_cast<ValueDecl *>(DeclOrKind);
+    }
+
+    /// \brief Retrieve the tuple index that corresponds to this overload
+    /// choice.
+    unsigned getTupleIndex() const {
+      assert(getKind() == OverloadChoiceKind::TupleIndex);
+      return (DeclOrKind >> 1) - (uintptr_t)OverloadChoiceKind::TupleIndex;
     }
   };
 
@@ -1140,7 +1166,7 @@ OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
                                  const Constraint *constraint,
                                  ArrayRef<OverloadChoice> choices) {
   unsigned size = sizeof(OverloadSet)
-  + sizeof(OverloadChoice) * choices.size();
+                + sizeof(OverloadChoice) * choices.size();
   void *mem = CS.getAllocator().Allocate(size, alignof(OverloadSet));
   return ::new (mem) OverloadSet(CS.assignOverloadSetID(), constraint,
                                  boundType, choices);
@@ -2829,6 +2855,21 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
     refType = FunctionType::get(choice.getBaseType(), choice.getBaseType(),
                                 getASTContext());
     break;
+
+  case OverloadChoiceKind::TupleIndex: {
+    TupleType *tupleTy;
+    auto lvalueTy = choice.getBaseType()->getAs<LValueType>();
+    if (lvalueTy)
+      tupleTy = lvalueTy->getObjectType()->castTo<TupleType>();
+    else
+      tupleTy = choice.getBaseType()->castTo<TupleType>();
+    refType = tupleTy->getElementType(choice.getTupleIndex());
+    if (lvalueTy && !refType->is<LValueType>()) {
+      refType = LValueType::get(refType, lvalueTy->getQualifiers(),
+                                getASTContext());
+    }
+    break;
+  }
   }
 
   // Add the type binding constraint.
@@ -2904,24 +2945,16 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
           Value < baseTuple->getFields().size())
         fieldIdx = Value;
     } else {
-      baseTuple->getNamedElementId(name);
+      fieldIdx = baseTuple->getNamedElementId(name);
     }
 
     if (fieldIdx == -1)
       return SolutionKind::Error;
 
-    // Determine the type of a reference to this tuple element.
-    auto fieldType = baseTuple->getElementType(fieldIdx);
-    // FIXME: What if we later find out that memberTy is an lvalue type?
-    // Do we have to worry about lvalue types of lvalue types forming?
-    if (!memberTy->is<LValueType>()) {
-      if (auto baseLv = baseTy->getAs<LValueType>()) {
-        fieldType = LValueType::get(fieldType, baseLv->getQualifiers(),
-                                    TC.Context);
-      }
-    }
-
-    addConstraint(ConstraintKind::Equal, fieldType, memberTy);
+    // Add an overload set that selects this field.
+    OverloadChoice choice(constraint.getFirstType(), fieldIdx);
+    addOverloadSet(OverloadSet::getNew(*this, memberTy, &constraint,
+                                       { &choice, 1 }));
     return SolutionKind::Solved;
   }
 
@@ -4202,9 +4235,26 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       auto ovl = CS.getGeneratedOverloadSet(expr);
       assert(ovl && "No overload set associated with decl reference expr?");
       auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
-      return buildMemberRef(expr->getBase(), expr->getDotLoc(),
-                            selected.first.getDecl(), expr->getNameLoc(),
-                            selected.second);
+
+      switch (selected.first.getKind()) {
+      case OverloadChoiceKind::Decl:
+        return buildMemberRef(expr->getBase(), expr->getDotLoc(),
+                              selected.first.getDecl(), expr->getNameLoc(),
+                              selected.second);
+
+      case OverloadChoiceKind::TupleIndex:
+        return new (CS.getASTContext()) TupleElementExpr(
+                                          expr->getBase(),
+                                          expr->getDotLoc(),
+                                          selected.first.getTupleIndex(),
+                                          expr->getNameLoc(),
+                                          CS.simplifyType(expr->getType()));
+
+      case OverloadChoiceKind::BaseType:
+      case OverloadChoiceKind::FunctionReturningBaseType:
+      case OverloadChoiceKind::IdentityFunction:
+        llvm_unreachable("Nonsensical overload choice");
+      }
     }
 
     Expr *visitSequenceExpr(SequenceExpr *expr) {
@@ -4800,6 +4850,10 @@ void ConstraintSystem::dump() {
           out << "identity " << choice.getBaseType()->getString() << " -> "
               << choice.getBaseType()->getString() << "\n";
           break;
+        case OverloadChoiceKind::TupleIndex:
+          out << "tuple " << choice.getBaseType()->getString() << " index "
+              << choice.getTupleIndex() << "\n";
+          break;
         }
       }
     }
@@ -4853,11 +4907,15 @@ void ConstraintSystem::dump() {
 
         case OverloadChoiceKind::FunctionReturningBaseType:
           out << "function returning base type "
-          << choice.getBaseType()->getString() << "\n";
+            << choice.getBaseType()->getString() << "\n";
           break;
         case OverloadChoiceKind::IdentityFunction:
           out << "identity " << choice.getBaseType()->getString() << " -> "
-          << choice.getBaseType()->getString() << "\n";
+            << choice.getBaseType()->getString() << "\n";
+          break;
+        case OverloadChoiceKind::TupleIndex:
+          out << "tuple " << choice.getBaseType()->getString() << " index "
+            << choice.getTupleIndex() << "\n";
           break;
         }
       }
