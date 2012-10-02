@@ -426,6 +426,7 @@ public:
       << " #decls=" << E->getDecls().size();
     for (ValueDecl *D : E->getDecls()) {
       OS << '\n';
+      OS.indent(Indent);
       OS << "  type=" << D->getTypeOfReference().getString();
     }
     OS << ')';
@@ -433,11 +434,11 @@ public:
   void visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *E) {
     printCommon(E, "overloadedmemberref_expr")
       << " name=" << E->getDecls()[0]->getName().str()
-      << "#decls=" << E->getDecls().size() << "\n"
-      << "base = ";
+      << " #decls=" << E->getDecls().size() << "\n";
     printRec(E->getBase());
     for (ValueDecl *D : E->getDecls()) {
       OS << '\n';
+      OS.indent(Indent);
       OS << "  type=" << D->getTypeOfReference().getString();
     }
     OS << ')';
