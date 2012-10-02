@@ -152,7 +152,9 @@ namespace {
     ValueMember,
     /// \brief The first type has a type member with the given name, and the
     /// type of that member, when referenced as a type, is the second type.
-    TypeMember
+    TypeMember,
+    /// \brief The first type must be an archetype.
+    Archetype
   };
 
   /// \brief Classification of the different kinds of constraints.
@@ -166,7 +168,11 @@ namespace {
 
     /// \brief A member constraint, which names a member of a type and assigns
     /// it a reference type.
-    Member
+    Member,
+
+    /// \brief An archetype constraint, which simply requires that the type
+    /// variable be bound to an archetype.
+    Archetype
   };
 
   /// \brief A constraint between two type variables.
@@ -223,6 +229,11 @@ namespace {
       case ConstraintKind::ValueMember:
         assert(!Member.empty() && "Member constraint has no member");
         break;
+
+      case ConstraintKind::Archetype:
+        assert(Member.empty() && "Archetype constraint cannot have a member");
+        assert(Second.isNull() && "Archetype constraint with second type");
+        break;
       }
     }
 
@@ -254,6 +265,9 @@ namespace {
       case ConstraintKind::ValueMember:
       case ConstraintKind::TypeMember:
         return ConstraintClassification::Member;
+
+      case ConstraintKind::Archetype:
+        return ConstraintClassification::Archetype;
       }
     }
 
@@ -325,6 +339,9 @@ namespace {
       case ConstraintKind::TypeMember:
         Out << "[." << Member.str() << ": type] == ";
         break;
+      case ConstraintKind::Archetype:
+        Out << " is an archetype";
+        return;
       }
 
       Second->print(Out);
@@ -745,6 +762,14 @@ namespace {
                                                    anchor));
     }
 
+    /// \brief Add an archetype constraint.
+    void addArchetypeConstraint(Type baseTy, Expr *anchor = nullptr) {
+      assert(baseTy);
+      Constraints.push_back(new (*this) Constraint(ConstraintKind::Archetype,
+                                                   baseTy, Type(), 
+                                                   Identifier(), anchor));
+    }
+
     /// \brief Retrieve the representative of the equivalence class containing
     /// this type variable.
     TypeVariableType *getRepresentative(TypeVariableType *typeVar) {
@@ -759,7 +784,7 @@ namespace {
           auto rep = getRepresentative(known->second);
 
           // Path compression: record the representative for this variable.
-          cs->Representatives[typeVar] = rep;
+          Representatives[typeVar] = rep;
           return rep;
         }
       }
@@ -1053,6 +1078,9 @@ namespace {
     /// \brief Attempt to simplify the given member constraint.
     SolutionKind simplifyMemberConstraint(const Constraint &constraint);
 
+    /// \brief Attempt to simplify the given archetype constraint.
+    SolutionKind simplifyArchetypeConstraint(const Constraint &constraint);
+
     /// \brief Simplify the given constaint.
     SolutionKind simplifyConstraint(const Constraint &constraint);
 
@@ -1344,6 +1372,33 @@ static Type adjustLValueForReference(Type type, bool isAssignment,
 }
 
 Type ConstraintSystem::getTypeOfReference(ValueDecl *value) {
+  if (auto proto = dyn_cast<ProtocolDecl>(value->getDeclContext())) {
+    // Unqualified lookup can find operator names within protocols.
+    auto func = cast<FuncDecl>(value);
+    assert(func->isOperator() && "Lookup should only find operators");
+
+    // Skip the 'this' metatype parameter. It's not used for deduction.
+    auto type = func->getTypeOfReference()->castTo<FunctionType>()->getResult();
+
+    // Find the archetype for 'This'. We'll be opening it.
+    auto thisArchetype
+      = proto->getThis()->getDeclaredType()->castTo<ArchetypeType>();
+    llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
+    type = adjustLValueForReference(openType(type, { &thisArchetype, 1 },
+                                             replacements),
+                                    func->getAttrs().isAssignment(),
+                                    TC.Context);
+
+    // The type variable to which 'This' was opened must be bound to an
+    // archetype.
+    // FIXME: We may eventually want to loosen this constraint, to allow us
+    // to find operator functions both in classes and in protocols to which
+    // a class conforms (if there's a default implementation).
+    addArchetypeConstraint(replacements[thisArchetype]);
+    
+    return type;
+  }
+
   // Determine the type of the value, opening up that type if necessary.
   return adjustLValueForReference(openType(value->getTypeOfReference()),
                                   value->getAttrs().isAssignment(),
@@ -3054,6 +3109,24 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   return SolutionKind::Solved;
 }
 
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyArchetypeConstraint(const Constraint &constraint) {
+  // Resolve the base type, if we can. If we can't resolve the base type,
+  // then we can't solve this constraint.
+  Type baseTy = constraint.getFirstType()->getRValueType();
+  if (auto tv = baseTy->getAs<TypeVariableType>()) {
+    auto fixed = getFixedType(tv);
+    if (!fixed)
+      return SolutionKind::Unsolved;
+
+    // Continue with the fixed type.
+    baseTy = fixed->getRValueType();
+  }
+
+  return baseTy->is<ArchetypeType>()? SolutionKind::TriviallySolved
+                                    : SolutionKind::Error;
+}
+
 /// \brief Retrieve the type-matching kind corresponding to the given
 /// constraint kind.
 static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
@@ -3072,6 +3145,9 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::ValueMember:
   case ConstraintKind::TypeMember:
     llvm_unreachable("Member constraints don't involve type matches");
+
+  case ConstraintKind::Archetype:
+    llvm_unreachable("Archetype constraints don't involve type matches");
   }
 }
 
@@ -3099,6 +3175,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::ValueMember:
   case ConstraintKind::TypeMember:
     return simplifyMemberConstraint(constraint);
+
+  case ConstraintKind::Archetype:
+    return simplifyArchetypeConstraint(constraint);
   }
 }
 
@@ -3141,6 +3220,9 @@ namespace {
 
         // Order by type vs. value member. Value members come first.
         return lhs->getKind() < rhs->getKind();
+
+      case ConstraintClassification::Archetype:
+        return false;
       }
     }
   };
@@ -3183,6 +3265,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
     case ConstraintKind::Literal:
     case ConstraintKind::ValueMember:
     case ConstraintKind::TypeMember:
+    case ConstraintKind::Archetype:
       // We don't care about the second type (or there isn't one).
       continue;
     }
@@ -3876,6 +3959,13 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs1,
             if (type1->isEqual(type2))
               continue;
 
+            // If either of the types still contains type variables, we can't
+            // compare them.
+            // FIXME: This is really unfortunate. More type variable sharing
+            // (when it's sane) would help us do much better here.
+            if (type1->hasTypeVariable() || type2->hasTypeVariable())
+              return SolutionCompareResult::Incomparable;
+
             // If one type is a subtype of the other, but not vice-verse,
             // we prefer the system with the more-constrained type.
             bool trivial = false;
@@ -4106,6 +4196,39 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return result;
     }
 
+    /// \brief Build a reference to an operator within a protocol.
+    Expr *buildProtocolOperatorRef(ProtocolDecl *proto, ValueDecl *value,
+                                   SourceLoc nameLoc, Type openedType) {
+      assert(isa<FuncDecl>(value) && "Only functions allowed");
+      assert(cast<FuncDecl>(value)->isOperator() && "Only operators allowed");
+
+      // Figure out the base type, which we do by finding the type variable
+      // in the open type that corresponds to the 'This' archetype, which
+      // we opened.
+      // FIXME: This is both inefficient and suspicious. We should probably
+      // find a place to cache the type variable, rather than searching for it
+      // again.
+      Type baseTy;
+      auto thisArchetype
+        = proto->getThis()->getDeclaredType()->castTo<ArchetypeType>();
+      CS.getTypeChecker().transformType(openedType, [&](Type type) -> Type {
+        if (auto typeVar = type->getAs<TypeVariableType>()) {
+          if (typeVar->getImpl().getArchetype() == thisArchetype) {
+            baseTy = CS.simplifyType(typeVar);
+            return nullptr;
+          }
+        }
+        
+        return type;
+      });
+      assert(baseTy && "Unable to find base type for protocol operator ref");
+      // FIXME: Check whether baseTy is an archetype?
+
+      auto &ctx = CS.getASTContext();
+      auto base = new (ctx) TypeOfExpr(nameLoc, MetaTypeType::get(baseTy, ctx));
+      return buildMemberRef(base, SourceLoc(), value, nameLoc, openedType);
+    }
+
   public:
     ExprRewriter(ConstraintSystem &CS) : CS(CS) { }
 
@@ -4136,14 +4259,21 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     // FIXME: Add specific entries for the various literal expressions.
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
-      // If the expression's type doesn't involve type variables, there is
-      // nothing to do.
       auto fromType = expr->getType();
+
+      if (auto proto
+            = dyn_cast<ProtocolDecl>(expr->getDecl()->getDeclContext())) {
+        // If this a member of a protocol, build an appropriate operator
+        // reference.
+        return buildProtocolOperatorRef(proto, expr->getDecl(), expr->getLoc(),
+                                        fromType);
+      }
 
       // Set the type of this expression to the actual type of the reference.
       expr->setType(expr->getDecl()->getTypeOfReference());
 
-      // If there is no variable in the original expression type, we're done.
+      // If there is no type variable in the original expression type, we're
+      // done.
       if (!fromType->hasTypeVariable())
         return expr;
 
@@ -4171,6 +4301,15 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
       auto choice = selected.first;
       auto decl = choice.getDecl();
+
+      if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+        // If this a member of a protocol, build an appropriate operator
+        // reference.
+        return buildProtocolOperatorRef(proto, decl, expr->getLoc(),
+                                          selected.second);
+      }
+
+      // Normal path: build a declaration reference.
       auto result = new (context) DeclRefExpr(decl, expr->getLoc(),
                                               decl->getTypeOfReference());
 
