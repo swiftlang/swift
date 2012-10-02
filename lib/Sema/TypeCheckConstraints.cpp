@@ -1986,6 +1986,21 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
                                    UnstructuredUnresolvedType::get(TC.Context));
         }
       }
+
+      if (auto dotIgnored = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr)) {
+        // A DotSyntaxCallExpr is a member reference that has already been
+        // type-checked down to a call where the argument doesn't actually
+        // matter; turn it back into an overloaded member reference expression.
+        SourceLoc memberLoc;
+        if (auto member = findReferencedDecl(dotIgnored->getRHS(), memberLoc)) {
+          auto base = skipImplicitConversions(dotIgnored->getLHS());
+          auto members
+            = TC.Context.AllocateCopy(ArrayRef<ValueDecl *>(&member, 1));
+          return new (TC.Context) OverloadedMemberRefExpr(base,
+                                    dotIgnored->getDotLoc(), members, memberLoc,
+                                    UnstructuredUnresolvedType::get(TC.Context));
+        }
+      }
       
       return expr;
     }
