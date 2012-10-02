@@ -724,20 +724,46 @@ namespace {
       return tv;
     }
 
+    /// \brief Add a newly-allocated constraint after attempting to simplify
+    /// it.
+    ///
+    /// \returns true if this constraint was solved.
+    bool addConstraint(Constraint *constraint) {
+      switch (simplifyConstraint(*constraint)) {
+      case SolutionKind::Error:
+        if (!failedConstraint) {
+          failedConstraint = constraint;
+          markUnsolvable();
+        }
+        return false;
+
+      case SolutionKind::TriviallySolved:
+      case SolutionKind::Solved:
+        // This constraint has already been solved; there is nothing more
+        // to do.
+        return true;
+
+      case SolutionKind::Unsolved:
+        // We couldn't solve this constraint; add it to the pile.
+        Constraints.push_back(constraint);
+        return false;
+      }
+    }
+
     /// \brief Add a constraint to the constraint system.
     void addConstraint(ConstraintKind kind, Type first, Type second,
                        Expr *anchor = nullptr) {
       assert(first && "Missing first type");
       assert(second && "Missing first type");
-      Constraints.push_back(new (*this) Constraint(kind, first, second,
-                                                   Identifier(), anchor));
+      addConstraint(new (*this) Constraint(kind, first, second, Identifier(),
+                                           anchor));
     }
 
     ///\ brief Add a literal constraint to the constraint system.
     void addLiteralConstraint(Type type, LiteralKind kind,
                               Expr *anchor = nullptr) {
       assert(type && "missing type for literal constraint");
-      Constraints.push_back(new (*this) Constraint(type, kind, anchor));
+      addConstraint(new (*this) Constraint(type, kind, anchor));
     }
 
     /// \brief Add a value member constraint to the constraint system.
@@ -746,9 +772,8 @@ namespace {
       assert(baseTy);
       assert(memberTy);
       assert(!name.empty());
-      Constraints.push_back(new (*this) Constraint(ConstraintKind::ValueMember,
-                                                   baseTy, memberTy, name,
-                                                   anchor));
+      addConstraint(new (*this) Constraint(ConstraintKind::ValueMember,
+                                           baseTy, memberTy, name, anchor));
     }
 
     /// \brief Add a type member constraint to the constraint system.
@@ -757,17 +782,16 @@ namespace {
       assert(baseTy);
       assert(memberTy);
       assert(!name.empty());
-      Constraints.push_back(new (*this) Constraint(ConstraintKind::ValueMember,
-                                                   baseTy, memberTy, name,
-                                                   anchor));
+      addConstraint(new (*this) Constraint(ConstraintKind::ValueMember,
+                                           baseTy, memberTy, name, anchor));
     }
 
     /// \brief Add an archetype constraint.
     void addArchetypeConstraint(Type baseTy, Expr *anchor = nullptr) {
       assert(baseTy);
-      Constraints.push_back(new (*this) Constraint(ConstraintKind::Archetype,
-                                                   baseTy, Type(), 
-                                                   Identifier(), anchor));
+      addConstraint(new (*this) Constraint(ConstraintKind::Archetype,
+                                           baseTy, Type(), Identifier(),
+                                           anchor));
     }
 
     /// \brief Retrieve the representative of the equivalence class containing
@@ -3501,26 +3525,11 @@ bool ConstraintSystem::simplify() {
       if (typeVarResolved.count(constraint))
         continue;
 
-      switch (simplifyConstraint(*constraint)) {
-      case SolutionKind::Error:
-        failedConstraint = constraint;
-        markUnsolvable();
-        return true;
-
-      case SolutionKind::TriviallySolved:
-        // Implicitly drop this solved constraint.
-        break;
-          
-      case SolutionKind::Solved:
-        // Implicitly drop this solved constraint.
+      if (addConstraint(constraint))
         solvedAny = true;
-        break;
 
-      case SolutionKind::Unsolved:
-        // Since this constraint was not solved, add it to the list of
-        // remaining constraints.
-        Constraints.push_back(constraint);
-        break;
+      if (failedConstraint) {
+        return true;
       }
     }
     existingConstraints.clear();
