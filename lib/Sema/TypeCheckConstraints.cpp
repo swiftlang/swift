@@ -366,17 +366,17 @@ namespace {
     /// \brief The base type to be used when referencing the declaration.
     Type Base;
 
-    /// \brief The kind of overload choice we're working with, along with
-    /// the declaration being selected (for an overload choice that picks a
-    /// declaration).
-    llvm::PointerIntPair<ValueDecl *, 2> ValueAndKind;
+    /// \brief Either the declaration pointer (if the low bit is clear) or the
+    /// overload choice kind shifted by 1 with the low bit set.
+    uintptr_t DeclOrKind;
 
   public:
-    OverloadChoice(Type base, ValueDecl *value)
-      : Base(base), ValueAndKind(value, (unsigned)OverloadChoiceKind::Decl) { }
+    OverloadChoice(Type base, ValueDecl *value) : Base(base) {
+      DeclOrKind = reinterpret_cast<uintptr_t>(value);
+    }
 
     OverloadChoice(Type base, OverloadChoiceKind kind)
-      : Base(base), ValueAndKind(nullptr, (unsigned)kind)
+      : Base(base), DeclOrKind((uintptr_t)kind << 1 | (uintptr_t)0x01)
     {
       assert(base && "Must have a base type for overload choice");
       assert(kind != OverloadChoiceKind::Decl && "wrong constructor for decl");
@@ -387,13 +387,15 @@ namespace {
 
     /// \brief Determines the kind of overload choice this is.
     OverloadChoiceKind getKind() const {
-      return (OverloadChoiceKind)ValueAndKind.getInt();
+      if (DeclOrKind & 0x01)
+        return (OverloadChoiceKind)(DeclOrKind >> 1);
+      return OverloadChoiceKind::Decl;
     }
 
     /// \brief Retrieve the declaraton that corresponds to this overload choice.
     ValueDecl *getDecl() const {
       assert(getKind() == OverloadChoiceKind::Decl && "Not a declaration");
-      return ValueAndKind.getPointer();
+      return reinterpret_cast<ValueDecl *>(DeclOrKind);
     }
   };
 
