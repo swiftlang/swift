@@ -19,6 +19,7 @@
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/SourceLoc.h"
@@ -545,14 +546,6 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ArchetypeMemberRef;
   }
-};
-
-/// Substitution - A substitution into a generic specialization.
-class Substitution {
-public:
-  ArchetypeType *Archetype;
-  Type Replacement;
-  ArrayRef<ProtocolConformance *> Conformance;
 };
 
 class GenericMemberRefExpr : public Expr {
