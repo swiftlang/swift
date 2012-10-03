@@ -142,16 +142,26 @@ class CaptureAnalysisVisitor : public ASTWalker {
     return true;
   }
 
+  void analyzeAssignmentLHS(Expr *E) {
+    if (ParenExpr *PE = dyn_cast<ParenExpr>(E)) {
+      analyzeAssignmentLHS(PE->getSubExpr());
+    } else if (TupleExpr *TE = dyn_cast<TupleExpr>(E)) {
+      for (Expr *Elem : TE->getElements())
+        analyzeAssignmentLHS(Elem);
+    } else if (ValueDecl *D = FindValueDecl(E)) {
+      if (D->getDeclContext()->isLocalContext())
+        D->setNeverUsedAsLValue(false);
+    } else {
+      E->walk(*this);
+    }
+  }
+
   bool walkToStmtPre(Stmt *S) {
     if (AssignStmt *AS = dyn_cast<AssignStmt>(S)) {
       // An assignment to a variable can't extend its lifetime.
-      if (ValueDecl *D = FindValueDecl(AS->getDest())) {
-        if (D->getDeclContext()->isLocalContext())
-          D->setNeverUsedAsLValue(false);
-
-        AS->getSrc()->walk(*this);
-        return false;
-      }
+      analyzeAssignmentLHS(AS->getDest());
+      AS->getSrc()->walk(*this);
+      return false;
     } else if (ForEachStmt *FES = dyn_cast<ForEachStmt>(S)) {
       // The normal ASTWalker walk doesn't examine everything we care about;
       // use a custom walk which does the right thing.
