@@ -19,7 +19,6 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "swift/AST/Decl.h"
-#include "GenProto.h"
 
 namespace swift {
 namespace irgen {
@@ -51,12 +50,30 @@ public:
   template <class... T>
   void addGenericFields(const GenericParamList &generics,
                         T &&...args) {
-    SmallVector<llvm::Type*, 4> signature;
-    expandPolymorphicSignature(IGM, generics, signature);
-    for (auto type : signature) {
-      asImpl().addGenericWitness(type, args...); // intentionally not forwarding
+    // Note that we intentionally don't forward the generic arguments.
+
+    // Add all the primary archetypes.
+    // TODO: only the *primary* archetypes.
+    // TODO: not archetypes from outer contexts.
+    for (auto archetype : generics.getAllArchetypes()) {
+      asImpl().addGenericArgument(archetype, args...);
+    }
+
+    // Add protocol witness tables for those archetypes.
+    for (auto archetype : generics.getAllArchetypes()) {
+      asImpl().beginGenericWitnessTables(archetype, args...);
+      for (auto protocol : archetype->getConformsTo()) {
+        asImpl().addGenericWitnessTable(archetype, protocol, args...);
+      }
+      asImpl().endGenericWitnessTables(archetype, args...);
     }
   }
+
+  template <class... T>
+  void beginGenericWitnessTables(ArchetypeType *type, T &&...args) {}
+
+  template <class... T>
+  void endGenericWitnessTables(ArchetypeType *type, T &&...args) {}
 };
 
 } // end namespace irgen

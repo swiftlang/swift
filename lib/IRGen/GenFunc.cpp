@@ -474,7 +474,7 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
     }
 
     if (auto polyTy = dyn_cast<PolymorphicFunctionType>(fnTy))
-      expandPolymorphicSignature(IGM, polyTy->getGenericParams(), argTypes);
+      expandPolymorphicSignature(IGM, polyTy, argTypes);
   }
 
   return CanType(fn->getResult());
@@ -730,7 +730,7 @@ namespace {
         IGF.emitRValueUnderSubstitutions(getArg(), CanType(fnType->getInput()),
                                          subs, out);
         if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType))
-          emitPolymorphicArguments(IGF, polyFn->getGenericParams(), subs, out);
+          emitPolymorphicArguments(IGF, polyFn, subs, out);
       } else {
         IGF.emitRValue(getArg(), out);
       }
@@ -2188,7 +2188,7 @@ void CallEmission::addArg(Expr *arg) {
 
     // FIXME: this doesn't handle instantiating at a generic type.
     if (auto polyFn = dyn_cast_or_null<PolymorphicFunctionType>(fnType))
-      emitPolymorphicArguments(IGF, polyFn->getGenericParams(), subs, argE);
+      emitPolymorphicArguments(IGF, polyFn, subs, argE);
 
   } else {
     IGF.emitRValue(arg, argE);
@@ -2449,7 +2449,7 @@ static void emitParameterClause(IRGenFunction &IGF, AnyFunctionType *fnType,
   // If the function type at this level is polymorphic, bind all the
   // archetypes.
   if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType))
-    emitPolymorphicParameters(IGF, polyFn->getGenericParams(), args);
+    emitPolymorphicParameters(IGF, polyFn, args);
 }
 
 /// Emit all the parameter clauses of the given function type.  This
@@ -2762,12 +2762,17 @@ namespace {
     void accumulatePolymorphicSignatureTypes(PolymorphicFunctionType *fn) {
       assert(fn->isCanonical());
       SmallVector<llvm::Type*, 4> types;
-      expandPolymorphicSignature(IGM, fn->getGenericParams(), types);
+      expandPolymorphicSignature(IGM, fn, types);
       assert(!types.empty());
       auto &witnessTablePtrTI = IGM.getWitnessTablePtrTypeInfo();
+      auto &typeMetadataPtrTI = IGM.getTypeMetadataPtrTypeInfo();
       for (auto type : types) {
-        assert(type == IGM.WitnessTablePtrTy); (void) type;
-        AllDataTypes.push_back(&witnessTablePtrTI);
+        if (type == IGM.TypeMetadataPtrTy) {
+          AllDataTypes.push_back(&typeMetadataPtrTI);
+        } else {
+          assert(type == IGM.WitnessTablePtrTy);
+          AllDataTypes.push_back(&witnessTablePtrTI);
+        }
       }
     }
 

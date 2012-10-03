@@ -59,6 +59,7 @@ class TypeConverter {
   const TypeInfo *FirstType;
   const ProtocolInfo *FirstProtocol;
   const TypeInfo *WitnessTablePtrTI = nullptr;
+  const TypeInfo *TypeMetadataPtrTI = nullptr;
 
   friend class GenProto;
 
@@ -87,6 +88,7 @@ public:
   ~TypeConverter();
   const TypeInfo &getFragileTypeInfo(CanType T);
   const TypeInfo &getFragileTypeInfo(ClassDecl *D);
+  const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
 };

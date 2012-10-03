@@ -24,7 +24,6 @@
 #include "llvm/Function.h"
 #include "llvm/GlobalVariable.h"
 
-#include "ClassMetadataLayout.h"
 #include "Explosion.h"
 #include "GenFunc.h"
 #include "GenMeta.h"
@@ -164,10 +163,6 @@ namespace {
   };
 }
 
-static void bindDestructorArchetypes(IRGenFunction &IGF, Address thisValue,
-                                     ClassDecl *CD,
-                                     const GenericParamList &generics);
-
 /// Emit the destructor for a class.
 ///
 /// \param DD - the optional explicit destructor declaration
@@ -189,9 +184,9 @@ static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
   // to destroy implicitly.
   assert((!DD || DD->getDeclContext() == CD) &&
          "destructor not defined in main class decl; archetypes might be off");
-  if (auto generics = CD->getGenericParamsOfContext()) {
+  if (CD->getGenericParamsOfContext()) {
     Address thisAsAddr = Address(thisValue, info.getHeapAlignment(IGF.IGM));
-    bindDestructorArchetypes(IGF, thisAsAddr, CD, *generics);
+    bindGenericClassArchetypes(IGF, thisAsAddr, CD);
   }
 
   // FIXME: If the class is generic, we need some way to get at the
@@ -350,70 +345,4 @@ const TypeInfo *TypeConverter::convertClassType(ClassDecl *D) {
   llvm::PointerType *irType = ST->getPointerTo();
   return new ClassTypeInfo(irType, IGM.getPointerSize(),
                            IGM.getPointerAlignment(), D);
-}
-
-
-namespace {
-  /// Really lame way of computing the offset of the metadata for a
-  /// destructor.
-  class DestructorMetadataDiscovery
-    : public ClassMetadataLayout<DestructorMetadataDiscovery> {
-
-    typedef ClassMetadataLayout<DestructorMetadataDiscovery> super;
-    IRGenFunction &IGF;
-    Address Metadata;
-    unsigned NextIndex = 0;
-    Explosion &Out;
-
-  public:
-    DestructorMetadataDiscovery(IRGenFunction &IGF, ClassDecl *theClass,
-                                Address metadata, Explosion &out)
-      : super(IGF.IGM, theClass), IGF(IGF), Metadata(metadata), Out(out) {}
-
-  public:
-    // Metadata header fields that we have to skip over.
-    void addMetadataFlags() { NextIndex++; }
-    void addValueWitnessTable() { NextIndex++; }
-    void addDestructorFunction() { NextIndex++; }
-    void addSizeFunction() { NextIndex++; }
-    void addNominalTypeDescriptor() { NextIndex++; }
-    void addParent() { NextIndex++; }
-    void addSuperClass() { NextIndex++; }
-    void addMethod(FunctionRef fn) { NextIndex++; }
-
-    void addGenericWitness(llvm::Type *witnessType, ClassDecl *forClass) {
-      // Ignore witnesses for base classes.
-      if (forClass != TargetClass) {
-        NextIndex++;
-        return;
-      }
-
-      // Otherwise, load this index.
-      Address elt = IGF.Builder.CreateConstArrayGEP(Metadata, NextIndex++,
-                                                    IGM.getPointerSize());
-      llvm::Value *wtable = IGF.Builder.CreateLoad(elt);
-      Out.addUnmanaged(wtable);
-    }
-  };
-}
-
-/// Bind the archetypes for this destructor declaration.
-static void bindDestructorArchetypes(IRGenFunction &IGF, Address thisValue,
-                                     ClassDecl *CD,
-                                     const GenericParamList &generics) {
-  // Reinterpret 'this' as a pointer to a table of witness tables.
-  llvm::Type *wtablePtrPtrPtrTy =
-    IGF.IGM.WitnessTablePtrTy->getPointerTo()->getPointerTo();
-
-  // Pull out that table of witness tables.
-  thisValue = IGF.Builder.CreateBitCast(thisValue, wtablePtrPtrPtrTy);
-  auto metadataPtr = IGF.Builder.CreateLoad(thisValue, "metadata");
-  Address metadata(metadataPtr, IGF.IGM.getPointerAlignment());
-
-  // Find the witnesses in the metadata.
-  Explosion witnesses(ExplosionKind::Maximal);
-  DestructorMetadataDiscovery(IGF, CD, metadata, witnesses).layout();
-
-  // Bind the archetypes.
-  emitPolymorphicParameters(IGF, generics, witnesses);
 }

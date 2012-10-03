@@ -810,10 +810,10 @@ namespace {
       : ConcreteMemberGetterSetterBase(target, numBaseValues, numIndexValues,
                                        thisSize) {}
 
-    void emitGenericArguments(IRGenFunction &IGF, Explosion &out) const {
-      auto &generics =
-        *getTarget()->getDeclContext()->getGenericParamsOfContext();
-      return emitPolymorphicArguments(IGF, generics,
+    void emitGenericArguments(CallEmission &emission, Explosion &out) const {
+      auto polyFn = cast<PolymorphicFunctionType>(
+                                   emission.getCallee().getOrigFormalType());
+      return emitPolymorphicArguments(emission.IGF, polyFn,
                                       getSubstitutions(),
                                       out);
     }
@@ -873,7 +873,7 @@ namespace {
                     getSubstitutions());
 
       // The generic arguments are bound at this level.
-      emitGenericArguments(emission.IGF, selfArg);
+      emitGenericArguments(emission, selfArg);
 
       emission.addArg(selfArg);
     }
@@ -904,8 +904,8 @@ namespace {
 
 #ifndef NDEBUG
       CanType origBaseType =
-        emission.getCallee().getOrigFormalType()
-          ->castTo<PolymorphicFunctionType>()->getInput()->getCanonicalType();
+        cast<PolymorphicFunctionType>(emission.getCallee().getOrigFormalType())
+          ->getInput()->getCanonicalType();
       assert(!differsByAbstractionInExplosion(emission.IGF.IGM,
                                               origBaseType,
                                               getSubstBaseType(),
@@ -915,7 +915,7 @@ namespace {
       selfArg.addUnmanaged(base.getAddress());
 
       // The generic arguments are bound at this level.
-      emitGenericArguments(emission.IGF, selfArg);
+      emitGenericArguments(emission, selfArg);
 
       emission.addArg(selfArg);
     }

@@ -17,7 +17,7 @@
 #ifndef SWIFT_IRGEN_GENPROTO_H
 #define SWIFT_IRGEN_GENPROTO_H
 
-#include <llvm/ADT/SetVector.h>
+#include "llvm/ADT/SetVector.h"
 
 namespace llvm {
   class Type;
@@ -31,7 +31,7 @@ namespace swift {
   class ExistentialMemberRefExpr;
   class ExistentialSubscriptExpr;
   class FuncDecl;
-  class GenericParamList;
+  class PolymorphicFunctionType;
 
 namespace irgen {
   class AbstractCallee;
@@ -104,21 +104,30 @@ namespace irgen {
   /// Add the witness arguments necessary for calling a function with
   /// the given generics clause.
   void expandPolymorphicSignature(IRGenModule &IGM,
-                                  const GenericParamList &generics,
+                                  PolymorphicFunctionType *type,
                                   SmallVectorImpl<llvm::Type*> &types);
 
   /// In the prelude of a generic function, perform the bindings for a
   /// generics clause.
   void emitPolymorphicParameters(IRGenFunction &IGF,
-                                 const GenericParamList &generics,
+                                 PolymorphicFunctionType *type,
                                  Explosion &args);
 
   /// When calling a polymorphic call, pass the arguments for the
   /// generics clause.
   void emitPolymorphicArguments(IRGenFunction &IGF,
-                                const GenericParamList &generics,
+                                PolymorphicFunctionType *type,
                                 ArrayRef<Substitution> subs,
                                 Explosion &args);
+
+  /// Emit a value-witness table for the given type, which is assumed
+  /// to be non-dependent.
+  llvm::Constant *emitValueWitnessTable(IRGenModule &IGM, CanType type);
+
+  /// Emit references to the witness tables for the substituted type
+  /// in the given substitution.
+  void emitWitnessTableRefs(IRGenFunction &IGF, const Substitution &sub,
+                            llvm::SmallVectorImpl<llvm::Value *> &out);
 
   void getValueWitnessTableElements(CanType T,
                                   llvm::SetVector<ArchetypeType*> &archetypes);

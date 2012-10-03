@@ -466,8 +466,11 @@ static void emitInjectionFunction(IRGenModule &IGM,
 
   Explosion explosion = IGF.collectParameters();
   OneOfDecl *ood = cast<OneOfDecl>(elt->getDeclContext());
-  if (ood->getGenericParams())
-    emitPolymorphicParameters(IGF, *ood->getGenericParams(), explosion);
+  if (ood->getGenericParamsOfContext()) {
+    auto polyFn =
+      cast<PolymorphicFunctionType>(elt->getType()->getCanonicalType());
+    emitPolymorphicParameters(IGF, polyFn, explosion);
+  }
   const OneofTypeInfo &oneofTI =
       IGM.getFragileTypeInfo(ood->getDeclaredTypeInContext()).as<OneofTypeInfo>();
   oneofTI.emitInjectionFunctionBody(IGF, elt, explosion);

@@ -43,6 +43,7 @@
 #include "FixedTypeInfo.h"
 #include "FunctionRef.h"
 #include "GenHeap.h"
+#include "GenMeta.h"
 #include "GenType.h"
 #include "IndirectTypeInfo.h"
 #include "IRGenFunction.h"
@@ -55,6 +56,10 @@
 
 using namespace swift;
 using namespace irgen;
+
+/// A special index into the IGF-stored witness tables list for an
+/// archetype for the metadata pointer.
+const unsigned MetadataWitnessKey = ~0U;
 
 namespace swift {
 namespace irgen {
@@ -87,6 +92,15 @@ namespace irgen {
     }
   };
 }
+}
+
+/// Given a type metadata pointer, load its value witness table.
+static llvm::Value *emitValueWitnessTableRefForMetadata(IRGenFunction &IGF,
+                                                        llvm::Value *metadata) {
+  assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
+  auto wtableSlot = IGF.Builder.CreateStructGEP(metadata, 1);
+  return IGF.Builder.CreateLoad(Address(wtableSlot,
+                                        IGF.IGM.getPointerAlignment()));
 }
 
 /// A fixed-size buffer is always 16 bytes and pointer-aligned.
@@ -945,6 +959,14 @@ namespace {
 
     ArrayRef<ProtocolEntry> getProtocols() const {
       return llvm::makeArrayRef(getProtocolsBuffer(), NumProtocols);
+    }
+
+    llvm::Value *getMetadataRef(IRGenFunction &IGF) const {
+      return GenProto::getArchetypeValueWitness(IGF, this, MetadataWitnessKey);
+    }
+
+    void setMetadataRef(IRGenFunction &IGF, llvm::Value *metadata) const {
+      GenProto::setArchetypeValueWitness(IGF, this, MetadataWitnessKey, metadata);
     }
 
     /// Return the witness table that's been set for this type.
@@ -2181,8 +2203,7 @@ namespace {
         forwardArgs(IGF, outerArgs, innerArg,
                     ArrayRef<Arg>(&Args[clauseBegin], clauseEnd - clauseBegin));
         if (auto polyFn = dyn_cast<PolymorphicFunctionType>(ImplTyAtUncurry[i]))
-          emitPolymorphicArguments(IGF, polyFn->getGenericParams(),
-                                   Substitutions, innerArg);
+          emitPolymorphicArguments(IGF, polyFn, Substitutions, innerArg);
       }
       for (unsigned i = innerArgs.size(); i != 0; --i)
         emission.addArg(innerArgs[i-1]);
@@ -2483,6 +2504,27 @@ getTrivialWitnessTable(IRGenModule &IGM, CanType concreteType,
   return table;
 }
 
+/// Emit a value-witness table for the given type, which is assumed to
+/// be non-dependent.
+llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
+                                             CanType concreteType) {
+  auto &concreteTI = IGM.getFragileTypeInfo(concreteType);
+  FixedPacking packing = computePacking(IGM, concreteTI);
+
+  SmallVector<llvm::Constant*, NumValueWitnesses> witnesses;
+  addValueWitnesses(IGM, packing, concreteType, concreteTI, witnesses);
+
+  auto tableTy = llvm::ArrayType::get(IGM.Int8PtrTy, witnesses.size());
+  auto table = llvm::ConstantArray::get(tableTy, witnesses);
+
+  auto addr = IGM.getAddrOfValueWitnessTable(concreteType, table->getType());
+  auto global = cast<llvm::GlobalVariable>(addr);
+  global->setConstant(true);
+  global->setInitializer(table);
+
+  return llvm::ConstantExpr::getBitCast(global, IGM.WitnessTablePtrTy);
+}
+
 /// Do a memoized witness-table layout for a protocol.
 const ProtocolInfo &IRGenModule::getProtocolInfo(ProtocolDecl *protocol) {
   return Types.getProtocolInfo(protocol);
@@ -2634,22 +2676,40 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *T) {
 
 /// Inform IRGenFunction that the given archetype has the given value
 /// witness value within this scope.
-void IRGenFunction::bindArchetype(ArchetypeType *type,
+void IRGenFunction::bindArchetype(ArchetypeType *archetype,
+                                  llvm::Value *metadata,
                                   ArrayRef<llvm::Value*> wtables) {
-  assert(wtables.size() >= 1);
-  auto &ti = getFragileTypeInfo(type).as<ArchetypeTypeInfo>();
+  auto &ti = getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
+
+  // Set the metadata pointer.
+  metadata->setName(archetype->getFullName());
+  ti.setMetadataRef(*this, metadata);
+
+  // Set the protocol witness tables.
+
+  assert(wtables.size() == ti.getProtocols().size());
   if (ti.getProtocols().empty()) {
-    ti.setValueWitnessTable(*this, wtables[0]);
+    // TODO: do this lazily.
+    auto wtable = emitValueWitnessTableRefForMetadata(*this, metadata);
+    wtable->setName(Twine(archetype->getFullName()) + "." + "value");
+    ti.setValueWitnessTable(*this, wtable);
   } else {
-    for (unsigned i = 0, e = ti.getProtocols().size(); i != e; ++i)
-      ti.setWitnessTable(*this, i, wtables[i]);
+    for (unsigned i = 0, e = ti.getProtocols().size(); i != e; ++i) {
+      auto &protoI = ti.getProtocols()[i];
+      auto wtable = wtables[i];
+      wtable->setName(Twine(archetype->getFullName()) + "." +
+                        protoI.getProtocol()->getName().str());
+      ti.setWitnessTable(*this, i, wtable);
+    }
   }
 }
 
 /// Perform all the bindings necessary to emit the given declaration.
 void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
-                                      const GenericParamList &generics,
+                                      PolymorphicFunctionType *type,
                                       Explosion &in) {
+  auto &generics = type->getGenericParams();
+
   // For now, treat all archetypes independently.
   // FIXME: Later, we'll want to emit only the minimal set of archetypes,
   // because non-primary archetypes (which correspond to associated types)
@@ -2659,36 +2719,21 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
     auto &archetypeTI =
       IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
 
+    auto metadata = in.claimUnmanagedNext();
+
     // Find the protocols the parameter implements.
-    auto protocols = archetypeTI.getProtocols();
+    SmallVector<llvm::Value*, 4> wtables;
+    in.claimUnmanaged(archetypeTI.getProtocols().size(), wtables);
 
-    // Even if there are no formal protocols, we always have at least
-    // one witness table so that we can use the type parameter as a
-    // value type.
-    if (protocols.empty()) {
-      llvm::Value *wtable = in.claimUnmanagedNext();
-      wtable->setName(archetype->getFullName());
-      archetypeTI.setValueWitnessTable(IGF, wtable);
-      continue;
-    }
-
-    // Otherwise, set all the protocol witnesses.
-    for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-      llvm::Value *wtable = in.claimUnmanagedNext();
-      wtable->setName(Twine(archetype->getFullName()) + "." +
-                        protocols[i].getProtocol()->getName().str());
-      archetypeTI.setWitnessTable(IGF, i, wtable);
-    }
+    IGF.bindArchetype(archetype, metadata, wtables);
   }
 }
 
 /// Emit a reference to the metadata object for an archetype.
 llvm::Value *irgen::emitArchetypeMetadataRef(IRGenFunction &IGF,
                                              ArchetypeType *type) {
-  // This should be easy to implement once we start passing metadata
-  // instead of value witnesses.
-  IGF.unimplemented(SourceLoc(), "metadata reference to archetype");
-  return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+  auto &archetypeTI = IGF.getFragileTypeInfo(type).as<ArchetypeTypeInfo>();
+  return archetypeTI.getMetadataRef(IGF);
 }
 
 void irgen::getValueWitnessTableElements(CanType T,
@@ -2731,11 +2776,52 @@ void irgen::setValueWitnessTables(IRGenFunction &IGF,
   }
 }
 
+/// Emit the witness table references required for the given type
+/// substitution.
+void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
+                                 const Substitution &sub,
+                                 SmallVectorImpl<llvm::Value*> &out) {
+  // We don't need to do anything if we have no protocols to conform to.
+  auto archetypeProtos = sub.Archetype->getConformsTo();
+  if (archetypeProtos.empty()) return;
+
+  // Look at the replacement type.
+  CanType replType = sub.Replacement->getCanonicalType();
+  auto &replTI = IGF.getFragileTypeInfo(replType);
+
+  // If it's an archetype, we'll need to grab from the local context.
+  if (isa<ArchetypeType>(replType)) {
+    auto &archTI = replTI.as<ArchetypeTypeInfo>();
+
+    for (auto proto : archetypeProtos) {
+      ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
+      auto wtable = archTI.getWitnessTable(IGF, path.getOriginIndex());
+      wtable = path.apply(IGF, wtable);
+      out.push_back(wtable);
+    }
+    return;
+  }
+
+  // Otherwise, we can construct the witnesses from the protocol
+  // conformances.
+  assert(archetypeProtos.size() == sub.Conformance.size());
+  for (unsigned j = 0, je = archetypeProtos.size(); j != je; ++j) {
+    auto proto = archetypeProtos[j];
+    auto &protoI = IGF.IGM.getProtocolInfo(proto);
+    auto &confI = protoI.getConformance(IGF.IGM, replType, replTI, proto,
+                                        *sub.Conformance[j]);
+
+    llvm::Value *wtable = confI.getTable(IGF);
+    out.push_back(wtable);
+  }
+}
+
 /// Pass all the arguments necessary for the given function.
 void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
-                                     const GenericParamList &generics,
+                                     PolymorphicFunctionType *polyFn,
                                      ArrayRef<Substitution> subs,
                                      Explosion &out) {
+  auto &generics = polyFn->getGenericParams();
   assert(generics.getAllArchetypes().size() == subs.size());
   
   // For now, treat all archetypes independently.
@@ -2746,23 +2832,23 @@ void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
   for (const auto &sub : subs) {
     auto archetype = sub.Archetype;
     auto archetypeProtos = archetype->getConformsTo();
-    CanType typeArg = sub.Replacement->getCanonicalType();
-    auto &argTI = IGF.getFragileTypeInfo(typeArg);
+    CanType argType = sub.Replacement->getCanonicalType();
+    auto &argTI = IGF.getFragileTypeInfo(argType);
 
-    // If the type argument is an archetype (FIXME: or is *dependent*
-    // on an archetype!), we can gather the protocol witnesses from
-    // that.
-    if (typeArg->is<ArchetypeType>()) {
+    // If the type argument is an archetype, we can gather the
+    // protocol witnesses from that.
+    if (argType->is<ArchetypeType>()) {
       auto &archTI = argTI.as<ArchetypeTypeInfo>();
-      if (archetypeProtos.empty()) {
-        out.addUnmanaged(archTI.getValueWitnessTable(IGF));
-      } else {
-        for (auto proto : archetypeProtos) {
-          ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
-          auto wtable = archTI.getWitnessTable(IGF, path.getOriginIndex());
-          wtable = path.apply(IGF, wtable);
-          out.addUnmanaged(wtable);
-        }
+
+      // Add the metadata reference.
+      out.addUnmanaged(archTI.getMetadataRef(IGF));
+
+      // Add witness tables for each of the required protocols.
+      for (auto proto : archetypeProtos) {
+        ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
+        auto wtable = archTI.getWitnessTable(IGF, path.getOriginIndex());
+        wtable = path.apply(IGF, wtable);
+        out.addUnmanaged(wtable);
       }
       continue;
     }
@@ -2772,43 +2858,35 @@ void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
     // Or, well, at least we can do this for the value witnesses.
     // Hopefully the type-checker won't let these through for protocols
     // that aren't theoretically sound?
-    assert(archetypeProtos.empty() || !typeArg->isExistentialType());
+    assert(archetypeProtos.empty() || !argType->isExistentialType());
 
     // Okay, we have a concrete type.
 
-    FixedPacking packing = computePacking(IGF.IGM, argTI);
+    // Add the metadata reference.
+    out.addUnmanaged(emitTypeMetadataRef(IGF, argType));
 
-    // If we just need value witnesses, go ahead and build those.
-    if (archetypeProtos.empty()) {
-      auto wtable = getTrivialWitnessTable(IGF.IGM, typeArg, argTI, packing);
-      out.addUnmanaged(wtable);
+    // Fast path: we don't need protocol witnesses.
+    if (archetypeProtos.empty())
       continue;
-    }
 
-    // Otherwise, we can construct the witnesses from the protocol
-    // conformances.
-    assert(archetypeProtos.size() == sub.Conformance.size());
-    for (unsigned j = 0, je = archetypeProtos.size(); j != je; ++j) {
-      auto proto = archetypeProtos[j];
-      auto &protoI = IGF.IGM.getProtocolInfo(proto);
-      auto &confI = protoI.getConformance(IGF.IGM, typeArg, argTI, proto,
-                                          *sub.Conformance[j]);
-
-      llvm::Value *wtable = confI.getTable(IGF);
+    SmallVector<llvm::Value*, 4> wtables;
+    emitWitnessTableRefs(IGF, sub, wtables);
+    for (auto wtable : wtables)
       out.addUnmanaged(wtable);
-    }                                         
   }
 }
 
 /// Given a generic signature, add the argument types required in order to call it.
 void irgen::expandPolymorphicSignature(IRGenModule &IGM,
-                                       const GenericParamList &generics,
+                                       PolymorphicFunctionType *polyFn,
                                        SmallVectorImpl<llvm::Type*> &out) {
+  auto &generics = polyFn->getGenericParams();
   for (auto archetype : generics.getAllArchetypes()) {
-    // For now, pass each signature requirement separately.  We always
-    // need to pass at least one witness table in order to know how to
-    // manipulate the type.
-    unsigned n = std::max(unsigned(archetype->getConformsTo().size()), 1U);
+    // Pass the type argument.
+    out.push_back(IGM.TypeMetadataPtrTy);
+
+    // For now, pass each signature requirement separately.
+    unsigned n = unsigned(archetype->getConformsTo().size());
     while (n--) out.push_back(IGM.WitnessTablePtrTy);
   }
 }

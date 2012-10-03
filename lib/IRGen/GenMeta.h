@@ -47,7 +47,7 @@ namespace irgen {
   void emitMetaTypeRef(IRGenFunction &IGF, Type type, Explosion &explosion);
 
   /// Emit a reference to a piece of type metadata.
-  llvm::Value *emitTypeMetadataRef(IRGenFunction &IGF, Type type);
+  llvm::Value *emitTypeMetadataRef(IRGenFunction &IGF, CanType type);
 
   /// Emit the metadata associated with the given class declaration.
   void emitClassMetadata(IRGenModule &IGM, ClassDecl *theClass,
@@ -56,6 +56,10 @@ namespace irgen {
   /// Emit the metadata associated with the given struct declaration.
   void emitStructMetadata(IRGenModule &IGM, StructDecl *theStruct);
 
+  /// When entering a member function of a generic class, bind
+  /// archetypes from the 'this' pointer.
+  void bindGenericClassArchetypes(IRGenFunction &IGF, Address thisAddr,
+                                  ClassDecl *CD);
 
 } // end namespace irgen
 } // end namespace swift

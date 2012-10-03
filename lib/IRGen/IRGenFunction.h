@@ -350,7 +350,9 @@ public:
 
   llvm::Function *getAddrOfLocalFunction(FunctionRef func);
 
-  void bindArchetype(ArchetypeType *type, ArrayRef<llvm::Value*> wtables);
+  void bindArchetype(ArchetypeType *type,
+                     llvm::Value *metadata,
+                     ArrayRef<llvm::Value*> wtables);
 
   void emitConstructorBody(ConstructorDecl *CD);
 

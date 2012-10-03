@@ -139,6 +139,7 @@ public:
   const TypeInfo &getFragileTypeInfo(CanType T);
   const TypeInfo &getFragileTypeInfo(Type T);
   const TypeInfo &getWitnessTablePtrTypeInfo();
+  const TypeInfo &getTypeMetadataPtrTypeInfo();
   llvm::Type *getFragileType(CanType T);
   llvm::StructType *createNominalType(TypeDecl *D);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
@@ -211,6 +212,7 @@ public:
 
   void emitTranslationUnit(TranslationUnit *TU, unsigned StartElem);
 
+  void emitProtocolDecl(ProtocolDecl *D);
   void emitOneOfDecl(OneOfDecl *D);
   void emitStructDecl(StructDecl *D);
   void emitClassDecl(ClassDecl *D);
@@ -239,7 +241,8 @@ public:
   Address getAddrOfWitnessTableOffset(VarDecl *field);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
                                         ValueWitness index);
-  llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType);
+  llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
+                                             llvm::Type *definitionType = nullptr);
   llvm::Function *getAddrOfConstructor(ConstructorDecl *D, ExplosionKind kind);
   llvm::Function *getAddrOfDestructor(ClassDecl *D);
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,

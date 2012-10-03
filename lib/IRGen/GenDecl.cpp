@@ -336,7 +336,7 @@ llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
       return cast<llvm::GlobalVariable>(existing);
 
     IGM.error(SourceLoc(),
-              "program too clever: function collides with existing symbol "
+              "program too clever: variable collides with existing symbol "
                 + getName());
 
     // Note that this will implicitly unique if the .unique name is also taken.
@@ -359,8 +359,7 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::Protocol:
-    // FIXME: Will want to emit metadata, eventually.
-    return;
+    return IGM.emitProtocolDecl(cast<ProtocolDecl>(D));
       
   case DeclKind::PatternBinding:
     emitPatternBindingDecl(cast<PatternBindingDecl>(D));
@@ -532,6 +531,59 @@ llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
   return entry;
 }
 
+/// Get or create a llvm::GlobalVariable.
+///
+/// If a definition type is given, the result will always be an
+/// llvm::GlobalVariable of that type.  Otherwise, the result will
+/// have type pointerToDefaultType and may involve bitcasts.
+static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
+                     llvm::DenseMap<LinkEntity, llvm::GlobalVariable*> &globals,
+                                             LinkEntity entity,
+                                             llvm::Type *definitionType,
+                                             llvm::Type *defaultType,
+                                             llvm::Type *pointerToDefaultType) {
+  auto &entry = globals[entity];
+  if (entry) {
+    // If we're looking to define something, we may need to replace a
+    // forward declaration.
+    if (definitionType) {
+      assert(entry->getType() == pointerToDefaultType);
+
+      // If the type is right, we're done.
+      if (definitionType == defaultType)
+        return entry;
+
+      // Fall out to the case below, clearing the name so that
+      // createVariable doesn't detect a collision.
+      entry->setName("");
+
+    // Otherwise, we have a previous declaration or definition which
+    // we need to ensure has the right type.
+    } else {
+      return llvm::ConstantExpr::getBitCast(entry, pointerToDefaultType);
+    }
+  }
+
+  // If we're not defining the object now
+  if (!definitionType) definitionType = defaultType;
+
+  // Create the variable.
+  LinkInfo link = LinkInfo::get(IGM, entity);
+  auto var = link.createVariable(IGM, definitionType);
+
+  // If we have an existing entry, destroy it, replacing it with the
+  // new variable.
+  if (entry) {
+    auto castVar = llvm::ConstantExpr::getBitCast(var, pointerToDefaultType);
+    entry->replaceAllUsesWith(castVar);
+    entry->eraseFromParent();
+  }
+
+  // Cache and return.
+  entry = var;
+  return var;
+}
+
 /// Fetch the declaration of the metadata (or metadata template) for a
 /// class.  If the definition type is specified, the result will
 /// always be a GlobalVariable of the given type.
@@ -544,46 +596,9 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   LinkEntity entity =
     LinkEntity::forTypeMetadata(concreteType, isIndirect, isPattern);
 
-  // Check whether we've cached this.
-  llvm::GlobalVariable *&entry = GlobalVars[entity];
-  if (entry) {
-    // If we're looking to define something, we may need to replace a
-    // forward declaration.
-    if (storageType) {
-      assert(entry->getType() == TypeMetadataPtrTy);
-
-      // If the type is right, we're done.
-      if (storageType == TypeMetadataStructTy)
-        return entry;
-
-      // Fall out to the case below.
-
-    // Otherwise, we have a previous declaration or definition which
-    // we need to ensure has the right type.
-    } else {
-      return llvm::ConstantExpr::getBitCast(entry, TypeMetadataPtrTy);
-    }
-  }
-
-  // If we're not defining the metadata now, use the generic metadata
-  // struct type as the storage type for the external declaration.
-  if (!storageType) storageType = TypeMetadataStructTy;
-
-  // Build the variable.
-  LinkInfo link = LinkInfo::get(*this, entity);
-  auto var = link.createVariable(*this, storageType);
-
-  // If we have an existing entry, destroy it, replacing it with the
-  // new variable.
-  if (entry) {
-    auto castVar = llvm::ConstantExpr::getBitCast(var, TypeMetadataPtrTy);
-    entry->replaceAllUsesWith(castVar);
-    entry->eraseFromParent();
-  }
-
-  // Update the entry and return.
-  entry = var;
-  return var;
+  return getAddrOfLLVMVariable(*this, GlobalVars, entity,
+                               storageType, TypeMetadataStructTy,
+                               TypeMetadataPtrTy);
 }
 
 /// Fetch the declaration of the given known function.
@@ -622,23 +637,16 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(CanType concreteType,
   return entry;
 }
 
-/// Returns the address of a value-witness table.
-llvm::Constant *IRGenModule::getAddrOfValueWitnessTable(CanType concreteType) {
+/// Returns the address of a value-witness table.  If a definition
+/// type is provided, the table is created with that type; the return
+/// value will be an llvm::GlobalVariable.  Otherwise, the result will
+/// have type WitnessTablePtrTy.
+llvm::Constant *IRGenModule::getAddrOfValueWitnessTable(CanType concreteType,
+                                                  llvm::Type *definitionType) {
   LinkEntity entity = LinkEntity::forValueWitnessTable(concreteType);
-
-  llvm::GlobalVariable *&entry = GlobalVars[entity];
-  if (entry) return entry;
-
-  // Find the appropriate function type.
-  LinkInfo link = LinkInfo::get(*this, entity);
-  auto variable = link.createVariable(*this, WitnessTableTy);
-  variable->setConstant(true);
-
-  // Cache and return.
-  entry = variable;
-  return variable;
+  return getAddrOfLLVMVariable(*this, GlobalVars, entity, definitionType,
+                               WitnessTableTy, WitnessTablePtrTy);
 }
-
 
 static CanType addOwnerArgument(ASTContext &ctx, DeclContext *DC,
                                 CanType resultType) {
