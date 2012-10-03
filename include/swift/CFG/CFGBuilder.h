@@ -119,6 +119,11 @@ public:
     return insert(new LoadInst(Expr, LV));
   }
 
+  StoreInst *createStore(AssignStmt *S, CFGValue Src, CFGValue DestLValue) {
+    return insert(new StoreInst(S, Src, DestLValue));
+  }
+
+
   MaterializeInst *createMaterialize(MaterializeExpr *Expr, CFGValue LV) {
     return insert(new MaterializeInst(Expr, LV));
   }

@@ -108,6 +108,10 @@ public:
   void visitLoadInst(LoadInst *LI) {
     OS << "load " << getID(LI->getLValue());
   }
+  void visitStoreInst(StoreInst *SI) {
+    OS << "store " << getID(SI->getSrc()) << " -> "
+       << getID(SI->getDestLValue());
+  }
   void visitMaterializeInst(MaterializeInst *MI) {
     OS << "materialize " << getID(MI->getOperand());
   }

@@ -115,6 +115,7 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   case InstKind::DeclRef:
   case InstKind::IntegerLiteral:
   case InstKind::Load:
+  case InstKind::Store:
   case InstKind::Materialize:
   case InstKind::Requalify:
   case InstKind::ScalarToTuple:

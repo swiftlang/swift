@@ -25,6 +25,7 @@ namespace Lowering {
   class Condition;
 
 class LLVM_LIBRARY_VISIBILITY CFGGen : public ASTVisitor<CFGGen, CFGValue> {
+public:
   /// The CFG being constructed.
   CFG &C;
   
@@ -37,6 +38,7 @@ class LLVM_LIBRARY_VISIBILITY CFGGen : public ASTVisitor<CFGGen, CFGValue> {
 
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
+
 public:
   CFGGen(CFG &C)
     : C(C), B(new (C) BasicBlock(&C), C), Cleanups(*this) {
@@ -82,10 +84,8 @@ public:
   /// SemiStmts are ignored for CFG construction.
   void visitSemiStmt(SemiStmt *S) {}
   
-  void visitAssignStmt(AssignStmt *S) {
-    assert(false && "Not yet implemented");
-  }
-  
+  void visitAssignStmt(AssignStmt *S);
+
   void visitReturnStmt(ReturnStmt *S) {
     // FIXME: Should use empty tuple for "void" return.
     CFGValue ArgV = S->hasResult() ? visit(S->getResult()) : (Instruction*) 0;

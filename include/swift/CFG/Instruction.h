@@ -32,6 +32,7 @@ class Type;
 class CFG;
 class BasicBlock;
 class ApplyExpr;
+class AssignStmt;
 class DeclRefExpr;
 class IntegerLiteralExpr;
 class LoadExpr;
@@ -146,8 +147,7 @@ public:
   }
 };
 
-/// Represents a reference to a declaration, essentially evaluating to
-/// its lvalue.
+/// Represents a reference to a declaration, evaluating to its lvalue.
 class DeclRefInst : public Instruction {
 public:
 
@@ -214,8 +214,34 @@ public:
   }
 };
 
+class StoreInst : public Instruction {
+  /// The value being stored and the lvalue being stored to.
+  CFGValue Src, DestLValue;
+
+  /// IsInitialization - True if this is the initialization of a memory location
+  /// that is uninitialized, not a general store.  In an initialization of an
+  /// ARC'd pointer (for example), the old value is not released.
+  bool IsInitialization;
+public:
+
+  StoreInst(AssignStmt *S, CFGValue Src, CFGValue DestLValue)
+  : Instruction(InstKind::Store, (Stmt*)S), Src(Src), DestLValue(DestLValue),
+    IsInitialization(false) {
+  }
+
+  CFGValue getSrc() const { return Src; }
+  CFGValue getDestLValue() const { return DestLValue; }
+
+  bool isInitialization() const { return IsInitialization; }
+
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::Store;
+  }
+};
+
 /// MaterializeInst - Turn an r-value into an l-value by placing it in
 /// temporary memory.
+/// FIXME: Eliminate this in preference to using alloc_temp.
 /// FIXME: Need a new "implicit conversion instruction" base class.
 class MaterializeInst : public Instruction {
   CFGValue Operand;
