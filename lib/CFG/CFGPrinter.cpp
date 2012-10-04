@@ -203,9 +203,9 @@ ID CFGPrinter::getID(const BasicBlockArg *BBArg) {
 }
 
 ID CFGPrinter::getID(CFGValue Val) {
-  if (const Instruction *Inst = Val.dyn_cast<Instruction*>())
+  if (const Instruction *Inst = Val.getInstOrNull())
     return getID(Inst);
-  return getID(Val.get<BasicBlockArg*>());
+  return getID(Val.getBBArg());
 }
 
 //===----------------------------------------------------------------------===//

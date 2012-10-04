@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the CFGType class.
+// This file defines the CFGValue class.
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,8 +24,29 @@ namespace swift {
   class Instruction;
   class BasicBlockArg;
 
-  // TODO: Expand out to a class.
-  typedef llvm::PointerUnion<Instruction*, BasicBlockArg*> CFGValue;
+  /// CFGValue - This class is a value that can be used as an "operand" to an
+  /// instruction.  It is either a reference to another instruction, or an
+  /// incoming basic block argument.
+  class CFGValue {
+    llvm::PointerUnion<Instruction*, BasicBlockArg*> V;
+  public:
+    explicit CFGValue() : V() {}
+    CFGValue(Instruction *I) : V(I) { assert(I); }
+    CFGValue(BasicBlockArg *A) : V(A) { assert(A); }
+
+    bool isNull() const { return V.isNull(); }
+    bool isInstruction() const { return V.is<Instruction*>(); }
+    bool isBasicBlockArg() const { return V.is<BasicBlockArg*>(); }
+
+    Instruction *getInst() const { return V.get<Instruction*>(); }
+    BasicBlockArg *getBBArg() const { return V.get<BasicBlockArg*>(); }
+
+    Instruction *getInstOrNull() const { return V.dyn_cast<Instruction*>(); }
+    BasicBlockArg *getBBArgOrNull() const {return V.dyn_cast<BasicBlockArg*>();}
+
+    //CFGType getType() const;
+
+  };
 } // end namespace swift
 
 #endif

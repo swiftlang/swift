@@ -58,14 +58,14 @@ public:
   }
   
   void visitReturnInst(ReturnInst *RI) {
-    assert(RI->getReturnValue() && "Return of null value is invalid");
+    assert(!RI->getReturnValue().isNull() && "Return of null value is invalid");
   }
   
   void visitBranchInst(BranchInst *BI) {
   }
   
   void visitCondBranchInst(CondBranchInst *CBI) {
-    assert(CBI->getCondition() &&
+    assert(!CBI->getCondition().isNull() &&
            "Condition of conditional branch can't be missing");
   }
 };
