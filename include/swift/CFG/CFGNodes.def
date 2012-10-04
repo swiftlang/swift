@@ -38,12 +38,15 @@
 #define INST_RANGE(Id, First, Last)
 #endif
 
+ABSTRACT_INST(Alloc, Instruction)
+  INST(AllocVar, AllocInst)
+  INST(AllocTmp, AllocInst)
+  INST_RANGE(Alloc, AllocVar, AllocTmp)
 INST(Apply, Instruction)
 INST(DeclRef, Instruction)
 INST(IntegerLiteral, Instruction)
 INST(Load, Instruction)
 INST(Store, Instruction)
-INST(Materialize, Instruction)
 INST(Requalify, Instruction)
 INST(Tuple, Instruction)
 INST(TypeOf, Instruction)

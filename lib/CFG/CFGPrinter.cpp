@@ -84,6 +84,14 @@ public:
     assert(0 && "CFGPrinter not implemented for this instruction!");
   }
 
+  void visitAllocVarInst(AllocVarInst *AVI) {
+    OS << "alloc_var";
+  }
+
+  void visitAllocTmpInst(AllocTmpInst *ATI) {
+    OS << "alloc_tmp";
+  }
+
   void visitApplyInst(ApplyInst *AI) {
     OS << "apply " << getID(AI->getCallee()) << '(';
     bool first = true;
@@ -111,9 +119,6 @@ public:
   void visitStoreInst(StoreInst *SI) {
     OS << "store " << getID(SI->getSrc()) << " -> "
        << getID(SI->getDestLValue());
-  }
-  void visitMaterializeInst(MaterializeInst *MI) {
-    OS << "materialize " << getID(MI->getOperand());
   }
   void visitRequalifyInst(RequalifyInst *RI) {
     OS << "requalify " << getID(RI->getOperand());

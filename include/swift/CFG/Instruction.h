@@ -113,6 +113,43 @@ public:
   static bool classof(const Instruction *I) { return true; }
 };
 
+
+/// AllocInst - This is the abstract base class common among all the memory
+/// allocation mechanisms.  This can allocate heap or stack memory.
+class AllocInst : public Instruction {
+// Eventually: enum AllocKind { Heap, Stack, StackNoRefCount, Pseudo };
+
+protected:
+  AllocInst(InstKind Kind, CFGLocation Loc) : Instruction(Kind, Loc) {}
+public:
+
+};
+
+
+/// AllocVarInst - This represents the allocation of a local variable due to a
+/// 'var' declaration.  A single var declaration may allocate multiple different
+/// CFG variables at once through its pattern.  One of these will be created
+/// for each variable in something like "var (x,y) : (Int, Int)".
+class AllocVarInst : public AllocInst {
+public:
+  AllocVarInst(); // : AllocInst(AllocVar, ?)
+};
+
+/// AllocTmpInst - This represents the allocation of a temporary variable due to a
+/// a MaterializeExpr.  This occurs when an rvalue needs to be converted to an
+/// l-value, for example to be the receiver of a dot-syntax method call.
+///
+/// The initial value for the temp will be provided by an initalization-style
+/// store to the temporary.
+class AllocTmpInst : public AllocInst {
+public:
+
+  AllocTmpInst(MaterializeExpr *E) : AllocInst(InstKind::AllocTmp, (Expr*)E) {}
+
+  
+};
+
+
 /// ApplyInst - Represents application of an argument to a function.
 class ApplyInst : public Instruction {
   /// The instruction representing the called function.
@@ -225,8 +262,13 @@ class StoreInst : public Instruction {
 public:
 
   StoreInst(AssignStmt *S, CFGValue Src, CFGValue DestLValue)
-  : Instruction(InstKind::Store, (Stmt*)S), Src(Src), DestLValue(DestLValue),
-    IsInitialization(false) {
+    : Instruction(InstKind::Store, (Stmt*)S), Src(Src), DestLValue(DestLValue),
+      IsInitialization(false) {
+  }
+
+  StoreInst(MaterializeExpr *E, CFGValue Src, CFGValue DestLValue)
+    : Instruction(InstKind::Store, (Expr*)E), Src(Src), DestLValue(DestLValue),
+      IsInitialization(true) {
   }
 
   CFGValue getSrc() const { return Src; }
@@ -238,20 +280,6 @@ public:
     return I->getKind() == InstKind::Store;
   }
 };
-
-/// MaterializeInst - Turn an r-value into an l-value by placing it in
-/// temporary memory.
-/// FIXME: Eliminate this in preference to using alloc_temp.
-/// FIXME: Need a new "implicit conversion instruction" base class.
-class MaterializeInst : public Instruction {
-  CFGValue Operand;
-public:
-  MaterializeInst(MaterializeExpr *E, CFGValue Operand)
-    : Instruction(InstKind::Materialize, (Expr*)E), Operand(Operand) {}
-
-  CFGValue getOperand() const { return Operand; }
-};
-
 
 /// RequalifyInst - Change the qualification on an l-value.  The new
 /// type always has the same object type as the old type with strictly
@@ -335,8 +363,9 @@ public:
 
 /// This class defines a "terminating instruction" for a BasicBlock.
 class TermInst : public Instruction {
-public:
+protected:
   TermInst(InstKind K, CFGLocation Loc) : Instruction(K, Loc) {}
+public:
 
   typedef llvm::ArrayRef<CFGSuccessor> SuccessorListTy;
 

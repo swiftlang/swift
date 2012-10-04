@@ -103,6 +103,10 @@ public:
   // Instruction Creation Methods
   //===--------------------------------------------------------------------===//
 
+  AllocTmpInst *createAllocTmp(MaterializeExpr *Expr) {
+    return insert(new AllocTmpInst(Expr));
+  }
+
   ApplyInst *createApply(ApplyExpr *Expr, CFGValue Fn, ArrayRef<CFGValue> Args){
     return insert(ApplyInst::create(Expr, Fn, Args, C));
   }
@@ -123,10 +127,11 @@ public:
     return insert(new StoreInst(S, Src, DestLValue));
   }
 
-
-  MaterializeInst *createMaterialize(MaterializeExpr *Expr, CFGValue LV) {
-    return insert(new MaterializeInst(Expr, LV));
+  StoreInst *createInitialization(MaterializeExpr *E, CFGValue Src,
+                                  CFGValue DestLValue) {
+    return insert(new StoreInst(E, Src, DestLValue));
   }
+
 
   RequalifyInst *createRequalify(RequalifyExpr *Expr, CFGValue Op) {
     return insert(new RequalifyInst(Expr, Op));

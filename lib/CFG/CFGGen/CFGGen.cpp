@@ -132,8 +132,10 @@ static void emitAssignStmtRecursive(AssignStmt *S, CFGValue Value, Expr *Dest,
                                     CFGGen &Gen) {
   // If the destination is a tuple, destructure.
   if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
-    for (Expr *Elem : TE->getElements())
+    for (Expr *Elem : TE->getElements()) {
+      (void)Elem;
       assert(0 && "unimplemented");
+    }
     //emitAssignStmtRecursive(IGF, value, elem);
     return;
   }
@@ -387,8 +389,12 @@ CFGValue CFGGen::visitLoadExpr(LoadExpr *E) {
 }
 
 CFGValue CFGGen::visitMaterializeExpr(MaterializeExpr *E) {
-  CFGValue SubV = visit(E->getSubExpr());
-  return B.createMaterialize(E, SubV);
+  // Evaluate the value, use it to initialize a new temporary and return the
+  // temp's address.
+  CFGValue Value = visit(E->getSubExpr());
+  CFGValue TmpMem = B.createAllocTmp(E);
+  B.createInitialization(E, Value, TmpMem);
+  return TmpMem;
 }
 
 
