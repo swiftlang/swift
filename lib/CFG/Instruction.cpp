@@ -21,6 +21,16 @@
 #include "llvm/ADT/APInt.h"
 using namespace swift;
 
+
+//===----------------------------------------------------------------------===//
+// CFGValue Implementation
+//===----------------------------------------------------------------------===//
+
+//CFGType CFGValue::getType() const {
+//  assert(isInstruction() && "getType() not implemented for BBArgs");
+//  return getInst()->getType();
+//}
+
 //===----------------------------------------------------------------------===//
 // ilist_traits<Instruction> Implementation
 //===----------------------------------------------------------------------===//

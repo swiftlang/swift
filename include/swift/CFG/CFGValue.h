@@ -17,7 +17,7 @@
 #ifndef SWIFT_CFG_CFGVALUE_H
 #define SWIFT_CFG_CFGVALUE_H
 
-#include "swift/CFG/CFGType.h"
+#include "swift/AST/Type.h"
 
 namespace swift {
 
@@ -44,7 +44,7 @@ namespace swift {
     Instruction *getInstOrNull() const { return V.dyn_cast<Instruction*>(); }
     BasicBlockArg *getBBArgOrNull() const {return V.dyn_cast<BasicBlockArg*>();}
 
-    //CFGType getType() const;
+    //Type getType() const;
 
   };
 } // end namespace swift
