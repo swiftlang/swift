@@ -20,6 +20,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/CFG/CFGBase.h"
 #include "swift/CFG/CFGLocation.h"
+#include "swift/CFG/CFGValue.h"
 #include "swift/CFG/CFGSuccessor.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist_node.h"

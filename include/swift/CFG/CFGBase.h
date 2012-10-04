@@ -1,4 +1,4 @@
-//===--- CFGBase.h - Defines some core details of CFGS  ----------*- C++ -*-==//
+//===--- CFGBase.h - Defines some core details of CFGS  ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -54,10 +54,6 @@ public:
     return C.allocate(Bytes, Alignment);
   }
 };
-
-class Instruction;
-class BasicBlockArg;
-typedef llvm::PointerUnion<Instruction*, BasicBlockArg*> CFGValue;
 
 } // end swift namespace
 
