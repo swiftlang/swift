@@ -2704,6 +2704,159 @@ void IRGenFunction::bindArchetype(ArchetypeType *archetype,
   }
 }
 
+namespace {
+  struct Fulfillment {
+    Fulfillment() = default;
+    Fulfillment(unsigned depth, unsigned index) : Depth(depth), Index(index) {}
+
+    /// The distance up the metadata chain.
+    /// 0 is the origin metadata, 1 is the parent of that, etc.
+    unsigned Depth;
+
+    /// The generic argument index.
+    unsigned Index;
+  };
+
+  /// A style of passing arguments to a polymorphic function.
+  class PolymorphicConvention {
+  public:
+    enum class SourceKind {
+      /// There is no source of additional information.
+      None,
+
+      /// The polymorphic arguments are derived from a source class
+      /// pointer.
+      ClassPointer,
+
+      // TODO: do these:
+
+      /// The polymorphic arguments are passed from generic type
+      /// metadata for the origin type.
+      // ExtraMetadata,
+    };
+
+  private:
+    SourceKind TheSourceKind;
+
+    typedef std::pair<ArchetypeType*, ProtocolDecl*> FulfillmentKey;
+    llvm::DenseMap<FulfillmentKey, Fulfillment> Fulfillments;
+
+  public:
+    PolymorphicConvention(IRGenModule &IGM, PolymorphicFunctionType *fnType) {
+      assert(fnType->isCanonical());
+
+      // We don't need to pass anything extra as long as all of the
+      // archetypes (and their requirements) are producible from the
+      // class-pointer argument.
+
+      // If the argument is a single class pointer, and all the
+      // archetypes exactly match those of the class, we're good.
+      CanType argTy = stripLabel(CanType(fnType->getInput()));
+
+      SourceKind source = SourceKind::None;
+      if (auto classTy = dyn_cast<ClassType>(argTy)) {
+        source = SourceKind::ClassPointer;
+        considerNominalType(classTy, 0);
+      } else if (auto boundTy = dyn_cast<BoundGenericType>(argTy)) {
+        if (isa<ClassDecl>(boundTy->getDecl())) {
+          source = SourceKind::ClassPointer;
+          considerBoundGenericType(boundTy, 0);
+        }
+      }
+
+      // If we didn't fulfill anything, there's no source.
+      if (Fulfillments.empty()) source = SourceKind::None;
+    }
+
+    SourceKind getSourceKind() const { return TheSourceKind; }
+
+  private:
+    // Look through any single-element labelled tuple types.
+    CanType stripLabel(CanType input) {
+      if (auto tuple = dyn_cast<TupleType>(input))
+        if (tuple->getFields().size() == 1)
+          return stripLabel(CanType(tuple->getFields()[0].getType()));
+      return input;
+    }
+
+    void considerParentType(CanType parent, unsigned depth) {
+      // We might not have a parent type.
+      if (!parent) return;
+
+      // If we do, it has to be nominal one way or another.
+      depth++;
+      if (auto nom = dyn_cast<NominalType>(parent))
+        considerNominalType(nom, depth);
+      else
+        considerBoundGenericType(cast<BoundGenericType>(parent), depth);
+    }
+
+    void considerNominalType(NominalType *type, unsigned depth) {
+      // Nominal types add no generic arguments themselves, but they
+      // may have the arguments of their parents.
+      considerParentType(CanType(type->getParent()), depth);
+    }
+
+    void considerBoundGenericType(BoundGenericType *type, unsigned depth) {
+      for (unsigned i = 0, e = type->getGenericArgs().size(); i != e; ++i) {
+        CanType arg = CanType(type->getGenericArgs()[i]);
+
+        // Right now, we can only pull things out of the direct
+        // arguments, not out of nested metadata.  For example, this
+        // prevents us from realizing that we can rederive T and U in the
+        // following:
+        //   \forall T U . Vector<T->U> -> ()
+        if (auto argArchetype = dyn_cast<ArchetypeType>(arg)) {
+          // Find the archetype from the generic type.
+          auto params = type->getDecl()->getGenericParams()->getAllArchetypes();
+          assert(params.size() == e); // should be parallel
+          considerArchetype(argArchetype, params[i], depth, i);
+        }
+      }
+
+      // Match against the parent first.  The polymorphic type
+      // will start with any arguments from the parent.
+      considerParentType(CanType(type->getParent()), depth);
+    }
+
+    /// We found a reference to the arg archetype at the given depth
+    /// and index.  Add any fulfillments this gives us.
+    void considerArchetype(ArchetypeType *arg, ArchetypeType *param,
+                           unsigned depth, unsigned index) {
+      // First, record that we can find this archetype at this point.
+      addFulfillment(arg, nullptr, depth, index);
+
+      // Now consider each of the protocols that the parameter guarantees.
+      for (auto protocol : param->getConformsTo()) {
+        // If arg == param, the second check is always true.  This is
+        // a fast path for some common cases where we're defining a
+        // method within the type we're matching against.
+        if (arg == param || requiresFulfillment(arg, protocol))
+          addFulfillment(arg, protocol, depth, index);
+      }
+    }
+
+    /// Does the given archetype require the given protocol to be fulfilled?
+    static bool requiresFulfillment(ArchetypeType *arg, ProtocolDecl *proto) {
+      // TODO: protocol inheritance should be considered here somehow.
+      for (auto argProto : arg->getConformsTo()) {
+        if (argProto == proto)
+          return true;
+      }
+      return false;
+    }
+
+    /// Testify that there's a fulfillment at the given depth and level.
+    void addFulfillment(ArchetypeType *arg, ProtocolDecl *proto,
+                        unsigned depth, unsigned index) {
+      // Only add a fulfillment if it's not enough information otherwise.
+      auto key = FulfillmentKey(arg, nullptr);
+      if (!Fulfillments.count(key))
+        Fulfillments.insert(std::make_pair(key, Fulfillment(depth, index)));
+    }
+  };
+};
+
 /// Perform all the bindings necessary to emit the given declaration.
 void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
                                       PolymorphicFunctionType *type,
