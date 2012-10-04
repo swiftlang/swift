@@ -46,12 +46,39 @@ public:
 
     // StructMetadata header.
     asImpl().addNominalTypeDescriptor();
-    asImpl().addParent();
+    asImpl().addParentMetadataRef();
 
-    // Instantiation-specific 
+    // If changing this layout, you must update the magic number in
+    // emitParentMetadataRef.
+
+    // Instantiation-specific.
     if (auto generics = Target->getGenericParamsOfContext()) {
       this->addGenericFields(*generics);
     }
+  }
+};
+
+/// An "implementation" of StructMetadataLayout that just scans through
+/// the metadata layout, maintaining the next index: the offset (in
+/// pointer-sized chunks) into the metadata for the next field.
+template <class Impl>
+class StructMetadataScanner : public StructMetadataLayout<Impl> {
+  typedef StructMetadataLayout<Impl> super;
+protected:
+  unsigned NextIndex = 0;
+
+  StructMetadataScanner(IRGenModule &IGM, StructDecl *target)
+    : super(IGM, target) {}
+
+public:
+  void addMetadataFlags() { NextIndex++; }
+  void addValueWitnessTable() { NextIndex++; }
+  void addNominalTypeDescriptor() { NextIndex++; }
+  void addParentMetadataRef() { NextIndex++; }
+  void addGenericArgument(ArchetypeType *argument) { NextIndex++; }
+  void addGenericWitnessTable(ArchetypeType *argument,
+                              ProtocolDecl *protocol) {
+    NextIndex++;
   }
 };
 

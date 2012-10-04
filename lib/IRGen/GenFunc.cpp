@@ -2763,7 +2763,8 @@ namespace {
       assert(fn->isCanonical());
       SmallVector<llvm::Type*, 4> types;
       expandPolymorphicSignature(IGM, fn, types);
-      assert(!types.empty());
+      if (types.empty()) return;
+
       auto &witnessTablePtrTI = IGM.getWitnessTablePtrTypeInfo();
       auto &typeMetadataPtrTI = IGM.getTypeMetadataPtrTypeInfo();
       for (auto type : types) {

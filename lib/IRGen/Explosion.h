@@ -236,6 +236,15 @@ public:
     NextValue += n;
   }
 
+  // These are all kindof questionable.
+
+  /// Without changing any state, take the last claimed value,
+  /// if there is one.
+  llvm::Value *getLastClaimed() {
+    assert(NextValue > 0);
+    return Values[NextValue-1].getUnmanagedValue();
+  }
+
   /// Claim and remove the last item in the array.
   /// Unlike the normal 'claim' methods, the item is gone forever.
   ManagedValue takeLast() {

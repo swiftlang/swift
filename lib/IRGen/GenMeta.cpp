@@ -582,7 +582,7 @@ namespace {
       Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
     }
 
-    void addParent() {
+    void addParentMetadataRef(ClassDecl *forClass) {
       // FIXME!
       Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
     }
@@ -861,12 +861,11 @@ namespace {
   /// Really lame way of computing the offset of the metadata for a
   /// destructor.
   class BindGenericArchetypes
-    : public ClassMetadataLayout<BindGenericArchetypes> {
+    : public ClassMetadataScanner<BindGenericArchetypes> {
 
-    typedef ClassMetadataLayout<BindGenericArchetypes> super;
+    typedef ClassMetadataScanner<BindGenericArchetypes> super;
     IRGenFunction &IGF;
     Address Metadata;
-    unsigned NextIndex = 0;
 
     // A hacky fill-and-drain queue.
     SmallVector<llvm::Value*, 8> ArgMetadata;
@@ -885,16 +884,6 @@ namespace {
     }
 
   public:
-    // Metadata header fields that we have to skip over.
-    void addMetadataFlags() { NextIndex++; }
-    void addValueWitnessTable() { NextIndex++; }
-    void addDestructorFunction() { NextIndex++; }
-    void addSizeFunction() { NextIndex++; }
-    void addNominalTypeDescriptor() { NextIndex++; }
-    void addParent() { NextIndex++; }
-    void addSuperClass() { NextIndex++; }
-    void addMethod(FunctionRef fn) { NextIndex++; }
-
     void addGenericArgument(ArchetypeType *argument,
                             ClassDecl *forClass) {
       // Ignore witnesses for base classes.
@@ -968,6 +957,305 @@ void irgen::bindGenericClassArchetypes(IRGenFunction &IGF, Address thisValue,
   BindGenericArchetypes(IGF, theClass, metadata).layout();
 }
 
+/// Emit a load from the given metadata at a constant index.
+static llvm::Value *emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
+                                                llvm::Value *metadata,
+                                                unsigned index,
+                                                llvm::PointerType *objectTy) {
+  // Require the metadata to be some type that we recognize as a
+  // metadata pointer.
+  assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy ||
+         metadata->getType() == IGF.IGM.HeapMetadataPtrTy);
+
+  // Some offsets are basically just never going to be right.
+  assert(index != 0 && "loading flags field?");
+
+  // We require objectType to be a pointer type so that the GEP will
+  // scale by the right amount.  We could load an arbitrary type using
+  // some extra bitcasting.
+
+  // Cast to T*.
+  auto objectPtrTy = objectTy->getPointerTo();
+  metadata = IGF.Builder.CreateBitCast(metadata, objectPtrTy);
+
+  // GEP to the slot.
+  Address slot(IGF.Builder.CreateConstInBoundsGEP1_32(metadata, index),
+               IGF.IGM.getPointerAlignment());
+
+  // Load.
+  auto result = IGF.Builder.CreateLoad(slot);
+  return result;
+}
+
+/// Load the metadata reference at the given index.
+static llvm::Value *emitLoadOfMetadataRefAtIndex(IRGenFunction &IGF,
+                                                 llvm::Value *metadata,
+                                                 unsigned index) {
+  return emitLoadFromMetadataAtIndex(IGF, metadata, index,
+                                     IGF.IGM.TypeMetadataPtrTy);
+}
+
+/// Load the protocol witness table reference at the given index.
+static llvm::Value *emitLoadOfWitnessTableRefAtIndex(IRGenFunction &IGF,
+                                                     llvm::Value *metadata,
+                                                     unsigned index) {
+  return emitLoadFromMetadataAtIndex(IGF, metadata, index,
+                                     IGF.IGM.WitnessTablePtrTy);
+}
+
+namespace {
+  /// A CRTP helper for classes which are simply searching for a
+  /// specific index within the metadata.
+  ///
+  /// The pattern is that subclasses should override an 'add' method
+  /// from the appropriate layout class and ensure that they call
+  /// setTargetIndex() when the appropriate location is reached.  The
+  /// subclass user then just calls getTargetIndex(), which performs
+  /// the layout and returns the found index.
+  ///
+  /// \param Base the base class, which should generally be a CRTP
+  ///   class template applied to the most-derived class
+  template <class Base> class MetadataSearcher : public Base {
+    static const unsigned InvalidIndex = ~0U;
+    unsigned TargetIndex = InvalidIndex;
+
+  protected:
+    void setTargetIndex() {
+      assert(TargetIndex == InvalidIndex && "setting twice");
+      TargetIndex = this->NextIndex;
+    }
+
+  public:
+    template <class... T> MetadataSearcher(T &&...args)
+      : Base(std::forward<T>(args)...) {}
+
+    unsigned getTargetIndex() {
+      assert(TargetIndex == InvalidIndex && "computing twice");
+      this->layout();
+      assert(TargetIndex != InvalidIndex && "target not found!");
+      return TargetIndex;
+    }
+  };
+
+  /// A class for finding the 'parent' index in a class metadata object.
+  class FindClassParentIndex :
+      public MetadataSearcher<ClassMetadataScanner<FindClassParentIndex>> {
+    typedef MetadataSearcher super;
+  public:
+    FindClassParentIndex(IRGenModule &IGM, ClassDecl *theClass)
+      : super(IGM, theClass) {}
+
+    void addParentMetadataRef(ClassDecl *forClass) {
+      if (forClass == TargetClass) setTargetIndex();
+      NextIndex++;
+    }
+  };
+}
+
+/// Given a reference to some metadata, derive a reference to the
+/// type's parent type.
+llvm::Value *irgen::emitParentMetadataRef(IRGenFunction &IGF,
+                                          NominalTypeDecl *decl,
+                                          llvm::Value *metadata) {
+  assert(decl->getDeclContext()->isTypeContext());
+
+  switch (decl->getKind()) {
+#define NOMINAL_TYPE_DECL(id, parent)
+#define DECL(id, parent) \
+  case DeclKind::id:
+#include "swift/AST/DeclNodes.def"
+    llvm_unreachable("not a nominal type");
+
+  case DeclKind::Protocol:
+    llvm_unreachable("protocols never have parent types!");
+
+  case DeclKind::Class: {
+    unsigned index =
+      FindClassParentIndex(IGF.IGM, cast<ClassDecl>(decl)).getTargetIndex();
+    return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
+  }
+
+  case DeclKind::OneOf:
+  case DeclKind::Struct:
+    // In both of these cases, 'Parent' is always the fourth field.
+    return emitLoadOfMetadataRefAtIndex(IGF, metadata, 3);
+  }
+  llvm_unreachable("bad decl kind!");
+}
+
+namespace {
+  /// A class for finding a type argument in a class metadata object.
+  class FindClassArgumentIndex :
+      public MetadataSearcher<ClassMetadataScanner<FindClassArgumentIndex>> {
+    typedef MetadataSearcher super;
+
+    ArchetypeType *TargetArchetype;
+
+  public:
+    FindClassArgumentIndex(IRGenModule &IGM, ClassDecl *theClass,
+                           ArchetypeType *targetArchetype)
+      : super(IGM, theClass), TargetArchetype(targetArchetype) {}
+
+    void addGenericArgument(ArchetypeType *argument, ClassDecl *forClass) {
+      if (forClass == TargetClass && argument == TargetArchetype)
+        setTargetIndex();
+      NextIndex++;
+    }
+  };
+
+  /// A class for finding a type argument in a struct metadata object.
+  class FindStructArgumentIndex :
+      public MetadataSearcher<StructMetadataScanner<FindStructArgumentIndex>> {
+    typedef MetadataSearcher super;
+
+    ArchetypeType *TargetArchetype;
+
+  public:
+    FindStructArgumentIndex(IRGenModule &IGM, StructDecl *decl,
+                            ArchetypeType *targetArchetype)
+      : super(IGM, decl), TargetArchetype(targetArchetype) {}
+
+    void addGenericArgument(ArchetypeType *argument) {
+      if (argument == TargetArchetype)
+        setTargetIndex();
+      NextIndex++;
+    }
+  };
+}
+
+/// Given a reference to nominal type metadata of the given type,
+/// derive a reference to the nth argument metadata.  The type must
+/// have generic arguments.
+llvm::Value *irgen::emitArgumentMetadataRef(IRGenFunction &IGF,
+                                            NominalTypeDecl *decl,
+                                            unsigned argumentIndex,
+                                            llvm::Value *metadata) {
+  assert(decl->getGenericParams() != nullptr);
+  auto targetArchetype =
+    decl->getGenericParams()->getAllArchetypes()[argumentIndex];
+
+  switch (decl->getKind()) {
+#define NOMINAL_TYPE_DECL(id, parent)
+#define DECL(id, parent) \
+  case DeclKind::id:
+#include "swift/AST/DeclNodes.def"
+    llvm_unreachable("not a nominal type");
+
+  case DeclKind::Protocol:
+    llvm_unreachable("protocols are never generic!");
+
+  case DeclKind::Class: {
+    unsigned index =
+      FindClassArgumentIndex(IGF.IGM, cast<ClassDecl>(decl), targetArchetype)
+        .getTargetIndex();
+    return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
+  }
+
+  case DeclKind::OneOf:
+  case DeclKind::Struct:
+    // FIXME: should oneofs really be using the struct logic? (no)
+    unsigned index =
+      FindStructArgumentIndex(IGF.IGM, cast<StructDecl>(decl), targetArchetype)
+        .getTargetIndex();
+    return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
+  }
+  llvm_unreachable("bad decl kind!");
+}
+
+namespace {
+  /// A class for finding a protocol witness table for a type argument
+  /// in a class metadata object.
+  class FindClassWitnessTableIndex :
+      public MetadataSearcher<ClassMetadataScanner<FindClassWitnessTableIndex>> {
+    typedef MetadataSearcher super;
+
+    ArchetypeType *TargetArchetype;
+    ProtocolDecl *TargetProtocol;
+
+  public:
+    FindClassWitnessTableIndex(IRGenModule &IGM, ClassDecl *theClass,
+                               ArchetypeType *targetArchetype,
+                               ProtocolDecl *targetProtocol)
+      : super(IGM, theClass), TargetArchetype(targetArchetype),
+        TargetProtocol(targetProtocol) {}
+
+    void addGenericWitnessTable(ArchetypeType *argument,
+                                ProtocolDecl *protocol,
+                                ClassDecl *forClass) {
+      if (forClass == TargetClass &&
+          argument == TargetArchetype &&
+          protocol == TargetProtocol)
+        setTargetIndex();
+      NextIndex++;
+    }
+  };
+
+  /// A class for finding a protocol witness table for a type argument
+  /// in a struct metadata object.
+  class FindStructWitnessTableIndex :
+      public MetadataSearcher<StructMetadataScanner<FindStructWitnessTableIndex>> {
+    typedef MetadataSearcher super;
+
+    ArchetypeType *TargetArchetype;
+    ProtocolDecl *TargetProtocol;
+
+  public:
+    FindStructWitnessTableIndex(IRGenModule &IGM, StructDecl *decl,
+                                ArchetypeType *targetArchetype,
+                                ProtocolDecl *targetProtocol)
+      : super(IGM, decl), TargetArchetype(targetArchetype) {}
+
+    void addGenericWitnessTable(ArchetypeType *argument,
+                                ProtocolDecl *protocol) {
+      if (argument == TargetArchetype && protocol == TargetProtocol)
+        setTargetIndex();
+      NextIndex++;
+    }
+  };
+}
+
+/// Given a reference to nominal type metadata of the given type,
+/// derive a reference to a protocol witness table for the nth
+/// argument metadata.  The type must have generic arguments.
+llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
+                                                NominalTypeDecl *decl,
+                                                unsigned argumentIndex,
+                                                ProtocolDecl *targetProtocol,
+                                                llvm::Value *metadata) {
+  assert(decl->getGenericParams() != nullptr);
+  auto targetArchetype =
+    decl->getGenericParams()->getAllArchetypes()[argumentIndex];
+
+  switch (decl->getKind()) {
+#define NOMINAL_TYPE_DECL(id, parent)
+#define DECL(id, parent) \
+  case DeclKind::id:
+#include "swift/AST/DeclNodes.def"
+    llvm_unreachable("not a nominal type");
+
+  case DeclKind::Protocol:
+    llvm_unreachable("protocols are never generic!");
+
+  case DeclKind::Class: {
+    unsigned index =
+      FindClassWitnessTableIndex(IGF.IGM, cast<ClassDecl>(decl),
+                                 targetArchetype, targetProtocol)
+        .getTargetIndex();
+    return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
+  }
+
+  case DeclKind::OneOf:
+  case DeclKind::Struct:
+    // FIXME: should oneofs really be using the struct logic? (no)
+    unsigned index =
+      FindStructWitnessTableIndex(IGF.IGM, cast<StructDecl>(decl),
+                                  targetArchetype, targetProtocol)
+        .getTargetIndex();
+    return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
+  }
+  llvm_unreachable("bad decl kind!");
+}
+
 // Structs
 
 namespace {
@@ -991,7 +1279,7 @@ namespace {
       Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
     }
 
-    void addParent() {
+    void addParentMetadataRef() {
       // FIXME!
       Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
     }

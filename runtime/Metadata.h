@@ -377,16 +377,12 @@ struct ClassMetadata : public HeapMetadata {
   /// An out-of-line description of the type.
   const NominalTypeDescriptor *Description;
 
-  /// The parent type of this member type, or null if this is not a
-  /// member type.
-  const Metadata *Parent;
-
   /// The metadata for the super class.  This is null for the root class.
   const ClassMetadata *SuperClass;
 
   // After this come the class members, laid out as follows:
   //   - class members for the base class (recursively)
-  //   - generic parameters for the parent (recursively)
+  //   - metadata reference for the parent, if applicable
   //   - generic parameters for this class
   //   - class variables (if we choose to support these)
   //   - "tabulated" virtual methods

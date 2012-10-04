@@ -63,7 +63,6 @@ public:
 
     // ClassMetadata header.
     asImpl().addNominalTypeDescriptor();
-    asImpl().addParent();
     asImpl().addSuperClass();
 
     // Class members.
@@ -78,8 +77,15 @@ private:
       addClassMembers(base->getClassOrBoundGenericClass());
     }
 
+    // Add a reference to the parent class, if applicable.
+    if (theClass->getDeclContext()->isTypeContext()) {
+      asImpl().addParentMetadataRef(theClass);
+    }
+
     // Add space for the generic parameters, if applicable.
-    if (auto generics = theClass->getGenericParamsOfContext()) {
+    // Note that we only add references for the immediate parameters;
+    // parameters for the parent context are handled by the parent.
+    if (auto generics = theClass->getGenericParams()) {
       addGenericClassFields(theClass, *generics);
     }
 
@@ -127,6 +133,37 @@ private:
 
     // Both static and non-static functions go in the metadata.
     asImpl().addMethod(FunctionRef(fn, explosionLevel, uncurryLevel));
+  }
+};
+
+/// An "implementation" of ClassMetadataLayout that just scans through
+/// the metadata layout, maintaining the next index: the offset (in
+/// pointer-sized chunks) into the metadata for the next field.
+template <class Impl>
+class ClassMetadataScanner : public ClassMetadataLayout<Impl> {
+  typedef ClassMetadataLayout<Impl> super;
+protected:
+  unsigned NextIndex = 0;
+
+  ClassMetadataScanner(IRGenModule &IGM, ClassDecl *target)
+    : super(IGM, target) {}
+
+public:
+  void addMetadataFlags() { NextIndex++; }
+  void addValueWitnessTable() { NextIndex++; }
+  void addDestructorFunction() { NextIndex++; }
+  void addSizeFunction() { NextIndex++; }
+  void addNominalTypeDescriptor() { NextIndex++; }
+  void addParentMetadataRef(ClassDecl *forClass) { NextIndex++; }
+  void addSuperClass() { NextIndex++; }
+  void addMethod(FunctionRef fn) { NextIndex++; }
+  void addGenericArgument(ArchetypeType *argument, ClassDecl *forClass) {
+    NextIndex++;
+  }
+  void addGenericWitnessTable(ArchetypeType *argument,
+                              ProtocolDecl *protocol,
+                              ClassDecl *forClass) {
+    NextIndex++;
   }
 };
 

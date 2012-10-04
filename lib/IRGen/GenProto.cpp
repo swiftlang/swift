@@ -94,6 +94,29 @@ namespace irgen {
 }
 }
 
+/// Given a heap pointer, load the metadata reference.
+static llvm::Value *emitMetadataRefForHeapObject(IRGenFunction &IGF,
+                                                 llvm::Value *object) {
+  auto zero = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
+
+  // Drill into the object pointer.  Rather than bitcasting, we make
+  // an effort to do something that should explode if we get something
+  // mistyped.
+  SmallVector<llvm::Value*, 4> indexes;
+  indexes.push_back(zero);
+  llvm::Type *ty = cast<llvm::PointerType>(object->getType())->getElementType();
+  while (auto structTy = dyn_cast<llvm::StructType>(ty)) {
+    indexes.push_back(zero);
+    ty = structTy->getElementType(0);
+  }
+  assert(ty == IGF.IGM.HeapMetadataPtrTy);
+
+  auto slot = IGF.Builder.CreateInBoundsGEP(object, indexes);
+  auto metadata = IGF.Builder.CreateLoad(Address(slot,
+                                             IGF.IGM.getPointerAlignment()));
+  return metadata;
+}
+
 /// Given a type metadata pointer, load its value witness table.
 static llvm::Value *emitValueWitnessTableRefForMetadata(IRGenFunction &IGF,
                                                         llvm::Value *metadata) {
@@ -2688,6 +2711,7 @@ void IRGenFunction::bindArchetype(ArchetypeType *archetype,
   // Set the protocol witness tables.
 
   assert(wtables.size() == ti.getProtocols().size());
+  assert(wtables.size() == archetype->getConformsTo().size());
   if (ti.getProtocols().empty()) {
     // TODO: do this lazily.
     auto wtable = emitValueWitnessTableRefForMetadata(*this, metadata);
@@ -2717,7 +2741,9 @@ namespace {
     unsigned Index;
   };
 
-  /// A style of passing arguments to a polymorphic function.
+  /// A class for computing how to pass arguments to a polymorphic
+  /// function.  The subclasses of this are the places which need to
+  /// be updated if the convention changes.
   class PolymorphicConvention {
   public:
     enum class SourceKind {
@@ -2735,14 +2761,17 @@ namespace {
       // ExtraMetadata,
     };
 
-  private:
+  protected:
+    PolymorphicFunctionType *FnType;
     SourceKind TheSourceKind;
+    SmallVector<NominalTypeDecl*, 4> TypesForDepths;
 
     typedef std::pair<ArchetypeType*, ProtocolDecl*> FulfillmentKey;
     llvm::DenseMap<FulfillmentKey, Fulfillment> Fulfillments;
 
   public:
-    PolymorphicConvention(IRGenModule &IGM, PolymorphicFunctionType *fnType) {
+    PolymorphicConvention(PolymorphicFunctionType *fnType)
+        : FnType(fnType) {
       assert(fnType->isCanonical());
 
       // We don't need to pass anything extra as long as all of the
@@ -2766,6 +2795,8 @@ namespace {
 
       // If we didn't fulfill anything, there's no source.
       if (Fulfillments.empty()) source = SourceKind::None;
+
+      TheSourceKind = source;
     }
 
     SourceKind getSourceKind() const { return TheSourceKind; }
@@ -2792,12 +2823,18 @@ namespace {
     }
 
     void considerNominalType(NominalType *type, unsigned depth) {
+      assert(TypesForDepths.size() == depth);
+      TypesForDepths.push_back(type->getDecl());
+
       // Nominal types add no generic arguments themselves, but they
       // may have the arguments of their parents.
       considerParentType(CanType(type->getParent()), depth);
     }
 
     void considerBoundGenericType(BoundGenericType *type, unsigned depth) {
+      assert(TypesForDepths.size() == depth);
+      TypesForDepths.push_back(type->getDecl());
+
       for (unsigned i = 0, e = type->getGenericArgs().size(); i != e; ++i) {
         CanType arg = CanType(type->getGenericArgs()[i]);
 
@@ -2855,31 +2892,103 @@ namespace {
         Fulfillments.insert(std::make_pair(key, Fulfillment(depth, index)));
     }
   };
+
+  /// A class for binding type parameters of a generic function.
+  class EmitPolymorphicParameters : public PolymorphicConvention {
+    IRGenFunction &IGF;
+    SmallVector<llvm::Value*, 4> MetadataForDepths;
+
+  public:
+    EmitPolymorphicParameters(IRGenFunction &IGF,
+                              PolymorphicFunctionType *fnType)
+      : PolymorphicConvention(fnType), IGF(IGF) {}
+
+    void emit(Explosion &in);
+
+  private:
+    /// Emit the source value for parameters.
+    llvm::Value *emitSourceForParameters(Explosion &in) {
+      switch (getSourceKind()) {
+      case SourceKind::None:
+        return nullptr;
+
+      case SourceKind::ClassPointer:
+        return emitMetadataRefForHeapObject(IGF, in.getLastClaimed());
+      }
+      llvm_unreachable("bad source kind!");
+    }
+
+    /// Produce the metadata value for the given depth, using the
+    /// given cache.
+    llvm::Value *getMetadataForDepth(unsigned depth) {
+      assert(!MetadataForDepths.empty());
+      while (depth >= MetadataForDepths.size()) {
+        auto child = MetadataForDepths.back();
+        auto childDecl = TypesForDepths[MetadataForDepths.size()];
+        auto parent = emitParentMetadataRef(IGF, childDecl, child);
+        MetadataForDepths.push_back(parent);
+      }
+      return MetadataForDepths[depth];
+    }
+  };
 };
+
+/// Emit a polymorphic parameters clause, binding all the metadata necessary.
+void EmitPolymorphicParameters::emit(Explosion &in) {
+  auto &generics = FnType->getGenericParams();
+
+  // Compute the first source metadata.
+  MetadataForDepths.push_back(emitSourceForParameters(in));
+
+  for (auto archetype : generics.getAllArchetypes()) {
+    // Derive the appropriate metadata reference.
+    llvm::Value *metadata;
+
+    // If the reference is fulfilled by the source, go for it.
+    auto it = Fulfillments.find(FulfillmentKey(archetype, nullptr));
+    if (it != Fulfillments.end()) {
+      auto &fulfillment = it->second;
+      auto ancestor = getMetadataForDepth(fulfillment.Depth);
+      auto ancestorDecl = TypesForDepths[fulfillment.Depth];
+      metadata = emitArgumentMetadataRef(IGF, ancestorDecl,
+                                         fulfillment.Index, ancestor);
+
+    // Otherwise, it's just next in line.
+    } else {
+      metadata = in.claimUnmanagedNext();
+    }
+
+    // Collect all the witness tables.
+    SmallVector<llvm::Value *, 8> wtables;
+    for (auto protocol : archetype->getConformsTo()) {
+      llvm::Value *wtable;
+
+      // If the protocol witness table is fulfilled by the source, go for it.
+      auto it = Fulfillments.find(FulfillmentKey(archetype, protocol));
+      if (it != Fulfillments.end()) {
+        auto &fulfillment = it->second;
+        auto ancestor = getMetadataForDepth(fulfillment.Depth);
+        auto ancestorDecl = TypesForDepths[fulfillment.Depth];
+        wtable = emitArgumentWitnessTableRef(IGF, ancestorDecl,
+                                             fulfillment.Index, protocol,
+                                             ancestor);
+
+      // Otherwise, it's just next in line.
+      } else {
+        wtable = in.claimUnmanagedNext();
+      }
+      wtables.push_back(wtable);
+    }
+
+    IGF.bindArchetype(archetype, metadata, wtables);
+  }  
+}
 
 /// Perform all the bindings necessary to emit the given declaration.
 void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
                                       PolymorphicFunctionType *type,
                                       Explosion &in) {
-  auto &generics = type->getGenericParams();
-
-  // For now, treat all archetypes independently.
-  // FIXME: Later, we'll want to emit only the minimal set of archetypes,
-  // because non-primary archetypes (which correspond to associated types)
-  // will have their witness tables embedded in the witness table corresponding
-  // to their parent.
-  for (auto archetype : generics.getAllArchetypes()) {
-    auto &archetypeTI =
-      IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
-
-    auto metadata = in.claimUnmanagedNext();
-
-    // Find the protocols the parameter implements.
-    SmallVector<llvm::Value*, 4> wtables;
-    in.claimUnmanaged(archetypeTI.getProtocols().size(), wtables);
-
-    IGF.bindArchetype(archetype, metadata, wtables);
-  }
+  EmitPolymorphicParameters(IGF, type).emit(in);
 }
 
 /// Emit a reference to the metadata object for an archetype.
@@ -2969,12 +3078,38 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
   }
 }
 
+namespace {
+  class EmitPolymorphicArguments : public PolymorphicConvention {
+    IRGenFunction &IGF;
+  public:
+    EmitPolymorphicArguments(IRGenFunction &IGF,
+                             PolymorphicFunctionType *polyFn)
+      : PolymorphicConvention(polyFn), IGF(IGF) {}
+
+    void emit(ArrayRef<Substitution> subs, Explosion &out);
+
+  private:
+    void emitSource(Explosion &out) {
+      switch (getSourceKind()) {
+      case SourceKind::None: return;
+      case SourceKind::ClassPointer: return;
+      }
+      llvm_unreachable("bad source kind!");
+    }
+  };
+}
+
 /// Pass all the arguments necessary for the given function.
 void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
                                      PolymorphicFunctionType *polyFn,
                                      ArrayRef<Substitution> subs,
                                      Explosion &out) {
-  auto &generics = polyFn->getGenericParams();
+  EmitPolymorphicArguments(IGF, polyFn).emit(subs, out);
+}
+
+void EmitPolymorphicArguments::emit(ArrayRef<Substitution> subs,
+                                    Explosion &out) {
+  auto &generics = FnType->getGenericParams();
   assert(generics.getAllArchetypes().size() == subs.size());
   
   // For now, treat all archetypes independently.
@@ -2984,64 +3119,90 @@ void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
   // to their parent.
   for (const auto &sub : subs) {
     auto archetype = sub.Archetype;
-    auto archetypeProtos = archetype->getConformsTo();
     CanType argType = sub.Replacement->getCanonicalType();
+
+    // Add the metadata reference unelss it's fulfilled.
+    if (!Fulfillments.count(FulfillmentKey(archetype, nullptr))) {
+      out.addUnmanaged(emitTypeMetadataRef(IGF, argType));
+    }
+
+    // Nothing else to do if there aren't any protocols to witness.
+    auto protocols = archetype->getConformsTo();
+    if (protocols.empty())
+      continue;
+
     auto &argTI = IGF.getFragileTypeInfo(argType);
 
-    // If the type argument is an archetype, we can gather the
-    // protocol witnesses from that.
-    if (argType->is<ArchetypeType>()) {
-      auto &archTI = argTI.as<ArchetypeTypeInfo>();
+    // Add witness tables for each of the required protocols.
+    for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
+      auto protocol = protocols[i];
 
-      // Add the metadata reference.
-      out.addUnmanaged(archTI.getMetadataRef(IGF));
+      // Skip this if it's fulfilled by the source.
+      if (Fulfillments.count(FulfillmentKey(archetype, protocol)))
+        continue;
 
-      // Add witness tables for each of the required protocols.
-      for (auto proto : archetypeProtos) {
-        ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
+      // If the target is an archetype, go to the type info.
+      if (isa<ArchetypeType>(argType)) {
+        auto &archTI = argTI.as<ArchetypeTypeInfo>();
+
+        ProtocolPath path(IGF.IGM, archTI.getProtocols(), protocol);
         auto wtable = archTI.getWitnessTable(IGF, path.getOriginIndex());
         wtable = path.apply(IGF, wtable);
         out.addUnmanaged(wtable);
+        continue;
       }
-      continue;
+
+      // Otherwise, go to the conformances.
+      auto &protoI = IGF.IGM.getProtocolInfo(protocol);
+      auto &confI = protoI.getConformance(IGF.IGM, argType, argTI, protocol,
+                                          *sub.Conformance[i]);
+      llvm::Value *wtable = confI.getTable(IGF);
+      out.addUnmanaged(wtable);
+    }
+  }
+}
+
+namespace {
+  /// A class for expanding a polymorphic signature.
+  class ExpandPolymorphicSignature : public PolymorphicConvention {
+    IRGenModule &IGM;
+  public:
+    ExpandPolymorphicSignature(IRGenModule &IGM, PolymorphicFunctionType *fn)
+      : PolymorphicConvention(fn), IGM(IGM) {}
+
+    void expand(SmallVectorImpl<llvm::Type*> &out) {
+      addSource(out);
+
+      auto &generics = FnType->getGenericParams();
+      for (auto archetype : generics.getAllArchetypes()) {
+        // Pass the type argument if not fulfilled.
+        if (!Fulfillments.count(FulfillmentKey(archetype, nullptr)))
+          out.push_back(IGM.TypeMetadataPtrTy);
+
+        // Pass each signature requirement separately (unless fulfilled).
+        for (auto protocol : archetype->getConformsTo())
+          if (!Fulfillments.count(FulfillmentKey(archetype, protocol)))
+            out.push_back(IGM.WitnessTablePtrTy);
+      }
     }
 
-    // If the type argument is an existential type, we can construct
-    // protocol witnesses that apply generically to existentials.
-    // Or, well, at least we can do this for the value witnesses.
-    // Hopefully the type-checker won't let these through for protocols
-    // that aren't theoretically sound?
-    assert(archetypeProtos.empty() || !argType->isExistentialType());
-
-    // Okay, we have a concrete type.
-
-    // Add the metadata reference.
-    out.addUnmanaged(emitTypeMetadataRef(IGF, argType));
-
-    // Fast path: we don't need protocol witnesses.
-    if (archetypeProtos.empty())
-      continue;
-
-    SmallVector<llvm::Value*, 4> wtables;
-    emitWitnessTableRefs(IGF, sub, wtables);
-    for (auto wtable : wtables)
-      out.addUnmanaged(wtable);
-  }
+  private:
+    /// Add signature elements for the source metadata.
+    void addSource(SmallVectorImpl<llvm::Type*> &out) {
+      switch (getSourceKind()) {
+      case SourceKind::None: return;
+      case SourceKind::ClassPointer: return; // already accounted for
+      }
+      llvm_unreachable("bad source kind");
+    }
+  };
 }
 
 /// Given a generic signature, add the argument types required in order to call it.
 void irgen::expandPolymorphicSignature(IRGenModule &IGM,
                                        PolymorphicFunctionType *polyFn,
                                        SmallVectorImpl<llvm::Type*> &out) {
-  auto &generics = polyFn->getGenericParams();
-  for (auto archetype : generics.getAllArchetypes()) {
-    // Pass the type argument.
-    out.push_back(IGM.TypeMetadataPtrTy);
-
-    // For now, pass each signature requirement separately.
-    unsigned n = unsigned(archetype->getConformsTo().size());
-    while (n--) out.push_back(IGM.WitnessTablePtrTy);
-  }
+  ExpandPolymorphicSignature(IGM, polyFn).expand(out);
 }
 
 /// Emit an erasure expression as an initializer for the given memory.
