@@ -21,5 +21,7 @@ Contents
    LogicalObjects
    Namespace Level Vars and Top Level Code
    TypeState
+   TypeChecker
+
 
 
