@@ -66,7 +66,8 @@ public:
            "DeclRef should return lvalue");
   }
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
-    assert(ILI->getType()->is<BuiltinType>() && "invalid integer literal type");
+    assert(ILI->getType()->is<BuiltinIntegerType>() &&
+           "invalid integer literal type");
   }
   void visitLoadInst(LoadInst *LI) {
     assert(!LI->getType()->is<LValueType>() && "Load should produce rvalue");

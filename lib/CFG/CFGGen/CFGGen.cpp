@@ -54,7 +54,7 @@ Condition CFGGen::emitCondition(Stmt *TheStmt, Expr *E,
     FullExpr Scope(Cleanups);
     V = visit(E);
   }
-  //  FIXME: assert(V->getType()->isIntegerTy(1));
+  assert(V.getType()->castTo<BuiltinIntegerType>()->getBitWidth() == 1);
   
   // Check for a constant condition.
 #if 0 // FIXME: Implement optimization
