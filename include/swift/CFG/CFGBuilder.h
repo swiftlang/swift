@@ -154,7 +154,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   UnreachableInst *createUnreachable() {
-    return insertTerminator(new UnreachableInst());
+    return insertTerminator(new UnreachableInst(C));
   }
 
   ReturnInst *createReturn(ReturnStmt *Stmt, CFGValue ReturnValue) {
@@ -168,7 +168,7 @@ public:
   }
     
   BranchInst *createBranch(BasicBlock *TargetBlock) {
-    return insertTerminator(new BranchInst(TargetBlock));
+    return insertTerminator(new BranchInst(TargetBlock, C));
   }
 
 

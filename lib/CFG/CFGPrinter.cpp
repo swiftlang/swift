@@ -118,7 +118,7 @@ public:
   }
   void visitStoreInst(StoreInst *SI) {
     OS << "store " << getID(SI->getSrc()) << " -> "
-       << getID(SI->getDestLValue());
+       << getID(SI->getDest());
   }
   void visitRequalifyInst(RequalifyInst *RI) {
     OS << "requalify " << getID(RI->getOperand());

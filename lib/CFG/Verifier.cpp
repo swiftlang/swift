@@ -16,6 +16,7 @@
 
 #include "swift/CFG/CFG.h"
 #include "swift/CFG/CFGVisitor.h"
+#include "swift/AST/Types.h"
 using namespace swift;
 
 namespace {
@@ -42,16 +43,47 @@ public:
     // Dispatch to our more-specialized instances below.
     ((CFGVisitor<CFGVerifier>*)this)->visit(I);
   }
-  
+
+  void visitAllocInst(AllocInst *AI) {
+    assert(AI->getType()->is<LValueType>() &&"Allocation should return lvalue");
+  }
+
+  void visitAllocVarInst(AllocVarInst *AI) {
+    visitAllocInst(AI);
+  }
+
+  void visitAllocTmpInst(AllocTmpInst *AI) {
+    visitAllocInst(AI);
+  }
+
+
   void visitApplyInst(ApplyInst *AI) {
   }
-  
+
   void visitDeclRefInst(DeclRefInst *DRI) {
+    //assert(DRI->getType()->is<LValueType>() && "DeclRef should return lvalue");
   }
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
+    assert(ILI->getType()->is<BuiltinType>() && "invalid integer literal type");
   }
   void visitLoadInst(LoadInst *LI) {
+    assert(!LI->getType()->is<LValueType>() && "Load should produce rvalue");
+    assert(LI->getLValue().getType()->is<LValueType>() &&
+           "Load op should be lvalue");
+    assert(LI->getLValue().getType()->getRValueType()->isEqual(LI->getType()) &&
+           "Load operand type and result type mismatch");
   }
+
+  void visitStoreInst(StoreInst *SI) {
+    assert(!SI->getSrc().getType()->is<LValueType>() &&
+           "Src value should be rvalue");
+    assert(SI->getDest().getType()->is<LValueType>() &&
+           "Dest address should be lvalue");
+    assert(SI->getDest().getType()->getRValueType()->
+              isEqual(SI->getSrc().getType()) &&
+           "Store operand type and dest type mismatch");
+  }
+
   void visitTupleInst(TupleInst *TI) {
   }
   void visitTypeOfInst(TypeOfInst *TOI) {

@@ -21,6 +21,7 @@
 
 namespace swift {
 
+class ASTContext;
 class Instruction;
 class Stmt;
 class TranslationUnit;
@@ -32,19 +33,24 @@ public:
 private:
   friend class BasicBlock;
 
+  /// Context - This is the context that uniques the types used by this CFG.
+  ASTContext &Context;
+
   /// The collection of all BasicBlocks in the CFG.
   BlockListType BlockList;
 
   // Intentionally marked private so that we need to use 'constructCFG()'
   // to construct a CFG.
-  CFG() {}
+  CFG(ASTContext &Context) : Context(Context) {}
 public:
   ~CFG();
 
   /// Construct a CFG from a given statement.  It is the caller's responsibility
   /// to 'delete' this object.  This can return nullptr if the CFG cannot
   /// be constructed.
-  static CFG *constructCFG(Stmt *S);
+  static CFG *constructCFG(Stmt *S, ASTContext &Context);
+
+  ASTContext &getContext() const { return Context; }
 
   //===--------------------------------------------------------------------===//
   // Block List Access

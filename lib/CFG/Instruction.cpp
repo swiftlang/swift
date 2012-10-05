@@ -26,10 +26,10 @@ using namespace swift;
 // CFGValue Implementation
 //===----------------------------------------------------------------------===//
 
-//CFGType CFGValue::getType() const {
-//  assert(isInstruction() && "getType() not implemented for BBArgs");
-//  return getInst()->getType();
-//}
+Type CFGValue::getType() const {
+  assert(isInstruction() && "getType() not implemented for BBArgs");
+  return getInst()->getType();
+}
 
 //===----------------------------------------------------------------------===//
 // ilist_traits<Instruction> Implementation
@@ -89,6 +89,36 @@ void Instruction::eraseFromParent() {
   getParent()->getInsts().erase(this);
 }
 
+//===----------------------------------------------------------------------===//
+// Instruction Subclasses
+//===----------------------------------------------------------------------===//
+
+static Type getVoidType(Type T) {
+  return T->getASTContext().TheEmptyTupleType;
+}
+
+AllocTmpInst::AllocTmpInst(MaterializeExpr *E)
+  : AllocInst(InstKind::AllocTmp, E, E->getType()) {}
+
+
+
+ApplyInst *ApplyInst::create(ApplyExpr *Expr, CFGValue Callee,
+                             ArrayRef<CFGValue> Args, CFG &C) {
+  void *Buffer = C.allocate(sizeof(ApplyInst) +
+                            Args.size() * sizeof(CFGValue),
+                            llvm::AlignOf<ApplyInst>::Alignment);
+  return ::new(Buffer) ApplyInst(Expr, Callee, Args);
+}
+
+ApplyInst::ApplyInst(ApplyExpr *Expr, CFGValue Callee, ArrayRef<CFGValue> Args)
+  : Instruction(InstKind::Apply, Expr, Expr->getType()),
+    Callee(Callee), NumArgs(Args.size()) {
+  memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(CFGValue));
+}
+
+DeclRefInst::DeclRefInst(DeclRefExpr *E)
+  : Instruction(InstKind::DeclRef, E, E->getType()) {}
+
 DeclRefExpr *DeclRefInst::getExpr() const {
   return getLocExpr<DeclRefExpr>();
 }
@@ -97,6 +127,11 @@ DeclRefExpr *DeclRefInst::getExpr() const {
 ValueDecl *DeclRefInst::getDecl() const {
   return getExpr()->getDecl();
 }
+
+IntegerLiteralInst::IntegerLiteralInst(IntegerLiteralExpr *E)
+  : Instruction(InstKind::IntegerLiteral, E, E->getType()) {
+}
+
 
 IntegerLiteralExpr *IntegerLiteralInst::getExpr() const {
   return getLocExpr<IntegerLiteralExpr>();
@@ -107,6 +142,40 @@ APInt IntegerLiteralInst::getValue() const {
   return getExpr()->getValue();
 }
 
+LoadInst::LoadInst(LoadExpr *E, CFGValue LValue)
+  : Instruction(InstKind::Load, E, E->getType()), LValue(LValue) {
+}
+
+
+StoreInst::StoreInst(AssignStmt *S, CFGValue Src, CFGValue Dest)
+  : Instruction(InstKind::Store, S, getVoidType(Src.getType())),
+    Src(Src), Dest(Dest), IsInitialization(false) {
+}
+
+StoreInst::StoreInst(MaterializeExpr *E, CFGValue Src, CFGValue Dest)
+  : Instruction(InstKind::Store, E, getVoidType(Src.getType())),
+    Src(Src), Dest(Dest), IsInitialization(true) {
+}
+
+RequalifyInst::RequalifyInst(RequalifyExpr *E, CFGValue Operand)
+  : Instruction(InstKind::Requalify, E, E->getType()), Operand(Operand) {}
+
+
+TupleInst *TupleInst::create(TupleExpr *Expr, ArrayRef<CFGValue> Elements,
+                             CFG &C) {
+  void *Buffer = C.allocate(sizeof(TupleInst) +
+                            Elements.size() * sizeof(CFGValue),
+                            llvm::AlignOf<TupleInst>::Alignment);
+  return ::new(Buffer) TupleInst(Expr, Elements);
+}
+
+TupleInst::TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elems)
+  : Instruction(InstKind::Tuple, Expr, Expr->getType()), NumArgs(Elems.size()) {
+  memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(CFGValue));
+}
+
+TypeOfInst::TypeOfInst(TypeOfExpr *E)
+  : Instruction(InstKind::TypeOf, E, E->getType()) {}
 
 TypeOfExpr *TypeOfInst::getExpr() const {
   return getLocExpr<TypeOfExpr>();
@@ -118,6 +187,9 @@ Type TypeOfInst::getMetaType() const {
   return getExpr()->getType();
 }
 
+ScalarToTupleInst::ScalarToTupleInst(ScalarToTupleExpr *E, CFGValue Operand)
+  : Instruction(InstKind::ScalarToTuple, E, E->getType()), Operand(Operand) {
+}
 
 TermInst::SuccessorListTy TermInst::getSuccessors() {
   switch (getKind()) {
@@ -144,39 +216,29 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   }
 }
 
-ApplyInst *ApplyInst::create(ApplyExpr *Expr, CFGValue Callee,
-                             ArrayRef<CFGValue> Args, CFG &C) {
-  void *Buffer = C.allocate(sizeof(ApplyInst) +
-                            Args.size() * sizeof(CFGValue),
-                            llvm::AlignOf<ApplyInst>::Alignment);
-  return ::new(Buffer) ApplyInst(Expr, Callee, Args);
+UnreachableInst::UnreachableInst(CFG &C)
+  : TermInst(InstKind::Unreachable, CFGLocation(),
+             C.getContext().TheEmptyTupleType) {
 }
 
-ApplyInst::ApplyInst(ApplyExpr *Expr, CFGValue Callee, ArrayRef<CFGValue> Args)
-  : Instruction(InstKind::Apply, Expr), Callee(Callee), NumArgs(Args.size()) {
-  memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(CFGValue));
+ReturnInst::ReturnInst(ReturnStmt *S, CFGValue ReturnValue)
+  : TermInst(InstKind::Return, S, getVoidType(ReturnValue.getType())),
+    ReturnValue(ReturnValue) {
 }
+
+BranchInst::BranchInst(BasicBlock *DestBB, CFG &C)
+  : TermInst(InstKind::Branch, CFGLocation(), C.getContext().TheEmptyTupleType),
+    DestBB(this, DestBB) {
+}
+
 
 CondBranchInst::CondBranchInst(Stmt *TheStmt, CFGValue Condition,
                                BasicBlock *TrueBB, BasicBlock *FalseBB)
-  : TermInst(InstKind::CondBranch, TheStmt), Condition(Condition) {
+  : TermInst(InstKind::CondBranch, TheStmt, getVoidType(Condition.getType())),
+    Condition(Condition) {
   DestBBs[0].init(this);
   DestBBs[1].init(this);
   DestBBs[0] = TrueBB;
   DestBBs[1] = FalseBB;
-}
-
-
-TupleInst *TupleInst::create(TupleExpr *Expr, ArrayRef<CFGValue> Elements,
-                             CFG &C) {
-  void *Buffer = C.allocate(sizeof(TupleInst) +
-                            Elements.size() * sizeof(CFGValue),
-                            llvm::AlignOf<TupleInst>::Alignment);
-  return ::new(Buffer) TupleInst(Expr, Elements);
-}
-
-TupleInst::TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elems)
-  : Instruction(InstKind::Tuple, Expr), NumArgs(Elems.size()) {
-  memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(CFGValue));
 }
 

@@ -61,10 +61,13 @@ public llvm::ilist_node<Instruction>, public CFGAllocated<Instruction> {
   const InstKind Kind;
 
   /// A backreference to the containing basic block.  This is maintained by
-  // ilist_traits<Instruction>.
+  /// ilist_traits<Instruction>.
   BasicBlock *ParentBB;
 
   CFGLocation Loc;
+
+  /// Ty - This is the type of the value produced by the instruction.
+  Type Ty;
 
   friend struct llvm::ilist_sentinel_traits<Instruction>;
   Instruction() = delete;
@@ -72,15 +75,15 @@ public llvm::ilist_node<Instruction>, public CFGAllocated<Instruction> {
   void operator delete(void *Ptr, size_t) = delete;
 
 protected:
-  Instruction(InstKind Kind, CFGLocation Loc)
-    : Kind(Kind), ParentBB(0), Loc(Loc) {}
+  Instruction(InstKind Kind, CFGLocation Loc, Type Ty)
+    : Kind(Kind), ParentBB(0), Loc(Loc), Ty(Ty) {}
 
 public:
 
   InstKind getKind() const { return Kind; }
   const BasicBlock *getParent() const { return ParentBB; }
   BasicBlock *getParent() { return ParentBB; }
-
+  Type getType() const { return Ty; }
 
   CFGLocation getLoc() const { return Loc; }
 
@@ -121,7 +124,8 @@ class AllocInst : public Instruction {
 // Eventually: enum AllocKind { Heap, Stack, StackNoRefCount, Pseudo };
 
 protected:
-  AllocInst(InstKind Kind, CFGLocation Loc) : Instruction(Kind, Loc) {}
+  AllocInst(InstKind Kind, CFGLocation Loc, Type Ty)
+    : Instruction(Kind, Loc, Ty) {}
 public:
 
 };
@@ -145,8 +149,7 @@ public:
 class AllocTmpInst : public AllocInst {
 public:
 
-  AllocTmpInst(MaterializeExpr *E) : AllocInst(InstKind::AllocTmp, (Expr*)E) {}
-
+  AllocTmpInst(MaterializeExpr *E);
   
 };
 
@@ -193,7 +196,7 @@ public:
   ///
   /// \param Expr A backpointer to the original DeclRefExpr.
   ///
-  DeclRefInst(DeclRefExpr *E) : Instruction(InstKind::DeclRef, (Expr*)E) {}
+  DeclRefInst(DeclRefExpr *E);
 
   DeclRefExpr *getExpr() const;
 
@@ -214,10 +217,8 @@ public:
   ///
   /// \param Expr A backpointer to the original IntegerLiteralExpr.
   ///
-  IntegerLiteralInst(IntegerLiteralExpr *E)
-    : Instruction(InstKind::IntegerLiteral, (Expr*)E) {
-  }
-
+  IntegerLiteralInst(IntegerLiteralExpr *E);
+  
   IntegerLiteralExpr *getExpr() const;
   
   /// getValue - Return the APInt for the underlying integer literal.
@@ -241,9 +242,7 @@ public:
   /// \param LValue The CFGValue representing the lvalue (address) to
   ///        use for the load.
   ///
-  LoadInst(LoadExpr *E, CFGValue LValue) :
-    Instruction(InstKind::Load, (Expr*)E), LValue(LValue) {}
-
+  LoadInst(LoadExpr *E, CFGValue LValue);
 
   CFGValue getLValue() const { return LValue; }
 
@@ -254,7 +253,7 @@ public:
 
 class StoreInst : public Instruction {
   /// The value being stored and the lvalue being stored to.
-  CFGValue Src, DestLValue;
+  CFGValue Src, Dest;
 
   /// IsInitialization - True if this is the initialization of a memory location
   /// that is uninitialized, not a general store.  In an initialization of an
@@ -262,18 +261,11 @@ class StoreInst : public Instruction {
   bool IsInitialization;
 public:
 
-  StoreInst(AssignStmt *S, CFGValue Src, CFGValue DestLValue)
-    : Instruction(InstKind::Store, (Stmt*)S), Src(Src), DestLValue(DestLValue),
-      IsInitialization(false) {
-  }
-
-  StoreInst(MaterializeExpr *E, CFGValue Src, CFGValue DestLValue)
-    : Instruction(InstKind::Store, (Expr*)E), Src(Src), DestLValue(DestLValue),
-      IsInitialization(true) {
-  }
+  StoreInst(AssignStmt *S, CFGValue Src, CFGValue Dest);
+  StoreInst(MaterializeExpr *E, CFGValue Src, CFGValue Dest);
 
   CFGValue getSrc() const { return Src; }
-  CFGValue getDestLValue() const { return DestLValue; }
+  CFGValue getDest() const { return Dest; }
 
   bool isInitialization() const { return IsInitialization; }
 
@@ -289,8 +281,7 @@ public:
 class RequalifyInst : public Instruction {
   CFGValue Operand;
 public:
-  RequalifyInst(RequalifyExpr *E, CFGValue Operand)
-    : Instruction(InstKind::Requalify, (Expr*)E), Operand(Operand) {}
+  RequalifyInst(RequalifyExpr *E, CFGValue Operand);
 
   CFGValue getOperand() const { return Operand; }
 };
@@ -334,7 +325,7 @@ public:
   ///
   /// \param Expr A backpointer to the original TypeOfExpr.
   ///
-  TypeOfInst(TypeOfExpr *E) : Instruction(InstKind::TypeOf, (Expr*)E) {}
+  TypeOfInst(TypeOfExpr *E);
 
   TypeOfExpr *getExpr() const;
 
@@ -351,8 +342,7 @@ public:
 class ScalarToTupleInst : public Instruction {
   CFGValue Operand;
 public:
-  ScalarToTupleInst(ScalarToTupleExpr *E, CFGValue Operand)
-    : Instruction(InstKind::ScalarToTuple, (Expr*)E), Operand(Operand) {}
+  ScalarToTupleInst(ScalarToTupleExpr *E, CFGValue Operand);
 
   CFGValue getOperand() const { return Operand; }
 
@@ -365,7 +355,7 @@ public:
 /// This class defines a "terminating instruction" for a BasicBlock.
 class TermInst : public Instruction {
 protected:
-  TermInst(InstKind K, CFGLocation Loc) : Instruction(K, Loc) {}
+  TermInst(InstKind K, CFGLocation Loc, Type Ty) : Instruction(K, Loc, Ty) {}
 public:
 
   typedef llvm::ArrayRef<CFGSuccessor> SuccessorListTy;
@@ -389,9 +379,8 @@ public:
 /// function or after a no-return function call.
 class UnreachableInst : public TermInst {
 public:
-  UnreachableInst() : TermInst(InstKind::Unreachable, CFGLocation()) {
-  }
-
+  UnreachableInst(CFG &C);
+  
   SuccessorListTy getSuccessors() {
     // No Successors.
     return SuccessorListTy();
@@ -414,9 +403,7 @@ public:
   ///
   /// \param returnValue The value to be returned.
   ///
-  ReturnInst(ReturnStmt *S, CFGValue ReturnValue)
-    : TermInst(InstKind::Return, (Stmt*)S), ReturnValue(ReturnValue) {
-  }
+  ReturnInst(ReturnStmt *S, CFGValue ReturnValue);
 
   CFGValue getReturnValue() const { return ReturnValue; }
 
@@ -438,9 +425,7 @@ public:
   typedef ArrayRef<CFGValue> ArgsTy;
   
   /// Construct an BranchInst that will branches to the specified block.
-  BranchInst(BasicBlock *DestBB)
-    : TermInst(InstKind::Branch, CFGLocation()), DestBB(this, DestBB) {
-  }
+  BranchInst(BasicBlock *DestBB, CFG &C);
   
   /// The jump target for the branch.
   BasicBlock *getDestBB() const { return DestBB; }

@@ -426,8 +426,8 @@ CFGValue CFGGen::visitTypeOfExpr(TypeOfExpr *E) {
 // CFG Class implementation
 //===--------------------------------------------------------------------===//
 
-CFG *CFG::constructCFG(Stmt *S) {
-  CFG *C = new CFG();
+CFG *CFG::constructCFG(Stmt *S, ASTContext &Ctx) {
+  CFG *C = new CFG(Ctx);
   CFGGen(*C).visit(S);
 
   C->verify();

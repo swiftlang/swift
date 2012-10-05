@@ -44,8 +44,7 @@ namespace swift {
     Instruction *getInstOrNull() const { return V.dyn_cast<Instruction*>(); }
     BasicBlockArg *getBBArgOrNull() const {return V.dyn_cast<BasicBlockArg*>();}
 
-    //Type getType() const;
-
+    Type getType() const;
   };
 } // end namespace swift
 
