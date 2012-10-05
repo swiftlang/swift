@@ -80,11 +80,6 @@ namespace irgen {
                                            ProtocolDecl *targetProtocol,
                                            llvm::Value *metadata);
 
-  /// When entering a member function of a generic class, bind
-  /// archetypes from the 'this' pointer.
-  void bindGenericClassArchetypes(IRGenFunction &IGF, Address thisAddr,
-                                  ClassDecl *CD);
-
 } // end namespace irgen
 } // end namespace swift
 

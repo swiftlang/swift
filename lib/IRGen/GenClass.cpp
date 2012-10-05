@@ -184,9 +184,18 @@ static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
   // to destroy implicitly.
   assert((!DD || DD->getDeclContext() == CD) &&
          "destructor not defined in main class decl; archetypes might be off");
-  if (CD->getGenericParamsOfContext()) {
-    Address thisAsAddr = Address(thisValue, info.getHeapAlignment(IGF.IGM));
-    bindGenericClassArchetypes(IGF, thisAsAddr, CD);
+  if (auto generics = CD->getGenericParamsOfContext()) {
+    Explosion fakeArgs(ExplosionKind::Minimal);
+    fakeArgs.addUnmanaged(thisValue);
+    fakeArgs.claimUnmanagedNext();
+
+    auto argType = CD->getDeclaredTypeInContext()->getCanonicalType();
+    auto polyFn =
+      PolymorphicFunctionType::get(argType,
+                                   TupleType::getEmpty(IGF.IGM.Context),
+                                   generics,
+                                   IGF.IGM.Context);
+    emitPolymorphicParameters(IGF, polyFn, fakeArgs);
   }
 
   // FIXME: If the class is generic, we need some way to get at the
