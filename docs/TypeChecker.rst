@@ -541,6 +541,12 @@ Meets and Joins
 
 Default Literal Types
 ..........................................
+If a type variable is bound by a literal constraint, e.g., "``T0``  is
+an integer literal``, then the constraint solver will guess that the
+type variable can be bound to the default literal type. For example,
+``T0`` would get the default literal type (e.g., ``Int``), allowing
+one to type-check expressions with too literal type information for
+literals, e.g., ``-1``.
 
 Supertype Fallback
 ..........................................
