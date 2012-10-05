@@ -61,7 +61,9 @@ public:
   }
 
   void visitDeclRefInst(DeclRefInst *DRI) {
-    //assert(DRI->getType()->is<LValueType>() && "DeclRef should return lvalue");
+    assert((DRI->getType()->is<LValueType>() ||
+            DRI->getType()->is<FunctionType>()) &&
+           "DeclRef should return lvalue");
   }
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     assert(ILI->getType()->is<BuiltinType>() && "invalid integer literal type");
