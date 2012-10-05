@@ -56,13 +56,6 @@ Condition CFGGen::emitCondition(Stmt *TheStmt, Expr *E,
   }
   assert(V.getType()->castTo<BuiltinIntegerType>()->getBitWidth() == 1);
   
-  // Check for a constant condition.
-#if 0 // FIXME: Implement optimization
-  if (llvm::ConstantInt *C = dyn_cast<llvm::ConstantInt>(V)) {
-    //
-  }
-#endif
-  
   BasicBlock *ContBB = new BasicBlock(&C, "condition.cont");
   BasicBlock *TrueBB = new BasicBlock(&C, "if.true");
   

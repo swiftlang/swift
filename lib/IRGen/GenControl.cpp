@@ -115,44 +115,21 @@ Condition IRGenFunction::emitCondition(Expr *E, bool hasFalseCode,
   }
   assert(V->getType()->isIntegerTy(1));
 
-  llvm::BasicBlock *trueBB, *falseBB, *contBB;
+  llvm::BasicBlock *contBB = createBasicBlock("condition.cont");
+  llvm::BasicBlock *trueBB = createBasicBlock("if.true");
 
-  // Check for a constant condition.
-  if (llvm::ConstantInt *C = dyn_cast<llvm::ConstantInt>(V)) {
-    // If the condition is constant false, ignore the true branch.  We
-    // will fall into the false branch unless there is none.
-    if (C->isZero() == !invertValue) {
-      trueBB = nullptr;
-      falseBB = (hasFalseCode ? Builder.GetInsertBlock() : nullptr);
-
-    // Otherwise, ignore the false branch.  We will fall into the true
-    // branch.
-    } else {
-      trueBB = Builder.GetInsertBlock();
-      falseBB = nullptr;
-    }
-
-    // There is no separate continuation block.
-    contBB = nullptr;
-
-  // Otherwise, the condition requires a conditional branch.
+  llvm::BasicBlock *falseBB, *falseDestBB;
+  if (hasFalseCode) {
+    falseBB = falseDestBB = createBasicBlock("if.false");
   } else {
-    contBB = createBasicBlock("condition.cont");
-    trueBB = createBasicBlock("if.true");
-
-    llvm::BasicBlock *falseDestBB;
-    if (hasFalseCode) {
-      falseBB = falseDestBB = createBasicBlock("if.false");
-    } else {
-      falseBB = nullptr;
-      falseDestBB = contBB;
-    }
-
-    if (invertValue)
-      Builder.CreateCondBr(V, falseDestBB, trueBB);
-    else
-      Builder.CreateCondBr(V, trueBB, falseDestBB);
+    falseBB = nullptr;
+    falseDestBB = contBB;
   }
+
+  if (invertValue)
+    Builder.CreateCondBr(V, falseDestBB, trueBB);
+  else
+    Builder.CreateCondBr(V, trueBB, falseDestBB);
 
   return Condition(trueBB, falseBB, contBB);
 }
