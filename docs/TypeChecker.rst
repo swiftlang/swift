@@ -536,27 +536,133 @@ types. There are several strategies employed by the solver.
 
 Meets and Joins
 ..........................................
+A given type variable ``T0`` often has relational constraints
+placed on it that relate it to concrete types, e.g., ``T0 << Int`` or
+``Float << T0``. In these cases, we can use the concrete types as a
+starting point to make educated guesses for the type ``T0``.
 
+To determine an appropriate guess, the relational constraints placed
+on the type variable are categorized. Given a relational constraint of the form 
+``T0 <? A`` (where ``<?`` is one of ``<``, ``<t``, or ``<<``), where
+``A`` is some concrete type, ``A`` is said to be  "above"
+``T0``. Similarly, given a constraint of the form ``B <? T0`` for a
+concrete type ``B``, ``B`` is said to be "below" ``T0``. The
+above/below terminologies comes from a visualization of the lattice of
+types formed by the conversion relationship, e.g., there is an edge
+``A -> B`` in the latter if ``A`` is convertible to ``B``. ``B`` would
+therefore be higher in the lattice than ``A``, and the topmost element
+of the lattice is the element to which all types can be converted,
+``protocol<>`` (often called "top"). 
+
+The concrete types "above" and "below" a given type variable provide
+bounds on the possible concrete types that can be assigned to that
+type variable. The solver computes [#]_ the join of the types "below"
+the type variable, i.e., the most specific (lowest) type to which all
+of the types "below" can be converted, and uses that join as a
+starting guess.
+
+
+Supertype Fallback
+..........................................
+The join of the "below" types computed as a starting point may be too
+specific, due to constraints that involve the type variable but
+weren't simple enough to consider as part of the join. To cope with
+such cases, if no solution can be found with the join of the "below"
+types, the solver creates a new set of derived constraint systems with
+weaker assumptions, corresponding to each of the types that the join
+is directly convertible to. For example, if the join was some class
+``Derived``, the supertype fallback would then try the class ``Base``
+from which ``Derived`` directly inherits. This fallback process
+continues until the types produced are no longer convertible to the
+meet of types "above" the type variable, i.e., the least specific
+(highest) type from which all of the types "above" the type variable
+can be converted [#]_.
 
 
 Default Literal Types
 ..........................................
 If a type variable is bound by a literal constraint, e.g., "``T0``  is
-an integer literal``, then the constraint solver will guess that the
+an integer literal", then the constraint solver will guess that the
 type variable can be bound to the default literal type. For example,
-``T0`` would get the default literal type (e.g., ``Int``), allowing
-one to type-check expressions with too literal type information for
-literals, e.g., ``-1``.
-
-Supertype Fallback
-..........................................
-
+``T0`` would get the default integer literal type ``Int``, allowing
+one to type-check expressions with too little type information to
+determine the types of these literals, e.g., ``-1``.
 
 Comparing Solutions
 `````````````````````````
+The solver explores a potentially large solution space, and it is
+possible that it will find multiple solutions to the constraint system
+as given. Such cases are not necessarily ambiguities, because the
+solver can then compare the solutions to to determine whether one of
+the solutions is better than all of the others. To do so, it compares
+the concrete type variable bindings and selected overloads from each
+pair of solutions:
+
+- If two type variables have different concrete type bindings in the
+  two solutions, the two type variables are compared. If the concrete
+  type bound in the first solution is convertible to the concrete type
+  bound in the second solution, then the binding in the first solution
+  is more specific than the binding in the second solution.
+
+  If neither concrete type is convertible to the other, and there is a
+  literal constraint on the type variable, then the binding in the
+  first solution is more specific if the bound type is the same as the
+  default literal type for that literal constraint (and the binding in
+  the second solution is not). This rule therefore prefers the use of
+  the default literal types over other types, and ends up breaking
+  ambiguities in cases where there are several literals.
+
+- If two overload sets have different selected overloads in the two
+  soluions, the overloads are compared [#]_. If the type of the
+  overload picked in the first solution is convertible to the type of
+  the overload picked in the second solution, then the overload
+  selection in the first solution is more specific than the binding in
+  the second solution.
+
+If any type variable bindings or overload selections in one solution
+are more specific than their corresponding binding or select in
+another solution, and no type variable binding or overload selection
+is less specific, then the first solution is more specific. The best
+solution is the solution that is more specific than all other
+solutions.
 
 Solution Application
 -------------------------
+Once the solver has produced a solution to the constraint system, that
+solution must be applied to the original expression to produce a fully
+type-checked expression that makes all implicit conversions and
+resolved overloads explicit. This application process walks the
+expression tree from the leaves to the root, rewriting each expression
+node based on the kind of expression:
+
+*Declaration references*
+  Declaration references are rewritten with the precise type of the
+  declaraion as referenced. For overloaded declaration references, the
+  ``Overload*Expr`` node is replaced with a simple declaration
+  reference expression. For references to polymorphic functions or
+  members of generic types, a ``SpecializeExpr`` node is introduced to
+  provide substitutions for all of the generic parameters.
+
+*Member references*
+  References to members are similar to declaration
+  references. However, they have the added constraint that the base
+  expression needs to be a reference. Therefore, an rvalue of
+  non-reference type will be materialized to produce the necessary
+  reference.
+
+*Literals*
+  Literals are converted to the appropriate literal type, which
+  typically involves introducing calls to ``convertFromXXXLiteral``
+  functions.
+
+*Function expressions*
+  Since the function expression has acquired a complete function type,
+  the body of the function expression is type-checked with that
+  complete function type. (This operation can be delayed).
+
+The solution application step cannot fail, because every potential
+failure is modeled as a constraint in the constraint system. If any
+failures do occur at this step, it is a bug in the type checker.
 
 Performance
 -----------------
@@ -567,8 +673,10 @@ quickly, since much of the work we perform is completely wasted.
 Diagnostics
 -----------------
 The diagnostics produced by the type checker are currently
-terrible. We plan to do something about this, eventually.
-
+terrible. We plan to do something about this, eventually. We also
+believe that we can implement some heroics, such as spell-checking
+that takes into account the surrounding expression to only provide
+well-typed suggestions.
 
 .. [#] It is possible that both overloads will result in a solution,
    in which case the solutions will be ranked based on the rules
@@ -579,3 +687,16 @@ terrible. We plan to do something about this, eventually.
   constraints-based type checker contains a function ``matchTypes``
   that documents and implements each of these rules. A future revision
   of this document will provide a more readily-accessible version.
+
+.. [#] More accurately, as of this writing, "will compute". The solver
+  doesn't current compute meets and joins properly. Rather, it
+  arbitrarily picks one of the constraints "below" to start with.
+
+.. [#] Again, as of this writing, the solver doesn't actually compute
+  meets and joins, so the solver continues until it runs out of
+  supertypes to enumerate.
+
+.. [#] This overload resolution has yet to be implemented. Moreover,
+   there is an optimization opportunity here to explore the
+   more-specific overloads before the less-specific overloads.
+
