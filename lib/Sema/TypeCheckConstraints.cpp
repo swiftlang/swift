@@ -4886,8 +4886,6 @@ namespace {
 Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-
-  // Pre-check the expression.
   expr = expr->walk(PreCheckExpression(*this));
   if (!expr)
     return nullptr;

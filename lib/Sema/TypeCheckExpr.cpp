@@ -1698,10 +1698,6 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   // If we're using the constraint solver, we take a different path through
   // the type checker. Handle it here.
   if (getLangOpts().UseConstraintSolver) {
-    // If this expression has already been type-checked, we're done.
-    if (E->getType())
-      return E->getType()->is<ErrorType>();
-
     E = typeCheckExpressionConstraints(E, ConvertType);
     return E == nullptr;
   }
