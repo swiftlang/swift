@@ -1462,6 +1462,9 @@ public:
 
   TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
 
+  /// \brief Retrieve the result type of this function.
+  Type getResultType(ASTContext &Ctx) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FuncExpr *) { return true; }
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Func; }

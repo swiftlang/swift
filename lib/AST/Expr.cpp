@@ -321,6 +321,20 @@ SourceRange FuncExpr::getSourceRange() const {
   return { FuncLoc, LastPat->getEndLoc() };
 }
 
+Type FuncExpr::getResultType(ASTContext &Ctx) const {
+  Type resultTy = getType();
+  if (resultTy->is<ErrorType>())
+    return resultTy;
+
+  for (unsigned i = 0, e = getParamPatterns().size(); i != e; ++i)
+    resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
+
+  if (!resultTy)
+    resultTy = TupleType::getEmpty(Ctx);
+
+  return resultTy;
+}
+
 static ValueDecl *getCalledValue(Expr *E) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->getDecl();

@@ -32,6 +32,9 @@ namespace {
     llvm::raw_ostream &Out;
     bool HadError;
 
+    /// \brief The stack of functions we're visiting.
+    llvm::SmallVector<FuncExpr *, 4> Functions;
+
   public:
     Verifier(TranslationUnit *TU) : TU(TU), Ctx(TU->Ctx), Out(llvm::errs()),
                                     HadError(TU->Ctx.hadError()) {}
@@ -55,7 +58,7 @@ namespace {
 
     Expr *walkToExprPost(Expr *E) {
       switch (E->getKind()) {
-#define DISPATCH(ID) return dispatchVisitPost(static_cast<ID##Expr*>(E))
+#define DISPATCH(ID) return dispatchVisitPost(static_cast<ID##Expr*>(E));
 #define EXPR(ID, PARENT) \
       case ExprKind::ID: \
         DISPATCH(ID);
@@ -108,14 +111,15 @@ namespace {
 
     bool walkToDeclPost(Decl *D) {
       switch (D->getKind()) {
-#define DISPATCH(ID) dispatchVisitPost(static_cast<ID##Decl*>(D)); return true;
+#define DISPATCH(ID) return dispatchVisitPost(static_cast<ID##Decl*>(D))
 #define DECL(ID, PARENT) \
       case DeclKind::ID: \
         DISPATCH(ID);
 #include "swift/AST/DeclNodes.def"
 #undef DISPATCH
       }
-      llvm_unreachable("not all cases handled!");
+
+      llvm_unreachable("Unhandled declaratiom kind");
     }
 
   private:
@@ -146,6 +150,9 @@ namespace {
         checkBoundGenericTypes(node);
       }
 
+      // Clean up anything that we've placed into a stack to check.
+      cleanup(node);
+
       // Always continue.
       return node;
     }
@@ -155,6 +162,11 @@ namespace {
     bool shouldVerify(Stmt *S) { return true; }
     bool shouldVerify(Decl *S) { return true; }
 
+    // Default cases for cleaning up as we exit a node.
+    void cleanup(Expr *E) { }
+    void cleanup(Stmt *S) { }
+    void cleanup(Decl *D) { }
+    
     // Base cases for the various stages of verification.
     void verifyParsed(Expr *E) {}
     void verifyParsed(Stmt *S) {}
@@ -167,6 +179,31 @@ namespace {
     void verifyChecked(Decl *D) {}
 
     // Specialized verifiers.
+
+    bool shouldVerify(FuncExpr *func) {
+      Functions.push_back(func);
+      return shouldVerify(cast<Expr>(func));
+    }
+    
+    void cleanup(FuncExpr *func) {
+      assert(Functions.back() == func);
+      Functions.pop_back();
+    }
+
+    void verifyChecked(ReturnStmt *S) {
+      auto func = Functions.back();
+      auto resultType = func->getResultType(Ctx);
+      
+      if (S->hasResult()) {
+        auto result = S->getResult();
+        auto returnType = result->getType();
+        // Make sure that the return has the same type as the function.
+        checkSameType(resultType, returnType, "return type");
+      } else {
+        // Make sure that the function has a Void result type.
+        checkSameType(resultType, TupleType::getEmpty(Ctx), "return type");
+      }
+    }
 
     void verifyChecked(IfStmt *S) {
       checkSameType(S->getCond()->getType(), BuiltinIntegerType::get(1, Ctx),
