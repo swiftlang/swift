@@ -347,7 +347,7 @@ namespace {
       Second->print(Out);
     }
 
-    void dump() LLVM_ATTRIBUTE_USED { print(llvm::outs()); }
+    void dump() LLVM_ATTRIBUTE_USED { print(llvm::errs()); }
 
     void *operator new(size_t bytes, ConstraintSystem& cs,
                        size_t alignment = alignof(Constraint)) {
@@ -3728,7 +3728,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
 
   // Simplify this constraint system.
   if (TC.getLangOpts().DebugConstraintSolver) {
-    llvm::outs() << "---Simplified constraints---\n";
+    llvm::errs() << "---Simplified constraints---\n";
   }
   bool error = simplify();
   if (TC.getLangOpts().DebugConstraintSolver) {
@@ -3816,11 +3816,11 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
         unsigned idx = 0;
         for (auto cs : viable) {
           SmallVector<TypeVariableType *, 4> freeVariables;
-          llvm::outs() << "---Child system #" << ++idx;
+          llvm::errs() << "---Child system #" << ++idx;
           if (cs == best) {
-            llvm::outs() << " (best)";
+            llvm::errs() << " (best)";
           }
-          llvm::outs() << "---\n";
+          llvm::errs() << "---\n";
           cs->dump();
         }
       }
@@ -4890,7 +4890,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   if (!expr)
     return nullptr;
 
-  llvm::raw_ostream &log = llvm::outs();
+  llvm::raw_ostream &log = llvm::errs();
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this);
@@ -4913,7 +4913,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   SmallVector<ConstraintSystem *, 4> viable;
   if (cs.solve(viable)) {
     if (getLangOpts().DebugConstraintSolver) {
-      llvm::outs() << "---Solved constraints---\n";
+      log << "---Solved constraints---\n";
       cs.dump();
 
       unsigned numSolved = 0;
@@ -4921,7 +4921,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
         unsigned idx = 0;
         for (auto cs : viable) {
           SmallVector<TypeVariableType *, 4> freeVariables;
-          llvm::outs() << "---Child system #" << ++idx << "---\n";
+          log << "---Child system #" << ++idx << "---\n";
           cs->dump();
           if (cs->isSolved(freeVariables)) {
             ++numSolved;
@@ -5036,7 +5036,7 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   if (!src)
     return { nullptr, nullptr };
 
-  llvm::raw_ostream &log = llvm::outs();
+  llvm::raw_ostream &log = llvm::errs();
 
   // Construct a constraint system from the destination and source.
   ConstraintSystem cs(*this);
@@ -5067,7 +5067,7 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   SmallVector<ConstraintSystem *, 4> viable;
   if (cs.solve(viable)) {
     if (getLangOpts().DebugConstraintSolver) {
-      llvm::outs() << "---Solved constraints---\n";
+      log << "---Solved constraints---\n";
       cs.dump();
 
       unsigned numSolved = 0;
@@ -5075,7 +5075,7 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
         unsigned idx = 0;
         for (auto cs : viable) {
           SmallVector<TypeVariableType *, 4> freeVariables;
-          llvm::outs() << "---Child system #" << ++idx << "---\n";
+          log << "---Child system #" << ++idx << "---\n";
           cs->dump();
           if (cs->isSolved(freeVariables)) {
             ++numSolved;
@@ -5145,7 +5145,7 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
 #pragma mark Debugging
 
 void ConstraintSystem::dump() {
-  llvm::raw_ostream &out = llvm::outs();
+  llvm::raw_ostream &out = llvm::errs();
 
   if (Parent) {
     SmallVector<ConstraintSystem *, 4> path;;
@@ -5274,15 +5274,15 @@ void ConstraintSystem::dump() {
   SmallVector<TypeVariableType *, 4> freeVariables;
   if (isSolved(freeVariables)) {
     if (freeVariables.empty()) {
-      llvm::outs() << "SOLVED (completely)\n";
+      out << "SOLVED (completely)\n";
     } else {
-      llvm::outs() << "SOLVED (with free variables):";
+      out << "SOLVED (with free variables):";
       for (auto fv : freeVariables) {
-        llvm::outs() << ' ' << fv->getString();
+        out << ' ' << fv->getString();
       }
-      llvm::outs() << '\n';
+      out << '\n';
     }
   } else {
-    llvm::outs() << "UNSOLVED\n";
+    out << "UNSOLVED\n";
   }
 }
