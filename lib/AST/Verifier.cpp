@@ -557,6 +557,18 @@ namespace {
       }
     }
 
+    void verifyChecked(NewArrayExpr *E) {
+      if (!E->hasElementType()) {
+        Out << "NewArrayExpr is missing its element type";
+        abort();
+      }
+
+      if (!E->hasInjectionFunction()) {
+        Out << "NewArrayExpr is missing an injection function";
+        abort();
+      }
+    }
+
     /// Look through a possible l-value type, returning true if it was
     /// an l-value.
     bool lookThroughLValue(Type &type, LValueType::Qual &qs) {

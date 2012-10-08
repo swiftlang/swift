@@ -1642,6 +1642,8 @@ public:
 
   bool hasInjectionFunction() const { return InjectionFn != nullptr; }
 
+  bool hasElementType() const { return !ElementTy.isNull(); }
+
   Type getElementType() const {
     assert(ElementTy && "Element type not yet computed!");
     return ElementTy;
