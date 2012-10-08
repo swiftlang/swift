@@ -58,7 +58,7 @@ namespace {
 
     Expr *walkToExprPost(Expr *E) {
       switch (E->getKind()) {
-#define DISPATCH(ID) return dispatchVisitPost(static_cast<ID##Expr*>(E));
+#define DISPATCH(ID) return dispatchVisitPost(static_cast<ID##Expr*>(E))
 #define EXPR(ID, PARENT) \
       case ExprKind::ID: \
         DISPATCH(ID);
