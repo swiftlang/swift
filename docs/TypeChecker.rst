@@ -92,14 +92,14 @@ the Swift type system:
   A conversion constraint requires that the first type be convertible
   to the second, which includes subtyping and equality. Additionally,
   it allows a user-defined conversion function to be
-  called. Conversion constraints are written ``X << Y``, read as
+  called. Conversion constraints are written ``X <c Y``, read as
   ```X`` can be converted to ``Y```.
 
 **Construction**
-  A construction constraint, written ``X <<C Y`` requires either that
+  A construction constraint, written ``X <C Y`` requires either that
   the first type can be convertible to the second type or that the
   second type be a nominal type with a constructor that accepts a
-  value of the first type. For example, the constraint``Int <<C
+  value of the first type. For example, the constraint``Int <C
   String`` is satisfiable because ``String`` has a constructor that
   accepts an ``Int``.
 
@@ -187,14 +187,14 @@ and types generated from the primary expression kinds are:
   T(a)`` (for fresh type variables ``T0`` and ``T1``) captures the
   rvalue-to-lvalue conversion applied on the function (``a``) and
   decomposes the function type into its argument and result
-  types. Second, the conversion constraint ``T(b) << T0`` captures the
+  types. Second, the conversion constraint ``T(b) <c T0`` captures the
   requirement that the actual argument type (``b``) be convertible to
   the argument type of the function. Finally, the expression is given
   the type ``T1``, i.e.,  the result type of the function.
 
 **Coercion/construction**
   A type coercion ``A(b)``, where ``A`` refers to a type, generates a
-  construction constraint ``T(b) <<C  A``, which requires that ``T(b)``
+  construction constraint ``T(b) <C  A``, which requires that ``T(b)``
   either be a subtype of ``A`` or  that ``A`` have a constructor that
   accepts ``b``. The type of the expression is ``A``.
 
@@ -210,7 +210,7 @@ and types generated from the primary expression kinds are:
   application. A value member constraint ``T(a).__subscript == T0 -> T1``
   treats the subscript as a function from the key type to the
   value type, represented by fresh type variables ``T0`` and ``T1``,
-  respectively. The constraint ``T(b) << T0`` requires the key
+  respectively. The constraint ``T(b) <c T0`` requires the key
   argument to be convertible to the key type, and the type of the
   subscript operation is ``T1``.
 
@@ -252,7 +252,7 @@ and types generated from the primary expression kinds are:
 **Object allocation**
   An object allocation ``new A(b)`` or ``new A[c]`` is assigned the
   type ``A`` or ``A[]``, respectively. For the single allocation case,
-  the construction constraint ``T(b) <<C A`` requires an ``A``
+  the construction constraint ``T(b) <C A`` requires an ``A``
   constructor that accepts ``b``. For the multiple allocation case,
   the type checker (separately) checks that ``T(c)`` is an array bound
   type.
@@ -438,7 +438,7 @@ structure of the two types and applying the typing rules of the Swift
 language to generate additional constraints. For example, if the
 constraint is a conversion constraint::
 
-  A -> B << C -> D
+  A -> B <c C -> D
 
 then both types are function types, and we can break down this
 constraint into two smaller constraints ``C < A`` and ``B < D`` by
@@ -537,13 +537,13 @@ types. There are several strategies employed by the solver.
 Meets and Joins
 ..........................................
 A given type variable ``T0`` often has relational constraints
-placed on it that relate it to concrete types, e.g., ``T0 << Int`` or
-``Float << T0``. In these cases, we can use the concrete types as a
+placed on it that relate it to concrete types, e.g., ``T0 <c Int`` or
+``Float <c T0``. In these cases, we can use the concrete types as a
 starting point to make educated guesses for the type ``T0``.
 
 To determine an appropriate guess, the relational constraints placed
 on the type variable are categorized. Given a relational constraint of the form 
-``T0 <? A`` (where ``<?`` is one of ``<``, ``<t``, or ``<<``), where
+``T0 <? A`` (where ``<?`` is one of ``<``, ``<t``, or ``<c``), where
 ``A`` is some concrete type, ``A`` is said to be  "above"
 ``T0``. Similarly, given a constraint of the form ``B <? T0`` for a
 concrete type ``B``, ``B`` is said to be "below" ``T0``. The

@@ -306,8 +306,8 @@ namespace {
       case ConstraintKind::EqualRvalue: Out << " ==R "; break;
       case ConstraintKind::TrivialSubtype: Out << " <t "; break;
       case ConstraintKind::Subtype: Out << " < "; break;
-      case ConstraintKind::Conversion: Out << " << "; break;
-      case ConstraintKind::Construction: Out << " <<C "; break;
+      case ConstraintKind::Conversion: Out << " <c "; break;
+      case ConstraintKind::Construction: Out << " <C "; break;
       case ConstraintKind::Literal:
         Out << " is ";
         switch (getLiteralKind()) {
@@ -3216,7 +3216,7 @@ namespace {
   ///
   /// The ordering depends on the the classification of constraints:
   ///   - For relational constraints, the constraints are ordered by strength,
-  ///     e.g., == precedes < and < precedes <<.
+  ///     e.g., == precedes < and < precedes <c.
   ///
   ///   - For literal constraints, we order by literal kind.
   ///
@@ -3340,8 +3340,8 @@ namespace {
 /// given type variable T.
 ///
 /// A type X is above T if there is a constraint
-/// T <t X, T < X, or T << X, whereas it is below T if there is a constraint
-/// X <t T, X < T, X << T.
+/// T <t X, T < X, or T <c X, whereas it is below T if there is a constraint
+/// X <t T, X < T, X <c T.
 ///
 /// \param cs The constraint system in which these constraints occur.
 ///
@@ -3483,7 +3483,7 @@ ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
 
   // Introduce transitive constraints, e.g.,
   //
-  //   X < T and T << Y => X << Y
+  //   X < T and T <c Y => X <c Y
   //
   // When the two relation kinds differ, as above, the weaker constraint is
   // used for the resulting relation.
@@ -4832,6 +4832,9 @@ namespace {
         llvm::SaveAndRestore<bool> savedUseCS(
                                      TC.getLangOpts().UseConstraintSolver,
                                      false);
+
+        // FIXME: Check that the element type has a default constructor.
+        
         if (TC.validateType(newArray->getElementTypeLoc(),
                             /*isFirstPass=*/false))
           return nullptr;
