@@ -431,9 +431,6 @@ void swift::REPL(ASTContext &Context) {
         swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
                                            CurBufferOffset,
                                            CurBufferEndOffset);
-    if (TU->getASTContext().LangOpts.UseConstraintSolver) {
-      ShouldRun = false;
-    }
 
     if (Context.hadError()) {
       Context.Diags.resetHadAnyError();
