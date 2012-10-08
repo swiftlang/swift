@@ -125,7 +125,7 @@ function(compile_swift_file file target objectvar)
     "${CMAKE_CURRENT_BINARY_DIR}/${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
   add_custom_command(
     OUTPUT ${objfile}
-    COMMAND swift "-c" "-parse-as-library" "${swift_flags}" "-o" "${objfile}" "${source_file}"
+    COMMAND swift "-c" "-parse-as-library" "-constraint-checker" "${swift_flags}" "-o" "${objfile}" "${source_file}"
     DEPENDS ${source_file}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${file_name}${CMAKE_C_OUTPUT_EXTENSION}")

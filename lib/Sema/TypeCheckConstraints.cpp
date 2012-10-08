@@ -4765,8 +4765,8 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
       // For an array, just walk the expression itself; its children have
       // already been type-checked.
-      if (isa<NewArrayExpr>(expr)) {
-        Rewriter.simplifyExprType(expr);
+      if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
+        Rewriter.visitNewArrayExpr(newArray);
         return false;
       }
 

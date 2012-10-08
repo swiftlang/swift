@@ -52,7 +52,7 @@ $(HeaderDir)/swift.swift: $(PATH_TO_SWIFT_SOURCES) $(HeaderDir)/.dir
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
 $(ObjDir)/swift.o: $(HeaderDir)/swift.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER)
 	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) -c $< -o $@ -parse-as-library $(SWIFT_OPTFLAG)
+	$(Verb) $(SWIFT_COMPILER) -c $< -o $@ -parse-as-library -constraint-checker $(SWIFT_OPTFLAG)
 
 $(ObjDir)/%.o: %.s $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE)
 	$(Echo) "Compiling $*.s for $(BuildMode) build" $(PIC_FLAG)
