@@ -616,6 +616,9 @@ namespace {
     llvm::DenseMap<TypeVariableType *, TypeVariableType *> Representatives;
     llvm::DenseMap<TypeVariableType *, Type> FixedTypes;
 
+    // Valid everywhere, for debugging
+    SmallVector<Constraint *, 16> SolvedConstraints;
+
     unsigned assignTypeVariableID() {
       return getTopConstraintSystem().TypeCounter++;
     }
@@ -741,6 +744,8 @@ namespace {
       case SolutionKind::Solved:
         // This constraint has already been solved; there is nothing more
         // to do.
+        if (TC.getLangOpts().DebugConstraintSolver)
+          SolvedConstraints.push_back(constraint);
         return true;
 
       case SolutionKind::Unsolved:
@@ -3526,8 +3531,12 @@ bool ConstraintSystem::simplify() {
       if (typeVarResolved.count(constraint))
         continue;
 
-      if (addConstraint(constraint))
+      if (addConstraint(constraint)) {
         solvedAny = true;
+
+        if (TC.getLangOpts().DebugConstraintSolver)
+          SolvedConstraints.push_back(constraint);        
+      }
 
       if (failedConstraint) {
         return true;
@@ -5211,8 +5220,15 @@ void ConstraintSystem::dump() {
     }
   }
   
-  out << "\nConstraints:\n";
+  out << "\nUnsolved Constraints:\n";
   for (auto constraint : Constraints) {
+    out.indent(2);
+    constraint->print(out);
+    out << "\n";
+  }
+
+  out << "\nSolved Constraints:\n";
+  for (auto constraint : SolvedConstraints) {
     out.indent(2);
     constraint->print(out);
     out << "\n";

@@ -20,6 +20,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Stmt.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 
@@ -135,6 +136,12 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
 
 /// Check an expression at the top level in a REPL.
 void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
+  // FIXME: Remove this once the constraints-based type checker is the
+  // only type checker.
+  llvm::SaveAndRestore<bool> turnOffConstraints(
+                               getLangOpts().UseConstraintSolver,
+                               false);
+
   // If the input is an lvalue, force an lvalue-to-rvalue conversion.
   Expr *ConvertedE = convertToMaterializable(E);
   if (!ConvertedE)
@@ -246,6 +253,11 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
 };
 
 void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
+  // FIXME: Remove this once the constraints-based type checker is the
+  // only type checker.
+  llvm::SaveAndRestore<bool> turnOffConstraints(
+                               getLangOpts().UseConstraintSolver,
+                               false);
   Expr *E = D->getInit();
 
   // FIXME: I'm assuming we don't need to bother printing the pattern binding
