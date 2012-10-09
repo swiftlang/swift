@@ -924,12 +924,21 @@ token following the opening '{' is either 'set' or 'get'.</p>
   </pre>
 
   <p>A class declares a reference type referring to an object which can contain
-     data members and have methods.</p>
+     data members and have methods.  Classes support single inheritance; 
+     a parent class should be listed as the first type in the
+     inheritance list.</p>
 
   <p>The body of a 'class' is a list of decls. Non-property 'var' decls
-     declare members with storage in the class. Other declarations act like
-     they would in an <a href="#decl-extension">extension</a> of the
-     class type.</p>
+     declare members with storage in the class. Non-static 'var' and 'func'
+     decls declare instance members; static 'var' and 'func' decls declare
+     members of the class itself.  Both class and instance members can
+     be overridden by a derived class.</p>
+  <p>Type declarations inside a class act essentially the same way as type
+     declarations outside a class.</p>
+
+  <p>FIXME: For the moment, see classes.rst for more details on the
+     class system.</p>
+  <p>FIXME: Add a reference to the section on generics.</p>
 
   <p>The only way to create a new instance of a class is with a
      <a href="#expr-new">new expression</a>.
