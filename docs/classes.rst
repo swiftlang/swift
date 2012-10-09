@@ -125,7 +125,7 @@ is still sort of an open question. There are a few possible models here:
         myMethod()
       }
 
-   Essentially the same semantic rules as (2), but less ugly (and possibly
+   Essentially the same semantic rules as (3), but less ugly (and possibly
    slightly more flexible in the presence of control flow because there
    could be multiple end-points).  The downside here is that it isn't obvious
    at a glance where exactly the split occurs, which could lead to unexpected
@@ -156,6 +156,7 @@ same name and kind as a member of its base class, or a subscript operator
 is defined, it can override a member of the base class. The rules for resolving
 a set of derived class members with the same name against the set of base
 class members with that name are as follows:
+
   1. If there's a derived class member whose type and kind exactly match the
      base class member, the member overrides the that base class member.
   2. If there's a subtyping relationship with a single base class member 
@@ -227,3 +228,77 @@ essentially the same way they work for class definitions.
 
 Constructors in extensions are required to delegate to another constructor. This
 is necessary because of access-control etc.  (FIXME: implicit delegation?)
+
+ObjC Interop, high-level summary
+--------------------------------
+We currently plan to allow making a class a ObjC class by inheriting directly
+or indirectly from NSObject. An ObjC class has ObjC metadata, and can be used
+where ObjC classes can be used.  Further details in the area are still up in
+the air.  We will provide syntax for defining ObjC methods which correspond
+to a specific selector.  Many details here are still up in the air.
+
+Defining ObjC methods
+-----------------------------
+
+Given a method looking something like the following in ObjC (loosely
+based on an NSView method)::
+
+  - (void) addTrackingRect:(NSRect)rect  owner:(id)owner withUserData:(id)data, assumeInside:(BOOL)assumeInside
+
+We tentatively decided to do something like the following::
+
+  func addTrackingRect(rect : NSRect)
+       owner(owner : Id)
+       withUserData(data : Id)
+       assumeInside(inside : Bool) -> Void {
+    // Impl
+  }
+
+Note that the names inside the parentheses do not affect the type system; the
+type of this declaration is
+``(NSRect, owner : Id, withUserData : Id, assumeInside : Bool) -> Void``.
+This syntax is just sugar to allow giving arguments sane names for
+the implementation and possibly for documentation.  Being able to rename
+for the implementation is particularly important for byref arguments,
+because they can't easily be renamed with a var decl in the implementation.
+
+The basic weakness here is that it requires a syntax extension to function
+declarations with two or more arguments, which we probably would not have
+included if not for ObjC interop.
+
+We seriously considered two other proposals for the declaration in swift.  One::
+
+  func addTrackingRect(rect : NSRect, owner : Id, withUserData : Id, assumeInside : Bool) {
+    // Impl
+  }
+
+(The selector parts come from the argument names, with the first argument
+ignored.) The obvious weaknesses here are that it doesn't correspond at all
+to a selector and that the implementation has to use a parameter named
+"withUserData"; this was rejected for being unintuitive and ugly.
+
+The second proposal was a variant of this which tried to solve the "withUserData"
+problem with some combination of heuristics and annotations. Chris
+categorically opposed this on the basis that requiring strange annotations
+to write Objective-C classes in Swift makes ObjC a second-class citizen.
+
+Calling ObjC methods
+--------------------
+
+Given the above form for method definitions, we iterated a bunch of times on the
+callee side, but eventually settled for something like Greg's proposal
+on swift-dev::
+
+  A.addTracking(r, owner = o, withUserData = d, assumeInside = False)
+
+This has the advantages of being a straightforward translation for most
+methods, and not requiring us to introduce any new ObjC-specific syntax
+at the caller side.
+
+The other possibility which we seriously considered was the ObjC-style
+square-brackets.  Square-brackets have the advantage of familiarity, but
+we've tentatively rejected them on the basis that it fractures the language:
+if we don't allow the style for all methods, it makes swift and
+objective-swift separate dialects, and if we do allow it, it leads to
+never-ending style wars.
+
