@@ -2860,7 +2860,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
    if (auto function2 = type2->getAs<FunctionType>()) {
       if (function2->isAutoClosure()) {
         trivial = false;
-        return matchTypes(type1, function2->getResult(), kind, flags, trivial);
+        return matchTypes(type1, function2->getResult(), kind, subFlags,
+                          trivial);
       }
     }
   }
