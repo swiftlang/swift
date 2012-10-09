@@ -1237,11 +1237,37 @@ void ConstraintSystem::markChildInactive(ConstraintSystem *childCS) {
     auto boundTy = childCS->getFixedType(typeVar);
     auto supertypes = enumerateDirectSupertypes(boundTy);
     auto &explored = ExploredTypeBindings[typeVar];
+
+    bool addedAny = false;
     for (auto supertype : supertypes) {
       if (explored.count(supertype->getCanonicalType()) > 0)
         continue;
 
       PotentialBindings.push_back( { typeVar, supertype } );
+      addedAny = true;
+    }
+
+    if (!addedAny) {
+      // If we haven't added any constraints for this type variable, check
+      // whether we can fall back to a default literal type.
+      // FIXME: This would be far, far more efficient if we keep constraints
+      // related to a type variable on-line.
+      for (auto constraint : Constraints) {
+        if (constraint->getClassification() !=ConstraintClassification::Literal)
+          continue;
+
+        if (auto constrainedVar
+              = constraint->getFirstType()->getAs<TypeVariableType>()) {
+          if (getRepresentative(constrainedVar) != typeVar)
+            continue;
+
+          if (auto literalType =
+                TC.getDefaultLiteralType(constraint->getLiteralKind())) {
+            if (explored.count(literalType->getCanonicalType()) == 0)
+              PotentialBindings.push_back({typeVar, literalType});
+          }
+        }
+      }
     }
   }
 }
