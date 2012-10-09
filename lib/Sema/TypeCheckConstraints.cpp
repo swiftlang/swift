@@ -1002,7 +1002,9 @@ namespace {
     }
 
     /// \brief Generate constraints for the given (unchecked) expression.
-    void generateConstraints(Expr *E);
+    ///
+    /// \returns true if an error occurred.
+    bool generateConstraints(Expr *E);
 
     /// \brief The result of attempting to resolve a constraint or set of
     /// constraints.
@@ -1600,7 +1602,7 @@ static ValueDecl *findReferencedDecl(Expr *expr, SourceLoc &loc) {
 }
 
 
-void ConstraintSystem::generateConstraints(Expr *expr) {
+bool ConstraintSystem::generateConstraints(Expr *expr) {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
 
@@ -2166,9 +2168,12 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
         return expr;
       }
 
-      auto type = CG.visit(expr);
-      expr->setType(type);
-      return expr;
+      if (auto type = CG.visit(expr)) {
+        expr->setType(type);
+        return expr;
+      }
+
+      return nullptr;
     }
 
     /// \brief Ignore statements.
@@ -2184,7 +2189,7 @@ void ConstraintSystem::generateConstraints(Expr *expr) {
   // Walk the expression, generating constraints.
   ConstraintGenerator CG(*this);
   ConstraintWalker CW(CG);
-  expr->walk(CW);
+  return expr->walk(CW) == nullptr;
 }
 
 SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
@@ -4921,7 +4926,8 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this);
-  cs.generateConstraints(expr);
+  if (cs.generateConstraints(expr))
+    return nullptr;
 
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
@@ -5067,8 +5073,8 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
 
   // Construct a constraint system from the destination and source.
   ConstraintSystem cs(*this);
-  cs.generateConstraints(dest);
-  cs.generateConstraints(src);
+  if (cs.generateConstraints(dest) || cs.generateConstraints(src))
+    return { nullptr, nullptr };
 
   // Compute the type to which the source must be converted to allow assignment
   // to the destination.

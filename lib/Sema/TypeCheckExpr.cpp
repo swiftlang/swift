@@ -1594,8 +1594,16 @@ Type TypeChecker::getDefaultLiteralType(LiteralKind kind) {
   }
 
   // If we haven't found the type yet, look for it now.
-  if (!*type)
+  if (!*type) {
     *type = lookupGlobalType(*this, name);
+
+    // Strip off one level of sugar; we don't actually want to print
+    // IntegerLiteralType anywhere.
+    if (type) {
+      if (auto typeAlias = dyn_cast<NameAliasType>(type->getPointer()))
+        *type = typeAlias->getDecl()->getUnderlyingType();
+    }
+  }
 
   return *type;
 }
