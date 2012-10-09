@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Target/TargetData.h"
+#include "llvm/DataLayout.h"
 #include "llvm/DerivedTypes.h"
 
 #include "IRGenFunction.h"
@@ -101,7 +101,7 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
       // We don't actually need to uglify the IR unless the natural
       // alignment of the IR type for the field isn't good enough.
       Alignment fieldIRAlignment(
-          IGM.TargetData.getABITypeAlignment(type->StorageType));
+          IGM.DataLayout.getABITypeAlignment(type->StorageType));
       assert(fieldIRAlignment <= type->StorageAlignment);
       if (fieldIRAlignment != type->StorageAlignment) {
         storageTypes.push_back(llvm::ArrayType::get(IGM.Int8Ty,

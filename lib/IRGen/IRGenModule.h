@@ -26,6 +26,7 @@
 
 namespace llvm {
   class Constant;
+  class DataLayout;
   class Function;
   class FunctionType;
   class GlobalVariable;
@@ -35,7 +36,6 @@ namespace llvm {
   class PointerType;
   class StructType;
   class StringRef;
-  class TargetData;
   class Type;
 }
 
@@ -84,7 +84,7 @@ public:
   Options &Opts;
   llvm::Module &Module;
   llvm::LLVMContext &LLVMContext;
-  const llvm::TargetData &TargetData;
+  const llvm::DataLayout &DataLayout;
 
   llvm::Type *VoidTy;                  /// void (usually {})
   llvm::IntegerType *Int1Ty;           /// i1
@@ -205,7 +205,7 @@ private:
 //--- Generic ---------------------------------------------------------------
 public:
   IRGenModule(ASTContext &Context, Options &Opts, llvm::Module &Module,
-              const llvm::TargetData &TargetData);
+              const llvm::DataLayout &DataLayout);
   ~IRGenModule();
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }

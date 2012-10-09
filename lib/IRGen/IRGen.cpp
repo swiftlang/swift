@@ -24,7 +24,7 @@
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/Assembly/PrintModulePass.h"
 #include "llvm/Bitcode/ReaderWriter.h"
-#include "llvm/Target/TargetData.h"
+#include "llvm/DataLayout.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/IPO.h"
@@ -111,12 +111,12 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   }
 
   // Set the module's string representation.
-  const TargetData *TargetData = TargetMachine->getTargetData();
-  assert(TargetData && "target machine didn't set TargetData?");
-  Module->setDataLayout(TargetData->getStringRepresentation());
+  const llvm::DataLayout *DataLayout = TargetMachine->getDataLayout();
+  assert(DataLayout && "target machine didn't set DatLayout?");
+  Module->setDataLayout(DataLayout->getStringRepresentation());
 
   // Emit the translation unit.
-  IRGenModule IRM(TU->Ctx, Opts, *Module, *TargetData);
+  IRGenModule IRM(TU->Ctx, Opts, *Module, *DataLayout);
   IRM.emitTranslationUnit(TU, StartElem);
 
   // Bail out if there are any errors.
@@ -204,7 +204,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   
   // Configure the function passes.
   FunctionPassManager FunctionPasses(Module);
-  FunctionPasses.add(new llvm::TargetData(*TargetData));
+  FunctionPasses.add(new llvm::DataLayout(*DataLayout));
   if (Opts.Verify)
     FunctionPasses.add(createVerifierPass());
   PMBuilder.populateFunctionPassManager(FunctionPasses);
@@ -218,7 +218,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
 
   // Configure the module passes.
   PassManager ModulePasses;
-  ModulePasses.add(new llvm::TargetData(*TargetData));
+  ModulePasses.add(new llvm::DataLayout(*DataLayout));
   PMBuilder.populateModulePassManager(ModulePasses);
   if (Opts.Verify)
     ModulePasses.add(createVerifierPass());

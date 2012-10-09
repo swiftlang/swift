@@ -19,6 +19,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Diagnostics.h"
 #include "llvm/Constants.h"
+#include "llvm/DataLayout.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Intrinsics.h"
 #include "llvm/Module.h"
@@ -26,7 +27,6 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SourceMgr.h"
-#include "llvm/Target/TargetData.h"
 
 #include "GenType.h"
 #include "IRGenModule.h"
@@ -37,10 +37,10 @@ using namespace irgen;
 
 IRGenModule::IRGenModule(ASTContext &Context,
 			 Options &Opts, llvm::Module &Module,
-                         const llvm::TargetData &TargetData)
+                         const llvm::DataLayout &DataLayout)
   : Context(Context), Opts(Opts),
     Module(Module), LLVMContext(Module.getContext()),
-    TargetData(TargetData), Types(*new TypeConverter(*this)) {
+    DataLayout(DataLayout), Types(*new TypeConverter(*this)) {
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
@@ -49,7 +49,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
   Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
-  SizeTy = TargetData.getIntPtrType(getLLVMContext());
+  SizeTy = DataLayout.getIntPtrType(getLLVMContext());
   MemCpyFn = nullptr;
   AllocObjectFn = nullptr;
   RetainNoResultFn = nullptr;
@@ -88,7 +88,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   llvm::Type *refCountedElts[] = { HeapMetadataPtrTy, SizeTy };
   RefCountedStructTy->setBody(refCountedElts);
 
-  PtrSize = Size(TargetData.getPointerSize());
+  PtrSize = Size(DataLayout.getPointerSize());
 
   llvm::Type *funcElts[] = { Int8PtrTy, RefCountedPtrTy };
   FunctionPairTy = llvm::StructType::get(LLVMContext, funcElts,

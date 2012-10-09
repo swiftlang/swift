@@ -62,7 +62,6 @@
 #include "llvm/Intrinsics.h"
 #include "llvm/Module.h"
 #include "llvm/Support/CallSite.h"
-#include "llvm/Target/TargetData.h"
 
 #include "ASTVisitor.h"
 #include "CallingConvention.h"

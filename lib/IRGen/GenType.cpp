@@ -20,7 +20,6 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Target/TargetData.h"
 
 #include "FixedTypeInfo.h"
 #include "GenType.h"

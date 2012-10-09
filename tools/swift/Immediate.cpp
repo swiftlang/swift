@@ -39,9 +39,9 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/system_error.h"
 #include "llvm/Support/TargetSelect.h"
-#include "llvm/Target/TargetData.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/DataLayout.h"
 #include "llvm/Linker.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Module.h"
@@ -145,7 +145,7 @@ void swift::RunImmediately(TranslationUnit *TU) {
   PMBuilder.OptLevel = 2;
   PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
   llvm::PassManager ModulePasses;
-  ModulePasses.add(new llvm::TargetData(Module.getDataLayout()));
+  ModulePasses.add(new llvm::DataLayout(Module.getDataLayout()));
   PMBuilder.populateModulePassManager(ModulePasses);
   ModulePasses.run(Module);
 
