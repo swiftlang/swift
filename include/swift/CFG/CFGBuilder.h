@@ -103,6 +103,10 @@ public:
   // Instruction Creation Methods
   //===--------------------------------------------------------------------===//
 
+  AllocVarInst *createAllocVar(VarDecl *VD) {
+    return insert(new AllocVarInst(VD));
+  }
+
   AllocTmpInst *createAllocTmp(MaterializeExpr *Expr) {
     return insert(new AllocTmpInst(Expr));
   }
@@ -127,6 +131,10 @@ public:
     return insert(new StoreInst(S, Src, DestLValue));
   }
 
+  StoreInst *createInitialization(VarDecl *VD, CFGValue Src,
+                                  CFGValue DestLValue) {
+    return insert(new StoreInst(VD, Src, DestLValue));
+  }
   StoreInst *createInitialization(MaterializeExpr *E, CFGValue Src,
                                   CFGValue DestLValue) {
     return insert(new StoreInst(E, Src, DestLValue));

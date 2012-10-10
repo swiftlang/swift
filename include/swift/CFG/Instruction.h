@@ -39,12 +39,13 @@ class IntegerLiteralExpr;
 class LoadExpr;
 class MaterializeExpr;
 class ReturnStmt;
-class Stmt;
 class RequalifyExpr;
 class ScalarToTupleExpr;
+class Stmt;
 class TupleElementExpr;
 class TupleExpr;
 class TypeOfExpr;
+class VarDecl;
 
 enum class InstKind {
 #define INST(Id, Parent) Id,
@@ -87,6 +88,12 @@ public:
   Type getType() const { return Ty; }
 
   CFGLocation getLoc() const { return Loc; }
+
+  /// Return the AST expression that this instruction is produced from, or null
+  /// if it is implicitly generated.  Note that this is aborts on locations that
+  /// come from statements.
+  template<typename T>
+  T *getLocDecl() const { return cast_or_null<T>(Loc.template get<Decl*>()); }
 
   /// Return the AST expression that this instruction is produced from, or null
   /// if it is implicitly generated.  Note that this is aborts on locations that
@@ -138,7 +145,14 @@ public:
 /// for each variable in something like "var (x,y) : (Int, Int)".
 class AllocVarInst : public AllocInst {
 public:
-  AllocVarInst(); // : AllocInst(AllocVar, ?)
+  AllocVarInst(VarDecl *VD);
+
+  /// getDecl - Return the underlying declaration.
+  VarDecl *getDecl() const;
+
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::AllocVar;
+  }
 };
 
 /// AllocTmpInst - This represents the allocation of a temporary variable due to a
@@ -151,7 +165,11 @@ class AllocTmpInst : public AllocInst {
 public:
 
   AllocTmpInst(MaterializeExpr *E);
-  
+
+
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::AllocTmp;
+  }
 };
 
 
@@ -264,6 +282,7 @@ class StoreInst : public Instruction {
 public:
 
   StoreInst(AssignStmt *S, CFGValue Src, CFGValue Dest);
+  StoreInst(VarDecl *VD, CFGValue Src, CFGValue Dest);
   StoreInst(MaterializeExpr *E, CFGValue Src, CFGValue Dest);
 
   CFGValue getSrc() const { return Src; }

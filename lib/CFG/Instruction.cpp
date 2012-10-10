@@ -97,6 +97,16 @@ static Type getVoidType(Type T) {
   return T->getASTContext().TheEmptyTupleType;
 }
 
+AllocVarInst::AllocVarInst(VarDecl *VD)
+  : AllocInst(InstKind::AllocVar, VD, VD->getTypeOfReference()) {
+}
+
+/// getDecl - Return the underlying declaration.
+VarDecl *AllocVarInst::getDecl() const {
+  return getLocDecl<VarDecl>();
+}
+
+
 AllocTmpInst::AllocTmpInst(MaterializeExpr *E)
   : AllocInst(InstKind::AllocTmp, E, E->getType()) {}
 
@@ -153,6 +163,12 @@ StoreInst::StoreInst(AssignStmt *S, CFGValue Src, CFGValue Dest)
   : Instruction(InstKind::Store, S, getVoidType(Src.getType())),
     Src(Src), Dest(Dest), IsInitialization(false) {
 }
+
+StoreInst::StoreInst(VarDecl *VD, CFGValue Src, CFGValue Dest)
+  : Instruction(InstKind::Store, VD, getVoidType(Src.getType())),
+    Src(Src), Dest(Dest), IsInitialization(true) {
+}
+
 
 StoreInst::StoreInst(MaterializeExpr *E, CFGValue Src, CFGValue Dest)
   : Instruction(InstKind::Store, E, getVoidType(Src.getType())),

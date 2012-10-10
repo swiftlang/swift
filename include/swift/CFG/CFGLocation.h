@@ -16,6 +16,7 @@
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
+  class Decl;
   class Expr;
   class Stmt;
 
@@ -24,7 +25,7 @@ namespace swift {
 ///
 /// FIXME: This should eventually include inlining history, when we get it.
 ///
-typedef PointerUnion<Stmt*,Expr*> CFGLocation;
+  typedef llvm::PointerUnion3<Stmt*,Expr*, Decl*> CFGLocation;
 
 } // end swift namespace
 

@@ -85,11 +85,13 @@ public:
   }
 
   void visitAllocVarInst(AllocVarInst *AVI) {
-    OS << "alloc_var";
+    OS << "alloc_var " << AVI->getDecl()->getName()
+       << ", type=" << AVI->getType().getString();
+
   }
 
   void visitAllocTmpInst(AllocTmpInst *ATI) {
-    OS << "alloc_tmp";
+    OS << "alloc_tmp type=" << ATI->getType().getString();
   }
 
   void visitApplyInst(ApplyInst *AI) {
@@ -120,6 +122,8 @@ public:
   void visitStoreInst(StoreInst *SI) {
     OS << "store " << getID(SI->getSrc()) << " -> "
        << getID(SI->getDest());
+    if (SI->isInitialization())
+      OS << " [initialization]";
   }
   void visitRequalifyInst(RequalifyInst *RI) {
     OS << "requalify " << getID(RI->getOperand());
@@ -149,7 +153,7 @@ public:
   
   void visitVarRefInst(VarRefInst *VRI) {
     OS << "varref " << VRI->getDecl()->getName()
-    << ", type=" << VRI->getDecl()->getType().getString();
+       << ", type=" << VRI->getDecl()->getType().getString();
   }
 
   void visitUnreachableInst(UnreachableInst *UI) {

@@ -49,20 +49,21 @@ struct InitPatternWithExpr
     
     // Bind to a named pattern by emitting the initializer into place.
     void visitNamedPattern(NamedPattern *P) {
-      assert(0 && "Unimp");
-#if 0
-      VarDecl *var = P->getDecl();
-      //const TypeInfo &type = IGF.getFragileTypeInfo(var->getType());
-      
+      VarDecl *VD = P->getDecl();
+
+      CFGValue AllocVar = Gen.B.createAllocVar(VD);
+
       FullExpr Scope(Gen.Cleanups);
-      //Address addr = I.emitVariable(IGF, var, type);
-      
-      //if (Init) {
-      //  I.emitInit(IGF, I.getObjectForDecl(var), addr, Init, type);
-      //} else {
-      //  I.emitZeroInit(IGF, I.getObjectForDecl(var), addr, type);
-      //}
-#endif
+
+      // FIXME: Zero initialization can throw an exception.  Need to model this
+      // in the ZeroInit node.
+      CFGValue Initializer;
+      if (Init)
+        Initializer = Gen.visit(Init);
+      else
+        abort(); //Initializer = Gen.B.createZeroInit(VD->getType());
+
+      Gen.B.createInitialization(VD, Initializer, AllocVar);
     }
     
     
