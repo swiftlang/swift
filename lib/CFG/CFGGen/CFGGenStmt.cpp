@@ -1,4 +1,4 @@
-//===--- CFGGen.cpp - Implements Lowering of ASTs -> CFGs -----------------===//
+//===--- CFGGenStmt.cpp - Implements Lowering of ASTs -> CFGs for Stmts ---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,7 +16,6 @@
 #include "swift/AST/AST.h"
 using namespace swift;
 using namespace Lowering;
-
 
 /// emitOrDeleteBlock - If there are branches to the specified basic block,
 /// emit it per emitBlock.  If there aren't, then just delete the block - it
