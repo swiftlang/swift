@@ -115,10 +115,6 @@ public:
     return insert(new ConstantRefInst(Expr));
   }
 
-  DeclRefInst *createDeclRef(DeclRefExpr *Expr) {
-    return insert(new DeclRefInst(Expr));
-  }
-
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *Expr) {
     return insert(new IntegerLiteralInst(Expr));
   }
@@ -136,7 +132,6 @@ public:
     return insert(new StoreInst(E, Src, DestLValue));
   }
 
-
   RequalifyInst *createRequalify(RequalifyExpr *Expr, CFGValue Op) {
     return insert(new RequalifyInst(Expr, Op));
   }
@@ -153,11 +148,15 @@ public:
                                        unsigned FieldNo) {
     return insert(new TupleElementInst(E, Operand, FieldNo));
   }
-
   
   TypeOfInst *createTypeOf(TypeOfExpr *Expr) {
     return insert(new TypeOfInst(Expr));
   }
+  
+  VarRefInst *createVarRef(DeclRefExpr *Expr) {
+    return insert(new VarRefInst(Expr));
+  }
+ 
   
   //===--------------------------------------------------------------------===//
   // Terminator Instruction Creation Methods

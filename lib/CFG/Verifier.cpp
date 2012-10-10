@@ -65,9 +65,6 @@ public:
            "ConstantRef should return not produce an lvalue");
   }
 
-  void visitDeclRefInst(DeclRefInst *DRI) {
-    assert(DRI->getType()->is<LValueType>() && "DeclRef should return lvalue");
-  }
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     assert(ILI->getType()->is<BuiltinIntegerType>() &&
            "invalid integer literal type");
@@ -94,6 +91,11 @@ public:
   }
   void visitTypeOfInst(TypeOfInst *TOI) {
   }
+  
+  void visitVarRefInst(VarRefInst *DRI) {
+    assert(DRI->getType()->is<LValueType>() && "VarRef should return lvalue");
+  }
+
   
   void visitReturnInst(ReturnInst *RI) {
     assert(!RI->getReturnValue().isNull() && "Return of null value is invalid");

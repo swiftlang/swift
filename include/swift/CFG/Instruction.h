@@ -210,27 +210,6 @@ public:
   }
 };
 
-/// DeclRefInst - Represents a reference to a non-constant declaration,
-/// evaluating to its lvalue (i.e., its address).
-class DeclRefInst : public Instruction {
-public:
-  
-  /// Construct a DeclRefInst.
-  ///
-  /// \param Expr A backpointer to the original DeclRefExpr.
-  ///
-  DeclRefInst(DeclRefExpr *E);
-  
-  DeclRefExpr *getExpr() const;
-  
-  /// getDecl - Return the underlying declaration.
-  ValueDecl *getDecl() const;
-  
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::DeclRef;
-  }
-};
-
 /// Encapsulates an integer constant, as defined originally by an
 /// an IntegerLiteralExpr.
 class IntegerLiteralInst : public Instruction {
@@ -392,6 +371,29 @@ public:
     return I->getKind() == InstKind::TupleElement;
   }
 };
+  
+/// VarRefInst - Represents a reference to a non-constant declaration,
+/// evaluating to its lvalue (i.e., its address).
+class VarRefInst : public Instruction {
+public:
+  
+  /// Construct a VarRefInst.
+  ///
+  /// \param Expr A backpointer to the original DeclRefExpr.
+  ///
+  VarRefInst(DeclRefExpr *E);
+  
+  DeclRefExpr *getExpr() const;
+  
+  /// getDecl - Return the underlying declaration.
+  ValueDecl *getDecl() const;
+  
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::VarRef;
+  }
+};
+
+
 
 //===----------------------------------------------------------------------===//
 // Instructions representing terminators.

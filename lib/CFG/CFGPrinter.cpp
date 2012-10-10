@@ -110,10 +110,6 @@ public:
     << ", type=" << DRI->getDecl()->getType().getString();
   }
 
-  void visitDeclRefInst(DeclRefInst *DRI) {
-    OS << "declref " << DRI->getDecl()->getName()
-       << ", type=" << DRI->getDecl()->getType().getString();
-  }
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     const auto &lit = ILI->getValue();
     OS << "integerliteral " << lit << ", width=" << lit.getBitWidth();
@@ -149,6 +145,11 @@ public:
   }
   void visitTypeOfInst(TypeOfInst *TOI) {
     OS << "typeof " << TOI->getMetaType().getString();
+  }
+  
+  void visitVarRefInst(VarRefInst *VRI) {
+    OS << "varref " << VRI->getDecl()->getName()
+    << ", type=" << VRI->getDecl()->getType().getString();
   }
 
   void visitUnreachableInst(UnreachableInst *UI) {

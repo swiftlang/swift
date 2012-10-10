@@ -129,17 +129,6 @@ ValueDecl *ConstantRefInst::getDecl() const {
 }
 
 
-DeclRefInst::DeclRefInst(DeclRefExpr *E)
-  : Instruction(InstKind::DeclRef, E, E->getType()) {}
-
-DeclRefExpr *DeclRefInst::getExpr() const {
-  return getLocExpr<DeclRefExpr>();
-}
-
-/// getDecl - Return the underlying declaration.
-ValueDecl *DeclRefInst::getDecl() const {
-  return getExpr()->getDecl();
-}
 
 IntegerLiteralInst::IntegerLiteralInst(IntegerLiteralExpr *E)
   : Instruction(InstKind::IntegerLiteral, E, E->getType()) {
@@ -211,13 +200,24 @@ TupleElementInst::TupleElementInst(TupleElementExpr *E, CFGValue Operand,
 }
 
 
+VarRefInst::VarRefInst(DeclRefExpr *E)
+: Instruction(InstKind::VarRef, E, E->getType()) {}
+
+DeclRefExpr *VarRefInst::getExpr() const {
+  return getLocExpr<DeclRefExpr>();
+}
+
+/// getDecl - Return the underlying declaration.
+ValueDecl *VarRefInst::getDecl() const {
+  return getExpr()->getDecl();
+}
+
 TermInst::SuccessorListTy TermInst::getSuccessors() {
   switch (getKind()) {
   case InstKind::AllocVar:
   case InstKind::AllocTmp:
   case InstKind::Apply:
   case InstKind::ConstantRef:
-  case InstKind::DeclRef:
   case InstKind::IntegerLiteral:
   case InstKind::Load:
   case InstKind::Store:
@@ -226,6 +226,7 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   case InstKind::Tuple:
   case InstKind::TupleElement:
   case InstKind::TypeOf:
+  case InstKind::VarRef:
     llvm_unreachable("Only TermInst's are allowed");
   case InstKind::Unreachable:
     return cast<UnreachableInst>(this)->getSuccessors();
