@@ -139,9 +139,11 @@ llvm::CallingConv::ID irgen::expandAbstractCC(IRGenModule &IGM,
                           SmallVectorImpl<llvm::AttributeWithIndex> &attrs) {
   // If we have an indirect result, add the appropriate attributes.
   if (hasIndirectResult) {
-    attrs.push_back(llvm::AttributeWithIndex::get(1,
-                                  llvm::Attribute::StructRet |
-                                  llvm::Attribute::NoAlias));
+    llvm::Attributes::AttrVal tmp[] = {
+      llvm::Attributes::StructRet,
+      llvm::Attributes::NoAlias
+    };
+    attrs.push_back(llvm::AttributeWithIndex::get(1, tmp));
   }
 
   switch (convention) {
