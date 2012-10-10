@@ -140,7 +140,7 @@ public:
   // ClassDecl - emitClassDecl
   // FuncDecl - emitLocalFunction
   // OneOfDecl - emitOneOfDecl
-  // PatternBindingDecl - emitPatternBindingDecl
+  void visitPatternBindingDecl(PatternBindingDecl *D);
   // StructDecl - emitStructDecl
     
   void visitTypeAliasDecl(TypeAliasDecl *D) {
