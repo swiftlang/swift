@@ -138,6 +138,10 @@ public:
     }
     OS << ')';
   }
+  void visitTupleElementInst(TupleElementInst *TEI) {
+    OS << "tupleelement " << getID(TEI->getOperand()) << ", "
+       << TEI->getFieldNo();
+  }
   void visitTypeOfInst(TypeOfInst *TOI) {
     OS << "typeof " << TOI->getMetaType().getString();
   }

@@ -191,6 +191,13 @@ ScalarToTupleInst::ScalarToTupleInst(ScalarToTupleExpr *E, CFGValue Operand)
   : Instruction(InstKind::ScalarToTuple, E, E->getType()), Operand(Operand) {
 }
 
+TupleElementInst::TupleElementInst(TupleElementExpr *E, CFGValue Operand,
+                                   unsigned FieldNo)
+  : Instruction(InstKind::TupleElement, E, E->getType()),
+    Operand(Operand), FieldNo(FieldNo) {
+}
+
+
 TermInst::SuccessorListTy TermInst::getSuccessors() {
   switch (getKind()) {
   case InstKind::AllocVar:
@@ -203,6 +210,7 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   case InstKind::Requalify:
   case InstKind::ScalarToTuple:
   case InstKind::Tuple:
+  case InstKind::TupleElement:
   case InstKind::TypeOf:
     llvm_unreachable("Only TermInst's are allowed");
   case InstKind::Unreachable:

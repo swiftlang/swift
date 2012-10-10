@@ -124,6 +124,7 @@ public:
   CFGValue visitParenExpr(ParenExpr *E);
   CFGValue visitTupleExpr(TupleExpr *E);
   CFGValue visitScalarToTupleExpr(ScalarToTupleExpr *E);
+  CFGValue visitTupleElementExpr(TupleElementExpr *E);
   CFGValue visitTypeOfExpr(TypeOfExpr *E);
   
 };

@@ -42,6 +42,7 @@ class ReturnStmt;
 class Stmt;
 class RequalifyExpr;
 class ScalarToTupleExpr;
+class TupleElementExpr;
 class TupleExpr;
 class TypeOfExpr;
 
@@ -346,6 +347,17 @@ public:
 
   CFGValue getOperand() const { return Operand; }
 
+};
+  
+/// TupleElementInst - Extract a numbered element out of a value of tuple type.
+class TupleElementInst : public Instruction {
+  CFGValue Operand;
+  unsigned FieldNo;
+public:
+  TupleElementInst(TupleElementExpr *E, CFGValue Operand, unsigned FieldNo);
+  
+  CFGValue getOperand() const { return Operand; }
+  unsigned getFieldNo() const { return FieldNo; }
 };
 
 //===----------------------------------------------------------------------===//

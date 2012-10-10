@@ -145,6 +145,12 @@ public:
     return insert(new ScalarToTupleInst(Expr, Op));
   }
 
+  TupleElementInst *createTupleElement(TupleElementExpr *E, CFGValue Operand,
+                                       unsigned FieldNo) {
+    return insert(new TupleElementInst(E, Operand, FieldNo));
+  }
+
+  
   TypeOfInst *createTypeOf(TypeOfExpr *Expr) {
     return insert(new TypeOfInst(Expr));
   }
