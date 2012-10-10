@@ -24,7 +24,8 @@ namespace swift {
 namespace Lowering {
   class Condition;
 
-class LLVM_LIBRARY_VISIBILITY CFGGen : public ASTVisitor<CFGGen, CFGValue> {
+class LLVM_LIBRARY_VISIBILITY CFGGen
+  : public ASTVisitor<CFGGen, CFGValue, void> {
 public:
   /// The CFG being constructed.
   CFG &C;
@@ -75,7 +76,7 @@ public:
   void emitBranch(JumpDest D);
   
   //===--------------------------------------------------------------------===//
-  // Statements.
+  // Statements
   //===--------------------------------------------------------------------===//
   
   /// Construct the CFG components for the given BraceStmt.
@@ -107,7 +108,7 @@ public:
   void visitContinueStmt(ContinueStmt *S);
   
   //===--------------------------------------------------------------------===//
-  // Expressions.
+  // Expressions
   //===--------------------------------------------------------------------===//
   
   CFGValue visitExpr(Expr *E) {
@@ -127,6 +128,28 @@ public:
   CFGValue visitTupleElementExpr(TupleElementExpr *E);
   CFGValue visitTypeOfExpr(TypeOfExpr *E);
   
+  //===--------------------------------------------------------------------===//
+  // Declarations
+  //===--------------------------------------------------------------------===//
+  
+  void visitDecl(Decl *D) {
+    D->dump();
+    llvm_unreachable("Not yet implemented");
+  }
+
+  // ClassDecl - emitClassDecl
+  // FuncDecl - emitLocalFunction
+  // OneOfDecl - emitOneOfDecl
+  // PatternBindingDecl - emitPatternBindingDecl
+  // StructDecl - emitStructDecl
+    
+  void visitTypeAliasDecl(TypeAliasDecl *D) {
+    // No lowering support needed.
+  }
+    
+  void visitVarDecl(VarDecl *D) {
+    // We handle these in pattern binding.
+  }
 };
   
 } // end namespace Lowering

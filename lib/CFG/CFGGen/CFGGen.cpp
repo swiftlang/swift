@@ -114,7 +114,7 @@ void CFGGen::visitBraceStmt(BraceStmt *S) {
       FullExpr scope(Cleanups);
       visit(E);
     } else
-      assert(0 && "FIXME: Handle Decls");
+      visit(ESD.get<Decl*>());
   }
 }
 
