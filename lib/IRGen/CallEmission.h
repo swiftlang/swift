@@ -76,6 +76,9 @@ public:
       : IGF(IGF), CurCallee(callee) {
     setFromCallee();
   }
+  CallEmission(const CallEmission &other) = delete;
+  CallEmission(CallEmission &&other);
+  CallEmission &operator=(const CallEmission &other) = delete;
   ~CallEmission();
 
   const Callee &getCallee() const { return CurCallee; }

@@ -1450,6 +1450,13 @@ public:
   ArrayRef<Pattern*> getParamPatterns() const {
     return ArrayRef<Pattern*>(getParamsBuffer(), NumPatterns);
   }
+
+  /// getNaturalArgumentCount - Returns the "natural" number of
+  /// argument clauses taken by this function.  See the comment on
+  /// FuncDecl.
+  unsigned getNaturalArgumentCount() const {
+    return NumPatterns;
+  }
   
   FuncDecl *getDecl() const { return TheFuncDecl; }
   void setDecl(FuncDecl *f) { TheFuncDecl = f; }

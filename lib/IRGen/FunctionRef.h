@@ -92,6 +92,16 @@ public:
   ExplosionKind getExplosionLevel() const {
     return ExplosionKind(ExplosionLevel);
   }
+
+  friend bool operator==(CodeRef left, CodeRef right) {
+    return left.getDecl() == right.getDecl() &&
+           left.getKind() == right.getKind() &&
+           left.getUncurryLevel() == right.getUncurryLevel() &&
+           left.getExplosionLevel() == right.getExplosionLevel();
+  }
+  friend bool operator!=(CodeRef left, CodeRef right) {
+    return !(left == right);
+  }
 };
 
 /// A specialization of CodeRef which asserts that its input is a FuncDecl.

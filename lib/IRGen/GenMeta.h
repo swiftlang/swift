@@ -18,6 +18,7 @@
 #define SWIFT_IRGEN_GENMETA_H
 
 namespace llvm {
+  template <class T> class ArrayRef;
   class Value;
 }
 
@@ -25,11 +26,16 @@ namespace swift {
   class Type;
   class CanType;
   class ClassDecl;
+  class FuncDecl;
   class NominalTypeDecl;
   class StructDecl;
+  class Substitution;
 
 namespace irgen {
+  class AbstractCallee;
+  class Callee;
   class Explosion;
+  enum class ExplosionKind : unsigned;
   class HeapLayout;
   class IRGenFunction;
   class IRGenModule;
@@ -79,6 +85,24 @@ namespace irgen {
                                            unsigned argumentIndex,
                                            ProtocolDecl *targetProtocol,
                                            llvm::Value *metadata);
+
+  /// Given a heap-object instance, with some heap-object type,
+  /// produce a reference to its metadata.
+  llvm::Value *emitMetadataRefForHeapObject(IRGenFunction &IGF,
+                                            llvm::Value *object);
+
+  /// Derive the abstract callee for a virtual call to the given method.
+  AbstractCallee getAbstractVirtualCallee(IRGenFunction &IGF,
+                                          FuncDecl *method);
+
+  /// Given an instance pointer (or, for a static method, a class
+  /// pointer), emit the callee for the given method.
+  Callee emitVirtualCallee(IRGenFunction &IGF, llvm::Value *base,
+                           FuncDecl *method, CanType substResultType,
+                           llvm::ArrayRef<Substitution> substitutions,
+                           ExplosionKind maxExplosion,
+                           unsigned bestUncurry);
+                           
 
 } // end namespace irgen
 } // end namespace swift

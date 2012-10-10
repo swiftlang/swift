@@ -70,6 +70,7 @@
 #include "FunctionRef.h"
 #include "GenHeap.h"
 #include "GenInit.h"
+#include "GenMeta.h"
 #include "GenPoly.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -103,7 +104,7 @@ static unsigned getNumCurries(AnyFunctionType *type) {
 /// in the function body.
 static unsigned getNaturalUncurryLevel(ValueDecl *val) {
   if (FuncDecl *func = dyn_cast<FuncDecl>(val)) {
-    return func->getBody()->getParamPatterns().size() - 1;
+    return func->getBody()->getNaturalArgumentCount() - 1;
   }
   if (isa<ConstructorDecl>(val) || isa<OneOfElementDecl>(val)) {
     return 1;
@@ -739,9 +740,30 @@ namespace {
   struct CalleeSource {
   public:
     enum class Kind {
-      Indirect, IndirectLiteral,
-      Direct, DirectWithSideEffects,
-      Existential, Archetype
+      /// A totally abstracted call.
+      Indirect,
+
+      /// An abstracted call with known values.  This is a sort of
+      /// internal convenience.
+      IndirectLiteral,
+
+      /// A direct call to a known function.
+      Direct,
+
+      /// A direct call to a known function, but where an expression
+      /// or two needs to be evaluated (and ignored) before the
+      /// arguments are evaluated.
+      DirectWithSideEffects,
+
+      /// A virtual call to a class member.  The first argument is a
+      /// pointer to a class instance.
+      Virtual,
+
+      /// A call to a protocol member on a value of existential type.
+      Existential,
+
+      /// A call to a protocol member on a value of archetype type.
+      Archetype
     };
 
   private:
@@ -759,6 +781,9 @@ namespace {
         ValueDecl *Fn;
         Expr *SideEffects;
       } Direct;
+      struct {
+        FuncDecl *Fn;
+      } Virtual;
       struct {
         ExistentialMemberRefExpr *Fn;
       } Existential;
@@ -794,6 +819,13 @@ namespace {
       result.TheKind = Kind::DirectWithSideEffects;
       result.Direct.Fn = fn;
       result.Direct.SideEffects = sideEffects;
+      return result;
+    }
+
+    static CalleeSource forVirtual(FuncDecl *fn) {
+      CalleeSource result;
+      result.TheKind = Kind::Virtual;
+      result.Virtual.Fn = fn;
       return result;
     }
 
@@ -833,6 +865,11 @@ namespace {
       return Indirect.Fn;
     }
 
+    FuncDecl *getVirtualFunction() const {
+      assert(getKind() == Kind::Virtual);
+      return Virtual.Fn;
+    }
+
     ExistentialMemberRefExpr *getExistentialFunction() const {
       assert(getKind() == Kind::Existential);
       return Existential.Fn;
@@ -853,7 +890,10 @@ namespace {
 
       case Kind::Direct:
       case Kind::DirectWithSideEffects:
-        return getAbstractDirectCallee(IGF, Direct.Fn);
+        return getAbstractDirectCallee(IGF, getDirectFunction());
+
+      case Kind::Virtual:
+        return getAbstractVirtualCallee(IGF, getVirtualFunction());
 
       case Kind::Existential:
         return getAbstractProtocolCallee(IGF,
@@ -1424,6 +1464,24 @@ CallEmission CalleeSource::prepareRootCall(IRGenFunction &IGF,
                                               getSubstitutions(),
                                               maxExplosion, bestUncurry));
 
+  case Kind::Virtual: {
+    // Emit the base.
+    Explosion baseValues(ExplosionKind::Minimal);
+    IGF.emitRValue(getCallSites().front().getArg(), baseValues);
+    CallSites.erase(CallSites.begin());
+
+    // Grab the base value before adding it as an argument.
+    llvm::Value *base = baseValues.begin()->getValue();
+
+    CallEmission emission(IGF, emitVirtualCallee(IGF, base,
+                                                 getVirtualFunction(),
+                                                 SubstResultType,
+                                                 getSubstitutions(),
+                                                 maxExplosion, bestUncurry));
+    emission.addArg(baseValues);
+    return emission;
+  }
+
   case Kind::IndirectLiteral:
     return CallEmission(IGF, Callee::forIndirectCall(
                                    CanType(IndirectLiteral.OrigFormalType),
@@ -1466,8 +1524,13 @@ namespace {
   struct FunctionDecomposer :
       irgen::ExprVisitor<FunctionDecomposer, CalleeSource> {
     CalleeSource visitDeclRefExpr(DeclRefExpr *E) {
-      if (FuncDecl *fn = dyn_cast<FuncDecl>(E->getDecl()))
-        return CalleeSource::forDirect(fn);
+      if (FuncDecl *fn = dyn_cast<FuncDecl>(E->getDecl())) {
+        // FIXME: this should apply to static methods as well.
+        if (!fn->isStatic() && isa<ClassDecl>(fn->getDeclContext()))
+          return CalleeSource::forVirtual(fn);
+        else
+          return CalleeSource::forDirect(fn);
+      }
       if (ConstructorDecl *ctor = dyn_cast<ConstructorDecl>(E->getDecl()))
         return CalleeSource::forDirect(ctor);
       if (OneOfElementDecl *ctor = dyn_cast<OneOfElementDecl>(E->getDecl()))
@@ -1753,6 +1816,21 @@ void CallEmission::emitToExplosion(Explosion &out) {
   }
     
   llvm_unreachable("bad difference kind");
+}
+
+CallEmission::CallEmission(CallEmission &&other)
+  : IGF(other.IGF),
+    Args(std::move(other.Args)),
+    Cleanups(std::move(other.Cleanups)),
+    CurCallee(std::move(other.CurCallee)),
+    CurOrigType(other.CurOrigType),
+    RemainingArgsForCallee(other.RemainingArgsForCallee),
+    LastArgWritten(other.LastArgWritten),
+    EmittedCall(other.EmittedCall) {
+  // Prevent other's destructor from asserting.
+  other.LastArgWritten = 0;
+  other.RemainingArgsForCallee = 0;
+  other.EmittedCall = true;
 }
 
 CallEmission::~CallEmission() {

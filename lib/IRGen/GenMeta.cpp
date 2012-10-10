@@ -28,6 +28,7 @@
 #include "llvm/ADT/SmallString.h"
 
 #include "Address.h"
+#include "Callee.h"
 #include "ClassMetadataLayout.h"
 #include "FixedTypeInfo.h"
 #include "GenClass.h"
@@ -1154,6 +1155,145 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
     return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
   }
   llvm_unreachable("bad decl kind!");
+}
+
+/// Given a heap pointer, load the metadata reference.
+llvm::Value *irgen::emitMetadataRefForHeapObject(IRGenFunction &IGF,
+                                                 llvm::Value *object) {
+  // Drill into the object pointer.  Rather than bitcasting, we make
+  // an effort to do something that should explode if we get something
+  // mistyped.
+  llvm::StructType *structTy =
+    cast<llvm::StructType>(
+      cast<llvm::PointerType>(object->getType())->getElementType());
+
+  llvm::Value *slot;
+
+  // We need a bitcast if we're dealing with an opaque class.
+  if (structTy->isOpaque()) {
+    auto metadataPtrPtrTy = IGF.IGM.HeapMetadataPtrTy->getPointerTo();
+    slot = IGF.Builder.CreateBitCast(object, metadataPtrPtrTy);
+
+  // Otherwise, make a GEP.
+  } else {
+    auto zero = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
+
+    SmallVector<llvm::Value*, 4> indexes;
+    indexes.push_back(zero);
+    do {
+      indexes.push_back(zero);
+
+      // Keep drilling down to the first element type.
+      auto eltTy = structTy->getElementType(0);
+      assert(isa<llvm::StructType>(eltTy) || eltTy == IGF.IGM.HeapMetadataPtrTy);
+      structTy = dyn_cast<llvm::StructType>(eltTy);
+    } while (structTy != nullptr);
+
+    slot = IGF.Builder.CreateInBoundsGEP(object, indexes);
+  }
+
+  auto metadata = IGF.Builder.CreateLoad(Address(slot,
+                                             IGF.IGM.getPointerAlignment()));
+  metadata->setName(llvm::Twine(object->getName()) + ".metadata");
+  return metadata;
+}
+
+namespace {
+  /// A class for finding a protocol witness table for a type argument
+  /// in a class metadata object.
+  class FindClassMethodIndex :
+      public MetadataSearcher<ClassMetadataScanner<FindClassMethodIndex>> {
+    typedef MetadataSearcher super;
+
+    FunctionRef TargetMethod;
+
+  public:
+    FindClassMethodIndex(IRGenModule &IGM, FunctionRef target)
+      : super(IGM, cast<ClassDecl>(target.getDecl()->getDeclContext())),
+        TargetMethod(target) {}
+
+    void addMethod(FunctionRef fn) {
+      if (TargetMethod == fn)
+        setTargetIndex();
+      NextIndex++;
+    }
+  };
+}
+
+/// Provide the abstract parameters for virtual calls to the given method.
+AbstractCallee irgen::getAbstractVirtualCallee(IRGenFunction &IGF,
+                                               FuncDecl *method) {
+  // TODO: maybe use better versions in the v-table sometimes?
+  ExplosionKind bestExplosion = ExplosionKind::Minimal;
+  unsigned naturalUncurry = method->getNaturalArgumentCount() - 1;
+
+  return AbstractCallee(AbstractCC::Method, bestExplosion,
+                        naturalUncurry, naturalUncurry, /*data*/ false);
+}
+
+/// Find the function which will actually appear in the virtual table.
+static FuncDecl *findOverriddenFunction(IRGenModule &IGM,
+                                        FuncDecl *method,
+                                        ExplosionKind explosionLevel,
+                                        unsigned uncurryLevel) {
+  // 'method' is the most final method in the hierarchy which we
+  // haven't yet found a compatible override for.  'cur' is the method
+  // we're currently looking at.  Compatibility is transitive,
+  // so we can forget our original method and just keep going up.
+
+  FuncDecl *cur = method;
+  while ((cur = cur->getOverriddenDecl())) {
+    if (isCompatibleOverride(IGM, method, cur, explosionLevel,
+                             uncurryLevel))
+      method = cur;
+  }
+  return method;
+}
+
+/// Load the correct virtual function for the given class method.
+Callee irgen::emitVirtualCallee(IRGenFunction &IGF, llvm::Value *base,
+                                FuncDecl *method, CanType substResultType,
+                                llvm::ArrayRef<Substitution> substitutions,
+                                ExplosionKind maxExplosion,
+                                unsigned bestUncurry) {
+  // TODO: maybe use better versions in the v-table sometimes?
+  ExplosionKind bestExplosion = ExplosionKind::Minimal;
+
+  unsigned naturalUncurry = method->getNaturalArgumentCount() - 1;
+  bestUncurry = std::min(bestUncurry, naturalUncurry);
+
+  // Find the function that's actually got an entry in the metadata.
+  FuncDecl *overridden =
+    findOverriddenFunction(IGF.IGM, method, bestExplosion, bestUncurry);
+
+  // Find the metadata.
+  llvm::Value *metadata;
+  if (method->isStatic()) {
+    metadata = base;
+  } else {
+    metadata = emitMetadataRefForHeapObject(IGF, base);
+  }
+
+  // Use the type of the method we were type-checked against, not the
+  // type of the overridden method.
+  auto formalType = method->getType()->getCanonicalType();
+  auto fnTy = IGF.IGM.getFunctionType(formalType, bestExplosion, bestUncurry,
+                                      /*data*/ false)->getPointerTo();
+
+  llvm::Value *fn;
+  if (bestUncurry != naturalUncurry) {
+    IGF.unimplemented(method->getLoc(), "not-fully-applied method reference");
+  } else {
+    FunctionRef fnRef(overridden, bestExplosion, bestUncurry);
+    auto index = FindClassMethodIndex(IGF.IGM, fnRef).getTargetIndex();
+
+    fn = emitLoadFromMetadataAtIndex(IGF, metadata, index, fnTy);
+  }
+
+  return Callee::forKnownFunction(AbstractCC::Method, formalType,
+                                  substResultType, substitutions,
+                                  fn, ManagedValue(nullptr),
+                                  bestExplosion, bestUncurry);
 }
 
 // Structs

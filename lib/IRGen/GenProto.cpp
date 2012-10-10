@@ -94,29 +94,6 @@ namespace irgen {
 }
 }
 
-/// Given a heap pointer, load the metadata reference.
-static llvm::Value *emitMetadataRefForHeapObject(IRGenFunction &IGF,
-                                                 llvm::Value *object) {
-  auto zero = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
-
-  // Drill into the object pointer.  Rather than bitcasting, we make
-  // an effort to do something that should explode if we get something
-  // mistyped.
-  SmallVector<llvm::Value*, 4> indexes;
-  indexes.push_back(zero);
-  llvm::Type *ty = cast<llvm::PointerType>(object->getType())->getElementType();
-  while (auto structTy = dyn_cast<llvm::StructType>(ty)) {
-    indexes.push_back(zero);
-    ty = structTy->getElementType(0);
-  }
-  assert(ty == IGF.IGM.HeapMetadataPtrTy);
-
-  auto slot = IGF.Builder.CreateInBoundsGEP(object, indexes);
-  auto metadata = IGF.Builder.CreateLoad(Address(slot,
-                                             IGF.IGM.getPointerAlignment()));
-  return metadata;
-}
-
 /// Given a type metadata pointer, load its value witness table.
 static llvm::Value *emitValueWitnessTableRefForMetadata(IRGenFunction &IGF,
                                                         llvm::Value *metadata) {

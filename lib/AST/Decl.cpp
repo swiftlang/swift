@@ -528,6 +528,12 @@ void VarDecl::setProperty(ASTContext &Context, SourceLoc LBraceLoc,
     Set->makeSetter(this);
 }
 
+/// getNaturalArgumentCount - Returns the "natural" number of
+/// argument clauses taken by this function.
+unsigned FuncDecl::getNaturalArgumentCount() const {
+  return getBody()->getNaturalArgumentCount();
+}
+
 /// getExtensionType - If this is a method in a type extension for some type,
 /// return that type, otherwise return Type().
 Type FuncDecl::getExtensionType() const {
