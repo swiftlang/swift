@@ -116,6 +116,19 @@ ApplyInst::ApplyInst(ApplyExpr *Expr, CFGValue Callee, ArrayRef<CFGValue> Args)
   memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(CFGValue));
 }
 
+ConstantRefInst::ConstantRefInst(DeclRefExpr *E)
+  : Instruction(InstKind::ConstantRef, E, E->getType()) {}
+
+DeclRefExpr *ConstantRefInst::getExpr() const {
+  return getLocExpr<DeclRefExpr>();
+}
+
+/// getDecl - Return the underlying declaration.
+ValueDecl *ConstantRefInst::getDecl() const {
+  return getExpr()->getDecl();
+}
+
+
 DeclRefInst::DeclRefInst(DeclRefExpr *E)
   : Instruction(InstKind::DeclRef, E, E->getType()) {}
 
@@ -203,6 +216,7 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   case InstKind::AllocVar:
   case InstKind::AllocTmp:
   case InstKind::Apply:
+  case InstKind::ConstantRef:
   case InstKind::DeclRef:
   case InstKind::IntegerLiteral:
   case InstKind::Load:

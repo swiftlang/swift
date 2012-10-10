@@ -369,7 +369,12 @@ CFGValue CFGGen::visitApplyExpr(ApplyExpr *E) {
 }
 
 CFGValue CFGGen::visitDeclRefExpr(DeclRefExpr *E) {
-  return B.createDeclRef(E);
+  // If this is a reference to a mutable decl, produce an lvalue.
+  if (E->getType()->is<LValueType>())
+    return B.createDeclRef(E);
+  
+  // Otherwise, we can only produce its value, use a ConstantRefInst.
+  return B.createConstantRef(E);
 }
 
 CFGValue CFGGen::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {

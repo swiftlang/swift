@@ -189,21 +189,43 @@ public:
   }
 };
 
-/// Represents a reference to a declaration, evaluating to its lvalue.
-class DeclRefInst : public Instruction {
+/// ConstantRefInst - Represents a reference to a *constant* declaration,
+/// evaluating to its value.
+class ConstantRefInst : public Instruction {
 public:
 
-  /// Construct a DeclRefInst.
+  /// Construct a ConstantRefInst.
   ///
   /// \param Expr A backpointer to the original DeclRefExpr.
   ///
-  DeclRefInst(DeclRefExpr *E);
+  ConstantRefInst(DeclRefExpr *E);
 
   DeclRefExpr *getExpr() const;
 
   /// getDecl - Return the underlying declaration.
   ValueDecl *getDecl() const;
 
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::ConstantRef;
+  }
+};
+
+/// DeclRefInst - Represents a reference to a non-constant declaration,
+/// evaluating to its lvalue (i.e., its address).
+class DeclRefInst : public Instruction {
+public:
+  
+  /// Construct a DeclRefInst.
+  ///
+  /// \param Expr A backpointer to the original DeclRefExpr.
+  ///
+  DeclRefInst(DeclRefExpr *E);
+  
+  DeclRefExpr *getExpr() const;
+  
+  /// getDecl - Return the underlying declaration.
+  ValueDecl *getDecl() const;
+  
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::DeclRef;
   }
@@ -285,6 +307,10 @@ public:
   RequalifyInst(RequalifyExpr *E, CFGValue Operand);
 
   CFGValue getOperand() const { return Operand; }
+  
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::Requalify;
+  }
 };
 
 
@@ -347,6 +373,9 @@ public:
 
   CFGValue getOperand() const { return Operand; }
 
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::ScalarToTuple;
+  }
 };
   
 /// TupleElementInst - Extract a numbered element out of a value of tuple type.
@@ -358,6 +387,10 @@ public:
   
   CFGValue getOperand() const { return Operand; }
   unsigned getFieldNo() const { return FieldNo; }
+  
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::TupleElement;
+  }
 };
 
 //===----------------------------------------------------------------------===//

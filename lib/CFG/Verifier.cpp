@@ -60,10 +60,13 @@ public:
   void visitApplyInst(ApplyInst *AI) {
   }
 
+  void visitConstantRefInst(ConstantRefInst *DRI) {
+    assert(!DRI->getType()->is<LValueType>() &&
+           "ConstantRef should return not produce an lvalue");
+  }
+
   void visitDeclRefInst(DeclRefInst *DRI) {
-    assert((DRI->getType()->is<LValueType>() ||
-            DRI->getType()->is<FunctionType>()) &&
-           "DeclRef should return lvalue");
+    assert(DRI->getType()->is<LValueType>() && "DeclRef should return lvalue");
   }
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     assert(ILI->getType()->is<BuiltinIntegerType>() &&

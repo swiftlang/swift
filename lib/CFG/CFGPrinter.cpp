@@ -105,6 +105,11 @@ public:
     OS << ')';
   }
 
+  void visitConstantRefInst(ConstantRefInst *DRI) {
+    OS << "constantref " << DRI->getDecl()->getName()
+    << ", type=" << DRI->getDecl()->getType().getString();
+  }
+
   void visitDeclRefInst(DeclRefInst *DRI) {
     OS << "declref " << DRI->getDecl()->getName()
        << ", type=" << DRI->getDecl()->getType().getString();

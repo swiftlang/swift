@@ -111,6 +111,10 @@ public:
     return insert(ApplyInst::create(Expr, Fn, Args, C));
   }
 
+  ConstantRefInst *createConstantRef(DeclRefExpr *Expr) {
+    return insert(new ConstantRefInst(Expr));
+  }
+
   DeclRefInst *createDeclRef(DeclRefExpr *Expr) {
     return insert(new DeclRefInst(Expr));
   }
