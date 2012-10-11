@@ -18,9 +18,10 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/OwningPtr.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
 struct ID {
@@ -119,6 +120,17 @@ public:
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     const auto &lit = ILI->getValue();
     OS << "integerliteral " << lit << ", width=" << lit.getBitWidth();
+  }
+  void visitFloatLiteralInst(FloatLiteralInst *FLI) {
+    SmallVector<char, 12> Buffer;
+    FLI->getValue().toString(Buffer);
+    OS << "floatliteral " << StringRef(Buffer.data(), Buffer.size());
+  }
+  void visitCharacterLiteralInst(CharacterLiteralInst *CLI) {
+    OS << "characterliteral " << CLI->getValue();
+  }
+  void visitStringLiteralInst(StringLiteralInst *SLI) {
+    OS << "stringliteral \"" << SLI->getValue() << "\"";
   }
   void visitLoadInst(LoadInst *LI) {
     OS << "load " << getID(LI->getLValue());

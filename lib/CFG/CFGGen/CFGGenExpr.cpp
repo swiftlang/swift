@@ -45,6 +45,15 @@ CFGValue CFGGen::visitDeclRefExpr(DeclRefExpr *E) {
 CFGValue CFGGen::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
   return B.createIntegerLiteral(E);
 }
+CFGValue CFGGen::visitFloatLiteralExpr(FloatLiteralExpr *E) {
+  return B.createFloatLiteral(E);
+}
+CFGValue CFGGen::visitCharacterLiteralExpr(CharacterLiteralExpr *E) {
+  return B.createCharacterLiteral(E);
+}
+CFGValue CFGGen::visitStringLiteralExpr(StringLiteralExpr *E) {
+  return B.createStringLiteral(E);
+}
 
 CFGValue CFGGen::visitLoadExpr(LoadExpr *E) {
   CFGValue SubV = visit(E->getSubExpr());

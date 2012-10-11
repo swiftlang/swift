@@ -18,6 +18,7 @@
 #include "swift/AST/AST.h"
 #include "swift/CFG/CFG.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 using namespace swift;
 
@@ -146,7 +147,6 @@ IntegerLiteralInst::IntegerLiteralInst(IntegerLiteralExpr *E)
   : Instruction(InstKind::IntegerLiteral, E, E->getType()) {
 }
 
-
 IntegerLiteralExpr *IntegerLiteralInst::getExpr() const {
   return getLocExpr<IntegerLiteralExpr>();
 }
@@ -155,6 +155,43 @@ IntegerLiteralExpr *IntegerLiteralInst::getExpr() const {
 APInt IntegerLiteralInst::getValue() const {
   return getExpr()->getValue();
 }
+
+FloatLiteralInst::FloatLiteralInst(FloatLiteralExpr *E)
+  : Instruction(InstKind::FloatLiteral, E, E->getType()) {
+}
+
+FloatLiteralExpr *FloatLiteralInst::getExpr() const {
+  return getLocExpr<FloatLiteralExpr>();
+}
+
+APFloat FloatLiteralInst::getValue() const {
+  return getExpr()->getValue();
+}
+
+CharacterLiteralInst::CharacterLiteralInst(CharacterLiteralExpr *E)
+  : Instruction(InstKind::CharacterLiteral, E, E->getType()) {
+}
+
+CharacterLiteralExpr *CharacterLiteralInst::getExpr() const {
+  return getLocExpr<CharacterLiteralExpr>();
+}
+
+uint32_t CharacterLiteralInst::getValue() const {
+  return getExpr()->getValue();
+}
+
+StringLiteralInst::StringLiteralInst(StringLiteralExpr *E)
+  : Instruction(InstKind::StringLiteral, E, E->getType()) {
+}
+
+StringLiteralExpr *StringLiteralInst::getExpr() const {
+  return getLocExpr<StringLiteralExpr>();
+}
+
+StringRef StringLiteralInst::getValue() const {
+  return getExpr()->getValue();
+}
+
 
 LoadInst::LoadInst(LoadExpr *E, CFGValue LValue)
   : Instruction(InstKind::Load, E, E->getType()), LValue(LValue) {
@@ -232,6 +269,9 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   case InstKind::ConstantRef:
   case InstKind::ZeroValue:
   case InstKind::IntegerLiteral:
+  case InstKind::FloatLiteral:
+  case InstKind::CharacterLiteral:
+  case InstKind::StringLiteral:
   case InstKind::Load:
   case InstKind::Store:
   case InstKind::Requalify:

@@ -125,6 +125,9 @@ public:
   CFGValue visitApplyExpr(ApplyExpr *E);
   CFGValue visitDeclRefExpr(DeclRefExpr *E);
   CFGValue visitIntegerLiteralExpr(IntegerLiteralExpr *E);
+  CFGValue visitFloatLiteralExpr(FloatLiteralExpr *E);
+  CFGValue visitCharacterLiteralExpr(CharacterLiteralExpr *E);
+  CFGValue visitStringLiteralExpr(StringLiteralExpr *E);
   CFGValue visitLoadExpr(LoadExpr *E);
   CFGValue visitMaterializeExpr(MaterializeExpr *E);
   CFGValue visitRequalifyExpr(RequalifyExpr *E);

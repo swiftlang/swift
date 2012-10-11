@@ -123,8 +123,17 @@ public:
     return insert(new ZeroValueInst(D));
   }
 
-  IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *Expr) {
-    return insert(new IntegerLiteralInst(Expr));
+  IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E) {
+    return insert(new IntegerLiteralInst(E));
+  }
+  FloatLiteralInst *createFloatLiteral(FloatLiteralExpr *E) {
+    return insert(new FloatLiteralInst(E));
+  }
+  CharacterLiteralInst *createCharacterLiteral(CharacterLiteralExpr *E) {
+    return insert(new CharacterLiteralInst(E));
+  }
+  StringLiteralInst *createStringLiteral(StringLiteralExpr *E) {
+    return insert(new StringLiteralInst(E));
   }
 
   LoadInst *createLoad(LoadExpr *Expr, CFGValue LV) {

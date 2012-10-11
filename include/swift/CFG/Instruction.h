@@ -34,13 +34,16 @@ class CFG;
 class BasicBlock;
 class ApplyExpr;
 class AssignStmt;
+class CharacterLiteralExpr;
 class DeclRefExpr;
+class FloatLiteralExpr;
 class IntegerLiteralExpr;
 class LoadExpr;
 class MaterializeExpr;
 class ReturnStmt;
 class RequalifyExpr;
 class ScalarToTupleExpr;
+class StringLiteralExpr;
 class Stmt;
 class TupleElementExpr;
 class TupleExpr;
@@ -245,15 +248,10 @@ public:
   }
 };
 
-/// Encapsulates an integer constant, as defined originally by an
-/// an IntegerLiteralExpr.
+/// IntegerLiteralInst - Encapsulates an integer constant, as defined originally
+/// by an an IntegerLiteralExpr.
 class IntegerLiteralInst : public Instruction {
 public:
-
-  /// Constructs an IntegerLiteralInst.
-  ///
-  /// \param Expr A backpointer to the original IntegerLiteralExpr.
-  ///
   IntegerLiteralInst(IntegerLiteralExpr *E);
   
   IntegerLiteralExpr *getExpr() const;
@@ -266,8 +264,56 @@ public:
   }
 };
 
-/// Represents a load from a memory location.
-/// FIXME: Need a new "implicit conversion instruction" base class.
+/// FloatLiteralInst - Encapsulates a floating point constant, as defined
+/// originally by a FloatLiteralExpr.
+class FloatLiteralInst : public Instruction {
+public:
+  FloatLiteralInst(FloatLiteralExpr *E);
+
+  FloatLiteralExpr *getExpr() const;
+
+  /// getValue - Return the APFloat for the underlying FP literal.
+  APFloat getValue() const;
+
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::FloatLiteral;
+  }
+};
+
+/// CharacterLiteralInst - Encapsulates a character constant, as defined
+/// originally by a CharacterLiteralExpr.
+class CharacterLiteralInst : public Instruction {
+public:
+  CharacterLiteralInst(CharacterLiteralExpr *E);
+
+  CharacterLiteralExpr *getExpr() const;
+
+  /// getValue - Return the value for the underlying literal.
+  uint32_t getValue() const;
+
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::CharacterLiteral;
+  }
+};
+
+/// StringLiteralInst - Encapsulates a string constant, as defined originally by
+/// a StringLiteralExpr.
+class StringLiteralInst : public Instruction {
+public:
+  StringLiteralInst(StringLiteralExpr *E);
+
+  StringLiteralExpr *getExpr() const;
+
+  /// getValue - Return the string data for the literal.
+  StringRef getValue() const;
+
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::StringLiteral;
+  }
+};
+
+
+/// LoadInst - Represents a load from a memory location.
 class LoadInst : public Instruction {
   /// The LValue (memory address) to use for the load.
   CFGValue LValue;
