@@ -28,10 +28,8 @@ namespace {
 struct InitPatternWithExpr
   : public PatternVisitor<InitPatternWithExpr> {
     CFGGen &Gen;
-    //Initialization &I;
     Expr *Init;
-    InitPatternWithExpr(CFGGen &Gen, /*Initialization &I,*/ Expr *Init)
-      : Gen(Gen), /*I(I),*/ Init(Init) {}
+    InitPatternWithExpr(CFGGen &Gen, Expr *Init) : Gen(Gen), Init(Init) {}
     
     // Paren & Typed patterns are noops, just look through them.
     void visitParenPattern(ParenPattern *P) {return visit(P->getSubPattern());}
@@ -53,24 +51,23 @@ struct InitPatternWithExpr
 
       CFGValue AllocVar = Gen.B.createAllocVar(VD);
 
-      FullExpr Scope(Gen.Cleanups);
-
       // NOTE: "Default zero initialization" is a dubious concept.  When we get
       // something like typestate or another concept that allows us to model
       // definitive assignment, then we can consider removing it.
       CFGValue Initializer;
-      if (Init)
+      if (Init) {
+        FullExpr Scope(Gen.Cleanups);
         Initializer = Gen.visit(Init);
-      else
+      } else
         Initializer = Gen.B.createZeroValue(VD);
 
       Gen.B.createInitialization(VD, Initializer, AllocVar);
     }
     
     
-#if 0 // Tuple patterns.
+    // Tuple patterns.
     /// Try to initialize the distinct elements of a tuple pattern
-    /// independently.
+    /// independently, just to reduce the size of the IR.
     bool tryInitTupleElementsIndependently(TuplePattern *P) {
       // Skip sugar.
       Expr *E = Init->getSemanticsProvidingExpr();
@@ -91,24 +88,24 @@ struct InitPatternWithExpr
       // around tuple literals.
       return false;
     }
-#endif
+    
     // Bind to a tuple pattern by first trying to see if we can emit
     // the initializers independently.
     void visitTuplePattern(TuplePattern *P) {
-      assert(0 && "Unimp");
-#if 0
       // If we have no initializer, just emit the subpatterns using
       // the missing initializer.
-      if (!Init) {
+      if (Init == nullptr) {
         for (auto &elt : P->getFields())
           visit(elt.getPattern());
         return;
       }
-      
+
       // Otherwise, try to initialize the tuple elements independently.
       if (tryInitTupleElementsIndependently(P))
         return;
-      
+
+      abort();
+#if 0
       // Otherwise, a single expression will initialize multiple
       // tuple elements.
       FullExpr Scope(Gen.Cleanups);
@@ -143,5 +140,5 @@ void CFGGen::visitPatternBindingDecl(PatternBindingDecl *D) {
   // then initialize them.  If an initial value was specified by the decl, use
   // it to produce the initial values, otherwise use the default value for the
   // type.
-  InitPatternWithExpr(*this, /*I,*/ D->getInit()).visit(D->getPattern());
+  InitPatternWithExpr(*this, D->getInit()).visit(D->getPattern());
 }
