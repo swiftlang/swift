@@ -25,106 +25,54 @@ namespace {
 /// the decls are default initialized.  This does not occur within the
 /// initializer's full-expression;  that should be pushed at the appropriate
 /// moment.
-struct InitPatternWithExpr
-  : public PatternVisitor<InitPatternWithExpr> {
-    CFGGen &Gen;
-    Expr *Init;
-    InitPatternWithExpr(CFGGen &Gen, Expr *Init) : Gen(Gen), Init(Init) {}
-    
-    // Paren & Typed patterns are noops, just look through them.
-    void visitParenPattern(ParenPattern *P) {return visit(P->getSubPattern());}
-    void visitTypedPattern(TypedPattern *P) {return visit(P->getSubPattern());}
+struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
+  CFGGen &Gen;
+  CFGValue Init;
+  InitPatternWithExpr(CFGGen &Gen, CFGValue Init) : Gen(Gen), Init(Init) {}
+  
+  // Paren & Typed patterns are noops, just look through them.
+  void visitParenPattern(ParenPattern *P) {return visit(P->getSubPattern());}
+  void visitTypedPattern(TypedPattern *P) {return visit(P->getSubPattern());}
+  
+  // AnyPatterns (i.e, _) don't require any further codegen beyond emitting the
+  // initializer.
+  void visitAnyPattern(AnyPattern *P) {}
+  
+  // Bind to a named pattern by creating a memory location and initializing it
+  // with the initial value.
+  void visitNamedPattern(NamedPattern *P) {
+    VarDecl *VD = P->getDecl();
+    CFGValue AllocVar = Gen.B.createAllocVar(VD);
 
-
-    // Bind to a wildcard pattern ("_") by emitting and ignoring the
-    // initializer.
-    void visitAnyPattern(AnyPattern *P) {
-      if (Init) {
-        FullExpr Scope(Gen.Cleanups);
-        Gen.visit(Init);
-      }
+    // NOTE: "Default zero initialization" is a dubious concept.  When we get
+    // something like typestate or another concept that allows us to model
+    // definitive assignment, then we can consider removing it.
+    auto InitVal = Init.isNull() ? Gen.B.createZeroValue(VD) : Init;
+    Gen.B.createInitialization(VD, InitVal, AllocVar);
+  }
+  
+  // Bind to a tuple pattern by first trying to see if we can emit
+  // the initializers independently.
+  void visitTuplePattern(TuplePattern *P) {
+    // If we have no initializer, just emit the subpatterns using
+    // the missing initializer.
+    if (Init.isNull()) {
+      for (auto &elt : P->getFields())
+        visit(elt.getPattern());
+      return;
     }
-    
-    // Bind to a named pattern by emitting the initializer into place.
-    void visitNamedPattern(NamedPattern *P) {
-      VarDecl *VD = P->getDecl();
 
-      CFGValue AllocVar = Gen.B.createAllocVar(VD);
-
-      // NOTE: "Default zero initialization" is a dubious concept.  When we get
-      // something like typestate or another concept that allows us to model
-      // definitive assignment, then we can consider removing it.
-      CFGValue Initializer;
-      if (Init) {
-        FullExpr Scope(Gen.Cleanups);
-        Initializer = Gen.visit(Init);
-      } else
-        Initializer = Gen.B.createZeroValue(VD);
-
-      Gen.B.createInitialization(VD, Initializer, AllocVar);
+    // Otherwise, iterate through the fields of the tuple that we're
+    // initializing and extract the interesting bits of Init out for each tuple
+    // element.
+    unsigned FieldNo = 0;
+    CFGValue TupleInit = Init;
+    for (auto &elt : P->getFields()) {
+      Init = Gen.B.createTupleElement(elt.getPattern()->getType(), TupleInit,
+                                      FieldNo++);
+      visit(elt.getPattern());
     }
-    
-    
-    // Tuple patterns.
-    /// Try to initialize the distinct elements of a tuple pattern
-    /// independently, just to reduce the size of the IR.
-    bool tryInitTupleElementsIndependently(TuplePattern *P) {
-      // Skip sugar.
-      Expr *E = Init->getSemanticsProvidingExpr();
-      
-      // If we can break the initializer down into a literal, that's great.
-      if (TupleExpr *literal = dyn_cast<TupleExpr>(E)) {
-        assert(literal->getNumElements() == P->getNumFields());
-        
-        for (unsigned i = 0, e = literal->getNumElements(); i != e; ++i) {
-          Init = literal->getElement(i);
-          assert(Init && "no expression for tuple element!");
-          visit(P->getFields()[i].getPattern());
-        }
-        return true;
-      }
-      
-      // TODO: there are other possibilities here, e.g. with shuffles
-      // around tuple literals.
-      return false;
-    }
-    
-    // Bind to a tuple pattern by first trying to see if we can emit
-    // the initializers independently.
-    void visitTuplePattern(TuplePattern *P) {
-      // If we have no initializer, just emit the subpatterns using
-      // the missing initializer.
-      if (Init == nullptr) {
-        for (auto &elt : P->getFields())
-          visit(elt.getPattern());
-        return;
-      }
-
-      // Otherwise, try to initialize the tuple elements independently.
-      if (tryInitTupleElementsIndependently(P))
-        return;
-
-      abort();
-#if 0
-      // Otherwise, a single expression will initialize multiple
-      // tuple elements.
-      FullExpr Scope(Gen.Cleanups);
-      
-      const TypeInfo &TI = IGF.getFragileTypeInfo(P->getType());
-      
-      // If we can emit the expression as an address, we can copy from
-      // there into the tuple.
-      if (Optional<Address> addr = IGF.tryEmitAsAddress(Init, TI)) {
-        emitTuplePatternInitFromAddress(IGF, I, addr.getValue(), P, TI);
-        return;
-      }
-      
-      // Otherwise, we have to explode.
-      Explosion explosion(ExplosionKind::Maximal);
-      IGF.emitRValue(Init, explosion);
-      InitPatternWithRValue(IGF, I, explosion).visitTuplePattern(P);
-#endif
-    }
+  }
 };
 } // end anonymous namespace
 
@@ -137,8 +85,14 @@ void CFGGen::visitPatternBindingDecl(PatternBindingDecl *D) {
   //RegisterPattern(*this, I).visit(D->getPattern());
   
   // Actually emit the code to allocate space for each declared variable, and
-  // then initialize them.  If an initial value was specified by the decl, use
-  // it to produce the initial values, otherwise use the default value for the
-  // type.
-  InitPatternWithExpr(*this, D->getInit()).visit(D->getPattern());
+  // then initialize them.
+
+  // If an initial value was specified by the decl, use it to produce the
+  // initial values, otherwise use the default value for the type.
+  CFGValue Initializer;
+  if (D->getInit()) {
+    FullExpr Scope(Cleanups);
+    Initializer = visit(D->getInit());
+  }
+  InitPatternWithExpr(*this, Initializer).visit(D->getPattern());
 }

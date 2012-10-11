@@ -398,6 +398,7 @@ class TupleElementInst : public Instruction {
   unsigned FieldNo;
 public:
   TupleElementInst(TupleElementExpr *E, CFGValue Operand, unsigned FieldNo);
+  TupleElementInst(Type ResultTy, CFGValue Operand, unsigned FieldNo);
   
   CFGValue getOperand() const { return Operand; }
   unsigned getFieldNo() const { return FieldNo; }

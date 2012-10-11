@@ -160,7 +160,11 @@ public:
                                        unsigned FieldNo) {
     return insert(new TupleElementInst(E, Operand, FieldNo));
   }
-  
+  TupleElementInst *createTupleElement(Type ResultTy, CFGValue Operand,
+                                       unsigned FieldNo) {
+    return insert(new TupleElementInst(ResultTy, Operand, FieldNo));
+  }
+
   TypeOfInst *createTypeOf(TypeOfExpr *Expr) {
     return insert(new TypeOfInst(Expr));
   }

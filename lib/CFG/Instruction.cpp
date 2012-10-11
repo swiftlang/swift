@@ -217,6 +217,14 @@ TupleElementInst::TupleElementInst(TupleElementExpr *E, CFGValue Operand,
     Operand(Operand), FieldNo(FieldNo) {
 }
 
+TupleElementInst::TupleElementInst(Type ResultTy, CFGValue Operand,
+                                   unsigned FieldNo)
+  : Instruction(InstKind::TupleElement, (Expr*)nullptr, ResultTy),
+    Operand(Operand), FieldNo(FieldNo) {
+  
+}
+
+
 
 VarRefInst::VarRefInst(DeclRefExpr *E)
 : Instruction(InstKind::VarRef, E, E->getType()) {}
