@@ -21,6 +21,10 @@
 #include <new>
 #include <string.h>
 
+#ifndef SWIFT_DEBUG_RUNTIME
+#define SWIFT_DEBUG_RUNTIME 0
+#endif
+
 using namespace swift;
 
 namespace {
@@ -48,7 +52,7 @@ namespace {
       // TODO: exploit our knowledge about the pointer alignment of
       // the arguments.
       const void *storedArguments = getArgumentsBuffer();
-      return memcmp(storedArguments, arguments, numArguments * sizeof(void*));
+      return memcmp(storedArguments, arguments, numArguments * sizeof(void*)) == 0;
     }
 
   public:
@@ -195,9 +199,24 @@ swift::swift_getGenericMetadata(GenericMetadata *pattern,
                                 const void *arguments) {
   auto genericArgs = (const void * const *) arguments;
   size_t numGenericArgs = pattern->NumArguments;
+
+#if SWIFT_DEBUG_RUNTIME
+  printf("swift_getGenericMetadata(%p):\n", pattern);
+  for (unsigned i = 0; i != numGenericArgs; ++i) {
+    printf("  %p\n", genericArgs[i]);
+  }
+#endif
+
   if (auto entry = getCache(pattern).find(genericArgs, numGenericArgs)) {
+#if SWIFT_DEBUG_RUNTIME
+    printf("found in cache!\n");
+#endif
     return entry->getData<Metadata>(numGenericArgs);
   }
+
+#if SWIFT_DEBUG_RUNTIME
+  printf("not found in cache!\n");
+#endif
 
   // Otherwise, instantiate a new one.
   return instantiateGenericMetadata(pattern, arguments);
