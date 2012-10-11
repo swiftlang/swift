@@ -181,16 +181,16 @@ RequalifyInst::RequalifyInst(RequalifyExpr *E, CFGValue Operand)
   : Instruction(InstKind::Requalify, E, E->getType()), Operand(Operand) {}
 
 
-TupleInst *TupleInst::create(TupleExpr *Expr, ArrayRef<CFGValue> Elements,
-                             CFG &C) {
+TupleInst *TupleInst::createImpl(Expr *E, ArrayRef<CFGValue> Elements,
+                                 CFG &C) {
   void *Buffer = C.allocate(sizeof(TupleInst) +
                             Elements.size() * sizeof(CFGValue),
                             llvm::AlignOf<TupleInst>::Alignment);
-  return ::new(Buffer) TupleInst(Expr, Elements);
+  return ::new(Buffer) TupleInst(E, Elements);
 }
 
-TupleInst::TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elems)
-  : Instruction(InstKind::Tuple, Expr, Expr->getType()), NumArgs(Elems.size()) {
+TupleInst::TupleInst(Expr *E, ArrayRef<CFGValue> Elems)
+  : Instruction(InstKind::Tuple, E, E->getType()), NumArgs(Elems.size()) {
   memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(CFGValue));
 }
 

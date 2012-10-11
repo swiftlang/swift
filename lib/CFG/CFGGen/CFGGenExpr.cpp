@@ -85,6 +85,46 @@ CFGValue CFGGen::visitTupleElementExpr(TupleElementExpr *E) {
   return B.createTupleElement(E, visit(E->getBase()), E->getFieldNumber());
 }
 
+CFGValue CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
+  // TupleShuffle expands out to extracts+inserts.  Start by emitting the base
+  // expression that we'll shuffle.
+  CFGValue Op = visit(E->getSubExpr());
+
+  // Then collect the new elements.
+  SmallVector<CFGValue, 8> ResultElements;
+
+  // Loop over each result element to compute it.
+  llvm::ArrayRef<TupleTypeElt> outerFields =
+    E->getType()->getAs<TupleType>()->getFields();
+
+  auto shuffleIndexIterator = E->getElementMapping().begin();
+  for (const TupleTypeElt &outerField : outerFields) {
+    int shuffleIndex = *shuffleIndexIterator++;
+
+    // If the shuffle index is -1, we're supposed to use the default value.
+    if (shuffleIndex == -1) {
+      assert(outerField.hasInit() && "no default initializer for field!");
+      ResultElements.push_back(visit(outerField.getInit()->getExpr()));
+      continue;
+    }
+
+    // If the shuffle index is -2, it is the beginning of the list of
+    // varargs inputs.  Save this case for last.
+    if (shuffleIndex != -2) {
+      // Map from a different tuple element.
+      assert(shuffleIndex >= 0 && (unsigned)shuffleIndex < outerFields.size());
+      Type EltTy = outerField.getType();
+      ResultElements.push_back(B.createTupleElement(EltTy, Op, shuffleIndex));
+      continue;
+    }
+
+    assert(0 && "FIXME: Varargs tuple shuffles not supported yet");
+    break;
+  }
+
+  return B.createTuple(E, ResultElements);
+}
+
 CFGValue CFGGen::visitTypeOfExpr(TypeOfExpr *E) {
   return B.createTypeOf(E);
 }

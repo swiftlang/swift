@@ -44,6 +44,7 @@ class ScalarToTupleExpr;
 class Stmt;
 class TupleElementExpr;
 class TupleExpr;
+class TupleShuffleExpr;
 class TypeOfExpr;
 class VarDecl;
 
@@ -337,7 +338,8 @@ class TupleInst : public Instruction {
 
   /// Private constructor.  Because of the storage requirements of
   /// TupleInst, object creation goes through 'create()'.
-  TupleInst(TupleExpr *Expr, ArrayRef<CFGValue> Elements);
+  TupleInst(Expr *E, ArrayRef<CFGValue> Elements);
+  static TupleInst *createImpl(Expr *E, ArrayRef<CFGValue> Elements, CFG &C);
 
 public:
   /// The elements referenced by this TupleInst.
@@ -350,8 +352,15 @@ public:
     return const_cast<TupleInst*>(this)->getElements();
   }
 
-  /// Construct a TupleInst.
-  static TupleInst *create(TupleExpr *Expr, ArrayRef<CFGValue> Elements,CFG &C);
+  /// Construct a TupleInst.  The two forms are used to ensure that these are
+  /// only created for specific syntactic forms.
+  static TupleInst *create(TupleExpr *E, ArrayRef<CFGValue> Elements,CFG &C){
+    return createImpl((Expr*)E, Elements, C);
+  }
+  static TupleInst *create(TupleShuffleExpr *E, ArrayRef<CFGValue> Elements,
+                           CFG &C) {
+    return createImpl((Expr*)E, Elements, C);
+  }
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::Tuple;

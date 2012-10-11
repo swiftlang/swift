@@ -132,6 +132,7 @@ public:
   CFGValue visitTupleExpr(TupleExpr *E);
   CFGValue visitScalarToTupleExpr(ScalarToTupleExpr *E);
   CFGValue visitTupleElementExpr(TupleElementExpr *E);
+  CFGValue visitTupleShuffleExpr(TupleShuffleExpr *E);
   CFGValue visitTypeOfExpr(TypeOfExpr *E);
   
   //===--------------------------------------------------------------------===//
