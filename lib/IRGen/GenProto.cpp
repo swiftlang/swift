@@ -1943,7 +1943,11 @@ namespace {
 
         /// This argument is passed to the witness as an l-value and
         /// needs to be loaded.
-        LValueToRValue
+        LValueToRValue,
+
+        /// This argument is ignored by the witness and needs to be
+        /// dropped.
+        Ignored
       };
 
     private:
@@ -1956,7 +1960,8 @@ namespace {
       static bool isTypeInfoKind(Kind kind) {
         return (kind == Direct ||
                 kind == IndirectToDirect ||
-                kind == LValueToRValue);
+                kind == LValueToRValue ||
+                kind == Ignored);
       }
 
       static bool isPointerTypeKind(Kind kind) {
@@ -1964,7 +1969,9 @@ namespace {
       }
 
       static bool isNonTriviallyAbstractedKind(Kind kind) {
-        return (kind == IndirectToDirect || kind == LValueToRValue);
+        return (kind == IndirectToDirect ||
+                kind == LValueToRValue ||
+                kind == Ignored);
       }
 
     public:
@@ -2109,7 +2116,7 @@ namespace {
       // you involved an archetype, but we might need to translate
       // function values to make the types work.
       if (isa<FunctionType>(sig)) {
-        if (!sig->isEqual(impl)) {
+        if (sig != impl) {
           IGM.unimplemented(SourceLoc(), "can't rewrite function values!");
         }
 
@@ -2117,11 +2124,16 @@ namespace {
         return;
       }
 
-      // We don't have a representation for metatypes yet, so no conversion
-      // is required.
-      if (isa<MetaTypeType>(sig)) {
-        assert(isa<MetaTypeType>(impl));
-        Args.push_back(Arg(Arg::Direct, implTI));
+      // Passing a metatype might require dropping an argument.
+      if (auto sigMetatype = dyn_cast<MetaTypeType>(sig)) {
+        auto implMetatype = cast<MetaTypeType>(impl);
+        if (IGM.hasTrivialMetatype(CanType(implMetatype->getInstanceType())) &&
+            !IGM.hasTrivialMetatype(CanType(sigMetatype->getInstanceType()))) {
+          HasAbstractedArg = true;
+          Args.push_back(Arg(Arg::Ignored, implTI));
+        } else {
+          Args.push_back(Arg(Arg::Direct, implTI));
+        }
         return;
       }
 
@@ -2199,6 +2211,7 @@ namespace {
 
       // Walk backwards through the parameter clauses, forward the arguments.
       std::vector<Explosion> innerArgs;
+      innerArgs.reserve(UncurryLevel + 1);
       for (unsigned i = UncurryLevel + 1; i != 0; ) {
         innerArgs.emplace_back(ExplosionKind::Minimal);
         Explosion& innerArg = innerArgs.back();
@@ -2232,6 +2245,11 @@ namespace {
         switch (technique.getKind()) {
         case Arg::DecomposedTuple: continue;
         case Arg::Nested: continue;
+
+        // Currently, Ignored is only used for metatypes.
+        case Arg::Ignored:
+          outerArgs.ignoreUnmanaged(1);
+          continue;
 
         case Arg::Direct:
           technique.getTypeInfo().reexplode(IGF, outerArgs, innerArgs);
@@ -3396,7 +3414,7 @@ static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
                                               CanType substResultType,
                                               ArrayRef<Substitution> subs,
                                               llvm::Value *witness,
-                                              llvm::Value *wtable,
+                                              llvm::Value *metadata,
                                               Address thisObject) {
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   unsigned uncurryLevel = 1;
@@ -3425,12 +3443,14 @@ static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
                                            "object-pointer");
     Explosion arg(ExplosionKind::Minimal);
     arg.addUnmanaged(thisObject.getAddress());
+    // FIXME: also the metatype
     emission.addArg(arg);
 
-  // If this is a static method, add an empty argument as the metatype.
-  // This is really questionable.
+  // If this is a static method, add the metatype argument.
   } else {
-    emission.addEmptyArg();
+    Explosion arg(ExplosionKind::Minimal);
+    arg.addUnmanaged(metadata);
+    emission.addArg(arg);
   }
 
   return emission;
@@ -3497,9 +3517,12 @@ irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
   auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
   llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
 
+  // FIXME: store type metadata in the existential!
+  llvm::Value *metadata = llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+
   // Emit the callee.
   return prepareProtocolMethodCall(IGF, fn, substResultType, subs,
-                                   witness, wtable, thisObject);
+                                   witness, metadata, thisObject);
 }
 
 /// Emit an existential member reference as a callee.
@@ -3548,9 +3571,12 @@ irgen::prepareArchetypeMemberRefCall(IRGenFunction &IGF,
   auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
   llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
 
+  // Acquire the archetype metadata.
+  llvm::Value *metadata = archetypeTI.getMetadataRef(IGF);
+
   // Emit the callee.
   return prepareProtocolMethodCall(IGF, fn, substResultType, subs,
-                                   witness, wtable, thisObject);
+                                   witness, metadata, thisObject);
 }
 
 

@@ -388,7 +388,13 @@ const TypeInfo *TypeConverter::convertModuleType(ModuleType *T) {
 }
 
 const TypeInfo *TypeConverter::convertMetaTypeType(MetaTypeType *T) {
-  return new EmptyTypeInfo(IGM.Int8Ty);
+  // Certain metatypes have trivial representation, and we only
+  // actually need to materialize them when converting to a more
+  // generic representation.
+  if (IGM.hasTrivialMetatype(CanType(T->getInstanceType())))
+    return new EmptyTypeInfo(IGM.Int8Ty);
+
+  return &getTypeMetadataPtrTypeInfo();
 }
 
 /// createNominalType - Create a new nominal type.

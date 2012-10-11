@@ -148,6 +148,7 @@ public:
   unsigned getExplosionSize(CanType T, ExplosionKind kind);
   llvm::PointerType *isSingleIndirectValue(CanType T, ExplosionKind kind);
   llvm::PointerType *requiresIndirectResult(CanType T, ExplosionKind kind);
+  bool hasTrivialMetatype(CanType type);
 
   bool isResilient(Decl *decl) { return false; }
 

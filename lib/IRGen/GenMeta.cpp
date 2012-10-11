@@ -341,10 +341,47 @@ llvm::Value *irgen::emitTypeMetadataRef(IRGenFunction &IGF, CanType type) {
   return EmitTypeMetadataRef(IGF).visit(type);
 }
 
+namespace {
+  /// A CRTP type visitor for deciding whether the metatype for a type
+  /// has trivial representation.
+  struct HasTrivialMetatype : irgen::TypeVisitor<HasTrivialMetatype, bool> {
+    /// Class metatypes have non-trivial representation due to the
+    /// possibility of subclassing.
+    bool visitClassType(ClassType *type) {
+      return false;
+    }
+    bool visitBoundGenericType(BoundGenericType *type) {
+      return !isa<ClassDecl>(type->getDecl());
+    }
+
+    /// Archetype metatypes have non-trivial representation in case
+    /// they instantiate to a class metatype.
+    bool visitArchetypeType(ArchetypeType *type) {
+      return false;
+    }
+
+    /// Everything else is trivial.
+    bool visitType(TypeBase *type) {
+      return true;
+    }
+  };
+}
+
+/// Does the metatype for the given type have a trivial representation?
+bool IRGenModule::hasTrivialMetatype(CanType instanceType) {
+  return HasTrivialMetatype().visit(instanceType);
+}
+
 /// Emit a DeclRefExpr which refers to a metatype.
-void irgen::emitMetaTypeRef(IRGenFunction &IGF, Type type,
+void irgen::emitMetaTypeRef(IRGenFunction &IGF, CanType type,
                             Explosion &explosion) {
-  // For now, all metatype types are empty.
+  // Some metatypes have trivial representation.
+  if (IGF.IGM.hasTrivialMetatype(type->getCanonicalType()))
+    return;
+
+  // Otherwise, emit a metadata reference.
+  llvm::Value *metadata = emitTypeMetadataRef(IGF, type);
+  explosion.addUnmanaged(metadata);
 }
 
 /*****************************************************************************/

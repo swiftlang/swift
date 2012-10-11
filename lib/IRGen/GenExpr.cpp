@@ -130,7 +130,7 @@ static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
   case DeclKind::Struct:
   case DeclKind::Class:
   case DeclKind::Protocol:
-    emitMetaTypeRef(IGF, D->getType(), explosion);
+    emitMetaTypeRef(IGF, D->getType()->getCanonicalType(), explosion);
     return;
 
   case DeclKind::Var:
@@ -282,7 +282,9 @@ namespace {
     }
 
     void visitTypeOfExpr(TypeOfExpr *E) {
-      emitMetaTypeRef(IGF, E->getType(), Out);
+      auto type = E->getType()->getCanonicalType();
+      type = CanType(cast<MetaTypeType>(type)->getInstanceType());
+      emitMetaTypeRef(IGF, type, Out);
     }
 
     void visitApplyExpr(ApplyExpr *E) {

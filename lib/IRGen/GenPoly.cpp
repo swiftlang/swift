@@ -261,11 +261,10 @@ namespace {
     }
 
     bool visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
-      // There's actually nothing to do here right now, but eventually
-      // we'll actually implement metatypes with representations.
-      IGM.unimplemented(SourceLoc(),
-                        "testing differ-by-abstraction for metatypes");
-      return false;
+      // Metatypes can differ by abstraction if the substitution
+      // reveals that the type is actually not a class type.
+      return (IGM.hasTrivialMetatype(CanType(substTy->getInstanceType())) &&
+              !IGM.hasTrivialMetatype(CanType(origTy->getInstanceType())));
     }
 
     /// Whether we're checking for memory or for an explosion, tuples
@@ -468,10 +467,26 @@ namespace {
     }
 
     void visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
-      // There's actually nothing to do here right now, but eventually
-      // some metatypes may actually get representations.
-      assert(IGF.IGM.getSchema(CanType(origTy), In.getKind()).empty());
-      assert(IGF.IGM.getSchema(CanType(substTy), Out.getKind()).empty());
+      CanType origInstanceTy = CanType(origTy->getInstanceType());
+      CanType substInstanceTy = CanType(substTy->getInstanceType());
+
+      // The only metatypes with non-trivial representations are those
+      // for archetypes and class types.  A type can't lose the class
+      // nature under substitution, so if the substituted type is
+      // trivial, the original type either must also be or must be an
+      // archetype.
+      if (IGF.IGM.hasTrivialMetatype(substInstanceTy)) {
+        assert(IGF.IGM.hasTrivialMetatype(origInstanceTy) ||
+               isa<ArchetypeType>(origInstanceTy));
+        if (isa<ArchetypeType>(origInstanceTy))
+          In.ignoreUnmanaged(1);
+        return;
+      }
+
+      // Otherwise, the original type is either a class type or an
+      // archetype, and in either case it has a non-trivial representation.
+      assert(!IGF.IGM.hasTrivialMetatype(origInstanceTy));
+      In.transferInto(Out, 1);
     }
 
     void visitTupleType(TupleType *origTy, TupleType *substTy) {

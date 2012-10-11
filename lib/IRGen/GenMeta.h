@@ -50,7 +50,7 @@ namespace irgen {
                                       CanType classType);
 
   /// Emit a declaration reference to a metatype object.
-  void emitMetaTypeRef(IRGenFunction &IGF, Type type, Explosion &explosion);
+  void emitMetaTypeRef(IRGenFunction &IGF, CanType type, Explosion &explosion);
 
   /// Emit a reference to a piece of type metadata.
   llvm::Value *emitTypeMetadataRef(IRGenFunction &IGF, CanType type);
