@@ -729,8 +729,8 @@ namespace {
       // (2) we might need to evaluate the r-value differently.
       if (!subs.empty()) {
         auto fnType = cast<AnyFunctionType>(FnType);
-        IGF.emitRValueUnderSubstitutions(getArg(), CanType(fnType->getInput()),
-                                         subs, out);
+        IGF.emitRValueAsUnsubstituted(getArg(), CanType(fnType->getInput()),
+                                      subs, out);
         if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType))
           emitPolymorphicArguments(IGF, polyFn, subs, out);
       } else {
@@ -2263,7 +2263,7 @@ void CallEmission::addArg(Expr *arg) {
       origInputType = CurOrigType;
     }
 
-    IGF.emitRValueUnderSubstitutions(arg, origInputType, subs, argE);
+    IGF.emitRValueAsUnsubstituted(arg, origInputType, subs, argE);
 
     // FIXME: this doesn't handle instantiating at a generic type.
     if (auto polyFn = dyn_cast_or_null<PolymorphicFunctionType>(fnType))

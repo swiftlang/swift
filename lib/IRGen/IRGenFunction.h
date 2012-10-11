@@ -316,9 +316,9 @@ public:
 
   void emitRValueAsInit(Expr *E, Address addr, const TypeInfo &type);
   void emitRValue(Expr *E, Explosion &explosion);
-  void emitRValueUnderSubstitutions(Expr *E, CanType destType,
-                                    ArrayRef<Substitution> subs,
-                                    Explosion &explosion);
+  void emitRValueAsUnsubstituted(Expr *E, CanType destType,
+                                 ArrayRef<Substitution> subs,
+                                 Explosion &explosion);
 
   llvm::Value *emitAsPrimitiveScalar(Expr *E);
 

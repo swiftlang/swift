@@ -511,27 +511,27 @@ static void reemitUnderSubstitutions(IRGenFunction &IGF,
   SubstRValueReemitter(IGF, subs, in, out).visit(expectedTy, substTy);
 }
 
-static void emitUnderSubstitutions(IRGenFunction &IGF, Expr *E,
-                                   CanType expectedType,
-                                   ArrayRef<Substitution> subs,
-                                   Explosion &out);
+static void emitAsUnsubstituted(IRGenFunction &IGF, Expr *E,
+                                CanType expectedType,
+                                ArrayRef<Substitution> subs,
+                                Explosion &out);
 
 namespace {
   /// A visitor for emitting a value under substitution rules.
   ///
   /// Invariants:
   ///  - Substitutions(ExpectedTy) == E->getType().
-  class SubstitutedRValueEmitter
-      : public irgen::ExprVisitor<SubstitutedRValueEmitter> {
-    typedef irgen::ExprVisitor<SubstitutedRValueEmitter> super;
+  class EmitRValueAsUnsubstituted
+      : public irgen::ExprVisitor<EmitRValueAsUnsubstituted> {
+    typedef irgen::ExprVisitor<EmitRValueAsUnsubstituted> super;
 
     IRGenFunction &IGF;
     CanType ExpectedTy;
     ArrayRef<Substitution> Substitutions;
     Explosion &Out;
   public:
-    SubstitutedRValueEmitter(IRGenFunction &IGF, CanType expected,
-                             ArrayRef<Substitution> subs, Explosion &out)
+    EmitRValueAsUnsubstituted(IRGenFunction &IGF, CanType expected,
+                              ArrayRef<Substitution> subs, Explosion &out)
       : IGF(IGF), ExpectedTy(expected), Substitutions(subs), Out(out) {}
 
     void visitTupleExpr(TupleExpr *E) {
@@ -542,9 +542,9 @@ namespace {
       auto expectedTuple = cast<TupleType>(ExpectedTy);
       assert(expectedTuple->getFields().size() == E->getElements().size());
       for (unsigned i = 0, e = expectedTuple->getFields().size(); i != e; ++i) {
-        emitUnderSubstitutions(IGF, E->getElements()[i],
-                               CanType(expectedTuple->getElementType(i)),
-                               Substitutions, Out);
+        emitAsUnsubstituted(IGF, E->getElements()[i],
+                            CanType(expectedTuple->getElementType(i)),
+                            Substitutions, Out);
       }
     }
 
@@ -637,10 +637,10 @@ static bool isDependentType(CanType type) {
 
 /// A helper routine that does some quick, common filtering before
 /// falling back to the general emitter.
-static void emitUnderSubstitutions(IRGenFunction &IGF, Expr *E,
-                                   CanType expectedType,
-                                   ArrayRef<Substitution> subs,
-                                   Explosion &out) {
+static void emitAsUnsubstituted(IRGenFunction &IGF, Expr *E,
+                                CanType expectedType,
+                                ArrayRef<Substitution> subs,
+                                Explosion &out) {
   // If the expected type isn't dependent, just use the normal emitter.
   if (!isDependentType(expectedType))
     return IGF.emitRValue(E, out);
@@ -654,16 +654,29 @@ static void emitUnderSubstitutions(IRGenFunction &IGF, Expr *E,
   }
 
   // Otherwise, use the specialized emitter.
-  SubstitutedRValueEmitter(IGF, expectedType, subs, out).visit(E);  
+  EmitRValueAsUnsubstituted(IGF, expectedType, subs, out).visit(E);
 }
 
-/// Emit a value under substitution rules.
-void IRGenFunction::emitRValueUnderSubstitutions(Expr *E, CanType expectedType,
-                                                 ArrayRef<Substitution> subs,
-                                                 Explosion &out) {
-  // It's convenient to call this with no substitutions sometimes.
-  // Just ignore that now.
-  if (subs.empty()) return emitRValue(E, out);
+/// Emit an expression as an r-value, producing a value as if the
+/// given type substitutions had never been applied.
+///
+/// For example, given an expression of type (Int, Float), an expected
+/// type (T,U), and a set of substitutions which include T=>Int and
+/// U=>Float, produce an exploded value which can serve as a (T,U).
+///
+/// \param expectedType - the "unsubstituted type" of the expression.
+///   The substitutions should translate this to the actual type of the
+///   expression
+void IRGenFunction::emitRValueAsUnsubstituted(Expr *E, CanType expectedType,
+                                              ArrayRef<Substitution> subs,
+                                              Explosion &out) {
+  // It's sometimes convenient to call this method even if we might
+  // not have substitutions active.  Just defer to the normal path in
+  // that case.
+  if (expectedType == E->getType()->getCanonicalType()) {
+    assert(expectedType == E->getType()->getCanonicalType());
+    return emitRValue(E, out);
+  }
 
-  emitUnderSubstitutions(*this, E, expectedType, subs, out);
+  emitAsUnsubstituted(*this, E, expectedType, subs, out);
 }
