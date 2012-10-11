@@ -119,6 +119,10 @@ public:
     return insert(new ConstantRefInst(Expr));
   }
 
+  ZeroValueInst *createZeroValue(VarDecl *D) {
+    return insert(new ZeroValueInst(D));
+  }
+
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *Expr) {
     return insert(new IntegerLiteralInst(Expr));
   }

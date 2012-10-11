@@ -136,6 +136,11 @@ protected:
     : Instruction(Kind, Loc, Ty) {}
 public:
 
+
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::AllocVar ||
+           I->getKind() == InstKind::AllocTmp;
+  }
 };
 
 
@@ -225,6 +230,17 @@ public:
 
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::ConstantRef;
+  }
+};
+
+/// A default "zero" value used to initialize a variable that was not otherwise
+/// explicitly initialized.
+class ZeroValueInst : public Instruction {
+public:
+  ZeroValueInst(VarDecl *D);
+
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::ZeroValue;
   }
 };
 

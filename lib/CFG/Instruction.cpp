@@ -138,7 +138,9 @@ ValueDecl *ConstantRefInst::getDecl() const {
   return getExpr()->getDecl();
 }
 
-
+ZeroValueInst::ZeroValueInst(VarDecl *D)
+  : Instruction(InstKind::ZeroValue, D, D->getType()) {
+}
 
 IntegerLiteralInst::IntegerLiteralInst(IntegerLiteralExpr *E)
   : Instruction(InstKind::IntegerLiteral, E, E->getType()) {
@@ -234,6 +236,7 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   case InstKind::AllocTmp:
   case InstKind::Apply:
   case InstKind::ConstantRef:
+  case InstKind::ZeroValue:
   case InstKind::IntegerLiteral:
   case InstKind::Load:
   case InstKind::Store:

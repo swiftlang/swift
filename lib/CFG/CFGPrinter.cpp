@@ -112,6 +112,10 @@ public:
     << ", type=" << DRI->getDecl()->getType().getString();
   }
 
+  void visitZeroValueInst(ZeroValueInst *ZVI) {
+    OS << "zerovalueinst " << ZVI->getType().getString();
+  }
+
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     const auto &lit = ILI->getValue();
     OS << "integerliteral " << lit << ", width=" << lit.getBitWidth();

@@ -55,13 +55,14 @@ struct InitPatternWithExpr
 
       FullExpr Scope(Gen.Cleanups);
 
-      // FIXME: Zero initialization can throw an exception.  Need to model this
-      // in the ZeroInit node.
+      // NOTE: "Default zero initialization" is a dubious concept.  When we get
+      // something like typestate or another concept that allows us to model
+      // definitive assignment, then we can consider removing it.
       CFGValue Initializer;
       if (Init)
         Initializer = Gen.visit(Init);
       else
-        abort(); //Initializer = Gen.B.createZeroInit(VD->getType());
+        Initializer = Gen.B.createZeroValue(VD);
 
       Gen.B.createInitialization(VD, Initializer, AllocVar);
     }
