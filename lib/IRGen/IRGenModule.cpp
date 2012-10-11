@@ -88,7 +88,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   llvm::Type *refCountedElts[] = { HeapMetadataPtrTy, SizeTy };
   RefCountedStructTy->setBody(refCountedElts);
 
-  PtrSize = Size(DataLayout.getPointerSize());
+  PtrSize = Size(DataLayout.getPointerSize(0));
 
   llvm::Type *funcElts[] = { Int8PtrTy, RefCountedPtrTy };
   FunctionPairTy = llvm::StructType::get(LLVMContext, funcElts,
