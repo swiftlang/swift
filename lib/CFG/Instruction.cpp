@@ -224,20 +224,6 @@ TupleElementInst::TupleElementInst(Type ResultTy, CFGValue Operand,
   
 }
 
-
-
-VarRefInst::VarRefInst(DeclRefExpr *E)
-: Instruction(InstKind::VarRef, E, E->getType()) {}
-
-DeclRefExpr *VarRefInst::getExpr() const {
-  return getLocExpr<DeclRefExpr>();
-}
-
-/// getDecl - Return the underlying declaration.
-ValueDecl *VarRefInst::getDecl() const {
-  return getExpr()->getDecl();
-}
-
 TermInst::SuccessorListTy TermInst::getSuccessors() {
   switch (getKind()) {
   case InstKind::AllocVar:
@@ -253,7 +239,6 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   case InstKind::Tuple:
   case InstKind::TupleElement:
   case InstKind::TypeOf:
-  case InstKind::VarRef:
     llvm_unreachable("Only TermInst's are allowed");
   case InstKind::Unreachable:
     return cast<UnreachableInst>(this)->getSuccessors();

@@ -33,8 +33,10 @@ CFGValue CFGGen::visitApplyExpr(ApplyExpr *E) {
 
 CFGValue CFGGen::visitDeclRefExpr(DeclRefExpr *E) {
   // If this is a reference to a mutable decl, produce an lvalue.
-  if (E->getType()->is<LValueType>())
-    return B.createVarRef(E);
+  if (E->getType()->is<LValueType>()) {
+    assert(VarLocs.count(E->getDecl()) && "VarDecl location not generated?");
+    return VarLocs[E->getDecl()];
+  }
   
   // Otherwise, we can only produce its value, use a ConstantRefInst.
   return B.createConstantRef(E);

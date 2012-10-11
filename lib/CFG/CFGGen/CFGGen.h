@@ -17,6 +17,7 @@
 #include "swift/CFG/CFG.h"
 #include "swift/CFG/CFGBuilder.h"
 #include "swift/AST/ASTVisitor.h"
+#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
   class BasicBlock;
@@ -40,6 +41,11 @@ public:
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
 
+  /// VarLocs - This is the memory location that an emitted variable is stored.
+  /// Entries in this map are generated when a PatternBindingDecl is emitted
+  /// that contains a reference, and queried for each DeclRefExpr.
+  llvm::DenseMap<ValueDecl*, CFGValue> VarLocs;
+    
 public:
   CFGGen(CFG &C)
     : C(C), B(new (C) BasicBlock(&C), C), Cleanups(*this) {

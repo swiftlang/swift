@@ -43,6 +43,10 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
   void visitNamedPattern(NamedPattern *P) {
     VarDecl *VD = P->getDecl();
     CFGValue AllocVar = Gen.B.createAllocVar(VD);
+    
+    /// Remember that this is the memory location that we're emitting the
+    /// decl to.
+    Gen.VarLocs[VD] = AllocVar;
 
     // NOTE: "Default zero initialization" is a dubious concept.  When we get
     // something like typestate or another concept that allows us to model

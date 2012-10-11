@@ -92,11 +92,6 @@ public:
   void visitTypeOfInst(TypeOfInst *TOI) {
   }
   
-  void visitVarRefInst(VarRefInst *DRI) {
-    assert(DRI->getType()->is<LValueType>() && "VarRef should return lvalue");
-  }
-
-  
   void visitReturnInst(ReturnInst *RI) {
     assert(!RI->getReturnValue().isNull() && "Return of null value is invalid");
   }

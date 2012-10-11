@@ -154,11 +154,6 @@ public:
   void visitTypeOfInst(TypeOfInst *TOI) {
     OS << "typeof " << TOI->getMetaType().getString();
   }
-  
-  void visitVarRefInst(VarRefInst *VRI) {
-    OS << "varref " << VRI->getDecl()->getName()
-       << ", type=" << VRI->getDecl()->getType().getString();
-  }
 
   void visitUnreachableInst(UnreachableInst *UI) {
     OS << "unreachable";

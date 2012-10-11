@@ -168,10 +168,6 @@ public:
   TypeOfInst *createTypeOf(TypeOfExpr *Expr) {
     return insert(new TypeOfInst(Expr));
   }
-  
-  VarRefInst *createVarRef(DeclRefExpr *Expr) {
-    return insert(new VarRefInst(Expr));
-  }
  
   
   //===--------------------------------------------------------------------===//
