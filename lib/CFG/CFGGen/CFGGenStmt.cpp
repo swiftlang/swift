@@ -209,9 +209,8 @@ void CFGGen::visitForStmt(ForStmt *S) {
   Scope ForScope(Cleanups);
   
   // Emit any local 'var' variables declared in the initializer.
-  // FIXME:
-  //for (auto D : S->getInitializerVarDecls())
-  //  emitLocal(D);
+  for (auto D : S->getInitializerVarDecls())
+    visit(D);
   
   if (Expr *E = S->getInitializer().dyn_cast<Expr*>()) {
     FullExpr Scope(Cleanups);
@@ -272,8 +271,7 @@ void CFGGen::visitForStmt(ForStmt *S) {
 void CFGGen::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'range' variable that we'll be using for iteration.
   Scope OuterForScope(Cleanups);
-  // FIXME: emitPatternBindingDecl
-  //emitPatternBindingDecl(S->getRange());
+  visitPatternBindingDecl(S->getRange());
   
   // If we ever reach an unreachable point, stop emitting statements.
   // This will need revision if we ever add goto.
@@ -298,7 +296,7 @@ void CFGGen::visitForEachStmt(ForEachStmt *S) {
     // at the end of each loop iteration.
     {
       Scope InnerForScope(Cleanups);
-      //FIXME: emitPatternBindingDecl(S->getElementInit());
+      visitPatternBindingDecl(S->getElementInit());
       visit(S->getBody());
     }
     
