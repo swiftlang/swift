@@ -374,14 +374,14 @@ struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
 
 namespace {
   /// A visitor for emitting substituted r-values.
-  class SubstRValueReemitter : public SubstTypeVisitor<SubstRValueReemitter> {
+  class ReemitAsUnsubstituted : public SubstTypeVisitor<ReemitAsUnsubstituted> {
     IRGenFunction &IGF;
     ArrayRef<Substitution> Subs;
     Explosion &In;
     Explosion &Out;
   public:
-    SubstRValueReemitter(IRGenFunction &IGF, ArrayRef<Substitution> subs,
-                         Explosion &in, Explosion &out)
+    ReemitAsUnsubstituted(IRGenFunction &IGF, ArrayRef<Substitution> subs,
+                          Explosion &in, Explosion &out)
       : IGF(IGF), Subs(subs), In(in), Out(out) {
       assert(in.getKind() == out.getKind());
     }
@@ -499,16 +499,18 @@ namespace {
   };
 }
 
-/// Re-emit a value under a set of substitutions.
+/// Given a substituted explosion, re-emit it as an unsubstituted one.
 ///
-/// The explosions have the same kind;  the input obeys
-/// the constraints of expectedTy, and the output needs to obey
-/// the constraints of substTy.
-static void reemitUnderSubstitutions(IRGenFunction &IGF,
-                                     ArrayRef<Substitution> subs,
-                                     CanType expectedTy, CanType substTy,
-                                     Explosion &in, Explosion &out) {
-  SubstRValueReemitter(IGF, subs, in, out).visit(expectedTy, substTy);
+/// For example, given an explosion which begins with the
+/// representation of an (Int, Float), consume that and produce the
+/// representation of an (Int, T).
+///
+/// The substitutions must carry origTy to substTy.
+void irgen::reemitAsUnsubstituted(IRGenFunction &IGF,
+                                  CanType expectedTy, CanType substTy,
+                                  ArrayRef<Substitution> subs,
+                                  Explosion &in, Explosion &out) {
+  ReemitAsUnsubstituted(IGF, subs, in, out).visit(expectedTy, substTy);
 }
 
 static void emitAsUnsubstituted(IRGenFunction &IGF, Expr *E,
@@ -561,8 +563,8 @@ namespace {
       IGF.emitRValue(E, temp);
 
       // Re-emit under substitution.
-      reemitUnderSubstitutions(IGF, Substitutions, ExpectedTy, substTy,
-                               temp, Out);
+      reemitAsUnsubstituted(IGF, ExpectedTy, substTy, Substitutions,
+                            temp, Out);
     }
   };
 

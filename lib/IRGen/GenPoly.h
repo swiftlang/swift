@@ -20,13 +20,17 @@
 
 namespace llvm {
   class Type;
+  template <class T> class ArrayRef;
 }
 
 namespace swift {
   class CanType;
+  class Substitution;
 
 namespace irgen {
+  class Explosion;
   enum class ExplosionKind : unsigned;
+  class IRGenFunction;
   class IRGenModule;
 
   /// Do the given types differ by abstraction when laid out as memory?
@@ -37,6 +41,18 @@ namespace irgen {
   bool differsByAbstractionInExplosion(IRGenModule &IGM,
                                        CanType origTy, CanType substTy,
                                        ExplosionKind explosionLevel);
+
+  /// Given a substituted explosion, re-emit it as an unsubstituted one.
+  ///
+  /// For example, given an explosion which begins with the
+  /// representation of an (Int, Float), consume that and produce the
+  /// representation of an (Int, T).
+  ///
+  /// The substitutions must carry origTy to substTy.
+  void reemitAsUnsubstituted(IRGenFunction &IGF,
+                             CanType origTy, CanType substTy,
+                             ArrayRef<Substitution> subs,
+                             Explosion &src, Explosion &dest);
 
 } // end namespace irgen
 } // end namespace swift
