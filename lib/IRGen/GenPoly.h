@@ -54,6 +54,18 @@ namespace irgen {
                              ArrayRef<Substitution> subs,
                              Explosion &src, Explosion &dest);
 
+  /// Given an unsubstituted explosion, re-emit it as a substituted one.
+  ///
+  /// For example, given an explosion which begins with the
+  /// representation of an (Int, T), consume that and produce the
+  /// representation of an (Int, Float).
+  ///
+  /// The substitutions must carry origTy to substTy.
+  void reemitAsSubstituted(IRGenFunction &IGF,
+                           CanType origTy, CanType substTy,
+                           ArrayRef<Substitution> subs,
+                           Explosion &src, Explosion &dest);
+
 } // end namespace irgen
 } // end namespace swift
 

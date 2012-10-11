@@ -22,6 +22,7 @@
 #include "ASTVisitor.h"
 #include "Explosion.h"
 #include "GenInit.h"
+#include "GenMeta.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "TypeInfo.h"
@@ -373,7 +374,9 @@ struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
 };
 
 namespace {
-  /// A visitor for emitting substituted r-values.
+  /// A CRTP class for translating substituted explosions into
+  /// unsubstituted ones, or in other words, emitting them at a higher
+  /// (less concrete) abstraction level.
   class ReemitAsUnsubstituted : public SubstTypeVisitor<ReemitAsUnsubstituted> {
     IRGenFunction &IGF;
     ArrayRef<Substitution> Subs;
@@ -479,7 +482,7 @@ namespace {
         assert(IGF.IGM.hasTrivialMetatype(origInstanceTy) ||
                isa<ArchetypeType>(origInstanceTy));
         if (isa<ArchetypeType>(origInstanceTy))
-          In.ignoreUnmanaged(1);
+          Out.addUnmanaged(emitTypeMetadataRef(IGF, substInstanceTy));
         return;
       }
 
@@ -511,6 +514,138 @@ void irgen::reemitAsUnsubstituted(IRGenFunction &IGF,
                                   ArrayRef<Substitution> subs,
                                   Explosion &in, Explosion &out) {
   ReemitAsUnsubstituted(IGF, subs, in, out).visit(expectedTy, substTy);
+}
+
+namespace {
+  /// A CRTP class for translating unsubstituted explosions into
+  /// substituted ones, or in other words, emitting them at a lower
+  /// (more concrete) abstraction level.
+  class ReemitAsSubstituted : public SubstTypeVisitor<ReemitAsSubstituted> {
+    IRGenFunction &IGF;
+    ArrayRef<Substitution> Subs;
+    Explosion &In;
+    Explosion &Out;
+  public:
+    ReemitAsSubstituted(IRGenFunction &IGF, ArrayRef<Substitution> subs,
+                          Explosion &in, Explosion &out)
+      : IGF(IGF), Subs(subs), In(in), Out(out) {
+      assert(in.getKind() == out.getKind());
+    }
+
+    void visitLeafType(CanType origTy, CanType substTy) {
+      assert(origTy == substTy);
+      Out.transferInto(In, IGF.IGM.getExplosionSize(origTy, In.getKind()));
+    }
+
+    /// The unsubstituted type is an archetype.  In explosion terms,
+    /// that makes it a single pointer-to-opaque.
+    void visitArchetypeType(ArchetypeType *origTy, CanType substTy) {
+      auto &substTI = IGF.getFragileTypeInfo(substTy);
+
+      ManagedValue inValue = In.claimNext();
+      auto inAddr = IGF.Builder.CreateBitCast(inValue.getValue(),
+                                    substTI.getStorageType()->getPointerTo(),
+                                              "substitution.reinterpret");
+
+      // If the substituted type is still a single indirect value,
+      // just pass it on without reinterpretation.
+      if (IGF.IGM.isSingleIndirectValue(substTy, In.getKind())) {
+        Out.add(ManagedValue(inAddr, inValue.getCleanup()));
+        return;
+      }
+
+      // Otherwise, load as a take and then kill the cleanup attached
+      // to the archetype value.
+      substTI.loadAsTake(IGF, Address(inAddr, substTI.StorageAlignment), Out);
+      if (inValue.hasCleanup())
+        IGF.setCleanupState(inValue.getCleanup(), CleanupState::Dead);
+    }
+
+    void visitArrayType(ArrayType *origTy, ArrayType *substTy) {
+      llvm_unreachable("remapping values of array type");
+    }
+
+    void visitBoundGenericType(BoundGenericType *origTy,
+                               BoundGenericType *substTy) {
+      assert(origTy->getDecl() == substTy->getDecl());
+
+      // If the base type has reference semantics, we can just copy
+      // that reference into the output explosion.
+      if (origTy->hasReferenceSemantics())
+        return In.transferInto(Out, 1);
+
+      // Otherwise, this gets more complicated.
+      if (EmbedsArchetype(IGF.IGM).visitBoundGenericType(origTy))
+        IGF.unimplemented(SourceLoc(),
+               "remapping bound generic value types with archetype members");
+
+      // FIXME: This is my first shot at implementing this, but it doesn't
+      // handle cases which actually need remapping.
+      auto n = IGF.IGM.getExplosionSize(CanType(origTy), In.getKind());
+      In.transferInto(Out, n);
+    }
+
+    void visitAnyFunctionType(AnyFunctionType *origTy,
+                              AnyFunctionType *substTy) {
+      if (differsByAbstraction(IGF.IGM, origTy, substTy,
+                               ExplosionKind::Minimal))
+        IGF.unimplemented(SourceLoc(), "remapping bound function type");
+      In.transferInto(Out, 2);
+    }
+
+    void visitLValueType(LValueType *origTy, LValueType *substTy) {
+      if (differsByAbstractionInMemory(IGF.IGM,
+                                       CanType(origTy->getObjectType()),
+                                       CanType(substTy->getObjectType())))
+        IGF.unimplemented(SourceLoc(), "remapping l-values");
+      In.transferInto(Out, 1);
+    }
+
+    void visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
+      CanType origInstanceTy = CanType(origTy->getInstanceType());
+      CanType substInstanceTy = CanType(substTy->getInstanceType());
+
+      // The only metatypes with non-trivial representations are those
+      // for archetypes and class types.  A type can't lose the class
+      // nature under substitution, so if the substituted type is
+      // trivial, the original type either must also be or must be an
+      // archetype.
+      if (IGF.IGM.hasTrivialMetatype(substInstanceTy)) {
+        assert(IGF.IGM.hasTrivialMetatype(origInstanceTy) ||
+               isa<ArchetypeType>(origInstanceTy));
+        if (isa<ArchetypeType>(origInstanceTy))
+          In.ignoreUnmanaged(1);
+        return;
+      }
+
+      // Otherwise, the original type is either a class type or an
+      // archetype, and in either case it has a non-trivial representation.
+      assert(!IGF.IGM.hasTrivialMetatype(origInstanceTy));
+      In.transferInto(Out, 1);
+    }
+
+    void visitTupleType(TupleType *origTy, TupleType *substTy) {
+      assert(origTy->getFields().size() == substTy->getFields().size());
+      for (unsigned i = 0, e = origTy->getFields().size(); i != e; ++i) {
+        visit(CanType(origTy->getElementType(i)),
+              CanType(substTy->getElementType(i)));
+      }
+    }
+  };
+}
+
+/// Given an unsubstituted explosion, re-emit it as a substituted one.
+///
+/// For example, given an explosion which begins with the
+/// representation of an (Int, T), consume that and produce the
+/// representation of an (Int, Float).
+///
+/// The substitutions must carry origTy to substTy.
+void irgen::reemitAsSubstituted(IRGenFunction &IGF,
+                                CanType origTy, CanType substTy,
+                                ArrayRef<Substitution> subs,
+                                Explosion &in, Explosion &out) {
+  ReemitAsSubstituted(IGF, subs, in, out).visit(origTy, substTy);
 }
 
 static void emitAsUnsubstituted(IRGenFunction &IGF, Expr *E,
