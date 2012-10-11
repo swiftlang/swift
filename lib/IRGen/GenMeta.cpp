@@ -35,7 +35,6 @@
 #include "GenHeap.h"
 #include "GenPoly.h"
 #include "GenProto.h"
-#include "GenType.h"
 #include "IRGenModule.h"
 #include "ScalarTypeInfo.h"
 #include "StructMetadataLayout.h"
@@ -45,30 +44,6 @@
 
 using namespace swift;
 using namespace irgen;
-
-namespace {
-  struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, FixedTypeInfo> {
-    EmptyTypeInfo(llvm::Type *ty)
-      : ScalarTypeInfo(ty, Size(0), Alignment(1), IsPOD) {}
-    unsigned getExplosionSize(ExplosionKind kind) const { return 0; }
-    void getSchema(ExplosionSchema &schema) const {}
-    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {}
-    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {}
-    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {}
-    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {}
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
-    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
-    void destroy(IRGenFunction &IGF, Address addr) const {}
-  };
-}
-
-const TypeInfo *TypeConverter::convertMetaTypeType(MetaTypeType *T) {
-  return new EmptyTypeInfo(IGM.Int8Ty);
-}
-
-const TypeInfo *TypeConverter::convertModuleType(ModuleType *T) {
-  return new EmptyTypeInfo(IGM.Int8Ty);
-}
 
 namespace {
   /// A structure for collecting generic arguments for emitting a

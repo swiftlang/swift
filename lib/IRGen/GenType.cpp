@@ -113,6 +113,23 @@ llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
 }
 
 namespace {
+  /// A TypeInfo implementation for empty types.
+  struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, FixedTypeInfo> {
+    EmptyTypeInfo(llvm::Type *ty)
+      : ScalarTypeInfo(ty, Size(0), Alignment(1), IsPOD) {}
+    unsigned getExplosionSize(ExplosionKind kind) const { return 0; }
+    void getSchema(ExplosionSchema &schema) const {}
+    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {}
+    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {}
+    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {}
+    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {}
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
+    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
+    void destroy(IRGenFunction &IGF, Address addr) const {}
+  };
+
+  /// A TypeInfo implementation for types represented as a single
+  /// scalar type.
   class PrimitiveTypeInfo :
     public PODSingleScalarTypeInfo<PrimitiveTypeInfo, FixedTypeInfo> {
   public:
@@ -364,6 +381,14 @@ const TypeInfo *TypeConverter::convertBoundGenericType(NominalTypeDecl *decl) {
   }
   }
   llvm_unreachable("bad declaration kind");
+}
+
+const TypeInfo *TypeConverter::convertModuleType(ModuleType *T) {
+  return new EmptyTypeInfo(IGM.Int8Ty);
+}
+
+const TypeInfo *TypeConverter::convertMetaTypeType(MetaTypeType *T) {
+  return new EmptyTypeInfo(IGM.Int8Ty);
 }
 
 /// createNominalType - Create a new nominal type.
