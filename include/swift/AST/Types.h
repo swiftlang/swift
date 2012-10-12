@@ -229,9 +229,6 @@ public:
   void dump() const;
   void print(raw_ostream &OS) const;
   
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *) { return true; }
-
 private:
   // Make vanilla new/delete illegal for Types.
   void *operator new(size_t Bytes) throw() = delete;
@@ -260,7 +257,6 @@ public:
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const ErrorType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Error;
   }
@@ -273,7 +269,6 @@ protected:
   : TypeBase(kind, &canTypeCtx, /*unresolved*/ false,
              /*HasTypeVariable=*/false) {}
 public:
-  static bool classof(const BuiltinType *T) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_BuiltinType &&
            T->getKind() <= TypeKind::Last_BuiltinType;
@@ -289,7 +284,6 @@ class BuiltinRawPointerType : public BuiltinType {
 public:
   void print(raw_ostream &OS) const;
   
-  static bool classof(const BuiltinRawPointerType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinRawPointer;
   }
@@ -306,7 +300,6 @@ class BuiltinObjectPointerType : public BuiltinType {
 public:
   void print(raw_ostream &OS) const;
 
-  static bool classof(const BuiltinObjectPointerType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinObjectPointer;
   }
@@ -321,7 +314,6 @@ class BuiltinObjCPointerType : public BuiltinType {
 public:
   void print(raw_ostream &OS) const;
 
-  static bool classof(const BuiltinObjCPointerType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinObjCPointer;
   }
@@ -346,7 +338,6 @@ public:
 
   void print(raw_ostream &OS) const;
 
-  static bool classof(const BuiltinIntegerType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinInteger;
   }
@@ -375,7 +366,6 @@ public:
   
   void print(raw_ostream &OS) const;
 
-  static bool classof(const BuiltinFloatType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinFloat;
   }
@@ -399,7 +389,6 @@ public:
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const UnstructuredUnresolvedType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::UnstructuredUnresolved;
   }
@@ -426,7 +415,6 @@ public:
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const NameAliasType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::NameAlias;
   }
@@ -483,7 +471,6 @@ public:
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const IdentifierType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Identifier;
   }
@@ -510,7 +497,6 @@ public:
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const ParenType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Paren;
   }
@@ -603,7 +589,6 @@ public:
   void print(raw_ostream &OS) const;
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const TupleType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Tuple;
   }
@@ -661,7 +646,6 @@ public:
                       Type Parent);
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const UnboundGenericType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::UnboundGeneric;
   }
@@ -725,7 +709,6 @@ public:
                       Type Parent, ArrayRef<Type> GenericArgs);
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const BoundGenericType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BoundGeneric;
   }
@@ -766,7 +749,6 @@ public:
   Type getParent() const { return Parent; }
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const NominalType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_NominalType &&
            T->getKind() <= TypeKind::Last_NominalType;
@@ -793,7 +775,6 @@ public:
   static void Profile(llvm::FoldingSetNodeID &ID, OneOfDecl *D, Type Parent);
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const OneOfType *D) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OneOf;
   }
@@ -823,7 +804,6 @@ public:
   static void Profile(llvm::FoldingSetNodeID &ID, StructDecl *D, Type Parent);
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const StructType *D) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Struct;
   }
@@ -853,7 +833,6 @@ public:
   static void Profile(llvm::FoldingSetNodeID &ID, ClassDecl *D, Type Parent);
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const ClassType *D) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Class;
   }
@@ -881,7 +860,6 @@ public:
   void print(raw_ostream &O) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const MetaTypeType *D) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::MetaType;
   }
@@ -906,7 +884,6 @@ public:
   void print(raw_ostream &O) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const ModuleType *D) { return true; }
   static bool classof(const TypeBase *T) {
     return  T->getKind() == TypeKind::Module;
   }
@@ -944,7 +921,6 @@ public:
   Type getResult() const { return Output; }
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const AnyFunctionType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_AnyFunctionType &&
            T->getKind() <= TypeKind::Last_AnyFunctionType;
@@ -973,7 +949,6 @@ public:
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const FunctionType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Function;
   }
@@ -1005,7 +980,6 @@ public:
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const PolymorphicFunctionType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PolymorphicFunction;
   }
@@ -1034,7 +1008,6 @@ public:
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const ArrayType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Array;
   }
@@ -1079,7 +1052,6 @@ public:
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const ArraySliceType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ArraySlice;
   }
@@ -1096,7 +1068,6 @@ public:
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const ProtocolType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Protocol;
   }
@@ -1141,7 +1112,6 @@ public:
   static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Protocols);
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const ProtocolCompositionType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ProtocolComposition;
   }
@@ -1319,7 +1289,6 @@ public:
   void print(raw_ostream &OS) const;
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const LValueType *type) { return true; }
   static bool classof(const TypeBase *type) {
     return type->getKind() == TypeKind::LValue;
   }
@@ -1356,7 +1325,6 @@ public:
   ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const SubstitutableType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_SubstitutableType &&
            T->getKind() <= TypeKind::Last_SubstitutableType;
@@ -1428,7 +1396,6 @@ public:
   }
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const ArchetypeType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Archetype;
   }
@@ -1488,7 +1455,6 @@ public:
   void print(raw_ostream &OS) const;
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const DeducibleGenericParamType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::DeducibleGenericParam;
   }
@@ -1524,7 +1490,6 @@ public:
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const SubstitutedType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Substituted;
   }
@@ -1569,7 +1534,6 @@ public:
   void print(raw_ostream &OS) const;
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeVariableType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::TypeVariable;
   }

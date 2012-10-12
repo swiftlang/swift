@@ -65,9 +65,6 @@ public:
   void dump() const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;
   
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Stmt *) { return true; }
-
   enum { Alignment = 8 };
 
   // Only allow allocation of Exprs using the allocator in ASTContext
@@ -93,8 +90,6 @@ public:
   
   SourceRange getSourceRange() const { return Loc; }
 
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const SemiStmt *) { return true; }
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Semi; }
 };
 
@@ -117,8 +112,6 @@ public:
   
   SourceRange getSourceRange() const;
   
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const AssignStmt *) { return true; }
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Assign; }
 };
 
@@ -160,8 +153,6 @@ public:
     return const_cast<BraceStmt*>(this)->getElements();
   }
 
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const BraceStmt *) { return true; }
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
 };
 
@@ -186,9 +177,7 @@ public:
   }
   void setResult(Expr *e) { Result = e; }
   
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const ReturnStmt *) { return true; }
-  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Return; }
+  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Return;}
 };
 
 /// IfStmt - if/then/else statement.  If no 'else' is specified, then the
@@ -222,7 +211,6 @@ public:
   void setElseStmt(Stmt *s) { Else = s; }
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const IfStmt *) { return true; }
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::If; }
 };
 
@@ -246,8 +234,6 @@ public:
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
   
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const WhileStmt *) { return true; }
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::While; }
 };
   
@@ -271,8 +257,6 @@ public:
   Expr *getCond() const { return Cond; }
   void setCond(Expr *e) { Cond = e; }
   
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const DoWhileStmt *) { return true; }
   static bool classof(const Stmt *S) {return S->getKind() == StmtKind::DoWhile;}
 };
 
@@ -318,8 +302,6 @@ public:
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
   
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const ForStmt *) { return true; }
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::For; }
 };
 
@@ -394,8 +376,6 @@ public:
     return SourceRange(ForLoc, Body->getEndLoc());
   }
   
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const ForEachStmt *) { return true; }
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::ForEach;
   }
@@ -412,8 +392,6 @@ public:
   
   SourceRange getSourceRange() const { return Loc; }
 
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const BreakStmt *) { return true; }
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Break;
   }
@@ -430,8 +408,6 @@ public:
   
   SourceRange getSourceRange() const { return Loc; }
 
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const ContinueStmt *) { return true; }
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Continue;
   }

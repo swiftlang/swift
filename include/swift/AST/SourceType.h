@@ -46,9 +46,6 @@ public:
   
   void dump() const;
   void print(raw_ostream &OS) const;
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const SourceType *) { return true; }
 };
   
 /// SourceIdentifierType - Represents a (potentially dotted) type written as an
@@ -71,11 +68,9 @@ private:
   
   SourceIdentifierType() : SourceType(SourceTypeKind::Identifier) {}
   
-  // Implement isa/cast/dyncast/etc.
   static bool classof(const SourceType *) {
     return getKind() == SourceTypeKind::Identifier;
   }
-  static bool classof(const SourceIdentifierType *) { return true; }
 };
   
 SourceType

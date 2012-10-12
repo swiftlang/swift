@@ -125,9 +125,6 @@ public:
 
   bool walk(ASTWalker &walker);
 
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *) { return true; }
-  
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;
@@ -471,11 +468,9 @@ public:
     return SourceRange(ImportLoc, getAccessPath().back().second);
   }
 
-  // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Import;
   }
-  static bool classof(const ImportDecl *D) { return true; }
 };
 
 /// ExtensionDecl - This represents a type extension containing methods
@@ -527,7 +522,6 @@ public:
   static bool classof(const DeclContext *C) {
     return C->getContextKind() == DeclContextKind::ExtensionDecl;
   }
-  static bool classof(const ExtensionDecl *D) { return true; }
 };
 
 // PatternBindingDecl - This decl contains a pattern and optional initializer
@@ -562,7 +556,6 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PatternBinding;
   }
-  static bool classof(const PatternBindingDecl *D) { return true; }
 
 };
 
@@ -599,7 +592,6 @@ public:
   static bool classof(const DeclContext *C) {
     return C->getContextKind() == DeclContextKind::TopLevelCodeDecl;
   }
-  static bool classof(const TopLevelCodeDecl *D) { return true; }
 };
 
 
@@ -684,13 +676,11 @@ public:
   /// function requires capturing it.
   bool needsCapture() const;
 
-  // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_ValueDecl &&
            D->getKind() <= DeclKind::Last_ValueDecl;
   }
-  static bool classof(const ValueDecl *D) { return true; }
-};  
+};
 
 /// This is a common base class for declarations which declare a type.
 class TypeDecl : public ValueDecl {
@@ -710,12 +700,10 @@ public:
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 
-  // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_TypeDecl &&
            D->getKind() <= DeclKind::Last_TypeDecl;
   }
-  static bool classof(const TypeDecl *D) { return true; }
 };
 
 /// TypeAliasDecl - This is a declaration of a typealias, for example:
@@ -758,11 +746,9 @@ public:
   /// getAliasType - Return the sugared version of this decl as a Type.
   NameAliasType *getAliasType() const { return AliasTy; }
   
-  // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::TypeAlias;
   }
-  static bool classof(const TypeAliasDecl *D) { return true; }
 };
 
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.  This
@@ -807,7 +793,6 @@ public:
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&
            D->getKind() <= DeclKind::Last_NominalTypeDecl;
   }
-  static bool classof(const NominalTypeDecl *D) { return true; }
   static bool classof(const DeclContext *C) {
     return C->getContextKind() == DeclContextKind::NominalTypeDecl;
   }
@@ -840,7 +825,6 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::OneOf;
   }
-  static bool classof(const OneOfDecl *D) { return true; }
   static bool classof(const NominalTypeDecl *D) {
     return D->getKind() == DeclKind::OneOf;
   }
@@ -874,7 +858,6 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Struct;
   }
-  static bool classof(const StructDecl *D) { return true; }
   static bool classof(const NominalTypeDecl *D) {
     return D->getKind() == DeclKind::Struct;
   }
@@ -914,7 +897,6 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Class;
   }
-  static bool classof(const ClassDecl *D) { return true; }
   static bool classof(const NominalTypeDecl *D) {
     return D->getKind() == DeclKind::Class;
   }
@@ -967,7 +949,6 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Protocol;
   }
-  static bool classof(const ProtocolDecl *D) { return true; }
   static bool classof(const NominalTypeDecl *D) {
     return D->getKind() == DeclKind::Protocol;
   }
@@ -1019,7 +1000,6 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
-  static bool classof(const VarDecl *D) { return true; }
 };
 
 
@@ -1144,9 +1124,7 @@ public:
   FuncDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(FuncDecl *over) { OverriddenDecl = over; }
 
-  // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
-  static bool classof(const FuncDecl *D) { return true; }
 };
 
 /// OneOfElementDecl - This represents an element of a 'oneof' declaration, e.g.
@@ -1176,12 +1154,9 @@ public:
   SourceLoc getLoc() const { return IdentifierLoc; }
   SourceRange getSourceRange() const;
 
-  // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::OneOfElement;
   }
-  static bool classof(const OneOfElementDecl *D) { return true; }
- 
 };
 
 /// SubscriptDecl - Declares a subscripting operator for a type.
@@ -1254,14 +1229,12 @@ public:
   /// The subscript setter is optional.
   FuncDecl *getSetter() const { return Set; }
   
-  static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::Subscript;
-  }
-
   SubscriptDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(SubscriptDecl *over) { OverriddenDecl = over; }
 
-  static bool classof(const SubscriptDecl *D) { return true; }
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Subscript;
+  }
 };
 
 /// ConstructorDecl - Declares a constructor for a type.  For example:
@@ -1321,7 +1294,6 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::ConstructorDecl;
   }
-  static bool classof(const ConstructorDecl *D) { return true; }
 };
 
 /// DestructorDecl - Declares a destructor for a type.  For example:
@@ -1366,7 +1338,6 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::DestructorDecl;
   }
-  static bool classof(const DestructorDecl *D) { return true; }
 };
 
 inline void GenericParam::setDeclContext(DeclContext *DC) {

@@ -105,9 +105,6 @@ public:
   void lookupMembers(Type BaseType, Identifier Name,
                      SmallVectorImpl<ValueDecl*> &Result);
 
-  static bool classof(const Module *M) {
-    return true;
-  }
   static bool classof(const DeclContext *DC) {
     return DC->isModuleContext();
   }
@@ -210,8 +207,6 @@ public:
 
   void dump() const;
   
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TranslationUnit *TU) { return true; }
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::TranslationUnit;
   }
@@ -228,8 +223,6 @@ public:
     ASTStage = TypeChecked;
   }
 
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const BuiltinModule *TU) { return true; }
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::BuiltinModule;
   }

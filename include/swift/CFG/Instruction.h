@@ -125,8 +125,6 @@ public:
   /// Pretty-print the Instruction.
   void dump() const;
   void print(raw_ostream &OS) const;
-
-  static bool classof(const Instruction *I) { return true; }
 };
 
 

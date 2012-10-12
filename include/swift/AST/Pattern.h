@@ -95,7 +95,7 @@ public:
   SourceLoc getLoc() const;
 
   static bool classof(const Pattern *P) { return true; }
-
+  
   //*** Allocation Routines ************************************************/
 
   enum { Alignment = 8U };
@@ -128,7 +128,6 @@ public:
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Paren;
   }
-  static bool classof(const ParenPattern *P) { return true; }
 };
 
 /// An element of a tuple pattern.
@@ -192,7 +191,6 @@ public:
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Tuple;
   }
-  static bool classof(const TuplePattern *P) { return true; }
 };
 
 /// A pattern which binds a name to an arbitrary value of its type.
@@ -211,7 +209,6 @@ public:
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Named;
   }
-  static bool classof(const NamedPattern *P) { return true; }
 };
 
 /// A pattern which matches an arbitrary value of a type, but does not
@@ -228,7 +225,6 @@ public:
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Any;
   }
-  static bool classof(const AnyPattern *P) { return true; }
 };
 
 /// A pattern which matches a sub-pattern and annotates it with a
@@ -250,7 +246,6 @@ public:
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Typed;
   }
-  static bool classof(const TypedPattern *P) { return true; }
 };
 
 inline Pattern *Pattern::getSemanticsProvidingPattern() {
