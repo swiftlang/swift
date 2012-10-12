@@ -187,8 +187,7 @@ public:
 
     return insert(new TupleElementInst(E, Operand, FieldNo));
   }
-  Value *createTupleElement(Type ResultTy, Value *Operand,
-                                       unsigned FieldNo) {
+  Value *createTupleElement(Type ResultTy, Value *Operand, unsigned FieldNo) {
     // Fold tupleelement(tuple(a,b,c), 1) -> b.
     if (TupleInst *TI = dyn_cast<TupleInst>(Operand))
       return TI->getElements()[FieldNo];
