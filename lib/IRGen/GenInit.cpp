@@ -159,6 +159,14 @@ OwnedAddress Initialization::emitVariable(IRGenFunction &IGF, VarDecl *var,
 OwnedAddress Initialization::emitGlobalVariable(IRGenFunction &IGF,
                                                 VarDecl *var,
                                                 const TypeInfo &type) {
+  // If the variable is empty, don't actually emit it; just return undef.
+  // FIXME: fragility?  global destructors?
+  if (type.isEmpty(ResilienceScope::Local)) {
+    auto undef = llvm::UndefValue::get(type.StorageType->getPointerTo());
+    auto addr = Address(undef, Alignment(1));
+    return OwnedAddress(addr, IGF.IGM.RefCountedNull);
+  }
+
   /// Get the global variable.
   Address addr = IGF.IGM.getAddrOfGlobalVariable(var);
 

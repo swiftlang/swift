@@ -1046,6 +1046,13 @@ LValue IRGenFunction::getGlobal(VarDecl *var) {
     return lvalue;
   }
 
+  const TypeInfo &type = getFragileTypeInfo(var->getType());
+  if (type.isEmpty(ResilienceScope::Local)) {
+    auto undef = llvm::UndefValue::get(type.StorageType->getPointerTo());
+    auto addr = Address(undef, Alignment(1));
+    return emitAddressLValue(OwnedAddress(addr, IGM.RefCountedNull));
+  }
+
   // Otherwise we can use a physical-address component.
   OwnedAddress addr(IGM.getAddrOfGlobalVariable(var), IGM.RefCountedNull);
   return emitAddressLValue(addr);
