@@ -131,6 +131,7 @@ public:
   CFGValue visitLoadExpr(LoadExpr *E);
   CFGValue visitMaterializeExpr(MaterializeExpr *E);
   CFGValue visitRequalifyExpr(RequalifyExpr *E);
+  CFGValue visitFunctionConversionExpr(FunctionConversionExpr *E);
   CFGValue visitParenExpr(ParenExpr *E);
   CFGValue visitTupleExpr(TupleExpr *E);
   CFGValue visitScalarToTupleExpr(ScalarToTupleExpr *E);

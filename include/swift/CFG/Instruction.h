@@ -37,11 +37,11 @@ class AssignStmt;
 class CharacterLiteralExpr;
 class DeclRefExpr;
 class FloatLiteralExpr;
+class ImplicitConversionExpr;
 class IntegerLiteralExpr;
 class LoadExpr;
 class MaterializeExpr;
 class ReturnStmt;
-class RequalifyExpr;
 class ScalarToTupleExpr;
 class StringLiteralExpr;
 class Stmt;
@@ -175,9 +175,29 @@ public:
 
   AllocTmpInst(MaterializeExpr *E);
 
-
   static bool classof(const Instruction *I) {
     return I->getKind() == InstKind::AllocTmp;
+  }
+};
+
+/// AllocArrayInst - This represents the allocation of an array of elements,
+/// whose element memory is left uninitialized.  This returns a value of tuple
+/// type.  The first return element is the object pointer (pointer to the object
+/// header) with Builtin.ObjectPointer type.  The second element returned is an
+/// lvalue to the first array element.
+///
+class AllocArrayInst : public Instruction {
+  Type ElementType;
+  unsigned NumElements;
+public:
+
+  AllocArrayInst(TupleShuffleExpr *E, Type ElementType, unsigned NumElements);
+
+  Type getElementType() const { return ElementType; }
+  unsigned getNumElements() const { return NumElements; }
+
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::AllocArray;
   }
 };
 
@@ -347,6 +367,7 @@ public:
   StoreInst(AssignStmt *S, CFGValue Src, CFGValue Dest);
   StoreInst(VarDecl *VD, CFGValue Src, CFGValue Dest);
   StoreInst(MaterializeExpr *E, CFGValue Src, CFGValue Dest);
+  StoreInst(TupleShuffleExpr *E, CFGValue Src, CFGValue Dest);
 
   CFGValue getSrc() const { return Src; }
   CFGValue getDest() const { return Dest; }
@@ -358,19 +379,17 @@ public:
   }
 };
 
-/// RequalifyInst - Change the qualification on an l-value.  The new
-/// type always has the same object type as the old type with strictly
-/// "more" (i.e. a supertyped set of) qualifiers.
-/// FIXME: Need a new "implicit conversion instruction" base class.
-class RequalifyInst : public Instruction {
+/// TypeConversionInst - Change the Type of some value without affecting how it
+/// will codegen.
+class TypeConversionInst : public Instruction {
   CFGValue Operand;
 public:
-  RequalifyInst(RequalifyExpr *E, CFGValue Operand);
+  TypeConversionInst(ImplicitConversionExpr *E, CFGValue Operand);
 
   CFGValue getOperand() const { return Operand; }
   
   static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::Requalify;
+    return I->getKind() == InstKind::TypeConversion;
   }
 };
 
@@ -463,9 +482,30 @@ public:
   }
 };
 
+//===----------------------------------------------------------------------===//
+// CFG-only instructions that don't have an AST analog
+//===----------------------------------------------------------------------===//
+
+
+/// IndexLValueInst - "%1 = index_lvalue %0, 42"
+/// This takes an lvalue and indexes over the pointer, striding by the type of
+/// the lvalue.  This is used to index into arrays of uniform elements.
+class IndexLValueInst : public Instruction {
+  CFGValue Operand;
+  unsigned Index;
+public:
+  IndexLValueInst(TupleShuffleExpr *E, CFGValue Operand, unsigned Index);
+
+  CFGValue getOperand() const { return Operand; }
+  unsigned getIndex() const { return Index; }
+
+  static bool classof(const Instruction *I) {
+    return I->getKind() == InstKind::IndexLValue;
+  }
+};
 
 //===----------------------------------------------------------------------===//
-// Instructions representing terminators.
+// Instructions representing terminators
 //===----------------------------------------------------------------------===//
 
 /// This class defines a "terminating instruction" for a BasicBlock.

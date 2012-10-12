@@ -42,20 +42,29 @@ ABSTRACT_INST(Alloc, Instruction)
   INST(AllocVar, AllocInst)
   INST(AllocTmp, AllocInst)
   INST_RANGE(Alloc, AllocVar, AllocTmp)
+INST(AllocArray, Instruction)
 INST(Apply, Instruction)
 INST(ConstantRef, Instruction)
+
+// Literals
 INST(ZeroValue, Instruction)
 INST(IntegerLiteral, Instruction)
 INST(FloatLiteral, Instruction)
 INST(CharacterLiteral, Instruction)
 INST(StringLiteral, Instruction)
+
 INST(Load, Instruction)
 INST(Store, Instruction)
-INST(Requalify, Instruction)
+INST(TypeConversion, Instruction)
 INST(Tuple, Instruction)
 INST(TypeOf, Instruction)
 INST(ScalarToTuple, Instruction)
 INST(TupleElement, Instruction)
+
+// CFG-only instructions that don't have an AST analog.
+INST(IndexLValue, Instruction)
+
+// Terminators.
 ABSTRACT_INST(Term, Instruction)
   INST(Unreachable, TermInst)
   INST(Return, TermInst)

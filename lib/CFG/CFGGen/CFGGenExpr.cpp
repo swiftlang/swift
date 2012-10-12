@@ -71,8 +71,11 @@ CFGValue CFGGen::visitMaterializeExpr(MaterializeExpr *E) {
 
 
 CFGValue CFGGen::visitRequalifyExpr(RequalifyExpr *E) {
-  CFGValue SubV = visit(E->getSubExpr());
-  return B.createRequalify(E, SubV);
+  return B.createTypeConversion(E, visit(E->getSubExpr()));
+}
+
+CFGValue CFGGen::visitFunctionConversionExpr(FunctionConversionExpr *E) {
+  return B.createTypeConversion(E, visit(E->getSubExpr()));
 }
 
 CFGValue CFGGen::visitParenExpr(ParenExpr *E) {
@@ -127,6 +130,47 @@ CFGValue CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
       continue;
     }
 
+    // Okay, we have a varargs tuple element.  All the remaining elements feed
+    // into the varargs portion of this, which is then constructed into a Slice
+    // through an informal protocol captured by the InjectionFn in the
+    // TupleShuffleExpr.
+    auto shuffleIndexIteratorEnd = E->getElementMapping().end();
+    llvm::ArrayRef<TupleTypeElt> InnerFields =
+      E->getSubExpr()->getType()->getAs<TupleType>()->getFields();
+
+    unsigned NumArrayElts = shuffleIndexIteratorEnd - shuffleIndexIterator;
+    CFGValue AllocArray = B.createAllocArray(E, outerField.getVarargBaseTy(),
+                                             NumArrayElts);
+
+    Type BaseLValue =
+      AllocArray.getType()->getAs<TupleType>()->getElementType(1);
+
+    CFGValue BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
+
+    unsigned CurElem = 0;
+    while (shuffleIndexIterator != shuffleIndexIteratorEnd) {
+      unsigned SourceField = *shuffleIndexIterator++;
+
+      CFGValue EltLoc = BasePtr;
+      if (CurElem) EltLoc = B.createIndexLValue(E, EltLoc, CurElem);
+
+      Type EltTy = InnerFields[SourceField].getType();
+      CFGValue EltVal = B.createTupleElement(EltTy, Op, SourceField);
+      B.createInitialization(E, EltVal, EltLoc);
+      ++CurElem;
+    }
+
+    CFGValue ObjectPtr =
+      B.createTupleElement(C.getContext().TheObjectPointerType, AllocArray, 0);
+    (void)ObjectPtr;
+
+    // FIXME: Need to bitcast the BasePtr (an lvalue) to Builtin.RawPtr.
+
+   // visit(E->getVarargsInjectionFunction());
+    // call Injection(Builtin.RawPointer, Builtin.ObjectPointer, typeof(length))
+    //ResElement = Call Injection(BasePtr, Object, #elements)
+    // ResultElements.push_back(ResElement);
+    
     assert(0 && "FIXME: Varargs tuple shuffles not supported yet");
     break;
   }

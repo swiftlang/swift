@@ -111,6 +111,12 @@ public:
     return insert(new AllocTmpInst(Expr));
   }
 
+  AllocArrayInst *createAllocArray(TupleShuffleExpr *E, Type ElementType,
+                                   unsigned NumElements) {
+    return insert(new AllocArrayInst(E, ElementType, NumElements));
+  }
+
+
   ApplyInst *createApply(ApplyExpr *Expr, CFGValue Fn, ArrayRef<CFGValue> Args){
     return insert(ApplyInst::create(Expr, Fn, Args, C));
   }
@@ -152,9 +158,14 @@ public:
                                   CFGValue DestLValue) {
     return insert(new StoreInst(E, Src, DestLValue));
   }
+  StoreInst *createInitialization(TupleShuffleExpr *E, CFGValue Src,
+                                  CFGValue DestLValue) {
+    return insert(new StoreInst(E, Src, DestLValue));
+  }
 
-  RequalifyInst *createRequalify(RequalifyExpr *Expr, CFGValue Op) {
-    return insert(new RequalifyInst(Expr, Op));
+  TypeConversionInst *createTypeConversion(ImplicitConversionExpr *E,
+                                           CFGValue Op) {
+    return insert(new TypeConversionInst(E, Op));
   }
 
   TupleInst *createTuple(TupleExpr *Expr, ArrayRef<CFGValue> Elements) {
@@ -180,8 +191,16 @@ public:
   TypeOfInst *createTypeOf(TypeOfExpr *Expr) {
     return insert(new TypeOfInst(Expr));
   }
- 
-  
+
+  //===--------------------------------------------------------------------===//
+  // CFG-only instructions that don't have an AST analog
+  //===--------------------------------------------------------------------===//
+
+  IndexLValueInst *createIndexLValue(TupleShuffleExpr *E, CFGValue Operand,
+                                     unsigned Index) {
+    return insert(new IndexLValueInst(E, Operand, Index));
+  }
+
   //===--------------------------------------------------------------------===//
   // Terminator Instruction Creation Methods
   //===--------------------------------------------------------------------===//

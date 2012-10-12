@@ -95,6 +95,11 @@ public:
     OS << "alloc_tmp type=" << ATI->getType().getString();
   }
 
+  void visitAllocArrayInst(AllocArrayInst *AAI) {
+    OS << "alloc_array element type=" << AAI->getElementType().getString()
+       << ", " << AAI->getNumElements();
+  }
+
   void visitApplyInst(ApplyInst *AI) {
     OS << "apply " << getID(AI->getCallee()) << '(';
     bool first = true;
@@ -141,8 +146,8 @@ public:
     if (SI->isInitialization())
       OS << " [initialization]";
   }
-  void visitRequalifyInst(RequalifyInst *RI) {
-    OS << "requalify " << getID(RI->getOperand());
+  void visitTypeConversionInst(TypeConversionInst *TCI) {
+    OS << "type_conversion " << getID(TCI->getOperand());
   }
   void visitScalarToTupleInst(ScalarToTupleInst *SI) {
     OS << "scalartotuple " << getID(SI->getOperand());
@@ -166,6 +171,11 @@ public:
   void visitTypeOfInst(TypeOfInst *TOI) {
     OS << "typeof " << TOI->getMetaType().getString();
   }
+
+  void visitIndexLValueInst(IndexLValueInst *ILI) {
+    OS << "index_lvalue " << getID(ILI->getOperand()) << ", " <<ILI->getIndex();
+  }
+
 
   void visitUnreachableInst(UnreachableInst *UI) {
     OS << "unreachable";

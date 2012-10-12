@@ -91,7 +91,13 @@ public:
   }
   void visitTypeOfInst(TypeOfInst *TOI) {
   }
-  
+
+  void visitIndexLValueInst(IndexLValueInst *ILI) {
+    assert(ILI->getType()->is<LValueType>() &&
+           ILI->getType()->isEqual(ILI->getOperand().getType()) &&
+           "invalid IndexLValueInst");
+  }
+
   void visitReturnInst(ReturnInst *RI) {
     assert(!RI->getReturnValue().isNull() && "Return of null value is invalid");
   }

@@ -111,6 +111,24 @@ VarDecl *AllocVarInst::getDecl() const {
 AllocTmpInst::AllocTmpInst(MaterializeExpr *E)
   : AllocInst(InstKind::AllocTmp, E, E->getType()) {}
 
+// AllocArray always returns a tuple (Builtin.ObjectPointer, lvalue[EltTy])
+static Type getAllocArrayType(Type EltTy) {
+  ASTContext &Ctx = EltTy->getASTContext();;
+
+  TupleTypeElt Fields[] = {
+    TupleTypeElt(Ctx.TheObjectPointerType, Identifier()),
+    TupleTypeElt(LValueType::get(EltTy, LValueType::Qual::DefaultForType, Ctx),
+                 Identifier())
+  };
+
+  return TupleType::get(Fields, Ctx);
+}
+
+AllocArrayInst::AllocArrayInst(TupleShuffleExpr *E, Type ElementType,
+                               unsigned NumElements)
+  : Instruction(InstKind::AllocArray, E, getAllocArrayType(ElementType)),
+    ElementType(ElementType), NumElements(NumElements) {
+}
 
 
 ApplyInst *ApplyInst::create(ApplyExpr *Expr, CFGValue Callee,
@@ -214,8 +232,18 @@ StoreInst::StoreInst(MaterializeExpr *E, CFGValue Src, CFGValue Dest)
     Src(Src), Dest(Dest), IsInitialization(true) {
 }
 
-RequalifyInst::RequalifyInst(RequalifyExpr *E, CFGValue Operand)
-  : Instruction(InstKind::Requalify, E, E->getType()), Operand(Operand) {}
+StoreInst::StoreInst(TupleShuffleExpr *E, CFGValue Src, CFGValue Dest)
+  : Instruction(InstKind::Store, E, getVoidType(Src.getType())),
+    Src(Src), Dest(Dest), IsInitialization(true) {
+  // This happens in a store to an array initializer for varargs tuple shuffle.
+}
+
+
+
+
+TypeConversionInst::TypeConversionInst(ImplicitConversionExpr *E,
+                                       CFGValue Operand)
+  : Instruction(InstKind::TypeConversion, E, E->getType()), Operand(Operand) {}
 
 
 TupleInst *TupleInst::createImpl(Expr *E, ArrayRef<CFGValue> Elements,
@@ -261,34 +289,31 @@ TupleElementInst::TupleElementInst(Type ResultTy, CFGValue Operand,
   
 }
 
+
+//===----------------------------------------------------------------------===//
+// CFG-only instructions that don't have an AST analog
+//===----------------------------------------------------------------------===//
+
+IndexLValueInst::IndexLValueInst(TupleShuffleExpr *E, CFGValue Operand,
+                                 unsigned Index)
+  : Instruction(InstKind::IndexLValue, E, Operand.getType()),
+    Operand(Operand), Index(Index) {
+}
+
+//===----------------------------------------------------------------------===//
+// Instructions representing terminators
+//===----------------------------------------------------------------------===//
+
+
 TermInst::SuccessorListTy TermInst::getSuccessors() {
-  switch (getKind()) {
-  case InstKind::AllocVar:
-  case InstKind::AllocTmp:
-  case InstKind::Apply:
-  case InstKind::ConstantRef:
-  case InstKind::ZeroValue:
-  case InstKind::IntegerLiteral:
-  case InstKind::FloatLiteral:
-  case InstKind::CharacterLiteral:
-  case InstKind::StringLiteral:
-  case InstKind::Load:
-  case InstKind::Store:
-  case InstKind::Requalify:
-  case InstKind::ScalarToTuple:
-  case InstKind::Tuple:
-  case InstKind::TupleElement:
-  case InstKind::TypeOf:
-    llvm_unreachable("Only TermInst's are allowed");
-  case InstKind::Unreachable:
-    return cast<UnreachableInst>(this)->getSuccessors();
-  case InstKind::Return:
-    return cast<ReturnInst>(this)->getSuccessors();
-  case InstKind::CondBranch:
-    return cast<CondBranchInst>(this)->getSuccessors();
-  case InstKind::Branch:
-    return cast<BranchInst>(this)->getSuccessors();
-  }
+  assert(isa<TermInst>(this) && "Only TermInst's are allowed");
+  if (auto I = dyn_cast<UnreachableInst>(this))
+    return I->getSuccessors();
+  if (auto I = dyn_cast<ReturnInst>(this))
+    return I->getSuccessors();
+  if (auto I = dyn_cast<CondBranchInst>(this))
+    return I->getSuccessors();
+  return cast<BranchInst>(this)->getSuccessors();
 }
 
 UnreachableInst::UnreachableInst(CFG &C)

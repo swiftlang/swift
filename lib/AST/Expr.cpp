@@ -576,7 +576,7 @@ public:
     OS << ')';
   }
   void visitFunctionConversionExpr(FunctionConversionExpr *E) {
-    printCommon(E, "parameter_rename_expr") << '\n';
+    printCommon(E, "function_conversion_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }
