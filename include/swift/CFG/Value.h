@@ -1,4 +1,4 @@
-//===--- CFGValue.h - Value reference in the CFG ----------------*- C++ -*-===//
+//===--- Value.h - Value base class for in the CFG --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the CFGValue class.
+// This file defines the Value class.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_CFG_CFGVALUE_H
-#define SWIFT_CFG_CFGVALUE_H
+#ifndef SWIFT_CFG_VALUE_H
+#define SWIFT_CFG_VALUE_H
 
 #include "swift/AST/Type.h"
 
