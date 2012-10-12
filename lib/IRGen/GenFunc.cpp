@@ -2281,6 +2281,7 @@ void CallEmission::addMaterializedArg(Address substAddr, bool asTake) {
   // If we're calling something with polymorphic type, we'd better have
   // substitutions.
   auto subs = getSubstitutions();
+  (void)subs;
   assert(subs.empty() && "can't handle substituted dematerialization now!");
 
   auto fnType = cast<FunctionType>(CurOrigType);

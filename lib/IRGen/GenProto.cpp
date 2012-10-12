@@ -3111,6 +3111,7 @@ void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
 void EmitPolymorphicArguments::emit(ArrayRef<Substitution> subs,
                                     Explosion &out) {
   auto &generics = FnType->getGenericParams();
+  (void)generics;
   assert(generics.getAllArchetypes().size() == subs.size());
   
   // For now, treat all archetypes independently.

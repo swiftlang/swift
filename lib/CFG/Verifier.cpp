@@ -28,6 +28,7 @@ public:
   void visit(Instruction *I) {
     
     const BasicBlock *BB = I->getParent();
+    (void)BB;
     // Check that non-terminators look ok.
     if (!isa<TermInst>(I)) {
       assert(!BB->empty() &&
