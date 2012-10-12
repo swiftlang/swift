@@ -179,12 +179,20 @@ public:
     return insert(new ScalarToTupleInst(Expr, Op));
   }
 
-  TupleElementInst *createTupleElement(TupleElementExpr *E, Value *Operand,
-                                       unsigned FieldNo) {
+  Value *createTupleElement(TupleElementExpr *E, Value *Operand,
+                            unsigned FieldNo) {
+    // Fold tupleelement(tuple(a,b,c), 1) -> b.
+    if (TupleInst *TI = dyn_cast<TupleInst>(Operand))
+      return TI->getElements()[FieldNo];
+
     return insert(new TupleElementInst(E, Operand, FieldNo));
   }
-  TupleElementInst *createTupleElement(Type ResultTy, Value *Operand,
+  Value *createTupleElement(Type ResultTy, Value *Operand,
                                        unsigned FieldNo) {
+    // Fold tupleelement(tuple(a,b,c), 1) -> b.
+    if (TupleInst *TI = dyn_cast<TupleInst>(Operand))
+      return TI->getElements()[FieldNo];
+
     return insert(new TupleElementInst(ResultTy, Operand, FieldNo));
   }
 

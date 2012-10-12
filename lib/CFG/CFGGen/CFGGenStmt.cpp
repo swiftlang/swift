@@ -103,7 +103,7 @@ static void emitAssignStmtRecursive(AssignStmt *S, Value *V, Expr *Dest,
   if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
     for (Expr *Elem : TE->getElements()) {
       (void)Elem;
-      assert(0 && "unimplemented");
+      assert(0 && "FIXME: unimplemented");
     }
     //emitAssignStmtRecursive(IGF, value, elem);
     return;
