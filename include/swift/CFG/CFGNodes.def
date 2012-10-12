@@ -14,12 +14,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// VALUE(Id, Parent)
+///   The expression enumerator value is an ValueKind.  The node's class name is
+///   Id, and the name of its base class (in the Value hierarchy) is Parent.
+#ifndef VALUE
+#define VALUE(Id, Parent)
+#endif
+
 /// INST(Id, Parent)
 ///   The expression enumerator value is an ValueKind.  The node's class name is
-///   Id##Inst, and the name of its base class (in the Instruction hierarchy) is
+///   Id, and the name of its base class (in the Instruction hierarchy) is
 ///   Parent.
 #ifndef INST
-#define INST(Id, Parent)
+#define INST(Id, Parent) VALUE(Id, Parent)
 #endif
 
 /// An abstract instruction is an abstract base class in the hierarchy;
@@ -28,52 +35,54 @@
 ///
 /// Most metaprograms do not care about abstract expressions, so the default
 /// is to ignore them.
-#ifndef ABSTRACT_INST
-#define ABSTRACT_INST(Id, Parent)
+#ifndef ABSTRACT_VALUE
+#define ABSTRACT_VALUE(Id, Parent)
 #endif
 
-/// A convenience for determining the range of instructions.  These will always
+/// A convenience for determining the range of values.  These will always
 /// appear immediately after the last member.
-#ifndef INST_RANGE
-#define INST_RANGE(Id, First, Last)
+#ifndef VALUE_RANGE
+#define VALUE_RANGE(Id, First, Last)
 #endif
 
-  ABSTRACT_INST(Alloc, Instruction)
-    INST(AllocVar, AllocInst)
-    INST(AllocTmp, AllocInst)
-    INST_RANGE(Alloc, AllocVar, AllocTmp)
-  INST(AllocArray, Instruction)
-  INST(Apply, Instruction)
-  INST(ConstantRef, Instruction)
+ABSTRACT_VALUE(Instruction, Value)
+  ABSTRACT_VALUE(AllocInst, Instruction)
+    INST(AllocVarInst, AllocInst)
+    INST(AllocTmpInst, AllocInst)
+    VALUE_RANGE(AllocInst, AllocVarInst, AllocTmpInst)
+  INST(AllocArrayInst, Instruction)
+  INST(ApplyInst, Instruction)
+  INST(ConstantRefInst, Instruction)
 
   // Literals
-  INST(ZeroValue, Instruction)
-  INST(IntegerLiteral, Instruction)
-  INST(FloatLiteral, Instruction)
-  INST(CharacterLiteral, Instruction)
-  INST(StringLiteral, Instruction)
+  INST(ZeroValueInst, Instruction)
+  INST(IntegerLiteralInst, Instruction)
+  INST(FloatLiteralInst, Instruction)
+  INST(CharacterLiteralInst, Instruction)
+  INST(StringLiteralInst, Instruction)
 
-  INST(Load, Instruction)
-  INST(Store, Instruction)
-  INST(TypeConversion, Instruction)
-  INST(Tuple, Instruction)
-  INST(TypeOf, Instruction)
-  INST(ScalarToTuple, Instruction)
-  INST(TupleElement, Instruction)
+  INST(LoadInst, Instruction)
+  INST(StoreInst, Instruction)
+  INST(TypeConversionInst, Instruction)
+  INST(TupleInst, Instruction)
+  INST(TypeOfInst, Instruction)
+  INST(ScalarToTupleInst, Instruction)
+  INST(TupleElementInst, Instruction)
 
   // CFG-only instructions that don't have an AST analog.
-  INST(IndexLValue, Instruction)
+  INST(IndexLValueInst, Instruction)
 
   // Terminators.
-  ABSTRACT_INST(Term, Instruction)
-    INST(Unreachable, TermInst)
-    INST(Return, TermInst)
-    INST(Branch, TermInst)
-    INST(CondBranch, TermInst)
-    INST_RANGE(Term, Unreachable, CondBranch)
+  ABSTRACT_VALUE(TermInst, Instruction)
+    INST(UnreachableInst, TermInst)
+    INST(ReturnInst, TermInst)
+    INST(BranchInst, TermInst)
+    INST(CondBranchInst, TermInst)
+    VALUE_RANGE(TermInst, UnreachableInst, CondBranchInst)
 
-INST_RANGE(Instruction, AllocVar, CondBranch)
+VALUE_RANGE(Instruction, AllocVarInst, CondBranchInst)
 
-#undef INST_RANGE
-#undef ABSTRACT_INST
+#undef VALUE_RANGE
+#undef ABSTRACT_VALUE
 #undef INST
+#undef VALUE

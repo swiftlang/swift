@@ -108,8 +108,8 @@ public:
   void eraseFromParent();
 
   static bool classof(const Value *I) {
-    return I->getKind() >= ValueKind::First_InstructionInst &&
-           I->getKind() <= ValueKind::Last_InstructionInst;
+    return I->getKind() >= ValueKind::First_Instruction &&
+           I->getKind() <= ValueKind::Last_Instruction;
   }
 };
 
@@ -143,7 +143,7 @@ public:
   VarDecl *getDecl() const;
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::AllocVar;
+    return I->getKind() == ValueKind::AllocVarInst;
   }
 };
 
@@ -159,7 +159,7 @@ public:
   AllocTmpInst(MaterializeExpr *E);
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::AllocTmp;
+    return I->getKind() == ValueKind::AllocTmpInst;
   }
 };
 
@@ -180,7 +180,7 @@ public:
   unsigned getNumElements() const { return NumElements; }
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::AllocArray;
+    return I->getKind() == ValueKind::AllocArrayInst;
   }
 };
 
@@ -215,7 +215,7 @@ public:
   }
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::Apply;
+    return I->getKind() == ValueKind::ApplyInst;
   }
 };
 
@@ -236,7 +236,7 @@ public:
   ValueDecl *getDecl() const;
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::ConstantRef;
+    return I->getKind() == ValueKind::ConstantRefInst;
   }
 };
 
@@ -247,7 +247,7 @@ public:
   ZeroValueInst(VarDecl *D);
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::ZeroValue;
+    return I->getKind() == ValueKind::ZeroValueInst;
   }
 };
 
@@ -263,7 +263,7 @@ public:
   APInt getValue() const;
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::IntegerLiteral;
+    return I->getKind() == ValueKind::IntegerLiteralInst;
   }
 };
 
@@ -279,7 +279,7 @@ public:
   APFloat getValue() const;
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::FloatLiteral;
+    return I->getKind() == ValueKind::FloatLiteralInst;
   }
 };
 
@@ -295,7 +295,7 @@ public:
   uint32_t getValue() const;
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::CharacterLiteral;
+    return I->getKind() == ValueKind::CharacterLiteralInst;
   }
 };
 
@@ -311,7 +311,7 @@ public:
   StringRef getValue() const;
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::StringLiteral;
+    return I->getKind() == ValueKind::StringLiteralInst;
   }
 };
 
@@ -333,7 +333,7 @@ public:
   Value *getLValue() const { return LValue; }
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::Load;
+    return I->getKind() == ValueKind::LoadInst;
   }
 };
 
@@ -358,7 +358,7 @@ public:
   bool isInitialization() const { return IsInitialization; }
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::Store;
+    return I->getKind() == ValueKind::StoreInst;
   }
 };
 
@@ -372,7 +372,7 @@ public:
   Value *getOperand() const { return Operand; }
   
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::TypeConversion;
+    return I->getKind() == ValueKind::TypeConversionInst;
   }
 };
 
@@ -411,7 +411,7 @@ public:
   }
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::Tuple;
+    return I->getKind() == ValueKind::TupleInst;
   }
 };
 
@@ -432,7 +432,7 @@ public:
   Type getMetaType() const;
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::TypeOf;
+    return I->getKind() == ValueKind::TypeOfInst;
   }
 };
 
@@ -445,7 +445,7 @@ public:
   Value *getOperand() const { return Operand; }
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::ScalarToTuple;
+    return I->getKind() == ValueKind::ScalarToTupleInst;
   }
 };
   
@@ -461,7 +461,7 @@ public:
   unsigned getFieldNo() const { return FieldNo; }
   
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::TupleElement;
+    return I->getKind() == ValueKind::TupleElementInst;
   }
 };
 
@@ -483,7 +483,7 @@ public:
   unsigned getIndex() const { return Index; }
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::IndexLValue;
+    return I->getKind() == ValueKind::IndexLValueInst;
   }
 };
 
@@ -526,7 +526,7 @@ public:
   }
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::Unreachable;
+    return I->getKind() == ValueKind::UnreachableInst;
   }
 };
 
@@ -552,7 +552,7 @@ public:
   }
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::Return;
+    return I->getKind() == ValueKind::ReturnInst;
   }
 };
 
@@ -569,18 +569,12 @@ public:
   /// The jump target for the branch.
   BasicBlock *getDestBB() const { return DestBB; }
 
-#if 0
-  /// The temporary arguments to the target blocks.
-  ArgsTy blockArgs() { return Arguments; }
-  const ArgsTy blockArgs() const { return Arguments; }
-#endif
-  
   SuccessorListTy getSuccessors() {
     return DestBB;
   }
-  
+
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::Branch;
+    return I->getKind() == ValueKind::BranchInst;
   }
 };
 
@@ -609,7 +603,7 @@ public:
   void setFalseBB(BasicBlock *BB) { DestBBs[1] = BB; }
   
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::CondBranch;
+    return I->getKind() == ValueKind::CondBranchInst;
   }
 };
 

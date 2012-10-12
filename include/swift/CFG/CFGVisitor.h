@@ -24,35 +24,35 @@ namespace swift {
 
 /// CFGVisitor - This is a simple visitor class for Swift CFG nodes, allowing
 /// clients to walk over entire CFGs, blocks, or instructions.
-template<typename ImplClass, typename InstRetTy = void>
+template<typename ImplClass, typename ValueRetTy = void>
 class CFGVisitor {
 public:
 
-  InstRetTy visitInstruction(Instruction *I) {
-    // Base class, used if some class of instructions isn't handled.
+  ValueRetTy visitValue(Value *V) {
+    // Base class, used if some class of value isn't handled.
   }
 
-#define INST(CLASS, PARENT)              \
+#define VALUE(CLASS, PARENT)              \
   case ValueKind::CLASS:                  \
-    return static_cast<ImplClass*>(this) \
-    ->visit##CLASS##Inst(static_cast<CLASS##Inst*>(I));
+    return static_cast<ImplClass*>(this)  \
+    ->visit##CLASS(static_cast<CLASS*>(V));
 
-  InstRetTy visit(Instruction *I) {
-    switch (I->getKind()) {
+  ValueRetTy visit(Value *V) {
+    switch (V->getKind()) {
 #include "swift/CFG/CFGNodes.def"
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
 
   // Define default dispatcher implementations chain to parent nodes.
-#define INST(CLASS, PARENT)              \
-InstRetTy visit##CLASS##Inst(CLASS##Inst *I) {             \
+#define VALUE(CLASS, PARENT)                   \
+ValueRetTy visit##CLASS(CLASS *I) {            \
   return static_cast<ImplClass*>(this)->visit##PARENT(I);  \
 }
 
-#define ABSTRACT_INST(CLASS, PARENT)                       \
-InstRetTy visit##CLASS##Inst(CLASS##Inst *I) {             \
-  return static_cast<ImplClass*>(this)->visit##PARENT(I);  \
+#define ABSTRACT_VALUE(CLASS, PARENT)                       \
+ValueRetTy visit##CLASS(CLASS *I) {                         \
+  return static_cast<ImplClass*>(this)->visit##PARENT(I);   \
 }
 #include "swift/CFG/CFGNodes.def"
 

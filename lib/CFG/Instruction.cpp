@@ -89,7 +89,7 @@ static Type getVoidType(Type T) {
 }
 
 AllocVarInst::AllocVarInst(VarDecl *VD)
-  : AllocInst(ValueKind::AllocVar, VD, VD->getTypeOfReference()) {
+  : AllocInst(ValueKind::AllocVarInst, VD, VD->getTypeOfReference()) {
 }
 
 /// getDecl - Return the underlying declaration.
@@ -99,7 +99,7 @@ VarDecl *AllocVarInst::getDecl() const {
 
 
 AllocTmpInst::AllocTmpInst(MaterializeExpr *E)
-  : AllocInst(ValueKind::AllocTmp, E, E->getType()) {}
+  : AllocInst(ValueKind::AllocTmpInst, E, E->getType()) {}
 
 // AllocArray always returns a tuple (Builtin.ObjectPointer, lvalue[EltTy])
 static Type getAllocArrayType(Type EltTy) {
@@ -116,7 +116,7 @@ static Type getAllocArrayType(Type EltTy) {
 
 AllocArrayInst::AllocArrayInst(TupleShuffleExpr *E, Type ElementType,
                                unsigned NumElements)
-  : Instruction(ValueKind::AllocArray, E, getAllocArrayType(ElementType)),
+  : Instruction(ValueKind::AllocArrayInst, E, getAllocArrayType(ElementType)),
     ElementType(ElementType), NumElements(NumElements) {
 }
 
@@ -130,13 +130,13 @@ ApplyInst *ApplyInst::create(ApplyExpr *Expr, Value *Callee,
 }
 
 ApplyInst::ApplyInst(ApplyExpr *Expr, Value *Callee, ArrayRef<Value*> Args)
-  : Instruction(ValueKind::Apply, Expr, Expr->getType()),
+  : Instruction(ValueKind::ApplyInst, Expr, Expr->getType()),
     Callee(Callee), NumArgs(Args.size()) {
   memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(Value*));
 }
 
 ConstantRefInst::ConstantRefInst(DeclRefExpr *E)
-  : Instruction(ValueKind::ConstantRef, E, E->getType()) {}
+  : Instruction(ValueKind::ConstantRefInst, E, E->getType()) {}
 
 DeclRefExpr *ConstantRefInst::getExpr() const {
   return getLocExpr<DeclRefExpr>();
@@ -148,11 +148,11 @@ ValueDecl *ConstantRefInst::getDecl() const {
 }
 
 ZeroValueInst::ZeroValueInst(VarDecl *D)
-  : Instruction(ValueKind::ZeroValue, D, D->getType()) {
+  : Instruction(ValueKind::ZeroValueInst, D, D->getType()) {
 }
 
 IntegerLiteralInst::IntegerLiteralInst(IntegerLiteralExpr *E)
-  : Instruction(ValueKind::IntegerLiteral, E, E->getType()) {
+  : Instruction(ValueKind::IntegerLiteralInst, E, E->getType()) {
 }
 
 IntegerLiteralExpr *IntegerLiteralInst::getExpr() const {
@@ -165,7 +165,7 @@ APInt IntegerLiteralInst::getValue() const {
 }
 
 FloatLiteralInst::FloatLiteralInst(FloatLiteralExpr *E)
-  : Instruction(ValueKind::FloatLiteral, E, E->getType()) {
+  : Instruction(ValueKind::FloatLiteralInst, E, E->getType()) {
 }
 
 FloatLiteralExpr *FloatLiteralInst::getExpr() const {
@@ -177,7 +177,7 @@ APFloat FloatLiteralInst::getValue() const {
 }
 
 CharacterLiteralInst::CharacterLiteralInst(CharacterLiteralExpr *E)
-  : Instruction(ValueKind::CharacterLiteral, E, E->getType()) {
+  : Instruction(ValueKind::CharacterLiteralInst, E, E->getType()) {
 }
 
 CharacterLiteralExpr *CharacterLiteralInst::getExpr() const {
@@ -189,7 +189,7 @@ uint32_t CharacterLiteralInst::getValue() const {
 }
 
 StringLiteralInst::StringLiteralInst(StringLiteralExpr *E)
-  : Instruction(ValueKind::StringLiteral, E, E->getType()) {
+  : Instruction(ValueKind::StringLiteralInst, E, E->getType()) {
 }
 
 StringLiteralExpr *StringLiteralInst::getExpr() const {
@@ -202,28 +202,28 @@ StringRef StringLiteralInst::getValue() const {
 
 
 LoadInst::LoadInst(LoadExpr *E, Value *LValue)
-  : Instruction(ValueKind::Load, E, E->getType()), LValue(LValue) {
+  : Instruction(ValueKind::LoadInst, E, E->getType()), LValue(LValue) {
 }
 
 
 StoreInst::StoreInst(AssignStmt *S, Value *Src, Value *Dest)
-  : Instruction(ValueKind::Store, S, getVoidType(Src->getType())),
+  : Instruction(ValueKind::StoreInst, S, getVoidType(Src->getType())),
     Src(Src), Dest(Dest), IsInitialization(false) {
 }
 
 StoreInst::StoreInst(VarDecl *VD, Value *Src, Value *Dest)
-  : Instruction(ValueKind::Store, VD, getVoidType(Src->getType())),
+  : Instruction(ValueKind::StoreInst, VD, getVoidType(Src->getType())),
     Src(Src), Dest(Dest), IsInitialization(true) {
 }
 
 
 StoreInst::StoreInst(MaterializeExpr *E, Value *Src, Value *Dest)
-  : Instruction(ValueKind::Store, E, getVoidType(Src->getType())),
+  : Instruction(ValueKind::StoreInst, E, getVoidType(Src->getType())),
     Src(Src), Dest(Dest), IsInitialization(true) {
 }
 
 StoreInst::StoreInst(TupleShuffleExpr *E, Value *Src, Value *Dest)
-  : Instruction(ValueKind::Store, E, getVoidType(Src->getType())),
+  : Instruction(ValueKind::StoreInst, E, getVoidType(Src->getType())),
     Src(Src), Dest(Dest), IsInitialization(true) {
   // This happens in a store to an array initializer for varargs tuple shuffle.
 }
@@ -233,7 +233,9 @@ StoreInst::StoreInst(TupleShuffleExpr *E, Value *Src, Value *Dest)
 
 TypeConversionInst::TypeConversionInst(ImplicitConversionExpr *E,
                                        Value *Operand)
-  : Instruction(ValueKind::TypeConversion, E, E->getType()), Operand(Operand) {}
+  : Instruction(ValueKind::TypeConversionInst, E, E->getType()),
+    Operand(Operand) {
+}
 
 
 TupleInst *TupleInst::createImpl(Expr *E, ArrayRef<Value*> Elements,
@@ -245,12 +247,12 @@ TupleInst *TupleInst::createImpl(Expr *E, ArrayRef<Value*> Elements,
 }
 
 TupleInst::TupleInst(Expr *E, ArrayRef<Value*> Elems)
-  : Instruction(ValueKind::Tuple, E, E->getType()), NumArgs(Elems.size()) {
+  : Instruction(ValueKind::TupleInst, E, E->getType()), NumArgs(Elems.size()) {
   memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(Value*));
 }
 
 TypeOfInst::TypeOfInst(TypeOfExpr *E)
-  : Instruction(ValueKind::TypeOf, E, E->getType()) {}
+  : Instruction(ValueKind::TypeOfInst, E, E->getType()) {}
 
 TypeOfExpr *TypeOfInst::getExpr() const {
   return getLocExpr<TypeOfExpr>();
@@ -263,18 +265,19 @@ Type TypeOfInst::getMetaType() const {
 }
 
 ScalarToTupleInst::ScalarToTupleInst(ScalarToTupleExpr *E, Value *Operand)
-  : Instruction(ValueKind::ScalarToTuple, E, E->getType()), Operand(Operand) {
+  : Instruction(ValueKind::ScalarToTupleInst, E, E->getType()),
+    Operand(Operand) {
 }
 
 TupleElementInst::TupleElementInst(TupleElementExpr *E, Value *Operand,
                                    unsigned FieldNo)
-  : Instruction(ValueKind::TupleElement, E, E->getType()),
+  : Instruction(ValueKind::TupleElementInst, E, E->getType()),
     Operand(Operand), FieldNo(FieldNo) {
 }
 
 TupleElementInst::TupleElementInst(Type ResultTy, Value *Operand,
                                    unsigned FieldNo)
-  : Instruction(ValueKind::TupleElement, (Expr*)nullptr, ResultTy),
+  : Instruction(ValueKind::TupleElementInst, (Expr*)nullptr, ResultTy),
     Operand(Operand), FieldNo(FieldNo) {
   
 }
@@ -286,7 +289,7 @@ TupleElementInst::TupleElementInst(Type ResultTy, Value *Operand,
 
 IndexLValueInst::IndexLValueInst(TupleShuffleExpr *E, Value *Operand,
                                  unsigned Index)
-  : Instruction(ValueKind::IndexLValue, E, Operand->getType()),
+  : Instruction(ValueKind::IndexLValueInst, E, Operand->getType()),
     Operand(Operand), Index(Index) {
 }
 
@@ -307,24 +310,26 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
 }
 
 UnreachableInst::UnreachableInst(CFG &C)
-  : TermInst(ValueKind::Unreachable, CFGLocation(),
+  : TermInst(ValueKind::UnreachableInst, CFGLocation(),
              C.getContext().TheEmptyTupleType) {
 }
 
 ReturnInst::ReturnInst(ReturnStmt *S, Value *ReturnValue)
-  : TermInst(ValueKind::Return, S, getVoidType(ReturnValue->getType())),
+  : TermInst(ValueKind::ReturnInst, S, getVoidType(ReturnValue->getType())),
     ReturnValue(ReturnValue) {
 }
 
 BranchInst::BranchInst(BasicBlock *DestBB, CFG &C)
-  : TermInst(ValueKind::Branch, CFGLocation(), C.getContext().TheEmptyTupleType),
+  : TermInst(ValueKind::BranchInst, CFGLocation(),
+             C.getContext().TheEmptyTupleType),
     DestBB(this, DestBB) {
 }
 
 
 CondBranchInst::CondBranchInst(Stmt *TheStmt, Value *Condition,
                                BasicBlock *TrueBB, BasicBlock *FalseBB)
-  : TermInst(ValueKind::CondBranch, TheStmt, getVoidType(Condition->getType())),
+  : TermInst(ValueKind::CondBranchInst, TheStmt,
+             getVoidType(Condition->getType())),
     Condition(Condition) {
   DestBBs[0].init(this);
   DestBBs[1].init(this);
