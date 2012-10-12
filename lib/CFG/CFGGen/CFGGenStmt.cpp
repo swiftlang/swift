@@ -45,12 +45,12 @@ Condition CFGGen::emitCondition(Stmt *TheStmt, Expr *E,
          "emitting condition at unreachable point");
   
   // Sema forces conditions to have Builtin.i1 type, which guarantees this.
-  CFGValue V;
+  Value *V = nullptr;
   {
     FullExpr Scope(Cleanups);
     V = visit(E);
   }
-  assert(V.getType()->castTo<BuiltinIntegerType>()->getBitWidth() == 1);
+  assert(V->getType()->castTo<BuiltinIntegerType>()->getBitWidth() == 1);
   
   BasicBlock *ContBB = new BasicBlock(&C, "condition.cont");
   BasicBlock *TrueBB = new BasicBlock(&C, "if.true");

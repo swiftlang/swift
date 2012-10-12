@@ -71,19 +71,19 @@ public:
   }
   void visitLoadInst(LoadInst *LI) {
     assert(!LI->getType()->is<LValueType>() && "Load should produce rvalue");
-    assert(LI->getLValue().getType()->is<LValueType>() &&
+    assert(LI->getLValue()->getType()->is<LValueType>() &&
            "Load op should be lvalue");
-    assert(LI->getLValue().getType()->getRValueType()->isEqual(LI->getType()) &&
+    assert(LI->getLValue()->getType()->getRValueType()->isEqual(LI->getType()) &&
            "Load operand type and result type mismatch");
   }
 
   void visitStoreInst(StoreInst *SI) {
-    assert(!SI->getSrc().getType()->is<LValueType>() &&
+    assert(!SI->getSrc()->getType()->is<LValueType>() &&
            "Src value should be rvalue");
-    assert(SI->getDest().getType()->is<LValueType>() &&
+    assert(SI->getDest()->getType()->is<LValueType>() &&
            "Dest address should be lvalue");
-    assert(SI->getDest().getType()->getRValueType()->
-              isEqual(SI->getSrc().getType()) &&
+    assert(SI->getDest()->getType()->getRValueType()->
+              isEqual(SI->getSrc()->getType()) &&
            "Store operand type and dest type mismatch");
   }
 
@@ -94,19 +94,19 @@ public:
 
   void visitIndexLValueInst(IndexLValueInst *ILI) {
     assert(ILI->getType()->is<LValueType>() &&
-           ILI->getType()->isEqual(ILI->getOperand().getType()) &&
+           ILI->getType()->isEqual(ILI->getOperand()->getType()) &&
            "invalid IndexLValueInst");
   }
 
   void visitReturnInst(ReturnInst *RI) {
-    assert(!RI->getReturnValue().isNull() && "Return of null value is invalid");
+    assert(RI->getReturnValue() && "Return of null value is invalid");
   }
   
   void visitBranchInst(BranchInst *BI) {
   }
   
   void visitCondBranchInst(CondBranchInst *CBI) {
-    assert(!CBI->getCondition().isNull() &&
+    assert(CBI->getCondition() &&
            "Condition of conditional branch can't be missing");
   }
 };

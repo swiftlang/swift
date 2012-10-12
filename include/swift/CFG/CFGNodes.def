@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 /// INST(Id, Parent)
-///   The expression enumerator value is an InstKind.  The node's class name is
+///   The expression enumerator value is an ValueKind.  The node's class name is
 ///   Id##Inst, and the name of its base class (in the Instruction hierarchy) is
 ///   Parent.
 #ifndef INST
@@ -24,7 +24,7 @@
 
 /// An abstract instruction is an abstract base class in the hierarchy;
 /// it is never a most-derived type, and it does not have an enumerator in
-/// InstKind.
+/// ValueKind.
 ///
 /// Most metaprograms do not care about abstract expressions, so the default
 /// is to ignore them.
@@ -38,39 +38,41 @@
 #define INST_RANGE(Id, First, Last)
 #endif
 
-ABSTRACT_INST(Alloc, Instruction)
-  INST(AllocVar, AllocInst)
-  INST(AllocTmp, AllocInst)
-  INST_RANGE(Alloc, AllocVar, AllocTmp)
-INST(AllocArray, Instruction)
-INST(Apply, Instruction)
-INST(ConstantRef, Instruction)
+  ABSTRACT_INST(Alloc, Instruction)
+    INST(AllocVar, AllocInst)
+    INST(AllocTmp, AllocInst)
+    INST_RANGE(Alloc, AllocVar, AllocTmp)
+  INST(AllocArray, Instruction)
+  INST(Apply, Instruction)
+  INST(ConstantRef, Instruction)
 
-// Literals
-INST(ZeroValue, Instruction)
-INST(IntegerLiteral, Instruction)
-INST(FloatLiteral, Instruction)
-INST(CharacterLiteral, Instruction)
-INST(StringLiteral, Instruction)
+  // Literals
+  INST(ZeroValue, Instruction)
+  INST(IntegerLiteral, Instruction)
+  INST(FloatLiteral, Instruction)
+  INST(CharacterLiteral, Instruction)
+  INST(StringLiteral, Instruction)
 
-INST(Load, Instruction)
-INST(Store, Instruction)
-INST(TypeConversion, Instruction)
-INST(Tuple, Instruction)
-INST(TypeOf, Instruction)
-INST(ScalarToTuple, Instruction)
-INST(TupleElement, Instruction)
+  INST(Load, Instruction)
+  INST(Store, Instruction)
+  INST(TypeConversion, Instruction)
+  INST(Tuple, Instruction)
+  INST(TypeOf, Instruction)
+  INST(ScalarToTuple, Instruction)
+  INST(TupleElement, Instruction)
 
-// CFG-only instructions that don't have an AST analog.
-INST(IndexLValue, Instruction)
+  // CFG-only instructions that don't have an AST analog.
+  INST(IndexLValue, Instruction)
 
-// Terminators.
-ABSTRACT_INST(Term, Instruction)
-  INST(Unreachable, TermInst)
-  INST(Return, TermInst)
-  INST(Branch, TermInst)
-  INST(CondBranch, TermInst)
-  INST_RANGE(Term, Unreachable, CondBranch)
+  // Terminators.
+  ABSTRACT_INST(Term, Instruction)
+    INST(Unreachable, TermInst)
+    INST(Return, TermInst)
+    INST(Branch, TermInst)
+    INST(CondBranch, TermInst)
+    INST_RANGE(Term, Unreachable, CondBranch)
+
+INST_RANGE(Instruction, AllocVar, CondBranch)
 
 #undef INST_RANGE
 #undef ABSTRACT_INST

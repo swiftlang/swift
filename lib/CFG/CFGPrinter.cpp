@@ -51,7 +51,6 @@ class CFGPrinter : public CFGVisitor<CFGPrinter> {
 
   llvm::DenseMap<const Instruction*, unsigned> InstructionToIDMap;
   ID getID(const Instruction *I);
-  ID getID(const BasicBlockArg *BBarg);
   ID getID(CFGValue V);
 
 public:
@@ -74,6 +73,11 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Instruction Printing Logic
+
+  void print(const Value *V) {
+    // FIXME: Print non-instruction values too.
+    print(cast<Instruction>(V));
+  }
 
   void print(const Instruction *I) {
     OS << "  " << getID(I) << " = ";
@@ -231,27 +235,20 @@ ID CFGPrinter::getID(const Instruction *Inst) {
   return R;
 }
 
-ID CFGPrinter::getID(const BasicBlockArg *BBArg) {
-  // FIXME: Not implemented yet.
-  ID R = { ID::SSAValue, ~0U };
-  return R;
-}
-
 ID CFGPrinter::getID(CFGValue Val) {
-  if (const Instruction *Inst = Val.getInstOrNull())
-    return getID(Inst);
-  return getID(Val.getBBArg());
+  // FIXME: Handle non-instruction values.
+  return getID(cast<Instruction>(Val));
 }
 
 //===----------------------------------------------------------------------===//
 // Printing for Instruction, BasicBlock, and CFG
 //===----------------------------------------------------------------------===//
 
-void Instruction::dump() const {
+void Value::dump() const {
   print(llvm::errs());
 }
 
-void Instruction::print(raw_ostream &OS) const {
+void Value::print(raw_ostream &OS) const {
   CFGPrinter(OS).print(this);
 }
 

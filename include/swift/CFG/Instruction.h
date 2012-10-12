@@ -51,20 +51,10 @@ class TupleShuffleExpr;
 class TypeOfExpr;
 class VarDecl;
 
-enum class InstKind {
-#define INST(Id, Parent) Id,
-#define INST_RANGE(Id, FirstId, LastId) \
-  First_##Id##Inst = FirstId, Last_##Id##Inst = LastId,
-#include "swift/CFG/CFGNodes.def"
-};
-
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift BasicBlock.
-class Instruction :
-public llvm::ilist_node<Instruction>, public CFGAllocated<Instruction> {
+class Instruction : public Value, public llvm::ilist_node<Instruction> {
   friend struct llvm::ilist_traits<Instruction>;
-  /// The kind of the Instruction.
-  const InstKind Kind;
 
   /// A backreference to the containing basic block.  This is maintained by
   /// ilist_traits<Instruction>.
@@ -72,24 +62,19 @@ public llvm::ilist_node<Instruction>, public CFGAllocated<Instruction> {
 
   CFGLocation Loc;
 
-  /// Ty - This is the type of the value produced by the instruction.
-  Type Ty;
-
   friend struct llvm::ilist_sentinel_traits<Instruction>;
   Instruction() = delete;
   void operator=(const Instruction &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
 
 protected:
-  Instruction(InstKind Kind, CFGLocation Loc, Type Ty)
-    : Kind(Kind), ParentBB(0), Loc(Loc), Ty(Ty) {}
+  Instruction(ValueKind Kind, CFGLocation Loc, Type Ty)
+    : Value(Kind, Ty), ParentBB(0), Loc(Loc) {}
 
 public:
 
-  InstKind getKind() const { return Kind; }
   const BasicBlock *getParent() const { return ParentBB; }
   BasicBlock *getParent() { return ParentBB; }
-  Type getType() const { return Ty; }
 
   CFGLocation getLoc() const { return Loc; }
 
@@ -121,10 +106,11 @@ public:
   /// block and deletes it.
   ///
   void eraseFromParent();
-  
-  /// Pretty-print the Instruction.
-  void dump() const;
-  void print(raw_ostream &OS) const;
+
+  static bool classof(const Value *I) {
+    return I->getKind() >= ValueKind::First_InstructionInst &&
+           I->getKind() <= ValueKind::Last_InstructionInst;
+  }
 };
 
 
@@ -134,14 +120,13 @@ class AllocInst : public Instruction {
 // Eventually: enum AllocKind { Heap, Stack, StackNoRefCount, Pseudo };
 
 protected:
-  AllocInst(InstKind Kind, CFGLocation Loc, Type Ty)
+  AllocInst(ValueKind Kind, CFGLocation Loc, Type Ty)
     : Instruction(Kind, Loc, Ty) {}
 public:
 
-
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::AllocVar ||
-           I->getKind() == InstKind::AllocTmp;
+  static bool classof(const Value *I) {
+    return I->getKind() >= ValueKind::First_AllocInst &&
+           I->getKind() <= ValueKind::Last_AllocInst;
   }
 };
 
@@ -157,8 +142,8 @@ public:
   /// getDecl - Return the underlying declaration.
   VarDecl *getDecl() const;
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::AllocVar;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::AllocVar;
   }
 };
 
@@ -173,8 +158,8 @@ public:
 
   AllocTmpInst(MaterializeExpr *E);
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::AllocTmp;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::AllocTmp;
   }
 };
 
@@ -194,8 +179,8 @@ public:
   Type getElementType() const { return ElementType; }
   unsigned getNumElements() const { return NumElements; }
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::AllocArray;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::AllocArray;
   }
 };
 
@@ -229,8 +214,8 @@ public:
     return const_cast<ApplyInst*>(this)->getArguments();
   }
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::Apply;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::Apply;
   }
 };
 
@@ -250,8 +235,8 @@ public:
   /// getDecl - Return the underlying declaration.
   ValueDecl *getDecl() const;
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::ConstantRef;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::ConstantRef;
   }
 };
 
@@ -261,8 +246,8 @@ class ZeroValueInst : public Instruction {
 public:
   ZeroValueInst(VarDecl *D);
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::ZeroValue;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::ZeroValue;
   }
 };
 
@@ -277,8 +262,8 @@ public:
   /// getValue - Return the APInt for the underlying integer literal.
   APInt getValue() const;
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::IntegerLiteral;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::IntegerLiteral;
   }
 };
 
@@ -293,8 +278,8 @@ public:
   /// getValue - Return the APFloat for the underlying FP literal.
   APFloat getValue() const;
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::FloatLiteral;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::FloatLiteral;
   }
 };
 
@@ -309,8 +294,8 @@ public:
   /// getValue - Return the value for the underlying literal.
   uint32_t getValue() const;
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::CharacterLiteral;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::CharacterLiteral;
   }
 };
 
@@ -325,8 +310,8 @@ public:
   /// getValue - Return the string data for the literal.
   StringRef getValue() const;
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::StringLiteral;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::StringLiteral;
   }
 };
 
@@ -347,8 +332,8 @@ public:
 
   CFGValue getLValue() const { return LValue; }
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::Load;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::Load;
   }
 };
 
@@ -372,8 +357,8 @@ public:
 
   bool isInitialization() const { return IsInitialization; }
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::Store;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::Store;
   }
 };
 
@@ -386,8 +371,8 @@ public:
 
   CFGValue getOperand() const { return Operand; }
   
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::TypeConversion;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::TypeConversion;
   }
 };
 
@@ -425,8 +410,8 @@ public:
     return createImpl((Expr*)E, Elements, C);
   }
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::Tuple;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::Tuple;
   }
 };
 
@@ -446,8 +431,8 @@ public:
   /// returns.
   Type getMetaType() const;
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::TypeOf;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::TypeOf;
   }
 };
 
@@ -459,8 +444,8 @@ public:
 
   CFGValue getOperand() const { return Operand; }
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::ScalarToTuple;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::ScalarToTuple;
   }
 };
   
@@ -475,8 +460,8 @@ public:
   CFGValue getOperand() const { return Operand; }
   unsigned getFieldNo() const { return FieldNo; }
   
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::TupleElement;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::TupleElement;
   }
 };
 
@@ -497,8 +482,8 @@ public:
   CFGValue getOperand() const { return Operand; }
   unsigned getIndex() const { return Index; }
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::IndexLValue;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::IndexLValue;
   }
 };
 
@@ -509,7 +494,7 @@ public:
 /// This class defines a "terminating instruction" for a BasicBlock.
 class TermInst : public Instruction {
 protected:
-  TermInst(InstKind K, CFGLocation Loc, Type Ty) : Instruction(K, Loc, Ty) {}
+  TermInst(ValueKind K, CFGLocation Loc, Type Ty) : Instruction(K, Loc, Ty) {}
 public:
 
   typedef llvm::ArrayRef<CFGSuccessor> SuccessorListTy;
@@ -522,9 +507,9 @@ public:
     return const_cast<TermInst*>(this)->getSuccessors();
   }
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() >= InstKind::First_TermInst &&
-           I->getKind() <= InstKind::Last_TermInst;
+  static bool classof(const Value *I) {
+    return I->getKind() >= ValueKind::First_TermInst &&
+           I->getKind() <= ValueKind::Last_TermInst;
   }
 };
 
@@ -540,8 +525,8 @@ public:
     return SuccessorListTy();
   }
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::Unreachable;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::Unreachable;
   }
 };
 
@@ -566,8 +551,8 @@ public:
     return SuccessorListTy();
   }
 
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::Return;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::Return;
   }
 };
 
@@ -594,8 +579,8 @@ public:
     return DestBB;
   }
   
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::Branch;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::Branch;
   }
 };
 
@@ -623,8 +608,8 @@ public:
   void setTrueBB(BasicBlock *BB) { DestBBs[0] = BB; }
   void setFalseBB(BasicBlock *BB) { DestBBs[1] = BB; }
   
-  static bool classof(const Instruction *I) {
-    return I->getKind() == InstKind::CondBranch;
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::CondBranch;
   }
 };
 

@@ -20,32 +20,32 @@
 #include "swift/AST/Type.h"
 
 namespace swift {
+  enum class ValueKind {
+#define INST(Id, Parent) Id,
+#define INST_RANGE(Id, FirstId, LastId) \
+First_##Id##Inst = FirstId, Last_##Id##Inst = LastId,
+#include "swift/CFG/CFGNodes.def"
+  };
 
-  class Instruction;
-  class BasicBlockArg;
-
-  /// CFGValue - This class is a value that can be used as an "operand" to an
+  /// Value - This class is a value that can be used as an "operand" to an
   /// instruction.  It is either a reference to another instruction, or an
   /// incoming basic block argument.
-  class CFGValue {
-    llvm::PointerUnion<Instruction*, BasicBlockArg*> V;
+  class Value : public CFGAllocated<Value> {
+    Type Ty;
+    const ValueKind Kind;
+  protected:
+    Value(ValueKind Kind, Type Ty) : Ty(Ty), Kind(Kind) {}
   public:
-    explicit CFGValue() : V() {}
-    CFGValue(Instruction *I) : V(I) { assert(I); }
-    CFGValue(BasicBlockArg *A) : V(A) { assert(A); }
 
-    bool isNull() const { return V.isNull(); }
-    bool isInstruction() const { return V.is<Instruction*>(); }
-    bool isBasicBlockArg() const { return V.is<BasicBlockArg*>(); }
+    ValueKind getKind() const { return Kind; }
+    Type getType() const { return Ty; }
 
-    Instruction *getInst() const { return V.get<Instruction*>(); }
-    BasicBlockArg *getBBArg() const { return V.get<BasicBlockArg*>(); }
-
-    Instruction *getInstOrNull() const { return V.dyn_cast<Instruction*>(); }
-    BasicBlockArg *getBBArgOrNull() const {return V.dyn_cast<BasicBlockArg*>();}
-
-    Type getType() const;
+    /// Pretty-print the Instruction.
+    void dump() const;
+    void print(raw_ostream &OS) const;
   };
+
+  typedef Value* CFGValue;
 } // end namespace swift
 
 #endif

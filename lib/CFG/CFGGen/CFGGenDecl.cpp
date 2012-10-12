@@ -51,7 +51,7 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     // NOTE: "Default zero initialization" is a dubious concept.  When we get
     // something like typestate or another concept that allows us to model
     // definitive assignment, then we can consider removing it.
-    auto InitVal = Init.isNull() ? Gen.B.createZeroValue(VD) : Init;
+    auto InitVal = Init ? Init : Gen.B.createZeroValue(VD);
     Gen.B.createInitialization(VD, InitVal, AllocVar);
   }
   
@@ -60,7 +60,7 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
   void visitTuplePattern(TuplePattern *P) {
     // If we have no initializer, just emit the subpatterns using
     // the missing initializer.
-    if (Init.isNull()) {
+    if (Init == nullptr) {
       for (auto &elt : P->getFields())
         visit(elt.getPattern());
       return;
@@ -93,7 +93,7 @@ void CFGGen::visitPatternBindingDecl(PatternBindingDecl *D) {
 
   // If an initial value was specified by the decl, use it to produce the
   // initial values, otherwise use the default value for the type.
-  CFGValue Initializer;
+  Value *Initializer = nullptr;
   if (D->getInit()) {
     FullExpr Scope(Cleanups);
     Initializer = visit(D->getInit());

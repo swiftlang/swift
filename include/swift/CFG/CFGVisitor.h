@@ -33,7 +33,7 @@ public:
   }
 
 #define INST(CLASS, PARENT)              \
-  case InstKind::CLASS:                  \
+  case ValueKind::CLASS:                  \
     return static_cast<ImplClass*>(this) \
     ->visit##CLASS##Inst(static_cast<CLASS##Inst*>(I));
 

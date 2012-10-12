@@ -143,7 +143,7 @@ CFGValue CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
                                              NumArrayElts);
 
     Type BaseLValue =
-      AllocArray.getType()->getAs<TupleType>()->getElementType(1);
+      AllocArray->getType()->getAs<TupleType>()->getElementType(1);
 
     CFGValue BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
 
