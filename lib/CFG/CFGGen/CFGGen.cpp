@@ -38,9 +38,10 @@ CFGGen::~CFGGen() {
 }
 
 
-CFG *CFG::constructCFG(Stmt *S, ASTContext &Ctx) {
-  CFG *C = new CFG(Ctx);
-  CFGGen(*C).visit(S);
+CFG *CFG::constructCFG(FuncExpr *FE) {
+  CFG *C = new CFG(FE->getASTContext());
+
+  CFGGen(*C).visit(FE->getBody());
 
   C->verify();
   return C;

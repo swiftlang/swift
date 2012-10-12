@@ -22,8 +22,8 @@
 namespace swift {
 
 class ASTContext;
+class FuncExpr;
 class Instruction;
-class Stmt;
 class TranslationUnit;
 
 class CFG : public CFGBase {
@@ -46,9 +46,8 @@ public:
   ~CFG();
 
   /// Construct a CFG from a given statement.  It is the caller's responsibility
-  /// to 'delete' this object.  This can return nullptr if the CFG cannot
-  /// be constructed.
-  static CFG *constructCFG(Stmt *S, ASTContext &Context);
+  /// to 'delete' this object.
+  static CFG *constructCFG(FuncExpr *FE);
 
   ASTContext &getContext() const { return Context; }
 

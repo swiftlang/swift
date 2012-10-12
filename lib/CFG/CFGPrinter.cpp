@@ -85,16 +85,10 @@ public:
   // Instruction Printing Logic
 
   void print(const Value *V) {
-    // FIXME: Print non-instruction values too.
-    print(cast<Instruction>(V));
-  }
-
-  void print(const Instruction *I) {
-    OS << "  " << getID(I) << " = ";
-    visit(const_cast<Instruction*>(I));
+    OS << "  " << getID(V) << " = ";
+    visit(const_cast<Value*>(V));
     OS << '\n';
   }
-
   void visitInstruction(Instruction *I) {
     assert(0 && "CFGPrinter not implemented for this instruction!");
   }
@@ -201,16 +195,6 @@ public:
 
   void visitBranchInst(BranchInst *UBI) {
     OS << "br " << getID(UBI->getDestBB());
-#if 0
-    const BranchInst::ArgsTy Args = UBI->blockArgs();
-
-    // FIXME: Args should move to terminator generic stuff.
-    if (!Args.empty()) {
-      OS << '(';
-      for (auto Arg : Args) { OS << "%" << Arg; }
-      OS << ')';
-    }
-#endif
   }
 
   void visitCondBranchInst(CondBranchInst *CBI) {
