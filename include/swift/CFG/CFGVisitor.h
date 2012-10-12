@@ -18,6 +18,7 @@
 #define SWIFT_CFG_CFGVISITOR_H
 
 #include "swift/CFG/CFG.h"
+#include "swift/CFG/BBArgument.h"
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {

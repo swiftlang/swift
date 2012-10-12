@@ -45,6 +45,8 @@
 #define VALUE_RANGE(Id, First, Last)
 #endif
 
+VALUE(BBArgument, Value)
+
 ABSTRACT_VALUE(Instruction, Value)
   ABSTRACT_VALUE(AllocInst, Instruction)
     INST(AllocVarInst, AllocInst)
@@ -80,7 +82,7 @@ ABSTRACT_VALUE(Instruction, Value)
     INST(CondBranchInst, TermInst)
     VALUE_RANGE(TermInst, UnreachableInst, CondBranchInst)
 
-VALUE_RANGE(Instruction, AllocVarInst, CondBranchInst)
+  VALUE_RANGE(Instruction, AllocVarInst, CondBranchInst)
 
 #undef VALUE_RANGE
 #undef ABSTRACT_VALUE

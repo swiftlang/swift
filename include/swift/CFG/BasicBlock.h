@@ -21,6 +21,7 @@
 
 namespace swift {
 class CFG;
+class BBArgument;
 
 class BasicBlock :
 public llvm::ilist_node<BasicBlock>, public CFGAllocated<BasicBlock> {
@@ -35,7 +36,10 @@ private:
   /// branching to this block, forming the predecessor list.  This is
   /// automatically managed by the CFGSuccessor class.
   CFGSuccessor *PredList;
-  
+
+  /// BBArgList - This is the list of basic block arguments for this block.
+  std::vector<BBArgument*> BBArgList;
+
   /// The ordered set of instructions in the BasicBlock.
   InstListType InstList;
   
@@ -80,6 +84,19 @@ public:
   const TermInst *getTerminator() const {
     return const_cast<BasicBlock*>(this)->getTerminator();
   }
+
+  //===--------------------------------------------------------------------===//
+  // BasicBlock Argument List Inspection and Manipulation
+  //===--------------------------------------------------------------------===//
+
+  typedef std::vector<BBArgument*>::iterator bbarg_iterator;
+  typedef std::vector<BBArgument*>::const_iterator const_bbarg_iterator;
+
+  bool bbarg_empty() const { return BBArgList.empty(); }
+  bbarg_iterator bbarg_begin() { return BBArgList.begin(); }
+  bbarg_iterator bbarg_end() { return BBArgList.end(); }
+  const_bbarg_iterator bbarg_begin() const { return BBArgList.begin(); }
+  const_bbarg_iterator bbarg_end() const { return BBArgList.end(); }
 
   //===--------------------------------------------------------------------===//
   // Predecessors and Successors

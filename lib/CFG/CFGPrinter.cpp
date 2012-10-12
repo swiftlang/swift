@@ -49,8 +49,7 @@ class CFGPrinter : public CFGVisitor<CFGPrinter> {
   llvm::DenseMap<const BasicBlock *, unsigned> BlocksToIDMap;
   ID getID(const BasicBlock *B);
 
-  llvm::DenseMap<const Instruction*, unsigned> InstructionToIDMap;
-  ID getID(const Instruction *I);
+  llvm::DenseMap<const Value*, unsigned> ValueToIDMap;
   ID getID(const Value *V);
 
 public:
@@ -58,7 +57,18 @@ public:
   }
 
   void print(const BasicBlock *BB) {
-    OS << getID(BB) << ":\t";
+    OS << getID(BB);
+
+    if (!BB->bbarg_empty()) {
+      OS << '(';
+      for (auto I = BB->bbarg_begin(), E = BB->bbarg_end(); I != E; ++I) {
+        if (I != BB->bbarg_begin()) OS << ", ";
+        OS << getID(*I) << " : " << (*I)->getType().getString();
+      }
+      OS << ')';
+    }
+
+    OS << ":\t";
 
     OS << " ; Preds:";
     for (auto BBI = BB->pred_begin(), E = BB->pred_end(); BBI != E; ++BBI)
@@ -222,22 +232,28 @@ ID CFGPrinter::getID(const BasicBlock *Block) {
   return R;
 }
 
-ID CFGPrinter::getID(const Instruction *Inst) {
+ID CFGPrinter::getID(const Value *V) {
   // Lazily initialize the instruction -> ID mapping.
-  if (InstructionToIDMap.empty()) {
+  if (ValueToIDMap.empty()) {
+    const BasicBlock *ParentBB;
+    if (const Instruction *I = dyn_cast<Instruction>(V))
+      ParentBB = I->getParent();
+    else
+      ParentBB = cast<BBArgument>(V)->getParent();
+
+
     unsigned idx = 0;
-    for (auto &BB : *Inst->getParent()->getParent())
+    for (auto &BB : *ParentBB->getParent()) {
+      for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
+        ValueToIDMap[*I] = idx++;
+
       for (auto &I : BB)
-        InstructionToIDMap[&I] = idx++;
+        ValueToIDMap[&I] = idx++;
+    }
   }
 
-  ID R = { ID::SSAValue, InstructionToIDMap[Inst] };
+  ID R = { ID::SSAValue, ValueToIDMap[V] };
   return R;
-}
-
-ID CFGPrinter::getID(const Value *Val) {
-  // FIXME: Handle non-instruction values.
-  return getID(cast<Instruction>(Val));
 }
 
 //===----------------------------------------------------------------------===//

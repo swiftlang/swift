@@ -120,7 +120,7 @@ llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
     }
 
     assert(isa<llvm::ConstantInt>(align));
-    assert(csize->getZExtValue() % cast<llvm::ConstantInt>(align)->getZExtValue()
+    assert(csize->getZExtValue() %cast<llvm::ConstantInt>(align)->getZExtValue()
              == 0 && "size not a multiple of alignment!");
   }
 
