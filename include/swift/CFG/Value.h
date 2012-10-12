@@ -21,9 +21,10 @@
 
 namespace swift {
   enum class ValueKind {
+#define VALUE(Id, Parent) Id,
 #define INST(Id, Parent) Id,
-#define INST_RANGE(Id, FirstId, LastId) \
-First_##Id##Inst = FirstId, Last_##Id##Inst = LastId,
+#define VALUE_RANGE(Id, FirstId, LastId) \
+First_##Id = FirstId, Last_##Id = LastId,
 #include "swift/CFG/CFGNodes.def"
   };
 
