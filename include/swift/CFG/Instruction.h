@@ -188,29 +188,29 @@ public:
 /// ApplyInst - Represents application of an argument to a function.
 class ApplyInst : public Instruction {
   /// The instruction representing the called function.
-  CFGValue Callee;
+  Value *Callee;
 
   unsigned NumArgs;
-  CFGValue *getArgsStorage() { return reinterpret_cast<CFGValue*>(this + 1); }
+  Value **getArgsStorage() { return reinterpret_cast<Value**>(this + 1); }
   
   /// Construct an ApplyInst from a given call expression and the provided
   /// arguments.
-  ApplyInst(ApplyExpr *Expr, CFGValue Callee, ArrayRef<CFGValue> Args);
+  ApplyInst(ApplyExpr *Expr, Value *Callee, ArrayRef<Value*> Args);
 
 public:
-  static ApplyInst *create(ApplyExpr *Expr, CFGValue Callee,
-                          ArrayRef<CFGValue> Args, CFG &C);
+  static ApplyInst *create(ApplyExpr *Expr, Value *Callee,
+                          ArrayRef<Value*> Args, CFG &C);
 
   
-  CFGValue getCallee() { return Callee; }
+  Value *getCallee() { return Callee; }
   
   /// The arguments passed to this ApplyInst.
-  MutableArrayRef<CFGValue> getArguments() {
-    return MutableArrayRef<CFGValue>(getArgsStorage(), NumArgs);
+  MutableArrayRef<Value*> getArguments() {
+    return MutableArrayRef<Value*>(getArgsStorage(), NumArgs);
   }
 
   /// The arguments passed to this ApplyInst.
-  ArrayRef<CFGValue> getArguments() const {
+  ArrayRef<Value*> getArguments() const {
     return const_cast<ApplyInst*>(this)->getArguments();
   }
 
@@ -319,18 +319,18 @@ public:
 /// LoadInst - Represents a load from a memory location.
 class LoadInst : public Instruction {
   /// The LValue (memory address) to use for the load.
-  CFGValue LValue;
+  Value *LValue;
 public:
   /// Constructs a LoadInst.
   ///
   /// \param Expr The backing LoadExpr in the AST.
   ///
-  /// \param LValue The CFGValue representing the lvalue (address) to
+  /// \param LValue The Value *representing the lvalue (address) to
   ///        use for the load.
   ///
-  LoadInst(LoadExpr *E, CFGValue LValue);
+  LoadInst(LoadExpr *E, Value *LValue);
 
-  CFGValue getLValue() const { return LValue; }
+  Value *getLValue() const { return LValue; }
 
   static bool classof(const Value *I) {
     return I->getKind() == ValueKind::Load;
@@ -339,7 +339,7 @@ public:
 
 class StoreInst : public Instruction {
   /// The value being stored and the lvalue being stored to.
-  CFGValue Src, Dest;
+  Value *Src, *Dest;
 
   /// IsInitialization - True if this is the initialization of a memory location
   /// that is uninitialized, not a general store.  In an initialization of an
@@ -347,13 +347,13 @@ class StoreInst : public Instruction {
   bool IsInitialization;
 public:
 
-  StoreInst(AssignStmt *S, CFGValue Src, CFGValue Dest);
-  StoreInst(VarDecl *VD, CFGValue Src, CFGValue Dest);
-  StoreInst(MaterializeExpr *E, CFGValue Src, CFGValue Dest);
-  StoreInst(TupleShuffleExpr *E, CFGValue Src, CFGValue Dest);
+  StoreInst(AssignStmt *S, Value *Src, Value *Dest);
+  StoreInst(VarDecl *VD, Value *Src, Value *Dest);
+  StoreInst(MaterializeExpr *E, Value *Src, Value *Dest);
+  StoreInst(TupleShuffleExpr *E, Value *Src, Value *Dest);
 
-  CFGValue getSrc() const { return Src; }
-  CFGValue getDest() const { return Dest; }
+  Value *getSrc() const { return Src; }
+  Value *getDest() const { return Dest; }
 
   bool isInitialization() const { return IsInitialization; }
 
@@ -365,11 +365,11 @@ public:
 /// TypeConversionInst - Change the Type of some value without affecting how it
 /// will codegen.
 class TypeConversionInst : public Instruction {
-  CFGValue Operand;
+  Value *Operand;
 public:
-  TypeConversionInst(ImplicitConversionExpr *E, CFGValue Operand);
+  TypeConversionInst(ImplicitConversionExpr *E, Value *Operand);
 
-  CFGValue getOperand() const { return Operand; }
+  Value *getOperand() const { return Operand; }
   
   static bool classof(const Value *I) {
     return I->getKind() == ValueKind::TypeConversion;
@@ -379,33 +379,33 @@ public:
 
 /// TupleInst - Represents a constructed tuple.
 class TupleInst : public Instruction {
-  CFGValue *getElementsStorage() {
-    return reinterpret_cast<CFGValue*>(this + 1);
+  Value **getElementsStorage() {
+    return reinterpret_cast<Value**>(this + 1);
   }
   unsigned NumArgs;
 
   /// Private constructor.  Because of the storage requirements of
   /// TupleInst, object creation goes through 'create()'.
-  TupleInst(Expr *E, ArrayRef<CFGValue> Elements);
-  static TupleInst *createImpl(Expr *E, ArrayRef<CFGValue> Elements, CFG &C);
+  TupleInst(Expr *E, ArrayRef<Value*> Elements);
+  static TupleInst *createImpl(Expr *E, ArrayRef<Value*> Elements, CFG &C);
 
 public:
   /// The elements referenced by this TupleInst.
-  MutableArrayRef<CFGValue> getElements() {
-    return MutableArrayRef<CFGValue>(getElementsStorage(), NumArgs);
+  MutableArrayRef<Value*> getElements() {
+    return MutableArrayRef<Value*>(getElementsStorage(), NumArgs);
   }
 
   /// The elements referenced by this TupleInst.
-  ArrayRef<CFGValue> getElements() const {
+  ArrayRef<Value*> getElements() const {
     return const_cast<TupleInst*>(this)->getElements();
   }
 
   /// Construct a TupleInst.  The two forms are used to ensure that these are
   /// only created for specific syntactic forms.
-  static TupleInst *create(TupleExpr *E, ArrayRef<CFGValue> Elements,CFG &C){
+  static TupleInst *create(TupleExpr *E, ArrayRef<Value*> Elements,CFG &C){
     return createImpl((Expr*)E, Elements, C);
   }
-  static TupleInst *create(TupleShuffleExpr *E, ArrayRef<CFGValue> Elements,
+  static TupleInst *create(TupleShuffleExpr *E, ArrayRef<Value*> Elements,
                            CFG &C) {
     return createImpl((Expr*)E, Elements, C);
   }
@@ -438,11 +438,11 @@ public:
 
 /// ScalarToTupleInst - Convert a scalar to a tuple.
 class ScalarToTupleInst : public Instruction {
-  CFGValue Operand;
+  Value *Operand;
 public:
-  ScalarToTupleInst(ScalarToTupleExpr *E, CFGValue Operand);
+  ScalarToTupleInst(ScalarToTupleExpr *E, Value *Operand);
 
-  CFGValue getOperand() const { return Operand; }
+  Value *getOperand() const { return Operand; }
 
   static bool classof(const Value *I) {
     return I->getKind() == ValueKind::ScalarToTuple;
@@ -451,13 +451,13 @@ public:
   
 /// TupleElementInst - Extract a numbered element out of a value of tuple type.
 class TupleElementInst : public Instruction {
-  CFGValue Operand;
+  Value *Operand;
   unsigned FieldNo;
 public:
-  TupleElementInst(TupleElementExpr *E, CFGValue Operand, unsigned FieldNo);
-  TupleElementInst(Type ResultTy, CFGValue Operand, unsigned FieldNo);
+  TupleElementInst(TupleElementExpr *E, Value *Operand, unsigned FieldNo);
+  TupleElementInst(Type ResultTy, Value *Operand, unsigned FieldNo);
   
-  CFGValue getOperand() const { return Operand; }
+  Value *getOperand() const { return Operand; }
   unsigned getFieldNo() const { return FieldNo; }
   
   static bool classof(const Value *I) {
@@ -474,12 +474,12 @@ public:
 /// This takes an lvalue and indexes over the pointer, striding by the type of
 /// the lvalue.  This is used to index into arrays of uniform elements.
 class IndexLValueInst : public Instruction {
-  CFGValue Operand;
+  Value *Operand;
   unsigned Index;
 public:
-  IndexLValueInst(TupleShuffleExpr *E, CFGValue Operand, unsigned Index);
+  IndexLValueInst(TupleShuffleExpr *E, Value *Operand, unsigned Index);
 
-  CFGValue getOperand() const { return Operand; }
+  Value *getOperand() const { return Operand; }
   unsigned getIndex() const { return Index; }
 
   static bool classof(const Value *I) {
@@ -533,7 +533,7 @@ public:
 /// ReturnInst - Representation of a ReturnStmt.
 class ReturnInst : public TermInst {
   /// The value to be returned.  This is never null.
-  CFGValue ReturnValue;
+  Value *ReturnValue;
   
 public:
   /// Constructs a ReturnInst representing an \b explicit return.
@@ -542,9 +542,9 @@ public:
   ///
   /// \param returnValue The value to be returned.
   ///
-  ReturnInst(ReturnStmt *S, CFGValue ReturnValue);
+  ReturnInst(ReturnStmt *S, Value *ReturnValue);
 
-  CFGValue getReturnValue() const { return ReturnValue; }
+  Value *getReturnValue() const { return ReturnValue; }
 
   SuccessorListTy getSuccessors() {
     // No Successors.
@@ -558,10 +558,10 @@ public:
 
 /// BranchInst - An unconditional branch.
 class BranchInst : public TermInst {
-  llvm::ArrayRef<CFGValue> Arguments;
+  llvm::ArrayRef<Value*> Arguments;
   CFGSuccessor DestBB;
 public:
-  typedef ArrayRef<CFGValue> ArgsTy;
+  typedef ArrayRef<Value*> ArgsTy;
   
   /// Construct an BranchInst that will branches to the specified block.
   BranchInst(BasicBlock *DestBB, CFG &C);
@@ -586,15 +586,15 @@ public:
 
 class CondBranchInst : public TermInst {
   /// The condition value used for the branch.
-  CFGValue Condition;
+  Value *Condition;
 
   CFGSuccessor DestBBs[2];
 public:
 
-  CondBranchInst(Stmt *TheStmt, CFGValue Condition,
+  CondBranchInst(Stmt *TheStmt, Value *Condition,
                  BasicBlock *TrueBB, BasicBlock *FalseBB);
 
-  CFGValue getCondition() const { return Condition; }
+  Value *getCondition() const { return Condition; }
 
   SuccessorListTy getSuccessors() {
     return DestBBs;

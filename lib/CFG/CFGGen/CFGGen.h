@@ -26,7 +26,7 @@ namespace Lowering {
   class Condition;
 
 class LLVM_LIBRARY_VISIBILITY CFGGen
-  : public ASTVisitor<CFGGen, CFGValue, void> {
+  : public ASTVisitor<CFGGen, Value*, void> {
 public:
   /// The CFG being constructed.
   CFG &C;
@@ -44,7 +44,7 @@ public:
   /// VarLocs - This is the memory location that an emitted variable is stored.
   /// Entries in this map are generated when a PatternBindingDecl is emitted
   /// that contains a reference, and queried for each DeclRefExpr.
-  llvm::DenseMap<ValueDecl*, CFGValue> VarLocs;
+  llvm::DenseMap<ValueDecl*, Value*> VarLocs;
     
 public:
   CFGGen(CFG &C)
@@ -95,7 +95,7 @@ public:
 
   void visitReturnStmt(ReturnStmt *S) {
     // FIXME: Should use empty tuple for "void" return.
-    CFGValue ArgV = S->hasResult() ? visit(S->getResult()) : (Instruction*) 0;
+    Value *ArgV = S->hasResult() ? visit(S->getResult()) : (Instruction*) 0;
     B.createReturn(S, ArgV);
   }
   
@@ -117,27 +117,27 @@ public:
   // Expressions
   //===--------------------------------------------------------------------===//
   
-  CFGValue visitExpr(Expr *E) {
+  Value *visitExpr(Expr *E) {
     E->dump();
     llvm_unreachable("Not yet implemented");
   }
   
-  CFGValue visitApplyExpr(ApplyExpr *E);
-  CFGValue visitDeclRefExpr(DeclRefExpr *E);
-  CFGValue visitIntegerLiteralExpr(IntegerLiteralExpr *E);
-  CFGValue visitFloatLiteralExpr(FloatLiteralExpr *E);
-  CFGValue visitCharacterLiteralExpr(CharacterLiteralExpr *E);
-  CFGValue visitStringLiteralExpr(StringLiteralExpr *E);
-  CFGValue visitLoadExpr(LoadExpr *E);
-  CFGValue visitMaterializeExpr(MaterializeExpr *E);
-  CFGValue visitRequalifyExpr(RequalifyExpr *E);
-  CFGValue visitFunctionConversionExpr(FunctionConversionExpr *E);
-  CFGValue visitParenExpr(ParenExpr *E);
-  CFGValue visitTupleExpr(TupleExpr *E);
-  CFGValue visitScalarToTupleExpr(ScalarToTupleExpr *E);
-  CFGValue visitTupleElementExpr(TupleElementExpr *E);
-  CFGValue visitTupleShuffleExpr(TupleShuffleExpr *E);
-  CFGValue visitTypeOfExpr(TypeOfExpr *E);
+  Value *visitApplyExpr(ApplyExpr *E);
+  Value *visitDeclRefExpr(DeclRefExpr *E);
+  Value *visitIntegerLiteralExpr(IntegerLiteralExpr *E);
+  Value *visitFloatLiteralExpr(FloatLiteralExpr *E);
+  Value *visitCharacterLiteralExpr(CharacterLiteralExpr *E);
+  Value *visitStringLiteralExpr(StringLiteralExpr *E);
+  Value *visitLoadExpr(LoadExpr *E);
+  Value *visitMaterializeExpr(MaterializeExpr *E);
+  Value *visitRequalifyExpr(RequalifyExpr *E);
+  Value *visitFunctionConversionExpr(FunctionConversionExpr *E);
+  Value *visitParenExpr(ParenExpr *E);
+  Value *visitTupleExpr(TupleExpr *E);
+  Value *visitScalarToTupleExpr(ScalarToTupleExpr *E);
+  Value *visitTupleElementExpr(TupleElementExpr *E);
+  Value *visitTupleShuffleExpr(TupleShuffleExpr *E);
+  Value *visitTypeOfExpr(TypeOfExpr *E);
   
   //===--------------------------------------------------------------------===//
   // Declarations

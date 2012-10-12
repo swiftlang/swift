@@ -121,18 +121,18 @@ AllocArrayInst::AllocArrayInst(TupleShuffleExpr *E, Type ElementType,
 }
 
 
-ApplyInst *ApplyInst::create(ApplyExpr *Expr, CFGValue Callee,
-                             ArrayRef<CFGValue> Args, CFG &C) {
+ApplyInst *ApplyInst::create(ApplyExpr *Expr, Value *Callee,
+                             ArrayRef<Value*> Args, CFG &C) {
   void *Buffer = C.allocate(sizeof(ApplyInst) +
-                            Args.size() * sizeof(CFGValue),
+                            Args.size() * sizeof(Value*),
                             llvm::AlignOf<ApplyInst>::Alignment);
   return ::new(Buffer) ApplyInst(Expr, Callee, Args);
 }
 
-ApplyInst::ApplyInst(ApplyExpr *Expr, CFGValue Callee, ArrayRef<CFGValue> Args)
+ApplyInst::ApplyInst(ApplyExpr *Expr, Value *Callee, ArrayRef<Value*> Args)
   : Instruction(ValueKind::Apply, Expr, Expr->getType()),
     Callee(Callee), NumArgs(Args.size()) {
-  memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(CFGValue));
+  memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(Value*));
 }
 
 ConstantRefInst::ConstantRefInst(DeclRefExpr *E)
@@ -201,28 +201,28 @@ StringRef StringLiteralInst::getValue() const {
 }
 
 
-LoadInst::LoadInst(LoadExpr *E, CFGValue LValue)
+LoadInst::LoadInst(LoadExpr *E, Value *LValue)
   : Instruction(ValueKind::Load, E, E->getType()), LValue(LValue) {
 }
 
 
-StoreInst::StoreInst(AssignStmt *S, CFGValue Src, CFGValue Dest)
+StoreInst::StoreInst(AssignStmt *S, Value *Src, Value *Dest)
   : Instruction(ValueKind::Store, S, getVoidType(Src->getType())),
     Src(Src), Dest(Dest), IsInitialization(false) {
 }
 
-StoreInst::StoreInst(VarDecl *VD, CFGValue Src, CFGValue Dest)
+StoreInst::StoreInst(VarDecl *VD, Value *Src, Value *Dest)
   : Instruction(ValueKind::Store, VD, getVoidType(Src->getType())),
     Src(Src), Dest(Dest), IsInitialization(true) {
 }
 
 
-StoreInst::StoreInst(MaterializeExpr *E, CFGValue Src, CFGValue Dest)
+StoreInst::StoreInst(MaterializeExpr *E, Value *Src, Value *Dest)
   : Instruction(ValueKind::Store, E, getVoidType(Src->getType())),
     Src(Src), Dest(Dest), IsInitialization(true) {
 }
 
-StoreInst::StoreInst(TupleShuffleExpr *E, CFGValue Src, CFGValue Dest)
+StoreInst::StoreInst(TupleShuffleExpr *E, Value *Src, Value *Dest)
   : Instruction(ValueKind::Store, E, getVoidType(Src->getType())),
     Src(Src), Dest(Dest), IsInitialization(true) {
   // This happens in a store to an array initializer for varargs tuple shuffle.
@@ -232,21 +232,21 @@ StoreInst::StoreInst(TupleShuffleExpr *E, CFGValue Src, CFGValue Dest)
 
 
 TypeConversionInst::TypeConversionInst(ImplicitConversionExpr *E,
-                                       CFGValue Operand)
+                                       Value *Operand)
   : Instruction(ValueKind::TypeConversion, E, E->getType()), Operand(Operand) {}
 
 
-TupleInst *TupleInst::createImpl(Expr *E, ArrayRef<CFGValue> Elements,
+TupleInst *TupleInst::createImpl(Expr *E, ArrayRef<Value*> Elements,
                                  CFG &C) {
   void *Buffer = C.allocate(sizeof(TupleInst) +
-                            Elements.size() * sizeof(CFGValue),
+                            Elements.size() * sizeof(Value*),
                             llvm::AlignOf<TupleInst>::Alignment);
   return ::new(Buffer) TupleInst(E, Elements);
 }
 
-TupleInst::TupleInst(Expr *E, ArrayRef<CFGValue> Elems)
+TupleInst::TupleInst(Expr *E, ArrayRef<Value*> Elems)
   : Instruction(ValueKind::Tuple, E, E->getType()), NumArgs(Elems.size()) {
-  memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(CFGValue));
+  memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(Value*));
 }
 
 TypeOfInst::TypeOfInst(TypeOfExpr *E)
@@ -262,17 +262,17 @@ Type TypeOfInst::getMetaType() const {
   return getExpr()->getType();
 }
 
-ScalarToTupleInst::ScalarToTupleInst(ScalarToTupleExpr *E, CFGValue Operand)
+ScalarToTupleInst::ScalarToTupleInst(ScalarToTupleExpr *E, Value *Operand)
   : Instruction(ValueKind::ScalarToTuple, E, E->getType()), Operand(Operand) {
 }
 
-TupleElementInst::TupleElementInst(TupleElementExpr *E, CFGValue Operand,
+TupleElementInst::TupleElementInst(TupleElementExpr *E, Value *Operand,
                                    unsigned FieldNo)
   : Instruction(ValueKind::TupleElement, E, E->getType()),
     Operand(Operand), FieldNo(FieldNo) {
 }
 
-TupleElementInst::TupleElementInst(Type ResultTy, CFGValue Operand,
+TupleElementInst::TupleElementInst(Type ResultTy, Value *Operand,
                                    unsigned FieldNo)
   : Instruction(ValueKind::TupleElement, (Expr*)nullptr, ResultTy),
     Operand(Operand), FieldNo(FieldNo) {
@@ -284,7 +284,7 @@ TupleElementInst::TupleElementInst(Type ResultTy, CFGValue Operand,
 // CFG-only instructions that don't have an AST analog
 //===----------------------------------------------------------------------===//
 
-IndexLValueInst::IndexLValueInst(TupleShuffleExpr *E, CFGValue Operand,
+IndexLValueInst::IndexLValueInst(TupleShuffleExpr *E, Value *Operand,
                                  unsigned Index)
   : Instruction(ValueKind::IndexLValue, E, Operand->getType()),
     Operand(Operand), Index(Index) {
@@ -311,7 +311,7 @@ UnreachableInst::UnreachableInst(CFG &C)
              C.getContext().TheEmptyTupleType) {
 }
 
-ReturnInst::ReturnInst(ReturnStmt *S, CFGValue ReturnValue)
+ReturnInst::ReturnInst(ReturnStmt *S, Value *ReturnValue)
   : TermInst(ValueKind::Return, S, getVoidType(ReturnValue->getType())),
     ReturnValue(ReturnValue) {
 }
@@ -322,7 +322,7 @@ BranchInst::BranchInst(BasicBlock *DestBB, CFG &C)
 }
 
 
-CondBranchInst::CondBranchInst(Stmt *TheStmt, CFGValue Condition,
+CondBranchInst::CondBranchInst(Stmt *TheStmt, Value *Condition,
                                BasicBlock *TrueBB, BasicBlock *FalseBB)
   : TermInst(ValueKind::CondBranch, TheStmt, getVoidType(Condition->getType())),
     Condition(Condition) {

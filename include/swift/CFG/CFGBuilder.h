@@ -117,7 +117,7 @@ public:
   }
 
 
-  ApplyInst *createApply(ApplyExpr *Expr, CFGValue Fn, ArrayRef<CFGValue> Args){
+  ApplyInst *createApply(ApplyExpr *Expr, Value *Fn, ArrayRef<Value*> Args){
     return insert(ApplyInst::create(Expr, Fn, Args, C));
   }
 
@@ -142,48 +142,48 @@ public:
     return insert(new StringLiteralInst(E));
   }
 
-  LoadInst *createLoad(LoadExpr *Expr, CFGValue LV) {
+  LoadInst *createLoad(LoadExpr *Expr, Value *LV) {
     return insert(new LoadInst(Expr, LV));
   }
 
-  StoreInst *createStore(AssignStmt *S, CFGValue Src, CFGValue DestLValue) {
+  StoreInst *createStore(AssignStmt *S, Value *Src, Value *DestLValue) {
     return insert(new StoreInst(S, Src, DestLValue));
   }
 
-  StoreInst *createInitialization(VarDecl *VD, CFGValue Src,
-                                  CFGValue DestLValue) {
+  StoreInst *createInitialization(VarDecl *VD, Value *Src,
+                                  Value *DestLValue) {
     return insert(new StoreInst(VD, Src, DestLValue));
   }
-  StoreInst *createInitialization(MaterializeExpr *E, CFGValue Src,
-                                  CFGValue DestLValue) {
+  StoreInst *createInitialization(MaterializeExpr *E, Value *Src,
+                                  Value *DestLValue) {
     return insert(new StoreInst(E, Src, DestLValue));
   }
-  StoreInst *createInitialization(TupleShuffleExpr *E, CFGValue Src,
-                                  CFGValue DestLValue) {
+  StoreInst *createInitialization(TupleShuffleExpr *E, Value *Src,
+                                  Value *DestLValue) {
     return insert(new StoreInst(E, Src, DestLValue));
   }
 
   TypeConversionInst *createTypeConversion(ImplicitConversionExpr *E,
-                                           CFGValue Op) {
+                                           Value *Op) {
     return insert(new TypeConversionInst(E, Op));
   }
 
-  TupleInst *createTuple(TupleExpr *Expr, ArrayRef<CFGValue> Elements) {
+  TupleInst *createTuple(TupleExpr *Expr, ArrayRef<Value*> Elements) {
     return insert(TupleInst::create(Expr, Elements, C));
   }
-  TupleInst *createTuple(TupleShuffleExpr *Expr, ArrayRef<CFGValue> Elements) {
+  TupleInst *createTuple(TupleShuffleExpr *Expr, ArrayRef<Value*> Elements) {
     return insert(TupleInst::create(Expr, Elements, C));
   }
 
-  ScalarToTupleInst *createScalarToTuple(ScalarToTupleExpr *Expr, CFGValue Op) {
+  ScalarToTupleInst *createScalarToTuple(ScalarToTupleExpr *Expr, Value *Op) {
     return insert(new ScalarToTupleInst(Expr, Op));
   }
 
-  TupleElementInst *createTupleElement(TupleElementExpr *E, CFGValue Operand,
+  TupleElementInst *createTupleElement(TupleElementExpr *E, Value *Operand,
                                        unsigned FieldNo) {
     return insert(new TupleElementInst(E, Operand, FieldNo));
   }
-  TupleElementInst *createTupleElement(Type ResultTy, CFGValue Operand,
+  TupleElementInst *createTupleElement(Type ResultTy, Value *Operand,
                                        unsigned FieldNo) {
     return insert(new TupleElementInst(ResultTy, Operand, FieldNo));
   }
@@ -196,7 +196,7 @@ public:
   // CFG-only instructions that don't have an AST analog
   //===--------------------------------------------------------------------===//
 
-  IndexLValueInst *createIndexLValue(TupleShuffleExpr *E, CFGValue Operand,
+  IndexLValueInst *createIndexLValue(TupleShuffleExpr *E, Value *Operand,
                                      unsigned Index) {
     return insert(new IndexLValueInst(E, Operand, Index));
   }
@@ -209,11 +209,11 @@ public:
     return insertTerminator(new UnreachableInst(C));
   }
 
-  ReturnInst *createReturn(ReturnStmt *Stmt, CFGValue ReturnValue) {
+  ReturnInst *createReturn(ReturnStmt *Stmt, Value *ReturnValue) {
     return insertTerminator(new ReturnInst(Stmt, ReturnValue));
   }
   
-  CondBranchInst *createCondBranch(Stmt *BranchStmt, CFGValue Cond,
+  CondBranchInst *createCondBranch(Stmt *BranchStmt, Value *Cond,
                                    BasicBlock *Target1, BasicBlock *Target2) {
     return insertTerminator(new CondBranchInst(BranchStmt, Cond,
                                                Target1, Target2));

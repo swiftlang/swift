@@ -44,8 +44,6 @@ First_##Id##Inst = FirstId, Last_##Id##Inst = LastId,
     void dump() const;
     void print(raw_ostream &OS) const;
   };
-
-  typedef Value* CFGValue;
 } // end namespace swift
 
 #endif

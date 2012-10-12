@@ -15,9 +15,9 @@
 using namespace swift;
 using namespace Lowering;
 
-CFGValue CFGGen::visitApplyExpr(ApplyExpr *E) {
-  CFGValue FnV = visit(E->getFn());
-  llvm::SmallVector<CFGValue, 10> ArgsV;
+Value *CFGGen::visitApplyExpr(ApplyExpr *E) {
+  Value *FnV = visit(E->getFn());
+  llvm::SmallVector<Value*, 10> ArgsV;
   
   // Special case Arg being a TupleExpr, to inline the arguments and
   // not create another instruction.
@@ -31,7 +31,7 @@ CFGValue CFGGen::visitApplyExpr(ApplyExpr *E) {
   return B.createApply(E, FnV, ArgsV);
 }
 
-CFGValue CFGGen::visitDeclRefExpr(DeclRefExpr *E) {
+Value *CFGGen::visitDeclRefExpr(DeclRefExpr *E) {
   // If this is a reference to a mutable decl, produce an lvalue.
   if (E->getType()->is<LValueType>()) {
     assert(VarLocs.count(E->getDecl()) && "VarDecl location not generated?");
@@ -42,68 +42,68 @@ CFGValue CFGGen::visitDeclRefExpr(DeclRefExpr *E) {
   return B.createConstantRef(E);
 }
 
-CFGValue CFGGen::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+Value *CFGGen::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
   return B.createIntegerLiteral(E);
 }
-CFGValue CFGGen::visitFloatLiteralExpr(FloatLiteralExpr *E) {
+Value *CFGGen::visitFloatLiteralExpr(FloatLiteralExpr *E) {
   return B.createFloatLiteral(E);
 }
-CFGValue CFGGen::visitCharacterLiteralExpr(CharacterLiteralExpr *E) {
+Value *CFGGen::visitCharacterLiteralExpr(CharacterLiteralExpr *E) {
   return B.createCharacterLiteral(E);
 }
-CFGValue CFGGen::visitStringLiteralExpr(StringLiteralExpr *E) {
+Value *CFGGen::visitStringLiteralExpr(StringLiteralExpr *E) {
   return B.createStringLiteral(E);
 }
 
-CFGValue CFGGen::visitLoadExpr(LoadExpr *E) {
-  CFGValue SubV = visit(E->getSubExpr());
+Value *CFGGen::visitLoadExpr(LoadExpr *E) {
+  Value *SubV = visit(E->getSubExpr());
   return B.createLoad(E, SubV);
 }
 
-CFGValue CFGGen::visitMaterializeExpr(MaterializeExpr *E) {
+Value *CFGGen::visitMaterializeExpr(MaterializeExpr *E) {
   // Evaluate the value, use it to initialize a new temporary and return the
   // temp's address.
-  CFGValue Value = visit(E->getSubExpr());
-  CFGValue TmpMem = B.createAllocTmp(E);
-  B.createInitialization(E, Value, TmpMem);
+  Value *V = visit(E->getSubExpr());
+  Value *TmpMem = B.createAllocTmp(E);
+  B.createInitialization(E, V, TmpMem);
   return TmpMem;
 }
 
 
-CFGValue CFGGen::visitRequalifyExpr(RequalifyExpr *E) {
+Value *CFGGen::visitRequalifyExpr(RequalifyExpr *E) {
   return B.createTypeConversion(E, visit(E->getSubExpr()));
 }
 
-CFGValue CFGGen::visitFunctionConversionExpr(FunctionConversionExpr *E) {
+Value *CFGGen::visitFunctionConversionExpr(FunctionConversionExpr *E) {
   return B.createTypeConversion(E, visit(E->getSubExpr()));
 }
 
-CFGValue CFGGen::visitParenExpr(ParenExpr *E) {
+Value *CFGGen::visitParenExpr(ParenExpr *E) {
   return visit(E->getSubExpr());
 }
 
-CFGValue CFGGen::visitTupleExpr(TupleExpr *E) {
-  llvm::SmallVector<CFGValue, 10> ArgsV;
+Value *CFGGen::visitTupleExpr(TupleExpr *E) {
+  llvm::SmallVector<Value*, 10> ArgsV;
   for (auto &I : E->getElements())
     ArgsV.push_back(visit(I));
   return B.createTuple(E, ArgsV);
 }
 
-CFGValue CFGGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
+Value *CFGGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
   return B.createScalarToTuple(E, visit(E->getSubExpr()));
 }
 
-CFGValue CFGGen::visitTupleElementExpr(TupleElementExpr *E) {
+Value *CFGGen::visitTupleElementExpr(TupleElementExpr *E) {
   return B.createTupleElement(E, visit(E->getBase()), E->getFieldNumber());
 }
 
-CFGValue CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
+Value *CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
   // TupleShuffle expands out to extracts+inserts.  Start by emitting the base
   // expression that we'll shuffle.
-  CFGValue Op = visit(E->getSubExpr());
+  Value *Op = visit(E->getSubExpr());
 
   // Then collect the new elements.
-  SmallVector<CFGValue, 8> ResultElements;
+  SmallVector<Value*, 8> ResultElements;
 
   // Loop over each result element to compute it.
   llvm::ArrayRef<TupleTypeElt> outerFields =
@@ -139,28 +139,28 @@ CFGValue CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
       E->getSubExpr()->getType()->getAs<TupleType>()->getFields();
 
     unsigned NumArrayElts = shuffleIndexIteratorEnd - shuffleIndexIterator;
-    CFGValue AllocArray = B.createAllocArray(E, outerField.getVarargBaseTy(),
+    Value *AllocArray = B.createAllocArray(E, outerField.getVarargBaseTy(),
                                              NumArrayElts);
 
     Type BaseLValue =
       AllocArray->getType()->getAs<TupleType>()->getElementType(1);
 
-    CFGValue BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
+    Value *BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
 
     unsigned CurElem = 0;
     while (shuffleIndexIterator != shuffleIndexIteratorEnd) {
       unsigned SourceField = *shuffleIndexIterator++;
 
-      CFGValue EltLoc = BasePtr;
+      Value *EltLoc = BasePtr;
       if (CurElem) EltLoc = B.createIndexLValue(E, EltLoc, CurElem);
 
       Type EltTy = InnerFields[SourceField].getType();
-      CFGValue EltVal = B.createTupleElement(EltTy, Op, SourceField);
+      Value *EltVal = B.createTupleElement(EltTy, Op, SourceField);
       B.createInitialization(E, EltVal, EltLoc);
       ++CurElem;
     }
 
-    CFGValue ObjectPtr =
+    Value *ObjectPtr =
       B.createTupleElement(C.getContext().TheObjectPointerType, AllocArray, 0);
     (void)ObjectPtr;
 
@@ -178,7 +178,7 @@ CFGValue CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
   return B.createTuple(E, ResultElements);
 }
 
-CFGValue CFGGen::visitTypeOfExpr(TypeOfExpr *E) {
+Value *CFGGen::visitTypeOfExpr(TypeOfExpr *E) {
   return B.createTypeOf(E);
 }
 

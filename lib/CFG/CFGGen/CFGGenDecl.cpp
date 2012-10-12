@@ -27,8 +27,8 @@ namespace {
 /// moment.
 struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
   CFGGen &Gen;
-  CFGValue Init;
-  InitPatternWithExpr(CFGGen &Gen, CFGValue Init) : Gen(Gen), Init(Init) {}
+  Value *Init;
+  InitPatternWithExpr(CFGGen &Gen, Value *Init) : Gen(Gen), Init(Init) {}
   
   // Paren & Typed patterns are noops, just look through them.
   void visitParenPattern(ParenPattern *P) {return visit(P->getSubPattern());}
@@ -42,7 +42,7 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
   // with the initial value.
   void visitNamedPattern(NamedPattern *P) {
     VarDecl *VD = P->getDecl();
-    CFGValue AllocVar = Gen.B.createAllocVar(VD);
+    Value *AllocVar = Gen.B.createAllocVar(VD);
     
     /// Remember that this is the memory location that we're emitting the
     /// decl to.
@@ -70,7 +70,7 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     // initializing and extract the interesting bits of Init out for each tuple
     // element.
     unsigned FieldNo = 0;
-    CFGValue TupleInit = Init;
+    Value *TupleInit = Init;
     for (auto &elt : P->getFields()) {
       Init = Gen.B.createTupleElement(elt.getPattern()->getType(), TupleInit,
                                       FieldNo++);

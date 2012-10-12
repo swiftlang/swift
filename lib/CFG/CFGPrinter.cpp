@@ -51,7 +51,7 @@ class CFGPrinter : public CFGVisitor<CFGPrinter> {
 
   llvm::DenseMap<const Instruction*, unsigned> InstructionToIDMap;
   ID getID(const Instruction *I);
-  ID getID(CFGValue V);
+  ID getID(const Value *V);
 
 public:
   CFGPrinter(raw_ostream &OS) : OS(OS) {
@@ -235,7 +235,7 @@ ID CFGPrinter::getID(const Instruction *Inst) {
   return R;
 }
 
-ID CFGPrinter::getID(CFGValue Val) {
+ID CFGPrinter::getID(const Value *Val) {
   // FIXME: Handle non-instruction values.
   return getID(cast<Instruction>(Val));
 }

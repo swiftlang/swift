@@ -97,7 +97,7 @@ void CFGGen::visitBraceStmt(BraceStmt *S) {
 
 /// emitAssignStmtRecursive - Used to destructure (potentially) recursive
 /// assignments into tuple expressions down to their scalar stores.
-static void emitAssignStmtRecursive(AssignStmt *S, CFGValue Value, Expr *Dest,
+static void emitAssignStmtRecursive(AssignStmt *S, Value *V, Expr *Dest,
                                     CFGGen &Gen) {
   // If the destination is a tuple, destructure.
   if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
@@ -110,13 +110,13 @@ static void emitAssignStmtRecursive(AssignStmt *S, CFGValue Value, Expr *Dest,
   }
   
   // Otherwise, emit the scalar assignment.
-  CFGValue DstV = Gen.visit(Dest);
-  Gen.B.createStore(S, Value, DstV);
+  Value *DstV = Gen.visit(Dest);
+  Gen.B.createStore(S, V, DstV);
 }
 
 
 void CFGGen::visitAssignStmt(AssignStmt *S) {
-  CFGValue SrcV = visit(S->getSrc());
+  Value *SrcV = visit(S->getSrc());
   
   // Handle tuple destinations by destructuring them if present.
   return emitAssignStmtRecursive(S, SrcV, S->getDest(), *this);

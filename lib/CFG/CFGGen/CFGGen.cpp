@@ -33,7 +33,7 @@ CFGGen::~CFGGen() {
   // hoist some logic from IRGen into a common place.
   B.createUnreachable();
 
-  //auto EmptyTuple = B.createTuple(nullptr, ArrayRef<CFGValue>());
+  //auto EmptyTuple = B.createTuple(nullptr, ArrayRef<Value*>());
   //B.createReturn(nullptr, EmptyTuple);
 }
 
