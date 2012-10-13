@@ -19,6 +19,12 @@ using namespace Lowering;
 // CFG Class implementation
 //===--------------------------------------------------------------------===//
 
+CFGGen::CFGGen(CFG &C, FuncExpr *FE)
+  : C(C), B(new (C) BasicBlock(&C), C), Cleanups(*this) {
+
+  emitProlog(FE);
+}
+
 /// CFGGen destructor - called when the entire AST has been visited.  This
 /// handles "falling off the end of the function" logic.
 CFGGen::~CFGGen() {
@@ -37,11 +43,10 @@ CFGGen::~CFGGen() {
   //B.createReturn(nullptr, EmptyTuple);
 }
 
-
 CFG *CFG::constructCFG(FuncExpr *FE) {
   CFG *C = new CFG(FE->getASTContext());
 
-  CFGGen(*C).visit(FE->getBody());
+  CFGGen(*C, FE).visit(FE->getBody());
 
   C->verify();
   return C;

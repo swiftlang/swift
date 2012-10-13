@@ -100,3 +100,12 @@ void CFGGen::visitPatternBindingDecl(PatternBindingDecl *D) {
   }
   InitPatternWithExpr(*this, Initializer).visit(D->getPattern());
 }
+
+void CFGGen::emitProlog(FuncExpr *FE) {
+  // Emit the argument variables.
+  for (auto &ParamPattern : FE->getParamPatterns())
+    InitPatternWithExpr(*this, nullptr).visit(ParamPattern);
+
+  // FIXME: The initializers should come from basic block arguments.
+}
+

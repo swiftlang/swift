@@ -47,12 +47,11 @@ public:
   llvm::DenseMap<ValueDecl*, Value*> VarLocs;
     
 public:
-  CFGGen(CFG &C)
-    : C(C), B(new (C) BasicBlock(&C), C), Cleanups(*this) {
-  }
-
+  CFGGen(CFG &C, FuncExpr *FE);
   ~CFGGen();
-  
+
+  void emitProlog(FuncExpr *FE);
+
   /// Retun a stable reference to the current cleanup.
   CleanupsDepth getCleanupsDepth() const {
     return Cleanups.getCleanupsDepth();
