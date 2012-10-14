@@ -65,21 +65,34 @@ static void emitAsCastTemporary(IRGenFunction &IGF, Expr *E,
 
 /// Answer the differs-by-abstraction question for the given
 /// function types.  See the comment below.
-static bool differsByAbstraction(IRGenModule &IGM,
-                                 AnyFunctionType *origTy,
-                                 AnyFunctionType *substTy,
-                                 ExplosionKind explosionLevel) {
+bool irgen::differsByAbstractionAsFunction(IRGenModule &IGM,
+                                           AnyFunctionType *origTy,
+                                           AnyFunctionType *substTy,
+                                           ExplosionKind explosionLevel,
+                                           unsigned uncurryLevel) {
   assert(origTy->isCanonical());
   assert(substTy->isCanonical());
 
   // Note that our type-system does not allow types to differ by
   // polymorphism.
 
-  // Arguments will be exploded.
-  if (differsByAbstractionInExplosion(IGM, CanType(origTy->getInput()),
-                                      CanType(substTy->getInput()),
-                                      explosionLevel))
-    return true;
+  while (true) {
+    // Arguments will be exploded.
+    if (differsByAbstractionInExplosion(IGM, CanType(origTy->getInput()),
+                                        CanType(substTy->getInput()),
+                                        explosionLevel))
+      return true;
+
+    // Stop processing things as arguments if we're out of uncurryings.
+    if (uncurryLevel == 0) break;
+
+    uncurryLevel--;
+    origTy = cast<AnyFunctionType>(CanType(origTy->getResult()));
+    substTy = cast<AnyFunctionType>(CanType(substTy->getResult()));
+
+    // Fast path.
+    if (origTy == substTy) return false;
+  }
 
   // For the result, consider whether it will be passed in memory or
   // exploded.
@@ -249,8 +262,9 @@ namespace {
     /// into this.
     bool visitAnyFunctionType(AnyFunctionType *origTy,
                               AnyFunctionType *substTy) {
-      return differsByAbstraction(IGM, origTy, substTy,
-                                  ExplosionKind::Minimal);
+      return differsByAbstractionAsFunction(IGM, origTy, substTy,
+                                            ExplosionKind::Minimal,
+                                            /*uncurry*/ 0);
     }
 
     // L-values go by the object type;  note that we ask the ordinary
@@ -455,18 +469,32 @@ namespace {
 
     void visitAnyFunctionType(AnyFunctionType *origTy,
                               AnyFunctionType *substTy) {
-      if (differsByAbstraction(IGF.IGM, origTy, substTy,
-                               ExplosionKind::Minimal))
+      if (differsByAbstractionAsFunction(IGF.IGM, origTy, substTy,
+                                         ExplosionKind::Minimal,
+                                         /*uncurry*/ 0))
         IGF.unimplemented(SourceLoc(), "remapping bound function type");
       In.transferInto(Out, 2);
     }
 
     void visitLValueType(LValueType *origTy, LValueType *substTy) {
-      if (differsByAbstractionInMemory(IGF.IGM,
-                                       CanType(origTy->getObjectType()),
-                                       CanType(substTy->getObjectType())))
+      CanType origObjectTy = CanType(origTy->getObjectType());
+      CanType substObjectTy = CanType(substTy->getObjectType());
+      if (differsByAbstractionInMemory(IGF.IGM, origObjectTy, substObjectTy))
         IGF.unimplemented(SourceLoc(), "remapping l-values");
-      In.transferInto(Out, 1);
+
+      ManagedValue substMV = In.claimNext();
+      if (origObjectTy == substObjectTy)
+        return Out.add(substMV);
+
+      // A bitcast will be sufficient.
+      auto &origObjectTI = IGF.IGM.getFragileTypeInfo(origObjectTy);
+      auto origPtrTy = origObjectTI.getStorageType()->getPointerTo();
+
+      auto substValue = substMV.getValue();
+      auto origValue =
+        IGF.Builder.CreateBitCast(substValue, origPtrTy,
+                                  substValue->getName() + ".reinterpret");
+      Out.add(ManagedValue(origValue, substMV.getCleanup()));
     }
 
     void visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
@@ -534,7 +562,7 @@ namespace {
 
     void visitLeafType(CanType origTy, CanType substTy) {
       assert(origTy == substTy);
-      Out.transferInto(In, IGF.IGM.getExplosionSize(origTy, In.getKind()));
+      In.transferInto(Out, IGF.IGM.getExplosionSize(origTy, In.getKind()));
     }
 
     /// The unsubstituted type is an archetype.  In explosion terms,
@@ -587,18 +615,32 @@ namespace {
 
     void visitAnyFunctionType(AnyFunctionType *origTy,
                               AnyFunctionType *substTy) {
-      if (differsByAbstraction(IGF.IGM, origTy, substTy,
-                               ExplosionKind::Minimal))
+      if (differsByAbstractionAsFunction(IGF.IGM, origTy, substTy,
+                                         ExplosionKind::Minimal,
+                                         /*uncurry*/ 0))
         IGF.unimplemented(SourceLoc(), "remapping bound function type");
       In.transferInto(Out, 2);
     }
 
     void visitLValueType(LValueType *origTy, LValueType *substTy) {
-      if (differsByAbstractionInMemory(IGF.IGM,
-                                       CanType(origTy->getObjectType()),
-                                       CanType(substTy->getObjectType())))
+      CanType origObjectTy = CanType(origTy->getObjectType());
+      CanType substObjectTy = CanType(substTy->getObjectType());
+      if (differsByAbstractionInMemory(IGF.IGM, origObjectTy, substObjectTy))
         IGF.unimplemented(SourceLoc(), "remapping l-values");
-      In.transferInto(Out, 1);
+
+      ManagedValue origMV = In.claimNext();
+      if (origObjectTy == substObjectTy)
+        return Out.add(origMV);
+
+      // A bitcast will be sufficient.
+      auto &substObjectTI = IGF.IGM.getFragileTypeInfo(substObjectTy);
+      auto substPtrTy = substObjectTI.getStorageType()->getPointerTo();
+
+      auto origValue = origMV.getValue();
+      auto substValue =
+        IGF.Builder.CreateBitCast(origValue, substPtrTy,
+                                  origValue->getName() + ".reinterpret");
+      Out.add(ManagedValue(substValue, origMV.getCleanup()));
     }
 
     void visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {

@@ -44,6 +44,7 @@
 #include "FunctionRef.h"
 #include "GenHeap.h"
 #include "GenMeta.h"
+#include "GenPoly.h"
 #include "GenType.h"
 #include "IndirectTypeInfo.h"
 #include "IRGenFunction.h"
@@ -1904,113 +1905,25 @@ namespace {
     llvm::Constant *ImplPtr;
     CanType ImplTy;
     CanType SignatureTy;
-    CanType SignatureResultTy;
-    CanType ImplResultTy;
-    SmallVector<AnyFunctionType *, 4> ImplTyAtUncurry;
+
+    ExplosionKind ExplosionLevel;
     unsigned UncurryLevel;
+
     ArrayRef<Substitution> Substitutions;
 
-    /// The return value needs to be returned via a fixed-size buffer.
-    bool HasAbstractedResult;
+    /// The first argument involves a lvalue-to-rvalue conversion.
+    bool HasAbstractedThis;
 
-    /// At least one of the arguments is abstracted.
-    bool HasAbstractedArg;
-
-    /// An argument of the implementation function, and how to
-    /// construct it from the witness parameters.  There's an entry
-    /// here for each possible "abstraction point", which includes
-    /// non-singleton tuples.
-    class Arg {
-    public:
-      enum Kind {
-        /// This argument is a placeholder for a tuple that could have
-        /// been abstracted, but is not.
-        DecomposedTuple,
-
-        /// This argument is nested within a type that's been abstracted.
-        Nested,
-
-        /// This argument is passed normally.
-        Direct,
-
-        /// This argument requires a bitcast but is otherwise passed
-        /// normally.
-        Bitcast,
-
-        /// This argument is passed to the witness abstractly and
-        /// needs to be exploded.
-        IndirectToDirect,
-
-        /// This argument is passed to the witness as an l-value and
-        /// needs to be loaded.
-        LValueToRValue,
-
-        /// This argument is ignored by the witness and needs to be
-        /// dropped.
-        Ignored
-      };
-
-    private:
-      Kind TheKind;
-      union {
-        const TypeInfo *TI;
-        llvm::PointerType *PtrTy;
-      };
-
-      static bool isTypeInfoKind(Kind kind) {
-        return (kind == Direct ||
-                kind == IndirectToDirect ||
-                kind == LValueToRValue ||
-                kind == Ignored);
-      }
-
-      static bool isPointerTypeKind(Kind kind) {
-        return (kind == Bitcast);
-      }
-
-      static bool isNonTriviallyAbstractedKind(Kind kind) {
-        return (kind == IndirectToDirect ||
-                kind == LValueToRValue ||
-                kind == Ignored);
-      }
-
-    public:
-      Arg(Kind kind) : TheKind(kind) {
-        assert(kind == DecomposedTuple || kind == Nested);
-      }
-      Arg(Kind kind, const TypeInfo &type) : TheKind(kind), TI(&type) {
-        assert(isTypeInfoKind(kind));
-      }
-      Arg(Kind kind, llvm::PointerType *type) : TheKind(kind), PtrTy(type) {
-        assert(isPointerTypeKind(kind));
-      }
-
-      Kind getKind() const { return TheKind; }
-      bool isNonTriviallyAbstracted() const {
-        return isNonTriviallyAbstractedKind(getKind());
-      }
-
-      const TypeInfo &getTypeInfo() const {
-        assert(isTypeInfoKind(getKind()));
-        return *TI;
-      }
-
-      llvm::PointerType *getPointerType() const {
-        assert(isPointerTypeKind(getKind()));
-        return PtrTy;
-      }
-    };
-
-    SmallVector<Arg, 16> Args;
-    SmallVector<unsigned, 4> UncurryClauseBegin;
-
-    unsigned NextParam;
+    /// The function involves any difference in abstraction.
+    bool HasAbstraction;
 
   public:
     WitnessBuilder(IRGenModule &IGM, llvm::Constant *impl,
-                   CanType implTy, CanType sigTy, unsigned uncurryLevel,
-                   ArrayRef<Substitution> subs)
-      : IGM(IGM), ImplPtr(impl), UncurryLevel(uncurryLevel),
+                   CanType implTy, CanType sigTy,
+                   ArrayRef<Substitution> subs,
+                   ExplosionKind explosionLevel, unsigned uncurryLevel)
+      : IGM(IGM), ImplPtr(impl),
+        ExplosionLevel(explosionLevel), UncurryLevel(uncurryLevel),
         Substitutions(subs) {
 
       implTy = implTy->getUnlabeledType(IGM.Context)->getCanonicalType();
@@ -2019,143 +1932,33 @@ namespace {
       sigTy = sigTy->getUnlabeledType(IGM.Context)->getCanonicalType();
       SignatureTy = sigTy;
 
-      // Find abstract parameters.
-      HasAbstractedArg = false;
-      for (unsigned i = 0; i != uncurryLevel + 1; ++i) {
-        AnyFunctionType *sigFnTy = cast<AnyFunctionType>(sigTy);
-        AnyFunctionType *implFnTy = cast<AnyFunctionType>(implTy);
-        ImplTyAtUncurry.push_back(implFnTy);
+      AnyFunctionType *sigFnTy = cast<AnyFunctionType>(sigTy);
+      AnyFunctionType *implFnTy = cast<AnyFunctionType>(implTy);
 
-        sigTy = CanType(sigFnTy->getResult());
-        implTy = CanType(implFnTy->getResult());
-
-        UncurryClauseBegin.push_back(Args.size());
-        findAbstractParameters(CanType(implFnTy->getInput()),
-                               CanType(sigFnTy->getInput()));
-      }
-
-      ImplResultTy = implTy;
-      SignatureResultTy = sigTy;
-      HasAbstractedResult = hasAbstractResult(sigTy);
-    }
-
-    /// Add entries to Args for all the abstraction points in this type.
-    void collectNestedArgs(Type param) {
-      Args.push_back(Arg(Arg::Nested));
-      if (TupleType *tuple = param->getAs<TupleType>()) {
-        for (auto &field : tuple->getFields())
-          collectNestedArgs(field.getType());
-      }
-    }
-
-    /// Find the abstract parameters.
-    void findAbstractParameters(CanType impl, CanType sig) {
-      // Walk recursively into tuples.
-      if (auto sigTuple = dyn_cast<TupleType>(sig)) {
-        // The tuple itself is a potential point of abstraction.
-        Args.push_back(Arg(Arg::DecomposedTuple));
-
-        auto sigFields = sigTuple->getFields();
-        auto implFields = cast<TupleType>(impl)->getFields();
-        assert(sigFields.size() == implFields.size());
-
-        for (unsigned i = 0, e = sigFields.size(); i != e; ++i)
-          findAbstractParameters(CanType(implFields[i].getType()),
-                                 CanType(sigFields[i].getType()));
+      // The first argument isn't necessarily a simple substitution.
+      // If so, we don't need to compute difference by abstraction.
+      if (isa<LValueType>(CanType(sigFnTy->getInput())) &&
+          !isa<LValueType>(CanType(implFnTy->getInput()))) {
+        HasAbstractedThis = true;
+        HasAbstraction = true;
         return;
       }
 
-      // Check whether we're directly matching an archetype.
-      if (isa<ArchetypeType>(sig)) {
-        // Count all the nested types.
-        collectNestedArgs(impl);
-
-        // That will include an entry for this type; remove that.
-        Args.pop_back();
-
-        // If the implementation type is passed indirectly anyway, we
-        // don't need any abstraction.
-        const TypeInfo &implTI = IGM.getFragileTypeInfo(impl);
-        ExplosionSchema schema = implTI.getSchema(ExplosionKind::Minimal);
-        if (schema.isSingleAggregate()) {
-          auto ptrTy = schema.begin()->getAggregateType()->getPointerTo();
-          Args.push_back(Arg(Arg::Bitcast, ptrTy));
-
-        // Otherwise, we have to do indirect-to-direct lowering.
-        } else {
-          Args.push_back(Arg(Arg::IndirectToDirect, implTI));
-          HasAbstractedArg = true;
-        }
-
-        return;
-      }
-
-      // Check for an l-value.  In some cases, we need an
-      // lvalue-to-rvalue abstraction.
-      if (isa<LValueType>(sig)) {
-        const TypeInfo &implTI = IGM.getFragileTypeInfo(impl);
-
-        // If we've got l-values on both sides, we can just directly convert.
-        if (isa<LValueType>(impl)) {
-          auto ptrTy = cast<llvm::PointerType>(implTI.getStorageType());
-          Args.push_back(Arg(Arg::Bitcast, ptrTy));
-
-        // Otherwise, assume this is 'this'-conversion, where the
-        // protocol user passes 'this' by reference but the
-        // implementation takes it by value.
-        } else {
-          Args.push_back(Arg(Arg::LValueToRValue, implTI));
-          HasAbstractedArg = true;
-        }
-        return;
-      }
-
-      const TypeInfo &implTI = IGM.getFragileTypeInfo(impl);
-
-      // The basic function representation doesn't change just because
-      // you involved an archetype, but we might need to translate
-      // function values to make the types work.
-      if (isa<FunctionType>(sig)) {
-        if (sig != impl) {
-          IGM.unimplemented(SourceLoc(), "can't rewrite function values!");
-        }
-
-        Args.push_back(Arg(Arg::Direct, implTI));
-        return;
-      }
-
-      // Passing a metatype might require dropping an argument.
-      if (auto sigMetatype = dyn_cast<MetaTypeType>(sig)) {
-        auto implMetatype = cast<MetaTypeType>(impl);
-        if (IGM.hasTrivialMetatype(CanType(implMetatype->getInstanceType())) &&
-            !IGM.hasTrivialMetatype(CanType(sigMetatype->getInstanceType()))) {
-          HasAbstractedArg = true;
-          Args.push_back(Arg(Arg::Ignored, implTI));
-        } else {
-          Args.push_back(Arg(Arg::Direct, implTI));
-        }
-        return;
-      }
-
-      // That's all the structural types, so the types really ought to
-      // match perfectly now.
-      assert(sig == impl);
-      Args.push_back(Arg(Arg::Direct, implTI));
-    }
-
-    /// If the given type includes an archetype, we need an abstracted
-    /// result because we have to return into a buffer.
-    bool hasAbstractResult(CanType sig) {
-      if (auto tuple = dyn_cast<TupleType>(sig))
-        for (auto &field : tuple->getFields())
-          if (hasAbstractResult(CanType(field.getType())))
-            return true;
-      return isa<ArchetypeType>(sig);
+      // Otherwise, do so.
+      // FIXME: the HACK here makes protocols work on generic types
+      // because we're emitting the witness table for the bound generic
+      // type rather than the unbound.  It's definitely not the right
+      // thing to do in general.
+      HasAbstractedThis = false;
+      HasAbstraction =
+        isa<PolymorphicFunctionType>(implFnTy) || // HACK
+        differsByAbstractionAsFunction(IGM, sigFnTy, implFnTy,
+                                       explosionLevel, uncurryLevel);
     }
 
     llvm::Constant *get() {
       // If we don't need any abstractions, we're golden.
-      if (!HasAbstractedResult && !HasAbstractedArg)
+      if (!HasAbstraction)
         return asOpaquePtr(IGM, ImplPtr);
 
       // Okay, mangle a name.
@@ -2170,9 +1973,9 @@ namespace {
       // Create the function.
       auto fnTy = IGM.getFunctionType(SignatureTy, ExplosionKind::Minimal,
                                       UncurryLevel, /*withData*/ false);
-      fn = llvm::Function::Create(fnTy, llvm::Function::LinkOnceODRLinkage,
+      fn = llvm::Function::Create(fnTy, llvm::Function::InternalLinkage,
                                   name.str(), &IGM.Module);
-      fn->setVisibility(llvm::Function::HiddenVisibility);
+      //fn->setVisibility(llvm::Function::HiddenVisibility);
 
       // Start building it.
       IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
@@ -2183,109 +1986,182 @@ namespace {
       return asOpaquePtr(IGM, fn);
     }
 
-    void emitThunk(IRGenFunction &IGF) {
-      Explosion outerArgs = IGF.collectParameters();
+  private:
+    struct ArgSite {
+      AnyFunctionType *SigFnType;
+      AnyFunctionType *ImplFnType;
 
-      const TypeInfo &innerResultTI = IGM.getFragileTypeInfo(ImplResultTy);
-      bool innerHasIndirectResult =
-        innerResultTI.getSchema(ExplosionKind::Minimal).requiresIndirectResult();
+      ArgSite(AnyFunctionType *sigFnType, AnyFunctionType *implFnType)
+        : SigFnType(sigFnType), ImplFnType(implFnType) {}
 
-      Address resultAddr;
-      if (HasAbstractedResult) {
-        llvm::Value *resultPtr = outerArgs.claimUnmanagedNext();
-        llvm::Type *resultPtrTy = innerResultTI.StorageType->getPointerTo();
-        resultPtr = IGF.Builder.CreateBitCast(resultPtr, resultPtrTy);
-        resultAddr = Address(resultPtr, innerResultTI.StorageAlignment);
-      } else if (innerHasIndirectResult) {
-        resultAddr = Address(outerArgs.claimUnmanagedNext(),
-                              innerResultTI.StorageAlignment);
+      CanType getSigInputType() const {
+        return CanType(SigFnType->getInput());
       }
 
-      // FIXME: Pass in the right types so that differsByAbstraction works
-      // correctly.
-      CallEmission emission(IGF,
-          Callee::forFreestandingFunction(ImplTy, ImplResultTy,
-                                          Substitutions, ImplPtr,
-                                          ExplosionKind::Minimal,
-                                          UncurryLevel));
-
-      // Walk backwards through the parameter clauses, forward the arguments.
-      std::vector<Explosion> innerArgs;
-      innerArgs.reserve(UncurryLevel + 1);
-      for (unsigned i = UncurryLevel + 1; i != 0; ) {
-        innerArgs.emplace_back(ExplosionKind::Minimal);
-        Explosion& innerArg = innerArgs.back();
-        unsigned clauseBegin = UncurryClauseBegin[--i];
-        unsigned clauseEnd =
-          (i == UncurryLevel ? Args.size() : UncurryClauseBegin[i+1]);
-
-        forwardArgs(IGF, outerArgs, innerArg,
-                    ArrayRef<Arg>(&Args[clauseBegin], clauseEnd - clauseBegin));
-        if (auto polyFn = dyn_cast<PolymorphicFunctionType>(ImplTyAtUncurry[i]))
-          emitPolymorphicArguments(IGF, polyFn, Substitutions, innerArg);
+      CanType getSigResultType() const {
+        return CanType(SigFnType->getResult());
       }
-      for (unsigned i = innerArgs.size(); i != 0; --i)
-        emission.addArg(innerArgs[i-1]);
-      
-      if (HasAbstractedResult || innerHasIndirectResult) {
-        // If the result needs to be in memory, emit it to memory.
-        emission.emitToMemory(resultAddr, innerResultTI);
-        IGF.Builder.CreateRetVoid();
-      } else {
-        // Otherwise, just forward the result in registers.
-        Explosion resultExplosion(ExplosionKind::Minimal);
-        emission.emitToExplosion(resultExplosion);
-        IGF.emitScalarReturn(resultExplosion);
+
+      CanType getImplInputType() const {
+        return CanType(ImplFnType->getInput());
+      }
+
+      CanType getImplResultType() const {
+        return CanType(ImplFnType->getResult());
+      }
+    };
+
+    void collectArgSites(AnyFunctionType *sigType,
+                         AnyFunctionType *implType,
+                         unsigned uncurryLevel,
+                         SmallVectorImpl<ArgSite> &out) {
+      out.push_back(ArgSite(sigType, implType));
+      if (uncurryLevel > 0) {
+        collectArgSites(cast<AnyFunctionType>(CanType(sigType->getResult())),
+                        cast<AnyFunctionType>(CanType(implType->getResult())),
+                        uncurryLevel - 1, out);
       }
     }
 
-    void forwardArgs(IRGenFunction &IGF, Explosion &outerArgs,
-                     Explosion &innerArgs, ArrayRef<Arg> techniques) {
-      for (auto &technique : techniques) {
-        switch (technique.getKind()) {
-        case Arg::DecomposedTuple: continue;
-        case Arg::Nested: continue;
+    void emitThunk(IRGenFunction &IGF) {
+      // Collect the types for the arg sites.
+      SmallVector<ArgSite, 4> argSites;
+      collectArgSites(cast<AnyFunctionType>(SignatureTy),
+                      cast<AnyFunctionType>(ImplTy),
+                      UncurryLevel,
+                      argSites);
 
-        // Currently, Ignored is only used for metatypes.
-        case Arg::Ignored:
-          outerArgs.ignoreUnmanaged(1);
-          continue;
+      // Collect the parameters.
+      Explosion sigParams = IGF.collectParameters();
 
-        case Arg::Direct:
-          technique.getTypeInfo().reexplode(IGF, outerArgs, innerArgs);
-          continue;
-
-        case Arg::Bitcast: {
-          llvm::Value *value = outerArgs.claimUnmanagedNext();
-          value = IGF.Builder.CreateBitCast(value, technique.getPointerType());
-          innerArgs.addUnmanaged(value);
-          continue;
-        }
-
-        case Arg::IndirectToDirect: {
-          const TypeInfo &innerTI = technique.getTypeInfo();
-          llvm::Value *rawAddr = outerArgs.claimUnmanagedNext();
-          rawAddr = IGF.Builder.CreateBitCast(rawAddr,
-                                   innerTI.getStorageType()->getPointerTo());
-
-          innerTI.loadAsTake(IGF, Address(rawAddr, innerTI.StorageAlignment),
-                             innerArgs);
-          continue;
-        }
-
-        case Arg::LValueToRValue: {
-          const TypeInfo &innerTI = technique.getTypeInfo();
-          llvm::Value *rawAddr = outerArgs.claimUnmanagedNext();
-          rawAddr = IGF.Builder.CreateBitCast(rawAddr,
-                                   innerTI.getStorageType()->getPointerTo());
-
-          innerTI.load(IGF, Address(rawAddr, innerTI.StorageAlignment),
-                       innerArgs);
-          continue;
-        }
-        }
-        llvm_unreachable("bad Arg technique kind");
+      // Peel off the result address if necessary.
+      auto &sigResultTI =
+        IGF.getFragileTypeInfo(argSites.back().getSigResultType());
+      llvm::Value *sigResultAddr = nullptr;
+      if (sigResultTI.getSchema(ExplosionLevel).requiresIndirectResult()) {
+        sigResultAddr = sigParams.claimUnmanagedNext();
       }
+
+      // Collect the parameter clauses and bind polymorphic parameters.
+      std::vector<Explosion> sigParamClauses;
+      sigParamClauses.reserve(UncurryLevel + 1);
+      for (unsigned i = 0, e = UncurryLevel + 1; i != e; ++i)
+        sigParamClauses.emplace_back(ExplosionLevel);
+
+      for (unsigned i = 0, e = UncurryLevel + 1; i != e; ++i) {
+        ArgSite &argSite = argSites[e - 1 - i];
+        Explosion &sigClause = sigParamClauses[e - 1 - i];
+
+        auto sigInputType = argSite.getSigInputType();
+        unsigned numParams = IGM.getExplosionSize(sigInputType, ExplosionLevel);
+        sigParams.transferInto(sigClause, numParams);
+
+        // Bind polymorphic parameters.
+        if (auto sigPoly = dyn_cast<PolymorphicFunctionType>(argSite.SigFnType))
+          emitPolymorphicParameters(IGF, sigPoly, sigParams);
+      }
+
+      // Begin our call emission.  CallEmission's builtin polymorphism
+      // support is based on around calling a more-abstract function,
+      // and we're actually calling a less-abstract function, so
+      // instead we're going to emit this as a call to a monomorphic
+      // function and do all our own translation.
+      // FIXME: virtual calls!
+      CallEmission emission(IGF,
+          Callee::forFreestandingFunction(ImplTy,
+                                          argSites.back().getImplResultType(),
+                                          ArrayRef<Substitution>(),
+                                          ImplPtr,
+                                          ExplosionLevel,
+                                          UncurryLevel));
+        
+      // Now actually pass the arguments.
+      for (unsigned i = 0, e = UncurryLevel + 1; i != e; ++i) {
+        ArgSite &argSite = argSites[i];
+        auto implInputType = argSite.getImplInputType();
+        auto sigInputType = argSite.getSigInputType();
+
+        Explosion &sigClause = sigParamClauses[i];
+        Explosion implArgs(ExplosionLevel);
+
+        // We need some special treatment for 'this'.
+        if (i == 0 && HasAbstractedThis) {
+          assert(isa<ClassType>(implInputType));
+          assert(isa<LValueType>(sigInputType));
+          assert(isa<ArchetypeType>(
+                   CanType(cast<LValueType>(sigInputType)->getObjectType())));
+
+          auto &implTI = IGF.getFragileTypeInfo(implInputType);
+
+          // It's an l-value, so the next value is the address.
+          auto sigThis = Address(sigClause.claimUnmanagedNext(),
+                                 implTI.StorageAlignment);
+
+          // Cast to T* and load.  In theory this might require
+          // remapping, but in practice the constraints (which we
+          // assert just above) don't permit that.
+          auto implPtrTy = implTI.getStorageType()->getPointerTo();
+          sigThis = IGF.Builder.CreateBitCast(sigThis, implPtrTy);
+          implTI.load(IGF, sigThis, implArgs);
+
+        // Otherwise, the impl type is the result of some substitution
+        // on the sig type.
+        } else {
+          reemitAsSubstituted(IGF, sigInputType, implInputType, Substitutions,
+                              sigClause, implArgs);
+        }
+
+        // Pass polymorphic arguments.
+        if (auto implPoly =
+              dyn_cast<PolymorphicFunctionType>(argSite.ImplFnType)) {
+          emitPolymorphicArguments(IGF, implPoly, Substitutions, implArgs);
+        }
+
+        emission.addArg(implArgs);
+      }
+
+      // Emit the call.
+      CanType sigResultType = argSites.back().getSigResultType();
+      CanType implResultType = argSites.back().getImplResultType();
+      auto &implResultTI = IGM.getFragileTypeInfo(implResultType);
+
+      // If we have a result address, emit to memory.
+      if (sigResultAddr) {
+        llvm::Value *implResultAddr;
+        if (differsByAbstractionInMemory(IGM, sigResultType, implResultType)) {
+          IGF.unimplemented(SourceLoc(),
+                            "remapping memory result in prototype witness");
+          implResultAddr = llvm::UndefValue::get(
+                              implResultTI.getStorageType()->getPointerTo());
+        } else {
+          implResultAddr =
+            IGF.Builder.CreateBitCast(sigResultAddr,
+                              implResultTI.getStorageType()->getPointerTo());
+        }
+
+        emission.emitToMemory(Address(implResultAddr,
+                                      implResultTI.StorageAlignment),
+                              implResultTI);
+
+        // TODO: remap here.
+
+        IGF.Builder.CreateRetVoid();
+        return;
+      }
+
+      // Otherwise, emit to explosion.
+      Explosion implResult(ExplosionLevel);
+      emission.emitToExplosion(implResult);
+
+      // Fast-path an exact match.
+      if (sigResultType == implResultType)
+        return IGF.emitScalarReturn(implResult);
+
+      // Otherwise, re-emit.
+      Explosion sigResult(ExplosionLevel);
+      reemitAsUnsubstituted(IGF, sigResultType, implResultType,
+                            Substitutions, implResult, sigResult);
+      IGF.emitScalarReturn(sigResult);
     }
 
     /// Mangle the name of the thunk this requires.
@@ -2294,25 +2170,7 @@ namespace {
 
       StringRef fnName =
         cast<llvm::Function>(ImplPtr->stripPointerCasts())->getName();
-      str << "_T";
-      str << (HasAbstractedResult ? "nr" : "na");
-
-      // Mangle the nontrivially-abstracted args as spans between the
-      // slots with nontrivial abstraction.
-      if (HasAbstractedArg) {
-        unsigned last = ~0U;
-        for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-          if (!Args[i].isNonTriviallyAbstracted()) continue;
-
-          unsigned n = (last == ~0U ? i : i - last - 1);
-          last = i;
-
-          mangleCount(str, n, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                              "abcdefghijklmnopqrstuvwxyz");
-        }
-      }
-
-      str << '_';
+      str << "_Tnk_";
       if (fnName.startswith("_T")) {
         str << fnName.substr(2);
       } else {
@@ -2457,8 +2315,8 @@ namespace {
 
     llvm::Constant *getWitness(llvm::Constant *fn, CanType fnTy,
                                CanType ifaceTy, unsigned uncurryLevel) {
-      return WitnessBuilder(IGM, fn, fnTy, ifaceTy, uncurryLevel,
-                            Substitutions).get();
+      return WitnessBuilder(IGM, fn, fnTy, ifaceTy, Substitutions,
+                            ExplosionKind::Minimal, uncurryLevel).get();
     }
   };
 }

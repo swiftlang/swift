@@ -114,7 +114,7 @@ static unsigned getNaturalUncurryLevel(ValueDecl *val) {
 
 /// Given a function type, return the formal result type at the given
 /// uncurrying level.  For 'a -> b -> c', this is 'b' at 0 and 'c' at 1.
-static CanType getResultType(CanType type, unsigned uncurryLevel) {
+CanType irgen::getResultType(CanType type, unsigned uncurryLevel) {
   do {
     type = CanType(cast<AnyFunctionType>(type)->getResult());
   } while (uncurryLevel--);

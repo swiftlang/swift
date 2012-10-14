@@ -26,6 +26,8 @@ namespace llvm {
 }
 
 namespace swift {
+class CanType;
+
 namespace irgen {
 
 class Size;
@@ -84,6 +86,10 @@ enum class ExplosionKind : unsigned {
   /// with specialized entry points for a function.
   Maximal
 };
+
+/// getResultType - Drill through N levels of function type to get to
+/// a formal result type.
+CanType getResultType(CanType fnType, unsigned uncurryLevel);
 
 /// An alignment value, in eight-bit units.
 class Alignment {
