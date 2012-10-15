@@ -203,6 +203,118 @@ bool TypeBase::isSpecialized() {
   }
 }
 
+/// \brief Gather the type variables in the given type, recursively.
+static void gatherTypeVariables(
+              Type wrappedTy, 
+              SmallVectorImpl<TypeVariableType *> &typeVariables,
+              llvm::SmallPtrSet<TypeVariableType *, 4> &knownTypeVariables) {
+  auto ty = wrappedTy.getPointer();
+  if (!ty)
+    return;
+
+  switch (ty->getKind()) {
+  case TypeKind::Error:
+  case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinObjectPointer:
+  case TypeKind::BuiltinObjCPointer:
+  case TypeKind::UnstructuredUnresolved:
+  case TypeKind::NameAlias:
+  case TypeKind::Identifier:
+  case TypeKind::Module:
+  case TypeKind::Protocol:
+  case TypeKind::Archetype:
+  case TypeKind::DeducibleGenericParam:
+  case TypeKind::ProtocolComposition:
+    // None of these types ever have type variables.
+    return;
+
+  case TypeKind::Paren:
+    return gatherTypeVariables(cast<ParenType>(ty)->getUnderlyingType(),
+                               typeVariables, knownTypeVariables);
+
+  case TypeKind::Tuple: {
+    const TupleType *tupleTy = cast<TupleType>(ty);
+    // FIXME: Always walk default arguments.
+    for (const auto &field : tupleTy->getFields()) {
+      gatherTypeVariables(field.getType(), typeVariables, knownTypeVariables);
+    }
+    return;
+  }
+
+  case TypeKind::OneOf:
+  case TypeKind::Struct:
+  case TypeKind::Class:
+    return gatherTypeVariables(cast<NominalType>(ty)->getParent(),
+                               typeVariables, knownTypeVariables);
+
+  case TypeKind::MetaType:
+    return gatherTypeVariables(cast<MetaTypeType>(ty)->getInstanceType(),
+                               typeVariables, knownTypeVariables);
+
+  case TypeKind::Substituted:
+    return gatherTypeVariables(cast<SubstitutedType>(ty)->getReplacementType(),
+                               typeVariables, knownTypeVariables);
+
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction: {
+    auto fnType = cast<AnyFunctionType>(ty);
+    gatherTypeVariables(fnType->getInput(), typeVariables, knownTypeVariables);
+    gatherTypeVariables(fnType->getResult(), typeVariables, knownTypeVariables);
+    return;
+  }
+
+  case TypeKind::Array:
+    return gatherTypeVariables(cast<ArrayType>(ty)->getBaseType(),
+                               typeVariables, knownTypeVariables);
+
+  case TypeKind::ArraySlice:
+    return gatherTypeVariables(cast<ArraySliceType>(ty)->getImplementationType(),
+                               typeVariables, knownTypeVariables);
+
+  case TypeKind::LValue:
+    return gatherTypeVariables(cast<LValueType>(ty)->getObjectType(),
+                               typeVariables, knownTypeVariables);
+
+  case TypeKind::UnboundGeneric:
+    return gatherTypeVariables(cast<UnboundGenericType>(ty)->getParent(),
+                               typeVariables, knownTypeVariables);
+
+  case TypeKind::BoundGeneric: {
+    auto boundTy = cast<BoundGenericType>(ty);
+    gatherTypeVariables(boundTy->getParent(), typeVariables, knownTypeVariables);
+    for (auto arg : boundTy->getGenericArgs())
+      gatherTypeVariables(arg, typeVariables, knownTypeVariables);
+    return;
+  }
+
+  case TypeKind::TypeVariable: {
+    auto typeVar = cast<TypeVariableType>(ty);
+    if (knownTypeVariables.insert(typeVar))
+      typeVariables.push_back(typeVar);
+    return;
+  }
+  }
+
+  llvm_unreachable("Unhandling type kind");
+}
+
+bool TypeBase::hasTypeVariable(
+       SmallVectorImpl<TypeVariableType *> &typeVariables) {
+  typeVariables.clear();
+
+  // If we know we don't have any type variables, we're done.
+  if (!hasTypeVariable())
+    return false;
+
+  llvm::SmallPtrSet<TypeVariableType *, 4> knownTypeVariables;
+  gatherTypeVariables(this, typeVariables, knownTypeVariables);
+  assert(!typeVariables.empty() && "Did not find type variables!");
+  return true;
+}
+
+
 ClassDecl *TypeBase::getClassOrBoundGenericClass() {
   if (auto classTy = getAs<ClassType>())
     return classTy->getDecl();

@@ -44,6 +44,7 @@ namespace swift {
   class OneOfElementDecl;
   class StructDecl;
   class ProtocolDecl;
+  class TypeVariableType;
   class ValueDecl;
   class Module;
   class ProtocolConformance;
@@ -175,9 +176,15 @@ public:
   /// the type occurs.
   bool isUnresolvedType() const;
 
-  /// \brief hasTypeVariable - Determines whether this type involves a
-  /// type variable.
+  /// \brief Determine whether this type involves a type variable.
   bool hasTypeVariable() const;
+
+  /// \brief Determine whether this type involves a type variable and compute the
+  /// set of type variables that occur within this type.
+  ///
+  /// \param typeVariables This vector is populated with the set of
+  /// type variables referenced by this type.
+  bool hasTypeVariable(SmallVectorImpl<TypeVariableType *> &typeVariables);
 
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to
