@@ -16,7 +16,7 @@ LIBRARYNAME := swift_runtime
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
 SWIFT_SOURCES := Bool.swift File.swift FixedPoint.swift FloatingPoint.swift Misc.swift \
-                 String.swift Dictionary.swift Vector.swift Algorithm.swift demangle.swift
+                 String.swift Dictionary.swift Vector.swift Algorithm.swift Demangle.swift
 SOURCES := FastEntryPoints.s Alloc.cpp KnownMetadata.cpp Metadata.cpp \
 	   Stubs.cpp ObjCBridge.mm swift.swift
 NO_BUILD_ARCHIVE := 1

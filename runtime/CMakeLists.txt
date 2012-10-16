@@ -10,7 +10,7 @@ set(SWIFTLIB_SOURCES
     Dictionary.swift
     Vector.swift
     Algorithm.swift
-    demangle.swift)
+    Demangle.swift)
 
 add_custom_command(
   OUTPUT ${CMAKE_BINARY_DIR}/lib/swift.swift
