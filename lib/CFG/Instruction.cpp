@@ -238,16 +238,18 @@ TypeConversionInst::TypeConversionInst(ImplicitConversionExpr *E,
 }
 
 
-TupleInst *TupleInst::createImpl(Expr *E, ArrayRef<Value*> Elements,
+TupleInst *TupleInst::createImpl(Expr *E, Type Ty, ArrayRef<Value*> Elements,
                                  CFG &C) {
+  if (E) Ty = E->getType();
+
   void *Buffer = C.allocate(sizeof(TupleInst) +
                             Elements.size() * sizeof(Value*),
                             llvm::AlignOf<TupleInst>::Alignment);
-  return ::new(Buffer) TupleInst(E, Elements);
+  return ::new(Buffer) TupleInst(E, Ty, Elements);
 }
 
-TupleInst::TupleInst(Expr *E, ArrayRef<Value*> Elems)
-  : Instruction(ValueKind::TupleInst, E, E->getType()), NumArgs(Elems.size()) {
+TupleInst::TupleInst(Expr *E, Type Ty, ArrayRef<Value*> Elems)
+  : Instruction(ValueKind::TupleInst, E, Ty), NumArgs(Elems.size()) {
   memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(Value*));
 }
 

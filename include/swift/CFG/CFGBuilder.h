@@ -174,6 +174,9 @@ public:
   TupleInst *createTuple(TupleShuffleExpr *Expr, ArrayRef<Value*> Elements) {
     return insert(TupleInst::create(Expr, Elements, C));
   }
+  TupleInst *createTuple(Type Ty, ArrayRef<Value*> Elements) {
+    return insert(TupleInst::create(Ty, Elements, C));
+  }
 
   ScalarToTupleInst *createScalarToTuple(ScalarToTupleExpr *Expr, Value *Op) {
     return insert(new ScalarToTupleInst(Expr, Op));

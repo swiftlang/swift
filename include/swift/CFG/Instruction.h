@@ -386,8 +386,9 @@ class TupleInst : public Instruction {
 
   /// Private constructor.  Because of the storage requirements of
   /// TupleInst, object creation goes through 'create()'.
-  TupleInst(Expr *E, ArrayRef<Value*> Elements);
-  static TupleInst *createImpl(Expr *E, ArrayRef<Value*> Elements, CFG &C);
+  TupleInst(Expr *E, Type Ty, ArrayRef<Value*> Elements);
+  static TupleInst *createImpl(Expr *E, Type Ty,
+                               ArrayRef<Value*> Elements, CFG &C);
 
 public:
   /// The elements referenced by this TupleInst.
@@ -403,11 +404,14 @@ public:
   /// Construct a TupleInst.  The two forms are used to ensure that these are
   /// only created for specific syntactic forms.
   static TupleInst *create(TupleExpr *E, ArrayRef<Value*> Elements,CFG &C){
-    return createImpl((Expr*)E, Elements, C);
+    return createImpl((Expr*)E, Type(), Elements, C);
   }
   static TupleInst *create(TupleShuffleExpr *E, ArrayRef<Value*> Elements,
                            CFG &C) {
-    return createImpl((Expr*)E, Elements, C);
+    return createImpl((Expr*)E, Type(), Elements, C);
+  }
+  static TupleInst *create(Type Ty, ArrayRef<Value*> Elements, CFG &C) {
+    return createImpl(nullptr, Ty, Elements, C);
   }
 
   static bool classof(const Value *I) {
