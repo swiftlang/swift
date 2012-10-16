@@ -84,10 +84,10 @@ static AllocToken getAllocToken(IRGenModule &IGM, uint64_t size) {
   llvm_unreachable("everything is terrible");
 }
 
-static llvm::AttrListPtr getAllocAttrs() {
+static llvm::AttrListPtr getAllocAttrs(llvm::LLVMContext &ctx) {
   llvm::AttributeWithIndex attrValues[] = {
-    llvm::AttributeWithIndex::get(0, llvm::Attributes::NoAlias),
-    llvm::AttributeWithIndex::get(~0, llvm::Attributes::NoUnwind)
+    llvm::AttributeWithIndex::get(ctx, 0, llvm::Attributes::NoAlias),
+    llvm::AttributeWithIndex::get(ctx, ~0, llvm::Attributes::NoUnwind)
   };
   return llvm::AttrListPtr::get(attrValues);
 }
@@ -96,7 +96,7 @@ static llvm::Value *emitAllocatingCall(IRGenFunction &IGF,
                                        llvm::Value *fn,
                                        std::initializer_list<llvm::Value*> args,
                                        const llvm::Twine &name) {
-  static auto allocAttrs = getAllocAttrs();
+  static auto allocAttrs = getAllocAttrs(IGF.IGM.LLVMContext);
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, makeArrayRef(args.begin(), args.size()));
   call->setCallingConv(IGF.IGM.RuntimeCC);

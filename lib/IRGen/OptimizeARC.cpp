@@ -114,7 +114,7 @@ static RT_Kind classifyInstruction(const Instruction &I) {
 static Constant *getRetain(Function &F, Type *ObjectPtrTy, Constant *&Cache) {
   if (Cache) return Cache;
   
-  auto AttrList = AttrListPtr::get(AttributeWithIndex::get(~0U,
+  auto AttrList = AttrListPtr::get(AttributeWithIndex::get(F.getContext(), ~0U,
                                                          Attributes::NoUnwind));
 
   Module *M = F.getParent();
@@ -131,8 +131,8 @@ static Constant *getRetainNoResult(Function &F, Type *ObjectPtrTy,
   if (Cache) return Cache;
  
   AttributeWithIndex Attrs[] = {
-    AttributeWithIndex::get(1, Attributes::NoCapture),
-    AttributeWithIndex::get(~0U, Attributes::NoUnwind)
+    AttributeWithIndex::get(F.getContext(), 1, Attributes::NoCapture),
+    AttributeWithIndex::get(F.getContext(), ~0U, Attributes::NoUnwind)
   };
   auto AttrList = AttrListPtr::get(Attrs);
   Module *M = F.getParent();
@@ -150,7 +150,7 @@ static Constant *getRetainAndReturnThree(Function &F, Type *ObjectPtrTy,
   if (Cache) return Cache;
   
   AttributeWithIndex Attrs[] = {
-    AttributeWithIndex::get(~0U, Attributes::NoUnwind)
+    AttributeWithIndex::get(F.getContext(), ~0U, Attributes::NoUnwind)
   };
   auto AttrList = AttrListPtr::get(Attrs);
   Module *M = F.getParent();

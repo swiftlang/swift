@@ -351,17 +351,19 @@ static void setHelperAttributesForAggResult(llvm::CallInst *call,
 
   // Don't set 'sret' unless this is also the formal result.
   if (!isFormalResult) {
-    attrs.push_back(llvm::AttributeWithIndex::get(1,llvm::Attributes::NoAlias));
+    attrs.push_back(llvm::AttributeWithIndex::get(call->getContext(),
+                                                  1,llvm::Attributes::NoAlias));
   } else {
     const static llvm::Attributes::AttrVal resultAttrs[] = {
       llvm::Attributes::NoAlias,
       llvm::Attributes::StructRet
     };
-    attrs.push_back(llvm::AttributeWithIndex::get(1, resultAttrs));
+    attrs.push_back(llvm::AttributeWithIndex::get(call->getContext(),
+                                                  1, resultAttrs));
   }
 
   // Set as nounwind.
-  attrs.push_back(llvm::AttributeWithIndex::get(~0,
+  attrs.push_back(llvm::AttributeWithIndex::get(call->getContext(), ~0,
                                                 llvm::Attributes::NoUnwind));
 
   call->setAttributes(llvm::AttrListPtr::get(attrs));
@@ -371,7 +373,7 @@ static void setHelperAttributesForAggResult(llvm::CallInst *call,
 static void setHelperAttributes(llvm::CallInst *call) {
   // Set as nounwind.
   llvm::SmallVector<llvm::AttributeWithIndex, 1> attrs;
-  attrs.push_back(llvm::AttributeWithIndex::get(~0,
+  attrs.push_back(llvm::AttributeWithIndex::get(call->getContext(), ~0,
                                                 llvm::Attributes::NoUnwind));
 
   call->setAttributes(llvm::AttrListPtr::get(attrs));

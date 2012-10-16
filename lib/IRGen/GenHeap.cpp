@@ -348,7 +348,8 @@ static llvm::Value *checkOverflow(IRGenFunction &IGF,
   llvm::CallInst *resultWithOverflow =
     IGF.Builder.CreateCall2(intrinsic, lhs, rhs);
   resultWithOverflow->setAttributes(
-                           llvm::Intrinsic::getAttributes(intrinsicID));
+                           llvm::Intrinsic::getAttributes(IGF.IGM.LLVMContext,
+                                                          intrinsicID));
 
   llvm::Value *result =
     IGF.Builder.CreateExtractValue(resultWithOverflow, 0);

@@ -143,7 +143,7 @@ llvm::CallingConv::ID irgen::expandAbstractCC(IRGenModule &IGM,
       llvm::Attributes::StructRet,
       llvm::Attributes::NoAlias
     };
-    attrs.push_back(llvm::AttributeWithIndex::get(1, tmp));
+    attrs.push_back(llvm::AttributeWithIndex::get(IGM.LLVMContext, 1, tmp));
   }
 
   switch (convention) {
