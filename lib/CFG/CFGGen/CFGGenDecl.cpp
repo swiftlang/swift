@@ -43,6 +43,14 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
   // with the initial value.
   void visitNamedPattern(NamedPattern *P) {
     VarDecl *VD = P->getDecl();
+
+    // If this is a [byref] argument, just use the argument lvalue as our
+    // address.
+    if (VD->getType()->is<LValueType>()) {
+      Gen.VarLocs[VD] = Init;
+      return;
+    }
+
     Value *AllocVar = Gen.B.createAllocVar(VD);
     
     /// Remember that this is the memory location that we're emitting the
