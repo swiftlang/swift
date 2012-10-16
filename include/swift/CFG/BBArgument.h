@@ -24,10 +24,8 @@ class BBArgument : public Value {
 
   BasicBlock *ParentBB;
 public:
-  explicit BBArgument(Type Ty, BasicBlock *ParentBB)
-    : Value(ValueKind::BBArgument, Ty), ParentBB(ParentBB) {
-  }
-
+  explicit BBArgument(Type Ty, BasicBlock *ParentBB);
+  
   BasicBlock *getParent() { return ParentBB; }
   const BasicBlock *getParent() const { return ParentBB; }
 

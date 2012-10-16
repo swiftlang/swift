@@ -13,6 +13,7 @@
 #include "swift/CFG/CFG.h"
 using namespace swift;
 
-CFG::~CFG() {}
+CFG::~CFG() {
+}
 
 

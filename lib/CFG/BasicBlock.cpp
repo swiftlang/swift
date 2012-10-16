@@ -15,8 +15,22 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/CFG/BasicBlock.h"
+#include "swift/CFG/BBArgument.h"
 #include "swift/CFG/CFG.h"
 using namespace swift;
+
+//===----------------------------------------------------------------------===//
+// BBArgument Implementation
+//===----------------------------------------------------------------------===//
+
+BBArgument::BBArgument(Type Ty, BasicBlock *ParentBB)
+  : Value(ValueKind::BBArgument, Ty), ParentBB(ParentBB) {
+  ParentBB->addArgument(this);
+}
+
+//===----------------------------------------------------------------------===//
+// BasicBlock Implementation
+//===----------------------------------------------------------------------===//
 
 BasicBlock::BasicBlock(CFG *ParentCFG, const char *Name)
   : ParentCFG(ParentCFG), PredList(0) {
@@ -25,7 +39,6 @@ BasicBlock::BasicBlock(CFG *ParentCFG, const char *Name)
   // FIXME: Drop the name on the floor for now.
 }
 BasicBlock::~BasicBlock() {}
-
 
 
 /// eraseFromParent - This method unlinks 'this' from the containing CFG and

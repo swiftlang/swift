@@ -127,6 +127,11 @@ public:
   static InstListType BasicBlock::*getSublistAccess() {
     return &BasicBlock::InstList;
   }
+
+private:
+  friend class BBArgument;
+  /// BBArgument's ctor adds it to the argument list of this block.
+  void addArgument(BBArgument *Arg) { BBArgList.push_back(Arg); }
 };
 
 } // end swift namespace
