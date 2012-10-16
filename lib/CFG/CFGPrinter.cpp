@@ -70,9 +70,11 @@ public:
 
     OS << ":\t";
 
-    OS << " ; Preds:";
-    for (auto BBI = BB->pred_begin(), E = BB->pred_end(); BBI != E; ++BBI)
-      OS << ' ' << getID(*BBI);
+    if (!BB->pred_empty()) {
+      OS << " ; Preds:";
+      for (auto BBI = BB->pred_begin(), E = BB->pred_end(); BBI != E; ++BBI)
+        OS << ' ' << getID(*BBI);
+    }
     OS << '\n';
 
     for (const Instruction &I : *BB)
