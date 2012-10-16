@@ -93,6 +93,11 @@ Value *CFGGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
   return B.createScalarToTuple(E, visit(E->getSubExpr()));
 }
 
+Value *CFGGen::visitAddressOfExpr(AddressOfExpr *E) {
+  return visit(E->getSubExpr());
+}
+
+
 Value *CFGGen::visitTupleElementExpr(TupleElementExpr *E) {
   return B.createTupleElement(E, visit(E->getBase()), E->getFieldNumber());
 }
