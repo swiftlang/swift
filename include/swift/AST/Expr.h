@@ -1158,7 +1158,7 @@ public:
 ///
 /// An example:
 /// \code
-/// func identity(x : T) -> T { return x }
+/// func identity<T>(x : T) -> T { return x }
 ///
 /// var i : Int = identity(17) // 'identity' is specialized to (x : Int) -> Int
 /// \endcode
