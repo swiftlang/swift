@@ -12,6 +12,7 @@
 
 #include "CFGGen.h"
 #include "Scope.h"
+#include "swift/CFG/BBargument.h"
 #include "swift/AST/AST.h"
 using namespace swift;
 using namespace Lowering;
@@ -31,8 +32,8 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
   InitPatternWithExpr(CFGGen &Gen, Value *Init) : Gen(Gen), Init(Init) {}
   
   // Paren & Typed patterns are noops, just look through them.
-  void visitParenPattern(ParenPattern *P) {return visit(P->getSubPattern());}
-  void visitTypedPattern(TypedPattern *P) {return visit(P->getSubPattern());}
+  void visitParenPattern(ParenPattern *P) { visit(P->getSubPattern()); }
+  void visitTypedPattern(TypedPattern *P) { visit(P->getSubPattern()); }
   
   // AnyPatterns (i.e, _) don't require any further codegen beyond emitting the
   // initializer.
@@ -101,11 +102,49 @@ void CFGGen::visitPatternBindingDecl(PatternBindingDecl *D) {
   InitPatternWithExpr(*this, Initializer).visit(D->getPattern());
 }
 
+
+namespace {
+/// ArgumentCreatorVisitor - A visitor for traversing a pattern and creating
+/// BBArgument's for each pattern variable.  This is used to create function
+/// arguments.
+struct ArgumentCreatorVisitor :
+  public PatternVisitor<ArgumentCreatorVisitor, Value*> {
+  CFG &C;
+  ArgumentCreatorVisitor(CFG &C) : C(C) {}
+
+  // Paren & Typed patterns are noops, just look through them.
+  Value *visitParenPattern(ParenPattern *P) {return visit(P->getSubPattern());}
+  Value *visitTypedPattern(TypedPattern *P) {return visit(P->getSubPattern());}
+
+  // Bind to a tuple pattern by first trying to see if we can emit
+  // the initializers independently.
+  Value *visitTuplePattern(TuplePattern *P) {
+    SmallVector<Value*, 4> Elements;
+    for (auto &elt : P->getFields())
+      Elements.push_back(visit(elt.getPattern()));
+
+    CFGBuilder B(C.begin(), C);
+    return B.createTuple(P->getType(), Elements);
+  }
+
+  Value *visitAnyPattern(AnyPattern *P) {
+    return new (C) BBArgument(P->getType(), C.begin());
+  }
+
+  Value *visitNamedPattern(NamedPattern *P) {
+    return new (C) BBArgument(P->getType(), C.begin());
+  }
+};
+} // end anonymous namespace
+
+
 void CFGGen::emitProlog(FuncExpr *FE) {
   // Emit the argument variables.
-  for (auto &ParamPattern : FE->getParamPatterns())
-    InitPatternWithExpr(*this, nullptr).visit(ParamPattern);
-
-  // FIXME: The initializers should come from basic block arguments.
+  for (auto &ParamPattern : FE->getParamPatterns()) {
+    // Add the BBArgument's and collect them as a Value.
+    Value *ArgInit = ArgumentCreatorVisitor(C).visit(ParamPattern);
+    // Use the value to initialize a (mutable) variable allocation.
+    InitPatternWithExpr(*this, ArgInit).visit(ParamPattern);
+  }
 }
 
