@@ -98,30 +98,6 @@ extern "C" bool _TSb13getLogicValuefRSbFT_Bi1(bool* b) {
   return *b;
 }
 
-// FIXME: load_protocol and store_protocol are extremely ugly hacks.
-struct protocol {
-  void **witness_table;
-  char buffer[24];
-};
-
-extern "C"
-void
-load_protocol(protocol *retval, protocol *p) {
-  retval->witness_table = p->witness_table;
-  typedef void* (*copyTy)(void*, void*, void**);
-  copyTy initializeBufferWithCopyOfBuffer = (copyTy)(size_t)retval->witness_table[1];
-  initializeBufferWithCopyOfBuffer(&retval->buffer,&p->buffer,retval->witness_table);
-}
-
-extern "C"
-void
-store_protocol(protocol *value, protocol *p) {
-  p->witness_table = value->witness_table;
-  typedef void* (*copyTy)(void*, void*, void**);
-  copyTy initializeBufferWithCopyOfBuffer = (copyTy)(size_t)value->witness_table[1];
-  initializeBufferWithCopyOfBuffer(&p->buffer,&value->buffer,value->witness_table);
-}
-
 static bool
 _swift_replOutputIsUTF8(void) {
   const char *lang = getenv("LANG");
