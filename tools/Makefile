@@ -11,7 +11,7 @@
 ##===----------------------------------------------------------------------===##
 
 SWIFT_LEVEL := ..
-DIRS := swift
+DIRS := swift httpd
 
 include $(SWIFT_LEVEL)/../../Makefile.config
 
