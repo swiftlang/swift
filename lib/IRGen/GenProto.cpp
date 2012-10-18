@@ -265,13 +265,13 @@ namespace {
 
     /// Given the offset of the buffer within an existential type.
     Size getBufferOffset(IRGenModule &IGM) const {
-      return IGM.getPointerSize() * NumTables;
+      return IGM.getPointerSize() * (NumTables + 1);
     }
 
     /// Given the address of an existential object, drill down to the
     /// buffer.
     Address projectExistentialBuffer(IRGenFunction &IGF, Address addr) const {
-      return IGF.Builder.CreateStructGEP(addr, getNumTables(),
+      return IGF.Builder.CreateStructGEP(addr, getNumTables() + 1,
                                          getBufferOffset(IGF.IGM));
     }
 
@@ -280,8 +280,8 @@ namespace {
     Address projectWitnessTable(IRGenFunction &IGF, Address addr,
                                 unsigned which) const {
       assert(which < getNumTables());
-      return IGF.Builder.CreateStructGEP(addr, which,
-                                         IGF.IGM.getPointerSize() * which);
+      return IGF.Builder.CreateStructGEP(addr, which + 1,
+                                         IGF.IGM.getPointerSize() * (which + 1));
     }
 
     /// Given the address of an existential object, load its witness table.
@@ -291,10 +291,28 @@ namespace {
                                     "witness-table");
     }
 
-    /// Given the address of an existential object, find a witness
-    /// table; it doesn't matter which.
-    llvm::Value *loadAnyWitnessTable(IRGenFunction &IGF, Address addr) const {
-      return loadWitnessTable(IGF, addr, 0);
+    /// Given the address of an existential object, drill down to the
+    /// metadata field.
+    Address projectMetadataRef(IRGenFunction &IGF, Address addr) {
+      return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
+    }
+
+    /// Given the address of an existential object, load its metadata
+    /// object.
+    llvm::Value *loadMetadataRef(IRGenFunction &IGF, Address addr) {
+      return IGF.Builder.CreateLoad(projectMetadataRef(IGF, addr),
+                               addr.getAddress()->getName() + ".metadata");
+    }
+
+    /// Produce a value witness table.  Any will do.
+    llvm::Value *loadAnyValueWitnessTable(IRGenFunction &IGF, Address addr) {
+      // Use the first protocol witness table if there are any.
+      if (getNumTables() != 0)
+        return loadWitnessTable(IGF, addr, 0);
+
+      // Otherwise, use the value witness table in the metadata.
+      llvm::Value *metadata = loadMetadataRef(IGF, addr);
+      return emitValueWitnessTableRefForMetadata(IGF, metadata);
     }
   };
 
@@ -510,8 +528,9 @@ static void emitDeallocateBufferCall(IRGenFunction &IGF,
 /// Given the address of an existential object, destroy it.
 static void emitDestroyExistential(IRGenFunction &IGF, Address addr,
                                    ExistentialLayout layout) {
-  llvm::Value *table = layout.loadAnyWitnessTable(IGF, addr);
-  emitDestroyBufferCall(IGF, table, layout.projectExistentialBuffer(IGF, addr));
+  llvm::Value *wtable = layout.loadAnyValueWitnessTable(IGF, addr);
+  Address object = layout.projectExistentialBuffer(IGF, addr);
+  emitDestroyBufferCall(IGF, wtable, object);
 }
 
 static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
@@ -855,7 +874,7 @@ namespace {
 
   public:
     ExistentialLayout getLayout() const {
-      return ExistentialLayout(std::max(NumProtocols, 1U));
+      return ExistentialLayout(NumProtocols);
     }
 
     static const ExistentialTypeInfo *create(llvm::Type *ty, Size size,
@@ -906,6 +925,9 @@ namespace {
                             Address dest, Address src) const {
       auto layout = getLayout();
 
+      llvm::Value *metadata = layout.loadMetadataRef(IGF, src);
+      IGF.Builder.CreateStore(metadata, layout.projectMetadataRef(IGF, dest));
+
       // Load the witness tables and copy them into the new object.
       // Remember one of them for the copy later;  it doesn't matter which.
       llvm::Value *wtable = nullptr;
@@ -916,7 +938,12 @@ namespace {
 
         if (i == 0) wtable = table;
       }
-      assert(wtable != nullptr);
+
+      // We need a witness table.  If we don't have one from the
+      // protocol witnesses, load it from the metadata.
+      if (wtable == nullptr) {
+        wtable = emitValueWitnessTableRefForMetadata(IGF, metadata);
+      }
 
       // Project down to the buffers and ask the witnesses to do a
       // copy-initialize.
@@ -1553,54 +1580,77 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
     Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
     Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
 
-    // Load the first dest and source tables.
-    Address destTableSlot = layout.projectWitnessTable(IGF, dest, 0);
-    llvm::Value *destTable = IGF.Builder.CreateLoad(destTableSlot);
-    llvm::Value *srcTable = layout.loadWitnessTable(IGF, src, 0);
+    // Load the metadata tables.
+    Address destMetadataSlot = layout.projectMetadataRef(IGF, dest);
+    llvm::Value *destMetadata = IGF.Builder.CreateLoad(destMetadataSlot);
+    llvm::Value *srcMetadata = layout.loadMetadataRef(IGF, src);
 
-    // Check whether the tables match.
-    // We're relying on the assumption that checking one table is good
-    // enough; if it becomes possible to check both, we could be in
-    // trouble.
+    // Check whether the metadata match.
     llvm::BasicBlock *matchBB = IGF.createBasicBlock("match");
     llvm::BasicBlock *noMatchBB = IGF.createBasicBlock("no-match");
-    llvm::Value *sameTable =
-      IGF.Builder.CreateICmpEQ(destTable, srcTable, "sameTable");
-    IGF.Builder.CreateCondBr(sameTable, matchBB, noMatchBB);
+    llvm::Value *sameMetadata =
+      IGF.Builder.CreateICmpEQ(destMetadata, srcMetadata, "sameMetadata");
+    IGF.Builder.CreateCondBr(sameMetadata, matchBB, noMatchBB);
 
-    // If so, do a direct assignment.
-    IGF.Builder.emitBlock(matchBB);
-    llvm::Value *destObject =
-      emitProjectBufferCall(IGF, destTable, destBuffer);
-    llvm::Value *srcObject =
-      emitProjectBufferCall(IGF, destTable, srcBuffer);
-    emitAssignWithCopyCall(IGF, destTable, destObject, srcObject);
-    IGF.Builder.CreateBr(doneBB);
+    { // (scope to avoid contaminating other branches with these values)
+
+      // If so, do a direct assignment.
+      IGF.Builder.emitBlock(matchBB);
+      llvm::Value *wtable = 
+        emitValueWitnessTableRefForMetadata(IGF, destMetadata);
+
+      llvm::Value *destObject =
+        emitProjectBufferCall(IGF, wtable, destBuffer);
+      llvm::Value *srcObject =
+        emitProjectBufferCall(IGF, wtable, srcBuffer);
+      emitAssignWithCopyCall(IGF, wtable, destObject, srcObject);
+      IGF.Builder.CreateBr(doneBB);
+    }
 
     // Otherwise, destroy and copy-initialize.
     // TODO: should we copy-initialize and then destroy?  That's
-    // possible if we copy aside, which is a small expensive but
+    // possible if we copy aside, which is a small expense but
     // always safe.  Otherwise the destroy (which can invoke user code)
     // could see invalid memory at this address.  These are basically
     // the madnesses that boost::variant has to go through, with the
     // advantage of address-invariance.
     IGF.Builder.emitBlock(noMatchBB);
 
-    // Store the first table.
-    IGF.Builder.CreateStore(srcTable, destTableSlot);
+    // Store the metadata ref.
+    IGF.Builder.CreateStore(srcMetadata, destMetadataSlot);
 
-    // Store the rest of the tables.
-    for (unsigned i = 1, e = layout.getNumTables(); i != e; ++i) {
+    llvm::Value *firstDestTable = nullptr;
+    llvm::Value *firstSrcTable = nullptr;
+
+    // Store the protocol witness tables.
+    unsigned numTables = layout.getNumTables();
+    for (unsigned i = 0, e = numTables; i != e; ++i) {
       Address destTableSlot = layout.projectWitnessTable(IGF, dest, i);
       llvm::Value *srcTable = layout.loadWitnessTable(IGF, src, i);
+
+      // Remember the first pair of witness tables if present.
+      if (i == 0) {
+        firstDestTable = IGF.Builder.CreateLoad(destTableSlot);
+        firstSrcTable = srcTable;
+      }
+
+      // Overwrite the old witness table.
       IGF.Builder.CreateStore(srcTable, destTableSlot);
     }
 
-    // Destroy the old value.
-    emitDestroyBufferCall(IGF, destTable, destBuffer);
+    // Destroy the old value.  Pull a value witness table from the
+    // destination metadata if we don't have any protocol witness
+    // tables to use.
+    if (numTables == 0)
+      firstDestTable = emitValueWitnessTableRefForMetadata(IGF, destMetadata);
+    emitDestroyBufferCall(IGF, firstDestTable, destBuffer);
 
-    // Copy-initialize with the new value.
-    emitInitializeBufferWithCopyOfBufferCall(IGF, srcTable,
+    // Copy-initialize with the new value.  Again, pull a value
+    // witness table from the source metadata if we can't use a
+    // protocol witness table.
+    if (numTables == 0)
+      firstSrcTable = emitValueWitnessTableRefForMetadata(IGF, srcMetadata);
+    emitInitializeBufferWithCopyOfBufferCall(IGF, firstSrcTable,
                                              destBuffer, srcBuffer);
     IGF.Builder.CreateBr(doneBB);
 
@@ -2365,29 +2415,6 @@ static llvm::Constant *buildWitnessTable(IRGenModule &IGM,
   return llvm::ConstantExpr::getInBoundsGetElementPtr(var, indices);
 }
 
-/// Get or create the trivial witness table for a type.
-static llvm::Constant *
-getTrivialWitnessTable(IRGenModule &IGM, CanType concreteType,
-                       const TypeInfo &concreteTI, FixedPacking packing) {
-  auto &cache = GenProto::getTrivialWitnessTablesCache(IGM);
-
-  // Check whether we've already made an entry for this.
-  TypeBase *key = concreteType.getPointer();
-  auto it = cache.find(key);
-  if (it != cache.end())
-    return it->second;
-
-  // Build the actual table.
-  SmallVector<llvm::Constant*, NumValueWitnesses> witnesses;
-  addValueWitnesses(IGM, packing, concreteType, concreteTI, witnesses);
-  llvm::Constant *table =
-    buildWitnessTable(IGM, concreteType, nullptr, witnesses);
-
-  // Add to the cache and return.
-  cache.insert(std::make_pair(key, table));
-  return table;
-}
-
 /// Emit a value-witness table for the given type, which is assumed to
 /// be non-dependent.
 llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
@@ -2496,21 +2523,19 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
   SmallVector<llvm::Type*, 5> fields;
   SmallVector<ProtocolEntry, 4> entries;
 
-  if (protocols.empty()) {
-    // We always need at least one witness table.
-    fields.push_back(IGM.WitnessTablePtrTy);
-  } else {
-    for (auto protocol : protocols) {
-      // Find the protocol layout.
-      const ProtocolInfo &impl = IGM.getProtocolInfo(protocol);
-      entries.push_back(ProtocolEntry(protocol, impl));
+  // The first field is the metadata reference.
+  fields.push_back(IGM.TypeMetadataPtrTy);
 
-      // Each protocol gets a witness table.
-      fields.push_back(IGM.WitnessTablePtrTy);
-    }
+  for (auto protocol : protocols) {
+    // Find the protocol layout.
+    const ProtocolInfo &impl = IGM.getProtocolInfo(protocol);
+    entries.push_back(ProtocolEntry(protocol, impl));
+
+    // Each protocol gets a witness table.
+    fields.push_back(IGM.WitnessTablePtrTy);
   }
 
-  ExistentialLayout layout(fields.size());
+  ExistentialLayout layout(entries.size());
 
   // Add the value buffer to the fields.
   fields.push_back(IGM.getFixedBufferTy());
@@ -3108,27 +3133,21 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
       Address destBuffer = destLayout.projectExistentialBuffer(IGF, dest);
       Address srcBuffer = srcLayout.projectExistentialBuffer(IGF, src);
       IGF.emitMemCpy(destBuffer, srcBuffer, getFixedBufferSize(IGF.IGM));
+
+      // Copy the metadata as well.
+      Address destMetadataSlot = destLayout.projectMetadataRef(IGF, dest);
+      IGF.Builder.CreateStore(srcLayout.loadMetadataRef(IGF, dest),
+                              destMetadataSlot);
     }
 
     // Okay, the buffer on dest has been meaningfully filled in.
     // Fill in the witnesses.
 
-    // If we're erasing *all* protocols, just grab any witness table
-    // from the source.
-    if (destEntries.empty()) {
-      // In the special case of not needing any destination protocols,
-      // that's enough; the presumably richer protocol on the source
-      // also works as a set of value witnesses.
-      if (evaluateInPlace) return;
-
-      // Otherwise copy over the first witness table.
-      Address destSlot = destLayout.projectWitnessTable(IGF, dest, 0);
-      llvm::Value *table = srcLayout.loadWitnessTable(IGF, src, 0);
-      IGF.Builder.CreateStore(table, destSlot);
+    // If we're erasing *all* protocols, we're done.
+    if (destEntries.empty())
       return;
-    }
 
-    // Okay, we're erasing to a non-trivial set of protocols.
+    // Okay, so we're erasing to a non-trivial set of protocols.
 
     // First, find all the destination tables.  We can't write these
     // into dest immediately because later fetches of protocols might
@@ -3148,72 +3167,100 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
   }
 
   // We're converting from a concrete type to an existential type.
+  const TypeInfo &srcTI = IGF.getFragileTypeInfo(srcType);
 
-  if (isa<ArchetypeType>(srcType)) {
-    IGF.unimplemented(E->getLoc(), "erasure from an archetype");
-    return;
+  // First, write out the metadata.
+  llvm::Value *metadata = emitTypeMetadataRef(IGF, srcType);
+  IGF.Builder.CreateStore(metadata, destLayout.projectMetadataRef(IGF, dest));
+
+  // Compute basic layout information about the type.  If we have a
+  // concrete type, we need to know how it packs into a fixed-size
+  // buffer.  If we don't, we need an value-witness table.
+  FixedPacking packing = (FixedPacking) -1;
+  llvm::Value *wtable = nullptr;
+  if (isa<ArchetypeType>(srcType)) { // FIXME: tuples of archetypes?
+    wtable = srcTI.as<ArchetypeTypeInfo>().getValueWitnessTable(IGF);
+  } else {
+    packing = computePacking(IGF.IGM, srcTI);
   }
 
-  // Find the concrete type.
-  const TypeInfo &srcTI = IGF.getFragileTypeInfo(srcType);
-  FixedPacking packing = computePacking(IGF.IGM, srcTI);
+  // Next, write the protocol witness tables.
+  for (unsigned i = 0, e = destEntries.size(); i != e; ++i) {
+    ProtocolDecl *proto = destEntries[i].getProtocol();
+    auto &protoI = destEntries[i].getInfo();
 
-  // First, evaluate into the buffer.
+    llvm::Value *ptable;
+
+    // If the source type is an archetype, look at what's bound.
+    if (isa<ArchetypeType>(srcType)) {
+      auto &archTI = srcTI.as<ArchetypeTypeInfo>();
+      ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
+      ptable = archTI.getWitnessTable(IGF, path.getOriginIndex());
+      ptable = path.apply(IGF, ptable);
+
+    // All other source types should be concrete enough that we have
+    // conformance information for them.
+    } else {
+      auto astConformance = E->getConformances()[i];
+      assert(astConformance);
+
+      // Compute the conformance information.
+      const ConformanceInfo &conformance =
+        protoI.getConformance(IGF.IGM, srcType, srcTI, proto, *astConformance);
+      assert(packing == conformance.getPacking());
+      ptable = conformance.getTable(IGF);
+    }
+
+    // Now store the protocol witness table into the destination.
+    Address ptableSlot = destLayout.projectWitnessTable(IGF, dest, i);
+    IGF.Builder.CreateStore(ptable, ptableSlot);
+  }
+  
+  // Finally, evaluate into the buffer.
 
   // If the type is provably empty, just emit the operand as ignored.
   if (srcTI.isEmpty(ResilienceScope::Local)) {
     assert(packing == FixedPacking::OffsetZero);
     IGF.emitIgnored(E->getSubExpr());
-  } else {
-    // Otherwise, allocate if necessary.
-    Address buffer = destLayout.projectExistentialBuffer(IGF, dest);
-    Address object = emitAllocateBuffer(IGF, buffer, packing, srcTI);
-
-    // Push a cleanup to destroy that.
-    CleanupsDepth deallocCleanup;
-    bool needsDeallocCleanup = !isNeverAllocated(packing);
-    if (needsDeallocCleanup) {
-      IGF.pushFullExprCleanup<DeallocateConcreteBuffer>(buffer, packing, srcTI);
-      deallocCleanup = IGF.getCleanupsDepth();
-    }
-
-    // Emit the object in-place.
-    IGF.emitRValueAsInit(E->getSubExpr(), object, srcTI);
-
-    // Deactivate the dealloc cleanup.
-    if (needsDeallocCleanup) {
-      IGF.setCleanupState(deallocCleanup, CleanupState::Dead);
-    }
-  }
-
-  // Okay, now write the witness table pointers into the existential.
-
-  // If this is the trivial composition type, grab the witness table.
-  if (destEntries.empty()) {
-    llvm::Constant *wtable =
-      getTrivialWitnessTable(IGF.IGM, srcType, srcTI, packing);
-    Address tableSlot = destLayout.projectWitnessTable(IGF, dest, 0);
-    IGF.Builder.CreateStore(wtable, tableSlot);
     return;
   }
 
-  for (unsigned i = 0, e = destEntries.size(); i != e; ++i) {
-    ProtocolDecl *proto = destEntries[i].getProtocol();
-    auto &protoI = destEntries[i].getInfo();
+  // Otherwise, allocate if necessary.
 
-    auto astConformance = E->getConformances()[i];
-    assert(astConformance);
+  // Project down to the destination fixed-size buffer.
+  Address buffer = destLayout.projectExistentialBuffer(IGF, dest);
 
-    // Compute the conformance information.
-    const ConformanceInfo &conformance =
-      protoI.getConformance(IGF.IGM, srcType, srcTI, proto, *astConformance);
-    assert(packing == conformance.getPacking());
+  Address object;
+  bool hasDeallocCleanup;
 
-    // Now produce the conformance table and store that into the
-    // destination.
-    llvm::Value *table = conformance.getTable(IGF);
-    Address tableSlot = destLayout.projectWitnessTable(IGF, dest, i);
-    IGF.Builder.CreateStore(table, tableSlot);
+  // If we're using a witness-table to do this, we need to emit a
+  // value-witness call to allocate the fixed-size buffer.
+  if (wtable) {
+    object = Address(emitAllocateBufferCall(IGF, wtable, buffer),
+                     Alignment(1));
+
+    hasDeallocCleanup = true;
+    IGF.pushFullExprCleanup<DeallocateBuffer>(buffer, wtable);
+
+  // Otherwise, allocate using what we know statically about the type.
+  } else {
+    object = emitAllocateBuffer(IGF, buffer, packing, srcTI);
+
+    hasDeallocCleanup = !isNeverAllocated(packing);
+    if (hasDeallocCleanup)
+      IGF.pushFullExprCleanup<DeallocateConcreteBuffer>(buffer, packing, srcTI);
+  }
+
+  // Remember where the cleanup was.
+  CleanupsDepth deallocCleanup;
+  if (hasDeallocCleanup) deallocCleanup = IGF.getCleanupsDepth();
+
+  // Emit the object in-place.
+  IGF.emitRValueAsInit(E->getSubExpr(), object, srcTI);
+
+  // Deactivate the dealloc cleanup.
+  if (hasDeallocCleanup) {
+    IGF.setCleanupState(deallocCleanup, CleanupState::Dead);
   }
 }
 
@@ -3346,6 +3393,7 @@ irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
 
   // The thing we're going to invoke a method on.
   Address thisObject;
+  auto existLayout = baseTI.getLayout();
 
   // For a non-static method, copy the object into a new buffer.
   // This is important for type-safety, because someone might assign
@@ -3359,8 +3407,7 @@ irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
     Address copyBuffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
                                           getFixedBufferAlignment(IGF.IGM),
                                           "copy-for-call");
-    auto layout = baseTI.getLayout();
-    Address srcBuffer = layout.projectExistentialBuffer(IGF, existAddr);
+    Address srcBuffer = existLayout.projectExistentialBuffer(IGF, existAddr);
 
     // The result of the copy is an i8* which points at the new object.
     llvm::Value *copy =
@@ -3373,13 +3420,13 @@ irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
     thisObject = Address(copy, Alignment(1));
   }
 
+  // Load the metadata.
+  llvm::Value *metadata = existLayout.loadMetadataRef(IGF, existAddr);
+
   // Find the actual witness.
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(fnProto);
   auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
   llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
-
-  // FIXME: store type metadata in the existential!
-  llvm::Value *metadata = llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
 
   // Emit the callee.
   return prepareProtocolMethodCall(IGF, fn, substResultType, subs,
