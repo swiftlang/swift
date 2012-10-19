@@ -43,6 +43,7 @@ class LoadExpr;
 class MaterializeExpr;
 class ReturnStmt;
 class ScalarToTupleExpr;
+class SpecializeExpr;
 class StringLiteralExpr;
 class Stmt;
 class TupleElementExpr;
@@ -337,6 +338,9 @@ public:
   }
 };
 
+/// StoreInst - Represents a store from a memory location.  If the destination
+/// is unitialized memory, this models an initialization of that memory
+/// location.
 class StoreInst : public Instruction {
   /// The value being stored and the lvalue being stored to.
   Value *Src, *Dest;
@@ -361,6 +365,29 @@ public:
     return I->getKind() == ValueKind::StoreInst;
   }
 };
+
+/// SpecializeInst - Specializes a reference to a generic entity by binding
+/// each of its type parameters to a specific type.
+///
+/// This instruction takes an arbitrary value of generic type and returns a new
+/// closure that takes concrete types for its archetypes.  This is commonly used
+/// in call sequences to generic functions, but can occur in arbitrarily general
+/// cases as well.
+///
+class SpecializeInst : public Instruction {
+  /// The value being specialized.  It always has FunctionType.
+  Value *Operand;
+public:
+
+  SpecializeInst(SpecializeExpr *SE, Value *Operand, Type DestTy);
+
+  Value *getOperand() const { return Operand; }
+
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::SpecializeInst;
+  }
+};
+
 
 /// TypeConversionInst - Change the Type of some value without affecting how it
 /// will codegen.

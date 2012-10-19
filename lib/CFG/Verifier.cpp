@@ -87,6 +87,11 @@ public:
               isEqual(SI->getSrc()->getType()) &&
            "Store operand type and dest type mismatch");
   }
+  void visitSpecializeInst(SpecializeInst *SI) {
+    assert(SI->getType()->is<FunctionType>() &&
+           SI->getOperand()->getType()->is<PolymorphicFunctionType>() &&
+           "SpecializeInst only works on function types");
+  }
 
   void visitTupleInst(TupleInst *TI) {
   }

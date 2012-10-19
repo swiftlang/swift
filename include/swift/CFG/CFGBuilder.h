@@ -163,6 +163,12 @@ public:
     return insert(new StoreInst(E, Src, DestLValue));
   }
 
+  SpecializeInst *createSpecialize(SpecializeExpr *SE, Value *Operand,
+                                   Type DestTy) {
+    return insert(new SpecializeInst(SE, Operand, DestTy));
+  }
+
+
   TypeConversionInst *createTypeConversion(ImplicitConversionExpr *E,
                                            Value *Op) {
     return insert(new TypeConversionInst(E, Op));

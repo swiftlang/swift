@@ -65,6 +65,7 @@ ABSTRACT_VALUE(Instruction, Value)
 
   INST(LoadInst, Instruction)
   INST(StoreInst, Instruction)
+  INST(SpecializeInst, Instruction)
   INST(TypeConversionInst, Instruction)
   INST(TupleInst, Instruction)
   INST(TypeOfInst, Instruction)

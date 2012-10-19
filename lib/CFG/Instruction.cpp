@@ -228,7 +228,9 @@ StoreInst::StoreInst(TupleShuffleExpr *E, Value *Src, Value *Dest)
   // This happens in a store to an array initializer for varargs tuple shuffle.
 }
 
-
+SpecializeInst::SpecializeInst(SpecializeExpr *SE, Value *Operand, Type DestTy)
+  : Instruction(ValueKind::SpecializeInst, SE, DestTy), Operand(Operand) {
+}
 
 
 TypeConversionInst::TypeConversionInst(ImplicitConversionExpr *E,

@@ -93,6 +93,10 @@ Value *CFGGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
   return B.createScalarToTuple(E, visit(E->getSubExpr()));
 }
 
+Value *CFGGen::visitSpecializeExpr(SpecializeExpr *E) {
+  return B.createSpecialize(E, visit(E->getSubExpr()), E->getType());
+}
+
 Value *CFGGen::visitAddressOfExpr(AddressOfExpr *E) {
   return visit(E->getSubExpr());
 }

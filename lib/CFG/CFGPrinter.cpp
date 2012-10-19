@@ -156,6 +156,10 @@ public:
     if (SI->isInitialization())
       OS << " [initialization]";
   }
+  void visitSpecializeInst(SpecializeInst *SI) {
+    OS << "specialize " << getID(SI->getOperand()) << " -> "
+       << SI->getType().getString();
+  }
   void visitTypeConversionInst(TypeConversionInst *TCI) {
     OS << "type_conversion " << getID(TCI->getOperand());
   }
