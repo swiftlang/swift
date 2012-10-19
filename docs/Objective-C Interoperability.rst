@@ -5,7 +5,7 @@ Objective-C Interoperability
 This document tracks the differences between the Swift and Objective-C ABIs and
 class models, and what it would take to merge the two as much as possible. The
 format of each section lays out the differences between Swift and Objective-C,
-then describes what needs to happen for 
+then describes what needs to happen for a user to mix the two seamlessly.
 
 
 Level 1: Message-passing
