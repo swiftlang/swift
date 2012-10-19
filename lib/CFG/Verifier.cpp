@@ -70,17 +70,15 @@ public:
     // whole tuple being presented all at once.
     if (AI->getArguments().size() != 1 ||
         !AI->getArguments()[0]->getType()->isEqual(FT->getInput())) {
-      // Otherwise, we must have a decomposed tuple.
-
+      // Otherwise, we must have a decomposed tuple.  Verify the arguments match
+      // up.
       const TupleType *TT = FT->getInput()->castTo<TupleType>();
       assert(AI->getArguments().size() == TT->getFields().size() &&
              "ApplyInst contains unexpected argument count for function");
-#if 0
       for (unsigned i = 0, e = AI->getArguments().size(); i != e; ++i)
         assert(AI->getArguments()[i]->getType()
                  ->isEqual(TT->getFields()[i].getType()) &&
                "ApplyInst argument type mismatch");
-#endif
     }
   }
 
