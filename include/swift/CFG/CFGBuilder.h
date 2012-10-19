@@ -111,7 +111,7 @@ public:
     return insert(new AllocTmpInst(Expr));
   }
 
-  AllocArrayInst *createAllocArray(TupleShuffleExpr *E, Type ElementType,
+  AllocArrayInst *createAllocArray(Expr *E, Type ElementType,
                                    unsigned NumElements) {
     return insert(new AllocArrayInst(E, ElementType, NumElements));
   }
@@ -157,13 +157,8 @@ public:
                                   Value *DestLValue) {
     return insert(new StoreInst(VD, Src, DestLValue));
   }
-  StoreInst *createInitialization(MaterializeExpr *E, Value *Src,
-                                  Value *DestLValue) {
-    return insert(new StoreInst(E, Src, DestLValue));
-  }
-  StoreInst *createInitialization(TupleShuffleExpr *E, Value *Src,
-                                  Value *DestLValue) {
-    return insert(new StoreInst(E, Src, DestLValue));
+  StoreInst *createInitialization(Expr *E, Value *Src, Value *DestLValue) {
+    return insert(new StoreInst(E, true, Src, DestLValue));
   }
 
   SpecializeInst *createSpecialize(SpecializeExpr *SE, Value *Operand,
@@ -180,14 +175,8 @@ public:
     return insert(new TypeConversionInst(Ty, Op));
   }
 
-  TupleInst *createTuple(TupleExpr *Expr, ArrayRef<Value*> Elements) {
-    return insert(TupleInst::create(Expr, Elements, C));
-  }
-  TupleInst *createTuple(TupleShuffleExpr *Expr, ArrayRef<Value*> Elements) {
-    return insert(TupleInst::create(Expr, Elements, C));
-  }
-  TupleInst *createTuple(ScalarToTupleExpr *Expr, ArrayRef<Value*> Elements) {
-    return insert(TupleInst::create(Expr, Elements, C));
+  TupleInst *createTuple(Expr *E, ArrayRef<Value*> Elements) {
+    return insert(TupleInst::create(E, Elements, C));
   }
   TupleInst *createTuple(Type Ty, ArrayRef<Value*> Elements) {
     return insert(TupleInst::create(Ty, Elements, C));
@@ -217,8 +206,7 @@ public:
   // CFG-only instructions that don't have an AST analog
   //===--------------------------------------------------------------------===//
 
-  IndexLValueInst *createIndexLValue(TupleShuffleExpr *E, Value *Operand,
-                                     unsigned Index) {
+  IndexLValueInst *createIndexLValue(Expr *E, Value *Operand, unsigned Index) {
     return insert(new IndexLValueInst(E, Operand, Index));
   }
 

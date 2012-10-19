@@ -114,7 +114,7 @@ static Type getAllocArrayType(Type EltTy) {
   return TupleType::get(Fields, Ctx);
 }
 
-AllocArrayInst::AllocArrayInst(TupleShuffleExpr *E, Type ElementType,
+AllocArrayInst::AllocArrayInst(Expr *E, Type ElementType,
                                unsigned NumElements)
   : Instruction(ValueKind::AllocArrayInst, E, getAllocArrayType(ElementType)),
     ElementType(ElementType), NumElements(NumElements) {
@@ -233,9 +233,9 @@ StoreInst::StoreInst(MaterializeExpr *E, Value *Src, Value *Dest)
     Src(Src), Dest(Dest), IsInitialization(true) {
 }
 
-StoreInst::StoreInst(TupleShuffleExpr *E, Value *Src, Value *Dest)
+StoreInst::StoreInst(Expr *E, bool IsInitialization, Value *Src, Value *Dest)
   : Instruction(ValueKind::StoreInst, E, getVoidType(Src->getType())),
-    Src(Src), Dest(Dest), IsInitialization(true) {
+    Src(Src), Dest(Dest), IsInitialization(IsInitialization) {
   // This happens in a store to an array initializer for varargs tuple shuffle.
 }
 
@@ -302,8 +302,7 @@ TupleElementInst::TupleElementInst(Type ResultTy, Value *Operand,
 // CFG-only instructions that don't have an AST analog
 //===----------------------------------------------------------------------===//
 
-IndexLValueInst::IndexLValueInst(TupleShuffleExpr *E, Value *Operand,
-                                 unsigned Index)
+IndexLValueInst::IndexLValueInst(Expr *E, Value *Operand, unsigned Index)
   : Instruction(ValueKind::IndexLValueInst, E, Operand->getType()),
     Operand(Operand), Index(Index) {
 }

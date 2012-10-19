@@ -91,6 +91,9 @@ Value *CFGGen::visitTupleExpr(TupleExpr *E) {
 
 Value *CFGGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
   Value *Arg = visit(E->getSubExpr());
+  //unsigned getScalarField() { return ScalarField; }
+  //Expr *getVarargsInjectionFunction()
+
   return B.createTuple(E, Arg);
 }
 
@@ -107,11 +110,9 @@ Value *CFGGen::visitTupleElementExpr(TupleElementExpr *E) {
   return B.createTupleElement(E, visit(E->getBase()), E->getFieldNumber());
 }
 
-Value *CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
-  // TupleShuffle expands out to extracts+inserts.  Start by emitting the base
-  // expression that we'll shuffle.
-  Value *Op = visit(E->getSubExpr());
-
+Value *CFGGen::emitTupleShuffle(Expr *E, Value *Op, TupleType *SrcTupleType,
+                                ArrayRef<int> ElementMapping,
+                                Expr *VarargsInjectionFunction) {
   // Then collect the new elements.
   SmallVector<Value*, 8> ResultElements;
 
@@ -119,7 +120,7 @@ Value *CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
   llvm::ArrayRef<TupleTypeElt> outerFields =
     E->getType()->getAs<TupleType>()->getFields();
 
-  auto shuffleIndexIterator = E->getElementMapping().begin();
+  auto shuffleIndexIterator = ElementMapping.begin();
   for (const TupleTypeElt &outerField : outerFields) {
     int shuffleIndex = *shuffleIndexIterator++;
 
@@ -144,9 +145,8 @@ Value *CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
     // into the varargs portion of this, which is then constructed into a Slice
     // through an informal protocol captured by the InjectionFn in the
     // TupleShuffleExpr.
-    auto shuffleIndexIteratorEnd = E->getElementMapping().end();
-    llvm::ArrayRef<TupleTypeElt> InnerFields =
-      E->getSubExpr()->getType()->getAs<TupleType>()->getFields();
+    auto shuffleIndexIteratorEnd = ElementMapping.end();
+    llvm::ArrayRef<TupleTypeElt> InnerFields = SrcTupleType->getFields();
 
     unsigned NumArrayElts = shuffleIndexIteratorEnd - shuffleIndexIterator;
     Value *AllocArray = B.createAllocArray(E, outerField.getVarargBaseTy(),
@@ -178,13 +178,23 @@ Value *CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
     Value *NumElts = B.createIntegerValueInst(NumArrayElts,
                                   BuiltinIntegerType::get(64, C.getContext()));
 
-    Value *InjectionFn = visit(E->getVarargsInjectionFunction());
+    Value *InjectionFn = visit(VarargsInjectionFunction);
     Value *InjectionArgs[] = { BasePtr, ObjectPtr, NumElts };
     ResultElements.push_back(B.createApply(InjectionFn, InjectionArgs));
     break;
   }
 
   return B.createTuple(E, ResultElements);
+}
+
+Value *CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
+  // TupleShuffle expands out to extracts+inserts.  Start by emitting the base
+  // expression that we'll shuffle.
+  Value *Op = visit(E->getSubExpr());
+
+  return emitTupleShuffle(E, Op, E->getSubExpr()->getType()->getAs<TupleType>(),
+                          E->getElementMapping(),
+                          E->getVarargsInjectionFunctionOrNull());
 }
 
 Value *CFGGen::visitTypeOfExpr(TypeOfExpr *E) {

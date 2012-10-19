@@ -175,7 +175,7 @@ class AllocArrayInst : public Instruction {
   unsigned NumElements;
 public:
 
-  AllocArrayInst(TupleShuffleExpr *E, Type ElementType, unsigned NumElements);
+  AllocArrayInst(Expr *E, Type ElementType, unsigned NumElements);
 
   Type getElementType() const { return ElementType; }
   unsigned getNumElements() const { return NumElements; }
@@ -355,7 +355,7 @@ public:
   StoreInst(AssignStmt *S, Value *Src, Value *Dest);
   StoreInst(VarDecl *VD, Value *Src, Value *Dest);
   StoreInst(MaterializeExpr *E, Value *Src, Value *Dest);
-  StoreInst(TupleShuffleExpr *E, Value *Src, Value *Dest);
+  StoreInst(Expr *E, bool isInitialization, Value *Src, Value *Dest);
 
   Value *getSrc() const { return Src; }
   Value *getDest() const { return Dest; }
@@ -432,16 +432,8 @@ public:
 
   /// Construct a TupleInst.  The two forms are used to ensure that these are
   /// only created for specific syntactic forms.
-  static TupleInst *create(TupleExpr *E, ArrayRef<Value*> Elements, CFG &C) {
-    return createImpl((Expr*)E, Type(), Elements, C);
-  }
-  static TupleInst *create(TupleShuffleExpr *E, ArrayRef<Value*> Elements,
-                           CFG &C) {
-    return createImpl((Expr*)E, Type(), Elements, C);
-  }
-  static TupleInst *create(ScalarToTupleExpr *E, ArrayRef<Value*> Elements,
-                           CFG &C) {
-    return createImpl((Expr*)E, Type(), Elements, C);
+  static TupleInst *create(Expr *E, ArrayRef<Value*> Elements, CFG &C) {
+    return createImpl(E, Type(), Elements, C);
   }
   static TupleInst *create(Type Ty, ArrayRef<Value*> Elements, CFG &C) {
     return createImpl(nullptr, Ty, Elements, C);
@@ -502,7 +494,7 @@ class IndexLValueInst : public Instruction {
   Value *Operand;
   unsigned Index;
 public:
-  IndexLValueInst(TupleShuffleExpr *E, Value *Operand, unsigned Index);
+  IndexLValueInst(Expr *E, Value *Operand, unsigned Index);
 
   Value *getOperand() const { return Operand; }
   unsigned getIndex() const { return Index; }

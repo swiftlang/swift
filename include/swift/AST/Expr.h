@@ -1037,6 +1037,9 @@ public:
     assert(InjectionFn != nullptr);
     return InjectionFn;
   }
+  Expr *getVarargsInjectionFunctionOrNull() const {
+    return InjectionFn;
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::TupleShuffle;
