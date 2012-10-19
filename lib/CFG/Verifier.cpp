@@ -59,6 +59,26 @@ public:
 
 
   void visitApplyInst(ApplyInst *AI) {
+    assert(AI->getCallee()->getType()->is<FunctionType>() &&
+           "Callee of ApplyInst should have function type");
+    FunctionType *FT = AI->getCallee()->getType()->castTo<FunctionType>();
+    assert(AI->getType()->isEqual(FT->getResult()) &&
+           "ApplyInst result type mismatch");
+    
+    if (const TupleType *TT = FT->getInput()->getAs<TupleType>()) {
+      assert(AI->getArguments().size() == TT->getFields().size() &&
+             "ApplyInst contains unexpected argument count for function");
+#if 0
+      for (unsigned i = 0, e = AI->getArguments().size(); i != e; ++i)
+        assert(AI->getArguments()[i]->getType()
+                 ->isEqual(TT->getFields()[i].getType()) &&
+               "ApplyInst argument type mismatch");
+#endif
+    } else {
+      // A single argument.
+      assert(AI->getArguments().size() == 1 &&
+             AI->getArguments()[0]->getType()->isEqual(FT->getInput()));
+    }
   }
 
   void visitConstantRefInst(ConstantRefInst *DRI) {
@@ -105,7 +125,7 @@ public:
   }
 
   void visitIntegerValueInst(IntegerValueInst *IVI) {
-    assert(IVI->getType()->is<BuiltinIntegerType());
+    assert(IVI->getType()->is<BuiltinIntegerType>());
   }
 
   void visitReturnInst(ReturnInst *RI) {
