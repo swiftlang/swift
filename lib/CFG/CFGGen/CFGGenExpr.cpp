@@ -89,14 +89,6 @@ Value *CFGGen::visitTupleExpr(TupleExpr *E) {
   return B.createTuple(E, ArgsV);
 }
 
-Value *CFGGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
-  Value *Arg = visit(E->getSubExpr());
-  //unsigned getScalarField() { return ScalarField; }
-  //Expr *getVarargsInjectionFunction()
-
-  return B.createTuple(E, Arg);
-}
-
 Value *CFGGen::visitSpecializeExpr(SpecializeExpr *E) {
   return B.createSpecialize(E, visit(E->getSubExpr()), E->getType());
 }
@@ -110,15 +102,15 @@ Value *CFGGen::visitTupleElementExpr(TupleElementExpr *E) {
   return B.createTupleElement(E, visit(E->getBase()), E->getFieldNumber());
 }
 
-Value *CFGGen::emitTupleShuffle(Expr *E, Value *Op, TupleType *SrcTupleType,
+Value *CFGGen::emitTupleShuffle(Expr *E, Value *Op,
                                 ArrayRef<int> ElementMapping,
                                 Expr *VarargsInjectionFunction) {
-  // Then collect the new elements.
+  // Collect the new elements.
   SmallVector<Value*, 8> ResultElements;
 
   // Loop over each result element to compute it.
-  llvm::ArrayRef<TupleTypeElt> outerFields =
-    E->getType()->getAs<TupleType>()->getFields();
+  ArrayRef<TupleTypeElt> outerFields =
+    E->getType()->castTo<TupleType>()->getFields();
 
   auto shuffleIndexIterator = ElementMapping.begin();
   for (const TupleTypeElt &outerField : outerFields) {
@@ -141,19 +133,19 @@ Value *CFGGen::emitTupleShuffle(Expr *E, Value *Op, TupleType *SrcTupleType,
       continue;
     }
 
+    assert(outerField.isVararg() && "Cannot initialize nonvariadic element");
+
     // Okay, we have a varargs tuple element.  All the remaining elements feed
     // into the varargs portion of this, which is then constructed into a Slice
     // through an informal protocol captured by the InjectionFn in the
     // TupleShuffleExpr.
     auto shuffleIndexIteratorEnd = ElementMapping.end();
-    llvm::ArrayRef<TupleTypeElt> InnerFields = SrcTupleType->getFields();
-
     unsigned NumArrayElts = shuffleIndexIteratorEnd - shuffleIndexIterator;
     Value *AllocArray = B.createAllocArray(E, outerField.getVarargBaseTy(),
                                            NumArrayElts);
 
     Type BaseLValue =
-      AllocArray->getType()->getAs<TupleType>()->getElementType(1);
+      AllocArray->getType()->castTo<TupleType>()->getElementType(1);
     Value *BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
 
     unsigned CurElem = 0;
@@ -162,9 +154,10 @@ Value *CFGGen::emitTupleShuffle(Expr *E, Value *Op, TupleType *SrcTupleType,
       
       Value *EltLoc = BasePtr;
       if (CurElem) EltLoc = B.createIndexLValue(E, EltLoc, CurElem);
-      
-      Type EltTy = InnerFields[SourceField].getType();
-      Value *EltVal = B.createTupleElement(EltTy, Op, SourceField);
+
+      Value *EltVal = Op;
+      if (!EltVal->getType()->isEqual(outerField.getType()))
+        EltVal = B.createTupleElement(outerField.getType(), EltVal,SourceField);
       B.createInitialization(E, EltVal, EltLoc);
       ++CurElem;
     }
@@ -192,9 +185,44 @@ Value *CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
   // expression that we'll shuffle.
   Value *Op = visit(E->getSubExpr());
 
-  return emitTupleShuffle(E, Op, E->getSubExpr()->getType()->getAs<TupleType>(),
-                          E->getElementMapping(),
+  return emitTupleShuffle(E, Op, E->getElementMapping(),
                           E->getVarargsInjectionFunctionOrNull());
+}
+
+Value *CFGGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
+  // Emit the argument and turn it into a trivial tuple.
+  Value *Arg = visit(E->getSubExpr());
+
+  // If we're trying to create a single-element tuple of a specific type (e.g.
+  // with a named element) use that type to build the destination tuple.
+  ArrayRef<TupleTypeElt> outerFields =
+    E->getType()->castTo<TupleType>()->getFields();
+  if (outerFields.size() == 1 && !outerFields[0].isVararg())
+    return B.createTuple(TupleType::get(outerFields[0], C.getContext()), Arg);
+
+  // Otherwise, create a tuple with a single element.
+  TupleTypeElt TTE(Arg->getType(), outerFields[E->getScalarField()].getName());
+  Arg = B.createTuple(TupleType::get(TTE, C.getContext()), Arg);
+
+  // If we don't have exactly the same tuple, perform a shuffle to create
+  // default arguments etc.
+  SmallVector<int, 8> ShuffleMask;
+
+  for (unsigned i = 0, e = outerFields.size(); i != e; ++i) {
+    // If we get to the last argument and it is a varargs list, make sure to
+    // mark it with a "-2" entry.
+    if (outerFields[i].isVararg())
+      ShuffleMask.push_back(-2);
+
+    // If we have a field with a default value, emit that value.  Otherwise, use
+    // the tuple we have as input.
+    if (i == E->getScalarField())
+      ShuffleMask.push_back(0);
+    else if (!outerFields[i].isVararg())
+      ShuffleMask.push_back(-1);
+  }
+
+  return emitTupleShuffle(E, Arg, ShuffleMask,E->getVarargsInjectionFunction());
 }
 
 Value *CFGGen::visitTypeOfExpr(TypeOfExpr *E) {

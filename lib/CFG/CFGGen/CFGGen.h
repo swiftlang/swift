@@ -21,7 +21,6 @@
 
 namespace swift {
   class BasicBlock;
-  class TupleType;
   
 namespace Lowering {
   class Condition;
@@ -141,8 +140,7 @@ public:
   Value *visitTupleShuffleExpr(TupleShuffleExpr *E);
   Value *visitTypeOfExpr(TypeOfExpr *E);
 
-  Value *emitTupleShuffle(Expr *E, Value *Op, TupleType *SrcTupleType,
-                          ArrayRef<int> ElementMapping,
+  Value *emitTupleShuffle(Expr *E, Value *Op, ArrayRef<int> ElementMapping,
                           Expr *VarargsInjectionFunction);
 
   //===--------------------------------------------------------------------===//

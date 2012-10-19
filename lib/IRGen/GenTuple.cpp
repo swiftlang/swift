@@ -257,7 +257,7 @@ void swift::irgen::emitScalarToTuple(IRGenFunction &IGF, ScalarToTupleExpr *E,
   IGF.emitRValue(innerExpr, innerExplosion);
 #endif
 
-  llvm::ArrayRef<TupleTypeElt> outerFields =
+  ArrayRef<TupleTypeElt> outerFields =
     cast<TupleType>(E->getType()->getCanonicalType())->getFields();
 
   unsigned destIndex = 0;
