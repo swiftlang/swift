@@ -64,8 +64,15 @@ public:
     FunctionType *FT = AI->getCallee()->getType()->castTo<FunctionType>();
     assert(AI->getType()->isEqual(FT->getResult()) &&
            "ApplyInst result type mismatch");
-    
-    if (const TupleType *TT = FT->getInput()->getAs<TupleType>()) {
+
+
+    // If there is a single argument to the apply, it might be a scalar or the
+    // whole tuple being presented all at once.
+    if (AI->getArguments().size() != 1 ||
+        !AI->getArguments()[0]->getType()->isEqual(FT->getInput())) {
+      // Otherwise, we must have a decomposed tuple.
+
+      const TupleType *TT = FT->getInput()->castTo<TupleType>();
       assert(AI->getArguments().size() == TT->getFields().size() &&
              "ApplyInst contains unexpected argument count for function");
 #if 0
@@ -74,10 +81,6 @@ public:
                  ->isEqual(TT->getFields()[i].getType()) &&
                "ApplyInst argument type mismatch");
 #endif
-    } else {
-      // A single argument.
-      assert(AI->getArguments().size() == 1 &&
-             AI->getArguments()[0]->getType()->isEqual(FT->getInput()));
     }
   }
 
