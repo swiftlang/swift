@@ -308,6 +308,10 @@ IndexLValueInst::IndexLValueInst(TupleShuffleExpr *E, Value *Operand,
     Operand(Operand), Index(Index) {
 }
 
+IntegerValueInst::IntegerValueInst(uint64_t Val, Type Ty)
+  : Instruction(ValueKind::IntegerValueInst, CFGLocation(), Ty), Val(Val) {}
+
+
 //===----------------------------------------------------------------------===//
 // Instructions representing terminators
 //===----------------------------------------------------------------------===//

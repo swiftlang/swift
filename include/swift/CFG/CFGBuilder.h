@@ -222,6 +222,11 @@ public:
     return insert(new IndexLValueInst(E, Operand, Index));
   }
 
+  IntegerValueInst *createIntegerValueInst(uint64_t Val, Type Ty) {
+    return insert(new IntegerValueInst(Val, Ty));
+  }
+
+
   //===--------------------------------------------------------------------===//
   // Terminator Instruction Creation Methods
   //===--------------------------------------------------------------------===//

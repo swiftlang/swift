@@ -73,6 +73,7 @@ ABSTRACT_VALUE(Instruction, Value)
 
   // CFG-only instructions that don't have an AST analog.
   INST(IndexLValueInst, Instruction)
+  INST(IntegerValueInst, Instruction)
 
   // Terminators.
   ABSTRACT_VALUE(TermInst, Instruction)

@@ -161,7 +161,8 @@ public:
        << SI->getType().getString();
   }
   void visitTypeConversionInst(TypeConversionInst *TCI) {
-    OS << "type_conversion " << getID(TCI->getOperand());
+    OS << "type_conversion " << getID(TCI->getOperand()) << " -> "
+       << TCI->getType().getString();
   }
   void visitTupleInst(TupleInst *TI) {
     OS << "tuple (";
@@ -187,6 +188,10 @@ public:
     OS << "index_lvalue " << getID(ILI->getOperand()) << ", " <<ILI->getIndex();
   }
 
+  void visitIntegerValueInst(IntegerValueInst *IVI) {
+    OS << "integer_value " << IVI->getValue() << ", "
+       << IVI->getType().getString();
+  }
 
   void visitUnreachableInst(UnreachableInst *UI) {
     OS << "unreachable";

@@ -512,6 +512,21 @@ public:
   }
 };
 
+/// IntegerValueInst - Always produces an integer of the specified value.  These
+/// always have Builtin.Integer type.
+class IntegerValueInst : public Instruction {
+  uint64_t Val;
+public:
+  IntegerValueInst(uint64_t Val, Type Ty);
+
+  uint64_t getValue() const { return Val; }
+
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::IntegerValueInst;
+  }
+};
+
+
 //===----------------------------------------------------------------------===//
 // Instructions representing terminators
 //===----------------------------------------------------------------------===//

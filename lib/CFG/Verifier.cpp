@@ -104,6 +104,10 @@ public:
            "invalid IndexLValueInst");
   }
 
+  void visitIntegerValueInst(IntegerValueInst *IVI) {
+    assert(IVI->getType()->is<BuiltinIntegerType());
+  }
+
   void visitReturnInst(ReturnInst *RI) {
     assert(RI->getReturnValue() && "Return of null value is invalid");
   }
