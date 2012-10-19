@@ -430,10 +430,14 @@ public:
 
   /// Construct a TupleInst.  The two forms are used to ensure that these are
   /// only created for specific syntactic forms.
-  static TupleInst *create(TupleExpr *E, ArrayRef<Value*> Elements,CFG &C){
+  static TupleInst *create(TupleExpr *E, ArrayRef<Value*> Elements, CFG &C) {
     return createImpl((Expr*)E, Type(), Elements, C);
   }
   static TupleInst *create(TupleShuffleExpr *E, ArrayRef<Value*> Elements,
+                           CFG &C) {
+    return createImpl((Expr*)E, Type(), Elements, C);
+  }
+  static TupleInst *create(ScalarToTupleExpr *E, ArrayRef<Value*> Elements,
                            CFG &C) {
     return createImpl((Expr*)E, Type(), Elements, C);
   }
@@ -467,19 +471,7 @@ public:
   }
 };
 
-/// ScalarToTupleInst - Convert a scalar to a tuple.
-class ScalarToTupleInst : public Instruction {
-  Value *Operand;
-public:
-  ScalarToTupleInst(ScalarToTupleExpr *E, Value *Operand);
 
-  Value *getOperand() const { return Operand; }
-
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::ScalarToTupleInst;
-  }
-};
-  
 /// TupleElementInst - Extract a numbered element out of a value of tuple type.
 class TupleElementInst : public Instruction {
   Value *Operand;

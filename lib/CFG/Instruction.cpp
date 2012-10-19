@@ -268,11 +268,6 @@ Type TypeOfInst::getMetaType() const {
   return getExpr()->getType();
 }
 
-ScalarToTupleInst::ScalarToTupleInst(ScalarToTupleExpr *E, Value *Operand)
-  : Instruction(ValueKind::ScalarToTupleInst, E, E->getType()),
-    Operand(Operand) {
-}
-
 TupleElementInst::TupleElementInst(TupleElementExpr *E, Value *Operand,
                                    unsigned FieldNo)
   : Instruction(ValueKind::TupleElementInst, E, E->getType()),

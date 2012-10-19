@@ -90,7 +90,8 @@ Value *CFGGen::visitTupleExpr(TupleExpr *E) {
 }
 
 Value *CFGGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
-  return B.createScalarToTuple(E, visit(E->getSubExpr()));
+  Value *Arg = visit(E->getSubExpr());
+  return B.createTuple(E, Arg);
 }
 
 Value *CFGGen::visitSpecializeExpr(SpecializeExpr *E) {

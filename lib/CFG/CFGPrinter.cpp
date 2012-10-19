@@ -163,9 +163,6 @@ public:
   void visitTypeConversionInst(TypeConversionInst *TCI) {
     OS << "type_conversion " << getID(TCI->getOperand());
   }
-  void visitScalarToTupleInst(ScalarToTupleInst *SI) {
-    OS << "scalartotuple " << getID(SI->getOperand());
-  }
   void visitTupleInst(TupleInst *TI) {
     OS << "tuple (";
     bool isFirst = true;
