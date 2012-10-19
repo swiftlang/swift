@@ -120,20 +120,31 @@ AllocArrayInst::AllocArrayInst(TupleShuffleExpr *E, Type ElementType,
     ElementType(ElementType), NumElements(NumElements) {
 }
 
+ApplyInst::ApplyInst(CFGLocation Loc, Type Ty, Value *Callee,
+                     ArrayRef<Value*> Args)
+  : Instruction(ValueKind::ApplyInst, Loc, Ty), Callee(Callee),
+    NumArgs(Args.size()) {
+  memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(Value*));
+}
 
 ApplyInst *ApplyInst::create(ApplyExpr *Expr, Value *Callee,
                              ArrayRef<Value*> Args, CFG &C) {
   void *Buffer = C.allocate(sizeof(ApplyInst) +
                             Args.size() * sizeof(Value*),
                             llvm::AlignOf<ApplyInst>::Alignment);
-  return ::new(Buffer) ApplyInst(Expr, Callee, Args);
+  Type ResTy = Callee->getType()->castTo<FunctionType>()->getResult();
+  assert(ResTy->isEqual(Expr->getType()));
+  return ::new(Buffer) ApplyInst(Expr, ResTy, Callee, Args);
 }
 
-ApplyInst::ApplyInst(ApplyExpr *Expr, Value *Callee, ArrayRef<Value*> Args)
-  : Instruction(ValueKind::ApplyInst, Expr, Expr->getType()),
-    Callee(Callee), NumArgs(Args.size()) {
-  memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(Value*));
+ApplyInst *ApplyInst::create(Value *Callee, ArrayRef<Value*> Args, CFG &C) {
+  void *Buffer = C.allocate(sizeof(ApplyInst) +
+                            Args.size() * sizeof(Value*),
+                            llvm::AlignOf<ApplyInst>::Alignment);
+  Type ResTy = Callee->getType()->castTo<FunctionType>()->getResult();
+  return ::new(Buffer) ApplyInst(CFGLocation(), ResTy, Callee, Args);
 }
+
 
 ConstantRefInst::ConstantRefInst(DeclRefExpr *E)
   : Instruction(ValueKind::ConstantRefInst, E, E->getType()) {}
@@ -236,6 +247,11 @@ SpecializeInst::SpecializeInst(SpecializeExpr *SE, Value *Operand, Type DestTy)
 TypeConversionInst::TypeConversionInst(ImplicitConversionExpr *E,
                                        Value *Operand)
   : Instruction(ValueKind::TypeConversionInst, E, E->getType()),
+    Operand(Operand) {
+}
+
+TypeConversionInst::TypeConversionInst(Type Ty, Value *Operand)
+  : Instruction(ValueKind::TypeConversionInst, (Expr*)nullptr, Ty),
     Operand(Operand) {
 }
 

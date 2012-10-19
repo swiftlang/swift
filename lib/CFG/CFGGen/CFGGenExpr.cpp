@@ -154,16 +154,15 @@ Value *CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
 
     Type BaseLValue =
       AllocArray->getType()->getAs<TupleType>()->getElementType(1);
-
     Value *BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
 
     unsigned CurElem = 0;
     while (shuffleIndexIterator != shuffleIndexIteratorEnd) {
       unsigned SourceField = *shuffleIndexIterator++;
-
+      
       Value *EltLoc = BasePtr;
       if (CurElem) EltLoc = B.createIndexLValue(E, EltLoc, CurElem);
-
+      
       Type EltTy = InnerFields[SourceField].getType();
       Value *EltVal = B.createTupleElement(EltTy, Op, SourceField);
       B.createInitialization(E, EltVal, EltLoc);
@@ -172,16 +171,13 @@ Value *CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
 
     Value *ObjectPtr =
       B.createTupleElement(C.getContext().TheObjectPointerType, AllocArray, 0);
-    (void)ObjectPtr;
 
-    // FIXME: Need to bitcast the BasePtr (an lvalue) to Builtin.RawPtr.
+    // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer.
+    BasePtr = B.createTypeConversion(C.getContext().TheRawPointerType, BasePtr);
 
-   // visit(E->getVarargsInjectionFunction());
-    // call Injection(Builtin.RawPointer, Builtin.ObjectPointer, typeof(length))
-    //ResElement = Call Injection(BasePtr, Object, #elements)
-    // ResultElements.push_back(ResElement);
-    
-    assert(0 && "FIXME: Varargs tuple shuffles not supported yet");
+    Value *InjectionFn = visit(E->getVarargsInjectionFunction());
+    Value *InjectionArgs[] = { BasePtr, ObjectPtr /* # Elements! */ };
+    ResultElements.push_back(B.createApply(InjectionFn, InjectionArgs));
     break;
   }
 

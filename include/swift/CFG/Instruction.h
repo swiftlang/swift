@@ -196,11 +196,12 @@ class ApplyInst : public Instruction {
   
   /// Construct an ApplyInst from a given call expression and the provided
   /// arguments.
-  ApplyInst(ApplyExpr *Expr, Value *Callee, ArrayRef<Value*> Args);
+  ApplyInst(CFGLocation Loc, Type Ty, Value *Callee, ArrayRef<Value*> Args);
 
 public:
   static ApplyInst *create(ApplyExpr *Expr, Value *Callee,
-                          ArrayRef<Value*> Args, CFG &C);
+                           ArrayRef<Value*> Args, CFG &C);
+  static ApplyInst *create(Value *Callee, ArrayRef<Value*> Args, CFG &C);
 
   
   Value *getCallee() { return Callee; }
@@ -395,6 +396,7 @@ class TypeConversionInst : public Instruction {
   Value *Operand;
 public:
   TypeConversionInst(ImplicitConversionExpr *E, Value *Operand);
+  TypeConversionInst(Type Ty, Value *Operand);
 
   Value *getOperand() const { return Operand; }
   

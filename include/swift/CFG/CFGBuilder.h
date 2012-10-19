@@ -117,8 +117,11 @@ public:
   }
 
 
-  ApplyInst *createApply(ApplyExpr *Expr, Value *Fn, ArrayRef<Value*> Args){
+  ApplyInst *createApply(ApplyExpr *Expr, Value *Fn, ArrayRef<Value*> Args) {
     return insert(ApplyInst::create(Expr, Fn, Args, C));
+  }
+  ApplyInst *createApply(Value *Fn, ArrayRef<Value*> Args) {
+    return insert(ApplyInst::create(Fn, Args, C));
   }
 
   ConstantRefInst *createConstantRef(DeclRefExpr *Expr) {
@@ -172,6 +175,9 @@ public:
   TypeConversionInst *createTypeConversion(ImplicitConversionExpr *E,
                                            Value *Op) {
     return insert(new TypeConversionInst(E, Op));
+  }
+  TypeConversionInst *createTypeConversion(Type Ty, Value *Op) {
+    return insert(new TypeConversionInst(Ty, Op));
   }
 
   TupleInst *createTuple(TupleExpr *Expr, ArrayRef<Value*> Elements) {
