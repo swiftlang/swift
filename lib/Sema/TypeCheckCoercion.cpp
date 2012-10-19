@@ -1655,7 +1655,7 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   // default value, see if the expression's type is convertable to the
   // element type.  This handles assigning 4 to "(a = 4, b : int)".
 
-  TupleTypeElt Field = DestTy->getFields()[ScalarField];
+  const TupleTypeElt &Field = DestTy->getFields()[ScalarField];
 
   // If we are performing coercion for an assignment, and this is the
   // first argument, make it an implicit lvalue.
@@ -1667,20 +1667,26 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
       SubFlags |= CF_ImplicitLValue;
   }
 
-  Type ScalarType = Field.getType();
+  // If the destination type is variadic, compute the injection function to use.
   Expr *injectionFn = nullptr;
-  if (Field.isVararg()) {
-    ScalarType = Field.getVarargBaseTy();
+  const TupleTypeElt &LastField = DestTy->getFields().back();
 
+  if (LastField.isVararg()) {
     // Find the appropriate injection function.
     ArraySliceType *sliceType =
-        cast<ArraySliceType>(Field.getType().getPointer());
+      cast<ArraySliceType>(LastField.getType().getPointer());
     Type boundType = BuiltinIntegerType::get(64, TC.Context);
     injectionFn = TC.buildArrayInjectionFnRef(sliceType, boundType,
                                               E->getStartLoc());
     if (!injectionFn)
       return nullptr;
   }
+
+  // If we're initializing the varargs list, use its base type.
+  Type ScalarType = Field.getType();
+  if (Field.isVararg())
+    ScalarType = Field.getVarargBaseTy();
+
   CoercedResult ERes = coerceToType(E, ScalarType, CC, SubFlags);
   if (!ERes)
     return ERes;
