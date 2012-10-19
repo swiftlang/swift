@@ -73,6 +73,7 @@ public:
       // Otherwise, we must have a decomposed tuple.  Verify the arguments match
       // up.
       const TupleType *TT = FT->getInput()->castTo<TupleType>();
+      (void)TT;
       assert(AI->getArguments().size() == TT->getFields().size() &&
              "ApplyInst contains unexpected argument count for function");
       for (unsigned i = 0, e = AI->getArguments().size(); i != e; ++i)
