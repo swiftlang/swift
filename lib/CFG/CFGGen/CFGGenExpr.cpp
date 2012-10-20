@@ -102,6 +102,23 @@ Value *CFGGen::visitTupleElementExpr(TupleElementExpr *E) {
   return B.createTupleElement(E, visit(E->getBase()), E->getFieldNumber());
 }
 
+
+/// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
+/// (which represents the retain count) a base pointer to some elements, and a
+/// length
+Value *CFGGen::emitArrayInjectionCall(Value *ObjectPtr, Value *BasePtr,
+                                      Value *Length,
+                                      Expr *ArrayInjectionFunction) {
+  // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
+  if (!BasePtr->getType()->isEqual(C.getContext().TheRawPointerType))
+    BasePtr = B.createTypeConversion(C.getContext().TheRawPointerType, BasePtr);
+
+  Value *InjectionFn = visit(ArrayInjectionFunction);
+  Value *InjectionArgs[] = { BasePtr, ObjectPtr, Length };
+  return B.createApply(InjectionFn, InjectionArgs);
+}
+
+
 Value *CFGGen::emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
                                 ArrayRef<int> ElementMapping,
                                 Expr *VarargsInjectionFunction) {
@@ -162,12 +179,8 @@ Value *CFGGen::emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
     Value *ObjectPtr =
       B.createTupleElement(C.getContext().TheObjectPointerType, AllocArray, 0);
 
-    // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer.
-    BasePtr = B.createTypeConversion(C.getContext().TheRawPointerType, BasePtr);
-
-    Value *InjectionFn = visit(VarargsInjectionFunction);
-    Value *InjectionArgs[] = { BasePtr, ObjectPtr, NumEltsVal };
-    ResultElements.push_back(B.createApply(InjectionFn, InjectionArgs));
+    ResultElements.push_back(emitArrayInjectionCall(ObjectPtr, BasePtr,
+                                        NumEltsVal, VarargsInjectionFunction));
     break;
   }
 
@@ -212,6 +225,29 @@ Value *CFGGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
 
   return emitTupleShuffle(E, Arg, ShuffleMask,E->getVarargsInjectionFunction());
 }
+
+Value *CFGGen::visitNewArrayExpr(NewArrayExpr *E) {
+  Value *NumElements = visit(E->getBounds()[0].Value);
+
+  // Allocate the array.
+  Value *AllocArray = B.createAllocArray(E, E->getElementType(), NumElements);
+
+  Type BaseLValue =
+    AllocArray->getType()->castTo<TupleType>()->getElementType(1);
+  Value *BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
+  Value *ObjectPtr =
+    B.createTupleElement(C.getContext().TheObjectPointerType, AllocArray, 0);
+
+  // FIXME: We need to initialize the elements of the array that are now
+  // allocated.
+
+  // Finally, build and return a Slice instance using the object
+  // header/base/count.
+  return emitArrayInjectionCall(ObjectPtr, BasePtr, NumElements,
+                                E->getInjectionFunction());
+}
+
+
 
 Value *CFGGen::visitTypeOfExpr(TypeOfExpr *E) {
   return B.createTypeOf(E);

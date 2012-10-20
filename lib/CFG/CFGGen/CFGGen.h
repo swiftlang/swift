@@ -138,8 +138,11 @@ public:
   Value *visitAddressOfExpr(AddressOfExpr *E);
   Value *visitTupleElementExpr(TupleElementExpr *E);
   Value *visitTupleShuffleExpr(TupleShuffleExpr *E);
+  Value *visitNewArrayExpr(NewArrayExpr *E);
   Value *visitTypeOfExpr(TypeOfExpr *E);
 
+  Value *emitArrayInjectionCall(Value *ObjectPtr, Value *BasePtr,
+                                Value *Length, Expr *ArrayInjectionFunction);
   Value *emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
                           ArrayRef<int> ElementMapping,
                           Expr *VarargsInjectionFunction);
