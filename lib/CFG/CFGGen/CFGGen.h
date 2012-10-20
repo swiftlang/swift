@@ -140,7 +140,8 @@ public:
   Value *visitTupleShuffleExpr(TupleShuffleExpr *E);
   Value *visitTypeOfExpr(TypeOfExpr *E);
 
-  Value *emitTupleShuffle(Expr *E, Value *Op, ArrayRef<int> ElementMapping,
+  Value *emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
+                          ArrayRef<int> ElementMapping,
                           Expr *VarargsInjectionFunction);
 
   //===--------------------------------------------------------------------===//

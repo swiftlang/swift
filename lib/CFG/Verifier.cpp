@@ -116,6 +116,11 @@ public:
   }
 
   void visitTupleInst(TupleInst *TI) {
+    assert(TI->getType()->is<TupleType>() && "TupleInst should return a tuple");
+    TupleType *ResTy = TI->getType()->castTo<TupleType>(); (void)ResTy;
+
+    assert(TI->getElements().size() == ResTy->getFields().size() &&
+           "Tuple field count mismatch!");
   }
   void visitTypeOfInst(TypeOfInst *TOI) {
   }
