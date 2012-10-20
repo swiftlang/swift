@@ -103,7 +103,9 @@ endif ()
 #   compile_swift_file(file         # Name of the source file, e.g., swift.swift)
 #     target                        # The target of which this file is a part
 #     objectvar)                    # Variable to receive the object file name
-function(compile_swift_file file target objectvar)
+function(compile_swift_file file target objectvar)	
+  parse_arguments(SWIFTFILE  "" "IS_MAIN" ${ARGN})
+
   # Determine where this file is.
   get_filename_component(file_path ${file} PATH) 
   if(IS_ABSOLUTE "${file_path}")
@@ -119,13 +121,17 @@ function(compile_swift_file file target objectvar)
   else()
     set(swift_flags "-O0")
   endif()
+  
+  if (NOT SWIFTFILE_IS_MAIN)
+    list(APPEND swift_flags -parse-as-library)
+  endif()
 
   get_filename_component(file_name ${file} NAME_WE)
   set(objfile
     "${CMAKE_CURRENT_BINARY_DIR}/${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
   add_custom_command(
     OUTPUT ${objfile}
-    COMMAND swift "-c" "-parse-as-library" "-constraint-checker" "${swift_flags}" "-o" "${objfile}" "${source_file}"
+    COMMAND swift "-c" "-constraint-checker" ${swift_flags} "-o" "${objfile}" "${source_file}"
     DEPENDS ${source_file}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
@@ -135,6 +141,7 @@ function(compile_swift_file file target objectvar)
     PROPERTIES 
     GENERATED true 
     EXTERNAL_OBJECT true
+    LANGUAGE C
     OBJECT_DEPENDS "${source_file}")
 
   # Make sure this object file gets cleaned up.
@@ -193,13 +200,20 @@ endfunction()
 # Usage:
 #   handle_swift_sources(sourcesvar externalvar target)
 function(handle_swift_sources sourcesvar externalvar target)
+  parse_arguments(SWIFTSOURCES  "" "IS_MAIN" ${ARGN})
+
   set(result)
   set(externally_compiled)
   foreach(src ${${sourcesvar}})
     get_filename_component(extension ${src} EXT)
     if(extension STREQUAL ".swift")
       # We have a swift file; compile it.
-      compile_swift_file(${src} ${target} "obj")
+      # FIXME: It's probably not okay to consider /every/ file a main file.
+      if (SWIFTSOURCES_IS_MAIN)
+        compile_swift_file(${src} ${target} "obj" IS_MAIN)
+      else()
+        compile_swift_file(${src} ${target} "obj")
+      endif()
       list(APPEND result ${obj})
       list(APPEND externally_compiled ${src})
     elseif(extension STREQUAL ".s")
@@ -293,8 +307,9 @@ macro(add_swift_executable name)
   # Parse the arguments we were given.
   parse_arguments(SWIFTEXE  "DEPENDS;COMPONENT_DEPENDS" "EXCLUDE_FROM_ALL" 
     ${ARGN})
+  set(SWIFTEXE)
   
-  handle_swift_sources(SWIFTEXE_DEFAULT_ARGS SWIFTEXE_EXTERNAL_SOURCES ${name})
+  handle_swift_sources(SWIFTEXE_DEFAULT_ARGS SWIFTEXE_EXTERNAL_SOURCES ${name} IS_MAIN)
 
   # Add the executable
   if (${SWIFTEXE_EXCLUDE_FROM_ALL})
