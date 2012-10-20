@@ -139,8 +139,10 @@ Value *CFGGen::emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
     // TupleShuffleExpr.
     auto shuffleIndexIteratorEnd = ElementMapping.end();
     unsigned NumArrayElts = shuffleIndexIteratorEnd - shuffleIndexIterator;
+    Value *NumEltsVal = B.createIntegerValueInst(NumArrayElts,
+                                   BuiltinIntegerType::get(64, C.getContext()));
     Value *AllocArray = B.createAllocArray(E, outerField.getVarargBaseTy(),
-                                           NumArrayElts);
+                                           NumEltsVal);
 
     Type BaseLValue =
       AllocArray->getType()->castTo<TupleType>()->getElementType(1);
@@ -163,11 +165,8 @@ Value *CFGGen::emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
     // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer.
     BasePtr = B.createTypeConversion(C.getContext().TheRawPointerType, BasePtr);
 
-    Value *NumElts = B.createIntegerValueInst(NumArrayElts,
-                                  BuiltinIntegerType::get(64, C.getContext()));
-
     Value *InjectionFn = visit(VarargsInjectionFunction);
-    Value *InjectionArgs[] = { BasePtr, ObjectPtr, NumElts };
+    Value *InjectionArgs[] = { BasePtr, ObjectPtr, NumEltsVal };
     ResultElements.push_back(B.createApply(InjectionFn, InjectionArgs));
     break;
   }

@@ -172,13 +172,13 @@ public:
 ///
 class AllocArrayInst : public Instruction {
   Type ElementType;
-  unsigned NumElements;
+  Value *NumElements;
 public:
 
-  AllocArrayInst(Expr *E, Type ElementType, unsigned NumElements);
+  AllocArrayInst(Expr *E, Type ElementType, Value *NumElements);
 
   Type getElementType() const { return ElementType; }
-  unsigned getNumElements() const { return NumElements; }
+  Value *getNumElements() const { return NumElements; }
 
   static bool classof(const Value *I) {
     return I->getKind() == ValueKind::AllocArrayInst;

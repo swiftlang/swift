@@ -107,7 +107,7 @@ public:
 
   void visitAllocArrayInst(AllocArrayInst *AAI) {
     OS << "alloc_array element type=" << AAI->getElementType().getString()
-       << ", " << AAI->getNumElements();
+       << ", " << getID(AAI->getNumElements());
   }
 
   void visitApplyInst(ApplyInst *AI) {

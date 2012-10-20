@@ -112,7 +112,7 @@ public:
   }
 
   AllocArrayInst *createAllocArray(Expr *E, Type ElementType,
-                                   unsigned NumElements) {
+                                   Value *NumElements) {
     return insert(new AllocArrayInst(E, ElementType, NumElements));
   }
 

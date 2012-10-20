@@ -115,7 +115,7 @@ static Type getAllocArrayType(Type EltTy) {
 }
 
 AllocArrayInst::AllocArrayInst(Expr *E, Type ElementType,
-                               unsigned NumElements)
+                               Value *NumElements)
   : Instruction(ValueKind::AllocArrayInst, E, getAllocArrayType(ElementType)),
     ElementType(ElementType), NumElements(NumElements) {
 }
