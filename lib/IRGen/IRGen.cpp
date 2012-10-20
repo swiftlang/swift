@@ -144,15 +144,22 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
         performCaptureAnalysis(SubTU);
         performIRGeneration(SubOpts, &SubModule, SubTU);
 
+        SmallVector<GlobalValue*, 8> DeclsToErase;
         for (llvm::Function &F : SubModule)
           if (!F.isDeclaration() && F.hasExternalLinkage())
             F.setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
-        for (llvm::GlobalVariable &G : SubModule.getGlobalList())
+        for (llvm::GlobalVariable &G : SubModule.getGlobalList()) {
           if (!G.isDeclaration() && G.hasExternalLinkage())
             G.setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
+          if (G.hasAppendingLinkage())
+            DeclsToErase.push_back(&G);
+        }
         for (llvm::GlobalAlias &A : SubModule.getAliasList())
           if (!A.isDeclaration() && A.hasExternalLinkage())
             A.setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
+
+        for (auto G : DeclsToErase)
+          G->eraseFromParent();
 
         std::string ErrorMessage;
         if (llvm::Linker::LinkModules(Module, &SubModule,
