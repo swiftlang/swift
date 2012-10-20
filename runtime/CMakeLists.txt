@@ -14,7 +14,11 @@ set(SWIFTLIB_SOURCES
 
 add_custom_command(
   OUTPUT ${CMAKE_BINARY_DIR}/lib/swift.swift
+  # FIXME: Do we need lib/swift.swift, or can we just use lib/swift/swift.swift?
   COMMAND cat ${SWIFTLIB_SOURCES} > ${CMAKE_BINARY_DIR}/lib/swift.swift
+  COMMAND mkdir -p "${CMAKE_BINARY_DIR}/lib/swift"
+  COMMAND ln -fs "${CMAKE_BINARY_DIR}/lib/swift.swift"
+    "${CMAKE_BINARY_DIR}/lib/swift/swift.swift"
   DEPENDS ${SWIFTLIB_SOURCES} swift
   COMMENT "FIXME: Concatenating Swift runtime sources into swift.swift"
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
@@ -55,11 +59,6 @@ if(XCODE)
   # Create the symlinks necessary to get the compiler to to find the
   # swift runtime during development with Xcode.
   add_custom_command(TARGET swift_runtime PRE_BUILD
-    COMMAND mkdir "-p" "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}"
-    COMMAND ln "-fs" "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}"
-            "${CMAKE_BINARY_DIR}/bin/lib"
-    COMMAND mkdir "-p" "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}/swift"
-    COMMAND ln "-fs" "${CMAKE_BINARY_DIR}/lib/swift.swift"
-            "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}/swift/swift.swift"
-    COMMENT "Adding runtime symlinks for development builds")
+    COMMAND ln "-fs" "${CMAKE_BINARY_DIR}/lib"
+            "${CMAKE_BINARY_DIR}/bin/lib")
 endif()
