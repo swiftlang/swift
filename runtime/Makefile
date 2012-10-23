@@ -13,16 +13,9 @@
 SWIFT_LEVEL := ..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
-DIRS := LowLevel
-
 LIBRARYNAME := swift_runtime
-LINK_LIBS_IN_SHARED := 1
-SHARED_LIBRARY := 1
-SWIFT_SOURCES := Bool.swift File.swift FixedPoint.swift FloatingPoint.swift Misc.swift \
-                 String.swift Dictionary.swift Vector.swift Algorithm.swift Demangle.swift
-SOURCES := swift.swift
-NO_BUILD_ARCHIVE := 1
-USEDLIBS := swift_LowLevelRuntime.a
+SOURCES := FastEntryPoints.s Alloc.cpp KnownMetadata.cpp \
+	   Metadata.cpp Stubs.cpp ObjCBridge.mm
 
 include $(SWIFT_LEVEL)/Makefile
 
@@ -42,38 +35,7 @@ endif
 
 SWIFT_OPTFLAG := -O3
 
-LDFLAGS += -framework Foundation
-
-HeaderDir := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift/
-PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
-$(HeaderDir)/swift.swift: $(PATH_TO_SWIFT_SOURCES) $(HeaderDir)/.dir
-	$(Echo) FIXME -- HACK -- Concatenating $(SWIFT_SOURCES) to build dir
-	$(Verb) cat $(PATH_TO_SWIFT_SOURCES) > $@
-
-SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
-$(ObjDir)/swift.o: $(HeaderDir)/swift.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER)
-	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) -c $< -o $@ -parse-as-library -constraint-checker $(SWIFT_OPTFLAG)
-
-RecursiveTargets += $(LibDir)/libswift_LowLevelRuntime.a
-
-# This is a hack --- something seems to want the LowLevelRuntime
-# library to exist before it tries recursively making.
-ifneq ($(PROJ_SRC_ROOT),$(PROJ_OBJ_ROOT))
-$(LibDir)/libswift_LowLevelRuntime.a:
-	$(Verb) for dir in $(DIRS); do \
-	  if ([ ! -f $$dir/Makefile ] || \
-	      command test $$dir/Makefile -ot $(PROJ_SRC_DIR)/$$dir/Makefile ); then \
-	    $(MKDIR) $$dir; \
-	    $(CP) $(PROJ_SRC_DIR)/$$dir/Makefile $$dir/Makefile; \
-	  fi; \
-	  ($(MAKE) -C $$dir $@ ) || exit 1; \
-	done
-else
-$(LibDir)/libswift_LowLevelRuntime.a:
-	$(Verb) for dir in $(DIRS); do \
-	  ($(MAKE) -C $$dir $@ ) || exit 1; \
-	done
-endif
-
-all-local:: $(HeaderDir)/swift.swift
+$(ObjDir)/%.o: %.s $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE)
+	$(Echo) "Compiling $*.s for $(BuildMode) build" $(PIC_FLAG)
+	$(Verb) if $(Compile.C) $(DEPEND_OPTIONS) $< -o $(ObjDir)/$*.o ; \
+	        $(DEPEND_MOVEFILE)

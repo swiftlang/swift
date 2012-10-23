@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../runtime/LowLevel/Metadata.h"
+#include "../runtime/Metadata.h"
 #include "gtest/gtest.h"
 
 using namespace swift;

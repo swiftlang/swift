@@ -38,8 +38,8 @@ extension Bool {
 }
 
 extension Bool : FormattedPrintable {
-  func printFormatted(kind : Char, layout : String) {
-    Format(layout).printString(String(this))
+  func format(kind : Char, layout : String) -> String {
+    return Format(layout).printToString(String(this))
   }
 }
 

@@ -60,7 +60,7 @@ static void LoadSwiftRuntime() {
   LibPath.eraseComponent();
   LibPath.eraseComponent();
   LibPath.appendComponent("lib");
-  LibPath.appendComponent("libswift_runtime.dylib");
+  LibPath.appendComponent("libswift_stdlib.dylib");
   dlopen(LibPath.c_str(), 0);
 }
 

@@ -165,218 +165,218 @@ struct Int128 {
 //===----------------------------------------------------------------------===//
 
 extension Int8 {
-  static func Int8(v : UInt8) -> Int8 {
-    return Int8(v.value)
+  constructor(v : UInt8) {
+    value = v.value
   }
-  static func Int8(v : Int16) -> Int8 {
-    return Int8(Builtin.trunc_Int16_Int8(v.value))
+  constructor(v : Int16) {
+    value = Builtin.trunc_Int16_Int8(v.value)
   }
-  static func Int8(v : UInt16) -> Int8 {
-    return Int8(Builtin.trunc_Int16_Int8(v.value))
+  constructor(v : UInt16) {
+    value = Builtin.trunc_Int16_Int8(v.value)
   }
-  static func Int8(v : Int32) -> Int8 {
-    return Int8(Builtin.trunc_Int32_Int8(v.value))
+  constructor(v : Int32) {
+    value = Builtin.trunc_Int32_Int8(v.value)
   }
-  static func Int8(v : UInt32) -> Int8 {
-    return Int8(Builtin.trunc_Int32_Int8(v.value))
+  constructor(v : UInt32) {
+    value = Builtin.trunc_Int32_Int8(v.value)
   }
-  static func Int8(v : Int64) -> Int8 {
-    return Int8(Builtin.trunc_Int64_Int8(v.value))
+  constructor(v : Int64) {
+    value = Builtin.trunc_Int64_Int8(v.value)
   }
-  static func Int8(v : UInt64) -> Int8 {
-    return Int8(Builtin.trunc_Int64_Int8(v.value))
+  constructor(v : UInt64) {
+    value = Builtin.trunc_Int64_Int8(v.value)
   }
-  static func Int8(v : Int128) -> Int8 {
-    return Int8(Builtin.trunc_Int128_Int8(v.value))
+  constructor(v : Int128) {
+    value = Builtin.trunc_Int128_Int8(v.value)
   }
 }
 
 extension UInt8 {
-  static func UInt8(v : Int8) -> UInt8 {
-    return UInt8(v.value)
+  constructor(v : Int8) {
+    value = v.value
   }
-  static func UInt8(v : Int16) -> UInt8 {
-    return UInt8(Builtin.trunc_Int16_Int8(v.value))
+  constructor(v : Int16) {
+    value = Builtin.trunc_Int16_Int8(v.value)
   }
-  static func UInt8(v : UInt16) -> UInt8 {
-    return UInt8(Builtin.trunc_Int16_Int8(v.value))
+  constructor(v : UInt16) {
+    value = Builtin.trunc_Int16_Int8(v.value)
   }
-  static func UInt8(v : Int32) -> UInt8 {
-    return UInt8(Builtin.trunc_Int32_Int8(v.value))
+  constructor(v : Int32) {
+    value = Builtin.trunc_Int32_Int8(v.value)
   }
-  static func UInt8(v : UInt32) -> UInt8 {
-    return UInt8(Builtin.trunc_Int32_Int8(v.value))
+  constructor(v : UInt32) {
+    value = Builtin.trunc_Int32_Int8(v.value)
   }
-  static func UInt8(v : Int64) -> UInt8 {
-    return UInt8(Builtin.trunc_Int64_Int8(v.value))
+  constructor(v : Int64) {
+    value = Builtin.trunc_Int64_Int8(v.value)
   }
-  static func UInt8(v : UInt64) -> UInt8 {
-    return UInt8(Builtin.trunc_Int64_Int8(v.value))
+  constructor(v : UInt64) {
+    value = Builtin.trunc_Int64_Int8(v.value)
   }
-  static func UInt8(v : Int128) -> UInt8 {
-    return UInt8(Builtin.trunc_Int128_Int8(v.value))
+  constructor(v : Int128) {
+    value = Builtin.trunc_Int128_Int8(v.value)
   }
 }
 
 extension Int16 {
-  static func Int16(v : Int8) -> Int16 {
-    return Int16(Builtin.sext_Int8_Int16(v.value))
+  constructor(v : Int8) {
+    value = Builtin.sext_Int8_Int16(v.value)
   }
-  static func Int16(v : UInt8) -> Int16 {
-    return Int16(Builtin.zext_Int8_Int16(v.value))
+  constructor(v : UInt8) {
+    value = Builtin.zext_Int8_Int16(v.value)
   }
-  static func Int16(v : UInt16) -> Int16 {
-    return Int16(v.value)
+  constructor(v : UInt16) {
+    value = v.value
   }
-  static func Int16(v : Int32) -> Int16 {
-    return Int16(Builtin.trunc_Int32_Int16(v.value))
+  constructor(v : Int32) {
+    value = Builtin.trunc_Int32_Int16(v.value)
   }
-  static func Int16(v : UInt32) -> Int16 {
-    return Int16(Builtin.trunc_Int32_Int16(v.value))
+  constructor(v : UInt32) {
+    value = Builtin.trunc_Int32_Int16(v.value)
   }
-  static func Int16(v : Int64) -> Int16 {
-    return Int16(Builtin.trunc_Int64_Int16(v.value))
+  constructor(v : Int64) {
+    value = Builtin.trunc_Int64_Int16(v.value)
   }
-  static func Int16(v : UInt64) -> Int16 {
-    return Int16(Builtin.trunc_Int64_Int16(v.value))
+  constructor(v : UInt64) {
+    value = Builtin.trunc_Int64_Int16(v.value)
   }
-  static func Int16(v : Int128) -> Int16 {
-    return Int16(Builtin.trunc_Int128_Int16(v.value))
+  constructor(v : Int128) {
+    value = Builtin.trunc_Int128_Int16(v.value)
   }
 }
 
 extension Int32 {
-  static func Int32(v : Int8) -> Int32 {
-    return Int32(Builtin.sext_Int8_Int32(v.value))
+  constructor(v : Int8) {
+    value = Builtin.sext_Int8_Int32(v.value)
   }
-  static func Int32(v : UInt8) -> Int32 {
-    return Int32(Builtin.zext_Int8_Int32(v.value))
+  constructor(v : UInt8) {
+    value = Builtin.zext_Int8_Int32(v.value)
   }
-  static func Int32(v : Int16) -> Int32 {
-    return Int32(Builtin.sext_Int16_Int32(v.value))
+  constructor(v : Int16) {
+    value = Builtin.sext_Int16_Int32(v.value)
   }
-  static func Int32(v : UInt16) -> Int32 {
-    return Int32(Builtin.zext_Int16_Int32(v.value))
+  constructor(v : UInt16) {
+    value = Builtin.zext_Int16_Int32(v.value)
   }
-  static func Int32(v : UInt32) -> Int32 {
-    return Int32(v.value)
+  constructor(v : UInt32) {
+    value = v.value
   }
-  static func Int32(v : Int64) -> Int32 {
-    return Int32(Builtin.trunc_Int64_Int32(v.value))
+  constructor(v : Int64) {
+    value = Builtin.trunc_Int64_Int32(v.value)
   }
-  static func Int32(v : UInt64) -> Int32 {
-    return Int32(Builtin.trunc_Int64_Int32(v.value))
+  constructor(v : UInt64) {
+    value = Builtin.trunc_Int64_Int32(v.value)
   }
-  static func Int32(v : Int128) -> Int32 {
-    return Int32(Builtin.trunc_Int128_Int32(v.value))
+  constructor(v : Int128) {
+    value = Builtin.trunc_Int128_Int32(v.value)
   }
 }
 
 extension UInt32 {
-  static func UInt32(v : Int8) -> UInt32 {
-    return UInt32(Builtin.sext_Int8_Int32(v.value))
+  constructor(v : Int8) {
+    value = Builtin.sext_Int8_Int32(v.value)
   }
-  static func UInt32(v : UInt8) -> UInt32 {
-    return UInt32(Builtin.zext_Int8_Int32(v.value))
+  constructor(v : UInt8) {
+    value = Builtin.zext_Int8_Int32(v.value)
   }
-  static func UInt32(v : Int16) -> UInt32 {
-    return UInt32(Builtin.sext_Int16_Int32(v.value))
+  constructor(v : Int16) {
+    value = Builtin.sext_Int16_Int32(v.value)
   }
-  static func UInt32(v : UInt16) -> UInt32 {
-    return UInt32(Builtin.zext_Int16_Int32(v.value))
+  constructor(v : UInt16) {
+    value = Builtin.zext_Int16_Int32(v.value)
   }
-  static func UInt32(v : Int32) -> UInt32 {
-    return UInt32(v.value)
+  constructor(v : Int32) {
+    value = v.value
   }
-  static func UInt32(v : Int64) -> UInt32 {
-    return UInt32(Builtin.trunc_Int64_Int32(v.value))
+  constructor(v : Int64) {
+    value = Builtin.trunc_Int64_Int32(v.value)
   }
-  static func UInt32(v : UInt64) -> UInt32 {
-    return UInt32(Builtin.trunc_Int64_Int32(v.value))
+  constructor(v : UInt64) {
+    value = Builtin.trunc_Int64_Int32(v.value)
   }
-  static func UInt32(v : Int128) -> UInt32 {
-    return UInt32(Builtin.trunc_Int128_Int32(v.value))
+  constructor(v : Int128) {
+    value = Builtin.trunc_Int128_Int32(v.value)
   }
 }
 
 extension Int64 {
-  static func Int64(v : Int8) -> Int64 {
-    return Int64(Builtin.sext_Int8_Int64(v.value))
+  constructor(v : Int8) {
+    value = Builtin.sext_Int8_Int64(v.value)
   }
-  static func Int64(v : UInt8) -> Int64 {
-    return Int64(Builtin.zext_Int8_Int64(v.value))
+  constructor(v : UInt8) {
+    value = Builtin.zext_Int8_Int64(v.value)
   }
-  static func Int64(v : Int16) -> Int64 {
-    return Int64(Builtin.sext_Int16_Int64(v.value))
+  constructor(v : Int16) {
+    value = Builtin.sext_Int16_Int64(v.value)
   }
-  static func Int64(v : UInt16) -> Int64 {
-    return Int64(Builtin.zext_Int16_Int64(v.value))
+  constructor(v : UInt16) {
+    value = Builtin.zext_Int16_Int64(v.value)
   }
-  static func Int64(v : Int32) -> Int64 {
-    return Int64(Builtin.sext_Int32_Int64(v.value))
+  constructor(v : Int32) {
+    value = Builtin.sext_Int32_Int64(v.value)
   }
-  static func Int64(v : UInt32) -> Int64 {
-    return Int64(Builtin.zext_Int32_Int64(v.value))
+  constructor(v : UInt32) {
+    value = Builtin.zext_Int32_Int64(v.value)
   }
-  static func Int64(v : UInt64) -> Int64 {
-    return Int64(v.value)
+  constructor(v : UInt64) {
+    value = v.value
   }
-  static func Int64(v : Int128) -> Int64 {
-    return Int64(Builtin.trunc_Int128_Int64(v.value))
+  constructor(v : Int128) {
+    value = Builtin.trunc_Int128_Int64(v.value)
   }
 }
 
 extension UInt64 {
-  static func UInt64(v : Int8) -> UInt64 {
-    return UInt64(Builtin.sext_Int8_Int64(v.value))
+  constructor(v : Int8) {
+    value = Builtin.sext_Int8_Int64(v.value)
   }
-  static func UInt64(v : UInt8) -> UInt64 {
-    return UInt64(Builtin.zext_Int8_Int64(v.value))
+  constructor(v : UInt8) {
+    value = Builtin.zext_Int8_Int64(v.value)
   }
-  static func UInt64(v : Int16) -> UInt64 {
-    return UInt64(Builtin.sext_Int16_Int64(v.value))
+  constructor(v : Int16) {
+    value = Builtin.sext_Int16_Int64(v.value)
   }
-  static func UInt64(v : UInt16) -> UInt64 {
-    return UInt64(Builtin.zext_Int16_Int64(v.value))
+  constructor(v : UInt16) {
+    value = Builtin.zext_Int16_Int64(v.value)
   }
-  static func UInt64(v : Int32) -> UInt64 {
-    return UInt64(Builtin.sext_Int32_Int64(v.value))
+  constructor(v : Int32) {
+    value = Builtin.sext_Int32_Int64(v.value)
   }
-  static func UInt64(v : UInt32) -> UInt64 {
-    return UInt64(Builtin.zext_Int32_Int64(v.value))
+  constructor(v : UInt32) {
+    value = Builtin.zext_Int32_Int64(v.value)
   }
-  static func UInt64(v : Int64) -> UInt64 {
-    return UInt64(v.value)
+  constructor(v : Int64) {
+    value = v.value
   }
-  static func UInt64(v : Int128) -> UInt64 {
-    return UInt64(Builtin.trunc_Int128_Int64(v.value))
+  constructor(v : Int128) {
+    value = Builtin.trunc_Int128_Int64(v.value)
   }
 }
 
 extension Int128 {
-  static func Int128(v : Int8) -> Int128 {
-    return Int128(Builtin.sext_Int8_Int128(v.value))
+  constructor(v : Int8) {
+    value = Builtin.sext_Int8_Int128(v.value)
   }
-  static func Int128(v : UInt8) -> Int128 {
-    return Int128(Builtin.zext_Int8_Int128(v.value))
+  constructor(v : UInt8) {
+    value = Builtin.zext_Int8_Int128(v.value)
   }
-  static func Int128(v : Int16) -> Int128 {
-    return Int128(Builtin.sext_Int16_Int128(v.value))
+  constructor(v : Int16) {
+    value = Builtin.sext_Int16_Int128(v.value)
   }
-  static func Int128(v : UInt16) -> Int128 {
-    return Int128(Builtin.zext_Int16_Int128(v.value))
+  constructor(v : UInt16) {
+    value = Builtin.zext_Int16_Int128(v.value)
   }
-  static func Int128(v : Int32) -> Int128 {
-    return Int128(Builtin.sext_Int32_Int128(v.value))
+  constructor(v : Int32) {
+    value = Builtin.sext_Int32_Int128(v.value)
   }
-  static func Int128(v : UInt32) -> Int128 {
-    return Int128(Builtin.zext_Int32_Int128(v.value))
+  constructor(v : UInt32) {
+    value = Builtin.zext_Int32_Int128(v.value)
   }
-  static func Int128(v : Int64) -> Int128 {
-    return Int128(Builtin.sext_Int64_Int128(v.value))
+  constructor(v : Int64) {
+    value = Builtin.sext_Int64_Int128(v.value)
   }
-  static func Int128(v : UInt64) -> Int128 {
-    return Int128(Builtin.zext_Int64_Int128(v.value))
+  constructor(v : UInt64) {
+    value = Builtin.zext_Int64_Int128(v.value)
   }
 }
 

@@ -349,6 +349,8 @@ add_subdirectory(lib)
 add_subdirectory(tools)
 add_subdirectory(test)
 add_subdirectory(runtime)
+add_subdirectory(stdlib)
+add_subdirectory(examples)
 
 # Add a documentation target so that documentation shows up in the
 # Xcode project.
