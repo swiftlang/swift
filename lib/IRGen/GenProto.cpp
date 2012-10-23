@@ -2821,6 +2821,11 @@ namespace {
       case SourceKind::GenericLValueMetadata: {
         llvm::Value *metatype = in.claimUnmanagedNext();
         metatype->setName("This");
+
+        // Mark this as the cached metatype for the l-value's object type.
+        CanType argTy = CanType(cast<AnyFunctionType>(FnType)->getInput());
+        argTy = CanType(cast<LValueType>(stripLabel(argTy))->getObjectType());
+        IGF.setUnscopedLocalTypeData(argTy, LocalTypeData::Metatype, metatype);
         return metatype;
       }
       }
