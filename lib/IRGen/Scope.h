@@ -28,6 +28,7 @@ class Scope {
   IRGenFunction &IGF;
   CleanupsDepth Depth;
   CleanupsDepth SavedInnermostScope;
+  IRGenFunction::LocalTypeDataDepth SavedLocalTypeDataDepth;
 
   void popImpl() {
     IGF.Cleanups.checkIterator(Depth);
@@ -37,12 +38,16 @@ class Scope {
     IGF.InnermostScope = SavedInnermostScope;
     IGF.endScope(Depth);
     IGF.Cleanups.checkIterator(IGF.InnermostScope);
+
+    assert(IGF.ScopedLocalTypeData.size() >= SavedLocalTypeDataDepth);
+    IGF.endLocalTypeDataScope(SavedLocalTypeDataDepth);
   }
 
 public:
   explicit Scope(IRGenFunction &IGF)
     : IGF(IGF), Depth(IGF.getCleanupsDepth()),
-      SavedInnermostScope(IGF.InnermostScope) {
+      SavedInnermostScope(IGF.InnermostScope),
+      SavedLocalTypeDataDepth(IGF.ScopedLocalTypeData.size()) {
     assert(Depth.isValid());
     IGF.Cleanups.checkIterator(IGF.InnermostScope);
     IGF.InnermostScope = Depth;

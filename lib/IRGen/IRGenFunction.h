@@ -76,6 +76,16 @@ namespace irgen {
   class Scope;
   class TypeInfo;
 
+/// LocalTypeData - A nonce value for storing some sort of
+/// locally-known information about a type.
+/// 
+/// The enumerated values are all in the "negative" range and so do
+/// not collide with reasonable index values.
+enum class LocalTypeData : unsigned {
+  /// A reference to a metatype.
+  Metatype = ~0U
+};
+
 /// Prologue - A value indicating controlling the kind of prologue/epilogue
 /// code to emit.
 enum class Prologue : unsigned char {
@@ -377,10 +387,60 @@ private:
   void emitGlobalDecl(Decl *D);
 
 //--- Type emission ------------------------------------------------------------
+public:
+  /// Look for a mapping for a local type-metadata reference.
+  llvm::Value *tryGetLocalTypeData(CanType type, LocalTypeData index) {
+    auto key = getLocalTypeDataKey(type, index);
+    auto it = LocalTypeDataMap.find(key);
+    if (it == LocalTypeDataMap.end())
+      return nullptr;
+    return it->second;
+  }
+
+  /// Retrieve a local type-metadata reference which is known to exist.
+  llvm::Value *getLocalTypeData(CanType type, LocalTypeData index) {
+    auto key = getLocalTypeDataKey(type, index);
+    assert(LocalTypeDataMap.count(key) && "no mapping for local type data");
+    return LocalTypeDataMap.find(key)->second;
+  }
+
+  /// Add a local type-metadata reference at a point which dominates
+  /// the entire function.
+  void setUnscopedLocalTypeData(CanType type, LocalTypeData index,
+                                llvm::Value *data) {
+    assert(data && "setting a null value for type data!");
+
+    auto key = getLocalTypeDataKey(type, index);
+    assert(!LocalTypeDataMap.count(key) &&
+           "existing mapping for local type data");
+    LocalTypeDataMap.insert(std::make_pair(key, data));
+  }
+
+  /// Add a local type-metadata reference at a point which does not
+  /// necessarily dominate the entire function.
+  void setScopedLocalTypeData(CanType type, LocalTypeData index,
+                              llvm::Value *data) {
+    ScopedLocalTypeData.push_back(getLocalTypeDataKey(type, index));
+    setUnscopedLocalTypeData(type, index, data);
+  }
+
 private:
-  friend class GenProto;
-  llvm::DenseMap<std::pair<const void*, unsigned>, llvm::Value*>
-      ArchetypeValueWitnessMap;
+  typedef unsigned LocalTypeDataDepth;
+  typedef std::pair<TypeBase*,unsigned> LocalTypeDataPair;
+  LocalTypeDataPair getLocalTypeDataKey(CanType type, LocalTypeData index) {
+    return LocalTypeDataPair(type.getPointer(), unsigned(index));
+  }
+
+  llvm::DenseMap<LocalTypeDataPair, llvm::Value*> LocalTypeDataMap;
+  llvm::SmallVector<LocalTypeDataPair, 4> ScopedLocalTypeData;
+
+  void endLocalTypeDataScope(LocalTypeDataDepth depth) {
+    assert(ScopedLocalTypeData.size() >= depth);
+    while (ScopedLocalTypeData.size() != depth) {
+      LocalTypeDataMap.erase(ScopedLocalTypeData.back());
+      ScopedLocalTypeData.pop_back();
+    }
+  }
 };
 
 } // end namespace irgen

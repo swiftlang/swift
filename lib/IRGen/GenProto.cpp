@@ -58,44 +58,6 @@
 using namespace swift;
 using namespace irgen;
 
-/// A special index into the IGF-stored witness tables list for an
-/// archetype for the metadata pointer.
-const unsigned MetadataWitnessKey = ~0U;
-
-namespace swift {
-namespace irgen {
-  /// A little helper to give this file some privileged access.
-  /// The amount of code in this class is intentionally very small.
-  class GenProto {
-  public:
-    static llvm::DenseMap<TypeBase*, llvm::Constant*> &
-    getTrivialWitnessTablesCache(IRGenModule &IGM) {
-      return IGM.Types.TrivialWitnessTables;
-    }
-
-    static llvm::Value *getArchetypeValueWitness(IRGenFunction &IGF,
-                                                 const void *archetypeTI,
-                                                 unsigned which) {
-      auto &map = IGF.ArchetypeValueWitnessMap;
-      auto key = std::make_pair(archetypeTI, which);
-      assert(map.count(key) && "IGF has no metatype/wtable set for archetype");
-      return map.find(key)->second;
-    }
-
-    static void setArchetypeValueWitness(IRGenFunction &IGF,
-                                         const void *archetypeTI,
-                                         unsigned which,
-                                         llvm::Value *wtable) {
-      auto &map = IGF.ArchetypeValueWitnessMap;
-      auto key = std::make_pair(archetypeTI, which);
-      assert(!map.count(key) &&
-             "IGF already has metatype/wtable set for archetype");
-      map.insert(std::make_pair(key, wtable));
-    }
-  };
-}
-}
-
 /// Given a type metadata pointer, load its value witness table.
 static llvm::Value *emitValueWitnessTableRefForMetadata(IRGenFunction &IGF,
                                                         llvm::Value *metadata) {
@@ -967,8 +929,7 @@ namespace {
   class ArchetypeTypeInfo :
       public IndirectTypeInfo<ArchetypeTypeInfo, TypeInfo> {
 
-    /// The number of protocols that this archetype ascribes to.
-    unsigned NumProtocols;
+    ArchetypeType *TheArchetype;
 
     ProtocolEntry *getProtocolsBuffer() {
       return reinterpret_cast<ProtocolEntry*>(this + 1);
@@ -977,55 +938,50 @@ namespace {
       return reinterpret_cast<const ProtocolEntry*>(this + 1);
     }
 
-    ArchetypeTypeInfo(llvm::Type *type, ArrayRef<ProtocolEntry> protocols)
+    ArchetypeTypeInfo(ArchetypeType *archetype, llvm::Type *type,
+                      ArrayRef<ProtocolEntry> protocols)
       : IndirectTypeInfo(type, Size(1), Alignment(1), IsNotPOD),
-        NumProtocols(protocols.size()) {
+        TheArchetype(archetype) {
+      assert(protocols.size() == archetype->getConformsTo().size());
       for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
         new (&getProtocolsBuffer()[i]) ProtocolEntry(protocols[i]);
       }
     }
 
   public:
-    static const ArchetypeTypeInfo *create(llvm::Type *type,
+    static const ArchetypeTypeInfo *create(ArchetypeType *archetype,
+                                           llvm::Type *type,
                                            ArrayRef<ProtocolEntry> protocols) {
       void *buffer =
         operator new(sizeof(ArchetypeTypeInfo) +
                      protocols.size() * sizeof(ProtocolEntry));
-      return new (buffer) ArchetypeTypeInfo(type, protocols);
+      return new (buffer) ArchetypeTypeInfo(archetype, type, protocols);
+    }
+
+    unsigned getNumProtocols() const {
+      return TheArchetype->getConformsTo().size();
     }
 
     ArrayRef<ProtocolEntry> getProtocols() const {
-      return llvm::makeArrayRef(getProtocolsBuffer(), NumProtocols);
+      return llvm::makeArrayRef(getProtocolsBuffer(), getNumProtocols());
     }
 
     llvm::Value *getMetadataRef(IRGenFunction &IGF) const {
-      return GenProto::getArchetypeValueWitness(IGF, this, MetadataWitnessKey);
-    }
-
-    void setMetadataRef(IRGenFunction &IGF, llvm::Value *metadata) const {
-      GenProto::setArchetypeValueWitness(IGF, this, MetadataWitnessKey, metadata);
+      return IGF.getLocalTypeData(CanType(TheArchetype),
+                                  LocalTypeData::Metatype);
     }
 
     /// Return the witness table that's been set for this type.
     llvm::Value *getWitnessTable(IRGenFunction &IGF, unsigned which) const {
-      assert(which < NumProtocols);
-      return GenProto::getArchetypeValueWitness(IGF, this, which);
-    }
-
-    void setWitnessTable(IRGenFunction &IGF, unsigned which,
-                         llvm::Value *wtable) const {
-      assert(which < NumProtocols);
-      GenProto::setArchetypeValueWitness(IGF, this, which, wtable);
+      assert(which < getNumProtocols());
+      return IGF.getLocalTypeData(CanType(TheArchetype),
+                                  LocalTypeData(which));
     }
 
     llvm::Value *getValueWitnessTable(IRGenFunction &IGF) const {
       // This can be called in any of the cases.
-      return GenProto::getArchetypeValueWitness(IGF, this, 0U);
-    }
-
-    void setValueWitnessTable(IRGenFunction &IGF, llvm::Value *wtable) const {
-      assert(NumProtocols == 0);
-      GenProto::setArchetypeValueWitness(IGF, this, 0U, wtable);
+      return IGF.getLocalTypeData(CanType(TheArchetype),
+                                  LocalTypeData(0));
     }
 
     /// Create an uninitialized archetype object.
@@ -1139,6 +1095,36 @@ namespace {
 
     // Resilience: it needs to be checked dynamically.
   };
+}
+
+static void setMetadataRef(IRGenFunction &IGF,
+                           ArchetypeType *archetype,
+                           llvm::Value *metadata) {
+  assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
+  IGF.setUnscopedLocalTypeData(CanType(archetype),
+                               LocalTypeData::Metatype,
+                               metadata);
+}
+
+static void setWitnessTable(IRGenFunction &IGF,
+                            ArchetypeType *archetype,
+                            unsigned protocolIndex,
+                            llvm::Value *wtable) {
+  assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy);
+  assert(protocolIndex < archetype->getConformsTo().size());
+  IGF.setUnscopedLocalTypeData(CanType(archetype),
+                               LocalTypeData(protocolIndex),
+                               wtable);
+}
+
+static void setValueWitnessTable(IRGenFunction &IGF,
+                                 ArchetypeType *archetype,
+                                 llvm::Value *wtable) {
+  assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy);
+  assert(archetype->getConformsTo().size() == 0);
+  IGF.setUnscopedLocalTypeData(CanType(archetype),
+                               LocalTypeData(0),
+                               wtable);
 }
 
 /// Detail about how an object conforms to a protocol.
@@ -2094,8 +2080,7 @@ namespace {
       auto archetype = cast<ArchetypeType>(thisTy);
 
       // Set the metadata pointer.
-      auto &ti = IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
-      ti.setMetadataRef(IGF, metadata);
+      setMetadataRef(IGF, archetype, metadata);
     }
 
     void emitThunk(IRGenFunction &IGF) {
@@ -2606,17 +2591,17 @@ TypeConverter::convertProtocolCompositionType(ProtocolCompositionType *T) {
   return createExistentialTypeInfo(IGM, type, protocols);
 }
 
-const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *T) {
+const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // Compute layouts for the protocols we ascribe to.
   SmallVector<ProtocolEntry, 4> protocols;
-  for (auto protocol : T->getConformsTo()) {
+  for (auto protocol : archetype->getConformsTo()) {
     const ProtocolInfo &impl = IGM.getProtocolInfo(protocol);
     protocols.push_back(ProtocolEntry(protocol, impl));
   }
   
   // For now, just always use the same type.
   llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();
-  return ArchetypeTypeInfo::create(storageType, protocols);
+  return ArchetypeTypeInfo::create(archetype, storageType, protocols);
 }
 
 /// Inform IRGenFunction that the given archetype has the given value
@@ -2624,28 +2609,25 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *T) {
 void IRGenFunction::bindArchetype(ArchetypeType *archetype,
                                   llvm::Value *metadata,
                                   ArrayRef<llvm::Value*> wtables) {
-  auto &ti = getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
-
   // Set the metadata pointer.
   metadata->setName(archetype->getFullName());
-  ti.setMetadataRef(*this, metadata);
+  setMetadataRef(*this, archetype, metadata);
 
   // Set the protocol witness tables.
 
-  assert(wtables.size() == ti.getProtocols().size());
   assert(wtables.size() == archetype->getConformsTo().size());
-  if (ti.getProtocols().empty()) {
+  if (wtables.empty()) {
     // TODO: do this lazily.
     auto wtable = emitValueWitnessTableRefForMetadata(*this, metadata);
     wtable->setName(Twine(archetype->getFullName()) + "." + "value");
-    ti.setValueWitnessTable(*this, wtable);
+    setValueWitnessTable(*this, archetype, wtable);
   } else {
-    for (unsigned i = 0, e = ti.getProtocols().size(); i != e; ++i) {
-      auto &protoI = ti.getProtocols()[i];
+    for (unsigned i = 0, e = wtables.size(); i != e; ++i) {
+      auto proto = archetype->getConformsTo()[i];
       auto wtable = wtables[i];
       wtable->setName(Twine(archetype->getFullName()) + "." +
-                        protoI.getProtocol()->getName().str());
-      ti.setWitnessTable(*this, i, wtable);
+                        proto->getName().str());
+      setWitnessTable(*this, archetype, i, wtable);
     }
   }
 }
@@ -2918,13 +2900,6 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
   EmitPolymorphicParameters(IGF, type).emit(in);
 }
 
-/// Emit a reference to the metadata object for an archetype.
-llvm::Value *irgen::emitArchetypeMetadataRef(IRGenFunction &IGF,
-                                             ArchetypeType *type) {
-  auto &archetypeTI = IGF.getFragileTypeInfo(type).as<ArchetypeTypeInfo>();
-  return archetypeTI.getMetadataRef(IGF);
-}
-
 void irgen::getValueWitnessTableElements(CanType T,
                                       llvm::SetVector<ArchetypeType*> &types) {
   // We need a value witness table for T
@@ -2957,11 +2932,9 @@ void irgen::setValueWitnessTables(IRGenFunction &IGF,
                                   ArrayRef<ArchetypeType*> archetypes,
                                   Explosion &tables) {
   for (auto archetype : archetypes) {
-    auto &archetypeTI =
-      IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
     llvm::Value *wtable = tables.claimUnmanagedNext();
     wtable->setName(archetype->getFullName());
-    archetypeTI.setValueWitnessTable(IGF, wtable);
+    setValueWitnessTable(IGF, archetype, wtable);
   }
 }
 

@@ -88,6 +88,13 @@ llvm::Value *irgen::emitNominalMetadataRef(IRGenFunction &IGF,
   assert(!isPattern || isa<BoundGenericType>(theType));
   assert(isPattern || isa<NominalType>(theType));
 
+  // If this is generic, check to see if we've maybe got a local
+  // reference already.
+  if (isPattern) {
+    if (auto cache = IGF.tryGetLocalTypeData(theType, LocalTypeData::Metatype))
+      return cache;
+  }
+
   bool isIndirect = false; // FIXME
 
   // Grab a reference to the metadata or metadata template.
@@ -140,6 +147,7 @@ llvm::Value *irgen::emitNominalMetadataRef(IRGenFunction &IGF,
                                         metadata, arguments);
   result->setDoesNotThrow();
 
+  IGF.setScopedLocalTypeData(theType, LocalTypeData::Metatype, result);
   return result;
 }
 
@@ -223,6 +231,9 @@ namespace {
     }
 
     llvm::Value *visitTupleType(TupleType *type) {
+      if (auto cached = tryGetLocal(CanType(type)))
+        return cached;
+
       auto elements = type->getFields();
 
       // I think the sanest thing to do here is drop labels, but maybe
@@ -281,7 +292,7 @@ namespace {
       call->setDoesNotThrow();
       call->setCallingConv(IGF.IGM.RuntimeCC);
 
-      return call;
+      return setLocal(CanType(type), call);
     }
 
     llvm::Value *visitPolymorphicFunctionType(PolymorphicFunctionType *type) {
@@ -291,6 +302,9 @@ namespace {
     }
 
     llvm::Value *visitFunctionType(FunctionType *type) {
+      if (auto metatype = tryGetLocal(CanType(type)))
+        return metatype;
+
       // TODO: use a caching entrypoint (with all information
       // out-of-line) for non-dependent functions.
 
@@ -302,7 +316,7 @@ namespace {
       call->setDoesNotThrow();
       call->setCallingConv(IGF.IGM.RuntimeCC);
 
-      return call;
+      return setLocal(CanType(type), call);
     }
 
     llvm::Value *visitArrayType(ArrayType *type) {
@@ -326,12 +340,23 @@ namespace {
     }
 
     llvm::Value *visitArchetypeType(ArchetypeType *type) {
-      return emitArchetypeMetadataRef(IGF, type);
+      return IGF.getLocalTypeData(CanType(type), LocalTypeData::Metatype);
     }
 
     llvm::Value *visitLValueType(LValueType *type) {
       IGF.unimplemented(SourceLoc(), "metadata ref for l-value type");
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+    }
+
+    /// Try to find the metatype in local data.
+    llvm::Value *tryGetLocal(CanType type) {
+      return IGF.tryGetLocalTypeData(type, LocalTypeData::Metatype);
+    }
+
+    /// Set the metatype in local data.
+    llvm::Value *setLocal(CanType type, llvm::Value *metatype) {
+      IGF.setScopedLocalTypeData(type, LocalTypeData::Metatype, metatype);
+      return metatype;
     }
   };
 }

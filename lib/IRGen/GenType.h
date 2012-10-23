@@ -55,13 +55,10 @@ class TypeConverter {
   IRGenModule &IGM;
   llvm::DenseMap<TypeBase*, const TypeInfo*> Types;
   llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
-  llvm::DenseMap<TypeBase*, llvm::Constant*> TrivialWitnessTables;
   const TypeInfo *FirstType;
   const ProtocolInfo *FirstProtocol;
   const TypeInfo *WitnessTablePtrTI = nullptr;
   const TypeInfo *TypeMetadataPtrTI = nullptr;
-
-  friend class GenProto;
 
   static const TypeInfo *createPrimitive(llvm::Type *T,
                                          Size size, Alignment align);
