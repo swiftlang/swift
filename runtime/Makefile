@@ -13,6 +13,8 @@
 SWIFT_LEVEL := ..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
+DIRS := LowLevel
+
 LIBRARYNAME := swift_runtime
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
@@ -53,7 +55,25 @@ $(ObjDir)/swift.o: $(HeaderDir)/swift.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PR
 	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
 	$(Verb) $(SWIFT_COMPILER) -c $< -o $@ -parse-as-library -constraint-checker $(SWIFT_OPTFLAG)
 
+RecursiveTargets += $(LibDir)/libswift_LowLevelRuntime.a
+
+# This is a hack --- something seems to want the LowLevelRuntime
+# library to exist before it tries recursively making.
+ifneq ($(PROJ_SRC_ROOT),$(PROJ_OBJ_ROOT))
 $(LibDir)/libswift_LowLevelRuntime.a:
-	$(MAKE) -C $$dir $@
+	$(Verb) for dir in $(DIRS); do \
+	  if ([ ! -f $$dir/Makefile ] || \
+	      command test $$dir/Makefile -ot $(PROJ_SRC_DIR)/$$dir/Makefile ); then \
+	    $(MKDIR) $$dir; \
+	    $(CP) $(PROJ_SRC_DIR)/$$dir/Makefile $$dir/Makefile; \
+	  fi; \
+	  ($(MAKE) -C $$dir $@ ) || exit 1; \
+	done
+else
+$(LibDir)/libswift_LowLevelRuntime.a:
+	$(Verb) for dir in $(DIRS); do \
+	  ($(MAKE) -C $$dir $@ ) || exit 1; \
+	done
+endif
 
 all-local:: $(HeaderDir)/swift.swift
