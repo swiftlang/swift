@@ -78,7 +78,7 @@ namespace irgen {
                                                  unsigned which) {
       auto &map = IGF.ArchetypeValueWitnessMap;
       auto key = std::make_pair(archetypeTI, which);
-      assert(map.count(key) && "IGF has no wtable set for archetype");
+      assert(map.count(key) && "IGF has no metatype/wtable set for archetype");
       return map.find(key)->second;
     }
 
@@ -88,7 +88,8 @@ namespace irgen {
                                          llvm::Value *wtable) {
       auto &map = IGF.ArchetypeValueWitnessMap;
       auto key = std::make_pair(archetypeTI, which);
-      assert(!map.count(key) && "IGF already has wtable set for archetype");
+      assert(!map.count(key) &&
+             "IGF already has metatype/wtable set for archetype");
       map.insert(std::make_pair(key, wtable));
     }
   };
@@ -1950,6 +1951,14 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   return asOpaquePtr(IGM, fn);
 }
 
+/// Look through any single-element labelled tuple types.
+static CanType stripLabel(CanType input) {
+  if (auto tuple = dyn_cast<TupleType>(input))
+    if (tuple->getFields().size() == 1)
+      return stripLabel(CanType(tuple->getFields()[0].getType()));
+  return input;
+}
+
 namespace {
   /// A class which builds a single witness.
   class WitnessBuilder {
@@ -2024,7 +2033,7 @@ namespace {
 
       // Create the function.
       auto fnTy = IGM.getFunctionType(SignatureTy, ExplosionKind::Minimal,
-                                      UncurryLevel, /*withData*/ false);
+                                      UncurryLevel, ExtraData::Metatype);
       fn = llvm::Function::Create(fnTy, llvm::Function::InternalLinkage,
                                   name.str(), &IGM.Module);
       //fn->setVisibility(llvm::Function::HiddenVisibility);
@@ -2075,6 +2084,26 @@ namespace {
       }
     }
 
+    /// Bind the metatype for 'This' in this witness.
+    void bindThisArchetype(IRGenFunction &IGF, llvm::Value *metadata) {
+      // Set a name for the metadata value.
+      metadata->setName("This");
+
+      // Find the This archetype.
+      auto thisTy = SignatureTy;
+      thisTy = stripLabel(CanType(cast<AnyFunctionType>(thisTy)->getInput()));
+      if (auto lvalueTy = dyn_cast<LValueType>(thisTy)) {
+        thisTy = CanType(lvalueTy->getObjectType());
+      } else {
+        thisTy = CanType(cast<MetaTypeType>(thisTy)->getInstanceType());
+      }
+      auto archetype = cast<ArchetypeType>(thisTy);
+
+      // Set the metadata pointer.
+      auto &ti = IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
+      ti.setMetadataRef(IGF, metadata);
+    }
+
     void emitThunk(IRGenFunction &IGF) {
       // Collect the types for the arg sites.
       SmallVector<ArgSite, 4> argSites;
@@ -2085,6 +2114,10 @@ namespace {
 
       // Collect the parameters.
       Explosion sigParams = IGF.collectParameters();
+
+      // The data parameter is a metatype; bind it as the This archetype.
+      llvm::Value *metatype = sigParams.takeLast().getUnmanagedValue();
+      bindThisArchetype(IGF, metatype);
 
       // Peel off the result address if necessary.
       auto &sigResultTI =
@@ -2112,6 +2145,8 @@ namespace {
         if (auto sigPoly = dyn_cast<PolymorphicFunctionType>(argSite.SigFnType))
           emitPolymorphicParameters(IGF, sigPoly, sigParams);
       }
+
+      assert(sigParams.empty() && "didn't drain all the parameters");
 
       // Begin our call emission.  CallEmission's builtin polymorphism
       // support is based on around calling a more-abstract function,
@@ -2345,7 +2380,7 @@ namespace {
                                              CanType ifaceType) {
       llvm::Constant *implPtr =
         IGM.getAddrOfFunction(FunctionRef(impl, ExplosionKind::Minimal, 1),
-                              /*data*/ false);
+                              ExtraData::None);
       return getWitness(implPtr, impl->getType()->getCanonicalType(),
                         ifaceType, 1);
     }
@@ -2357,7 +2392,7 @@ namespace {
       if (impl->getDeclContext()->isModuleContext()) {
         llvm::Constant *implPtr =
           IGM.getAddrOfFunction(FunctionRef(impl, ExplosionKind::Minimal, 0),
-                                /*data*/ false);
+                                ExtraData::None);
         // FIXME: This is an ugly hack: we're pretending that the function
         // has a different type from its actual type.  This works because the
         // LLVM representation happens to be the same.
@@ -2368,7 +2403,7 @@ namespace {
       }
       llvm::Constant *implPtr =
         IGM.getAddrOfFunction(FunctionRef(impl, ExplosionKind::Minimal, 1),
-                              /*data*/ false);
+                              ExtraData::None);
       return getWitness(implPtr, impl->getType()->getCanonicalType(),
                         ifaceType, 1);
     }
@@ -2622,14 +2657,6 @@ void IRGenFunction::bindArchetype(ArchetypeType *archetype,
   }
 }
 
-/// Look through any single-element labelled tuple types.
-static CanType stripLabel(CanType input) {
-  if (auto tuple = dyn_cast<TupleType>(input))
-    if (tuple->getFields().size() == 1)
-      return stripLabel(CanType(tuple->getFields()[0].getType()));
-  return input;
-}
-
 namespace {
   struct Fulfillment {
     Fulfillment() = default;
@@ -2816,8 +2843,11 @@ namespace {
       case SourceKind::ClassPointer:
         return emitMetadataRefForHeapObject(IGF, in.getLastClaimed());
 
-      case SourceKind::GenericLValueMetadata:
-        return in.claimUnmanagedNext();
+      case SourceKind::GenericLValueMetadata: {
+        llvm::Value *metatype = in.claimUnmanagedNext();
+        metatype->setName("This");
+        return metatype;
+      }
       }
       llvm_unreachable("bad source kind!");
     }
@@ -3361,14 +3391,14 @@ static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
   CanType origFnType = fn->getType()->getCanonicalType();
   llvm::FunctionType *fnTy =
     IGF.IGM.getFunctionType(origFnType, explosionLevel, uncurryLevel,
-                            /*data*/ false);
+                            ExtraData::Metatype);
   witness = IGF.Builder.CreateBitCast(witness, fnTy->getPointerTo());
 
   Callee callee =
     Callee::forKnownFunction(fn->isStatic() ? AbstractCC::Freestanding
                                             : AbstractCC::Method,
                              origFnType, substResultType, subs,
-                             witness, ManagedValue(nullptr),
+                             witness, ManagedValue(metadata),
                              explosionLevel, uncurryLevel);
 
   CallEmission emission(IGF, callee);
@@ -3526,9 +3556,9 @@ AbstractCallee irgen::getAbstractProtocolCallee(IRGenFunction &IGF,
   // TODO: consider adding non-minimal or curried entrypoints.
   if (fn->isStatic())
     return AbstractCallee(AbstractCC::Freestanding, ExplosionKind::Minimal,
-                          0, 0, false);
+                          0, 0, ExtraData::Metatype);
   return AbstractCallee(AbstractCC::Method, ExplosionKind::Minimal,
-                        1, 1, false);
+                        1, 1, ExtraData::Metatype);
 }
 
 /// Emit an expression which accesses a member out of an archetype.

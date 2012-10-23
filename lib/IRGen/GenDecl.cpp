@@ -62,7 +62,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   params[0]->setType(TupleType::getEmpty(Context));
 
   llvm::FunctionType *fnType =
-      getFunctionType(unitToUnit, ExplosionKind::Minimal, 0, false);
+      getFunctionType(unitToUnit, ExplosionKind::Minimal, 0, ExtraData::None);
   llvm::Function *fn;
   if (tunit->Kind == TranslationUnit::Main ||
       tunit->Kind == TranslationUnit::Repl) {
@@ -450,7 +450,7 @@ static bool hasIndirectResult(IRGenModule &IGM, CanType type,
 
 /// Fetch the declaration of the given known function.
 llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
-                                               bool needsData) {
+                                               ExtraData extraData) {
   LinkEntity entity = LinkEntity::forFunction(fn);
 
   // Check whether we've cached this.
@@ -459,7 +459,7 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
 
   llvm::FunctionType *fnType =
     getFunctionType(fn.getDecl()->getType()->getCanonicalType(),
-                    fn.getExplosionLevel(), fn.getUncurryLevel(), needsData);
+                    fn.getExplosionLevel(), fn.getUncurryLevel(), extraData);
 
   AbstractCC convention = getAbstractCC(fn.getDecl());
   bool indirectResult =
@@ -498,7 +498,7 @@ llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
                              indirectResult, attrs);
 
   llvm::FunctionType *fnType =
-    getFunctionType(formalType, explosionLevel, uncurryLevel, /*data*/false);
+    getFunctionType(formalType, explosionLevel, uncurryLevel, ExtraData::None);
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, cc, attrs);
   return entry;
@@ -517,7 +517,7 @@ llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
 
   CanType formalType = cons->getType()->getCanonicalType();
   llvm::FunctionType *fnType =
-    getFunctionType(formalType, kind, uncurryLevel, /*needsData*/false);
+    getFunctionType(formalType, kind, uncurryLevel, ExtraData::None);
 
   bool indirectResult =
     hasIndirectResult(*this, formalType, kind, uncurryLevel);
@@ -733,7 +733,7 @@ llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
 
   llvm::FunctionType *fnType =
     getFunctionType(formal.getType(), explosionLevel,
-                    formal.getNaturalUncurryLevel(), /*data*/ false);
+                    formal.getNaturalUncurryLevel(), ExtraData::None);
 
   SmallVector<llvm::AttributeWithIndex, 4> attrs;
   auto convention = expandAbstractCC(*this, formal.getCC(), false, attrs);
@@ -780,7 +780,7 @@ llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
 
   llvm::FunctionType *fnType =
     getFunctionType(formal.getType(), explosionLevel,
-                    formal.getNaturalUncurryLevel(), /*data*/ false);
+                    formal.getNaturalUncurryLevel(), ExtraData::None);
 
   SmallVector<llvm::AttributeWithIndex, 4> attrs;
   auto convention = expandAbstractCC(*this, formal.getCC(), false, attrs);

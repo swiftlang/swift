@@ -626,7 +626,7 @@ namespace {
                        fn.getUncurryLevel());
 
       // Add the appropriate method to the module.
-      Fields.push_back(IGM.getAddrOfFunction(fn, /*with data*/ false));
+      Fields.push_back(IGM.getAddrOfFunction(fn, ExtraData::None));
     }
 
     void addGenericArgument(ArchetypeType *archetype, ClassDecl *forClass) {
@@ -1240,7 +1240,7 @@ AbstractCallee irgen::getAbstractVirtualCallee(IRGenFunction &IGF,
   unsigned naturalUncurry = method->getNaturalArgumentCount() - 1;
 
   return AbstractCallee(AbstractCC::Method, bestExplosion,
-                        naturalUncurry, naturalUncurry, /*data*/ false);
+                        naturalUncurry, naturalUncurry, ExtraData::None);
 }
 
 /// Find the function which will actually appear in the virtual table.
@@ -1290,7 +1290,7 @@ Callee irgen::emitVirtualCallee(IRGenFunction &IGF, llvm::Value *base,
   // type of the overridden method.
   auto formalType = method->getType()->getCanonicalType();
   auto fnTy = IGF.IGM.getFunctionType(formalType, bestExplosion, bestUncurry,
-                                      /*data*/ false)->getPointerTo();
+                                      ExtraData::None)->getPointerTo();
 
   llvm::Value *fn;
   if (bestUncurry != naturalUncurry) {

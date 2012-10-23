@@ -224,13 +224,14 @@ public:
   void emitConstructor(ConstructorDecl *D);
 
   llvm::FunctionType *getFunctionType(CanType fnType, ExplosionKind kind,
-                                      unsigned uncurryLevel, bool withData);
+                                      unsigned uncurryLevel,
+                                      ExtraData data);
 
   FormalType getTypeOfGetter(ValueDecl *D);
   FormalType getTypeOfSetter(ValueDecl *D);
 
   Address getAddrOfGlobalVariable(VarDecl *D);
-  llvm::Function *getAddrOfFunction(FunctionRef ref, bool needsData);
+  llvm::Function *getAddrOfFunction(FunctionRef ref, ExtraData data);
   llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);
   llvm::Function *getAddrOfGetter(ValueDecl *D, FormalType type,
                                   ExplosionKind kind);

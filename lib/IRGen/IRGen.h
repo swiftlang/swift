@@ -38,6 +38,18 @@ enum OnHeap_t : unsigned char {
   OnHeap
 };
 
+/// Whether a function requires extra data.
+enum class ExtraData : unsigned char {
+  /// The function requires no extra data.
+  None,
+
+  /// The function requires a retainable object pointer of extra data.
+  Retainable,
+
+  /// The function requires a metatype object as extra data.
+  Metatype
+};
+
 /// ResilienceScope - The compiler is often able to pursue
 /// optimizations based on its knowledge of the implementation of some
 /// language structure.  However, optimizations which affect

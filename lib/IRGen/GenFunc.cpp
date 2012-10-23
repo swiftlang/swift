@@ -288,10 +288,10 @@ namespace {
     ///   - the explosion kind desired
     ///   - whether a data pointer argument is required
     struct Currying {
-      Signature Signatures[2][2];
+      Signature Signatures[2][3];
 
-      Signature &select(ExplosionKind kind, bool needsData) {
-        return Signatures[unsigned(kind)][unsigned(needsData)];
+      Signature &select(ExplosionKind kind, ExtraData extraData) {
+        return Signatures[unsigned(kind)][unsigned(extraData)];
       }
     };
 
@@ -336,7 +336,7 @@ namespace {
     }
 
     Signature getSignature(IRGenModule &IGM, ExplosionKind explosionKind,
-                           unsigned currying, bool needsData) const;
+                           unsigned currying, ExtraData extraData) const;
 
     unsigned getExplosionSize(ExplosionKind kind) const {
       return 2;
@@ -485,11 +485,11 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
 Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
                                      ExplosionKind explosionKind,
                                      unsigned uncurryLevel,
-                                     bool needsData) const {
+                                     ExtraData extraData) const {
   // Compute a reference to the appropriate signature cache.
   assert(uncurryLevel < getNumCurries(FormalType));
   Currying &currying = getCurryingsBuffer()[uncurryLevel];
-  Signature &signature = currying.select(explosionKind, needsData);
+  Signature &signature = currying.select(explosionKind, extraData);
 
   // If it's already been filled in, we're done.
   if (signature.isValid())
@@ -530,8 +530,11 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
 
   // Data arguments are last.
   // See the comment in this file's header comment.
-  if (needsData)
-    argTypes.push_back(IGM.RefCountedPtrTy);
+  switch (extraData) {
+  case ExtraData::None: break;
+  case ExtraData::Retainable: argTypes.push_back(IGM.RefCountedPtrTy); break;
+  case ExtraData::Metatype: argTypes.push_back(IGM.TypeMetadataPtrTy); break;
+  }
 
   // Ignore the first element of the array unless we have an aggregate result.
   llvm::ArrayRef<llvm::Type*> realArgTypes = argTypes;
@@ -549,11 +552,11 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
 
 llvm::FunctionType *
 IRGenModule::getFunctionType(CanType type, ExplosionKind explosionKind,
-                             unsigned curryingLevel, bool withData) {
+                             unsigned curryingLevel, ExtraData extraData) {
   assert(isa<AnyFunctionType>(type));
   const FuncTypeInfo &fnTypeInfo = getFragileTypeInfo(type).as<FuncTypeInfo>();
   Signature sig = fnTypeInfo.getSignature(*this, explosionKind,
-                                          curryingLevel, withData);
+                                          curryingLevel, extraData);
   return sig.getType();
 }
 
@@ -581,14 +584,14 @@ static AbstractCallee getAbstractDirectCallee(IRGenFunction &IGF,
     minUncurry = 1;
   unsigned maxUncurry = getNaturalUncurryLevel(val);
   
-  bool needsData = false;
+  auto extraData = ExtraData::None;
   if (FuncDecl *fn = dyn_cast<FuncDecl>(val)) {
-    needsData =
-        (isLocal && !isa<llvm::ConstantPointerNull>(IGF.getLocalFuncData(fn)));
+    if (isLocal && !isa<llvm::ConstantPointerNull>(IGF.getLocalFuncData(fn)))
+      extraData = ExtraData::Retainable;
   }
   AbstractCC convention = getAbstractCC(val);
 
-  return AbstractCallee(convention, level, minUncurry, maxUncurry, needsData);
+  return AbstractCallee(convention, level, minUncurry, maxUncurry, extraData);
 }
 
 /// Return this function pointer, bitcasted to an i8*.
@@ -609,8 +612,9 @@ static llvm::Value *emitCastOfIndirectFunction(IRGenFunction &IGF,
                                                ManagedValue dataPtr,
                                                CanType origFnType) {
   bool hasData = !isa<llvm::ConstantPointerNull>(dataPtr.getValue());
+  auto extraData = (hasData ? ExtraData::Retainable : ExtraData::None);
   auto fnPtrTy = IGF.IGM.getFunctionType(origFnType, ExplosionKind::Minimal,
-                                         0, hasData)->getPointerTo();
+                                         0, extraData)->getPointerTo();
   return IGF.Builder.CreateBitCast(fnPtr, fnPtrTy);
 }
 
@@ -649,7 +653,7 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
       fnPtr = llvm::UndefValue::get(
           IGF.IGM.getFunctionType(val->getType()->getCanonicalType(),
                                   bestExplosion, bestUncurry,
-                                  /*needsData*/false));
+                                  ExtraData::None));
     } else {
       fnPtr = IGF.IGM.getAddrOfConstructor(ctor, bestExplosion);
     }
@@ -665,7 +669,7 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
       fnPtr = llvm::UndefValue::get(
           IGF.IGM.getFunctionType(val->getType()->getCanonicalType(),
                                   bestExplosion, bestUncurry,
-                                  /*needsData*/false));
+                                  ExtraData::None));
     } else {
       fnPtr = IGF.IGM.getAddrOfInjectionFunction(oneofelt);
     }
@@ -677,8 +681,7 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
   FuncDecl *fn = cast<FuncDecl>(val);
   FunctionRef fnRef = FunctionRef(fn, bestExplosion, bestUncurry);
   if (!fn->getDeclContext()->isLocalContext()) {
-    llvm::Constant *fnPtr =
-      IGF.IGM.getAddrOfFunction(fnRef, /*data*/ false);
+    llvm::Constant *fnPtr = IGF.IGM.getAddrOfFunction(fnRef, ExtraData::None);
     if (fn->isInstanceMember()) {
       return Callee::forMethod(fn->getType()->getCanonicalType(),
                                substResultType, subs, fnPtr,
@@ -2782,8 +2785,9 @@ namespace {
 
       // Create an internal function to serve as the forwarding
       // function (B -> C).
+      auto extraData = (layout.empty() ? ExtraData::None : ExtraData::Retainable);
       llvm::Function *forwarder =
-        getAddrOfForwardingStub(nextEntrypoint, /*hasData*/ !layout.empty());
+        getAddrOfForwardingStub(nextEntrypoint, extraData);
 
       // Emit the curried entrypoint.
       emitCurriedEntrypointBody(entrypoint, forwarder, layout);
@@ -2862,10 +2866,10 @@ namespace {
 
     /// Create a forwarding stub.
     llvm::Function *getAddrOfForwardingStub(llvm::Function *nextEntrypoint,
-                                            bool hasData) {
+                                            ExtraData extraData) {
       llvm::FunctionType *fnType =
         IGM.getFunctionType(Clauses[CurClause].ForwardingFnType,
-                            ExplosionLevel, /*uncurry*/ 0, hasData);
+                            ExplosionLevel, /*uncurry*/ 0, extraData);
 
       // Create the function and place it immediately before the next stub.
       llvm::Function *forwarder =
@@ -2995,7 +2999,7 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
   FuncExpr *funcExpr = func->getBody();
 
   // FIXME: support defining currying entrypoints for local functions.
-  bool needsData = false;
+  ExtraData extraData = ExtraData::None;
 
   // FIXME: variant currying levels!
   // FIXME: also emit entrypoints with maximal explosion when all types are known!
@@ -3012,7 +3016,7 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
     entrypoint = IGM.getAddrOfSetter(cast<ValueDecl>(var), explosionLevel);
   } else {
     auto fnRef = FunctionRef(func, explosionLevel, startingUncurryLevel);
-    entrypoint = IGM.getAddrOfFunction(fnRef, needsData);
+    entrypoint = IGM.getAddrOfFunction(fnRef, extraData);
   }
 
   CurriedData curriedData(IGM, funcExpr, explosionLevel,
@@ -3024,7 +3028,7 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
          uncurryLevel != naturalUncurryLevel; ++uncurryLevel) {
     llvm::Function *nextEntrypoint =
       IGM.getAddrOfFunction(FunctionRef(func, explosionLevel, uncurryLevel + 1),
-                            needsData);
+                            extraData);
 
     curriedData.emitCurriedEntrypoint(entrypoint, nextEntrypoint);
 

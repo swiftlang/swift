@@ -39,7 +39,7 @@ namespace irgen {
     unsigned ExplosionLevel : 1;
 
     /// Whether the function takes a data pointer.
-    unsigned NeedsData : 1;
+    unsigned Data : 2;
 
     /// The abstract calling convention.
     unsigned Convention : 2;
@@ -48,19 +48,19 @@ namespace irgen {
     unsigned MinUncurryLevel : 2;
 
     /// The max uncurrying level available for the function.
-    unsigned MaxUncurryLevel : 10;
+    unsigned MaxUncurryLevel : 9;
 
   public:
     AbstractCallee(AbstractCC convention, ExplosionKind level,
-                   unsigned minUncurry, unsigned maxUncurry, bool needsData)
-      : ExplosionLevel(unsigned(level)), NeedsData(needsData),
+                   unsigned minUncurry, unsigned maxUncurry, ExtraData data)
+      : ExplosionLevel(unsigned(level)), Data(unsigned(data)),
         Convention(unsigned(convention)),
         MinUncurryLevel(minUncurry), MaxUncurryLevel(maxUncurry) {}
 
     static AbstractCallee forIndirect() {
       return AbstractCallee(AbstractCC::Freestanding, ExplosionKind::Minimal,
                             /*min uncurry*/ 0, /*max uncurry*/ 0,
-                            /*data*/ true);
+                            ExtraData::Retainable);
     }
 
     AbstractCC getConvention() const {
@@ -74,7 +74,10 @@ namespace irgen {
     }
 
     /// Whether the function requires a data pointer.
-    bool needsDataPointer() const { return NeedsData; }
+    bool needsDataPointer() const { return getExtraData() != ExtraData::None; }
+
+    /// Whether the function requires a data pointer.
+    ExtraData getExtraData() const { return ExtraData(Data); }
 
     /// The maximum uncurrying level at which the function can be called.
     unsigned getMaxUncurryLevel() const { return MaxUncurryLevel; }

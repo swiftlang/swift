@@ -49,7 +49,7 @@ namespace {
 
     CaptureInfo(IRGenFunction &IGF, CapturingExpr *E);
 
-    bool requiresData() const { return !Captures.empty(); }
+    bool requiresData() const { return (!Captures.empty()); }
 
   private:
     void captureFunc(IRGenFunction &IGF, FuncDecl *fn);
@@ -283,7 +283,9 @@ void irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E, Explosion &out) {
   // Create the LLVM function declaration.
   llvm::FunctionType *fnType =
     IGF.IGM.getFunctionType(E->getType()->getCanonicalType(),
-                            explosionLevel, uncurryLevel, info.requiresData());
+                            explosionLevel, uncurryLevel,
+                            info.requiresData() ? ExtraData::Retainable
+                                                : ExtraData::None);
   llvm::Function *fn =
     llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                            "closure", &IGF.IGM.Module);
@@ -327,9 +329,10 @@ IRGenFunction::getAddrOfLocalFunction(FunctionRef fnRef) {
 
   llvm::Value *data = getLocalFuncData(func);
   bool needsData = !isa<llvm::ConstantPointerNull>(data);
+  ExtraData extraData = (needsData ? ExtraData::Retainable : ExtraData::None);
 
   // Find the function pointer.
-  llvm::Function *fn = IGM.getAddrOfFunction(fnRef, needsData);
+  llvm::Function *fn = IGM.getAddrOfFunction(fnRef, extraData);
 
   // If we already have a function body, we're set.
   if (!fn->empty()) return fn;
