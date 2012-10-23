@@ -117,6 +117,7 @@ namespace irgen {
   /// generics clause.
   void emitPolymorphicArguments(IRGenFunction &IGF,
                                 PolymorphicFunctionType *type,
+                                CanType substInputType,
                                 ArrayRef<Substitution> subs,
                                 Explosion &args);
 

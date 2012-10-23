@@ -810,10 +810,11 @@ namespace {
       : ConcreteMemberGetterSetterBase(target, numBaseValues, numIndexValues,
                                        thisSize) {}
 
-    void emitGenericArguments(CallEmission &emission, Explosion &out) const {
+    void emitGenericArguments(CallEmission &emission, CanType substBaseType,
+                              Explosion &out) const {
       auto polyFn = cast<PolymorphicFunctionType>(
                                    emission.getCallee().getOrigFormalType());
-      return emitPolymorphicArguments(emission.IGF, polyFn,
+      return emitPolymorphicArguments(emission.IGF, polyFn, substBaseType,
                                       getSubstitutions(),
                                       out);
     }
@@ -868,12 +869,13 @@ namespace {
       CanType origBaseType =
         getTarget()->getDeclContext()->getDeclaredTypeInContext()
                    ->getCanonicalType();
+      CanType substBaseType = getSubstBaseType();
       addBaseValues(emission.IGF, selfArg, shouldPreserve,
-                    origBaseType, getSubstBaseType(),
+                    origBaseType, substBaseType,
                     getSubstitutions());
 
       // The generic arguments are bound at this level.
-      emitGenericArguments(emission, selfArg);
+      emitGenericArguments(emission, substBaseType, selfArg);
 
       emission.addArg(selfArg);
     }
@@ -915,7 +917,7 @@ namespace {
       selfArg.addUnmanaged(base.getAddress());
 
       // The generic arguments are bound at this level.
-      emitGenericArguments(emission, selfArg);
+      emitGenericArguments(emission, getSubstBaseType(), selfArg);
 
       emission.addArg(selfArg);
     }

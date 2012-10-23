@@ -2126,7 +2126,7 @@ namespace {
                                           ImplPtr,
                                           ExplosionLevel,
                                           UncurryLevel));
-        
+
       // Now actually pass the arguments.
       for (unsigned i = 0, e = UncurryLevel + 1; i != e; ++i) {
         ArgSite &argSite = argSites[i];
@@ -2136,12 +2136,18 @@ namespace {
         Explosion &sigClause = sigParamClauses[i];
         Explosion implArgs(ExplosionLevel);
 
+        // The input type we're going to pass to the implementation,
+        // expressed in terms of signature archetypes.
+        CanType sigInputTypeForImpl;
+
         // We need some special treatment for 'this'.
         if (i == 0 && HasAbstractedThis) {
           assert(isa<ClassType>(implInputType));
           assert(isa<LValueType>(sigInputType));
-          assert(isa<ArchetypeType>(
-                   CanType(cast<LValueType>(sigInputType)->getObjectType())));
+
+          sigInputTypeForImpl =
+            CanType(cast<LValueType>(sigInputType)->getObjectType());
+          assert(isa<ArchetypeType>(sigInputTypeForImpl));
 
           auto &implTI = IGF.getFragileTypeInfo(implInputType);
 
@@ -2161,12 +2167,14 @@ namespace {
         } else {
           reemitAsSubstituted(IGF, sigInputType, implInputType, Substitutions,
                               sigClause, implArgs);
+          sigInputTypeForImpl = sigInputType;
         }
 
         // Pass polymorphic arguments.
         if (auto implPoly =
               dyn_cast<PolymorphicFunctionType>(argSite.ImplFnType)) {
-          emitPolymorphicArguments(IGF, implPoly, Substitutions, implArgs);
+          emitPolymorphicArguments(IGF, implPoly, sigInputTypeForImpl,
+                                   Substitutions, implArgs);
         }
 
         emission.addArg(implArgs);
@@ -2614,6 +2622,14 @@ void IRGenFunction::bindArchetype(ArchetypeType *archetype,
   }
 }
 
+/// Look through any single-element labelled tuple types.
+static CanType stripLabel(CanType input) {
+  if (auto tuple = dyn_cast<TupleType>(input))
+    if (tuple->getFields().size() == 1)
+      return stripLabel(CanType(tuple->getFields()[0].getType()));
+  return input;
+}
+
 namespace {
   struct Fulfillment {
     Fulfillment() = default;
@@ -2640,11 +2656,9 @@ namespace {
       /// pointer.
       ClassPointer,
 
-      // TODO: do these:
-
       /// The polymorphic arguments are passed from generic type
       /// metadata for the origin type.
-      // ExtraMetadata,
+      GenericLValueMetadata
     };
 
   protected:
@@ -2677,6 +2691,15 @@ namespace {
           source = SourceKind::ClassPointer;
           considerBoundGenericType(boundTy, 0);
         }
+      } else if (auto lvalueTy = dyn_cast<LValueType>(argTy)) {
+        CanType objTy = CanType(lvalueTy->getObjectType());
+        if (auto nomTy = dyn_cast<NominalType>(objTy)) {
+          source = SourceKind::GenericLValueMetadata;
+          considerNominalType(nomTy, 0);
+        } else if (auto boundTy = dyn_cast<BoundGenericType>(objTy)) {
+          source = SourceKind::GenericLValueMetadata;
+          considerBoundGenericType(boundTy, 0);
+        }
       }
 
       // If we didn't fulfill anything, there's no source.
@@ -2688,14 +2711,6 @@ namespace {
     SourceKind getSourceKind() const { return TheSourceKind; }
 
   private:
-    // Look through any single-element labelled tuple types.
-    CanType stripLabel(CanType input) {
-      if (auto tuple = dyn_cast<TupleType>(input))
-        if (tuple->getFields().size() == 1)
-          return stripLabel(CanType(tuple->getFields()[0].getType()));
-      return input;
-    }
-
     void considerParentType(CanType parent, unsigned depth) {
       // We might not have a parent type.
       if (!parent) return;
@@ -2800,6 +2815,9 @@ namespace {
 
       case SourceKind::ClassPointer:
         return emitMetadataRefForHeapObject(IGF, in.getLastClaimed());
+
+      case SourceKind::GenericLValueMetadata:
+        return in.claimUnmanagedNext();
       }
       llvm_unreachable("bad source kind!");
     }
@@ -2972,13 +2990,20 @@ namespace {
                              PolymorphicFunctionType *polyFn)
       : PolymorphicConvention(polyFn), IGF(IGF) {}
 
-    void emit(ArrayRef<Substitution> subs, Explosion &out);
+    void emit(CanType substInputType, ArrayRef<Substitution> subs,
+              Explosion &out);
 
   private:
-    void emitSource(Explosion &out) {
+    void emitSource(CanType substInputType, Explosion &out) {
       switch (getSourceKind()) {
       case SourceKind::None: return;
       case SourceKind::ClassPointer: return;
+      case SourceKind::GenericLValueMetadata: {
+        CanType argTy = stripLabel(substInputType);
+        CanType objTy = CanType(cast<LValueType>(argTy)->getObjectType());
+        out.addUnmanaged(emitTypeMetadataRef(IGF, objTy));
+        return;
+      }
       }
       llvm_unreachable("bad source kind!");
     }
@@ -2988,16 +3013,20 @@ namespace {
 /// Pass all the arguments necessary for the given function.
 void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
                                      PolymorphicFunctionType *polyFn,
+                                     CanType substInputType,
                                      ArrayRef<Substitution> subs,
                                      Explosion &out) {
-  EmitPolymorphicArguments(IGF, polyFn).emit(subs, out);
+  EmitPolymorphicArguments(IGF, polyFn).emit(substInputType, subs, out);
 }
 
-void EmitPolymorphicArguments::emit(ArrayRef<Substitution> subs,
+void EmitPolymorphicArguments::emit(CanType substInputType,
+                                    ArrayRef<Substitution> subs,
                                     Explosion &out) {
   auto &generics = FnType->getGenericParams();
   (void)generics;
   assert(generics.getAllArchetypes().size() == subs.size());
+
+  emitSource(substInputType, out);
   
   // For now, treat all archetypes independently.
   // FIXME: Later, we'll want to emit only the minimal set of archetypes,
@@ -3079,6 +3108,8 @@ namespace {
       switch (getSourceKind()) {
       case SourceKind::None: return;
       case SourceKind::ClassPointer: return; // already accounted for
+      case SourceKind::GenericLValueMetadata:
+        return out.push_back(IGM.TypeMetadataPtrTy);
       }
       llvm_unreachable("bad source kind");
     }
