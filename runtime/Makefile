@@ -11,17 +11,16 @@
 ##===----------------------------------------------------------------------===##
 
 SWIFT_LEVEL := ..
+include $(SWIFT_LEVEL)/../../Makefile.config
 
 LIBRARYNAME := swift_runtime
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
 SWIFT_SOURCES := Bool.swift File.swift FixedPoint.swift FloatingPoint.swift Misc.swift \
                  String.swift Dictionary.swift Vector.swift Algorithm.swift Demangle.swift
-SOURCES := FastEntryPoints.s Alloc.cpp KnownMetadata.cpp Metadata.cpp \
-	   Stubs.cpp ObjCBridge.mm swift.swift
+SOURCES := swift.swift
 NO_BUILD_ARCHIVE := 1
-
-include $(SWIFT_LEVEL)/../../Makefile.config
+USEDLIBS := swift_LowLevelRuntime.a
 
 include $(SWIFT_LEVEL)/Makefile
 
@@ -54,9 +53,7 @@ $(ObjDir)/swift.o: $(HeaderDir)/swift.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PR
 	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
 	$(Verb) $(SWIFT_COMPILER) -c $< -o $@ -parse-as-library -constraint-checker $(SWIFT_OPTFLAG)
 
-$(ObjDir)/%.o: %.s $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE)
-	$(Echo) "Compiling $*.s for $(BuildMode) build" $(PIC_FLAG)
-	$(Verb) if $(Compile.C) $(DEPEND_OPTIONS) $< -o $(ObjDir)/$*.o ; \
-	        $(DEPEND_MOVEFILE)
+$(LibDir)/libswift_LowLevelRuntime.a:
+	$(MAKE) -C $$dir $@
 
 all-local:: $(HeaderDir)/swift.swift

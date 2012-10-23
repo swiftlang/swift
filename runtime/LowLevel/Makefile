@@ -1,4 +1,4 @@
-##===- tools/httpd/Makefile --------------------------------*- Makefile -*-===##
+##===- runtime/LowLevel/Makefile ---------------------------*- Makefile -*-===##
 #
 # This source file is part of the Swift.org open source project
 #
@@ -11,9 +11,12 @@
 ##===----------------------------------------------------------------------===##
 
 SWIFT_LEVEL := ../..
+include $(SWIFT_LEVEL)/../../Makefile.config
 
-TOOLNAME := httpd
-SOURCES := httpd.swift
+LIBRARYNAME := swift_LowLevelRuntime
+
+SOURCES := FastEntryPoints.s Alloc.cpp KnownMetadata.cpp \
+	   Metadata.cpp Stubs.cpp ObjCBridge.mm
 
 include $(SWIFT_LEVEL)/Makefile
 
@@ -33,16 +36,7 @@ endif
 
 SWIFT_OPTFLAG := -O3
 
-LDFLAGS += -framework Foundation -lswift_runtime
-
-SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
-$(ObjDir)/%.o: %.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER)
-	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) -c $< -o $@ $(SWIFT_OPTFLAG)
-
 $(ObjDir)/%.o: %.s $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE)
 	$(Echo) "Compiling $*.s for $(BuildMode) build" $(PIC_FLAG)
 	$(Verb) if $(Compile.C) $(DEPEND_OPTIONS) $< -o $(ObjDir)/$*.o ; \
 	        $(DEPEND_MOVEFILE)
-
-#all-local:: httpd
