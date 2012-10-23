@@ -137,14 +137,12 @@ LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
 
 namespace {
   class ClassDestroyCleanup : public Cleanup {
-    ClassDecl *CD;
     llvm::Value *ThisValue;
     const ClassTypeInfo &info;
 
   public:
-    ClassDestroyCleanup(ClassDecl *CD, llvm::Value *ThisValue,
-                        const ClassTypeInfo &info)
-      : CD(CD), ThisValue(ThisValue), info(info) {}
+    ClassDestroyCleanup(llvm::Value *ThisValue, const ClassTypeInfo &info)
+      : ThisValue(ThisValue), info(info) {}
 
     void emit(IRGenFunction &IGF) const {
       // FIXME: This implementation will be wrong once we get dynamic
@@ -206,7 +204,7 @@ static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
   IGF.emitRetainCall(thisValue);
 
   Scope scope(IGF);
-  IGF.pushCleanup<ClassDestroyCleanup>(CD, thisValue, info);
+  IGF.pushCleanup<ClassDestroyCleanup>(thisValue, info);
 
   if (DD) {
     auto thisDecl = DD->getImplicitThisDecl();

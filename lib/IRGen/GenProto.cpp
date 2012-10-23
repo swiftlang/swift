@@ -1151,8 +1151,6 @@ class irgen::ConformanceInfo {
   /// here would just indicate how to find the actual thing.
   llvm::Constant *Table;
 
-  FixedPacking Packing;
-
 public:
   llvm::Value *getTable(IRGenFunction &IGF) const {
     return Table;
@@ -1162,10 +1160,6 @@ public:
   /// not be supportable at all.
   llvm::Constant *tryGetConstantTable() const {
     return Table;
-  }
-
-  FixedPacking getPacking() const {
-    return Packing;
   }
 };
 
@@ -2552,7 +2546,6 @@ ProtocolInfo::getConformance(IRGenModule &IGM, CanType concreteType,
 
   ConformanceInfo *info = new ConformanceInfo;
   info->Table = table;
-  info->Packing = packing;
 
   auto res = Conformances.insert(std::make_pair(&conformance, info));
   return *res.first->second;
@@ -3268,7 +3261,6 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
       // Compute the conformance information.
       const ConformanceInfo &conformance =
         protoI.getConformance(IGF.IGM, srcType, srcTI, proto, *astConformance);
-      assert(packing == conformance.getPacking());
       ptable = conformance.getTable(IGF);
     }
 

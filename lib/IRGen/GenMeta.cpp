@@ -1295,6 +1295,7 @@ Callee irgen::emitVirtualCallee(IRGenFunction &IGF, llvm::Value *base,
   llvm::Value *fn;
   if (bestUncurry != naturalUncurry) {
     IGF.unimplemented(method->getLoc(), "not-fully-applied method reference");
+    fn = nullptr;
   } else {
     FunctionRef fnRef(overridden, bestExplosion, bestUncurry);
     auto index = FindClassMethodIndex(IGF.IGM, fnRef).getTargetIndex();
