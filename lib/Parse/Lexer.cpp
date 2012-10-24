@@ -320,6 +320,7 @@ void Lexer::lexIdentifier() {
     .Case("extension", tok::kw_extension)
     .Case("func", tok::kw_func)
     .Case("import", tok::kw_import)
+    .Case("metatype", tok::kw_metatype)
     .Case("oneof", tok::kw_oneof)
     .Case("protocol", tok::kw_protocol)
     .Case("requires", tok::kw_requires)

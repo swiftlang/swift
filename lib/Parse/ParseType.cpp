@@ -129,6 +129,18 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
     return true;
   }
 
+  // '.metatype' still leaves us with type-simple.
+  while (Tok.is(tok::period) && peekToken().is(tok::kw_metatype)) {
+    consumeToken(tok::period);
+    SourceLoc metatypeLoc = consumeToken(tok::kw_metatype);
+
+    Type metatypeType = MetaTypeType::get(Result.getType(), Context);
+
+    SourceRange metatypeTypeRange{ Result.getSourceRange().Start,
+                                   metatypeLoc };
+    Result = { metatypeType, metatypeTypeRange };
+  }
+
   // Handle type-function if we have an arrow.
   if (consumeIf(tok::arrow)) {
     // If the argument was not syntactically a tuple type, report an error.
@@ -214,7 +226,7 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
 
   SmallVector<IdentifierType::Component, 4> Components;
   SourceLoc EndLoc;
-  do {
+  while (true) {
     SourceLoc Loc = Tok.getLoc();
     Identifier Name;
     if (parseIdentifier(Name, diag::expected_identifier_in_dotted_type))
@@ -228,7 +240,15 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
     }
     Components.push_back(IdentifierType::Component(Loc, Name, GenericArgs));
     EndLoc = Loc;
-  } while (consumeIf(tok::period));
+
+    // Treat 'Foo.<anything>' as an attempt to write a dotted type
+    // unless <anything> is 'metatype'.
+    if (Tok.is(tok::period) && peekToken().isNot(tok::kw_metatype)) {
+      consumeToken(tok::period);
+    } else {
+      break;
+    }
+  }
 
   // Lookup element #0 through our current scope chains in case it is some thing
   // local (this returns null if nothing is found).

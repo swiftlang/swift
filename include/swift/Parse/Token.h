@@ -45,6 +45,7 @@ enum class tok {
   KEYWORD(func)
   KEYWORD(import)
   KEYWORD(oneof)
+  KEYWORD(metatype)
   KEYWORD(protocol)
   KEYWORD(requires)
   KEYWORD(struct)

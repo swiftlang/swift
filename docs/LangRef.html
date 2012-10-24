@@ -1287,6 +1287,7 @@ if vec[3] {
     type-simple ::= <a href="#type-identifier">type-identifier</a>
     type-simple ::= <a href="#type-tuple">type-tuple</a>
     type-simple ::= <a href="#type-composition">type-composition</a>
+    type-simple ::= <a href="#type-metatype">type-metatype</a>
 
     type-annotation ::= <a href="#attribute-list">attribute-list</a> type
   </pre>
@@ -1627,7 +1628,20 @@ if vec[3] {
   </pre>
 
   <!-- _____________________________________________________________________ -->
-  <h3 id="type-composition">Protocol Composition Types</h4>
+  <h3 id="type-metatype">Metatype Types</h3>
+  <pre class="grammar">
+    type-metatype ::= type-simple '.' 'metatype'
+  </pre>
+
+  <p>Every type has an associated metatype.  A value of the metatype
+    type is a reference to a global object which describes the type.
+    Most metatype types are singleton and therefore require no
+    storage, but metatypes associated with <a href="#decl-class">class
+    types</a> follow the same subtyping rules as their associated
+    class types and therefore are not singleton.</p>
+
+  <!-- _____________________________________________________________________ -->
+  <h3 id="type-composition">Protocol Composition Types</h3>
   <pre class="grammar">
    type-composition ::= 'protocol' '&lt;' type-composition-list? '&gt;'
 

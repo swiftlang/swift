@@ -1176,9 +1176,8 @@ void IdentifierType::print(raw_ostream &OS) const {
 }
 
 void MetaTypeType::print(raw_ostream &OS) const {
-  OS << "metatype<";
   InstanceType->print(OS);
-  OS << '>';
+  OS << ".metatype";
 }
 
 void ModuleType::print(raw_ostream &OS) const {
