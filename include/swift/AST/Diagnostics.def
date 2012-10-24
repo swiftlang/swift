@@ -143,6 +143,8 @@ ERROR(disallowed_type,decl_parsing,none,
       "type not allowed here", ())
 ERROR(disallowed_init,decl_parsing,none,
       "variable initializer is not allowed here", ())
+ERROR(disallowed_semi,decl_parsing,none,
+      "semicolon is not allowed here", ())
 ERROR(decl_inner_scope,decl_parsing,none,
       "declaration is only valid at file scope", ())
 

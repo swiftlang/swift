@@ -353,6 +353,12 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     diagnose(Tok, diag::expected_decl);
     HadParseError = true;
     break;
+  case tok::semi:
+    // FIXME: Add a fixit to remove the semicolon.
+    diagnose(Tok, diag::disallowed_semi);
+    // Don't set HadParseError; just eat the semicolon and continue.
+    consumeToken(tok::semi);
+    break;
   case tok::kw_import:
     Entries.push_back(parseDeclImport());
     break;
@@ -395,6 +401,14 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
                                        !(Flags & PD_DisallowFuncDef),
                                        Entries);
     break;
+  }
+
+  // In containers, statements are not allowed, so a trailing semicolon can't
+  // be parsed as a SemiStmt. Just consume it here.
+  if ((Flags & PD_HasContainerType) && Tok.is(tok::semi)) {
+    consumeToken(tok::semi);
+    // FIXME: Should we preserve the location of the semicolon for
+    // diagnostic/rewriting purposes?
   }
   
   // If we got back a null pointer, then a parse error happened.
