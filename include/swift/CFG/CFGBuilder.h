@@ -198,8 +198,8 @@ public:
     return insert(new TupleElementInst(ResultTy, Operand, FieldNo));
   }
 
-  TypeOfInst *createTypeOf(TypeOfExpr *Expr) {
-    return insert(new TypeOfInst(Expr));
+  MetatypeInst *createMetatype(MetatypeExpr *Expr) {
+    return insert(new MetatypeInst(Expr));
   }
 
   //===--------------------------------------------------------------------===//

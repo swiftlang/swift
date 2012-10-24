@@ -1066,8 +1066,8 @@ public:
 
     if (Best) {
       Type ClassMetaTy = MetaTypeType::get(CT, TC.Context);
-      Expr *TypeBase = new (TC.Context) TypeOfExpr(E->getLoc(),
-                                                   ClassMetaTy);
+      Expr *TypeBase = new (TC.Context) MetatypeExpr(nullptr, E->getLoc(),
+                                                     ClassMetaTy);
       Expr *CtorRef = new (TC.Context) DeclRefExpr(Best.getDecl(),
                                                    E->getLoc(),
                                                    Best.getDecl()->getType());
@@ -1086,8 +1086,13 @@ public:
     return E;
   }
 
-  Expr *visitTypeOfExpr(TypeOfExpr *E) {
-    // TypeOfExpr is fully type-checked.
+  Expr *visitMetatypeExpr(MetatypeExpr *E) {
+    if (Expr *base = E->getBase()) {
+      if (!base->getType()->is<ErrorType>())
+        E->setType(MetaTypeType::get(base->getType(), TC.Context));
+    }
+
+    // Otherwise, TypeOfExpr is fully type-checked.
     return E;
   }
 
@@ -1217,7 +1222,8 @@ Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
                                             Type lenTy, SourceLoc Loc) {
   // Build the expression "Slice<T>".
   Expr *sliceTypeRef =
-      new (Context) TypeOfExpr(Loc, MetaTypeType::get(sliceType, Context));
+    new (Context) MetatypeExpr(nullptr, Loc,
+                               MetaTypeType::get(sliceType, Context));
 
   // Build the expression "Slice<T>.convertFromHeapArray".
   Expr *injectionFn = semaUnresolvedDotExpr(

@@ -238,7 +238,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;
   }
 
-  Expr *visitTypeOfExpr(TypeOfExpr *E) {
+  Expr *visitMetatypeExpr(MetatypeExpr *E) {
+    if (Expr *base = E->getBase()) {
+      if ((base = doIt(base)))
+        E->setBase(base);
+      else
+        return nullptr;
+    }
     return E;
   }
 

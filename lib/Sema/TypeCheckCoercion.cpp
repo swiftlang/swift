@@ -264,8 +264,8 @@ public:
   CoercedResult visitNewReferenceExpr(NewReferenceExpr *E) {
     return failed(E); // FIXME: Is this reachable?
   }
-  CoercedResult visitTypeOfExpr(TypeOfExpr *E) {
-    llvm_unreachable("This node doesn't exist for unresolved types");
+  CoercedResult visitMetatypeExpr(MetatypeExpr *E) {
+    return failed(E); // We actually could potentially do a coercion here.
   }
   CoercedResult visitOpaqueValueExpr(OpaqueValueExpr *E) {
     // An OpaqueValueExpr can be unresolved if deducible types are involved.
@@ -455,8 +455,8 @@ public:
     if (!(Flags & CF_Apply))
       return DED->getType();
 
-    Expr *E = new (TC.Context) TypeOfExpr(UME->getDotLoc(),
-                                          MetaTypeType::get(DT, TC.Context));
+    Expr *E = new (TC.Context) MetatypeExpr(nullptr, UME->getDotLoc(),
+                                            MetaTypeType::get(DT, TC.Context));
     E = TC.buildMemberRefExpr(E, SourceLoc(), DED, UME->getDotLoc());
     return coerced(TC.recheckTypes(E));
   }  
@@ -894,8 +894,8 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
   if (!(Flags & CF_Apply))
     return DestTy;
 
-  Expr *DRE = new (TC.Context) TypeOfExpr(Intermediate->getStartLoc(),
-                                          Method->computeThisType());
+  Expr *DRE = new (TC.Context) MetatypeExpr(nullptr, Intermediate->getStartLoc(),
+                                            Method->computeThisType());
   DRE = TC.recheckTypes(TC.buildMemberRefExpr(DRE, SourceLoc(), Method,
                                               Intermediate->getStartLoc()));
 
@@ -1022,8 +1022,9 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
         continue;
 
       Type DestMetaTy = MetaTypeType::get(DestTy, TC.Context);
-      Expr *TypeBase = new (TC.Context) TypeOfExpr(Segment->getStartLoc(),
-                                                   DestMetaTy);
+      Expr *TypeBase = new (TC.Context) MetatypeExpr(nullptr,
+                                                     Segment->getStartLoc(),
+                                                     DestMetaTy);
       Expr *CtorRef = new (TC.Context) DeclRefExpr(Best.getDecl(),
                                                    Segment->getStartLoc(),
                                                    Best.getDecl()->getType());

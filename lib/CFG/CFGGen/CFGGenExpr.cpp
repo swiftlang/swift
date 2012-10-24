@@ -249,7 +249,7 @@ Value *CFGGen::visitNewArrayExpr(NewArrayExpr *E) {
 
 
 
-Value *CFGGen::visitTypeOfExpr(TypeOfExpr *E) {
-  return B.createTypeOf(E);
+Value *CFGGen::visitMetatypeExpr(MetatypeExpr *E) {
+  return B.createMetatype(E);
 }
 

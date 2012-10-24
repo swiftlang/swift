@@ -41,6 +41,7 @@ class ImplicitConversionExpr;
 class IntegerLiteralExpr;
 class LoadExpr;
 class MaterializeExpr;
+class MetatypeExpr;
 class ReturnStmt;
 class ScalarToTupleExpr;
 class SpecializeExpr;
@@ -49,7 +50,6 @@ class Stmt;
 class TupleElementExpr;
 class TupleExpr;
 class TupleShuffleExpr;
-class TypeOfExpr;
 class VarDecl;
 
 /// This is the root class for all instructions that can be used as the contents
@@ -444,24 +444,26 @@ public:
   }
 };
 
-/// TypeOfInst - Represents the production of an instance of a given metatype.
-class TypeOfInst : public Instruction {
+/// MetatypeInst - Represents the production of an instance of a given metatype.
+///
+/// FIXME: base!
+class MetatypeInst : public Instruction {
 public:
 
   /// Constructs a TypeOfInst.
   ///
-  /// \param Expr A backpointer to the original TypeOfExpr.
+  /// \param Expr A backpointer to the original MetatypeExpr.
   ///
-  TypeOfInst(TypeOfExpr *E);
+  MetatypeInst(MetatypeExpr *E);
 
-  TypeOfExpr *getExpr() const;
+  MetatypeExpr *getExpr() const;
 
   /// getMetaType - Return the type of the metatype that this instruction
   /// returns.
   Type getMetaType() const;
 
   static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::TypeOfInst;
+    return I->getKind() == ValueKind::MetatypeInst;
   }
 };
 

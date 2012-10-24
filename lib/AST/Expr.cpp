@@ -672,8 +672,15 @@ public:
     OS << ')';
   }
 
-  void visitTypeOfExpr(TypeOfExpr *E) {
-    printCommon(E, "typeof_expr") << ")";
+  void visitMetatypeExpr(MetatypeExpr *E) {
+    printCommon(E, "metatype_expr");
+    if (Expr *base = E->getBase()) {
+      OS << '\n';
+      printRec(base);
+    } else {
+      OS << " baseless";
+    }
+    OS << ")";
   }
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E) {

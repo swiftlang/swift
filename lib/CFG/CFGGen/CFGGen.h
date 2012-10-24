@@ -139,7 +139,7 @@ public:
   Value *visitTupleElementExpr(TupleElementExpr *E);
   Value *visitTupleShuffleExpr(TupleShuffleExpr *E);
   Value *visitNewArrayExpr(NewArrayExpr *E);
-  Value *visitTypeOfExpr(TypeOfExpr *E);
+  Value *visitMetatypeExpr(MetatypeExpr *E);
 
   Value *emitArrayInjectionCall(Value *ObjectPtr, Value *BasePtr,
                                 Value *Length, Expr *ArrayInjectionFunction);

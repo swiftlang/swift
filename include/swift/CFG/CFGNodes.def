@@ -68,7 +68,7 @@ ABSTRACT_VALUE(Instruction, Value)
   INST(SpecializeInst, Instruction)
   INST(TypeConversionInst, Instruction)
   INST(TupleInst, Instruction)
-  INST(TypeOfInst, Instruction)
+  INST(MetatypeInst, Instruction)
   INST(TupleElementInst, Instruction)
 
   // CFG-only instructions that don't have an AST analog.

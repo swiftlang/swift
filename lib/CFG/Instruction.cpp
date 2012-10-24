@@ -271,16 +271,16 @@ TupleInst::TupleInst(Expr *E, Type Ty, ArrayRef<Value*> Elems)
   memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(Value*));
 }
 
-TypeOfInst::TypeOfInst(TypeOfExpr *E)
-  : Instruction(ValueKind::TypeOfInst, E, E->getType()) {}
+MetatypeInst::MetatypeInst(MetatypeExpr *E)
+  : Instruction(ValueKind::MetatypeInst, E, E->getType()) {}
 
-TypeOfExpr *TypeOfInst::getExpr() const {
-  return getLocExpr<TypeOfExpr>();
+MetatypeExpr *MetatypeInst::getExpr() const {
+  return getLocExpr<MetatypeExpr>();
 }
 
 /// getMetaType - Return the type of the metatype that this instruction
 /// returns.
-Type TypeOfInst::getMetaType() const {
+Type MetatypeInst::getMetaType() const {
   return getExpr()->getType();
 }
 

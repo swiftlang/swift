@@ -539,10 +539,16 @@ namespace {
       }
     }
 
-    void verifyChecked(TypeOfExpr *E) {
-      if (!E->getType()->is<MetaTypeType>()) {
-        Out << "TypeOfExpr must have MetaTypeType\n";
+    void verifyChecked(MetatypeExpr *E) {
+      auto metatype = E->getType()->getAs<MetaTypeType>();
+      if (!metatype) {
+        Out << "MetatypeExpr must have metatype type\n";
         abort();
+      }
+
+      if (E->getBase()) {
+        checkSameType(E->getBase()->getType(), metatype->getInstanceType(),
+                      "base type of .metatype expression");
       }
     }
 

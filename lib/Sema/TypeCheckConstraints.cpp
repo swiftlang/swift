@@ -2012,7 +2012,13 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return instanceTy;
     }
 
-    Type visitTypeOfExpr(TypeOfExpr *expr) {
+    Type visitMetatypeExpr(MetatypeExpr *expr) {
+      if (auto base = expr->getBase()) {
+        auto tv = CS.createTypeVariable();
+        auto metaTy = MetaTypeType::get(tv, CS.getASTContext());
+        CS.addConstraint(ConstraintKind::EqualRvalue, metaTy,
+                         base->getType(), expr);
+      }
       return expr->getType();
     }
 
@@ -4276,7 +4282,8 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // FIXME: Check whether baseTy is an archetype?
 
       auto &ctx = CS.getASTContext();
-      auto base = new (ctx) TypeOfExpr(nameLoc, MetaTypeType::get(baseTy, ctx));
+      auto base = new (ctx) MetatypeExpr(nullptr, nameLoc,
+                                         MetaTypeType::get(baseTy, ctx));
       return buildMemberRef(base, SourceLoc(), value, nameLoc, openedType);
     }
 
@@ -4420,9 +4427,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
       // The base expression is simply the metatype of a oneof type.
       auto &tc = CS.getTypeChecker();
-      auto base = new (tc.Context) TypeOfExpr(expr->getDotLoc(),
-                                              MetaTypeType::get(oneofTy,
-                                                                tc.Context));
+      auto base = new (tc.Context) MetatypeExpr(nullptr,
+                                                expr->getDotLoc(),
+                                                MetaTypeType::get(oneofTy,
+                                                                  tc.Context));
 
       // Find the member and build a reference to it.
       // FIXME: Redundant member lookup.
@@ -4678,8 +4686,15 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return expr;
     }
 
-    Expr *visitTypeOfExpr(TypeOfExpr *expr) {
-      return simplifyExprType(expr);
+    Expr *visitMetatypeExpr(MetatypeExpr *expr) {
+      auto &tc = CS.getTypeChecker();
+
+      if (Expr *base = expr->getBase()) {
+        base = tc.convertToRValue(base);
+        if (!base) return nullptr;
+        expr->setBase(base);
+      }
+      return expr;
     }
 
     Expr *visitOpaqueValueExpr(OpaqueValueExpr *expr) {
@@ -4742,7 +4757,8 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // Form the constructor call expression.
       auto &tc = CS.getTypeChecker();
       auto classMetaTy = MetaTypeType::get(instanceTy, tc.Context);
-      Expr *typeBase = new (tc.Context) TypeOfExpr(expr->getLoc(), classMetaTy);
+      Expr *typeBase = new (tc.Context) MetatypeExpr(nullptr, expr->getLoc(),
+                                                     classMetaTy);
       Expr *ctorRef = new (tc.Context) DeclRefExpr(constructor, expr->getLoc(),
                                          constructor->getTypeOfReference());
       ctorRef = new (tc.Context) ConstructorRefCallExpr(ctorRef, typeBase);

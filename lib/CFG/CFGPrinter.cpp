@@ -180,8 +180,8 @@ public:
     OS << "tupleelement " << getID(TEI->getOperand()) << ", "
        << TEI->getFieldNo();
   }
-  void visitTypeOfInst(TypeOfInst *TOI) {
-    OS << "typeof " << TOI->getMetaType().getString();
+  void visitMetatypeInst(MetatypeInst *MI) {
+    OS << "metatype " << MI->getMetaType().getString();
   }
 
   void visitIndexLValueInst(IndexLValueInst *ILI) {

@@ -974,8 +974,8 @@ Expr *TypeChecker::specializeOverloadResult(const OverloadCandidate &Candidate,
   if (Type baseTy = Candidate.getInferredBaseType()) {
     if (auto dre = dyn_cast<DeclRefExpr>(E)) {
       Expr *baseExpr
-        = new (Context) TypeOfExpr(E->getLoc(),
-                                   MetaTypeType::get(baseTy, Context));
+        = new (Context) MetatypeExpr(nullptr, E->getLoc(),
+                                     MetaTypeType::get(baseTy, Context));
       ValueDecl *decl = dre->getDecl();
       E = buildMemberRefExpr(baseExpr, SourceLoc(), { &decl, 1 },
                              dre->getLoc());

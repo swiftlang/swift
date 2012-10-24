@@ -1190,7 +1190,7 @@ public:
 };
 
 /// GetMetatypeExpr - Given a value of type T, returns the corresponding value
-/// of type metatype<T>.
+/// of type T.metatype.
 class GetMetatypeExpr : public ImplicitConversionExpr {
 public:
   GetMetatypeExpr(Expr *subExpr, Type type)
@@ -1580,23 +1580,29 @@ public:
   }
 };
 
-/// TypeOfExpr - Produces an instance of a given metatype.
-///
-/// FIXME: This has no parsed representation (yet), although we suspect that
-/// it will become useful once metatypes get 'real', so that one can retrieve
-/// the (dynamic) metatype of a value, in which case it will need to gain an
-/// optional subexpression.
-class TypeOfExpr : public Expr {
-  SourceLoc Loc;
+/// MetatypeExpr - Evaluates an (optional) expression and produces a
+/// metatype value.  If there's no base expression, this isn't really
+/// a parsed form.
+class MetatypeExpr : public Expr {
+  Expr *Base;
+  SourceLoc MetatypeLoc;
 
 public:
-  explicit TypeOfExpr(SourceLoc Loc, Type Ty)
-    : Expr(ExprKind::TypeOf, Ty), Loc(Loc) { }
+  explicit MetatypeExpr(Expr *base, SourceLoc metatypeLoc, Type ty)
+    : Expr(ExprKind::Metatype, ty), Base(base), MetatypeLoc(metatypeLoc) { }
 
-  SourceRange getSourceRange() const { return Loc; }
+  Expr *getBase() const { return Base; }
+  void setBase(Expr *base) { Base = base; }
+
+  SourceLoc getLoc() const { return MetatypeLoc; }
+
+  SourceRange getSourceRange() const {
+    if (Base) return SourceRange(Base->getStartLoc(), MetatypeLoc);
+    return SourceRange(MetatypeLoc);
+  }
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::TypeOf;
+    return E->getKind() == ExprKind::Metatype;
   }
 };
 

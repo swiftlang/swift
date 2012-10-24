@@ -1194,9 +1194,10 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
   llvm_unreachable("bad decl kind!");
 }
 
-/// Given a heap pointer, load the metadata reference.
+/// Given a heap pointer, load the metadata reference as a %type*.
 llvm::Value *irgen::emitMetadataRefForHeapObject(IRGenFunction &IGF,
-                                                 llvm::Value *object) {
+                                                 llvm::Value *object,
+                                                 bool suppressCast) {
   // Drill into the object pointer.  Rather than bitcasting, we make
   // an effort to do something that should explode if we get something
   // mistyped.
@@ -1208,7 +1209,7 @@ llvm::Value *irgen::emitMetadataRefForHeapObject(IRGenFunction &IGF,
 
   // We need a bitcast if we're dealing with an opaque class.
   if (structTy->isOpaque()) {
-    auto metadataPtrPtrTy = IGF.IGM.HeapMetadataPtrTy->getPointerTo();
+    auto metadataPtrPtrTy = IGF.IGM.TypeMetadataPtrTy->getPointerTo();
     slot = IGF.Builder.CreateBitCast(object, metadataPtrPtrTy);
 
   // Otherwise, make a GEP.
@@ -1227,6 +1228,11 @@ llvm::Value *irgen::emitMetadataRefForHeapObject(IRGenFunction &IGF,
     } while (structTy != nullptr);
 
     slot = IGF.Builder.CreateInBoundsGEP(object, indexes);
+
+    if (!suppressCast) {
+      slot = IGF.Builder.CreateBitCast(slot,
+                                  IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+    }
   }
 
   auto metadata = IGF.Builder.CreateLoad(Address(slot,
@@ -1308,7 +1314,7 @@ Callee irgen::emitVirtualCallee(IRGenFunction &IGF, llvm::Value *base,
   if (method->isStatic()) {
     metadata = base;
   } else {
-    metadata = emitMetadataRefForHeapObject(IGF, base);
+    metadata = emitMetadataRefForHeapObject(IGF, base, /*suppress cast*/ true);
   }
 
   // Use the type of the method we were type-checked against, not the

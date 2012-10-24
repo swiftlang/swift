@@ -199,6 +199,25 @@ static OwnedAddress emitMaterializeExpr(IRGenFunction &IGF,
   return addr;
 }
 
+/// Emit a get-metatype operation for the given base expression.
+static void emitGetMetatype(IRGenFunction &IGF, Expr *base, Explosion &out) {
+  auto type = base->getType()->getCanonicalType();
+
+  // If the expression has class type, evaluate to an object and
+  // pull the metatype out of that.
+  if (type->getClassOrBoundGenericClass()) {
+    Explosion temp(ExplosionKind::Maximal);
+    IGF.emitRValue(base, temp);
+    auto value = temp.claimNext().getValue(); // let the cleanup happen
+    out.addUnmanaged(emitMetadataRefForHeapObject(IGF, value));
+    return;
+  }
+
+  // Otherwise, ignore and use the static type.
+  IGF.emitIgnored(base);
+  emitMetaTypeRef(IGF, type, out);
+}
+
 namespace {
   /// A visitor for emitting a value into an explosion.  We call this
   /// r-value emission, but do note that it's valid to emit an
@@ -250,7 +269,7 @@ namespace {
       IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
     }
     void visitGetMetatypeExpr(GetMetatypeExpr *E) {
-      IGF.emitIgnored(E->getSubExpr());
+      emitGetMetatype(IGF, E->getSubExpr(), Out);
     }
     void visitDerivedToBaseExpr(DerivedToBaseExpr *E) {
       Explosion subResult(ExplosionKind::Maximal);
@@ -281,7 +300,12 @@ namespace {
       emitNewArrayExpr(IGF, E, Out);
     }
 
-    void visitTypeOfExpr(TypeOfExpr *E) {
+    void visitMetatypeExpr(MetatypeExpr *E) {
+      // If we have a base, we have to evaluate it.
+      if (auto base = E->getBase())
+        return emitGetMetatype(IGF, base, Out);
+
+      // Otherwise, just use the static type of the expression.
       auto type = E->getType()->getCanonicalType();
       type = CanType(cast<MetaTypeType>(type)->getInstanceType());
       emitMetaTypeRef(IGF, type, Out);
@@ -443,7 +467,7 @@ namespace {
     NOT_LVALUE_EXPR(Tuple)
     NOT_LVALUE_EXPR(NewArray)
     NOT_LVALUE_EXPR(NewReference)
-    NOT_LVALUE_EXPR(TypeOf)
+    NOT_LVALUE_EXPR(Metatype)
     NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
     NOT_LVALUE_EXPR(Coerce)
     NOT_LVALUE_EXPR(Module)
@@ -611,7 +635,7 @@ namespace {
     NON_LOCATEABLE(DotSyntaxBaseIgnoredExpr)
     NON_LOCATEABLE(NewReferenceExpr)
     NON_LOCATEABLE(NewArrayExpr)
-    NON_LOCATEABLE(TypeOfExpr)
+    NON_LOCATEABLE(MetatypeExpr)
     NON_LOCATEABLE(CoerceExpr)
     NON_LOCATEABLE(ExistentialMemberRefExpr)
     NON_LOCATEABLE(ArchetypeMemberRefExpr)

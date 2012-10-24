@@ -122,7 +122,7 @@ public:
     assert(TI->getElements().size() == ResTy->getFields().size() &&
            "Tuple field count mismatch!");
   }
-  void visitTypeOfInst(TypeOfInst *TOI) {
+  void visitMetatypeInst(MetatypeInst *MI) {
   }
 
   void visitIndexLValueInst(IndexLValueInst *ILI) {

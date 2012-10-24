@@ -89,7 +89,8 @@ namespace irgen {
   /// Given a heap-object instance, with some heap-object type,
   /// produce a reference to its metadata.
   llvm::Value *emitMetadataRefForHeapObject(IRGenFunction &IGF,
-                                            llvm::Value *object);
+                                            llvm::Value *object,
+                                            bool suppressCast = false);
 
   /// Derive the abstract callee for a virtual call to the given method.
   AbstractCallee getAbstractVirtualCallee(IRGenFunction &IGF,

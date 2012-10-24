@@ -2816,7 +2816,8 @@ namespace {
         return nullptr;
 
       case SourceKind::ClassPointer:
-        return emitMetadataRefForHeapObject(IGF, in.getLastClaimed());
+        return emitMetadataRefForHeapObject(IGF, in.getLastClaimed(),
+                                            /*suppress cast*/ true);
 
       case SourceKind::GenericLValueMetadata: {
         llvm::Value *metatype = in.claimUnmanagedNext();

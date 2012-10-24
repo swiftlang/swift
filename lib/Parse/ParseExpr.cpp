@@ -233,6 +233,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
 ///   expr-postfix:
 ///     expr-primary
 ///     expr-dot
+///     expr-metatype
 ///     expr-subscript
 ///     expr-call
 ///     expr-postfix operator-postfix
@@ -316,6 +317,12 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     SourceLoc TokLoc = Tok.getLoc();
     
     if (consumeIf(tok::period)) {
+      if (Tok.is(tok::kw_metatype)) {
+        SourceLoc metatypeLoc = consumeToken(tok::kw_metatype);
+        Result = new (Context) MetatypeExpr(Result.get(), metatypeLoc, Type());
+        continue;
+      }
+
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::dollarident)) {
         diagnose(Tok, diag::expected_field_name);
         return 0;
