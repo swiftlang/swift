@@ -258,6 +258,10 @@ namespace {
       emitTupleShuffle(IGF, E, Out);
     }
 
+    /// Metatypes are always compatible up the inheritance hierarchy.
+    void visitMetatypeConversionExpr(MetatypeConversionExpr *E) {
+      IGF.emitRValue(E->getSubExpr(), Out);
+    }
     void visitFunctionConversionExpr(FunctionConversionExpr *E) {
       IGF.emitRValue(E->getSubExpr(), Out);
     }
@@ -456,6 +460,8 @@ namespace {
     NOT_LVALUE_EXPR(StringLiteral)
     NOT_LVALUE_EXPR(InterpolatedStringLiteral)
     NOT_LVALUE_EXPR(TupleShuffle)
+    NOT_LVALUE_EXPR(FunctionConversion)
+    NOT_LVALUE_EXPR(MetatypeConversion)
     NOT_LVALUE_EXPR(Erasure)
     NOT_LVALUE_EXPR(Specialize) // FIXME: Generic subscripts?
     NOT_LVALUE_EXPR(GetMetatype)
@@ -487,10 +493,6 @@ namespace {
       return IGF.emitAddressLValue(addr);
     }
 
-    LValue visitFunctionConversionExpr(FunctionConversionExpr *E) {
-      return visit(E->getSubExpr());
-    }
-    
     LValue visitDeclRefExpr(DeclRefExpr *E) {
       return emitDeclRefLValue(IGF, E);
     }
@@ -596,9 +598,6 @@ namespace {
     Optional<Address> visitRequalifyExpr(RequalifyExpr *E) {
       return visit(E->getSubExpr());
     }
-    Optional<Address> visitFunctionConversionExpr(FunctionConversionExpr *E) {
-      return visit(E->getSubExpr());
-    }
     Optional<Address> visitAddressOfExpr(AddressOfExpr *E) {
       return visit(E->getSubExpr());
     }
@@ -630,6 +629,8 @@ namespace {
     NON_LOCATEABLE(GetMetatypeExpr)
     NON_LOCATEABLE(DerivedToBaseExpr)
     NON_LOCATEABLE(ScalarToTupleExpr)
+    NON_LOCATEABLE(FunctionConversionExpr)
+    NON_LOCATEABLE(MetatypeConversionExpr)
     NON_LOCATEABLE(CapturingExpr)
     NON_LOCATEABLE(ModuleExpr)
     NON_LOCATEABLE(DotSyntaxBaseIgnoredExpr)

@@ -348,6 +348,7 @@ public:
     bool Trivial = false;
     return isSubtypeOf(T1, T2, Trivial, CC);
   }
+  bool isTrivialSubtypeOf(Type T1, Type T2, CoercionContext *CC = nullptr);
 
   /// \brief Determine whether T1 and T2 are the same type (structureally)
   /// within the given coercion context, deducing generic arguments if needed.

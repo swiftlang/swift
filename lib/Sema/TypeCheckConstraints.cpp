@@ -2013,13 +2013,16 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitMetatypeExpr(MetatypeExpr *expr) {
-      if (auto base = expr->getBase()) {
-        auto tv = CS.createTypeVariable();
-        auto metaTy = MetaTypeType::get(tv, CS.getASTContext());
-        CS.addConstraint(ConstraintKind::EqualRvalue, metaTy,
-                         base->getType(), expr);
-      }
-      return expr->getType();
+      auto base = expr->getBase();
+
+      // If this is an artificial MetatypeExpr, it's fully type-checked.
+      if (!base) return expr->getType();
+
+      auto tv = CS.createTypeVariable();
+      CS.addConstraint(ConstraintKind::EqualRvalue, tv,
+                       base->getType(), expr);
+
+      return MetaTypeType::get(tv, CS.getASTContext());
     }
 
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {
@@ -2706,9 +2709,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // metatype<B> < metatype<A> if A < B and both A and B are classes.
       TypeMatchKind subKind = TypeMatchKind::SameType;
       if (kind != TypeMatchKind::SameType &&
-          meta1->getInstanceType()->getClassOrBoundGenericClass() &&
-          meta2->getInstanceType()->getClassOrBoundGenericClass())
-        subKind = std::max(kind, TypeMatchKind::Subtype);
+          (meta1->getInstanceType()->getClassOrBoundGenericClass() ||
+           meta2->getInstanceType()->getClassOrBoundGenericClass()))
+        subKind = std::min(kind, TypeMatchKind::Subtype);
       
       return matchTypes(meta1->getInstanceType(), meta2->getInstanceType(),
                         subKind, subFlags, trivial);
@@ -4693,6 +4696,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
         base = tc.convertToRValue(base);
         if (!base) return nullptr;
         expr->setBase(base);
+        expr->setType(MetaTypeType::get(base->getType(), tc.Context));
       }
       return expr;
     }

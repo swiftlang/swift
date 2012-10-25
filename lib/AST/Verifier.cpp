@@ -264,11 +264,27 @@ namespace {
       // FIXME: Should either properly check implicit here, or model the dropping
       // of 'implicit' differently.
       if (!(srcQuals < dstQuals) && !(srcQuals == dstQuals)) {
-        Out << "bad qualifier sets for RequalifyExpr";
+        Out << "bad qualifier sets for RequalifyExpr:\n";
         E->print(Out);
         Out << "\n";
         abort();
       }
+    }
+
+    void verifyChecked(MetatypeConversionExpr *E) {
+      auto destTy = checkMetatypeType(E->getType(),
+                                      "result of MetatypeConversionExpr");
+      auto srcTy = checkMetatypeType(E->getSubExpr()->getType(),
+                                     "source of MetatypeConversionExpr");
+
+      if (destTy->isEqual(srcTy)) {
+        Out << "trivial MetatypeConversionExpr:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+
+      checkTrivialSubtype(srcTy, destTy, "MetatypeConversionExpr");
     }
 
     void verifyChecked(MaterializeExpr *E) {
@@ -653,6 +669,16 @@ namespace {
     }
 
     // Verification utilities.
+    Type checkMetatypeType(Type type, const char *what) {
+      auto metatype = type->getAs<MetaTypeType>();
+      if (metatype) return metatype->getInstanceType();
+
+      Out << what << " is not a metatype: ";
+      type.print(Out);
+      Out << "\n";
+      abort();
+    }
+
     void checkSameType(Type T0, Type T1, const char *what) {
       if (T0->getCanonicalType() == T1->getCanonicalType())
         return;
@@ -661,6 +687,57 @@ namespace {
       T0.print(Out);
       Out << " vs. ";
       T1.print(Out);
+      Out << "\n";
+      abort();
+    }
+
+    void checkTrivialSubtype(Type srcTy, Type destTy, const char *what) {
+      if (srcTy->isEqual(destTy)) return;
+
+      if (auto srcMetaType = srcTy->getAs<MetaTypeType>()) {
+        if (auto destMetaType = destTy->getAs<MetaTypeType>()) {
+          return checkTrivialSubtype(srcMetaType->getInstanceType(),
+                                     destMetaType->getInstanceType(),
+                                     what);
+        }
+        goto fail;
+      }
+
+      // FIXME: don't just check the hierarchy.
+      {
+        ClassDecl *srcClass = srcTy->getClassOrBoundGenericClass();
+        ClassDecl *destClass = destTy->getClassOrBoundGenericClass();
+
+        if (!srcClass || !destClass) {
+          Out << "subtype conversion in " << what
+              << " doesn't involve class types: ";
+          srcTy.print(Out);
+          Out << " to ";
+          destTy.print(Out);
+          Out << "\n";
+          abort();
+        }
+
+        assert(srcClass != destClass);
+        while (srcClass->hasBaseClass()) {
+          srcClass = srcClass->getBaseClass()->getClassOrBoundGenericClass();
+          assert(srcClass);
+          if (srcClass == destClass) return;
+        }
+
+        Out << "subtype conversion in " << what << " is not to super class: ";
+        srcTy.print(Out);
+        Out << " to ";
+        destTy.print(Out);
+        Out << "\n";
+        abort();
+      }
+
+    fail:
+      Out << "subtype conversion in " << what << " is invalid: ";
+      srcTy.print(Out);
+      Out << " to ";
+      destTy.print(Out);
       Out << "\n";
       abort();
     }

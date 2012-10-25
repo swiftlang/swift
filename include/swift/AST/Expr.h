@@ -1110,6 +1110,18 @@ public:
   }
 };
 
+/// MetatypeConversionExpr - Convert a metatype to another metatype
+/// using essentially a derived-to-base conversion.
+class MetatypeConversionExpr : public ImplicitConversionExpr {
+public:
+  MetatypeConversionExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::MetatypeConversion, subExpr, type) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::MetatypeConversion;
+  }
+};
+
 /// ErasureExpr - Perform type erasure by converting a value to existential
 /// type. For example:
 ///
