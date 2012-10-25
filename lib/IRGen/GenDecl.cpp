@@ -206,7 +206,9 @@ static bool isLocalLinkageType(CanType type) {
   case TypeKind::UnboundGeneric:
     return isLocalLinkageDecl(cast<UnboundGenericType>(base)->getDecl());
 
-  case TypeKind::BoundGeneric: {
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct: {
     BoundGenericType *BGT = cast<BoundGenericType>(base);
     if (isLocalLinkageDecl(BGT->getDecl()))
       return true;

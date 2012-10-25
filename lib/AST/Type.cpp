@@ -98,24 +98,22 @@ bool TypeBase::hasReferenceSemantics() {
   case TypeKind::ProtocolComposition:
   case TypeKind::LValue:
   case TypeKind::TypeVariable:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct:
     return false;
 
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::Class:
+  case TypeKind::BoundGenericClass:
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
     return true;
 
   case TypeKind::UnboundGeneric:
     return isa<ClassDecl>(canonical->castTo<UnboundGenericType>()->getDecl());
-      
-  case TypeKind::BoundGeneric:
-    return isa<ClassDecl>(canonical->castTo<BoundGenericType>()->getDecl());
   }
 
   llvm_unreachable("Unhandled type kind!");
-
-  
 }
 
 bool TypeBase::isExistentialType(SmallVectorImpl<ProtocolDecl *> &Protocols) {
@@ -153,7 +151,9 @@ bool TypeBase::isSpecialized() {
 
     return false;
 
-  case TypeKind::BoundGeneric:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct:
     return true;
 
 
@@ -281,7 +281,9 @@ static void gatherTypeVariables(
     return gatherTypeVariables(cast<UnboundGenericType>(ty)->getParent(),
                                typeVariables, knownTypeVariables);
 
-  case TypeKind::BoundGeneric: {
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct: {
     auto boundTy = cast<BoundGenericType>(ty);
     gatherTypeVariables(boundTy->getParent(), typeVariables, knownTypeVariables);
     for (auto arg : boundTy->getGenericArgs())
@@ -353,7 +355,9 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
   case TypeKind::Archetype:
   case TypeKind::ProtocolComposition:
   case TypeKind::UnboundGeneric:
-  case TypeKind::BoundGeneric:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct:
   case TypeKind::DeducibleGenericParam:
   case TypeKind::TypeVariable:
     return this;
@@ -710,7 +714,9 @@ CanType TypeBase::getCanonicalType() {
                                      parentTy->getASTContext());
     break;
   }
-  case TypeKind::BoundGeneric: {
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct: {
     BoundGenericType *BGT = cast<BoundGenericType>(this);
     Type parentTy;
     if (BGT->getParent())
@@ -745,7 +751,9 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::ProtocolComposition:
   case TypeKind::MetaType:
   case TypeKind::UnboundGeneric:
-  case TypeKind::BoundGeneric:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct:
   case TypeKind::OneOf:
   case TypeKind::Struct:
   case TypeKind::Class:

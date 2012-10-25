@@ -92,7 +92,11 @@ SUGARED_TYPE(ArraySlice, Type)
 TYPE(ProtocolComposition, Type)
 TYPE(LValue, Type)
 TYPE(UnboundGeneric, Type)
-TYPE(BoundGeneric, Type)
+ABSTRACT_TYPE(BoundGeneric, Type)
+  TYPE(BoundGenericClass, BoundGenericType)
+  TYPE(BoundGenericOneOf, BoundGenericType)
+  TYPE(BoundGenericStruct, BoundGenericType)
+  TYPE_RANGE(BoundGeneric, BoundGenericClass, BoundGenericStruct)
 UNCHECKED_TYPE(TypeVariable, Type)
 
 #undef TYPE_RANGE

@@ -246,27 +246,28 @@ void BoundGenericType::Profile(llvm::FoldingSetNodeID &ID,
     ID.AddPointer(Arg.getPointer());
 }
 
-BoundGenericType::BoundGenericType(NominalTypeDecl *TheDecl,
-                                   Type Parent,
-                                   ArrayRef<Type> GenericArgs,
-                                   ASTContext *C,
-                                   bool HasTypeVariable)
-  : TypeBase(TypeKind::BoundGeneric, C, /*Unresolved=*/false,
-             HasTypeVariable),
-    TheDecl(TheDecl), Parent(Parent), GenericArgs(GenericArgs)
+BoundGenericType::BoundGenericType(TypeKind theKind,
+                                   NominalTypeDecl *theDecl,
+                                   Type parent,
+                                   ArrayRef<Type> genericArgs,
+                                   ASTContext *context,
+                                   bool hasTypeVariable)
+  : TypeBase(theKind, context, /*Unresolved=*/false,
+             hasTypeVariable),
+    TheDecl(theDecl), Parent(parent), GenericArgs(genericArgs)
 {
   // Determine whether this type is unresolved.
-  if (Parent && Parent->isUnresolvedType())
+  if (parent && parent->isUnresolvedType())
     setUnresolved();
-  else for (Type Arg : GenericArgs) {
-    if (Arg->isUnresolvedType()) {
+  else for (Type arg : genericArgs) {
+    if (arg->isUnresolvedType()) {
       setUnresolved();
       break;
     }
   }
 }
 
-BoundGenericType* BoundGenericType::get(NominalTypeDecl *TheDecl,
+BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
                                         Type Parent,
                                         ArrayRef<Type> GenericArgs) {
   ASTContext &C = TheDecl->getDeclContext()->getASTContext();
@@ -296,13 +297,25 @@ BoundGenericType* BoundGenericType::get(NominalTypeDecl *TheDecl,
       }
     }
   }
-  
-  BoundGenericType *New = new (C) BoundGenericType(TheDecl, Parent, ArgsCopy,
-                                                   IsCanonical ? &C : 0,
-                                                   HasTypeVariable);
-  C.Impl.BoundGenericTypes.InsertNode(New, InsertPos);
 
-  return New;
+  BoundGenericType *newType;
+  if (auto theClass = dyn_cast<ClassDecl>(TheDecl)) {
+    newType = new (C) BoundGenericClassType(theClass, Parent, ArgsCopy,
+                                            IsCanonical ? &C : 0,
+                                            HasTypeVariable);
+  } else if (auto theStruct = dyn_cast<StructDecl>(TheDecl)) {
+    newType = new (C) BoundGenericStructType(theStruct, Parent, ArgsCopy,
+                                             IsCanonical ? &C : 0,
+                                             HasTypeVariable);
+  } else {
+    auto theOneOf = cast<OneOfDecl>(TheDecl);
+    newType = new (C) BoundGenericOneOfType(theOneOf, Parent, ArgsCopy,
+                                            IsCanonical ? &C : 0,
+                                            HasTypeVariable);
+  }
+  C.Impl.BoundGenericTypes.InsertNode(newType, InsertPos);
+
+  return newType;
 }
 
 NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, ASTContext &C) {

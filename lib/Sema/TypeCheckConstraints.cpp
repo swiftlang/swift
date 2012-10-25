@@ -2752,7 +2752,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::UnboundGeneric:
       llvm_unreachable("Unbound generic type should have been opened");
 
-    case TypeKind::BoundGeneric: {
+    case TypeKind::BoundGenericClass:
+    case TypeKind::BoundGenericOneOf:
+    case TypeKind::BoundGenericStruct: {
       auto bound1 = cast<BoundGenericType>(canType1);
       auto bound2 = cast<BoundGenericType>(canType2);
       

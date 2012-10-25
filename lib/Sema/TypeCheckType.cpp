@@ -484,7 +484,9 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     break;
   }
 
-  case TypeKind::BoundGeneric: {
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct: {
     BoundGenericType *BGT = cast<BoundGenericType>(T);
     unsigned Index = 0;
     for (Type Arg : BGT->getGenericArgs()) {
@@ -589,7 +591,9 @@ Type TypeChecker::transformType(Type type,
     return UnboundGenericType::get(unbound->getDecl(), substParentTy, Context);
   }
 
-  case TypeKind::BoundGeneric: {
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct: {
     auto BGT = cast<BoundGenericType>(base);
     SmallVector<Type, 4> SubstArgs;
     bool AnyChanged = false;

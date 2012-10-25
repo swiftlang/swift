@@ -90,6 +90,9 @@ public:
     case TypeKind::DeducibleGenericParam:
       llvm_unreachable("DeducibleGenericParamType should not survive Sema");
 
+    case TypeKind::UnboundGeneric:
+      llvm_unreachable("UnboundGeneric should not survive Sema");
+
     case TypeKind::BuiltinFloat:
     case TypeKind::BuiltinInteger:
     case TypeKind::BuiltinObjectPointer:
@@ -108,55 +111,35 @@ public:
         ->visitArchetypeType(cast<ArchetypeType>(origTy),
                              substTy);
 
-    case TypeKind::Array:
-      return static_cast<Impl*>(this)
-        ->visitArrayType(cast<ArrayType>(origTy),
-                         cast<ArrayType>(substTy));
-
-    case TypeKind::UnboundGeneric:
-      llvm_unreachable("UnboundGeneric should not survive Sema");
-
-    case TypeKind::BoundGeneric:
-      return static_cast<Impl*>(this)
-        ->visitBoundGenericType(cast<BoundGenericType>(origTy),
-                                cast<BoundGenericType>(substTy));
-
-    case TypeKind::Function:
-      return static_cast<Impl*>(this)
-        ->visitFunctionType(cast<FunctionType>(origTy),
-                            cast<FunctionType>(substTy));
-
-    case TypeKind::PolymorphicFunction:
-      return static_cast<Impl*>(this)
-        ->visitPolymorphicFunctionType(cast<PolymorphicFunctionType>(origTy),
-                                       cast<PolymorphicFunctionType>(substTy));
-
-    case TypeKind::LValue:
-      return static_cast<Impl*>(this)
-        ->visitLValueType(cast<LValueType>(origTy),
-                          cast<LValueType>(substTy));
-
-    case TypeKind::MetaType:
-      return static_cast<Impl*>(this)
-        ->visitMetaTypeType(cast<MetaTypeType>(origTy),
-                            cast<MetaTypeType>(substTy));
-
-    case TypeKind::Tuple:
-      return static_cast<Impl*>(this)
-        ->visitTupleType(cast<TupleType>(origTy),
-                         cast<TupleType>(substTy));
+#define DISPATCH(Concrete)                                      \
+    case TypeKind::Concrete:                                    \
+      return static_cast<Impl*>(this)                           \
+        ->visit##Concrete##Type(cast<Concrete##Type>(origTy),   \
+                                cast<Concrete##Type>(substTy));
+    DISPATCH(Array)
+    DISPATCH(BoundGenericClass)
+    DISPATCH(BoundGenericOneOf)
+    DISPATCH(BoundGenericStruct)
+    DISPATCH(Function)
+    DISPATCH(PolymorphicFunction)
+    DISPATCH(LValue)
+    DISPATCH(MetaType)
+    DISPATCH(Tuple)
+#undef DISPATCH
     }
     llvm_unreachable("bad type kind");
   }
 
-  RetTy visitFunctionType(FunctionType *origTy, FunctionType *substTy) {
-    return static_cast<Impl*>(this)->visitAnyFunctionType(origTy, substTy);
+#define DEFER_TO_SUPERTYPE(Concrete, Abstract) \
+  RetTy visit##Concrete##Type(Concrete##Type *origTy, Concrete##Type *substTy) { \
+    return static_cast<Impl*>(this)->visit##Abstract##Type(origTy, substTy); \
   }
-
-  RetTy visitPolymorphicFunctionType(PolymorphicFunctionType *origTy,
-                                     PolymorphicFunctionType *substTy) {
-    return static_cast<Impl*>(this)->visitAnyFunctionType(origTy, substTy);
-  }
+  DEFER_TO_SUPERTYPE(Function, AnyFunction)
+  DEFER_TO_SUPERTYPE(PolymorphicFunction, AnyFunction)
+  DEFER_TO_SUPERTYPE(BoundGenericClass, BoundGeneric)
+  DEFER_TO_SUPERTYPE(BoundGenericOneOf, BoundGeneric)
+  DEFER_TO_SUPERTYPE(BoundGenericStruct, BoundGeneric)
+#undef DEFER_TO_SUPERTYPE
 };
   
 } // end namespace irgen

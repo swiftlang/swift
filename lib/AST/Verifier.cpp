@@ -869,7 +869,9 @@ namespace {
         return checkBoundGenericTypes(
                  cast<UnboundGenericType>(typePtr)->getParent());
 
-      case TypeKind::BoundGeneric: {
+      case TypeKind::BoundGenericClass:
+      case TypeKind::BoundGenericOneOf:
+      case TypeKind::BoundGenericStruct: {
         auto BGT = cast<BoundGenericType>(typePtr);
         if (!BGT->hasSubstitutions()) {
           Out << "BoundGenericType without substitutions!\n";

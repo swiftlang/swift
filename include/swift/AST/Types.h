@@ -658,8 +658,8 @@ public:
   }
 };
 
-/// BoundGenericType - Represents a generic nominal type bound to the
-/// given type arguments.
+/// BoundGenericType - An abstract class for applying a generic
+/// nominal type to the given type arguments.
 class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
   NominalTypeDecl *TheDecl;
 
@@ -669,10 +669,10 @@ class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
   ArrayRef<Type> GenericArgs;
   
 
-private:
-  BoundGenericType(NominalTypeDecl *TheDecl, Type Parent,
-                   ArrayRef<Type> GenericArgs, ASTContext *C,
-                   bool HasTypeVariable);
+protected:
+  BoundGenericType(TypeKind theKind, NominalTypeDecl *theDecl, Type parent,
+                   ArrayRef<Type> genericArgs, ASTContext *context,
+                   bool hasTypeVariable);
 
 public:
   static BoundGenericType* get(NominalTypeDecl *TheDecl, Type Parent,
@@ -717,7 +717,98 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::BoundGeneric;
+    return T->getKind() >= TypeKind::First_BoundGenericType &&
+           T->getKind() <= TypeKind::Last_BoundGenericType;
+  }
+};
+
+/// BoundGenericClassType - A subclass of BoundGenericType for the case
+/// when the nominal type is a generic class type.
+class BoundGenericClassType : public BoundGenericType {
+private:
+  BoundGenericClassType(ClassDecl *theDecl, Type parent,
+                        ArrayRef<Type> genericArgs, ASTContext *context,
+                        bool hasTypeVariable)
+    : BoundGenericType(TypeKind::BoundGenericClass,
+                       reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
+                       genericArgs, context, hasTypeVariable) {}
+  friend class BoundGenericType;
+
+public:
+  static BoundGenericClassType* get(ClassDecl *theDecl, Type parent,
+                                    ArrayRef<Type> genericArgs) {
+    return cast<BoundGenericClassType>(
+             BoundGenericType::get(reinterpret_cast<NominalTypeDecl*>(theDecl),
+                                   parent, genericArgs));
+  }
+
+  /// \brief Returns the declaration that declares this type.
+  ClassDecl *getDecl() const {
+    return reinterpret_cast<ClassDecl*>(BoundGenericType::getDecl());
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BoundGenericClass;
+  }
+};
+
+/// BoundGenericOneOfType - A subclass of BoundGenericType for the case
+/// when the nominal type is a generic oneof type.
+class BoundGenericOneOfType : public BoundGenericType {
+private:
+  BoundGenericOneOfType(OneOfDecl *theDecl, Type parent,
+                        ArrayRef<Type> genericArgs, ASTContext *context,
+                        bool hasTypeVariable)
+    : BoundGenericType(TypeKind::BoundGenericOneOf,
+                       reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
+                       genericArgs, context, hasTypeVariable) {}
+  friend class BoundGenericType;
+
+public:
+  static BoundGenericOneOfType* get(OneOfDecl *theDecl, Type parent,
+                                    ArrayRef<Type> genericArgs) {
+    return cast<BoundGenericOneOfType>(
+             BoundGenericType::get(reinterpret_cast<NominalTypeDecl*>(theDecl),
+                                   parent, genericArgs));
+  }
+
+  /// \brief Returns the declaration that declares this type.
+  OneOfDecl *getDecl() const {
+    return reinterpret_cast<OneOfDecl*>(BoundGenericType::getDecl());
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BoundGenericOneOf;
+  }
+};
+
+/// BoundGenericStructType - A subclass of BoundGenericType for the case
+/// when the nominal type is a generic struct type.
+class BoundGenericStructType : public BoundGenericType {
+private:
+  BoundGenericStructType(StructDecl *theDecl, Type parent,
+                         ArrayRef<Type> genericArgs, ASTContext *context,
+                         bool hasTypeVariable)
+    : BoundGenericType(TypeKind::BoundGenericStruct, 
+                       reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
+                       genericArgs, context, hasTypeVariable) {}
+  friend class BoundGenericType;
+
+public:
+  static BoundGenericStructType* get(StructDecl *theDecl, Type parent,
+                                    ArrayRef<Type> genericArgs) {
+    return cast<BoundGenericStructType>(
+             BoundGenericType::get(reinterpret_cast<NominalTypeDecl*>(theDecl),
+                                   parent, genericArgs));
+  }
+
+  /// \brief Returns the declaration that declares this type.
+  StructDecl *getDecl() const {
+    return reinterpret_cast<StructDecl*>(BoundGenericType::getDecl());
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BoundGenericStruct;
   }
 };
 

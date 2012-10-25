@@ -314,7 +314,9 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
 
   case TypeKind::Archetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
-  case TypeKind::BoundGeneric:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct:
     return convertBoundGenericType(cast<BoundGenericType>(ty)->getDecl());
   case TypeKind::LValue:
     return convertLValueType(cast<LValueType>(ty));

@@ -436,7 +436,9 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   case TypeKind::Class:
     return mangleNominalType(cast<ClassType>(base)->getDecl(), explosion);
 
-  case TypeKind::BoundGeneric: {
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct: {
     // type ::= 'G' <type> <type>+ '_'
     auto type = cast<BoundGenericType>(base);
     Buffer << 'G';
