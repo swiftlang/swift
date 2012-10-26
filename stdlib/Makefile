@@ -16,8 +16,9 @@ include $(SWIFT_LEVEL)/../../Makefile.config
 LIBRARYNAME := swift_stdlib
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
-SWIFT_SOURCES := Bool.swift File.swift FixedPoint.swift FloatingPoint.swift Misc.swift \
-                 String.swift Dictionary.swift Vector.swift Algorithm.swift Demangle.swift
+SWIFT_SOURCES := Bool.swift POSIX/Descriptor.swift POSIX/File.swift \
+		 FixedPoint.swift FloatingPoint.swift Misc.swift String.swift \
+		 Dictionary.swift Vector.swift Algorithm.swift Demangle.swift
 SOURCES := swift.swift
 NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
@@ -40,7 +41,8 @@ endif
 
 SWIFT_OPTFLAG := -O3
 
-LDFLAGS += -framework Foundation -lswift_runtime -Wl,-force_load,$(LibDir)/libswift_runtime.a
+LDFLAGS += -framework Foundation \
+	   -lswift_runtime -Wl,-force_load,$(LibDir)/libswift_runtime.a
 
 HeaderDir := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift/
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
