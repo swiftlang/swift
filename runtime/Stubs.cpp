@@ -235,30 +235,41 @@ extern "C"
 int
 swift_file_open(const char* filename)
 {
-    return open(filename, O_RDONLY);
+  return open(filename, O_RDONLY);
 }
 
 extern "C"
 int
 swift_file_close(int fd)
 {
-    return close(fd);
+  return close(fd);
 }
 
 extern "C"
 size_t
 swift_file_read(int fd, char* buf, size_t nb)
 {
-    return read(fd, buf, nb);
+  return read(fd, buf, nb);
 }
 
 extern "C"
 size_t
 swift_file_size(const char* filename)
 {
-    struct stat buf;
-    int err = stat(filename, &buf);
-    assert(err == 0);
-    (void) err;
-    return buf.st_size;
+  struct stat buf;
+  int err = stat(filename, &buf);
+  assert(err == 0);
+  (void) err;
+  return buf.st_size;
+}
+
+extern "C"
+size_t
+swift_fd_size(int fd)
+{
+  struct stat buf;
+  int err = fstat(fd, &buf);
+  assert(err == 0);
+  (void) err;
+  return buf.st_size;
 }
