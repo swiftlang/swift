@@ -29,12 +29,12 @@ Simple Application Writer
 I want to write my new iOS application in Swift, using all the Objective-C
 frameworks that come with iOS.
 
-  Requirements:
+Requirements:
 
-  - Can send messages to Objective-C objects from Swift.
-  - Can subclass Objective-C classes, override Objective-C methods, and
-    implement Objective-C protocols.
-  - Can use my subclass as an Objective-C object (e.g. a delegate).
+- Can send messages to Objective-C objects from Swift.
+- Can subclass Objective-C classes, override Objective-C methods, and
+  implement Objective-C protocols.
+- Can use my subclass as an Objective-C object (e.g. a delegate).
 
 
 Intermediate Application Writer
@@ -43,10 +43,10 @@ Intermediate Application Writer
 I want to write my new application in Objective-C, but there's a really nice
 Swift framework I want to use.
 
-  Requirements:
+Requirements:
 
-  - Can subclass (at least some) Swift objects in Objective-C.
-  - Can call (at least some) Swift methods from Objective-C.
+- Can subclass (at least some) Swift objects in Objective-C.
+- Can call (at least some) Swift methods from Objective-C.
 
 
 New Framework Writer
@@ -54,9 +54,9 @@ New Framework Writer
 
 I want to write a framework that can be used by anyone.
 
-  Requirements:
+Requirements:
 
-  - Can call (at least some) Swift methods from Objective-C.
+- Can call (at least some) Swift methods from Objective-C.
 
 
 Intermediate Framework Writer
@@ -64,27 +64,41 @@ Intermediate Framework Writer
 
 I have an existing Objective-C framework that I want to move to Swift.
 
-  Requirements:
+Requirements:
 
-  - Can subclass Objective-C classes in Swift.
-  - Can call (at least some) Swift methods from Objective-C.
+- Can subclass Objective-C classes in Swift.
+- Can call (at least some) Swift methods from Objective-C.
+
+Decisions:
+
+- Should I expose Swift entry points as API?
+- If so, should they be essentially the same as the Objective-C entry points, or
+  should I have a very different interface that's more suited for Swift (and
+  easily could be "better")?
+
+
+End User
+--------
+
+- Things should be fast.
+- Things should not take a ton of memory.
 
 
 Nice to Have (uncategorized)
 ----------------------------
 
-  - Can write a Swift extension for an Objective-C class.
-  - Can write a Swift extension for an Objective-C class that adopts an
-    Objective-C protocol.
-  - Can write a Swift extension for an Objective-C class that exposes arbitrary
-    new methods in Objective-C.
+- Can write a Swift extension for an Objective-C class.
+- Can write a Swift extension for an Objective-C class that adopts an
+  Objective-C protocol.
+- Can write a Swift extension for an Objective-C class that exposes arbitrary
+  new methods in Objective-C.
 
 
 Level 1: Message-passing
 ========================
 
-*Assuming an object is known to be a Swift object or an Objective-C object at*
-*compile-time, what does it take to send a message from one to the other?*
+*Assuming an object is known to be a Swift object or an Objective-C object at
+compile-time, what does it take to send a message from one to the other?*
 
 
 ARC
@@ -111,8 +125,8 @@ autoreleasing the return value.
 **Not yet decided**: do we need to expose *both* entry points here, or only the
 Objective-C one?
 
-*Swift methods will **not** be exposed as* ``ns_returns_retained`` because they*
-*should behave like Objective-C methods when called through an* ``id``.
+*Swift methods will **not** be exposed as* ``ns_returns_retained`` because they
+should behave like Objective-C methods when called through an* ``id``.
 
 
 Arguments
