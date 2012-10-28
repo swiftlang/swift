@@ -632,21 +632,36 @@ namespace {
     ConstraintSystem(TypeChecker &TC)
       : TC(TC) {}
 
-    /// \brief Creates a child constraint system, inheriting the constraints
-    /// of its parent.
+    /// \brief Creates a child constraint system that selects a
+    /// particular overload from an unresolved overload set.
     ///
     /// \param parent The parent constraint system.
     ///
-    /// \param overloadChoiceIdx The index into the parent's first unresolved
-    /// overload set, which indices which overload choice this child system
-    /// explores.
-    ConstraintSystem(ConstraintSystem *parent, unsigned overloadChoiceIdx)
+    /// \param overloadSetIdx The index into the parent's unresolved
+    /// overload set, selecting the overload to be resolved.
+    ///
+    /// \param overloadChoiceIdx The index into the unresolved
+    /// overload set identified by \p overloadSetIdx. This index
+    /// selects which overload choice this child system will explore.
+    ConstraintSystem(ConstraintSystem *parent, 
+                     unsigned overloadSetIdx,
+                     unsigned overloadChoiceIdx)
       : TC(parent->TC), Parent(parent),
         // FIXME: Lazily copy from parent system.
-        Constraints(parent->Constraints),
-        UnresolvedOverloadSets(parent->UnresolvedOverloadSets.begin()+1,
-                               parent->UnresolvedOverloadSets.end())
+        Constraints(parent->Constraints)
     {
+      // Copy all of the parent's unresolved overload sets *except*
+      // the one we're resolving in this child system.
+      UnresolvedOverloadSets.append(
+        parent->UnresolvedOverloadSets.begin(),
+        parent->UnresolvedOverloadSets.begin() + overloadSetIdx);
+      UnresolvedOverloadSets.append(
+        parent->UnresolvedOverloadSets.begin() + overloadSetIdx + 1,
+        parent->UnresolvedOverloadSets.end());
+
+      // Resolve this overload, as requested by the caller.
+      resolveOverload(parent->UnresolvedOverloadSets[overloadSetIdx], 
+                      overloadChoiceIdx);
     }
 
     /// \brief Creates a child constraint system, inheriting the constraints
@@ -718,6 +733,18 @@ namespace {
     }
 
   public:
+
+    /// \brief Retrieve an unresolved overload set.
+    OverloadSet *getUnresolvedOverloadSet(unsigned Idx) const {
+      return UnresolvedOverloadSets[Idx];
+    }
+
+    /// \brief Determine the number of unresolved overload sets in
+    /// this constraint system.
+    unsigned getNumUnresolvedOverloadSets() const {
+      return UnresolvedOverloadSets.size();
+    }
+
     /// \brief Create a new type variable.
     template<typename ...Args>
     TypeVariableType *createTypeVariable(Args &&...args) {
@@ -3635,13 +3662,13 @@ bool ConstraintSystem::simplify() {
 /// during simplification will be added to the stack of constraint systems
 /// being considered.
 static void resolveOverloadSet(ConstraintSystem &cs,
-                               OverloadSet *ovl,
+                               unsigned ovlSetIdx,
                                SmallVectorImpl<ConstraintSystem *> &stack) {
+  OverloadSet *ovl = cs.getUnresolvedOverloadSet(ovlSetIdx);
   auto choices = ovl->getChoices();
   for (unsigned i = 0, n = choices.size(); i != n; ++i) {
     auto idx = n-i-1;
-    auto childCS = cs.createDerivedConstraintSystem(idx);
-    childCS->resolveOverload(ovl, idx);
+    auto childCS = cs.createDerivedConstraintSystem(ovlSetIdx, idx);
     
     // Simplify the child system. Assuming it's still valid, add it to
     // the stack to be dealt with later.
@@ -3793,7 +3820,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     // If there are any unresolved overload sets, create child systems in
     // which we resolve the overload set to each option.
     if (!cs->UnresolvedOverloadSets.empty()) {
-      resolveOverloadSet(*cs, cs->UnresolvedOverloadSets.front(), stack);
+      resolveOverloadSet(*cs, 0, stack);
 
       // When we've resolved an overload set, we are done with this constraint
       // system: everything else will be handled by .
