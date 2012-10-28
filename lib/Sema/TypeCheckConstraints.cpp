@@ -664,19 +664,24 @@ namespace {
                       overloadChoiceIdx);
     }
 
-    /// \brief Creates a child constraint system, inheriting the constraints
-    /// of its parent.
+    /// \brief Creates a child constraint system that binds a given
+    /// type variable to a given type.
     ///
     /// \param parent The parent constraint system.
     ///
     /// \param typeVar The type variable whose binding we will be exploring
     /// within this child system.
-    ConstraintSystem(ConstraintSystem *parent, TypeVariableType *typeVar)
+    ///
+    /// \param type The type to which type variable will be bound
+    /// within this child system.
+    ConstraintSystem(ConstraintSystem *parent, TypeVariableType *typeVar,
+                     Type type)
       : TC(parent->TC), Parent(parent), assumedTypeVar(typeVar),
         // FIXME: Lazily copy from parent system.
         Constraints(parent->Constraints),
         UnresolvedOverloadSets(parent->UnresolvedOverloadSets)
     {
+      addConstraint(ConstraintKind::Equal, typeVar, type);
     }
 
     /// \brief Retrieve the type checker associated with this constraint system.
@@ -3870,9 +3875,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     cs->PotentialBindings.clear();
     for (auto binding : potentialBindings) {
       if (cs->exploreBinding(binding.first, binding.second)) {
-        auto childCS = cs->createDerivedConstraintSystem(binding.first);
-        childCS->addConstraint(ConstraintKind::Equal, binding.first,
-                               binding.second);
+        auto childCS = cs->createDerivedConstraintSystem(binding.first,
+                                                         binding.second);
         if (!childCS->simplify())
           stack.push_back(childCS);
       }
