@@ -49,7 +49,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
   Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
-  SizeTy = DataLayout.getIntPtrType(getLLVMContext());
+  SizeTy = DataLayout.getIntPtrType(getLLVMContext(), /*addrspace*/ 0);
   MemCpyFn = nullptr;
   AllocObjectFn = nullptr;
   RetainNoResultFn = nullptr;
