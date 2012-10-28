@@ -28,6 +28,8 @@
 #include <sys/stat.h> // stat
 #include <fcntl.h>    // open
 #include <unistd.h>  // read, close
+#include <dirent.h>
+#include <limits.h>
 #include "llvm/ADT/StringExtras.h"
 
 // FIXME: We shouldn't be writing implemenetations for functions in the swift
@@ -272,4 +274,22 @@ swift_fd_size(int fd)
   assert(err == 0);
   (void) err;
   return buf.st_size;
+}
+
+struct readdir_tuple_s {
+  char *str;
+  int64_t len;
+};
+
+extern "C"
+struct readdir_tuple_s
+posix_readdir_hack(DIR *d)
+{
+  struct readdir_tuple_s rval = { NULL, 0 };
+  struct dirent *dp;
+  if ((dp = readdir(d))) {
+    rval.str = dp->d_name;
+    rval.len = dp->d_namlen;
+  }
+  return rval;
 }
