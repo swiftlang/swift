@@ -1156,19 +1156,6 @@ namespace {
     void collectConstraintsForTypeVariables(
            SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints);
 
-    /// \brief Simplify the constraints on the given type variable.
-    ///
-    /// \param tvc The type variable and its constraints.
-    ///
-    /// \param solved Set into which every fully-solved constraint will be
-    /// added, allowing the caller to remove such constraints from the list
-    /// later.
-    ///
-    /// \returns true if any new constraints were introduced when simplifying
-    /// the type variable constraints.
-    bool simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
-                                    SmallPtrSet<Constraint *, 4> &solved);
-
   public:
     /// \brief Simplify the system of constraints, by breaking down complex
     /// constraints into simpler constraints.
@@ -3508,92 +3495,8 @@ collectTypesAboveAndBelow(ConstraintSystem &cs,
   return curCons;
 }
 
-bool
-ConstraintSystem::simplifyTypeVarConstraints(TypeVariableConstraints &tvc,
-                                         SmallPtrSet<Constraint *, 4> &solved) {
-  bool addedConstraints = false;
-  bool foundEquality = false;
-
-  // Collect the relational constraints above and below each simplified type,
-  // dropping any redundant constraints in the process.
-  SmallVector<std::pair<Type, Constraint *>, 4> typesBelow;
-  SmallVector<std::pair<Type, Constraint *>, 4> typesAbove;
-
-  auto lastConstraint = tvc.Constraints.end();
-  auto currentConstraint
-    = collectTypesAboveAndBelow(*this, tvc, typesBelow, typesAbove,
-                                [&](Constraint *redundant) {
-                                  solved.insert(redundant);
-                                },
-        [&](Type bound,
-            Constraint *above,
-            Constraint *below) {
-          // If a type variable T is bounded both above and below by a nominal
-          // type X (or specialization of one), then we can conclude that
-          // X == T, e.g.,
-          //
-          //   X < T and T < X => T == X
-          //
-          // Note that this rule does not apply in general because tuple types
-          // allow one to add or drop labels essentially at will, so there are
-          // multiple types T for which X < T and T < X. With nominal types,
-          // we prohibit cyclic conversions and subtyping relationships.
-          if (bound->is<NominalType>() || bound->is<BoundGenericType>()) {
-            addConstraint(ConstraintKind::Equal, tvc.TypeVar, bound);
-            foundEquality = true;
-            addedConstraints = true;
-          }
-        });
-
-  // If we determined an equality constraint, all of the relational constraints
-  // are now solved.
-  if (foundEquality) {
-    for (auto at : typesAbove) {
-        solved.insert(at.second);
-    }
-    for (auto bt : typesBelow) {
-      solved.insert(bt.second);
-    }
-  }
-
-  // Introduce transitive constraints, e.g.,
-  //
-  //   X < T and T <c Y => X <c Y
-  //
-  // When the two relation kinds differ, as above, the weaker constraint is
-  // used for the resulting relation.
-  // FIXME: Actually implement this, taking care to avoid introducing cycles
-  // in simplify().
-
-  // Remove redundant literal constraints.
-  Constraint *prevLit = nullptr;
-  for (; currentConstraint != lastConstraint &&
-       (*currentConstraint)->getClassification()
-         == ConstraintClassification::Literal;
-       ++currentConstraint) {
-    if (!prevLit) {
-      prevLit = *currentConstraint;
-      continue;
-    }
-
-    // We have a redundant literal constraint; remove the latter constraint.
-    if (prevLit->getLiteralKind() == (*currentConstraint)->getLiteralKind()) {
-      solved.insert(*currentConstraint);
-    }
-  }
-
-  // FIXME: If we see multiple type-member constraints, we can equate the
-  // right-hand types.
-  // FIXME: If we see a value member constraint and a type-member constraint
-  // with the same name, we can relate the first to the metatype of the
-  // second.
-  return addedConstraints;
-}
-
 bool ConstraintSystem::simplify() {
-  bool firstLoop = true;
   bool solvedAny;
-  SmallPtrSet<Constraint *, 4> typeVarResolved;
   do {
     // Loop through all of the thus-far-unsolved constraints, attempting to
     // simplify each one.
@@ -3601,11 +3504,6 @@ bool ConstraintSystem::simplify() {
     existingConstraints.swap(Constraints);
     solvedAny = false;
     for (auto constraint : existingConstraints) {
-      // If we have already solved this constraint externally, just silently
-      // drop it.
-      if (typeVarResolved.count(constraint))
-        continue;
-
       if (addConstraint(constraint)) {
         solvedAny = true;
 
@@ -3617,39 +3515,6 @@ bool ConstraintSystem::simplify() {
         return true;
       }
     }
-    existingConstraints.clear();
-
-    // If we didn't actually solve anything real and this isn't the first time
-    // through the loop, bail out now so we don't do the work of checking
-    // specific constraints on type variables.
-    if (!solvedAny && !firstLoop) {
-      break;
-    }
-
-    // From the remaining constraints, collect the constraints for each of
-    // the representative (non-fixed) type variables.
-    SmallVector<TypeVariableConstraints, 32> typeVarConstraints;
-    typeVarResolved.clear();
-    collectConstraintsForTypeVariables(typeVarConstraints);
-    for (auto &tvc : typeVarConstraints) {
-      if (simplifyTypeVarConstraints(tvc, typeVarResolved))
-        solvedAny = true;
-    }
-    typeVarConstraints.clear();
-
-    // If we solved any constraints via type variable constraints and we aren't
-    // going to go through the constraint list again, just remove these
-    // constraints from the list.
-    if (!typeVarResolved.empty() && !solvedAny) {
-      Constraints.erase(std::remove_if(Constraints.begin(),
-                                       Constraints.end(),
-                                       [&](Constraint *con) {
-                                         return typeVarResolved.count(con) > 0;
-                                       }),
-                         Constraints.end());
-    }
-
-    firstLoop = false;
   } while (solvedAny);
 
   // We've simplified all of the constraints we can.
