@@ -1147,6 +1147,7 @@ namespace {
     /// \brief Simplify the given constaint.
     SolutionKind simplifyConstraint(const Constraint &constraint);
 
+  public:
     /// \brief Walks through the list of constraints, collecting the constraints
     /// that directly apply to each representative type variable.
     ///
@@ -3526,6 +3527,66 @@ bool ConstraintSystem::simplify() {
 //===--------------------------------------------------------------------===//
 #pragma mark Constraint solving
 
+namespace {
+  /// \brief Describes the kind of step taking toward a potential
+  /// solution.
+  enum class SolutionStepKind : char { 
+    /// \brief Resolves an overload set by exploring each option.
+    Overload, 
+    /// \brief Binds a type variable to a given type.
+    TypeBinding
+  };
+
+  /// \brief A step in the search for a solution, which may resolve a
+  /// type variale or resolve an overload.
+  class SolutionStep {
+    /// \brief The kind of solution step this is.
+    SolutionStepKind Kind;
+
+    union {
+      /// \brief The index of the overload set to be evaluated next.
+      unsigned OvlSetIdx;
+
+      /// \brief The type binding to perform. 
+      struct {
+        /// \brief The type variable to bind.
+        TypeVariableType *TypeVar;
+        /// \brief The type to which the type variable will be bound.
+        TypeBase *BoundType;
+      } TypeBinding; 
+    };
+
+  public:
+    /// \brief Construct a solution step that resolves an overload.
+    SolutionStep(unsigned ovlSetIdx) 
+      : Kind(SolutionStepKind::Overload), OvlSetIdx(ovlSetIdx) { }
+
+    /// \brief Construct a solution step that binds a type variable.
+    SolutionStep(TypeVariableType *typeVar, Type boundType)
+      : Kind(SolutionStepKind::TypeBinding), 
+        TypeBinding{typeVar, boundType.getPointer()} { }
+
+    /// \brief Determine the kind of solution step to take.
+    SolutionStepKind getKind() const { return Kind; }
+
+    /// \brief Retrieve the overload set index.
+    ///
+    /// Only valid for an overload solution step.
+    unsigned getOverloadSetIdx() const {
+      assert(getKind() == SolutionStepKind::Overload);
+      return OvlSetIdx;
+    }
+
+    /// \brief Retrieve the type variable and binding.
+    ///
+    /// Only valid for a type-binding solution step.
+    std::pair<TypeVariableType *, Type> getTypeBinding() const {
+      assert(getKind() == SolutionStepKind::TypeBinding);
+      return { TypeBinding.TypeVar, Type(TypeBinding.BoundType) };
+    }
+  };
+}
+
 /// \brief Resolve an overload set in the given constraint system by
 /// producing a set of child constraint systems, each of which picks a specific
 /// overload from that set. Those child constraint systems that do not fail
@@ -3599,7 +3660,7 @@ findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc) {
 /// \brief Given the direct constraints placed on the type variables within
 /// a given constraint system, create potential bindings that resolve the
 /// constraints for a type variable.
-static void
+static Optional<std::pair<TypeVariableType *, Type>>
 resolveTypeVariable(ConstraintSystem &cs,
   SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints) {
 
@@ -3617,8 +3678,7 @@ resolveTypeVariable(ConstraintSystem &cs,
     // If we have a lower bound, introduce a child constraint system binding
     // this type variable to that lower bound.
     if (bounds.first) {
-      cs.addPotentialBinding(tvc.TypeVar, bounds.first);
-      return;
+      return std::make_pair(tvc.TypeVar, bounds.first);
     }
 
     // If there is an upper bound, record that (but don't use it yet).
@@ -3633,8 +3693,7 @@ resolveTypeVariable(ConstraintSystem &cs,
   // FIXME: This type may be too specific, but we'd really rather not
   // go on a random search for subtypes that might work.
   if (tvcWithUpper) {
-    cs.addPotentialBinding(tvcWithUpper->TypeVar, tvcUpper);
-    return;
+    return std::make_pair(tvcWithUpper->TypeVar, tvcUpper);
   }
 
   // If there are any literal constraints, add the default literal values as
@@ -3645,22 +3704,44 @@ resolveTypeVariable(ConstraintSystem &cs,
     if (cs.haveExploredTypeVar(tvc.TypeVar))
       continue;
 
-    bool foundLiteral = false;
     for (auto &constraint : tvc.Constraints) {
       if (constraint->getClassification() != ConstraintClassification::Literal)
         continue;
 
       if (auto type = tc.getDefaultLiteralType(constraint->getLiteralKind())) {
-        cs.addPotentialBinding(tvc.TypeVar, type);
-        foundLiteral = true;
+        return std::make_pair(tvc.TypeVar, type);
       }
     }
-
-    if (foundLiteral)
-      return;
   }
 
   // We're out of ideas.
+  return Nothing;
+}
+
+/// \brief Determine the next step to take toward finding a solution
+/// based on the given constraint system.
+///
+/// \returns The next solution step, or an empty \c Optional if we've
+/// run out of ideas.
+static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
+  // If there are any unresolved overload sets, resolve one now.
+  // FIXME: This is terrible for performance.
+  if (cs.getNumUnresolvedOverloadSets() > 0) {
+    // Resolve the first unresolved overload set.
+    return SolutionStep(0);
+  }
+
+  // Gather the constraints on each of the type variables.
+  SmallVector<TypeVariableConstraints, 16> typeVarConstraints;
+  cs.collectConstraintsForTypeVariables(typeVarConstraints);
+
+  // Try to determine a binding for a type variable.
+  if (auto binding = resolveTypeVariable(cs, typeVarConstraints)) {
+    return SolutionStep(binding->first, binding->second);
+  }
+
+  // We're out of ideas.
+  return Nothing;
 }
 
 bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
@@ -3687,16 +3768,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     auto cs = stack.back();
     stack.pop_back();
 
-    // If there are any unresolved overload sets, create child systems in
-    // which we resolve the overload set to each option.
-    if (!cs->UnresolvedOverloadSets.empty()) {
-      resolveOverloadSet(*cs, 0, stack);
-
-      // When we've resolved an overload set, we are done with this constraint
-      // system: everything else will be handled by .
-      continue;
-    }
-
     // If there are any children of this system that are still active,
     // then we found a potential solution. There is no need to explore
     // alternatives based on this constraint system.
@@ -3704,24 +3775,35 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
       continue;
 
     // If we have not queued up potential bindings (or have exhausted all of
-    // our potential bindings thus far), try to generate new bindings.
+    // our potential bindings thus far), check whether we have a next
+    // solution step.
     if (cs->PotentialBindings.empty()) {
-      // Collect the list of constraints that apply directly to each of the
-      // type variables. This list will be used in subsequent solution attempts.
-      // FIXME: Tons of redundant computation here. We need to keep this
-      // data online.
-      SmallVector<TypeVariableConstraints, 16> typeVarConstraints;
-      cs->collectConstraintsForTypeVariables(typeVarConstraints);
+      if (auto step = getNextSolutionStep(*cs)) {
+        switch (step->getKind()) {
+        case SolutionStepKind::Overload: {
+          // When we resolve an overload set, we're done with this
+          // system; everything else will be handled by descendant
+          // systems.
+          resolveOverloadSet(*cs, step->getOverloadSetIdx(), stack);
+          continue;
+        }
 
-      // If there are no remaining type constraints, this system is either
-      // solved or underconstrained. 
-      if (typeVarConstraints.empty()) {
-        viable.push_back(cs);
-        continue;
+        case SolutionStepKind::TypeBinding: {
+          // Add this type binding as a potential binding; we'll
+          // explore potential bindings below.
+          auto binding = step->getTypeBinding();
+          cs->addPotentialBinding(binding.first, binding.second);
+          break;
+        }
+        }
       }
+    }
 
-      // Pick a type variable to resolve into a potential binding.
-      resolveTypeVariable(*cs, typeVarConstraints);
+    // If there are no unsolved constraints, this system is either a
+    // solution or it is underconstrained.
+    if (cs->Constraints.empty()) {
+      viable.push_back(cs);
+      continue;
     }
 
     // If there are no potential bindings, we have nothing else we can
