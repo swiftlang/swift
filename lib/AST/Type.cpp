@@ -304,8 +304,6 @@ static void gatherTypeVariables(
 
 bool TypeBase::hasTypeVariable(
        SmallVectorImpl<TypeVariableType *> &typeVariables) {
-  typeVariables.clear();
-
   // If we know we don't have any type variables, we're done.
   if (!hasTypeVariable())
     return false;
