@@ -21,6 +21,7 @@
 #include "swift/AST/NameLookup.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -30,6 +31,7 @@
 #include <iterator>
 #include <memory>
 #include <utility>
+#include <tuple>
 
 using namespace swift;
 using llvm::SmallPtrSet;
@@ -3674,7 +3676,7 @@ static void resolveOverloadSet(ConstraintSystem &cs,
 static std::pair<Type, Type>
 findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc,
                        bool &isDefinitive) {
-  isDefinitive = true;
+  isDefinitive = !tvc.HasNonConcreteConstraints;
 
   // Collect the relational constraints above and below the type variable.
   // FIXME: We perform this operation multiple times. It would be better to
@@ -3741,17 +3743,18 @@ findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc,
 /// \brief Given the direct constraints placed on the type variables within
 /// a given constraint system, create potential bindings that resolve the
 /// constraints for a type variable.
-static Optional<std::pair<TypeVariableType *, Type>>
+static Optional<std::tuple<TypeVariableType *, Type, bool>>
 resolveTypeVariable(
   ConstraintSystem &cs,
   SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints,
-  bool onlyConcrete)
+  bool onlyDefinitive)
 {
 
   // Find a type variable with a lower bound, because those are the most
   // interesting.
   TypeVariableConstraints *tvcWithUpper = nullptr;
   Type tvcUpper;
+  bool tvcWithUpperIsDefinitive;
   for (auto &tvc : typeVarConstraints) {
     // If we already explored type bindings for this type variable, skip it.
     if (cs.haveExploredTypeVar(tvc.TypeVar))
@@ -3760,25 +3763,26 @@ resolveTypeVariable(
     // If we're only allowed to look at type variables with concrete
     // constraints, and this type variable has non-concrete constraints,
     // skip it.
-    if (onlyConcrete && tvc.HasNonConcreteConstraints)
+    if (onlyDefinitive && tvc.HasNonConcreteConstraints)
       continue;
 
     bool isDefinitive;
     auto bounds = findTypeVariableBounds(cs, tvc, isDefinitive);
 
-    if (onlyConcrete && !isDefinitive)
+    if (onlyDefinitive && !isDefinitive)
       continue;
 
     // If we have a lower bound, introduce a child constraint system binding
     // this type variable to that lower bound.
     if (bounds.first) {
-      return std::make_pair(tvc.TypeVar, bounds.first);
+      return std::make_tuple(tvc.TypeVar, bounds.first, isDefinitive);
     }
 
     // If there is an upper bound, record that (but don't use it yet).
     if (bounds.second && !tvcWithUpper) {
       tvcWithUpper = &tvc;
       tvcUpper = bounds.second;
+      tvcWithUpperIsDefinitive = isDefinitive;
     }
   }
 
@@ -3787,12 +3791,13 @@ resolveTypeVariable(
   // FIXME: This type may be too specific, but we'd really rather not
   // go on a random search for subtypes that might work.
   if (tvcWithUpper) {
-    return std::make_pair(tvcWithUpper->TypeVar, tvcUpper);
+    return std::make_tuple(tvcWithUpper->TypeVar, tvcUpper,
+                           tvcWithUpperIsDefinitive);
   }
 
   // If we were only looking for concrete bindings, don't consider literal
   // bindings.
-  if (onlyConcrete)
+  if (onlyDefinitive)
     return Nothing;
 
   // If there are any literal constraints, add the default literal values as
@@ -3808,7 +3813,7 @@ resolveTypeVariable(
         continue;
 
       if (auto type = tc.getDefaultLiteralType(constraint->getLiteralKind())) {
-        return std::make_pair(tvc.TypeVar, type);
+        return std::make_tuple(tvc.TypeVar, type, tvc.Constraints.size() == 1);
       }
     }
   }
@@ -3824,11 +3829,10 @@ resolveTypeVariable(
 /// run out of ideas.
 static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
 #if 0
-  // FIXME: We'll want to find a variable that we can determine immediately.
   // Try to determine a binding for a type variable that has only concrete
   // bindings.
   if (auto binding = resolveTypeVariable(cs, typeVarConstraints,
-                                         /*onlyConcrete=*/true)) {
+                                         /*onlyDefinitive=*/true)) {
     return SolutionStep(binding->first, binding->second, true);
   }
 #endif
@@ -3846,8 +3850,9 @@ static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
 
   // Try to determine a binding for a type variable.
   if (auto binding = resolveTypeVariable(cs, typeVarConstraints,
-                                         /*onlyConcrete=*/false)) {
-    return SolutionStep(binding->first, binding->second, false);
+                                         /*onlyDefinitive=*/false)) {
+    using std::get;
+    return SolutionStep(get<0>(*binding), get<1>(*binding), get<2>(*binding));
   }
 
   // We're out of ideas.
@@ -3887,28 +3892,37 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     // If we have not queued up potential bindings (or have exhausted all of
     // our potential bindings thus far), check whether we have a next
     // solution step.
-    bool isDefinitive = false;
     if (cs->PotentialBindings.empty()) {
       if (auto step = getNextSolutionStep(*cs)) {
         switch (step->getKind()) {
         case SolutionStepKind::Overload: {
           // Resolve the overload set.
-          resolveOverloadSet(*cs, step->getOverloadSetIdx(), stack);
           assert(step->isDefinitive() && "Overload solutions are definitive");
+          resolveOverloadSet(*cs, step->getOverloadSetIdx(), stack);
           continue;
         }
 
         case SolutionStepKind::TypeBinding: {
+          // We have a type binding.
+          auto binding = step->getTypeBinding();
+
+          // If we have a definitive type binding, apply it immediately;
+          // there's no point in creating a child system.
+          if (step->isDefinitive()) {
+            cs->addConstraint(ConstraintKind::Equal,
+                              binding.first, binding.second);
+            if (!cs->simplify())
+              stack.push_back(cs);
+            continue;
+          }
+          
           // Add this type binding as a potential binding; we'll
           // explore potential bindings below.
-          auto binding = step->getTypeBinding();
           cs->addPotentialBinding(binding.first, binding.second);
-          isDefinitive = step->isDefinitive();
           break;
         }
         }
       }
-
     }
 
     // If there are no unsolved constraints, this system is either a
@@ -4069,7 +4083,7 @@ static bool updateSolutionCompareResult(SolutionCompareResult &result,
   if (firstAsGoodAsSecond != secondAsGoodAsFirst) {
     switch (result) {
     case SolutionCompareResult::Incomparable:
-      return true;
+      return false;
 
     case SolutionCompareResult::Identical:
       result = firstAsGoodAsSecond? SolutionCompareResult::Better
@@ -4098,69 +4112,68 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs1,
 
   // Compare the sets of bound type variables in the two systems.
   // FIXME: This would be a good place to stop at the LCA.
-  bool disjointTypeVariables = false;
   auto compareTypeVariables =
     [&](ConstraintSystem *cs1, ConstraintSystem *cs2) -> SolutionCompareResult {
       SolutionCompareResult result = SolutionCompareResult::Identical;
+
+      // Collect all of the fixed types in CS1.
+      llvm::MapVector<TypeVariableType *, Type> cs1FixedTypes;
       for (auto walkCS1 = cs1; walkCS1; walkCS1 = walkCS1->Parent) {
-        if (auto boundTV1 = walkCS1->assumedTypeVar) {
-          if (auto type2 = cs2->simplifyType(boundTV1)) {
-            auto type1 = cs1->simplifyType(boundTV1);
+        for (const auto &fixed : walkCS1->FixedTypes)
+          cs1FixedTypes[fixed.first] = fixed.second;
+      }
 
-            // If the types are equivalent, there's nothing more to do.
-            if (type1->isEqual(type2))
-              continue;
+      auto &topSystem = cs1->getTopConstraintSystem();
+      for (const auto &fixedTV1 : cs1FixedTypes) {
+        auto boundTV1 = fixedTV1.first;
+        if (auto type2 = cs2->simplifyType(boundTV1)) {
+          auto type1 = cs1->simplifyType(fixedTV1.second);
 
-            // If either of the types still contains type variables, we can't
-            // compare them.
-            // FIXME: This is really unfortunate. More type variable sharing
-            // (when it's sane) would help us do much better here.
-            if (type1->hasTypeVariable() || type2->hasTypeVariable())
-              return SolutionCompareResult::Incomparable;
-
-            // If one type is a subtype of the other, but not vice-verse,
-            // we prefer the system with the more-constrained type.
-            bool trivial = false;
-            bool type1Better = cs1->matchTypes(type1, type2,
-                                               TypeMatchKind::Subtype,
-                                               TMF_None, trivial)
-                                 == SolutionKind::TriviallySolved;
-            bool type2Better = cs2->matchTypes(type2, type1,
-                                               TypeMatchKind::Subtype,
-                                               TMF_None, trivial)
-                                 == SolutionKind::TriviallySolved;
-            if (updateSolutionCompareResult(result, type1Better, type2Better))
-              return result;
-            if (type1Better || type2Better)
-              continue;
-
-            // If the type variable was bound by a literal constraint, and the
-            // type it is bound to happens to match the default literal
-            // constraint in one system but not the other, we prefer the one
-            // that matches the default.
-            // Note that the constraint will be available in the parent of
-            // the constraint system that assumed a value for the type variable
-            // (or, of course, in the original system, since these constraints
-            // are generated directly from the expression).
-            // FIXME: Make it efficient to find these constraints. This is
-            // silly.
-            bool defaultLit1
-              = walkCS1->Parent->typeMatchesDefaultLiteralConstraint(boundTV1,
-                                                                     type1);
-            bool defaultLit2
-              = walkCS1->Parent->typeMatchesDefaultLiteralConstraint(boundTV1,
-                                                                     type2);
-            if (updateSolutionCompareResult(result, defaultLit1, defaultLit2))
-              return result;
-            
+          // If the types are equivalent, there's nothing more to do.
+          if (type1->isEqual(type2))
             continue;
-          }
 
-          // There's a type variable in one constraint system that isn't in the
-          // other.
-          // FIXME: We would love to be able to match up more type variables,
-          // perhaps by being more careful when we open types in peer systems.
-          disjointTypeVariables = true;
+          // If either of the types still contains type variables, we can't
+          // compare them.
+          // FIXME: This is really unfortunate. More type variable sharing
+          // (when it's sane) would help us do much better here.
+          if (type1->hasTypeVariable() || type2->hasTypeVariable())
+            return SolutionCompareResult::Incomparable;
+
+          // If one type is a subtype of the other, but not vice-verse,
+          // we prefer the system with the more-constrained type.
+          bool trivial = false;
+          bool type1Better = cs1->matchTypes(type1, type2,
+                                             TypeMatchKind::Subtype,
+                                             TMF_None, trivial)
+                               == SolutionKind::TriviallySolved;
+          bool type2Better = cs2->matchTypes(type2, type1,
+                                             TypeMatchKind::Subtype,
+                                             TMF_None, trivial)
+                               == SolutionKind::TriviallySolved;
+          if (updateSolutionCompareResult(result, type1Better, type2Better))
+            return result;
+          if (type1Better || type2Better)
+            continue;
+
+          // If the type variable was bound by a literal constraint, and the
+          // type it is bound to happens to match the default literal
+          // constraint in one system but not the other, we prefer the one
+          // that matches the default.
+          // Note that the constraint will be available in the parent of
+          // the constraint system that assumed a value for the type variable
+          // (or, of course, in the original system, since these constraints
+          // are generated directly from the expression).
+          // FIXME: Make it efficient to find these constraints. This is
+          // silly.
+          bool defaultLit1
+            = topSystem.typeMatchesDefaultLiteralConstraint(boundTV1, type1);
+          bool defaultLit2
+            = topSystem.typeMatchesDefaultLiteralConstraint(boundTV1, type2);
+          if (updateSolutionCompareResult(result, defaultLit1, defaultLit2))
+            return result;
+          
+          continue;
         }
       }
 
