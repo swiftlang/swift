@@ -770,6 +770,12 @@ namespace {
       return UnresolvedOverloadSets.size();
     }
 
+    /// \brief Determine whether this constraint system has any potential
+    /// bindings.
+    bool hasPotentialBindings() const {
+      return !PotentialBindings.empty();
+    }
+
     /// \brief Create a new type variable.
     template<typename ...Args>
     TypeVariableType *createTypeVariable(Args &&...args) {
@@ -3581,11 +3587,13 @@ bool ConstraintSystem::simplify() {
 namespace {
   /// \brief Describes the kind of step taking toward a potential
   /// solution.
-  enum class SolutionStepKind : char { 
+  enum class SolutionStepKind : char {
     /// \brief Resolves an overload set by exploring each option.
     Overload, 
     /// \brief Binds a type variable to a given type.
-    TypeBinding
+    TypeBinding,
+    /// \brief Explore potential bindings.
+    ExploreBindings
   };
 
   /// \brief A step in the search for a solution, which may resolve a
@@ -3611,10 +3619,16 @@ namespace {
     };
 
   public:
+    /// \brief Construct a solution step for a simple kind, which needs no
+    /// extra data.
+    SolutionStep(SolutionStepKind kind) : Kind(kind) {
+      assert(kind == SolutionStepKind::ExploreBindings);
+    }
+
     /// \brief Construct a solution step that resolves an overload.
     ///
     /// Overload solution steps are always definitive.
-    SolutionStep(unsigned ovlSetIdx) 
+    explicit SolutionStep(unsigned ovlSetIdx)
       : Kind(SolutionStepKind::Overload), IsDefinitive(true),
         OvlSetIdx(ovlSetIdx) { }
 
@@ -3825,6 +3839,11 @@ resolveTypeVariable(
 /// \returns The next solution step, or an empty \c Optional if we've
 /// run out of ideas.
 static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
+  // If there are any potential bindings to explore, do it now.
+  if (cs.hasPotentialBindings()) {
+    return SolutionStep(SolutionStepKind::ExploreBindings);
+  }
+  
 #if 0
   // FIXME: Look for a definitive type variable binding, and bind it now.
   if (auto binding = resolveTypeVariable(cs, typeVarConstraints,
@@ -3887,39 +3906,40 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     if (cs->hasActiveChildren())
       continue;
 
-    // If we have not queued up potential bindings (or have exhausted all of
-    // our potential bindings thus far), check whether we have a next
-    // solution step.
-    if (cs->PotentialBindings.empty()) {
-      if (auto step = getNextSolutionStep(*cs)) {
-        switch (step->getKind()) {
-        case SolutionStepKind::Overload: {
-          // Resolve the overload set.
-          assert(step->isDefinitive() && "Overload solutions are definitive");
-          resolveOverloadSet(*cs, step->getOverloadSetIdx(), stack);
+    // Determine our next step.
+    if (auto step = getNextSolutionStep(*cs)) {
+      switch (step->getKind()) {
+      case SolutionStepKind::Overload: {
+        // Resolve the overload set.
+        assert(step->isDefinitive() && "Overload solutions are definitive");
+        resolveOverloadSet(*cs, step->getOverloadSetIdx(), stack);
+        continue;
+      }
+
+      case SolutionStepKind::TypeBinding: {
+        // We have a type binding.
+        auto binding = step->getTypeBinding();
+
+        // If we have a definitive type binding, apply it immediately;
+        // there's no point in creating a child system.
+        if (step->isDefinitive()) {
+          cs->addConstraint(ConstraintKind::Equal,
+                            binding.first, binding.second);
+          if (!cs->simplify())
+            stack.push_back(cs);
           continue;
         }
+        
+        // Add this type binding as a potential binding; we'll
+        // explore potential bindings below.
+        cs->addPotentialBinding(binding.first, binding.second);
 
-        case SolutionStepKind::TypeBinding: {
-          // We have a type binding.
-          auto binding = step->getTypeBinding();
-
-          // If we have a definitive type binding, apply it immediately;
-          // there's no point in creating a child system.
-          if (step->isDefinitive()) {
-            cs->addConstraint(ConstraintKind::Equal,
-                              binding.first, binding.second);
-            if (!cs->simplify())
-              stack.push_back(cs);
-            continue;
-          }
+        // Break out to explore this binding.
+        break;
+      }
           
-          // Add this type binding as a potential binding; we'll
-          // explore potential bindings below.
-          cs->addPotentialBinding(binding.first, binding.second);
-          break;
-        }
-        }
+      case SolutionStepKind::ExploreBindings:
+        break;
       }
     }
 
@@ -3940,7 +3960,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     // Push this constraint system back onto the stack to be reconsidered if
     // none of the child systems created below succeed.
     stack.push_back(cs);
-    
+
     // Create child systems for each of the potential bindings.
     auto potentialBindings = std::move(cs->PotentialBindings);
     cs->PotentialBindings.clear();
@@ -3953,6 +3973,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
       }
     }
   }
+
 
   // If there is more than one viable system, attempt to pick the best solution.
   if (viable.size() > 1) {
