@@ -23,6 +23,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -39,6 +40,12 @@ namespace {
 
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment = 8);
+
+//===--------------------------------------------------------------------===//
+// Constraint solver statistics
+//===--------------------------------------------------------------------===//
+#define DEBUG_TYPE "Constraint solver"
+STATISTIC(NumExploredConstraintSystems, "# of constraint systems explored");
 
 //===--------------------------------------------------------------------===//
 // Type variable implementation.
@@ -634,8 +641,9 @@ namespace {
     friend class OverloadSet;
 
   public:
-    ConstraintSystem(TypeChecker &TC)
-      : TC(TC) {}
+    ConstraintSystem(TypeChecker &TC) : TC(TC) {
+      ++NumExploredConstraintSystems;
+    }
 
     /// \brief Creates a child constraint system that selects a
     /// particular overload from an unresolved overload set.
@@ -655,6 +663,8 @@ namespace {
         // FIXME: Lazily copy from parent system.
         Constraints(parent->Constraints)
     {
+      ++NumExploredConstraintSystems;
+      
       // Copy all of the parent's unresolved overload sets *except*
       // the one we're resolving in this child system.
       UnresolvedOverloadSets.append(
@@ -686,6 +696,8 @@ namespace {
         Constraints(parent->Constraints),
         UnresolvedOverloadSets(parent->UnresolvedOverloadSets)
     {
+      ++NumExploredConstraintSystems;
+      
       addConstraint(ConstraintKind::Equal, typeVar, type);
     }
 
