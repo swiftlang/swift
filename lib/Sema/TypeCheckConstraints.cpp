@@ -48,6 +48,7 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
 //===--------------------------------------------------------------------===//
 #define DEBUG_TYPE "Constraint solver"
 STATISTIC(NumExploredConstraintSystems, "# of constraint systems explored");
+STATISTIC(NumLameNonDefinitive, "# of type variables lamely non-definitive");
 
 //===--------------------------------------------------------------------===//
 // Type variable implementation.
@@ -3715,6 +3716,8 @@ findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc,
       // potential solutions with the current approach.
       bounds.first = typesBelow.front().first;
       isDefinitive = false;
+
+      ++NumLameNonDefinitive;
     }
   }
 
@@ -3726,16 +3729,10 @@ findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc,
       // potential solutions with the current approach.
       bounds.second = typesAbove.front().first;
       isDefinitive = false;
+
+      ++NumLameNonDefinitive;
     }
   }
-
-  // A result is not definitive if there are both upper and lower bounds and
-  // they are not equivalent.
-  // FIXME: This really isn't true; we need to actual solve all of the
-  // constraints in some reasonable manner.
-  if (isDefinitive && bounds.first && bounds.second &&
-      bounds.first->getCanonicalType() != bounds.second->getCanonicalType())
-    isDefinitive = false;
 
   return bounds;
 }
@@ -3829,14 +3826,15 @@ resolveTypeVariable(
 /// run out of ideas.
 static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
 #if 0
-  // Try to determine a binding for a type variable that has only concrete
-  // bindings.
+  // FIXME: Look for a definitive type variable binding, and bind it now.
   if (auto binding = resolveTypeVariable(cs, typeVarConstraints,
                                          /*onlyDefinitive=*/true)) {
-    return SolutionStep(binding->first, binding->second, true);
+    using std::get;
+    assert(get<2>(*binding) && "Binding must be definitive!");
+    return SolutionStep(get<0>(*binding), get<1>(*binding), get<2>(*binding));
   }
 #endif
-  
+
   // If there are any unresolved overload sets, resolve one now.
   // FIXME: This is terrible for performance.
   if (cs.getNumUnresolvedOverloadSets() > 0) {
