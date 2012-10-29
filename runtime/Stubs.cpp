@@ -293,3 +293,14 @@ posix_readdir_hack(DIR *d)
   }
   return rval;
 }
+
+extern "C"
+int64_t
+posix_isDirectory_hack(const char *path)
+{
+  struct stat sb;
+  int r = stat(path, &sb);
+  (void)r;
+  assert(r != -1);
+  return S_ISDIR(sb.st_mode);
+}
