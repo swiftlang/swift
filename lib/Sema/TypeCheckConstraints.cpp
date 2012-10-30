@@ -3306,20 +3306,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   }
 }
 
-namespace {
-#define CONCAT2(X,Y) X##Y
-#define CONCAT(X,Y) CONCAT2(X,Y)
-/// \brief Provide a block of code that will execute when control flow leaves
-/// the current block.
-#define ON_EXIT(Block) auto CONCAT(onExitFuncObj,__LINE__) = [&] Block; \
-  struct CONCAT(OnExit,__LINE__) {                                      \
-    typedef decltype(CONCAT(onExitFuncObj,__LINE__)) ExitFuncType;      \
-    ExitFuncType &Func;                                                 \
-    CONCAT(OnExit,__LINE__)(ExitFuncType &Func) : Func(Func) { }        \
-    ~CONCAT(OnExit,__LINE__)() { Func(); }                                \
-  } CONCAT(onExitFunc,__LINE__)(CONCAT(onExitFuncObj,__LINE__))
-}
-
 void ConstraintSystem::collectConstraintsForTypeVariables(
        SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints) {
   typeVarConstraints.clear();
@@ -3339,17 +3325,8 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
 
   // First, collect all of the constraints that relate directly to a
   // type variable.
+  llvm::SetVector<TypeVariableType *> referencedTypeVars;
   for (auto constraint : Constraints) {
-    // Keep track of any type variables referenced by this constraint. When
-    // we're done looking at this constraint, mark them as having non-concrete
-    // constraints.
-    SmallVector<TypeVariableType *, 4> referencedTypeVars;
-    ON_EXIT({
-      for (auto tv : referencedTypeVars) {
-        getTVC(tv).HasNonConcreteConstraints = true;
-      }
-    });
-
     auto first = simplifyType(constraint->getFirstType());
     switch (constraint->getClassification()) {
     case ConstraintClassification::Relational:
@@ -3397,20 +3374,25 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
 
     // If both types are type variables, mark both as referenced.
     if (firstTV && secondTV) {
-      referencedTypeVars.push_back(firstTV);
-      referencedTypeVars.push_back(secondTV);
+      referencedTypeVars.insert(firstTV);
+      referencedTypeVars.insert(secondTV);
     }
   }
 
   // Mark any type variables that specify the result of an unresolved overload
   // set as having non-concrete constraints.
   for (auto ovl : UnresolvedOverloadSets) {
-    SmallVector<TypeVariableType *, 4> referencedTypeVars;
-    if (ovl->getBoundType()->hasTypeVariable(referencedTypeVars)) {
-      for (auto tv : referencedTypeVars) {
-        getTVC(tv).HasNonConcreteConstraints = true;
-      }
-    }
+    ovl->getBoundType()->hasTypeVariable(referencedTypeVars);
+  }
+
+  // Mark any referenced type variables as having non-concrete constraints.
+  for (auto tv : referencedTypeVars) {
+    tv = getRepresentative(tv);
+    auto known = typeVarConstraintsMap.find(tv);
+    if (known == typeVarConstraintsMap.end())
+      continue;
+
+    typeVarConstraints[known->second-1].HasNonConcreteConstraints = true;
   }
 }
 

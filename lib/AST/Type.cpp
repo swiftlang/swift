@@ -206,8 +206,7 @@ bool TypeBase::isSpecialized() {
 /// \brief Gather the type variables in the given type, recursively.
 static void gatherTypeVariables(
               Type wrappedTy, 
-              SmallVectorImpl<TypeVariableType *> &typeVariables,
-              llvm::SmallPtrSet<TypeVariableType *, 4> &knownTypeVariables) {
+              llvm::SetVector<TypeVariableType *> &typeVariables) {
   auto ty = wrappedTy.getPointer();
   if (!ty)
     return;
@@ -232,13 +231,13 @@ static void gatherTypeVariables(
 
   case TypeKind::Paren:
     return gatherTypeVariables(cast<ParenType>(ty)->getUnderlyingType(),
-                               typeVariables, knownTypeVariables);
+                               typeVariables);
 
   case TypeKind::Tuple: {
     const TupleType *tupleTy = cast<TupleType>(ty);
     // FIXME: Always walk default arguments.
     for (const auto &field : tupleTy->getFields()) {
-      gatherTypeVariables(field.getType(), typeVariables, knownTypeVariables);
+      gatherTypeVariables(field.getType(), typeVariables);
     }
     return;
   }
@@ -247,69 +246,65 @@ static void gatherTypeVariables(
   case TypeKind::Struct:
   case TypeKind::Class:
     return gatherTypeVariables(cast<NominalType>(ty)->getParent(),
-                               typeVariables, knownTypeVariables);
+                               typeVariables);
 
   case TypeKind::MetaType:
     return gatherTypeVariables(cast<MetaTypeType>(ty)->getInstanceType(),
-                               typeVariables, knownTypeVariables);
+                               typeVariables);
 
   case TypeKind::Substituted:
     return gatherTypeVariables(cast<SubstitutedType>(ty)->getReplacementType(),
-                               typeVariables, knownTypeVariables);
+                               typeVariables);
 
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction: {
     auto fnType = cast<AnyFunctionType>(ty);
-    gatherTypeVariables(fnType->getInput(), typeVariables, knownTypeVariables);
-    gatherTypeVariables(fnType->getResult(), typeVariables, knownTypeVariables);
+    gatherTypeVariables(fnType->getInput(), typeVariables);
+    gatherTypeVariables(fnType->getResult(), typeVariables);
     return;
   }
 
   case TypeKind::Array:
     return gatherTypeVariables(cast<ArrayType>(ty)->getBaseType(),
-                               typeVariables, knownTypeVariables);
+                               typeVariables);
 
   case TypeKind::ArraySlice:
     return gatherTypeVariables(cast<ArraySliceType>(ty)->getImplementationType(),
-                               typeVariables, knownTypeVariables);
+                               typeVariables);
 
   case TypeKind::LValue:
     return gatherTypeVariables(cast<LValueType>(ty)->getObjectType(),
-                               typeVariables, knownTypeVariables);
+                               typeVariables);
 
   case TypeKind::UnboundGeneric:
     return gatherTypeVariables(cast<UnboundGenericType>(ty)->getParent(),
-                               typeVariables, knownTypeVariables);
+                               typeVariables);
 
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericOneOf:
   case TypeKind::BoundGenericStruct: {
     auto boundTy = cast<BoundGenericType>(ty);
-    gatherTypeVariables(boundTy->getParent(), typeVariables, knownTypeVariables);
+    gatherTypeVariables(boundTy->getParent(), typeVariables);
     for (auto arg : boundTy->getGenericArgs())
-      gatherTypeVariables(arg, typeVariables, knownTypeVariables);
+      gatherTypeVariables(arg, typeVariables);
     return;
   }
 
-  case TypeKind::TypeVariable: {
-    auto typeVar = cast<TypeVariableType>(ty);
-    if (knownTypeVariables.insert(typeVar))
-      typeVariables.push_back(typeVar);
+  case TypeKind::TypeVariable:
+    typeVariables.insert(cast<TypeVariableType>(ty));
     return;
-  }
   }
 
   llvm_unreachable("Unhandling type kind");
 }
 
-bool TypeBase::hasTypeVariable(
-       SmallVectorImpl<TypeVariableType *> &typeVariables) {
+bool
+TypeBase::hasTypeVariable(llvm::SetVector<TypeVariableType *> &typeVariables) {
   // If we know we don't have any type variables, we're done.
   if (!hasTypeVariable())
     return false;
 
-  llvm::SmallPtrSet<TypeVariableType *, 4> knownTypeVariables;
-  gatherTypeVariables(this, typeVariables, knownTypeVariables);
+  gatherTypeVariables(this, typeVariables);
   assert(!typeVariables.empty() && "Did not find type variables!");
   return true;
 }
