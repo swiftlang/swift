@@ -44,7 +44,7 @@ using namespace irgen;
 
 namespace {
   /// Layout information for class types.
-  class ClassTypeInfo : public HeapTypeInfo {
+  class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
     ClassDecl *TheClass;
     mutable HeapLayout *Layout;
 
@@ -52,6 +52,10 @@ namespace {
     ClassTypeInfo(llvm::PointerType *irType, Size size, Alignment align,
                   ClassDecl *D)
       : HeapTypeInfo(irType, size, align), TheClass(D), Layout(nullptr) {
+    }
+
+    bool isKnownSwift() const {
+      return true;
     }
 
     ~ClassTypeInfo() {

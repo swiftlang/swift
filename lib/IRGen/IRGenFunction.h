@@ -290,6 +290,10 @@ public:
   void emitRetainCall(llvm::Value *value);
   void emitRelease(llvm::Value *value);
   ManagedValue enterReleaseCleanup(llvm::Value *value);
+  void emitObjCRetain(llvm::Value *value, Explosion &explosion);
+  llvm::Value *emitObjCRetainCall(llvm::Value *value);
+  void emitObjCRelease(llvm::Value *value);
+  ManagedValue enterObjCReleaseCleanup(llvm::Value *value);
 
 //--- Statement emission -------------------------------------------------------
 public:

@@ -27,26 +27,44 @@ namespace irgen {
 
 /// HeapTypeInfo - A type designed for use implementing a type
 /// which consists solely of something reference-counted.
-class HeapTypeInfo : public SingleScalarTypeInfo<HeapTypeInfo, FixedTypeInfo> {
+template <class Impl>
+class HeapTypeInfo : public SingleScalarTypeInfo<Impl, FixedTypeInfo> {
+  typedef SingleScalarTypeInfo<Impl, FixedTypeInfo> super;
+protected:
+  using super::asDerived;
 public:
   HeapTypeInfo(llvm::PointerType *storage, Size size, Alignment align)
-    : SingleScalarTypeInfo(storage, size, align, IsNotPOD) {}
+    : super(storage, size, align, IsNotPOD) {}
 
-  bool isSingleRetainablePointer(ResilienceScope scope) const;
+  bool isSingleRetainablePointer(ResilienceScope scope) const {
+    return asDerived().isKnownSwift();
+  }
 
   static const bool IsScalarPOD = false;
 
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitRelease(value);
+    if (asDerived().isKnownSwift()) {
+      IGF.emitRelease(value);
+    } else {
+      IGF.emitObjCRelease(value);
+    }
   }
 
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitRetainCall(value);
+    if (asDerived().isKnownSwift()) {
+      IGF.emitRetainCall(value);
+    } else {
+      IGF.emitObjCRetainCall(value);
+    }
   }
 
   void enterScalarCleanup(IRGenFunction &IGF, llvm::Value *value,
                           Explosion &out) const {
-    out.add(IGF.enterReleaseCleanup(value));
+    if (asDerived().isKnownSwift()) {
+      out.add(IGF.enterReleaseCleanup(value));
+    } else {
+      out.add(IGF.enterObjCReleaseCleanup(value));
+    }
   }
 };
 

@@ -21,6 +21,7 @@
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenType.h"
+#include "HeapTypeInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "ScalarTypeInfo.h"
@@ -46,13 +47,29 @@ llvm::Constant *IRGenModule::getObjCReleaseFn() {
   return ObjCReleaseFn;
 }
 
-static void emitObjCReleaseCall(IRGenFunction &IGF, llvm::Value *value) {
-  auto call = IGF.Builder.CreateCall(IGF.IGM.getObjCReleaseFn(), value);
+void IRGenFunction::emitObjCRelease(llvm::Value *value) {
+  // Get an appropriately-casted function pointer.
+  auto fn = IGM.getObjCReleaseFn();
+  if (value->getType() != IGM.ObjCPtrTy) {
+    auto fnTy = llvm::FunctionType::get(IGM.VoidTy, value->getType(),
+                                        false)->getPointerTo();
+    fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
+  }
+
+  auto call = Builder.CreateCall(fn, value);
   call->setDoesNotThrow();
 }
 
-static llvm::Value *emitObjCRetainCall(IRGenFunction &IGF, llvm::Value *value) {
-  auto call = IGF.Builder.CreateCall(IGF.IGM.getObjCRetainFn(), value);
+llvm::Value *IRGenFunction::emitObjCRetainCall(llvm::Value *value) {
+  // Get an appropriately-casted function pointer.
+  auto fn = IGM.getObjCRetainFn();
+  if (value->getType() != IGM.ObjCPtrTy) {
+    auto fnTy = llvm::FunctionType::get(value->getType(), value->getType(),
+                                        false)->getPointerTo();
+    fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
+  }
+
+  auto call = Builder.CreateCall(fn, value);
   call->setDoesNotThrow();
   return call;
 }
@@ -63,39 +80,26 @@ namespace {
     CallObjCRelease(llvm::Value *value) : Value(value) {}
 
     void emit(IRGenFunction &IGF) const {
-      emitObjCReleaseCall(IGF, Value);
+      IGF.emitObjCRelease(Value);
     }
   };
 }
 
-static void enterObjCReleaseCleanup(IRGenFunction &IGF, llvm::Value *value,
-                                    Explosion &out) {
-  IGF.pushFullExprCleanup<CallObjCRelease>(value);
-  out.add(ManagedValue(value, IGF.getCleanupsDepth()));
+ManagedValue IRGenFunction::enterObjCReleaseCleanup(llvm::Value *value) {
+  pushFullExprCleanup<CallObjCRelease>(value);
+  return ManagedValue(value, getCleanupsDepth());
 }
 
 namespace {
   /// A type-info implementation suitable for an ObjC pointer type.
-  class ObjCTypeInfo : public SingleScalarTypeInfo<ObjCTypeInfo, FixedTypeInfo> {
+  class ObjCTypeInfo : public HeapTypeInfo<ObjCTypeInfo> {
   public:
     ObjCTypeInfo(llvm::PointerType *storageType, Size size, Alignment align)
-      : SingleScalarTypeInfo(storageType, size, align, IsNotPOD) {
+      : HeapTypeInfo(storageType, size, align) {
     }
 
-    static const bool IsScalarPOD = false;
-
-    void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
-      emitObjCReleaseCall(IGF, value);
-    }
-
-    llvm::Value *emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
-      return emitObjCRetainCall(IGF, value);
-    }
-
-    void enterScalarCleanup(IRGenFunction &IGF, llvm::Value *value,
-                            Explosion &out) const {
-      return enterObjCReleaseCleanup(IGF, value, out);
-    }
+    // Metaprogramming.
+    bool isKnownSwift() const { return false; }
   };
 }
 

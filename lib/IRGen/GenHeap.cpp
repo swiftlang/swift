@@ -553,13 +553,22 @@ Address HeapLayout::emitCastOfAlloc(IRGenFunction &IGF,
   return Address(addr, getAlignment());
 }
 
-bool HeapTypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
-  return true;
+namespace {
+  class BuiltinObjectPointerTypeInfo
+    : public HeapTypeInfo<BuiltinObjectPointerTypeInfo> {
+  public:
+    BuiltinObjectPointerTypeInfo(llvm::PointerType *storage,
+                                 Size size, Alignment align)
+    : HeapTypeInfo(storage, size, align) {}
+
+    bool isKnownSwift() const { return true; }
+  };
 }
 
 const TypeInfo *TypeConverter::convertBuiltinObjectPointer() {
-  return new HeapTypeInfo(IGM.RefCountedPtrTy, IGM.getPointerSize(),
-                          IGM.getPointerAlignment());
+  return new BuiltinObjectPointerTypeInfo(IGM.RefCountedPtrTy,
+                                          IGM.getPointerSize(),
+                                          IGM.getPointerAlignment());
 }
 
 /// Does the given value superficially not require reference-counting?
