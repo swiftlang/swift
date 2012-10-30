@@ -533,9 +533,15 @@ namespace {
     /// \brief The representative type variable.
     TypeVariableType *TypeVar;
 
-    /// \brief The set of constraints directly applicable to the type
-    /// variable T.
-    SmallVector<Constraint *, 4> Constraints;
+    /// \brief The set of constraints "above" the type variable.
+    SmallVector<std::pair<Constraint *, Type>, 4> Above;
+
+    /// \brief The set of constraints "below" the type variable.
+    SmallVector<std::pair<Constraint *, Type>, 4> Below;
+
+    /// \brief The set of archetype and literal constraints directly applicable
+    /// to the type variable T.
+    SmallVector<Constraint *, 4> KindConstraints;
   };
 
   //===--------------------------------------------------------------------===//
@@ -3301,53 +3307,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 }
 
 namespace {
-  /// \brief Provide a partial ordering between two constraints.
-  ///
-  /// The ordering depends on the the classification of constraints:
-  ///   - For relational constraints, the constraints are ordered by strength,
-  ///     e.g., == precedes < and < precedes <c.
-  ///
-  ///   - For literal constraints, we order by literal kind.
-  ///
-  ///   - For member constraints, we order by member name (lexicographically)
-  ///     and, for equivalently-named constraints, with value members
-  ///     preceding type members.
-  class OrderConstraintForTypeVariable {
-  public:
-    bool operator()(Constraint *lhs, Constraint *rhs) const {
-      // If the classifications differ, order by classification.
-      auto lhsClass = lhs->getClassification();
-      auto rhsClass = rhs->getClassification();
-      if (lhsClass != rhsClass)
-        return lhsClass < rhsClass;
-
-      switch (lhsClass) {
-      case ConstraintClassification::Relational: {
-        // Order based on the relational constraint kind.
-        return lhs->getKind() < rhs->getKind();
-      }
-
-      case ConstraintClassification::Literal:
-        // For literals, order by literal kind.
-        return lhs->getLiteralKind() < rhs->getLiteralKind();
-
-      case ConstraintClassification::Member:
-        // For members, order first by member name.
-        if (lhs->getMember() != rhs->getMember()) {
-          return lhs->getMember().str() < rhs->getMember().str();
-        }
-
-        // Order by type vs. value member. Value members come first.
-        return lhs->getKind() < rhs->getKind();
-
-      case ConstraintClassification::Archetype:
-        return false;
-      }
-    }
-  };
-}
-
-namespace {
 #define CONCAT2(X,Y) X##Y
 #define CONCAT(X,Y) CONCAT2(X,Y)
 /// \brief Provide a block of code that will execute when control flow leaves
@@ -3401,7 +3360,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
     case ConstraintClassification::Literal:
       if (auto firstTV = first->getAs<TypeVariableType>()) {
         // Record this constraint on the type variable.
-        getTVC(firstTV).Constraints.push_back(constraint);
+        getTVC(firstTV).KindConstraints.push_back(constraint);
       } else {
         // Simply mark any type variables in the type as referenced.
         first->hasTypeVariable(referencedTypeVars);
@@ -3421,7 +3380,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
     auto firstTV = first->getAs<TypeVariableType>();
     if (firstTV) {
       // Record the constraint.
-      getTVC(firstTV).Constraints.push_back(constraint);
+      getTVC(firstTV).Above.push_back(std::make_pair(constraint, second));
     } else {
       // Collect any type variables represented in the first type.
       first->hasTypeVariable(referencedTypeVars);
@@ -3430,7 +3389,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
     auto secondTV = second->getAs<TypeVariableType>();
     if (secondTV) {
       // Record the constraint.
-      getTVC(secondTV).Constraints.push_back(constraint);
+      getTVC(secondTV).Below.push_back(std::make_pair(constraint, first));
     } else {
       // Collect any type variables represented in the second type.
       second->hasTypeVariable(referencedTypeVars);
@@ -3453,12 +3412,6 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       }
     }
   }
-
-  // Sort the type variable constraints.
-  for (auto &tvc : typeVarConstraints) {
-    std::stable_sort(tvc.Constraints.begin(), tvc.Constraints.end(),
-                     OrderConstraintForTypeVariable());
-  }
 }
 
 namespace {
@@ -3469,88 +3422,6 @@ namespace {
     Constraint *Below;
     Constraint *Above;
   };
-}
-
-/// \brief Collect the set of types that are bound "below" and "above" the
-/// given type variable T.
-///
-/// A type X is above T if there is a constraint
-/// T <t X, T < X, or T <c X, whereas it is below T if there is a constraint
-/// X <t T, X < T, X <c T.
-///
-/// \param cs The constraint system in which these constraints occur.
-///
-/// \param tvc The type variable and its constraints. The constraints must
-/// already have been sorted with the predicate
-/// \c OrderConstraintForTypeVariable.
-///
-/// \param typesBelow Will be populated with a set of type/constraint pairs
-/// describing the types that are "below" the type variable. The list of types
-/// is uniqued, and the corresponding constraint will be the most strict
-/// constraint for that particular type.
-///
-/// \param typesAbove Will be populated with a set of type/constraint pairs
-/// describing the types that are "above" the type variable. The list of types
-/// is uniqued, and the corresponding constraint will be the most strict
-/// constraint for that particular type.
-///
-/// \returns An iterator into the list of constraints on this type variable
-/// that points just past the last relational constraint.
-static SmallVectorImpl<Constraint *>::iterator
-collectTypesAboveAndBelow(
-  ConstraintSystem &cs,
-  TypeVariableConstraints &tvc,
-  SmallVectorImpl<std::pair<Type, Constraint *>> &typesBelow,
-  SmallVectorImpl<std::pair<Type, Constraint *>> &typesAbove)
-{
-  // Collect the relational constraints above and below each simplified type,
-  // dropping any redundant constraints in the process.
-  llvm::DenseMap<CanType, RelationalTypeVarConstraints> typeVarConstraints;
-  auto curCons = tvc.Constraints.begin(),
-  lastConstraint = tvc.Constraints.end();
-  for (; curCons != lastConstraint &&
-       (*curCons)->getClassification()  == ConstraintClassification::Relational;
-       ++curCons) {
-    // Determine whether we have a constraint below (vs. a constraint above)
-    // this type variable.
-    bool constraintIsBelow = false;
-    if (auto secondTV = (*curCons)->getSecondType()
-            ->getAs<TypeVariableType>()) {
-      constraintIsBelow = (cs.getRepresentative(secondTV) == tvc.TypeVar);
-    }
-
-    // Compute the type bound, and simplify it.
-    Type bound = constraintIsBelow? (*curCons)->getFirstType()
-                                  : (*curCons)->getSecondType();
-    bound = cs.simplifyType(bound);
-
-    Constraint *(RelationalTypeVarConstraints::*which)
-      = constraintIsBelow? &RelationalTypeVarConstraints::Below
-                         : &RelationalTypeVarConstraints::Above;
-    auto &typeVarConstraint = typeVarConstraints[bound->getCanonicalType()];
-
-    if (typeVarConstraint.*which) {
-      // We already have a constraint that provides either the same relation
-      // or a tighter relation, because the sort orders relational constraints
-      // in order of nonincreasing strictness.
-      // 
-      // FIXME: If the type may end up being a tuple type, then a conversion
-      // constraint is not redundant with a subtyping constraint.
-      assert(((typeVarConstraint.*which)->getKind()
-              <= (*curCons)->getKind()) &&
-             "Improper ordering of constraints");
-      continue;
-    }
-
-    // Record this constraint.
-    typeVarConstraint.*which = *curCons;
-    if (constraintIsBelow)
-      typesBelow.push_back(std::make_pair(bound, *curCons));
-    else
-      typesAbove.push_back(std::make_pair(bound, *curCons));
-  }
-  
-  return curCons;
 }
 
 bool ConstraintSystem::simplify() {
@@ -3691,61 +3562,37 @@ static void resolveOverloadSet(ConstraintSystem &cs,
 static std::pair<Type, Type>
 findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc,
                        bool &isDefinitive) {
-  isDefinitive = !tvc.HasNonConcreteConstraints;
-
-  // Collect the relational constraints above and below the type variable.
-  // FIXME: We perform this operation multiple times. It would be better to
-  // keep this information online, generated either as constraints are
-  // added or as part of simplification.
-  SmallVector<std::pair<Type, Constraint *>, 4> typesBelow;
-  SmallVector<std::pair<Type, Constraint *>, 4> typesAbove;
-  if (collectTypesAboveAndBelow(cs, tvc, typesBelow, typesAbove)
-        != tvc.Constraints.end())
-    isDefinitive = false;
+  isDefinitive = !tvc.HasNonConcreteConstraints && tvc.KindConstraints.empty();
 
   std::pair<Type, Type> bounds;
+  for (auto arg : tvc.Below) {
+    if (arg.second->hasTypeVariable())
+      continue;
 
-  // Only consider concrete above/below that don't involve type variables.
-  // FIXME: Do we really need this restriction?
-  auto pairHasTypeVariable = [&](std::pair<Type, Constraint *> tc) {
-    if (tc.first->hasTypeVariable()) {
-      isDefinitive = false;
-      return true;
-    }
-
-    return false;
-  };
-  typesBelow.erase(std::remove_if(typesBelow.begin(), typesBelow.end(),
-                                  pairHasTypeVariable),
-                   typesBelow.end());
-  typesAbove.erase(std::remove_if(typesAbove.begin(), typesAbove.end(),
-                                  pairHasTypeVariable),
-                   typesAbove.end());
-
-  if (!typesBelow.empty()) {
-    if (typesBelow.size() == 1) {
-      bounds.first = typesBelow.front().first;
-    } else {
-      // FIXME: Compute the meet of the types in typesBelow. We'll miss
+    if (bounds.first) {
+      // FIXME: Compute the meet of the types. We'll miss
       // potential solutions with the current approach.
-      bounds.first = typesBelow.front().first;
       isDefinitive = false;
-
       ++NumLameNonDefinitive;
+      break;
     }
+
+    bounds.first = arg.second;
   }
 
-  if (!typesAbove.empty()) {
-    if (typesAbove.size() == 1) {
-      bounds.second = typesAbove.front().first;
-    } else {
-      // FIXME: Compute the join of the types in typesAbove. We'll miss
-      // potential solutions with the current approach.
-      bounds.second = typesAbove.front().first;
-      isDefinitive = false;
+  for (auto arg : tvc.Above) {
+    if (arg.second->hasTypeVariable())
+      continue;
 
+    if (bounds.second) {
+      // FIXME: Compute the join of the types. We'll miss
+      // potential solutions with the current approach.
+      isDefinitive = false;
       ++NumLameNonDefinitive;
+      break;
     }
+
+    bounds.second = arg.second;
   }
 
   return bounds;
@@ -3819,12 +3666,14 @@ resolveTypeVariable(
     if (cs.haveExploredTypeVar(tvc.TypeVar))
       continue;
 
-    for (auto &constraint : tvc.Constraints) {
+    for (auto &constraint : tvc.KindConstraints) {
       if (constraint->getClassification() != ConstraintClassification::Literal)
         continue;
 
       if (auto type = tc.getDefaultLiteralType(constraint->getLiteralKind())) {
-        return std::make_tuple(tvc.TypeVar, type, tvc.Constraints.size() == 1);
+        return std::make_tuple(tvc.TypeVar, type,
+                               tvc.KindConstraints.size() == 1 &&
+                               tvc.Above.empty() && tvc.Below.empty());
       }
     }
   }
