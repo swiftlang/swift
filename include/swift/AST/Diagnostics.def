@@ -514,10 +514,6 @@ ERROR(invalid_precedence,attribute_parsing,none,
 
 ERROR(import_attributes,attribute_parsing,none,
       "invalid attributes specified for import", ())
-ERROR(oneof_attributes,attribute_parsing,none,
-      "oneof types are not allowed to have attributes", ())
-ERROR(protocol_attributes,attribute_parsing,none,
-      "protocol types are not allowed to have attributes", ())
 
 // byref
 ERROR(byref_attribute_expected_identifier,attribute_parsing,none,
@@ -716,6 +712,8 @@ ERROR(conversion_not_instance_method,sema_tcd,none,
       (Identifier))
 ERROR(conversion_params,sema_tcd,none,
       "conversion function %0 has non-defaulted parameters", (Identifier))
+ERROR(invalid_objc_decl,sema_tcd,none,
+      "only classes and their methods can be declared 'objc'", ())
       
 ERROR(invalid_decl_attribute,sema_tcd,none,
       "attribute '%0' cannot be applied to declaration", (StringRef))

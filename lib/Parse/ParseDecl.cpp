@@ -260,6 +260,16 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;    
   }
 
+  /// FIXME: This is a temporary hack until we can import ObjC modules.
+  case AttrName::objc: {
+    if (Attributes.isObjC())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+
+    consumeToken(tok::identifier);
+    Attributes.ObjC = true;
+    return false;
+  }
+
   /// FIXME: This is a temporary hack until we can import C modules.
   case AttrName::asmname: {
     SourceLoc TokLoc = Tok.getLoc();
@@ -1262,6 +1272,8 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
                                            GenericParams, CurDeclContext);
   Decls.push_back(OOD);
 
+  if (Attributes.isValid()) OOD->getMutableAttrs() = Attributes;
+
   // Now that we have a context, update the generic parameters with that
   // context.
   if (GenericParams) {
@@ -1306,10 +1318,6 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
     }
   }
 
-  // No attributes are valid on oneof types at this time.
-  if (!Attributes.empty())
-    diagnose(Attributes.LSquareLoc, diag::oneof_attributes);
-  
   llvm::SmallDenseMap<Identifier, OneOfElementDecl*, 16> SeenSoFar;
   SmallVector<Decl *, 16> MemberDecls;
 
@@ -1401,6 +1409,8 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
                                             CurDeclContext);
   Decls.push_back(SD);
 
+  if (Attributes.isValid()) SD->getMutableAttrs() = Attributes;
+
   // Now that we have a context, update the generic parameters with that
   // context.
   if (GenericParams) {
@@ -1431,8 +1441,6 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   MemberDecls.push_back(ValueCD);
   ThisDecl->setDeclContext(ValueCD);
 
-  if (!Attributes.empty())
-    diagnose(Attributes.LSquareLoc, diag::oneof_attributes);
   SD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, Tok.getLoc() });
   ScopeInfo.addToScope(SD);
 
@@ -1484,6 +1492,8 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
                                           GenericParams, CurDeclContext);
   Decls.push_back(CD);
 
+  if (Attributes.isValid()) CD->getMutableAttrs() = Attributes;
+
   // Now that we have a context, update the generic parameters with that
   // context.
   if (GenericParams) {
@@ -1524,8 +1534,6 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
     MemberDecls.push_back(Constructor);
   }
   
-  if (!Attributes.empty())
-    diagnose(Attributes.LSquareLoc, diag::oneof_attributes);
   CD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, Tok.getLoc() });
   ScopeInfo.addToScope(CD);
 
@@ -1570,6 +1578,9 @@ Decl *Parser::parseDeclProtocol() {
     = new (Context) ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc,
                                  ProtocolName,
                                  Context.AllocateCopy(InheritedProtocols));
+
+  if (Attributes.isValid()) Proto->getMutableAttrs() = Attributes;
+
   ContextChange CC(*this, Proto);
   Scope ProtocolBodyScope(this, /*AllowLookup=*/false);
 
@@ -1609,11 +1620,6 @@ Decl *Parser::parseDeclProtocol() {
       diagnose(Tok.getLoc(), diag::expected_rbrace_protocol);
       diagnose(LBraceLoc, diag::opening_brace);      
     }
-    
-    
-    // Handle attributes.
-    if (!Attributes.empty())
-      diagnose(Attributes.LSquareLoc, diag::protocol_attributes);
     
     // Install the protocol elements.
     Proto->setMembers(Context.AllocateCopy(Members),

@@ -31,5 +31,6 @@ ATTR(byref)
 ATTR(auto_closure)
 ATTR(asmname)
 ATTR(postfix)
+ATTR(objc)
 
 #undef ATTR

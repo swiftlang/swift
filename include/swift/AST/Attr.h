@@ -137,16 +137,15 @@ public:
   InfixData Infix;
   ResilienceData Resilience;
   StringRef AsmName;
-  bool Byref;
-  bool ByrefHeap;
-  bool AutoClosure;
-  bool Assignment;
-  bool Conversion;
-  bool Postfix;
+  bool Byref = false;
+  bool ByrefHeap = false;
+  bool AutoClosure = false;
+  bool Assignment = false;
+  bool Conversion = false;
+  bool ObjC = false;
+  bool Postfix = false;
   
-  DeclAttributes() : Byref(false), ByrefHeap(false),
-                     AutoClosure(false), Assignment(false),
-                     Conversion(false), Postfix(false) { }
+  DeclAttributes() { }
 
   bool isValid() const { return LSquareLoc.isValid(); }
 
@@ -159,11 +158,12 @@ public:
   bool isAssignment() const { return Assignment; }
   bool isConversion() const { return Conversion; }
   bool isPostfix() const { return Postfix; }
+  bool isObjC() const { return ObjC; }
   
   bool empty() const {
     return !isInfix() && !getResilienceData().isValid() && !isByref() &&
            !isAutoClosure() && !isAssignment() && !isConversion() &&
-           !isPostfix();
+           !isPostfix() && !isObjC();
   }
 };
   

@@ -302,6 +302,8 @@ public:
       OOD->overwriteType(OOD->getType()->getCanonicalType());
       OOD->overwriteDeclaredType(OOD->getDeclaredType()->getCanonicalType());
       TC.validateTypeSimple(OOD->getDeclaredTypeInContext());
+
+      validateAttributes(OOD);
     }
     
     for (Decl *member : OOD->getMembers())
@@ -327,6 +329,8 @@ public:
       SD->overwriteType(SD->getType()->getCanonicalType());
       SD->overwriteDeclaredType(SD->getDeclaredType()->getCanonicalType());
       TC.validateTypeSimple(SD->getDeclaredTypeInContext());
+
+      validateAttributes(SD);
     }
 
     ConstructorDecl *ValueCD = cast<ConstructorDecl>(SD->getMembers().back());
@@ -385,6 +389,8 @@ public:
       CD->overwriteType(CD->getType()->getCanonicalType());
       CD->overwriteDeclaredType(CD->getDeclaredType()->getCanonicalType());
       TC.validateTypeSimple(CD->getDeclaredTypeInContext());
+
+      validateAttributes(CD);
     }
 
     for (Decl *Member : CD->getMembers())
@@ -434,6 +440,8 @@ public:
     // Check the members.
     for (auto Member : PD->getMembers())
       visit(Member);
+
+    validateAttributes(PD);
   }
   
   void visitVarDecl(VarDecl *VD) {
@@ -664,6 +672,21 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     // anyway.
     if (NumArguments == 1 && VD->getName().str() == "&") {
       TC.diagnose(VD->getStartLoc(), diag::custom_operator_addressof);
+      return;
+    }
+  }
+
+  if (Attrs.isObjC()) {
+    // Only classes and methods can be ObjC.
+    bool isLegal = false;
+    if (isa<ClassDecl>(VD)) {
+      isLegal = true;
+    } else if (isa<FuncDecl>(VD) && isa<ClassDecl>(VD->getDeclContext())) {
+      isLegal = !isOperator;
+    }
+    if (!isLegal) {
+      TC.diagnose(VD->getStartLoc(), diag::invalid_objc_decl);
+      VD->getMutableAttrs().ObjC = false;
       return;
     }
   }
