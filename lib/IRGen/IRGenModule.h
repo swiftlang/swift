@@ -159,11 +159,15 @@ private:
 //--- Globals ---------------------------------------------------------------
 public:
   llvm::Constant *getAddrOfGlobalString(llvm::StringRef string);
+  llvm::Constant *getAddrOfObjCSelectorRef(llvm::StringRef selector);
+  llvm::Constant *getAddrOfObjCMethodName(llvm::StringRef methodName);
 
 private:
   llvm::DenseMap<LinkEntity, llvm::GlobalVariable*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::StringMap<llvm::Constant*> GlobalStrings;
+  llvm::StringMap<llvm::Constant*> ObjCSelectorRefs;
+  llvm::StringMap<llvm::Constant*> ObjCMethodNames;
 
   void mangleGlobalInitializer(raw_ostream &buffer, TranslationUnit *D);
 
