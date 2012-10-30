@@ -23,15 +23,57 @@ Terminology used in this document:
   class used by the ``objc_msgSend`` "fast path" are the same.
 
 
-Major design question:
+Design
+======
 
-- Are all Swift objects ``id``-compatible? That is, can any random ``id`` refer
-  to a Swift object?
+All Swift objects [#]_ will be ``id``-compatible and will have an Objective-C
+isa, on the assumption that you want to be able to put them in an array, set
+them as represented objects, etc. [#]_
 
-  The other possibility is that only Swift objects that inherit from Objective-C
-  objects are ``id``-compatible. Any other Swift object is treated as some
-  opaque type by the compiler. (A further decision: can you send messages to
-  these things if they have *known* type?)
+Swift classes that inherit from NSObject (directly or indirectly [#]_) behave
+exactly like Objective-C classes from the perspective of Objective-C source.
+All methods marked as "API" in Swift will have dual entry points exposed by
+default. Methods not marked as "API" will not be exposed to Objective-C at all.
+Instances of these classes can be used like any other Objective-C objects.
+
+Subclassing a "Swift NSObject class" in Objective-C requires a bit of extra
+work: generating Swift vtables. We haven't decided how to do this:
+
+- Clang could be taught about Swift class layout.
+- The Clang driver could call out to the Swift compiler to do this. Somehow.
+- The runtime could fill in the vtable from the Objective-C isa list at class
+  load time. (This could be necessary anyway to support dynamic subclassing...
+  which we may or may not do.)
+
+Swift classes that do not inherit from NSObject are not visible from
+Objective-C. Their instances can be manipulated as ``id``, or via whatever
+protocols they may implement.
+
+::
+
+  class AppController : NSApplicationDelegate {
+    func applicationDidFinishLaunching(notification : NSNotification) {
+      // do stuff
+    }
+  }
+
+  // Use 'id <NSApplicationDelegate>' in Objective-C.
+
+Like "Swift NSObject classes", though, "pure" Swift classes will still have an
+isa, and any methods declared in an Objective-C protocol will be emitted with
+dual entry points.
+
+
+.. [#] Really, "All Swift objects on OS X and iOS". Presumably a Swift compiler
+   on another system wouldn't bother to emit the Objective-C isa info.
+.. [#] Dave is working out an object and class layout scheme that will minimize
+   the performance cost of emitting both the Objective-C isa and a Swift vtable.
+   It is entirely possible that from the Swift perspective, the Objective-C isa
+   is just an opaque "vtable slice" that is fixed at offset 0.
+.. [#] ...or any other Objective-C class, including alternate roots like
+   NSProxy. Most likely this will be implemented with an inherited attribute
+   ``[objc]`` on the class, which would even allow Swift to create Objective-C
+   root classes.
 
 
 Use Cases
@@ -45,12 +87,11 @@ Simple Application Writer
 I want to write my new iOS application in Swift, using all the Objective-C
 frameworks that come with iOS.
 
-Requirements:
+Guidelines:
 
-- Can send messages to Objective-C objects from Swift.
-- Can subclass Objective-C classes, override Objective-C methods, and
-  implement Objective-C protocols.
-- Can use my subclass as an Objective-C object (e.g. a delegate).
+Everything should Just Work™. There should be no need to subclass NSObject
+anywhere in your program, unless you are specifically specializing a class in
+the Cocoa Touch frameworks.
 
 
 Intermediate Application Writer
@@ -59,11 +100,47 @@ Intermediate Application Writer
 I want to write my new application in Objective-C, but there's a really nice
 Swift framework I want to use.
 
-Requirements:
+Guidelines:
 
-- Can subclass (at least some) Swift objects in Objective-C.
-- Can call (at least some) Swift methods from Objective-C.
+- Not all Swift methods in the framework may be available in Objective-C. You
+  can work around this by adding *extensions* to the Swift framework classes to
+  expose a more Objective-C-friendly interface. You will need to mark these new
+  methods as "API" in order to make them visible to Objective-C.
+- "Pure" Swift classes will not be visible to Objective-C at all. You will have
+  to write a wrapper class (or wrapper functions) in Swift if you want to use
+  the features of these classes directly. However, you can still treat them
+  like any other objects in your program (store them in ``id`` variables,
+  Objective-C collections, etc).
 
+
+Transitioning Application Writer
+--------------------------------
+
+I have an existing Objective-C application, and I want to convert it
+piece-by-piece to Swift.
+
+Guidelines:
+
+- Swift is different from Objective-C in that methods in Swift classes are not
+  automatically usable from everywhere. If your Swift class inherits from
+  NSObject, marking your methods as "API" will allow them to be called from
+  Objective-C code. A Swift class that does not inherit from NSObject will only
+  respond to messages included in its adopted protocols. [#]_
+- Once you have finished transitioning to Swift, go through your classes and
+  remove the "API" marker from any methods that do not need to be accessed from
+  Objective-C. Remove NSObject as a superclass from any classes that do not need
+  to be accessed from Objective-C. Both of these allow the compiler to be more
+  aggressive in optimizing your program, potentially making it both smaller and
+  faster.
+
+.. [#] If you explicitly want to expose a Swift method to Objective-C, but it
+   is not part of an existing protocol, you can mark the method as "API" and
+   include the ``[objc]`` attribute::
+   
+     // Note: This syntax is not final!
+     func [API, objc] accessibilityDescription {
+       return "\(this.givenName) \(this.familyName)"
+     }
 
 New Framework Writer
 --------------------
