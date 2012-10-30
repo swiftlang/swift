@@ -561,7 +561,8 @@ namespace {
                                  Size size, Alignment align)
     : HeapTypeInfo(storage, size, align) {}
 
-    bool isKnownSwift() const { return true; }
+    /// Builtin.ObjectPointer uses Swift reference-counting.
+    bool hasSwiftRefcount() const { return true; }
   };
 }
 

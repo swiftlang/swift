@@ -16,6 +16,7 @@
 
 #include "GenClass.h"
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
@@ -42,20 +43,35 @@
 using namespace swift;
 using namespace irgen;
 
+/// Does the given class have a Swift refcount?
+static bool hasSwiftRefcount(ClassDecl *theClass) {
+  if (theClass->getAttrs().isObjC()) return false;
+  if (!theClass->hasBaseClass()) return true;
+  auto baseClass = theClass->getBaseClass()->getClassOrBoundGenericClass();
+  assert(baseClass && "base type of class not a class?");
+  return hasSwiftRefcount(baseClass);
+}
+
 namespace {
   /// Layout information for class types.
   class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
     ClassDecl *TheClass;
     mutable HeapLayout *Layout;
 
+    /// Can we use swift reference-counting, or do we have to use
+    /// objc_retain/release?
+    bool HasSwiftRefcount;
+
   public:
     ClassTypeInfo(llvm::PointerType *irType, Size size, Alignment align,
                   ClassDecl *D)
       : HeapTypeInfo(irType, size, align), TheClass(D), Layout(nullptr) {
+
+      HasSwiftRefcount = ::hasSwiftRefcount(D);
     }
 
-    bool isKnownSwift() const {
-      return true;
+    bool hasSwiftRefcount() const {
+      return HasSwiftRefcount;
     }
 
     ~ClassTypeInfo() {

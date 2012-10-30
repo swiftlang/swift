@@ -98,8 +98,8 @@ namespace {
       : HeapTypeInfo(storageType, size, align) {
     }
 
-    // Metaprogramming.
-    bool isKnownSwift() const { return false; }
+    /// Builtin.ObjCPointer requires ObjC reference-counting.
+    bool hasSwiftRefcount() const { return false; }
   };
 }
 

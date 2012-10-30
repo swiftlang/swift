@@ -27,6 +27,11 @@ namespace irgen {
 
 /// HeapTypeInfo - A type designed for use implementing a type
 /// which consists solely of something reference-counted.
+///
+/// Subclasses should implement the following method, returning true
+/// if it's known to be okay to use Swift reference-counting on values
+/// of this type:
+///   bool hasSwiftRefcount() const;
 template <class Impl>
 class HeapTypeInfo : public SingleScalarTypeInfo<Impl, FixedTypeInfo> {
   typedef SingleScalarTypeInfo<Impl, FixedTypeInfo> super;
@@ -37,13 +42,13 @@ public:
     : super(storage, size, align, IsNotPOD) {}
 
   bool isSingleRetainablePointer(ResilienceScope scope) const {
-    return asDerived().isKnownSwift();
+    return asDerived().hasSwiftRefcount();
   }
 
   static const bool IsScalarPOD = false;
 
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
-    if (asDerived().isKnownSwift()) {
+    if (asDerived().hasSwiftRefcount()) {
       IGF.emitRelease(value);
     } else {
       IGF.emitObjCRelease(value);
@@ -51,7 +56,7 @@ public:
   }
 
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    if (asDerived().isKnownSwift()) {
+    if (asDerived().hasSwiftRefcount()) {
       IGF.emitRetainCall(value);
     } else {
       IGF.emitObjCRetainCall(value);
@@ -60,7 +65,7 @@ public:
 
   void enterScalarCleanup(IRGenFunction &IGF, llvm::Value *value,
                           Explosion &out) const {
-    if (asDerived().isKnownSwift()) {
+    if (asDerived().hasSwiftRefcount()) {
       out.add(IGF.enterReleaseCleanup(value));
     } else {
       out.add(IGF.enterObjCReleaseCleanup(value));
