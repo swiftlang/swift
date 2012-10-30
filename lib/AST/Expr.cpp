@@ -17,11 +17,13 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -297,6 +299,52 @@ Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
   return new (C) OverloadedSubscriptExpr(Base, C.AllocateCopy(Decls),
                                          LBracketLoc, Index, RBracketLoc,
                                          UnstructuredUnresolvedType::get(C));
+}
+
+namespace {
+  class FindCapturedVars : public ASTWalker {
+    llvm::SetVector<ValueDecl*> &Captures;
+    CapturingExpr *CurExpr;
+
+  public:
+    bool walkToExprPre(Expr *E) {
+      if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+        if (DRE->getDecl()->getDeclContext()->isLocalContext() &&
+            DRE->getDecl()->getDeclContext() != CurExpr)
+          Captures.insert(DRE->getDecl());
+        return false;
+      }
+      if (CapturingExpr *SubCE = dyn_cast<CapturingExpr>(E)) {
+        for (auto D : SubCE->getCaptures())
+          if (D->getDeclContext() != CurExpr)
+            Captures.insert(D);
+        return false;
+      }
+      return true;
+    }
+
+    FindCapturedVars(llvm::SetVector<ValueDecl*> &captures,
+                     CapturingExpr *curExpr)
+      : Captures(captures), CurExpr(curExpr) {}
+
+    void doWalk(Expr *E) {
+      E->walk(*this);
+    }
+    void doWalk(Stmt *S) {
+      S->walk(*this);
+    }
+  };
+}
+
+void CapturingExpr::computeCaptures(ASTContext &Context) {
+  llvm::SetVector<ValueDecl*> Captures;
+  if (isa<ClosureExpr>(this))
+    FindCapturedVars(Captures, this).doWalk(cast<ClosureExpr>(this)->getBody());
+  else
+    FindCapturedVars(Captures, this).doWalk(cast<FuncExpr>(this)->getBody());
+  ValueDecl** CaptureCopy
+    = Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
+  setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
 }
 
 FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,

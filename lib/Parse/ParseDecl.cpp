@@ -817,11 +817,6 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       
       GetFn->setBody(Body.get());
 
-      auto& Captures = ValCaptures.back();
-      ValueDecl** CaptureCopy =
-          Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
-      GetFn->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
-
       LastValidLoc = Body.get()->getRBraceLoc();
       
       Get = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), GetLoc,
@@ -935,11 +930,6 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     }
     
     SetFn->setBody(Body.get());
-
-    auto& Captures = ValCaptures.back();
-    ValueDecl** CaptureCopy =
-        Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
-    SetFn->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
 
     LastValidLoc = Body.get()->getRBraceLoc();
     
@@ -1205,11 +1195,6 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
         // FIXME: Should do some sort of error recovery here?
       } else {
         FE->setBody(Body.get());
-        
-        auto& Captures = ValCaptures.back();
-        ValueDecl** CaptureCopy =
-        Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
-        FE->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
       }
     }
   }

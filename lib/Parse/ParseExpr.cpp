@@ -468,11 +468,6 @@ NullablePtr<Expr> Parser::parseExprExplicitClosure() {
                          LBLoc, diag::opening_brace))
     RBLoc = Body.get()->getEndLoc();
 
-  auto& Captures = ValCaptures.back();
-  ValueDecl** CaptureCopy = Context.AllocateCopy<ValueDecl*>(Captures.begin(),
-                                                             Captures.end());
-  ThisClosure->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
-
   ThisClosure->setRBraceLoc(RBLoc);
 
   auto& Vars = AnonClosureVars.back();
@@ -524,16 +519,6 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
     return new (Context) UnresolvedDeclRefExpr(text, refKind, loc);
   }
 
-  // Compute captures for local value declaration.
-  if (D->needsCapture()) {
-    DeclContext *ValDC = D->getDeclContext();
-    DeclContext *DC = CurDeclContext;
-    unsigned i = ValCaptures.size();
-    while (DC != ValDC) {
-      ValCaptures[--i].insert(D);
-      DC = DC->getParent();
-    }
-  }
   return new (Context) DeclRefExpr(D, loc);
 }
 
@@ -647,11 +632,6 @@ NullablePtr<Expr> Parser::parseExprFunc() {
     return 0;
 
   FE->setBody(Body.get());
-
-  auto& Captures = ValCaptures.back();
-  ValueDecl** CaptureCopy = Context.AllocateCopy<ValueDecl*>(Captures.begin(),
-                                                             Captures.end());
-  FE->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
 
   return FE;
 }

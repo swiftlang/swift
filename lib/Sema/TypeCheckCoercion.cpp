@@ -1276,6 +1276,9 @@ CoercedResult SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
     return 0;
   
   E->setBody(Result);
+
+  E->computeCaptures(TC.Context);
+
   return unchanged(E);
 }
 
@@ -1763,27 +1766,6 @@ SemaCoerce::coerceObjectArgument(Expr *E, Type ContainerTy, CoercionContext &CC,
   return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Flags);
 }
 
-namespace {
-  class FindCapturedVars : public ASTWalker {
-    llvm::SetVector<ValueDecl*> &Captures;
-
-  public:
-    bool walkToExprPre(Expr *E) {
-      if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
-        if (DRE->getDecl()->getDeclContext()->isLocalContext())
-          Captures.insert(DRE->getDecl());
-      return true;
-    }
-
-    FindCapturedVars(llvm::SetVector<ValueDecl*> &captures)
-      : Captures(captures) {}
-
-    void doWalk(Expr *E) {
-      E->walk(*this);
-    }
-  };
-}
-
 /// \brief Record that the given archetype was deduced to have the given
 /// type within a coercion context. If this deduction conflicts with a
 /// prior deduction, complain (if allowed) and return true to indicate failure.
@@ -1877,14 +1859,8 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
       Pat->setType(TupleType::getEmpty(TC.Context));
       ICE->setPattern(Pat);
 
-      // Perform a recursive walk to compute the capture list; this is quite
-      // different from the way this is done for explicit closures because
-      // the closure doesn't exist until type-checking.
-      llvm::SetVector<ValueDecl*> Captures;
-      FindCapturedVars(Captures).doWalk(E);
-      ValueDecl** CaptureCopy
-        = TC.Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
-      ICE->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
+      // Compute the capture list, now that we have analyzed the expression.
+      ICE->computeCaptures(TC.Context);
 
       return coerced(ICE, Flags);
     }

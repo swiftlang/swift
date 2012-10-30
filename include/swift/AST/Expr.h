@@ -1335,6 +1335,7 @@ public:
 
   ArrayRef<ValueDecl*> getCaptures() { return Captures; }
   void setCaptures(ArrayRef<ValueDecl*> C) { Captures = C; }
+  void computeCaptures(ASTContext &C);
 
   bool isNotCaptured() { return IsNotCaptured; }
   void setIsNotCaptured(bool v) { IsNotCaptured = v; }

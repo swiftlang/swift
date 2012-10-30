@@ -56,7 +56,6 @@ public:
   ASTContext &Context;
   ScopeInfo ScopeInfo;
   std::vector<TranslationUnit::IdentTypeAndContext> UnresolvedIdentifierTypes;
-  std::vector<llvm::SetVector<ValueDecl*>> ValCaptures;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   std::vector<TranslationUnit::TupleTypeAndContext> TypesWithDefaultValues;
   bool IsMainModule;
@@ -76,7 +75,6 @@ public:
       : P(P), OldContext(P.CurDeclContext) {
       assert(DC && "pushing null context?");
       P.CurDeclContext = DC;
-      P.ValCaptures.emplace_back();
     }
 
     /// Prematurely pop the DeclContext installed by the constructor.
@@ -85,7 +83,6 @@ public:
       assert(OldContext && "already popped context!");
       P.CurDeclContext = OldContext;
       OldContext = nullptr;
-      P.ValCaptures.pop_back();
     }
 
     ~ContextChange() {

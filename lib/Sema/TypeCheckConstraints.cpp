@@ -4591,6 +4591,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       if (Expr *body = CS.convertToType(expr->getBody(), resultType))
         expr->setBody(body);
       expr->setType(type);
+
+      // Compute the capture list, now that we have analyzed the expression.
+      expr->computeCaptures(CS.getASTContext());
+
       return expr;
     }
 
