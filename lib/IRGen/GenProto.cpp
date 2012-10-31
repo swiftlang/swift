@@ -50,8 +50,10 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
+#include "NecessaryBindings.h"
 #include "ProtocolInfo.h"
 #include "TypeInfo.h"
+#include "TypeVisitor.h"
 
 #include "GenProto.h"
 
@@ -90,56 +92,56 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
                                                      ValueWitness index) {
   switch (index) {
 
-  // void (*deallocateBuffer)(B *buffer, W *self);
-  // void (*destroyBuffer)(B *buffer, W *self);
+  // void (*deallocateBuffer)(B *buffer, M *self);
+  // void (*destroyBuffer)(B *buffer, M *self);
   case ValueWitness::DeallocateBuffer:
   case ValueWitness::DestroyBuffer: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
-    llvm::Type *args[] = { bufPtrTy, IGM.WitnessTablePtrTy };
+    llvm::Type *args[] = { bufPtrTy, IGM.TypeMetadataPtrTy };
     return llvm::FunctionType::get(IGM.VoidTy, args, false);
   }
 
   // void (*destroy)(T *object, witness_t *self);
   case ValueWitness::Destroy: {
-    llvm::Type *args[] = { IGM.OpaquePtrTy, IGM.WitnessTablePtrTy };
+    llvm::Type *args[] = { IGM.OpaquePtrTy, IGM.TypeMetadataPtrTy };
     return llvm::FunctionType::get(IGM.VoidTy, args, false);
   }
 
-  // T *(*initializeBufferWithCopyOfBuffer)(B *dest, B *src, W *self);
+  // T *(*initializeBufferWithCopyOfBuffer)(B *dest, B *src, M *self);
   case ValueWitness::InitializeBufferWithCopyOfBuffer: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
-    llvm::Type *args[] = { bufPtrTy, bufPtrTy, IGM.WitnessTablePtrTy };
+    llvm::Type *args[] = { bufPtrTy, bufPtrTy, IGM.TypeMetadataPtrTy };
     return llvm::FunctionType::get(IGM.OpaquePtrTy, args, false);
   }
 
-  // T *(*allocateBuffer)(B *buffer, W *self);
-  // T *(*projectBuffer)(B *buffer, W *self);
+  // T *(*allocateBuffer)(B *buffer, M *self);
+  // T *(*projectBuffer)(B *buffer, M *self);
   case ValueWitness::AllocateBuffer:
   case ValueWitness::ProjectBuffer: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
-    llvm::Type *args[] = { bufPtrTy, IGM.WitnessTablePtrTy };
+    llvm::Type *args[] = { bufPtrTy, IGM.TypeMetadataPtrTy };
     return llvm::FunctionType::get(IGM.OpaquePtrTy, args, false);
   }
 
-  // T *(*initializeBufferWithCopy)(B *dest, T *src, W *self);
-  // T *(*initializeBufferWithTake)(B *dest, T *src, W *self);
+  // T *(*initializeBufferWithCopy)(B *dest, T *src, M *self);
+  // T *(*initializeBufferWithTake)(B *dest, T *src, M *self);
   case ValueWitness::InitializeBufferWithCopy:
   case ValueWitness::InitializeBufferWithTake: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
-    llvm::Type *args[] = { bufPtrTy, IGM.OpaquePtrTy, IGM.WitnessTablePtrTy };
+    llvm::Type *args[] = { bufPtrTy, IGM.OpaquePtrTy, IGM.TypeMetadataPtrTy };
     return llvm::FunctionType::get(IGM.OpaquePtrTy, args, false);
   }
 
-  // T *(*assignWithCopy)(T *dest, T *src, W *self);
-  // T *(*assignWithTake)(T *dest, T *src, W *self);
-  // T *(*initializeWithCopy)(T *dest, T *src, W *self);
-  // T *(*initializeWithTake)(T *dest, T *src, W *self);
+  // T *(*assignWithCopy)(T *dest, T *src, M *self);
+  // T *(*assignWithTake)(T *dest, T *src, M *self);
+  // T *(*initializeWithCopy)(T *dest, T *src, M *self);
+  // T *(*initializeWithTake)(T *dest, T *src, M *self);
   case ValueWitness::AssignWithCopy:
   case ValueWitness::AssignWithTake:
   case ValueWitness::InitializeWithCopy:
   case ValueWitness::InitializeWithTake: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
-    llvm::Type *args[] = { ptrTy, ptrTy, IGM.WitnessTablePtrTy };
+    llvm::Type *args[] = { ptrTy, ptrTy, IGM.TypeMetadataPtrTy };
     return llvm::FunctionType::get(ptrTy, args, false);
   }
 
@@ -266,17 +268,6 @@ namespace {
       return IGF.Builder.CreateLoad(projectMetadataRef(IGF, addr),
                                addr.getAddress()->getName() + ".metadata");
     }
-
-    /// Produce a value witness table.  Any will do.
-    llvm::Value *loadAnyValueWitnessTable(IRGenFunction &IGF, Address addr) {
-      // Use the first protocol witness table if there are any.
-      if (getNumTables() != 0)
-        return loadWitnessTable(IGF, addr, 0);
-
-      // Otherwise, use the value witness table in the metadata.
-      llvm::Value *metadata = loadMetadataRef(IGF, addr);
-      return emitValueWitnessTableRefForMetadata(IGF, metadata);
-    }
   };
 
   /// A concrete witness table, together with its known layout.
@@ -363,13 +354,14 @@ static void setHelperAttributes(llvm::CallInst *call) {
 /// Emit a call to do an 'initializeBufferWithCopyOfBuffer' operation.
 static llvm::Value *emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
                                                      llvm::Value *witnessTable,
+                                                     llvm::Value *metadata,
                                                      Address destBuffer,
                                                      Address srcBuffer) {
   llvm::Value *copyFn = loadValueWitness(IGF, witnessTable,
                              ValueWitness::InitializeBufferWithCopyOfBuffer);
   llvm::CallInst *call =
     IGF.Builder.CreateCall3(copyFn, destBuffer.getAddress(),
-                            srcBuffer.getAddress(), witnessTable);
+                            srcBuffer.getAddress(), metadata);
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributesForAggResult(call, false);
 
@@ -379,11 +371,12 @@ static llvm::Value *emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
 /// Emit a call to do an 'allocateBuffer' operation.
 static llvm::Value *emitAllocateBufferCall(IRGenFunction &IGF,
                                            llvm::Value *witnessTable,
+                                           llvm::Value *metadata,
                                            Address buffer) {
   llvm::Value *allocateFn = loadValueWitness(IGF, witnessTable,
                                              ValueWitness::AllocateBuffer);
   llvm::CallInst *result =
-    IGF.Builder.CreateCall2(allocateFn, buffer.getAddress(), witnessTable);
+    IGF.Builder.CreateCall2(allocateFn, buffer.getAddress(), metadata);
   result->setCallingConv(IGF.IGM.RuntimeCC);
   result->setDoesNotThrow();
   return result;
@@ -392,11 +385,12 @@ static llvm::Value *emitAllocateBufferCall(IRGenFunction &IGF,
 /// Emit a call to do a 'projectBuffer' operation.
 static llvm::Value *emitProjectBufferCall(IRGenFunction &IGF,
                                           llvm::Value *witnessTable,
+                                           llvm::Value *metadata,
                                           Address buffer) {
   llvm::Value *projectFn = loadValueWitness(IGF, witnessTable,
                                             ValueWitness::ProjectBuffer);
   llvm::CallInst *result =
-    IGF.Builder.CreateCall2(projectFn, buffer.getAddress(), witnessTable);
+    IGF.Builder.CreateCall2(projectFn, buffer.getAddress(), metadata);
   result->setCallingConv(IGF.IGM.RuntimeCC);
   result->setDoesNotThrow();
   return result;
@@ -405,12 +399,13 @@ static llvm::Value *emitProjectBufferCall(IRGenFunction &IGF,
 /// Emit a call to do an 'initializeWithCopy' operation.
 static void emitInitializeWithCopyCall(IRGenFunction &IGF,
                                        llvm::Value *witnessTable,
+                                       llvm::Value *metadata,
                                        llvm::Value *destObject,
                                        llvm::Value *srcObject) {
   llvm::Value *copyFn = loadValueWitness(IGF, witnessTable,
                                          ValueWitness::InitializeWithCopy);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, witnessTable);
+    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
@@ -418,12 +413,13 @@ static void emitInitializeWithCopyCall(IRGenFunction &IGF,
 /// Emit a call to do an 'initializeWithTake' operation.
 static void emitInitializeWithTakeCall(IRGenFunction &IGF,
                                        llvm::Value *witnessTable,
+                                       llvm::Value *metadata,
                                        llvm::Value *destObject,
                                        llvm::Value *srcObject) {
   llvm::Value *copyFn = loadValueWitness(IGF, witnessTable,
                                          ValueWitness::InitializeWithTake);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, witnessTable);
+    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
@@ -431,12 +427,13 @@ static void emitInitializeWithTakeCall(IRGenFunction &IGF,
 /// Emit a call to do an 'assignWithCopy' operation.
 static void emitAssignWithCopyCall(IRGenFunction &IGF,
                                    llvm::Value *witnessTable,
+                                   llvm::Value *metadata,
                                    llvm::Value *destObject,
                                    llvm::Value *srcObject) {
   llvm::Value *copyFn = loadValueWitness(IGF, witnessTable,
                                          ValueWitness::AssignWithCopy);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, witnessTable);
+    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
@@ -444,12 +441,13 @@ static void emitAssignWithCopyCall(IRGenFunction &IGF,
 /// Emit a call to do an 'assignWithTake' operation.
 static void emitAssignWithTakeCall(IRGenFunction &IGF,
                                    llvm::Value *witnessTable,
+                                   llvm::Value *metadata,
                                    llvm::Value *destObject,
                                    llvm::Value *srcObject) {
   llvm::Value *copyFn = loadValueWitness(IGF, witnessTable,
                                          ValueWitness::AssignWithTake);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, witnessTable);
+    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
@@ -457,9 +455,10 @@ static void emitAssignWithTakeCall(IRGenFunction &IGF,
 /// Emit a call to do a 'destroy' operation.
 static void emitDestroyCall(IRGenFunction &IGF,
                             llvm::Value *witnessTable,
+                            llvm::Value *metadata,
                             llvm::Value *object) {
   llvm::Value *fn = loadValueWitness(IGF, witnessTable, ValueWitness::Destroy);
-  llvm::CallInst *call = IGF.Builder.CreateCall2(fn, object, witnessTable);
+  llvm::CallInst *call = IGF.Builder.CreateCall2(fn, object, metadata);
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributes(call);
 }
@@ -467,11 +466,12 @@ static void emitDestroyCall(IRGenFunction &IGF,
 /// Emit a call to do a 'destroyBuffer' operation.
 static void emitDestroyBufferCall(IRGenFunction &IGF,
                                   llvm::Value *witnessTable,
+                                   llvm::Value *metadata,
                                   Address buffer) {
   llvm::Value *fn = loadValueWitness(IGF, witnessTable,
                                      ValueWitness::DestroyBuffer);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall2(fn, buffer.getAddress(), witnessTable);
+    IGF.Builder.CreateCall2(fn, buffer.getAddress(), metadata);
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributes(call);
 }
@@ -479,11 +479,12 @@ static void emitDestroyBufferCall(IRGenFunction &IGF,
 /// Emit a call to do a 'deallocateBuffer' operation.
 static void emitDeallocateBufferCall(IRGenFunction &IGF,
                                      llvm::Value *witnessTable,
+                                     llvm::Value *metadata,
                                      Address buffer) {
   llvm::Value *fn = loadValueWitness(IGF, witnessTable,
                                      ValueWitness::DeallocateBuffer);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall2(fn, buffer.getAddress(), witnessTable);
+    IGF.Builder.CreateCall2(fn, buffer.getAddress(), metadata);
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributes(call);
 }
@@ -491,9 +492,20 @@ static void emitDeallocateBufferCall(IRGenFunction &IGF,
 /// Given the address of an existential object, destroy it.
 static void emitDestroyExistential(IRGenFunction &IGF, Address addr,
                                    ExistentialLayout layout) {
-  llvm::Value *wtable = layout.loadAnyValueWitnessTable(IGF, addr);
+  llvm::Value *metadata = layout.loadMetadataRef(IGF, addr);
+
+  // We need a value witness table.  Use one from the existential if
+  // possible because (1) it should be in cache and (2) the address
+  // won't be dependent on the metadata load.
+  llvm::Value *wtable;
+  if (layout.getNumTables()) {
+    wtable = layout.loadWitnessTable(IGF, addr, 0);
+  } else {
+    wtable = emitValueWitnessTableRefForMetadata(IGF, metadata);
+  }
+
   Address object = layout.projectExistentialBuffer(IGF, addr);
-  emitDestroyBufferCall(IGF, wtable, object);
+  emitDestroyBufferCall(IGF, wtable, metadata, object);
 }
 
 static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
@@ -504,22 +516,24 @@ namespace {
   struct DestroyBuffer : Cleanup {
     Address Buffer;
     llvm::Value *Table;
-    DestroyBuffer(Address buffer, llvm::Value *table)
-      : Buffer(buffer), Table(table) {}
+    llvm::Value *Metatype;
+    DestroyBuffer(Address buffer, llvm::Value *table, llvm::Value *metatype)
+      : Buffer(buffer), Table(table), Metatype(metatype) {}
 
     void emit(IRGenFunction &IGF) const {
-      emitDestroyBufferCall(IGF, Table, Buffer);
+      emitDestroyBufferCall(IGF, Table, Metatype, Buffer);
     }
   };
 
   struct DeallocateBuffer : Cleanup {
     Address Buffer;
     llvm::Value *Table;
-    DeallocateBuffer(Address buffer, llvm::Value *table)
-      : Buffer(buffer), Table(table) {}
+    llvm::Value *Metatype;
+    DeallocateBuffer(Address buffer, llvm::Value *table, llvm::Value *metatype)
+      : Buffer(buffer), Table(table), Metatype(metatype) {}
 
     void emit(IRGenFunction &IGF) const {
-      emitDeallocateBufferCall(IGF, Table, Buffer);
+      emitDeallocateBufferCall(IGF, Table, Metatype, Buffer);
     }
   };
 
@@ -912,7 +926,7 @@ namespace {
       // copy-initialize.
       Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
       Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
-      emitInitializeBufferWithCopyOfBufferCall(IGF, wtable,
+      emitInitializeBufferWithCopyOfBufferCall(IGF, wtable, metadata,
                                                destBuffer, srcBuffer);
     }
 
@@ -1020,12 +1034,13 @@ namespace {
 
       // Allocate an object of the appropriate type within it.
       llvm::Value *wtable = getValueWitnessTable(IGF);
-      Address allocated(emitAllocateBufferCall(IGF, wtable, buffer),
+      llvm::Value *metadata = getMetadataRef(IGF);
+      Address allocated(emitAllocateBufferCall(IGF, wtable, metadata, buffer),
                         Alignment(1));
       OwnedAddress ownedAddr(allocated, IGF.IGM.RefCountedNull);
 
       // Push a cleanup to dealloc it.
-      IGF.pushCleanup<DeallocateBuffer>(buffer, wtable);
+      IGF.pushCleanup<DeallocateBuffer>(buffer, wtable, metadata);
       CleanupsDepth dealloc = IGF.getCleanupsDepth();
       init.markAllocated(IGF, object, ownedAddr, dealloc);
       return ownedAddr;
@@ -1033,28 +1048,33 @@ namespace {
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
       emitAssignWithCopyCall(IGF, getValueWitnessTable(IGF),
+                             getMetadataRef(IGF),
                              dest.getAddress(), src.getAddress());
     }
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
       emitAssignWithTakeCall(IGF, getValueWitnessTable(IGF),
+                             getMetadataRef(IGF),
                              dest.getAddress(), src.getAddress());
     }
 
     void initializeWithCopy(IRGenFunction &IGF,
                             Address dest, Address src) const {
       emitInitializeWithCopyCall(IGF, getValueWitnessTable(IGF),
+                                 getMetadataRef(IGF),
                                  dest.getAddress(), src.getAddress());
     }
 
     void initializeWithTake(IRGenFunction &IGF,
                             Address dest, Address src) const {
       emitInitializeWithTakeCall(IGF, getValueWitnessTable(IGF),
+                                 getMetadataRef(IGF),
                                  dest.getAddress(), src.getAddress());
     }
 
     void destroy(IRGenFunction &IGF, Address addr) const {
-      emitDestroyCall(IGF, getValueWitnessTable(IGF), addr.getAddress());
+      emitDestroyCall(IGF, getValueWitnessTable(IGF), getMetadataRef(IGF),
+                      addr.getAddress());
     }
 
     std::pair<llvm::Value*,llvm::Value*>
@@ -1581,10 +1601,10 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
         emitValueWitnessTableRefForMetadata(IGF, destMetadata);
 
       llvm::Value *destObject =
-        emitProjectBufferCall(IGF, wtable, destBuffer);
+        emitProjectBufferCall(IGF, wtable, destMetadata, destBuffer);
       llvm::Value *srcObject =
-        emitProjectBufferCall(IGF, wtable, srcBuffer);
-      emitAssignWithCopyCall(IGF, wtable, destObject, srcObject);
+        emitProjectBufferCall(IGF, wtable, destMetadata, srcBuffer);
+      emitAssignWithCopyCall(IGF, wtable, destMetadata, destObject, srcObject);
       IGF.Builder.CreateBr(doneBB);
     }
 
@@ -1624,14 +1644,14 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
     // tables to use.
     if (numTables == 0)
       firstDestTable = emitValueWitnessTableRefForMetadata(IGF, destMetadata);
-    emitDestroyBufferCall(IGF, firstDestTable, destBuffer);
+    emitDestroyBufferCall(IGF, firstDestTable, destMetadata, destBuffer);
 
     // Copy-initialize with the new value.  Again, pull a value
     // witness table from the source metadata if we can't use a
     // protocol witness table.
     if (numTables == 0)
       firstSrcTable = emitValueWitnessTableRefForMetadata(IGF, srcMetadata);
-    emitInitializeBufferWithCopyOfBufferCall(IGF, firstSrcTable,
+    emitInitializeBufferWithCopyOfBufferCall(IGF, firstSrcTable, srcMetadata,
                                              destBuffer, srcBuffer);
     IGF.Builder.CreateBr(doneBB);
 
@@ -1645,7 +1665,7 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
 /// Return a function which takes two pointer arguments and returns
 /// void immediately.
 static llvm::Constant *getNoOpVoidFunction(IRGenModule &IGM) {
-  llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.WitnessTablePtrTy };
+  llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.TypeMetadataPtrTy };
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(IGM.VoidTy, argTys, false);
   llvm::Constant *fn =
@@ -1662,7 +1682,7 @@ static llvm::Constant *getNoOpVoidFunction(IRGenModule &IGM) {
 /// Return a function which takes two pointer arguments and returns
 /// the first one immediately.
 static llvm::Constant *getReturnSelfFunction(IRGenModule &IGM) {
-  llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.WitnessTablePtrTy };
+  llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.TypeMetadataPtrTy };
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(IGM.Int8PtrTy, argTys, false);
   llvm::Constant *fn =
@@ -2906,41 +2926,110 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
   EmitPolymorphicParameters(IGF, type).emit(in);
 }
 
-void irgen::getValueWitnessTableElements(CanType T,
-                                      llvm::SetVector<ArchetypeType*> &types) {
-  // We need a value witness table for T
-  if (auto archetype = dyn_cast<ArchetypeType>(T)) {
-    types.insert(archetype);
-    return;
-  }
 
-  // In (T, U). we need witness tables for T and U
-  if (auto tuple = dyn_cast<TupleType>(T)) {
-    for (auto element : tuple->getFields())
-      getValueWitnessTableElements(CanType(element.getType()), types);
-    return;
-  }
+namespace {
+  /// A CRTP class for finding the archetypes we need to bind in order
+  /// to perform value operations on the given type.
+  struct FindArchetypesToBind : irgen::TypeVisitor<FindArchetypesToBind> {
+    llvm::SetVector<ArchetypeType*> &Types;
+  public:
+    FindArchetypesToBind(llvm::SetVector<ArchetypeType*> &types)
+      : Types(types) {}
 
-  // FIXME: For X<T>, we need a witness table for T if X is a struct or oneof.
+    // We're collecting archetypes.
+    void visitArchetypeType(ArchetypeType *type) {
+      Types.insert(type);
+    }
+
+    // We need to walk into tuples.
+    void visitTupleType(TupleType *tuple) {
+      for (auto &elt : tuple->getFields())
+        visit(CanType(elt.getType()));
+    }
+
+    // We need to walk into constant-sized arrays.
+    void visitArrayType(ArrayType *type) {
+      visit(CanType(type->getBaseType()));
+    }
+
+    // We do not need to walk into any of these types, because their
+    // value operations do not depend on the specifics of their
+    // sub-structure (or they have none).
+    void visitAnyFunctionType(AnyFunctionType *fn) {}
+    void visitBuiltinType(BuiltinType *type) {}
+    void visitMetaTypeType(MetaTypeType *type) {}
+    void visitModuleType(ModuleType *type) {}
+    void visitProtocolCompositionType(ProtocolCompositionType *type) {}
+
+    // L-values are impossible.
+    void visitLValueType(LValueType *type) {
+      llvm_unreachable("cannot store l-value type directly");
+    }
+
+    // For now, assume we don't need to add anything for nominal and
+    // generic-nominal types.  We might actually need to bind all the
+    // argument archetypes from this type and its parent.
+    void visitNominalType(NominalType *type) {}
+    void visitBoundGenericType(BoundGenericType *type) {}
+  };
 }
 
-void irgen::getValueWitnessTables(IRGenFunction &IGF,
-                                  ArrayRef<ArchetypeType*> archetypes,
-                                  Explosion &tables) {
-  for (auto archetype : archetypes) {
-    auto &archetypeTI =
-      IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
-    tables.addUnmanaged(archetypeTI.getValueWitnessTable(IGF));
-  }
+/// Initialize this set of necessary bindings.
+NecessaryBindings::NecessaryBindings(IRGenModule &IGM, CanType type) {
+  FindArchetypesToBind(Types).visit(type);
 }
 
-void irgen::setValueWitnessTables(IRGenFunction &IGF,
-                                  ArrayRef<ArchetypeType*> archetypes,
-                                  Explosion &tables) {
-  for (auto archetype : archetypes) {
-    llvm::Value *wtable = tables.claimUnmanagedNext();
-    wtable->setName(archetype->getFullName());
+Size NecessaryBindings::getBufferSize(IRGenModule &IGM) const {
+  return IGM.getPointerSize() * Types.size();
+}
+
+void NecessaryBindings::restore(IRGenFunction &IGF, Address buffer) const {
+  if (Types.empty()) return;
+
+  // Cast the buffer to %type**.
+  auto metatypePtrPtrTy = IGF.IGM.TypeMetadataPtrTy->getPointerTo();
+  buffer = IGF.Builder.CreateBitCast(buffer, metatypePtrPtrTy);
+
+  for (unsigned i = 0, e = Types.size(); i != e; ++i) {
+    auto archetype = Types[i];
+
+    // GEP to the appropriate slot.
+    Address slot = buffer;
+    if (i) slot = IGF.Builder.CreateConstArrayGEP(slot, i,
+                                                  IGF.IGM.getPointerSize());
+
+    // Load the archetype's metatype.
+    llvm::Value *metatype = IGF.Builder.CreateLoad(slot);
+    metatype->setName(archetype->getFullName());
+    setMetadataRef(IGF, archetype, metatype);
+
+    // Also bind the witness table from the archetype. TODO: lazily?
+    auto wtable = emitValueWitnessTableRefForMetadata(IGF, metatype);
+    wtable->setName(Twine(archetype->getFullName()) + "." + "value");
     setValueWitnessTable(IGF, archetype, wtable);
+  }
+}
+
+void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
+  if (Types.empty()) return;
+
+  // Cast the buffer to %type**.
+  auto metatypePtrPtrTy = IGF.IGM.TypeMetadataPtrTy->getPointerTo();
+  buffer = IGF.Builder.CreateBitCast(buffer, metatypePtrPtrTy);
+
+  for (unsigned i = 0, e = Types.size(); i != e; ++i) {
+    auto archetype = Types[i];
+
+    // GEP to the appropriate slot.
+    Address slot = buffer;
+    if (i) slot = IGF.Builder.CreateConstArrayGEP(slot, i,
+                                                  IGF.IGM.getPointerSize());
+
+    // Find the metatype for the appropriate archetype and store it in
+    // the slot.
+    llvm::Value *metatype =
+      IGF.getLocalTypeData(CanType(archetype), LocalTypeData::Metatype);
+    IGF.Builder.CreateStore(metatype, slot);
   }
 }
 
@@ -3268,11 +3357,11 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
   // If we're using a witness-table to do this, we need to emit a
   // value-witness call to allocate the fixed-size buffer.
   if (wtable) {
-    object = Address(emitAllocateBufferCall(IGF, wtable, buffer),
+    object = Address(emitAllocateBufferCall(IGF, wtable, metadata, buffer),
                      Alignment(1));
 
     hasDeallocCleanup = true;
-    IGF.pushFullExprCleanup<DeallocateBuffer>(buffer, wtable);
+    IGF.pushFullExprCleanup<DeallocateBuffer>(buffer, wtable, metadata);
 
   // Otherwise, allocate using what we know statically about the type.
   } else {
@@ -3427,6 +3516,9 @@ irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
   Address thisObject;
   auto existLayout = baseTI.getLayout();
 
+  // Load the metadata.
+  llvm::Value *metadata = existLayout.loadMetadataRef(IGF, existAddr);
+
   // For a non-static method, copy the object into a new buffer.
   // This is important for type-safety, because someone might assign
   // to the object while the call is in progress.
@@ -3443,17 +3535,14 @@ irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
 
     // The result of the copy is an i8* which points at the new object.
     llvm::Value *copy =
-      emitInitializeBufferWithCopyOfBufferCall(IGF, wtable, copyBuffer,
-                                               srcBuffer);
+      emitInitializeBufferWithCopyOfBufferCall(IGF, wtable, metadata,
+                                               copyBuffer, srcBuffer);
 
     // Enter a cleanup for the temporary.  
-    IGF.pushFullExprCleanup<DestroyBuffer>(copyBuffer, wtable);
+    IGF.pushFullExprCleanup<DestroyBuffer>(copyBuffer, wtable, metadata);
 
     thisObject = Address(copy, Alignment(1));
   }
-
-  // Load the metadata.
-  llvm::Value *metadata = existLayout.loadMetadataRef(IGF, existAddr);
 
   // Find the actual witness.
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(fnProto);

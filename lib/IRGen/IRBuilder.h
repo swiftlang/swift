@@ -208,6 +208,15 @@ public:
                    base.getAlignment().alignmentAtOffset(eltSize * index));
   }
 
+  /// Given an i8*, GEP to N bytes past it.
+  Address CreateConstByteArrayGEP(Address base, Size offset,
+                                  const llvm::Twine &name = "") {
+    auto addr = CreateConstInBoundsGEP1_32(base.getAddress(),
+                                           offset.getValue(),
+                                           name);
+    return Address(addr, base.getAlignment().alignmentAtOffset(offset));
+  }
+
   using IRBuilderBase::CreateBitCast;
   Address CreateBitCast(Address address, llvm::Type *type,
                         const llvm::Twine &name = "") {

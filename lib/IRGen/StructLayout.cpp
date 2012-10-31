@@ -45,11 +45,17 @@ static bool requiresHeapHeader(LayoutKind kind) {
   llvm_unreachable("bad layout kind!");
 }
 
-void swift::irgen::addHeapHeaderToLayout(IRGenModule &IGM,
-                                         Size &size, Alignment &align,
-                                         SmallVectorImpl<llvm::Type*> &fields) {
+/// Return the size of the standard heap header.
+Size irgen::getHeapHeaderSize(IRGenModule &IGM) {
+  return IGM.getPointerSize() * 2;
+}
+
+/// Add the fields for the standard heap header to the given layout.
+void irgen::addHeapHeaderToLayout(IRGenModule &IGM,
+                                  Size &size, Alignment &align,
+                                  SmallVectorImpl<llvm::Type*> &fields) {
   assert(size.isZero() && align.isOne() && fields.empty());
-  size += IGM.getPointerSize() * 2;
+  size = getHeapHeaderSize(IGM);
   align = IGM.getPointerAlignment();
   fields.push_back(IGM.RefCountedStructTy);
 }

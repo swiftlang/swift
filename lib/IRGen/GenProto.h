@@ -17,8 +17,6 @@
 #ifndef SWIFT_IRGEN_GENPROTO_H
 #define SWIFT_IRGEN_GENPROTO_H
 
-#include "llvm/ADT/SetVector.h"
-
 namespace llvm {
   class Type;
 }
@@ -125,15 +123,6 @@ namespace irgen {
   /// in the given substitution.
   void emitWitnessTableRefs(IRGenFunction &IGF, const Substitution &sub,
                             llvm::SmallVectorImpl<llvm::Value *> &out);
-
-  void getValueWitnessTableElements(CanType T,
-                                  llvm::SetVector<ArchetypeType*> &archetypes);
-  void getValueWitnessTables(IRGenFunction &IGF,
-                             ArrayRef<ArchetypeType*> archetypes,
-                             Explosion &tables);
-  void setValueWitnessTables(IRGenFunction &IGF,
-                             ArrayRef<ArchetypeType*> archetypes,
-                             Explosion &tables);
 
 } // end namespace irgen
 } // end namespace swift

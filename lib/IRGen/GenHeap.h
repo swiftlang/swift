@@ -18,8 +18,7 @@
 #ifndef SWIFT_IRGEN_GENHEAP_H
 #define SWIFT_IRGEN_GENHEAP_H
 
-#include "llvm/ADT/SetVector.h"
-
+#include "NecessaryBindings.h"
 #include "StructLayout.h"
 
 namespace llvm {
@@ -65,7 +64,7 @@ class ArrayHeapLayout {
   const TypeInfo &ElementTI;
   Size HeaderSize;
   Alignment Align;
-  llvm::SetVector<ArchetypeType*> WitnessTypes;
+  NecessaryBindings Bindings;
 
 public:
   ArrayHeapLayout(IRGenFunction &IGF, CanType T);

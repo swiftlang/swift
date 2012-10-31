@@ -52,6 +52,7 @@ add_swift_library(swiftIRGen
   LValue.h
   Linking.h
   Mangle.cpp
+  NecessaryBindings.h
   OptimizeARC.cpp
   ProtocolInfo.h
   Scope.h

@@ -104,6 +104,8 @@ public:
   llvm::Value *emitAlign(IRGenFunction &IGF) const;
 };
 
+Size getHeapHeaderSize(IRGenModule &IGM);
+
 void addHeapHeaderToLayout(IRGenModule &IGM, Size &size, Alignment &align,
                            SmallVectorImpl<llvm::Type*> &fieldTypes);
 

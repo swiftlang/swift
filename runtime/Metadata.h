@@ -24,6 +24,7 @@
 namespace swift {
 
 struct HeapObject;
+struct Metadata;
 
 /// Storage for an arbitrary value.  In C/C++ terms, this is an
 /// 'object', because it is rooted in memory.
@@ -77,7 +78,7 @@ namespace value_witness_types {
 ///   'buffer' is an initialized buffer
 /// Postconditions:
 ///   'buffer' is an unallocated buffer
-typedef void destroyBuffer(ValueBuffer *buffer, const ValueWitnessTable *self);
+typedef void destroyBuffer(ValueBuffer *buffer, const Metadata *self);
 
 /// Given an unallocated buffer, initialize it as a copy of the
 /// object in the source buffer.  This can be decomposed as:
@@ -94,7 +95,7 @@ typedef void destroyBuffer(ValueBuffer *buffer, const ValueWitnessTable *self);
 ///   'src' is an initialized buffer
 typedef OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                       ValueBuffer *src,
-                                                const ValueWitnessTable *self);
+                                                      const Metadata *self);
 
 /// Given an allocated or initialized buffer, derive a pointer to
 /// the object.
@@ -102,7 +103,7 @@ typedef OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
 /// Invariants:
 ///   'buffer' is an allocated or initialized buffer
 typedef OpaqueValue *projectBuffer(ValueBuffer *buffer,
-                                   const ValueWitnessTable *self);
+                                   const Metadata *self);
 
 /// Given an allocated buffer, deallocate the object.
 ///
@@ -111,7 +112,7 @@ typedef OpaqueValue *projectBuffer(ValueBuffer *buffer,
 /// Postconditions:
 ///   'buffer' is an unallocated buffer
 typedef void deallocateBuffer(ValueBuffer *buffer,
-                              const ValueWitnessTable *self);
+                              const Metadata *self);
 
 /// Given an initialized object, destroy it.
 ///
@@ -120,7 +121,7 @@ typedef void deallocateBuffer(ValueBuffer *buffer,
 /// Postconditions:
 ///   'object' is an uninitialized object
 typedef void destroy(OpaqueValue *object,
-                     const ValueWitnessTable *self);
+                     const Metadata *self);
 
 /// Given an uninitialized buffer and an initialized object, allocate
 /// storage in the buffer and copy the value there.
@@ -135,7 +136,7 @@ typedef void destroy(OpaqueValue *object,
 ///   'src' is an initialized object
 typedef OpaqueValue *initializeBufferWithCopy(ValueBuffer *dest,
                                               OpaqueValue *src,
-                                              const ValueWitnessTable *self);
+                                              const Metadata *self);
 
 /// Given an uninitialized object and an initialized object, copy
 /// the value.
@@ -152,7 +153,7 @@ typedef OpaqueValue *initializeBufferWithCopy(ValueBuffer *dest,
 ///   'src' is an initialized object
 typedef OpaqueValue *initializeWithCopy(OpaqueValue *dest,
                                         OpaqueValue *src,
-                                        const ValueWitnessTable *self);
+                                        const Metadata *self);
 
 /// Given two initialized objects, copy the value from one to the
 /// other.
@@ -166,7 +167,7 @@ typedef OpaqueValue *initializeWithCopy(OpaqueValue *dest,
 ///   'src' is an initialized object
 typedef OpaqueValue *assignWithCopy(OpaqueValue *dest,
                                     OpaqueValue *src,
-                                    const ValueWitnessTable *self);
+                                    const Metadata *self);
 
 /// Given an uninitialized buffer and an initialized object, move
 /// the value from the object to the buffer, leaving the source object
@@ -184,7 +185,7 @@ typedef OpaqueValue *assignWithCopy(OpaqueValue *dest,
 ///   'src' is an uninitialized object
 typedef OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
                                               OpaqueValue *src,
-                                              const ValueWitnessTable *self);
+                                              const Metadata *self);
 
 /// Given an uninitialized object and an initialized object, move
 /// the value from one to the other, leaving the source object
@@ -207,7 +208,7 @@ typedef OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
 ///   'src' is an uninitialized object
 typedef OpaqueValue *initializeWithTake(OpaqueValue *dest,
                                         OpaqueValue *src,
-                                        const ValueWitnessTable *self);
+                                        const Metadata *self);
 
 /// Given an initialized object and an initialized object, move
 /// the value from one to the other, leaving the source object
@@ -229,7 +230,7 @@ typedef OpaqueValue *initializeWithTake(OpaqueValue *dest,
 ///   'dest' is an initialized object
 typedef OpaqueValue *assignWithTake(OpaqueValue *dest,
                                     OpaqueValue *src,
-                                    const ValueWitnessTable *self);
+                                    const Metadata *self);
 
 /// Given an uninitialized buffer, allocate an object.
 ///
@@ -240,7 +241,7 @@ typedef OpaqueValue *assignWithTake(OpaqueValue *dest,
 /// Postconditions:
 ///   'buffer' is an allocated buffer
 typedef OpaqueValue *allocateBuffer(ValueBuffer *buffer,
-                                    const ValueWitnessTable *self);
+                                    const Metadata *self);
 
 /// The number of bytes required to store an object of this type.
 /// This value may be zero.  This value is not necessarily a

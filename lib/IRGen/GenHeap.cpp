@@ -129,9 +129,37 @@ llvm::Constant *HeapLayout::getPrivateMetadata(IRGenModule &IGM) const {
   return buildPrivateMetadataVar(IGM, fields);
 }
 
+/// Return the size of the array heap header, minus the array of
+/// stored archetypes.
+static Size getArrayHeapHeaderSize(IRGenModule &IGM) {
+  return getHeapHeaderSize(IGM) + IGM.getPointerSize();
+}
+
+/// Given an array allocation, project down to the necessary-bindings
+/// buffer.
+static Address projectBindingsBuffer(IRGenFunction &IGF,
+                                     Address alloc) {
+  Size headerSize = getArrayHeapHeaderSize(IGF.IGM);
+
+  Address slot = alloc;
+  slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int8PtrTy);
+  slot = IGF.Builder.CreateConstByteArrayGEP(slot, headerSize);
+  return slot;
+}
+
+/// Do the work necessary to bind the necessary bindings for the given
+/// array allocation.
+static void bindNecessaryBindings(IRGenFunction &IGF,
+                                  const NecessaryBindings &bindings,
+                                  Address allocation) {
+  if (bindings.empty()) return;
+  Address bindingsBuffer = projectBindingsBuffer(IGF, allocation);
+  bindings.restore(IGF, bindingsBuffer);
+}
+
 /// Lay out an array on the heap.
 ArrayHeapLayout::ArrayHeapLayout(IRGenFunction &IGF, CanType T)
-  : ElementTI(IGF.getFragileTypeInfo(T)) {
+  : ElementTI(IGF.getFragileTypeInfo(T)), Bindings(IGF.IGM, T) {
 
   // Add the heap header.
   Size size(0);
@@ -143,10 +171,10 @@ ArrayHeapLayout::ArrayHeapLayout(IRGenFunction &IGF, CanType T)
 
   // Add the length field.
   size += IGF.IGM.getPointerSize();
+  assert(size == getArrayHeapHeaderSize(IGF.IGM));
 
-  // Add value witness tables.
-  getValueWitnessTableElements(T, WitnessTypes);
-  size += IGF.IGM.getPointerSize() * WitnessTypes.size();
+  // Add the necessary bindings size.
+  size += Bindings.getBufferSize(IGF.IGM);
 
   // Update the required alignment.
   if (ElementTI.StorageAlignment > align)
@@ -208,62 +236,12 @@ static void emitArrayDestroy(IRGenFunction &IGF,
   IGF.Builder.emitBlock(endBB);
 }
 
-static void
-loadValueWitnessTables(IRGenFunction &IGF,
-                       llvm::Value *header,
-                       const llvm::SetVector<ArchetypeType*> &witnessTypes) {
-  if (witnessTypes.empty())
-    return;
-
-  Explosion tables(ExplosionKind::Maximal);
-  llvm::Value *tablesPtr;
-  tablesPtr = IGF.Builder.CreateBitCast(header, IGF.IGM.Int8PtrTy);
-  tablesPtr = IGF.Builder.CreateConstInBoundsGEP1_32(tablesPtr, 24);
-  llvm::Type *tablesPtrTy = IGF.IGM.WitnessTablePtrTy->getPointerTo();
-  tablesPtr = IGF.Builder.CreateBitCast(tablesPtr, tablesPtrTy);
-
-  for (unsigned i = 0, e = witnessTypes.size(); i != e; ++i) {
-    llvm::Value *table = IGF.Builder.CreateConstInBoundsGEP1_32(tablesPtr, i);
-    table = IGF.Builder.CreateLoad(table, IGF.IGM.getPointerAlignment());
-    tables.addUnmanaged(table);
-  }
-  setValueWitnessTables(
-      IGF,
-      llvm::makeArrayRef(&*witnessTypes.begin(), &*witnessTypes.end()),
-      tables);
-}
-
-static void
-storeValueWitnessTables(IRGenFunction &IGF,
-                        llvm::Value *header,
-                        const llvm::SetVector<ArchetypeType*> &witnessTypes) {
-  if (witnessTypes.empty())
-    return;
-
-  Explosion tables(ExplosionKind::Maximal);
-  llvm::Value *tablesPtr;
-  tablesPtr = IGF.Builder.CreateBitCast(header, IGF.IGM.Int8PtrTy);
-  tablesPtr = IGF.Builder.CreateConstInBoundsGEP1_32(tablesPtr, 24);
-  llvm::Type *tablesPtrTy = IGF.IGM.WitnessTablePtrTy->getPointerTo();
-  tablesPtr = IGF.Builder.CreateBitCast(tablesPtr, tablesPtrTy);
-
-  getValueWitnessTables(
-      IGF,
-      llvm::makeArrayRef(&*witnessTypes.begin(), &*witnessTypes.end()),
-      tables);
-  for (unsigned i = 0, e = witnessTypes.size(); i != e; ++i) {
-    llvm::Value *table = IGF.Builder.CreateConstInBoundsGEP1_32(tablesPtr, i);
-    llvm::Value *tableVal = tables.claimUnmanagedNext();
-    IGF.Builder.CreateStore(tableVal, table, IGF.IGM.getPointerAlignment());
-  }
-}
-
 /// Create the destructor function for an array layout.
 /// TODO: give this some reasonable name and possibly linkage.
 static llvm::Constant *
 createArrayDtorFn(IRGenModule &IGM,
                   const ArrayHeapLayout &layout,
-                  const llvm::SetVector<ArchetypeType*> &witnessTypes) {
+                  const NecessaryBindings &bindings) {
   llvm::Function *fn =
     llvm::Function::Create(IGM.DtorTy, llvm::Function::InternalLinkage,
                            "arraydestroy", &IGM.Module);
@@ -275,10 +253,13 @@ createArrayDtorFn(IRGenModule &IGM,
   Address lengthPtr = layout.getLengthPointer(IGF, header);
   llvm::Value *length = IGF.Builder.CreateLoad(lengthPtr, "length");
 
-  loadValueWitnessTables(IGF, header, witnessTypes);
+  // Bind the necessary archetypes.
+  bindNecessaryBindings(IGF, bindings, Address(header, layout.getAlignment()));
 
-  llvm::Value *elementSize = layout.getElementTypeInfo().getStride(IGF);
+  // If the layout isn't known to be POD, we actually have to do work here.
   if (!layout.getElementTypeInfo().isPOD(ResilienceScope::Local)) {
+    llvm::Value *elementSize = layout.getElementTypeInfo().getStride(IGF);
+
     llvm::Value *begin = layout.getBeginPointer(IGF, header);
     llvm::Value *end;
     if (layout.getElementTypeInfo().StorageType->isSized()) {
@@ -289,6 +270,7 @@ createArrayDtorFn(IRGenModule &IGM,
       end = IGF.Builder.CreateInBoundsGEP(end, lengthBytes);
       end = IGF.Builder.CreateBitCast(end, begin->getType());
     }
+
     emitArrayDestroy(IGF, begin, end, layout.getElementTypeInfo(), elementSize);
   }
 
@@ -303,7 +285,7 @@ createArrayDtorFn(IRGenModule &IGM,
 static llvm::Function *
 createArraySizeFn(IRGenModule &IGM,
                   const ArrayHeapLayout &layout,
-                  const llvm::SetVector<ArchetypeType*> &witnessTypes) {
+                  const NecessaryBindings &bindings) {
   llvm::Function *fn =
     llvm::Function::Create(IGM.DtorTy, llvm::Function::InternalLinkage,
                            "arraysize", &IGM.Module);
@@ -315,7 +297,7 @@ createArraySizeFn(IRGenModule &IGM,
   Address lengthPtr = layout.getLengthPointer(IGF, header);
   llvm::Value *length = IGF.Builder.CreateLoad(lengthPtr, "length");
 
-  loadValueWitnessTables(IGF, header, witnessTypes);
+  bindNecessaryBindings(IGF, bindings, Address(header, layout.getAlignment()));
 
   llvm::Value *size = layout.getAllocationSize(IGF, length, false, false);
   IGF.Builder.CreateRet(size);
@@ -328,8 +310,8 @@ void ArrayHeapLayout::buildMetadataInto(IRGenModule &IGM,
   fields.push_back(llvm::ConstantInt::get(IGM.Int8Ty,
                                           unsigned(MetadataKind::HeapArray)));
   fields.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
-  fields.push_back(createArrayDtorFn(IGM, *this, WitnessTypes));
-  fields.push_back(createArraySizeFn(IGM, *this, WitnessTypes));
+  fields.push_back(createArrayDtorFn(IGM, *this, Bindings));
+  fields.push_back(createArraySizeFn(IGM, *this, Bindings));
 }
 
 llvm::Constant *ArrayHeapLayout::getPrivateMetadata(IRGenModule &IGM) const {
@@ -501,7 +483,11 @@ ManagedValue ArrayHeapLayout::emitAlloc(IRGenFunction &IGF,
   llvm::Value *alloc =
     IGF.emitAllocObjectCall(metadata, size, align, "array.alloc");
 
-  storeValueWitnessTables(IGF, alloc, WitnessTypes);
+  if (!Bindings.empty()) {
+    Address bindingsBuffer =
+      projectBindingsBuffer(IGF, Address(alloc, getAlignment()));
+    Bindings.save(IGF, bindingsBuffer);
+  }
 
   // Find the begin pointer.
   llvm::Value *beginPtr = getBeginPointer(IGF, alloc);

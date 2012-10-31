@@ -72,7 +72,7 @@ enum class ValueWitness : unsigned {
   // existential code are then grouped together for cache-locality
   // reasons.
   
-  ///   void (*destroyBuffer)(B *buffer, W *self);
+  ///   void (*destroyBuffer)(B *buffer, M *self);
   ///
   /// Given a valid buffer which owns a valid object of this type,
   /// destroy it.  This can be decomposed as
@@ -80,19 +80,19 @@ enum class ValueWitness : unsigned {
   ///   self->deallocateBuffer(buffer), self);
   DestroyBuffer,
 
-  ///   T *(*initializeBufferWithCopyOfBuffer)(B *dest, B *src, W *self);
+  ///   T *(*initializeBufferWithCopyOfBuffer)(B *dest, B *src, M *self);
   /// Given an invalid buffer, initialize it as a copy of the
   /// object in the source buffer.  This can be decomposed as:
   ///   initalizeBufferWithCopy(dest, self->projectBuffer(src), self)
   InitializeBufferWithCopyOfBuffer,
   
-  ///   T *(*projectBuffer)(B *buffer, W *self);
+  ///   T *(*projectBuffer)(B *buffer, M *self);
   ///
   /// Given an initialized fixed-size buffer, find its allocated
   /// storage.
   ProjectBuffer,
 
-  ///   void (*deallocateBuffer)(B *buffer, W *self);
+  ///   void (*deallocateBuffer)(B *buffer, M *self);
   ///
   /// Given a buffer owning storage for an uninitialized object of this
   /// type, deallocate the storage, putting the buffer in an invalid
@@ -107,46 +107,46 @@ enum class ValueWitness : unsigned {
   /// struct, or tuple element.
   Destroy,
 
-  ///   T *(*initializeBufferWithCopy)(B *dest, T *src, W *self);
+  ///   T *(*initializeBufferWithCopy)(B *dest, T *src, M *self);
   /// Given an invalid buffer, initialize it as a copy of the
   /// source object.  This can be decomposed as:
   ///   initializeWithCopy(self->allocateBuffer(dest, self), src, self)
   InitializeBufferWithCopy,
 
-  ///   T *(*initializeWithCopy)(T *dest, T *src, W *self);
+  ///   T *(*initializeWithCopy)(T *dest, T *src, M *self);
   ///
   /// Given an invalid object of this type, initialize it as a copy of
   /// the source object.  Returns the dest object.
   InitializeWithCopy,
 
-  ///   T *(*assignWithCopy)(T *dest, T *src, W *self);
+  ///   T *(*assignWithCopy)(T *dest, T *src, M *self);
   ///
   /// Given a valid object of this type, change it to be a copy of the
   /// source object.  Returns the dest object.
   AssignWithCopy,
 
-  ///   T *(*initializeBufferWithTake)(B *dest, T *src, W *self);
+  ///   T *(*initializeBufferWithTake)(B *dest, T *src, M *self);
   ///
   /// Given an invalid buffer, initialize it by taking the value
   /// of the source object.  The source object becomes invalid.
   /// Returns the dest object.  
   InitializeBufferWithTake,
 
-  ///   T *(*initializeWithTake)(T *dest, T *src, W *self);
+  ///   T *(*initializeWithTake)(T *dest, T *src, M *self);
   ///
   /// Given an invalid object of this type, initialize it by taking
   /// the value of the source object.  The source object becomes
   /// invalid.  Returns the dest object.
   InitializeWithTake,
 
-  ///   T *(*assignWithTake)(T *dest, T *src, W *self);
+  ///   T *(*assignWithTake)(T *dest, T *src, M *self);
   ///
   /// Given a valid object of this type, change it to be a copy of the
   /// source object.  The source object becomes invalid.  Returns the
   /// dest object.
   AssignWithTake,
 
-  ///   T *(*allocateBuffer)(B *buffer, W *self);
+  ///   T *(*allocateBuffer)(B *buffer, M *self);
   /// 
   /// Given a buffer in an invalid state, make it the owner of storage
   /// for an uninitialized object of this type.  Return the address of

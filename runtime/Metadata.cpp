@@ -267,17 +267,24 @@ namespace {
   };
 }
 
+/// Given a metatype pointer, produce the value-witness table for it.
+/// This is equivalent to metatype->ValueWitnesses but more efficient.
+static const ValueWitnessTable *tuple_getValueWitnesses(const Metadata *metatype) {
+  return ((const ValueWitnessTable*) metatype) - 1;
+}
+
 /// Generic tuple value witness for 'projectBuffer'.
 static OpaqueValue *tuple_projectBuffer(ValueBuffer *buffer,
-                                        const ValueWitnessTable *wtable) {
-  if (wtable->isValueInline())
+                                        const Metadata *metatype) {
+  if (tuple_getValueWitnesses(metatype)->isValueInline())
     return reinterpret_cast<OpaqueValue*>(buffer);
   return *reinterpret_cast<OpaqueValue**>(buffer);
 }
 
 /// Generic tuple value witness for 'allocateBuffer'.
 static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
-                                         const ValueWitnessTable *wtable) {
+                                         const Metadata *metatype) {
+  auto wtable = tuple_getValueWitnesses(metatype);
   if (wtable->isValueInline())
     return reinterpret_cast<OpaqueValue*>(buffer);
 
@@ -291,7 +298,8 @@ static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
 
 /// Generic tuple value witness for 'deallocateBuffer'.
 static void tuple_deallocateBuffer(ValueBuffer *buffer,
-                                   const ValueWitnessTable *wtable) {
+                                   const Metadata *metatype) {
+  auto wtable = tuple_getValueWitnesses(metatype);
   if (wtable->isValueInline())
     return;
 
@@ -300,22 +308,21 @@ static void tuple_deallocateBuffer(ValueBuffer *buffer,
 }
 
 /// Generic tuple value witness for 'destroy'.
-static void tuple_destroy(OpaqueValue *tuple, const ValueWitnessTable *wtable) {
-  auto &metadata = ((TupleTypeData *) wtable)->Metadata;
+static void tuple_destroy(OpaqueValue *tuple, const Metadata *_metatype) {
+  auto &metadata = *(const TupleTypeMetadata*) _metatype;
   for (size_t i = 0, e = metadata.NumElements; i != e; ++i) {
     auto &eltInfo = metadata.getElements()[i];
     OpaqueValue *elt = eltInfo.findIn(tuple);
     auto eltWitnesses = eltInfo.Type->ValueWitnesses;
-    eltWitnesses->destroy(elt, eltWitnesses);
+    eltWitnesses->destroy(elt, eltInfo.Type);
   }
 }
 
 /// Generic tuple value witness for 'destroyBuffer'.
-static void tuple_destroyBuffer(ValueBuffer *buffer,
-                                const ValueWitnessTable *wtable) {
-  auto tuple = tuple_projectBuffer(buffer, wtable);
-  tuple_destroy(tuple, wtable);
-  tuple_deallocateBuffer(buffer, wtable);
+static void tuple_destroyBuffer(ValueBuffer *buffer, const Metadata *metatype) {
+  auto tuple = tuple_projectBuffer(buffer, metatype);
+  tuple_destroy(tuple, metatype);
+  tuple_deallocateBuffer(buffer, metatype);
 }
 
 // The operation doesn't have to be initializeWithCopy, but they all
@@ -326,16 +333,16 @@ typedef value_witness_types::initializeWithCopy *
 /// Perform an operation for each field of two tuples.
 static OpaqueValue *tuple_forEachField(OpaqueValue *destTuple,
                                        OpaqueValue *srcTuple,
-                                       const ValueWitnessTable *wtable,
+                                       const Metadata *_metatype,
                                        forEachOperation member) {
-  auto &metadata = ((TupleTypeData *) wtable)->Metadata;
-  for (size_t i = 0, e = metadata.NumElements; i != e; ++i) {
-    auto &eltInfo = metadata.getElements()[i];
+  auto metatype = *(const TupleTypeMetadata*) _metatype;
+  for (size_t i = 0, e = metatype.NumElements; i != e; ++i) {
+    auto &eltInfo = metatype.getElements()[i];
     auto eltValueWitnesses = eltInfo.Type->ValueWitnesses;
 
     OpaqueValue *destElt = eltInfo.findIn(destTuple);
     OpaqueValue *srcElt = eltInfo.findIn(srcTuple);
-    (eltValueWitnesses->*member)(destElt, srcElt, eltValueWitnesses);
+    (eltValueWitnesses->*member)(destElt, srcElt, eltInfo.Type);
   }
 
   return destTuple;
@@ -344,60 +351,60 @@ static OpaqueValue *tuple_forEachField(OpaqueValue *destTuple,
 /// Generic tuple value witness for 'initializeWithCopy'.
 static OpaqueValue *tuple_initializeWithCopy(OpaqueValue *dest,
                                              OpaqueValue *src,
-                                             const ValueWitnessTable *wtable) {
-  return tuple_forEachField(dest, src, wtable,
+                                             const Metadata *metatype) {
+  return tuple_forEachField(dest, src, metatype,
                             &ValueWitnessTable::initializeWithCopy);
 }
 
 /// Generic tuple value witness for 'initializeWithTake'.
 static OpaqueValue *tuple_initializeWithTake(OpaqueValue *dest,
                                              OpaqueValue *src,
-                                             const ValueWitnessTable *wtable) {
-  return tuple_forEachField(dest, src, wtable,
+                                             const Metadata *metatype) {
+  return tuple_forEachField(dest, src, metatype,
                             &ValueWitnessTable::initializeWithTake);
 }
 
 /// Generic tuple value witness for 'assignWithCopy'.
 static OpaqueValue *tuple_assignWithCopy(OpaqueValue *dest,
                                          OpaqueValue *src,
-                                         const ValueWitnessTable *wtable) {
-  return tuple_forEachField(dest, src, wtable,
+                                         const Metadata *metatype) {
+  return tuple_forEachField(dest, src, metatype,
                             &ValueWitnessTable::assignWithCopy);
 }
 
 /// Generic tuple value witness for 'assignWithTake'.
 static OpaqueValue *tuple_assignWithTake(OpaqueValue *dest,
                                          OpaqueValue *src,
-                                         const ValueWitnessTable *wtable) {
-  return tuple_forEachField(dest, src, wtable,
+                                         const Metadata *metatype) {
+  return tuple_forEachField(dest, src, metatype,
                             &ValueWitnessTable::assignWithTake);
 }
 
 /// Generic tuple value witness for 'initializeBufferWithCopy'.
 static OpaqueValue *tuple_initializeBufferWithCopy(ValueBuffer *dest,
                                                    OpaqueValue *src,
-                                             const ValueWitnessTable *wtable) {
-  return tuple_initializeWithCopy(tuple_allocateBuffer(dest, wtable),
+                                                   const Metadata *metatype) {
+  return tuple_initializeWithCopy(tuple_allocateBuffer(dest, metatype),
                                   src,
-                                  wtable);
+                                  metatype);
 }
 
 /// Generic tuple value witness for 'initializeBufferWithTake'.
 static OpaqueValue *tuple_initializeBufferWithTake(ValueBuffer *dest,
                                                    OpaqueValue *src,
-                                             const ValueWitnessTable *wtable) {
-  return tuple_initializeWithTake(tuple_allocateBuffer(dest, wtable),
+                                                   const Metadata *metatype) {
+  return tuple_initializeWithTake(tuple_allocateBuffer(dest, metatype),
                                   src,
-                                  wtable);
+                                  metatype);
 }
 
 /// Generic tuple value witness for 'initializeBufferWithCopyOfBuffer'.
 static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                            ValueBuffer *src,
-                                             const ValueWitnessTable *wtable) {
+                                                     const Metadata *metatype) {
   return tuple_initializeBufferWithCopy(dest,
-                                        tuple_projectBuffer(src, wtable),
-                                        wtable);
+                                        tuple_projectBuffer(src, metatype),
+                                        metatype);
 }
 
 /// Standard, inefficient witness table for tuples.
