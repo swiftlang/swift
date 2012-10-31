@@ -757,11 +757,6 @@ namespace {
       /// A direct call to a known function.
       Direct,
 
-      /// A direct call to a known function, but where an expression
-      /// or two needs to be evaluated (and ignored) before the
-      /// arguments are evaluated.
-      DirectWithSideEffects,
-
       /// A virtual call to a class member.  The first argument is a
       /// pointer to a class instance.
       Virtual,
@@ -786,7 +781,6 @@ namespace {
       } IndirectLiteral;
       struct {
         ValueDecl *Fn;
-        Expr *SideEffects;
       } Direct;
       struct {
         FuncDecl *Fn;
@@ -802,6 +796,7 @@ namespace {
     CanType SubstResultType;
     ArrayRef<Substitution> Substitutions;
     SmallVector<CallSite, 4> CallSites;
+    Expr *SideEffects = nullptr;
 
   public:
     static CalleeSource decompose(Expr *fn);
@@ -817,15 +812,6 @@ namespace {
       CalleeSource result;
       result.TheKind = Kind::Direct;
       result.Direct.Fn = fn;
-      return result;
-    }
-
-    static CalleeSource forDirectWithSideEffects(FuncDecl *fn,
-                                                 Expr *sideEffects) {
-      CalleeSource result;
-      result.TheKind = Kind::DirectWithSideEffects;
-      result.Direct.Fn = fn;
-      result.Direct.SideEffects = sideEffects;
       return result;
     }
 
@@ -853,8 +839,7 @@ namespace {
     Kind getKind() const { return TheKind; }
 
     bool isDirect() const {
-      return (getKind() == Kind::Direct ||
-              getKind() == Kind::DirectWithSideEffects);
+      return getKind() == Kind::Direct;
     }
 
     ValueDecl *getDirectFunction() const {
@@ -862,9 +847,12 @@ namespace {
       return Direct.Fn;
     }
 
-    Expr *getDirectSideEffects() const {
-      assert(getKind() == Kind::DirectWithSideEffects);
-      return Direct.SideEffects;
+    Expr *getSideEffects() const {
+      return SideEffects;
+    }
+    void addSideEffect(Expr *sideEffect) {
+      assert(SideEffects == nullptr && "adding multiple side effects?");
+      SideEffects = sideEffect;
     }
 
     Expr *getIndirectFunction() const {
@@ -896,7 +884,6 @@ namespace {
         return AbstractCallee::forIndirect();
 
       case Kind::Direct:
-      case Kind::DirectWithSideEffects:
         return getAbstractDirectCallee(IGF, getDirectFunction());
 
       case Kind::Virtual:
@@ -1226,17 +1213,44 @@ static void emitCompareBuiltin(IRGenFunction &IGF, FuncDecl *fn,
 /// emitBuiltinCall - Emit a call to a builtin function.
 static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
                             SpecializedCallEmission &emission) {
-  // Emit the arguments.  Maybe we'll get builtins that are more
-  // complex than this.
+  // Builtins currently always have a single argument.
   Expr *argExpr = emission.claimArg();
-  Explosion args(ExplosionKind::Maximal);
-  IGF.emitRValue(argExpr, args);
-  
+
   // Decompose the function's name into a builtin name and type list.
   SmallVector<Type, 4> Types;
   StringRef BuiltinName = getBuiltinBaseName(IGF.IGM.Context,
                                              fn->getName().str(), Types);
 
+  // These builtins don't care about their argument:
+  if (BuiltinName == "sizeof") {
+    IGF.emitIgnored(argExpr);
+    Type valueTy = emission.getSubstitutions()[0].Replacement;
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    emission.setScalarUnmanagedSubstResult(valueTI.getSize(IGF));
+    return;
+  }
+
+  if (BuiltinName == "strideof") {
+    IGF.emitIgnored(argExpr);
+    Type valueTy = emission.getSubstitutions()[0].Replacement;
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    emission.setScalarUnmanagedSubstResult(valueTI.getStride(IGF));
+    return;
+  }
+
+  if (BuiltinName == "alignof") {
+    IGF.emitIgnored(argExpr);
+    Type valueTy = emission.getSubstitutions()[0].Replacement;
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    emission.setScalarUnmanagedSubstResult(valueTI.getAlignment(IGF));
+    return;
+  }
+
+  // Everything else cares about the argument, so go ahead and
+  // evaluate it.
+  Explosion args(ExplosionKind::Maximal);
+  IGF.emitRValue(argExpr, args);
+  
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
   if (unsigned IID = getLLVMIntrinsicID(BuiltinName, !Types.empty())) {
     SmallVector<llvm::Type*, 4> ArgTys;
@@ -1316,8 +1330,15 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   }
 
   if (BuiltinName == "destroy") {
-    // The type of the operation has to be grabbed from the substitutions.
-    Type valueTy = emission.getSubstitutions()[0].Replacement;
+    // The type of the operation is the first element of the argument tuple.
+    CanType valueTy = argExpr->getType()->getCanonicalType();
+    valueTy = CanType(cast<TupleType>(valueTy)->getElementType(0));
+    valueTy = CanType(cast<MetaTypeType>(valueTy)->getInstanceType());
+
+    // Skip the metatype if it has a non-trivial representation.
+    if (!IGF.IGM.hasTrivialMetatype(valueTy))
+      args.claimUnmanagedNext();
+
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
 
     llvm::Value *addrValue = args.claimUnmanagedNext();
@@ -1327,7 +1348,7 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     emission.setVoidResult();
     return;
   }
-  
+
   if (BuiltinName == "assign") {
     // The type of the operation is the type of the first argument of
     // the store function.
@@ -1360,27 +1381,6 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     
     // Perform the init operation.
     return valueTI.initialize(IGF, args, addr);
-  }
-
-  if (BuiltinName == "sizeof") {
-    Type valueTy = emission.getSubstitutions()[0].Replacement;
-    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-    emission.setScalarUnmanagedSubstResult(valueTI.getSize(IGF));
-    return;
-  }
-
-  if (BuiltinName == "strideof") {
-    Type valueTy = emission.getSubstitutions()[0].Replacement;
-    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-    emission.setScalarUnmanagedSubstResult(valueTI.getStride(IGF));
-    return;
-  }
-
-  if (BuiltinName == "alignof") {
-    Type valueTy = emission.getSubstitutions()[0].Replacement;
-    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-    emission.setScalarUnmanagedSubstResult(valueTI.getAlignment(IGF));
-    return;
   }
 
   if (BuiltinName == "allocRaw") {
@@ -1463,8 +1463,10 @@ CallEmission CalleeSource::prepareRootCall(IRGenFunction &IGF,
   unsigned bestUncurry = numArgs - 1;
   assert(bestUncurry != -1U);
 
+  if (auto sideEffects = getSideEffects())
+    IGF.emitIgnored(sideEffects);
+
   switch (getKind()) {
-  case Kind::DirectWithSideEffects:
   case Kind::Direct:
     return CallEmission(IGF, emitDirectCallee(IGF, getDirectFunction(),
                                               SubstResultType,
@@ -1532,8 +1534,7 @@ namespace {
       irgen::ExprVisitor<FunctionDecomposer, CalleeSource> {
     CalleeSource visitDeclRefExpr(DeclRefExpr *E) {
       if (FuncDecl *fn = dyn_cast<FuncDecl>(E->getDecl())) {
-        // FIXME: this should apply to static methods as well.
-        if (!fn->isStatic() && isa<ClassDecl>(fn->getDeclContext()))
+        if (isa<ClassDecl>(fn->getDeclContext()))
           return CalleeSource::forVirtual(fn);
         else
           return CalleeSource::forDirect(fn);
@@ -1546,23 +1547,9 @@ namespace {
     }
 
     CalleeSource visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
-      Expr *rhs = E->getRHS();
-      if (SpecializeExpr *specialize = dyn_cast<SpecializeExpr>(rhs)) {
-        // FIXME: We should generalize forDirectWithSideEffects.
-        Expr *subExpr = specialize->getSubExpr();
-        if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(subExpr)) {
-          if (FuncDecl *fn = dyn_cast<FuncDecl>(dre->getDecl())) {
-            CalleeSource src = CalleeSource::forDirectWithSideEffects(fn, E);
-            src.addSubstitutions(specialize->getSubstitutions());
-            return src;
-          }
-        }
-      }
-      if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(rhs)) {
-        if (FuncDecl *fn = dyn_cast<FuncDecl>(dre->getDecl()))
-          return CalleeSource::forDirectWithSideEffects(fn, E);
-      }
-      return CalleeSource::forIndirect(E);
+      CalleeSource source = visit(E->getRHS());
+      source.addSideEffect(E);
+      return source;
     }
 
     CalleeSource visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {

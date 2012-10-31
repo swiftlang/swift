@@ -129,9 +129,11 @@ static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
   case DeclKind::OneOf:
   case DeclKind::Struct:
   case DeclKind::Class:
-  case DeclKind::Protocol:
-    emitMetaTypeRef(IGF, D->getType()->getCanonicalType(), explosion);
+  case DeclKind::Protocol: {
+    auto type = cast<TypeDecl>(D)->getDeclaredType()->getCanonicalType();
+    emitMetaTypeRef(IGF, type, explosion);
     return;
+  }
 
   case DeclKind::Var:
     return IGF.emitLValueAsScalar(emitDeclRefLValue(IGF, E),
@@ -361,8 +363,12 @@ namespace {
         return IGF.emitLValueAsScalar(emit##KIND##MemberRefLValue(IGF, E), \
                                       isOnHeap(E->getType()), Out);        \
       }                                                                    \
-      if (isTypeMember(E->getDecl()))                                      \
-        return;                                                            \
+      if (isTypeMember(E->getDecl())) {                                    \
+        IGF.emitIgnored(E->getBase());                                     \
+        auto type = cast<TypeDecl>(E->getDecl())->getDeclaredType()        \
+          ->getCanonicalType();                                            \
+        return emitMetaTypeRef(IGF, type, Out);                            \
+      }                                                                    \
                                                                            \
       assert(!E->getType()->is<LValueType>());                             \
       emit##KIND##MemberRef(IGF, E, Out);                                  \

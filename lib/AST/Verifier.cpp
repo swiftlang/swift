@@ -555,6 +555,17 @@ namespace {
       }
     }
 
+    void verifyChecked(GetMetatypeExpr *E) {
+      auto metatype = E->getType()->getAs<MetaTypeType>();
+      if (!metatype) {
+        Out << "GetMetatypeExpr must have metatype type\n";
+        abort();
+      }
+
+      checkSameType(E->getSubExpr()->getType(), metatype->getInstanceType(),
+                    "base type of GetMetatype expression");
+    }
+
     void verifyChecked(MetatypeExpr *E) {
       auto metatype = E->getType()->getAs<MetaTypeType>();
       if (!metatype) {

@@ -1078,6 +1078,7 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
         } else {
           if (baseIsInstance && !Member->isInstanceMember()) {
             Type baseMetaTy = MetaTypeType::get(baseTy, Context);
+            Base = convertToRValue(Base);
             Base = new (Context) GetMetatypeExpr(Base, baseMetaTy);
           }
           apply = new (Context) DotSyntaxCallExpr(specializedRef, DotLoc, Base);
@@ -1108,6 +1109,7 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
 
       if (baseIsInstance && !Member->isInstanceMember()) {
         Type baseMetaTy = MetaTypeType::get(baseTy, Context);
+        Base = convertToRValue(Base);
         Base = new (Context) GetMetatypeExpr(Base, baseMetaTy);
         return new (Context) DotSyntaxCallExpr(Ref, DotLoc, Base);
       }

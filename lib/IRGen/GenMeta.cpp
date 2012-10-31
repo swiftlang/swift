@@ -375,8 +375,8 @@ namespace {
     bool visitClassType(ClassType *type) {
       return false;
     }
-    bool visitBoundGenericType(BoundGenericType *type) {
-      return !isa<ClassDecl>(type->getDecl());
+    bool visitBoundGenericClassType(BoundGenericClassType *type) {
+      return false;
     }
 
     /// Archetype metatypes have non-trivial representation in case
@@ -401,7 +401,7 @@ bool IRGenModule::hasTrivialMetatype(CanType instanceType) {
 void irgen::emitMetaTypeRef(IRGenFunction &IGF, CanType type,
                             Explosion &explosion) {
   // Some metatypes have trivial representation.
-  if (IGF.IGM.hasTrivialMetatype(type->getCanonicalType()))
+  if (IGF.IGM.hasTrivialMetatype(type))
     return;
 
   // Otherwise, emit a metadata reference.
