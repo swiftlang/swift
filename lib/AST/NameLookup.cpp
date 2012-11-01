@@ -473,7 +473,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         FindLocalVal localVal(Loc, Name);
         localVal.visit(FE->getBody());
         if (!localVal.MatchingValue) {
-          for (Pattern *P : FE->getParamPatterns())
+          for (Pattern *P : FE->getBodyParamPatterns())
             localVal.checkPattern(P);
         }
         if (localVal.MatchingValue) {

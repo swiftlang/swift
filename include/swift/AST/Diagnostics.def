@@ -207,6 +207,12 @@ ERROR(func_decl_without_paren,decl_parsing,none,
       "expected '(' in argument list of func declaration", ())
 ERROR(static_func_decl_global_scope,decl_parsing,none,
       "'static' functions may only be declared on a type", ())
+ERROR(func_selector_without_paren,decl_parsing,none,
+      "expected '(' after identifier in argument list of selector-style func declaration", ())
+ERROR(func_selector_with_not_one_argument,decl_parsing,none,
+      "selector-style func arguments may only be used with one-argument patterns", ())
+ERROR(func_selector_with_curry,decl_parsing,none,
+      "funcs with selector-style arguments may not be curried", ())
 
 // OneOf
 

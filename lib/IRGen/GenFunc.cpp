@@ -2514,7 +2514,8 @@ namespace {
 /// Emit a specific parameter clause.
 static void emitParameterClause(IRGenFunction &IGF, AnyFunctionType *fnType,
                                 Pattern *param, Explosion &args) {
-  assert(param->getType()->isEqual(fnType->getInput()));
+  assert(param->getType()->getUnlabeledType(IGF.IGM.Context)
+         ->isEqual(fnType->getInput()->getUnlabeledType(IGF.IGM.Context)));
 
   // Emit the pattern.
   ParamPatternEmitter(IGF, args).visit(param);
@@ -2882,7 +2883,7 @@ namespace {
                                       Func);
 
       IRGenFunction IGF(IGM, Func->getType()->getCanonicalType(),
-                        Func->getParamPatterns(), ExplosionLevel,
+                        Func->getBodyParamPatterns(), ExplosionLevel,
                         CurClause, entrypoint, Prologue::Bare);
 
       Explosion params = IGF.collectParameters();
@@ -2934,7 +2935,7 @@ namespace {
                                       Func);
 
       IRGenFunction IGF(IGM, Func->getType()->getCanonicalType(),
-                        Func->getParamPatterns(), ExplosionLevel, CurClause,
+                        Func->getBodyParamPatterns(), ExplosionLevel, CurClause,
                         forwarder, Prologue::Bare);
 
       // Accumulate the function's immediate parameters.
@@ -3025,7 +3026,7 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
   // Finally, emit the uncurried entrypoint.
   PrettyStackTraceDecl stackTrace("emitting IR for", func);
   IRGenFunction(IGM, funcExpr->getType()->getCanonicalType(),
-                funcExpr->getParamPatterns(), explosionLevel,
+                funcExpr->getBodyParamPatterns(), explosionLevel,
                 naturalUncurryLevel, entrypoint)
     .emitFunctionTopLevel(funcExpr->getBody());
 }

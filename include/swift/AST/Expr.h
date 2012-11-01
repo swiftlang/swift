@@ -1376,14 +1376,52 @@ class FuncExpr : public CapturingExpr {
       TheFuncDecl(nullptr), FnRetType(FnRetType) {}
 public:
   static FuncExpr *create(ASTContext &Context, SourceLoc FuncLoc,
-                          ArrayRef<Pattern*> Params, TypeLoc FnRetType,
+                          ArrayRef<Pattern*> ArgParams,
+                          ArrayRef<Pattern*> BodyParams,
+                          TypeLoc FnRetType,
                           BraceStmt *Body, DeclContext *Parent);
 
   SourceRange getSourceRange() const;
   SourceLoc getLoc() const { return FuncLoc; }
+  
+  size_t getNumParamPatterns() const { return NumPatterns; }
 
-  ArrayRef<Pattern*> getParamPatterns() const {
+  /// getArgParamPatterns - Returns the argument pattern(s) for the function
+  /// definition that determine the function type.
+  /// - For a definition of the form `func foo(a:A, b:B)`, this will
+  ///   be a one-element array containing the argument pattern `(a:A, b:B)`.
+  /// - For a curried definition such as `func foo(a:A)(b:B)`, this will
+  ///   be a multiple-element array containing a pattern for each level
+  ///   of currying, in this case two patterns `(a:A)` and `(b:B)`.
+  /// - For a selector-style definition such as `func foo(a:A) bar(b:B)`,
+  ///   this will be a one-element array containing the argument pattern
+  ///   of the keyword arguments, in this case `(_:A, bar:B)`. For selector-
+  ///   style definitions, this is different from `getBodyParamPatterns`,
+  ///   which would return the declared parameter names `(a:A, b:B)`.
+  ///
+  /// If the function expression refers to a method definition, there will
+  /// be an additional first argument pattern for the `this` parameter.
+  
+  ArrayRef<Pattern*> getArgParamPatterns() const {
     return ArrayRef<Pattern*>(getParamsBuffer(), NumPatterns);
+  }
+
+  /// getBodyParamPatterns - Returns the parameter pattern(s) for the function
+  /// definition that determine the parameter names bound in the function body.
+  /// Typically, this is the same as `getArgParamPatterns`, unless the function
+  /// was defined with selector-style syntax such as `func foo(a:A) bar(b:B)`.
+  /// For a selector-style definition, `getArgParamPatterns` will return the
+  /// pattern that describes the keyword argument names, in this case
+  /// `(_:A, bar:B)`, whereas `getBodyParamPatterns` will return a pattern
+  /// referencing the declared parameter names in the function body's scope,
+  /// in this case `(a:A, b:B)`.
+  ///
+  /// In all cases `getArgParamPatterns().size()` should equal
+  /// `getBodyParamPatterns().size()`, and the corresponding elements of each
+  /// array should resolve to equivalent unlabeled types.
+  
+  ArrayRef<Pattern*> getBodyParamPatterns() const {
+    return ArrayRef<Pattern*>(getParamsBuffer() + NumPatterns, NumPatterns);
   }
 
   /// getNaturalArgumentCount - Returns the "natural" number of

@@ -144,8 +144,8 @@ public:
 
   Pattern *getPattern() const { return ThePattern; }
   ExprHandle *getInit() const { return Init; }
-  bool isVararg() { return !VarargBaseType.isNull(); }
-  Type getVarargBaseType() { return VarargBaseType; }
+  bool isVararg() const { return !VarargBaseType.isNull(); }
+  Type getVarargBaseType() const { return VarargBaseType; }
   void setVarargBaseType(Type ty) { VarargBaseType = ty; }
 };
 

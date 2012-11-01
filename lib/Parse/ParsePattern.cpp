@@ -16,26 +16,221 @@
 
 #include "Parser.h"
 #include "swift/AST/ExprHandle.h"
+#include <llvm/ADT/StringMap.h>
 
 using namespace swift;
 
+/// Parse function arguments.
+///   func-arguments:
+///     curried-arguments | selector-arguments
+///   curried-arguments:
+///     pattern-tuple+
+///   selector-arguments:
+///     '(' selector-element ')' (identifier '(' selector-element ')')+
+///   selector-element:
+///      identifier '(' pattern-atom (':' type-annotation)? ('=' expr)? ')'
+
+static bool parseCurriedFunctionArguments(Parser *parser,
+                                          SmallVectorImpl<Pattern*> &argP,
+                                          SmallVectorImpl<Pattern*> &bodyP) {
+  // parseFunctionArguments parsed the first argument pattern.
+  // Parse additional curried argument clauses as long as we can.
+  while (parser->Tok.isAnyLParen()) {
+    NullablePtr<Pattern> pattern = parser->parsePatternTuple();
+    if (pattern.isNull())
+      return true;
+    else {
+      argP.push_back(pattern.get());
+      bodyP.push_back(pattern.get());
+    }
+  }
+  return false;
+}
+
+static bool parseSelectorArgument(Parser *parser,
+                                  SmallVectorImpl<TuplePatternElt> &argElts,
+                                  SmallVectorImpl<TuplePatternElt> &bodyElts,
+                                  llvm::StringMap<VarDecl*> &selectorNames,
+                                  SourceLoc &rp)
+{
+  NullablePtr<Pattern> argPattern = parser->parsePatternIdentifier();
+  assert(argPattern.isNonNull() &&
+         "selector argument did not start with an identifier!");
+  
+  // Check that a selector name isn't used multiple times, which would
+  // lead to the function type having multiple arguments with the same name.
+  if (NamedPattern *name = dyn_cast<NamedPattern>(argPattern.get())) {
+    VarDecl *decl = name->getDecl();
+    StringRef id = decl->getName().str();
+    auto prevName = selectorNames.find(id);
+    if (prevName != selectorNames.end()) {
+      parser->diagnoseRedefinition(prevName->getValue(), decl);
+    } else {
+      selectorNames[id] = decl;
+    }
+  }
+  
+  if (!parser->Tok.isAnyLParen()) {
+    parser->diagnose(parser->Tok.getLoc(),
+                     diag::func_selector_without_paren);
+    return true;
+  }
+  parser->consumeToken();
+  
+  if (parser->Tok.is(tok::r_paren)) {
+    parser->diagnose(parser->Tok, diag::func_selector_with_not_one_argument);
+    return true;
+  }
+  
+  NullablePtr<Pattern> bodyPattern = parser->parsePatternAtom();
+  if (bodyPattern.isNull()) {
+    parser->skipUntil(tok::r_paren);
+    return true;
+  }
+  
+  if (parser->consumeIf(tok::colon)) {
+    TypeLoc type;
+    if (parser->parseTypeAnnotation(type)) {
+      parser->skipUntil(tok::r_paren);
+      return true;
+    }
+    
+    argPattern = new (parser->Context) TypedPattern(argPattern.get(), type);
+    bodyPattern = new (parser->Context) TypedPattern(bodyPattern.get(), type);
+  }
+  
+  ExprHandle *init = nullptr;
+  if (parser->consumeIf(tok::equal)) {
+    NullablePtr<Expr> initR =
+      parser->parseExpr(diag::expected_initializer_expr);
+    if (initR.isNull()) {
+      parser->skipUntil(tok::r_paren);
+      return true;
+    }
+    init = ExprHandle::get(parser->Context, initR.get());
+  }
+  
+  if (parser->Tok.is(tok::comma)) {
+    parser->diagnose(parser->Tok, diag::func_selector_with_not_one_argument);
+    parser->skipUntil(tok::r_paren);
+    return true;
+  }
+  
+  if (parser->Tok.isNot(tok::r_paren)) {
+    parser->diagnose(parser->Tok, diag::expected_rparen_tuple_pattern_list);
+    return true;
+  }
+  
+  rp = parser->consumeToken(tok::r_paren);
+  argElts.push_back(TuplePatternElt(argPattern.get(), init));
+  bodyElts.push_back(TuplePatternElt(bodyPattern.get(), init));
+  return false;
+}
+
+static Pattern *getFirstSelectorPattern(ASTContext &Context,
+                                     Pattern *argPattern,
+                                     SourceLoc loc)
+{
+  Pattern *pattern = new (Context) AnyPattern(loc);
+  if (TypedPattern *typed = dyn_cast<TypedPattern>(argPattern)) {
+    pattern = new (Context) TypedPattern(pattern, typed->getTypeLoc());
+  }
+  return pattern;
+}
+
+static bool parseSelectorFunctionArguments(Parser *parser,
+                                           SmallVectorImpl<Pattern*> &argP,
+                                           SmallVectorImpl<Pattern*> &bodyP,
+                                           Pattern *firstPattern)
+{
+  SourceLoc lp;
+  SmallVector<TuplePatternElt, 8> argElts;
+  SmallVector<TuplePatternElt, 8> bodyElts;
+
+  // For the argument pattern, try to convert the first parameter pattern to
+  // an anonymous AnyPattern of the same type as the body parameter.
+  if (ParenPattern *firstParen = dyn_cast<ParenPattern>(firstPattern)) {
+    bodyElts.push_back(TuplePatternElt(firstParen->getSubPattern()));
+    lp = firstParen->getLParenLoc();
+    argElts.push_back(TuplePatternElt(
+      getFirstSelectorPattern(parser->Context,
+                              firstParen->getSubPattern(),
+                              firstParen->getLoc())));
+  } else if (TuplePattern *firstTuple = dyn_cast<TuplePattern>(firstPattern)) {
+    if (firstTuple->getNumFields() != 1) {
+      parser->diagnose(parser->Tok, diag::func_selector_with_not_one_argument);
+      return true;
+    }
+    
+    TuplePatternElt const &firstElt = firstTuple->getFields()[0];
+    bodyElts.push_back(firstElt);
+    argElts.push_back(TuplePatternElt(
+      getFirstSelectorPattern(parser->Context,
+                              firstElt.getPattern(),
+                              firstTuple->getLoc()),
+      firstElt.getInit(),
+      firstElt.getVarargBaseType()));
+  } else
+    llvm_unreachable("unexpected function argument pattern!");
+  
+  // Parse additional selectors as long as we can.
+  SourceLoc rp;
+  llvm::StringMap<VarDecl*> selectorNames;
+
+  for (;;) {
+    if (parser->Tok.is(tok::identifier)) {
+      if (parseSelectorArgument(parser, argElts, bodyElts, selectorNames, rp)) {
+        return true;
+      }
+    } else if (parser->Tok.isAnyLParen()) {
+      parser->diagnose(parser->Tok, diag::func_selector_with_curry);
+      return true;
+    } else
+      break;
+  }
+  
+  argP.push_back(TuplePattern::create(parser->Context, lp, argElts, rp));
+  bodyP.push_back(TuplePattern::create(parser->Context, lp, bodyElts, rp));
+  return false;
+}
+
+bool Parser::parseFunctionArguments(SmallVectorImpl<Pattern*> &argPatterns,
+                                    SmallVectorImpl<Pattern*> &bodyPatterns) {
+  // Parse the first function argument clause.
+  NullablePtr<Pattern> pattern = parsePatternTuple();
+  if (pattern.isNull())
+    return true;
+  else {
+    Pattern *firstPattern = pattern.get();
+    
+    if (Tok.is(tok::identifier)) {
+      // This looks like a selector-style argument. Try to convert the first
+      // argument pattern into a single argument type and parse subsequent
+      // selector forms.
+      return parseSelectorFunctionArguments(this,
+                                            argPatterns, bodyPatterns,
+                                            pattern.get());
+    } else {
+      argPatterns.push_back(firstPattern);
+      bodyPatterns.push_back(firstPattern);
+      return parseCurriedFunctionArguments(this,
+                                           argPatterns, bodyPatterns);
+    }
+  }
+}
+
 /// parseFunctionSignature - Parse a function definition signature.
 ///   func-signature:
-///     pattern-tuple+ func-signature-result?
+///     func-arguments func-signature-result?
 ///   func-signature-result:
 ///     '->' type
 ///
 /// Note that this leaves retType as null if unspecified.
-bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
+bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &argPatterns,
+                                    SmallVectorImpl<Pattern*> &bodyPatterns,
                                     TypeLoc &retType) {
-  // Parse curried function argument clauses as long as we can.
-  do {
-    NullablePtr<Pattern> pattern = parsePatternTuple();
-    if (pattern.isNull())
-      return true;
-    else
-      params.push_back(pattern.get());
-  } while (Tok.isAnyLParen());
+  if (parseFunctionArguments(argPatterns, bodyPatterns))
+    return true;
 
   // If there's a trailing arrow, parse the rest as the result type.
   if (consumeIf(tok::arrow)) {
@@ -67,6 +262,23 @@ NullablePtr<Pattern> Parser::parsePattern() {
   return pattern;
 }
 
+/// Parse an identifier as a pattern.
+NullablePtr<Pattern> Parser::parsePatternIdentifier() {
+  SourceLoc loc = Tok.getLoc();
+  StringRef text = Tok.getText();
+  if (consumeIf(tok::identifier)) {
+    // '_' is a special case which means 'ignore this'.
+    if (text == "_") {
+      return new (Context) AnyPattern(loc);
+    } else {
+      Identifier ident = Context.getIdentifier(text);
+      VarDecl *var = new (Context) VarDecl(loc, ident, Type(), nullptr);
+      return new (Context) NamedPattern(var);
+    }
+  } else
+    return nullptr;
+}
+
 /// Parse a pattern "atom", meaning the part that precedes the
 /// optional type annotation.
 ///
@@ -78,20 +290,8 @@ NullablePtr<Pattern> Parser::parsePatternAtom() {
   case tok::l_paren_space:
     return parsePatternTuple();
 
-  case tok::identifier: {
-    SourceLoc loc = Tok.getLoc();
-    StringRef text = Tok.getText();
-    consumeToken(tok::identifier);
-
-    // '_' is a special case which means 'ignore this'.
-    if (text == "_") {
-      return new (Context) AnyPattern(loc);
-    } else {
-      Identifier ident = Context.getIdentifier(text);
-      VarDecl *var = new (Context) VarDecl(loc, ident, Type(), nullptr);
-      return new (Context) NamedPattern(var);
-    }
-  }
+  case tok::identifier:
+    return parsePatternIdentifier();
 
   default:
     diagnose(Tok, diag::expected_pattern);
@@ -107,6 +307,7 @@ NullablePtr<Pattern> Parser::parsePatternAtom() {
 ///     pattern-tuple-element (',' pattern-tuple-body)*
 ///   pattern-tuple-element:
 ///     pattern ('=' expr)?
+
 NullablePtr<Pattern> Parser::parsePatternTuple() {
   assert(Tok.isAnyLParen());
 

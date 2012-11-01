@@ -348,15 +348,20 @@ void CapturingExpr::computeCaptures(ASTContext &Context) {
 }
 
 FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
-                           ArrayRef<Pattern*> params, TypeLoc fnRetType,
+                           ArrayRef<Pattern*> argParams,
+                           ArrayRef<Pattern*> bodyParams,
+                           TypeLoc fnRetType,
                            BraceStmt *body, DeclContext *parent) {
-  unsigned nParams = params.size();
-  void *buf = C.Allocate(sizeof(FuncExpr) + nParams * sizeof(Pattern*),
+  assert(argParams.size() == bodyParams.size());
+  unsigned nParams = argParams.size();
+  void *buf = C.Allocate(sizeof(FuncExpr) + 2 * nParams * sizeof(Pattern*),
                          Expr::Alignment);
   FuncExpr *fn = ::new (buf) FuncExpr(funcLoc, nParams, fnRetType,
                                       body, parent);
   for (unsigned i = 0; i != nParams; ++i)
-    fn->getParamsBuffer()[i] = params[i];
+    fn->getParamsBuffer()[i] = argParams[i];
+  for (unsigned i = 0; i != nParams; ++i)
+    fn->getParamsBuffer()[i+nParams] = bodyParams[i];
   return fn;
 }
 
@@ -365,7 +370,7 @@ SourceRange FuncExpr::getSourceRange() const {
     return { FuncLoc, Body->getEndLoc() };
   if (FnRetType.hasLocation())
     return { FuncLoc, FnRetType.getSourceRange().End };
-  Pattern *LastPat = getParamPatterns().back();
+  Pattern *LastPat = getArgParamPatterns().back();
   return { FuncLoc, LastPat->getEndLoc() };
 }
 
@@ -374,7 +379,7 @@ Type FuncExpr::getResultType(ASTContext &Ctx) const {
   if (resultTy->is<ErrorType>())
     return resultTy;
 
-  for (unsigned i = 0, e = getParamPatterns().size(); i != e; ++i)
+  for (unsigned i = 0, e = getNumParamPatterns(); i != e; ++i)
     resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
 
   if (!resultTy)

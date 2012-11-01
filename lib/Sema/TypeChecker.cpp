@@ -429,7 +429,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         CurDeclContexts.push_back(DD);
 
       if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-        // If this is an instance method with a body, set the type of it's
+        // If this is an instance method with a body, set the type of its
         // implicit 'this' variable.
         // FIXME: This is only necessary because we do name-binding for
         // DeclRefs too early.
@@ -668,7 +668,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       } else if (SubscriptDecl *SD = dyn_cast<SubscriptDecl>(D)) {
         visitPattern(SD->getIndices(), D->getDeclContext());
       } else if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-        for (Pattern *p : FD->getBody()->getParamPatterns())
+        for (Pattern *p : FD->getBody()->getArgParamPatterns())
           visitPattern(p, D->getDeclContext());
       }
       return true;

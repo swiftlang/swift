@@ -604,24 +604,27 @@ NullablePtr<Expr> Parser::parseExprParen() {
 NullablePtr<Expr> Parser::parseExprFunc() {
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
-  SmallVector<Pattern*, 4> Params;
+  SmallVector<Pattern*, 4> ArgParams;
+  SmallVector<Pattern*, 4> BodyParams;
   TypeLoc RetTy;
   if (Tok.is(tok::l_brace)) {
     // If the func-signature isn't present, then this is a ()->Unresolved
     // function.
-    Params.push_back(TuplePattern::create(Context, SourceLoc(),
-                                          llvm::ArrayRef<TuplePatternElt>(),
-                                          SourceLoc()));
+    TuplePattern *unitPattern = TuplePattern::create(Context, SourceLoc(),
+      llvm::ArrayRef<TuplePatternElt>(),
+      SourceLoc());
+    ArgParams.push_back(unitPattern);
+    BodyParams.push_back(unitPattern);
   } else if (Tok.isNotAnyLParen()) {
     diagnose(Tok, diag::func_decl_without_paren);
     return 0;
-  } else if (parseFunctionSignature(Params, RetTy)) {
+  } else if (parseFunctionSignature(ArgParams, BodyParams, RetTy)) {
     return 0;
   }
   
   // The arguments to the func are defined in their own scope.
   Scope FuncBodyScope(this, /*AllowLookup=*/true);
-  FuncExpr *FE = actOnFuncExprStart(FuncLoc, RetTy, Params);
+  FuncExpr *FE = actOnFuncExprStart(FuncLoc, RetTy, ArgParams, BodyParams);
 
   // Establish the new context.
   ContextChange CC(*this, FE);
@@ -671,11 +674,13 @@ static void AddFuncArgumentsToScope(Pattern *pat, FuncExpr *FE, Parser &P) {
 }
 
 FuncExpr *Parser::actOnFuncExprStart(SourceLoc FuncLoc, TypeLoc FuncRetTy, 
-                                     ArrayRef<Pattern*> Params) {
-  FuncExpr *FE = FuncExpr::create(Context, FuncLoc, Params, FuncRetTy,
+                                     ArrayRef<Pattern*> ArgParams,
+                                     ArrayRef<Pattern*> BodyParams) {
+  FuncExpr *FE = FuncExpr::create(Context, FuncLoc,
+                                  ArgParams, BodyParams, FuncRetTy,
                                   nullptr, CurDeclContext);
 
-  for (Pattern *P : Params)
+  for (Pattern *P : BodyParams)
     AddFuncArgumentsToScope(P, FE, *this);
   
   return FE;

@@ -122,7 +122,7 @@ class CaptureAnalysisVisitor : public ASTWalker {
     } else if (CapturingExpr *CE = dyn_cast<CapturingExpr>(E)) {
       // Initialize flags for the function arguments.
       if (FuncExpr *FE = dyn_cast<FuncExpr>(CE)) {
-        for (Pattern *P : FE->getParamPatterns())
+        for (Pattern *P : FE->getBodyParamPatterns())
           WalkPattern(P);
       } else if (ClosureExpr *CLE = dyn_cast<ClosureExpr>(CE)) {
         WalkPattern(CLE->getPattern());

@@ -802,7 +802,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Type GetterRetTy = ElementTy;
       FuncExpr *GetFn = actOnFuncExprStart(GetLoc,
                                            TypeLoc::withoutLoc(GetterRetTy),
-                                           Params);
+                                           Params, Params);
       
       // Establish the new context.
       ContextChange CC(*this, GetFn);
@@ -916,7 +916,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     Type SetterRetTy = TupleType::getEmpty(Context);
     FuncExpr *SetFn = actOnFuncExprStart(SetLoc,
                                          TypeLoc::withoutLoc(SetterRetTy),
-                                         Params);
+                                         Params, Params);
     
     // Establish the new context.
     ContextChange CC(*this, SetFn);
@@ -1151,18 +1151,22 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
     return 0;
   }
 
-  SmallVector<Pattern*, 8> Params;
+  SmallVector<Pattern*, 8> ArgParams;
+  SmallVector<Pattern*, 8> BodyParams;
   
   // If we're within a container and this isn't a static method, add an
   // implicit first pattern to match the container type as an element
   // named 'this'.  This turns "(int)->int" on FooTy into "(this :
   // [byref] FooTy)->((int)->int)".  Note that we can't actually compute the
   // type here until Sema.
-  if (hasContainerType)
-    Params.push_back(buildImplicitThisParameter());
+  if (hasContainerType) {
+    Pattern *thisPattern = buildImplicitThisParameter();
+    ArgParams.push_back(thisPattern);
+    BodyParams.push_back(thisPattern);
+  }
 
   TypeLoc FuncRetTy;
-  if (parseFunctionSignature(Params, FuncRetTy))
+  if (parseFunctionSignature(ArgParams, BodyParams, FuncRetTy))
     return 0;
 
   // Enter the arguments for the function into a new function-body scope.  We
@@ -1172,7 +1176,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   {
     Scope FnBodyScope(this, /*AllowLookup=*/true);
     
-    FE = actOnFuncExprStart(FuncLoc, FuncRetTy, Params);
+    FE = actOnFuncExprStart(FuncLoc, FuncRetTy, ArgParams, BodyParams);
 
     // Now that we have a context, update the generic parameters with that
     // context.

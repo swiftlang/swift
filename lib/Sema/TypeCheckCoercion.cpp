@@ -1286,7 +1286,7 @@ CoercedResult SemaCoerce::visitFuncExpr(FuncExpr *E) {
   // Make sure that we're converting the closure to a function type.  If not,
   // diagnose the error.
   FunctionType *FT = DestTy->getAs<FunctionType>();
-  if (FT == 0 || E->getParamPatterns().size() != 1) {
+  if (FT == 0 || E->getNumParamPatterns() != 1) {
     diagnose(E->getStartLoc(), diag::funcexpr_not_function_type, DestTy)
       << E->getSourceRange();
     return nullptr;
@@ -1317,7 +1317,9 @@ CoercedResult SemaCoerce::visitFuncExpr(FuncExpr *E) {
   E->setType(FT);
 
   // Apply inferred argument type information to the argument patterns.
-  if (TC.coerceToType(E->getParamPatterns()[0], FT->getInput(), false))
+  if (TC.coerceToType(E->getArgParamPatterns()[0], FT->getInput(), false))
+    return nullptr;
+  if (TC.coerceToType(E->getBodyParamPatterns()[0], FT->getInput(), false))
     return nullptr;
   
   // FIXME: Result type too!

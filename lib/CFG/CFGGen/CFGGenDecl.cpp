@@ -148,7 +148,7 @@ struct ArgumentCreatorVisitor :
 
 void CFGGen::emitProlog(FuncExpr *FE) {
   // Emit the argument variables.
-  for (auto &ParamPattern : FE->getParamPatterns()) {
+  for (auto &ParamPattern : FE->getBodyParamPatterns()) {
     // Add the BBArgument's and collect them as a Value.
     Value *ArgInit = ArgumentCreatorVisitor(C).visit(ParamPattern);
     // Use the value to initialize a (mutable) variable allocation.

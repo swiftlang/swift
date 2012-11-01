@@ -298,3 +298,12 @@ bool Parser::parseValueSpecifier(TypeLoc &Ty,
   return false;
 }
 
+/// diagnoseRedefinition - Diagnose a redefinition error, with a note
+/// referring back to the original definition.
+
+void Parser::diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New) {
+  assert(New != Prev && "Cannot conflict with self");
+  diagnose(New->getLoc(), diag::decl_redefinition, New->isDefinition());
+  diagnose(Prev->getLoc(), diag::previous_decldef, Prev->isDefinition(),
+             Prev->getName());
+}

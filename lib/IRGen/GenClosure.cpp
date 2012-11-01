@@ -196,7 +196,7 @@ static void emitLocalFunctionBody(IRGenFunction &definingIGF,
 
   ArrayRef<Pattern*> patterns;
   if (FuncExpr *func = dyn_cast<FuncExpr>(E))
-    patterns = func->getParamPatterns();
+    patterns = func->getBodyParamPatterns();
   else
     patterns = cast<ClosureExpr>(E)->getParamPatterns();
 

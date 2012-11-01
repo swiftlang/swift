@@ -1958,7 +1958,7 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // computing the type of each pattern (which may involve fresh type
       // variables where parameter types where no provided) and building the
       // eventual function type.
-      auto patterns = expr->getParamPatterns();
+      auto patterns = expr->getArgParamPatterns();
       for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
         Type paramTy =  getTypeForPattern(patterns[e - i - 1], expr);
         funcTy = FunctionType::get(paramTy, funcTy, CS.getASTContext());
@@ -4546,7 +4546,9 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
       // Coerce the FuncExpr's pattern, in case we resolved something.
       Type input = expr->getType()->castTo<FunctionType>()->getInput();
-      if (CS.TC.coerceToType(expr->getParamPatterns()[0], input, false))
+      if (CS.TC.coerceToType(expr->getArgParamPatterns()[0], input, false))
+        return nullptr;
+      if (CS.TC.coerceToType(expr->getBodyParamPatterns()[0], input, false))
         return nullptr;
 
       return expr;

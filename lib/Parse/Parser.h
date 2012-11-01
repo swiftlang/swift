@@ -137,6 +137,8 @@ public:
   InFlightDiagnostic diagnose(Token Tok, ArgTypes... Args) {
     return Diags.diagnose(Tok.getLoc(), Diagnostic(Args...));
   }
+  
+  void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New);
      
   /// \brief Check whether the current token starts with '<'.
   bool startsWithLess(Token Tok) {
@@ -275,10 +277,14 @@ public:
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 
-  bool parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
+  bool parseFunctionArguments(SmallVectorImpl<Pattern*> &argPatterns,
+                              SmallVectorImpl<Pattern*> &bodyPatterns);
+  bool parseFunctionSignature(SmallVectorImpl<Pattern*> &argPatterns,
+                              SmallVectorImpl<Pattern*> &bodyPatterns,
                               TypeLoc &retLoc);
   NullablePtr<Pattern> parsePattern();
   NullablePtr<Pattern> parsePatternTuple();
+  NullablePtr<Pattern> parsePatternIdentifier();
   NullablePtr<Pattern> parsePatternAtom();
 
   //===--------------------------------------------------------------------===//
@@ -301,7 +307,8 @@ public:
   Expr *parseExprOperator();
   Expr *actOnIdentifierExpr(Identifier Text, SourceLoc Loc);
   FuncExpr *actOnFuncExprStart(SourceLoc FuncLoc, TypeLoc FuncRetTy,
-                               ArrayRef<Pattern*> Patterns);
+                               ArrayRef<Pattern*> ArgPatterns,
+                               ArrayRef<Pattern*> BodyPatterns);
 
   //===--------------------------------------------------------------------===//
   // Statement Parsing

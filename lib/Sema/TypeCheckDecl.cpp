@@ -460,7 +460,7 @@ public:
     if (Type thisType = FD->computeThisType(&outerGenericParams)) {
       TC.validateTypeSimple(thisType);
       TypedPattern *thisPattern =
-        cast<TypedPattern>(body->getParamPatterns()[0]);
+        cast<TypedPattern>(body->getArgParamPatterns()[0]);
       if (thisPattern->hasType()) {
         assert(thisPattern->getType().getPointer() == thisType.getPointer());
       } else {

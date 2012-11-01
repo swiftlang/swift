@@ -671,7 +671,10 @@ token following the opening '{' is either 'set' or 'get'.</p>
   <h4 id="func-signature">Function signatures</h4>
 
   <pre class="grammar">
-    func-signature ::= <a href="#pattern-tuple">pattern-tuple</a>+ func-signature-result?
+    func-signature ::= func-arguments func-signature-result?
+    func-arguments ::= <a href="#pattern-tuple">pattern-tuple</a>+
+    func-arguments ::= selector-tuple
+    selector-tuple ::= '(' <a href="#pattern-tuple">pattern-tuple-element</a> ')' (<a href="#identifier">identifier</a> '(' pattern-tuple-element ')')+
     func-signature-result ::= '-&gt;' <a href="#type">type</a>
   </pre>
 
@@ -701,6 +704,19 @@ token following the opening '{' is either 'set' or 'get'.</p>
     <tt>R</tt>), all of the arguments are then available and the
     function body is finally evaluated as normal.</p>
 
+  <p>A function declared with a selector-style signature
+    <tt>func(a<sub>0</sub>:T<sub>0</sub>) name<sub>1</sub>(a<sub>1</sub>:T<sub>1</sub>) .. name<sub><i>n</i></sub>(a<sub><i>n</i></sub>:T<sub><i>n</i></sub>) -&gt; R</tt>
+    has the type <tt>(_:T<sub>0</sub>, name<sub>1</sub>:T<sub>1</sub>, .. name<sub><i>n</i></sub>:T<sub><i>n</i></sub>) -&gt; R</tt>,
+    that is, the names of the fields in the argument tuple are the
+    <tt>name<sub><i>n</i></sub></tt> identifiers preceding each argument
+    pattern. However, in the body of a function
+    described by a signature, those arguments will be bound using the
+    corresponding
+    <tt>a<sub><i>n</i></sub></tt> patterns inside
+    the arguments. This allows for Cocoa-style keyword function
+    names such as <tt>doThing(x, withThing=y)</tt> to be defined without
+    requiring that an awkward keyword name be the same as the
+    variable name.
 
   <p>Here are some examples of func definitions:</p>
   
@@ -742,8 +758,24 @@ token following the opening '{' is either 'set' or 'get'.</p>
       static func someMetaTypeMethod() {}
     }
     
-    // Dot syntax on metatype.
+    <i>// Dot syntax on metatype.</i>
     bankaccount.someMetaTypeMethod()
+
+    <i>// A function with selector-style signature.</i>
+
+    oneof PersonOfInterest {ColonelMustard, MissScarlet}
+    oneof Room {Conservatory, Ballroom}
+    oneof Weapon {Candlestick, LeadPipe}
+
+    func accuseSuspect(suspect:PersonOfInterest)
+        inRoom(room:Room)
+        withWeapon(weapon:Weapon) {
+        println("It was " + suspect + " in the " + room + " with the " +
+                weapon);
+    }
+
+    <i>// Calling a selector-style function.</i>
+    accuseSuspect(.ColonelMustard, inRoom=.Ballroom, withWeapon=.LeadPipe)
   </pre>
 
   <!-- ===================================================================== -->

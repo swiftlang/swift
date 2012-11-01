@@ -616,10 +616,10 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
 /// extension context, it will have a 'this' argument.  This method returns it
 /// if present, or returns null if not.
 VarDecl *FuncDecl::getImplicitThisDecl() {
-  if (Body->getParamPatterns().empty()) return 0;
+  if (Body->getNumParamPatterns() == 0) return 0;
   
   // "this" is represented as (typed_pattern (named_pattern (var_decl 'this')).
-  TypedPattern *TP = dyn_cast<TypedPattern>(Body->getParamPatterns()[0]);
+  TypedPattern *TP = dyn_cast<TypedPattern>(Body->getArgParamPatterns()[0]);
   if (TP == 0) return 0;
   
   // The decl should be named 'this' and have no location information.

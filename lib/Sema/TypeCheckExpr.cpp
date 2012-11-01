@@ -1772,6 +1772,22 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   return true;
 }
 
+static bool semaFuncParamPatterns(TypeChecker *checker,
+                                  ArrayRef<Pattern*> paramPatterns,
+                                  bool isFirstPass,
+                                  bool allowUnknownTypes) {
+  bool badType = false;
+  for (Pattern *P : paramPatterns) {
+    if (P->hasType())
+      continue;
+    if (checker->typeCheckPattern(P, isFirstPass, allowUnknownTypes)) {
+      badType = true;
+      continue;
+    }
+  }
+  return badType;
+}
+
 void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass,
                                bool allowUnknownTypes) {
   if (FE->getType() && !FE->getType()->isUnresolvedType())
@@ -1784,15 +1800,11 @@ void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass,
       badType = true;
     }
   }
-
-  for (Pattern *P : FE->getParamPatterns()) {
-    if (P->hasType())
-      continue;
-    if (typeCheckPattern(P, isFirstPass, allowUnknownTypes)) {
-      badType = true;
-      continue;
-    }
-  }
+  
+  badType = badType || semaFuncParamPatterns(this, FE->getArgParamPatterns(),
+                                             isFirstPass, allowUnknownTypes);
+  badType = badType || semaFuncParamPatterns(this, FE->getBodyParamPatterns(),
+                                             isFirstPass, allowUnknownTypes);
 
   if (badType) {
     FE->setType(ErrorType::get(Context));
@@ -1808,7 +1820,7 @@ void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass,
   }
 
   // FIXME: it would be nice to have comments explaining what this is all about.
-  auto patterns = FE->getParamPatterns();
+  auto patterns = FE->getArgParamPatterns();
   bool isInstanceFunc = false;
   GenericParamList *genericParams = nullptr;
   GenericParamList *outerGenericParams = nullptr;

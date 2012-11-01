@@ -171,7 +171,7 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
     ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
   }
   typeCheckPattern(ParamPat, /*isFirstPass*/false, /*allowUnknownTypes*/false);
-  FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, TypeLoc(),
+  FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, ParamPat, TypeLoc(),
                                   0, TLCD);
   Type FuncTy = FunctionType::get(ParamPat->getType(),
                                   TupleType::getEmpty(Context), Context);
@@ -287,7 +287,9 @@ void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
     ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
   }
   typeCheckPattern(ParamPat, /*isFirstPass*/false, /*allowUnknownTypes*/false);
-  FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, TypeLoc(), 0, &TU);
+  FuncExpr *FE = FuncExpr::create(Context, Loc,
+                                  ParamPat, ParamPat, TypeLoc(),
+                                  0, &TU);
   Type FuncTy = FunctionType::get(ParamPat->getType(), T, Context);
   FE->setType(FuncTy);
   Arg->setDeclContext(FE);

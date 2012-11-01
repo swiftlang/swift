@@ -119,7 +119,9 @@ public:
     Type ResultTy = TheFunc->getType();
     if (ResultTy->is<ErrorType>())
       return 0;
-    for (unsigned i = 0, e = TheFunc->getParamPatterns().size(); i != e; ++i)
+    for (unsigned i = 0, e = TheFunc->getNumParamPatterns();
+         i != e;
+         ++i)
       ResultTy = ResultTy->castTo<AnyFunctionType>()->getResult();
 
     if (!RS->hasResult()) {
@@ -496,7 +498,9 @@ void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
   // If this was a func() expression whose context did not fully infer types for
   // the arguments, mark the argument types as error type.
   if (FE->getType()->isUnresolvedType()) {
-    for (auto P : FE->getParamPatterns())
+    for (auto P : FE->getArgParamPatterns())
+      coerceToType(P, ErrorType::get(Context), false);
+    for (auto P : FE->getBodyParamPatterns())
       coerceToType(P, ErrorType::get(Context), false);
   }
   

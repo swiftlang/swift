@@ -40,13 +40,6 @@ Scope::Scope(Parser *P, bool ResolvableScope)
 // ScopeInfo Implementation
 //===----------------------------------------------------------------------===//
 
-static void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, Parser &P) {
-  assert(New != Prev && "Cannot conflict with self");
-  P.diagnose(New->getLoc(), diag::decl_redefinition, New->isDefinition());
-  P.diagnose(Prev->getLoc(), diag::previous_decldef, Prev->isDefinition(),
-             Prev->getName());
-}
-
 /// checkValidOverload - Check whether it is ok for D1 and D2 to be declared at
 /// the same scope.  This check is a transitive relationship, so if "D1 is a
 /// valid overload of D2" and "D2 is a valid overload of D3" then we know that
@@ -81,7 +74,7 @@ void ScopeInfo::addToScope(ValueDecl *D) {
     // If this is in a resolvable scope, diagnose redefinitions.  Later
     // phases will handle scopes like module-scope, etc.
     if (CurScope->getDepth() >= ResolvableDepth)
-      return diagnoseRedefinition(PrevDecl, D, TheParser);
+      return TheParser.diagnoseRedefinition(PrevDecl, D);
     
     // If this is at top-level scope, validate that the members of the overload
     // set all agree.
