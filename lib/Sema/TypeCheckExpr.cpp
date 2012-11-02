@@ -500,6 +500,15 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     E->setType(E1->getType());
     return E;
   }
+  
+  // If the args are erroneous, propagate the error up. If the callee type is
+  // unresolved (for instance, if it's overloaded), we will also not be able
+  // to resolve it, so propagate the error to the callee as well.
+  if (E2->getType()->is<ErrorType>()) {
+    E->setType(E2->getType());
+    E1->setType(E2->getType());
+    return E;
+  }
 
   // Perform lvalue-to-rvalue conversion on the function.
   E1 = convertToRValue(E1);
@@ -722,18 +731,29 @@ public:
     return E;
   }
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
+    llvm::errs() << "bottom-up declref " << E->getDecl()->isInvalid() << '\n';
+    E->print(llvm::errs());
+    llvm::errs() << ' ';
+    E->getDecl()->print(llvm::errs());
+    llvm::errs() << '\n';
+    
     if (E->getDecl() == 0) {
       TC.diagnose(E->getLoc(), diag::use_undeclared_identifier);
       return 0;
     }
-
+    
     // If the type of a decl is not computed yet, make the declref unresolved;
     // this can happen for references to "$0" etc.
     if (!E->getDecl()->hasType()) {
-      E->setType(UnstructuredUnresolvedType::get(TC.Context));
-      return E;
+      if (E->getDecl()->isInvalid()) {
+        E->setType(ErrorType::get(TC.Context));
+        return 0;
+      } else {
+        E->setType(UnstructuredUnresolvedType::get(TC.Context));
+        return E;
+      }
     }
-
+    
     // If the decl had an invalid type, then an error has already been emitted,
     // just propagate it up.
     if (E->getDecl()->getType()->is<ErrorType>())
