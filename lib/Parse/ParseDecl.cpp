@@ -1107,8 +1107,7 @@ Pattern *Parser::buildImplicitThisParameter() {
 }
 
 /// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
-/// caller handles this case and does recovery as appropriate.  If AllowScoped
-/// is true, we parse both productions.
+/// caller handles this case and does recovery as appropriate.
 ///
 ///   decl-func:
 ///     'static'? 'func' attribute-list any-identifier generic-params?
@@ -1440,7 +1439,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   return false;
 }
 
-/// parseDeclStruct - Parse a 'struct' declaration, returning true (and doing no
+/// parseDeclClass - Parse a 'class' declaration, returning true (and doing no
 /// token skipping) on error.  
 ///
 ///   decl-class:
