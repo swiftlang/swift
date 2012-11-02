@@ -731,12 +731,6 @@ public:
     return E;
   }
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
-    llvm::errs() << "bottom-up declref " << E->getDecl()->isInvalid() << '\n';
-    E->print(llvm::errs());
-    llvm::errs() << ' ';
-    E->getDecl()->print(llvm::errs());
-    llvm::errs() << '\n';
-    
     if (E->getDecl() == 0) {
       TC.diagnose(E->getLoc(), diag::use_undeclared_identifier);
       return 0;
