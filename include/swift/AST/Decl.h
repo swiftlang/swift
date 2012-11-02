@@ -60,8 +60,9 @@ class Decl {
   class DeclBitfields {
     friend class Decl;
     unsigned Kind : 8;
+    bool Invalid : 1;
   };
-  enum { NumDeclBits = 8 };
+  enum { NumDeclBits = 9 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
 
   enum { NumValueDeclBits = NumDeclBits };
@@ -99,6 +100,7 @@ private:
 protected:
   Decl(DeclKind kind, DeclContext *DC) : Context(DC) {
     DeclBits.Kind = unsigned(kind);
+    DeclBits.Invalid = false;
   }
 
 public:
@@ -124,7 +126,13 @@ public:
   void print(raw_ostream &OS, unsigned Indent = 0) const;
 
   bool walk(ASTWalker &walker);
-
+  
+  /// \brief Return whether this declaration has been determined invalid.
+  bool isInvalid() const { return DeclBits.Invalid; }
+  
+  /// \brief Mark this declaration invalid.
+  void setInvalid() { DeclBits.Invalid = true; }
+  
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;
