@@ -34,7 +34,6 @@ namespace swift {
 namespace irgen {
   class AbstractCallee;
   class Address;
-  class Arg;
   class Explosion;
   enum class ExplosionKind : unsigned;
   class CallEmission;

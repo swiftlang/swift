@@ -14,9 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/SmallString.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Module.h"
 
+#include "swift/AST/Decl.h"
+#include "swift/AST/Types.h"
+
+#include "CallEmission.h"
 #include "Cleanup.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
@@ -26,26 +31,62 @@
 #include "IRGenModule.h"
 #include "ScalarTypeInfo.h"
 
+#include "GenObjC.h"
+
 using namespace swift;
 using namespace irgen;
 
-llvm::Constant *IRGenModule::getObjCRetainFn() {
-  if (ObjCRetainFn) return ObjCRetainFn;
-
-  llvm::FunctionType *fnType =
-    llvm::FunctionType::get(ObjCPtrTy, ObjCPtrTy, false);
-  ObjCRetainFn = Module.getOrInsertFunction("objc_retain", fnType);
-  return ObjCRetainFn;
+/// Create an Objective-C runtime function.  The ObjC runtime uses the
+/// standard C conventions.
+static llvm::Constant *createObjCRuntimeFunction(IRGenModule &IGM, StringRef name,
+                                                 llvm::FunctionType *fnType) {
+  llvm::Constant *addr = IGM.Module.getOrInsertFunction(name, fnType);
+  return addr;
 }
 
-llvm::Constant *IRGenModule::getObjCReleaseFn() {
-  if (ObjCReleaseFn) return ObjCReleaseFn;
 
+llvm::Constant *IRGenModule::getObjCMsgSendFn() {
+  if (ObjCMsgSendFn) return ObjCMsgSendFn;
+
+  // T objc_msgSend(id, SEL*, U...);
+  // We use a totally bogus signature to make sure we *always* cast.
   llvm::FunctionType *fnType =
-    llvm::FunctionType::get(VoidTy, ObjCPtrTy, false);
-  ObjCReleaseFn = Module.getOrInsertFunction("objc_release", fnType);
-  return ObjCReleaseFn;
+    llvm::FunctionType::get(VoidTy, ArrayRef<llvm::Type*>(), false);
+  ObjCMsgSendFn = createObjCRuntimeFunction(*this, "objc_msgSend", fnType);
+  return ObjCMsgSendFn;
 }
+
+llvm::Constant *IRGenModule::getObjCMsgSendStretFn() {
+  if (ObjCMsgSendStretFn) return ObjCMsgSendStretFn;
+
+  // T objc_msgSend_stret(id, SEL*, U...);
+  // We use a totally bogus signature to make sure we *always* cast.
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(VoidTy, ArrayRef<llvm::Type*>(), false);
+  ObjCMsgSendStretFn =
+    createObjCRuntimeFunction(*this, "objc_msgSend_stret", fnType);
+  return ObjCMsgSendStretFn;
+}
+
+#define DEFINE_OBJC_RUNTIME_FUNCTION(LABEL, NAME, RETTY)            \
+llvm::Constant *IRGenModule::getObjC##LABEL##Fn() {                 \
+  if (ObjC##LABEL##Fn) return ObjC##LABEL##Fn;                      \
+                                                                    \
+  llvm::FunctionType *fnType =                                      \
+    llvm::FunctionType::get(RETTY, ObjCPtrTy, false);               \
+  ObjC##LABEL##Fn = createObjCRuntimeFunction(*this, NAME, fnType); \
+  return ObjC##LABEL##Fn;                                           \
+}
+
+DEFINE_OBJC_RUNTIME_FUNCTION(Retain,
+                             "objc_retain",
+                             ObjCPtrTy)
+DEFINE_OBJC_RUNTIME_FUNCTION(RetainAutoreleasedReturnValue,
+                             "objc_retainAutoreleasedReturnValue",
+                             ObjCPtrTy)
+DEFINE_OBJC_RUNTIME_FUNCTION(Release,
+                             "objc_release",
+                             VoidTy)
 
 void IRGenFunction::emitObjCRelease(llvm::Value *value) {
   // Get an appropriately-casted function pointer.
@@ -60,16 +101,42 @@ void IRGenFunction::emitObjCRelease(llvm::Value *value) {
   call->setDoesNotThrow();
 }
 
+/// Given a function of type %objc* (%objc*)*, cast it as appropriate
+/// to be used with values of type T.
+static llvm::Constant *getCastOfRetainFn(IRGenModule &IGM,
+                                         llvm::Constant *fn,
+                                         llvm::Type *valueTy) {
+#ifndef NDEBUG
+  auto origFnTy = cast<llvm::FunctionType>(fn->getType()->getPointerElementType());
+  assert(origFnTy->getReturnType() == IGM.ObjCPtrTy);
+  assert(origFnTy->getNumParams() == 1);
+  assert(origFnTy->getParamType(0) == IGM.ObjCPtrTy);
+  assert(isa<llvm::PointerType>(valueTy));
+#endif
+  if (valueTy == IGM.ObjCPtrTy)
+    return fn;
+
+  auto fnTy = llvm::FunctionType::get(valueTy, valueTy, false);
+  return llvm::ConstantExpr::getBitCast(fn, fnTy->getPointerTo(0));
+}
+
 llvm::Value *IRGenFunction::emitObjCRetainCall(llvm::Value *value) {
   // Get an appropriately-casted function pointer.
   auto fn = IGM.getObjCRetainFn();
-  if (value->getType() != IGM.ObjCPtrTy) {
-    auto fnTy = llvm::FunctionType::get(value->getType(), value->getType(),
-                                        false)->getPointerTo();
-    fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
-  }
+  fn = getCastOfRetainFn(IGM, fn, value->getType());
 
   auto call = Builder.CreateCall(fn, value);
+  call->setDoesNotThrow();
+  return call;
+}
+
+/// Reclaim an autoreleased return value.
+llvm::Value *irgen::emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,
+                                                          llvm::Value *value) {
+  auto fn = IGF.IGM.getObjCRetainAutoreleasedReturnValueFn();
+  fn = getCastOfRetainFn(IGF.IGM, fn, value->getType());
+
+  auto call = IGF.Builder.CreateCall(fn, value);
   call->setDoesNotThrow();
   return call;
 }
@@ -156,4 +223,173 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
   // Cache and return.
   entry = global;
   return global;
+}
+
+/// Determine the natural limits on how we can call the given method
+/// using Objective-C method dispatch.
+AbstractCallee irgen::getAbstractObjCMethodCallee(IRGenFunction &IGF,
+                                                  FuncDecl *fn) {
+  return AbstractCallee(AbstractCC::C, ExplosionKind::Minimal,
+                        /*minUncurry*/ 1, /*maxUncurry*/ 1,
+                        ExtraData::None);
+}
+
+/// Does an Objective-C method returning the given type require an
+/// indirect result?
+static llvm::PointerType *requiresObjCIndirectResult(IRGenModule &IGM,
+                                                     CanType type) {
+  // FIXME: we need to consider the target's C calling convention.
+  return IGM.requiresIndirectResult(type, ExplosionKind::Minimal);
+}
+
+namespace {
+  struct ObjCMethodSignature {
+    bool IsIndirectReturn;
+    llvm::FunctionType *FnTy;
+
+    ObjCMethodSignature(IRGenModule &IGM, CanType formalType) {
+      auto selfFnType = cast<FunctionType>(formalType);
+      auto formalFnType = cast<FunctionType>(CanType(selfFnType->getResult()));
+
+      llvm::Type *resultTy;
+      SmallVector<llvm::Type*, 8> argTys;
+
+      // Consider the result type first.
+      auto resultType = CanType(formalFnType->getResult());
+      if (auto ptrTy = requiresObjCIndirectResult(IGM, resultType)) {
+        IsIndirectReturn = true;
+        resultTy = IGM.VoidTy;
+        argTys.push_back(ptrTy);
+      } else {
+        IsIndirectReturn = false;
+
+        auto resultSchema = IGM.getSchema(resultType, ExplosionKind::Minimal);
+        assert(!resultSchema.containsAggregate());
+        resultTy = resultSchema.getScalarResultType(IGM);
+      }
+
+      // Add the 'self' argument.
+      argTys.push_back(IGM.getFragileType(CanType(selfFnType->getInput())));
+
+      // Add the _cmd argument.
+      argTys.push_back(IGM.Int8PtrTy);
+
+      // Add the formal arguments.
+      auto argSchema = IGM.getSchema(CanType(formalFnType->getInput()),
+                                     ExplosionKind::Minimal);
+      argSchema.addToArgTypes(IGM, argTys);
+
+      FnTy = llvm::FunctionType::get(resultTy, argTys, /*variadic*/ false);
+    }
+  };
+
+  class Selector {
+    llvm::SmallString<80> Text;
+
+  public:
+
+#define FOREACH_FAMILY(FAMILY)         \
+    FAMILY(Alloc, "alloc")             \
+    FAMILY(Copy, "copy")               \
+    FAMILY(Init, "init")               \
+    FAMILY(MutableCopy, "mutableCopy") \
+    FAMILY(New, "new")
+
+    // Note that these are in parallel with 'prefixes', below.
+    enum class Family {
+      None,
+#define GET_LABEL(LABEL, PREFIX) LABEL,
+      FOREACH_FAMILY(GET_LABEL)
+#undef GET_LABEL
+    };
+
+    Selector(FuncDecl *method) {
+      method->getSelector(Text);
+    }
+
+    StringRef str() const {
+      return Text;
+    }
+
+    /// Return the family string of this selector.
+    Family getFamily() const {
+      StringRef text = str();
+      while (!text.empty() && text[0] == '_') text = text.substr(1);
+
+#define CHECK_PREFIX(LABEL, PREFIX) \
+      if (hasPrefix(text, PREFIX)) return Family::LABEL;
+      FOREACH_FAMILY(CHECK_PREFIX)
+#undef CHECK_PREFIX
+
+      return Family::None;
+    }
+
+  private:
+    /// Does the given selector start with the given string as a
+    /// prefix, in the sense of the selector naming conventions?
+    static bool hasPrefix(StringRef text, StringRef prefix) {
+      if (!text.startswith(prefix)) return false;
+      if (text.size() == prefix.size()) return true;
+      assert(text.size() > prefix.size());
+      return !islower(text[prefix.size()]);
+    }
+
+#undef FOREACH_FAMILY
+  };
+}
+
+/// Prepare a call using ObjC method dispatch.
+CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF, FuncDecl *method,
+                                          Expr *self,
+                                          CanType substResultType,
+                                          ArrayRef<Substitution> subs,
+                                          ExplosionKind maxExplosion,
+                                          unsigned maxUncurry) {
+  CanType origFormalType = method->getType()->getCanonicalType();
+  ObjCMethodSignature sig(IGF.IGM, origFormalType);
+
+  // Create the appropriate messenger function.
+  // FIXME: this needs to be target-specific.
+  llvm::Constant *messenger;
+  if (sig.IsIndirectReturn) {
+    messenger = IGF.IGM.getObjCMsgSendStretFn();
+  } else {
+    messenger = IGF.IGM.getObjCMsgSendFn();
+  }
+
+  // Cast the messenger to the right type.
+  messenger = llvm::ConstantExpr::getBitCast(messenger,
+                                             sig.FnTy->getPointerTo());
+
+  CallEmission emission(IGF, Callee::forKnownFunction(AbstractCC::C,
+                                                      origFormalType,
+                                                      substResultType,
+                                                      subs,
+                                                      messenger,
+                                                      ManagedValue(nullptr),
+                                                      ExplosionKind::Minimal,
+                                                      /*uncurry*/ 1));
+
+  // Emit the self argument.
+  Explosion selfValues(ExplosionKind::Minimal);
+  IGF.emitRValue(self, selfValues);
+  assert(selfValues.size() == 1);
+
+  // Pull the 'self' value out of the explosion, clear its cleanup,
+  // and re-add it.  FIXME: this is a hack to pass the value at +0.
+  ManagedValue value = selfValues.claimNext();
+  selfValues.reset();
+  selfValues.addUnmanaged(value.getValue());
+
+  // Add the selector value.
+  Selector selector(method);
+  auto selectorRef = IGF.IGM.getAddrOfObjCSelectorRef(selector.str());
+  auto selectorV =
+    IGF.Builder.CreateLoad(Address(selectorRef, IGF.IGM.getPointerAlignment()));
+  selfValues.addUnmanaged(selectorV);
+
+  // Add that to the emission.
+  emission.addArg(selfValues);
+
+  return emission;
 }

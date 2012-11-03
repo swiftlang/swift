@@ -38,7 +38,7 @@ namespace irgen {
     /// The best explosion level available for the call.
     unsigned ExplosionLevel : 1;
 
-    /// Whether the function takes a data pointer.
+    /// The kind of extra data this call receives.
     unsigned Data : 2;
 
     /// The abstract calling convention.

@@ -71,6 +71,7 @@
 #include "GenHeap.h"
 #include "GenInit.h"
 #include "GenMeta.h"
+#include "GenObjC.h"
 #include "GenPoly.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -86,6 +87,28 @@
 
 using namespace swift;
 using namespace irgen;
+
+llvm::Type *ExplosionSchema::getScalarResultType(IRGenModule &IGM) const {
+  if (size() == 0) {
+    return IGM.VoidTy;
+  } else if (size() == 1) {
+    return begin()->getScalarType();
+  } else {
+    SmallVector<llvm::Type*, MaxScalarsForDirectResult> elts;
+    for (auto &elt : *this) elts.push_back(elt.getScalarType());
+    return llvm::StructType::get(IGM.getLLVMContext(), elts);
+  }
+}
+
+void ExplosionSchema::addToArgTypes(IRGenModule &IGM,
+                                    SmallVectorImpl<llvm::Type*> &types) const {
+  for (auto &elt : *this) {
+    if (elt.isAggregate())
+      types.push_back(elt.getAggregateType()->getPointerTo());
+    else
+      types.push_back(elt.getScalarType());
+  }
+}
 
 /// Return the number of potential curries of this function type.
 /// This is equal to the number of "straight-line" arrows in the type.
@@ -465,15 +488,8 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
 
   // Explode the argument clusters in that reversed order.
   for (AnyFunctionType *fnTy : formalFnTypes) {
-    ExplosionSchema schema(explosionKind);
-    IGM.getSchema(CanType(fnTy->getInput()), schema);
-
-    for (ExplosionSchema::Element &elt : schema) {
-      if (elt.isAggregate())
-        argTypes.push_back(elt.getAggregateType()->getPointerTo());
-      else
-        argTypes.push_back(elt.getScalarType());
-    }
+    auto schema = IGM.getSchema(CanType(fnTy->getInput()), explosionKind);
+    schema.addToArgTypes(IGM, argTypes);
 
     if (auto polyTy = dyn_cast<PolymorphicFunctionType>(fnTy))
       expandPolymorphicSignature(IGM, polyTy, argTypes);
@@ -516,15 +532,8 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
       const TypeInfo &info = IGM.getFragileTypeInfo(formalResultType);
       argTypes[0] = info.StorageType->getPointerTo();
       resultType = IGM.VoidTy;
-    } else if (schema.size() == 0) {
-      resultType = IGM.VoidTy;
-    } else if (schema.size() == 1) {
-      resultType = schema.begin()->getScalarType();
     } else {
-      llvm::SmallVector<llvm::Type*,
-                        ExplosionSchema::MaxScalarsForDirectResult> elts;
-      for (auto &elt : schema) elts.push_back(elt.getScalarType());
-      resultType = llvm::StructType::get(IGM.getLLVMContext(), elts);
+      resultType = schema.getScalarResultType(IGM);
     }
   }
 
@@ -758,8 +767,11 @@ namespace {
       Direct,
 
       /// A virtual call to a class member.  The first argument is a
-      /// pointer to a class instance.
+      /// pointer to a class instance or metatype.
       Virtual,
+
+      /// An Objective-C message send.
+      ObjCMessage,
 
       /// A call to a protocol member on a value of existential type.
       Existential,
@@ -785,6 +797,9 @@ namespace {
       struct {
         FuncDecl *Fn;
       } Virtual;
+      struct {
+        FuncDecl *Fn;
+      } ObjCMessage;
       struct {
         ExistentialMemberRefExpr *Fn;
       } Existential;
@@ -812,6 +827,13 @@ namespace {
       CalleeSource result;
       result.TheKind = Kind::Direct;
       result.Direct.Fn = fn;
+      return result;
+    }
+
+    static CalleeSource forObjCMessage(FuncDecl *fn) {
+      CalleeSource result;
+      result.TheKind = Kind::ObjCMessage;
+      result.ObjCMessage.Fn = fn;
       return result;
     }
 
@@ -865,6 +887,11 @@ namespace {
       return Virtual.Fn;
     }
 
+    FuncDecl *getObjCMethod() const {
+      assert(getKind() == Kind::ObjCMessage);
+      return ObjCMessage.Fn;
+    }
+
     ExistentialMemberRefExpr *getExistentialFunction() const {
       assert(getKind() == Kind::Existential);
       return Existential.Fn;
@@ -888,6 +915,9 @@ namespace {
 
       case Kind::Virtual:
         return getAbstractVirtualCallee(IGF, getVirtualFunction());
+
+      case Kind::ObjCMessage:
+        return getAbstractObjCMethodCallee(IGF, getObjCMethod());
 
       case Kind::Existential:
         return getAbstractProtocolCallee(IGF,
@@ -1473,6 +1503,16 @@ CallEmission CalleeSource::prepareRootCall(IRGenFunction &IGF,
                                               getSubstitutions(),
                                               maxExplosion, bestUncurry));
 
+  case Kind::ObjCMessage: {
+    // Find the 'self' expression and pass it separately.
+    Expr *self = CallSites[0].getArg();
+    CallSites.erase(CallSites.begin());
+
+    return prepareObjCMethodCall(IGF, getObjCMethod(), self,
+                                 SubstResultType, getSubstitutions(),
+                                 maxExplosion, bestUncurry);
+  }
+
   case Kind::Virtual: {
     // Emit the base.
     Explosion baseValues(ExplosionKind::Minimal);
@@ -1534,10 +1574,15 @@ namespace {
       irgen::ExprVisitor<FunctionDecomposer, CalleeSource> {
     CalleeSource visitDeclRefExpr(DeclRefExpr *E) {
       if (FuncDecl *fn = dyn_cast<FuncDecl>(E->getDecl())) {
-        if (isa<ClassDecl>(fn->getDeclContext()))
-          return CalleeSource::forVirtual(fn);
-        else
+        if (isa<ClassDecl>(fn->getDeclContext())) {
+          if (fn->getAttrs().isObjC()) {
+            return CalleeSource::forObjCMessage(fn);
+          } else {
+            return CalleeSource::forVirtual(fn);
+          }
+        } else {
           return CalleeSource::forDirect(fn);
+        }
       }
       if (ConstructorDecl *ctor = dyn_cast<ConstructorDecl>(E->getDecl()))
         return CalleeSource::forDirect(ctor);
@@ -1615,8 +1660,17 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   auto call = emitCallSite(false);
 
   // Bail out immediately on a void result.
-  llvm::Instruction *result = call.getInstruction();
+  llvm::Value *result = call.getInstruction();
   if (result->getType()->isVoidTy()) return;
+
+  // HACK: the Objective-C convention is to return at +0.
+  if (getCallee().getConvention() == AbstractCC::C) {
+    if (auto theClass = CurOrigType->getClassOrBoundGenericClass()) {
+      if (theClass->getAttrs().isObjC()) {
+        result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
+      }
+    }
+  }
 
   // Extract out the scalar results.
   auto &origResultTI = IGF.getFragileTypeInfo(CurOrigType);
@@ -2214,16 +2268,38 @@ void CallEmission::addEmptyArg() {
   addArg(temp);
 }
 
+/// Does the given convention grow clauses left-to-right?
+/// Swift generally grows right-to-left, but ObjC needs us
+/// to go left-to-right.
+static bool isLeftToRight(AbstractCC cc) {
+  return cc == AbstractCC::C;
+}
+
 /// Add a new set of arguments to the function.
 void CallEmission::addArg(Explosion &arg) {
   forceCallee();
 
-  // Add the given number of ar
+  // Add the given number of arguments.
   assert(getCallee().getExplosionLevel() == arg.getKind());
   assert(LastArgWritten >= arg.size());
-  LastArgWritten -= arg.size();
+  unsigned newLastArgWritten = LastArgWritten - arg.size();
 
-  auto argIterator = Args.begin() + LastArgWritten;
+  size_t targetIndex;
+
+  if (isLeftToRight(getCallee().getConvention())) {
+    // Shift the existing arguments to the left.
+    size_t numArgsToMove = Args.size() - LastArgWritten;
+    for (size_t i = 0, e = numArgsToMove; i != e; ++i) {
+      Args[newLastArgWritten + i] = Args[LastArgWritten + i];
+    }
+    targetIndex = newLastArgWritten + numArgsToMove;
+  } else {
+    targetIndex = newLastArgWritten;
+  }
+
+  LastArgWritten = newLastArgWritten;
+
+  auto argIterator = Args.begin() + targetIndex;
   for (auto value : arg.claimAll()) {
     *argIterator++ = value.split(Cleanups);
   }

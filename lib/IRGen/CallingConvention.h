@@ -26,7 +26,7 @@ namespace llvm {
 }
 
 namespace swift {
-class FuncDecl;
+class ValueDecl;
 
 namespace irgen {
 class IRGenModule;

@@ -347,6 +347,18 @@ public:
     Elements.push_back(e);
     ContainsAggregate |= e.isAggregate();
   }
+
+  /// Produce the correct type for a direct return of this schema,
+  /// which is assumed to contain only scalars.  This is defined as:
+  ///   - void, if the schema is empty;
+  ///   - the element type, if the schema contains exactly one element;
+  ///   - an anonymous struct type concatenating those types, otherwise.
+  llvm::Type *getScalarResultType(IRGenModule &IGM) const;
+
+  /// Treating the types in this schema as potential arguments to a
+  /// function call, add them to the end of the given vector of types.
+  void addToArgTypes(IRGenModule &IGM,
+                     llvm::SmallVectorImpl<llvm::Type*> &types) const;
 };
 
 } // end namespace irgen

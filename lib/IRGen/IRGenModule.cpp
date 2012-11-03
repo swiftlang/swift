@@ -112,6 +112,7 @@ IRGenModule::~IRGenModule() {
   delete &Types;
 }
 
+/// Create a function using swift's runtime calling convention.
 static llvm::Constant *createRuntimeFunction(IRGenModule &IGM, StringRef name,
                                              llvm::FunctionType *fnType) {
   llvm::Constant *addr = IGM.Module.getOrInsertFunction(name, fnType);
