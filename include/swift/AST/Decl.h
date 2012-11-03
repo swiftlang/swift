@@ -1129,6 +1129,10 @@ public:
   /// is a getter or setter, if it is one.
   Decl *getGetterOrSetterDecl() const { return GetOrSetDecl.getPointer(); }
 
+  /// getSelector - Given that this is an Objective-C method
+  /// declaration, produce its selector in the given buffer (as UTF-8).
+  void getSelector(llvm::SmallVectorImpl<char> &buffer) const;
+
   FuncDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(FuncDecl *over) { OverriddenDecl = over; }
 

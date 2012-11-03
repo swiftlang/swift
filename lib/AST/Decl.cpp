@@ -629,6 +629,48 @@ VarDecl *FuncDecl::getImplicitThisDecl() {
   return 0;
 }
 
+/// Produce the selector for this "Objective-C method" in the given buffer.
+void FuncDecl::getSelector(llvm::SmallVectorImpl<char> &buffer) const {
+  assert(buffer.empty());
+
+  llvm::raw_svector_ostream out(buffer);
+
+  // Start with the method name.
+  out << getName().str();
+
+  // We should always have exactly two levels of argument pattern.
+  auto argPatterns = getBody()->getArgParamPatterns();
+  assert(argPatterns.size() == 2);
+  Pattern *pattern = argPatterns[1];
+  auto tuple = dyn_cast<TuplePattern>(pattern);
+
+  // If it's an empty tuple pattern, it's a nullary selector.
+  if (tuple && tuple->getNumFields() == 0)
+    return;
+
+  // Otherwise, it's at least a unary selector.
+  out << ':';
+
+  // If it's a unary selector, we're done.
+  if (!tuple)
+    return;
+
+  // For every element except the first, add a selector component.
+  for (auto &elt : tuple->getFields().slice(1)) {
+    auto eltPattern = elt.getPattern();
+
+    // Add a label to the selector component if there's a tag.
+    if (auto named = dyn_cast<NamedPattern>(eltPattern)) {
+      out << named->getBoundName().str();
+    }
+
+    // Add the colon regardless.  Yes, this can sometimes create a
+    // component that's just a colon, and that's actually a legal
+    // selector.
+    out << ':';
+  }
+}
+
 SourceRange FuncDecl::getSourceRange() const {
   return Body->getSourceRange();
 }
