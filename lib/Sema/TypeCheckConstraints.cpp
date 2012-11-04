@@ -3408,16 +3408,6 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
   }
 }
 
-namespace {
-  /// \brief Maintains the set of type variable constraints
-  struct RelationalTypeVarConstraints {
-    RelationalTypeVarConstraints() : Below(), Above() { }
-    
-    Constraint *Below;
-    Constraint *Above;
-  };
-}
-
 bool ConstraintSystem::simplify() {
   bool solvedAny;
   do {
