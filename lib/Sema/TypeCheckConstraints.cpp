@@ -3705,17 +3705,21 @@ static bool bindDefinitiveTypeVariables(
     if (below.second)
       continue;
 
-    // Find unique concrete type above.
-    auto above = findUniqueConcreteType(cs, tvc.Above);
-    if (above.second)
-      continue;
+    auto type = below.first;
+    if (!type) {
+      // Find unique concrete type above.
+      auto above = findUniqueConcreteType(cs, tvc.Above);
+      if (above.second)
+        continue;
+
+      type = above.first;
+    }
 
     // Find unique kind type.
     auto kind = findUniqueKindType(cs, tvc.KindConstraints);
     if (kind.second)
       continue;
 
-    Type type = below.first? below.first : above.first;
     if (kind.first) {
       if (type && !type->isEqual(kind.first))
         continue;
@@ -3876,6 +3880,7 @@ static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
   if (auto binding = resolveTypeVariable(cs, typeVarConstraints,
                                          /*onlyDefinitive=*/false)) {
     using std::get;
+    assert(!get<2>(*binding) && "Missing definitive result above?");
     return SolutionStep(get<0>(*binding), get<1>(*binding), get<2>(*binding));
   }
 
