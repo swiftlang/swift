@@ -636,8 +636,15 @@ namespace {
     SmallVector<OverloadSet *, 4> UnresolvedOverloadSets;
     llvm::DenseMap<Expr *, OverloadSet *> GeneratedOverloadSets;
     SmallVector<std::unique_ptr<ConstraintSystem>, 2> Children;
-    llvm::DenseMap<TypeVariableType *, TypeVariableType *> Representatives;
-    llvm::DenseMap<TypeVariableType *, Type> FixedTypes;
+
+    typedef llvm::PointerUnion<TypeVariableType *, TypeBase *>
+      RepresentativeOrFixed;
+
+    /// \brief For each type variable, maps to either the representative of that
+    /// type variable or to the fixed type to which that type variable is
+    /// bound.
+    llvm::DenseMap<TypeVariableType *, RepresentativeOrFixed>
+      TypeVariableInfo;
 
     // Valid everywhere, for debugging
     SmallVector<Constraint *, 16> SolvedConstraints;
@@ -878,14 +885,21 @@ namespace {
       // equivalences can be handled via direct pointer jumps rather than
       // via a hash table lookup.
       for (auto cs = this; cs; cs = cs->Parent) {
-        auto known = cs->Representatives.find(typeVar);
-        if (known != cs->Representatives.end()) {
-          // Find the representative of the representative.
-          auto rep = getRepresentative(known->second);
+        auto known = cs->TypeVariableInfo.find(typeVar);
+        if (known != cs->TypeVariableInfo.end()) {
+          if (known->second.is<TypeVariableType *>()) {
+            // Find the representative of the representative.
+            auto rep = getRepresentative(
+                         known->second.get<TypeVariableType *>());
 
-          // Path compression: record the representative for this variable.
-          Representatives[typeVar] = rep;
-          return rep;
+            // Path compression: record the representative for this variable.
+            TypeVariableInfo[typeVar] = rep;
+            return rep;
+          }
+
+          // The presence of a fixed type indicates that this type variable
+          // is its own representative. This is a degenerate case.
+          return typeVar;
         }
       }
 
@@ -911,36 +925,59 @@ namespace {
       // ensures that the representative won't be further down the solution
       // stack than anything it is merged with.
       if (typeVar1->getImpl().getID() < typeVar2->getImpl().getID())
-        Representatives[typeVar2] = typeVar1;
+        TypeVariableInfo[typeVar2] = typeVar1;
       else
-        Representatives[typeVar1] = typeVar2;
+        TypeVariableInfo[typeVar1] = typeVar2;
     }
 
     /// \brief Retrieve the fixed type corresponding to the given type variable,
     /// or a null type if there is no fixed type.
-    Type getFixedType(TypeVariableType *typeVar, bool isRepresentative = false){
-      if (!isRepresentative)
-        typeVar = getRepresentative(typeVar);
-      auto known = FixedTypes.find(typeVar);
-      if (known == FixedTypes.end()) {
-        if (Parent) {
-          Type result = Parent->getFixedType(typeVar,
-                                             /*isRepresentative=*/true);
-          FixedTypes[typeVar] = result;
-          return result;
-        }
+    Type getFixedType(TypeVariableType *typeVar) {
+      for (auto cs = this; cs; cs = cs->Parent) {
+        auto known = cs->TypeVariableInfo.find(typeVar);
+        if (known != cs->TypeVariableInfo.end()) {
+          if (known->second.is<TypeBase *>()) {
+            // We found our fixed type.
+            Type result = known->second.get<TypeBase *>();
 
-        return Type();
+            // Path compression: record the fixed type of this variable.
+            if (cs != this)
+              TypeVariableInfo[typeVar] = result.getPointer();
+
+            return result;
+          }
+
+          // We found a type representative. Get its fixed type.
+          if (auto rep = known->second.get<TypeVariableType *>()) {
+            auto type = getFixedType(rep);
+            if (type)
+              TypeVariableInfo[typeVar] = type.getPointer();
+            return type;
+          }
+
+          return Type();
+        }
       }
 
-      return known->second;
+      return Type();
     }
 
     /// \brief Assign a fixed type to the given type variable.
     void assignFixedType(TypeVariableType *typeVar, Type type) {
-      typeVar = getRepresentative(typeVar);
-      assert(!FixedTypes[typeVar] && "Already have a type assignment!");
-      FixedTypes[typeVar] = type;
+      // Find the representative of this type variable, if any.
+      for (auto cs = this; cs; cs = cs->Parent) {
+        auto known = cs->TypeVariableInfo.find(typeVar);
+        if (known != cs->TypeVariableInfo.end()) {
+          auto rep = known->second.get<TypeVariableType *>();
+          if (rep != typeVar)
+            return assignFixedType(rep, type);
+
+          break;
+        }
+      }
+
+      // Our type variable is the representative. Record the fixed type.
+      TypeVariableInfo[typeVar] = type.getPointer();
     }
 
     /// \brief Determine whether we have already explored type bindings for
@@ -4133,9 +4170,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs1,
       // Collect all of the fixed types in CS1.
       llvm::MapVector<TypeVariableType *, Type> cs1FixedTypes;
       for (auto walkCS1 = cs1; walkCS1; walkCS1 = walkCS1->Parent) {
-        for (const auto &fixed : walkCS1->FixedTypes)
-          if (fixed.second)
-            cs1FixedTypes[fixed.first] = fixed.second;
+        for (const auto &fixed : walkCS1->TypeVariableInfo)
+          if (auto type = fixed.second.dyn_cast<TypeBase *>())
+            cs1FixedTypes[fixed.first] = type;
       }
 
       auto &topSystem = cs1->getTopConstraintSystem();
