@@ -3801,8 +3801,24 @@ static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
   // If there are any unresolved overload sets, resolve one now.
   // FIXME: This is terrible for performance.
   if (cs.getNumUnresolvedOverloadSets() > 0) {
-    // Resolve the first unresolved overload set.
-    return SolutionStep(0);
+    // Find the overload set with the minimum number of overloads.
+    unsigned minSize = cs.getUnresolvedOverloadSet(0)->getChoices().size();
+    unsigned minIdx = 0;
+    if (minSize > 2) {
+      for (unsigned i = 1, n = cs.getNumUnresolvedOverloadSets(); i < n; ++i) {
+        unsigned newSize = cs.getUnresolvedOverloadSet(i)->getChoices().size();
+        if (newSize < minSize) {
+          minSize = newSize;
+          minIdx = i;
+
+          if (minSize == 2)
+            break;
+        }
+      }
+    }
+
+    // Resolve the unresolved overload set with the minimum number of overloads.
+    return SolutionStep(minIdx);
   }
 
   // Try to determine a binding for a type variable.
