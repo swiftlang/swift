@@ -48,6 +48,7 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
 //===--------------------------------------------------------------------===//
 #define DEBUG_TYPE "Constraint solver"
 STATISTIC(NumExploredConstraintSystems, "# of constraint systems explored");
+STATISTIC(NumSimplifyIterations, "# of simplification iterations");
 STATISTIC(NumLameNonDefinitive, "# of type variables lamely non-definitive");
 
 //===--------------------------------------------------------------------===//
@@ -631,6 +632,7 @@ namespace {
     // Valid everywhere
     SmallVector<TypeVariableType *, 16> TypeVariables;
     SmallVector<Constraint *, 16> Constraints;
+    llvm::SmallPtrSet<Constraint *, 4> ExternallySolved;
     SmallVector<OverloadSet *, 4> UnresolvedOverloadSets;
     llvm::DenseMap<Expr *, OverloadSet *> GeneratedOverloadSets;
     SmallVector<std::unique_ptr<ConstraintSystem>, 2> Children;
@@ -795,7 +797,8 @@ namespace {
     /// it.
     ///
     /// \returns true if this constraint was solved.
-    bool addConstraint(Constraint *constraint) {
+    bool addConstraint(Constraint *constraint,
+                       bool isExternallySolved = false) {
       switch (simplifyConstraint(*constraint)) {
       case SolutionKind::Error:
         if (!failedConstraint) {
@@ -810,11 +813,15 @@ namespace {
         // to do.
         if (TC.getLangOpts().DebugConstraintSolver)
           SolvedConstraints.push_back(constraint);
+
+        if (isExternallySolved)
+          ExternallySolved.insert(constraint);
         return true;
 
       case SolutionKind::Unsolved:
         // We couldn't solve this constraint; add it to the pile.
-        Constraints.push_back(constraint);
+        if (!isExternallySolved)
+          Constraints.push_back(constraint);
         return false;
       }
     }
@@ -3420,6 +3427,9 @@ bool ConstraintSystem::simplify() {
     existingConstraints.swap(Constraints);
     solvedAny = false;
     for (auto constraint : existingConstraints) {
+      if (ExternallySolved.count(constraint))
+        continue;
+
       if (addConstraint(constraint)) {
         solvedAny = true;
 
@@ -3431,6 +3441,9 @@ bool ConstraintSystem::simplify() {
         return true;
       }
     }
+
+    ExternallySolved.clear();
+    ++NumSimplifyIterations;
   } while (solvedAny);
 
   // We've simplified all of the constraints we can.
@@ -3689,7 +3702,18 @@ static bool bindDefinitiveTypeVariables(
     // We found a type. Use it.
     cs.addConstraint(ConstraintKind::Equal, tvc.TypeVar, type);
     foundAny = true;
-  }  
+
+    // Directly solve the constraints associated with this type variable.
+    for (const auto &below : tvc.Below) {
+      cs.addConstraint(below.first, /*isExternallySolved=*/true);
+    }
+    for (const auto &above : tvc.Above) {
+      cs.addConstraint(above.first, /*isExternallySolved=*/true);
+    }
+    for (auto constraint : tvc.KindConstraints) {
+      cs.addConstraint(constraint, /*isExternallySolved=*/true);
+    }
+  }
 
   return foundAny;
 }
