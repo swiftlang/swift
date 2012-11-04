@@ -3955,6 +3955,26 @@ static bool updateSolutionCompareResult(SolutionCompareResult &result,
   return false;
 }
 
+/// \brief Remove the initializers from any tuple types within the
+/// given type.
+static Type stripInitializers(TypeChecker &tc, Type origType) {
+  return tc.transformType(origType, 
+           [&](Type type) -> Type {
+             if (auto tupleTy = type->getAs<TupleType>()) {
+               SmallVector<TupleTypeElt, 4> fields;
+               for (const auto &field : tupleTy->getFields()) {
+                 fields.push_back(TupleTypeElt(field.getType(),
+                                               field.getName(),
+                                               nullptr,
+                                               field.getVarargBaseTy()));
+                                               
+               }
+               return TupleType::get(fields, tc.Context);
+             }
+             return type;
+           });
+}
+
 SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs1,
                                                          ConstraintSystem &cs2){
   // FIXME: Find least common ancestor. We don't need to look further than
@@ -3978,6 +3998,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs1,
         auto boundTV1 = fixedTV1.first;
         if (auto type2 = cs2->simplifyType(boundTV1)) {
           auto type1 = cs1->simplifyType(fixedTV1.second);
+
+          // Strip any initializers from tuples in the type; they aren't
+          // to be compared.
+          type1 = stripInitializers(cs1->getTypeChecker(), type1);
+          type2 = stripInitializers(cs1->getTypeChecker(), type2);
 
           // If the types are equivalent, there's nothing more to do.
           if (type1->isEqual(type2))
