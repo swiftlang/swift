@@ -3670,23 +3670,13 @@ static bool bindDefinitiveTypeVariables(
     if (kind.second)
       continue;
 
-    Type type;
-    if (below.first) {
-      type = below.first;
-      if (above.first && !type->isEqual(above.first)) {
+    Type type = below.first? below.first : above.first;
+    if (kind.first) {
+      if (type && !type->isEqual(kind.first))
         continue;
-      }
-      if (kind.first && !type->isEqual(kind.first)) {
-        continue;
-      }
-    } else if (above.first) {
-      type = above.first;
-      if (kind.first && !type->isEqual(kind.first)) {
-        continue;
-      }
-    } else if (kind.first) {
+
       type = kind.first;
-    } else {
+    } else if (!type) {
       continue;
     }
     assert(type && "missing type?");
