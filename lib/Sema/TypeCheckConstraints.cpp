@@ -916,8 +916,12 @@ namespace {
         typeVar = getRepresentative(typeVar);
       auto known = FixedTypes.find(typeVar);
       if (known == FixedTypes.end()) {
-        if (Parent)
-          return Parent->getFixedType(typeVar, /*isRepresentative=*/true);
+        if (Parent) {
+          Type result = Parent->getFixedType(typeVar,
+                                             /*isRepresentative=*/true);
+          FixedTypes[typeVar] = result;
+          return result;
+        }
 
         return Type();
       }
@@ -4100,11 +4104,15 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs1,
       llvm::MapVector<TypeVariableType *, Type> cs1FixedTypes;
       for (auto walkCS1 = cs1; walkCS1; walkCS1 = walkCS1->Parent) {
         for (const auto &fixed : walkCS1->FixedTypes)
-          cs1FixedTypes[fixed.first] = fixed.second;
+          if (fixed.second)
+            cs1FixedTypes[fixed.first] = fixed.second;
       }
 
       auto &topSystem = cs1->getTopConstraintSystem();
       for (const auto &fixedTV1 : cs1FixedTypes) {
+        if (!fixedTV1.first)
+          continue;
+
         auto boundTV1 = fixedTV1.first;
         if (auto type2 = cs2->simplifyType(boundTV1)) {
           auto type1 = cs1->simplifyType(fixedTV1.second);
