@@ -3441,6 +3441,8 @@ namespace {
   /// \brief Describes the kind of step taking toward a potential
   /// solution.
   enum class SolutionStepKind : char {
+    /// \brief Simplify the system again.
+    Simplify,
     /// \brief Resolves an overload set by exploring each option.
     Overload, 
     /// \brief Binds a type variable to a given type.
@@ -3475,7 +3477,8 @@ namespace {
     /// \brief Construct a solution step for a simple kind, which needs no
     /// extra data.
     SolutionStep(SolutionStepKind kind) : Kind(kind) {
-      assert(kind == SolutionStepKind::ExploreBindings);
+      assert(kind == SolutionStepKind::ExploreBindings ||
+             kind == SolutionStepKind::Simplify);
     }
 
     /// \brief Construct a solution step that resolves an overload.
@@ -3580,6 +3583,122 @@ findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc,
   return bounds;
 }
 
+/// \brief Given a set of constraint/type pairs, find the unique concrete type.
+///
+/// \returns a pair (T, Conflict), where T is the unique concrete type
+/// found (or null if there is no such type) and Conflict is a bool
+/// indicating whether there was some kind of conflict that makes the
+/// type variable we're solving for not have an obvious solution.
+static std::pair<Type, bool> 
+findUniqueConcreteType(ConstraintSystem &cs,
+                       ArrayRef<std::pair<Constraint *, Type>> values) {
+  Type result;
+  for (const auto &value : values) {
+    if (value.second->hasTypeVariable()) {
+      return { Type(), true };
+    }
+
+    if (result && !result->isEqual(value.second)) {
+      return { Type(), true };
+    }
+
+
+    result = value.second;
+  }
+
+  return { result, false };
+}
+
+/// \brief Given a set of 'kind' constraints, e.g., literal and
+/// archetype constraints, find the unique type that satisfies these
+/// constraints, if any.
+///
+/// \returns a pair (T, Conflict), where T is the unique concrete type
+/// found (or null if there is no such type) and Conflict is a bool
+/// indicating whether there was some kind of conflict that makes the
+/// type variable we're solving for not have an obvious solution.
+static std::pair<Type, bool> 
+findUniqueKindType(ConstraintSystem &cs,
+                   ArrayRef<Constraint *> constraints)  {
+  auto &tc = cs.getTypeChecker();
+  Type result;
+  for (auto constraint : constraints) {
+    if (constraint->getKind() != ConstraintKind::Literal) {
+      return { Type(), true };
+    }
+
+    auto literalType = tc.getDefaultLiteralType(constraint->getLiteralKind());
+    if (!literalType || (result && !result->isEqual(literalType))) {
+      return { Type(), true };
+    }
+
+    result = literalType;
+  }
+
+  return { result, false };
+}
+
+/// \brief Identify type variables for which can we determine a
+/// concrete binding, and immediately produce constraints describing
+/// that binding.
+///
+/// Any binding produced is either part of all solutions to this
+/// constraint system, or their are no solutions to this constraint
+/// system.
+///
+/// \return true if any type variables were bound.
+static bool bindDefinitiveTypeVariables(
+              ConstraintSystem &cs,
+              SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints) {
+  bool foundAny = false;
+  for (auto &tvc : typeVarConstraints) {
+    if (tvc.HasNonConcreteConstraints)
+      continue;
+
+    // Find unique concrete type below.
+    auto below = findUniqueConcreteType(cs, tvc.Below);
+    if (below.second)
+      continue;
+
+    // Find unique concrete type above.
+    auto above = findUniqueConcreteType(cs, tvc.Above);
+    if (above.second)
+      continue;
+
+    // Find unique kind type.
+    auto kind = findUniqueKindType(cs, tvc.KindConstraints);
+    if (kind.second)
+      continue;
+
+    Type type;
+    if (below.first) {
+      type = below.first;
+      if (above.first && !type->isEqual(above.first)) {
+        continue;
+      }
+      if (kind.first && !type->isEqual(kind.first)) {
+        continue;
+      }
+    } else if (above.first) {
+      type = above.first;
+      if (kind.first && !type->isEqual(kind.first)) {
+        continue;
+      }
+    } else if (kind.first) {
+      type = kind.first;
+    } else {
+      continue;
+    }
+    assert(type && "missing type?");
+
+    // We found a type. Use it.
+    cs.addConstraint(ConstraintKind::Equal, tvc.TypeVar, type);
+    foundAny = true;
+  }  
+
+  return foundAny;
+}
+
 /// \brief Given the direct constraints placed on the type variables within
 /// a given constraint system, create potential bindings that resolve the
 /// constraints for a type variable.
@@ -3675,15 +3794,14 @@ static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
     return SolutionStep(SolutionStepKind::ExploreBindings);
   }
   
-#if 0
-  // FIXME: Look for a definitive type variable binding, and bind it now.
-  if (auto binding = resolveTypeVariable(cs, typeVarConstraints,
-                                         /*onlyDefinitive=*/true)) {
-    using std::get;
-    assert(get<2>(*binding) && "Binding must be definitive!");
-    return SolutionStep(get<0>(*binding), get<1>(*binding), get<2>(*binding));
+  SmallVector<TypeVariableConstraints, 16> typeVarConstraints;
+  cs.collectConstraintsForTypeVariables(typeVarConstraints);
+
+  // If there are any type variables that we can definitively solve,
+  // do so now.
+  if (bindDefinitiveTypeVariables(cs, typeVarConstraints)) {
+    return SolutionStep(SolutionStepKind::Simplify);
   }
-#endif
 
   // If there are any unresolved overload sets, resolve one now.
   // FIXME: This is terrible for performance.
@@ -3691,10 +3809,6 @@ static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
     // Resolve the first unresolved overload set.
     return SolutionStep(0);
   }
-
-  // Gather the constraints on each of the type variables.
-  SmallVector<TypeVariableConstraints, 16> typeVarConstraints;
-  cs.collectConstraintsForTypeVariables(typeVarConstraints);
 
   // Try to determine a binding for a type variable.
   if (auto binding = resolveTypeVariable(cs, typeVarConstraints,
@@ -3740,6 +3854,11 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     // Determine our next step.
     if (auto step = getNextSolutionStep(*cs)) {
       switch (step->getKind()) {
+      case SolutionStepKind::Simplify:
+        if (!cs->simplify())
+          stack.push_back(cs);
+        continue;
+
       case SolutionStepKind::Overload: {
         // Resolve the overload set.
         assert(step->isDefinitive() && "Overload solutions are definitive");
