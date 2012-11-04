@@ -520,38 +520,28 @@ namespace {
                                ArrayRef<OverloadChoice> choices);
   };
 
-  /// \brief Collects the set of directly-solvable constraints that
-  /// bound a given type variable.
-  struct TypeVariableBounds {
-    TypeVariableBounds() : HasNonConcreteConstraints(false) { }
+  /// \brief A representative type variable with the list of constraints
+  /// that apply to it.
+  struct TypeVariableConstraints {
+    TypeVariableConstraints(TypeVariableType *typeVar)
+      : HasNonConcreteConstraints(false), TypeVar(typeVar) {}
 
-    /// \brief Whether there are any constraints on this type variable
-    /// that aren't represented as concrete constraints described in
-    /// this structure.
-    ///
-    /// When false, the \c Above, \c Below, and \c Direct members
-    /// contain all of the constraints placed on this type variable.
+    /// \brief Whether there are any non-concrete constraints placed on this
+    /// type variable that aren't represented by the stored \c Constraints.
     bool HasNonConcreteConstraints;
 
-    /// \brief The set of constraints that bounds the type variable
-    /// "above", e.g., \c T <s X where \c T is the type variable, \c X
-    /// is a concrete type, and \c <s is a relational constraint.
-    ///
-    /// The first element in the pair is constraint, and the second
-    /// element in the pair is the concrete type.
-    llvm::SmallVector<std::pair<Constraint *, Type>, 2> Above;
+    /// \brief The representative type variable.
+    TypeVariableType *TypeVar;
 
-    /// \brief The set of constraints that bounds the type variable
-    /// "below", e.g., \c X <s T where \c T is the type variable, \c X
-    /// is a concrete type, and \c <s is a relational constraint.
-    ///
-    /// The first element in the pair is constraint, and the second
-    /// element in the pair is the concrete type.
-    llvm::SmallVector<std::pair<Constraint *, Type>, 2> Below;
+    /// \brief The set of constraints "above" the type variable.
+    SmallVector<std::pair<Constraint *, Type>, 4> Above;
 
-    /// \brief The set of 'direct' constraints on a type variable,
-    /// e.g., a literal or archetype constraint.
-    llvm::SmallVector<Constraint *, 2> Direct;
+    /// \brief The set of constraints "below" the type variable.
+    SmallVector<std::pair<Constraint *, Type>, 4> Below;
+
+    /// \brief The set of archetype and literal constraints directly applicable
+    /// to the type variable T.
+    SmallVector<Constraint *, 4> KindConstraints;
   };
 
   //===--------------------------------------------------------------------===//
@@ -639,39 +629,16 @@ namespace {
     TypeVariableType *assumedTypeVar = nullptr;
 
     // Valid everywhere
-
-    /// \brief The set of type variables introduced in this constraint
-    /// system.
     SmallVector<TypeVariableType *, 16> TypeVariables;
-
-    /// \brief The set of constraints that have not yet been solved.
     SmallVector<Constraint *, 16> Constraints;
-
-    /// \brief The set of bounds on each of the representative type
-    /// variables.
-    llvm::MapVector<TypeVariableType *, TypeVariableBounds> TypeVarBounds;
-
-    /// \brief The overload sets that have not yet been resolved.
     SmallVector<OverloadSet *, 4> UnresolvedOverloadSets;
-
-    /// \brief Overload sets that were generated from the given expressions.
     llvm::DenseMap<Expr *, OverloadSet *> GeneratedOverloadSets;
-
-    /// \brief The constraint dystems that are 
     SmallVector<std::unique_ptr<ConstraintSystem>, 2> Children;
-
-    /// \brief The mapping from each type variable to its
-    /// representative type variable.
     llvm::DenseMap<TypeVariableType *, TypeVariableType *> Representatives;
-
-    /// \brief The mapping from each solved type variable to the fixed
-    /// (concrete) type to which it is bound.
     llvm::DenseMap<TypeVariableType *, Type> FixedTypes;
 
-    /// \brief The set of constraints that has already been solved.
-    ///
-    /// Only populated when debugging of the constraint solver is enabled.
-    SmallVector<Constraint *, 1> SolvedConstraints;
+    // Valid everywhere, for debugging
+    SmallVector<Constraint *, 16> SolvedConstraints;
 
     unsigned assignTypeVariableID() {
       return getTopConstraintSystem().TypeCounter++;
@@ -809,12 +776,6 @@ namespace {
       return UnresolvedOverloadSets.size();
     }
 
-    /// \brief Retrieve the map of type variables that have constraints that
-    /// apply directly to them.
-    llvm::MapVector<TypeVariableType *, TypeVariableBounds> &getTypeVarBounds() {
-      return TypeVarBounds;
-    }
-
     /// \brief Determine whether this constraint system has any potential
     /// bindings.
     bool hasPotentialBindings() const {
@@ -824,86 +785,12 @@ namespace {
     /// \brief Create a new type variable.
     template<typename ...Args>
     TypeVariableType *createTypeVariable(Args &&...args) {
-      auto tv = TypeVariableType::getNew(TC.Context, assignTypeVariableID(),
-                                         std::forward<Args>(args)...);
+      auto tv= TypeVariableType::getNew(TC.Context, assignTypeVariableID(),
+                                        std::forward<Args>(args)...);
       TypeVariables.push_back(tv);
       return tv;
     }
 
-  private:
-    /// \brief Adds a new constraint that we know cannot be directly
-    /// solved or simplified to the list of constraints.
-    void addUnsolvedConstraint(Constraint *constraint) {
-      Constraints.push_back(constraint);
-      
-      // If this is a relational constraint, check whether it
-      // relates a type variable to a concrete type. If so, record
-      // it.
-      llvm::SetVector<TypeVariableType *> referencedTypeVars;
-
-      switch (constraint->getClassification()) {
-      case ConstraintClassification::Relational: {
-        auto first = simplifyType(constraint->getFirstType());
-        auto second = simplifyType(constraint->getSecondType());
-       
-        // Check whether this constraint bounds a type variable from
-        // above with a concrete type.
-        auto firstTypeVar = first->getAs<TypeVariableType>();
-        if (firstTypeVar) {
-          TypeVarBounds[getRepresentative(firstTypeVar)].Above
-            .push_back({constraint, second});
-        } else {
-          first->hasTypeVariable(referencedTypeVars);
-        }
-
-        // Check whether this constraint bounds a type variable from
-        // below with a concrete type.
-        auto secondTypeVar = second->getAs<TypeVariableType>();
-        if (secondTypeVar) {
-          TypeVarBounds[getRepresentative(secondTypeVar)].Below
-            .push_back({constraint, first});
-        } else {
-          second->hasTypeVariable(referencedTypeVars);
-        }
-
-        if (firstTypeVar && secondTypeVar) {
-          referencedTypeVars.insert(firstTypeVar);
-          referencedTypeVars.insert(secondTypeVar);
-        }
-        break;
-      }
-
-      case ConstraintClassification::Member: {
-        // Member constraints aren't directly solvable; simply mark
-        // any type variables referenced in either side.
-        simplifyType(constraint->getFirstType())
-          ->hasTypeVariable(referencedTypeVars);
-        simplifyType(constraint->getSecondType())
-          ->hasTypeVariable(referencedTypeVars);
-        break;
-      }
-        
-      case ConstraintClassification::Literal:
-      case ConstraintClassification::Archetype: {
-        auto first = simplifyType(constraint->getFirstType());
-        if (auto typeVar = first->getAs<TypeVariableType>()) {
-          TypeVarBounds[getRepresentative(typeVar)].Direct.push_back(constraint);
-        } else {
-          first->hasTypeVariable(referencedTypeVars);
-        }
-        break;
-      }
-      }
-
-      // Mark any type variables referenced here as having
-      // non-concrete constraints.
-      for (auto typeVar : referencedTypeVars) {
-        TypeVarBounds[getRepresentative(typeVar)]
-          .HasNonConcreteConstraints = true;
-      }
-    }
-
-  public: 
     /// \brief Add a newly-allocated constraint after attempting to simplify
     /// it.
     ///
@@ -927,7 +814,7 @@ namespace {
 
       case SolutionKind::Unsolved:
         // We couldn't solve this constraint; add it to the pile.
-        addUnsolvedConstraint(constraint);
+        Constraints.push_back(constraint);
         return false;
       }
     }
@@ -1291,6 +1178,16 @@ namespace {
 
     /// \brief Simplify the given constaint.
     SolutionKind simplifyConstraint(const Constraint &constraint);
+
+  public:
+    /// \brief Walks through the list of constraints, collecting the constraints
+    /// that directly apply to each representative type variable.
+    ///
+    /// \param typeVarConstraints will be populated with a list of
+    /// representative type variables and the constraints that apply directly
+    /// to them.
+    void collectConstraintsForTypeVariables(
+           SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints);
 
   public:
     /// \brief Simplify the system of constraints, by breaking down complex
@@ -3409,109 +3306,104 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   }
 }
 
-/// \brief Given a set of constraint/type pairs, find the unique concrete type.
-///
-/// \returns a pair (T, Conflict), where T is the unique concrete type
-/// found (or null if there is no such type) and Conflict is a bool
-/// indicating whether there was some kind of conflict that makes the
-/// type variable we're solving for not have an obvious solution.
-static std::pair<Type, bool> 
-findUniqueConcreteType(ConstraintSystem &cs,
-                       ArrayRef<std::pair<Constraint *, Type>> values) {
-  Type result;
-  for (const auto &value : values) {
-    if (value.second->hasTypeVariable()) {
-      return { Type(), true };
+void ConstraintSystem::collectConstraintsForTypeVariables(
+       SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints) {
+  typeVarConstraints.clear();
+
+  // Provide a mapping from type variable to its constraints. The getTVC
+  // function ties togeter the SmallVector and the DenseMap.
+  llvm::DenseMap<TypeVariableType *, unsigned> typeVarConstraintsMap;
+  auto getTVC = [&](TypeVariableType *tv) -> TypeVariableConstraints& {
+    tv = getRepresentative(tv);
+    unsigned& constraintsIdx = typeVarConstraintsMap[tv];
+    if (!constraintsIdx) {
+      typeVarConstraints.push_back(TypeVariableConstraints(tv));
+      constraintsIdx = typeVarConstraints.size();
+    }
+    return typeVarConstraints[constraintsIdx - 1];
+  };
+
+  // First, collect all of the constraints that relate directly to a
+  // type variable.
+  llvm::SetVector<TypeVariableType *> referencedTypeVars;
+  for (auto constraint : Constraints) {
+    auto first = simplifyType(constraint->getFirstType());
+    switch (constraint->getClassification()) {
+    case ConstraintClassification::Relational:
+      // Handle this interesting case below.
+      break;
+
+    case ConstraintClassification::Archetype:
+    case ConstraintClassification::Literal:
+      if (auto firstTV = first->getAs<TypeVariableType>()) {
+        // Record this constraint on the type variable.
+        getTVC(firstTV).KindConstraints.push_back(constraint);
+      } else {
+        // Simply mark any type variables in the type as referenced.
+        first->hasTypeVariable(referencedTypeVars);
+      }
+      continue;
+
+    case ConstraintClassification::Member:
+      // Mark the referenced type variables for both sides.
+      first->hasTypeVariable(referencedTypeVars);
+      simplifyType(constraint->getSecondType())
+        ->hasTypeVariable(referencedTypeVars);
+      continue;
     }
 
-    if (result && !result->isEqual(value.second)) {
-      return { Type(), true };
+    auto second = simplifyType(constraint->getSecondType());
+
+    auto firstTV = first->getAs<TypeVariableType>();
+    if (firstTV) {
+      // Record the constraint.
+      getTVC(firstTV).Above.push_back(std::make_pair(constraint, second));
+    } else {
+      // Collect any type variables represented in the first type.
+      first->hasTypeVariable(referencedTypeVars);
     }
 
+    auto secondTV = second->getAs<TypeVariableType>();
+    if (secondTV) {
+      // Record the constraint.
+      getTVC(secondTV).Below.push_back(std::make_pair(constraint, first));
+    } else {
+      // Collect any type variables represented in the second type.
+      second->hasTypeVariable(referencedTypeVars);
+    }
 
-    result = value.second;
+    // If both types are type variables, mark both as referenced.
+    if (firstTV && secondTV) {
+      referencedTypeVars.insert(firstTV);
+      referencedTypeVars.insert(secondTV);
+    }
   }
 
-  return { result, false };
-}
-
-/// \brief Given a set of 'kind' constraints, e.g., literal and
-/// archetype constraints, find the unique type that satisfies these
-/// constraints, if any.
-///
-/// \returns a pair (T, Conflict), where T is the unique concrete type
-/// found (or null if there is no such type) and Conflict is a bool
-/// indicating whether there was some kind of conflict that makes the
-/// type variable we're solving for not have an obvious solution.
-static std::pair<Type, bool> 
-findUniqueKindType(ConstraintSystem &cs,
-                   ArrayRef<Constraint *> constraints)  {
-  auto &tc = cs.getTypeChecker();
-  Type result;
-  for (auto constraint : constraints) {
-    if (constraint->getKind() != ConstraintKind::Literal) {
-      return { Type(), true };
-    }
-
-    auto literalType = tc.getDefaultLiteralType(constraint->getLiteralKind());
-    if (!literalType || (result && !result->isEqual(literalType))) {
-      return { Type(), true };
-    }
-
-    result = literalType;
+  // Mark any type variables that specify the result of an unresolved overload
+  // set as having non-concrete constraints.
+  for (auto ovl : UnresolvedOverloadSets) {
+    ovl->getBoundType()->hasTypeVariable(referencedTypeVars);
   }
 
-  return { result, false };
+  // Mark any referenced type variables as having non-concrete constraints.
+  for (auto tv : referencedTypeVars) {
+    tv = getRepresentative(tv);
+    auto known = typeVarConstraintsMap.find(tv);
+    if (known == typeVarConstraintsMap.end())
+      continue;
+
+    typeVarConstraints[known->second-1].HasNonConcreteConstraints = true;
+  }
 }
 
-/// \brief Identify type variables for which can we determine a
-/// concrete binding, and immediately produce constraints describing
-/// that binding.
-///
-/// Any binding produced is either part of all solutions to this
-/// constraint system, or their are no solutions to this constraint
-/// system.
-///
-/// \return true if any type variables were bound.
-static bool bindDefinitiveTypeVariables(
-              ConstraintSystem &cs) {
-  bool foundAny = false;
-  for (const auto &tvb : cs.getTypeVarBounds()) {
-    if (tvb.second.HasNonConcreteConstraints)
-      continue;
-
-    // Find unique concrete type below.
-    auto below = findUniqueConcreteType(cs, tvb.second.Below);
-    if (below.second)
-      continue;
-
-    // Find unique concrete type above.
-    auto above = findUniqueConcreteType(cs, tvb.second.Above);
-    if (above.second)
-      continue;
-
-    // Find unique kind type.
-    auto kind = findUniqueKindType(cs, tvb.second.Direct);
-    if (kind.second)
-      continue;
-
-    Type type = below.first? below.first : above.first;
-    if (kind.first) {
-      if (type && !type->isEqual(kind.first))
-        continue;
-
-      type = kind.first;
-    } else if (!type) {
-      continue;
-    }
-    assert(type && "missing type?");
-
-    // We found a type. Use it.
-    cs.addConstraint(ConstraintKind::Equal, tvb.first, type);
-    foundAny = true;
-  }  
-
-  return foundAny;
+namespace {
+  /// \brief Maintains the set of type variable constraints
+  struct RelationalTypeVarConstraints {
+    RelationalTypeVarConstraints() : Below(), Above() { }
+    
+    Constraint *Below;
+    Constraint *Above;
+  };
 }
 
 bool ConstraintSystem::simplify() {
@@ -3520,7 +3412,6 @@ bool ConstraintSystem::simplify() {
     // Loop through all of the thus-far-unsolved constraints, attempting to
     // simplify each one.
     SmallVector<Constraint *, 16> existingConstraints;
-    TypeVarBounds.clear(); // eventually, we'll want to keep the old ones
     existingConstraints.swap(Constraints);
     solvedAny = false;
     for (auto constraint : existingConstraints) {
@@ -3534,20 +3425,6 @@ bool ConstraintSystem::simplify() {
       if (failedConstraint) {
         return true;
       }
-    }
-
-    // Mark any type variables involved in unresolved overload sets as
-    // 'referenced'.
-    llvm::SetVector<TypeVariableType *> referencedTypeVars;
-    for (auto ovl : UnresolvedOverloadSets) {
-      ovl->getBoundType()->hasTypeVariable(referencedTypeVars);
-    }
-    for (auto typeVar : referencedTypeVars) {
-      TypeVarBounds[getRepresentative(typeVar)]
-        .HasNonConcreteConstraints = true;
-    }
-    if (bindDefinitiveTypeVariables(*this)) {
-      solvedAny = true;
     }
   } while (solvedAny);
 
@@ -3564,6 +3441,8 @@ namespace {
   /// \brief Describes the kind of step taking toward a potential
   /// solution.
   enum class SolutionStepKind : char {
+    /// \brief Simplify the system again.
+    Simplify,
     /// \brief Resolves an overload set by exploring each option.
     Overload, 
     /// \brief Binds a type variable to a given type.
@@ -3598,7 +3477,8 @@ namespace {
     /// \brief Construct a solution step for a simple kind, which needs no
     /// extra data.
     SolutionStep(SolutionStepKind kind) : Kind(kind) {
-      assert(kind == SolutionStepKind::ExploreBindings);
+      assert(kind == SolutionStepKind::ExploreBindings ||
+             kind == SolutionStepKind::Simplify);
     }
 
     /// \brief Construct a solution step that resolves an overload.
@@ -3665,12 +3545,12 @@ static void resolveOverloadSet(ConstraintSystem &cs,
 
 /// \brief Find the lower and upper bounds on a type variable.
 static std::pair<Type, Type>
-findTypeVariableBounds(ConstraintSystem &cs, const TypeVariableBounds &tvb,
+findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc,
                        bool &isDefinitive) {
-  isDefinitive = !tvb.HasNonConcreteConstraints && tvb.Direct.empty();
+  isDefinitive = !tvc.HasNonConcreteConstraints && tvc.KindConstraints.empty();
 
   std::pair<Type, Type> bounds;
-  for (auto arg : tvb.Below) {
+  for (auto arg : tvc.Below) {
     if (arg.second->hasTypeVariable())
       continue;
 
@@ -3685,7 +3565,7 @@ findTypeVariableBounds(ConstraintSystem &cs, const TypeVariableBounds &tvb,
     bounds.first = arg.second;
   }
 
-  for (auto arg : tvb.Above) {
+  for (auto arg : tvc.Above) {
     if (arg.second->hasTypeVariable())
       continue;
 
@@ -3703,33 +3583,140 @@ findTypeVariableBounds(ConstraintSystem &cs, const TypeVariableBounds &tvb,
   return bounds;
 }
 
+/// \brief Given a set of constraint/type pairs, find the unique concrete type.
+///
+/// \returns a pair (T, Conflict), where T is the unique concrete type
+/// found (or null if there is no such type) and Conflict is a bool
+/// indicating whether there was some kind of conflict that makes the
+/// type variable we're solving for not have an obvious solution.
+static std::pair<Type, bool> 
+findUniqueConcreteType(ConstraintSystem &cs,
+                       ArrayRef<std::pair<Constraint *, Type>> values) {
+  Type result;
+  for (const auto &value : values) {
+    if (value.second->hasTypeVariable()) {
+      return { Type(), true };
+    }
+
+    if (result && !result->isEqual(value.second)) {
+      return { Type(), true };
+    }
+
+
+    result = value.second;
+  }
+
+  return { result, false };
+}
+
+/// \brief Given a set of 'kind' constraints, e.g., literal and
+/// archetype constraints, find the unique type that satisfies these
+/// constraints, if any.
+///
+/// \returns a pair (T, Conflict), where T is the unique concrete type
+/// found (or null if there is no such type) and Conflict is a bool
+/// indicating whether there was some kind of conflict that makes the
+/// type variable we're solving for not have an obvious solution.
+static std::pair<Type, bool> 
+findUniqueKindType(ConstraintSystem &cs,
+                   ArrayRef<Constraint *> constraints)  {
+  auto &tc = cs.getTypeChecker();
+  Type result;
+  for (auto constraint : constraints) {
+    if (constraint->getKind() != ConstraintKind::Literal) {
+      return { Type(), true };
+    }
+
+    auto literalType = tc.getDefaultLiteralType(constraint->getLiteralKind());
+    if (!literalType || (result && !result->isEqual(literalType))) {
+      return { Type(), true };
+    }
+
+    result = literalType;
+  }
+
+  return { result, false };
+}
+
+/// \brief Identify type variables for which can we determine a
+/// concrete binding, and immediately produce constraints describing
+/// that binding.
+///
+/// Any binding produced is either part of all solutions to this
+/// constraint system, or their are no solutions to this constraint
+/// system.
+///
+/// \return true if any type variables were bound.
+static bool bindDefinitiveTypeVariables(
+              ConstraintSystem &cs,
+              SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints) {
+  bool foundAny = false;
+  for (auto &tvc : typeVarConstraints) {
+    if (tvc.HasNonConcreteConstraints)
+      continue;
+
+    // Find unique concrete type below.
+    auto below = findUniqueConcreteType(cs, tvc.Below);
+    if (below.second)
+      continue;
+
+    // Find unique concrete type above.
+    auto above = findUniqueConcreteType(cs, tvc.Above);
+    if (above.second)
+      continue;
+
+    // Find unique kind type.
+    auto kind = findUniqueKindType(cs, tvc.KindConstraints);
+    if (kind.second)
+      continue;
+
+    Type type = below.first? below.first : above.first;
+    if (kind.first) {
+      if (type && !type->isEqual(kind.first))
+        continue;
+
+      type = kind.first;
+    } else if (!type) {
+      continue;
+    }
+    assert(type && "missing type?");
+
+    // We found a type. Use it.
+    cs.addConstraint(ConstraintKind::Equal, tvc.TypeVar, type);
+    foundAny = true;
+  }  
+
+  return foundAny;
+}
+
 /// \brief Given the direct constraints placed on the type variables within
 /// a given constraint system, create potential bindings that resolve the
 /// constraints for a type variable.
 static Optional<std::tuple<TypeVariableType *, Type, bool>>
 resolveTypeVariable(
   ConstraintSystem &cs,
+  SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints,
   bool onlyDefinitive)
 {
 
   // Find a type variable with a lower bound, because those are the most
   // interesting.
-  TypeVariableType *tvbTypeVar = nullptr;
-  Type tvbUpper;
-  bool tvbWithUpperIsDefinitive;
-  for (const auto &tvb : cs.getTypeVarBounds()) {
+  TypeVariableConstraints *tvcWithUpper = nullptr;
+  Type tvcUpper;
+  bool tvcWithUpperIsDefinitive;
+  for (auto &tvc : typeVarConstraints) {
     // If we already explored type bindings for this type variable, skip it.
-    if (cs.haveExploredTypeVar(tvb.first))
+    if (cs.haveExploredTypeVar(tvc.TypeVar))
       continue;
 
     // If we're only allowed to look at type variables with concrete
     // constraints, and this type variable has non-concrete constraints,
     // skip it.
-    if (onlyDefinitive && tvb.second.HasNonConcreteConstraints)
+    if (onlyDefinitive && tvc.HasNonConcreteConstraints)
       continue;
 
     bool isDefinitive;
-    auto bounds = findTypeVariableBounds(cs, tvb.second, isDefinitive);
+    auto bounds = findTypeVariableBounds(cs, tvc, isDefinitive);
 
     if (onlyDefinitive && !isDefinitive)
       continue;
@@ -3737,14 +3724,14 @@ resolveTypeVariable(
     // If we have a lower bound, introduce a child constraint system binding
     // this type variable to that lower bound.
     if (bounds.first) {
-      return std::make_tuple(tvb.first, bounds.first, isDefinitive);
+      return std::make_tuple(tvc.TypeVar, bounds.first, isDefinitive);
     }
 
     // If there is an upper bound, record that (but don't use it yet).
-    if (bounds.second && !tvbTypeVar) {
-      tvbTypeVar = tvb.first;
-      tvbUpper = bounds.second;
-      tvbWithUpperIsDefinitive = isDefinitive;
+    if (bounds.second && !tvcWithUpper) {
+      tvcWithUpper = &tvc;
+      tvcUpper = bounds.second;
+      tvcWithUpperIsDefinitive = isDefinitive;
     }
   }
 
@@ -3752,9 +3739,9 @@ resolveTypeVariable(
   // this type variable to that upper bound.
   // FIXME: This type may be too specific, but we'd really rather not
   // go on a random search for subtypes that might work.
-  if (tvbTypeVar) {
-    return std::make_tuple(tvbTypeVar, tvbUpper,
-                           tvbWithUpperIsDefinitive);
+  if (tvcWithUpper) {
+    return std::make_tuple(tvcWithUpper->TypeVar, tvcUpper,
+                           tvcWithUpperIsDefinitive);
   }
 
   // If we were only looking for concrete bindings, don't consider literal
@@ -3765,20 +3752,19 @@ resolveTypeVariable(
   // If there are any literal constraints, add the default literal values as
   // potential bindings.
   auto &tc = cs.getTypeChecker();
-  for (const auto &tvb : cs.getTypeVarBounds()) {
+  for (auto &tvc : typeVarConstraints) {
     // If we already explored type bindings for this type variable, skip it.
-    if (cs.haveExploredTypeVar(tvb.first))
+    if (cs.haveExploredTypeVar(tvc.TypeVar))
       continue;
 
-    for (auto &constraint : tvb.second.Direct) {
+    for (auto &constraint : tvc.KindConstraints) {
       if (constraint->getClassification() != ConstraintClassification::Literal)
         continue;
 
       if (auto type = tc.getDefaultLiteralType(constraint->getLiteralKind())) {
-        return std::make_tuple(tvb.first, type,
-                               tvb.second.Direct.size() == 1 &&
-                               tvb.second.Above.empty() && 
-                               tvb.second.Below.empty());
+        return std::make_tuple(tvc.TypeVar, type,
+                               tvc.KindConstraints.size() == 1 &&
+                               tvc.Above.empty() && tvc.Below.empty());
       }
     }
   }
@@ -3798,6 +3784,15 @@ static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
     return SolutionStep(SolutionStepKind::ExploreBindings);
   }
   
+  SmallVector<TypeVariableConstraints, 16> typeVarConstraints;
+  cs.collectConstraintsForTypeVariables(typeVarConstraints);
+
+  // If there are any type variables that we can definitively solve,
+  // do so now.
+  if (bindDefinitiveTypeVariables(cs, typeVarConstraints)) {
+    return SolutionStep(SolutionStepKind::Simplify);
+  }
+
   // If there are any unresolved overload sets, resolve one now.
   // FIXME: This is terrible for performance.
   if (cs.getNumUnresolvedOverloadSets() > 0) {
@@ -3806,7 +3801,8 @@ static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
   }
 
   // Try to determine a binding for a type variable.
-  if (auto binding = resolveTypeVariable(cs, /*onlyDefinitive=*/false)) {
+  if (auto binding = resolveTypeVariable(cs, typeVarConstraints,
+                                         /*onlyDefinitive=*/false)) {
     using std::get;
     return SolutionStep(get<0>(*binding), get<1>(*binding), get<2>(*binding));
   }
@@ -3848,6 +3844,11 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     // Determine our next step.
     if (auto step = getNextSolutionStep(*cs)) {
       switch (step->getKind()) {
+      case SolutionStepKind::Simplify:
+        if (!cs->simplify())
+          stack.push_back(cs);
+        continue;
+
       case SolutionStepKind::Overload: {
         // Resolve the overload set.
         assert(step->isDefinitive() && "Overload solutions are definitive");
