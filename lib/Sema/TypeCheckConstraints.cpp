@@ -773,6 +773,17 @@ namespace {
         Parent->markChildInactive(this);
     }
 
+    /// \brief Remove any inactive (== unsolvable) children.
+    void removeInactiveChildren() {
+      Children.erase(std::remove_if(Children.begin(), Children.end(),
+                       [&](std::unique_ptr<ConstraintSystem> &child) -> bool {
+                         return !child->hasActiveChildren() &&
+                                (!child->Children.empty() ||
+                                 !child->isSolved());
+                       }),
+                     Children.end());
+    }
+
   public:
 
     /// \brief Retrieve an unresolved overload set.
@@ -795,8 +806,8 @@ namespace {
     /// \brief Create a new type variable.
     template<typename ...Args>
     TypeVariableType *createTypeVariable(Args &&...args) {
-      auto tv= TypeVariableType::getNew(TC.Context, assignTypeVariableID(),
-                                        std::forward<Args>(args)...);
+      auto tv = TypeVariableType::getNew(TC.Context, assignTypeVariableID(),
+                                         std::forward<Args>(args)...);
       TypeVariables.push_back(tv);
       return tv;
     }
@@ -3908,8 +3919,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
   SmallVector<ConstraintSystem *, 16> stack;
   stack.push_back(this);
 
-  // If there are any unresolved overload sets, create child systems in
-  // which we resolve the next overload set.
+  // While there are still constraint systems to search, do so.
   while (!stack.empty()) {
     auto cs = stack.back();
     stack.pop_back();
@@ -3917,8 +3927,10 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     // If there are any children of this system that are still active,
     // then we found a potential solution. There is no need to explore
     // alternatives based on this constraint system.
-    if (cs->hasActiveChildren())
+    if (cs->hasActiveChildren()) {
+      cs->removeInactiveChildren();
       continue;
+    }
 
     // Determine our next step.
     if (auto step = getNextSolutionStep(*cs)) {
@@ -3973,6 +3985,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     // explore. Consider this system dead.
     if (cs->PotentialBindings.empty()) {
       cs->markUnsolvable();
+      cs->removeInactiveChildren();
       continue;
     }
 
