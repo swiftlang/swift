@@ -49,6 +49,7 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
 #define DEBUG_TYPE "Constraint solver"
 STATISTIC(NumExploredConstraintSystems, "# of constraint systems explored");
 STATISTIC(NumSimplifyIterations, "# of simplification iterations");
+STATISTIC(NumSupertypeFallbacks, "# of supertype fallbacks");
 STATISTIC(NumLameNonDefinitive, "# of type variables lamely non-definitive");
 
 //===--------------------------------------------------------------------===//
@@ -1346,6 +1347,7 @@ void ConstraintSystem::markChildInactive(ConstraintSystem *childCS) {
       if (explored.count(supertype->getCanonicalType()) > 0)
         continue;
 
+      ++NumSupertypeFallbacks;
       PotentialBindings.push_back( { typeVar, supertype } );
       addedAny = true;
     }
