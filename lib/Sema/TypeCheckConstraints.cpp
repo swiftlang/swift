@@ -747,6 +747,10 @@ namespace {
       return depth;
     }
 
+    /// \brief Determine whether this constraint system has any child
+    /// constraint systems, active or not.
+    bool hasChildren() const { return !Children.empty(); }
+    
     /// \brief Determine whether this constraint system has any active
     /// child constraint systems.
     bool hasActiveChildren() const { return NumActiveChildren > 0; }
@@ -782,6 +786,36 @@ namespace {
                                  !child->isSolved());
                        }),
                      Children.end());
+    }
+
+    /// \brief Make this constraint system 'standalone', in the sense that it
+    /// will not need to look to its parent for any information.
+    void makeStandalone() {
+      decltype(ExploredTypeBindings)().swap(ExploredTypeBindings);
+      PotentialBindings.clear();
+      decltype(ExternallySolved)().swap(ExternallySolved);
+
+      // For each of the type variables, get its fixed type or representative.
+      for (auto cs = this; cs; cs = cs->Parent) {
+        for (auto tv : cs->TypeVariables) {
+          for (auto innerCS = this->Parent; innerCS; innerCS = innerCS->Parent){
+            auto known = innerCS->TypeVariableInfo.find(tv);
+            if (known != innerCS->TypeVariableInfo.end()) {
+              TypeVariableInfo[tv] = known->second;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    /// \brief Clear out any 'intermediate' data that is no longer useful when
+    /// all of the child systems are standalone.
+    void clearIntermediateData() {
+      decltype(ExploredTypeBindings)().swap(ExploredTypeBindings);
+      PotentialBindings.clear();
+      decltype(ExternallySolved)().swap(ExternallySolved);
+      decltype(TypeVariableInfo)().swap(TypeVariableInfo);
     }
 
   public:
@@ -3929,6 +3963,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     // alternatives based on this constraint system.
     if (cs->hasActiveChildren()) {
       cs->removeInactiveChildren();
+      cs->clearIntermediateData();
       continue;
     }
 
@@ -3977,6 +4012,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     // If there are no unsolved constraints, this system is either a
     // solution or it is underconstrained.
     if (cs->Constraints.empty()) {
+      cs->makeStandalone();
       viable.push_back(cs);
       continue;
     }
