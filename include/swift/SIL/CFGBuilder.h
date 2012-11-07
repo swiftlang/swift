@@ -1,4 +1,4 @@
-//===--- CFGBuilder.h - Class for creating CFG Constructs --------*- C++ -*-==//
+//===--- SILBuilder.h - Class for creating SIL Constructs --------*- C++ -*-==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_CFG_CFGBUILDER_H
-#define SWIFT_CFG_CFGBUILDER_H
+#ifndef SWIFT_SIL_SILBUILDER_H
+#define SWIFT_SIL_SILBUILDER_H
 
-#include "swift/CFG/BasicBlock.h"
-#include "swift/CFG/Instruction.h"
+#include "swift/SIL/BasicBlock.h"
+#include "swift/SIL/Instruction.h"
 
 namespace swift {
 

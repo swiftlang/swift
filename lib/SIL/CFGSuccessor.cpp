@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/CFG/CFGSuccessor.h"
-#include "swift/CFG/BasicBlock.h"
+#include "swift/SIL/CFGSuccessor.h"
+#include "swift/SIL/BasicBlock.h"
 using namespace swift;
 
 void CFGSuccessor::operator=(BasicBlock *BB) {

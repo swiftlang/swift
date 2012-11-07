@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/CFG/CFG.h"
+#include "swift/SIL/CFG.h"
 using namespace swift;
 
 CFG::~CFG() {

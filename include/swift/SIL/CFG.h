@@ -14,10 +14,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_CFG_CFG_H
-#define SWIFT_CFG_CFG_H
+#ifndef SWIFT_SIL_CFG_H
+#define SWIFT_SIL_CFG_H
 
-#include "swift/CFG/BasicBlock.h"
+#include "swift/SIL/BasicBlock.h"
 
 namespace swift {
 

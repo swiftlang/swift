@@ -14,9 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/CFG/Instruction.h"
+#include "swift/SIL/Instruction.h"
 #include "swift/AST/AST.h"
-#include "swift/CFG/CFG.h"
+#include "swift/SIL/CFG.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"

@@ -14,9 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/CFG/BasicBlock.h"
-#include "swift/CFG/BBArgument.h"
-#include "swift/CFG/CFG.h"
+#include "swift/SIL/BasicBlock.h"
+#include "swift/SIL/BBArgument.h"
+#include "swift/SIL/CFG.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//

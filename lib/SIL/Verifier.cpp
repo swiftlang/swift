@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/CFG/CFG.h"
-#include "swift/CFG/CFGVisitor.h"
+#include "swift/SIL/CFG.h"
+#include "swift/SIL/CFGVisitor.h"
 #include "swift/AST/Types.h"
 using namespace swift;
 

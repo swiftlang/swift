@@ -1,4 +1,4 @@
-//===--- CFGVisitor.h - Defines the CFGVisitor class -------------*- C++ -*-==//
+//===--- SILVisitor.h - Defines the SILVisitor class -------------*- C++ -*-==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,15 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the CFGVisitor class, used for walking CFGs.
+// This file defines the SILVisitor class, used for walking SIL code.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_CFG_CFGVISITOR_H
-#define SWIFT_CFG_CFGVISITOR_H
+#ifndef SWIFT_SIL_SILVISITOR_H
+#define SWIFT_SIL_SILVISITOR_H
 
-#include "swift/CFG/CFG.h"
-#include "swift/CFG/BBArgument.h"
+#include "swift/SIL/CFG.h"
+#include "swift/SIL/BBArgument.h"
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
@@ -40,7 +40,7 @@ public:
 
   ValueRetTy visit(Value *V) {
     switch (V->getKind()) {
-#include "swift/CFG/CFGNodes.def"
+#include "swift/SIL/CFGNodes.def"
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
@@ -55,7 +55,7 @@ ValueRetTy visit##CLASS(CLASS *I) {            \
 ValueRetTy visit##CLASS(CLASS *I) {                         \
   return static_cast<ImplClass*>(this)->visit##PARENT(I);   \
 }
-#include "swift/CFG/CFGNodes.def"
+#include "swift/SIL/CFGNodes.def"
 
   void visitBB(BasicBlock *BB) {
     for (auto &I : *BB)

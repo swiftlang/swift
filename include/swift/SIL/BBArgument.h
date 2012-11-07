@@ -1,4 +1,4 @@
-//===--- BBArgument.h - CFG BasicBlock Argument Representation --*- C++ -*-===//
+//===--- BBArgument.h - SIL BasicBlock Argument Representation --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_CFG_BBARGUMENT_H
-#define SWIFT_CFG_BBARGUMENT_H
+#ifndef SWIFT_SIL_BBARGUMENT_H
+#define SWIFT_SIL_BBARGUMENT_H
 
-#include "swift/CFG/Value.h"
+#include "swift/SIL/Value.h"
 
 namespace swift {
   class BasicBlock;

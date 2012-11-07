@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "Condition.h"
-#include "swift/CFG/CFG.h"
-#include "swift/CFG/CFGBuilder.h"
+#include "swift/SIL/CFG.h"
+#include "swift/SIL/CFGBuilder.h"
 using namespace swift;
 using namespace Lowering;
 
