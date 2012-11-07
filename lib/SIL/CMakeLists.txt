@@ -1,4 +1,4 @@
-add_subdirectory(CFGGen)
+add_subdirectory(SILGen)
 add_swift_library(swiftSIL
   BasicBlock.cpp
   CFG.cpp
