@@ -1,4 +1,4 @@
-##===- swift/lib/CFG/Makefile ------------------------------*- Makefile -*-===##
+##===- swift/lib/SIL/Makefile ------------------------------*- Makefile -*-===##
 # 
 # This source file is part of the Swift.org open source project
 #
@@ -15,7 +15,7 @@ include $(SWIFT_LEVEL)/../../Makefile.config
 
 PARALLEL_DIRS = CFGGen
 
-LIBRARYNAME := swiftCFG
+LIBRARYNAME := swiftSIL
 
 include $(SWIFT_LEVEL)/Makefile
 

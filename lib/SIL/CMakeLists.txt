@@ -1,5 +1,5 @@
 add_subdirectory(CFGGen)
-add_swift_library(swiftCFG
+add_swift_library(swiftSIL
   BasicBlock.cpp
   CFG.cpp
   CFGPrinter.cpp

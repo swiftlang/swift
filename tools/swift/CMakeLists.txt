@@ -6,7 +6,7 @@ add_swift_executable(swift
   PrintingDiagnosticConsumer.cpp
   PrintingDiagnosticConsumer.h
   swift.cpp
-  DEPENDS swiftIRGen swiftParse swiftSema swiftAST swiftCFG swiftCFGGen
+  DEPENDS swiftIRGen swiftParse swiftSema swiftAST swiftSIL swiftSILGen
   COMPONENT_DEPENDS bitwriter codegen ipo jit linker mcjit asmparser
                                         selectiondag ${LLVM_TARGETS_TO_BUILD})
 
