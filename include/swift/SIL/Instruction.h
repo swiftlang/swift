@@ -18,9 +18,9 @@
 #define SWIFT_CFG_INSTRUCTION_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/SIL/CFGBase.h"
-#include "swift/SIL/CFGLocation.h"
-#include "swift/SIL/CFGSuccessor.h"
+#include "swift/SIL/SILBase.h"
+#include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILSuccessor.h"
 #include "swift/SIL/Value.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist_node.h"

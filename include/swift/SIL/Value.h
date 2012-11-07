@@ -24,7 +24,7 @@ namespace swift {
 #define VALUE(Id, Parent) Id,
 #define VALUE_RANGE(Id, FirstId, LastId) \
   First_##Id = FirstId, Last_##Id = LastId,
-#include "swift/SIL/CFGNodes.def"
+#include "swift/SIL/SILNodes.def"
   };
 
   /// Value - This class is a value that can be used as an "operand" to an

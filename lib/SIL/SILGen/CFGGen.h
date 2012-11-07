@@ -14,8 +14,8 @@
 #define CFGGEN_H
 
 #include "Cleanup.h"
-#include "swift/SIL/CFG.h"
-#include "swift/SIL/CFGBuilder.h"
+#include "swift/SIL/SIL.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "llvm/ADT/DenseMap.h"
 

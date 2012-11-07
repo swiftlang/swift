@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/CFGVisitor.h"
+#include "swift/SIL/SILVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "llvm/ADT/DenseMap.h"

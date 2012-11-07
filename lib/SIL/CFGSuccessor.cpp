@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/CFGSuccessor.h"
+#include "swift/SIL/SILSuccessor.h"
 #include "swift/SIL/BasicBlock.h"
 using namespace swift;
 

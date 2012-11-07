@@ -17,7 +17,7 @@
 #ifndef SWIFT_SIL_SILVISITOR_H
 #define SWIFT_SIL_SILVISITOR_H
 
-#include "swift/SIL/CFG.h"
+#include "swift/SIL/SIL.h"
 #include "swift/SIL/BBArgument.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -40,7 +40,7 @@ public:
 
   ValueRetTy visit(Value *V) {
     switch (V->getKind()) {
-#include "swift/SIL/CFGNodes.def"
+#include "swift/SIL/SILNodes.def"
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
@@ -55,7 +55,7 @@ ValueRetTy visit##CLASS(CLASS *I) {            \
 ValueRetTy visit##CLASS(CLASS *I) {                         \
   return static_cast<ImplClass*>(this)->visit##PARENT(I);   \
 }
-#include "swift/SIL/CFGNodes.def"
+#include "swift/SIL/SILNodes.def"
 
   void visitBB(BasicBlock *BB) {
     for (auto &I : *BB)
