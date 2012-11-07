@@ -6,6 +6,7 @@ add_swift_library(swift_runtime
   KnownMetadata.cpp
   Metadata.cpp
   Stubs.cpp
+  SwiftObject.mm
   ObjCBridge.mm)
 
 if(SWIFT_OPTIMIZED)
