@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SIL.h"
+#include "swift/SIL/Function.h"
 using namespace swift;
 
 Function::~Function() {

@@ -16,7 +16,7 @@
 
 #include "swift/SIL/Instruction.h"
 #include "swift/AST/AST.h"
-#include "swift/SIL/SIL.h"
+#include "swift/SIL/Function.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
