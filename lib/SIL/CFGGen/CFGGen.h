@@ -134,6 +134,7 @@ public:
   Value *visitParenExpr(ParenExpr *E);
   Value *visitTupleExpr(TupleExpr *E);
   Value *visitScalarToTupleExpr(ScalarToTupleExpr *E);
+  Value *visitGetMetatypeExpr(GetMetatypeExpr *E);
   Value *visitSpecializeExpr(SpecializeExpr *E);
   Value *visitAddressOfExpr(AddressOfExpr *E);
   Value *visitTupleElementExpr(TupleElementExpr *E);

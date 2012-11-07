@@ -89,6 +89,10 @@ Value *CFGGen::visitTupleExpr(TupleExpr *E) {
   return B.createTuple(E, ArgsV);
 }
 
+Value *CFGGen::visitGetMetatypeExpr(GetMetatypeExpr *E) {
+  return visit(E->getSubExpr());
+}
+
 Value *CFGGen::visitSpecializeExpr(SpecializeExpr *E) {
   return B.createSpecialize(E, visit(E->getSubExpr()), E->getType());
 }

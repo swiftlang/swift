@@ -1,6 +1,6 @@
 add_subdirectory(AST)
 add_subdirectory(Basic)
-add_subdirectory(CFG)
+add_subdirectory(SIL)
 add_subdirectory(IRGen)
 add_subdirectory(Parse)
 add_subdirectory(Sema)

@@ -11,7 +11,7 @@
 ##===----------------------------------------------------------------------===##
 SWIFT_LEVEL := ..
 
-PARALLEL_DIRS = Basic AST Sema Parse CFG IRGen
+PARALLEL_DIRS = Basic AST Sema Parse SIL IRGen
 
 include $(SWIFT_LEVEL)/Makefile
 
