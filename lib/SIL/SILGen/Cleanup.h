@@ -1,4 +1,4 @@
-//===--- Cleanup.h - Declarations for CFG Cleanup Generation ----*- C++ -*-===//
+//===--- Cleanup.h - Declarations for SIL Cleanup Generation ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

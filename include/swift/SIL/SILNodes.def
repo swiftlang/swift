@@ -1,4 +1,4 @@
-//===--- CFGNodes.def - Swift CFG Metaprogramming ---------------*- C++ -*-===//
+//===--- SILNodes.def - Swift SIL Metaprogramming ---------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines macros used for macro-metaprogramming with CFG nodes.
+// This file defines macros used for macro-metaprogramming with SIL nodes.
 //
 //===----------------------------------------------------------------------===//
 
@@ -71,7 +71,7 @@ ABSTRACT_VALUE(Instruction, Value)
   INST(MetatypeInst, Instruction)
   INST(TupleElementInst, Instruction)
 
-  // CFG-only instructions that don't have an AST analog.
+  // SIL-only instructions that don't have an AST analog.
   INST(IndexLValueInst, Instruction)
   INST(IntegerValueInst, Instruction)
 

@@ -1,4 +1,4 @@
-//===--- Value.h - Value base class for in the CFG --------------*- C++ -*-===//
+//===--- Value.h - Value base class for SIL ---------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

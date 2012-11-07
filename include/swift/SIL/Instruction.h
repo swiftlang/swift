@@ -134,7 +134,7 @@ public:
 
 /// AllocVarInst - This represents the allocation of a local variable due to a
 /// 'var' declaration.  A single var declaration may allocate multiple different
-/// CFG variables at once through its pattern.  One of these will be created
+/// SIL allocations at once through its pattern.  One of these will be created
 /// for each variable in something like "var (x,y) : (Int, Int)".
 class AllocVarInst : public AllocInst {
 public:
@@ -485,7 +485,7 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
-// CFG-only instructions that don't have an AST analog
+// SIL-only instructions that don't have an AST analog
 //===----------------------------------------------------------------------===//
 
 

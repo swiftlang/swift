@@ -16,7 +16,7 @@ using namespace swift;
 using namespace Lowering;
 
 //===--------------------------------------------------------------------===//
-// CFG Class implementation
+// SILGen Class implementation
 //===--------------------------------------------------------------------===//
 
 SILGen::SILGen(CFG &C, FuncExpr *FE)

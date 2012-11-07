@@ -19,7 +19,7 @@ using namespace Lowering;
 
 
 namespace {
-/// InitPatternWithExpr - A visitor for traversing a pattern and generating CFG
+/// InitPatternWithExpr - A visitor for traversing a pattern and generating SIL
 /// code to allocate the declared variables and generate initialization
 /// sequences for their values.  If an initial value is specified by the "Init"
 /// expression, then it is used to initialize the corresponding decls.  If not,

@@ -203,7 +203,7 @@ public:
   }
 
   //===--------------------------------------------------------------------===//
-  // CFG-only instructions that don't have an AST analog
+  // SIL-only instructions that don't have an AST analog
   //===--------------------------------------------------------------------===//
 
   IndexLValueInst *createIndexLValue(Expr *E, Value *Operand, unsigned Index) {

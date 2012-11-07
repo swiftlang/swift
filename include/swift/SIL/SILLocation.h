@@ -1,4 +1,4 @@
-//===--- SILLocation.h - Location information for CFG nodes ------*- C++ -*-==//
+//===--- SILLocation.h - Location information for SIL nodes -----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -20,7 +20,7 @@ namespace swift {
   class Expr;
   class Stmt;
 
-/// SILLocation - This is a pointer to the AST node that a CFG instruction was
+/// SILLocation - This is a pointer to the AST node that a SIL instruction was
 /// derived from.
 ///
 /// FIXME: This should eventually include inlining history, when we get it.

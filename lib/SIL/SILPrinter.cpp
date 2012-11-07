@@ -42,7 +42,7 @@ raw_ostream &operator<<(raw_ostream &OS, ID i) {
 
 namespace {
 /// SILPrinter class - This is the internal implementation details of printing
-/// for CFG structures.
+/// for SIL structures.
 class SILPrinter : public SILVisitor<SILPrinter> {
   raw_ostream &OS;
 

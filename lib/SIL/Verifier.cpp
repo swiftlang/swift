@@ -146,7 +146,8 @@ public:
 } // end anonymous namespace
 
 
-/// verify - Run the IR verifier to make sure that the CFG follows invariants.
+/// verify - Run the IR verifier to make sure that the Function follows
+/// invariants.
 void CFG::verify() const {
   SILVerifier().visitCFG(const_cast<CFG*>(this));
 }

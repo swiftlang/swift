@@ -299,7 +299,7 @@ TupleElementInst::TupleElementInst(Type ResultTy, Value *Operand,
 
 
 //===----------------------------------------------------------------------===//
-// CFG-only instructions that don't have an AST analog
+// SIL-only instructions that don't have an AST analog
 //===----------------------------------------------------------------------===//
 
 IndexLValueInst::IndexLValueInst(Expr *E, Value *Operand, unsigned Index)

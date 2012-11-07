@@ -1,4 +1,4 @@
-//===--- CFG.h - Defines the CFG and CFG library umbrella header -*- C++ -*-==//
+//===--- Function.h - Defines the Function class ----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the CFG and includes the CFG components headers.
+// This file defines the Function class.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_CFG_H
-#define SWIFT_SIL_CFG_H
+#ifndef SWIFT_SIL_SILFUNCTION_H
+#define SWIFT_SIL_SILFUNCTION_H
 
 #include "swift/SIL/BasicBlock.h"
 
@@ -33,7 +33,8 @@ public:
 private:
   friend class BasicBlock;
 
-  /// Context - This is the context that uniques the types used by this CFG.
+  /// Context - This is the context that uniques the types used by this
+  /// Function.
   ASTContext &Context;
 
   /// The collection of all BasicBlocks in the CFG.
@@ -45,8 +46,8 @@ private:
 public:
   ~CFG();
 
-  /// Construct a CFG from a given statement.  It is the caller's responsibility
-  /// to 'delete' this object.
+  /// Construct a SIL function from a given statement.  It is the caller's
+  /// responsibility to 'delete' this object.
   static CFG *constructSIL(FuncExpr *FE);
 
   ASTContext &getContext() const { return Context; }
@@ -72,7 +73,8 @@ public:
   // Miscellaneous
   //===--------------------------------------------------------------------===//
 
-  /// verify - Run the IR verifier to make sure that the CFG follows invariants.
+  /// verify - Run the IR verifier to make sure that the Function follows
+  /// invariants.
   void verify() const;
   
   /// Pretty-print the CFG.

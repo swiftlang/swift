@@ -1,4 +1,4 @@
-//===--- CFG.cpp - Defines the CFG data structure --------------------------==//
+//===--- SILFunction.cpp - Defines the SILFunction data structure ---------===//
 //
 // This source file is part of the Swift.org open source project
 //

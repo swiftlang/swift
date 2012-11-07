@@ -31,8 +31,8 @@ public:
   /// The CFG being constructed.
   CFG &C;
   
-  /// B - The SILBuilder used to construct the CFG.  It is what maintains the
-  /// notion of the current block being emitted into.
+  /// B - The SILBuilder used to construct the Function.  It is what maintains
+  /// the notion of the current block being emitted into.
   SILBuilder B;
   
   std::vector<JumpDest> BreakDestStack;
@@ -84,10 +84,7 @@ public:
   // Statements
   //===--------------------------------------------------------------------===//
   
-  /// Construct the CFG components for the given BraceStmt.
   void visitBraceStmt(BraceStmt *S);
-  
-  /// SemiStmts are ignored for CFG construction.
   void visitSemiStmt(SemiStmt *S) {}
   
   void visitAssignStmt(AssignStmt *S);

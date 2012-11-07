@@ -49,14 +49,14 @@ private:
   void operator delete(void *Ptr, size_t) = delete;
 
 public:
-  BasicBlock(CFG *C, const char *Name = "");
+  BasicBlock(CFG *F, const char *Name = "");
   ~BasicBlock();
 
   CFG *getParent() { return Parent; }
   const CFG *getParent() const { return Parent; }
 
-  /// eraseFromParent - This method unlinks 'this' from the containing CFG and
-  /// deletes it.
+  /// eraseFromParent - This method unlinks 'this' from the containing Function
+  /// and deletes it.
   ///
   void eraseFromParent();
 
