@@ -476,7 +476,7 @@ static void emitInjectionFunction(IRGenModule &IGM,
   oneofTI.emitInjectionFunctionBody(IGF, elt, explosion);
 }
 
-/// emitOneOfType - Emit all the declarations associated with this oneof type.
+/// emitOneOfDecl - Emit all the declarations associated with this oneof type.
 void IRGenModule::emitOneOfDecl(OneOfDecl *oneof) {
   // FIXME: This is mostly copy-paste from emitExtension;
   // figure out how to refactor! 

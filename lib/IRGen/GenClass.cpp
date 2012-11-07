@@ -291,7 +291,7 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   IGF.emitConstructorBody(CD);
 }
 
-/// emitStructType - Emit all the declarations associated with this oneof type.
+/// emitClassDecl - Emit all the declarations associated with this class type.
 void IRGenModule::emitClassDecl(ClassDecl *D) {
   auto &classTI = Types.getFragileTypeInfo(D).as<ClassTypeInfo>();
   auto &layout = classTI.getLayout(*this);

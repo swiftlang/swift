@@ -188,7 +188,7 @@ LValue irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
 }
 
 
-/// emitStructType - Emit all the declarations associated with this oneof type.
+/// emitStructDecl - Emit all the declarations associated with this struct type.
 void IRGenModule::emitStructDecl(StructDecl *st) {
   emitStructMetadata(*this, st);
 
