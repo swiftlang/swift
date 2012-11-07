@@ -1,4 +1,4 @@
-//===--- CFGLocation.h - Location information for CFG nodes ------*- C++ -*-==//
+//===--- SILLocation.h - Location information for CFG nodes ------*- C++ -*-==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_CFG_LOCATION_H
-#define SWIFT_CFG_LOCATION_H
+#ifndef SWIFT_SIL_LOCATION_H
+#define SWIFT_SIL_LOCATION_H
 
 #include "llvm/ADT/PointerUnion.h"
 
@@ -20,12 +20,12 @@ namespace swift {
   class Expr;
   class Stmt;
 
-/// CFGLocation - This is a pointer to the AST node that a CFG instruction was
+/// SILLocation - This is a pointer to the AST node that a CFG instruction was
 /// derived from.
 ///
 /// FIXME: This should eventually include inlining history, when we get it.
 ///
-  typedef llvm::PointerUnion3<Stmt*,Expr*, Decl*> CFGLocation;
+  typedef llvm::PointerUnion3<Stmt*,Expr*, Decl*> SILLocation;
 
 } // end swift namespace
 

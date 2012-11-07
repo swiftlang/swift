@@ -60,7 +60,7 @@ void CleanupManager::endScope(CleanupsDepth depth) {
 /// threading out through any cleanups we might need to run.  This does not
 /// pop the cleanup stack.
 void CleanupManager::emitBranchAndCleanups(JumpDest Dest) {
-  CFGBuilder &B = Gen.getBuilder();
+  SILBuilder &B = Gen.getBuilder();
   assert(B.hasValidInsertionPoint() && "Inserting branch in invalid spot");
   assert(Stack.empty() && "FIXME: Implement cleanup support");
   B.createBranch(Dest.getBlock());

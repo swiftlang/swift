@@ -21,12 +21,12 @@
 
 namespace swift {
 namespace Lowering {
-  class CFGGen;
+  class SILGen;
 
 class LLVM_LIBRARY_VISIBILITY CleanupManager {
   friend class Scope;
 
-  CFGGen &Gen;
+  SILGen &Gen;
   
   /// Stack - Currently active cleanups in this scope tree.
   DiverseStack<Cleanup, 128> Stack;
@@ -37,7 +37,7 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   void endScope(CleanupsDepth Depth);
 
 public:
-  CleanupManager(CFGGen &Gen)
+  CleanupManager(SILGen &Gen)
     : Gen(Gen), InnermostScope(Stack.stable_end()) {
   }
   

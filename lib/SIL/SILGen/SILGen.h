@@ -1,4 +1,4 @@
-//===--- CFGGen.h - Implements Lowering of ASTs -> CFGs ---------*- C++ -*-===//
+//===--- SILGen.h - Implements Lowering of ASTs -> CFGs ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CFGGEN_H
-#define CFGGEN_H
+#ifndef SILGen_H
+#define SILGen_H
 
 #include "Cleanup.h"
 #include "swift/SIL/SIL.h"
@@ -25,15 +25,15 @@ namespace swift {
 namespace Lowering {
   class Condition;
 
-class LLVM_LIBRARY_VISIBILITY CFGGen
-  : public ASTVisitor<CFGGen, Value*, void> {
+class LLVM_LIBRARY_VISIBILITY SILGen
+  : public ASTVisitor<SILGen, Value*, void> {
 public:
   /// The CFG being constructed.
   CFG &C;
   
-  /// B - The CFGBuilder used to construct the CFG.  It is what maintains the
+  /// B - The SILBuilder used to construct the CFG.  It is what maintains the
   /// notion of the current block being emitted into.
-  CFGBuilder B;
+  SILBuilder B;
   
   std::vector<JumpDest> BreakDestStack;
   std::vector<JumpDest> ContinueDestStack;
@@ -47,8 +47,8 @@ public:
   llvm::DenseMap<ValueDecl*, Value*> VarLocs;
     
 public:
-  CFGGen(CFG &C, FuncExpr *FE);
-  ~CFGGen();
+  SILGen(CFG &C, FuncExpr *FE);
+  ~SILGen();
 
   void emitProlog(FuncExpr *FE);
 
@@ -57,7 +57,7 @@ public:
     return Cleanups.getCleanupsDepth();
   }
   
-  CFGBuilder &getBuilder() { return B; }
+  SILBuilder &getBuilder() { return B; }
   
   //===--------------------------------------------------------------------===//
   // Statements.

@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_CFG_INSTRUCTION_H
-#define SWIFT_CFG_INSTRUCTION_H
+#ifndef SWIFT_SIL_INSTRUCTION_H
+#define SWIFT_SIL_INSTRUCTION_H
 
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILBase.h"
@@ -61,7 +61,7 @@ class Instruction : public Value, public llvm::ilist_node<Instruction> {
   /// ilist_traits<Instruction>.
   BasicBlock *ParentBB;
 
-  CFGLocation Loc;
+  SILLocation Loc;
 
   friend struct llvm::ilist_sentinel_traits<Instruction>;
   Instruction() = delete;
@@ -69,7 +69,7 @@ class Instruction : public Value, public llvm::ilist_node<Instruction> {
   void operator delete(void *Ptr, size_t) = delete;
 
 protected:
-  Instruction(ValueKind Kind, CFGLocation Loc, Type Ty)
+  Instruction(ValueKind Kind, SILLocation Loc, Type Ty)
     : Value(Kind, Ty), ParentBB(0), Loc(Loc) {}
 
 public:
@@ -77,7 +77,7 @@ public:
   const BasicBlock *getParent() const { return ParentBB; }
   BasicBlock *getParent() { return ParentBB; }
 
-  CFGLocation getLoc() const { return Loc; }
+  SILLocation getLoc() const { return Loc; }
 
   /// Return the AST expression that this instruction is produced from, or null
   /// if it is implicitly generated.  Note that this is aborts on locations that
@@ -121,7 +121,7 @@ class AllocInst : public Instruction {
 // Eventually: enum AllocKind { Heap, Stack, StackNoRefCount, Pseudo };
 
 protected:
-  AllocInst(ValueKind Kind, CFGLocation Loc, Type Ty)
+  AllocInst(ValueKind Kind, SILLocation Loc, Type Ty)
     : Instruction(Kind, Loc, Ty) {}
 public:
 
@@ -196,7 +196,7 @@ class ApplyInst : public Instruction {
   
   /// Construct an ApplyInst from a given call expression and the provided
   /// arguments.
-  ApplyInst(CFGLocation Loc, Type Ty, Value *Callee, ArrayRef<Value*> Args);
+  ApplyInst(SILLocation Loc, Type Ty, Value *Callee, ArrayRef<Value*> Args);
 
 public:
   static ApplyInst *create(ApplyExpr *Expr, Value *Callee,
@@ -528,10 +528,10 @@ public:
 /// This class defines a "terminating instruction" for a BasicBlock.
 class TermInst : public Instruction {
 protected:
-  TermInst(ValueKind K, CFGLocation Loc, Type Ty) : Instruction(K, Loc, Ty) {}
+  TermInst(ValueKind K, SILLocation Loc, Type Ty) : Instruction(K, Loc, Ty) {}
 public:
 
-  typedef llvm::ArrayRef<CFGSuccessor> SuccessorListTy;
+  typedef llvm::ArrayRef<SILSuccessor> SuccessorListTy;
 
   /// The successor basic blocks of this terminator.
   SuccessorListTy getSuccessors();
@@ -593,7 +593,7 @@ public:
 /// BranchInst - An unconditional branch.
 class BranchInst : public TermInst {
   llvm::ArrayRef<Value*> Arguments;
-  CFGSuccessor DestBB;
+  SILSuccessor DestBB;
 public:
   typedef ArrayRef<Value*> ArgsTy;
   
@@ -616,7 +616,7 @@ class CondBranchInst : public TermInst {
   /// The condition value used for the branch.
   Value *Condition;
 
-  CFGSuccessor DestBBs[2];
+  SILSuccessor DestBBs[2];
 public:
 
   CondBranchInst(Stmt *TheStmt, Value *Condition,

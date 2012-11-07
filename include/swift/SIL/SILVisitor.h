@@ -23,10 +23,10 @@
 
 namespace swift {
 
-/// CFGVisitor - This is a simple visitor class for Swift CFG nodes, allowing
+/// SILVisitor - This is a simple visitor class for Swift CFG nodes, allowing
 /// clients to walk over entire CFGs, blocks, or instructions.
 template<typename ImplClass, typename ValueRetTy = void>
-class CFGVisitor {
+class SILVisitor {
 public:
 
   ValueRetTy visitValue(Value *V) {

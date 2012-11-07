@@ -1,4 +1,4 @@
-//===--- CFGSuccessor.h - Terminator Instruction Successor -------*- C++ -*-==//
+//===--- SILSuccessor.h - Terminator Instruction Successor -------*- C++ -*-==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_CFG_CFGSUCCESSOR_H
-#define SWIFT_CFG_CFGSUCCESSOR_H
+#ifndef SWIFT_SIL_SILSuccessor_H
+#define SWIFT_SIL_SILSuccessor_H
 
 #include <cassert>
 
@@ -19,11 +19,11 @@ namespace swift {
 class BasicBlock;
 class TermInst;
 
-/// CFGSuccessor - This represents a reference to a BasicBlock in a terminator
+/// SILSuccessor - This represents a reference to a BasicBlock in a terminator
 /// instruction, forming a list of TermInst references to BasicBlocks.  This
 /// forms the predecessor list, ensuring that it is always kept up to date.
-class CFGSuccessor {
-  friend class CFGSuccessorIterator;
+class SILSuccessor {
+  friend class SILSuccessorIterator;
   /// ContainingInst - This is the Terminator instruction that contains this
   /// successor.
   TermInst *ContainingInst;
@@ -34,24 +34,24 @@ class CFGSuccessor {
   
   /// This is the prev and next terminator reference to SuccessorBlock, or
   /// null if SuccessorBlock is null.
-  CFGSuccessor **Prev, *Next;
+  SILSuccessor **Prev, *Next;
 public:
-  CFGSuccessor() {}
+  SILSuccessor() {}
 
-  CFGSuccessor(TermInst *CI)
+  SILSuccessor(TermInst *CI)
     : ContainingInst(CI), SuccessorBlock(nullptr) {
   }
 
-  CFGSuccessor(TermInst *CI, BasicBlock *Succ)
+  SILSuccessor(TermInst *CI, BasicBlock *Succ)
     : ContainingInst(CI), SuccessorBlock(nullptr) {
     *this = Succ;
   }
   
-  ~CFGSuccessor() {
+  ~SILSuccessor() {
     *this = nullptr;
   }
 
-  /// init - This should only be used when the CFGSuccessor is default ctor'd.
+  /// init - This should only be used when the SILSuccessor is default ctor'd.
   void init(TermInst *TI) { ContainingInst = TI; SuccessorBlock = nullptr; }
 
   void operator=(BasicBlock *BB);
@@ -59,15 +59,15 @@ public:
   operator BasicBlock*() const { return SuccessorBlock; }
 };
   
-/// CFGSuccessorIterator - This is an iterator for walking the successor list of
+/// SILSuccessorIterator - This is an iterator for walking the successor list of
 /// a BasicBlock.
-class CFGSuccessorIterator {
-  CFGSuccessor *Cur;
+class SILSuccessorIterator {
+  SILSuccessor *Cur;
 public:
-  CFGSuccessorIterator(CFGSuccessor *Cur = 0) : Cur(Cur) {}
+  SILSuccessorIterator(SILSuccessor *Cur = 0) : Cur(Cur) {}
   
-  bool operator==(CFGSuccessorIterator I2) const { return Cur == I2.Cur; }
-  bool operator!=(CFGSuccessorIterator I2) const { return Cur != I2.Cur; }
+  bool operator==(SILSuccessorIterator I2) const { return Cur == I2.Cur; }
+  bool operator!=(SILSuccessorIterator I2) const { return Cur != I2.Cur; }
 
   void operator++() {
     assert(Cur && "Trying to advance past end");

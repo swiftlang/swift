@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_CFG_VALUE_H
-#define SWIFT_CFG_VALUE_H
+#ifndef SWIFT_SIL_VALUE_H
+#define SWIFT_SIL_VALUE_H
 
 #include "swift/AST/Type.h"
 
@@ -30,7 +30,7 @@ namespace swift {
   /// Value - This class is a value that can be used as an "operand" to an
   /// instruction.  It is either a reference to another instruction, or an
   /// incoming basic block argument.
-  class Value : public CFGAllocated<Value> {
+  class Value : public SILAllocated<Value> {
     Type Ty;
     const ValueKind Kind;
   protected:

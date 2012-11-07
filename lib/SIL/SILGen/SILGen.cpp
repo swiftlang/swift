@@ -1,4 +1,4 @@
-//===--- CFGGen.cpp - Implements Lowering of ASTs -> CFGs -----------------===//
+//===--- SILGen.cpp - Implements Lowering of ASTs -> CFGs -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,15 +19,15 @@ using namespace Lowering;
 // CFG Class implementation
 //===--------------------------------------------------------------------===//
 
-CFGGen::CFGGen(CFG &C, FuncExpr *FE)
+SILGen::SILGen(CFG &C, FuncExpr *FE)
   : C(C), B(new (C) BasicBlock(&C), C), Cleanups(*this) {
 
   emitProlog(FE);
 }
 
-/// CFGGen destructor - called when the entire AST has been visited.  This
+/// SILGen destructor - called when the entire AST has been visited.  This
 /// handles "falling off the end of the function" logic.
-CFGGen::~CFGGen() {
+SILGen::~SILGen() {
   // If the end of the function isn't reachable (e.g. it ended in an explicit
   // return), then we're done.
   if (!B.hasValidInsertionPoint())
@@ -46,7 +46,7 @@ CFGGen::~CFGGen() {
 CFG *CFG::constructCFG(FuncExpr *FE) {
   CFG *C = new CFG(FE->getASTContext());
 
-  CFGGen(*C, FE).visit(FE->getBody());
+  SILGen(*C, FE).visit(FE->getBody());
 
   C->verify();
   return C;

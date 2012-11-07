@@ -1,4 +1,4 @@
-//===--- CFGPrinter.cpp - Pretty-printing of CFGs --------------------------==//
+//===--- SILPrinter.cpp - Pretty-printing of CFGs --------------------------==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -41,9 +41,9 @@ raw_ostream &operator<<(raw_ostream &OS, ID i) {
 
 
 namespace {
-/// CFGPrinter class - This is the internal implementation details of printing
+/// SILPrinter class - This is the internal implementation details of printing
 /// for CFG structures.
-class CFGPrinter : public CFGVisitor<CFGPrinter> {
+class SILPrinter : public SILVisitor<SILPrinter> {
   raw_ostream &OS;
 
   llvm::DenseMap<const BasicBlock *, unsigned> BlocksToIDMap;
@@ -53,7 +53,7 @@ class CFGPrinter : public CFGVisitor<CFGPrinter> {
   ID getID(const Value *V);
 
 public:
-  CFGPrinter(raw_ostream &OS) : OS(OS) {
+  SILPrinter(raw_ostream &OS) : OS(OS) {
   }
 
   void print(const BasicBlock *BB) {
@@ -92,7 +92,7 @@ public:
     OS << '\n';
   }
   void visitInstruction(Instruction *I) {
-    assert(0 && "CFGPrinter not implemented for this instruction!");
+    assert(0 && "SILPrinter not implemented for this instruction!");
   }
 
   void visitAllocVarInst(AllocVarInst *AVI) {
@@ -212,7 +212,7 @@ public:
 };
 } // end anonymous namespace
 
-ID CFGPrinter::getID(const BasicBlock *Block) {
+ID SILPrinter::getID(const BasicBlock *Block) {
   // Lazily initialize the Blocks-to-IDs mapping.
   if (BlocksToIDMap.empty()) {
     unsigned idx = 0;
@@ -224,7 +224,7 @@ ID CFGPrinter::getID(const BasicBlock *Block) {
   return R;
 }
 
-ID CFGPrinter::getID(const Value *V) {
+ID SILPrinter::getID(const Value *V) {
   // Lazily initialize the instruction -> ID mapping.
   if (ValueToIDMap.empty()) {
     const BasicBlock *ParentBB;
@@ -257,7 +257,7 @@ void Value::dump() const {
 }
 
 void Value::print(raw_ostream &OS) const {
-  CFGPrinter(OS).print(this);
+  SILPrinter(OS).print(this);
 }
 
 void BasicBlock::dump() const {
@@ -266,7 +266,7 @@ void BasicBlock::dump() const {
 
 /// Pretty-print the BasicBlock with the designated stream.
 void BasicBlock::print(raw_ostream &OS) const {
-  CFGPrinter(OS).print(this);
+  SILPrinter(OS).print(this);
 }
 
 /// Pretty-print the basic block.
@@ -276,7 +276,7 @@ void CFG::dump() const {
 
 /// Pretty-print the basi block with the designated stream.
 void CFG::print(llvm::raw_ostream &OS) const {
-  CFGPrinter Printer(OS);
+  SILPrinter Printer(OS);
   for (const BasicBlock &B : *this)
     Printer.print(&B);
 }

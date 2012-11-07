@@ -1,4 +1,4 @@
-//===--- CFGSuccessor.cpp - Implementation of CFGSuccessor.h ---------------==//
+//===--- SILSuccessor.cpp - Implementation of SILSuccessor.h ---------------==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,7 +14,7 @@
 #include "swift/SIL/BasicBlock.h"
 using namespace swift;
 
-void CFGSuccessor::operator=(BasicBlock *BB) {
+void SILSuccessor::operator=(BasicBlock *BB) {
   // If we're not changing anything, we're done.
   if (SuccessorBlock == BB) return;
   
@@ -39,7 +39,7 @@ void CFGSuccessor::operator=(BasicBlock *BB) {
 }
 
 // Derferencing the SuccIterator returns the predecessors BasicBlock.
-BasicBlock *CFGSuccessorIterator::operator*() {
+BasicBlock *SILSuccessorIterator::operator*() {
   assert(Cur && "Can't deference end (or default constructed) iterator");
   return Cur->ContainingInst->getParent();
 }

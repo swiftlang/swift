@@ -14,13 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_CFG_LOWERING_CONDITION_H
-#define SWIFT_CFG_LOWERING_CONDITION_H
+#ifndef SWIFT_SIL_LOWERING_CONDITION_H
+#define SWIFT_SIL_LOWERING_CONDITION_H
 
 #include "llvm/Support/Compiler.h"
 
 namespace swift {
-  class CFGBuilder;
+  class SILBuilder;
   class BasicBlock;
   
 namespace Lowering {
@@ -46,23 +46,23 @@ public:
   
   /// enterTrue - Begin the emission of the true block.  This should only be
   /// called if hasTrue() returns true.
-  void enterTrue(CFGBuilder &B);
+  void enterTrue(SILBuilder &B);
   
   /// exitTrue - End the emission of the true block.  This must be called after
   /// enterTrue but before anything else on this Condition.
-  void exitTrue(CFGBuilder &B);
+  void exitTrue(SILBuilder &B);
   
   /// enterFalse - Begin the emission of the false block.  This should only be
   /// called if hasFalse() returns true.
-  void enterFalse(CFGBuilder &B);
+  void enterFalse(SILBuilder &B);
   
   /// exitFalse - End the emission of the true block.  This must be called after
   /// exitFalse but before anything else on this Condition.
-  void exitFalse(CFGBuilder &B);
+  void exitFalse(SILBuilder &B);
   
   /// complete - Complete this conditional execution.  This should be called
   /// only after all other calls on this Condition have been made.
-  void complete(CFGBuilder &B);
+  void complete(SILBuilder &B);
 };
 
 } // end namespace Lowering

@@ -18,7 +18,7 @@
 
 namespace swift {
 
-class CFGBuilder {
+class SILBuilder {
   /// BB - If this is non-null, the instruction is inserted in the specified
   /// basic block, at the specified InsertPt.  If null, created instructions
   /// are not auto-inserted.
@@ -27,17 +27,17 @@ class CFGBuilder {
   BasicBlock::iterator InsertPt;
 public:
 
-  CFGBuilder(CFG &C) : C(C), BB(0) {}
+  SILBuilder(CFG &C) : C(C), BB(0) {}
 
-  CFGBuilder(Instruction *I, CFG &C) : C(C) {
+  SILBuilder(Instruction *I, CFG &C) : C(C) {
     setInsertionPoint(I);
   }
 
-  CFGBuilder(BasicBlock *BB, CFG &C) : C(C) {
+  SILBuilder(BasicBlock *BB, CFG &C) : C(C) {
     setInsertionPoint(BB);
   }
 
-  CFGBuilder(BasicBlock *BB, BasicBlock::iterator InsertPt, CFG &C) : C(C) {
+  SILBuilder(BasicBlock *BB, BasicBlock::iterator InsertPt, CFG &C) : C(C) {
     setInsertionPoint(BB, InsertPt);
   }
 

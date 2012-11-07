@@ -1,4 +1,4 @@
-//===--- Verifier.cpp - Verification of Swift CFGs ------------------------===//
+//===--- Verifier.cpp - Verification of Swift SIL Code --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,10 +9,6 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines the high-level Instruction classes used for Swift CFGs.
-//
-//===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SIL.h"
 #include "swift/SIL/SILVisitor.h"
@@ -20,9 +16,9 @@
 using namespace swift;
 
 namespace {
-/// CFGVerifier class - This class implements the CFG verifier, which walks over
-/// an instance of the CFG, checking and enforcing its invariants.
-class CFGVerifier : public CFGVisitor<CFGVerifier> {
+/// SILVerifier class - This class implements the SIL verifier, which walks over
+/// SIL, checking and enforcing its invariants.
+class SILVerifier : public SILVisitor<SILVerifier> {
 public:
   
   void visit(Instruction *I) {
@@ -42,7 +38,7 @@ public:
 
     
     // Dispatch to our more-specialized instances below.
-    ((CFGVisitor<CFGVerifier>*)this)->visit(I);
+    ((SILVisitor<SILVerifier>*)this)->visit(I);
   }
 
   void visitAllocInst(AllocInst *AI) {
@@ -152,5 +148,5 @@ public:
 
 /// verify - Run the IR verifier to make sure that the CFG follows invariants.
 void CFG::verify() const {
-  CFGVerifier().visitCFG(const_cast<CFG*>(this));
+  SILVerifier().visitCFG(const_cast<CFG*>(this));
 }

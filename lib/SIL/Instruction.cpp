@@ -120,7 +120,7 @@ AllocArrayInst::AllocArrayInst(Expr *E, Type ElementType,
     ElementType(ElementType), NumElements(NumElements) {
 }
 
-ApplyInst::ApplyInst(CFGLocation Loc, Type Ty, Value *Callee,
+ApplyInst::ApplyInst(SILLocation Loc, Type Ty, Value *Callee,
                      ArrayRef<Value*> Args)
   : Instruction(ValueKind::ApplyInst, Loc, Ty), Callee(Callee),
     NumArgs(Args.size()) {
@@ -142,7 +142,7 @@ ApplyInst *ApplyInst::create(Value *Callee, ArrayRef<Value*> Args, CFG &C) {
                             Args.size() * sizeof(Value*),
                             llvm::AlignOf<ApplyInst>::Alignment);
   Type ResTy = Callee->getType()->castTo<FunctionType>()->getResult();
-  return ::new(Buffer) ApplyInst(CFGLocation(), ResTy, Callee, Args);
+  return ::new(Buffer) ApplyInst(SILLocation(), ResTy, Callee, Args);
 }
 
 
@@ -308,7 +308,7 @@ IndexLValueInst::IndexLValueInst(Expr *E, Value *Operand, unsigned Index)
 }
 
 IntegerValueInst::IntegerValueInst(uint64_t Val, Type Ty)
-  : Instruction(ValueKind::IntegerValueInst, CFGLocation(), Ty), Val(Val) {}
+  : Instruction(ValueKind::IntegerValueInst, SILLocation(), Ty), Val(Val) {}
 
 
 //===----------------------------------------------------------------------===//
@@ -328,7 +328,7 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
 }
 
 UnreachableInst::UnreachableInst(CFG &C)
-  : TermInst(ValueKind::UnreachableInst, CFGLocation(),
+  : TermInst(ValueKind::UnreachableInst, SILLocation(),
              C.getContext().TheEmptyTupleType) {
 }
 
@@ -338,7 +338,7 @@ ReturnInst::ReturnInst(ReturnStmt *S, Value *ReturnValue)
 }
 
 BranchInst::BranchInst(BasicBlock *DestBB, CFG &C)
-  : TermInst(ValueKind::BranchInst, CFGLocation(),
+  : TermInst(ValueKind::BranchInst, SILLocation(),
              C.getContext().TheEmptyTupleType),
     DestBB(this, DestBB) {
 }

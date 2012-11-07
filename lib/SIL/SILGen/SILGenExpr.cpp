@@ -1,4 +1,4 @@
-//===--- CFGGenExpr.cpp - Implements Lowering of ASTs -> CFGs for Exprs ---===//
+//===--- SILGenExpr.cpp - Implements Lowering of ASTs -> CFGs for Exprs ---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,7 +15,7 @@
 using namespace swift;
 using namespace Lowering;
 
-Value *CFGGen::visitApplyExpr(ApplyExpr *E) {
+Value *SILGen::visitApplyExpr(ApplyExpr *E) {
   Value *FnV = visit(E->getFn());
   llvm::SmallVector<Value*, 10> ArgsV;
   
@@ -31,7 +31,7 @@ Value *CFGGen::visitApplyExpr(ApplyExpr *E) {
   return B.createApply(E, FnV, ArgsV);
 }
 
-Value *CFGGen::visitDeclRefExpr(DeclRefExpr *E) {
+Value *SILGen::visitDeclRefExpr(DeclRefExpr *E) {
   // If this is a reference to a mutable decl, produce an lvalue.
   if (E->getType()->is<LValueType>()) {
     assert(VarLocs.count(E->getDecl()) && "VarDecl location not generated?");
@@ -42,25 +42,25 @@ Value *CFGGen::visitDeclRefExpr(DeclRefExpr *E) {
   return B.createConstantRef(E);
 }
 
-Value *CFGGen::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+Value *SILGen::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
   return B.createIntegerLiteral(E);
 }
-Value *CFGGen::visitFloatLiteralExpr(FloatLiteralExpr *E) {
+Value *SILGen::visitFloatLiteralExpr(FloatLiteralExpr *E) {
   return B.createFloatLiteral(E);
 }
-Value *CFGGen::visitCharacterLiteralExpr(CharacterLiteralExpr *E) {
+Value *SILGen::visitCharacterLiteralExpr(CharacterLiteralExpr *E) {
   return B.createCharacterLiteral(E);
 }
-Value *CFGGen::visitStringLiteralExpr(StringLiteralExpr *E) {
+Value *SILGen::visitStringLiteralExpr(StringLiteralExpr *E) {
   return B.createStringLiteral(E);
 }
 
-Value *CFGGen::visitLoadExpr(LoadExpr *E) {
+Value *SILGen::visitLoadExpr(LoadExpr *E) {
   Value *SubV = visit(E->getSubExpr());
   return B.createLoad(E, SubV);
 }
 
-Value *CFGGen::visitMaterializeExpr(MaterializeExpr *E) {
+Value *SILGen::visitMaterializeExpr(MaterializeExpr *E) {
   // Evaluate the value, use it to initialize a new temporary and return the
   // temp's address.
   Value *V = visit(E->getSubExpr());
@@ -70,39 +70,39 @@ Value *CFGGen::visitMaterializeExpr(MaterializeExpr *E) {
 }
 
 
-Value *CFGGen::visitRequalifyExpr(RequalifyExpr *E) {
+Value *SILGen::visitRequalifyExpr(RequalifyExpr *E) {
   return B.createTypeConversion(E, visit(E->getSubExpr()));
 }
 
-Value *CFGGen::visitFunctionConversionExpr(FunctionConversionExpr *E) {
+Value *SILGen::visitFunctionConversionExpr(FunctionConversionExpr *E) {
   return B.createTypeConversion(E, visit(E->getSubExpr()));
 }
 
-Value *CFGGen::visitParenExpr(ParenExpr *E) {
+Value *SILGen::visitParenExpr(ParenExpr *E) {
   return visit(E->getSubExpr());
 }
 
-Value *CFGGen::visitTupleExpr(TupleExpr *E) {
+Value *SILGen::visitTupleExpr(TupleExpr *E) {
   llvm::SmallVector<Value*, 10> ArgsV;
   for (auto &I : E->getElements())
     ArgsV.push_back(visit(I));
   return B.createTuple(E, ArgsV);
 }
 
-Value *CFGGen::visitGetMetatypeExpr(GetMetatypeExpr *E) {
+Value *SILGen::visitGetMetatypeExpr(GetMetatypeExpr *E) {
   return visit(E->getSubExpr());
 }
 
-Value *CFGGen::visitSpecializeExpr(SpecializeExpr *E) {
+Value *SILGen::visitSpecializeExpr(SpecializeExpr *E) {
   return B.createSpecialize(E, visit(E->getSubExpr()), E->getType());
 }
 
-Value *CFGGen::visitAddressOfExpr(AddressOfExpr *E) {
+Value *SILGen::visitAddressOfExpr(AddressOfExpr *E) {
   return visit(E->getSubExpr());
 }
 
 
-Value *CFGGen::visitTupleElementExpr(TupleElementExpr *E) {
+Value *SILGen::visitTupleElementExpr(TupleElementExpr *E) {
   return B.createTupleElement(E, visit(E->getBase()), E->getFieldNumber());
 }
 
@@ -110,7 +110,7 @@ Value *CFGGen::visitTupleElementExpr(TupleElementExpr *E) {
 /// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
 /// (which represents the retain count) a base pointer to some elements, and a
 /// length
-Value *CFGGen::emitArrayInjectionCall(Value *ObjectPtr, Value *BasePtr,
+Value *SILGen::emitArrayInjectionCall(Value *ObjectPtr, Value *BasePtr,
                                       Value *Length,
                                       Expr *ArrayInjectionFunction) {
   // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
@@ -123,7 +123,7 @@ Value *CFGGen::emitArrayInjectionCall(Value *ObjectPtr, Value *BasePtr,
 }
 
 
-Value *CFGGen::emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
+Value *SILGen::emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
                                 ArrayRef<int> ElementMapping,
                                 Expr *VarargsInjectionFunction) {
   // Collect the new elements.
@@ -191,7 +191,7 @@ Value *CFGGen::emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
   return B.createTuple(E, ResultElements);
 }
 
-Value *CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
+Value *SILGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
   // TupleShuffle expands out to extracts+inserts.  Start by emitting the base
   // expression that we'll shuffle.
   Value *Op = visit(E->getSubExpr());
@@ -204,7 +204,7 @@ Value *CFGGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
                           E->getVarargsInjectionFunctionOrNull());
 }
 
-Value *CFGGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
+Value *SILGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
   // Emit the argument and turn it into a trivial tuple.
   Value *Arg = visit(E->getSubExpr());
 
@@ -230,7 +230,7 @@ Value *CFGGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
   return emitTupleShuffle(E, Arg, ShuffleMask,E->getVarargsInjectionFunction());
 }
 
-Value *CFGGen::visitNewArrayExpr(NewArrayExpr *E) {
+Value *SILGen::visitNewArrayExpr(NewArrayExpr *E) {
   Value *NumElements = visit(E->getBounds()[0].Value);
 
   // Allocate the array.
@@ -253,7 +253,7 @@ Value *CFGGen::visitNewArrayExpr(NewArrayExpr *E) {
 
 
 
-Value *CFGGen::visitMetatypeExpr(MetatypeExpr *E) {
+Value *SILGen::visitMetatypeExpr(MetatypeExpr *E) {
   return B.createMetatype(E);
 }
 

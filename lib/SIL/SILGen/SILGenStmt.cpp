@@ -1,4 +1,4 @@
-//===--- CFGGenStmt.cpp - Implements Lowering of ASTs -> CFGs for Stmts ---===//
+//===--- SILGenStmt.cpp - Implements Lowering of ASTs -> CFGs for Stmts ---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -20,7 +20,7 @@ using namespace Lowering;
 /// emitOrDeleteBlock - If there are branches to the specified basic block,
 /// emit it per emitBlock.  If there aren't, then just delete the block - it
 /// turns out to have not been needed.
-static void emitOrDeleteBlock(CFGBuilder &B, BasicBlock *BB) {
+static void emitOrDeleteBlock(SILBuilder &B, BasicBlock *BB) {
   if (BB->pred_empty()) {
     // If the block is unused, we don't need it; just delete it.
     BB->eraseFromParent();
@@ -39,7 +39,7 @@ static void emitOrDeleteBlock(CFGBuilder &B, BasicBlock *BB) {
 ///        to the fallthrough.
 /// \param invertValue - true if this routine should invert the value before
 ///        testing true/false.
-Condition CFGGen::emitCondition(Stmt *TheStmt, Expr *E,
+Condition SILGen::emitCondition(Stmt *TheStmt, Expr *E,
                                 bool hasFalseCode, bool invertValue) {
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
@@ -73,7 +73,7 @@ Condition CFGGen::emitCondition(Stmt *TheStmt, Expr *E,
 
 
 
-void CFGGen::visitBraceStmt(BraceStmt *S) {
+void SILGen::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
   Scope BraceScope(Cleanups);
   
@@ -98,7 +98,7 @@ void CFGGen::visitBraceStmt(BraceStmt *S) {
 /// emitAssignStmtRecursive - Used to destructure (potentially) recursive
 /// assignments into tuple expressions down to their scalar stores.
 static void emitAssignStmtRecursive(AssignStmt *S, Value *Src, Expr *Dest,
-                                    CFGGen &Gen) {
+                                    SILGen &Gen) {
   // If the destination is a tuple, recursively destructure.
   if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
     unsigned EltNo = 0;
@@ -116,14 +116,14 @@ static void emitAssignStmtRecursive(AssignStmt *S, Value *Src, Expr *Dest,
 }
 
 
-void CFGGen::visitAssignStmt(AssignStmt *S) {
+void SILGen::visitAssignStmt(AssignStmt *S) {
   Value *SrcV = visit(S->getSrc());
   
   // Handle tuple destinations by destructuring them if present.
   return emitAssignStmtRecursive(S, SrcV, S->getDest(), *this);
 }
 
-void CFGGen::visitIfStmt(IfStmt *S) {
+void SILGen::visitIfStmt(IfStmt *S) {
   Condition Cond = emitCondition(S, S->getCond(), S->getElseStmt() != nullptr);
   
   if (Cond.hasTrue()) {
@@ -142,7 +142,7 @@ void CFGGen::visitIfStmt(IfStmt *S) {
   Cond.complete(B);
 }
 
-void CFGGen::visitWhileStmt(WhileStmt *S) {
+void SILGen::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (C) BasicBlock(&C, "while");
   B.emitBlock(LoopBB);
@@ -173,7 +173,7 @@ void CFGGen::visitWhileStmt(WhileStmt *S) {
   ContinueDestStack.pop_back();
 }
 
-void CFGGen::visitDoWhileStmt(DoWhileStmt *S) {
+void SILGen::visitDoWhileStmt(DoWhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (C) BasicBlock(&C, "dowhile");
   B.emitBlock(LoopBB);
@@ -205,7 +205,7 @@ void CFGGen::visitDoWhileStmt(DoWhileStmt *S) {
   ContinueDestStack.pop_back();
 }
 
-void CFGGen::visitForStmt(ForStmt *S) {
+void SILGen::visitForStmt(ForStmt *S) {
   // Enter a new scope.
   Scope ForScope(Cleanups);
   
@@ -269,7 +269,7 @@ void CFGGen::visitForStmt(ForStmt *S) {
   ContinueDestStack.pop_back();
 }
 
-void CFGGen::visitForEachStmt(ForEachStmt *S) {
+void SILGen::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'range' variable that we'll be using for iteration.
   Scope OuterForScope(Cleanups);
   visitPatternBindingDecl(S->getRange());
@@ -315,10 +315,10 @@ void CFGGen::visitForEachStmt(ForEachStmt *S) {
   ContinueDestStack.pop_back();
 }
 
-void CFGGen::visitBreakStmt(BreakStmt *S) {
+void SILGen::visitBreakStmt(BreakStmt *S) {
   Cleanups.emitBranchAndCleanups(BreakDestStack.back());
 }
 
-void CFGGen::visitContinueStmt(ContinueStmt *S) {
+void SILGen::visitContinueStmt(ContinueStmt *S) {
   Cleanups.emitBranchAndCleanups(ContinueDestStack.back());
 }

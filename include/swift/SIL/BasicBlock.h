@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_CFG_BASICBLOCK_H
-#define SWIFT_CFG_BASICBLOCK_H
+#ifndef SWIFT_SIL_BASICBLOCK_H
+#define SWIFT_SIL_BASICBLOCK_H
 
 #include "swift/SIL/Instruction.h"
 
@@ -24,8 +24,8 @@ class CFG;
 class BBArgument;
 
 class BasicBlock :
-public llvm::ilist_node<BasicBlock>, public CFGAllocated<BasicBlock> {
-  friend class CFGSuccessor;
+public llvm::ilist_node<BasicBlock>, public SILAllocated<BasicBlock> {
+  friend class SILSuccessor;
 public:
   typedef llvm::iplist<Instruction> InstListType;
 private:
@@ -34,8 +34,8 @@ private:
   
   /// PrevList - This is a list of all of the terminator operands that are
   /// branching to this block, forming the predecessor list.  This is
-  /// automatically managed by the CFGSuccessor class.
-  CFGSuccessor *PredList;
+  /// automatically managed by the SILSuccessor class.
+  SILSuccessor *PredList;
 
   /// BBArgList - This is the list of basic block arguments for this block.
   std::vector<BBArgument*> BBArgList;
@@ -102,13 +102,13 @@ public:
   // Predecessors and Successors
   //===--------------------------------------------------------------------===//
 
-  typedef CFGSuccessorIterator pred_iterator;
+  typedef SILSuccessorIterator pred_iterator;
   
   bool pred_empty() const { return PredList == nullptr; }
   pred_iterator pred_begin() const { return pred_iterator(PredList); }
   pred_iterator pred_end() const { return pred_iterator(); }
      
-  typedef ArrayRef<CFGSuccessor> Successors;
+  typedef ArrayRef<SILSuccessor> Successors;
 
   /// The successors of a BasicBlock are defined either explicitly as
   /// a single successor as the branch targets of the terminator instruction.

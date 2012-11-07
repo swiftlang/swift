@@ -16,7 +16,7 @@
 using namespace swift;
 using namespace Lowering;
 
-void Condition::enterTrue(CFGBuilder &B) {
+void Condition::enterTrue(SILBuilder &B) {
   assert(TrueBB && "Cannot call enterTrue without a True block!");
   
   // TrueBB has already been inserted somewhere unless there's a
@@ -26,7 +26,7 @@ void Condition::enterTrue(CFGBuilder &B) {
   B.emitBlock(TrueBB);
 }
 
-void Condition::exitTrue(CFGBuilder &B) {
+void Condition::exitTrue(SILBuilder &B) {
   // If there's no continuation block, it's because the condition was
   // folded to true.  In that case, we just continue emitting code as
   // if we were still in the true case, and we're unreachable iff the
@@ -58,7 +58,7 @@ void Condition::exitTrue(CFGBuilder &B) {
   //   - a cleared IP, if the end of the true block was not reachable.
 }
 
-void Condition::enterFalse(CFGBuilder &B) {
+void Condition::enterFalse(SILBuilder &B) {
   assert(FalseBB && "entering the false branch when it was not valid");
   
   // FalseBB has already been inserted somewhere unless there's a
@@ -70,7 +70,7 @@ void Condition::enterFalse(CFGBuilder &B) {
   B.emitBlock(FalseBB);
 }
 
-void Condition::exitFalse(CFGBuilder &B) {
+void Condition::exitFalse(SILBuilder &B) {
   // If there's no continuation block, it's because the condition was
   // folded to false.  In that case, we just continue emitting code as
   // if we were still in the false case, and we're unreachable iff the
@@ -109,7 +109,7 @@ void Condition::exitFalse(CFGBuilder &B) {
   }
 }
 
-void Condition::complete(CFGBuilder &B) {
+void Condition::complete(SILBuilder &B) {
   // If there is no continuation block, it's because we
   // constant-folded the branch.  The case-exit will have left us in a
   // normal insertion state (i.e. not a post-terminator IP) with

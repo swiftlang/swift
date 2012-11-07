@@ -1,4 +1,4 @@
-//===--- CFGGenDecl.cpp - Implements Lowering of ASTs -> CFGs for Decls ---===//
+//===--- SILGenDecl.cpp - Implements Lowering of ASTs -> CFGs for Decls ---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -27,9 +27,9 @@ namespace {
 /// initializer's full-expression;  that should be pushed at the appropriate
 /// moment.
 struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
-  CFGGen &Gen;
+  SILGen &Gen;
   Value *Init;
-  InitPatternWithExpr(CFGGen &Gen, Value *Init) : Gen(Gen), Init(Init) {}
+  InitPatternWithExpr(SILGen &Gen, Value *Init) : Gen(Gen), Init(Init) {}
   
   // Paren & Typed patterns are noops, just look through them.
   void visitParenPattern(ParenPattern *P) { visit(P->getSubPattern()); }
@@ -90,7 +90,7 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
 } // end anonymous namespace
 
 
-void CFGGen::visitPatternBindingDecl(PatternBindingDecl *D) {
+void SILGen::visitPatternBindingDecl(PatternBindingDecl *D) {
   // FIXME: Implement support for cleanups.
   //Initialization I;
   
@@ -131,7 +131,7 @@ struct ArgumentCreatorVisitor :
     for (auto &elt : P->getFields())
       Elements.push_back(visit(elt.getPattern()));
 
-    CFGBuilder B(C.begin(), C);
+    SILBuilder B(C.begin(), C);
     return B.createTuple(P->getType(), Elements);
   }
 
@@ -146,7 +146,7 @@ struct ArgumentCreatorVisitor :
 } // end anonymous namespace
 
 
-void CFGGen::emitProlog(FuncExpr *FE) {
+void SILGen::emitProlog(FuncExpr *FE) {
   // Emit the argument variables.
   for (auto &ParamPattern : FE->getBodyParamPatterns()) {
     // Add the BBArgument's and collect them as a Value.
