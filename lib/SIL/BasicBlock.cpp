@@ -1,4 +1,4 @@
-//===--- BasicBlock.cpp - Basic blocks for high-level CFGs -----------------==//
+//===--- BasicBlock.cpp - Basic blocks for high-level SIL code -------------==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the high-level BasicBlocks used for Swift CFGs.
+// This file defines the high-level BasicBlocks used for Swift SIL code.
 //
 //===----------------------------------------------------------------------===//
 
@@ -32,16 +32,16 @@ BBArgument::BBArgument(Type Ty, BasicBlock *ParentBB)
 // BasicBlock Implementation
 //===----------------------------------------------------------------------===//
 
-BasicBlock::BasicBlock(CFG *ParentCFG, const char *Name)
-  : ParentCFG(ParentCFG), PredList(0) {
-  ParentCFG->getBlocks().push_back(this);
+BasicBlock::BasicBlock(CFG *Parent, const char *Name)
+  : Parent(Parent), PredList(0) {
+  Parent->getBlocks().push_back(this);
     
   // FIXME: Drop the name on the floor for now.
 }
 BasicBlock::~BasicBlock() {}
 
 
-/// eraseFromParent - This method unlinks 'this' from the containing CFG and
+/// eraseFromParent - This method unlinks 'this' from the containing SIL and
 /// deletes it.
 ///
 void BasicBlock::eraseFromParent() {

@@ -24,7 +24,7 @@
 namespace swift {
 
 /// SILVisitor - This is a simple visitor class for Swift CFG nodes, allowing
-/// clients to walk over entire CFGs, blocks, or instructions.
+/// clients to walk over entire SIL code, blocks, or instructions.
 template<typename ImplClass, typename ValueRetTy = void>
 class SILVisitor {
 public:

@@ -1,4 +1,4 @@
-//===--- SILPrinter.cpp - Pretty-printing of CFGs --------------------------==//
+//===--- SILPrinter.cpp - Pretty-printing of SIL Code ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the logic to pretty-print CFGs, Instructions, etc.
+// This file defines the logic to pretty-print SIL, Instructions, etc.
 //
 //===----------------------------------------------------------------------===//
 

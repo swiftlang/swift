@@ -1,4 +1,4 @@
-//===--- Condition.h - Defines the CFGLowering Condition class ---*- C++ -*-==//
+//===--- Condition.h - Defines the SILGen Condition class -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the Condition class, used by CFG Lowering.
+// This file defines the Condition class, used by SIL Generation.
 //
 //===----------------------------------------------------------------------===//
 

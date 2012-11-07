@@ -1,4 +1,4 @@
-//===--- BasicBlock.h - Basic blocks for high-level CFGs ---------*- C++ -*-==//
+//===--- BasicBlock.h - Basic blocks for SIL --------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the high-level BasicBlocks used for Swift CFGs.
+// This file defines the high-level BasicBlocks used for Swift SIL code.
 //
 //===----------------------------------------------------------------------===//
 
@@ -30,7 +30,7 @@ public:
   typedef llvm::iplist<Instruction> InstListType;
 private:
   /// A backreference to the containing CFG.
-  CFG * const ParentCFG;
+  CFG * const Parent;
   
   /// PrevList - This is a list of all of the terminator operands that are
   /// branching to this block, forming the predecessor list.  This is
@@ -44,7 +44,7 @@ private:
   InstListType InstList;
   
   friend struct llvm::ilist_sentinel_traits<BasicBlock>;
-  BasicBlock() : ParentCFG(0) {}
+  BasicBlock() : Parent(0) {}
   void operator=(const BasicBlock &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
 
@@ -52,8 +52,8 @@ public:
   BasicBlock(CFG *C, const char *Name = "");
   ~BasicBlock();
 
-  CFG *getParent() { return ParentCFG; }
-  const CFG *getParent() const { return ParentCFG; }
+  CFG *getParent() { return Parent; }
+  const CFG *getParent() const { return Parent; }
 
   /// eraseFromParent - This method unlinks 'this' from the containing CFG and
   /// deletes it.

@@ -26,7 +26,7 @@ class FuncExpr;
 class Instruction;
 class TranslationUnit;
 
-class CFG : public CFGBase {
+class CFG : public SILBase {
 public:
   typedef llvm::iplist<BasicBlock> BlockListType;
 
@@ -39,7 +39,7 @@ private:
   /// The collection of all BasicBlocks in the CFG.
   BlockListType BlockList;
 
-  // Intentionally marked private so that we need to use 'constructCFG()'
+  // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a CFG.
   CFG(ASTContext &Context) : Context(Context) {}
 public:
@@ -47,7 +47,7 @@ public:
 
   /// Construct a CFG from a given statement.  It is the caller's responsibility
   /// to 'delete' this object.
-  static CFG *constructCFG(FuncExpr *FE);
+  static CFG *constructSIL(FuncExpr *FE);
 
   ASTContext &getContext() const { return Context; }
 

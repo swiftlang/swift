@@ -1,4 +1,4 @@
-//===--- SILGenDecl.cpp - Implements Lowering of ASTs -> CFGs for Decls ---===//
+//===--- SILGenDecl.cpp - Implements Lowering of ASTs -> SIL for Decls ----===//
 //
 // This source file is part of the Swift.org open source project
 //

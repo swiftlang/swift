@@ -1,4 +1,4 @@
-//===--- SILGen.h - Implements Lowering of ASTs -> CFGs ---------*- C++ -*-===//
+//===--- SILGen.h - Implements Lowering of ASTs -> SIL ----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

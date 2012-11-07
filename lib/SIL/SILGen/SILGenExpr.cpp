@@ -1,4 +1,4 @@
-//===--- SILGenExpr.cpp - Implements Lowering of ASTs -> CFGs for Exprs ---===//
+//===--- SILGenExpr.cpp - Implements Lowering of ASTs -> SIL for Exprs ----===//
 //
 // This source file is part of the Swift.org open source project
 //

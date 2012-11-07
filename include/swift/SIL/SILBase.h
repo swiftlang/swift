@@ -1,4 +1,4 @@
-//===--- CFGBase.h - Defines some core details of CFGS  ---------*- C++ -*-===//
+//===--- SILBase.h - Defines some core details of SIL code ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,20 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the CFBase class, which provides some basic functionality
-// for clients of CFGs and serves as a baseclass for CFGs.
+// This file defines the SILBase class, which provides some basic functionality
+// for clients of SIL and serves as a baseclass for SIL types.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_CFGBASE_H
-#define SWIFT_SIL_CFGBASE_H
+#ifndef SWIFT_SIL_SILBase_H
+#define SWIFT_SIL_SILBase_H
 
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/AlignOf.h"
 
 namespace swift {
-class CFGBase {
+class SILBase {
   /// Allocator that manages the memory of all the pieces of the CFG.
   mutable llvm::BumpPtrAllocator BPA;
 public:
@@ -49,7 +49,7 @@ public:
 
   /// Custom version of 'new' that uses the CFG's BumpPtrAllocator with
   /// precise alignment knowledge.
-  void *operator new(size_t Bytes, const swift::CFGBase &C,
+  void *operator new(size_t Bytes, const swift::SILBase &C,
                      size_t Alignment = llvm::AlignOf<DERIVED>::Alignment) {
     return C.allocate(Bytes, Alignment);
   }

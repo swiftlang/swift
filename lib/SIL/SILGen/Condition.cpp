@@ -1,4 +1,4 @@
-//===--- Condition.cpp - Implements the CFGLowering Condition class --------==//
+//===--- Condition.cpp - Implements the SILGen Condition class ------------===//
 //
 // This source file is part of the Swift.org open source project
 //

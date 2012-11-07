@@ -1,4 +1,4 @@
-//===--- SILGen.cpp - Implements Lowering of ASTs -> CFGs -----------------===//
+//===--- SILGen.cpp - Implements Lowering of ASTs -> SIL ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -43,7 +43,7 @@ SILGen::~SILGen() {
   //B.createReturn(nullptr, EmptyTuple);
 }
 
-CFG *CFG::constructCFG(FuncExpr *FE) {
+CFG *CFG::constructSIL(FuncExpr *FE) {
   CFG *C = new CFG(FE->getASTContext());
 
   SILGen(*C, FE).visit(FE->getBody());

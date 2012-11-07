@@ -1,4 +1,4 @@
-//===--- SILGenStmt.cpp - Implements Lowering of ASTs -> CFGs for Stmts ---===//
+//===--- SILGenStmt.cpp - Implements Lowering of ASTs -> SIL for Stmts ----===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===--- Instruction.h - Instructions for high-level CFGs --------*- C++ -*-==//
+//===--- Instruction.h - Instructions for high-level SIL code ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the high-level Instruction class used for Swift CFGs.
+// This file defines the high-level Instruction class used for Swift SIL code.
 //
 //===----------------------------------------------------------------------===//
 
