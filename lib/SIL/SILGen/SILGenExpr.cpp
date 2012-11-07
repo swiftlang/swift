@@ -114,8 +114,8 @@ Value *SILGen::emitArrayInjectionCall(Value *ObjectPtr, Value *BasePtr,
                                       Value *Length,
                                       Expr *ArrayInjectionFunction) {
   // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
-  if (!BasePtr->getType()->isEqual(C.getContext().TheRawPointerType))
-    BasePtr = B.createTypeConversion(C.getContext().TheRawPointerType, BasePtr);
+  if (!BasePtr->getType()->isEqual(F.getContext().TheRawPointerType))
+    BasePtr = B.createTypeConversion(F.getContext().TheRawPointerType, BasePtr);
 
   Value *InjectionFn = visit(ArrayInjectionFunction);
   Value *InjectionArgs[] = { BasePtr, ObjectPtr, Length };
@@ -161,7 +161,7 @@ Value *SILGen::emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
     auto shuffleIndexIteratorEnd = ElementMapping.end();
     unsigned NumArrayElts = shuffleIndexIteratorEnd - shuffleIndexIterator;
     Value *NumEltsVal = B.createIntegerValueInst(NumArrayElts,
-                                   BuiltinIntegerType::get(64, C.getContext()));
+                                   BuiltinIntegerType::get(64, F.getContext()));
     Value *AllocArray = B.createAllocArray(E, outerField.getVarargBaseTy(),
                                            NumEltsVal);
 
@@ -181,7 +181,7 @@ Value *SILGen::emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
     }
 
     Value *ObjectPtr =
-      B.createTupleElement(C.getContext().TheObjectPointerType, AllocArray, 0);
+      B.createTupleElement(F.getContext().TheObjectPointerType, AllocArray, 0);
 
     ResultElements.push_back(emitArrayInjectionCall(ObjectPtr, BasePtr,
                                         NumEltsVal, VarargsInjectionFunction));
@@ -240,7 +240,7 @@ Value *SILGen::visitNewArrayExpr(NewArrayExpr *E) {
     AllocArray->getType()->castTo<TupleType>()->getElementType(1);
   Value *BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
   Value *ObjectPtr =
-    B.createTupleElement(C.getContext().TheObjectPointerType, AllocArray, 0);
+    B.createTupleElement(F.getContext().TheObjectPointerType, AllocArray, 0);
 
   // FIXME: We need to initialize the elements of the array that are now
   // allocated.

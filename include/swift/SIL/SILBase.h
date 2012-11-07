@@ -24,10 +24,10 @@
 
 namespace swift {
 class SILBase {
-  /// Allocator that manages the memory of all the pieces of the CFG.
+  /// Allocator that manages the memory of all the pieces of the Function.
   mutable llvm::BumpPtrAllocator BPA;
 public:
-  /// Allocate memory using CFG's internal allocator.
+  /// Allocate memory using Function's internal allocator.
   void *allocate(unsigned Size, unsigned Align) const {
     return BPA.Allocate(Size, Align);
   }
@@ -47,7 +47,7 @@ public:
     ::operator delete(Ptr);
   }
 
-  /// Custom version of 'new' that uses the CFG's BumpPtrAllocator with
+  /// Custom version of 'new' that uses the Function's BumpPtrAllocator with
   /// precise alignment knowledge.
   void *operator new(size_t Bytes, const swift::SILBase &C,
                      size_t Alignment = llvm::AlignOf<DERIVED>::Alignment) {

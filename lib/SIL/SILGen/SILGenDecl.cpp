@@ -117,8 +117,8 @@ namespace {
 /// arguments.
 struct ArgumentCreatorVisitor :
   public PatternVisitor<ArgumentCreatorVisitor, Value*> {
-  CFG &C;
-  ArgumentCreatorVisitor(CFG &C) : C(C) {}
+  Function &F;
+  ArgumentCreatorVisitor(Function &F) : F(F) {}
 
   // Paren & Typed patterns are noops, just look through them.
   Value *visitParenPattern(ParenPattern *P) {return visit(P->getSubPattern());}
@@ -131,16 +131,16 @@ struct ArgumentCreatorVisitor :
     for (auto &elt : P->getFields())
       Elements.push_back(visit(elt.getPattern()));
 
-    SILBuilder B(C.begin(), C);
+    SILBuilder B(F.begin(), F);
     return B.createTuple(P->getType(), Elements);
   }
 
   Value *visitAnyPattern(AnyPattern *P) {
-    return new (C) BBArgument(P->getType(), C.begin());
+    return new (F) BBArgument(P->getType(), F.begin());
   }
 
   Value *visitNamedPattern(NamedPattern *P) {
-    return new (C) BBArgument(P->getType(), C.begin());
+    return new (F) BBArgument(P->getType(), F.begin());
   }
 };
 } // end anonymous namespace
@@ -150,7 +150,7 @@ void SILGen::emitProlog(FuncExpr *FE) {
   // Emit the argument variables.
   for (auto &ParamPattern : FE->getBodyParamPatterns()) {
     // Add the BBArgument's and collect them as a Value.
-    Value *ArgInit = ArgumentCreatorVisitor(C).visit(ParamPattern);
+    Value *ArgInit = ArgumentCreatorVisitor(F).visit(ParamPattern);
     // Use the value to initialize a (mutable) variable allocation.
     InitPatternWithExpr(*this, ArgInit).visit(ParamPattern);
   }

@@ -148,6 +148,6 @@ public:
 
 /// verify - Run the IR verifier to make sure that the Function follows
 /// invariants.
-void CFG::verify() const {
-  SILVerifier().visitCFG(const_cast<CFG*>(this));
+void Function::verify() const {
+  SILVerifier().visitFunction(const_cast<Function*>(this));
 }

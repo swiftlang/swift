@@ -128,8 +128,8 @@ ApplyInst::ApplyInst(SILLocation Loc, Type Ty, Value *Callee,
 }
 
 ApplyInst *ApplyInst::create(ApplyExpr *Expr, Value *Callee,
-                             ArrayRef<Value*> Args, CFG &C) {
-  void *Buffer = C.allocate(sizeof(ApplyInst) +
+                             ArrayRef<Value*> Args, Function &F) {
+  void *Buffer = F.allocate(sizeof(ApplyInst) +
                             Args.size() * sizeof(Value*),
                             llvm::AlignOf<ApplyInst>::Alignment);
   Type ResTy = Callee->getType()->castTo<FunctionType>()->getResult();
@@ -137,8 +137,8 @@ ApplyInst *ApplyInst::create(ApplyExpr *Expr, Value *Callee,
   return ::new(Buffer) ApplyInst(Expr, ResTy, Callee, Args);
 }
 
-ApplyInst *ApplyInst::create(Value *Callee, ArrayRef<Value*> Args, CFG &C) {
-  void *Buffer = C.allocate(sizeof(ApplyInst) +
+ApplyInst *ApplyInst::create(Value *Callee, ArrayRef<Value*> Args, Function &F) {
+  void *Buffer = F.allocate(sizeof(ApplyInst) +
                             Args.size() * sizeof(Value*),
                             llvm::AlignOf<ApplyInst>::Alignment);
   Type ResTy = Callee->getType()->castTo<FunctionType>()->getResult();
@@ -257,10 +257,10 @@ TypeConversionInst::TypeConversionInst(Type Ty, Value *Operand)
 
 
 TupleInst *TupleInst::createImpl(Expr *E, Type Ty, ArrayRef<Value*> Elements,
-                                 CFG &C) {
+                                 Function &F) {
   if (E) Ty = E->getType();
 
-  void *Buffer = C.allocate(sizeof(TupleInst) +
+  void *Buffer = F.allocate(sizeof(TupleInst) +
                             Elements.size() * sizeof(Value*),
                             llvm::AlignOf<TupleInst>::Alignment);
   return ::new(Buffer) TupleInst(E, Ty, Elements);
@@ -327,9 +327,9 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   return cast<BranchInst>(this)->getSuccessors();
 }
 
-UnreachableInst::UnreachableInst(CFG &C)
+UnreachableInst::UnreachableInst(Function &F)
   : TermInst(ValueKind::UnreachableInst, SILLocation(),
-             C.getContext().TheEmptyTupleType) {
+             F.getContext().TheEmptyTupleType) {
 }
 
 ReturnInst::ReturnInst(ReturnStmt *S, Value *ReturnValue)
@@ -337,9 +337,9 @@ ReturnInst::ReturnInst(ReturnStmt *S, Value *ReturnValue)
     ReturnValue(ReturnValue) {
 }
 
-BranchInst::BranchInst(BasicBlock *DestBB, CFG &C)
+BranchInst::BranchInst(BasicBlock *DestBB, Function &F)
   : TermInst(ValueKind::BranchInst, SILLocation(),
-             C.getContext().TheEmptyTupleType),
+             F.getContext().TheEmptyTupleType),
     DestBB(this, DestBB) {
 }
 

@@ -30,7 +30,7 @@ namespace swift {
 
 class ValueDecl;
 class Type;
-class CFG;
+class Function;
 class BasicBlock;
 class ApplyExpr;
 class AssignStmt;
@@ -200,8 +200,8 @@ class ApplyInst : public Instruction {
 
 public:
   static ApplyInst *create(ApplyExpr *Expr, Value *Callee,
-                           ArrayRef<Value*> Args, CFG &C);
-  static ApplyInst *create(Value *Callee, ArrayRef<Value*> Args, CFG &C);
+                           ArrayRef<Value*> Args, Function &F);
+  static ApplyInst *create(Value *Callee, ArrayRef<Value*> Args, Function &F);
 
   
   Value *getCallee() { return Callee; }
@@ -417,7 +417,7 @@ class TupleInst : public Instruction {
   /// TupleInst, object creation goes through 'create()'.
   TupleInst(Expr *E, Type Ty, ArrayRef<Value*> Elements);
   static TupleInst *createImpl(Expr *E, Type Ty,
-                               ArrayRef<Value*> Elements, CFG &C);
+                               ArrayRef<Value*> Elements, Function &F);
 
 public:
   /// The elements referenced by this TupleInst.
@@ -432,11 +432,11 @@ public:
 
   /// Construct a TupleInst.  The two forms are used to ensure that these are
   /// only created for specific syntactic forms.
-  static TupleInst *create(Expr *E, ArrayRef<Value*> Elements, CFG &C) {
-    return createImpl(E, Type(), Elements, C);
+  static TupleInst *create(Expr *E, ArrayRef<Value*> Elements, Function &F) {
+    return createImpl(E, Type(), Elements, F);
   }
-  static TupleInst *create(Type Ty, ArrayRef<Value*> Elements, CFG &C) {
-    return createImpl(nullptr, Ty, Elements, C);
+  static TupleInst *create(Type Ty, ArrayRef<Value*> Elements, Function &F) {
+    return createImpl(nullptr, Ty, Elements, F);
   }
 
   static bool classof(const Value *I) {
@@ -552,7 +552,7 @@ public:
 /// function or after a no-return function call.
 class UnreachableInst : public TermInst {
 public:
-  UnreachableInst(CFG &C);
+  UnreachableInst(Function &F);
   
   SuccessorListTy getSuccessors() {
     // No Successors.
@@ -598,7 +598,7 @@ public:
   typedef ArrayRef<Value*> ArgsTy;
   
   /// Construct an BranchInst that will branches to the specified block.
-  BranchInst(BasicBlock *DestBB, CFG &C);
+  BranchInst(BasicBlock *DestBB, Function &F);
   
   /// The jump target for the branch.
   BasicBlock *getDestBB() const { return DestBB; }

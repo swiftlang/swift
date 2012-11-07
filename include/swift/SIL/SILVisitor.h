@@ -65,12 +65,12 @@ ValueRetTy visit##CLASS(CLASS *I) {                         \
     visitBB(&BB);
   }
 
-  void visitCFG(CFG *C) {
-    for (auto &BB : *C)
+  void visitFunction(Function *F) {
+    for (auto &BB : *F)
       visitBB(BB);
   }
-  void visitCFG(CFG &C) {
-    visitBB(&C);
+  void visitFunction(Function &F) {
+    visitBB(&F);
   }
 };
 

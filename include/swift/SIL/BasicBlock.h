@@ -20,7 +20,7 @@
 #include "swift/SIL/Instruction.h"
 
 namespace swift {
-class CFG;
+class Function;
 class BBArgument;
 
 class BasicBlock :
@@ -29,8 +29,8 @@ public llvm::ilist_node<BasicBlock>, public SILAllocated<BasicBlock> {
 public:
   typedef llvm::iplist<Instruction> InstListType;
 private:
-  /// A backreference to the containing CFG.
-  CFG * const Parent;
+  /// A backreference to the containing Function.
+  Function * const Parent;
   
   /// PrevList - This is a list of all of the terminator operands that are
   /// branching to this block, forming the predecessor list.  This is
@@ -49,11 +49,11 @@ private:
   void operator delete(void *Ptr, size_t) = delete;
 
 public:
-  BasicBlock(CFG *F, const char *Name = "");
+  BasicBlock(Function *F, const char *Name = "");
   ~BasicBlock();
 
-  CFG *getParent() { return Parent; }
-  const CFG *getParent() const { return Parent; }
+  Function *getParent() { return Parent; }
+  const Function *getParent() const { return Parent; }
 
   /// eraseFromParent - This method unlinks 'this' from the containing Function
   /// and deletes it.

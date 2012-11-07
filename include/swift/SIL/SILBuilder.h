@@ -22,22 +22,22 @@ class SILBuilder {
   /// BB - If this is non-null, the instruction is inserted in the specified
   /// basic block, at the specified InsertPt.  If null, created instructions
   /// are not auto-inserted.
-  CFG &C;
+  Function &F;
   BasicBlock *BB;
   BasicBlock::iterator InsertPt;
 public:
 
-  SILBuilder(CFG &C) : C(C), BB(0) {}
+  SILBuilder(Function &F) : F(F), BB(0) {}
 
-  SILBuilder(Instruction *I, CFG &C) : C(C) {
+  SILBuilder(Instruction *I, Function &F) : F(F) {
     setInsertionPoint(I);
   }
 
-  SILBuilder(BasicBlock *BB, CFG &C) : C(C) {
+  SILBuilder(BasicBlock *BB, Function &F) : F(F) {
     setInsertionPoint(BB);
   }
 
-  SILBuilder(BasicBlock *BB, BasicBlock::iterator InsertPt, CFG &C) : C(C) {
+  SILBuilder(BasicBlock *BB, BasicBlock::iterator InsertPt, Function &F) : F(F){
     setInsertionPoint(BB, InsertPt);
   }
 
@@ -74,7 +74,7 @@ public:
   }
 
   /// emitBlock - Each basic block is individually new'd, then them emitted with
-  /// this function.  Since each block is implicitly added to the CFG's list of
+  /// this function.  Since each block is implicitly added to the Function's list of
   /// blocks when created, the construction order is not particularly useful.
   ///
   /// Instead, we want blocks to end up in the order that they are *emitted*.
@@ -86,7 +86,7 @@ public:
   /// This function also sets the insertion point of the builder to be the newly
   /// emitted block.
   void emitBlock(BasicBlock *BB) {
-    CFG *C = BB->getParent();
+    Function *F = BB->getParent();
     // If this is a fall through into BB, emit the fall through branch.
     if (hasValidInsertionPoint())
       createBranch(BB);
@@ -95,8 +95,8 @@ public:
     setInsertionPoint(BB);
     
     // Move block to the end of the list.
-    if (&C->getBlocks().back() != BB)
-      C->getBlocks().splice(C->end(), C->getBlocks(), BB);
+    if (&F->getBlocks().back() != BB)
+      F->getBlocks().splice(F->end(), F->getBlocks(), BB);
   }
   
   //===--------------------------------------------------------------------===//
@@ -118,10 +118,10 @@ public:
 
 
   ApplyInst *createApply(ApplyExpr *Expr, Value *Fn, ArrayRef<Value*> Args) {
-    return insert(ApplyInst::create(Expr, Fn, Args, C));
+    return insert(ApplyInst::create(Expr, Fn, Args, F));
   }
   ApplyInst *createApply(Value *Fn, ArrayRef<Value*> Args) {
-    return insert(ApplyInst::create(Fn, Args, C));
+    return insert(ApplyInst::create(Fn, Args, F));
   }
 
   ConstantRefInst *createConstantRef(DeclRefExpr *Expr) {
@@ -176,10 +176,10 @@ public:
   }
 
   TupleInst *createTuple(Expr *E, ArrayRef<Value*> Elements) {
-    return insert(TupleInst::create(E, Elements, C));
+    return insert(TupleInst::create(E, Elements, F));
   }
   TupleInst *createTuple(Type Ty, ArrayRef<Value*> Elements) {
-    return insert(TupleInst::create(Ty, Elements, C));
+    return insert(TupleInst::create(Ty, Elements, F));
   }
 
   Value *createTupleElement(TupleElementExpr *E, Value *Operand,
@@ -220,7 +220,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   UnreachableInst *createUnreachable() {
-    return insertTerminator(new UnreachableInst(C));
+    return insertTerminator(new UnreachableInst(F));
   }
 
   ReturnInst *createReturn(ReturnStmt *Stmt, Value *ReturnValue) {
@@ -234,7 +234,7 @@ public:
   }
     
   BranchInst *createBranch(BasicBlock *TargetBlock) {
-    return insertTerminator(new BranchInst(TargetBlock, C));
+    return insertTerminator(new BranchInst(TargetBlock, F));
   }
 
 

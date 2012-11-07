@@ -28,8 +28,8 @@ namespace Lowering {
 class LLVM_LIBRARY_VISIBILITY SILGen
   : public ASTVisitor<SILGen, Value*, void> {
 public:
-  /// The CFG being constructed.
-  CFG &C;
+  /// The Function being constructed.
+  Function &F;
   
   /// B - The SILBuilder used to construct the Function.  It is what maintains
   /// the notion of the current block being emitted into.
@@ -47,7 +47,7 @@ public:
   llvm::DenseMap<ValueDecl*, Value*> VarLocs;
     
 public:
-  SILGen(CFG &C, FuncExpr *FE);
+  SILGen(Function &F, FuncExpr *FE);
   ~SILGen();
 
   void emitProlog(FuncExpr *FE);

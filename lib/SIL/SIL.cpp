@@ -13,7 +13,7 @@
 #include "swift/SIL/SIL.h"
 using namespace swift;
 
-CFG::~CFG() {
+Function::~Function() {
 }
 
 

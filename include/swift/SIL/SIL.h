@@ -26,7 +26,7 @@ class FuncExpr;
 class Instruction;
 class TranslationUnit;
 
-class CFG : public SILBase {
+class Function : public SILBase {
 public:
   typedef llvm::iplist<BasicBlock> BlockListType;
 
@@ -37,18 +37,18 @@ private:
   /// Function.
   ASTContext &Context;
 
-  /// The collection of all BasicBlocks in the CFG.
+  /// The collection of all BasicBlocks in the Function.
   BlockListType BlockList;
 
   // Intentionally marked private so that we need to use 'constructSIL()'
-  // to construct a CFG.
-  CFG(ASTContext &Context) : Context(Context) {}
+  // to construct a Function.
+  Function(ASTContext &Context) : Context(Context) {}
 public:
-  ~CFG();
+  ~Function();
 
   /// Construct a SIL function from a given statement.  It is the caller's
   /// responsibility to 'delete' this object.
-  static CFG *constructSIL(FuncExpr *FE);
+  static Function *constructSIL(FuncExpr *FE);
 
   ASTContext &getContext() const { return Context; }
 
@@ -77,10 +77,10 @@ public:
   /// invariants.
   void verify() const;
   
-  /// Pretty-print the CFG.
+  /// Pretty-print the Function.
   void dump() const;
 
-  /// Pretty-print the CFG with the designated stream.
+  /// Pretty-print the Function with the designated stream.
   void print(raw_ostream &OS) const;
 };
 

@@ -19,8 +19,8 @@ using namespace Lowering;
 // SILGen Class implementation
 //===--------------------------------------------------------------------===//
 
-SILGen::SILGen(CFG &C, FuncExpr *FE)
-  : C(C), B(new (C) BasicBlock(&C), C), Cleanups(*this) {
+SILGen::SILGen(Function &F, FuncExpr *FE)
+  : F(F), B(new (F) BasicBlock(&F), F), Cleanups(*this) {
 
   emitProlog(FE);
 }
@@ -43,8 +43,8 @@ SILGen::~SILGen() {
   //B.createReturn(nullptr, EmptyTuple);
 }
 
-CFG *CFG::constructSIL(FuncExpr *FE) {
-  CFG *C = new CFG(FE->getASTContext());
+Function *Function::constructSIL(FuncExpr *FE) {
+  Function *C = new Function(FE->getASTContext());
 
   SILGen(*C, FE).visit(FE->getBody());
 

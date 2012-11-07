@@ -249,7 +249,7 @@ ID SILPrinter::getID(const Value *V) {
 }
 
 //===----------------------------------------------------------------------===//
-// Printing for Instruction, BasicBlock, and CFG
+// Printing for Instruction, BasicBlock, and Function
 //===----------------------------------------------------------------------===//
 
 void Value::dump() const {
@@ -270,12 +270,12 @@ void BasicBlock::print(raw_ostream &OS) const {
 }
 
 /// Pretty-print the basic block.
-void CFG::dump() const {
+void Function::dump() const {
   print(llvm::errs());
 }
 
 /// Pretty-print the basi block with the designated stream.
-void CFG::print(llvm::raw_ostream &OS) const {
+void Function::print(llvm::raw_ostream &OS) const {
   SILPrinter Printer(OS);
   for (const BasicBlock &B : *this)
     Printer.print(&B);

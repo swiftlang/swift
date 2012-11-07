@@ -32,7 +32,7 @@ BBArgument::BBArgument(Type Ty, BasicBlock *ParentBB)
 // BasicBlock Implementation
 //===----------------------------------------------------------------------===//
 
-BasicBlock::BasicBlock(CFG *Parent, const char *Name)
+BasicBlock::BasicBlock(Function *Parent, const char *Name)
   : Parent(Parent), PredList(0) {
   Parent->getBlocks().push_back(this);
     
