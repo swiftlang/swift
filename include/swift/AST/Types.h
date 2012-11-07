@@ -233,6 +233,10 @@ public:
   /// getRValueType - For an lvalue type, retrieves the underlying object type.
   /// Otherwise, returns the type itself.
   Type getRValueType();
+  
+  /// isSettableLValue - Returns true if the type is a settable lvalue, or
+  /// false if the type is an rvalue or non-settable lvalue.
+  bool isSettableLValue();
 
   void dump() const;
   void print(raw_ostream &OS) const;
@@ -1271,7 +1275,14 @@ public:
       ///
       /// This qualifier is only used by the (constraint-based) type checker.
       Implicit = 0x2,
-
+      
+      /// A non-settable lvalue is an lvalue that cannot be assigned to because
+      /// it is a property with a `get` but no `set` method, a property of a
+      /// non-settable lvalue, or a property of an rvalue. Non-settable
+      /// lvalues cannot be used as the destination of an assignment or as
+      /// [byref] arguments.
+      NonSettable = 0x4,
+      
       /// The default for a [byref] type.
       DefaultForType = NonHeap,
 
@@ -1295,7 +1306,8 @@ public:
     opaque_type getOpaqueData() const { return Bits; }
 
     bool isHeap() const { return !(*this & NonHeap); }
-
+    bool isSettable() const { return !(*this & NonSettable); }
+    
     friend Qual operator|(QualBits l, QualBits r) {
       return Qual(opaque_type(l) | opaque_type(r));
     }
@@ -1344,6 +1356,7 @@ public:
     ///   An l-value type is a subtype of another l-value of the
     ///   same object type except:
     ///   - an implicit l-value is not a subtype of an explicit one.
+    ///   - a non-settable lvalue is not a subtype of a settable one.
     friend bool operator<=(Qual l, Qual r) {
       // Right now, all our qualifiers are boolean and independent,
       // and we've set it up so that 1 bits correspond to supertypes.
@@ -1377,6 +1390,11 @@ public:
   /// heap l-values, i.e. they can be arbitrarily persisted.
   bool isHeap() const {
     return getQualifiers().isHeap();
+  }
+
+  /// Is this lvalue settable?
+  bool isSettable() const {
+    return getQualifiers().isSettable();
   }
 
   /// For now, no l-values are ever materializable.  Maybe in the
@@ -1657,6 +1675,13 @@ inline Type TypeBase::getRValueType() {
     return this;
 
   return castTo<LValueType>()->getObjectType();
+}
+
+inline bool TypeBase::isSettableLValue() {
+  if (!is<LValueType>())
+    return false;
+  
+  return castTo<LValueType>()->isSettable();
 }
 
 inline Identifier SubstitutableType::getName() const {

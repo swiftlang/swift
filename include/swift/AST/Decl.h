@@ -662,6 +662,11 @@ public:
     return getKind() == DeclKind::Var;
   }
 
+  /// isSettable - Determine whether references to this decl may appear
+  /// on the left-hand side of an assignment or as the operand of a
+  /// `&` or [assignment] operator.
+  bool isSettable() const;
+  
   void setHasFixedLifetime(bool flag) {
     ValueDeclBits.HasFixedLifetime = flag;
   }
@@ -1002,7 +1007,11 @@ public:
 
   /// \brief Retrieve the setter used to mutate the value of this variable.
   FuncDecl *getSetter() const { return GetSet? GetSet->Set : nullptr; }
-
+  
+  /// \brief Returns whether the var is settable, either because it is a
+  /// simple var or because it is a property with a setter.
+  bool isSettable() const { return !GetSet || GetSet->Set; }
+  
   VarDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(VarDecl *over) { OverriddenDecl = over; }
 
@@ -1241,6 +1250,9 @@ public:
   /// The subscript setter is optional.
   FuncDecl *getSetter() const { return Set; }
   
+  /// \brief Returns whether the subscript operation has a setter.
+  bool isSettable() const { return Set; }
+  
   SubscriptDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(SubscriptDecl *over) { OverriddenDecl = over; }
 
@@ -1356,6 +1368,15 @@ inline void GenericParam::setDeclContext(DeclContext *DC) {
   TypeParam->setDeclContext(DC);
 }
 
+inline bool ValueDecl::isSettable() const {
+  if (auto vd = dyn_cast<VarDecl>(this)) {
+    return vd->isSettable();
+  } else if (auto sd = dyn_cast<SubscriptDecl>(this)) {
+    return sd->isSettable();
+  } else
+    return false;
+}
+  
 } // end namespace swift
 
 #endif

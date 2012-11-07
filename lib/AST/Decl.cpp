@@ -267,11 +267,14 @@ SourceRange TopLevelCodeDecl::getSourceRange() const {
 /// getTypeOfReference - Return the full type judgement for a non-member
 /// reference to this value.
 Type ValueDecl::getTypeOfReference() const {
+  // TODO: when the old type checker dies, set the NonSettable bit here instead
+  // of in TypeCheckConstraints.cpp.
   if (isReferencedAsLValue()) {
     if (LValueType *LVT = Ty->getAs<LValueType>())
       return LValueType::get(LVT->getObjectType(),
                              LValueType::Qual::DefaultForVar, getASTContext());
-    return LValueType::get(Ty, LValueType::Qual::DefaultForVar, getASTContext());
+    return LValueType::get(Ty,
+                           LValueType::Qual::DefaultForVar, getASTContext());
   }
 
   return Ty;

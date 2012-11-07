@@ -914,6 +914,10 @@ ERROR(expression_unused_lvalue,sema_tcs,none,
       "expression resolves to an unused l-value", ())
 ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
       "cannot assign to the result of this expression", ())
+ERROR(assignment_lhs_not_settable,sema_tcs,none,
+      "cannot assign to a property or subscript without a 'set' method", ())
+ERROR(byref_not_settable,sema_tcs,none,
+      "cannot pass by reference a property or subscript without a 'set' method", ())
 
 // ForEach Stmt
 ERROR(foreach_missing_enumerable,sema_tcs,none,

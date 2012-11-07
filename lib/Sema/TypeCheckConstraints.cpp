@@ -1533,7 +1533,7 @@ Type ConstraintSystem::openType(
 /// the lvalue.
 ///
 /// For the function type of an assignment operator, makes the first argument
-/// an implicit byref.
+/// an implicit byref(settable).
 static Type adjustLValueForReference(Type type, bool isAssignment,
                                      ASTContext &context) {
   LValueType::Qual quals = LValueType::Qual::NonHeap|LValueType::Qual::Implicit;
@@ -1544,7 +1544,9 @@ static Type adjustLValueForReference(Type type, bool isAssignment,
     // When we actually apply the inferred types in a constraint system to a
     // concrete expression, the 'implicit' bits will be dropped and the
     // appropriate 'heap' bits will be re-introduced.
-    return LValueType::get(lv->getObjectType(), quals, context);
+    return LValueType::get(lv->getObjectType(),
+                           quals | lv->getQualifiers(),
+                           context);
   }
 
   // For an assignment operator, the first parameter is an implicit byref.
@@ -1576,6 +1578,37 @@ static Type adjustLValueForReference(Type type, bool isAssignment,
   return type;
 }
 
+// A property or subscript is settable if:
+// - its base type (the type of the 'a' in 'a[n]' or 'a.b') either has
+//   reference semantics or has value semantics and is settable, AND
+// - the 'var' or 'subscript' decl for the property provides a setter
+template<typename SomeValueDecl>
+static LValueType::Qual settableQualForDecl(Type baseType,
+                                            SomeValueDecl *decl) {
+  bool settable = ((!baseType ||
+                    baseType->isSettableLValue() ||
+                    baseType->getRValueType()->hasReferenceSemantics()) &&
+                   decl->isSettable());
+  return settable ? LValueType::Qual(0) : LValueType::Qual::NonSettable;
+}
+
+// TODO This should replace ValueDecl::getTypeOfReference once the old
+// type checker is retired.
+static Type getTypeOfValueDeclReference(Type baseType,
+                                        ValueDecl *decl,
+                                        ASTContext &Context) {
+  LValueType::Qual qual = LValueType::Qual::DefaultForVar |
+                          settableQualForDecl(baseType, decl);
+  
+  if (decl->isReferencedAsLValue()) {
+    if (LValueType *LVT = decl->getType()->getAs<LValueType>())
+      return LValueType::get(LVT->getObjectType(), qual, Context);
+    return LValueType::get(decl->getType(), qual, Context);
+  }
+  
+  return decl->getType();
+}
+
 Type ConstraintSystem::getTypeOfReference(ValueDecl *value) {
   if (auto proto = dyn_cast<ProtocolDecl>(value->getDeclContext())) {
     // Unqualified lookup can find operator names within protocols.
@@ -1605,9 +1638,13 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value) {
   }
 
   // Determine the type of the value, opening up that type if necessary.
-  return adjustLValueForReference(openType(value->getTypeOfReference()),
+  Type valueType = getTypeOfValueDeclReference(nullptr,
+                                               value,
+                                               TC.Context);
+  valueType = adjustLValueForReference(openType(valueType),
                                   value->getAttrs().isAssignment(),
                                   TC.Context);
+  return valueType;
 }
 
 Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
@@ -1617,10 +1654,10 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     return getTypeOfReference(value);
 
   // Figure out the instance type used for the base.
-  baseTy = baseTy->getRValueType();
+  Type baseObjTy = baseTy->getRValueType();
   bool isInstance = true;
-  if (auto baseMeta = baseTy->getAs<MetaTypeType>()) {
-    baseTy = baseMeta->getInstanceType();
+  if (auto baseMeta = baseObjTy->getAs<MetaTypeType>()) {
+    baseObjTy = baseMeta->getInstanceType();
     isInstance = false;
   }
 
@@ -1659,7 +1696,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   // subtyping suffices. However, the owner might be a protocol and the base a
   // type that implements that protocol, if which case we need to model this
   // with a conversion constraint.
-  addConstraint(ConstraintKind::Conversion, baseTy, ownerTy);
+  addConstraint(ConstraintKind::Conversion, baseObjTy, ownerTy);
 
   // Determine the type of the member.
   Type type;
@@ -1668,12 +1705,13 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
     auto resultTy = LValueType::get(subscript->getElementType(),
                                     LValueType::Qual::DefaultForMemberAccess|
-                                    LValueType::Qual::Implicit,
+                                    LValueType::Qual::Implicit|
+                                    settableQualForDecl(baseTy, subscript),
                                     TC.Context);
     type = FunctionType::get(subscript->getIndices()->getType(), resultTy,
                              TC.Context);
   } else
-    type = value->getTypeOfReference();
+    type = getTypeOfValueDeclReference(baseTy, value, TC.Context);
   type = openType(type, { }, replacements);
 
   // Skip the 'this' argument if it's already been bound by the base.
@@ -1943,27 +1981,36 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // The base type must have a subscript declaration with type 
       // I -> [byref] O, where I and O are fresh type variables. The index
       // expression must be convertible to I and the subscript expression
-      // itself has type [byref] O.
+      // itself has type [byref] O, where O may or may not be settable.
       auto inputTv = CS.createTypeVariable(expr);
       auto outputTv = CS.createTypeVariable(expr);
-      auto outputTy = LValueType::get(outputTv, 
-                                      LValueType::Qual::DefaultForMemberAccess|
-                                      LValueType::Qual::Implicit,
-                                      Context);
-      auto fnTy = FunctionType::get(inputTv, outputTy, Context);
 
-      // Add the constraint for a subscript declaration.
+      auto outputSuperTv = CS.createTypeVariable(expr);
+      auto outputSuperTy = LValueType::get(outputSuperTv,
+                                      LValueType::Qual::DefaultForMemberAccess|
+                                      LValueType::Qual::Implicit|
+                                      LValueType::Qual::NonSettable,
+                                      Context);
+
+      // Add the member constraint for a subscript declaration.
       // FIXME: lame name!
       auto baseTy = expr->getBase()->getType();
+      auto fnTy = FunctionType::get(inputTv, outputTv, Context);
       CS.addValueMemberConstraint(baseTy, Context.getIdentifier("__subscript"),
                                   fnTy, expr);
+      
+      // Add the subtype constraint that the output type must be some lvalue
+      // subtype.
+      CS.addConstraint(ConstraintKind::Subtype,
+                       outputTv,
+                       outputSuperTy);
       
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getIndex()->getType(),
                        inputTv, expr);
-      return outputTy;
+      return outputTv;
     }
 
     Type visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *expr) {
@@ -2092,18 +2139,25 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitAddressOfExpr(AddressOfExpr *expr) {
-      // The address-of operator produces an explicit lvalue [byref] T from a
-      // (potentially implicit) lvalue S. We model this with the constraint
+      // The address-of operator produces an explicit lvalue
+      // [byref(settable)] T from a (potentially implicit) settable lvalue S.
+      // We model this with the constraint
       //
-      //     [byref] T < S
+      //     S < [byref(implicit, settable)] T
       //
       // where T is a fresh type variable.
       auto tv = CS.createTypeVariable(expr);
-      auto result = LValueType::get(tv, LValueType::Qual::DefaultForType,
+      auto bound = LValueType::get(tv,
+                                   LValueType::Qual::DefaultForType|
+                                   LValueType::Qual::Implicit,
+                                   CS.getASTContext());
+      auto result = LValueType::get(tv,
+                                    LValueType::Qual::DefaultForType,
                                     CS.getASTContext());
 
-      CS.addConstraint(ConstraintKind::Subtype, result,
-                       expr->getSubExpr()->getType(), expr);
+      CS.addConstraint(ConstraintKind::Subtype,
+                       expr->getSubExpr()->getType(), bound,
+                       expr);
       return result;
     }
 
@@ -3212,21 +3266,24 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
-  Type baseTy = constraint.getFirstType()->getRValueType();
-  if (auto tv = baseTy->getAs<TypeVariableType>()) {
+  Type baseTy = constraint.getFirstType();
+  Type baseObjTy = baseTy->getRValueType();
+  
+  while (auto tv = baseObjTy->getAs<TypeVariableType>()) {
     auto fixed = getFixedType(tv);
     if (!fixed)
       return SolutionKind::Unsolved;
 
     // Continue with the fixed type.
-    baseTy = fixed->getRValueType();
+    baseTy = fixed;
+    baseObjTy = fixed->getRValueType();
   }
 
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
   Identifier name = constraint.getMember();
   Type memberTy = constraint.getSecondType();
-  if (auto baseTuple = baseTy->getAs<TupleType>()) {
+  if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
     StringRef nameStr = name.str();
     int fieldIdx = -1;
     if (nameStr[0] == '$') {
@@ -3255,14 +3312,14 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   if (name.str() == "constructor") {
     // Constructors have their own approach to name lookup.
-    ConstructorLookup constructors(baseTy, TC.TU);
+    ConstructorLookup constructors(baseObjTy, TC.TU);
     if (!constructors.isSuccess()) {
       return SolutionKind::Error;
     }
 
     // Check whether we have an 'identity' constructor.
     bool needIdentityConstructor = true;
-    if (baseTy->getClassOrBoundGenericClass()) {
+    if (baseObjTy->getClassOrBoundGenericClass()) {
       // When we are constructing a class type, there is no coercion case
       // to consider.
       needIdentityConstructor = false;
@@ -3279,7 +3336,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
               }
             }
 
-            if (inputTy->isEqual(baseTy)) {
+            if (inputTy->isEqual(baseObjTy)) {
               needIdentityConstructor = false;
               break;
             }
@@ -3306,14 +3363,14 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   }
 
   // Look for members within the base.
-  MemberLookup lookup(baseTy, name, TC.TU);
+  MemberLookup lookup(baseObjTy, name, TC.TU);
   if (!lookup.isSuccess()) {
     return SolutionKind::Error;
   }
 
   // Can't refer to a property without an object instance.
   // FIXME: Subscripts have a similar restriction. Check it here.
-  bool isMetatypeBase = baseTy->getRValueType()->is<MetaTypeType>();
+  bool isMetatypeBase = baseObjTy->getRValueType()->is<MetaTypeType>();
   if (isMetatypeBase && lookup.Results.size() == 1 &&
       lookup.Results[0].Kind == MemberLookupResult::MemberProperty) {
     return SolutionKind::Error;
@@ -4878,7 +4935,9 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // due to the presence of the 'nonheap' bit?
       auto lv = expr->getSubExpr()->getType()->getAs<LValueType>();
       assert(lv && "Subexpression is not an lvalue?");
-
+      assert(lv->isSettable() &&
+             "Solved an address-of constraint with a non-settable lvalue?!");
+      
       auto destQuals = lv->getQualifiers() - LValueType::Qual::Implicit;
       expr->setType(LValueType::get(lv->getObjectType(), destQuals,
                                     CS.getASTContext()));
@@ -5274,17 +5333,21 @@ static Type computeAssignDestType(ConstraintSystem &cs, Expr *dest,
 
   Type destTy = cs.simplifyType(dest->getType());
   if (LValueType *destLV = destTy->getAs<LValueType>()) {
-    // If the destination is an lvalue, we're good; get it's object type.
+    // If the destination is a settable lvalue, we're good; get its object type.
+    if (!destLV->isSettable()) {
+      cs.getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_settable)
+        << dest->getSourceRange();
+    }
     destTy = destLV->getObjectType();
   } else if (auto typeVar = destTy->getAs<TypeVariableType>()) {
     // The destination is a type variable. This type variable must be an
     // lvalue type, which we enforce via a subtyping relationship with
-    // [byref(implicit)] T, where T is a fresh type variable that will be
-    // the object type of this particular expression type.
+    // [byref(implicit, settable)] T, where T is a fresh type variable that
+    // will be the object type of this particular expression type.
     auto objectTv = cs.createTypeVariable(dest);
     auto refTv = LValueType::get(objectTv,
-                                 LValueType::Qual(LValueType::Qual::Implicit|
-                                                  LValueType::Qual::NonHeap),
+                                 LValueType::Qual::Implicit|
+                                 LValueType::Qual::NonHeap,
                                  cs.getASTContext());
     cs.addConstraint(ConstraintKind::Subtype, typeVar, refTv);
     destTy = objectTv;
@@ -5551,6 +5614,13 @@ void ConstraintSystem::dump() {
     }
   }
 
+  if (failedConstraint) {
+    out << "\nFailed constraint:\n";
+    out.indent(2);
+    failedConstraint->print(out);
+    out << "\n";
+  }
+
   SmallVector<TypeVariableType *, 4> freeVariables;
   if (isSolved(freeVariables)) {
     if (freeVariables.empty()) {
@@ -5565,4 +5635,5 @@ void ConstraintSystem::dump() {
   } else {
     out << "UNSOLVED\n";
   }
+  
 }
