@@ -3266,19 +3266,12 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
-  Type baseTy = constraint.getFirstType();
+  Type baseTy = simplifyType(constraint.getFirstType());
   Type baseObjTy = baseTy->getRValueType();
   
-  while (auto tv = baseObjTy->getAs<TypeVariableType>()) {
-    auto fixed = getFixedType(tv);
-    if (!fixed)
-      return SolutionKind::Unsolved;
-
-    // Continue with the fixed type.
-    baseTy = fixed;
-    baseObjTy = fixed->getRValueType();
-  }
-
+  if (baseObjTy->is<TypeVariableType>())
+    return SolutionKind::Unsolved;
+  
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
   Identifier name = constraint.getMember();
