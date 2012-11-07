@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CFGGen.h"
+#include "SILGen.h"
 #include "swift/AST/AST.h"
 using namespace swift;
 using namespace Lowering;

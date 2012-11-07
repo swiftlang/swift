@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CFGGen.h"
+#include "SILGen.h"
 #include "Scope.h"
 #include "swift/SIL/BBArgument.h"
 #include "swift/AST/AST.h"

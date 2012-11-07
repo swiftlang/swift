@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CFGGen.h"
+#include "SILGen.h"
 #include "Scope.h"
 #include "Condition.h"
 #include "swift/AST/AST.h"
