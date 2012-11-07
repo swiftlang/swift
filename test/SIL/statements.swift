@@ -1,7 +1,20 @@
-// RUN: %swift -cfg-dump %s | FileCheck %s
+// RUN: %swift -dump-cfg %s | FileCheck %s
 
 func bar(x:Int)
 func foo(x:Int, y:Bool);
+
+func assignment(x : Int, y : Int) {
+  x = 42
+  y = 57
+  
+  (x, y) = (1,2)
+}
+
+// CHECK: func_decl assignment
+// CHECK: integerliteral 42, width=64
+// CHECK: store
+// CHECK: integerliteral 57, width=64
+// CHECK: store
 
 func if_test(x:Int, y:Bool) {
   if (y) {
@@ -116,6 +129,10 @@ func for_loops(x:Int, c : Bool) {
    println(x)
    ++x
   }
+  
+  for var i = 0; i < 100; ++i {
+  }
+  
   return ()
 }
 // CHECK: func_decl for_loops
