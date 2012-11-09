@@ -46,6 +46,8 @@ public:
   /// that contains a reference, and queried for each DeclRefExpr.
   llvm::DenseMap<ValueDecl*, Value*> VarLocs;
     
+  bool hasVoidReturn;
+    
 public:
   SILGen(Function &F, FuncExpr *FE);
   ~SILGen();

@@ -19,8 +19,19 @@ using namespace Lowering;
 // SILGen Class implementation
 //===--------------------------------------------------------------------===//
 
+// TODO: more accurately port the result schema logic from
+// IRGenFunction::emitEpilogue to handle all cases where a default void return
+// is needed
+static bool isVoidableType(Type type) {
+  if (TupleType *tt = type->getAs<TupleType>()) {
+    return tt->getFields().empty();
+  } else
+    return false;
+}
+
 SILGen::SILGen(Function &F, FuncExpr *FE)
-  : F(F), B(new (F) BasicBlock(&F), F), Cleanups(*this) {
+  : F(F), B(new (F) BasicBlock(&F), F), Cleanups(*this),
+    hasVoidReturn(isVoidableType(FE->getResultType(F.getContext()))) {
 
   emitProlog(FE);
 }
@@ -35,12 +46,13 @@ SILGen::~SILGen() {
 
   // If we have an unterminated block, it is either an implicit return of an
   // empty tuple, or a dynamically unreachable location.
-  // FIXME: When the function returns a "voidable" result, we should produce it.
-  // hoist some logic from IRGen into a common place.
-  B.createUnreachable();
-
-  //auto EmptyTuple = B.createTuple(nullptr, ArrayRef<Value*>());
-  //B.createReturn(nullptr, EmptyTuple);
+  if (hasVoidReturn) {
+    auto EmptyTuple = B.createTuple(TupleType::getEmpty(F.getContext()),
+                                    ArrayRef<Value*>());
+    B.createReturn(nullptr, EmptyTuple);
+  } else {
+    B.createUnreachable();
+  }
 }
 
 Function *Function::constructSIL(FuncExpr *FE) {
