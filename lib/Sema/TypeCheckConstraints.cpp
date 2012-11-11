@@ -764,6 +764,9 @@ namespace {
       return ResolvedOverloadsInChildSystems;
     }
 
+    /// \brief Retrieve the constraint that caused this system to fail.
+    Constraint *getFailedConstraint() const { return failedConstraint; }
+
     /// \brief Create a new constraint system that is derived from this
     /// constraint system, referencing the rules of the parent system but
     /// also introducing its own (likely dependent) constraints.
@@ -3955,11 +3958,15 @@ resolveTypeVariable(
 /// \returns The next solution step, or an empty \c Optional if we've
 /// run out of ideas.
 static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
+  // If this constraint system has a failed constraint, there's nothing to do.
+  if (cs.getFailedConstraint())
+    return Nothing;
+
   // If this constraint system resolved overloads in a child system, there is
   // nothing more we can do with it.
   if (cs.hasResolvedOverloadsInChildSystems())
     return Nothing;
-  
+
   // If there are any potential bindings to explore, do it now.
   if (cs.hasPotentialBindings()) {
     return SolutionStep(SolutionStepKind::ExploreBindings);
@@ -4041,13 +4048,26 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
       continue;
     }
 
-    // Determine our next step.
-    if (auto step = getNextSolutionStep(*cs)) {
+    // If there are no unsolved constraints and no unresolved overload sets,
+    // this system is either a solution or it is underconstrained.
+    if (cs->Constraints.empty() && cs->UnresolvedOverloadSets.empty()) {
+      cs->makeStandalone();
+      viable.push_back(cs);
+      continue;
+    }
+
+    // While we have something interesting to do with this constraint
+    // system, do it.
+    bool done = false;
+    while (auto step = getNextSolutionStep(*cs)) {
       switch (step->getKind()) {
       case SolutionStepKind::Simplify:
-        if (!cs->simplify())
-          stack.push_back(cs);
-        continue;
+        // Simplify the system again.
+        if (cs->simplify()) {
+          cs->removeInactiveChildren();
+          done = true;
+        }
+        break;
 
       case SolutionStepKind::Overload: {
         // Resolve the overload set.
@@ -4055,7 +4075,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
         cs->ResolvedOverloadsInChildSystems = true;
         stack.push_back(cs);
         resolveOverloadSet(*cs, step->getOverloadSetIdx(), stack);
-        continue;
+        done = true;
+        break;
       }
 
       case SolutionStepKind::TypeBinding: {
@@ -4067,53 +4088,73 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
         if (step->isDefinitive()) {
           cs->addConstraint(ConstraintKind::Equal,
                             binding.first, binding.second);
-          if (!cs->simplify())
-            stack.push_back(cs);
-          continue;
+          if (cs->simplify()) {
+            cs->removeInactiveChildren();
+            done = true;
+          }
+          break;
         }
         
         // Add this type binding as a potential binding; we'll
         // explore potential bindings below.
         cs->addPotentialBinding(binding.first, binding.second);
 
-        // Break out to explore this binding.
-        break;
+        // Fall though to explore this binding.
       }
           
-      case SolutionStepKind::ExploreBindings:
+      case SolutionStepKind::ExploreBindings: {
+        // If there are no potential bindings, we have nothing else we can
+        // explore. Consider this system dead.
+        if (cs->PotentialBindings.empty()) {
+          cs->markUnsolvable();
+          cs->removeInactiveChildren();
+          done = true;
+          break;
+        }
+
+        // Push this constraint system back onto the stack to be reconsidered if
+        // none of the child systems created below succeed.
+        stack.push_back(cs);
+
+        // Create child systems for each of the potential bindings.
+        auto potentialBindings = std::move(cs->PotentialBindings);
+        cs->PotentialBindings.clear();
+        for (auto binding : potentialBindings) {
+          if (cs->exploreBinding(binding.first, binding.second)) {
+            if (auto childCS
+                       = cs->createDerivedConstraintSystem(binding.first,
+                                                           binding.second))
+              stack.push_back(childCS);
+          }
+        }
+        done = true;
+        break;
+      }
+      }
+
+      if (done)
+        break;
+
+      if (cs->Constraints.empty() && cs->UnresolvedOverloadSets.empty()) {
+        cs->makeStandalone();
+        viable.push_back(cs);
+        done = true;
         break;
       }
     }
 
-    // If there are no unsolved constraints, this system is either a
-    // solution or it is underconstrained.
-    if (cs->Constraints.empty()) {
-      cs->makeStandalone();
-      viable.push_back(cs);
-      continue;
-    }
+    if (!done) {
+      // If there are no unsolved constraints and no unresolved overload sets,
+      // this system is either a solution or it is underconstrained.
+      if (cs->Constraints.empty() && cs->UnresolvedOverloadSets.empty()) {
+        cs->makeStandalone();
+        viable.push_back(cs);
+        continue;
+      }
 
-    // If there are no potential bindings, we have nothing else we can
-    // explore. Consider this system dead.
-    if (cs->PotentialBindings.empty()) {
+      // We couldn't do anything with the system, so it's unsolvable.
       cs->markUnsolvable();
       cs->removeInactiveChildren();
-      continue;
-    }
-
-    // Push this constraint system back onto the stack to be reconsidered if
-    // none of the child systems created below succeed.
-    stack.push_back(cs);
-
-    // Create child systems for each of the potential bindings.
-    auto potentialBindings = std::move(cs->PotentialBindings);
-    cs->PotentialBindings.clear();
-    for (auto binding : potentialBindings) {
-      if (cs->exploreBinding(binding.first, binding.second)) {
-        if (auto childCS = cs->createDerivedConstraintSystem(binding.first,
-                                                             binding.second))
-          stack.push_back(childCS);
-      }
     }
   }
 
