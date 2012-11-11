@@ -57,6 +57,26 @@ STATISTIC(NumLameNonDefinitive, "# of type variables lamely non-definitive");
 //===--------------------------------------------------------------------===//
 #pragma mark Type variable implementation
 
+namespace {
+  
+/// \brief A handle that holds the saved state of a type variable, which
+/// can be restored
+class SavedTypeVariableBinding {
+  /// \brief The type variable.
+  TypeVariableType *TypeVar;
+
+  /// \brief The parent or fixed type.
+  llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
+
+public:
+  explicit SavedTypeVariableBinding(TypeVariableType *typeVar);
+
+  /// \brief Restore the state of the type variable to the saved state.
+  void restore();
+};
+  
+}
+
 /// \brief The implementation object for a type variable used within the
 /// constraint-solving type checker.
 ///
@@ -75,15 +95,25 @@ class TypeVariableType::Implementation {
   /// \brief The archetype that this type variable describes.
   ArchetypeType *Archetype;
 
+  /// \brief Either the parent of this type variable within an equivalence
+  /// class of type variables, or the fixed type to which this type variable
+  /// type is bound.
+  llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
+
+  friend class SavedTypeVariableBinding;
+
 public:
   explicit Implementation(unsigned ID)
-    : ID(ID), TheExpr(nullptr), Archetype(nullptr) { }
+    : ID(ID), TheExpr(nullptr), Archetype(nullptr),
+      ParentOrFixed(getTypeVariable()) { }
 
   explicit Implementation(unsigned ID, Expr *TheExpr)
-    : ID(ID), TheExpr(TheExpr), Archetype(nullptr) { }
+    : ID(ID), TheExpr(TheExpr), Archetype(nullptr),
+      ParentOrFixed(getTypeVariable()) { }
 
   explicit Implementation(unsigned ID, ArchetypeType *Archetype)
-    : ID(ID), TheExpr(nullptr), Archetype(Archetype) { }
+    : ID(ID), TheExpr(nullptr), Archetype(Archetype),
+      ParentOrFixed(getTypeVariable()) { }
 
   /// \brief Retrieve the unique ID corresponding to this type variable.
   unsigned getID() const { return ID; }
@@ -98,6 +128,126 @@ public:
   /// \brief Retrieve the type variable associated with this implementation.
   TypeVariableType *getTypeVariable() {
     return reinterpret_cast<TypeVariableType *>(this) - 1;
+  }
+
+  /// \brief Retrieve the state of this type variable.
+  SavedTypeVariableBinding getSavedBinding() {
+    return SavedTypeVariableBinding(getTypeVariable());
+  }
+
+  /// \brief Retrieve the representative of the equivalence class to which this
+  /// type variable belongs.
+  ///
+  /// \param record The record of changes made by retrieving the representative,
+  /// which can happen due to path compression. If null, path compression is
+  /// not performed.
+  TypeVariableType *
+  getRepresentative(SmallVectorImpl<SavedTypeVariableBinding> *record) {
+    // Find the representative type variable.
+    auto result = getTypeVariable();
+    Implementation *impl = this;
+    while (impl->ParentOrFixed.is<TypeVariableType *>()) {
+      // Extract the representative.
+      auto nextTV = impl->ParentOrFixed.get<TypeVariableType *>();
+      if (nextTV == result)
+        break;
+
+      result = nextTV;
+      impl = &nextTV->getImpl();
+    }
+
+    if (impl == this || !record)
+      return result;
+
+    // Perform path compression.
+    impl = this;
+    while (impl->ParentOrFixed.is<TypeVariableType *>()) {
+      // Extract the representative.
+      auto nextTV = impl->ParentOrFixed.get<TypeVariableType *>();
+      if (nextTV == result)
+        break;
+
+      // Record the state change.
+      record->push_back(impl->getSavedBinding());
+
+      impl->ParentOrFixed = result;
+      impl = &nextTV->getImpl();
+    }
+
+    return result;
+  }
+
+  /// \brief Merge the equivalence class of this type variable with the
+  /// equivalence class of another type variable.
+  ///
+  /// \param other The type variable to merge with.
+  ///
+  /// \param record The record of state changes.
+  void mergeEquivalenceClasses(TypeVariableType *other,
+                               SmallVectorImpl<SavedTypeVariableBinding> &record) {
+    // Merge the equivalence classes corresponding to these two type
+    // variables. Always merge 'up' the constraint stack, because it is simpler.
+    if (getID() < other->getImpl().getID()) {
+      auto rep = other->getImpl().getRepresentative(&record);
+      record.push_back(rep->getImpl().getSavedBinding());
+      rep->getImpl().ParentOrFixed = getTypeVariable();
+    } else {
+      auto rep = getRepresentative(&record);
+      record.push_back(rep->getImpl().getSavedBinding());
+      rep->getImpl().ParentOrFixed = other;
+    }
+  }
+
+  /// \brief Retrieve the fixed type that corresponds to this type variable,
+  /// if there is one.
+  ///
+  /// \returns the fixed type associated with this type variable, or a null
+  /// type if there is no fixed type.
+  ///
+  /// \param record The record of changes made by retrieving the representative,
+  /// which can happen due to path compression. If null, path compression is
+  /// not performed.
+  Type getFixedType(SmallVectorImpl<SavedTypeVariableBinding> *record) {
+    // Find the representative type variable.
+    Implementation *impl = this;
+    while (impl->ParentOrFixed.is<TypeVariableType *>()) {
+      auto nextTV = impl->ParentOrFixed.get<TypeVariableType *>();
+
+      // If we found the representative, there is no fixed type.
+      if (nextTV == impl->getTypeVariable()) {
+        return Type();
+      }
+
+      impl = &nextTV->getImpl();
+    }
+
+    Type result = impl->ParentOrFixed.get<TypeBase *>();
+    if (impl == this || !record)
+      return result;
+
+    // Perform path compression.
+    impl = this;
+    while (impl->ParentOrFixed.is<TypeVariableType *>()) {
+      // Extract the representative.
+      auto nextTV = impl->ParentOrFixed.get<TypeVariableType *>();
+      if (nextTV == impl->getTypeVariable())
+        return result;
+
+      record->push_back(impl->getSavedBinding());
+      impl->ParentOrFixed = result.getPointer();
+      impl = &nextTV->getImpl();
+    }
+
+    return result;
+  }
+
+  /// \brief Assign a fixed type to this equivalence class.
+  void assignFixedType(Type type, SmallVectorImpl<SavedTypeVariableBinding> &record) {
+    assert((!getFixedType(0) || getFixedType(0)->isEqual(type)) &&
+           "Already has a fixed type!");
+    auto rep = getRepresentative(&record);
+    record.push_back(rep->getImpl().getSavedBinding());
+    rep->getImpl().ParentOrFixed = type.getPointer();
   }
 
   void print(llvm::raw_ostream &Out) {
@@ -124,6 +274,13 @@ TypeVariableType *TypeVariableType::getNew(ASTContext &C, Args &&...args) {
 
 void TypeVariableType::print(raw_ostream &OS) const {
   OS << "$T" << getImpl().getID();
+}
+
+SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
+  : TypeVar(typeVar), ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
+
+void SavedTypeVariableBinding::restore() {
+  TypeVar->getImpl().ParentOrFixed = ParentOrFixed;
 }
 
 //===--------------------------------------------------------------------===//
@@ -590,6 +747,17 @@ namespace {
     Worse
   };
 
+#ifndef NDEBUG
+  /// \brief Determine whether the given two types are equivalent or are
+  /// both null.
+  static bool sameTypeOrNull(Type type1, Type type2) {
+    if (!type1 || !type2)
+      return !type1 && !type2;
+
+    return type1->isEqual(type2);
+  }
+#endif
+
   /// \brief Describes a system of constraints on type variables, the
   /// solution of which assigns concrete types to each of the type variables.
   /// Constraint systems are typically generated given an (untyped) expression.
@@ -642,6 +810,10 @@ namespace {
     SmallVector<OverloadSet *, 4> UnresolvedOverloadSets;
     llvm::DenseMap<Expr *, OverloadSet *> GeneratedOverloadSets;
     SmallVector<std::unique_ptr<ConstraintSystem>, 2> Children;
+
+    /// \brief The set of type variable bindings that have changed while
+    /// processing this constraint system.
+    SmallVector<SavedTypeVariableBinding, 16> SavedBindings;
 
     typedef llvm::PointerUnion<TypeVariableType *, TypeBase *>
       RepresentativeOrFixed;
@@ -810,6 +982,7 @@ namespace {
       if (result->simplify()) {
         // The constraint system constraints an error. Delete it now and
         // return a null pointer to indicate failure.
+        result->restoreTypeVariableBindings();
         delete result;
         return nullptr;
       }
@@ -839,6 +1012,7 @@ namespace {
       switch (State) {
       case Unsolvable:
         removeInactiveChildren();
+        restoreTypeVariableBindings();
         return true;
 
       case Solved:
@@ -850,6 +1024,7 @@ namespace {
           // There is a solution below, but by itself this isn't a solution.
           removeInactiveChildren();
           clearIntermediateData();
+          restoreTypeVariableBindings();
           return true;
         }
 
@@ -859,16 +1034,19 @@ namespace {
           State = Solved;
           makeStandalone();
           removeInactiveChildren();
+          restoreTypeVariableBindings();
           return false;
         }
 
         // We don't have a solution;
         markUnsolvable();
         removeInactiveChildren();
+          restoreTypeVariableBindings();
         return true;
       }
     }
 
+  private:
     /// \brief Remove any inactive (== unsolvable) children.
     void removeInactiveChildren() {
       Children.erase(std::remove_if(Children.begin(), Children.end(),
@@ -887,16 +1065,10 @@ namespace {
       PotentialBindings.clear();
       decltype(ExternallySolved)().swap(ExternallySolved);
 
-      // For each of the type variables, get its fixed type or representative.
+      // For each of the type variables, get its fixed type.
       for (auto cs = this; cs; cs = cs->Parent) {
         for (auto tv : cs->TypeVariables) {
-          for (auto innerCS = this->Parent; innerCS; innerCS = innerCS->Parent){
-            auto known = innerCS->TypeVariableInfo.find(tv);
-            if (known != innerCS->TypeVariableInfo.end()) {
-              TypeVariableInfo[tv] = known->second;
-              break;
-            }
-          }
+          TypeVariableInfo[tv] = getFixedType(tv).getPointer();
         }
       }
     }
@@ -911,6 +1083,25 @@ namespace {
     }
 
   public:
+    /// \brief Restore the type variable bindings to what they were before
+    /// we attempted to solve this constraint system.
+    void restoreTypeVariableBindings() {
+      std::for_each(SavedBindings.rbegin(), SavedBindings.rend(),
+                    [](SavedTypeVariableBinding &saved) {
+                      saved.restore();
+                    });
+      SavedBindings.clear();
+    }
+
+  public:
+    /// \brief Take the permanent type variable bindings and push them into
+    /// the type variables.
+    void injectPermanentTypeVariableBindings() {
+      for (const auto &tvi : TypeVariableInfo) {
+        tvi.first->getImpl().assignFixedType(tvi.second.get<TypeBase *>(),
+                                             SavedBindings);
+      }
+    }
 
     /// \brief Retrieve an unresolved overload set.
     OverloadSet *getUnresolvedOverloadSet(unsigned Idx) const {
@@ -1018,30 +1209,7 @@ namespace {
     /// \brief Retrieve the representative of the equivalence class containing
     /// this type variable.
     TypeVariableType *getRepresentative(TypeVariableType *typeVar) {
-      // FIXME: Optimize the case where the type variable was introduced
-      // in the current constraint system, so that most type variable 
-      // equivalences can be handled via direct pointer jumps rather than
-      // via a hash table lookup.
-      for (auto cs = this; cs; cs = cs->Parent) {
-        auto known = cs->TypeVariableInfo.find(typeVar);
-        if (known != cs->TypeVariableInfo.end()) {
-          if (known->second.is<TypeVariableType *>()) {
-            // Find the representative of the representative.
-            auto rep = getRepresentative(
-                         known->second.get<TypeVariableType *>());
-
-            // Path compression: record the representative for this variable.
-            TypeVariableInfo[typeVar] = rep;
-            return rep;
-          }
-
-          // The presence of a fixed type indicates that this type variable
-          // is its own representative. This is a degenerate case.
-          return typeVar;
-        }
-      }
-
-      return typeVar;
+      return typeVar->getImpl().getRepresentative(&SavedBindings);
     }
 
     /// \brief Merge the equivalence sets of the two type variables.
@@ -1056,66 +1224,18 @@ namespace {
       assert(typeVar2 == getRepresentative(typeVar2) &&
              "typeVar2 is not the representative");
       assert(typeVar1 != typeVar2 && "cannot merge type with itself");
-
-      // Merge the equivalence classes corresponding to these two type
-      // variables. Always merge 'up' the constraint stack, so that our
-      // representative has the smallest ID within the equivalence class. This
-      // ensures that the representative won't be further down the solution
-      // stack than anything it is merged with.
-      if (typeVar1->getImpl().getID() < typeVar2->getImpl().getID())
-        TypeVariableInfo[typeVar2] = typeVar1;
-      else
-        TypeVariableInfo[typeVar1] = typeVar2;
+      typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, SavedBindings);
     }
 
     /// \brief Retrieve the fixed type corresponding to the given type variable,
     /// or a null type if there is no fixed type.
     Type getFixedType(TypeVariableType *typeVar) {
-      for (auto cs = this; cs; cs = cs->Parent) {
-        auto known = cs->TypeVariableInfo.find(typeVar);
-        if (known != cs->TypeVariableInfo.end()) {
-          if (known->second.is<TypeBase *>()) {
-            // We found our fixed type.
-            Type result = known->second.get<TypeBase *>();
-
-            // Path compression: record the fixed type of this variable.
-            if (cs != this)
-              TypeVariableInfo[typeVar] = result.getPointer();
-
-            return result;
-          }
-
-          // We found a type representative. Get its fixed type.
-          if (auto rep = known->second.get<TypeVariableType *>()) {
-            auto type = getFixedType(rep);
-            if (type)
-              TypeVariableInfo[typeVar] = type.getPointer();
-            return type;
-          }
-
-          return Type();
-        }
-      }
-
-      return Type();
+      return typeVar->getImpl().getFixedType(&SavedBindings);
     }
 
     /// \brief Assign a fixed type to the given type variable.
     void assignFixedType(TypeVariableType *typeVar, Type type) {
-      // Find the representative of this type variable, if any.
-      for (auto cs = this; cs; cs = cs->Parent) {
-        auto known = cs->TypeVariableInfo.find(typeVar);
-        if (known != cs->TypeVariableInfo.end()) {
-          auto rep = known->second.get<TypeVariableType *>();
-          if (rep != typeVar)
-            return assignFixedType(rep, type);
-
-          break;
-        }
-      }
-
-      // Our type variable is the representative. Record the fixed type.
-      TypeVariableInfo[typeVar] = type.getPointer();
+      typeVar->getImpl().assignFixedType(type, SavedBindings);
     }
 
     /// \brief Determine whether we have already explored type bindings for
@@ -4434,8 +4554,15 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs1,
           continue;
 
         auto boundTV1 = fixedTV1.first;
-        if (auto type2 = cs2->simplifyType(boundTV1)) {
-          auto type1 = cs1->simplifyType(fixedTV1.second);
+
+        // Find the fixed type in the second constraint system.
+        Type type2;
+        auto known2 = cs2->TypeVariableInfo.find(boundTV1);
+        if (known2 != cs2->TypeVariableInfo.end() &&
+            known2->second.is<TypeBase *>())
+          type2 = known2->second.get<TypeBase *>();
+        if (type2) {
+          auto type1 = fixedTV1.second;
 
           // Strip any initializers from tuples in the type; they aren't
           // to be compared.
@@ -5417,19 +5544,25 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
     solution->dump();
   }
 
+  // Inject the permanent type bindings from this solution.
+  solution->injectPermanentTypeVariableBindings();
+
   // Apply the solution to the expression.
   auto result = solution->applySolution(expr);
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
-    return nullptr;
+    solution->restoreTypeVariableBindings();
+   return nullptr;
   }
 
   // If we're supposed to convert the expression to some particular type,
   // do so now.
   if (convertType) {
     result = solution->convertToType(result, convertType);
-    if (!result)
+    if (!result) {
+      solution->restoreTypeVariableBindings();
       return nullptr;
+    }
   }
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -5437,6 +5570,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
     result->dump();
   }
 
+  solution->restoreTypeVariableBindings();
   return result;
 }
 
@@ -5571,10 +5705,14 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
     solution->dump();
   }
 
+  // Inject the permanent type bindings from this solution.
+  solution->injectPermanentTypeVariableBindings();
+
   // Apply the solution to the destination.
   dest = solution->applySolution(dest);
   if (!dest) {
     // Failure already diagnosed, above, as part of applying the solution.
+    solution->restoreTypeVariableBindings();
     return { nullptr, nullptr };
   }
 
@@ -5582,6 +5720,7 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   src = solution->applySolution(src);
   if (!src) {
     // Failure already diagnosed, above, as part of applying the solution.
+    solution->restoreTypeVariableBindings();
     return { nullptr, nullptr };
   }
 
@@ -5589,6 +5728,7 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   src = solution->convertToType(src, solution->simplifyType(destTy));
   if (!src) {
     // Failure already diagnosed, above, as part of applying the solution.
+    solution->restoreTypeVariableBindings();
     return { nullptr, nullptr };
   }
 
@@ -5602,6 +5742,7 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
     log << "\n";
   }
 
+  solution->restoreTypeVariableBindings();
   return { dest, src };
 }
 
