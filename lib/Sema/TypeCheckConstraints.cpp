@@ -3745,6 +3745,60 @@ namespace {
       return { TypeBinding.TypeVar, Type(TypeBinding.BoundType) };
     }
   };
+
+  /// \brief Describes the kind of child system that we should build to take
+  /// the next solution step.
+  enum class ChildKind : char {
+    /// \brief Don't build a child system at all; we're looking at the parent
+    /// system.
+    None,
+    /// \brief Select a particular overload choice.
+    OverloadChoice,
+    /// \brief Bind a given type variable to a given type.
+    TypeBinding
+  };
+
+  /// \brief Describes the child system that we should be building.
+  class ChildDescription {
+    ChildKind Kind;
+
+    union {
+      struct {
+        unsigned SetIdx;
+        unsigned ChoiceIdx;
+      } Overload;
+
+      struct {
+        TypeVariableType *TypeVar;
+        TypeBase *Binding;
+      } TypeBinding;
+    };
+
+  public:
+    ChildDescription() : Kind(ChildKind::None) { }
+    ChildDescription(unsigned ovlSetIdx, unsigned ovlChoiceIdx)
+      : Kind(ChildKind::OverloadChoice), Overload{ovlSetIdx, ovlChoiceIdx} { }
+    ChildDescription(TypeVariableType *typeVar, Type binding)
+      : Kind(ChildKind::TypeBinding), TypeBinding{typeVar, binding.getPointer()}
+    {
+    }
+
+    ChildKind getKind() const { return Kind; }
+
+    std::pair<unsigned, unsigned> getOverloadChoice() const {
+      assert(getKind() == ChildKind::OverloadChoice);
+      return {Overload.SetIdx, Overload.ChoiceIdx};
+    }
+
+    std::pair<TypeVariableType *, Type> getTypeBinding() const {
+      assert(getKind() == ChildKind::TypeBinding);
+      return {TypeBinding.TypeVar, Type(TypeBinding.Binding)};
+    }
+  };
+
+  /// \brief Stack used to store the constraint systems to visit.
+  typedef SmallVector<std::pair<ConstraintSystem *, ChildDescription>, 16>
+    SolutionStack;
 }
 
 /// \brief Resolve an overload set in the given constraint system by
@@ -3754,13 +3808,11 @@ namespace {
 /// being considered.
 static void resolveOverloadSet(ConstraintSystem &cs,
                                unsigned ovlSetIdx,
-                               SmallVectorImpl<ConstraintSystem *> &stack) {
+                               SolutionStack &stack) {
   OverloadSet *ovl = cs.getUnresolvedOverloadSet(ovlSetIdx);
   auto choices = ovl->getChoices();
   for (unsigned i = 0, n = choices.size(); i != n; ++i) {
-    auto idx = n-i-1;
-    if (auto childCS = cs.createDerivedConstraintSystem(ovlSetIdx, idx))
-      stack.push_back(childCS);
+    stack.push_back({&cs, ChildDescription(ovlSetIdx, n-i-1)});
   }
 }
 
@@ -4088,14 +4140,43 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     return true;
 
   // Seed the constraint system stack with ourselves.
-  SmallVector<ConstraintSystem *, 16> stack;
-  stack.push_back(this);
+  SolutionStack stack;
+  stack.push_back({this, ChildDescription()});
 
   // While there are still constraint systems to search, do so.
   while (!stack.empty()) {
-    auto cs = stack.back();
+    auto csAndChildDesc = stack.back();
+    auto cs = csAndChildDesc.first;
+    auto childDesc = csAndChildDesc.second;
     stack.pop_back();
 
+    // If we're supposed to build a child system, do so now (and simplify it).
+    switch (childDesc.getKind()) {
+    case ChildKind::None:
+      break;
+
+    case ChildKind::OverloadChoice: {
+      auto ovl = childDesc.getOverloadChoice();
+      if (auto childCS = cs->createDerivedConstraintSystem(ovl.first,
+                                                           ovl.second)) {
+        cs = childCS;
+        break;
+      }
+
+      continue;
+    }
+
+    case ChildKind::TypeBinding: {
+      auto binding = childDesc.getTypeBinding();
+      if (auto childCS = cs->createDerivedConstraintSystem(binding.first,
+                                                           binding.second)) {
+        cs = childCS;
+        break;
+      }
+      continue;
+    }
+    }
+    
     // If there are any children of this system that are still active,
     // then we found a potential solution. There is no need to explore
     // alternatives based on this constraint system.
@@ -4129,7 +4210,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
         // Resolve the overload set.
         assert(step->isDefinitive() && "Overload solutions are definitive");
         cs->ResolvedOverloadsInChildSystems = true;
-        stack.push_back(cs);
+        stack.push_back({cs, ChildDescription()});
         resolveOverloadSet(*cs, step->getOverloadSetIdx(), stack);
         done = true;
         break;
@@ -4170,17 +4251,15 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
 
         // Push this constraint system back onto the stack to be reconsidered if
         // none of the child systems created below succeed.
-        stack.push_back(cs);
+        stack.push_back({cs, ChildDescription()});
 
         // Create child systems for each of the potential bindings.
         auto potentialBindings = std::move(cs->PotentialBindings);
         cs->PotentialBindings.clear();
         for (auto binding : potentialBindings) {
           if (cs->exploreBinding(binding.first, binding.second)) {
-            if (auto childCS
-                       = cs->createDerivedConstraintSystem(binding.first,
-                                                           binding.second))
-              stack.push_back(childCS);
+            stack.push_back({cs,
+                             ChildDescription(binding.first, binding.second)});
           }
         }
         done = true;
