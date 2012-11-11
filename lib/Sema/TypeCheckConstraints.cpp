@@ -1332,17 +1332,9 @@ namespace {
     /// \returns true if an error occurred, false otherwise.
     bool solve(SmallVectorImpl<ConstraintSystem *> &viable);
 
-    /// \brief Determine whether this constraint system is fully solved, meaning
-    /// that all type variables are either bound to fixed types or have only
-    /// protocol constraints remaining on them.
-    bool isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables);
-
     /// \brief Determine whether this constraint system is fully solved, with
     /// no free variables.
-    bool isSolved() {
-      SmallVector<TypeVariableType *, 4> freeVariables;
-      return isSolved(freeVariables) && freeVariables.empty();
-    }
+    bool isSolved();
 
   private:
     /// \brief Determine whether the given \p type matches the default literal
@@ -4180,13 +4172,10 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     }
   }
 
-  SmallVector<TypeVariableType *, 4> freeVariables;
-  return viable.size() != 1 || !viable.front()->isSolved(freeVariables) ||
-         !freeVariables.empty();
+  return viable.size() != 1;
 }
 
-bool
-ConstraintSystem::isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables) {
+bool ConstraintSystem::isSolved() {
   // Look for a failed constraint.
   if (failedConstraint)
     return false;
@@ -4208,7 +4197,7 @@ ConstraintSystem::isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables) {
       continue;
     }
 
-    freeVariables.push_back(tv);
+    return false;
   }
 
   // Look for any remaining constraints.
@@ -4233,7 +4222,6 @@ ConstraintSystem::isSolved(SmallVectorImpl<TypeVariableType *> &freeVariables) {
       return false;
   }
 
-  assert(!freeVariables.empty() || Constraints.empty());
   return true;
 }
 
@@ -4439,15 +4427,11 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<ConstraintSystem *> &viable){
   if (viable.empty())
     return nullptr;
   if (viable.size() == 1)
-    return viable[0]->isSolved()? viable[0] : nullptr;
+    return viable[0];
 
   // Find a potential best. 
   ConstraintSystem *best = nullptr;
   for (auto cs : viable) {
-    // Skip unsolved systems.
-    if (!cs->isSolved())
-      continue;
-    
     if (!best) {
       // Found the first solved system.
       best = cs;
@@ -4473,7 +4457,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<ConstraintSystem *> &viable){
 
   // Make sure that our current best is better than all of the solved systems.
   for (auto cs : viable) {
-    if (best == cs || !cs->isSolved())
+    if (best == cs)
       continue;
 
     switch (compareSolutions(*best, *cs)) {
@@ -5181,11 +5165,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     virtual bool walkToDeclPre(Decl *decl) { return false; }
   };
 
-#ifndef NDEBUG
-  SmallVector<TypeVariableType *, 4> freeVariables;
-  assert(isSolved(freeVariables) && "Solution is not solved!");
-  assert(freeVariables.empty() && "Solution has free variables");
-#endif
+  assert(isSolved() && "Solution is not solved!");
 
   // FIXME: Disable the constraint-based type checker here, because we depend
   // heavily on the existing type checker.
@@ -5314,25 +5294,20 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
       log << "---Solved constraints---\n";
       cs.dump();
 
-      unsigned numSolved = 0;
       if (!viable.empty()) {
         unsigned idx = 0;
         for (auto cs : viable) {
-          SmallVector<TypeVariableType *, 4> freeVariables;
           log << "---Child system #" << ++idx << "---\n";
           cs->dump();
-          if (cs->isSolved(freeVariables)) {
-            ++numSolved;
-          }
         }
       }
 
-      if (numSolved == 0)
+      if (viable.size() == 0)
         log << "No solution found.\n";
-      else if (numSolved == 1)
+      else if (viable.size() == 1)
         log << "Unique solution found.\n";
       else {
-        log << "Found " << numSolved << " potential solutions.\n";
+        log << "Found " << viable.size() << " potential solutions.\n";
       }
     }
 
@@ -5472,25 +5447,21 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
       log << "---Solved constraints---\n";
       cs.dump();
 
-      unsigned numSolved = 0;
       if (!viable.empty()) {
         unsigned idx = 0;
         for (auto cs : viable) {
           SmallVector<TypeVariableType *, 4> freeVariables;
           log << "---Child system #" << ++idx << "---\n";
           cs->dump();
-          if (cs->isSolved(freeVariables)) {
-            ++numSolved;
-          }
         }
       }
 
-      if (numSolved == 0)
+      if (viable.size() == 0)
         log << "No solution found.\n";
-      else if (numSolved == 1)
+      else if (viable.size() == 1)
         log << "Unique solution found.\n";
       else {
-        log << "Found " << numSolved << " potential solutions.\n";
+        log << "Found " << viable.size() << " potential solutions.\n";
       }
     }
 
@@ -5680,17 +5651,8 @@ void ConstraintSystem::dump() {
     out << "\n";
   }
 
-  SmallVector<TypeVariableType *, 4> freeVariables;
-  if (isSolved(freeVariables)) {
-    if (freeVariables.empty()) {
-      out << "SOLVED (completely)\n";
-    } else {
-      out << "SOLVED (with free variables):";
-      for (auto fv : freeVariables) {
-        out << ' ' << fv->getString();
-      }
-      out << '\n';
-    }
+  if (isSolved()) {
+    out << "SOLVED (completely)\n";
   } else {
     out << "UNSOLVED\n";
   }
