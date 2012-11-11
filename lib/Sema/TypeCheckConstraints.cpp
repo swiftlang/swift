@@ -758,10 +758,25 @@ namespace {
     /// \brief Create a new constraint system that is derived from this
     /// constraint system, referencing the rules of the parent system but
     /// also introducing its own (likely dependent) constraints.
+    ///
+    /// The new constraint system will be immediately simplified, and deleted
+    /// if simplification fails.
+    ///
+    /// \returns the new constraint system, or null if simplification failed.
     template<typename ...Args>
     ConstraintSystem *createDerivedConstraintSystem(Args &&...args){
       ++NumActiveChildren;
       auto result = new ConstraintSystem(this, std::forward<Args>(args)...);
+
+      // Attempt simplification of the resulting constraint system.
+      if (result->simplify()) {
+        // The constraint system constraints an error. Delete it now and
+        // return a null pointer to indicate failure.
+        delete result;
+        return nullptr;
+      }
+      
+      // The system may be solvable. Record and return it.
       Children.push_back(std::unique_ptr<ConstraintSystem>(result));
       return result;
     }
@@ -3675,12 +3690,7 @@ static void resolveOverloadSet(ConstraintSystem &cs,
   auto choices = ovl->getChoices();
   for (unsigned i = 0, n = choices.size(); i != n; ++i) {
     auto idx = n-i-1;
-    auto childCS = cs.createDerivedConstraintSystem(ovlSetIdx, idx);
-    
-    // Simplify the child system. Assuming it's still valid, add it to
-    // the stack to be dealt with later.
-    // FIXME: If it's not still valid, keep it around for diagnostics.
-    if (!childCS->simplify())
+    if (auto childCS = cs.createDerivedConstraintSystem(ovlSetIdx, idx))
       stack.push_back(childCS);
   }
 }
@@ -4084,9 +4094,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     cs->PotentialBindings.clear();
     for (auto binding : potentialBindings) {
       if (cs->exploreBinding(binding.first, binding.second)) {
-        auto childCS = cs->createDerivedConstraintSystem(binding.first,
-                                                         binding.second);
-        if (!childCS->simplify())
+        if (auto childCS = cs->createDerivedConstraintSystem(binding.first,
+                                                             binding.second))
           stack.push_back(childCS);
       }
     }
