@@ -634,6 +634,8 @@ namespace {
     TypeVariableType *assumedTypeVar = nullptr;
 
     // Valid everywhere
+    enum { Active, Unsolvable, Solved } State = Active;
+
     SmallVector<TypeVariableType *, 16> TypeVariables;
     SmallVector<Constraint *, 16> Constraints;
     llvm::SmallPtrSet<Constraint *, 4> ExternallySolved;
@@ -764,6 +766,30 @@ namespace {
       return ResolvedOverloadsInChildSystems;
     }
 
+    /// \brief Determine whether this constraint system has any free type
+    /// variables.
+    bool hasFreeTypeVariables() {
+      // Look for any free type variables.
+      for (auto cs = this; cs; cs = cs->Parent) {
+        for (auto tv : cs->TypeVariables) {
+          // We only care about the representatives.
+          if (getRepresentative(tv) != tv)
+            continue;
+
+          if (auto fixed = getFixedType(tv)) {
+            if (simplifyType(fixed)->hasTypeVariable())
+              return false;
+
+            continue;
+          }
+          
+          return true;
+        }
+      }
+      
+      return false;
+    }
+
     /// \brief Retrieve the constraint that caused this system to fail.
     Constraint *getFailedConstraint() const { return failedConstraint; }
 
@@ -800,8 +826,47 @@ namespace {
 
     /// \brief Indicates that this constraint system is unsolvable.
     void markUnsolvable() {
+      State = Unsolvable;
       if (Parent)
         Parent->markChildInactive(this);
+    }
+
+    /// \brief Finalize this constraint system; we're done attempting to solve
+    /// it.
+    ///
+    /// \returns true if this constraint system is unsolvable.
+    bool finalize() {
+      switch (State) {
+      case Unsolvable:
+        removeInactiveChildren();
+        return true;
+
+      case Solved:
+        llvm_unreachable("Already finalized (?)");
+        break;
+
+      case Active:
+        if (hasActiveChildren()) {
+          // There is a solution below, but by itself this isn't a solution.
+          removeInactiveChildren();
+          clearIntermediateData();
+          return true;
+        }
+
+        // Check whether we have a proper solution.
+        if (Constraints.empty() && UnresolvedOverloadSets.empty() &&
+            !hasFreeTypeVariables()) {
+          State = Solved;
+          makeStandalone();
+          removeInactiveChildren();
+          return false;
+        }
+
+        // We don't have a solution;
+        markUnsolvable();
+        removeInactiveChildren();
+        return true;
+      }
     }
 
     /// \brief Remove any inactive (== unsolvable) children.
@@ -1334,7 +1399,7 @@ namespace {
 
     /// \brief Determine whether this constraint system is fully solved, with
     /// no free variables.
-    bool isSolved();
+    bool isSolved() const { return State == Solved; }
 
   private:
     /// \brief Determine whether the given \p type matches the default literal
@@ -4035,16 +4100,15 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     // then we found a potential solution. There is no need to explore
     // alternatives based on this constraint system.
     if (cs->hasActiveChildren()) {
-      cs->removeInactiveChildren();
-      cs->clearIntermediateData();
+      cs->finalize();
       continue;
     }
 
     // If there are no unsolved constraints and no unresolved overload sets,
     // this system is either a solution or it is underconstrained.
     if (cs->Constraints.empty() && cs->UnresolvedOverloadSets.empty()) {
-      cs->makeStandalone();
-      viable.push_back(cs);
+      if (!cs->finalize())
+        viable.push_back(cs);
       continue;
     }
 
@@ -4056,7 +4120,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
       case SolutionStepKind::Simplify:
         // Simplify the system again.
         if (cs->simplify()) {
-          cs->removeInactiveChildren();
+          cs->finalize();
           done = true;
         }
         break;
@@ -4081,7 +4145,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
           cs->addConstraint(ConstraintKind::Equal,
                             binding.first, binding.second);
           if (cs->simplify()) {
-            cs->removeInactiveChildren();
+            cs->finalize();
             done = true;
           }
           break;
@@ -4099,7 +4163,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
         // explore. Consider this system dead.
         if (cs->PotentialBindings.empty()) {
           cs->markUnsolvable();
-          cs->removeInactiveChildren();
+          cs->finalize();
           done = true;
           break;
         }
@@ -4128,8 +4192,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
         break;
 
       if (cs->Constraints.empty() && cs->UnresolvedOverloadSets.empty()) {
-        cs->makeStandalone();
-        viable.push_back(cs);
+        if (!cs->finalize())
+          viable.push_back(cs);
         done = true;
         break;
       }
@@ -4139,14 +4203,14 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
       // If there are no unsolved constraints and no unresolved overload sets,
       // this system is either a solution or it is underconstrained.
       if (cs->Constraints.empty() && cs->UnresolvedOverloadSets.empty()) {
-        cs->makeStandalone();
-        viable.push_back(cs);
+        if (!cs->finalize())
+          viable.push_back(cs);
         continue;
       }
 
       // We couldn't do anything with the system, so it's unsolvable.
       cs->markUnsolvable();
-      cs->removeInactiveChildren();
+      cs->finalize();
     }
   }
 
@@ -4173,56 +4237,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
   }
 
   return viable.size() != 1;
-}
-
-bool ConstraintSystem::isSolved() {
-  // Look for a failed constraint.
-  if (failedConstraint)
-    return false;
-  
-  // Look for any unresolved overload sets.
-  if (!UnresolvedOverloadSets.empty())
-    return false;
-
-  // Look for any free type variables.
-  for (auto tv : TypeVariables) {
-    // We only care about the representatives.
-    if (getRepresentative(tv) != tv)
-      continue;
-
-    if (auto fixed = getFixedType(tv)) {
-      if (simplifyType(fixed)->hasTypeVariable())
-        return false;
-      
-      continue;
-    }
-
-    return false;
-  }
-
-  // Look for any remaining constraints.
-  for (auto con : Constraints) {
-    // First type must be a type variable...
-    auto tv = con->getFirstType()->getAs<TypeVariableType>();
-    if (!tv)
-      return false;
-
-    // ... that has not been bound to a fixed type.
-    tv = getRepresentative(tv);
-    if (getFixedType(tv))
-      return false;
-
-    // This must be a subtyping or conversion constraint.
-    if (con->getKind() != ConstraintKind::Subtype &&
-        con->getKind() != ConstraintKind::Conversion)
-      return false;
-
-    // The second type must be existential.
-    if (!con->getSecondType()->isExistentialType())
-      return false;
-  }
-
-  return true;
 }
 
 //===--------------------------------------------------------------------===//
