@@ -603,6 +603,9 @@ namespace {
     /// been found to be unsolvable.
     unsigned NumActiveChildren = 0;
 
+    /// \brief Whether we have resolved an overload by creating child systems.
+    bool ResolvedOverloadsInChildSystems = false;
+
     /// \brief Keeps track of the attempted type variable bindings we have
     /// performed in child systems.
     llvm::DenseMap<TypeVariableType *, llvm::SmallPtrSet<CanType, 16>>
@@ -754,6 +757,12 @@ namespace {
     /// \brief Determine whether this constraint system has any active
     /// child constraint systems.
     bool hasActiveChildren() const { return NumActiveChildren > 0; }
+
+    /// \brief Whether this system has resolved an overload by creating
+    /// child systems.
+    bool hasResolvedOverloadsInChildSystems() const {
+      return ResolvedOverloadsInChildSystems;
+    }
 
     /// \brief Create a new constraint system that is derived from this
     /// constraint system, referencing the rules of the parent system but
@@ -3946,6 +3955,11 @@ resolveTypeVariable(
 /// \returns The next solution step, or an empty \c Optional if we've
 /// run out of ideas.
 static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
+  // If this constraint system resolved overloads in a child system, there is
+  // nothing more we can do with it.
+  if (cs.hasResolvedOverloadsInChildSystems())
+    return Nothing;
+  
   // If there are any potential bindings to explore, do it now.
   if (cs.hasPotentialBindings()) {
     return SolutionStep(SolutionStepKind::ExploreBindings);
@@ -4038,6 +4052,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
       case SolutionStepKind::Overload: {
         // Resolve the overload set.
         assert(step->isDefinitive() && "Overload solutions are definitive");
+        cs->ResolvedOverloadsInChildSystems = true;
+        stack.push_back(cs);
         resolveOverloadSet(*cs, step->getOverloadSetIdx(), stack);
         continue;
       }
