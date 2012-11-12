@@ -748,20 +748,6 @@ namespace {
     Worse
   };
 
-  /// \brief A pair of a type and identifier.
-  struct TypeAndName {
-    Type type;
-    Identifier name;
-
-    friend bool operator<(const TypeAndName &x, const TypeAndName &y) {
-      return std::less<TypeBase *>()(x.type.getPointer(),
-                                     y.type.getPointer()) ||
-        (x.type.getPointer() == y.type.getPointer() &&
-         std::less<void*>()(x.name.getAsOpaquePointer(),
-                            y.name.getAsOpaquePointer()));
-    }
-  };
-
   /// \brief Describes a system of constraints on type variables, the
   /// solution of which assigns concrete types to each of the type variables.
   /// Constraint systems are typically generated given an (untyped) expression.
@@ -783,7 +769,8 @@ namespace {
       unsigned OverloadSetCounter = 0;
 
       /// \brief Cached member lookups.
-      std::map<TypeAndName, MemberLookup> MemberLookups;
+      llvm::DenseMap<std::pair<Type, Identifier>, std::unique_ptr<MemberLookup>>
+        MemberLookups;
 
       /// \brief Cached literal checks.
       std::map<std::pair<TypeBase *, LiteralKind>, bool> LiteralChecks;
@@ -1135,18 +1122,10 @@ namespace {
     /// \returns A reference to the member-lookup result.
     MemberLookup &lookupMember(Type base, Identifier name) {
       base = base->getCanonicalType();
-
-      // Check whether we've performed this lookup before.
-      auto known = SharedState->MemberLookups.find({base, name});
-      if (known != SharedState->MemberLookups.end())
-        return known->second;
-
-      // We have not performed this lookup before; do it again.
-      return SharedState->MemberLookups.emplace(
-               std::piecewise_construct,
-               std::make_tuple(TypeAndName{base, name}),
-               std::make_tuple(base, name, std::ref(TC.TU))
-             ).first->second;
+      auto &ptr = SharedState->MemberLookups[{base, name}];
+      if (!ptr)
+        ptr.reset(new MemberLookup(base, name, TC.TU));
+      return *ptr;
     }
 
   public:
