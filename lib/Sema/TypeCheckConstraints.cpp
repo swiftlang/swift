@@ -770,6 +770,28 @@ namespace {
     ConstraintSystem *Parent = nullptr;
     Constraint *failedConstraint = nullptr;
 
+    /// \brief Contains state that is shared among all of the child constraint
+    /// systems for a given type-checking problem.
+    struct SharedStateType {
+      /// \brief Allocator used for all of the related constraint systems.
+      llvm::BumpPtrAllocator Allocator;
+
+      /// \brief Counter for type variables introduced.
+      unsigned TypeCounter = 0;
+
+      /// \brief Counter for the overload sets introduced.
+      unsigned OverloadSetCounter = 0;
+
+      /// \brief Cached member lookups.
+      std::map<TypeAndName, MemberLookup> MemberLookups;
+
+      /// \brief Cached literal checks.
+      std::map<std::pair<TypeBase *, LiteralKind>, bool> LiteralChecks;
+    };
+
+    /// \brief The state shared among all of the related constraint systems.
+    SharedStateType *SharedState;
+
     // ---Track the state space we've already explored---
     /// \brief The number of child systems that are still active, i.e., haven't
     /// been found to be unsolvable.
@@ -790,19 +812,8 @@ namespace {
     /// we've already attempted.
     SmallVector<std::pair<TypeVariableType *, Type>, 16> PotentialBindings;
 
-    // ---Only valid in the top-level constraint system---
-    llvm::BumpPtrAllocator Allocator;
-    unsigned TypeCounter = 0;
-    unsigned OverloadSetCounter = 0;
-
     // Valid everywhere
     
-    /// \brief Cached member lookups.
-    std::map<TypeAndName, MemberLookup> MemberLookups;
-
-    /// \brief Cached literal checks.
-    std::map<std::pair<TypeBase *, LiteralKind>, bool> LiteralChecks;
-
     /// \brief A mapping from each overload set that is resolved in this
     /// constraint system to a pair (index, type), where index is the index of
     /// the overload choice (within the overload set) and type is the type
@@ -839,16 +850,18 @@ namespace {
     SmallVector<Constraint *, 16> SolvedConstraints;
 
     unsigned assignTypeVariableID() {
-      return getTopConstraintSystem().TypeCounter++;
+      return SharedState->TypeCounter++;
     }
 
     unsigned assignOverloadSetID() {
-      return getTopConstraintSystem().OverloadSetCounter++;
+      return SharedState->OverloadSetCounter++;
     }
     friend class OverloadSet;
 
   public:
-    ConstraintSystem(TypeChecker &TC) : TC(TC) {
+    ConstraintSystem(TypeChecker &TC)
+      : TC(TC), SharedState(new SharedStateType)
+    {
       ++NumExploredConstraintSystems;
     }
 
@@ -866,7 +879,7 @@ namespace {
     ConstraintSystem(ConstraintSystem *parent, 
                      unsigned overloadSetIdx,
                      unsigned overloadChoiceIdx)
-      : TC(parent->TC), Parent(parent),
+      : TC(parent->TC), Parent(parent), SharedState(parent->SharedState),
         // FIXME: Lazily copy from parent system.
         Constraints(parent->Constraints)
     {
@@ -898,7 +911,8 @@ namespace {
     /// within this child system.
     ConstraintSystem(ConstraintSystem *parent, TypeVariableType *typeVar,
                      Type type)
-      : TC(parent->TC), Parent(parent), assumedTypeVar(typeVar),
+      : TC(parent->TC), Parent(parent), SharedState(parent->SharedState),
+        assumedTypeVar(typeVar),
         // FIXME: Lazily copy from parent system.
         Constraints(parent->Constraints),
         UnresolvedOverloadSets(parent->UnresolvedOverloadSets)
@@ -906,6 +920,11 @@ namespace {
       ++NumExploredConstraintSystems;
       
       addConstraint(ConstraintKind::Equal, typeVar, type);
+    }
+
+    ~ConstraintSystem() {
+      if (!Parent)
+        delete SharedState;
     }
 
     /// \brief Retrieve the type checker associated with this constraint system.
@@ -1115,21 +1134,19 @@ namespace {
     ///
     /// \returns A reference to the member-lookup result.
     MemberLookup &lookupMember(Type base, Identifier name) {
-      auto &top = getTopConstraintSystem();
       base = base->getCanonicalType();
 
       // Check whether we've performed this lookup before.
-      auto known = top.MemberLookups.find({base, name});
-      if (known != top.MemberLookups.end())
+      auto known = SharedState->MemberLookups.find({base, name});
+      if (known != SharedState->MemberLookups.end())
         return known->second;
 
       // We have not performed this lookup before; do it again.
-      return top.MemberLookups.emplace(std::piecewise_construct,
-                                       std::make_tuple(TypeAndName{base,
-                                                                   name}),
-                                       std::make_tuple(base, name,
-                                                       std::ref(TC.TU)))
-               .first->second;
+      return SharedState->MemberLookups.emplace(
+               std::piecewise_construct,
+               std::make_tuple(TypeAndName{base, name}),
+               std::make_tuple(base, name, std::ref(TC.TU))
+             ).first->second;
     }
 
   public:
@@ -1393,13 +1410,14 @@ namespace {
     }
 
     /// \brief Retrieve the allocator used by this constraint system.
-    llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
+    llvm::BumpPtrAllocator &getAllocator() { return SharedState->Allocator; }
 
     template <typename It>
     ArrayRef<typename std::iterator_traits<It>::value_type>
     allocateCopy(It start, It end) {
       typedef typename std::iterator_traits<It>::value_type T;
-      T *result = (T*)Allocator.Allocate(sizeof(T)*(end-start), __alignof__(T));
+      T *result = (T*)getAllocator().Allocate(sizeof(T)*(end-start),
+                                              __alignof__(T));
       unsigned i;
       for (i = 0; start != end; ++start, ++i)
         new (result+i) T(*start);
@@ -3498,15 +3516,14 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind) {
   }
 
   // Have we already checked whether this type is literal compatible?
-  auto &top = getTopConstraintSystem();
   auto typePtr = type->getCanonicalType().getPointer();
-  auto known = top.LiteralChecks.find({typePtr, kind});
-  if (known != top.LiteralChecks.end())
+  auto known = SharedState->LiteralChecks.find({typePtr, kind});
+  if (known != SharedState->LiteralChecks.end())
     return known->second? SolutionKind::TriviallySolved : SolutionKind::Error;
 
   // We have not yet checked this type; check it now, and cache the result.
   // FIXME: We should do this caching in the translation unit.
-  bool &result = top.LiteralChecks[{typePtr, kind}];
+  bool &result = SharedState->LiteralChecks[{typePtr, kind}];
   result = TC.isLiteralCompatibleType(type, SourceLoc(), kind,
                                       /*Complain=*/false).first;
 
@@ -4293,7 +4310,7 @@ static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
 }
 
 bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
-  assert(&getTopConstraintSystem() == this &&"Can only solve at the top level");
+  assert(!Parent &&"Can only solve at the top level");
 
   // Simplify this constraint system.
   if (TC.getLangOpts().DebugConstraintSolver) {
