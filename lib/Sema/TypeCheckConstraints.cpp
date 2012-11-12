@@ -1661,7 +1661,8 @@ void ConstraintSystem::markChildInactive(ConstraintSystem *childCS) {
           continue;
 
         if (auto constrainedVar
-              = constraint->getFirstType()->getAs<TypeVariableType>()) {
+              = dyn_cast<TypeVariableType>(
+                  constraint->getFirstType().getPointer())) {
           if (getRepresentative(constrainedVar) != typeVar)
             continue;
 
@@ -3004,7 +3005,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              unsigned flags, bool &trivial) {
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
-  auto typeVar1 = type1->getAs<TypeVariableType>();
+  auto typeVar1 = dyn_cast<TypeVariableType>(type1.getPointer());
   if (typeVar1) {
     if (auto fixed = getFixedType(typeVar1)) {
       type1 = fixed;
@@ -3012,7 +3013,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
-  auto typeVar2 = type2->getAs<TypeVariableType>();
+  auto typeVar2 = dyn_cast<TypeVariableType>(type2.getPointer());
   if (typeVar2) {
     if (auto fixed = getFixedType(typeVar2)) {
       type2 = fixed;
@@ -3021,9 +3022,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   }
 
   // If the types are equivalent, we're done.
-  // FIXME: This gets complicated when dealing with type variables, because
-  // they can get unified via same-type requirements, breaking the canonical
-  // type system in amusing and horrible ways.
   if (type1->isEqual(type2))
     return SolutionKind::TriviallySolved;
 
@@ -3482,7 +3480,7 @@ Type ConstraintSystem::simplifyType(Type type,
        llvm::SmallPtrSet<TypeVariableType *, 16> &substituting) {
   return TC.transformType(type,
                           [&](Type type) -> Type {
-            if (auto tvt = type->getAs<TypeVariableType>()) {
+            if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
               tvt = getRepresentative(tvt);
               if (auto fixed = getFixedType(tvt)) {
                 if (substituting.insert(tvt)) {
@@ -3501,7 +3499,7 @@ Type ConstraintSystem::simplifyType(Type type,
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind) {
-  if (auto tv = type->getAs<TypeVariableType>()) {
+  if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
     auto fixed = getFixedType(tv);
     if (!fixed)
       return SolutionKind::Unsolved;
@@ -3649,7 +3647,7 @@ ConstraintSystem::simplifyArchetypeConstraint(const Constraint &constraint) {
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
   Type baseTy = constraint.getFirstType()->getRValueType();
-  if (auto tv = baseTy->getAs<TypeVariableType>()) {
+  if (auto tv = dyn_cast<TypeVariableType>(baseTy.getPointer())) {
     auto fixed = getFixedType(tv);
     if (!fixed)
       return SolutionKind::Unsolved;
@@ -3745,7 +3743,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
 
     case ConstraintClassification::Archetype:
     case ConstraintClassification::Literal:
-      if (auto firstTV = first->getAs<TypeVariableType>()) {
+      if (auto firstTV = dyn_cast<TypeVariableType>(first.getPointer())) {
         // Record this constraint on the type variable.
         getTVC(firstTV).KindConstraints.push_back(constraint);
       } else {
@@ -3764,7 +3762,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
 
     auto second = simplifyType(constraint->getSecondType());
 
-    auto firstTV = first->getAs<TypeVariableType>();
+    auto firstTV = dyn_cast<TypeVariableType>(first.getPointer());
     if (firstTV) {
       // Record the constraint.
       getTVC(firstTV).Above.push_back(std::make_pair(constraint, second));
@@ -3773,7 +3771,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       first->hasTypeVariable(referencedTypeVars);
     }
 
-    auto secondTV = second->getAs<TypeVariableType>();
+    auto secondTV = dyn_cast<TypeVariableType>(second.getPointer());
     if (secondTV) {
       // Record the constraint.
       getTVC(secondTV).Below.push_back(std::make_pair(constraint, first));
@@ -4514,7 +4512,8 @@ bool ConstraintSystem::typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
       continue;
 
     // on type variables...
-    auto constraintTV = constraint->getFirstType()->getAs<TypeVariableType>();
+    auto constraintTV
+      = dyn_cast<TypeVariableType>(constraint->getFirstType().getPointer());
     if (!constraintTV)
       continue;
 
@@ -4805,19 +4804,20 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // by identifying all of the type variables in the original type
       auto &tc = CS.getTypeChecker();
       TypeSubstitutionMap substitutions;
-      auto type = tc.transformType(openedType,
-                   [&](Type type) -> Type {
-                     if (auto tv = type->getAs<TypeVariableType>()) {
-                       auto archetype = tv->getImpl().getArchetype();
-                       auto simplified = CS.simplifyType(tv);
-                       substitutions[archetype] = simplified;
+      auto type
+        = tc.transformType(openedType,
+            [&](Type type) -> Type {
+              if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
+                auto archetype = tv->getImpl().getArchetype();
+                auto simplified = CS.simplifyType(tv);
+                substitutions[archetype] = simplified;
 
-                       return SubstitutedType::get(archetype, simplified,
-                                                   tc.Context);
-                     }
+                return SubstitutedType::get(archetype, simplified,
+                                           tc.Context);
+              }
 
-                     return type;
-                   });
+              return type;
+            });
 
       // Check that the substitutions we've produced actually work.
       // FIXME: We'd like the type checker to ensure that this always
@@ -4873,7 +4873,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       auto thisArchetype
         = proto->getThis()->getDeclaredType()->castTo<ArchetypeType>();
       CS.getTypeChecker().transformType(openedType, [&](Type type) -> Type {
-        if (auto typeVar = type->getAs<TypeVariableType>()) {
+        if (auto typeVar = dyn_cast<TypeVariableType>(type.getPointer())) {
           if (typeVar->getImpl().getArchetype() == thisArchetype) {
             baseTy = CS.simplifyType(typeVar);
             return nullptr;
@@ -5660,7 +5660,7 @@ static Type computeAssignDestType(ConstraintSystem &cs, Expr *dest,
         << dest->getSourceRange();
     }
     destTy = destLV->getObjectType();
-  } else if (auto typeVar = destTy->getAs<TypeVariableType>()) {
+  } else if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
     // The destination is a type variable. This type variable must be an
     // lvalue type, which we enforce via a subtyping relationship with
     // [byref(implicit, settable)] T, where T is a fresh type variable that
