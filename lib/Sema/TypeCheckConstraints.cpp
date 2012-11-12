@@ -748,17 +748,6 @@ namespace {
     Worse
   };
 
-#ifndef NDEBUG
-  /// \brief Determine whether the given two types are equivalent or are
-  /// both null.
-  static bool sameTypeOrNull(Type type1, Type type2) {
-    if (!type1 || !type2)
-      return !type1 && !type2;
-
-    return type1->isEqual(type2);
-  }
-#endif
-
   /// \brief A pair of a type and identifier.
   struct TypeAndName {
     Type type;
