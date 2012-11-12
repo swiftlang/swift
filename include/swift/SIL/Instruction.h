@@ -148,7 +148,7 @@ public:
   }
 };
 
-/// AllocTmpInst - This represents the allocation of a temporary variable due to a
+/// AllocTmpInst - This represents the allocation of a temporary variable due to
 /// a MaterializeExpr.  This occurs when an rvalue needs to be converted to an
 /// l-value, for example to be the receiver of a dot-syntax method call.
 ///
@@ -318,10 +318,16 @@ public:
 };
 
 
-/// LoadInst - Represents a load from a memory location.
+/// LoadInst - Represents a load from a memory location. A load can optionally
+/// "take" ownership of the loaded value from the memory location, leaving the
+/// memory uninitialized.
 class LoadInst : public Instruction {
   /// The LValue (memory address) to use for the load.
   Value *LValue;
+  
+  /// IsTake - True if the result of the load instruction takes ownership of the
+  /// value and deinitializes the lvalue.
+  bool IsTake;
 public:
   /// Constructs a LoadInst.
   ///
@@ -330,9 +336,13 @@ public:
   /// \param LValue The Value *representing the lvalue (address) to
   ///        use for the load.
   ///
-  LoadInst(LoadExpr *E, Value *LValue);
+  /// \param IsTake True if this load takes ownership of the value from the
+  ///        lvalue.
+  LoadInst(LoadExpr *E, Value *LValue, bool IsTake = false);
 
   Value *getLValue() const { return LValue; }
+  
+  bool isTake() const { return IsTake; }
 
   static bool classof(const Value *I) {
     return I->getKind() == ValueKind::LoadInst;
@@ -364,6 +374,40 @@ public:
 
   static bool classof(const Value *I) {
     return I->getKind() == ValueKind::StoreInst;
+  }
+};
+  
+/// CopyInst - Represents a copy from one memory location to another. This is
+/// similar to:
+///   %1 = load %src
+///   store %1 -> %dest
+/// but a copy instruction can be used with types that cannot be
+/// loaded, such as resilient value types.
+class CopyInst : public Instruction {
+  /// Src - The lvalue being loaded from.
+  Value *Src;
+  /// Dest - The lvalue being stored to.
+  Value *Dest;
+  
+  /// IsTakeOfSrc - True if ownership will be taken from the value at the source
+  /// memory location.
+  bool IsTakeOfSrc : 1;
+  /// IsInitializationOfDest - True if this is the initialization of the
+  /// uninitialized destination memory location.
+  bool IsInitializationOfDest : 1;
+  
+public:
+  CopyInst(Expr *E,
+           Value *Src, Value *Dest,
+           bool IsTakeOfSrc, bool IsInitializationOfDest);
+  
+  Value *getSrc() const { return Src; }
+  Value *getDest() const { return Dest; }
+  bool isTakeOfSrc() const { return IsTakeOfSrc; }
+  bool isInitializationOfDest() const { return IsInitializationOfDest; }
+  
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::CopyInst;
   }
 };
 
@@ -481,6 +525,65 @@ public:
   
   static bool classof(const Value *I) {
     return I->getKind() == ValueKind::TupleElementInst;
+  }
+};
+
+/// RetainInst - Increase the retain count of a value.
+class RetainInst : public Instruction {
+  Value *Operand;
+public:
+  RetainInst(Expr *E, Value *Operand);
+  
+  Value *getOperand() const { return Operand; }
+  
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::RetainInst;
+  }
+};
+
+/// ReleaseInst - Decrease the retain count of a value, and dealloc the value
+/// if its retain count is zero.
+class ReleaseInst : public Instruction {
+  Value *Operand;
+public:
+  ReleaseInst(Expr *E, Value *Operand);
+  
+  Value *getOperand() const { return Operand; }
+  
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::ReleaseInst;
+  }
+};
+
+/// DeallocInst - Dealloc a value, releasing any resources it owns.
+class DeallocInst : public Instruction {
+  Value *Operand;
+public:
+  DeallocInst(Expr *E, Value *Operand);
+  
+  Value *getOperand() const { return Operand; }
+  
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::DeallocInst;
+  }
+};
+
+/// DestroyInst - Destroy the value at a memory location and deallocate the
+/// memory. This is similar to:
+///   %1 = load %operand
+///   release %1
+///   dealloc %operand
+/// but a destroy instruction can be used for types that cannot be loaded,
+/// such as resilient value types.
+class DestroyInst : public Instruction {
+  Value *Operand;
+public:
+  DestroyInst(Expr *E, Value *Operand);
+  
+  Value *getOperand() const { return Operand; }
+  
+  static bool classof(const Value *I) {
+    return I->getKind() == ValueKind::ReleaseInst;
   }
 };
 

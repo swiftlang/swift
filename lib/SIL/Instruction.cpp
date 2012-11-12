@@ -212,8 +212,10 @@ StringRef StringLiteralInst::getValue() const {
 }
 
 
-LoadInst::LoadInst(LoadExpr *E, Value *LValue)
-  : Instruction(ValueKind::LoadInst, E, E->getType()), LValue(LValue) {
+LoadInst::LoadInst(LoadExpr *E, Value *LValue, bool IsTake)
+  : Instruction(ValueKind::LoadInst, E, E->getType()),
+    LValue(LValue),
+    IsTake(IsTake) {
 }
 
 
@@ -238,6 +240,15 @@ StoreInst::StoreInst(Expr *E, bool IsInitialization, Value *Src, Value *Dest)
     Src(Src), Dest(Dest), IsInitialization(IsInitialization) {
   // This happens in a store to an array initializer for varargs tuple shuffle.
 }
+
+
+CopyInst::CopyInst(Expr *E, Value *SrcLValue, Value *DestLValue,
+                   bool IsTakeOfSrc, bool IsInitializationOfDest)
+  : Instruction(ValueKind::CopyInst, E, getVoidType(Src->getType())),
+    Src(SrcLValue), Dest(DestLValue),
+    IsTakeOfSrc(IsTakeOfSrc), IsInitializationOfDest(IsInitializationOfDest) {
+}
+
 
 SpecializeInst::SpecializeInst(SpecializeExpr *SE, Value *Operand, Type DestTy)
   : Instruction(ValueKind::SpecializeInst, SE, DestTy), Operand(Operand) {
@@ -297,6 +308,25 @@ TupleElementInst::TupleElementInst(Type ResultTy, Value *Operand,
   
 }
 
+RetainInst::RetainInst(Expr *E, Value *Operand)
+  : Instruction(ValueKind::RetainInst, E, Operand->getType()),
+    Operand(Operand) {
+}
+
+ReleaseInst::ReleaseInst(Expr *E, Value *Operand)
+  : Instruction(ValueKind::ReleaseInst, E, getVoidType(Operand->getType())),
+    Operand(Operand) {
+}
+
+DeallocInst::DeallocInst(Expr *E, Value *Operand)
+  : Instruction(ValueKind::DeallocInst, E, getVoidType(Operand->getType())),
+    Operand(Operand) {
+}
+
+DestroyInst::DestroyInst(Expr *E, Value *Operand)
+  : Instruction(ValueKind::DestroyInst, E, getVoidType(Operand->getType())),
+    Operand(Operand) {
+}
 
 //===----------------------------------------------------------------------===//
 // SIL-only instructions that don't have an AST analog

@@ -153,6 +153,10 @@ public:
     return insert(new StoreInst(S, Src, DestLValue));
   }
 
+  CopyInst *createCopy(Expr *E, Value *SrcLValue, Value *DestLValue) {
+    return insert(new CopyInst(E, SrcLValue, DestLValue, false, false));
+  }
+  
   StoreInst *createInitialization(VarDecl *VD, Value *Src,
                                   Value *DestLValue) {
     return insert(new StoreInst(VD, Src, DestLValue));
@@ -200,6 +204,19 @@ public:
 
   MetatypeInst *createMetatype(MetatypeExpr *Expr) {
     return insert(new MetatypeInst(Expr));
+  }
+  
+  RetainInst *createRetain(Expr *E, Value *Operand) {
+    return insert(new RetainInst(E, Operand));
+  }
+  ReleaseInst *createRelease(Expr *E, Value *Operand) {
+    return insert(new ReleaseInst(E, Operand));
+  }
+  DeallocInst *createDealloc(Expr *E, Value *Operand) {
+    return insert(new DeallocInst(E, Operand));
+  }
+  DestroyInst *createDestroy(Expr *E, Value *Operand) {
+    return insert(new DestroyInst(E, Operand));
   }
 
   //===--------------------------------------------------------------------===//

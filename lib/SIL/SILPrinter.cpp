@@ -149,11 +149,21 @@ public:
   }
   void visitLoadInst(LoadInst *LI) {
     OS << "load " << getID(LI->getLValue());
+    if (LI->isTake())
+      OS << " [take]";
   }
   void visitStoreInst(StoreInst *SI) {
     OS << "store " << getID(SI->getSrc()) << " -> "
        << getID(SI->getDest());
     if (SI->isInitialization())
+      OS << " [initialization]";
+  }
+  void visitCopyInst(CopyInst *CI) {
+    OS << "copy " << getID(CI->getSrc());
+    if (CI->isTakeOfSrc())
+      OS << " [take]";
+    OS << " -> " << getID(CI->getDest());
+    if (CI->isInitializationOfDest())
       OS << " [initialization]";
   }
   void visitSpecializeInst(SpecializeInst *SI) {
@@ -183,7 +193,20 @@ public:
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype " << MI->getMetaType().getString();
   }
-
+  
+  void visitRetainInst(RetainInst *RI) {
+    OS << "retain " << getID(RI->getOperand());
+  }
+  void visitReleaseInst(ReleaseInst *RI) {
+    OS << "release " << getID(RI->getOperand());
+  }
+  void visitDeallocInst(DeallocInst *DI) {
+    OS << "dealloc " << getID(DI->getOperand());
+  }
+  void visitDestroyInst(DestroyInst *DI) {
+    OS << "destroy " << getID(DI->getOperand());
+  }
+  
   void visitIndexLValueInst(IndexLValueInst *ILI) {
     OS << "index_lvalue " << getID(ILI->getOperand()) << ", " <<ILI->getIndex();
   }

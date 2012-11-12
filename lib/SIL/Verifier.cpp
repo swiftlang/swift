@@ -105,6 +105,17 @@ public:
               isEqual(SI->getSrc()->getType()) &&
            "Store operand type and dest type mismatch");
   }
+
+  void visitCopyInst(CopyInst *SI) {
+    assert(SI->getSrc()->getType()->is<LValueType>() &&
+           "Src value should be lvalue");
+    assert(SI->getDest()->getType()->is<LValueType>() &&
+           "Dest address should be lvalue");
+    assert(SI->getDest()->getType()->getRValueType()->
+           isEqual(SI->getSrc()->getType()->getRValueType()) &&
+           "Store operand type and dest type mismatch");
+  }
+  
   void visitSpecializeInst(SpecializeInst *SI) {
     assert(SI->getType()->is<FunctionType>() &&
            SI->getOperand()->getType()->is<PolymorphicFunctionType>() &&
@@ -119,6 +130,17 @@ public:
            "Tuple field count mismatch!");
   }
   void visitMetatypeInst(MetatypeInst *MI) {
+  }
+  
+  void visitRetainInst(RetainInst *RI) {
+  }
+  void visitReleaseInst(ReleaseInst *RI) {
+  }
+  void visitDeallocInst(DeallocInst *DI) {
+  }
+  void visitDestroyInst(DestroyInst *DI) {
+    assert(DI->getType()->is<LValueType>() &&
+           "Operand of destroy must be lvalue");
   }
 
   void visitIndexLValueInst(IndexLValueInst *ILI) {
