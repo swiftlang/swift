@@ -29,6 +29,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <iterator>
+#include <map>
 #include <memory>
 #include <utility>
 #include <tuple>
@@ -758,6 +759,20 @@ namespace {
   }
 #endif
 
+  /// \brief A pair of a type and identifier.
+  struct TypeAndName {
+    Type type;
+    Identifier name;
+
+    friend bool operator<(const TypeAndName &x, const TypeAndName &y) {
+      return std::less<TypeBase *>()(x.type.getPointer(),
+                                     y.type.getPointer()) ||
+        (x.type.getPointer() == y.type.getPointer() &&
+         std::less<void*>()(x.name.getAsOpaquePointer(),
+                            y.name.getAsOpaquePointer()));
+    }
+  };
+
   /// \brief Describes a system of constraints on type variables, the
   /// solution of which assigns concrete types to each of the type variables.
   /// Constraint systems are typically generated given an (untyped) expression.
@@ -791,6 +806,11 @@ namespace {
     unsigned TypeCounter = 0;
     unsigned OverloadSetCounter = 0;
 
+    // Valid everywhere
+    
+    /// \brief Cached member lookups.
+    std::map<TypeAndName, MemberLookup> MemberLookups;
+
     /// \brief A mapping from each overload set that is resolved in this
     /// constraint system to a pair (index, type), where index is the index of
     /// the overload choice (within the overload set) and type is the type
@@ -801,7 +821,6 @@ namespace {
     /// type.
     TypeVariableType *assumedTypeVar = nullptr;
 
-    // Valid everywhere
     enum { Active, Unsolvable, Solved } State = Active;
 
     SmallVector<TypeVariableType *, 16> TypeVariables;
@@ -1091,6 +1110,34 @@ namespace {
                       saved.restore();
                     });
       SavedBindings.clear();
+    }
+
+    /// \brief Lookup for a member with the given name in the given base type.
+    ///
+    /// This routine caches the results of member lookups in the top constraint
+    /// system, to avoid.
+    ///
+    /// FIXME: This caching should almost certainly be performed at the
+    /// translation unit level, since type checking occurs after name binding,
+    /// and no new names are introduced after name binding.
+    ///
+    /// \returns A reference to the member-lookup result.
+    MemberLookup &lookupMember(Type base, Identifier name) {
+      auto &top = getTopConstraintSystem();
+      base = base->getCanonicalType();
+
+      // Check whether we've performed this lookup before.
+      auto known = top.MemberLookups.find({base, name});
+      if (known != top.MemberLookups.end())
+        return known->second;
+
+      // We have not performed this lookup before; do it again.
+      return top.MemberLookups.emplace(std::piecewise_construct,
+                                       std::make_tuple(TypeAndName{base,
+                                                                   name}),
+                                       std::make_tuple(base, name,
+                                                       std::ref(TC.TU)))
+               .first->second;
     }
 
   public:
@@ -3339,7 +3386,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       type1->getNominalOrBoundGenericNominal()) {
     auto &context = getASTContext();
     auto name = context.getIdentifier("__conversion");
-    MemberLookup lookup(type1, name, TC.TU);
+    MemberLookup &lookup = lookupMember(type1, name);
     if (lookup.isSuccess()) {
       auto inputTV = createTypeVariable();
       auto outputTV = createTypeVariable();
@@ -3560,7 +3607,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   }
 
   // Look for members within the base.
-  MemberLookup lookup(baseObjTy, name, TC.TU);
+  MemberLookup &lookup = lookupMember(baseObjTy, name);
   if (!lookup.isSuccess()) {
     return SolutionKind::Error;
   }
@@ -4978,7 +5025,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
       // Find the member and build a reference to it.
       // FIXME: Redundant member lookup.
-      MemberLookup lookup(oneofTy, expr->getName(), tc.TU);
+      MemberLookup &lookup = CS.lookupMember(oneofTy, expr->getName());
       assert(lookup.isSuccess() && "Failed lookup?");
       auto member = lookup.Results[0].D;
       auto result = tc.buildMemberRefExpr(base, expr->getDotLoc(),
