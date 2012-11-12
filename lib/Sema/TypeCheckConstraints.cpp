@@ -1099,7 +1099,6 @@ namespace {
       decltype(TypeVariableInfo)().swap(TypeVariableInfo);
     }
 
-  public:
     /// \brief Restore the type variable bindings to what they were before
     /// we attempted to solve this constraint system.
     void restoreTypeVariableBindings() {
@@ -1109,6 +1108,17 @@ namespace {
                     });
       SavedBindings.clear();
     }
+
+    /// \brief Take the permanent type variable bindings and push them into
+    /// the type variables.
+    void injectPermanentTypeVariableBindings() {
+      for (const auto &tvi : TypeVariableInfo) {
+        tvi.first->getImpl().assignFixedType(tvi.second.get<TypeBase *>(),
+                                             SavedBindings);
+      }
+    }
+
+    friend class ReinstateTypeVariableBindingsRAII;
 
     /// \brief Lookup for a member with the given name in the given base type.
     ///
@@ -1129,15 +1139,6 @@ namespace {
     }
 
   public:
-    /// \brief Take the permanent type variable bindings and push them into
-    /// the type variables.
-    void injectPermanentTypeVariableBindings() {
-      for (const auto &tvi : TypeVariableInfo) {
-        tvi.first->getImpl().assignFixedType(tvi.second.get<TypeBase *>(),
-                                             SavedBindings);
-      }
-    }
-
     /// \brief Retrieve an unresolved overload set.
     OverloadSet *getUnresolvedOverloadSet(unsigned Idx) const {
       return UnresolvedOverloadSets[Idx];
@@ -1586,6 +1587,30 @@ namespace {
     Expr *applySolution(Expr *expr);
 
     void dump();
+  };
+
+  /// \brief RAII object that re-instates the type variable bindings for
+  /// the given constraint system.
+  class ReinstateTypeVariableBindingsRAII {
+    ConstraintSystem &CS;
+
+  public:
+    ReinstateTypeVariableBindingsRAII(ConstraintSystem &cs) : CS(cs) {
+      cs.injectPermanentTypeVariableBindings();
+    }
+
+    ~ReinstateTypeVariableBindingsRAII() {
+      CS.restoreTypeVariableBindings();
+    }
+
+    ReinstateTypeVariableBindingsRAII(const ReinstateTypeVariableBindingsRAII&)
+      = delete;
+    ReinstateTypeVariableBindingsRAII(ReinstateTypeVariableBindingsRAII&&)
+      = delete;
+    ReinstateTypeVariableBindingsRAII &
+    operator=(const ReinstateTypeVariableBindingsRAII&) = delete;
+    ReinstateTypeVariableBindingsRAII &
+    operator=(ReinstateTypeVariableBindingsRAII&&) = delete;
   };
 }
 
@@ -5590,13 +5615,12 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   }
 
   // Inject the permanent type bindings from this solution.
-  solution->injectPermanentTypeVariableBindings();
+  ReinstateTypeVariableBindingsRAII reinstateBindings(*solution);
 
   // Apply the solution to the expression.
   auto result = solution->applySolution(expr);
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
-    solution->restoreTypeVariableBindings();
    return nullptr;
   }
 
@@ -5605,7 +5629,6 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   if (convertType) {
     result = solution->convertToType(result, convertType);
     if (!result) {
-      solution->restoreTypeVariableBindings();
       return nullptr;
     }
   }
@@ -5615,7 +5638,6 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
     result->dump();
   }
 
-  solution->restoreTypeVariableBindings();
   return result;
 }
 
@@ -5751,13 +5773,12 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   }
 
   // Inject the permanent type bindings from this solution.
-  solution->injectPermanentTypeVariableBindings();
+  ReinstateTypeVariableBindingsRAII reinstateBindings(*solution);
 
   // Apply the solution to the destination.
   dest = solution->applySolution(dest);
   if (!dest) {
     // Failure already diagnosed, above, as part of applying the solution.
-    solution->restoreTypeVariableBindings();
     return { nullptr, nullptr };
   }
 
@@ -5765,7 +5786,6 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   src = solution->applySolution(src);
   if (!src) {
     // Failure already diagnosed, above, as part of applying the solution.
-    solution->restoreTypeVariableBindings();
     return { nullptr, nullptr };
   }
 
@@ -5773,7 +5793,6 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   src = solution->convertToType(src, solution->simplifyType(destTy));
   if (!src) {
     // Failure already diagnosed, above, as part of applying the solution.
-    solution->restoreTypeVariableBindings();
     return { nullptr, nullptr };
   }
 
@@ -5787,7 +5806,6 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
     log << "\n";
   }
 
-  solution->restoreTypeVariableBindings();
   return { dest, src };
 }
 
