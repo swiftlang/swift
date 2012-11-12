@@ -811,6 +811,9 @@ namespace {
     /// \brief Cached member lookups.
     std::map<TypeAndName, MemberLookup> MemberLookups;
 
+    /// \brief Cached literal checks.
+    std::map<std::pair<TypeBase *, LiteralKind>, bool> LiteralChecks;
+
     /// \brief A mapping from each overload set that is resolved in this
     /// constraint system to a pair (index, type), where index is the index of
     /// the overload choice (within the overload set) and type is the type
@@ -3507,10 +3510,20 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind) {
     type = fixed;
   }
 
-  return TC.isLiteralCompatibleType(type, SourceLoc(), kind,
-                                    /*Complain=*/false).first
-           ? SolutionKind::TriviallySolved
-           : SolutionKind::Error;
+  // Have we already checked whether this type is literal compatible?
+  auto &top = getTopConstraintSystem();
+  auto typePtr = type->getCanonicalType().getPointer();
+  auto known = top.LiteralChecks.find({typePtr, kind});
+  if (known != top.LiteralChecks.end())
+    return known->second? SolutionKind::TriviallySolved : SolutionKind::Error;
+
+  // We have not yet checked this type; check it now, and cache the result.
+  // FIXME: We should do this caching in the translation unit.
+  bool &result = top.LiteralChecks[{typePtr, kind}];
+  result = TC.isLiteralCompatibleType(type, SourceLoc(), kind,
+                                      /*Complain=*/false).first;
+
+  return result? SolutionKind::TriviallySolved : SolutionKind::Error;
 }
 
 ConstraintSystem::SolutionKind
