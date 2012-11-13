@@ -57,13 +57,13 @@ unsigned long long
 print_int(char* TmpBuffer, __int64_t buf_len, __int128_t X, uint64_t Radix) {
   assert(Radix != 0 && Radix <= 36 && "Invalid radix for string conversion");
   char *P = TmpBuffer;
-  
+
   bool WasNeg = X < 0;
   __uint128_t Y = WasNeg ? -X : X;
 
   if (Y == 0) {
-    *P++ = '0';  // Special case. 
-  } else if (Radix == 10) {  // Special case for 10, since we care so much about performance right now.
+    *P++ = '0';
+  } else if (Radix == 10) {
     while (Y) {
       *P++ = '0' + char(Y % 10);
       Y /= 10;
@@ -75,8 +75,34 @@ print_int(char* TmpBuffer, __int64_t buf_len, __int128_t X, uint64_t Radix) {
       Y /= Radix32;
     }
   }
-  
+
   if (WasNeg) *P++ = '-';
+  std::reverse(TmpBuffer, P);
+  return size_t(P - TmpBuffer);
+}
+
+// static func String(v : UInt128, radix : Int) -> String
+extern "C"
+unsigned long long
+print_uint(char* TmpBuffer, __int64_t buf_len, __uint128_t Y, uint64_t Radix) {
+  assert(Radix != 0 && Radix <= 36 && "Invalid radix for string conversion");
+  char *P = TmpBuffer;
+
+  if (Y == 0) {
+    *P++ = '0';
+  } else if (Radix == 10) {
+    while (Y) {
+      *P++ = '0' + char(Y % 10);
+      Y /= 10;
+    }
+  } else {
+    unsigned Radix32 = Radix;
+    while (Y) {
+      *P++ = llvm::hexdigit(Y % Radix32);
+      Y /= Radix32;
+    }
+  }
+
   std::reverse(TmpBuffer, P);
   return size_t(P - TmpBuffer);
 }
