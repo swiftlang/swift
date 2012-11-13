@@ -1,10 +1,8 @@
 add_swift_library(swiftSema
   ArchetypeBuilder.cpp
-  ArchetypeBuilder.h
   CaptureAnalysis.cpp
   NameBinding.cpp
   TypeChecker.cpp
-  TypeChecker.h
   TypeCheckCoercion.cpp
   TypeCheckConstraints.cpp
   TypeCheckExpr.cpp

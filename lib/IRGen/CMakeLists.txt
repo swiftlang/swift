@@ -1,64 +1,28 @@
 add_swift_library(swiftIRGen
-  ASTVisitor.h
-  Address.h
-  CMakeLists.txt
-  CallingConvention.h
-  CallEmission.h
-  Callee.h
-  Cleanup.h
-  Condition.h
-  Explosion.h
   GenArray.cpp
   GenClass.cpp
-  GenClass.h
   GenClosure.cpp
-  GenClosure.h
   GenConstructor.cpp
   GenControl.cpp
   GenDecl.cpp
   GenExpr.cpp
   GenFunc.cpp
-  GenFunc.h
   GenHeap.cpp
-  GenHeap.h
   GenInit.cpp
-  GenInit.h
   GenLValue.cpp
-  GenLValue.h
   GenMeta.cpp
-  GenMeta.h
   GenObjC.cpp
-  GenObjC.h
   GenOneOf.cpp
   GenPoly.cpp
   GenProto.cpp
-  GenProto.h
   GenStmt.cpp
   GenStruct.cpp
   GenTuple.cpp
-  GenTuple.h
   GenType.cpp
-  GenType.h
-  GetterSetter.h
-  HeapTypeInfo.h
-  IndirectTypeInfo.h
-  IRBuilder.h
   IRGen.cpp
-  IRGen.h
   IRGenFunction.cpp
-  IRGenFunction.h
   IRGenModule.cpp
-  IRGenModule.h
-  JumpDest.h
-  LValue.h
-  Linking.h
   Mangle.cpp
-  NecessaryBindings.h
   OptimizeARC.cpp
-  ProtocolInfo.h
-  Scope.h
   StructLayout.cpp
-  StructLayout.h
-  TypeInfo.h
-  ValueWitness.h
   DEPENDS swiftAST)

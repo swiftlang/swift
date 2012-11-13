@@ -230,6 +230,8 @@ function(handle_swift_sources sourcesvar externalvar target)
       list(APPEND result ${src})
     endif()
   endforeach()
+
+  llvm_process_sources(result ${result})
   set(${sourcesvar} "${result}" PARENT_SCOPE)
   set(${externalvar} "${externally_compiled}" PARENT_SCOPE)
 endfunction()

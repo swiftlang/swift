@@ -1,10 +1,7 @@
 add_swift_executable(swift
   Frontend.cpp
-  Frontend.h
   Immediate.cpp
-  Immediate.h
   PrintingDiagnosticConsumer.cpp
-  PrintingDiagnosticConsumer.h
   swift.cpp
   DEPENDS swiftIRGen swiftParse swiftSema swiftAST swiftSIL swiftSILGen
   COMPONENT_DEPENDS bitwriter codegen ipo jit linker mcjit asmparser
