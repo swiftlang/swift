@@ -330,3 +330,17 @@ posix_isDirectory_hack(const char *path)
   assert(r != -1);
   return S_ISDIR(sb.st_mode);
 }
+
+extern "C"
+int
+posix_get_errno(void)
+{
+  return errno; // errno is not a global, but a macro
+}
+
+extern "C"
+void
+posix_set_errno(int value)
+{
+  errno = value; // errno is not a global, but a macro
+}
