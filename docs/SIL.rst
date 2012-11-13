@@ -9,7 +9,7 @@ TODO: enable high-level optimization, interoperability, persistence, embedded in
 General features
 ----------------
 
-TODO: SSA, functional representation, etc.
+TODO: SSA, functional representation, all implicit Swift behavior is explicit in SIL, etc.
 
 Types
 -----
@@ -72,9 +72,11 @@ alloc_ref
 Allocates an object of reference type ``T``. The object will be initialized with retain count 1; it
 will be uninitialized otherwise.
 
+TODO: is this necessary, or should allocating reftypes be done by calls to constructor functions?
+
 alloc_tmp
 `````````
-XXX does this still need to be different from alloc_var?
+TODO: does this still need to be different from alloc_var?
 
 alloc_box
 `````````
@@ -180,8 +182,88 @@ except that ``copy`` must be used if ``T`` is an address-only type. The operands
 be given the ``take`` and ``initialize`` attributes to indicate respectively whether the source may be
 destroyed and whether the destination must be initialized.
 
-TODO other instructions
-~~~~~~~~~~~~~~~~~~~~~~~
+Literal values
+~~~~~~~~~~~~~~
+
+TODO
+
+Data manipulation
+~~~~~~~~~~~~~~~~~
+
+tuple
+`````
+::
+
+  %N:(T0,T1,...) = tuple (%0:T0, %1:T1, ...)
+
+Creates a value of a tuple type. This does not allocate any memory or retain its inputs; those must
+be done explicitly in other instructions if necessary.
+
+tuple_element
+`````````````
+::
+
+  %2:TN = tuple_element %0:(T0,T1,...), %N:Int
+
+Selects the ``%N``-th value out of a tuple or fragile struct value.
+
+index_address
+`````````````
+::
+
+  %2:Address<T> = index_address %0:Address<T>, %1:Int
+
+Returns the address of the ``%1``-th element relative to ``%0``.
+
+TODO: could it also index into tuples and structs like GEP?
+
+convert
+```````
+::
+
+  %1:U = convert %0:T -> U
+
+Performs an implicit conversion from ``T`` to ``U``.
+
+Functions
+~~~~~~~~~
+
+closure
+```````
+::
+
+  %C:((TN+1,...) -> R) = closure %0:((T1,...) -> R), (%1:T1, %2:T2, ..., %N:TN)
+
+Allocates a closure by partially applying the function ``%0`` in its first ``N`` arguments. The
+closure will be a allocated as a box with retain count 1 containing the values ``%1`` through
+``%N``, which must be retained if necessary in separate instructions.
+
+specialize
+``````````
+::
+
+  %1:F1 = specialize %0:F0 -> F1
+
+Specializes a generic function of function type ``F0`` 
+
+apply
+`````
+::
+
+  %R:R = apply %0:((T1, T2, ...) -> R) (%1:T1, %2:T2, ...)
+
+Transfers control to function ``%0``, passing in the given arguments. The ``apply`` instruction does no retaining or
+releasing of its arguments by itself; the calling convention's retain/release policy must be handled
+by separate explicit ``retain`` and ``release`` instructions. The return value will likewise not be
+implicitly retained or released.
+
+TODO: should have normal/unwind branch targets like ``invoke``
+
+Branching
+~~~~~~~~~
+
+TODO
+
 
 Examples
 --------
