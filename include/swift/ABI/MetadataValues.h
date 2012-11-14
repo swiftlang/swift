@@ -23,23 +23,18 @@
 
 namespace swift {
 
-enum : uint8_t { GenericTypeFlag = 0x80 };
-
 /// Kinds of Swift metadata records.  Some of these are types, some
 /// aren't.
 enum class MetadataKind : uint8_t {
   /// A class type.
   Class         = 0,
-  GenericClass  = unsigned(Class)  | GenericTypeFlag,
 
   /// A struct type.
   Struct        = 1,
-  GenericStruct = unsigned(Struct) | GenericTypeFlag,
 
   /// A oneof type.
   /// If we add reference oneofs, that needs to go here.
   Oneof         = 2,
-  GenericOneof  = unsigned(Oneof)  | GenericTypeFlag,
 
   /// A type whose value is not exposed in the metadata system.
   Opaque        = 8,

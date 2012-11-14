@@ -342,8 +342,7 @@ struct Metadata {
 
   /// Is this metadata for a class type?
   bool isClassType() const {
-    return Kind == MetadataKind::Class ||
-           Kind == MetadataKind::GenericClass;
+    return Kind == MetadataKind::Class;
   }
 };
 

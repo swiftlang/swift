@@ -613,6 +613,11 @@ namespace {
     }
 
   public:
+    void addMetadataFlags() {
+      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
+                                              unsigned(MetadataKind::Class)));
+    }
+
     /// The runtime provides a value witness table for Builtin.ObjectPointer.
     void addValueWitnessTable() {
       auto type = CanType(this->IGM.Context.TheObjectPointerType);
@@ -688,11 +693,6 @@ namespace {
                          const HeapLayout &layout)
       : ClassMetadataBuilderBase(IGM, theClass, layout) {}
 
-    void addMetadataFlags() {
-      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
-                                              unsigned(MetadataKind::Class)));
-    }
-
     llvm::Constant *getInit() {
       if (Fields.size() == NumHeapMetadataFields) {
         return llvm::ConstantStruct::get(IGM.HeapMetadataStructTy, Fields);
@@ -714,11 +714,6 @@ namespace {
                                 const HeapLayout &layout,
                                 const GenericParamList &classGenerics)
       : super(IGM, classGenerics, theClass, layout) {}
-
-    void addMetadataFlags() {
-      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
-                                       unsigned(MetadataKind::GenericClass)));
-    }
   };
 }
 
@@ -1371,6 +1366,11 @@ namespace {
     unsigned getNextIndex() const { return Fields.size(); }
 
   public:
+    void addMetadataFlags() {
+      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
+                                              unsigned(MetadataKind::Struct)));
+    }
+
     void addNominalTypeDescriptor() {
       // FIXME!
       Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
@@ -1405,11 +1405,6 @@ namespace {
     StructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct)
       : StructMetadataBuilderBase(IGM, theStruct) {}
 
-    void addMetadataFlags() {
-      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
-                                              unsigned(MetadataKind::Struct)));
-    }
-
     void addValueWitnessTable() {
       auto type = this->Target->getDeclaredType()->getCanonicalType();
       Fields.push_back(emitValueWitnessTable(IGM, type));
@@ -1431,11 +1426,6 @@ namespace {
     GenericStructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct,
                                 const GenericParamList &classGenerics)
       : super(IGM, classGenerics, theStruct) {}
-
-    void addMetadataFlags() {
-      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
-                                       unsigned(MetadataKind::GenericStruct)));
-    }
 
     // FIXME.  This is a *horrendous* hack, but:  just apply the generic
     // type at the empty-tuple type a bunch.  I don't have a theory right
