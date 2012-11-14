@@ -45,6 +45,13 @@
 using namespace swift;
 using namespace irgen;
 
+/// Produce a constant to place in a metatype's isa field
+/// corresponding to the given metadata kind.
+static llvm::ConstantInt *getMetadataKind(IRGenModule &IGM,
+                                          MetadataKind kind) {
+  return llvm::ConstantInt::get(IGM.MetadataKindTy, uint8_t(kind));
+}
+
 namespace {
   /// A structure for collecting generic arguments for emitting a
   /// nominal metadata reference.  The structure produced here is
@@ -614,8 +621,7 @@ namespace {
 
   public:
     void addMetadataFlags() {
-      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
-                                              unsigned(MetadataKind::Class)));
+      Fields.push_back(getMetadataKind(this->IGM, MetadataKind::Class));
     }
 
     /// The runtime provides a value witness table for Builtin.ObjectPointer.
@@ -1367,8 +1373,7 @@ namespace {
 
   public:
     void addMetadataFlags() {
-      Fields.push_back(llvm::ConstantInt::get(this->IGM.Int8Ty,
-                                              unsigned(MetadataKind::Struct)));
+      Fields.push_back(getMetadataKind(IGM, MetadataKind::Struct));
     }
 
     void addNominalTypeDescriptor() {
@@ -1522,8 +1527,7 @@ namespace {
     }
 
     void addMetadataFlags() {
-      Fields.push_back(llvm::ConstantInt::get(IGM.Int8Ty,
-                                       unsigned(MetadataKind::Existential)));
+      Fields.push_back(getMetadataKind(IGM, MetadataKind::Existential));
     }
 
     void addValueWitnessTable() {

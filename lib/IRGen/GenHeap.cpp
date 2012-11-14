@@ -36,6 +36,13 @@
 using namespace swift;
 using namespace irgen;
 
+/// Produce a constant to place in a metatype's isa field
+/// corresponding to the given metadata kind.
+static llvm::ConstantInt *getMetadataKind(IRGenModule &IGM,
+                                          MetadataKind kind) {
+  return llvm::ConstantInt::get(IGM.MetadataKindTy, uint8_t(kind));
+}
+
 static llvm::ConstantInt *getSize(IRGenFunction &IGF, Size value) {
   return llvm::ConstantInt::get(IGF.IGM.SizeTy, value.getValue());
 }
@@ -103,8 +110,7 @@ llvm::Constant *HeapLayout::createSizeFn(IRGenModule &IGM) const {
 
 void HeapLayout::buildMetadataInto(IRGenModule &IGM,
                     llvm::SmallVectorImpl<llvm::Constant*> &metadata) const {
-  metadata.push_back(llvm::ConstantInt::get(IGM.Int8Ty,
-                                 unsigned(MetadataKind::HeapLocalVariable)));
+  metadata.push_back(getMetadataKind(IGM, MetadataKind::HeapLocalVariable));
   metadata.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
   metadata.push_back(createDtorFn(IGM, *this));
   metadata.push_back(createSizeFn(IGM));
@@ -307,8 +313,7 @@ createArraySizeFn(IRGenModule &IGM,
 
 void ArrayHeapLayout::buildMetadataInto(IRGenModule &IGM,
                       llvm::SmallVectorImpl<llvm::Constant*> &fields) const {
-  fields.push_back(llvm::ConstantInt::get(IGM.Int8Ty,
-                                          unsigned(MetadataKind::HeapArray)));
+  fields.push_back(getMetadataKind(IGM, MetadataKind::HeapArray));
   fields.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
   fields.push_back(createArrayDtorFn(IGM, *this, Bindings));
   fields.push_back(createArraySizeFn(IGM, *this, Bindings));

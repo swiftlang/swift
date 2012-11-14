@@ -92,7 +92,10 @@ public:
   llvm::IntegerType *Int16Ty;          /// i16
   llvm::IntegerType *Int32Ty;          /// i32
   llvm::IntegerType *Int64Ty;          /// i64
-  llvm::IntegerType *SizeTy;           /// usually i32 or i64
+  union {
+    llvm::IntegerType *SizeTy;         /// usually i32 or i64
+    llvm::IntegerType *MetadataKindTy;
+  };
   union {
     llvm::PointerType *Int8PtrTy;      /// i8*
     llvm::PointerType *WitnessTableTy;

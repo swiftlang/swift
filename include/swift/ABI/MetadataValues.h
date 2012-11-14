@@ -25,7 +25,7 @@ namespace swift {
 
 /// Kinds of Swift metadata records.  Some of these are types, some
 /// aren't.
-enum class MetadataKind : uint8_t {
+enum class MetadataKind : uintptr_t {
   /// A class type.
   Class         = 0,
 

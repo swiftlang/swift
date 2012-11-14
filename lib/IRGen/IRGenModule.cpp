@@ -67,7 +67,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   RefCountedPtrTy = RefCountedStructTy->getPointerTo(/*addrspace*/ 0);
   RefCountedNull = llvm::ConstantPointerNull::get(RefCountedPtrTy);
 
-  llvm::Type *typeMetadataElts[] = { Int8Ty, WitnessTablePtrTy };
+  llvm::Type *typeMetadataElts[] = { MetadataKindTy, WitnessTablePtrTy };
   TypeMetadataStructTy =
     llvm::StructType::create(getLLVMContext(), typeMetadataElts,
                              "swift.type");
@@ -78,7 +78,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
 
   // Note that heap metadata share a common prefix with type metadata.
   llvm::Type *heapMetadataElts[] = {
-    Int8Ty, WitnessTablePtrTy, dtorPtrTy, dtorPtrTy
+    MetadataKindTy, WitnessTablePtrTy, dtorPtrTy, dtorPtrTy
   };
   HeapMetadataStructTy =
     llvm::StructType::create(getLLVMContext(), heapMetadataElts,
