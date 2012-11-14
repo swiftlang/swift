@@ -89,10 +89,6 @@ class TypeVariableType::Implementation {
   /// \brief The unique number assigned to this type variable.
   unsigned ID;
 
-  /// \brief The expression that will be assigned this particular type, if
-  /// any.
-  Expr *TheExpr;
-
   /// \brief The archetype that this type variable describes.
   ArchetypeType *Archetype;
 
@@ -105,24 +101,20 @@ class TypeVariableType::Implementation {
 
 public:
   explicit Implementation(unsigned ID)
-    : ID(ID), TheExpr(nullptr), Archetype(nullptr),
+    : ID(ID), Archetype(nullptr),
       ParentOrFixed(getTypeVariable()) { }
 
   explicit Implementation(unsigned ID, Expr *TheExpr)
-    : ID(ID), TheExpr(TheExpr), Archetype(nullptr),
+    : ID(ID), Archetype(nullptr),
       ParentOrFixed(getTypeVariable()) { }
 
   explicit Implementation(unsigned ID, ArchetypeType *Archetype)
-    : ID(ID), TheExpr(nullptr), Archetype(Archetype),
+    : ID(ID), Archetype(Archetype),
       ParentOrFixed(getTypeVariable()) { }
 
   /// \brief Retrieve the unique ID corresponding to this type variable.
   unsigned getID() const { return ID; }
   
-  /// \brief Retrieve the expression that will be assigned this particular
-  /// type, if any.
-  Expr *getExpr() const { return TheExpr; }
-
   /// \brief Retrieve the archetype that this type variable replaced.
   ArchetypeType *getArchetype() const { return Archetype; }
 
