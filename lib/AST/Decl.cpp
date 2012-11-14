@@ -633,7 +633,7 @@ VarDecl *FuncDecl::getImplicitThisDecl() {
 }
 
 /// Produce the selector for this "Objective-C method" in the given buffer.
-void FuncDecl::getSelector(llvm::SmallVectorImpl<char> &buffer) const {
+StringRef FuncDecl::getObjCSelector(llvm::SmallVectorImpl<char> &buffer) const {
   assert(buffer.empty());
 
   llvm::raw_svector_ostream out(buffer);
@@ -649,14 +649,14 @@ void FuncDecl::getSelector(llvm::SmallVectorImpl<char> &buffer) const {
 
   // If it's an empty tuple pattern, it's a nullary selector.
   if (tuple && tuple->getNumFields() == 0)
-    return;
+    return StringRef(buffer.data(), buffer.size());
 
   // Otherwise, it's at least a unary selector.
   out << ':';
 
   // If it's a unary selector, we're done.
   if (!tuple)
-    return;
+    return StringRef(buffer.data(), buffer.size());
 
   // For every element except the first, add a selector component.
   for (auto &elt : tuple->getFields().slice(1)) {
@@ -672,6 +672,8 @@ void FuncDecl::getSelector(llvm::SmallVectorImpl<char> &buffer) const {
     // selector.
     out << ':';
   }
+
+  return StringRef(buffer.data(), buffer.size());
 }
 
 SourceRange FuncDecl::getSourceRange() const {

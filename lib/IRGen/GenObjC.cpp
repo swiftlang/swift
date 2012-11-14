@@ -304,7 +304,7 @@ namespace {
     };
 
     Selector(FuncDecl *method) {
-      method->getSelector(Text);
+      method->getObjCSelector(Text);
     }
 
     StringRef str() const {
