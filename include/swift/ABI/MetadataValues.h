@@ -56,6 +56,9 @@ enum class MetadataKind : uint8_t {
   /// An existential type.
   Existential   = 12,
 
+  /// A metatype.
+  Metatype      = 13,
+
   // Array types?
   // L-value types?
 

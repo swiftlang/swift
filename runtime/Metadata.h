@@ -317,6 +317,16 @@ extern "C" const ValueWitnessTable _TWVFT_T_;     // () -> ()
 // The () table can be used for arbitrary empty types.
 extern "C" const ValueWitnessTable _TWVT_;        // ()
 
+/// Return the value witnesses for unmanaged pointers.
+static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
+#ifdef __LP64__
+  return _TWVBi64_;
+#else
+  return _TWVBi32_;
+#endif
+}
+
+
 /// The common structure of all type metadata.
 struct Metadata {
   /// The kind.
@@ -329,6 +339,12 @@ struct Metadata {
   /// those for (e.g.) non-class heap allocations, may have an invalid
   /// pointer here.
   const ValueWitnessTable *ValueWitnesses;
+
+  /// Is this metadata for a class type?
+  bool isClassType() const {
+    return Kind == MetadataKind::Class ||
+           Kind == MetadataKind::GenericClass;
+  }
 };
 
 /// The common structure of opaque metadata.  Adds nothing.
@@ -440,6 +456,12 @@ struct FunctionTypeMetadata : public Metadata {
 
   /// The type metadata for the result type.
   const Metadata *ResultType;
+};
+
+/// The structure of metadata for metatypes.
+struct MetatypeMetadata : public Metadata {
+  /// The type metadata for the element.
+  const Metadata *InstanceType;
 };
 
 /// The structure of tuple type metadata.
@@ -598,6 +620,10 @@ swift_getTupleTypeMetadata(size_t numElements,
                            const Metadata * const *elements,
                            const char *labels,
                            const ValueWitnessTable *proposedWitnesses);
+
+/// \brief Fetch a uniqued metadata for a metatype type.
+extern "C" const MetatypeMetadata *
+swift_getMetatypeMetadata(const Metadata *instanceType);
 
 } // end namespace swift
 

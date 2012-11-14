@@ -56,11 +56,18 @@ namespace {
     }
 
   public:
-    static Impl *allocate(size_t numArguments, size_t payloadSize) {
+    static Impl *allocate(const void * const *arguments,
+                          size_t numArguments, size_t payloadSize) {
       void *buffer = operator new(sizeof(Impl) +
                                   numArguments * sizeof(void*) +
                                   payloadSize);
-      return new (buffer) Impl(numArguments);
+      auto result = new (buffer) Impl(numArguments);
+
+      // Copy the arguments into the right place for the key.
+      memcpy(result->getArgumentsBuffer(), arguments,
+             numArguments * sizeof(void*));
+
+      return result;
     }
 
     const Impl *getNext() const { return Next; }
@@ -152,21 +159,18 @@ static const Metadata *
 instantiateGenericMetadata(GenericMetadata *pattern,
                            const void *arguments) {
   size_t numGenericArguments = pattern->NumArguments;
+  void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
 
   // Allocate the new entry.
-  auto entry = GenericCacheEntry::allocate(numGenericArguments,
+  auto entry = GenericCacheEntry::allocate(argumentsAsArray,
+                                           numGenericArguments,
                                            pattern->MetadataSize);
-
-  // Copy the arguments into the right place for the key.
-  memcpy(entry->getArgumentsBuffer(), arguments,
-         numGenericArguments * sizeof(void*));
 
   // Initialize the metadata by copying the template.
   auto metadata = entry->getData<Metadata>(numGenericArguments);
   memcpy(metadata, pattern->getMetadataTemplate(), pattern->MetadataSize);
 
   // Fill in the missing spaces from the arguments.
-  void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
   void **metadataAsArray = reinterpret_cast<void**>(metadata);
   for (auto i = pattern->fill_ops_begin(),
             e = pattern->fill_ops_end(); i != e; ++i) {
@@ -237,7 +241,7 @@ swift::swift_getFunctionTypeMetadata(const Metadata *argMetadata,
     return entry->getData<FunctionTypeMetadata>(numGenericArgs);
   }
 
-  auto entry = FunctionCacheEntry::allocate(numGenericArgs,
+  auto entry = FunctionCacheEntry::allocate(args, numGenericArgs,
                                             sizeof(FunctionTypeMetadata));
 
   auto metadata = entry->getData<FunctionTypeMetadata>(numGenericArgs);
@@ -436,7 +440,7 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 
   // This is actually a bit silly because the data is *completely*
   // shared between the header and the tuple metadata itself.
-  auto entry = TupleCacheEntry::allocate(numElements,
+  auto entry = TupleCacheEntry::allocate(genericArgs, numElements,
                                          sizeof(TupleTypeData) +
                                          numElements * sizeof(Element));
 
@@ -476,4 +480,52 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 #undef ASSIGN_TUPLE_WITNESS
 
   return &TupleTypes.add(entry)->getData<TupleTypeData>(numElements)->Metadata;
+}
+
+/*** Metatypes *************************************************************/
+
+typedef HomogeneousCacheEntry MetatypeCacheEntry;
+
+/// The uniquing structure for metatype type metadata.
+static MetadataCache<MetatypeCacheEntry> MetatypeTypes;
+
+/// \brief Find the appropriate value witness table for the given type.
+static const ValueWitnessTable *
+getMetatypeValueWitnesses(const Metadata *instanceType) {
+  // The following metatypes have non-trivial representation
+  // in the concrete:
+  //   - class types
+  //   - metatypes of types that require value witnesses
+
+  // For class types, return the unmanaged-pointer witnesses.
+  if (instanceType->isClassType())
+    return &getUnmanagedPointerValueWitnesses();
+
+  // Metatypes preserve the triviality of their instance type.
+  if (instanceType->Kind == MetadataKind::Metatype)
+    return instanceType->ValueWitnesses;
+
+  // Everything else is trivial and can use the empty-tuple metadata.
+  return &_TWVT_;
+}
+
+/// \brief Fetch a uniqued metadata for a metatype type.
+extern "C" const MetatypeMetadata *
+swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
+  const size_t numGenericArgs = 1;
+
+  const void *args[] = { instanceMetadata };
+  if (auto entry = MetatypeTypes.find(args, numGenericArgs)) {
+    return entry->getData<MetatypeMetadata>(numGenericArgs);
+  }
+
+  auto entry = MetatypeCacheEntry::allocate(args, numGenericArgs,
+                                            sizeof(MetatypeMetadata));
+
+  auto metadata = entry->getData<MetatypeMetadata>(numGenericArgs);
+  metadata->Kind = MetadataKind::Metatype;
+  metadata->ValueWitnesses = getMetatypeValueWitnesses(instanceMetadata);
+  metadata->InstanceType = instanceMetadata;
+
+  return MetatypeTypes.add(entry)->getData<MetatypeMetadata>(numGenericArgs);
 }
