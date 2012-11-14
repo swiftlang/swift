@@ -762,6 +762,13 @@ namespace {
       /// \brief Allocator used for all of the related constraint systems.
       llvm::BumpPtrAllocator Allocator;
 
+      /// \brief Arena used for memory management of constraint-checker-related
+      /// allocations.
+      ///
+      /// This arena will automatically be destroyed when the top constraint
+      /// system is destroyed.
+      ConstraintCheckerArenaRAII Arena;
+
       /// \brief Counter for type variables introduced.
       unsigned TypeCounter = 0;
 
@@ -774,6 +781,9 @@ namespace {
 
       /// \brief Cached literal checks.
       std::map<std::pair<TypeBase *, LiteralKind>, bool> LiteralChecks;
+
+    public:
+      SharedStateType(TypeChecker &tc) : Arena(tc.Context, Allocator) {}
     };
 
     /// \brief The state shared among all of the related constraint systems.
@@ -846,8 +856,8 @@ namespace {
     friend class OverloadSet;
 
   public:
-    ConstraintSystem(TypeChecker &TC)
-      : TC(TC), SharedState(new SharedStateType)
+    ConstraintSystem(TypeChecker &tc)
+      : TC(tc), SharedState(new SharedStateType(tc))
     {
       ++NumExploredConstraintSystems;
     }

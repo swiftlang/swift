@@ -32,6 +32,7 @@ namespace llvm {
   struct fltSemantics;
 }
 namespace swift {
+  enum class AllocationArena;
   class ArchetypeType;
   class ASTContext;
   class ClassDecl;
@@ -249,8 +250,8 @@ private:
 public:
   // Only allow allocation of Types using the allocator in ASTContext
   // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = 8);  
+  void *operator new(size_t bytes, ASTContext &ctx, AllocationArena arena,
+                     unsigned alignment = 8);
 };
 
 /// ErrorType - This represents a type that was erroneously constructed.  This
@@ -715,10 +716,12 @@ public:
   void print(raw_ostream &O) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, TheDecl, Parent, GenericArgs);
+    bool hasTypeVariable = false;
+    Profile(ID, TheDecl, Parent, GenericArgs, hasTypeVariable);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *TheDecl,
-                      Type Parent, ArrayRef<Type> GenericArgs);
+                      Type Parent, ArrayRef<Type> GenericArgs,
+                      bool &hasTypeVariable);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

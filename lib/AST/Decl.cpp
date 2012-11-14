@@ -371,7 +371,7 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
 {
   // Set the type of the TypeAlias to the right MetaTypeType.
   ASTContext &Ctx = getASTContext();
-  AliasTy = new (Ctx) NameAliasType(this);
+  AliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
   setType(MetaTypeType::get(AliasTy, Ctx));
 }
 
@@ -451,7 +451,7 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
 {
   // Compute the associated type for this ClassDecl.
   ASTContext &Ctx = DC->getASTContext();
-  DeclaredTy = new (Ctx) ProtocolType(this, Ctx);
+  DeclaredTy = new (Ctx, AllocationArena::Permanent) ProtocolType(this, Ctx);
   // Set the type of the ProtocolDecl to the right MetaTypeType.
   setType(MetaTypeType::get(DeclaredTy, Ctx));
 }

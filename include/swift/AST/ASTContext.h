@@ -28,10 +28,12 @@
 #include <utility>
 
 namespace llvm {
+  class BumpPtrAllocator;
   class SourceMgr;
 }
 
 namespace swift {
+  class ASTContext;
   class BoundGenericType;
   class SourceLoc;
   class Type;
@@ -71,7 +73,53 @@ public:
   /// the requirements of those protocols.
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
 };
-  
+
+/// \brief The arena in which a particular ASTContext allocation will go.
+enum class AllocationArena {
+  /// \brief The permanent arena, which is tied to the lifetime of
+  /// the ASTContext.
+  ///
+  /// All global declarations and types need to be allocated into this arena.
+  /// At present, everything that is not a type involving a type variable is
+  /// allocated in this arena.
+  Permanent,
+  /// \brief The constraint solver's temporary arena, which is tied to the
+  /// lifetime of a particular instance of the constraint solver.
+  ///
+  /// Any type involving a type variable is allocated in this arena.
+  ConstraintSolver
+};
+
+/// \brief Introduces a new constraint checker arena, whose lifetime is
+/// tied to the lifetime of this RAII object.
+class ConstraintCheckerArenaRAII {
+  ASTContext &Self;
+  void *Data;
+
+public:
+  /// \brief Introduces a new constraint checker arena, supplanting any
+  /// existing constraint checker arena.
+  ///
+  /// \param self The ASTContext into which this constraint checker arena
+  /// will be installed.
+  ///
+  /// \param allocator The allocator used for allocating any data that
+  /// goes into the constraint checker arena.
+  ConstraintCheckerArenaRAII(ASTContext &self,
+                             llvm::BumpPtrAllocator &allocator);
+
+  ConstraintCheckerArenaRAII(const ConstraintCheckerArenaRAII &) = delete;
+  ConstraintCheckerArenaRAII(ConstraintCheckerArenaRAII &&) = delete;
+
+  ConstraintCheckerArenaRAII &
+  operator=(const ConstraintCheckerArenaRAII &) = delete;
+
+  ConstraintCheckerArenaRAII &
+  operator=(ConstraintCheckerArenaRAII &&) = delete;
+
+  ~ConstraintCheckerArenaRAII();
+};
+
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
   ASTContext(const ASTContext&) = delete;
@@ -81,6 +129,8 @@ public:
   // Members that should only be used by ASTContext.cpp.
   struct Implementation;
   Implementation &Impl;
+  
+  friend class ConstraintCheckerArenaRAII;
 public:
   
   ASTContext(LangOptions &langOpts, llvm::SourceMgr &SourceMgr,
@@ -113,47 +163,63 @@ public:
   /// ConformsTo - Caches the results of checking whether a given (canonical)
   /// type conforms to a given protocol.
   ConformsToMap ConformsTo;
+  
+  /// \brief Retrieve the allocator for the given arena.
+  llvm::BumpPtrAllocator &
+  getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
 
   /// Allocate - Allocate memory from the ASTContext bump pointer.
-  void *Allocate(unsigned long Bytes, unsigned Alignment);
+  void *Allocate(unsigned long bytes, unsigned alignment,
+                 AllocationArena arena = AllocationArena::Permanent) {
+    return getAllocator(arena).Allocate(bytes, alignment);
+  }
+
 
   template <typename T>
-  T *Allocate(unsigned NElts) {
-    T *Res = (T*)Allocate(sizeof(T)*NElts, __alignof__(T));
-    for (unsigned i = 0; i != NElts; ++i)
-      new (Res+i) T();
-    return Res;
+  T *Allocate(unsigned numElts,
+              AllocationArena arena = AllocationArena::Permanent) {
+    T *res = (T*)Allocate(sizeof(T)*numElts, __alignof__(T), arena);
+    for (unsigned i = 0; i != numElts; ++i)
+      new (res+i) T();
+    return res;
   }
 
   template <typename T, typename It>
-  T *AllocateCopy(It Start, It End) {
-    T *Res = (T*)Allocate(sizeof(T)*(End-Start), __alignof__(T));
-    for (unsigned i = 0; Start != End; ++Start, ++i)
-      new (Res+i) T(*Start);
-    return Res;
+  T *AllocateCopy(It start, It end,
+                  AllocationArena arena = AllocationArena::Permanent) {
+    T *res = (T*)Allocate(sizeof(T)*(end-start), __alignof__(T), arena);
+    for (unsigned i = 0; start != end; ++start, ++i)
+      new (res+i) T(*start);
+    return res;
   }
 
   template<typename T>
-  ArrayRef<T> AllocateCopy(ArrayRef<T> Arr) {
-    return ArrayRef<T>(AllocateCopy<T>(Arr.begin(), Arr.end()),
-                             Arr.size());
+  ArrayRef<T> AllocateCopy(ArrayRef<T> array,
+                           AllocationArena arena = AllocationArena::Permanent) {
+    return ArrayRef<T>(AllocateCopy<T>(array.begin(), array.end(), arena),
+                       array.size());
   }
   
   template<typename T>
-  MutableArrayRef<T> AllocateCopy(MutableArrayRef<T> Arr) {
-    return MutableArrayRef<T>(AllocateCopy<T>(Arr.begin(), Arr.end()),
-                       Arr.size());
+  MutableArrayRef<T>
+  AllocateCopy(MutableArrayRef<T> array,
+               AllocationArena arena = AllocationArena::Permanent) {
+    return MutableArrayRef<T>(AllocateCopy<T>(array.begin(), array.end(),arena),
+                       array.size());
   }
 
 
   template<typename T>
-  ArrayRef<T> AllocateCopy(const SmallVectorImpl<T> &Vec) {
-    return AllocateCopy(ArrayRef<T>(Vec));
+  ArrayRef<T> AllocateCopy(const SmallVectorImpl<T> &vec,
+                           AllocationArena arena = AllocationArena::Permanent) {
+    return AllocateCopy(ArrayRef<T>(vec), arena);
   }
 
   template<typename T>
-  MutableArrayRef<T> AllocateCopy(SmallVectorImpl<T> &Vec) {
-    return AllocateCopy(MutableArrayRef<T>(Vec));
+  MutableArrayRef<T>
+  AllocateCopy(SmallVectorImpl<T> &vec,
+               AllocationArena arena = AllocationArena::Permanent) {
+    return AllocateCopy(MutableArrayRef<T>(vec), arena);
   }
 
   

@@ -28,9 +28,9 @@
 using namespace swift;
 
 // Only allow allocation of Stmts using the allocator in ASTContext.
-void *TypeBase::operator new(size_t Bytes, ASTContext &C,
-                         unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
+void *TypeBase::operator new(size_t bytes, ASTContext &ctx,
+                             AllocationArena arena, unsigned alignment) {
+  return ctx.Allocate(bytes, alignment, arena);
 }
 
 bool CanType::isActuallyCanonicalOrNull() const {
@@ -896,9 +896,10 @@ ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, ArchetypeType *Parent,
   llvm::array_pod_sort(ConformsToProtos.begin(), ConformsToProtos.end(),
                        compareProtocols);
 
-  return new (Ctx) ArchetypeType(Ctx, Parent, Name,
-                                 Ctx.AllocateCopy(ConformsToProtos),
-                                 Index);
+  auto arena = AllocationArena::Permanent;
+  return new (Ctx, arena) ArchetypeType(Ctx, Parent, Name,
+                                        Ctx.AllocateCopy(ConformsToProtos),
+                                        Index);
 }
 
 ArchetypeType *
@@ -910,8 +911,9 @@ ArchetypeType::getNew(ASTContext &Ctx, ArchetypeType *Parent,
   minimizeProtocols(ConformsTo);
   llvm::array_pod_sort(ConformsTo.begin(), ConformsTo.end(), compareProtocols);
 
-  return new (Ctx) ArchetypeType(Ctx, Parent, Name,
-                                 Ctx.AllocateCopy(ConformsTo), Index);
+  auto arena = AllocationArena::Permanent;
+  return new (Ctx, arena) ArchetypeType(Ctx, Parent, Name,
+                                        Ctx.AllocateCopy(ConformsTo), Index);
 }
 
 namespace {
@@ -974,7 +976,8 @@ DeducibleGenericParamType *
 DeducibleGenericParamType::getNew(ASTContext &Ctx,
                                   DeducibleGenericParamType *Parent,
                                   ArchetypeType *Archetype) {
-  return new (Ctx) DeducibleGenericParamType(Ctx, Parent, Archetype);
+  auto arena = AllocationArena::Permanent;
+  return new (Ctx, arena) DeducibleGenericParamType(Ctx, Parent, Archetype);
 }
 
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
