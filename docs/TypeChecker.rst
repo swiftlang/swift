@@ -330,16 +330,16 @@ parameter polymorphism that enables polymorphic types and
 functions. For example, one can implement a ``min`` function as,
 e.g.,::
 
-  func min<T : Ordered>(x : T, y : T) -> T { 
+  func min<T : Comparable>(x : T, y : T) -> T {
     if y < x { return y }
     return x
   }
 
 Here, ``T`` is effectively a type variable that can be replaced with
 any concrete type, so long as that type conforms to the protocol
-``Ordered``. The type of ``min`` is (internally) written as ``<T : Ordered> (x :
+``Comparable``. The type of ``min`` is (internally) written as ``<T : Comparable> (x :
 T, y : T) -> T``, which can be read as "for all ``T``, where ``T``
-conforms to ``Ordered``, the type of the function is ``(x : T, y : T)
+conforms to ``Comparable``, the type of the function is ``(x : T, y : T)
 -> T``. Different uses of the ``min`` function may have different
 bindings for the type variable ``T``.
 
@@ -351,7 +351,7 @@ function, and produces a monomorphic function type based on the
 newly-generated type variables. For example, the first occurrence of
 the declaration reference expression ``min`` would result in a type
 ``(x : T0, y : T0) -> T0``, where ``T0`` is a fresh type variable, as
-well as the subtype constraint ``T0 < Ordered``, which expresses
+well as the subtype constraint ``T0 < Comparable``, which expresses
 protocol conformance. The next occurrence of the declaration reference
 expression ``min`` would produce the type ``(x : T1, y : T1) -> T1``,
 where ``T1`` is a fresh type variable (and therefore distinct from

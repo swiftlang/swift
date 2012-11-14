@@ -724,7 +724,7 @@ Generic functions can be overloaded based entirely on constraints. For example,
 consider a binary search algorithm::
   
   func binarySearch<C : EnumerableCollection>(collection : C, value : C.Element) -> C.RangeType
-  requires C.Element : Ordered {
+  requires C.Element : Comparable {
     // We can perform log(N) comparisons, but EnumerableCollection only supports linear
     // walks, so this is linear time
   }
@@ -734,7 +734,7 @@ consider a binary search algorithm::
   }
 
   func binarySearch<C : EnumerableCollection>(collection : C, value : C.Element) -> C.RangeType
-  requires C.Element : Ordered, C.RangeType : RandomAccessRange {
+  requires C.Element : Comparable, C.RangeType : RandomAccessRange {
     // We can perform log(N) comparisons and log(N) range splits, so this is logarithmic time
   }
 
