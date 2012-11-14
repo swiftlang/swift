@@ -54,6 +54,7 @@ immediately obvious.
   type ::= 'F' type type                     // function type
   type ::= 'f' type type                     // uncurried function type
   type ::= 'G' type <type>+ '_'              // generic type application
+  type ::= 'M' type                          // metatype
   type ::= 'P' protocol-list '_'             // protocol
   type ::= 'Q' index                         // archetype with depth=0
   type ::= 'Qd' index index                  // archetype with depth=M+1

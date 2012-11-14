@@ -385,6 +385,11 @@ namespace {
       return false;
     }
 
+    /// All levels of class metatypes support subtyping.
+    bool visitMetaTypeType(MetaTypeType *type) {
+      return visit(CanType(type->getInstanceType()));
+    }
+
     /// Everything else is trivial.
     bool visitType(TypeBase *type) {
       return true;
