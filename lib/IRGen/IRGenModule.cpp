@@ -207,6 +207,19 @@ llvm::Constant *IRGenModule::getDeallocObjectFn() {
   return DeallocObjectFn;
 }
 
+llvm::Constant *IRGenModule::getGetFunctionMetadataFn() {
+  if (GetFunctionMetadataFn) return GetFunctionMetadataFn;
+
+  // type_metadata_t *swift_getFunctionMetadata(type_metadata_t *arg,
+  //                                            type_metadata_t *result);
+  llvm::Type *argTypes[] = { TypeMetadataPtrTy, TypeMetadataPtrTy };
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
+  GetFunctionMetadataFn =
+    createRuntimeFunction(*this, "swift_getFunctionMetadata", fnType);
+  return GetFunctionMetadataFn;
+}
+
 llvm::Constant *IRGenModule::getGetGenericMetadataFn() {
   if (GetGenericMetadataFn) return GetGenericMetadataFn;
 
@@ -220,17 +233,16 @@ llvm::Constant *IRGenModule::getGetGenericMetadataFn() {
   return GetGenericMetadataFn;
 }
 
-llvm::Constant *IRGenModule::getGetFunctionMetadataFn() {
-  if (GetFunctionMetadataFn) return GetFunctionMetadataFn;
+llvm::Constant *IRGenModule::getGetMetatypeMetadataFn() {
+  if (GetMetatypeMetadataFn) return GetMetatypeMetadataFn;
 
-  // type_metadata_t *swift_getFunctionMetadata(type_metadata_t *arg,
-  //                                            type_metadata_t *result);
-  llvm::Type *argTypes[] = { TypeMetadataPtrTy, TypeMetadataPtrTy };
+  // type_metadata_t *swift_getMetatypeMetadata(type_metadata_t *instanceTy);
+  llvm::Type *argTypes[] = { TypeMetadataPtrTy };
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
-  GetFunctionMetadataFn =
-    createRuntimeFunction(*this, "swift_getFunctionMetadata", fnType);
-  return GetFunctionMetadataFn;
+  GetMetatypeMetadataFn =
+    createRuntimeFunction(*this, "swift_getMetatypeMetadata", fnType);
+  return GetMetatypeMetadataFn;
 }
 
 llvm::Constant *IRGenModule::getGetTupleMetadataFn() {

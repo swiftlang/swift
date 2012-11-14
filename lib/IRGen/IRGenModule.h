@@ -190,9 +190,10 @@ public:
   llvm::Constant *getObjCMsgSendFn();
   llvm::Constant *getObjCMsgSendStretFn();
 
-  llvm::Constant *getGetGenericMetadataFn();
-  llvm::Constant *getGetTupleMetadataFn();
   llvm::Constant *getGetFunctionMetadataFn();
+  llvm::Constant *getGetGenericMetadataFn();
+  llvm::Constant *getGetMetatypeMetadataFn();
+  llvm::Constant *getGetTupleMetadataFn();
 
 private:
   llvm::Function *MemCpyFn;
@@ -206,6 +207,7 @@ private:
   llvm::Constant *SlowRawDeallocFn;
   llvm::Constant *GetFunctionMetadataFn = nullptr;
   llvm::Constant *GetGenericMetadataFn = nullptr;
+  llvm::Constant *GetMetatypeMetadataFn = nullptr;
   llvm::Constant *GetTupleMetadataFn = nullptr;
   llvm::Constant *ObjCRetainFn = nullptr;
   llvm::Constant *ObjCRetainAutoreleasedReturnValueFn = nullptr;

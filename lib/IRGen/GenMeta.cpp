@@ -325,8 +325,16 @@ namespace {
     }
 
     llvm::Value *visitMetaTypeType(MetaTypeType *type) {
-      IGF.unimplemented(SourceLoc(), "metadata ref for metatype type");
-      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+      if (auto metatype = tryGetLocal(CanType(type)))
+        return metatype;
+
+      auto instMetadata = visit(CanType(type->getInstanceType()));
+      auto call = IGF.Builder.CreateCall(IGF.IGM.getGetMetatypeMetadataFn(),
+                                         instMetadata);
+      call->setDoesNotThrow();
+      call->setCallingConv(IGF.IGM.RuntimeCC);
+
+      return setLocal(CanType(type), call);
     }
 
     llvm::Value *visitModuleType(ModuleType *type) {
