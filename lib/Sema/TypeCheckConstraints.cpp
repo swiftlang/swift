@@ -254,7 +254,8 @@ TypeVariableType *TypeVariableType::getNew(ASTContext &C, Args &&...args) {
 
   // Allocate memory
   void *mem = C.Allocate(sizeof(TypeVariableType) + sizeof(Implementation),
-                         alignof(TypeVariableType));
+                         alignof(TypeVariableType),
+                         AllocationArena::ConstraintSolver);
 
   // Construct the type variable.
   auto *result = ::new (mem) TypeVariableType(C);
