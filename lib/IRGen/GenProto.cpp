@@ -2306,7 +2306,6 @@ namespace {
   /// A class which lays out a specific conformance to a protocol.
   class WitnessTableBuilder : public WitnessVisitor<WitnessTableBuilder> {
     SmallVectorImpl<llvm::Constant*> &Table;
-    FixedPacking Packing;
     CanType ConcreteType;
     const TypeInfo &ConcreteTI;
     const ProtocolConformance &Conformance;
@@ -2335,10 +2334,9 @@ namespace {
   public:
     WitnessTableBuilder(IRGenModule &IGM,
                         SmallVectorImpl<llvm::Constant*> &table,
-                        FixedPacking packing,
                         CanType concreteType, const TypeInfo &concreteTI,
                         const ProtocolConformance &conformance)
-      : WitnessVisitor(IGM), Table(table), Packing(packing),
+      : WitnessVisitor(IGM), Table(table),
         ConcreteType(concreteType), ConcreteTI(concreteTI),
         Conformance(conformance) {
       computeSubstitutionsForType();
@@ -2542,7 +2540,7 @@ ProtocolInfo::getConformance(IRGenModule &IGM, CanType concreteType,
   addValueWitnesses(IGM, packing, concreteType, concreteTI, witnesses);
 
   // Next, build the protocol witnesses.
-  WitnessTableBuilder(IGM, witnesses, packing, concreteType, concreteTI,
+  WitnessTableBuilder(IGM, witnesses, concreteType, concreteTI,
                       conformance).visit(protocol);
 
   // Build the actual global variable.
