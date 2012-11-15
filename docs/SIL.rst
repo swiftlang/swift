@@ -37,7 +37,7 @@ might get optimized down to the following SIL::
 
   func @fizzbuzz : $(Bool, Bool) -> () {
   entry(%fizz:$Bool, %buzz:$Bool):
-    %fizzandbuzz = apply $Builtin.and(%fizz, %buzz)
+    %fizzandbuzz = apply @Builtin.and(%fizz, %buzz)
     cond_branch %fizzandbuzz, fizzandbuzz(), notfizzandbuzz()
 
   fizzandbuzz():
@@ -56,8 +56,8 @@ might get optimized down to the following SIL::
     branch print(%s3)
 
   print(%s:RawPointer):
-    %string = apply $convertFromStringLiteral<String>(%s)
-    apply $println(%string)
+    %string = apply @convertFromStringLiteral<String>(%s)
+    %void = apply @println(%string)
   }
 
 In Swift, memory management is almost always implicit, but in SIL, it is always
@@ -196,7 +196,7 @@ Creates a floating-point literal value. The result will be of type ``T``, which
 must be a builtin floating-point type.
 
 char_literal
-`````````````````
+````````````
 ::
 
   %1 = char_literal $T 'x'
@@ -235,7 +235,7 @@ alloc_var
 `````````
 ::
 
-  %1 = alloc_var {heap|stack} $T
+  %1 = alloc_var {heap|stack|pseudo} $T
   ; $T must be a type
   ; %1 has type $SIL.Address<T>
 
@@ -244,6 +244,10 @@ from the heap or from the stack. The result of the instruction is the address
 of the allocated memory. The memory must be deallocated with a ``dealloc``
 instruction of the matching ``heap`` or ``stack`` type. The memory will not be
 retainable; to allocate a retainable box for a value type, use ``alloc_box``.
+
+An ``alloc_var`` may also perform a ``pseudo`` allocation, which is a stack
+allocation for debugging or tooling purposes. A pseudo-allocation does not
+need to be deallocated or destroyed and should only be stored to by the program.
 
 alloc_ref
 `````````
@@ -302,33 +306,27 @@ retain
 ``````
 ::
 
-  %1 = retain %0
-  ; Kills %0
-  ; %1 will be of the same type as %0
+  retain %0
 
 Retains the value represented by ``%0``. If it is of a value type, this is a
-no-op, and ``%1`` will be equivalent to ``%0``. If the value is of a reference
-type or is an object pointer, the retain count of the referenced box is
-increased by one. Retaining an address is an error. The input ``%0`` is killed
-by this instruction and may not be referenced after it.
+no-op. If the value is of a reference type or is an object pointer, the retain
+count of the referenced box is increased by one. Retaining an address is an
+error.
 
 release
 ```````
 ::
 
   release %0
-  ; Kills %0
 
 Releases the value represented by ``%0``. If it is of a value type, this
 destroys the value. If the value is of a reference type or is an object
 pointer, the retain count of the referenced box is decreased by one, and if it
 becomes zero, the referenced object is destroyed and the memory is deallocated.
-The released value is invalid after the release instruction is executed.
-Releasing an address is an error. The input ``%0`` is killed by this
-instruction and may not be referenced after it.
+Releasing an address is an error.
 
 TODO: does releasing a value type really destroy it? should destroying a value
-type be a separate op?
+type be a separate insn?
 
 destroy
 ```````
@@ -547,4 +545,158 @@ TODO: throw
 Examples
 --------
 
-TODO
+Trivial example
+~~~~~~~~~~~~~~~
+
+A simple Swift function::
+
+  func foo(b:Int) {
+    var a = b
+    f(a)
+  }
+
+will be emitted as the following SIL::
+
+  ; decl "func foo"
+  func @foo: $(Int) -> () {
+  entry(%b:$Int):
+    ; prologue
+    %b_alloc = alloc_box $Int
+    %b_addr = tuple_element %b_alloc, 1
+    store %b -> initialize %b_addr
+
+    ; decl "var a"
+    %a_alloc = alloc_box $Int
+    %a_addr = tuple_element %a_alloc, 1
+    ; expression "b"
+    %1 = load %b_addr
+    ; initializer "var a = b"
+    store %1 -> initialize %a_addr
+
+    ; expression "a"
+    %2 = load %a
+
+    ; expression "f"
+    %3 = constant_ref $(Int) -> Int @f
+
+    ; expression "f(a)"
+    retain %2 ; parameters are passed at +1
+    %4 = apply %3(%2)
+    ; cleanup for full expr "f(a)"
+    release %4 ; return values returned at +1
+
+    ; cleanup for block
+    %a_box = tuple_element %a_alloc, 0
+    release %a_box
+
+    ; epilogue
+    %b_box = tuple_element %b_alloc, 0
+    release %b_box ; arguments are received at +1
+    %void = tuple ()
+    return %void
+  }
+
+Note that all the memory management and allocation implicit to the Swift code
+is made explicit in the SIL codegen. Optimization will simplify that into this::
+
+  func @foo: $(Int) -> () {
+  entry(%b:Int):
+    %b_dbg = alloc_var pseudo $Int
+    store %b -> initialize %b_dbg
+
+    %a_dbg = alloc_var pseudo $Int
+    store %b -> initialize %a_dbg
+
+    %1 = apply @f(%b)
+    release %1 ; if return value of ``f`` is not POD
+
+    %void = tuple ()
+    return %void
+  }
+
+Escape analysis detects that the boxes allocated for ``a`` and ``b``
+are unnecessary and eliminates the boxes, replacing them with a ``pseudo``
+allocation for debugging purposes. The variables are also reduced to registers.
+Since ``Int`` is a POD type, the retain and release operations are no-ops and
+are also eliminated.
+
+Closures
+~~~~~~~~
+
+A function that closes over a local argument and lets the closure escape::
+
+  func adder(x:Int) -> (y:Int) -> Int {
+    return func(y) { x + y }
+  }
+
+will be emitted as SIL::
+
+  ; decl "func adder"
+  func @adder: $(Int) -> (Int) -> Int {
+  entry(%x:Int):
+    ; prologue
+    %x_alloc = alloc_box $Int
+    %x_addr = tuple_element %x_alloc, 1
+    store %x -> initialize %x_addr
+
+    ; expression "func(y)..."
+    %1 = constant_ref $(SIL.ObjectPointer, SIL.Address<Int>, Int) -> Int \
+                      @adder_1
+    %x_box = tuple_element %x_alloc, 0
+    retain %x_box
+    %2 = closure %1(%x_box, %x_addr)
+
+    ; epilogue
+    release %x_box
+    return %2
+  }
+
+  ; decl for anonymous function
+  func @adder_1: $(SIL.ObjectPointer, SIL.Address<Int>, Int) -> Int {
+  entry(%x_box:SIL.ObjectPointer, %x_addr:SIL.Address<Int>, %y:Int):
+    ; prologue
+    %y_alloc = alloc_box $Int
+    %y_addr = tuple_element %y_alloc, 1
+    store %y -> initialize %y_addr
+
+    ; expression "x"
+    %1 = load %x_addr
+    ; expression "y"
+    %2 = load %y_addr
+    ; expression "+"
+    %3 = constant_ref $(Int, Int) -> Int @+
+    ; expression "x + y"
+    %4 = apply %3(%1, %2)
+
+    ; epilogue
+    %y_box = tuple_element %y_alloc, 0
+    release %y_box
+    return %4
+  }
+
+FIXME: can we avoid closing over two values for a mutable capture?
+
+That the closed-over variable is represented as a pair of parameters to
+the closure, the box holding the variable's reference count and the address
+of the variable inside the box. The outer function retains the box explicitly
+before embedding it in the closure with a ``closure`` instruction. In this case,
+the variable ``x`` is not modified, so optimization can reduce the capture to
+a primitive value::
+
+  func @adder: $(Int) -> (Int) -> Int {
+  entry(%x:Int):
+    %x_dbg = alloc_var pseudo $Int
+    store %x -> initialize %x_dbg
+    %1 = closure @adder_1(%x)
+    return %1
+  }
+
+  func @adder_1: $(Int, Int) -> Int {
+  entry(%x:Int, %y:Int):
+    %x_dbg = alloc_var pseudo $Int
+    store %x -> initialize %x_dbg
+    %y_dbg = alloc_var pseudo $Int
+    store %y -> initialize %y_dbg
+    %1 = apply @+(%1, %2)
+    return %1
+  }
