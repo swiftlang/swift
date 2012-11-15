@@ -405,6 +405,12 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
 /// or 0 if the intrinsic name doesn't match anything.
 unsigned swift::getLLVMIntrinsicID(StringRef InName, bool hasArgTypes) {
   using namespace llvm;
+
+  // FIXME: Hack so we don't treat "trunc" as "llvm.trunc"; we should consider
+  // renaming the swift intrinsic so it doesn't conflict.
+  if (InName == "trunc")
+    return llvm::Intrinsic::not_intrinsic;
+
   // Prepend "llvm." and change _ to . in name.
   SmallString<128> NameS;
   NameS.append("llvm.");
