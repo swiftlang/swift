@@ -438,9 +438,12 @@ convert
   ; %1 will be of type $T
 
 Performs an implicit conversion of ``%0`` to type ``T``. This instruction is
-limited to conversions that will not affect how the value will codegen.
+limited to conversions that will not affect how the value will codegen, such as:
 
-TODO: what exactly is implicitly convertible at the sil level?
+* derived-to-base conversion
+* metatype-to-metatype conversion
+* scalar-to-equivalent-tuple conversion
+* function-to-equivalent-function conversion
 
 Functions
 ~~~~~~~~~
