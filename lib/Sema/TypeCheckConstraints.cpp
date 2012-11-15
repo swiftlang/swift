@@ -3017,36 +3017,39 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              unsigned flags, bool &trivial) {
+  // Desugar both types.
+  auto desugar1 = type1->getDesugaredType();
+  auto desugar2 = type2->getDesugaredType();
+
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
-  auto typeVar1 = dyn_cast<TypeVariableType>(type1.getPointer());
+  auto typeVar1 = dyn_cast<TypeVariableType>(desugar1);
   if (typeVar1) {
     if (auto fixed = getFixedType(typeVar1)) {
       type1 = fixed;
+      desugar1 = fixed->getDesugaredType();
       typeVar1 = nullptr;
     }
   }
 
-  auto typeVar2 = dyn_cast<TypeVariableType>(type2.getPointer());
+  auto typeVar2 = dyn_cast<TypeVariableType>(desugar2);
   if (typeVar2) {
     if (auto fixed = getFixedType(typeVar2)) {
       type2 = fixed;
+      desugar2 = fixed->getDesugaredType();
       typeVar2 = nullptr;
     }
   }
-
-  // If the types are equivalent, we're done.
-  if (type1->isEqual(type2))
-    return SolutionKind::TriviallySolved;
 
   // If we have a same-type-as-rvalue constraint, and the right-hand side
   // has a form that is either definitely an lvalue or definitely an rvalue,
   // force the right-hand side to be an rvalue and
   if (kind == TypeMatchKind::SameTypeRvalue) {
-    if (auto lvalue2 = type2->getAs<LValueType>()) {
+    if (isa<LValueType>(desugar2)) {
       // The right-hand side is an lvalue type. Strip off the lvalue and
       // call this a normal 'same-type' constraint.
-      type2 = lvalue2->getObjectType();
+      type2 = type2->castTo<LValueType>()->getObjectType();
+      desugar2 = type2->getDesugaredType();
       kind = TypeMatchKind::SameType;
       flags |= TMF_GenerateConstraints;
     } else if (!type2->is<TypeVariableType>()) {
@@ -3056,13 +3059,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       flags |= TMF_GenerateConstraints;
     }
 
-    if (auto func2 = type2->getAs<FunctionType>()) {
+    if (auto desugarFunc2 = dyn_cast<FunctionType>(desugar2)) {
       // The right-hand side is a function type, which is guaranteed to be
       // an rvalue type. Call this a normal same-type constraint, and
       // strip off the [auto_closure], which is not part of the type.
-      if (func2->isAutoClosure())
+      if (desugarFunc2->isAutoClosure()) {
+        auto func2 = type2->castTo<FunctionType>();
         type2 = FunctionType::get(func2->getInput(), func2->getResult(),
                                   TC.Context);
+        desugar2 = type2.getPointer();
+      }
       kind = TypeMatchKind::SameType;
       flags |= TMF_GenerateConstraints;
     }
@@ -3114,26 +3120,29 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // We couldn't solve this constraint. If only one of the types is a type
       // variable, perhaps we can do something with it below.
       if (typeVar1 && typeVar2)
-        return SolutionKind::Unsolved;
+        return typeVar1 == typeVar2? SolutionKind::TriviallySolved
+                                   : SolutionKind::Unsolved;
         
       break;
     }
   }
 
   // Decompose parallel structure.
-  auto canType1 = type1->getCanonicalType();
-  auto canType2 = type2->getCanonicalType();
   unsigned subFlags = flags | TMF_GenerateConstraints;
-  if (canType1->getKind() == canType2->getKind()) {
-    switch (canType1->getKind()) {
+  if (desugar1->getKind() == desugar2->getKind()) {
+    switch (desugar1->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-      llvm_unreachable("Sugared type masquerading as canonical");
+      llvm_unreachable("Type has not been desugared completely");
 
 #define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+        return desugar1 == desugar2
+                 ? SolutionKind::TriviallySolved
+                 : SolutionKind::Error;
+
     case TypeKind::Error:
       return SolutionKind::Error;
 
@@ -3144,19 +3153,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       llvm_unreachable("Type variables handled above");
 
     case TypeKind::Tuple: {
-      auto tuple1 = cast<TupleType>(canType1);
-      auto tuple2 = cast<TupleType>(canType2);
+      auto tuple1 = cast<TupleType>(desugar1);
+      auto tuple2 = cast<TupleType>(desugar2);
       return matchTupleTypes(tuple1, tuple2, kind, flags, trivial);
     }
 
     case TypeKind::OneOf:
     case TypeKind::Struct:
     case TypeKind::Class: {
-      auto nominal1 = cast<NominalType>(canType1);
-      auto nominal2 = cast<NominalType>(canType2);
+      auto nominal1 = cast<NominalType>(desugar1);
+      auto nominal2 = cast<NominalType>(desugar2);
       if (nominal1->getDecl() == nominal2->getDecl()) {
-        return SolutionKind::Error;
-
         assert((bool)nominal1->getParent() == (bool)nominal2->getParent() &&
                "Mismatched parents of nominal types");
 
@@ -3171,8 +3178,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
 
     case TypeKind::MetaType: {
-      auto meta1 = cast<MetaTypeType>(canType1);
-      auto meta2 = cast<MetaTypeType>(canType2);
+      auto meta1 = cast<MetaTypeType>(desugar1);
+      auto meta2 = cast<MetaTypeType>(desugar2);
 
       // metatype<B> < metatype<A> if A < B and both A and B are classes.
       TypeMatchKind subKind = TypeMatchKind::SameType;
@@ -3186,8 +3193,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
 
     case TypeKind::Function: {
-      auto func1 = cast<FunctionType>(canType1);
-      auto func2 = cast<FunctionType>(canType2);
+      auto func1 = cast<FunctionType>(desugar1);
+      auto func2 = cast<FunctionType>(desugar2);
       return matchFunctionTypes(func1, func2, kind, flags, trivial);
     }
 
@@ -3195,8 +3202,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       llvm_unreachable("Polymorphic function type should have been opened");
 
     case TypeKind::Array: {
-      auto array1 = cast<ArrayType>(canType1);
-      auto array2 = cast<ArrayType>(canType2);
+      auto array1 = cast<ArrayType>(desugar1);
+      auto array2 = cast<ArrayType>(desugar2);
       return matchTypes(array1->getBaseType(), array2->getBaseType(),
                         TypeMatchKind::SameType, subFlags, trivial);
     }
@@ -3206,8 +3213,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       break;
 
     case TypeKind::LValue: {
-      auto lvalue1 = cast<LValueType>(canType1);
-      auto lvalue2 = cast<LValueType>(canType2);
+      auto lvalue1 = cast<LValueType>(desugar1);
+      auto lvalue2 = cast<LValueType>(desugar2);
       if (lvalue1->getQualifiers() != lvalue2->getQualifiers() &&
           !(kind >= TypeMatchKind::TrivialSubtype &&
             lvalue1->getQualifiers() < lvalue2->getQualifiers()))
@@ -3223,8 +3230,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::BoundGenericClass:
     case TypeKind::BoundGenericOneOf:
     case TypeKind::BoundGenericStruct: {
-      auto bound1 = cast<BoundGenericType>(canType1);
-      auto bound2 = cast<BoundGenericType>(canType2);
+      auto bound1 = cast<BoundGenericType>(desugar1);
+      auto bound2 = cast<BoundGenericType>(desugar2);
       
       if (bound1->getDecl() == bound2->getDecl()) {
         // Match up the parents, exactly, if there are parents.
@@ -3775,7 +3782,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
 
     auto second = simplifyType(constraint->getSecondType());
 
-    auto firstTV = dyn_cast<TypeVariableType>(first.getPointer());
+    auto firstTV = first->getAs<TypeVariableType>();
     if (firstTV) {
       // Record the constraint.
       getTVC(firstTV).Above.push_back(std::make_pair(constraint, second));
@@ -3784,7 +3791,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       first->hasTypeVariable(referencedTypeVars);
     }
 
-    auto secondTV = dyn_cast<TypeVariableType>(second.getPointer());
+    auto secondTV = second->getAs<TypeVariableType>();
     if (secondTV) {
       // Record the constraint.
       getTVC(secondTV).Below.push_back(std::make_pair(constraint, first));
