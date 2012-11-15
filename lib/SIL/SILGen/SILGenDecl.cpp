@@ -17,8 +17,20 @@
 using namespace swift;
 using namespace Lowering;
 
+#include "llvm/Support/raw_ostream.h"
 
 namespace {
+
+class CleanupVar : public Cleanup {
+  Value *alloc;
+public:
+  CleanupVar(Value *alloc) : alloc(alloc) {}
+  void emit(SILGen &gen) {
+    gen.B.createDestroy(nullptr, alloc);
+    gen.B.createDealloc(nullptr, alloc);
+  }
+};
+
 /// InitPatternWithExpr - A visitor for traversing a pattern and generating SIL
 /// code to allocate the declared variables and generate initialization
 /// sequences for their values.  If an initial value is specified by the "Init"
@@ -62,6 +74,8 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     // definitive assignment, then we can consider removing it.
     auto InitVal = Init ? Init : Gen.B.createZeroValue(VD);
     Gen.B.createInitialization(VD, InitVal, AllocVar);
+    
+    Gen.Cleanups.pushCleanup<CleanupVar>(AllocVar);
   }
   
   // Bind to a tuple pattern by first trying to see if we can emit

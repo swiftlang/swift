@@ -25,10 +25,7 @@ namespace swift {
   
 namespace Lowering {
 
-/// FIXME: Temporary.
-typedef int Cleanup;
-  
-//class Cleanup;
+class Cleanup;
 typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
 
 /// The destination of a direct jump.  Swift currently does not
