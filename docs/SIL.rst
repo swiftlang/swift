@@ -275,7 +275,9 @@ Allocates a box large enough to hold a value of type ``T``. The result of the
 instruction is a pair containing an object pointer to the box as its first
 element and an address of type ``T`` pointing to the storage for the value
 inside the box as its second. The box will be initialized with a retain count
-of 1; the storage will be uninitialized.
+of 1; the storage will be uninitialized. The storage must be initialized before
+the address can be ``load``-ed or the box can be ``release``-d. When the box's
+retain count reaches zero, the value inside the box will be ``release``-d.
 
 alloc_array
 ```````````
@@ -290,7 +292,10 @@ Allocates a box large enough to hold an array of ``%0`` values of type ``T``.
 The result of the instruction is a pair containing an object pointer to the box
 as its first element and an address of type ``T`` pointing to the storage for
 the first element of the array inside the box as its second. The box will be
-initialized with a retain count of 1; the storage will be uninitialized.
+initialized with a retain count of 1; the storage will be uninitialized. The
+storage must be initialized before the address can be ``load``-ed or the box
+can be ``release``-d. When the box's retain count reaches zero, the values
+inside the box will be ``release``-d.
 
 dealloc
 ```````
@@ -680,8 +685,8 @@ That the closed-over variable is represented as a pair of parameters to
 the closure, the box holding the variable's reference count and the address
 of the variable inside the box. The outer function retains the box explicitly
 before embedding it in the closure with a ``closure`` instruction. In this case,
-the variable ``x`` is not modified, so optimization can reduce the capture to
-a primitive value::
+the variable ``x`` is not modified, so optimization can reduce the box capture
+to a direct value capture::
 
   func @adder: $(Int) -> (Int) -> Int {
   entry(%x:Int):
@@ -700,3 +705,81 @@ a primitive value::
     %1 = apply @+(%1, %2)
     return %1
   }
+
+TODO: inlineable downward closure example, e.g. ``&&``
+
+Resilient value types
+~~~~~~~~~~~~~~~~~~~~~
+
+A function that operates on a resilient type::
+
+  struct [API] Point {
+    var x:Float
+    var y:Float
+
+    constructor(x:Float, y:Float)
+  }
+
+  func reflect(point:Point) {
+    var reflected = Point(-point.x, -point.y)
+    return reflected
+  }
+
+will be emitted as SIL that operates on addresses of the type indirectly::
+
+  func @reflect: $(SIL.Address<Point>) -> SIL.Address<Point> {
+  entry(%point:SIL.Address<Point>):
+    ; prologue
+    %point_alloc = alloc_box $Point
+    %point_addr = tuple_element %point_alloc, 1
+    copy take %point -> initialize %point_addr ; copy, not store
+    dealloc %point ; we own the copy we were passed, so dealloc it
+
+    ; decl "var reflected"
+    %reflected_alloc = alloc_box $Point
+    %reflected_addr = tuple_element %reflected_alloc, 1
+
+    ; expression "point.x"
+    %1 = constant_ref $(SIL.Address<Point>) -> Float @"Point.x get"
+    %2 = apply %1(%point_addr)
+    ; expression "-point.x"
+    %3 = constant_ref $(Float) -> Float @-
+    %4 = apply %3(%2)
+
+    ; expression "point.y"
+    %5 = constant_ref $(SIL.Address<Point>) -> Float @"Point.y get"
+    %6 = apply %5(%point_addr)
+    ; expression "-point.y"
+    %7 = constant_ref $(Float) -> Float @-
+    %8 = apply %7(%6)
+
+    ; expression "Point"
+    %9 = metatype $Point
+    %10 = constant_ref $(Point.metatype) -> (Float, Float) \
+                                         -> SIL.Address<Point> \
+                       @constructor
+    %11 = apply %10(%3)
+
+    ; expression "Point(-point.x, -point.y)"
+    %12 = apply %11(%4, %8)
+
+    ; initializer "var reflected = ..."
+    copy %12 -> initialize %reflected_addr ; copy, not store
+
+    ; statement "return reflected"
+    %returned = alloc_var heap $Point
+    copy %reflected_addr -> initialize %returned
+
+    ; cleanup for block
+    %reflected_box = tuple_element %reflected_alloc, 0
+    release %reflected_box
+
+    ; epilogue
+    release %point_box
+    return %returned
+  }
+
+Note that although resilient types are manipulated through pointers, they still
+have value semantics, so assigning and passing resilient values still incurs
+allocations and copies as with loadable fragile types, although many copies can
+be eliminated by optimization.
