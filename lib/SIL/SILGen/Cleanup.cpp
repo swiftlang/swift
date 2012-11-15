@@ -15,73 +15,44 @@
 using namespace swift;
 using namespace Lowering;
 
-/// Are there any active cleanups in the given range?
-static bool hasAnyActiveCleanups(DiverseStackImpl<Cleanup>::iterator begin,
-                                 DiverseStackImpl<Cleanup>::iterator end) {
-  for (; begin != end; ++begin)
-    if (begin->isActive())
-      return true;
-  return false;
-}
-
-/// Transition the state of a cleanup.
-/// FIXME: transition logic
-static void setCleanupState(Cleanup &cleanup,
-                            CleanupState state) {
-  cleanup.setState(state);
-}
-
-namespace {
-  /// A CleanupBuffer is a location to which to temporarily copy a
-  /// cleanup.
-  class CleanupBuffer {
-    llvm::SmallVector<char, sizeof(Cleanup) + 10 * sizeof(void*)> Data;
-    
-  public:
-    CleanupBuffer(const Cleanup &cleanup) {
-      size_t size = cleanup.allocated_size();
-      Data.set_size(size);
-      memcpy(Data.data(), reinterpret_cast<const void*>(&cleanup), size);
-    }
-    
-    Cleanup &getCopy() { return *reinterpret_cast<Cleanup*>(Data.data()); }
-  };
-}
-
-void CleanupManager::popAndEmitTopCleanup() {
-  Cleanup &stackCleanup = *Stack.begin();
-  assert(stackCleanup.isDead() && "popping a living cleanup");
-  
-  // Copy it off the cleanups stack.
-  CleanupBuffer buffer(stackCleanup);
-  Cleanup &cleanup = buffer.getCopy();
-  
-  // Pop now.
-  Stack.pop();
-  
-  cleanup.emit(Gen);
-}
 
 /// Leave a scope, with all its cleanups.
 void CleanupManager::endScope(CleanupsDepth depth) {
   Stack.checkIterator(depth);
   
-  // FIXME: Thread a branch through the cleanups if there are any active
-  // cleanups and we have a valid insertion point.
-  
-  if (!hasAnyActiveCleanups(Stack.begin(), Stack.find(depth)))
+  // Fast path: no cleanups to leave in this scope.
+  if (Stack.stable_begin() == depth) {
+    // FIXME.
+    //popAndEmitTopDeadCleanups(*this, Cleanups, InnermostScope);
     return;
+  }
+  
+#if 0 // FIXME: Cleanups.
+  
+  // Thread a branch through the cleanups if there are any active
+  // cleanups and we have a valid insertion point.
+  BasicBlock *contBB = nullptr;
+  if (B.hasValidInsertionPoint() &&
+      hasAnyActiveCleanups(Cleanups.begin(), Cleanups.find(depth))) {
+    contBB = new (C) BasicBlock(&C, "cleanups.fallthrough");
+    emitBranch(JumpDest(contBB, depth));
+  }
   
   // Iteratively mark cleanups dead and pop them.
   // Maybe we'd get better results if we marked them all dead in one shot?
-  while (Stack.stable_begin() != depth) {
+  while (Cleanups.stable_begin() != depth) {
     // Mark the cleanup dead.
-    if (!Stack.begin()->isDead())
-      setCleanupState(*Stack.begin(), CleanupState::Dead);
+    if (!Cleanups.begin()->isDead())
+      setCleanupState(*Cleanups.begin(), CleanupState::Dead);
     
     // Pop it.
-    popAndEmitTopCleanup();
+    popAndEmitTopCleanup(*this, Cleanups);
   }
+  
+  // Emit the continuation block if we made one.
+  if (contBB)
+    B.emitMergeableBlock(contBB);
+#endif
 }
 
 
@@ -93,13 +64,4 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest) {
   assert(B.hasValidInsertionPoint() && "Inserting branch in invalid spot");
   assert(Stack.empty() && "FIXME: Implement cleanup support");
   B.createBranch(Dest.getBlock());
-}
-
-Cleanup &CleanupManager::initCleanup(Cleanup &cleanup,
-                                     size_t allocSize,
-                                     CleanupState state)
-{
-  cleanup.allocatedSize = allocSize;
-  cleanup.state = state;
-  return cleanup;
 }

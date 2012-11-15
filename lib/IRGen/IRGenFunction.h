@@ -192,7 +192,7 @@ public:
     return pushCleanupInState<T, A...>(state, ::std::forward<A>(args)...);
   }
 
-  /// Return a stable reference to the current cleanup.
+  /// Retun a stable reference to the current cleanup.
   CleanupsDepth getCleanupsDepth() const {
     return Cleanups.stable_begin();
   }

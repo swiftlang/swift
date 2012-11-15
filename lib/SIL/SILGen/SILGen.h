@@ -54,12 +54,11 @@ public:
 
   void emitProlog(FuncExpr *FE);
 
-  /// Return a stable reference to the current cleanup.
+  /// Retun a stable reference to the current cleanup.
   CleanupsDepth getCleanupsDepth() const {
     return Cleanups.getCleanupsDepth();
   }
   
-  Function &getFunction() { return F; }
   SILBuilder &getBuilder() { return B; }
   
   //===--------------------------------------------------------------------===//
