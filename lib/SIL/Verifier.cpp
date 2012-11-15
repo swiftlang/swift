@@ -133,13 +133,19 @@ public:
   }
   
   void visitRetainInst(RetainInst *RI) {
+    assert(!RI->getOperand()->getType()->is<LValueType>() &&
+           "Operand of retain must not be lvalue");
   }
   void visitReleaseInst(ReleaseInst *RI) {
+    assert(!RI->getOperand()->getType()->is<LValueType>() &&
+           "Operand of release must not be lvalue");
   }
   void visitDeallocInst(DeallocInst *DI) {
+    assert(DI->getOperand()->getType()->is<LValueType>() &&
+           "Operand of dealloc must be lvalue");
   }
   void visitDestroyInst(DestroyInst *DI) {
-    assert(DI->getType()->is<LValueType>() &&
+    assert(DI->getOperand()->getType()->is<LValueType>() &&
            "Operand of destroy must be lvalue");
   }
 
