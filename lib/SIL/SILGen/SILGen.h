@@ -26,7 +26,7 @@ namespace Lowering {
   class Condition;
 
 class LLVM_LIBRARY_VISIBILITY SILGen
-  : public ASTVisitor<SILGen, Value*, void> {
+  : public ASTVisitor<SILGen, Value, void> {
 public:
   /// The Function being constructed.
   Function &F;
@@ -44,7 +44,7 @@ public:
   /// VarLocs - This is the memory location that an emitted variable is stored.
   /// Entries in this map are generated when a PatternBindingDecl is emitted
   /// that contains a reference, and queried for each DeclRefExpr.
-  llvm::DenseMap<ValueDecl*, Value*> VarLocs;
+  llvm::DenseMap<ValueDecl*, Value> VarLocs;
     
   bool hasVoidReturn;
     
@@ -94,7 +94,7 @@ public:
 
   void visitReturnStmt(ReturnStmt *S) {
     // FIXME: Should use empty tuple for "void" return.
-    Value *ArgV = S->hasResult() ? visit(S->getResult()) : (Instruction*) 0;
+    Value ArgV = S->hasResult() ? visit(S->getResult()) : nullptr;
     B.createReturn(S, ArgV);
   }
   
@@ -116,37 +116,37 @@ public:
   // Expressions
   //===--------------------------------------------------------------------===//
   
-  Value *visitExpr(Expr *E) {
+  Value visitExpr(Expr *E) {
     E->dump();
     llvm_unreachable("Not yet implemented");
   }
   
-  Value *visitApplyExpr(ApplyExpr *E);
-  Value *visitDeclRefExpr(DeclRefExpr *E);
-  Value *visitIntegerLiteralExpr(IntegerLiteralExpr *E);
-  Value *visitFloatLiteralExpr(FloatLiteralExpr *E);
-  Value *visitCharacterLiteralExpr(CharacterLiteralExpr *E);
-  Value *visitStringLiteralExpr(StringLiteralExpr *E);
-  Value *visitLoadExpr(LoadExpr *E);
-  Value *visitMaterializeExpr(MaterializeExpr *E);
-  Value *visitRequalifyExpr(RequalifyExpr *E);
-  Value *visitFunctionConversionExpr(FunctionConversionExpr *E);
-  Value *visitParenExpr(ParenExpr *E);
-  Value *visitTupleExpr(TupleExpr *E);
-  Value *visitScalarToTupleExpr(ScalarToTupleExpr *E);
-  Value *visitGetMetatypeExpr(GetMetatypeExpr *E);
-  Value *visitSpecializeExpr(SpecializeExpr *E);
-  Value *visitAddressOfExpr(AddressOfExpr *E);
-  Value *visitTupleElementExpr(TupleElementExpr *E);
-  Value *visitTupleShuffleExpr(TupleShuffleExpr *E);
-  Value *visitNewArrayExpr(NewArrayExpr *E);
-  Value *visitMetatypeExpr(MetatypeExpr *E);
+  Value visitApplyExpr(ApplyExpr *E);
+  Value visitDeclRefExpr(DeclRefExpr *E);
+  Value visitIntegerLiteralExpr(IntegerLiteralExpr *E);
+  Value visitFloatLiteralExpr(FloatLiteralExpr *E);
+  Value visitCharacterLiteralExpr(CharacterLiteralExpr *E);
+  Value visitStringLiteralExpr(StringLiteralExpr *E);
+  Value visitLoadExpr(LoadExpr *E);
+  Value visitMaterializeExpr(MaterializeExpr *E);
+  Value visitRequalifyExpr(RequalifyExpr *E);
+  Value visitFunctionConversionExpr(FunctionConversionExpr *E);
+  Value visitParenExpr(ParenExpr *E);
+  Value visitTupleExpr(TupleExpr *E);
+  Value visitScalarToTupleExpr(ScalarToTupleExpr *E);
+  Value visitGetMetatypeExpr(GetMetatypeExpr *E);
+  Value visitSpecializeExpr(SpecializeExpr *E);
+  Value visitAddressOfExpr(AddressOfExpr *E);
+  Value visitTupleElementExpr(TupleElementExpr *E);
+  Value visitTupleShuffleExpr(TupleShuffleExpr *E);
+  Value visitNewArrayExpr(NewArrayExpr *E);
+  Value visitMetatypeExpr(MetatypeExpr *E);
 
-  Value *emitArrayInjectionCall(Value *ObjectPtr, Value *BasePtr,
-                                Value *Length, Expr *ArrayInjectionFunction);
-  Value *emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
-                          ArrayRef<int> ElementMapping,
-                          Expr *VarargsInjectionFunction);
+  Value emitArrayInjectionCall(Value ObjectPtr, Value BasePtr,
+                               Value Length, Expr *ArrayInjectionFunction);
+  Value emitTupleShuffle(Expr *E, ArrayRef<Value> InOps,
+                         ArrayRef<int> ElementMapping,
+                         Expr *VarargsInjectionFunction);
 
   //===--------------------------------------------------------------------===//
   // Declarations

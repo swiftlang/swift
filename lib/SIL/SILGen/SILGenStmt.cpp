@@ -45,7 +45,7 @@ Condition SILGen::emitCondition(Stmt *TheStmt, Expr *E,
          "emitting condition at unreachable point");
   
   // Sema forces conditions to have Builtin.i1 type, which guarantees this.
-  Value *V = nullptr;
+  Value V;
   {
     FullExpr Scope(Cleanups);
     V = visit(E);
@@ -97,27 +97,27 @@ void SILGen::visitBraceStmt(BraceStmt *S) {
 
 /// emitAssignStmtRecursive - Used to destructure (potentially) recursive
 /// assignments into tuple expressions down to their scalar stores.
-static void emitAssignStmtRecursive(AssignStmt *S, Value *Src, Expr *Dest,
+static void emitAssignStmtRecursive(AssignStmt *S, Value Src, Expr *Dest,
                                     SILGen &Gen) {
   // If the destination is a tuple, recursively destructure.
   if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
     unsigned EltNo = 0;
     for (Expr *DestElem : TE->getElements()) {
-      Value *SrcVal = Gen.B.createTupleElement(DestElem->getType(), Src,
-                                               EltNo++);
+      Value SrcVal = Gen.B.createTupleElement(DestElem->getType(), Src,
+                                              EltNo++);
       emitAssignStmtRecursive(S, SrcVal, DestElem, Gen);
     }
     return;
   }
   
   // Otherwise, emit the scalar assignment.
-  Value *DstV = Gen.visit(Dest);
+  Value DstV = Gen.visit(Dest);
   Gen.B.createStore(S, Src, DstV);
 }
 
 
 void SILGen::visitAssignStmt(AssignStmt *S) {
-  Value *SrcV = visit(S->getSrc());
+  Value SrcV = visit(S->getSrc());
   
   // Handle tuple destinations by destructuring them if present.
   return emitAssignStmtRecursive(S, SrcV, S->getDest(), *this);

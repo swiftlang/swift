@@ -48,7 +48,7 @@ SILGen::~SILGen() {
   // empty tuple, or a dynamically unreachable location.
   if (hasVoidReturn) {
     auto EmptyTuple = B.createTuple(TupleType::getEmpty(F.getContext()),
-                                    ArrayRef<Value*>());
+                                    ArrayRef<Value>());
     B.createReturn(nullptr, EmptyTuple);
   } else {
     B.createUnreachable();

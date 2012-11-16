@@ -32,7 +32,7 @@ public:
 };
 }
 
-ArrayRef<Type> Value::getTypes() const {
+ArrayRef<Type> ValueBase::getTypes() const {
   // No results.
   if (Types.isNull())
     return ArrayRef<Type>();
@@ -44,7 +44,7 @@ ArrayRef<Type> Value::getTypes() const {
 }
 
 // FIXME: temporary.
-Type Value::getType() const {
+Type ValueBase::getType() const {
   assert(getTypes().size() == 1);
   return getTypes()[0];
 }

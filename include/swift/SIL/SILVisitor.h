@@ -29,7 +29,7 @@ template<typename ImplClass, typename ValueRetTy = void>
 class SILVisitor {
 public:
 
-  ValueRetTy visitValue(Value *V) {
+  ValueRetTy visitValue(ValueBase *V) {
     // Base class, used if some class of value isn't handled.
   }
 
@@ -38,11 +38,14 @@ public:
     return static_cast<ImplClass*>(this)  \
     ->visit##CLASS(static_cast<CLASS*>(V));
 
-  ValueRetTy visit(Value *V) {
+  ValueRetTy visit(ValueBase *V) {
     switch (V->getKind()) {
 #include "swift/SIL/SILNodes.def"
     }
     llvm_unreachable("Not reachable, all cases handled");
+  }
+  ValueRetTy visit(Value V) {
+    return visit(V.getDef());
   }
 
   // Define default dispatcher implementations chain to parent nodes.

@@ -22,9 +22,9 @@ using namespace Lowering;
 namespace {
 
 class CleanupVar : public Cleanup {
-  Value *alloc;
+  Value alloc;
 public:
-  CleanupVar(Value *alloc) : alloc(alloc) {}
+  CleanupVar(Value alloc) : alloc(alloc) {}
   void emit(SILGen &gen) {
     gen.B.createDestroy(nullptr, alloc);
     gen.B.createDealloc(nullptr, alloc);
@@ -40,8 +40,8 @@ public:
 /// moment.
 struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
   SILGen &Gen;
-  Value *Init;
-  InitPatternWithExpr(SILGen &Gen, Value *Init) : Gen(Gen), Init(Init) {}
+  Value Init;
+  InitPatternWithExpr(SILGen &Gen, Value Init) : Gen(Gen), Init(Init) {}
   
   // Paren & Typed patterns are noops, just look through them.
   void visitParenPattern(ParenPattern *P) { visit(P->getSubPattern()); }
@@ -63,7 +63,7 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
       return;
     }
 
-    Value *AllocVar = Gen.B.createAllocVar(VD);
+    Value AllocVar = Gen.B.createAllocVar(VD);
     
     /// Remember that this is the memory location that we're emitting the
     /// decl to.
@@ -93,7 +93,7 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     // initializing and extract the interesting bits of Init out for each tuple
     // element.
     unsigned FieldNo = 0;
-    Value *TupleInit = Init;
+    Value TupleInit = Init;
     for (auto &elt : P->getFields()) {
       Init = Gen.B.createTupleElement(elt.getPattern()->getType(), TupleInit,
                                       FieldNo++);
@@ -116,7 +116,7 @@ void SILGen::visitPatternBindingDecl(PatternBindingDecl *D) {
 
   // If an initial value was specified by the decl, use it to produce the
   // initial values, otherwise use the default value for the type.
-  Value *Initializer = nullptr;
+  Value Initializer = nullptr;
   if (D->getInit()) {
     FullExpr Scope(Cleanups);
     Initializer = visit(D->getInit());
@@ -130,18 +130,18 @@ namespace {
 /// BBArgument's for each pattern variable.  This is used to create function
 /// arguments.
 struct ArgumentCreatorVisitor :
-  public PatternVisitor<ArgumentCreatorVisitor, Value*> {
+  public PatternVisitor<ArgumentCreatorVisitor, Value> {
   Function &F;
   ArgumentCreatorVisitor(Function &F) : F(F) {}
 
   // Paren & Typed patterns are noops, just look through them.
-  Value *visitParenPattern(ParenPattern *P) {return visit(P->getSubPattern());}
-  Value *visitTypedPattern(TypedPattern *P) {return visit(P->getSubPattern());}
+  Value visitParenPattern(ParenPattern *P) {return visit(P->getSubPattern());}
+  Value visitTypedPattern(TypedPattern *P) {return visit(P->getSubPattern());}
 
   // Bind to a tuple pattern by first trying to see if we can emit
   // the initializers independently.
-  Value *visitTuplePattern(TuplePattern *P) {
-    SmallVector<Value*, 4> Elements;
+  Value visitTuplePattern(TuplePattern *P) {
+    SmallVector<Value, 4> Elements;
     for (auto &elt : P->getFields())
       Elements.push_back(visit(elt.getPattern()));
 
@@ -149,11 +149,11 @@ struct ArgumentCreatorVisitor :
     return B.createTuple(P->getType(), Elements);
   }
 
-  Value *visitAnyPattern(AnyPattern *P) {
+  Value visitAnyPattern(AnyPattern *P) {
     return new (F) BBArgument(P->getType(), F.begin());
   }
 
-  Value *visitNamedPattern(NamedPattern *P) {
+  Value visitNamedPattern(NamedPattern *P) {
     return new (F) BBArgument(P->getType(), F.begin());
   }
 };
@@ -164,7 +164,7 @@ void SILGen::emitProlog(FuncExpr *FE) {
   // Emit the argument variables.
   for (auto &ParamPattern : FE->getBodyParamPatterns()) {
     // Add the BBArgument's and collect them as a Value.
-    Value *ArgInit = ArgumentCreatorVisitor(F).visit(ParamPattern);
+    Value ArgInit = ArgumentCreatorVisitor(F).visit(ParamPattern);
     // Use the value to initialize a (mutable) variable allocation.
     InitPatternWithExpr(*this, ArgInit).visit(ParamPattern);
   }

@@ -18,7 +18,7 @@
 namespace swift {
   class BasicBlock;
 
-class BBArgument : public Value {
+class BBArgument : public ValueBase {
   void operator=(const BBArgument &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
 
@@ -29,8 +29,8 @@ public:
   BasicBlock *getParent() { return ParentBB; }
   const BasicBlock *getParent() const { return ParentBB; }
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::BBArgument;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::BBArgument;
   }
 };
 

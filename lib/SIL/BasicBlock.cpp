@@ -24,7 +24,7 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 BBArgument::BBArgument(Type Ty, BasicBlock *ParentBB)
-  : Value(ValueKind::BBArgument, Ty), ParentBB(ParentBB) {
+  : ValueBase(ValueKind::BBArgument, Ty), ParentBB(ParentBB) {
   ParentBB->addArgument(this);
 }
 

@@ -49,8 +49,8 @@ class SILPrinter : public SILVisitor<SILPrinter> {
   llvm::DenseMap<const BasicBlock *, unsigned> BlocksToIDMap;
   ID getID(const BasicBlock *B);
 
-  llvm::DenseMap<const Value*, unsigned> ValueToIDMap;
-  ID getID(const Value *V);
+  llvm::DenseMap<Value, unsigned> ValueToIDMap;
+  ID getID(Value V);
 
 public:
   SILPrinter(raw_ostream &OS) : OS(OS) {
@@ -86,9 +86,9 @@ public:
   //===--------------------------------------------------------------------===//
   // Instruction Printing Logic
 
-  void print(const Value *V) {
+  void print(Value V) {
     OS << "  " << getID(V) << " = ";
-    visit(const_cast<Value*>(V));
+    visit(V);
     OS << '\n';
   }
   void visitInstruction(Instruction *I) {
@@ -247,7 +247,7 @@ ID SILPrinter::getID(const BasicBlock *Block) {
   return R;
 }
 
-ID SILPrinter::getID(const Value *V) {
+ID SILPrinter::getID(Value V) {
   // Lazily initialize the instruction -> ID mapping.
   if (ValueToIDMap.empty()) {
     const BasicBlock *ParentBB;
@@ -275,11 +275,11 @@ ID SILPrinter::getID(const Value *V) {
 // Printing for Instruction, BasicBlock, and Function
 //===----------------------------------------------------------------------===//
 
-void Value::dump() const {
+void ValueBase::dump() const {
   print(llvm::errs());
 }
 
-void Value::print(raw_ostream &OS) const {
+void ValueBase::print(raw_ostream &OS) const {
   SILPrinter(OS).print(this);
 }
 

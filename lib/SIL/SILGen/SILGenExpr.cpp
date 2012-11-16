@@ -15,9 +15,9 @@
 using namespace swift;
 using namespace Lowering;
 
-Value *SILGen::visitApplyExpr(ApplyExpr *E) {
-  Value *FnV = visit(E->getFn());
-  llvm::SmallVector<Value*, 10> ArgsV;
+Value SILGen::visitApplyExpr(ApplyExpr *E) {
+  Value FnV = visit(E->getFn());
+  llvm::SmallVector<Value, 10> ArgsV;
   
   // Special case Arg being a TupleExpr, to inline the arguments and
   // not create another instruction.
@@ -31,7 +31,7 @@ Value *SILGen::visitApplyExpr(ApplyExpr *E) {
   return B.createApply(E, FnV, ArgsV);
 }
 
-Value *SILGen::visitDeclRefExpr(DeclRefExpr *E) {
+Value SILGen::visitDeclRefExpr(DeclRefExpr *E) {
   // If this is a reference to a mutable decl, produce an lvalue.
   if (E->getType()->is<LValueType>()) {
     assert(VarLocs.count(E->getDecl()) && "VarDecl location not generated?");
@@ -42,67 +42,67 @@ Value *SILGen::visitDeclRefExpr(DeclRefExpr *E) {
   return B.createConstantRef(E);
 }
 
-Value *SILGen::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+Value SILGen::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
   return B.createIntegerLiteral(E);
 }
-Value *SILGen::visitFloatLiteralExpr(FloatLiteralExpr *E) {
+Value SILGen::visitFloatLiteralExpr(FloatLiteralExpr *E) {
   return B.createFloatLiteral(E);
 }
-Value *SILGen::visitCharacterLiteralExpr(CharacterLiteralExpr *E) {
+Value SILGen::visitCharacterLiteralExpr(CharacterLiteralExpr *E) {
   return B.createCharacterLiteral(E);
 }
-Value *SILGen::visitStringLiteralExpr(StringLiteralExpr *E) {
+Value SILGen::visitStringLiteralExpr(StringLiteralExpr *E) {
   return B.createStringLiteral(E);
 }
 
-Value *SILGen::visitLoadExpr(LoadExpr *E) {
-  Value *SubV = visit(E->getSubExpr());
+Value SILGen::visitLoadExpr(LoadExpr *E) {
+  Value SubV = visit(E->getSubExpr());
   return B.createLoad(E, SubV);
 }
 
-Value *SILGen::visitMaterializeExpr(MaterializeExpr *E) {
+Value SILGen::visitMaterializeExpr(MaterializeExpr *E) {
   // Evaluate the value, use it to initialize a new temporary and return the
   // temp's address.
-  Value *V = visit(E->getSubExpr());
-  Value *TmpMem = B.createAllocTmp(E);
+  Value V = visit(E->getSubExpr());
+  Value TmpMem = B.createAllocTmp(E);
   B.createInitialization(E, V, TmpMem);
   return TmpMem;
 }
 
 
-Value *SILGen::visitRequalifyExpr(RequalifyExpr *E) {
+Value SILGen::visitRequalifyExpr(RequalifyExpr *E) {
   return B.createTypeConversion(E, visit(E->getSubExpr()));
 }
 
-Value *SILGen::visitFunctionConversionExpr(FunctionConversionExpr *E) {
+Value SILGen::visitFunctionConversionExpr(FunctionConversionExpr *E) {
   return B.createTypeConversion(E, visit(E->getSubExpr()));
 }
 
-Value *SILGen::visitParenExpr(ParenExpr *E) {
+Value SILGen::visitParenExpr(ParenExpr *E) {
   return visit(E->getSubExpr());
 }
 
-Value *SILGen::visitTupleExpr(TupleExpr *E) {
-  llvm::SmallVector<Value*, 10> ArgsV;
+Value SILGen::visitTupleExpr(TupleExpr *E) {
+  llvm::SmallVector<Value, 10> ArgsV;
   for (auto &I : E->getElements())
     ArgsV.push_back(visit(I));
   return B.createTuple(E, ArgsV);
 }
 
-Value *SILGen::visitGetMetatypeExpr(GetMetatypeExpr *E) {
+Value SILGen::visitGetMetatypeExpr(GetMetatypeExpr *E) {
   return visit(E->getSubExpr());
 }
 
-Value *SILGen::visitSpecializeExpr(SpecializeExpr *E) {
+Value SILGen::visitSpecializeExpr(SpecializeExpr *E) {
   return B.createSpecialize(E, visit(E->getSubExpr()), E->getType());
 }
 
-Value *SILGen::visitAddressOfExpr(AddressOfExpr *E) {
+Value SILGen::visitAddressOfExpr(AddressOfExpr *E) {
   return visit(E->getSubExpr());
 }
 
 
-Value *SILGen::visitTupleElementExpr(TupleElementExpr *E) {
+Value SILGen::visitTupleElementExpr(TupleElementExpr *E) {
   return B.createTupleElement(E, visit(E->getBase()), E->getFieldNumber());
 }
 
@@ -110,24 +110,24 @@ Value *SILGen::visitTupleElementExpr(TupleElementExpr *E) {
 /// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
 /// (which represents the retain count) a base pointer to some elements, and a
 /// length
-Value *SILGen::emitArrayInjectionCall(Value *ObjectPtr, Value *BasePtr,
-                                      Value *Length,
-                                      Expr *ArrayInjectionFunction) {
+Value SILGen::emitArrayInjectionCall(Value ObjectPtr, Value BasePtr,
+                                     Value Length,
+                                     Expr *ArrayInjectionFunction) {
   // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
   if (!BasePtr->getType()->isEqual(F.getContext().TheRawPointerType))
     BasePtr = B.createTypeConversion(F.getContext().TheRawPointerType, BasePtr);
 
-  Value *InjectionFn = visit(ArrayInjectionFunction);
-  Value *InjectionArgs[] = { BasePtr, ObjectPtr, Length };
+  Value InjectionFn = visit(ArrayInjectionFunction);
+  Value InjectionArgs[] = { BasePtr, ObjectPtr, Length };
   return B.createApply(InjectionFn, InjectionArgs);
 }
 
 
-Value *SILGen::emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
-                                ArrayRef<int> ElementMapping,
-                                Expr *VarargsInjectionFunction) {
+Value SILGen::emitTupleShuffle(Expr *E, ArrayRef<Value> InOps,
+                               ArrayRef<int> ElementMapping,
+                               Expr *VarargsInjectionFunction) {
   // Collect the new elements.
-  SmallVector<Value*, 8> ResultElements;
+  SmallVector<Value, 8> ResultElements;
 
   // Loop over each result element to compute it.
   ArrayRef<TupleTypeElt> outerFields =
@@ -160,27 +160,27 @@ Value *SILGen::emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
     // TupleShuffleExpr.
     auto shuffleIndexIteratorEnd = ElementMapping.end();
     unsigned NumArrayElts = shuffleIndexIteratorEnd - shuffleIndexIterator;
-    Value *NumEltsVal = B.createIntegerValueInst(NumArrayElts,
+    Value NumEltsVal = B.createIntegerValueInst(NumArrayElts,
                                    BuiltinIntegerType::get(64, F.getContext()));
-    Value *AllocArray = B.createAllocArray(E, outerField.getVarargBaseTy(),
-                                           NumEltsVal);
+    Value AllocArray = B.createAllocArray(E, outerField.getVarargBaseTy(),
+                                          NumEltsVal);
 
     Type BaseLValue =
       AllocArray->getType()->castTo<TupleType>()->getElementType(1);
-    Value *BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
+    Value BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
 
     unsigned CurElem = 0;
     while (shuffleIndexIterator != shuffleIndexIteratorEnd) {
       unsigned SourceField = *shuffleIndexIterator++;
       
-      Value *EltLoc = BasePtr;
+      Value EltLoc = BasePtr;
       if (CurElem) EltLoc = B.createIndexLValue(E, EltLoc, CurElem);
 
       B.createInitialization(E, InOps[SourceField], EltLoc);
       ++CurElem;
     }
 
-    Value *ObjectPtr =
+    Value ObjectPtr =
       B.createTupleElement(F.getContext().TheObjectPointerType, AllocArray, 0);
 
     ResultElements.push_back(emitArrayInjectionCall(ObjectPtr, BasePtr,
@@ -191,11 +191,11 @@ Value *SILGen::emitTupleShuffle(Expr *E, ArrayRef<Value *> InOps,
   return B.createTuple(E, ResultElements);
 }
 
-Value *SILGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
+Value SILGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
   // TupleShuffle expands out to extracts+inserts.  Start by emitting the base
   // expression that we'll shuffle.
-  Value *Op = visit(E->getSubExpr());
-  SmallVector<Value*, 8> InElts;
+  Value Op = visit(E->getSubExpr());
+  SmallVector<Value, 8> InElts;
   unsigned EltNo = 0;
   for (auto &InField : Op->getType()->castTo<TupleType>()->getFields())
     InElts.push_back(B.createTupleElement(InField.getType(), Op, EltNo++));
@@ -204,9 +204,9 @@ Value *SILGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
                           E->getVarargsInjectionFunctionOrNull());
 }
 
-Value *SILGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
+Value SILGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
   // Emit the argument and turn it into a trivial tuple.
-  Value *Arg = visit(E->getSubExpr());
+  Value Arg = visit(E->getSubExpr());
 
   // If we don't have exactly the same tuple, perform a shuffle to create
   // default arguments etc.
@@ -230,16 +230,16 @@ Value *SILGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
   return emitTupleShuffle(E, Arg, ShuffleMask,E->getVarargsInjectionFunction());
 }
 
-Value *SILGen::visitNewArrayExpr(NewArrayExpr *E) {
-  Value *NumElements = visit(E->getBounds()[0].Value);
+Value SILGen::visitNewArrayExpr(NewArrayExpr *E) {
+  Value NumElements = visit(E->getBounds()[0].Value);
 
   // Allocate the array.
-  Value *AllocArray = B.createAllocArray(E, E->getElementType(), NumElements);
+  Value AllocArray = B.createAllocArray(E, E->getElementType(), NumElements);
 
   Type BaseLValue =
     AllocArray->getType()->castTo<TupleType>()->getElementType(1);
-  Value *BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
-  Value *ObjectPtr =
+  Value BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
+  Value ObjectPtr =
     B.createTupleElement(F.getContext().TheObjectPointerType, AllocArray, 0);
 
   // FIXME: We need to initialize the elements of the array that are now
@@ -253,7 +253,7 @@ Value *SILGen::visitNewArrayExpr(NewArrayExpr *E) {
 
 
 
-Value *SILGen::visitMetatypeExpr(MetatypeExpr *E) {
+Value SILGen::visitMetatypeExpr(MetatypeExpr *E) {
   return B.createMetatype(E);
 }
 

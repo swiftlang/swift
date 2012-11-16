@@ -115,31 +115,29 @@ static Type getAllocArrayType(Type EltTy) {
 }
 
 AllocArrayInst::AllocArrayInst(Expr *E, Type ElementType,
-                               Value *NumElements)
+                               Value NumElements)
   : Instruction(ValueKind::AllocArrayInst, E, getAllocArrayType(ElementType)),
     ElementType(ElementType), NumElements(NumElements) {
 }
 
-ApplyInst::ApplyInst(SILLocation Loc, Type Ty, Value *Callee,
-                     ArrayRef<Value*> Args)
+ApplyInst::ApplyInst(SILLocation Loc, Type Ty, Value Callee,
+                     ArrayRef<Value> Args)
   : Instruction(ValueKind::ApplyInst, Loc, Ty), Callee(Callee),
     NumArgs(Args.size()) {
-  memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(Value*));
+  memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(Value));
 }
 
-ApplyInst *ApplyInst::create(ApplyExpr *Expr, Value *Callee,
-                             ArrayRef<Value*> Args, Function &F) {
-  void *Buffer = F.allocate(sizeof(ApplyInst) +
-                            Args.size() * sizeof(Value*),
+ApplyInst *ApplyInst::create(ApplyExpr *Expr, Value Callee,
+                             ArrayRef<Value> Args, Function &F) {
+  void *Buffer = F.allocate(sizeof(ApplyInst) + Args.size() * sizeof(Value),
                             llvm::AlignOf<ApplyInst>::Alignment);
   Type ResTy = Callee->getType()->castTo<FunctionType>()->getResult();
   assert(ResTy->isEqual(Expr->getType()));
   return ::new(Buffer) ApplyInst(Expr, ResTy, Callee, Args);
 }
 
-ApplyInst *ApplyInst::create(Value *Callee, ArrayRef<Value*> Args, Function &F) {
-  void *Buffer = F.allocate(sizeof(ApplyInst) +
-                            Args.size() * sizeof(Value*),
+ApplyInst *ApplyInst::create(Value Callee, ArrayRef<Value> Args, Function &F) {
+  void *Buffer = F.allocate(sizeof(ApplyInst) + Args.size() * sizeof(Value),
                             llvm::AlignOf<ApplyInst>::Alignment);
   Type ResTy = Callee->getType()->castTo<FunctionType>()->getResult();
   return ::new(Buffer) ApplyInst(SILLocation(), ResTy, Callee, Args);
@@ -212,37 +210,37 @@ StringRef StringLiteralInst::getValue() const {
 }
 
 
-LoadInst::LoadInst(LoadExpr *E, Value *LValue, bool IsTake)
+LoadInst::LoadInst(LoadExpr *E, Value LValue, bool IsTake)
   : Instruction(ValueKind::LoadInst, E, E->getType()),
     LValue(LValue),
     IsTake(IsTake) {
 }
 
 
-StoreInst::StoreInst(AssignStmt *S, Value *Src, Value *Dest)
+StoreInst::StoreInst(AssignStmt *S, Value Src, Value Dest)
   : Instruction(ValueKind::StoreInst, S, getVoidType(Src->getType())),
     Src(Src), Dest(Dest), IsInitialization(false) {
 }
 
-StoreInst::StoreInst(VarDecl *VD, Value *Src, Value *Dest)
+StoreInst::StoreInst(VarDecl *VD, Value Src, Value Dest)
   : Instruction(ValueKind::StoreInst, VD, getVoidType(Src->getType())),
     Src(Src), Dest(Dest), IsInitialization(true) {
 }
 
 
-StoreInst::StoreInst(MaterializeExpr *E, Value *Src, Value *Dest)
+StoreInst::StoreInst(MaterializeExpr *E, Value Src, Value Dest)
   : Instruction(ValueKind::StoreInst, E, getVoidType(Src->getType())),
     Src(Src), Dest(Dest), IsInitialization(true) {
 }
 
-StoreInst::StoreInst(Expr *E, bool IsInitialization, Value *Src, Value *Dest)
+StoreInst::StoreInst(Expr *E, bool IsInitialization, Value Src, Value Dest)
   : Instruction(ValueKind::StoreInst, E, getVoidType(Src->getType())),
     Src(Src), Dest(Dest), IsInitialization(IsInitialization) {
   // This happens in a store to an array initializer for varargs tuple shuffle.
 }
 
 
-CopyInst::CopyInst(Expr *E, Value *SrcLValue, Value *DestLValue,
+CopyInst::CopyInst(Expr *E, Value SrcLValue, Value DestLValue,
                    bool IsTakeOfSrc, bool IsInitializationOfDest)
   : Instruction(ValueKind::CopyInst, E, getVoidType(Src->getType())),
     Src(SrcLValue), Dest(DestLValue),
@@ -250,36 +248,35 @@ CopyInst::CopyInst(Expr *E, Value *SrcLValue, Value *DestLValue,
 }
 
 
-SpecializeInst::SpecializeInst(SpecializeExpr *SE, Value *Operand, Type DestTy)
+SpecializeInst::SpecializeInst(SpecializeExpr *SE, Value Operand, Type DestTy)
   : Instruction(ValueKind::SpecializeInst, SE, DestTy), Operand(Operand) {
 }
 
 
 TypeConversionInst::TypeConversionInst(ImplicitConversionExpr *E,
-                                       Value *Operand)
+                                       Value Operand)
   : Instruction(ValueKind::TypeConversionInst, E, E->getType()),
     Operand(Operand) {
 }
 
-TypeConversionInst::TypeConversionInst(Type Ty, Value *Operand)
+TypeConversionInst::TypeConversionInst(Type Ty, Value Operand)
   : Instruction(ValueKind::TypeConversionInst, (Expr*)nullptr, Ty),
     Operand(Operand) {
 }
 
 
-TupleInst *TupleInst::createImpl(Expr *E, Type Ty, ArrayRef<Value*> Elements,
+TupleInst *TupleInst::createImpl(Expr *E, Type Ty, ArrayRef<Value> Elements,
                                  Function &F) {
   if (E) Ty = E->getType();
 
-  void *Buffer = F.allocate(sizeof(TupleInst) +
-                            Elements.size() * sizeof(Value*),
+  void *Buffer = F.allocate(sizeof(TupleInst) + Elements.size() * sizeof(Value),
                             llvm::AlignOf<TupleInst>::Alignment);
   return ::new(Buffer) TupleInst(E, Ty, Elements);
 }
 
-TupleInst::TupleInst(Expr *E, Type Ty, ArrayRef<Value*> Elems)
+TupleInst::TupleInst(Expr *E, Type Ty, ArrayRef<Value> Elems)
   : Instruction(ValueKind::TupleInst, E, Ty), NumArgs(Elems.size()) {
-  memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(Value*));
+  memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(Value));
 }
 
 MetatypeInst::MetatypeInst(MetatypeExpr *E)
@@ -295,35 +292,35 @@ Type MetatypeInst::getMetaType() const {
   return getExpr()->getType();
 }
 
-TupleElementInst::TupleElementInst(TupleElementExpr *E, Value *Operand,
+TupleElementInst::TupleElementInst(TupleElementExpr *E, Value Operand,
                                    unsigned FieldNo)
   : Instruction(ValueKind::TupleElementInst, E, E->getType()),
     Operand(Operand), FieldNo(FieldNo) {
 }
 
-TupleElementInst::TupleElementInst(Type ResultTy, Value *Operand,
+TupleElementInst::TupleElementInst(Type ResultTy, Value Operand,
                                    unsigned FieldNo)
   : Instruction(ValueKind::TupleElementInst, (Expr*)nullptr, ResultTy),
     Operand(Operand), FieldNo(FieldNo) {
   
 }
 
-RetainInst::RetainInst(Expr *E, Value *Operand)
+RetainInst::RetainInst(Expr *E, Value Operand)
   : Instruction(ValueKind::RetainInst, E, Operand->getType()),
     Operand(Operand) {
 }
 
-ReleaseInst::ReleaseInst(Expr *E, Value *Operand)
+ReleaseInst::ReleaseInst(Expr *E, Value Operand)
   : Instruction(ValueKind::ReleaseInst, E, getVoidType(Operand->getType())),
     Operand(Operand) {
 }
 
-DeallocInst::DeallocInst(Expr *E, Value *Operand)
+DeallocInst::DeallocInst(Expr *E, Value Operand)
   : Instruction(ValueKind::DeallocInst, E, getVoidType(Operand->getType())),
     Operand(Operand) {
 }
 
-DestroyInst::DestroyInst(Expr *E, Value *Operand)
+DestroyInst::DestroyInst(Expr *E, Value Operand)
   : Instruction(ValueKind::DestroyInst, E, getVoidType(Operand->getType())),
     Operand(Operand) {
 }
@@ -332,7 +329,7 @@ DestroyInst::DestroyInst(Expr *E, Value *Operand)
 // SIL-only instructions that don't have an AST analog
 //===----------------------------------------------------------------------===//
 
-IndexLValueInst::IndexLValueInst(Expr *E, Value *Operand, unsigned Index)
+IndexLValueInst::IndexLValueInst(Expr *E, Value Operand, unsigned Index)
   : Instruction(ValueKind::IndexLValueInst, E, Operand->getType()),
     Operand(Operand), Index(Index) {
 }
@@ -362,7 +359,7 @@ UnreachableInst::UnreachableInst(Function &F)
              F.getContext().TheEmptyTupleType) {
 }
 
-ReturnInst::ReturnInst(ReturnStmt *S, Value *ReturnValue)
+ReturnInst::ReturnInst(ReturnStmt *S, Value ReturnValue)
   : TermInst(ValueKind::ReturnInst, S, getVoidType(ReturnValue->getType())),
     ReturnValue(ReturnValue) {
 }
@@ -374,7 +371,7 @@ BranchInst::BranchInst(BasicBlock *DestBB, Function &F)
 }
 
 
-CondBranchInst::CondBranchInst(Stmt *TheStmt, Value *Condition,
+CondBranchInst::CondBranchInst(Stmt *TheStmt, Value Condition,
                                BasicBlock *TrueBB, BasicBlock *FalseBB)
   : TermInst(ValueKind::CondBranchInst, TheStmt,
              getVoidType(Condition->getType())),

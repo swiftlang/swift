@@ -19,6 +19,7 @@
 
 #include "swift/SIL/SILBase.h"
 #include "swift/AST/Type.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
@@ -34,13 +35,13 @@ namespace swift {
   /// Value - This class is a value that can be used as an "operand" to an
   /// instruction.  It is either a reference to another instruction, or an
   /// incoming basic block argument.
-  class Value : public SILAllocated<Value> {
+  class ValueBase : public SILAllocated<ValueBase> {
     PointerUnion<Type, SILTypeList *> Types;
     const ValueKind Kind;
   protected:
-    Value(ValueKind Kind, SILTypeList *TypeList)
+    ValueBase(ValueKind Kind, SILTypeList *TypeList)
       : Types(TypeList), Kind(Kind) {}
-    Value(ValueKind Kind, Type Ty)
+    ValueBase(ValueKind Kind, Type Ty)
       : Types(Ty), Kind(Kind) {}
   public:
 
@@ -55,6 +56,63 @@ namespace swift {
     void dump() const;
     void print(raw_ostream &OS) const;
   };
+
+  class Value {
+    llvm::PointerIntPair<ValueBase*, 1> ValueAndResultNumber;
+  public:
+    Value(const ValueBase *V = 0, unsigned ResultNumber = 0)
+      : ValueAndResultNumber((ValueBase*)V, ResultNumber) {
+      assert(ResultNumber == getResultNumber() && "Overflow");
+    }
+
+    ValueBase *getDef() const {
+      return ValueAndResultNumber.getPointer();
+    }
+    ValueBase *operator->() const { return getDef(); }
+    unsigned getResultNumber() const { return ValueAndResultNumber.getInt(); }
+
+    Type getType() const {
+      return getDef()->getTypes()[getResultNumber()];
+    }
+
+    // Comparison.
+    bool operator==(Value RHS) const {
+      return ValueAndResultNumber == RHS.ValueAndResultNumber;
+    }
+    bool operator!=(Value RHS) const { return !(*this == RHS); }
+
+    // Boolean conversion for null checks.
+    operator bool() const { return getDef() != nullptr; }
+  };
 } // end namespace swift
+
+
+namespace llvm {
+  // A Value casts like a ValueBase*.
+  template<> struct simplify_type<const ::swift::Value> {
+    typedef ::swift::ValueBase *SimpleType;
+    static SimpleType getSimplifiedValue(::swift::Value Val) {
+      return Val.getDef();
+    }
+  };
+  template<> struct simplify_type< ::swift::Value>
+    : public simplify_type<const ::swift::Value> {};
+
+  // Value's hash just like pointers.
+  template<> struct DenseMapInfo<swift::Value> {
+    static swift::Value getEmptyKey() {
+      return llvm::DenseMapInfo<swift::ValueBase*>::getEmptyKey();
+    }
+    static swift::Value getTombstoneKey() {
+      return llvm::DenseMapInfo<swift::ValueBase*>::getTombstoneKey();
+    }
+    static unsigned getHashValue(swift::Value V) {
+      return DenseMapInfo<swift::ValueBase*>::getHashValue(V.getDef());
+    }
+    static bool isEqual(swift::Value LHS, swift::Value RHS) {
+      return LHS == RHS;
+    }
+  };
+}  // end namespace llvm
 
 #endif

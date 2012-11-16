@@ -17,11 +17,9 @@
 #ifndef SWIFT_SIL_INSTRUCTION_H
 #define SWIFT_SIL_INSTRUCTION_H
 
-#include "swift/SIL/SILBase.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILSuccessor.h"
 #include "swift/SIL/Value.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
 
@@ -53,7 +51,7 @@ class VarDecl;
 
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift BasicBlock.
-class Instruction : public Value, public llvm::ilist_node<Instruction> {
+class Instruction : public ValueBase, public llvm::ilist_node<Instruction> {
   friend struct llvm::ilist_traits<Instruction>;
 
   /// A backreference to the containing basic block.  This is maintained by
@@ -69,7 +67,7 @@ class Instruction : public Value, public llvm::ilist_node<Instruction> {
 
 protected:
   Instruction(ValueKind Kind, SILLocation Loc, Type Ty)
-    : Value(Kind, Ty), ParentBB(0), Loc(Loc) {}
+    : ValueBase(Kind, Ty), ParentBB(0), Loc(Loc) {}
 
 public:
 
@@ -107,9 +105,9 @@ public:
   ///
   void eraseFromParent();
 
-  static bool classof(const Value *I) {
-    return I->getKind() >= ValueKind::First_Instruction &&
-           I->getKind() <= ValueKind::Last_Instruction;
+  static bool classof(Value V) {
+    return V->getKind() >= ValueKind::First_Instruction &&
+           V->getKind() <= ValueKind::Last_Instruction;
   }
 };
 
@@ -124,9 +122,9 @@ protected:
     : Instruction(Kind, Loc, Ty) {}
 public:
 
-  static bool classof(const Value *I) {
-    return I->getKind() >= ValueKind::First_AllocInst &&
-           I->getKind() <= ValueKind::Last_AllocInst;
+  static bool classof(Value V) {
+    return V->getKind() >= ValueKind::First_AllocInst &&
+           V->getKind() <= ValueKind::Last_AllocInst;
   }
 };
 
@@ -142,8 +140,8 @@ public:
   /// getDecl - Return the underlying declaration.
   VarDecl *getDecl() const;
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::AllocVarInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::AllocVarInst;
   }
 };
 
@@ -158,8 +156,8 @@ public:
 
   AllocTmpInst(MaterializeExpr *E);
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::AllocTmpInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::AllocTmpInst;
   }
 };
 
@@ -171,16 +169,16 @@ public:
 ///
 class AllocArrayInst : public Instruction {
   Type ElementType;
-  Value *NumElements;
+  Value NumElements;
 public:
 
-  AllocArrayInst(Expr *E, Type ElementType, Value *NumElements);
+  AllocArrayInst(Expr *E, Type ElementType, Value NumElements);
 
   Type getElementType() const { return ElementType; }
-  Value *getNumElements() const { return NumElements; }
+  Value getNumElements() const { return NumElements; }
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::AllocArrayInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::AllocArrayInst;
   }
 };
 
@@ -188,35 +186,35 @@ public:
 /// ApplyInst - Represents application of an argument to a function.
 class ApplyInst : public Instruction {
   /// The instruction representing the called function.
-  Value *Callee;
+  Value Callee;
 
   unsigned NumArgs;
-  Value **getArgsStorage() { return reinterpret_cast<Value**>(this + 1); }
+  Value *getArgsStorage() { return reinterpret_cast<Value*>(this + 1); }
   
   /// Construct an ApplyInst from a given call expression and the provided
   /// arguments.
-  ApplyInst(SILLocation Loc, Type Ty, Value *Callee, ArrayRef<Value*> Args);
+  ApplyInst(SILLocation Loc, Type Ty, Value Callee, ArrayRef<Value> Args);
 
 public:
-  static ApplyInst *create(ApplyExpr *Expr, Value *Callee,
-                           ArrayRef<Value*> Args, Function &F);
-  static ApplyInst *create(Value *Callee, ArrayRef<Value*> Args, Function &F);
+  static ApplyInst *create(ApplyExpr *Expr, Value Callee,
+                           ArrayRef<Value> Args, Function &F);
+  static ApplyInst *create(Value Callee, ArrayRef<Value> Args, Function &F);
 
   
-  Value *getCallee() { return Callee; }
+  Value getCallee() { return Callee; }
   
   /// The arguments passed to this ApplyInst.
-  MutableArrayRef<Value*> getArguments() {
-    return MutableArrayRef<Value*>(getArgsStorage(), NumArgs);
+  MutableArrayRef<Value> getArguments() {
+    return MutableArrayRef<Value>(getArgsStorage(), NumArgs);
   }
 
   /// The arguments passed to this ApplyInst.
-  ArrayRef<Value*> getArguments() const {
+  ArrayRef<Value> getArguments() const {
     return const_cast<ApplyInst*>(this)->getArguments();
   }
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::ApplyInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ApplyInst;
   }
 };
 
@@ -236,8 +234,8 @@ public:
   /// getDecl - Return the underlying declaration.
   ValueDecl *getDecl() const;
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::ConstantRefInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ConstantRefInst;
   }
 };
 
@@ -247,8 +245,8 @@ class ZeroValueInst : public Instruction {
 public:
   ZeroValueInst(VarDecl *D);
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::ZeroValueInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ZeroValueInst;
   }
 };
 
@@ -263,8 +261,8 @@ public:
   /// getValue - Return the APInt for the underlying integer literal.
   APInt getValue() const;
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::IntegerLiteralInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::IntegerLiteralInst;
   }
 };
 
@@ -279,8 +277,8 @@ public:
   /// getValue - Return the APFloat for the underlying FP literal.
   APFloat getValue() const;
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::FloatLiteralInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::FloatLiteralInst;
   }
 };
 
@@ -295,8 +293,8 @@ public:
   /// getValue - Return the value for the underlying literal.
   uint32_t getValue() const;
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::CharacterLiteralInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::CharacterLiteralInst;
   }
 };
 
@@ -311,8 +309,8 @@ public:
   /// getValue - Return the string data for the literal.
   StringRef getValue() const;
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::StringLiteralInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::StringLiteralInst;
   }
 };
 
@@ -322,7 +320,7 @@ public:
 /// memory uninitialized.
 class LoadInst : public Instruction {
   /// The LValue (memory address) to use for the load.
-  Value *LValue;
+  Value LValue;
   
   /// IsTake - True if the result of the load instruction takes ownership of the
   /// value and deinitializes the lvalue.
@@ -332,19 +330,19 @@ public:
   ///
   /// \param Expr The backing LoadExpr in the AST.
   ///
-  /// \param LValue The Value *representing the lvalue (address) to
+  /// \param LValue The Value representing the lvalue (address) to
   ///        use for the load.
   ///
   /// \param IsTake True if this load takes ownership of the value from the
   ///        lvalue.
-  LoadInst(LoadExpr *E, Value *LValue, bool IsTake = false);
+  LoadInst(LoadExpr *E, Value LValue, bool IsTake = false);
 
-  Value *getLValue() const { return LValue; }
+  Value getLValue() const { return LValue; }
   
   bool isTake() const { return IsTake; }
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::LoadInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::LoadInst;
   }
 };
 
@@ -353,7 +351,7 @@ public:
 /// location.
 class StoreInst : public Instruction {
   /// The value being stored and the lvalue being stored to.
-  Value *Src, *Dest;
+  Value Src, Dest;
 
   /// IsInitialization - True if this is the initialization of a memory location
   /// that is uninitialized, not a general store.  In an initialization of an
@@ -361,18 +359,18 @@ class StoreInst : public Instruction {
   bool IsInitialization;
 public:
 
-  StoreInst(AssignStmt *S, Value *Src, Value *Dest);
-  StoreInst(VarDecl *VD, Value *Src, Value *Dest);
-  StoreInst(MaterializeExpr *E, Value *Src, Value *Dest);
-  StoreInst(Expr *E, bool isInitialization, Value *Src, Value *Dest);
+  StoreInst(AssignStmt *S, Value Src, Value Dest);
+  StoreInst(VarDecl *VD, Value Src, Value Dest);
+  StoreInst(MaterializeExpr *E, Value Src, Value Dest);
+  StoreInst(Expr *E, bool isInitialization, Value Src, Value Dest);
 
-  Value *getSrc() const { return Src; }
-  Value *getDest() const { return Dest; }
+  Value getSrc() const { return Src; }
+  Value getDest() const { return Dest; }
 
   bool isInitialization() const { return IsInitialization; }
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::StoreInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::StoreInst;
   }
 };
   
@@ -384,9 +382,9 @@ public:
 /// loaded, such as resilient value types.
 class CopyInst : public Instruction {
   /// Src - The lvalue being loaded from.
-  Value *Src;
+  Value Src;
   /// Dest - The lvalue being stored to.
-  Value *Dest;
+  Value Dest;
   
   /// IsTakeOfSrc - True if ownership will be taken from the value at the source
   /// memory location.
@@ -396,17 +394,16 @@ class CopyInst : public Instruction {
   bool IsInitializationOfDest : 1;
   
 public:
-  CopyInst(Expr *E,
-           Value *Src, Value *Dest,
+  CopyInst(Expr *E, Value Src, Value Dest,
            bool IsTakeOfSrc, bool IsInitializationOfDest);
   
-  Value *getSrc() const { return Src; }
-  Value *getDest() const { return Dest; }
+  Value getSrc() const { return Src; }
+  Value getDest() const { return Dest; }
   bool isTakeOfSrc() const { return IsTakeOfSrc; }
   bool isInitializationOfDest() const { return IsInitializationOfDest; }
   
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::CopyInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::CopyInst;
   }
 };
 
@@ -420,15 +417,15 @@ public:
 ///
 class SpecializeInst : public Instruction {
   /// The value being specialized.  It always has FunctionType.
-  Value *Operand;
+  Value Operand;
 public:
 
-  SpecializeInst(SpecializeExpr *SE, Value *Operand, Type DestTy);
+  SpecializeInst(SpecializeExpr *SE, Value Operand, Type DestTy);
 
-  Value *getOperand() const { return Operand; }
+  Value getOperand() const { return Operand; }
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::SpecializeInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::SpecializeInst;
   }
 };
 
@@ -436,54 +433,54 @@ public:
 /// TypeConversionInst - Change the Type of some value without affecting how it
 /// will codegen.
 class TypeConversionInst : public Instruction {
-  Value *Operand;
+  Value Operand;
 public:
-  TypeConversionInst(ImplicitConversionExpr *E, Value *Operand);
-  TypeConversionInst(Type Ty, Value *Operand);
+  TypeConversionInst(ImplicitConversionExpr *E, Value Operand);
+  TypeConversionInst(Type Ty, Value Operand);
 
-  Value *getOperand() const { return Operand; }
+  Value getOperand() const { return Operand; }
   
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::TypeConversionInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::TypeConversionInst;
   }
 };
 
 
 /// TupleInst - Represents a constructed tuple.
 class TupleInst : public Instruction {
-  Value **getElementsStorage() {
-    return reinterpret_cast<Value**>(this + 1);
+  Value *getElementsStorage() {
+    return reinterpret_cast<Value*>(this + 1);
   }
   unsigned NumArgs;
 
   /// Private constructor.  Because of the storage requirements of
   /// TupleInst, object creation goes through 'create()'.
-  TupleInst(Expr *E, Type Ty, ArrayRef<Value*> Elements);
+  TupleInst(Expr *E, Type Ty, ArrayRef<Value> Elements);
   static TupleInst *createImpl(Expr *E, Type Ty,
-                               ArrayRef<Value*> Elements, Function &F);
+                               ArrayRef<Value> Elements, Function &F);
 
 public:
   /// The elements referenced by this TupleInst.
-  MutableArrayRef<Value*> getElements() {
-    return MutableArrayRef<Value*>(getElementsStorage(), NumArgs);
+  MutableArrayRef<Value> getElements() {
+    return MutableArrayRef<Value>(getElementsStorage(), NumArgs);
   }
 
   /// The elements referenced by this TupleInst.
-  ArrayRef<Value*> getElements() const {
+  ArrayRef<Value> getElements() const {
     return const_cast<TupleInst*>(this)->getElements();
   }
 
   /// Construct a TupleInst.  The two forms are used to ensure that these are
   /// only created for specific syntactic forms.
-  static TupleInst *create(Expr *E, ArrayRef<Value*> Elements, Function &F) {
+  static TupleInst *create(Expr *E, ArrayRef<Value> Elements, Function &F) {
     return createImpl(E, Type(), Elements, F);
   }
-  static TupleInst *create(Type Ty, ArrayRef<Value*> Elements, Function &F) {
+  static TupleInst *create(Type Ty, ArrayRef<Value> Elements, Function &F) {
     return createImpl(nullptr, Ty, Elements, F);
   }
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::TupleInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::TupleInst;
   }
 };
 
@@ -505,65 +502,65 @@ public:
   /// returns.
   Type getMetaType() const;
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::MetatypeInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::MetatypeInst;
   }
 };
 
 
 /// TupleElementInst - Extract a numbered element out of a value of tuple type.
 class TupleElementInst : public Instruction {
-  Value *Operand;
+  Value Operand;
   unsigned FieldNo;
 public:
-  TupleElementInst(TupleElementExpr *E, Value *Operand, unsigned FieldNo);
-  TupleElementInst(Type ResultTy, Value *Operand, unsigned FieldNo);
+  TupleElementInst(TupleElementExpr *E, Value Operand, unsigned FieldNo);
+  TupleElementInst(Type ResultTy, Value Operand, unsigned FieldNo);
   
-  Value *getOperand() const { return Operand; }
+  Value getOperand() const { return Operand; }
   unsigned getFieldNo() const { return FieldNo; }
   
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::TupleElementInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::TupleElementInst;
   }
 };
 
 /// RetainInst - Increase the retain count of a value.
 class RetainInst : public Instruction {
-  Value *Operand;
+  Value Operand;
 public:
-  RetainInst(Expr *E, Value *Operand);
+  RetainInst(Expr *E, Value Operand);
   
-  Value *getOperand() const { return Operand; }
+  Value getOperand() const { return Operand; }
   
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::RetainInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::RetainInst;
   }
 };
 
 /// ReleaseInst - Decrease the retain count of a value, and dealloc the value
 /// if its retain count is zero.
 class ReleaseInst : public Instruction {
-  Value *Operand;
+  Value Operand;
 public:
-  ReleaseInst(Expr *E, Value *Operand);
+  ReleaseInst(Expr *E, Value Operand);
   
-  Value *getOperand() const { return Operand; }
+  Value getOperand() const { return Operand; }
   
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::ReleaseInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ReleaseInst;
   }
 };
 
 /// DeallocInst - Dealloc a value, releasing any resources it owns.
 class DeallocInst : public Instruction {
-  Value *Operand;
+  Value Operand;
 public:
-  DeallocInst(Expr *E, Value *Operand);
+  DeallocInst(Expr *E, Value Operand);
   
-  Value *getOperand() const { return Operand; }
+  Value getOperand() const { return Operand; }
   
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::DeallocInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::DeallocInst;
   }
 };
 
@@ -575,14 +572,14 @@ public:
 /// but a destroy instruction can be used for types that cannot be loaded,
 /// such as resilient value types.
 class DestroyInst : public Instruction {
-  Value *Operand;
+  Value Operand;
 public:
-  DestroyInst(Expr *E, Value *Operand);
+  DestroyInst(Expr *E, Value Operand);
   
-  Value *getOperand() const { return Operand; }
+  Value getOperand() const { return Operand; }
   
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::ReleaseInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ReleaseInst;
   }
 };
 
@@ -595,16 +592,16 @@ public:
 /// This takes an lvalue and indexes over the pointer, striding by the type of
 /// the lvalue.  This is used to index into arrays of uniform elements.
 class IndexLValueInst : public Instruction {
-  Value *Operand;
+  Value Operand;
   unsigned Index;
 public:
-  IndexLValueInst(Expr *E, Value *Operand, unsigned Index);
+  IndexLValueInst(Expr *E, Value Operand, unsigned Index);
 
-  Value *getOperand() const { return Operand; }
+  Value getOperand() const { return Operand; }
   unsigned getIndex() const { return Index; }
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::IndexLValueInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::IndexLValueInst;
   }
 };
 
@@ -617,8 +614,8 @@ public:
 
   uint64_t getValue() const { return Val; }
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::IntegerValueInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::IntegerValueInst;
   }
 };
 
@@ -643,9 +640,9 @@ public:
     return const_cast<TermInst*>(this)->getSuccessors();
   }
 
-  static bool classof(const Value *I) {
-    return I->getKind() >= ValueKind::First_TermInst &&
-           I->getKind() <= ValueKind::Last_TermInst;
+  static bool classof(Value V) {
+    return V->getKind() >= ValueKind::First_TermInst &&
+           V->getKind() <= ValueKind::Last_TermInst;
   }
 };
 
@@ -661,15 +658,15 @@ public:
     return SuccessorListTy();
   }
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::UnreachableInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::UnreachableInst;
   }
 };
 
 /// ReturnInst - Representation of a ReturnStmt.
 class ReturnInst : public TermInst {
   /// The value to be returned.  This is never null.
-  Value *ReturnValue;
+  Value ReturnValue;
   
 public:
   /// Constructs a ReturnInst representing an \b explicit return.
@@ -678,26 +675,26 @@ public:
   ///
   /// \param returnValue The value to be returned.
   ///
-  ReturnInst(ReturnStmt *S, Value *ReturnValue);
+  ReturnInst(ReturnStmt *S, Value ReturnValue);
 
-  Value *getReturnValue() const { return ReturnValue; }
+  Value getReturnValue() const { return ReturnValue; }
 
   SuccessorListTy getSuccessors() {
     // No Successors.
     return SuccessorListTy();
   }
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::ReturnInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ReturnInst;
   }
 };
 
 /// BranchInst - An unconditional branch.
 class BranchInst : public TermInst {
-  llvm::ArrayRef<Value*> Arguments;
+  llvm::ArrayRef<Value> Arguments;
   SILSuccessor DestBB;
 public:
-  typedef ArrayRef<Value*> ArgsTy;
+  typedef ArrayRef<Value> ArgsTy;
   
   /// Construct an BranchInst that will branches to the specified block.
   BranchInst(BasicBlock *DestBB, Function &F);
@@ -709,22 +706,22 @@ public:
     return DestBB;
   }
 
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::BranchInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::BranchInst;
   }
 };
 
 class CondBranchInst : public TermInst {
   /// The condition value used for the branch.
-  Value *Condition;
+  Value Condition;
 
   SILSuccessor DestBBs[2];
 public:
 
-  CondBranchInst(Stmt *TheStmt, Value *Condition,
+  CondBranchInst(Stmt *TheStmt, Value Condition,
                  BasicBlock *TrueBB, BasicBlock *FalseBB);
 
-  Value *getCondition() const { return Condition; }
+  Value getCondition() const { return Condition; }
 
   SuccessorListTy getSuccessors() {
     return DestBBs;
@@ -738,8 +735,8 @@ public:
   void setTrueBB(BasicBlock *BB) { DestBBs[0] = BB; }
   void setFalseBB(BasicBlock *BB) { DestBBs[1] = BB; }
   
-  static bool classof(const Value *I) {
-    return I->getKind() == ValueKind::CondBranchInst;
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::CondBranchInst;
   }
 };
 

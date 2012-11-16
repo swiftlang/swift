@@ -112,15 +112,15 @@ public:
   }
 
   AllocArrayInst *createAllocArray(Expr *E, Type ElementType,
-                                   Value *NumElements) {
+                                   Value NumElements) {
     return insert(new AllocArrayInst(E, ElementType, NumElements));
   }
 
 
-  ApplyInst *createApply(ApplyExpr *Expr, Value *Fn, ArrayRef<Value*> Args) {
+  ApplyInst *createApply(ApplyExpr *Expr, Value Fn, ArrayRef<Value> Args) {
     return insert(ApplyInst::create(Expr, Fn, Args, F));
   }
-  ApplyInst *createApply(Value *Fn, ArrayRef<Value*> Args) {
+  ApplyInst *createApply(Value Fn, ArrayRef<Value> Args) {
     return insert(ApplyInst::create(Fn, Args, F));
   }
 
@@ -145,56 +145,56 @@ public:
     return insert(new StringLiteralInst(E));
   }
 
-  LoadInst *createLoad(LoadExpr *Expr, Value *LV) {
+  LoadInst *createLoad(LoadExpr *Expr, Value LV) {
     return insert(new LoadInst(Expr, LV));
   }
 
-  StoreInst *createStore(AssignStmt *S, Value *Src, Value *DestLValue) {
+  StoreInst *createStore(AssignStmt *S, Value Src, Value DestLValue) {
     return insert(new StoreInst(S, Src, DestLValue));
   }
 
-  CopyInst *createCopy(Expr *E, Value *SrcLValue, Value *DestLValue) {
+  CopyInst *createCopy(Expr *E, Value SrcLValue, Value DestLValue) {
     return insert(new CopyInst(E, SrcLValue, DestLValue, false, false));
   }
   
-  StoreInst *createInitialization(VarDecl *VD, Value *Src,
-                                  Value *DestLValue) {
+  StoreInst *createInitialization(VarDecl *VD, Value Src,
+                                  Value DestLValue) {
     return insert(new StoreInst(VD, Src, DestLValue));
   }
-  StoreInst *createInitialization(Expr *E, Value *Src, Value *DestLValue) {
+  StoreInst *createInitialization(Expr *E, Value Src, Value DestLValue) {
     return insert(new StoreInst(E, true, Src, DestLValue));
   }
 
-  SpecializeInst *createSpecialize(SpecializeExpr *SE, Value *Operand,
+  SpecializeInst *createSpecialize(SpecializeExpr *SE, Value Operand,
                                    Type DestTy) {
     return insert(new SpecializeInst(SE, Operand, DestTy));
   }
 
 
   TypeConversionInst *createTypeConversion(ImplicitConversionExpr *E,
-                                           Value *Op) {
+                                           Value Op) {
     return insert(new TypeConversionInst(E, Op));
   }
-  TypeConversionInst *createTypeConversion(Type Ty, Value *Op) {
+  TypeConversionInst *createTypeConversion(Type Ty, Value Op) {
     return insert(new TypeConversionInst(Ty, Op));
   }
 
-  TupleInst *createTuple(Expr *E, ArrayRef<Value*> Elements) {
+  TupleInst *createTuple(Expr *E, ArrayRef<Value> Elements) {
     return insert(TupleInst::create(E, Elements, F));
   }
-  TupleInst *createTuple(Type Ty, ArrayRef<Value*> Elements) {
+  TupleInst *createTuple(Type Ty, ArrayRef<Value> Elements) {
     return insert(TupleInst::create(Ty, Elements, F));
   }
 
-  Value *createTupleElement(TupleElementExpr *E, Value *Operand,
-                            unsigned FieldNo) {
+  Value createTupleElement(TupleElementExpr *E, Value Operand,
+                           unsigned FieldNo) {
     // Fold tupleelement(tuple(a,b,c), 1) -> b.
     if (TupleInst *TI = dyn_cast<TupleInst>(Operand))
       return TI->getElements()[FieldNo];
 
     return insert(new TupleElementInst(E, Operand, FieldNo));
   }
-  Value *createTupleElement(Type ResultTy, Value *Operand, unsigned FieldNo) {
+  Value createTupleElement(Type ResultTy, Value Operand, unsigned FieldNo) {
     // Fold tupleelement(tuple(a,b,c), 1) -> b.
     if (TupleInst *TI = dyn_cast<TupleInst>(Operand))
       return TI->getElements()[FieldNo];
@@ -206,16 +206,16 @@ public:
     return insert(new MetatypeInst(Expr));
   }
   
-  RetainInst *createRetain(Expr *E, Value *Operand) {
+  RetainInst *createRetain(Expr *E, Value Operand) {
     return insert(new RetainInst(E, Operand));
   }
-  ReleaseInst *createRelease(Expr *E, Value *Operand) {
+  ReleaseInst *createRelease(Expr *E, Value Operand) {
     return insert(new ReleaseInst(E, Operand));
   }
-  DeallocInst *createDealloc(Expr *E, Value *Operand) {
+  DeallocInst *createDealloc(Expr *E, Value Operand) {
     return insert(new DeallocInst(E, Operand));
   }
-  DestroyInst *createDestroy(Expr *E, Value *Operand) {
+  DestroyInst *createDestroy(Expr *E, Value Operand) {
     return insert(new DestroyInst(E, Operand));
   }
 
@@ -223,7 +223,7 @@ public:
   // SIL-only instructions that don't have an AST analog
   //===--------------------------------------------------------------------===//
 
-  IndexLValueInst *createIndexLValue(Expr *E, Value *Operand, unsigned Index) {
+  IndexLValueInst *createIndexLValue(Expr *E, Value Operand, unsigned Index) {
     return insert(new IndexLValueInst(E, Operand, Index));
   }
 
@@ -240,11 +240,11 @@ public:
     return insertTerminator(new UnreachableInst(F));
   }
 
-  ReturnInst *createReturn(ReturnStmt *Stmt, Value *ReturnValue) {
+  ReturnInst *createReturn(ReturnStmt *Stmt, Value ReturnValue) {
     return insertTerminator(new ReturnInst(Stmt, ReturnValue));
   }
   
-  CondBranchInst *createCondBranch(Stmt *BranchStmt, Value *Cond,
+  CondBranchInst *createCondBranch(Stmt *BranchStmt, Value Cond,
                                    BasicBlock *Target1, BasicBlock *Target2) {
     return insertTerminator(new CondBranchInst(BranchStmt, Cond,
                                                Target1, Target2));
