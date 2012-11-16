@@ -16,13 +16,15 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Component.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Types.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "clang/AST/ASTContext.h"
-#include "clang/AST/ASTConsumer.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/STLExtras.h"
@@ -34,6 +36,7 @@ using namespace swift;
 using clang::CompilerInstance;
 using clang::CompilerInvocation;
 
+#pragma mark Internal data structures
 namespace {
   class SwiftModuleLoaderAction : public clang::SyntaxOnlyAction {
   protected:
@@ -69,6 +72,60 @@ struct ClangImporter::Implementation {
   /// \brief Clang compiler action, which is used to actually run the
   /// parser.
   std::unique_ptr<SwiftModuleLoaderAction> Action;
+
+  /// \brief Mapping of already-imported declarations.
+  llvm::DenseMap<clang::NamedDecl *, ValueDecl *> ImportedDecls;
+
+  /// \brief The first Clang module we loaded.
+  ///
+  /// FIXME: This horrible hack is used because we don't have a nice way to
+  /// map from a Decl in the tree back to the appropriate Clang module.
+  /// It also means building ClangModules for all of the dependencies of a
+  /// Clang module.
+  ClangModule *firstClangModule = nullptr;
+
+  /// \brief Retrieve the Clang AST context.
+  clang::ASTContext &getClangASTContext() const {
+    return Instance->getASTContext();
+  }
+
+  /// \brief Import the given Swift identifier into Clang.
+  clang::DeclarationName importName(Identifier name) {
+    // FIXME: When we start dealing with C++, we can map over some operator
+    // names.
+    if (name.isOperator())
+      return clang::DeclarationName();
+
+    // Map the identifier. If it's some kind of keyword, it can't be mapped.
+    auto ident = &Instance->getASTContext().Idents.get(name.str());
+    if (ident->getTokenID() != clang::tok::identifier)
+      return clang::DeclarationName();
+
+    return ident;
+  }
+
+  /// \brief Import the given Clang name into Swift.
+  Identifier importName(clang::DeclarationName name) {
+    // FIXME: At some point, we'll be able to import operations as well.
+    if (!name || name.getNameKind() != clang::DeclarationName::Identifier)
+      return Identifier();
+
+    // Make the identifier over.
+    // FIXME: Check for Swift keywords, and filter those out.
+    return SwiftContext.getIdentifier(name.getAsIdentifierInfo()->getName());
+  }
+
+  /// \brief Import the given Clang declaration into Swift.
+  ///
+  /// \returns The imported declaration, or null if this declaration could
+  /// not be represented in Swift.
+  ValueDecl *importDecl(clang::NamedDecl *decl);
+
+  /// \brief Import the given Clang type into Swift.
+  ///
+  /// \returns The imported type, or null if this type could
+  /// not be represented in Swift.
+  Type importType(clang::QualType type);
 };
 
 ClangImporter::ClangImporter(ASTContext &ctx)
@@ -79,6 +136,8 @@ ClangImporter::ClangImporter(ASTContext &ctx)
 ClangImporter::~ClangImporter() {
   delete &Impl;
 }
+
+#pragma mark Module loading
 
 ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
                                      StringRef targetTriple,
@@ -189,7 +248,89 @@ Module *ClangImporter::loadModule(
   auto component = new (Impl.SwiftContext.Allocate<Component>(1)) Component();
 
   // Build the representation of the Clang module in Swift.
-  return new (Impl.SwiftContext) ClangModule(Impl.SwiftContext, component,
-                                             clangModule);
+  auto result = new (Impl.SwiftContext) ClangModule(Impl.SwiftContext,
+                                                    component, clangModule);
+
+  // FIXME: Total hack.
+  if (!Impl.firstClangModule)
+    Impl.firstClangModule = result;
+
+  return result;
+}
+
+#pragma mark Name lookup
+void ClangImporter::lookupValue(ClangModule *module,
+                                Module::AccessPathTy accessPath,
+                                Identifier name,
+                                NLKind lookupKind,
+                                SmallVectorImpl<ValueDecl*> &results) {
+  auto &sema = Impl.Instance->getSema();
+
+  // Map the name. If we can't represent the Swift name in Clang, bail out now.
+  auto clangName = Impl.importName(name);
+  if (!clangName)
+    return;
+
+  // Perform name lookup into the global scope.
+  // FIXME: Map source locations over.
+  clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
+                                   clang::Sema::LookupOrdinaryName);
+  if (!sema.LookupName(lookupResult, /*Scope=*/0))
+    return;
+
+  // FIXME: Filter based on access path? C++ access control?
+  for (auto decl : lookupResult) {
+    if (auto swiftDecl = Impl.importDecl(decl))
+      results.push_back(swiftDecl);
+  }
+}
+
+#pragma mark Declaration imports
+ValueDecl *ClangImporter::Implementation::importDecl(clang::NamedDecl *decl) {
+  auto known = ImportedDecls.find(decl);
+  if (known != ImportedDecls.end())
+    return known->second;
+
+  if (decl->getKind() == clang::Decl::Function) {
+    auto func = cast<clang::FunctionDecl>(decl);
+    auto type = importType(func->getType());
+    if (!type)
+      return nullptr;
+
+    auto name = importName(decl->getDeclName());
+
+    // FIXME: Map source locations!
+    auto result = new (SwiftContext) FuncDecl(SourceLoc(),
+                                              SourceLoc(),
+                                              name,
+                                              SourceLoc(),
+                                              /*GenericParams=*/0,
+                                              type,
+                                              /*Body=*/nullptr,
+                                              firstClangModule);
+    return ImportedDecls[decl] = result;
+  }
+
+  return nullptr;
+}
+
+
+#pragma mark Type imports
+Type ClangImporter::Implementation::importType(clang::QualType type) {
+  auto &clangContext = getClangASTContext();
+  if (auto funcTy = type->getAs<clang::FunctionProtoType>()) {
+    // Only allow void(void) types for now.
+    if (!clangContext.hasSameUnqualifiedType(clangContext.VoidTy,
+                                             funcTy->getResultType()) ||
+        funcTy->getNumArgs() != 0 ||
+        funcTy->isVariadic())
+      return Type();
+
+    return FunctionType::get(SwiftContext.TheEmptyTupleType,
+                             SwiftContext.TheEmptyTupleType,
+                             SwiftContext);
+  }
+
+  return Type();
 }
 

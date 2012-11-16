@@ -258,7 +258,8 @@ ClangModule::ClangModule(ASTContext &ctx, Component *comp,
            comp, ctx),
     clangModule(clangModule)
 {
-
+  // Clang modules are always well-formed.
+  ASTStage = TypeChecked;
 }
 
 //===----------------------------------------------------------------------===//

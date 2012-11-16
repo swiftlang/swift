@@ -71,6 +71,24 @@ public:
   /// emits a diagnostic and returns NULL.
   virtual Module *loadModule(SourceLoc importLoc,
                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
+
+  /// \brief Look for declarations associated with the given name.
+  ///
+  /// \param module The module to search.
+  ///
+  /// \param accessPath The access path used to refer to the name within this
+  /// (top-level) module.
+  ///
+  /// \param name The name we're searching for.
+  ///
+  /// \param lookupKind Whether we're performing qualified vs. unqualified
+  /// lookup.
+  ///
+  /// \param result Will be populated with the results of name lookup.
+  virtual void lookupValue(ClangModule *module,
+                           Module::AccessPathTy accessPath, Identifier name,
+                           NLKind lookupKind,
+                           SmallVectorImpl<ValueDecl*> &result);
 };
 
 }
