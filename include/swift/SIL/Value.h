@@ -32,9 +32,9 @@ namespace swift {
 #include "swift/SIL/SILNodes.def"
   };
 
-  /// Value - This class is a value that can be used as an "operand" to an
-  /// instruction.  It is either a reference to another instruction, or an
-  /// incoming basic block argument.
+  /// ValueBase - This is the base class of the SIL value hierarchy, which
+  /// represents a runtime computed value.  Things like Instruction derive from
+  /// this.
   class ValueBase : public SILAllocated<ValueBase> {
     PointerUnion<Type, SILTypeList *> Types;
     const ValueKind Kind;
@@ -57,6 +57,8 @@ namespace swift {
     void print(raw_ostream &OS) const;
   };
 
+  /// Value - A Value is a use of a specific result of an ValueBase.  As such,
+  /// it is a pair of the ValueBase and the result number being referenced.
   class Value {
     llvm::PointerIntPair<ValueBase*, 1> ValueAndResultNumber;
   public:
