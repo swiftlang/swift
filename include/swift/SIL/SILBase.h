@@ -18,19 +18,30 @@
 #ifndef SWIFT_SIL_SILBase_H
 #define SWIFT_SIL_SILBase_H
 
-#include "llvm/ADT/PointerUnion.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/AlignOf.h"
 
 namespace swift {
+class SILTypeList;
+class Type;
 class SILBase {
   /// Allocator that manages the memory of all the pieces of the Function.
   mutable llvm::BumpPtrAllocator BPA;
+  void *TypeListUniquing;
+  SILBase(const SILBase&) = delete;
+  void operator=(const SILBase&) = delete;
 public:
+  SILBase();
+  ~SILBase();
+
   /// Allocate memory using Function's internal allocator.
   void *allocate(unsigned Size, unsigned Align) const {
     return BPA.Allocate(Size, Align);
   }
+  /// getSILTypeList - Get a uniqued pointer to a SIL type list.  This can only
+  /// be used by Value.
+  SILTypeList *getSILTypeList(llvm::ArrayRef<Type> Types);
 };
 
 template <typename DERIVED>
@@ -49,7 +60,7 @@ public:
 
   /// Custom version of 'new' that uses the Function's BumpPtrAllocator with
   /// precise alignment knowledge.
-  void *operator new(size_t Bytes, const swift::SILBase &C,
+  void *operator new(size_t Bytes, const SILBase &C,
                      size_t Alignment = llvm::AlignOf<DERIVED>::Alignment) {
     return C.allocate(Bytes, Alignment);
   }

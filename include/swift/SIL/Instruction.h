@@ -17,7 +17,6 @@
 #ifndef SWIFT_SIL_INSTRUCTION_H
 #define SWIFT_SIL_INSTRUCTION_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILBase.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILSuccessor.h"

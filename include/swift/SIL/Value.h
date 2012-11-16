@@ -17,9 +17,12 @@
 #ifndef SWIFT_SIL_VALUE_H
 #define SWIFT_SIL_VALUE_H
 
+#include "swift/SIL/SILBase.h"
 #include "swift/AST/Type.h"
 
 namespace swift {
+  class SILTypeList;
+
   enum class ValueKind {
 #define VALUE(Id, Parent) Id,
 #define VALUE_RANGE(Id, FirstId, LastId) \
