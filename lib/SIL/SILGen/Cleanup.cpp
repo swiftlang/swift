@@ -91,7 +91,13 @@ void CleanupManager::endScope(CleanupsDepth depth) {
 void CleanupManager::emitBranchAndCleanups(JumpDest Dest) {
   SILBuilder &B = Gen.getBuilder();
   assert(B.hasValidInsertionPoint() && "Inserting branch in invalid spot");
-  assert(Stack.empty() && "FIXME: Implement cleanup support");
+  auto depth = Dest.getDepth();
+  auto end = Stack.find(depth);
+  for (auto cleanup = Stack.begin();
+       cleanup != end;
+       ++cleanup) {
+    cleanup->emit(Gen);
+  }
   B.createBranch(Dest.getBlock());
 }
 
