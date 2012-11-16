@@ -25,7 +25,10 @@ class BBArgument : public ValueBase {
   BasicBlock *ParentBB;
 public:
   explicit BBArgument(Type Ty, BasicBlock *ParentBB);
-  
+
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
   BasicBlock *getParent() { return ParentBB; }
   const BasicBlock *getParent() const { return ParentBB; }
 

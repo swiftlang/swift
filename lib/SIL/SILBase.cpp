@@ -43,13 +43,6 @@ ArrayRef<Type> ValueBase::getTypes() const {
   return Types.get<Type>();
 }
 
-// FIXME: temporary.
-Type ValueBase::getType() const {
-  assert(getTypes().size() == 1);
-  return getTypes()[0];
-}
-
-
 /// SILTypeListUniquingType - This is the type of the folding set maintained by
 /// SILBase that these things are uniqued into.
 typedef llvm::FoldingSet<SILTypeList> SILTypeListUniquingType;

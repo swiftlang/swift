@@ -123,6 +123,8 @@ protected:
   AllocInst(ValueKind Kind, SILLocation Loc, Type Ty)
     : Instruction(Kind, Loc, Ty) {}
 public:
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() >= ValueKind::First_AllocInst &&
@@ -215,6 +217,9 @@ public:
     return const_cast<ApplyInst*>(this)->getArguments();
   }
 
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ApplyInst;
   }
@@ -236,6 +241,9 @@ public:
   /// getDecl - Return the underlying declaration.
   ValueDecl *getDecl() const;
 
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ConstantRefInst;
   }
@@ -246,6 +254,9 @@ public:
 class ZeroValueInst : public Instruction {
 public:
   ZeroValueInst(VarDecl *D);
+
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ZeroValueInst;
@@ -263,6 +274,9 @@ public:
   /// getValue - Return the APInt for the underlying integer literal.
   APInt getValue() const;
 
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
   static bool classof(Value V) {
     return V->getKind() == ValueKind::IntegerLiteralInst;
   }
@@ -278,6 +292,9 @@ public:
 
   /// getValue - Return the APFloat for the underlying FP literal.
   APFloat getValue() const;
+
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::FloatLiteralInst;
@@ -295,6 +312,9 @@ public:
   /// getValue - Return the value for the underlying literal.
   uint32_t getValue() const;
 
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
   static bool classof(Value V) {
     return V->getKind() == ValueKind::CharacterLiteralInst;
   }
@@ -310,6 +330,9 @@ public:
 
   /// getValue - Return the string data for the literal.
   StringRef getValue() const;
+
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::StringLiteralInst;
@@ -342,6 +365,9 @@ public:
   Value getLValue() const { return LValue; }
   
   bool isTake() const { return IsTake; }
+
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::LoadInst;
@@ -426,6 +452,9 @@ public:
 
   Value getOperand() const { return Operand; }
 
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
   static bool classof(Value V) {
     return V->getKind() == ValueKind::SpecializeInst;
   }
@@ -441,7 +470,10 @@ public:
   TypeConversionInst(Type Ty, Value Operand);
 
   Value getOperand() const { return Operand; }
-  
+
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
   static bool classof(Value V) {
     return V->getKind() == ValueKind::TypeConversionInst;
   }
@@ -480,6 +512,9 @@ public:
   static TupleInst *create(Type Ty, ArrayRef<Value> Elements, Function &F) {
     return createImpl(nullptr, Ty, Elements, F);
   }
+
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::TupleInst;
@@ -602,6 +637,9 @@ public:
   Value getOperand() const { return Operand; }
   unsigned getIndex() const { return Index; }
 
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
   static bool classof(Value V) {
     return V->getKind() == ValueKind::IndexLValueInst;
   }
@@ -615,6 +653,9 @@ public:
   IntegerValueInst(uint64_t Val, Type Ty);
 
   uint64_t getValue() const { return Val; }
+
+  /// getType() is ok since this is known to only have one type.
+  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::IntegerValueInst;

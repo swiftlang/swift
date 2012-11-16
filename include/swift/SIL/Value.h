@@ -49,8 +49,7 @@ namespace swift {
 
     ArrayRef<Type> getTypes() const;
 
-    // FIXME: temporary.
-    Type getType() const;
+    Type getType(unsigned i = 0) const { return getTypes()[i]; }
 
     /// Pretty-print the Instruction.
     void dump() const;
