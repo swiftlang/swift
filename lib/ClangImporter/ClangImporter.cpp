@@ -36,32 +36,6 @@ using clang::CompilerInvocation;
 
 namespace {
   class SwiftModuleLoaderAction : public clang::SyntaxOnlyAction {
-  public:
-    /// \brief The compiler instance.
-    CompilerInstance *CI;
-
-    /// \brief Clang's semantic analysis.
-    llvm::OwningPtr<clang::Sema> Sema;
-
-    /// \brief The AST consumer that received information about the translation
-    /// unit as it was parsed or loaded.
-    llvm::OwningPtr<clang::ASTConsumer> Consumer;
-
-    /// \brief The Clang file manager.
-    llvm::IntrusiveRefCntPtr<clang::FileManager> FileMgr;
-
-    /// \brief The Clang source manager.
-    llvm::IntrusiveRefCntPtr<clang::SourceManager> SourceMgr;
-
-    /// \brief The Clang preprocessor.
-    llvm::IntrusiveRefCntPtr<clang::Preprocessor> PP;
-
-    /// \brief The Clang ASTContext.
-    llvm::IntrusiveRefCntPtr<clang::ASTContext> Ctx;
-
-    /// \brief The Clang target.
-    llvm::IntrusiveRefCntPtr<clang::TargetInfo> Target;
-
   protected:
     /// BeginSourceFileAction - Callback at the start of processing a single
     /// input.
@@ -70,30 +44,11 @@ namespace {
     /// EndSourceFileAction() will not be called.
     virtual bool BeginSourceFileAction(CompilerInstance &ci,
                                        StringRef filename) {
-      // Save the compiler instance.
-      CI = &ci;
-
       // Enable incremental processing, so we can load modules after we've
       // finished parsing our fake translation unit.
       ci.getPreprocessor().enableIncrementalProcessing();
 
       return clang::SyntaxOnlyAction::BeginSourceFileAction(ci, filename);
-    }
-
-    virtual void ExecuteAction() {
-      // Execute the underlying action.
-      clang::SyntaxOnlyAction::ExecuteAction();
-
-#if 0
-      // Steal the resources we care about from the action.
-      Sema.reset(CI->takeSema());
-      Consumer.reset(CI->takeASTConsumer());
-      Ctx = &CI->getASTContext();
-      PP = &CI->getPreprocessor();
-      FileMgr = &CI->getFileManager();
-      SourceMgr = &CI->getSourceManager();
-      Target = &CI->getTarget();
-#endif
     }
   };
 }
