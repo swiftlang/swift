@@ -114,7 +114,7 @@ Value SILGen::emitArrayInjectionCall(Value ObjectPtr, Value BasePtr,
                                      Value Length,
                                      Expr *ArrayInjectionFunction) {
   // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
-  if (!BasePtr->getType()->isEqual(F.getContext().TheRawPointerType))
+  if (!BasePtr.getType()->isEqual(F.getContext().TheRawPointerType))
     BasePtr = B.createTypeConversion(F.getContext().TheRawPointerType, BasePtr);
 
   Value InjectionFn = visit(ArrayInjectionFunction);
@@ -166,7 +166,7 @@ Value SILGen::emitTupleShuffle(Expr *E, ArrayRef<Value> InOps,
                                           NumEltsVal);
 
     Type BaseLValue =
-      AllocArray->getType()->castTo<TupleType>()->getElementType(1);
+      AllocArray.getType()->castTo<TupleType>()->getElementType(1);
     Value BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
 
     unsigned CurElem = 0;
@@ -197,7 +197,7 @@ Value SILGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
   Value Op = visit(E->getSubExpr());
   SmallVector<Value, 8> InElts;
   unsigned EltNo = 0;
-  for (auto &InField : Op->getType()->castTo<TupleType>()->getFields())
+  for (auto &InField : Op.getType()->castTo<TupleType>()->getFields())
     InElts.push_back(B.createTupleElement(InField.getType(), Op, EltNo++));
 
   return emitTupleShuffle(E, InElts, E->getElementMapping(),
@@ -237,7 +237,7 @@ Value SILGen::visitNewArrayExpr(NewArrayExpr *E) {
   Value AllocArray = B.createAllocArray(E, E->getElementType(), NumElements);
 
   Type BaseLValue =
-    AllocArray->getType()->castTo<TupleType>()->getElementType(1);
+    AllocArray.getType()->castTo<TupleType>()->getElementType(1);
   Value BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
   Value ObjectPtr =
     B.createTupleElement(F.getContext().TheObjectPointerType, AllocArray, 0);

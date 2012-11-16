@@ -127,7 +127,7 @@ ApplyInst *ApplyInst::create(ApplyExpr *Expr, Value Callee,
                              ArrayRef<Value> Args, Function &F) {
   void *Buffer = F.allocate(sizeof(ApplyInst) + Args.size() * sizeof(Value),
                             llvm::AlignOf<ApplyInst>::Alignment);
-  Type ResTy = Callee->getType()->castTo<FunctionType>()->getResult();
+  Type ResTy = Callee.getType()->castTo<FunctionType>()->getResult();
   assert(ResTy->isEqual(Expr->getType()));
   return ::new(Buffer) ApplyInst(Expr, ResTy, Callee, Args);
 }
@@ -135,7 +135,7 @@ ApplyInst *ApplyInst::create(ApplyExpr *Expr, Value Callee,
 ApplyInst *ApplyInst::create(Value Callee, ArrayRef<Value> Args, Function &F) {
   void *Buffer = F.allocate(sizeof(ApplyInst) + Args.size() * sizeof(Value),
                             llvm::AlignOf<ApplyInst>::Alignment);
-  Type ResTy = Callee->getType()->castTo<FunctionType>()->getResult();
+  Type ResTy = Callee.getType()->castTo<FunctionType>()->getResult();
   return ::new(Buffer) ApplyInst(SILLocation(), ResTy, Callee, Args);
 }
 
@@ -301,7 +301,7 @@ TupleElementInst::TupleElementInst(Type ResultTy, Value Operand,
 }
 
 RetainInst::RetainInst(Expr *E, Value Operand)
-  : Instruction(ValueKind::RetainInst, E, Operand->getType()), Operand(Operand){
+  : Instruction(ValueKind::RetainInst, E, Operand.getType()), Operand(Operand){
 }
 
 ReleaseInst::ReleaseInst(Expr *E, Value Operand)
@@ -321,7 +321,7 @@ DestroyInst::DestroyInst(Expr *E, Value Operand)
 //===----------------------------------------------------------------------===//
 
 IndexLValueInst::IndexLValueInst(Expr *E, Value Operand, unsigned Index)
-  : Instruction(ValueKind::IndexLValueInst, E, Operand->getType()),
+  : Instruction(ValueKind::IndexLValueInst, E, Operand.getType()),
     Operand(Operand), Index(Index) {
 }
 

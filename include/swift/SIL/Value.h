@@ -73,7 +73,7 @@ namespace swift {
     unsigned getResultNumber() const { return ValueAndResultNumber.getInt(); }
 
     Type getType() const {
-      return getDef()->getTypes()[getResultNumber()];
+      return getDef()->getType(getResultNumber());
     }
 
     // Comparison.

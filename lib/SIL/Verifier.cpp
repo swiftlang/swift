@@ -55,9 +55,9 @@ public:
 
 
   void visitApplyInst(ApplyInst *AI) {
-    assert(AI->getCallee()->getType()->is<FunctionType>() &&
+    assert(AI->getCallee().getType()->is<FunctionType>() &&
            "Callee of ApplyInst should have function type");
-    FunctionType *FT = AI->getCallee()->getType()->castTo<FunctionType>();
+    FunctionType *FT = AI->getCallee().getType()->castTo<FunctionType>();
     assert(AI->getType()->isEqual(FT->getResult()) &&
            "ApplyInst result type mismatch");
 
@@ -65,7 +65,7 @@ public:
     // If there is a single argument to the apply, it might be a scalar or the
     // whole tuple being presented all at once.
     if (AI->getArguments().size() != 1 ||
-        !AI->getArguments()[0]->getType()->isEqual(FT->getInput())) {
+        !AI->getArguments()[0].getType()->isEqual(FT->getInput())) {
       // Otherwise, we must have a decomposed tuple.  Verify the arguments match
       // up.
       const TupleType *TT = FT->getInput()->castTo<TupleType>();
@@ -73,7 +73,7 @@ public:
       assert(AI->getArguments().size() == TT->getFields().size() &&
              "ApplyInst contains unexpected argument count for function");
       for (unsigned i = 0, e = AI->getArguments().size(); i != e; ++i)
-        assert(AI->getArguments()[i]->getType()
+        assert(AI->getArguments()[i].getType()
                  ->isEqual(TT->getFields()[i].getType()) &&
                "ApplyInst argument type mismatch");
     }
@@ -90,35 +90,35 @@ public:
   }
   void visitLoadInst(LoadInst *LI) {
     assert(!LI->getType()->is<LValueType>() && "Load should produce rvalue");
-    assert(LI->getLValue()->getType()->is<LValueType>() &&
+    assert(LI->getLValue().getType()->is<LValueType>() &&
            "Load op should be lvalue");
-    assert(LI->getLValue()->getType()->getRValueType()->isEqual(LI->getType()) &&
+    assert(LI->getLValue().getType()->getRValueType()->isEqual(LI->getType()) &&
            "Load operand type and result type mismatch");
   }
 
   void visitStoreInst(StoreInst *SI) {
-    assert(!SI->getSrc()->getType()->is<LValueType>() &&
+    assert(!SI->getSrc().getType()->is<LValueType>() &&
            "Src value should be rvalue");
-    assert(SI->getDest()->getType()->is<LValueType>() &&
+    assert(SI->getDest().getType()->is<LValueType>() &&
            "Dest address should be lvalue");
-    assert(SI->getDest()->getType()->getRValueType()->
-              isEqual(SI->getSrc()->getType()) &&
+    assert(SI->getDest().getType()->getRValueType()->
+              isEqual(SI->getSrc().getType()) &&
            "Store operand type and dest type mismatch");
   }
 
   void visitCopyInst(CopyInst *SI) {
-    assert(SI->getSrc()->getType()->is<LValueType>() &&
+    assert(SI->getSrc().getType()->is<LValueType>() &&
            "Src value should be lvalue");
-    assert(SI->getDest()->getType()->is<LValueType>() &&
+    assert(SI->getDest().getType()->is<LValueType>() &&
            "Dest address should be lvalue");
-    assert(SI->getDest()->getType()->getRValueType()->
-           isEqual(SI->getSrc()->getType()->getRValueType()) &&
+    assert(SI->getDest().getType()->getRValueType()->
+           isEqual(SI->getSrc().getType()->getRValueType()) &&
            "Store operand type and dest type mismatch");
   }
   
   void visitSpecializeInst(SpecializeInst *SI) {
     assert(SI->getType()->is<FunctionType>() &&
-           SI->getOperand()->getType()->is<PolymorphicFunctionType>() &&
+           SI->getOperand().getType()->is<PolymorphicFunctionType>() &&
            "SpecializeInst only works on function types");
   }
 
@@ -133,25 +133,25 @@ public:
   }
   
   void visitRetainInst(RetainInst *RI) {
-    assert(!RI->getOperand()->getType()->is<LValueType>() &&
+    assert(!RI->getOperand().getType()->is<LValueType>() &&
            "Operand of retain must not be lvalue");
   }
   void visitReleaseInst(ReleaseInst *RI) {
-    assert(!RI->getOperand()->getType()->is<LValueType>() &&
+    assert(!RI->getOperand().getType()->is<LValueType>() &&
            "Operand of release must not be lvalue");
   }
   void visitDeallocInst(DeallocInst *DI) {
-    assert(DI->getOperand()->getType()->is<LValueType>() &&
+    assert(DI->getOperand().getType()->is<LValueType>() &&
            "Operand of dealloc must be lvalue");
   }
   void visitDestroyInst(DestroyInst *DI) {
-    assert(DI->getOperand()->getType()->is<LValueType>() &&
+    assert(DI->getOperand().getType()->is<LValueType>() &&
            "Operand of destroy must be lvalue");
   }
 
   void visitIndexLValueInst(IndexLValueInst *ILI) {
     assert(ILI->getType()->is<LValueType>() &&
-           ILI->getType()->isEqual(ILI->getOperand()->getType()) &&
+           ILI->getType()->isEqual(ILI->getOperand().getType()) &&
            "invalid IndexLValueInst");
   }
 

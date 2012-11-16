@@ -50,7 +50,7 @@ Condition SILGen::emitCondition(Stmt *TheStmt, Expr *E,
     FullExpr Scope(Cleanups);
     V = visit(E);
   }
-  assert(V->getType()->castTo<BuiltinIntegerType>()->getBitWidth() == 1);
+  assert(V.getType()->castTo<BuiltinIntegerType>()->getBitWidth() == 1);
   
   BasicBlock *ContBB = new BasicBlock(&F, "condition.cont");
   BasicBlock *TrueBB = new BasicBlock(&F, "if.true");
