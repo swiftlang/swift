@@ -84,10 +84,6 @@ void Instruction::eraseFromParent() {
 // Instruction Subclasses
 //===----------------------------------------------------------------------===//
 
-static Type getVoidType(Type T) {
-  return T->getASTContext().TheEmptyTupleType;
-}
-
 AllocVarInst::AllocVarInst(VarDecl *VD)
   : AllocInst(ValueKind::AllocVarInst, VD, VD->getTypeOfReference()) {
 }
@@ -218,23 +214,23 @@ LoadInst::LoadInst(LoadExpr *E, Value LValue, bool IsTake)
 
 
 StoreInst::StoreInst(AssignStmt *S, Value Src, Value Dest)
-  : Instruction(ValueKind::StoreInst, S, getVoidType(Src->getType())),
+  : Instruction(ValueKind::StoreInst, S),
     Src(Src), Dest(Dest), IsInitialization(false) {
 }
 
 StoreInst::StoreInst(VarDecl *VD, Value Src, Value Dest)
-  : Instruction(ValueKind::StoreInst, VD, getVoidType(Src->getType())),
+  : Instruction(ValueKind::StoreInst, VD),
     Src(Src), Dest(Dest), IsInitialization(true) {
 }
 
 
 StoreInst::StoreInst(MaterializeExpr *E, Value Src, Value Dest)
-  : Instruction(ValueKind::StoreInst, E, getVoidType(Src->getType())),
+  : Instruction(ValueKind::StoreInst, E),
     Src(Src), Dest(Dest), IsInitialization(true) {
 }
 
 StoreInst::StoreInst(Expr *E, bool IsInitialization, Value Src, Value Dest)
-  : Instruction(ValueKind::StoreInst, E, getVoidType(Src->getType())),
+  : Instruction(ValueKind::StoreInst, E),
     Src(Src), Dest(Dest), IsInitialization(IsInitialization) {
   // This happens in a store to an array initializer for varargs tuple shuffle.
 }
@@ -242,8 +238,7 @@ StoreInst::StoreInst(Expr *E, bool IsInitialization, Value Src, Value Dest)
 
 CopyInst::CopyInst(Expr *E, Value SrcLValue, Value DestLValue,
                    bool IsTakeOfSrc, bool IsInitializationOfDest)
-  : Instruction(ValueKind::CopyInst, E, getVoidType(Src->getType())),
-    Src(SrcLValue), Dest(DestLValue),
+  : Instruction(ValueKind::CopyInst, E), Src(SrcLValue), Dest(DestLValue),
     IsTakeOfSrc(IsTakeOfSrc), IsInitializationOfDest(IsInitializationOfDest) {
 }
 
@@ -306,23 +301,19 @@ TupleElementInst::TupleElementInst(Type ResultTy, Value Operand,
 }
 
 RetainInst::RetainInst(Expr *E, Value Operand)
-  : Instruction(ValueKind::RetainInst, E, Operand->getType()),
-    Operand(Operand) {
+  : Instruction(ValueKind::RetainInst, E, Operand->getType()), Operand(Operand){
 }
 
 ReleaseInst::ReleaseInst(Expr *E, Value Operand)
-  : Instruction(ValueKind::ReleaseInst, E, getVoidType(Operand->getType())),
-    Operand(Operand) {
+  : Instruction(ValueKind::ReleaseInst, E), Operand(Operand) {
 }
 
 DeallocInst::DeallocInst(Expr *E, Value Operand)
-  : Instruction(ValueKind::DeallocInst, E, getVoidType(Operand->getType())),
-    Operand(Operand) {
+  : Instruction(ValueKind::DeallocInst, E), Operand(Operand) {
 }
 
 DestroyInst::DestroyInst(Expr *E, Value Operand)
-  : Instruction(ValueKind::DestroyInst, E, getVoidType(Operand->getType())),
-    Operand(Operand) {
+  : Instruction(ValueKind::DestroyInst, E), Operand(Operand) {
 }
 
 //===----------------------------------------------------------------------===//
@@ -360,7 +351,7 @@ UnreachableInst::UnreachableInst(Function &F)
 }
 
 ReturnInst::ReturnInst(ReturnStmt *S, Value ReturnValue)
-  : TermInst(ValueKind::ReturnInst, S, getVoidType(ReturnValue->getType())),
+  : TermInst(ValueKind::ReturnInst, S),
     ReturnValue(ReturnValue) {
 }
 
@@ -373,9 +364,7 @@ BranchInst::BranchInst(BasicBlock *DestBB, Function &F)
 
 CondBranchInst::CondBranchInst(Stmt *TheStmt, Value Condition,
                                BasicBlock *TrueBB, BasicBlock *FalseBB)
-  : TermInst(ValueKind::CondBranchInst, TheStmt,
-             getVoidType(Condition->getType())),
-    Condition(Condition) {
+  : TermInst(ValueKind::CondBranchInst, TheStmt), Condition(Condition) {
   DestBBs[0].init(this);
   DestBBs[1].init(this);
   DestBBs[0] = TrueBB;

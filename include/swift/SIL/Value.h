@@ -28,7 +28,7 @@ namespace swift {
   enum class ValueKind {
 #define VALUE(Id, Parent) Id,
 #define VALUE_RANGE(Id, FirstId, LastId) \
-  First_##Id = FirstId, Last_##Id = LastId,
+    First_##Id = FirstId, Last_##Id = LastId,
 #include "swift/SIL/SILNodes.def"
   };
 
@@ -39,7 +39,7 @@ namespace swift {
     PointerUnion<Type, SILTypeList *> Types;
     const ValueKind Kind;
   protected:
-    ValueBase(ValueKind Kind, SILTypeList *TypeList)
+    ValueBase(ValueKind Kind, SILTypeList *TypeList = 0)
       : Types(TypeList), Kind(Kind) {}
     ValueBase(ValueKind Kind, Type Ty)
       : Types(Ty), Kind(Kind) {}

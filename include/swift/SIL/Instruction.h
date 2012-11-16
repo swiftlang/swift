@@ -68,6 +68,8 @@ class Instruction : public ValueBase, public llvm::ilist_node<Instruction> {
 protected:
   Instruction(ValueKind Kind, SILLocation Loc, Type Ty)
     : ValueBase(Kind, Ty), ParentBB(0), Loc(Loc) {}
+  Instruction(ValueKind Kind, SILLocation Loc, SILTypeList *TypeList = 0)
+    : ValueBase(Kind, TypeList), ParentBB(0), Loc(Loc) {}
 
 public:
 
@@ -628,6 +630,7 @@ public:
 class TermInst : public Instruction {
 protected:
   TermInst(ValueKind K, SILLocation Loc, Type Ty) : Instruction(K, Loc, Ty) {}
+  TermInst(ValueKind K, SILLocation Loc) : Instruction(K, Loc) {}
 public:
 
   typedef llvm::ArrayRef<SILSuccessor> SuccessorListTy;
