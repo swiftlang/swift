@@ -21,7 +21,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "clang/Frontend/CompilerInvocation.h"
-#include "clang/Frontend/FrontendActions.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "clang/AST/ASTContext.h"
@@ -85,8 +84,10 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
   //
   // FIXME: Figure out an appropriate OS deployment version to pass along.
   std::vector<std::string> invocationArgStrs = {
-    "-x", "objective-c", "-fobjc-arc", "-fmodules", "-fsyntax-only", "-w",
-    "-isysroot", sdkroot.str(), "-triple", targetTriple.str(), "swift.m"
+    "-x", "objective-c", "-fobjc-arc", "-fmodules", "-fblocks",
+    "-fsyntax-only", "-w",
+    "-isysroot", sdkroot.str(), "-triple", targetTriple.str(),
+    "swift.m"
   };
 
   // If there is a module cache path, pass it along.
@@ -269,25 +270,5 @@ ValueDecl *ClangImporter::Implementation::importDecl(clang::NamedDecl *decl) {
   }
 
   return nullptr;
-}
-
-
-#pragma mark Type imports
-Type ClangImporter::Implementation::importType(clang::QualType type) {
-  auto &clangContext = getClangASTContext();
-  if (auto funcTy = type->getAs<clang::FunctionProtoType>()) {
-    // Only allow void(void) types for now.
-    if (!clangContext.hasSameUnqualifiedType(clangContext.VoidTy,
-                                             funcTy->getResultType()) ||
-        funcTy->getNumArgs() != 0 ||
-        funcTy->isVariadic())
-      return Type();
-
-    return FunctionType::get(SwiftContext.TheEmptyTupleType,
-                             SwiftContext.TheEmptyTupleType,
-                             SwiftContext);
-  }
-
-  return Type();
 }
 

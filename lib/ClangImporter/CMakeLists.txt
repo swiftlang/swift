@@ -1,5 +1,6 @@
 add_swift_library(swiftClangImporter
   ClangImporter.cpp
+  ImportType.cpp
   DEPENDS swiftAST)
 
 # Clang dependencies.

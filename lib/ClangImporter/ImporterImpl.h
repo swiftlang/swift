@@ -17,16 +17,17 @@
 #ifndef SWIFT_CLANG_IMPORTER_IMPL_H
 #define SWIFT_CLANG_IMPORTER_IMPL_H
 
+#include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Frontend/FrontendActions.h"
 
 namespace clang {
 class CompilerInvocation;
 class DeclarationName;
 class NamedDecl;
 class QualType;
-class SyntaxOnlyAction;
 }
 
 namespace swift {
@@ -57,6 +58,9 @@ struct ClangImporter::Implementation {
   /// \brief Mapping of already-imported declarations.
   llvm::DenseMap<clang::NamedDecl *, ValueDecl *> ImportedDecls;
 
+  ///\ brief The Swift standard library module.
+  Module *swiftModule = nullptr;
+
   /// \brief The first Clang module we loaded.
   ///
   /// FIXME: This horrible hack is used because we don't have a nice way to
@@ -81,6 +85,11 @@ struct ClangImporter::Implementation {
   /// \returns The imported declaration, or null if this declaration could
   /// not be represented in Swift.
   ValueDecl *importDecl(clang::NamedDecl *decl);
+
+  /// \brief Retrieve the named Swift type, e.g., Int32.
+  ///
+  /// \returns The named type, or null if the type could not be found.
+  Type getNamedSwiftType(StringRef name);
 
   /// \brief Import the given Clang type into Swift.
   ///
