@@ -18,6 +18,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ExprHandle.h"
+#include "swift/AST/ModuleLoader.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/DenseMap.h"
@@ -32,6 +33,9 @@ struct ASTContext::Implementation {
 
   llvm::BumpPtrAllocator Allocator; // used in later initializations
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
+
+  /// \brief The module loader used to load modules.
+  llvm::IntrusiveRefCntPtr<swift::ModuleLoader> ModuleLoader;
 
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
@@ -189,6 +193,23 @@ void ASTContext::setSubstitutions(BoundGenericType* Bound,
   assert(Impl.BoundGenericSubstitutions.count(Bound) == 0 &&
          "Already have substitutions?");
   Impl.BoundGenericSubstitutions[Bound] = Subs;
+}
+
+/// \brief Determine whether this ASTContext has a module loader.
+bool ASTContext::hasModuleLoader() const {
+  return Impl.ModuleLoader;
+}
+
+/// \brief Set the module loader for this ASTContext.
+void ASTContext::setModuleLoader(llvm::IntrusiveRefCntPtr<ModuleLoader> loader){
+  assert(!hasModuleLoader() && "Already has a module loader");
+  Impl.ModuleLoader = loader;
+}
+
+/// \brief Retrieve the module loader for this ASTContext.
+ModuleLoader &ASTContext::getModuleLoader() const {
+  assert(hasModuleLoader() && "No module loader!");
+  return *Impl.ModuleLoader;
 }
 
 //===----------------------------------------------------------------------===//

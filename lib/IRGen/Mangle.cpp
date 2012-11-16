@@ -163,6 +163,9 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
   case DeclContextKind::BuiltinModule:
     llvm_unreachable("mangling member of builtin module!");
 
+  case DeclContextKind::ClangModule:
+    llvm_unreachable("mangling member of Clang module");
+
   case DeclContextKind::TranslationUnit: {
     Module *module = cast<Module>(ctx);
 

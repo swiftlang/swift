@@ -39,7 +39,7 @@ namespace llvm {
     static swift::DeclContext *getFromVoidPointer(void *P) {
       return (swift::DeclContext*)P;
     }
-    enum { NumLowBitsAvailable = 3 };
+    enum { NumLowBitsAvailable = 4 };
   };
 }
 
@@ -52,6 +52,7 @@ enum class DeclContextKind {
   //Module,
     TranslationUnit,
     BuiltinModule,
+    ClangModule,
   CapturingExpr,
   NominalTypeDecl,
   ExtensionDecl,
@@ -59,7 +60,7 @@ enum class DeclContextKind {
   ConstructorDecl,
   DestructorDecl,
   
-  First_Module = TranslationUnit, Last_Module = BuiltinModule,
+  First_Module = TranslationUnit, Last_Module = ClangModule,
 };
   
 /// A DeclContext is an AST object which acts as a semantic container
@@ -67,19 +68,25 @@ enum class DeclContextKind {
 /// contexts broadly: a lambda expression in a function is a new
 /// DeclContext, but a new brace statement is not.  There's no
 /// particular mandate for this, though.
-class DeclContext {
-  llvm::PointerIntPair<DeclContext*, 3, unsigned> ParentAndKind;
+class DeclContext  {
+  // FIXME: Can we use the low bits of Parent for the Kind?
+
+  /// \brief The parent of this context.
+  DeclContext *Parent;
+
+  DeclContextKind Kind;
 
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
-    : ParentAndKind(Parent, static_cast<unsigned>(Kind)) {
+    : Parent(Parent), Kind(Kind)
+  {
     assert((Parent != 0 || isModuleContext()) &&
            "DeclContext must have a parent unless it is a module!");
   }
 
   /// Returns the kind of context this is.
   DeclContextKind getContextKind() const {
-    return DeclContextKind(ParentAndKind.getInt());
+    return Kind;
   }
 
   /// Determines whether this context is itself a local scope in a
@@ -122,7 +129,7 @@ public:
   /// Returns the semantic parent of this context.  A context has a
   /// parent if and only if it is not a module context.
   DeclContext *getParent() const {
-    return ParentAndKind.getPointer();
+    return Parent;
   }
   
   /// getASTContext - Return the ASTContext for a specified DeclContext by

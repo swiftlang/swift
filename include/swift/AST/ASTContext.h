@@ -24,6 +24,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include <vector>
 #include <utility>
 
@@ -43,6 +44,7 @@ namespace swift {
   class ArrayType;
   class Identifier;
   class Module;
+  class ModuleLoader;
   class TupleTypeElt;
   class OneOfElementDecl;
   class ProtocolDecl;
@@ -145,10 +147,10 @@ public:
 
   /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
-  
+
   /// LoadedModules - The set of modules we have loaded.
   llvm::StringMap<Module*> LoadedModules;
-  
+
   /// TheBuiltinModule - The builtin module.
   Module * const TheBuiltinModule;
 
@@ -258,6 +260,15 @@ public:
   const Type TheIEEE80Type;     /// TheIEEE80Type  - 80-bit IEEE floating point
   const Type TheIEEE128Type;    /// TheIEEE128Type - 128-bit IEEE floating point
   const Type ThePPC128Type;     /// ThePPC128Type  - 128-bit PowerPC 2xDouble
+
+  /// \brief Determine whether this ASTContext has a module loader.
+  bool hasModuleLoader() const;
+
+  /// \brief Set the module loader for this ASTContext.
+  void setModuleLoader(llvm::IntrusiveRefCntPtr<ModuleLoader> loader);
+
+  /// \brief Retrieve the module loader for this ASTContext.
+  ModuleLoader &getModuleLoader() const;
 
 private:
   friend class BoundGenericType;

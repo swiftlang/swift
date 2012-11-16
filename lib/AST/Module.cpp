@@ -15,7 +15,9 @@
 //===----------------------------------------------------------------------===//
   
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleLoader.h"
 #include "swift/AST/AST.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -201,11 +203,13 @@ ArrayRef<ExtensionDecl*> Module::lookupExtensions(Type T) {
   
   // The builtin module just has free functions, not extensions.
   if (isa<BuiltinModule>(this)) return ArrayRef<ExtensionDecl*>();
-  
-  TUExtensionCache &Cache =
-    getTUExtensionCachePimpl(ExtensionCachePimpl, *cast<TranslationUnit>(this));
-  
-  return Cache.getExtensions(T->getCanonicalType());
+
+  if (auto tu = dyn_cast<TranslationUnit>(this)) {
+    TUExtensionCache &Cache = getTUExtensionCachePimpl(ExtensionCachePimpl,*tu);
+    return Cache.getExtensions(T->getCanonicalType());
+  }
+
+  return Ctx.getModuleLoader().lookupExtensions(cast<ClangModule>(this), T);
 }
 
 //===----------------------------------------------------------------------===//
@@ -224,12 +228,15 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
     return getBuiltinCachePimpl(LookupCachePimpl)
       .lookupValue(Name, LookupKind, *BM, Result);
   }
-  
-  // Otherwise must be TranslationUnit.  Someday we should generalize this to
-  // allow modules with multiple translation units.
-  TranslationUnit &TU = *cast<TranslationUnit>(this);
-  return getTUCachePimpl(LookupCachePimpl, TU)
-    .lookupValue(AccessPath, Name, LookupKind, TU, Result);
+
+  if (auto TU = dyn_cast<TranslationUnit>(this)) {
+    // Look in the translation unit.
+    return getTUCachePimpl(LookupCachePimpl, *TU)
+      .lookupValue(AccessPath, Name, LookupKind, *TU, Result);
+  }
+
+  return Ctx.getModuleLoader().lookupValue(cast<ClangModule>(this), AccessPath,
+                                           Name, LookupKind, Result);
 }
 
 //===----------------------------------------------------------------------===//
@@ -240,3 +247,21 @@ void TranslationUnit::clearLookupCache() {
   freeTUCachePimpl(LookupCachePimpl);
   freeTUExtensionCachePimpl(ExtensionCachePimpl);
 }
+
+//===----------------------------------------------------------------------===//
+// ClangModule Implementation
+//===----------------------------------------------------------------------===//
+ClangModule::ClangModule(ASTContext &ctx, Component *comp,
+                         clang::Module *clangModule)
+  : Module(DeclContextKind::ClangModule,
+           ctx.getIdentifier(clangModule->getFullModuleName()),
+           comp, ctx),
+    clangModule(clangModule)
+{
+
+}
+
+//===----------------------------------------------------------------------===//
+// ModuleLoader Implementation
+//===----------------------------------------------------------------------===//
+ModuleLoader::~ModuleLoader() {}

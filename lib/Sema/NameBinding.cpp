@@ -20,6 +20,7 @@
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ModuleLoader.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -136,13 +137,38 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
   Module *M = Context.LoadedModules.lookup(ModuleID.first.str());
   if (M) return M;
 
+  // If the imported module name is the same as the current translation unit,
+  // skip the Swift module loader and use the Clang module loader instead.
+  // This allows a Swift module to extend a Clang module of the same name.
+  bool useClangModule = false;
+  if (ModuleID.first == TU->Name && Context.hasModuleLoader())
+    useClangModule = true;
+
   // Open the input file.
   llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
-  if (llvm::error_code Err = findModule(ModuleID.first.str(), ModuleID.second,
-                                        InputFile)) {
-    diagnose(ModuleID.second, diag::sema_opening_import,
-             ModuleID.first.str(), Err.message());
-    return 0;
+  if (!useClangModule) {
+    if (llvm::error_code Err = findModule(ModuleID.first.str(), ModuleID.second,
+                                          InputFile)) {
+      if (Err.value() != llvm::errc::no_such_file_or_directory ||
+          !Context.hasModuleLoader()) {
+        diagnose(ModuleID.second, diag::sema_opening_import,
+                 ModuleID.first.str(), Err.message());
+        return 0;
+      }
+
+      // There was no Swift module with this name, so try a Clang module.
+      useClangModule = true;
+    }
+  }
+
+  if (useClangModule) {
+    // FIXME: We're assuming that 'externally loaded module' == 'clang module',
+    // which is clearly nonsense. We almost certainy want to have a chain
+    // of external module loaders, with the Swift one first and the Clang one
+    // as a fallback.
+    // FIXME: Bad location info?
+    return Context.getModuleLoader().loadModule(ModuleID.second,
+                                                { &ModuleID, 1 });
   }
 
   unsigned BufferID =

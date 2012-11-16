@@ -58,6 +58,10 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
   // The builtin module has no imports.
   if (isa<BuiltinModule>(CurModule)) return;
 
+  // The Clang module loader handles transitive lookups itself... but is that
+  // what we want?
+  if (isa<ClangModule>(CurModule)) return;
+
   // If we find a type in the current module, don't look into any
   // imported modules.
   if (CurModuleHasTypeDecl) return;

@@ -22,6 +22,10 @@
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 
+namespace clang {
+  class Module;
+}
+
 namespace swift {
   class ASTContext;
   class BraceStmt;
@@ -227,7 +231,23 @@ public:
     return DC->getContextKind() == DeclContextKind::BuiltinModule;
   }
 };
+
+/// \brief Represents a Clang module that has been imported into Swift.
+class ClangModule : public Module {
+  clang::Module *clangModule;
   
+public:
+  ClangModule(ASTContext &ctx, Component *comp, clang::Module *clangModule);
+
+  /// \brief Retrieve the underlying Clang module.
+  clang::Module *getClangModule() const { return clangModule; }
+
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::ClangModule;
+  }
+};
+
+
 } // end namespace swift
 
 #endif
