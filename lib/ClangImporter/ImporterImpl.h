@@ -27,6 +27,7 @@ namespace clang {
 class CompilerInvocation;
 class DeclarationName;
 class NamedDecl;
+class ParmVarDecl;
 class QualType;
 }
 
@@ -96,6 +97,23 @@ struct ClangImporter::Implementation {
   /// \returns The imported type, or null if this type could
   /// not be represented in Swift.
   Type importType(clang::QualType type);
+
+  /// \brief Import the given function type.
+  ///
+  /// This routine should be preferred when importing function types for
+  /// which we have actual function parameters, e.g., when dealing with a
+  /// function declaration, because it produces a function type whose input
+  /// tuple has argument names.
+  ///
+  /// \param resultType The result type of the function.
+  /// \param params The parameter types to the function.
+  /// \param isVariadic Whether the function is variadic.
+  ///
+  /// \returns the imported function type, or null if the type cannot be
+  /// imported.
+  Type importFunctionType(clang::QualType resultType,
+                          ArrayRef<clang::ParmVarDecl *> params,
+                          bool isVariadic);
 };
 
 }

@@ -251,7 +251,18 @@ ValueDecl *ClangImporter::Implementation::importDecl(clang::NamedDecl *decl) {
 
   if (decl->getKind() == clang::Decl::Function) {
     auto func = cast<clang::FunctionDecl>(decl);
-    auto type = importType(func->getType());
+
+    // Import the function type. If we have parameters, make sure their names
+    // get into the resulting function type.
+    Type type;
+    if (func->param_size())
+      type = importFunctionType(
+               func->getType()->getAs<clang::FunctionType>()->getResultType(),
+               { func->param_begin(), func->param_size() },
+               func->isVariadic());
+    else
+      type = importType(func->getType());
+
     if (!type)
       return nullptr;
 

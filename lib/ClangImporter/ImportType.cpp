@@ -315,6 +315,55 @@ Type ClangImporter::Implementation::importType(clang::QualType type) {
   return converter.Visit(type.getTypePtr());
 }
 
+Type ClangImporter::Implementation::importFunctionType(
+       clang::QualType resultType,
+       ArrayRef<clang::ParmVarDecl *> params,
+       bool isVariadic) {
+  // Cannot import variadic types.
+  if (isVariadic)
+    return Type();
+
+  // Import the result type.
+  auto swiftResultTy = importType(resultType);
+  if (!swiftResultTy)
+    return Type();
+
+  // Import the parameters.
+  SmallVector<TupleTypeElt, 4> swiftParams;
+  for (auto param : params) {
+    auto paramTy = param->getType();
+    if (paramTy->isVoidType())
+      continue;
+
+    bool byRef = false;
+
+    // C++ reference types are mapped to [byref].
+    if (auto refType = paramTy->getAs<clang::ReferenceType>()) {
+      byRef = true;
+      paramTy = refType->getPointeeType();
+    }
+
+    auto swiftParamTy = importType(paramTy);
+    if (!swiftParamTy)
+      return Type();
+
+    if (byRef)
+      swiftParamTy = LValueType::get(swiftParamTy,
+                                     LValueType::Qual::DefaultForType,
+                                     SwiftContext);
+
+    swiftParams.push_back(TupleTypeElt(swiftParamTy,
+                                       importName(param->getDeclName())));
+  }
+
+  // Form the parameter tuple.
+  auto paramsTy = TupleType::get(swiftParams, SwiftContext);
+
+  // Form the function type.
+  return FunctionType::get(paramsTy, swiftResultTy, SwiftContext);
+}
+
+
 Type ClangImporter::Implementation::getNamedSwiftType(StringRef name) {
   if (!swiftModule) {
     for (auto module : SwiftContext.LoadedModules) {
