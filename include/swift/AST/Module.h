@@ -103,12 +103,6 @@ public:
   /// extending the specified type and return a list of them.
   ArrayRef<ExtensionDecl*> lookupExtensions(Type T);
 
-  /// lookupMembers - Lookup the members for the specified BaseType with
-  /// the specified name, and return them in Result.  This looks in both the
-  /// type declaration itself and in extensions.
-  void lookupMembers(Type BaseType, Identifier Name,
-                     SmallVectorImpl<ValueDecl*> &Result);
-
   static bool classof(const DeclContext *DC) {
     return DC->isModuleContext();
   }
