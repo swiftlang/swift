@@ -29,6 +29,7 @@ struct ID {
     BasicBlock, SSAValue
   } Kind;
   unsigned Number;
+  int ResultNumber;
 };
 
 raw_ostream &operator<<(raw_ostream &OS, ID i) {
@@ -36,7 +37,11 @@ raw_ostream &operator<<(raw_ostream &OS, ID i) {
   case ID::BasicBlock: OS << "bb"; break;
   case ID::SSAValue: OS << '%'; break;
   }
-  return OS << i.Number;
+  OS << i.Number;
+
+  if (i.ResultNumber != -1)
+    OS << '#' << i.ResultNumber;
+  return OS;
 }
 
 
@@ -243,7 +248,7 @@ ID SILPrinter::getID(const BasicBlock *Block) {
       BlocksToIDMap[&B] = idx++;
   }
 
-  ID R = { ID::BasicBlock, BlocksToIDMap[Block] };
+  ID R = { ID::BasicBlock, BlocksToIDMap[Block], -1 };
   return R;
 }
 
@@ -267,7 +272,11 @@ ID SILPrinter::getID(Value V) {
     }
   }
 
-  ID R = { ID::SSAValue, ValueToIDMap[V] };
+  int ResultNumber = -1;
+  if (V.getDef()->getTypes().size() > 1)
+    ResultNumber = V.getResultNumber();
+
+  ID R = { ID::SSAValue, ValueToIDMap[V], ResultNumber };
   return R;
 }
 
