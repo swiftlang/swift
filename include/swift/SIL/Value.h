@@ -19,6 +19,7 @@
 
 #include "swift/SIL/SILBase.h"
 #include "swift/AST/Type.h"
+#include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
   class SILTypeList;
@@ -34,14 +35,21 @@ namespace swift {
   /// instruction.  It is either a reference to another instruction, or an
   /// incoming basic block argument.
   class Value : public SILAllocated<Value> {
-    Type Ty;
+    PointerUnion<Type, SILTypeList *> Types;
     const ValueKind Kind;
   protected:
-    Value(ValueKind Kind, Type Ty) : Ty(Ty), Kind(Kind) {}
+    Value(ValueKind Kind, SILTypeList *TypeList)
+      : Types(TypeList), Kind(Kind) {}
+    Value(ValueKind Kind, Type Ty)
+      : Types(Ty), Kind(Kind) {}
   public:
 
     ValueKind getKind() const { return Kind; }
-    Type getType() const { return Ty; }
+
+    ArrayRef<Type> getTypes() const;
+
+    // FIXME: temporary.
+    Type getType() const;
 
     /// Pretty-print the Instruction.
     void dump() const;

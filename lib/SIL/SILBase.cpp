@@ -32,6 +32,24 @@ public:
 };
 }
 
+ArrayRef<Type> Value::getTypes() const {
+  // No results.
+  if (Types.isNull())
+    return ArrayRef<Type>();
+  // Arbitrary list of results.
+  if (auto TypeList = Types.dyn_cast<SILTypeList*>())
+    return ArrayRef<Type>(TypeList->Types, TypeList->NumTypes);
+  // Single result.
+  return Types.get<Type>();
+}
+
+// FIXME: temporary.
+Type Value::getType() const {
+  assert(getTypes().size() == 1);
+  return getTypes()[0];
+}
+
+
 /// SILTypeListUniquingType - This is the type of the folding set maintained by
 /// SILBase that these things are uniqued into.
 typedef llvm::FoldingSet<SILTypeList> SILTypeListUniquingType;
@@ -47,7 +65,8 @@ SILBase::~SILBase() {
 
 /// getSILTypeList - Get a uniqued pointer to a SIL type list.  This can only
 /// be used by Value.
-SILTypeList *SILBase::getSILTypeList(ArrayRef<Type> Types) {
+SILTypeList *SILBase::getSILTypeList(ArrayRef<Type> Types) const {
+  assert(Types.size() > 1 && "Shouldn't use type list for 0 or 1 types");
   auto UniqueMap = (SILTypeListUniquingType*)TypeListUniquing;
 
   llvm::FoldingSetNodeID ID;

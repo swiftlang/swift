@@ -41,7 +41,7 @@ public:
   }
   /// getSILTypeList - Get a uniqued pointer to a SIL type list.  This can only
   /// be used by Value.
-  SILTypeList *getSILTypeList(llvm::ArrayRef<Type> Types);
+  SILTypeList *getSILTypeList(llvm::ArrayRef<Type> Types) const;
 };
 
 template <typename DERIVED>
