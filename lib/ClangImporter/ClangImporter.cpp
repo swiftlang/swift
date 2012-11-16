@@ -14,12 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/ClangImporter/ClangImporter.h"
+#include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Component.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
-#include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Sema/Lookup.h"
@@ -56,77 +56,6 @@ namespace {
   };
 }
 
-struct ClangImporter::Implementation {
-  Implementation(ASTContext &ctx) : SwiftContext(ctx) { }
-  
-  /// \brief Swift AST context.
-  ASTContext &SwiftContext;
-
-  /// \brief Clang compiler invocation.
-  llvm::IntrusiveRefCntPtr<CompilerInvocation> Invocation;
-
-  /// \brief Clang compiler instance, which is used to actually load Clang
-  /// modules.
-  std::unique_ptr<CompilerInstance> Instance;
-
-  /// \brief Clang compiler action, which is used to actually run the
-  /// parser.
-  std::unique_ptr<SwiftModuleLoaderAction> Action;
-
-  /// \brief Mapping of already-imported declarations.
-  llvm::DenseMap<clang::NamedDecl *, ValueDecl *> ImportedDecls;
-
-  /// \brief The first Clang module we loaded.
-  ///
-  /// FIXME: This horrible hack is used because we don't have a nice way to
-  /// map from a Decl in the tree back to the appropriate Clang module.
-  /// It also means building ClangModules for all of the dependencies of a
-  /// Clang module.
-  ClangModule *firstClangModule = nullptr;
-
-  /// \brief Retrieve the Clang AST context.
-  clang::ASTContext &getClangASTContext() const {
-    return Instance->getASTContext();
-  }
-
-  /// \brief Import the given Swift identifier into Clang.
-  clang::DeclarationName importName(Identifier name) {
-    // FIXME: When we start dealing with C++, we can map over some operator
-    // names.
-    if (name.isOperator())
-      return clang::DeclarationName();
-
-    // Map the identifier. If it's some kind of keyword, it can't be mapped.
-    auto ident = &Instance->getASTContext().Idents.get(name.str());
-    if (ident->getTokenID() != clang::tok::identifier)
-      return clang::DeclarationName();
-
-    return ident;
-  }
-
-  /// \brief Import the given Clang name into Swift.
-  Identifier importName(clang::DeclarationName name) {
-    // FIXME: At some point, we'll be able to import operations as well.
-    if (!name || name.getNameKind() != clang::DeclarationName::Identifier)
-      return Identifier();
-
-    // Make the identifier over.
-    // FIXME: Check for Swift keywords, and filter those out.
-    return SwiftContext.getIdentifier(name.getAsIdentifierInfo()->getName());
-  }
-
-  /// \brief Import the given Clang declaration into Swift.
-  ///
-  /// \returns The imported declaration, or null if this declaration could
-  /// not be represented in Swift.
-  ValueDecl *importDecl(clang::NamedDecl *decl);
-
-  /// \brief Import the given Clang type into Swift.
-  ///
-  /// \returns The imported type, or null if this type could
-  /// not be represented in Swift.
-  Type importType(clang::QualType type);
-};
 
 ClangImporter::ClangImporter(ASTContext &ctx)
   : Impl(*new Implementation(ctx))
@@ -257,6 +186,34 @@ Module *ClangImporter::loadModule(
 
   return result;
 }
+
+#pragma mark Importing names
+clang::DeclarationName
+ClangImporter::Implementation::importName(Identifier name) {
+  // FIXME: When we start dealing with C++, we can map over some operator
+  // names.
+  if (name.isOperator())
+    return clang::DeclarationName();
+
+  // Map the identifier. If it's some kind of keyword, it can't be mapped.
+  auto ident = &Instance->getASTContext().Idents.get(name.str());
+  if (ident->getTokenID() != clang::tok::identifier)
+    return clang::DeclarationName();
+
+  return ident;
+}
+
+Identifier
+ClangImporter::Implementation::importName(clang::DeclarationName name) {
+  // FIXME: At some point, we'll be able to import operators as well.
+  if (!name || name.getNameKind() != clang::DeclarationName::Identifier)
+    return Identifier();
+
+  // Make the identifier over.
+  // FIXME: Check for Swift keywords, and filter those out.
+  return SwiftContext.getIdentifier(name.getAsIdentifierInfo()->getName());
+}
+
 
 #pragma mark Name lookup
 void ClangImporter::lookupValue(ClangModule *module,
