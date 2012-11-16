@@ -41,7 +41,9 @@ include $(LEVEL)/Makefile.common
 
 # Set common Swift build flags.
 CPP.Flags += -I$(PROJ_SRC_DIR)/$(SWIFT_LEVEL)/include \
-             -I$(PROJ_OBJ_DIR)/$(SWIFT_LEVEL)/include
+             -I$(PROJ_OBJ_DIR)/$(SWIFT_LEVEL)/include \
+             -I$(PROJ_SRC_DIR)/$(SWIFT_LEVEL)/../clang/include \
+             -I$(PROJ_OBJ_DIR)/$(SWIFT_LEVEL)/../clang/include
 ifdef SWIFT_VENDOR
 CPP.Flags += -DSWIFT_VENDOR='"$(SWIFT_VENDOR) "'
 endif

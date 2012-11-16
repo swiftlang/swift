@@ -33,7 +33,7 @@ LLVMLibsOptions :=     \
   -lclangSema          \
   -lclangAnalysis      \
   -lclangEdit	       \
-  -lclangRewrite       \
+  -lclangRewriteCore   \
   -lclangLex	       \
   -lclangAST	       \
   -lclangBasic         \

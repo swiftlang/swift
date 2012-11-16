@@ -187,7 +187,7 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
 
   // Create the target instance.
   instance.setTarget(
-    clang::TargetInfo::CreateTargetInfo(*clangDiags, instance.getTargetOpts()));
+    clang::TargetInfo::CreateTargetInfo(*clangDiags,&instance.getTargetOpts()));
   if (!instance.hasTarget())
     return nullptr;
 
