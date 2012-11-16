@@ -19,7 +19,6 @@
 #include "swift/AST/Component.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/Types.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
@@ -241,45 +240,5 @@ void ClangImporter::lookupValue(ClangModule *module,
     if (auto swiftDecl = Impl.importDecl(decl))
       results.push_back(swiftDecl);
   }
-}
-
-#pragma mark Declaration imports
-ValueDecl *ClangImporter::Implementation::importDecl(clang::NamedDecl *decl) {
-  auto known = ImportedDecls.find(decl);
-  if (known != ImportedDecls.end())
-    return known->second;
-
-  if (decl->getKind() == clang::Decl::Function) {
-    auto func = cast<clang::FunctionDecl>(decl);
-
-    // Import the function type. If we have parameters, make sure their names
-    // get into the resulting function type.
-    Type type;
-    if (func->param_size())
-      type = importFunctionType(
-               func->getType()->getAs<clang::FunctionType>()->getResultType(),
-               { func->param_begin(), func->param_size() },
-               func->isVariadic());
-    else
-      type = importType(func->getType());
-
-    if (!type)
-      return nullptr;
-
-    auto name = importName(decl->getDeclName());
-
-    // FIXME: Map source locations!
-    auto result = new (SwiftContext) FuncDecl(SourceLoc(),
-                                              SourceLoc(),
-                                              name,
-                                              SourceLoc(),
-                                              /*GenericParams=*/0,
-                                              type,
-                                              /*Body=*/nullptr,
-                                              firstClangModule);
-    return ImportedDecls[decl] = result;
-  }
-
-  return nullptr;
 }
 
