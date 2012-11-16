@@ -80,12 +80,24 @@ struct ClangImporter::Implementation {
   
   /// \brief Import the given Clang name into Swift.
   Identifier importName(clang::DeclarationName name);
-  
+
+  /// \brief Import the given Swift source location into Clang.
+  clang::SourceLocation importSourceLoc(SourceLoc loc);
+
+  /// \brief Import the given Clang source location into Swift.
+  SourceLoc importSourceLoc(clang::SourceLocation loc);
+
   /// \brief Import the given Clang declaration into Swift.
   ///
   /// \returns The imported declaration, or null if this declaration could
   /// not be represented in Swift.
   ValueDecl *importDecl(clang::NamedDecl *decl);
+
+  /// \brief Import the given Clang declaration context into Swift.
+  ///
+  /// \returns The imported declaration context, or null if it could not
+  /// be converted.
+  DeclContext *importDeclContext(clang::DeclContext *dc);
 
   /// \brief Retrieve the named Swift type, e.g., Int32.
   ///

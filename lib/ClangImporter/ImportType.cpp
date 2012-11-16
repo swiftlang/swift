@@ -236,8 +236,11 @@ namespace {
     }
 
     Type VisitTypedefType(const clang::TypedefType *type) {
-      // FIXME: Actually import the decl as a type alias.
-      return Impl.importType(type->getDecl()->getUnderlyingType());
+      auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
+      if (!decl)
+        return nullptr;
+
+      return decl->getDeclaredType();
     }
 
     Type VisitTypeOfExpr(const clang::TypeOfExprType *type) {

@@ -187,6 +187,19 @@ Module *ClangImporter::loadModule(
   return result;
 }
 
+#pragma mark Source locations
+clang::SourceLocation
+ClangImporter::Implementation::importSourceLoc(SourceLoc loc) {
+  // FIXME: Implement!
+  return clang::SourceLocation();
+}
+
+SourceLoc
+ClangImporter::Implementation::importSourceLoc(clang::SourceLocation loc) {
+  // FIXME: Implement!
+  return SourceLoc();
+}
+
 #pragma mark Importing names
 clang::DeclarationName
 ClangImporter::Implementation::importName(Identifier name) {
