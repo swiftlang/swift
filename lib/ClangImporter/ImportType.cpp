@@ -267,8 +267,11 @@ namespace {
     }
 
     Type VisitEnumType(const clang::EnumType *type) {
-      // FIXME: Import enum types as oneofs.
-      return Type();
+      auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
+      if (!decl)
+        return nullptr;
+
+      return decl->getDeclaredType();
     }
 
     Type VisitElaboratedType(const clang::ElaboratedType *type) {

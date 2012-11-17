@@ -67,7 +67,7 @@ namespace {
       return nullptr;
     }
 
-    TypeDecl *VisitTypedefNameDecl(clang::TypedefNameDecl *decl){
+    ValueDecl *VisitTypedefNameDecl(clang::TypedefNameDecl *decl){
       auto name = Impl.importName(decl->getDeclName());
       if (name.empty())
         return nullptr;
@@ -90,7 +90,111 @@ namespace {
                                       { });
     }
 
+    ValueDecl *
+    VisitUnresolvedUsingTypenameDecl(clang::UnresolvedUsingTypenameDecl *decl) {
+      // Note: only occurs in templates.
+      return nullptr;
+    }
+
+    ValueDecl *VisitEnumDecl(clang::EnumDecl *decl) {
+      decl = decl->getDefinition();
+      if (!decl)
+        return nullptr;
+      
+      Identifier name;
+      if (decl->getDeclName())
+        name = Impl.importName(decl->getDeclName());
+      else if (decl->getTypedefNameForAnonDecl())
+        name =Impl.importName(decl->getTypedefNameForAnonDecl()->getDeclName());
+
+      if (name.empty())
+        return nullptr;
+
+      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      if (!dc)
+        return nullptr;
+
+      // Create the oneof declaration and record it.
+      auto result = new (Impl.SwiftContext)
+                      OneOfDecl(Impl.importSourceLoc(decl->getLocStart()),
+                                name,
+                                Impl.importSourceLoc(decl->getLocation()),
+                                { }, nullptr, dc);
+      Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+
+      // Import each of the enumerators.
+      SmallVector<Decl *, 4> members;
+      for (auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
+           ec != ecEnd; ++ec) {
+        auto ood = Impl.importDecl(*ec);
+        if (!ood)
+          continue;
+
+        members.push_back(ood);
+      }
+
+      // FIXME: Source range isn't totally accurate because Clang lacks the
+      // location of the '{'.
+      result->setMembers(Impl.SwiftContext.AllocateCopy(members),
+                         Impl.importSourceRange(clang::SourceRange(
+                                                  decl->getLocation(),
+                                                  decl->getRBraceLoc())));
+
+      return result;
+    }
+
+    ValueDecl *VisitRecordDecl(clang::RecordDecl *decl) {
+      // FIXME: Map structs and classes to structs.
+      // FIXME: Unions will have to be dropped.
+      return nullptr;
+    }
+
+    ValueDecl *VisitClassTemplateSpecializationDecl(
+                 clang::ClassTemplateSpecializationDecl *decl) {
+      // FIXME: We could import specializations, but perhaps only as unnamed
+      // structural types. That's probably not useful.
+      return nullptr;
+    }
+
+    ValueDecl *VisitClassTemplatePartialSpecializationDecl(
+                 clang::ClassTemplatePartialSpecializationDecl *decl) {
+      // Note: templates are not imported.
+      return nullptr;
+    }
+
+    ValueDecl *VisitTemplateTypeParmDecl(clang::TemplateTypeParmDecl *decl) {
+      // Note: templates are not imported.
+      return nullptr;
+    }
+
+    ValueDecl *VisitEnumConstantDecl(clang::EnumConstantDecl *decl) {
+      auto name = Impl.importName(decl->getDeclName());
+      if (name.empty())
+        return nullptr;
+
+      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      if (!dc)
+        return nullptr;
+
+      auto result
+        = new (Impl.SwiftContext)
+            OneOfElementDecl(Impl.importSourceLoc(decl->getLocation()),
+                             name, TypeLoc(), dc);
+
+      // Give the oneof element the appropriate type.
+      auto oneof = cast<OneOfDecl>(dc);
+      auto argTy = MetaTypeType::get(oneof->getDeclaredType(),
+                                     Impl.SwiftContext);
+      result->overwriteType(FunctionType::get(argTy, oneof->getDeclaredType(),
+                                              Impl.SwiftContext));
+      return result;
+    }
+
     ValueDecl *VisitFunctionDecl(clang::FunctionDecl *decl) {
+      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      if (!dc)
+        return nullptr;
+
       // Import the function type. If we have parameters, make sure their names
       // get into the resulting function type.
       Type type;
@@ -109,27 +213,27 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      // FIXME: Map source locations!
-      return new (Impl.SwiftContext) FuncDecl(SourceLoc(),
-                                              SourceLoc(),
-                                              name,
-                                              SourceLoc(),
-                                              /*GenericParams=*/0,
-                                              type,
-                                              /*Body=*/nullptr,
-                                              Impl.firstClangModule);
+      return new (Impl.SwiftContext)
+               FuncDecl(SourceLoc(),
+                        Impl.importSourceLoc(decl->getLocStart()),
+                        name,
+                        Impl.importSourceLoc(decl->getLocation()),
+                        /*GenericParams=*/0,
+                        type,
+                        /*Body=*/nullptr,
+                        dc);
     }
   };
 }
 
 ValueDecl *ClangImporter::Implementation::importDecl(clang::NamedDecl *decl) {
-  auto known = ImportedDecls.find(decl);
+  auto known = ImportedDecls.find(decl->getCanonicalDecl());
   if (known != ImportedDecls.end())
     return known->second;
 
   SwiftDeclConverter converter(*this);
   auto result = converter.Visit(decl);
-  return ImportedDecls[decl] = result;
+  return ImportedDecls[decl->getCanonicalDecl()] = result;
 }
 
 DeclContext *

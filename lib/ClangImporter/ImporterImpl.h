@@ -25,6 +25,7 @@
 
 namespace clang {
 class CompilerInvocation;
+class Decl;
 class DeclarationName;
 class NamedDecl;
 class ParmVarDecl;
@@ -57,7 +58,7 @@ struct ClangImporter::Implementation {
   std::unique_ptr<clang::SyntaxOnlyAction> Action;
 
   /// \brief Mapping of already-imported declarations.
-  llvm::DenseMap<clang::NamedDecl *, ValueDecl *> ImportedDecls;
+  llvm::DenseMap<clang::Decl *, ValueDecl *> ImportedDecls;
 
   ///\ brief The Swift standard library module.
   Module *swiftModule = nullptr;
@@ -86,6 +87,9 @@ struct ClangImporter::Implementation {
 
   /// \brief Import the given Clang source location into Swift.
   SourceLoc importSourceLoc(clang::SourceLocation loc);
+
+  /// \brief Import the given Clang source range into Swift.
+  SourceRange importSourceRange(clang::SourceRange loc);
 
   /// \brief Import the given Clang declaration into Swift.
   ///

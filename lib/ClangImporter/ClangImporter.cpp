@@ -146,6 +146,9 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
     action.Execute();
     // Note: don't call EndSourceFile here!
   }
+  // FIXME: This is necessary because Clang doesn't really support what we're
+  // doing, and TUScope has gone stale.
+  instance.getSema().TUScope = nullptr;
 
   return importer.release();
 }
@@ -198,6 +201,12 @@ SourceLoc
 ClangImporter::Implementation::importSourceLoc(clang::SourceLocation loc) {
   // FIXME: Implement!
   return SourceLoc();
+}
+
+SourceRange
+ClangImporter::Implementation::importSourceRange(clang::SourceRange loc) {
+  // FIXME: Implement!
+  return SourceRange();
 }
 
 #pragma mark Importing names
