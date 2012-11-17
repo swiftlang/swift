@@ -54,7 +54,7 @@ class SILPrinter : public SILVisitor<SILPrinter> {
   llvm::DenseMap<const BasicBlock *, unsigned> BlocksToIDMap;
   ID getID(const BasicBlock *B);
 
-  llvm::DenseMap<Value, unsigned> ValueToIDMap;
+  llvm::DenseMap<const ValueBase*, unsigned> ValueToIDMap;
   ID getID(Value V);
 
 public:
@@ -92,7 +92,9 @@ public:
   // Instruction Printing Logic
 
   void print(Value V) {
-    OS << "  " << getID(V) << " = ";
+    ID Name = getID(V);
+    Name.ResultNumber = -1;  // Don't print subresult number.
+    OS << "  " << Name << " = ";
     visit(V);
     OS << '\n';
   }
@@ -276,7 +278,7 @@ ID SILPrinter::getID(Value V) {
   if (V.getDef()->getTypes().size() > 1)
     ResultNumber = V.getResultNumber();
 
-  ID R = { ID::SSAValue, ValueToIDMap[V], ResultNumber };
+  ID R = { ID::SSAValue, ValueToIDMap[V.getDef()], ResultNumber };
   return R;
 }
 
