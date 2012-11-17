@@ -160,12 +160,11 @@ public:
     return insert(new CopyInst(E, SrcLValue, DestLValue, false, false));
   }
   
-  StoreInst *createInitialization(VarDecl *VD, Value Src,
-                                  Value DestLValue) {
+  StoreInst *createStore(VarDecl *VD, Value Src, Value DestLValue) {
     return insert(new StoreInst(VD, Src, DestLValue));
   }
-  StoreInst *createInitialization(Expr *E, Value Src, Value DestLValue) {
-    return insert(new StoreInst(E, true, Src, DestLValue));
+  StoreInst *createStore(Expr *E, Value Src, Value DestLValue) {
+    return insert(new StoreInst(E, Src, DestLValue));
   }
 
   SpecializeInst *createSpecialize(SpecializeExpr *SE, Value Operand,

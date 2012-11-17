@@ -112,6 +112,8 @@ static void emitAssignStmtRecursive(AssignStmt *S, Value Src, Expr *Dest,
   
   // Otherwise, emit the scalar assignment.
   Value DstV = Gen.visit(Dest);
+
+  // FIXME: This should do the Retain/Load/Release/Store dance!
   Gen.B.createStore(S, Src, DstV);
 }
 

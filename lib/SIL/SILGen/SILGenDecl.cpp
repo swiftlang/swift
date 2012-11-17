@@ -73,7 +73,7 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     // something like typestate or another concept that allows us to model
     // definitive assignment, then we can consider removing it.
     auto InitVal = Init ? Init : Gen.B.createZeroValue(VD);
-    Gen.B.createInitialization(VD, InitVal, AllocVar);
+    Gen.B.createStore(VD, InitVal, AllocVar);
     
     Gen.Cleanups.pushCleanup<CleanupVar>(AllocVar);
   }

@@ -366,28 +366,19 @@ public:
   }
 };
 
-/// StoreInst - Represents a store from a memory location.  If the destination
-/// is unitialized memory, this models an initialization of that memory
-/// location.
+/// StoreInst - Represents a store from a memory location.
 class StoreInst : public Instruction {
   /// The value being stored and the lvalue being stored to.
   Value Src, Dest;
-
-  /// IsInitialization - True if this is the initialization of a memory location
-  /// that is uninitialized, not a general store.  In an initialization of an
-  /// ARC'd pointer (for example), the old value is not released.
-  bool IsInitialization;
 public:
 
   StoreInst(AssignStmt *S, Value Src, Value Dest);
   StoreInst(VarDecl *VD, Value Src, Value Dest);
   StoreInst(MaterializeExpr *E, Value Src, Value Dest);
-  StoreInst(Expr *E, bool isInitialization, Value Src, Value Dest);
+  StoreInst(Expr *E, Value Src, Value Dest);
 
   Value getSrc() const { return Src; }
   Value getDest() const { return Dest; }
-
-  bool isInitialization() const { return IsInitialization; }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::StoreInst;

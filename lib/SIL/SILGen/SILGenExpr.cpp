@@ -65,7 +65,7 @@ Value SILGen::visitMaterializeExpr(MaterializeExpr *E) {
   // temp's address.
   Value V = visit(E->getSubExpr());
   Value TmpMem = B.createAllocTmp(E);
-  B.createInitialization(E, V, TmpMem);
+  B.createStore(E, V, TmpMem);
   return TmpMem;
 }
 
@@ -175,7 +175,7 @@ Value SILGen::emitTupleShuffle(Expr *E, ArrayRef<Value> InOps,
       Value EltLoc = BasePtr;
       if (CurElem) EltLoc = B.createIndexAddr(E, EltLoc, CurElem);
 
-      B.createInitialization(E, InOps[SourceField], EltLoc);
+      B.createStore(E, InOps[SourceField], EltLoc);
       ++CurElem;
     }
 

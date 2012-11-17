@@ -215,23 +215,22 @@ LoadInst::LoadInst(LoadExpr *E, Value LValue)
 
 StoreInst::StoreInst(AssignStmt *S, Value Src, Value Dest)
   : Instruction(ValueKind::StoreInst, S),
-    Src(Src), Dest(Dest), IsInitialization(false) {
+    Src(Src), Dest(Dest) {
 }
 
 StoreInst::StoreInst(VarDecl *VD, Value Src, Value Dest)
   : Instruction(ValueKind::StoreInst, VD),
-    Src(Src), Dest(Dest), IsInitialization(true) {
+    Src(Src), Dest(Dest) {
 }
 
 
 StoreInst::StoreInst(MaterializeExpr *E, Value Src, Value Dest)
   : Instruction(ValueKind::StoreInst, E),
-    Src(Src), Dest(Dest), IsInitialization(true) {
+    Src(Src), Dest(Dest) {
 }
 
-StoreInst::StoreInst(Expr *E, bool IsInitialization, Value Src, Value Dest)
-  : Instruction(ValueKind::StoreInst, E),
-    Src(Src), Dest(Dest), IsInitialization(IsInitialization) {
+StoreInst::StoreInst(Expr *E, Value Src, Value Dest)
+  : Instruction(ValueKind::StoreInst, E), Src(Src), Dest(Dest) {
   // This happens in a store to an array initializer for varargs tuple shuffle.
 }
 

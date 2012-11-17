@@ -159,10 +159,7 @@ public:
     OS << "load " << getID(LI->getLValue());
   }
   void visitStoreInst(StoreInst *SI) {
-    OS << "store " << getID(SI->getSrc()) << " to "
-       << getID(SI->getDest());
-    if (SI->isInitialization())
-      OS << " [initialization]";
+    OS << "store " << getID(SI->getSrc()) << " to " << getID(SI->getDest());
   }
   void visitCopyInst(CopyInst *CI) {
     OS << "copy " << getID(CI->getSrc());
