@@ -176,7 +176,7 @@ class AllocArrayInst : public Instruction {
   Value NumElements;
 public:
 
-  AllocArrayInst(Expr *E, Type ElementType, Value NumElements);
+  AllocArrayInst(Expr *E, Type ElementType, Value NumElements, SILBase &B);
 
   Type getElementType() const { return ElementType; }
   Value getNumElements() const { return NumElements; }

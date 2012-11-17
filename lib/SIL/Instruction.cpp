@@ -98,21 +98,21 @@ AllocTmpInst::AllocTmpInst(MaterializeExpr *E)
   : AllocInst(ValueKind::AllocTmpInst, E, E->getType()) {}
 
 // AllocArray always returns a tuple (Builtin.ObjectPointer, lvalue[EltTy])
-static Type getAllocArrayType(Type EltTy) {
-  ASTContext &Ctx = EltTy->getASTContext();;
+static SILTypeList *getAllocArrayType(Type EltTy, SILBase &B) {
+  ASTContext &Ctx = EltTy->getASTContext();
 
-  TupleTypeElt Fields[] = {
-    TupleTypeElt(Ctx.TheObjectPointerType, Identifier()),
-    TupleTypeElt(LValueType::get(EltTy, LValueType::Qual::DefaultForType, Ctx),
-                 Identifier())
+  Type ResTys[] = {
+    Ctx.TheObjectPointerType,
+    LValueType::get(EltTy, LValueType::Qual::DefaultForType, Ctx)
   };
 
-  return TupleType::get(Fields, Ctx);
+  return B.getSILTypeList(ResTys);
 }
 
 AllocArrayInst::AllocArrayInst(Expr *E, Type ElementType,
-                               Value NumElements)
-  : Instruction(ValueKind::AllocArrayInst, E, getAllocArrayType(ElementType)),
+                               Value NumElements, SILBase &B)
+  : Instruction(ValueKind::AllocArrayInst, E,
+                getAllocArrayType(ElementType, B)),
     ElementType(ElementType), NumElements(NumElements) {
 }
 

@@ -113,7 +113,7 @@ public:
 
   AllocArrayInst *createAllocArray(Expr *E, Type ElementType,
                                    Value NumElements) {
-    return insert(new AllocArrayInst(E, ElementType, NumElements));
+    return insert(new AllocArrayInst(E, ElementType, NumElements, F));
   }
 
 

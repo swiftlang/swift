@@ -162,12 +162,11 @@ Value SILGen::emitTupleShuffle(Expr *E, ArrayRef<Value> InOps,
     unsigned NumArrayElts = shuffleIndexIteratorEnd - shuffleIndexIterator;
     Value NumEltsVal = B.createIntegerValueInst(NumArrayElts,
                                    BuiltinIntegerType::get(64, F.getContext()));
-    Value AllocArray = B.createAllocArray(E, outerField.getVarargBaseTy(),
-                                          NumEltsVal);
+    AllocArrayInst *AllocArray =
+      B.createAllocArray(E, outerField.getVarargBaseTy(), NumEltsVal);
 
-    Type BaseLValue =
-      AllocArray.getType()->castTo<TupleType>()->getElementType(1);
-    Value BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
+    Value ObjectPtr(AllocArray, 0);
+    Value BasePtr(AllocArray, 1);
 
     unsigned CurElem = 0;
     while (shuffleIndexIterator != shuffleIndexIteratorEnd) {
@@ -179,9 +178,6 @@ Value SILGen::emitTupleShuffle(Expr *E, ArrayRef<Value> InOps,
       B.createInitialization(E, InOps[SourceField], EltLoc);
       ++CurElem;
     }
-
-    Value ObjectPtr =
-      B.createTupleElement(F.getContext().TheObjectPointerType, AllocArray, 0);
 
     ResultElements.push_back(emitArrayInjectionCall(ObjectPtr, BasePtr,
                                         NumEltsVal, VarargsInjectionFunction));
@@ -234,13 +230,10 @@ Value SILGen::visitNewArrayExpr(NewArrayExpr *E) {
   Value NumElements = visit(E->getBounds()[0].Value);
 
   // Allocate the array.
-  Value AllocArray = B.createAllocArray(E, E->getElementType(), NumElements);
+  AllocArrayInst *AllocArray = B.createAllocArray(E, E->getElementType(),
+                                                  NumElements);
 
-  Type BaseLValue =
-    AllocArray.getType()->castTo<TupleType>()->getElementType(1);
-  Value BasePtr = B.createTupleElement(BaseLValue, AllocArray, 1);
-  Value ObjectPtr =
-    B.createTupleElement(F.getContext().TheObjectPointerType, AllocArray, 0);
+  Value ObjectPtr(AllocArray, 0), BasePtr(AllocArray, 1);
 
   // FIXME: We need to initialize the elements of the array that are now
   // allocated.

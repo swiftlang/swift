@@ -39,8 +39,7 @@ public:
   void *allocate(unsigned Size, unsigned Align) const {
     return BPA.Allocate(Size, Align);
   }
-  /// getSILTypeList - Get a uniqued pointer to a SIL type list.  This can only
-  /// be used by Value.
+  /// getSILTypeList - Get a uniqued pointer to a SIL type list.
   SILTypeList *getSILTypeList(llvm::ArrayRef<Type> Types) const;
 };
 
