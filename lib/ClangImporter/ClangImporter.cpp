@@ -254,8 +254,12 @@ void ClangImporter::lookupValue(ClangModule *module,
   // FIXME: Map source locations over.
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    clang::Sema::LookupOrdinaryName);
-  if (!sema.LookupName(lookupResult, /*Scope=*/0))
-    return;
+  if (!sema.LookupName(lookupResult, /*Scope=*/0)) {
+    // If we didn't find an ordinary name, fall back to a tag name.
+    lookupResult.clear(clang::Sema::LookupTagName);
+    if (!sema.LookupName(lookupResult, /*Scope=*/0))
+      return;
+  }
 
   // FIXME: Filter based on access path? C++ access control?
   for (auto decl : lookupResult) {
