@@ -574,7 +574,8 @@ index_addr
   ; %1 must be of a builtin integer type
   ; %2 will be of the same $SIL.Address<T> type as %0
 
-Given a pointer into an Returns the address of the ``%1``-th element relative to ``%0``.
+Given a pointer into an Returns the address of the ``%1``-th element relative to
+``%0``.
 
 convert
 ```````
