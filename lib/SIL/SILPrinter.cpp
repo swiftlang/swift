@@ -157,8 +157,6 @@ public:
   }
   void visitLoadInst(LoadInst *LI) {
     OS << "load " << getID(LI->getLValue());
-    if (LI->isTake())
-      OS << " [take]";
   }
   void visitStoreInst(StoreInst *SI) {
     OS << "store " << getID(SI->getSrc()) << " to "

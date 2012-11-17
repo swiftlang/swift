@@ -204,10 +204,8 @@ StringRef StringLiteralInst::getValue() const {
 }
 
 
-LoadInst::LoadInst(LoadExpr *E, Value LValue, bool IsTake)
-  : Instruction(ValueKind::LoadInst, E, E->getType()),
-    LValue(LValue),
-    IsTake(IsTake) {
+LoadInst::LoadInst(LoadExpr *E, Value LValue)
+  : Instruction(ValueKind::LoadInst, E, E->getType()), LValue(LValue) {
 }
 
 

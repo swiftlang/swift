@@ -347,16 +347,10 @@ public:
 };
 
 
-/// LoadInst - Represents a load from a memory location. A load can optionally
-/// "take" ownership of the loaded value from the memory location, leaving the
-/// memory uninitialized.
+/// LoadInst - Represents a load from a memory location.
 class LoadInst : public Instruction {
   /// The LValue (memory address) to use for the load.
   Value LValue;
-  
-  /// IsTake - True if the result of the load instruction takes ownership of the
-  /// value and deinitializes the lvalue.
-  bool IsTake;
 public:
   /// Constructs a LoadInst.
   ///
@@ -364,14 +358,9 @@ public:
   ///
   /// \param LValue The Value representing the lvalue (address) to
   ///        use for the load.
-  ///
-  /// \param IsTake True if this load takes ownership of the value from the
-  ///        lvalue.
-  LoadInst(LoadExpr *E, Value LValue, bool IsTake = false);
+  LoadInst(LoadExpr *E, Value LValue);
 
   Value getLValue() const { return LValue; }
-  
-  bool isTake() const { return IsTake; }
 
   /// getType() is ok since this is known to only have one type.
   Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
