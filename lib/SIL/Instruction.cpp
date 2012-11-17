@@ -246,15 +246,12 @@ SpecializeInst::SpecializeInst(SpecializeExpr *SE, Value Operand, Type DestTy)
 }
 
 
-TypeConversionInst::TypeConversionInst(ImplicitConversionExpr *E,
-                                       Value Operand)
-  : Instruction(ValueKind::TypeConversionInst, E, E->getType()),
-    Operand(Operand) {
+ConvertInst::ConvertInst(ImplicitConversionExpr *E, Value Operand)
+  : Instruction(ValueKind::ConvertInst, E, E->getType()), Operand(Operand) {
 }
 
-TypeConversionInst::TypeConversionInst(Type Ty, Value Operand)
-  : Instruction(ValueKind::TypeConversionInst, (Expr*)nullptr, Ty),
-    Operand(Operand) {
+ConvertInst::ConvertInst(Type Ty, Value Operand)
+  : Instruction(ValueKind::ConvertInst, (Expr*)nullptr, Ty), Operand(Operand) {
 }
 
 

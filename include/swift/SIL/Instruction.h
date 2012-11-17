@@ -468,13 +468,13 @@ public:
 };
 
 
-/// TypeConversionInst - Change the Type of some value without affecting how it
+/// ConvertInst - Change the Type of some value without affecting how it
 /// will codegen.
-class TypeConversionInst : public Instruction {
+class ConvertInst : public Instruction {
   Value Operand;
 public:
-  TypeConversionInst(ImplicitConversionExpr *E, Value Operand);
-  TypeConversionInst(Type Ty, Value Operand);
+  ConvertInst(ImplicitConversionExpr *E, Value Operand);
+  ConvertInst(Type Ty, Value Operand);
 
   Value getOperand() const { return Operand; }
 
@@ -482,7 +482,7 @@ public:
   Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
-    return V->getKind() == ValueKind::TypeConversionInst;
+    return V->getKind() == ValueKind::ConvertInst;
   }
 };
 

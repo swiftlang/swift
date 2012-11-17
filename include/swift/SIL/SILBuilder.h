@@ -174,12 +174,11 @@ public:
   }
 
 
-  TypeConversionInst *createTypeConversion(ImplicitConversionExpr *E,
-                                           Value Op) {
-    return insert(new TypeConversionInst(E, Op));
+  ConvertInst *createConvert(ImplicitConversionExpr *E, Value Op) {
+    return insert(new ConvertInst(E, Op));
   }
-  TypeConversionInst *createTypeConversion(Type Ty, Value Op) {
-    return insert(new TypeConversionInst(Ty, Op));
+  ConvertInst *createConvert(Type Ty, Value Op) {
+    return insert(new ConvertInst(Ty, Op));
   }
 
   TupleInst *createTuple(Expr *E, ArrayRef<Value> Elements) {

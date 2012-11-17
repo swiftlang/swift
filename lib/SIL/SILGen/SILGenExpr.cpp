@@ -71,11 +71,11 @@ Value SILGen::visitMaterializeExpr(MaterializeExpr *E) {
 
 
 Value SILGen::visitRequalifyExpr(RequalifyExpr *E) {
-  return B.createTypeConversion(E, visit(E->getSubExpr()));
+  return B.createConvert(E, visit(E->getSubExpr()));
 }
 
 Value SILGen::visitFunctionConversionExpr(FunctionConversionExpr *E) {
-  return B.createTypeConversion(E, visit(E->getSubExpr()));
+  return B.createConvert(E, visit(E->getSubExpr()));
 }
 
 Value SILGen::visitParenExpr(ParenExpr *E) {
@@ -115,7 +115,7 @@ Value SILGen::emitArrayInjectionCall(Value ObjectPtr, Value BasePtr,
                                      Expr *ArrayInjectionFunction) {
   // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
   if (!BasePtr.getType()->isEqual(F.getContext().TheRawPointerType))
-    BasePtr = B.createTypeConversion(F.getContext().TheRawPointerType, BasePtr);
+    BasePtr = B.createConvert(F.getContext().TheRawPointerType, BasePtr);
 
   Value InjectionFn = visit(ArrayInjectionFunction);
   Value InjectionArgs[] = { BasePtr, ObjectPtr, Length };

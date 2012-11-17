@@ -178,9 +178,9 @@ public:
     OS << "specialize " << getID(SI->getOperand()) << ", $"
        << SI->getType().getString();
   }
-  void visitTypeConversionInst(TypeConversionInst *TCI) {
-    OS << "type_conversion " << getID(TCI->getOperand()) << ", $"
-       << TCI->getType().getString();
+  void visitConvertInst(ConvertInst *CI) {
+    OS << "convert " << getID(CI->getOperand()) << ", $"
+       << CI->getType().getString();
   }
   void visitTupleInst(TupleInst *TI) {
     OS << "tuple (";
