@@ -325,8 +325,8 @@ DestroyInst::DestroyInst(Expr *E, Value Operand)
 // SIL-only instructions that don't have an AST analog
 //===----------------------------------------------------------------------===//
 
-IndexLValueInst::IndexLValueInst(Expr *E, Value Operand, unsigned Index)
-  : Instruction(ValueKind::IndexLValueInst, E, Operand.getType()),
+IndexAddrInst::IndexAddrInst(Expr *E, Value Operand, unsigned Index)
+  : Instruction(ValueKind::IndexAddrInst, E, Operand.getType()),
     Operand(Operand), Index(Index) {
 }
 

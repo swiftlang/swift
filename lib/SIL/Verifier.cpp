@@ -149,10 +149,10 @@ public:
            "Operand of destroy must be lvalue");
   }
 
-  void visitIndexLValueInst(IndexLValueInst *ILI) {
-    assert(ILI->getType()->is<LValueType>() &&
-           ILI->getType()->isEqual(ILI->getOperand().getType()) &&
-           "invalid IndexLValueInst");
+  void visitIndexLValueInst(IndexAddrInst *IAI) {
+    assert(IAI->getType()->is<LValueType>() &&
+           IAI->getType()->isEqual(IAI->getOperand().getType()) &&
+           "invalid IndexAddrInst");
   }
 
   void visitIntegerValueInst(IntegerValueInst *IVI) {

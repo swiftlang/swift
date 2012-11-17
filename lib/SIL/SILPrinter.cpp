@@ -218,8 +218,8 @@ public:
     OS << "destroy " << getID(DI->getOperand());
   }
   
-  void visitIndexLValueInst(IndexLValueInst *ILI) {
-    OS << "index_lvalue " << getID(ILI->getOperand()) << ", " <<ILI->getIndex();
+  void visitIndexAddrInst(IndexAddrInst *IAI) {
+    OS << "index_addr " << getID(IAI->getOperand()) << ", " <<IAI->getIndex();
   }
 
   void visitIntegerValueInst(IntegerValueInst *IVI) {

@@ -79,7 +79,7 @@ ABSTRACT_VALUE(Instruction, Value)
   INST(DestroyInst, Instruction)
 
   // SIL-only instructions that don't have an AST analog.
-  INST(IndexLValueInst, Instruction)
+  INST(IndexAddrInst, Instruction)
   INST(IntegerValueInst, Instruction)
 
   // Terminators.

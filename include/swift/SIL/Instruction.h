@@ -644,14 +644,14 @@ public:
 //===----------------------------------------------------------------------===//
 
 
-/// IndexLValueInst - "%1 = index_lvalue %0, 42"
+/// IndexAddrInst - "%1 = index_addr %0, 42"
 /// This takes an lvalue and indexes over the pointer, striding by the type of
 /// the lvalue.  This is used to index into arrays of uniform elements.
-class IndexLValueInst : public Instruction {
+class IndexAddrInst : public Instruction {
   Value Operand;
   unsigned Index;
 public:
-  IndexLValueInst(Expr *E, Value Operand, unsigned Index);
+  IndexAddrInst(Expr *E, Value Operand, unsigned Index);
 
   Value getOperand() const { return Operand; }
   unsigned getIndex() const { return Index; }
@@ -660,7 +660,7 @@ public:
   Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
-    return V->getKind() == ValueKind::IndexLValueInst;
+    return V->getKind() == ValueKind::IndexAddrInst;
   }
 };
 

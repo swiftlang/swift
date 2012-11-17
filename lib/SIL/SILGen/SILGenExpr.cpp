@@ -173,7 +173,7 @@ Value SILGen::emitTupleShuffle(Expr *E, ArrayRef<Value> InOps,
       unsigned SourceField = *shuffleIndexIterator++;
       
       Value EltLoc = BasePtr;
-      if (CurElem) EltLoc = B.createIndexLValue(E, EltLoc, CurElem);
+      if (CurElem) EltLoc = B.createIndexAddr(E, EltLoc, CurElem);
 
       B.createInitialization(E, InOps[SourceField], EltLoc);
       ++CurElem;

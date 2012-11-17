@@ -226,8 +226,8 @@ public:
   // SIL-only instructions that don't have an AST analog
   //===--------------------------------------------------------------------===//
 
-  IndexLValueInst *createIndexLValue(Expr *E, Value Operand, unsigned Index) {
-    return insert(new IndexLValueInst(E, Operand, Index));
+  IndexAddrInst *createIndexAddr(Expr *E, Value Operand, unsigned Index) {
+    return insert(new IndexAddrInst(E, Operand, Index));
   }
 
   IntegerValueInst *createIntegerValueInst(uint64_t Val, Type Ty) {
