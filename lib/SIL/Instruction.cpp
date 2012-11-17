@@ -97,8 +97,8 @@ VarDecl *AllocVarInst::getDecl() const {
 AllocTmpInst::AllocTmpInst(MaterializeExpr *E)
   : AllocInst(ValueKind::AllocTmpInst, E, E->getType()) {}
 
-// AllocArray always returns a tuple (Builtin.ObjectPointer, lvalue[EltTy])
-static SILTypeList *getAllocArrayType(Type EltTy, SILBase &B) {
+// Allocations always returns two results: Builtin.ObjectPointer & LValue[EltTy]
+static SILTypeList *getAllocType(Type EltTy, SILBase &B) {
   ASTContext &Ctx = EltTy->getASTContext();
 
   Type ResTys[] = {
@@ -109,10 +109,15 @@ static SILTypeList *getAllocArrayType(Type EltTy, SILBase &B) {
   return B.getSILTypeList(ResTys);
 }
 
+AllocBoxInst::AllocBoxInst(Expr *E, Type ElementType, SILBase &B)
+  : Instruction(ValueKind::AllocBoxInst, E, getAllocType(ElementType, B)),
+    ElementType(ElementType) {
+}
+
+
 AllocArrayInst::AllocArrayInst(Expr *E, Type ElementType,
                                Value NumElements, SILBase &B)
-  : Instruction(ValueKind::AllocArrayInst, E,
-                getAllocArrayType(ElementType, B)),
+  : Instruction(ValueKind::AllocArrayInst, E, getAllocType(ElementType, B)),
     ElementType(ElementType), NumElements(NumElements) {
 }
 

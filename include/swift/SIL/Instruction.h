@@ -165,9 +165,28 @@ public:
   }
 };
 
+/// AllocBoxInst - This represents the allocation of a heap box for a Swift
+/// value of some type, and whose element memory is left uninitialized.  This
+/// returns two values.  The first return element is the object pointer (pointer
+/// to the object header) with Builtin.ObjectPointer type.  The second element
+/// returned is an lvalue to the element.
+///
+class AllocBoxInst : public Instruction {
+  Type ElementType;
+public:
+  AllocBoxInst(Expr *E, Type ElementType, SILBase &B);
+
+  Type getElementType() const { return ElementType; }
+
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::AllocBoxInst;
+  }
+};
+
+
 /// AllocArrayInst - This represents the allocation of an array of elements,
-/// whose element memory is left uninitialized.  This returns a value of tuple
-/// type.  The first return element is the object pointer (pointer to the object
+/// whose element memory is left uninitialized.  This returns two values.  The
+/// first return element is the object pointer (pointer to the object
 /// header) with Builtin.ObjectPointer type.  The second element returned is an
 /// lvalue to the first array element.
 ///

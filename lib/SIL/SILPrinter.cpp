@@ -112,8 +112,12 @@ public:
     OS << "alloc_tmp type=" << ATI->getType().getString();
   }
 
+  void visitAllocBoxInst(AllocBoxInst *ABI) {
+    OS << "alloc_box $" << ABI->getElementType().getString();
+  }
+
   void visitAllocArrayInst(AllocArrayInst *AAI) {
-    OS << "alloc_array element type=" << AAI->getElementType().getString()
+    OS << "alloc_array $" << AAI->getElementType().getString()
        << ", " << getID(AAI->getNumElements());
   }
 
@@ -262,7 +266,6 @@ ID SILPrinter::getID(Value V) {
       ParentBB = I->getParent();
     else
       ParentBB = cast<BBArgument>(V)->getParent();
-
 
     unsigned idx = 0;
     for (auto &BB : *ParentBB->getParent()) {

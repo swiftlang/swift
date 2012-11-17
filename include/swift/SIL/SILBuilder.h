@@ -111,11 +111,14 @@ public:
     return insert(new AllocTmpInst(Expr));
   }
 
+  AllocBoxInst *createAllocBox(Expr *E, Type ElementType) {
+    return insert(new AllocBoxInst(E, ElementType, F));
+  }
+
   AllocArrayInst *createAllocArray(Expr *E, Type ElementType,
                                    Value NumElements) {
     return insert(new AllocArrayInst(E, ElementType, NumElements, F));
   }
-
 
   ApplyInst *createApply(ApplyExpr *Expr, Value Fn, ArrayRef<Value> Args) {
     return insert(ApplyInst::create(Expr, Fn, Args, F));
