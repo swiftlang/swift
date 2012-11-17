@@ -287,8 +287,6 @@ public:
 /// IntegerLiteralInst - Encapsulates an integer constant, as defined originally
 /// by an an IntegerLiteralExpr or CharacterLiteralExpr.
 class IntegerLiteralInst : public Instruction {
-  APInt value;
-  
 public:
   IntegerLiteralInst(IntegerLiteralExpr *E);
   IntegerLiteralInst(CharacterLiteralExpr *E);
@@ -309,8 +307,6 @@ public:
 /// FloatLiteralInst - Encapsulates a floating point constant, as defined
 /// originally by a FloatLiteralExpr.
 class FloatLiteralInst : public Instruction {
-  APFloat value;
-  
 public:
   FloatLiteralInst(FloatLiteralExpr *E);
 

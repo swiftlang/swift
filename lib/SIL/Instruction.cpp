@@ -160,13 +160,11 @@ ZeroValueInst::ZeroValueInst(VarDecl *D)
 }
 
 IntegerLiteralInst::IntegerLiteralInst(IntegerLiteralExpr *E)
-  : Instruction(ValueKind::IntegerLiteralInst, E, E->getType()),
-    value(E->getValue()) {
+  : Instruction(ValueKind::IntegerLiteralInst, E, E->getType()) {
 }
 
 IntegerLiteralInst::IntegerLiteralInst(CharacterLiteralExpr *E)
-  : Instruction(ValueKind::IntegerLiteralInst, E, E->getType()),
-    value(32, E->getValue()) {
+  : Instruction(ValueKind::IntegerLiteralInst, E, E->getType()) {
 }
 
 Expr *IntegerLiteralInst::getExpr() const {
@@ -175,12 +173,18 @@ Expr *IntegerLiteralInst::getExpr() const {
 
 /// getValue - Return the APInt for the underlying integer literal.
 APInt IntegerLiteralInst::getValue() const {
-  return value;
+  auto expr = getExpr();
+  if (auto intExpr = dyn_cast<IntegerLiteralExpr>(expr)) {
+    return intExpr->getValue();
+  } else if (auto charExpr = dyn_cast<CharacterLiteralExpr>(expr)) {
+    return APInt(32, charExpr->getValue());
+  }
+  llvm_unreachable("int_literal instruction associated with unexpected "
+                   "ast node!");
 }
 
 FloatLiteralInst::FloatLiteralInst(FloatLiteralExpr *E)
-  : Instruction(ValueKind::FloatLiteralInst, E, E->getType()),
-    value(E->getValue()) {
+  : Instruction(ValueKind::FloatLiteralInst, E, E->getType()) {
 }
 
 FloatLiteralExpr *FloatLiteralInst::getExpr() const {
@@ -188,7 +192,7 @@ FloatLiteralExpr *FloatLiteralInst::getExpr() const {
 }
 
 APFloat FloatLiteralInst::getValue() const {
-  return value;
+  return getExpr()->getValue();
 }
 
 StringLiteralInst::StringLiteralInst(StringLiteralExpr *E)
