@@ -164,7 +164,7 @@ public:
       OS << " [take]";
   }
   void visitStoreInst(StoreInst *SI) {
-    OS << "store " << getID(SI->getSrc()) << " -> "
+    OS << "store " << getID(SI->getSrc()) << " to "
        << getID(SI->getDest());
     if (SI->isInitialization())
       OS << " [initialization]";
@@ -173,16 +173,16 @@ public:
     OS << "copy " << getID(CI->getSrc());
     if (CI->isTakeOfSrc())
       OS << " [take]";
-    OS << " -> " << getID(CI->getDest());
+    OS << " to " << getID(CI->getDest());
     if (CI->isInitializationOfDest())
       OS << " [initialization]";
   }
   void visitSpecializeInst(SpecializeInst *SI) {
-    OS << "specialize " << getID(SI->getOperand()) << " -> "
+    OS << "specialize " << getID(SI->getOperand()) << ", $"
        << SI->getType().getString();
   }
   void visitTypeConversionInst(TypeConversionInst *TCI) {
-    OS << "type_conversion " << getID(TCI->getOperand()) << " -> "
+    OS << "type_conversion " << getID(TCI->getOperand()) << ", $"
        << TCI->getType().getString();
   }
   void visitTupleInst(TupleInst *TI) {
