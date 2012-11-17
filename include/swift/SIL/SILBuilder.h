@@ -138,11 +138,11 @@ public:
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E) {
     return insert(new IntegerLiteralInst(E));
   }
+  IntegerLiteralInst *createIntegerLiteral(CharacterLiteralExpr *E) {
+    return insert(new IntegerLiteralInst(E));
+  }
   FloatLiteralInst *createFloatLiteral(FloatLiteralExpr *E) {
     return insert(new FloatLiteralInst(E));
-  }
-  CharacterLiteralInst *createCharacterLiteral(CharacterLiteralExpr *E) {
-    return insert(new CharacterLiteralInst(E));
   }
   StringLiteralInst *createStringLiteral(StringLiteralExpr *E) {
     return insert(new StringLiteralInst(E));

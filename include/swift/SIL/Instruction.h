@@ -22,6 +22,8 @@
 #include "swift/SIL/Value.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APInt.h"
 
 namespace swift {
 
@@ -283,12 +285,15 @@ public:
 };
 
 /// IntegerLiteralInst - Encapsulates an integer constant, as defined originally
-/// by an an IntegerLiteralExpr.
+/// by an an IntegerLiteralExpr or CharacterLiteralExpr.
 class IntegerLiteralInst : public Instruction {
+  APInt value;
+  
 public:
   IntegerLiteralInst(IntegerLiteralExpr *E);
+  IntegerLiteralInst(CharacterLiteralExpr *E);
   
-  IntegerLiteralExpr *getExpr() const;
+  Expr *getExpr() const;
   
   /// getValue - Return the APInt for the underlying integer literal.
   APInt getValue() const;
@@ -304,6 +309,8 @@ public:
 /// FloatLiteralInst - Encapsulates a floating point constant, as defined
 /// originally by a FloatLiteralExpr.
 class FloatLiteralInst : public Instruction {
+  APFloat value;
+  
 public:
   FloatLiteralInst(FloatLiteralExpr *E);
 
@@ -317,25 +324,6 @@ public:
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::FloatLiteralInst;
-  }
-};
-
-/// CharacterLiteralInst - Encapsulates a character constant, as defined
-/// originally by a CharacterLiteralExpr.
-class CharacterLiteralInst : public Instruction {
-public:
-  CharacterLiteralInst(CharacterLiteralExpr *E);
-
-  CharacterLiteralExpr *getExpr() const;
-
-  /// getValue - Return the value for the underlying literal.
-  uint32_t getValue() const;
-
-  /// getType() is ok since this is known to only have one type.
-  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
-  static bool classof(Value V) {
-    return V->getKind() == ValueKind::CharacterLiteralInst;
   }
 };
 

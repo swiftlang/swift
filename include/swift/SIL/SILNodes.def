@@ -61,7 +61,6 @@ ABSTRACT_VALUE(Instruction, Value)
   INST(ZeroValueInst, Instruction)
   INST(IntegerLiteralInst, Instruction)
   INST(FloatLiteralInst, Instruction)
-  INST(CharacterLiteralInst, Instruction)
   INST(StringLiteralInst, Instruction)
 
   INST(LoadInst, Instruction)

@@ -18,8 +18,6 @@
 #include "swift/AST/AST.h"
 #include "swift/SIL/Function.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/APInt.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -162,20 +160,27 @@ ZeroValueInst::ZeroValueInst(VarDecl *D)
 }
 
 IntegerLiteralInst::IntegerLiteralInst(IntegerLiteralExpr *E)
-  : Instruction(ValueKind::IntegerLiteralInst, E, E->getType()) {
+  : Instruction(ValueKind::IntegerLiteralInst, E, E->getType()),
+    value(E->getValue()) {
 }
 
-IntegerLiteralExpr *IntegerLiteralInst::getExpr() const {
-  return getLocExpr<IntegerLiteralExpr>();
+IntegerLiteralInst::IntegerLiteralInst(CharacterLiteralExpr *E)
+  : Instruction(ValueKind::IntegerLiteralInst, E, E->getType()),
+    value(32, E->getValue()) {
+}
+
+Expr *IntegerLiteralInst::getExpr() const {
+  return getLocExpr<Expr>();
 }
 
 /// getValue - Return the APInt for the underlying integer literal.
 APInt IntegerLiteralInst::getValue() const {
-  return getExpr()->getValue();
+  return value;
 }
 
 FloatLiteralInst::FloatLiteralInst(FloatLiteralExpr *E)
-  : Instruction(ValueKind::FloatLiteralInst, E, E->getType()) {
+  : Instruction(ValueKind::FloatLiteralInst, E, E->getType()),
+    value(E->getValue()) {
 }
 
 FloatLiteralExpr *FloatLiteralInst::getExpr() const {
@@ -183,19 +188,7 @@ FloatLiteralExpr *FloatLiteralInst::getExpr() const {
 }
 
 APFloat FloatLiteralInst::getValue() const {
-  return getExpr()->getValue();
-}
-
-CharacterLiteralInst::CharacterLiteralInst(CharacterLiteralExpr *E)
-  : Instruction(ValueKind::CharacterLiteralInst, E, E->getType()) {
-}
-
-CharacterLiteralExpr *CharacterLiteralInst::getExpr() const {
-  return getLocExpr<CharacterLiteralExpr>();
-}
-
-uint32_t CharacterLiteralInst::getValue() const {
-  return getExpr()->getValue();
+  return value;
 }
 
 StringLiteralInst::StringLiteralInst(StringLiteralExpr *E)

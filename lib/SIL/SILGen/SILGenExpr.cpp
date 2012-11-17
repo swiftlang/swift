@@ -49,7 +49,7 @@ Value SILGen::visitFloatLiteralExpr(FloatLiteralExpr *E) {
   return B.createFloatLiteral(E);
 }
 Value SILGen::visitCharacterLiteralExpr(CharacterLiteralExpr *E) {
-  return B.createCharacterLiteral(E);
+  return B.createIntegerLiteral(E);
 }
 Value SILGen::visitStringLiteralExpr(StringLiteralExpr *E) {
   return B.createStringLiteral(E);

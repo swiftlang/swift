@@ -152,9 +152,6 @@ public:
     FLI->getValue().toString(Buffer);
     OS << "floatliteral " << StringRef(Buffer.data(), Buffer.size());
   }
-  void visitCharacterLiteralInst(CharacterLiteralInst *CLI) {
-    OS << "characterliteral " << CLI->getValue();
-  }
   void visitStringLiteralInst(StringLiteralInst *SLI) {
     OS << "stringliteral \"" << SLI->getValue() << "\"";
   }
