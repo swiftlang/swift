@@ -9,6 +9,8 @@
 - (int)informalProp;
 
 - (int)informalMadeFormal;
+
+@property int overriddenProp;
 @end
 
 @interface B : A
@@ -18,5 +20,7 @@
 @property (readonly) int readCounter;
 
 @property int informalMadeFormal;
+
+@property int overriddenProp;
 @end
 

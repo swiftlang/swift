@@ -563,7 +563,7 @@ namespace {
         if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd))
           if (auto property = objcMethod->findPropertyDecl())
             if (Impl.importDecl(
-                               const_cast<clang::ObjCPropertyDecl *>(property)))
+                  const_cast<clang::ObjCPropertyDecl *>(property)))
               continue;
 
         members.push_back(member);
@@ -598,12 +598,14 @@ namespace {
       // property. If so, suppress the property; the user will have to use
       // the methods directly, to avoid ambiguities.
       auto containerTy = dc->getDeclaredTypeInContext();
+      VarDecl *overridden = nullptr;
       MemberLookup lookup(containerTy, name, *Impl.firstClangModule);
       for (const auto &result : lookup.Results) {
         if (isa<FuncDecl>(result.D))
           return nullptr;
 
-        // FIXME: Track overrides
+        if (auto var = dyn_cast<VarDecl>(result.D))
+          overridden = var;
       }
 
       auto type = Impl.importType(decl->getType());
@@ -625,10 +627,14 @@ namespace {
       auto result = new (Impl.SwiftContext)
                       VarDecl(Impl.importSourceLoc(decl->getLocation()),
                               name, type, dc);
-      if (getter) {
-        // FIXME: Fake locations for '{' and '}'?
-        result->setProperty(Impl.SwiftContext, SourceLoc(), getter, setter,
-                            SourceLoc());
+
+      // Turn this into a property.
+      // FIXME: Fake locations for '{' and '}'?
+      result->setProperty(Impl.SwiftContext, SourceLoc(), getter, setter,
+                          SourceLoc());
+
+      if (overridden) {
+        result->setOverriddenDecl(overridden);
       }
 
       return result;
