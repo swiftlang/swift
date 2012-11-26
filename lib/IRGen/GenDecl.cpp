@@ -324,7 +324,7 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
   fn->setVisibility(getVisibility());
   fn->setCallingConv(cc);
   if (!attrs.empty())
-    fn->setAttributes(llvm::AttrListPtr::get(attrs));
+    fn->setAttributes(llvm::AttrListPtr::get(fnType->getContext(), attrs));
   return fn;
 }
 
