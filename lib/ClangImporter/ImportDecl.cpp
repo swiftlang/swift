@@ -364,6 +364,39 @@ namespace {
       // @defs is an anachronism; ignore it.
       return nullptr;
     }
+
+    ValueDecl *VisitVarDecl(clang::VarDecl *decl) {
+      // FIXME: Swift does not have static variables in structs/classes yet.
+      if (decl->getDeclContext()->isRecord())
+        return nullptr;
+
+      // Variables are imported as... variables.
+      auto name = Impl.importName(decl->getDeclName());
+      if (name.empty())
+        return nullptr;
+
+      auto type = Impl.importType(decl->getType());
+      if (!type)
+        return nullptr;
+
+      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      if (!dc)
+        return nullptr;
+
+      return new (Impl.SwiftContext)
+               VarDecl(Impl.importSourceLoc(decl->getLocation()),
+                       name, type, dc);
+    }
+
+    ValueDecl *VisitImplicitParamDecl(clang::ImplicitParamDecl *decl) {
+      // Parameters are never directly imported.
+      return nullptr;
+    }
+
+    ValueDecl *VisitParmVarDecl(clang::ParmVarDecl *decl) {
+      // Parameters are never directly imported.
+      return nullptr;
+    }
   };
 }
 

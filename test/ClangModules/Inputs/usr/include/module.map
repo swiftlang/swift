@@ -1,3 +1,4 @@
 module cfuncs { header "cfuncs.h" }
 module ctypes { header "ctypes.h" }
+module cvars { header "cvars.h" }
 
