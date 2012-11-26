@@ -468,9 +468,33 @@ namespace {
                                /*Body=*/nullptr,
                                dc);
 
+      // Mark class methods as static.
       if (decl->isClassMethod())
         result->setStatic();
-      
+
+      // If this method overrides another method, mark it as such.
+      // FIXME: We'll eventually have to deal with having multiple overrides
+      // in Swift.
+      if (decl->isOverriding()) {
+        SmallVector<const clang::ObjCMethodDecl *, 2> overridden;
+        decl->getOverriddenMethods(overridden);
+        clang::ObjCMethodDecl *superResult = nullptr;
+        clang::ObjCMethodDecl *categoryResult = nullptr;
+        for (auto ov : overridden) {
+          if (isa<clang::ObjCInterfaceDecl>(ov->getDeclContext()))
+            superResult = const_cast<clang::ObjCMethodDecl *>(ov);
+          else if (isa<clang::ObjCCategoryDecl>(ov->getDeclContext()))
+            categoryResult = const_cast<clang::ObjCMethodDecl *>(ov);
+        }
+
+        if (superResult)
+          result->setOverriddenDecl(
+            cast_or_null<FuncDecl>(Impl.importDecl(superResult)));
+        else if (categoryResult)
+          result->setOverriddenDecl(
+            cast_or_null<FuncDecl>(Impl.importDecl(categoryResult)));
+      }
+
       return result;
     }
 
@@ -518,7 +542,7 @@ namespace {
 
       // Note that this is an Objective-C class.
       result->getMutableAttrs().ObjC = true;
-
+      
       // Import each of the members.
       SmallVector<Decl *, 4> members;
       for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
@@ -531,11 +555,21 @@ namespace {
         if (!member)
           continue;
 
+        // If this member is a method that is a getter or setter for a property
+        // that was imported, don't add it to the list of members so it won't
+        // be found by name lookup. This eliminates the ambiguity between
+        // property names and getter names (by choosing to only have a
+        // variable).
+        if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd))
+          if (auto property = objcMethod->findPropertyDecl())
+            if (Impl.importDecl(
+                               const_cast<clang::ObjCPropertyDecl *>(property)))
+              continue;
+
         members.push_back(member);
       }
 
-      // FIXME: Source range isn't totally accurate because Clang lacks the
-      // location of the '{'.
+      // FIXME: Source range isn't accurate.
       result->setMembers(Impl.SwiftContext.AllocateCopy(members),
                          Impl.importSourceRange(clang::SourceRange(
                                                   decl->getLocation(),
@@ -550,7 +584,55 @@ namespace {
       return nullptr;
     }
 
-    // FIXME: ObjCPropertyDecl
+    ValueDecl *VisitObjCPropertyDecl(clang::ObjCPropertyDecl *decl) {
+      // Properties are imported as variables.
+      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      if (!dc)
+        return nullptr;
+
+      auto name = Impl.importName(decl->getDeclName());
+      if (name.empty())
+        return nullptr;
+
+      // Check whether there is a function with the same name as this
+      // property. If so, suppress the property; the user will have to use
+      // the methods directly, to avoid ambiguities.
+      auto containerTy = dc->getDeclaredTypeInContext();
+      MemberLookup lookup(containerTy, name, *Impl.firstClangModule);
+      for (const auto &result : lookup.Results) {
+        if (isa<FuncDecl>(result.D))
+          return nullptr;
+
+        // FIXME: Track overrides
+      }
+
+      auto type = Impl.importType(decl->getType());
+      if (!type)
+        return nullptr;
+
+      // Import the getter.
+      auto getter
+        = cast_or_null<FuncDecl>(Impl.importDecl(decl->getGetterMethodDecl()));
+      if (!getter && decl->getGetterMethodDecl())
+        return nullptr;
+
+      // Import the setter, if there is one.
+      auto setter
+        = cast_or_null<FuncDecl>(Impl.importDecl(decl->getSetterMethodDecl()));
+      if (!setter && decl->getSetterMethodDecl())
+        return nullptr;
+      
+      auto result = new (Impl.SwiftContext)
+                      VarDecl(Impl.importSourceLoc(decl->getLocation()),
+                              name, type, dc);
+      if (getter) {
+        // FIXME: Fake locations for '{' and '}'?
+        result->setProperty(Impl.SwiftContext, SourceLoc(), getter, setter,
+                            SourceLoc());
+      }
+
+      return result;
+    }
 
     ValueDecl *
     VisitObjCCompatibleAliasDecl(clang::ObjCCompatibleAliasDecl *decl) {
@@ -615,6 +697,9 @@ namespace {
 }
 
 ValueDecl *ClangImporter::Implementation::importDecl(clang::NamedDecl *decl) {
+  if (!decl)
+    return nullptr;
+  
   auto known = ImportedDecls.find(decl->getCanonicalDecl());
   if (known != ImportedDecls.end())
     return known->second;
