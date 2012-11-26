@@ -21,6 +21,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclObjC.h"
 #include "clang/AST/TypeVisitor.h"
 #include "llvm/ADT/StringExtras.h"
 
@@ -150,7 +151,6 @@ namespace {
           return Type();
 
         // The class type is passed [byref].
-        // FIXME: Should be [byref(implicit)].
         auto thisTy = LValueType::get(classTy, LValueType::Qual::DefaultForType,
                                       Impl.SwiftContext);
         return FunctionType::get(ParenType::get(Impl.SwiftContext, thisTy),
@@ -312,8 +312,18 @@ namespace {
     }
 
     Type VisitObjCObjectPointerType(const clang::ObjCObjectPointerType *type) {
-      // FIXME: Map these, once we learn how to import an Objective-C class
-      // declaration and all of its various categories/extensions.
+      // 
+      if (auto interface = type->getInterfaceDecl()) {
+        auto imported = cast_or_null<ClassDecl>(Impl.importDecl(interface));
+        if (!imported)
+          return nullptr;
+
+        // FIXME: Swift cannot express qualified object pointer types, e.g.,
+        // NSObject<Proto>, so we drop the <Proto> part.
+        return imported->getDeclaredType();
+      }
+
+      // FIXME: Deal with 'id' and 'Class', and possibly the protocols.
       return Type();
     }
   };

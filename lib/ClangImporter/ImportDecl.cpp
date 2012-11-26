@@ -16,6 +16,7 @@
 
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -420,7 +421,90 @@ namespace {
       return nullptr;
     }
 
-    // FIXME: Import Objective-C named declarations here.
+    // FIXME: ObjCCategoryDecl
+    // FIXME: ObjCProtocolDecl
+
+    ValueDecl *VisitObjCInterfaceDecl(clang::ObjCInterfaceDecl *decl) {
+      // FIXME: Figure out how to deal with incomplete types, since that
+      // notion doesn't exist in Swift.
+      decl = decl->getDefinition();
+      if (!decl)
+        return nullptr;
+
+      auto name = Impl.importName(decl->getDeclName());
+      if (name.empty())
+        return nullptr;
+
+      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      if (!dc)
+        return nullptr;
+
+      // FIXME: Import the protocols that this class conforms to. There's
+      // a minor, annoying problem here because those protocols might mention
+      // this class before we've had a chance to build it (due to forward
+      // declarations). The same issue occurs with the superclass...
+
+      // Create the class declaration and record it.
+      auto result = new (Impl.SwiftContext)
+                      ClassDecl(Impl.importSourceLoc(decl->getLocStart()),
+                                name,
+                                Impl.importSourceLoc(decl->getLocation()),
+                                { }, nullptr, dc);
+      Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+
+      // If this Objective-C class has a supertype, import it.
+      if (auto objcSuper = decl->getSuperClass()) {
+        auto super = cast_or_null<ClassDecl>(Impl.importDecl(objcSuper));
+        if (!super)
+          return nullptr;
+
+        TypeLoc superTy(super->getDeclaredType(),
+                        Impl.importSourceRange(decl->getSuperClassLoc()));
+        result->setBaseClassLoc(superTy);
+      }
+
+      // Note that this is an Objective-C class.
+      result->getMutableAttrs().ObjC = true;
+
+      // Import each of the members.
+      SmallVector<Decl *, 4> members;
+      for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
+           m != mEnd; ++m) {
+        auto nd = dyn_cast<clang::NamedDecl>(*m);
+        if (!nd)
+          continue;
+
+        auto member = Impl.importDecl(nd);
+        if (!member)
+          continue;
+
+        members.push_back(member);
+      }
+
+      // FIXME: Source range isn't totally accurate because Clang lacks the
+      // location of the '{'.
+      result->setMembers(Impl.SwiftContext.AllocateCopy(members),
+                         Impl.importSourceRange(clang::SourceRange(
+                                                  decl->getLocation(),
+                                                  decl->getLocEnd())));
+
+      return result;
+    }
+
+    ValueDecl *VisitObjCImplDecl(clang::ObjCImplDecl *decl) {
+      // Implementations of Objective-C classes and categories are not
+      // reflected into Swift.
+      return nullptr;
+    }
+
+    // FIXME: ObjCPropertyDecl
+
+    ValueDecl *
+    VisitObjCCompatibleAliasDecl(clang::ObjCCompatibleAliasDecl *decl) {
+      // Like C++ using declarations, name lookup simply looks through
+      // Objective-C compatibility aliases. They are not imported directly.
+      return nullptr;
+    }
 
     ValueDecl *VisitLinkageSpecDecl(clang::LinkageSpecDecl *decl) {
       // Linkage specifications are not imported.
