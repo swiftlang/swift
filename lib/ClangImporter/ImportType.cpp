@@ -118,9 +118,10 @@ namespace {
     }
 
     Type VisitPointerType(const clang::PointerType *type) {
-      // Function pointer types are mapped to function types.
+      // FIXME: Function pointer types can be mapped to Swift function types
+      // once we have the notion of a function that does not capture anything.
       if (type->getPointeeType()->isFunctionType())
-        return Impl.importType(type->getPointeeType());
+        return Type();
 
       // All other C pointers come across as raw pointers.
       return Impl.SwiftContext.TheRawPointerType;
@@ -138,27 +139,9 @@ namespace {
     }
 
     Type VisitMemberPointer(const clang::MemberPointerType *type) {
-      // Member function pointers are mapped to curried functions.
-      if (type->getPointeeType()->isFunctionProtoType()) {
-        // Import the function type.
-        auto funcTy = Impl.importType(type->getPointeeType());
-        if (!funcTy)
-          return Type();
-
-        // Import the class type.
-        auto classTy = Impl.importType(clang::QualType(type->getClass(), 0));
-        if (!classTy)
-          return Type();
-
-        // The class type is passed [byref].
-        auto thisTy = LValueType::get(classTy, LValueType::Qual::DefaultForType,
-                                      Impl.SwiftContext);
-        return FunctionType::get(ParenType::get(Impl.SwiftContext, thisTy),
-                                 funcTy, Impl.SwiftContext);
-      }
-
-      // Note: without generalized lvalues, there is no way to map a data
-      // member pointer into Swift.
+      // FIXME: Member function pointers can be mapped to curried functions,
+      // but only when we can express the notion of a function that does
+      // not capture anything from its enclosing context.
       return Type();
     }
 
