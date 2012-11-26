@@ -80,7 +80,6 @@ namespace {
       if (!type)
         return nullptr;
 
-
       return new (Impl.SwiftContext) TypeAliasDecl(
                                       Impl.importSourceLoc(decl->getLocStart()),
                                       name,
@@ -144,15 +143,87 @@ namespace {
     }
 
     ValueDecl *VisitRecordDecl(clang::RecordDecl *decl) {
-      // FIXME: Map structs and classes to structs.
-      // FIXME: Unions will have to be dropped.
-      return nullptr;
+      // FIXME: Skip unions for now. We can't properly map them to oneofs,
+      // because they aren't descriminated in any way. We could map them to
+      // structs, but that would make them very, very unsafe to use.
+      if (decl->isUnion())
+        return nullptr;
+
+      // FIXME: Skip Microsoft __interfaces.
+      if (decl->isInterface())
+        return nullptr;
+
+      // The types of anonymous structs or unions are never imported; their
+      // fields are dumped directly into the enclosing class.
+      if (decl->isAnonymousStructOrUnion())
+        return nullptr;
+
+      // FIXME: Figure out how to deal with incomplete types, since that
+      // notion doesn't exist in Swift.
+      decl = decl->getDefinition();
+      if (!decl)
+        return nullptr;
+
+      Identifier name;
+      if (decl->getDeclName())
+        name = Impl.importName(decl->getDeclName());
+      else if (decl->getTypedefNameForAnonDecl())
+        name =Impl.importName(decl->getTypedefNameForAnonDecl()->getDeclName());
+
+      if (name.empty())
+        return nullptr;
+
+      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      if (!dc)
+        return nullptr;
+
+      // Create the struct declaration and record it.
+      auto result = new (Impl.SwiftContext)
+                      StructDecl(Impl.importSourceLoc(decl->getLocStart()),
+                                 name,
+                                 Impl.importSourceLoc(decl->getLocation()),
+                                 { }, nullptr, dc);
+      Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+
+      // FIXME: Figure out what to do with base classes in C++. One possible
+      // solution would be to turn them into members and add conversion
+      // functions.
+
+      // Import each of the members.
+      SmallVector<Decl *, 4> members;
+      for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
+           m != mEnd; ++m) {
+        auto nd = dyn_cast<clang::NamedDecl>(*m);
+        if (!nd)
+          continue;
+
+        // Skip anonymous structs or unions; they'll be dealt with via the
+        // IndirectFieldDecls.
+        if (auto field = dyn_cast<clang::FieldDecl>(nd))
+          if (field->isAnonymousStructOrUnion())
+            continue;
+
+        auto member = Impl.importDecl(nd);
+        if (!member)
+          continue;
+
+        members.push_back(member);
+      }
+
+      // FIXME: Source range isn't totally accurate because Clang lacks the
+      // location of the '{'.
+      result->setMembers(Impl.SwiftContext.AllocateCopy(members),
+                         Impl.importSourceRange(clang::SourceRange(
+                                                  decl->getLocation(),
+                                                  decl->getRBraceLoc())));
+
+      return result;
     }
 
     ValueDecl *VisitClassTemplateSpecializationDecl(
                  clang::ClassTemplateSpecializationDecl *decl) {
       // FIXME: We could import specializations, but perhaps only as unnamed
-      // structural types. That's probably not useful.
+      // structural types.
       return nullptr;
     }
 
@@ -190,6 +261,41 @@ namespace {
       return result;
     }
 
+    ValueDecl *
+    VisitUnresolvedUsingValueDecl(clang::UnresolvedUsingValueDecl *decl) {
+      // Note: templates are not imported.
+      return nullptr;
+    }
+
+    ValueDecl *VisitIndirectFieldDecl(clang::IndirectFieldDecl *decl) {
+      // Check whether the context of any of the fields in the chain is a
+      // union. If so, don't import this field.
+      for (auto f = decl->chain_begin(), fEnd = decl->chain_end(); f != fEnd;
+           ++f) {
+        if (auto record = dyn_cast<clang::RecordDecl>((*f)->getDeclContext())) {
+          if (record->isUnion())
+            return nullptr;
+        }
+      }
+
+      auto name = Impl.importName(decl->getDeclName());
+      if (name.empty())
+        return nullptr;
+
+      auto type = Impl.importType(decl->getType());
+      if (!type)
+        return nullptr;
+
+      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      if (!dc)
+        return nullptr;
+
+      // Map this indirect field to a Swift variable.
+      return new (Impl.SwiftContext)
+               VarDecl(Impl.importSourceLoc(decl->getLocStart()),
+                       name, type, dc);
+    }
+
     ValueDecl *VisitFunctionDecl(clang::FunctionDecl *decl) {
       auto dc = Impl.importDeclContext(decl->getDeclContext());
       if (!dc)
@@ -222,6 +328,41 @@ namespace {
                         type,
                         /*Body=*/nullptr,
                         dc);
+    }
+
+    ValueDecl *VisitCXXMethodDecl(clang::CXXMethodDecl *decl) {
+      // FIXME: Import C++ member functions as methods.
+      return nullptr;
+    }
+
+    ValueDecl *VisitFieldDecl(clang::FieldDecl *decl) {
+      // Fields are imported as variables.
+      auto name = Impl.importName(decl->getDeclName());
+      if (name.empty())
+        return nullptr;
+
+      auto type = Impl.importType(decl->getType());
+      if (!type)
+        return nullptr;
+
+      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      if (!dc)
+        return nullptr;
+
+      return new (Impl.SwiftContext)
+               VarDecl(Impl.importSourceLoc(decl->getLocation()),
+                       name, type, dc);
+    }
+
+    ValueDecl *VisitObjCIvarDecl(clang::ObjCIvarDecl *decl) {
+      // FIXME: Deal with fact that a property and an ivar can have the same
+      // name.
+      return VisitFieldDecl(decl);
+    }
+
+    ValueDecl *VisitObjCAtDefsFieldDecl(clang::ObjCAtDefsFieldDecl *decl) {
+      // @defs is an anachronism; ignore it.
+      return nullptr;
     }
   };
 }

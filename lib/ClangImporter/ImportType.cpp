@@ -262,8 +262,11 @@ namespace {
     }
 
     Type VisitRecordType(const clang::RecordType *type) {
-      // FIXME: Import record types as structs.
-      return Type();
+      auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
+      if (!decl)
+        return nullptr;
+
+      return decl->getDeclaredType();
     }
 
     Type VisitEnumType(const clang::EnumType *type) {
