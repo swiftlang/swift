@@ -166,7 +166,7 @@ types but are needed for some operations:
   or passed around as opaque operands. Operations that allocate retainable
   memory generally return both a box and a typed address pointing
   into the box.
-* Unlike Swift, unbound *generic function types* such as
+* Unlike Swift, values of unbound *generic function types* such as
   ``$<T...> (A...) -> R`` can be expressed in SIL.  Accessing a generic
   function with ``constant_ref`` will give a value of a generic function type.
   Its type variables can be bound with a ``specialize`` instruction to
@@ -431,7 +431,7 @@ Destroys the value in memory at address ``%0``. This is equivalent to::
   destroy %1
 
 except that ``destroy_addr`` must be used if ``%0`` is of an address-only type.
-This only destroy the referenced value; the memory may additionally need to be
+This only destroys the referenced value; the memory may additionally need to be
 deallocated with a separate ``dealloc_var`` instruction.
 
 load
@@ -557,6 +557,7 @@ that type with a single element replaced.
 element_addr
 ````````````
 ::
+
   %1 = element_addr %0, 123
   ; %0 must of a $SIL.Address<T> type for a loadable aggregate type T
   ; %1 will be of type $SIL.Address<U> where U is the type of the 123rd
@@ -574,8 +575,8 @@ index_addr
   ; %1 must be of a builtin integer type
   ; %2 will be of the same $SIL.Address<T> type as %0
 
-Given a pointer into an Returns the address of the ``%1``-th element relative to
-``%0``.
+Given a pointer into an array of values, returns the address of the
+``%1``-th element relative to ``%0``.
 
 convert
 ```````
@@ -940,7 +941,7 @@ Note that although resilient types are manipulated through pointers, they still
 have value semantics, so assigning and passing resilient values still incurs
 allocations and copies as with loadable fragile types, although many value
 semantics operations can be eliminated by optimization. For instance, since
-the temporary value %12 is destroyed immediately after being copied into a
+the temporary value ``%12`` is destroyed immediately after being copied into a
 variable, it can be combined into the ``copy_addr`` as a ``take`` operation::
 
     copy_addr take %12 to %reflected_alloc#1
@@ -957,3 +958,4 @@ TODO design questions
 ---------------------
 
 * debug information representation
+* maintaining good AST location info in the face of optimization
