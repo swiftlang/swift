@@ -426,11 +426,6 @@ namespace {
       if (!dc)
         return nullptr;
 
-      // FIXME: We can't handle class methods because Swift cues off the
-      // existence of a source location. Fix this.
-      if (decl->isClassMethod())
-        return nullptr;
-
       // The name of the method is the first part of the selector.
       auto name
         = Impl.importName(decl->getSelector().getIdentifierInfoForSlot(0));
@@ -463,15 +458,20 @@ namespace {
 
       // FIXME: Add proper parameter patterns so this looks more like a method
       // declaration when Swift prints it back out.
-      return new (Impl.SwiftContext)
-               FuncDecl(SourceLoc(),
-                        Impl.importSourceLoc(decl->getLocStart()),
-                        name,
-                        Impl.importSourceLoc(decl->getLocation()),
-                        /*GenericParams=*/0,
-                        type,
-                        /*Body=*/nullptr,
-                        dc);
+      auto result = new (Impl.SwiftContext)
+                      FuncDecl(SourceLoc(),
+                               Impl.importSourceLoc(decl->getLocStart()),
+                               name,
+                               Impl.importSourceLoc(decl->getLocation()),
+                               /*GenericParams=*/0,
+                               type,
+                               /*Body=*/nullptr,
+                               dc);
+
+      if (decl->isClassMethod())
+        result->setStatic();
+      
+      return result;
     }
 
     // FIXME: ObjCCategoryDecl

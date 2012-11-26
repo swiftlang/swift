@@ -84,10 +84,21 @@ class Decl {
   enum { NumValueDeclBits = NumDeclBits + 2 };
   static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
 
+  class FuncDeclBitFields {
+    friend class FuncDecl;
+    unsigned : NumValueDeclBits;
+
+    /// \brief Whether this function is a 'static' method.
+    unsigned Static : 1;
+  };
+  enum { NumFuncDeclBits = NumValueDeclBits + 1 };
+  static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     DeclBitfields DeclBits;
     ValueDeclBitfields ValueDeclBits;
+    FuncDeclBitFields FuncDeclBits;
   };
 
 private:
@@ -1035,10 +1046,15 @@ public:
            FuncExpr *Body, DeclContext *DC)
     : ValueDecl(DeclKind::Func, DC, Name, Ty), StaticLoc(StaticLoc),
       FuncLoc(FuncLoc), NameLoc(NameLoc), GenericParams(GenericParams),
-      Body(Body), OverriddenDecl(nullptr) { }
+      Body(Body), OverriddenDecl(nullptr) {
+    FuncDeclBits.Static = StaticLoc.isValid() || getName().isOperator();
+  }
   
   bool isStatic() const {
-    return StaticLoc.isValid() || getName().isOperator();
+    return FuncDeclBits.Static;
+  }
+  void setStatic(bool Static = true) {
+    FuncDeclBits.Static = Static;
   }
 
   FuncExpr *getBody() const { return Body; }
