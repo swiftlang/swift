@@ -65,12 +65,9 @@ class Decl {
   enum { NumDeclBits = 9 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
 
-  enum { NumValueDeclBits = NumDeclBits };
-  static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
-
   class ValueDeclBitfields {
     friend class ValueDecl;
-    unsigned : NumValueDeclBits;
+    unsigned : NumDeclBits;
 
     // The following flags are not necessarily meaningful for all
     // kinds of value-declarations.
@@ -84,6 +81,8 @@ class Decl {
     // the stack frame.)
     unsigned HasFixedLifetime : 1;
   };
+  enum { NumValueDeclBits = NumDeclBits + 2 };
+  static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
 
 protected:
   union {
