@@ -176,6 +176,7 @@ public:
 class AllocBoxInst : public Instruction {
   Type ElementType;
 public:
+  AllocBoxInst(VarDecl *VD, SILBase &B);
   AllocBoxInst(Expr *E, Type ElementType, SILBase &B);
 
   Type getElementType() const { return ElementType; }

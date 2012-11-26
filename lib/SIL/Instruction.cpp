@@ -107,6 +107,12 @@ static SILTypeList *getAllocType(Type EltTy, SILBase &B) {
   return B.getSILTypeList(ResTys);
 }
 
+AllocBoxInst::AllocBoxInst(VarDecl *VD, SILBase &B)
+  : Instruction(ValueKind::AllocBoxInst, VD,
+                getAllocType(VD->getType(), B)),
+    ElementType(VD->getType()) {
+}
+
 AllocBoxInst::AllocBoxInst(Expr *E, Type ElementType, SILBase &B)
   : Instruction(ValueKind::AllocBoxInst, E, getAllocType(ElementType, B)),
     ElementType(ElementType) {

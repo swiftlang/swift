@@ -111,6 +111,10 @@ public:
     return insert(new AllocTmpInst(Expr));
   }
 
+  AllocBoxInst *createAllocBox(VarDecl *VD) {
+    return insert(new AllocBoxInst(VD, F));
+  }
+  
   AllocBoxInst *createAllocBox(Expr *E, Type ElementType) {
     return insert(new AllocBoxInst(E, ElementType, F));
   }

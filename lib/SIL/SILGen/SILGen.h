@@ -41,9 +41,10 @@ public:
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
 
-  /// VarLocs - This is the memory location that an emitted variable is stored.
+  /// VarLocs - This is the address for the box in which an emitted
+  /// variable is stored.
   /// Entries in this map are generated when a PatternBindingDecl is emitted
-  /// that contains a reference, and queried for each DeclRefExpr.
+  /// that contains a reference and are queried for each DeclRefExpr.
   llvm::DenseMap<ValueDecl*, Value> VarLocs;
     
   bool hasVoidReturn;

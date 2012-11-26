@@ -22,12 +22,11 @@ using namespace Lowering;
 namespace {
 
 class CleanupVar : public Cleanup {
-  Value alloc;
+  AllocBoxInst *box;
 public:
-  CleanupVar(Value alloc) : alloc(alloc) {}
+  CleanupVar(AllocBoxInst *box) : box(box) {}
   void emit(SILGen &gen) {
-    gen.B.createDestroy(nullptr, alloc);
-    gen.B.createDealloc(nullptr, alloc);
+    gen.B.createRelease(nullptr, Value(box, 0));
   }
 };
 
@@ -54,28 +53,29 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
   // Bind to a named pattern by creating a memory location and initializing it
   // with the initial value.
   void visitNamedPattern(NamedPattern *P) {
-    VarDecl *VD = P->getDecl();
+    VarDecl *vd = P->getDecl();
 
     // If this is a [byref] argument, just use the argument lvalue as our
     // address.
-    if (VD->getType()->is<LValueType>()) {
-      Gen.VarLocs[VD] = Init;
+    if (vd->getType()->is<LValueType>()) {
+      Gen.VarLocs[vd] = Init;
       return;
     }
 
-    Value AllocVar = Gen.B.createAllocVar(VD);
+    auto allocBox = Gen.B.createAllocBox(vd);
+    auto addr = Value(allocBox, 1);
     
     /// Remember that this is the memory location that we're emitting the
     /// decl to.
-    Gen.VarLocs[VD] = AllocVar;
+    Gen.VarLocs[vd] = Value(allocBox, 1);
 
     // NOTE: "Default zero initialization" is a dubious concept.  When we get
     // something like typestate or another concept that allows us to model
     // definitive assignment, then we can consider removing it.
-    auto InitVal = Init ? Init : Gen.B.createZeroValue(VD);
-    Gen.B.createStore(VD, InitVal, AllocVar);
+    auto initVal = Init ? Init : Gen.B.createZeroValue(vd);
+    Gen.B.createStore(vd, initVal, addr);
     
-    Gen.Cleanups.pushCleanup<CleanupVar>(AllocVar);
+    Gen.Cleanups.pushCleanup<CleanupVar>(allocBox);
   }
   
   // Bind to a tuple pattern by first trying to see if we can emit
