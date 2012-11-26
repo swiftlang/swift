@@ -397,6 +397,83 @@ namespace {
       // Parameters are never directly imported.
       return nullptr;
     }
+
+    ValueDecl *
+    VisitNonTypeTemplateParmDecl(clang::NonTypeTemplateParmDecl *decl) {
+      // Note: templates are not imported.
+      return nullptr;
+    }
+
+    ValueDecl *VisitTemplateDecl(clang::TemplateDecl *decl) {
+      // Note: templates are not imported.
+      return nullptr;
+    }
+
+    ValueDecl *VisitUsingDecl(clang::UsingDecl *decl) {
+      // Using declarations are not imported.
+      return nullptr;
+    }
+
+    ValueDecl *VisitUsingShadowDecl(clang::UsingShadowDecl *decl) {
+      // Using shadow declarations are not imported; rather, name lookup just
+      // looks through them.
+      return nullptr;
+    }
+
+    // FIXME: Import Objective-C named declarations here.
+
+    ValueDecl *VisitLinkageSpecDecl(clang::LinkageSpecDecl *decl) {
+      // Linkage specifications are not imported.
+      return nullptr;
+    }
+
+    ValueDecl *VisitObjCPropertyImplDecl(clang::ObjCPropertyImplDecl *decl) {
+      // @synthesize and @dynamic are not imported, since they are not part
+      // of the interface to a class.
+      return nullptr;
+    }
+
+    ValueDecl *VisitFileScopeAsmDecl(clang::FileScopeAsmDecl *decl) {
+      return nullptr;
+    }
+
+    ValueDecl *VisitAccessSpecDecl(clang::AccessSpecDecl *decl) {
+      return nullptr;
+    }
+
+    ValueDecl *VisitFriendDecl(clang::FriendDecl *decl) {
+      // Friends are not imported; Swift has a different access control
+      // mechanism.
+      return nullptr;
+    }
+
+    ValueDecl *VisitFriendTemplateDecl(clang::FriendTemplateDecl *decl) {
+      // Friends are not imported; Swift has a different access control
+      // mechanism.
+      return nullptr;
+    }
+
+    ValueDecl *VisitStaticAssertDecl(clang::StaticAssertDecl *decl) {
+      // Static assertions are an implementation detail.
+      return nullptr;
+    }
+
+    ValueDecl *VisitBlockDecl(clang::BlockDecl *decl) {
+      // Blocks are not imported (although block types can be imported).
+      return nullptr;
+    }
+
+    ValueDecl *VisitClassScopeFunctionSpecializationDecl(
+                 clang::ClassScopeFunctionSpecializationDecl *decl) {
+      // Note: templates are not imported.
+      return nullptr;
+    }
+
+    ValueDecl *VisitImportDecl(clang::ImportDecl *decl) {
+      // Transitive module imports are not handled at the declaration level.
+      // Rather, they are understood from the module itself.
+      return nullptr;
+    }
   };
 }
 

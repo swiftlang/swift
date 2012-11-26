@@ -263,7 +263,7 @@ void ClangImporter::lookupValue(ClangModule *module,
 
   // FIXME: Filter based on access path? C++ access control?
   for (auto decl : lookupResult) {
-    if (auto swiftDecl = Impl.importDecl(decl))
+    if (auto swiftDecl = Impl.importDecl(decl->getUnderlyingDecl()))
       results.push_back(swiftDecl);
   }
 }
