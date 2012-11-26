@@ -421,6 +421,59 @@ namespace {
       return nullptr;
     }
 
+    ValueDecl *VisitObjCMethodDecl(clang::ObjCMethodDecl *decl) {
+      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      if (!dc)
+        return nullptr;
+
+      // FIXME: We can't handle class methods because Swift cues off the
+      // existence of a source location. Fix this.
+      if (decl->isClassMethod())
+        return nullptr;
+
+      // The name of the method is the first part of the selector.
+      auto name
+        = Impl.importName(decl->getSelector().getIdentifierInfoForSlot(0));
+      if (name.empty())
+        return nullptr;
+
+      // Import the type that this method will have.
+      auto type = Impl.importFunctionType(decl->getResultType(),
+                                          { decl->param_begin(),
+                                            decl->param_size() },
+                                          decl->isVariadic(),
+                                          decl->getSelector());
+      if (!type)
+        return nullptr;
+
+      // Figure out the type of the container.
+      auto containerTy= dc->getDeclaredTypeOfContext();
+      assert(containerTy && "Method in non-type context?");
+
+      // Add the implicit 'this' parameter.
+      auto thisTy = containerTy;
+      if (decl->isClassMethod())
+        thisTy = MetaTypeType::get(thisTy, Impl.SwiftContext);
+      TupleTypeElt thisParam(thisTy, Impl.SwiftContext.getIdentifier("this"));
+      auto thisTupleTy = TupleType::get({ &thisParam, 1 }, Impl.SwiftContext);
+      type = FunctionType::get(thisTupleTy, type, Impl.SwiftContext);
+
+      // FIXME: Related result type? Not so important when we get constructors
+      // working.
+
+      // FIXME: Add proper parameter patterns so this looks more like a method
+      // declaration when Swift prints it back out.
+      return new (Impl.SwiftContext)
+               FuncDecl(SourceLoc(),
+                        Impl.importSourceLoc(decl->getLocStart()),
+                        name,
+                        Impl.importSourceLoc(decl->getLocation()),
+                        /*GenericParams=*/0,
+                        type,
+                        /*Body=*/nullptr,
+                        dc);
+    }
+
     // FIXME: ObjCCategoryDecl
     // FIXME: ObjCProtocolDecl
 

@@ -22,6 +22,7 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Basic/IdentifierTable.h"
 
 namespace clang {
 class CompilerInvocation;
@@ -124,12 +125,14 @@ struct ClangImporter::Implementation {
   /// \param resultType The result type of the function.
   /// \param params The parameter types to the function.
   /// \param isVariadic Whether the function is variadic.
+  /// \param selector The Objective-C method selector to use for the names.
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
   Type importFunctionType(clang::QualType resultType,
                           ArrayRef<clang::ParmVarDecl *> params,
-                          bool isVariadic);
+                          bool isVariadic,
+                          clang::Selector selector = clang::Selector());
 };
 
 }

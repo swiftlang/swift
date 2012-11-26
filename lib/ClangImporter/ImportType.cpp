@@ -337,7 +337,8 @@ Type ClangImporter::Implementation::importType(clang::QualType type) {
 Type ClangImporter::Implementation::importFunctionType(
        clang::QualType resultType,
        ArrayRef<clang::ParmVarDecl *> params,
-       bool isVariadic) {
+       bool isVariadic,
+       clang::Selector selector) {
   // Cannot import variadic types.
   if (isVariadic)
     return Type();
@@ -349,10 +350,13 @@ Type ClangImporter::Implementation::importFunctionType(
 
   // Import the parameters.
   SmallVector<TupleTypeElt, 4> swiftParams;
+  unsigned index = 0;
   for (auto param : params) {
     auto paramTy = param->getType();
-    if (paramTy->isVoidType())
+    if (paramTy->isVoidType()) {
+      ++index;
       continue;
+    }
 
     bool byRef = false;
 
@@ -371,8 +375,19 @@ Type ClangImporter::Implementation::importFunctionType(
                                      LValueType::Qual::DefaultForType,
                                      SwiftContext);
 
-    swiftParams.push_back(TupleTypeElt(swiftParamTy,
-                                       importName(param->getDeclName())));
+    // Figure out the name for this parameter.
+    Identifier name;
+    if (selector.isNull()) {
+      // When there is no selector, simply import the parameter name.
+      name = importName(param->getDeclName());
+    } else if (index > 0 && index < selector.getNumArgs()) {
+      // For parameters after the first, the name comes from the selector.
+      // The first parameter is always unnamed.
+      name = importName(selector.getIdentifierInfoForSlot(index));
+    }
+
+    swiftParams.push_back(TupleTypeElt(swiftParamTy, name));
+    ++index;
   }
 
   // Form the parameter tuple.
