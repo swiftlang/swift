@@ -31,29 +31,25 @@ if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
   set(SWIFT_PATH_TO_CLANG_BUILD "" CACHE PATH
     "Path to the directory where Clang was built or installed.")
 
-  if( SWIFT_PATH_TO_CLANG_SOURCE )
-    if( NOT EXISTS "${SWIFT_PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h" )
-      message(FATAL_ERROR "Please set SWIFT_PATH_TO_CLANG_SOURCE to the root directory of Clang's source code.")
-    else()
-      get_filename_component(CLANG_MAIN_SRC_DIR ${SWIFT_PATH_TO_CLANG_SOURCE}
-	ABSOLUTE)
-    endif()
+  if( NOT EXISTS "${SWIFT_PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h" )
+    message(FATAL_ERROR "Please set SWIFT_PATH_TO_CLANG_SOURCE to the root directory of Clang's source code.")
+  else()
+    get_filename_component(CLANG_MAIN_SRC_DIR ${SWIFT_PATH_TO_CLANG_SOURCE}
+      ABSOLUTE)
   endif()
 
-  if( SWIFT_PATH_TO_CLANG_BUILD )
-    if(EXISTS "${SWIFT_PATH_TO_CLANG_BUILD}/include/clang/Basic/Version.inc")
-      set(CLANG_BUILD_INCLUDE_DIR "${SWIFT_PATH_TO_CLANG_BUILD}/include")
-    elseif(EXISTS "${SWIFT_PATH_TO_CLANG_BUILD}/tools/clang/include/clang/Basic/Version.inc")
-      set(CLANG_BUILD_INCLUDE_DIR "${SWIFT_PATH_TO_CLANG_BUILD}/tools/clang/include")
-    else()
-      message(FATAL_ERROR "Please set SWIFT_PATH_TO_CLANG_BUILD to a directory containing a Clang build.")
-    endif()
-    if (CLANG_MAIN_INCLUDE_DIR)
-      get_filename_component(CLANG_MAIN_SRC_DIR ${SWIFT_PATH_TO_CLANG_SOURCE}
-      ABSOLUTE)
-    endif()
-    message("${CLANG_MAIN_INCLUDE_DIR}")
+  if(EXISTS "${SWIFT_PATH_TO_CLANG_BUILD}/include/clang/Basic/Version.inc")
+    set(CLANG_BUILD_INCLUDE_DIR "${SWIFT_PATH_TO_CLANG_BUILD}/include")
+  elseif(EXISTS "${SWIFT_PATH_TO_CLANG_BUILD}/tools/clang/include/clang/Basic/Version.inc")
+    set(CLANG_BUILD_INCLUDE_DIR "${SWIFT_PATH_TO_CLANG_BUILD}/tools/clang/include")
+  else()
+    message(FATAL_ERROR "Please set SWIFT_PATH_TO_CLANG_BUILD to a directory containing a Clang build.")
   endif()
+  if (CLANG_MAIN_INCLUDE_DIR)
+    get_filename_component(CLANG_MAIN_SRC_DIR ${SWIFT_PATH_TO_CLANG_SOURCE}
+    ABSOLUTE)
+  endif()
+  message("${CLANG_MAIN_INCLUDE_DIR}")
 
   list(APPEND CMAKE_MODULE_PATH "${SWIFT_PATH_TO_LLVM_BUILD}/share/llvm/cmake")
 
