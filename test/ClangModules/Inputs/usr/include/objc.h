@@ -1,4 +1,6 @@
 @interface NSObject
++ alloc;
+- init;
 @end
 
 @interface A : NSObject
@@ -25,6 +27,10 @@
 @property int informalMadeFormal;
 
 @property int overriddenProp;
+
+- init;
+- initWithInt:(int)i;
+- initWithInt:(int)i andDouble:(double)d;
 @end
 
 @interface NSDate : NSObject

@@ -62,6 +62,12 @@ struct ClangImporter::Implementation {
   /// \brief Mapping of already-imported declarations.
   llvm::DenseMap<clang::Decl *, ValueDecl *> ImportedDecls;
 
+private:
+  /// \brief NSObject, imported into Swift.
+  Type NSObjectTy;
+
+public:
+  
   ///\ brief The Swift standard library module.
   Module *swiftModule = nullptr;
 
@@ -109,6 +115,9 @@ struct ClangImporter::Implementation {
   ///
   /// \returns The named type, or null if the type could not be found.
   Type getNamedSwiftType(StringRef name);
+
+  /// \brief Retrieve the NSObject type.
+  Type getNSObjectType();
 
   /// \brief Import the given Clang type into Swift.
   ///

@@ -21,6 +21,8 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
+#include "clang/Sema/Lookup.h"
+#include "clang/Sema/Sema.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/TypeVisitor.h"
@@ -296,7 +298,8 @@ namespace {
     }
 
     Type VisitObjCObjectPointerType(const clang::ObjCObjectPointerType *type) {
-      // 
+      // If this object pointer refers to an Objective-C class (possibly
+      // qualified), 
       if (auto interface = type->getInterfaceDecl()) {
         auto imported = cast_or_null<ClassDecl>(Impl.importDecl(interface));
         if (!imported)
@@ -307,8 +310,9 @@ namespace {
         return imported->getDeclaredType();
       }
 
-      // FIXME: Deal with 'id' and 'Class', and possibly the protocols.
-      return Type();
+      // FIXME: We fake 'id' and 'Class' by using NSObject. We need a proper
+      // 'top' type for Objective-C objects.
+      return Impl.getNSObjectType();
     }
   };
 }
@@ -435,6 +439,35 @@ Type ClangImporter::Implementation::getNamedSwiftType(StringRef name) {
   UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), swiftModule);
   if (auto type = lookup.getSingleTypeResult()) {
     return type->getDeclaredType();
+  }
+
+  return Type();
+}
+
+Type ClangImporter::Implementation::getNSObjectType() {
+  if (NSObjectTy)
+    return NSObjectTy;
+
+  auto &sema = Instance->getSema();
+
+  // Map the name. If we can't represent the Swift name in Clang, bail out now.
+  auto clangName = &getClangASTContext().Idents.get("NSObject");
+
+  // Perform name lookup into the global scope.
+  // FIXME: Map source locations over.
+  clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
+                                   clang::Sema::LookupOrdinaryName);
+  if (!sema.LookupName(lookupResult, /*Scope=*/0)) {
+    return Type();
+  }
+
+  for (auto decl : lookupResult) {
+    if (auto swiftDecl = importDecl(decl->getUnderlyingDecl())) {
+      if (auto classDecl = dyn_cast<ClassDecl>(swiftDecl)) {
+        NSObjectTy = classDecl->getDeclaredType();
+        return NSObjectTy;
+      }
+    }
   }
 
   return Type();
