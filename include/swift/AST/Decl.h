@@ -28,6 +28,10 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include <cstddef>
 
+namespace clang {
+  class Decl;
+}
+
 namespace swift {
   class ArchetypeType;
   class ASTContext;
@@ -60,9 +64,16 @@ class Decl {
   class DeclBitfields {
     friend class Decl;
     unsigned Kind : 8;
-    bool Invalid : 1;
+
+    /// \brief Whether this declaration is invalid.
+    unsigned Invalid : 1;
+
+    /// \brief Whether this declaration was mapped directly from a Clang AST.
+    ///
+    /// Use getClangAST() to retrieve the corresponding Clang AST.
+    unsigned FromClang : 1;
   };
-  enum { NumDeclBits = 9 };
+  enum { NumDeclBits = 10 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
 
   class ValueDeclBitfields {
@@ -111,7 +122,10 @@ protected:
   Decl(DeclKind kind, DeclContext *DC) : Context(DC) {
     DeclBits.Kind = unsigned(kind);
     DeclBits.Invalid = false;
+    DeclBits.FromClang = false;
   }
+
+  clang::Decl *getClangDeclSlow();
 
 public:
   /// Alignment - The required alignment of Decl objects.
@@ -142,7 +156,19 @@ public:
   
   /// \brief Mark this declaration invalid.
   void setInvalid() { DeclBits.Invalid = true; }
-  
+
+  /// \brief Retrieve the Clang declaration from which this declaration was
+  /// synthesized, if any.
+  clang::Decl *getClangDecl() {
+    if (!DeclBits.FromClang)
+      return nullptr;
+
+    return getClangDeclSlow();
+  }
+
+  /// \brief Set the Clang declaration associated with this declaration.
+  void setClangDecl(clang::Decl *decl);
+
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;

@@ -33,9 +33,14 @@ namespace llvm {
   class SourceMgr;
 }
 
+namespace clang {
+  class Decl;
+}
+
 namespace swift {
   class ASTContext;
   class BoundGenericType;
+  class Decl;
   class SourceLoc;
   class Type;
   class TupleType;
@@ -271,6 +276,10 @@ public:
   ModuleLoader &getModuleLoader() const;
 
 private:
+  friend class Decl;
+  clang::Decl *getClangDecl(Decl *decl);
+  void setClangDecl(Decl *decl, clang::Decl *clangDecl);
+
   friend class BoundGenericType;
 
   /// \brief Retrieve the substitutions for a bound generic type, if known.

@@ -18,8 +18,10 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclVisitor.h"
@@ -297,6 +299,17 @@ namespace {
                        name, type, dc);
     }
 
+    /// \brief Set the declaration context of each variable within the given
+    /// patterns to \p dc.
+    static void setVarDeclContexts(SmallVectorImpl<Pattern *> &patterns,
+                                   DeclContext *dc) {
+      for (auto pattern : patterns) {
+        auto pat = pattern->getSemanticsProvidingPattern();
+        if (auto named = dyn_cast<NamedPattern>(pat))
+          named->getDecl()->setDeclContext(dc);
+      }
+    }
+
     ValueDecl *VisitFunctionDecl(clang::FunctionDecl *decl) {
       auto dc = Impl.importDeclContext(decl->getDeclContext());
       if (!dc)
@@ -304,31 +317,41 @@ namespace {
 
       // Import the function type. If we have parameters, make sure their names
       // get into the resulting function type.
+      SmallVector<Pattern *, 4> argPatterns;
+      SmallVector<Pattern *, 4> bodyPatterns;
       Type type;
       if (decl->param_size())
         type = Impl.importFunctionType(
                  decl->getType()->getAs<clang::FunctionType>()->getResultType(),
                  { decl->param_begin(), decl->param_size() },
-                 decl->isVariadic());
+                 decl->isVariadic(), argPatterns, bodyPatterns);
       else
         type = Impl.importType(decl->getType());
 
       if (!type)
         return nullptr;
 
+      auto resultTy = type->castTo<FunctionType>()->getResult();
+
       auto name = Impl.importName(decl->getDeclName());
       if (name.empty())
         return nullptr;
 
-      return new (Impl.SwiftContext)
-               FuncDecl(SourceLoc(),
-                        Impl.importSourceLoc(decl->getLocStart()),
-                        name,
-                        Impl.importSourceLoc(decl->getLocation()),
-                        /*GenericParams=*/0,
-                        type,
-                        /*Body=*/nullptr,
-                        dc);
+      // FIXME: Poor location info.
+      auto loc = Impl.importSourceLoc(decl->getLocStart());
+      auto funcExpr = FuncExpr::create(Impl.SwiftContext, loc,
+                                       argPatterns, bodyPatterns,
+                                       TypeLoc::withoutLoc(resultTy),
+                                       nullptr, dc);
+      auto nameLoc = Impl.importSourceLoc(decl->getLocation());
+      auto result = new (Impl.SwiftContext) FuncDecl(SourceLoc(), loc,
+                                                     name, nameLoc,
+                                                     /*GenericParams=*/0,
+                                                     type, funcExpr,
+                                                     dc);
+      setVarDeclContexts(argPatterns, funcExpr);
+      setVarDeclContexts(bodyPatterns, funcExpr);
+      return result;
     }
 
     ValueDecl *VisitCXXMethodDecl(clang::CXXMethodDecl *decl) {
@@ -433,10 +456,14 @@ namespace {
         return nullptr;
 
       // Import the type that this method will have.
+      SmallVector<Pattern *, 4> argPatterns;
+      SmallVector<Pattern *, 4> bodyPatterns;
       auto type = Impl.importFunctionType(decl->getResultType(),
                                           { decl->param_begin(),
                                             decl->param_size() },
                                           decl->isVariadic(),
+                                          argPatterns,
+                                          bodyPatterns,
                                           decl->getSelector());
       if (!type)
         return nullptr;
@@ -712,7 +739,12 @@ ValueDecl *ClangImporter::Implementation::importDecl(clang::NamedDecl *decl) {
 
   SwiftDeclConverter converter(*this);
   auto result = converter.Visit(decl);
-  return ImportedDecls[decl->getCanonicalDecl()] = result;
+  auto canon = decl->getCanonicalDecl();
+  if (result) {
+    assert(!result->getClangDecl() || result->getClangDecl() == canon);
+    result->setClangDecl(canon);
+  }
+  return ImportedDecls[canon] = result;
 }
 
 DeclContext *

@@ -37,6 +37,7 @@ namespace swift {
 
 class ASTContext;
 class Identifier;
+class Pattern;
 class Type;
 class ValueDecl;
 
@@ -125,6 +126,8 @@ struct ClangImporter::Implementation {
   /// \param resultType The result type of the function.
   /// \param params The parameter types to the function.
   /// \param isVariadic Whether the function is variadic.
+  /// \param argPatterns The externally-visible patterns for the parameters.
+  /// \param bodyPatterns The patterns visible inside the function body.
   /// \param selector The Objective-C method selector to use for the names.
   ///
   /// \returns the imported function type, or null if the type cannot be
@@ -132,6 +135,8 @@ struct ClangImporter::Implementation {
   Type importFunctionType(clang::QualType resultType,
                           ArrayRef<clang::ParmVarDecl *> params,
                           bool isVariadic,
+                          SmallVectorImpl<Pattern*> &argPatterns,
+                          SmallVectorImpl<Pattern*> &bodyPatterns,
                           clang::Selector selector = clang::Selector());
 };
 

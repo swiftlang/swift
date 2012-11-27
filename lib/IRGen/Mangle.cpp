@@ -25,6 +25,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"
 
+#include "clang/AST/Decl.h"
+
 #include "IRGen.h"
 #include "IRGenModule.h"
 #include "Linking.h"
@@ -665,11 +667,21 @@ static StringRef mangleValueWitness(ValueWitness witness) {
 }
 
 void LinkEntity::mangle(raw_ostream &buffer) const {
-  // As a special case, functions can have external asm names.
-  if (getKind() == Kind::Function &&
-      !getDecl()->getAttrs().AsmName.empty()) {
-    buffer << getDecl()->getAttrs().AsmName;
-    return;
+  if (getKind() == Kind::Function) {
+    // As a special case, functions can have external asm names.
+    if (!getDecl()->getAttrs().AsmName.empty()) {
+      buffer << getDecl()->getAttrs().AsmName;
+      return;
+    }
+
+    // As another special case, Clang C functions don't get mangled at all.
+    // FIXME: When we can import C++, use Clang's mangler.
+    if (auto clangDecl = getDecl()->getClangDecl()) {
+      if (auto clangFunc = dyn_cast<clang::FunctionDecl>(clangDecl)) {
+        buffer << clangFunc->getName();
+        return;
+      }
+    }
   }
 
   // Otherwise, everything gets the common prefix.

@@ -73,7 +73,7 @@ static bool IRGenImportedModules(TranslationUnit *TU,
                                  bool IsREPL = true) {
   // IRGen the modules this module depends on.
   for (auto ModPair : TU->getImportedModules()) {
-    if (isa<BuiltinModule>(ModPair.second))
+    if (isa<BuiltinModule>(ModPair.second) || isa<ClangModule>(ModPair.second))
       continue;
 
     TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.second);

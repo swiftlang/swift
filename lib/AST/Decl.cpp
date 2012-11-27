@@ -193,6 +193,15 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLoc();
   llvm_unreachable("Unknown decl kind");
 }
 
+clang::Decl *Decl::getClangDeclSlow() {
+  return getASTContext().getClangDecl(this);
+}
+
+void Decl::setClangDecl(clang::Decl *decl) {
+  DeclBits.FromClang = true;
+  getASTContext().setClangDecl(this, decl);
+}
+
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
                                    ArrayRef<GenericParam> Params,
                                    SourceLoc RequiresLoc,

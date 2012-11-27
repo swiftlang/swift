@@ -19,6 +19,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
@@ -321,6 +322,8 @@ Type ClangImporter::Implementation::importFunctionType(
        clang::QualType resultType,
        ArrayRef<clang::ParmVarDecl *> params,
        bool isVariadic,
+       SmallVectorImpl<Pattern*> &argPatterns,
+       SmallVectorImpl<Pattern*> &bodyPatterns,
        clang::Selector selector) {
   // Cannot import variadic types.
   if (isVariadic)
@@ -333,6 +336,8 @@ Type ClangImporter::Implementation::importFunctionType(
 
   // Import the parameters.
   SmallVector<TupleTypeElt, 4> swiftParams;
+  SmallVector<TuplePatternElt, 4> argPatternElts;
+  SmallVector<TuplePatternElt, 4> bodyPatternElts;
   unsigned index = 0;
   for (auto param : params) {
     auto paramTy = param->getType();
@@ -359,22 +364,53 @@ Type ClangImporter::Implementation::importFunctionType(
                                      SwiftContext);
 
     // Figure out the name for this parameter.
-    Identifier name;
-    if (selector.isNull()) {
-      // When there is no selector, simply import the parameter name.
-      name = importName(param->getDeclName());
-    } else if (index > 0 && index < selector.getNumArgs()) {
+    Identifier bodyName = importName(param->getDeclName());
+    Identifier name = bodyName;
+    if (index > 0 && index < selector.getNumArgs()) {
       // For parameters after the first, the name comes from the selector.
       // The first parameter is always unnamed.
       name = importName(selector.getIdentifierInfoForSlot(index));
     }
 
+    // Compute the pattern to put into the body.
+    auto bodyVar
+      = new (SwiftContext) VarDecl(importSourceLoc(param->getLocation()),
+                                   bodyName, swiftParamTy, firstClangModule);
+    bodyVar->setClangDecl(param);
+    Pattern *bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
+    bodyPattern
+      = new (SwiftContext) TypedPattern(bodyPattern,
+                                        TypeLoc::withoutLoc(swiftParamTy));
+    bodyPatternElts.push_back(TuplePatternElt(bodyPattern));
+
+    // Compute the pattern to put into the argument list, which may be
+    // different (when there is a selector involved).
+    auto argVar = bodyVar;
+    auto argPattern = bodyPattern;
+    if (bodyName != name) {
+      argVar = new (SwiftContext) VarDecl(importSourceLoc(param->getLocation()),
+                                          name, swiftParamTy, firstClangModule);
+      argVar->setClangDecl(param);
+      argPattern = new (SwiftContext) NamedPattern(argVar);
+      argPattern
+        = new (SwiftContext) TypedPattern(argPattern,
+                                          TypeLoc::withoutLoc(swiftParamTy));
+    }
+    argPatternElts.push_back(TuplePatternElt(argPattern));
+
+    // Add the tuple element for the function type.
     swiftParams.push_back(TupleTypeElt(swiftParamTy, name));
     ++index;
   }
 
   // Form the parameter tuple.
   auto paramsTy = TupleType::get(swiftParams, SwiftContext);
+
+  // Form the body and argument patterns.
+  bodyPatterns.push_back(TuplePattern::create(SwiftContext, SourceLoc(),
+                                              bodyPatternElts, SourceLoc()));
+  argPatterns.push_back(TuplePattern::create(SwiftContext, SourceLoc(),
+                                             argPatternElts, SourceLoc()));
 
   // Form the function type.
   return FunctionType::get(paramsTy, swiftResultTy, SwiftContext);
