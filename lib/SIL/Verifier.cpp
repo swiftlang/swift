@@ -106,7 +106,7 @@ public:
            "Store operand type and dest type mismatch");
   }
 
-  void visitCopyInst(CopyInst *SI) {
+  void visitCopyAddrInst(CopyAddrInst *SI) {
     assert(SI->getSrc().getType()->is<LValueType>() &&
            "Src value should be lvalue");
     assert(SI->getDest().getType()->is<LValueType>() &&

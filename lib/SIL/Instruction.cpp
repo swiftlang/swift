@@ -213,9 +213,9 @@ StoreInst::StoreInst(SILLocation Loc, Value Src, Value Dest)
 }
 
 
-CopyInst::CopyInst(SILLocation Loc, Value SrcLValue, Value DestLValue,
-                   bool IsTakeOfSrc, bool IsInitializationOfDest)
-  : Instruction(ValueKind::CopyInst, Loc), Src(SrcLValue), Dest(DestLValue),
+CopyAddrInst::CopyAddrInst(SILLocation Loc, Value SrcLValue, Value DestLValue,
+                           bool IsTakeOfSrc, bool IsInitializationOfDest)
+  : Instruction(ValueKind::CopyAddrInst, Loc), Src(SrcLValue), Dest(DestLValue),
     IsTakeOfSrc(IsTakeOfSrc), IsInitializationOfDest(IsInitializationOfDest) {
 }
 

@@ -369,13 +369,13 @@ public:
   }
 };
   
-/// CopyInst - Represents a copy from one memory location to another. This is
-/// similar to:
+/// CopyAddrInst - Represents a copy from one memory location to another. This
+/// is similar to:
 ///   %1 = load %src
 ///   store %1 -> %dest
-/// but a copy instruction can be used with types that cannot be
-/// loaded, such as resilient value types.
-class CopyInst : public Instruction {
+/// but a copy instruction can be used with types that cannot be loaded, such as
+/// resilient value types.
+class CopyAddrInst : public Instruction {
   /// Src - The lvalue being loaded from.
   Value Src;
   /// Dest - The lvalue being stored to.
@@ -389,8 +389,8 @@ class CopyInst : public Instruction {
   bool IsInitializationOfDest : 1;
   
 public:
-  CopyInst(SILLocation Loc, Value Src, Value Dest,
-           bool IsTakeOfSrc, bool IsInitializationOfDest);
+  CopyAddrInst(SILLocation Loc, Value Src, Value Dest,
+               bool IsTakeOfSrc, bool IsInitializationOfDest);
   
   Value getSrc() const { return Src; }
   Value getDest() const { return Dest; }
@@ -398,7 +398,7 @@ public:
   bool isInitializationOfDest() const { return IsInitializationOfDest; }
   
   static bool classof(Value V) {
-    return V->getKind() == ValueKind::CopyInst;
+    return V->getKind() == ValueKind::CopyAddrInst;
   }
 };
 

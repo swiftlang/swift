@@ -161,8 +161,8 @@ public:
   void visitStoreInst(StoreInst *SI) {
     OS << "store " << getID(SI->getSrc()) << " to " << getID(SI->getDest());
   }
-  void visitCopyInst(CopyInst *CI) {
-    OS << "copy " << getID(CI->getSrc());
+  void visitCopyAddrInst(CopyAddrInst *CI) {
+    OS << "copy_addr " << getID(CI->getSrc());
     if (CI->isTakeOfSrc())
       OS << " [take]";
     OS << " to " << getID(CI->getDest());

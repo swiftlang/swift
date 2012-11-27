@@ -153,8 +153,9 @@ public:
     return insert(new StoreInst(Loc, Src, DestLValue));
   }
 
-  CopyInst *createCopy(SILLocation Loc, Value SrcLValue, Value DestLValue) {
-    return insert(new CopyInst(Loc, SrcLValue, DestLValue, false, false));
+  CopyAddrInst *createCopyAddr(SILLocation Loc, Value SrcLValue,
+                               Value DestLValue) {
+    return insert(new CopyAddrInst(Loc, SrcLValue, DestLValue, false, false));
   }
   
 
