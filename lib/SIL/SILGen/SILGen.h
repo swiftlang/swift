@@ -93,11 +93,7 @@ public:
   
   void visitAssignStmt(AssignStmt *S);
 
-  void visitReturnStmt(ReturnStmt *S) {
-    // FIXME: Should use empty tuple for "void" return.
-    Value ArgV = S->hasResult() ? visit(S->getResult()) : nullptr;
-    B.createReturn(S, ArgV);
-  }
+  void visitReturnStmt(ReturnStmt *S);
   
   void visitIfStmt(IfStmt *S);
   

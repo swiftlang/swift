@@ -125,6 +125,14 @@ void SILGen::visitAssignStmt(AssignStmt *S) {
   return emitAssignStmtRecursive(S, SrcV, S->getDest(), *this);
 }
 
+void SILGen::visitReturnStmt(ReturnStmt *S) {
+  Value ArgV = S->hasResult()
+    ? visit(S->getResult())
+    : B.createTuple(S, TupleType::getEmpty(F.getContext()),
+                    ArrayRef<Value>());
+  B.createReturn(S, ArgV);
+}
+
 void SILGen::visitIfStmt(IfStmt *S) {
   Condition Cond = emitCondition(S, S->getCond(), S->getElseStmt() != nullptr);
   
