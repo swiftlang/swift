@@ -75,7 +75,7 @@ ABSTRACT_VALUE(Instruction, Value)
   INST(RetainInst, Instruction)
   INST(ReleaseInst, Instruction)
   INST(DeallocInst, Instruction)
-  INST(DestroyInst, Instruction)
+  INST(DestroyAddrInst, Instruction)
 
   // SIL-only instructions that don't have an AST analog.
   INST(IndexAddrInst, Instruction)

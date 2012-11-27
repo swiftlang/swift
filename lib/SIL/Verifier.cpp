@@ -144,7 +144,7 @@ public:
     assert(DI->getOperand().getType()->is<LValueType>() &&
            "Operand of dealloc must be lvalue");
   }
-  void visitDestroyInst(DestroyInst *DI) {
+  void visitDestroyAddrInst(DestroyAddrInst *DI) {
     assert(DI->getOperand().getType()->is<LValueType>() &&
            "Operand of destroy must be lvalue");
   }

@@ -194,8 +194,8 @@ public:
   DeallocInst *createDealloc(Expr *E, Value Operand) {
     return insert(new DeallocInst(E, Operand));
   }
-  DestroyInst *createDestroy(Expr *E, Value Operand) {
-    return insert(new DestroyInst(E, Operand));
+  DestroyAddrInst *createDestroyAddr(Expr *E, Value Operand) {
+    return insert(new DestroyAddrInst(E, Operand));
   }
 
   //===--------------------------------------------------------------------===//

@@ -206,8 +206,8 @@ public:
   void visitDeallocInst(DeallocInst *DI) {
     OS << "dealloc " << getID(DI->getOperand());
   }
-  void visitDestroyInst(DestroyInst *DI) {
-    OS << "destroy " << getID(DI->getOperand());
+  void visitDestroyAddrInst(DestroyAddrInst *DI) {
+    OS << "destroy_addr " << getID(DI->getOperand());
   }
   
   void visitIndexAddrInst(IndexAddrInst *IAI) {

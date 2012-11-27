@@ -564,17 +564,17 @@ public:
   }
 };
 
-/// DestroyInst - Destroy the value at a memory location and deallocate the
+/// DestroyAddrInst - Destroy the value at a memory location and deallocate the
 /// memory. This is similar to:
 ///   %1 = load %operand
 ///   release %1
 ///   dealloc %operand
 /// but a destroy instruction can be used for types that cannot be loaded,
 /// such as resilient value types.
-class DestroyInst : public Instruction {
+class DestroyAddrInst : public Instruction {
   Value Operand;
 public:
-  DestroyInst(SILLocation Loc, Value Operand);
+  DestroyAddrInst(SILLocation Loc, Value Operand);
   
   Value getOperand() const { return Operand; }
   

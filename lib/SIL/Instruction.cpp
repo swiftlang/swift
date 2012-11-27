@@ -275,8 +275,8 @@ DeallocInst::DeallocInst(SILLocation Loc, Value Operand)
   : Instruction(ValueKind::DeallocInst, Loc), Operand(Operand) {
 }
 
-DestroyInst::DestroyInst(SILLocation Loc, Value Operand)
-  : Instruction(ValueKind::DestroyInst, Loc), Operand(Operand) {
+DestroyAddrInst::DestroyAddrInst(SILLocation Loc, Value Operand)
+  : Instruction(ValueKind::DestroyAddrInst, Loc), Operand(Operand) {
 }
 
 //===----------------------------------------------------------------------===//
