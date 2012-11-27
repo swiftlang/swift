@@ -238,7 +238,7 @@ ClangImporter::Implementation::importName(clang::DeclarationName name) {
 
 
 #pragma mark Name lookup
-void ClangImporter::lookupValue(ClangModule *module,
+void ClangImporter::lookupValue(Module *module,
                                 Module::AccessPathTy accessPath,
                                 Identifier name,
                                 NLKind lookupKind,

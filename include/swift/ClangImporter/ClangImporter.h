@@ -88,7 +88,7 @@ public:
   /// lookup.
   ///
   /// \param result Will be populated with the results of name lookup.
-  virtual void lookupValue(ClangModule *module,
+  virtual void lookupValue(Module *module,
                            Module::AccessPathTy accessPath, Identifier name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result);

@@ -57,7 +57,7 @@ public:
   /// lookup.
   ///
   /// \param result Will be populated with the results of name lookup.
-  virtual void lookupValue(ClangModule *module,
+  virtual void lookupValue(Module *module,
                            Module::AccessPathTy accessPath, Identifier name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) { }
@@ -67,8 +67,7 @@ public:
   /// \param module The module to search.
   ///
   /// \param type The type for which we are looking for extensions.
-  virtual ArrayRef<ExtensionDecl*> lookupExtensions(ClangModule *module,
-                                                    Type type) {
+  virtual ArrayRef<ExtensionDecl*> lookupExtensions(Module *module, Type type) {
     return {};
   }
 
@@ -81,7 +80,7 @@ public:
   /// \param name The name of the members we are looking for.
   ///
   /// \param result Will be populated with the results of name lookup.
-  virtual void lookupMembers(ClangModule *module, Type base, Identifier name,
+  virtual void lookupMembers(Module *module, Type base, Identifier name,
                              SmallVectorImpl<ValueDecl*> &result) { }
 };
 
