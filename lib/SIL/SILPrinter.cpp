@@ -104,12 +104,12 @@ public:
 
   void visitAllocVarInst(AllocVarInst *AVI) {
     OS << "alloc_var " << AVI->getDecl()->getName()
-       << ", type=" << AVI->getType().getString();
+       << ", $" << AVI->getType().getString();
 
   }
 
   void visitAllocTmpInst(AllocTmpInst *ATI) {
-    OS << "alloc_tmp type=" << ATI->getType().getString();
+    OS << "alloc_tmp $" << ATI->getType().getString();
   }
 
   void visitAllocBoxInst(AllocBoxInst *ABI) {
@@ -135,8 +135,8 @@ public:
   }
 
   void visitConstantRefInst(ConstantRefInst *DRI) {
-    OS << "constantref " << DRI->getDecl()->getName()
-    << ", type=" << DRI->getDecl()->getType().getString();
+    OS << "constant_ref $" << DRI->getDecl()->getType().getString() << ", @"
+       << DRI->getDecl()->getName();
   }
 
   void visitZeroValueInst(ZeroValueInst *ZVI) {
@@ -145,16 +145,16 @@ public:
 
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     const auto &lit = ILI->getValue();
-    OS << "integerliteral $" << ILI->getType().getString() << ' ' << lit;
+    OS << "integer_literal $" << ILI->getType().getString() << ", " << lit;
   }
   void visitFloatLiteralInst(FloatLiteralInst *FLI) {
     SmallVector<char, 12> Buffer;
     FLI->getValue().toString(Buffer);
-    OS << "floatliteral $" << FLI->getType().getString() << ' '
+    OS << "float_literal $" << FLI->getType().getString() << ", "
        << StringRef(Buffer.data(), Buffer.size());
   }
   void visitStringLiteralInst(StringLiteralInst *SLI) {
-    OS << "stringliteral \"" << SLI->getValue() << "\"";
+    OS << "string_literal \"" << SLI->getValue() << "\"";
   }
   void visitLoadInst(LoadInst *LI) {
     OS << "load " << getID(LI->getLValue());
@@ -195,7 +195,7 @@ public:
        << TEI->getFieldNo();
   }
   void visitMetatypeInst(MetatypeInst *MI) {
-    OS << "metatype " << MI->getMetaType().getString();
+    OS << "metatype $" << MI->getMetaType().getString();
   }
   
   void visitRetainInst(RetainInst *RI) {
@@ -216,7 +216,7 @@ public:
   }
 
   void visitIntegerValueInst(IntegerValueInst *IVI) {
-    OS << "integer_value " << IVI->getValue() << ", "
+    OS << "integer_value " << IVI->getValue() << ", $"
        << IVI->getType().getString();
   }
 

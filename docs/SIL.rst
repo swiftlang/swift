@@ -121,8 +121,8 @@ Operands
 
 Most instructions take only local ``%`` operands. Special instructions
 are needed to load a local operand value referencing a global constant or
-literal value, for example ``constant_ref`` for globals or ``int_literal`` for
-integers.
+literal value, for example ``constant_ref`` for globals or ``integer_literal`` 
+for integers.
 
 Types
 -----
@@ -242,7 +242,7 @@ integer_literal
 ```````````````
 ::
 
-  %1 = integer_literal $T 123
+  %1 = integer_literal $T, 123
   ; $T must be a builtin integer type
   ; %1 has type $T
 
@@ -253,7 +253,7 @@ float_literal
 `````````````
 ::
 
-  %1 = float_literal $T 1.23
+  %1 = float_literal $T, 1.23
   ; $T must be a builtin floating-point type
   ; %1 has type $T
 
