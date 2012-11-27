@@ -6,3 +6,5 @@ double_bin_op_block cfunc3(double (^)(double, double));
 
 void exit(int);
 
+double pow(double, double);
+
