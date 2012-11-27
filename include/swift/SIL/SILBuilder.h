@@ -185,14 +185,14 @@ public:
     return insert(new MetatypeInst(Expr));
   }
   
-  RetainInst *createRetain(Expr *E, Value Operand) {
-    return insert(new RetainInst(E, Operand));
+  RetainInst *createRetain(SILLocation Loc, Value Operand) {
+    return insert(new RetainInst(Loc, Operand));
   }
-  ReleaseInst *createRelease(Expr *E, Value Operand) {
-    return insert(new ReleaseInst(E, Operand));
+  ReleaseInst *createRelease(SILLocation Loc, Value Operand) {
+    return insert(new ReleaseInst(Loc, Operand));
   }
-  DeallocInst *createDealloc(Expr *E, Value Operand) {
-    return insert(new DeallocInst(E, Operand));
+  DeallocInst *createDealloc(SILLocation Loc, Value Operand) {
+    return insert(new DeallocInst(Loc, Operand));
   }
   DestroyAddrInst *createDestroyAddr(Expr *E, Value Operand) {
     return insert(new DestroyAddrInst(E, Operand));

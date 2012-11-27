@@ -25,8 +25,8 @@ class CleanupVar : public Cleanup {
   AllocBoxInst *box;
 public:
   CleanupVar(AllocBoxInst *box) : box(box) {}
-  void emit(SILGen &gen) {
-    gen.B.createRelease(nullptr, Value(box, 0));
+  void emit(SILGen &gen) override {
+    gen.B.createRelease(SILLocation(), Value(box, 0));
   }
 };
 
