@@ -153,12 +153,14 @@ public:
     return insert(new StoreInst(Loc, Src, DestLValue));
   }
 
-  CopyAddrInst *createCopyAddr(SILLocation Loc, Value SrcLValue,
-                               Value DestLValue) {
-    return insert(new CopyAddrInst(Loc, SrcLValue, DestLValue, false, false));
+  CopyAddrInst *createCopyAddr(SILLocation Loc,
+                               Value SrcLValue, Value DestLValue,
+                               bool isTake = false,
+                               bool isInitialize = false) {
+    return insert(new CopyAddrInst(Loc, SrcLValue, DestLValue,
+                                   isTake, isInitialize));
   }
   
-
   SpecializeInst *createSpecialize(SILLocation Loc, Value Operand,
                                    Type DestTy) {
     return insert(new SpecializeInst(Loc, Operand, DestTy));

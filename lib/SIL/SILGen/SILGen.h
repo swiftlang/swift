@@ -14,6 +14,7 @@
 #define SILGen_H
 
 #include "Cleanup.h"
+#include "Scope.h"
 #include "swift/SIL/Function.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/AST/ASTVisitor.h"
@@ -40,6 +41,9 @@ public:
 
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
+  /// ArgumentScope - The depth of the cleanup stack before generating argument
+  /// cleanups from the function prologue.
+  CleanupsDepth ArgumentScope;
 
   /// VarLocs - This is the address for the box in which an emitted
   /// variable is stored.
@@ -48,7 +52,7 @@ public:
   llvm::DenseMap<ValueDecl*, Value> VarLocs;
     
   bool hasVoidReturn;
-    
+
 public:
   SILGen(Function &F, FuncExpr *FE);
   ~SILGen();
@@ -64,7 +68,7 @@ public:
   SILBuilder &getBuilder() { return B; }
   
   //===--------------------------------------------------------------------===//
-  // Statements.
+  // Control flow
   //===--------------------------------------------------------------------===//
   
   /// emitCondition - Emit a boolean expression as a control-flow condition.
@@ -84,6 +88,41 @@ public:
   /// through any cleanups we might need to run.
   void emitBranch(JumpDest D);
   
+  //===--------------------------------------------------------------------===//
+  // Memory management
+  //===--------------------------------------------------------------------===//
+  
+  /// emitCopy - Emits the instructions necessary to store a copy of a value
+  /// to an address.
+  /// - For trivial loadable types, a 'store v to dest' is generated.
+  /// - For reference types, 'v' is retained before being stored.
+  /// - For loadable types with reference type members, the reference type
+  ///   members are retained before being stored.
+  /// - For address-only types, this generates a copy_addr instruction.
+  /// The operation may be either an initialization, which stores the value to
+  /// uninitialized memory, or an assignment, which replaces an already existing
+  /// value stored at the destination address.
+  ///
+  /// \param loc - The location information to assign to the generated
+  ///   instructions.
+  /// \param v - The value to copy. It should be either a value of a loadable
+  ///   type or the address of a value of an address-only type.
+  /// \param dest - The value of the address to store the copy to. It should be
+  ///   an address type matching the type of v.
+  /// \param isAssignment - If true, indicates that there is already a value
+  ///   stored at the destination address. The existing value will be loaded
+  ///   and released if necessary.
+  void emitCopy(SILLocation loc, Value v, Value dest, bool isAssignment);
+
+  /// emitDestroy - Emits the instructions necessary to destroy a value.
+  /// - For trivial loadable types, this is a no-op.
+  /// - For reference types, 'v' is released.
+  /// - For loadable types with reference type members, the reference types
+  ///   are all released.
+  /// - For address-only types, the value at the address is destroyed using
+  ///   a destroy_addr instruction.
+  void emitDestroy(SILLocation loc, Value v);
+    
   //===--------------------------------------------------------------------===//
   // Statements
   //===--------------------------------------------------------------------===//

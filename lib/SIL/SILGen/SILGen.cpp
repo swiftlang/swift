@@ -30,7 +30,8 @@ static bool isVoidableType(Type type) {
 }
 
 SILGen::SILGen(Function &F, FuncExpr *FE)
-  : F(F), B(new (F) BasicBlock(&F), F), Cleanups(*this),
+  : F(F), B(new (F) BasicBlock(&F), F),
+    Cleanups(*this), ArgumentScope(Cleanups.getCleanupsDepth()),
     hasVoidReturn(isVoidableType(FE->getResultType(F.getContext()))) {
 
   emitProlog(FE);
@@ -43,6 +44,9 @@ SILGen::~SILGen() {
   // return), then we're done.
   if (!B.hasValidInsertionPoint())
     return;
+  
+  // Clean up arguments.
+  Cleanups.endScope(ArgumentScope);
 
   // If we have an unterminated block, it is either an implicit return of an
   // empty tuple, or a dynamically unreachable location.

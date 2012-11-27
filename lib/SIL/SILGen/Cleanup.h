@@ -71,9 +71,6 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   
   CleanupsDepth InnermostScope;
   
-  /// endScope - used by the Scope class.
-  void endScope(CleanupsDepth Depth);
-
   void popAndEmitTopCleanup();
   
   Cleanup &initCleanup(Cleanup &cleanup, size_t allocSize, CleanupState state);
@@ -119,6 +116,9 @@ public:
 };
 
   
+
+  /// endScope - used by the Scope class.
+  void endScope(CleanupsDepth Depth);
 
 } // end namespace Lowering
 } // end namespace swift
