@@ -65,26 +65,42 @@ struct ClangImporter::Implementation {
   /// \brief Mapping of already-imported declarations.
   llvm::DenseMap<clang::Decl *, Decl *> ImportedDecls;
 
+  /// \brief Generation number that is used for crude versioning.
+  ///
+  /// This value is incremented every time a new module is imported.
+  unsigned Generation = 1;
+
   /// \brief A cached set of extensions for a particular Objective-C class.
   struct CachedExtensions {
-    CachedExtensions() : Extensions(new SmallVector<ExtensionDecl *, 4>) { }
+    CachedExtensions()
+      : Extensions(new SmallVector<ExtensionDecl *, 4>), Generation(0) { }
+
     CachedExtensions(const CachedExtensions &) = delete;
     CachedExtensions &operator=(const CachedExtensions &) = delete;
 
-    CachedExtensions(CachedExtensions &&other) : Extensions(other.Extensions) {
+    CachedExtensions(CachedExtensions &&other)
+      : Extensions(other.Extensions), Generation(other.Generation)
+    {
       other.Extensions = nullptr;
+      other.Generation = 0;
     }
 
     CachedExtensions &operator=(CachedExtensions &&other) {
       delete Extensions;
       Extensions = other.Extensions;
+      Generation = other.Generation;
       other.Extensions = nullptr;
+      other.Generation = 0;
       return *this;
     }
 
     ~CachedExtensions() { delete Extensions; }
-    
+
+    /// \brief The cached extensions.
     SmallVector<ExtensionDecl *, 4> *Extensions;
+
+    /// \brief Generation number used to tell when this cache has gone stale.
+    unsigned Generation;
   };
 
   /// \brief Cache of the class extensions.

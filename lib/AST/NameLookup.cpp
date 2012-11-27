@@ -30,6 +30,9 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
   bool CurModuleHasTypeDecl = false;
   llvm::SmallPtrSet<CanType, 8> CurModuleTypes;
 
+  // FIXME: Hack to avoid searching Clang modules more than once.
+  bool searchedClangModule = isa<ClangModule>(CurModule);
+
   // Find all extensions in this module.
   for (ExtensionDecl *ED : CurModule->lookupExtensions(BaseType)) {
     for (Decl *Member : ED->getMembers()) {
@@ -74,7 +77,15 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
   for (auto &ImpEntry : TU.getImportedModules()) {
     if (!Visited.insert(ImpEntry.second))
       continue;
-    
+
+    // FIXME: Don't search Clang modules more than once.
+    if (isa<ClangModule>(ImpEntry.second)) {
+      if (searchedClangModule)
+        continue;
+
+      searchedClangModule = true;
+    }
+
     for (ExtensionDecl *ED : ImpEntry.second->lookupExtensions(BaseType)) {
       for (Decl *Member : ED->getMembers()) {
         if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
@@ -623,10 +634,16 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     }
   }
 
+  // Track whether we've already searched the Clang modules.
+  // FIXME: This is a weird hack. We either need to filter within the
+  // Clang module importer, or we need to change how this works.
+  bool searchedClangModule = false;
+  
   // Do a local lookup within the current module.
   llvm::SmallVector<ValueDecl*, 4> CurModuleResults;
   M.lookupValue(Module::AccessPathTy(), Name, NLKind::UnqualifiedLookup,
                 CurModuleResults);
+  searchedClangModule = isa<ClangModule>(&M);
   for (ValueDecl *VD : CurModuleResults)
     Results.push_back(Result::getModuleMember(VD));
 
@@ -651,6 +668,14 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   for (auto &ImpEntry : TU.getImportedModules()) {
     if (!Visited.insert(ImpEntry.second))
       continue;
+
+    // FIXME: Only searching Clang modules once.
+    if (isa<ClangModule>(ImpEntry.second)) {
+      if (searchedClangModule)
+        continue;
+
+      searchedClangModule = true;
+    }
 
     SmallVector<ValueDecl*, 8> ImportedModuleResults;
     ImpEntry.second->lookupValue(ImpEntry.first, Name, NLKind::UnqualifiedLookup,

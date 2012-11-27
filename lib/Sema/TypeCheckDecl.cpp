@@ -808,8 +808,18 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       
       // Look in imported modules.
       if (!VD->getAttrs().isInfix()) {
+        // FIXME: Hack to avoid searching Clang modules more than once.
+        bool searchedClangModule = false;
         for (auto &ModPath : TU->getImportedModules()) {
           if (Module *Mod = ModPath.second) {
+            // FIXME: Only searching Clang modules once.
+            if (isa<ClangModule>(Mod)) {
+              if (searchedClangModule)
+                continue;
+
+              searchedClangModule = true;
+            }
+
             SmallVector<ValueDecl *, 4> Found;
             Mod->lookupValue(Module::AccessPathTy(), VD->getName(),
                              NLKind::QualifiedLookup, Found);

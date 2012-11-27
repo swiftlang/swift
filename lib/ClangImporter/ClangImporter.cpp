@@ -188,6 +188,9 @@ Module *ClangImporter::loadModule(
   if (!Impl.firstClangModule)
     Impl.firstClangModule = result;
 
+  // Bump the generation count.
+  ++Impl.Generation;
+
   return result;
 }
 
@@ -283,8 +286,15 @@ ClangImporter::lookupExtensions(Module *module, Type type) {
   if (!objcClass)
     return { };
 
-  auto extensions = Impl.ClassExtensions[classDecl].Extensions;
-  extensions->clear(); // FIXME: Inefficient.
+  // Check the cache. If it is up-to-date, use it.
+  auto &cache = Impl.ClassExtensions[classDecl];
+  if (cache.Generation == Impl.Generation)
+    return *cache.Extensions;
+
+  // Rebuild the cache.
+  cache.Generation = Impl.Generation;
+  auto extensions = cache.Extensions;
+  extensions->clear();
   for (auto category = objcClass->getCategoryList(); category;
        category = category->getNextClassCategory()) {
     if (auto imported = cast_or_null<ExtensionDecl>(Impl.importDecl(category)))
