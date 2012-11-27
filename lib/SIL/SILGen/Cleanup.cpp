@@ -101,6 +101,14 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest) {
   B.createBranch(Dest.getBlock());
 }
 
+void CleanupManager::emitReturnAndCleanups(SILLocation loc, Value returnValue) {
+  SILBuilder &B = Gen.getBuilder();
+  assert(B.hasValidInsertionPoint() && "Inserting return in invalid spot");
+  for (auto &cleanup : Stack)
+    cleanup.emit(Gen);
+  B.createReturn(loc, returnValue);
+}
+
 Cleanup &CleanupManager::initCleanup(Cleanup &cleanup,
                                      size_t allocSize,
                                      CleanupState state)

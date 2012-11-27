@@ -41,9 +41,6 @@ public:
 
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
-  /// ArgumentScope - The depth of the cleanup stack before generating argument
-  /// cleanups from the function prologue.
-  CleanupsDepth ArgumentScope;
 
   /// VarLocs - This is the address for the box in which an emitted
   /// variable is stored.

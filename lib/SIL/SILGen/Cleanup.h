@@ -18,10 +18,12 @@
 #define CLEANUP_H
 
 #include "JumpDest.h"
+#include "swift/SIL/SILLocation.h"
 
 namespace swift {
   class BasicBlock;
   class Function;
+  class Value;
   
 namespace Lowering {
   class SILGen;
@@ -74,6 +76,9 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   void popAndEmitTopCleanup();
   
   Cleanup &initCleanup(Cleanup &cleanup, size_t allocSize, CleanupState state);
+  
+  void endScope(CleanupsDepth depth);
+  
 public:
   CleanupManager(SILGen &Gen)
     : Gen(Gen), InnermostScope(Stack.stable_end()) {
@@ -85,9 +90,14 @@ public:
   }
   
   /// emitBranchAndCleanups - Emit a branch to the given jump destination,
-  /// threading out through any cleanups we might need to run.  This does not
-  /// pop the cleanup stack.
+  /// threading out through any cleanups we need to run. This does not pop the
+  /// cleanup stack.
   void emitBranchAndCleanups(JumpDest Dest);
+  
+  /// emitReturnAndCleanups - Emit a return from the current function, threading
+  /// out through all active cleanups that need to run. This does not pop the
+  /// cleanup stack.
+  void emitReturnAndCleanups(SILLocation loc, Value returnValue);
   
   /// pushCleanup - Push a new cleanup.
   template<class T, class... A>
@@ -113,14 +123,7 @@ public:
     return pushCleanupInState<T, A...>(CleanupState::Active,
                                        ::std::forward<A>(args)...);
   }
-  
-  void endScope(CleanupsDepth depth);
 };
-
-  
-
-  /// endScope - used by the Scope class.
-  void endScope(CleanupsDepth Depth);
 
 } // end namespace Lowering
 } // end namespace swift

@@ -129,7 +129,7 @@ void SILGen::visitReturnStmt(ReturnStmt *S) {
     ? visit(S->getResult())
     : B.createTuple(S, TupleType::getEmpty(F.getContext()),
                     ArrayRef<Value>());
-  B.createReturn(S, ArgV);
+  Cleanups.emitReturnAndCleanups(S, ArgV);
 }
 
 void SILGen::visitIfStmt(IfStmt *S) {

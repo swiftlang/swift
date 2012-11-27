@@ -31,7 +31,7 @@ static bool isVoidableType(Type type) {
 
 SILGen::SILGen(Function &F, FuncExpr *FE)
   : F(F), B(new (F) BasicBlock(&F), F),
-    Cleanups(*this), ArgumentScope(Cleanups.getCleanupsDepth()),
+    Cleanups(*this),
     hasVoidReturn(isVoidableType(FE->getResultType(F.getContext()))) {
 
   emitProlog(FE);
@@ -53,9 +53,8 @@ SILGen::~SILGen() {
   // If we have an unterminated block, it is either an implicit return of an
   // empty tuple, or a dynamically unreachable location.
   if (hasVoidReturn) {
-    Cleanups.endScope(ArgumentScope);
-    auto EmptyTuple = B.createEmptyTuple(SILLocation());
-    B.createReturn(SILLocation(), EmptyTuple);
+    Value emptyTuple = B.createEmptyTuple(SILLocation());
+    Cleanups.emitReturnAndCleanups(SILLocation(), emptyTuple);
   } else {
     B.createUnreachable();
   }
