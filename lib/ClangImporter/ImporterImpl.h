@@ -73,7 +73,7 @@ struct ClangImporter::Implementation {
   /// \brief A cached set of extensions for a particular Objective-C class.
   struct CachedExtensions {
     CachedExtensions()
-      : Extensions(new SmallVector<ExtensionDecl *, 4>), Generation(0) { }
+      : Extensions(nullptr), Generation(0) { }
 
     CachedExtensions(const CachedExtensions &) = delete;
     CachedExtensions &operator=(const CachedExtensions &) = delete;

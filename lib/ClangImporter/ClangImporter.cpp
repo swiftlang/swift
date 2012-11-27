@@ -288,18 +288,34 @@ ClangImporter::lookupExtensions(Module *module, Type type) {
 
   // Check the cache. If it is up-to-date, use it.
   auto &cache = Impl.ClassExtensions[classDecl];
-  if (cache.Generation == Impl.Generation)
-    return *cache.Extensions;
+  if (cache.Generation == Impl.Generation) {
+    if (cache.Extensions)
+      return *cache.Extensions;
+
+    return { };
+  }
 
   // Rebuild the cache.
   cache.Generation = Impl.Generation;
   auto extensions = cache.Extensions;
-  extensions->clear();
+  if (extensions)
+    extensions->clear();
   for (auto category = objcClass->getCategoryList(); category;
        category = category->getNextClassCategory()) {
-    if (auto imported = cast_or_null<ExtensionDecl>(Impl.importDecl(category)))
+    if (auto imported = cast_or_null<ExtensionDecl>(Impl.importDecl(category))){
+      if (!extensions) {
+        extensions = new SmallVector<ExtensionDecl *, 4>;
+
+        // The dense map may have been re-allocated, so we can't use 'cache'
+        // here.
+        Impl.ClassExtensions[classDecl].Extensions = extensions;
+      }
       extensions->push_back(imported);
+    }
   }
 
-  return *extensions;
+  if (extensions)
+    return *extensions;
+
+  return { };
 }
