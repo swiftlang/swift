@@ -335,10 +335,10 @@ storage for the values inside the box. The box will be initialized
 with a retain count of 1; the storage will be uninitialized and must
 be initialized with ``store`` instructions before the address can be
 ``load``-ed or the box can be ``release``-d. When the box's retain count
-reaches zero, the values inside the box will all be ``destroy``-ed or
-``release``-d if necessary. Boxes are normally heap-allocated and released
-with a ``release`` instruction, but optimization may lower the allocation to a
-stack allocation and the release to a ``dealloc_ref``.
+reaches zero, the values inside the box will all be ``release``-d if necessary.
+Boxes are normally heap-allocated and released with a ``release`` instruction,
+but optimization may lower the allocation to a stack allocation and the
+release to a ``dealloc_ref``.
 
 alloc_array
 ```````````
@@ -406,18 +406,6 @@ be released to reference count zero; it must instead be deallocated with a
 ``dealloc_ref stack`` instruction. Releasing an address or value type is an
 error.
 
-destroy
-```````
-::
-
-  destroy %0
-  ; %0 must be of a loadable value type
-
-Destroys the value ``%0``. If the type of ``%0`` is POD, this is a no-op.
-Destroying a loadable aggregate type is equivalent to ``release``-ing all
-of its reference type elements and ``destroy``-ing all of its value type
-elements with nontrivial destructors.
-
 destroy_addr
 ````````````
 ::
@@ -428,7 +416,7 @@ destroy_addr
 Destroys the value in memory at address ``%0``. This is equivalent to::
 
   %1 = load %0
-  destroy %1
+  release %1
 
 except that ``destroy_addr`` must be used if ``%0`` is of an address-only type.
 This only destroys the referenced value; the memory may additionally need to be
@@ -485,9 +473,9 @@ attributes:
   ``copy_addr`` will retain resources in ``%0`` so that both ``%0`` and ``%1``
   are valid after the instruction.
 * ``assign`` indicates that ``%1`` already contains a valid value which must be
-  ``destroy``-ed or ``release``-d before being replaced with the value at
-  ``%0``. Without ``assign``, ``copy_addr`` will overwrite the memory at ``%1``
-  as if it is uninitialized.
+  ``release``-d before being replaced with the value at ``%0``. Without
+  ``assign``, ``copy_addr`` will overwrite the memory at ``%1`` as if it is
+  uninitialized.
 
 The three attributed forms thus behave like the following loadable type
 operations::
@@ -748,8 +736,6 @@ will be emitted as the following SIL::
 
     ; expression "f(a)"
     %4 = apply %3(%2)
-    ; cleanup for full expr "f(a)"
-    destroy %4 ; destroy temporary return value
 
     ; cleanup for block
     release %a_alloc#0
@@ -773,7 +759,6 @@ is made explicit in the SIL codegen. Optimization will simplify that into this::
 
     %f = constant_ref $(FragileType) -> FragileType, @f
     %1 = apply %f(%b)
-    destroy %1
 
     %void = tuple ()
     return %void
