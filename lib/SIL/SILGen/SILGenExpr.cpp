@@ -71,11 +71,11 @@ Value SILGen::visitMaterializeExpr(MaterializeExpr *E) {
 
 
 Value SILGen::visitRequalifyExpr(RequalifyExpr *E) {
-  return B.createConvert(E, visit(E->getSubExpr()));
+  return B.createConvert(E, visit(E->getSubExpr()), E->getType());
 }
 
 Value SILGen::visitFunctionConversionExpr(FunctionConversionExpr *E) {
-  return B.createConvert(E, visit(E->getSubExpr()));
+  return B.createConvert(E, visit(E->getSubExpr()), E->getType());
 }
 
 Value SILGen::visitParenExpr(ParenExpr *E) {
@@ -86,7 +86,7 @@ Value SILGen::visitTupleExpr(TupleExpr *E) {
   llvm::SmallVector<Value, 10> ArgsV;
   for (auto &I : E->getElements())
     ArgsV.push_back(visit(I));
-  return B.createTuple(E, ArgsV);
+  return B.createTuple(E, E->getType(), ArgsV);
 }
 
 Value SILGen::visitGetMetatypeExpr(GetMetatypeExpr *E) {
@@ -103,7 +103,8 @@ Value SILGen::visitAddressOfExpr(AddressOfExpr *E) {
 
 
 Value SILGen::visitTupleElementExpr(TupleElementExpr *E) {
-  return B.createTupleElement(E, visit(E->getBase()), E->getFieldNumber());
+  return B.createTupleElement(E, visit(E->getBase()), E->getFieldNumber(),
+                              E->getType());
 }
 
 
@@ -115,11 +116,12 @@ Value SILGen::emitArrayInjectionCall(Value ObjectPtr, Value BasePtr,
                                      Expr *ArrayInjectionFunction) {
   // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
   if (!BasePtr.getType()->isEqual(F.getContext().TheRawPointerType))
-    BasePtr = B.createConvert(F.getContext().TheRawPointerType, BasePtr);
+    BasePtr = B.createConvert(SILLocation(), BasePtr,
+                              F.getContext().TheRawPointerType);
 
   Value InjectionFn = visit(ArrayInjectionFunction);
   Value InjectionArgs[] = { BasePtr, ObjectPtr, Length };
-  return B.createApply(InjectionFn, InjectionArgs);
+  return B.createApply(SILLocation(), InjectionFn, InjectionArgs);
 }
 
 
@@ -184,7 +186,7 @@ Value SILGen::emitTupleShuffle(Expr *E, ArrayRef<Value> InOps,
     break;
   }
 
-  return B.createTuple(E, ResultElements);
+  return B.createTuple(E, E->getType(), ResultElements);
 }
 
 Value SILGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
@@ -194,7 +196,8 @@ Value SILGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
   SmallVector<Value, 8> InElts;
   unsigned EltNo = 0;
   for (auto &InField : Op.getType()->castTo<TupleType>()->getFields())
-    InElts.push_back(B.createTupleElement(InField.getType(), Op, EltNo++));
+    InElts.push_back(B.createTupleElement(SILLocation(), Op, EltNo++,
+                                          InField.getType()));
 
   return emitTupleShuffle(E, InElts, E->getElementMapping(),
                           E->getVarargsInjectionFunctionOrNull());

@@ -107,16 +107,12 @@ public:
     return insert(new AllocVarInst(VD));
   }
 
-  AllocTmpInst *createAllocTmp(MaterializeExpr *Expr) {
-    return insert(new AllocTmpInst(Expr));
+  AllocTmpInst *createAllocTmp(SILLocation Loc) {
+    return insert(new AllocTmpInst(Loc));
   }
 
-  AllocBoxInst *createAllocBox(VarDecl *VD) {
-    return insert(new AllocBoxInst(VD, F));
-  }
-  
-  AllocBoxInst *createAllocBox(Expr *E, Type ElementType) {
-    return insert(new AllocBoxInst(E, ElementType, F));
+  AllocBoxInst *createAllocBox(SILLocation Loc, Type ElementType) {
+    return insert(new AllocBoxInst(Loc, ElementType, F));
   }
 
   AllocArrayInst *createAllocArray(Expr *E, Type ElementType,
@@ -124,19 +120,16 @@ public:
     return insert(new AllocArrayInst(E, ElementType, NumElements, F));
   }
 
-  ApplyInst *createApply(ApplyExpr *Expr, Value Fn, ArrayRef<Value> Args) {
-    return insert(ApplyInst::create(Expr, Fn, Args, F));
-  }
-  ApplyInst *createApply(Value Fn, ArrayRef<Value> Args) {
-    return insert(ApplyInst::create(Fn, Args, F));
+  ApplyInst *createApply(SILLocation Loc, Value Fn, ArrayRef<Value> Args) {
+    return insert(ApplyInst::create(Loc, Fn, Args, F));
   }
 
   ConstantRefInst *createConstantRef(DeclRefExpr *Expr) {
     return insert(new ConstantRefInst(Expr));
   }
 
-  ZeroValueInst *createZeroValue(VarDecl *D) {
-    return insert(new ZeroValueInst(D));
+  ZeroValueInst *createZeroValue(SILLocation Loc, Type Ty) {
+    return insert(new ZeroValueInst(Loc, Ty));
   }
 
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E) {
@@ -152,61 +145,41 @@ public:
     return insert(new StringLiteralInst(E));
   }
 
-  LoadInst *createLoad(LoadExpr *Expr, Value LV) {
-    return insert(new LoadInst(Expr, LV));
+  LoadInst *createLoad(SILLocation Loc, Value LV) {
+    return insert(new LoadInst(Loc, LV));
   }
 
-  StoreInst *createStore(AssignStmt *S, Value Src, Value DestLValue) {
-    return insert(new StoreInst(S, Src, DestLValue));
+  StoreInst *createStore(SILLocation Loc, Value Src, Value DestLValue) {
+    return insert(new StoreInst(Loc, Src, DestLValue));
   }
 
-  CopyInst *createCopy(Expr *E, Value SrcLValue, Value DestLValue) {
-    return insert(new CopyInst(E, SrcLValue, DestLValue, false, false));
+  CopyInst *createCopy(SILLocation Loc, Value SrcLValue, Value DestLValue) {
+    return insert(new CopyInst(Loc, SrcLValue, DestLValue, false, false));
   }
   
-  StoreInst *createStore(VarDecl *VD, Value Src, Value DestLValue) {
-    return insert(new StoreInst(VD, Src, DestLValue));
-  }
-  StoreInst *createStore(Expr *E, Value Src, Value DestLValue) {
-    return insert(new StoreInst(E, Src, DestLValue));
-  }
 
-  SpecializeInst *createSpecialize(SpecializeExpr *SE, Value Operand,
+  SpecializeInst *createSpecialize(SILLocation Loc, Value Operand,
                                    Type DestTy) {
-    return insert(new SpecializeInst(SE, Operand, DestTy));
+    return insert(new SpecializeInst(Loc, Operand, DestTy));
   }
 
 
-  ConvertInst *createConvert(ImplicitConversionExpr *E, Value Op) {
-    return insert(new ConvertInst(E, Op));
-  }
-  ConvertInst *createConvert(Type Ty, Value Op) {
-    return insert(new ConvertInst(Ty, Op));
+  ConvertInst *createConvert(SILLocation Loc, Value Op, Type Ty) {
+    return insert(new ConvertInst(Loc, Op, Ty));
   }
 
-  TupleInst *createTuple(Expr *E, ArrayRef<Value> Elements) {
-    return insert(TupleInst::create(E, Elements, F));
-  }
-  TupleInst *createTuple(Type Ty, ArrayRef<Value> Elements) {
-    return insert(TupleInst::create(Ty, Elements, F));
+  TupleInst *createTuple(SILLocation Loc, Type Ty, ArrayRef<Value> Elements) {
+    return insert(TupleInst::create(Loc, Ty, Elements, F));
   }
 
-  Value createTupleElement(TupleElementExpr *E, Value Operand,
-                           unsigned FieldNo) {
+  Value createTupleElement(SILLocation Loc, Value Operand, unsigned FieldNo,
+                           Type ResultTy) {
     // Fold tupleelement(tuple(a,b,c), 1) -> b.
     if (TupleInst *TI = dyn_cast<TupleInst>(Operand))
       return TI->getElements()[FieldNo];
 
-    return insert(new TupleElementInst(E, Operand, FieldNo));
+    return insert(new TupleElementInst(Loc, Operand, FieldNo, ResultTy));
   }
-  Value createTupleElement(Type ResultTy, Value Operand, unsigned FieldNo) {
-    // Fold tupleelement(tuple(a,b,c), 1) -> b.
-    if (TupleInst *TI = dyn_cast<TupleInst>(Operand))
-      return TI->getElements()[FieldNo];
-
-    return insert(new TupleElementInst(ResultTy, Operand, FieldNo));
-  }
-
   MetatypeInst *createMetatype(MetatypeExpr *Expr) {
     return insert(new MetatypeInst(Expr));
   }
@@ -245,14 +218,13 @@ public:
     return insertTerminator(new UnreachableInst(F));
   }
 
-  ReturnInst *createReturn(ReturnStmt *Stmt, Value ReturnValue) {
-    return insertTerminator(new ReturnInst(Stmt, ReturnValue));
+  ReturnInst *createReturn(SILLocation Loc, Value ReturnValue) {
+    return insertTerminator(new ReturnInst(Loc, ReturnValue));
   }
   
-  CondBranchInst *createCondBranch(Stmt *BranchStmt, Value Cond,
+  CondBranchInst *createCondBranch(SILLocation Loc, Value Cond,
                                    BasicBlock *Target1, BasicBlock *Target2) {
-    return insertTerminator(new CondBranchInst(BranchStmt, Cond,
-                                               Target1, Target2));
+    return insertTerminator(new CondBranchInst(Loc, Cond, Target1, Target2));
   }
     
   BranchInst *createBranch(BasicBlock *TargetBlock) {

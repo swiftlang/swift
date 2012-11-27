@@ -159,8 +159,7 @@ public:
 /// store to the temporary.
 class AllocTmpInst : public AllocInst {
 public:
-
-  AllocTmpInst(MaterializeExpr *E);
+  AllocTmpInst(SILLocation Loc);
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::AllocTmpInst;
@@ -176,8 +175,7 @@ public:
 class AllocBoxInst : public Instruction {
   Type ElementType;
 public:
-  AllocBoxInst(VarDecl *VD, SILBase &B);
-  AllocBoxInst(Expr *E, Type ElementType, SILBase &B);
+  AllocBoxInst(SILLocation Loc, Type ElementType, SILBase &B);
 
   Type getElementType() const { return ElementType; }
 
@@ -198,7 +196,8 @@ class AllocArrayInst : public Instruction {
   Value NumElements;
 public:
 
-  AllocArrayInst(Expr *E, Type ElementType, Value NumElements, SILBase &B);
+  AllocArrayInst(SILLocation Loc, Type ElementType, Value NumElements,
+                 SILBase &B);
 
   Type getElementType() const { return ElementType; }
   Value getNumElements() const { return NumElements; }
@@ -222,10 +221,8 @@ class ApplyInst : public Instruction {
   ApplyInst(SILLocation Loc, Type Ty, Value Callee, ArrayRef<Value> Args);
 
 public:
-  static ApplyInst *create(ApplyExpr *Expr, Value Callee,
+  static ApplyInst *create(SILLocation Loc, Value Callee,
                            ArrayRef<Value> Args, Function &F);
-  static ApplyInst *create(Value Callee, ArrayRef<Value> Args, Function &F);
-
   
   Value getCallee() { return Callee; }
   
@@ -275,7 +272,7 @@ public:
 /// explicitly initialized.
 class ZeroValueInst : public Instruction {
 public:
-  ZeroValueInst(VarDecl *D);
+  ZeroValueInst(SILLocation Loc, Type Ty);
 
   /// getType() is ok since this is known to only have one type.
   Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
@@ -355,7 +352,7 @@ public:
   ///
   /// \param LValue The Value representing the lvalue (address) to
   ///        use for the load.
-  LoadInst(LoadExpr *E, Value LValue);
+  LoadInst(SILLocation Loc, Value LValue);
 
   Value getLValue() const { return LValue; }
 
@@ -373,10 +370,7 @@ class StoreInst : public Instruction {
   Value Src, Dest;
 public:
 
-  StoreInst(AssignStmt *S, Value Src, Value Dest);
-  StoreInst(VarDecl *VD, Value Src, Value Dest);
-  StoreInst(MaterializeExpr *E, Value Src, Value Dest);
-  StoreInst(Expr *E, Value Src, Value Dest);
+  StoreInst(SILLocation Loc, Value Src, Value Dest);
 
   Value getSrc() const { return Src; }
   Value getDest() const { return Dest; }
@@ -406,7 +400,7 @@ class CopyInst : public Instruction {
   bool IsInitializationOfDest : 1;
   
 public:
-  CopyInst(Expr *E, Value Src, Value Dest,
+  CopyInst(SILLocation Loc, Value Src, Value Dest,
            bool IsTakeOfSrc, bool IsInitializationOfDest);
   
   Value getSrc() const { return Src; }
@@ -432,7 +426,7 @@ class SpecializeInst : public Instruction {
   Value Operand;
 public:
 
-  SpecializeInst(SpecializeExpr *SE, Value Operand, Type DestTy);
+  SpecializeInst(SILLocation Loc, Value Operand, Type DestTy);
 
   Value getOperand() const { return Operand; }
 
@@ -450,8 +444,7 @@ public:
 class ConvertInst : public Instruction {
   Value Operand;
 public:
-  ConvertInst(ImplicitConversionExpr *E, Value Operand);
-  ConvertInst(Type Ty, Value Operand);
+  ConvertInst(SILLocation Loc, Value Operand, Type Ty);
 
   Value getOperand() const { return Operand; }
 
@@ -473,8 +466,8 @@ class TupleInst : public Instruction {
 
   /// Private constructor.  Because of the storage requirements of
   /// TupleInst, object creation goes through 'create()'.
-  TupleInst(Expr *E, Type Ty, ArrayRef<Value> Elements);
-  static TupleInst *createImpl(Expr *E, Type Ty,
+  TupleInst(SILLocation Loc, Type Ty, ArrayRef<Value> Elements);
+  static TupleInst *createImpl(SILLocation Loc, Type Ty,
                                ArrayRef<Value> Elements, Function &F);
 
 public:
@@ -488,13 +481,10 @@ public:
     return const_cast<TupleInst*>(this)->getElements();
   }
 
-  /// Construct a TupleInst.  The two forms are used to ensure that these are
-  /// only created for specific syntactic forms.
-  static TupleInst *create(Expr *E, ArrayRef<Value> Elements, Function &F) {
-    return createImpl(E, Type(), Elements, F);
-  }
-  static TupleInst *create(Type Ty, ArrayRef<Value> Elements, Function &F) {
-    return createImpl(nullptr, Ty, Elements, F);
+  /// Construct a TupleInst.
+  static TupleInst *create(SILLocation Loc, Type Ty, ArrayRef<Value> Elements,
+                           Function &F) {
+    return createImpl(SILLocation(), Ty, Elements, F);
   }
 
   /// getType() is ok since this is known to only have one type.
@@ -534,8 +524,8 @@ class TupleElementInst : public Instruction {
   Value Operand;
   unsigned FieldNo;
 public:
-  TupleElementInst(TupleElementExpr *E, Value Operand, unsigned FieldNo);
-  TupleElementInst(Type ResultTy, Value Operand, unsigned FieldNo);
+  TupleElementInst(SILLocation Loc, Value Operand, unsigned FieldNo,
+                   Type ResultTy);
   
   Value getOperand() const { return Operand; }
   unsigned getFieldNo() const { return FieldNo; }
@@ -549,7 +539,7 @@ public:
 class RetainInst : public Instruction {
   Value Operand;
 public:
-  RetainInst(Expr *E, Value Operand);
+  RetainInst(SILLocation Loc, Value Operand);
   
   Value getOperand() const { return Operand; }
   
@@ -563,7 +553,7 @@ public:
 class ReleaseInst : public Instruction {
   Value Operand;
 public:
-  ReleaseInst(Expr *E, Value Operand);
+  ReleaseInst(SILLocation Loc, Value Operand);
   
   Value getOperand() const { return Operand; }
   
@@ -576,7 +566,7 @@ public:
 class DeallocInst : public Instruction {
   Value Operand;
 public:
-  DeallocInst(Expr *E, Value Operand);
+  DeallocInst(SILLocation Loc, Value Operand);
   
   Value getOperand() const { return Operand; }
   
@@ -595,7 +585,7 @@ public:
 class DestroyInst : public Instruction {
   Value Operand;
 public:
-  DestroyInst(Expr *E, Value Operand);
+  DestroyInst(SILLocation Loc, Value Operand);
   
   Value getOperand() const { return Operand; }
   
@@ -616,7 +606,7 @@ class IndexAddrInst : public Instruction {
   Value Operand;
   unsigned Index;
 public:
-  IndexAddrInst(Expr *E, Value Operand, unsigned Index);
+  IndexAddrInst(SILLocation Loc, Value Operand, unsigned Index);
 
   Value getOperand() const { return Operand; }
   unsigned getIndex() const { return Index; }
@@ -703,7 +693,7 @@ public:
   ///
   /// \param returnValue The value to be returned.
   ///
-  ReturnInst(ReturnStmt *S, Value ReturnValue);
+  ReturnInst(SILLocation Loc, Value ReturnValue);
 
   Value getReturnValue() const { return ReturnValue; }
 
@@ -746,7 +736,7 @@ class CondBranchInst : public TermInst {
   SILSuccessor DestBBs[2];
 public:
 
-  CondBranchInst(Stmt *TheStmt, Value Condition,
+  CondBranchInst(SILLocation Loc, Value Condition,
                  BasicBlock *TrueBB, BasicBlock *FalseBB);
 
   Value getCondition() const { return Condition; }

@@ -62,9 +62,9 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
       return;
     }
 
-    auto allocBox = Gen.B.createAllocBox(vd);
+    auto allocBox = Gen.B.createAllocBox(vd, vd->getType());
     auto addr = Value(allocBox, 1);
-    
+
     /// Remember that this is the memory location that we're emitting the
     /// decl to.
     Gen.VarLocs[vd] = Value(allocBox, 1);
@@ -72,7 +72,7 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     // NOTE: "Default zero initialization" is a dubious concept.  When we get
     // something like typestate or another concept that allows us to model
     // definitive assignment, then we can consider removing it.
-    auto initVal = Init ? Init : Gen.B.createZeroValue(vd);
+    auto initVal = Init ? Init : Gen.B.createZeroValue(vd, vd->getType());
     Gen.B.createStore(vd, initVal, addr);
     
     Gen.Cleanups.pushCleanup<CleanupVar>(allocBox);
@@ -95,8 +95,8 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     unsigned FieldNo = 0;
     Value TupleInit = Init;
     for (auto &elt : P->getFields()) {
-      Init = Gen.B.createTupleElement(elt.getPattern()->getType(), TupleInit,
-                                      FieldNo++);
+      Init = Gen.B.createTupleElement(SILLocation(), TupleInit, FieldNo++,
+                                      elt.getPattern()->getType());
       visit(elt.getPattern());
     }
   }
@@ -146,7 +146,7 @@ struct ArgumentCreatorVisitor :
       Elements.push_back(visit(elt.getPattern()));
 
     SILBuilder B(F.begin(), F);
-    return B.createTuple(P->getType(), Elements);
+    return B.createTuple(SILLocation(), P->getType(), Elements);
   }
 
   Value visitAnyPattern(AnyPattern *P) {

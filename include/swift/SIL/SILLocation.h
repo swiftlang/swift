@@ -16,16 +16,17 @@
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
-  class Decl;
-  class Expr;
-  class Stmt;
+class Decl;
+class Expr;
+class Stmt;
 
 /// SILLocation - This is a pointer to the AST node that a SIL instruction was
 /// derived from.
 ///
-/// FIXME: This should eventually include inlining history, when we get it.
+/// FIXME: This should eventually include inlining history, generics
+/// instantiation info, etc (when we get to it).
 ///
-  typedef llvm::PointerUnion3<Stmt*,Expr*, Decl*> SILLocation;
+typedef llvm::PointerUnion3<Stmt*,Expr*, Decl*> SILLocation;
 
 } // end swift namespace
 

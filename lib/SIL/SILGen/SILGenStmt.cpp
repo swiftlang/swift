@@ -103,8 +103,8 @@ static void emitAssignStmtRecursive(AssignStmt *S, Value Src, Expr *Dest,
   if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
     unsigned EltNo = 0;
     for (Expr *DestElem : TE->getElements()) {
-      Value SrcVal = Gen.B.createTupleElement(DestElem->getType(), Src,
-                                              EltNo++);
+      Value SrcVal = Gen.B.createTupleElement(SILLocation(), Src,
+                                              EltNo++, DestElem->getType());
       emitAssignStmtRecursive(S, SrcVal, DestElem, Gen);
     }
     return;

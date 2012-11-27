@@ -47,9 +47,10 @@ SILGen::~SILGen() {
   // If we have an unterminated block, it is either an implicit return of an
   // empty tuple, or a dynamically unreachable location.
   if (hasVoidReturn) {
-    auto EmptyTuple = B.createTuple(TupleType::getEmpty(F.getContext()),
+    auto EmptyTuple = B.createTuple(SILLocation(),
+                                    TupleType::getEmpty(F.getContext()),
                                     ArrayRef<Value>());
-    B.createReturn(nullptr, EmptyTuple);
+    B.createReturn(SILLocation(), EmptyTuple);
   } else {
     B.createUnreachable();
   }
