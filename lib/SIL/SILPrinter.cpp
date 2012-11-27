@@ -140,17 +140,18 @@ public:
   }
 
   void visitZeroValueInst(ZeroValueInst *ZVI) {
-    OS << "zerovalueinst " << ZVI->getType().getString();
+    OS << "zero_value $" << ZVI->getType().getString();
   }
 
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     const auto &lit = ILI->getValue();
-    OS << "integerliteral " << lit << ", width=" << lit.getBitWidth();
+    OS << "integerliteral $" << ILI->getType().getString() << ' ' << lit;
   }
   void visitFloatLiteralInst(FloatLiteralInst *FLI) {
     SmallVector<char, 12> Buffer;
     FLI->getValue().toString(Buffer);
-    OS << "floatliteral " << StringRef(Buffer.data(), Buffer.size());
+    OS << "floatliteral $" << FLI->getType().getString() << ' '
+       << StringRef(Buffer.data(), Buffer.size());
   }
   void visitStringLiteralInst(StringLiteralInst *SLI) {
     OS << "stringliteral \"" << SLI->getValue() << "\"";
