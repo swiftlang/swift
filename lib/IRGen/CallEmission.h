@@ -32,7 +32,7 @@ public:
   IRGenFunction &IGF;
 
 private:
-  /// The builtin/specialiarguments to pass to the call.
+  /// The builtin/special arguments to pass to the call.
   llvm::SmallVector<llvm::Value*, 8> Args;
 
   /// The cleanups to deactivate when we make a call.

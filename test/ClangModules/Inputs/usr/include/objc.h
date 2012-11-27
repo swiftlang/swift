@@ -1,4 +1,7 @@
-@interface A
+@interface NSObject
+@end
+
+@interface A : NSObject
 - (int)method:(int)arg withDouble:(double)d;
 + (int)classMethod;
 + (int)classMethod:(int)arg;
@@ -24,3 +27,8 @@
 @property int overriddenProp;
 @end
 
+@interface NSDate : NSObject
+- (signed char)isEqualToDate:(NSDate *)anotherDate;
+@end
+
+NSDate *swift_createDate(void);

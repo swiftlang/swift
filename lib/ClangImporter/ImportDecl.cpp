@@ -343,6 +343,7 @@ namespace {
                                        argPatterns, bodyPatterns,
                                        TypeLoc::withoutLoc(resultTy),
                                        nullptr, dc);
+      funcExpr->setType(type);
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto result = new (Impl.SwiftContext) FuncDecl(SourceLoc(), loc,
                                                      name, nameLoc,
@@ -455,9 +456,28 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      // Import the type that this method will have.
+      // Figure out the type of the container.
+      auto containerTy= dc->getDeclaredTypeOfContext();
+      assert(containerTy && "Method in non-type context?");
+
+      // Add the implicit 'this' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
+      auto thisTy = containerTy;
+      if (decl->isClassMethod())
+        thisTy = MetaTypeType::get(thisTy, Impl.SwiftContext);
+      auto thisName = Impl.SwiftContext.getIdentifier("this");
+      auto thisVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), thisName,
+                                                     thisTy,
+                                                     Impl.firstClangModule);
+      Pattern *thisPat = new (Impl.SwiftContext) NamedPattern(thisVar);
+      thisPat
+        = new (Impl.SwiftContext) TypedPattern(thisPat,
+                                               TypeLoc::withoutLoc(thisTy));
+      argPatterns.push_back(thisPat);
+      bodyPatterns.push_back(thisPat);
+      
+      // Import the type that this method will have.
       auto type = Impl.importFunctionType(decl->getResultType(),
                                           { decl->param_begin(),
                                             decl->param_size() },
@@ -468,32 +488,33 @@ namespace {
       if (!type)
         return nullptr;
 
-      // Figure out the type of the container.
-      auto containerTy= dc->getDeclaredTypeOfContext();
-      assert(containerTy && "Method in non-type context?");
+      auto resultTy = type->castTo<FunctionType>()->getResult();
 
-      // Add the implicit 'this' parameter.
-      auto thisTy = containerTy;
-      if (decl->isClassMethod())
-        thisTy = MetaTypeType::get(thisTy, Impl.SwiftContext);
-      TupleTypeElt thisParam(thisTy, Impl.SwiftContext.getIdentifier("this"));
-      auto thisTupleTy = TupleType::get({ &thisParam, 1 }, Impl.SwiftContext);
-      type = FunctionType::get(thisTupleTy, type, Impl.SwiftContext);
+      // Add the 'this' parameter to the function type.
+      type = FunctionType::get(thisTy, type, Impl.SwiftContext);
 
       // FIXME: Related result type? Not so important when we get constructors
       // working.
 
-      // FIXME: Add proper parameter patterns so this looks more like a method
-      // declaration when Swift prints it back out.
-      auto result = new (Impl.SwiftContext)
-                      FuncDecl(SourceLoc(),
-                               Impl.importSourceLoc(decl->getLocStart()),
-                               name,
-                               Impl.importSourceLoc(decl->getLocation()),
-                               /*GenericParams=*/0,
-                               type,
-                               /*Body=*/nullptr,
-                               dc);
+      // FIXME: Poor location info.
+      auto loc = Impl.importSourceLoc(decl->getLocStart());
+      auto nameLoc = Impl.importSourceLoc(decl->getLocation());
+      auto funcExpr = FuncExpr::create(Impl.SwiftContext, loc,
+                                       argPatterns, bodyPatterns,
+                                       TypeLoc::withoutLoc(resultTy),
+                                       nullptr, dc);
+      funcExpr->setType(type);
+
+      auto result = new (Impl.SwiftContext) FuncDecl(SourceLoc(), loc,
+                                                     name, nameLoc,
+                                                     /*GenericParams=*/0,
+                                                     type, funcExpr, dc);
+
+      setVarDeclContexts(argPatterns, funcExpr);
+      setVarDeclContexts(bodyPatterns, funcExpr);
+
+      // Mark this as an Objective-C method.
+      result->getMutableAttrs().ObjC = true;
 
       // Mark class methods as static.
       if (decl->isClassMethod())

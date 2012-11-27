@@ -37,6 +37,9 @@ swift_NSStringToString(NSString *nsstring, SwiftString *string);
 NSString *
 swift_StringToNSString(SwiftString *string);
 
+NSDate *
+swift_createDate(void);
+  
 }; // extern "C"
 
 struct SwiftString {
@@ -152,4 +155,9 @@ swift_StringToNSString(SwiftString *string) {
   r->swiftString = *string;
   _swift_retain(r->swiftString.owner);
   return r;
+}
+
+// FIXME: Just a hack for testing!
+NSDate *swift_createDate(void) {
+  return [NSDate date];
 }

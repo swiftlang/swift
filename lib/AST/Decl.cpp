@@ -673,7 +673,7 @@ StringRef FuncDecl::getObjCSelector(llvm::SmallVectorImpl<char> &buffer) const {
 
   // For every element except the first, add a selector component.
   for (auto &elt : tuple->getFields().slice(1)) {
-    auto eltPattern = elt.getPattern();
+    auto eltPattern = elt.getPattern()->getSemanticsProvidingPattern();
 
     // Add a label to the selector component if there's a tag.
     if (auto named = dyn_cast<NamedPattern>(eltPattern)) {

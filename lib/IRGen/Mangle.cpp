@@ -166,7 +166,10 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     llvm_unreachable("mangling member of builtin module!");
 
   case DeclContextKind::ClangModule:
-    llvm_unreachable("mangling member of Clang module");
+    // Clang modules aren't namespaces, so there's nothing to mangle.
+    // FIXME: This isn't right for C++, which does have namespaces,
+    // but they aren't reflected into Swift anyway.
+    return;
 
   case DeclContextKind::TranslationUnit: {
     Module *module = cast<Module>(ctx);
