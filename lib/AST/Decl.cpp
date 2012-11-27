@@ -870,6 +870,12 @@ namespace {
 
       if (ShowColors)
         OS << llvm::sys::Process::ResetColor();
+
+      if (auto value = dyn_cast<ValueDecl>(D)) {
+        if (!value->getName().empty()) {
+          OS << " \"" << value->getName().str() << "\"";
+        }
+      }
     }
 
     void printInherited(ArrayRef<TypeLoc> Inherited) {

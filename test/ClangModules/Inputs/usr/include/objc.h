@@ -33,6 +33,18 @@
 - initWithInt:(int)i andDouble:(double)d;
 @end
 
+@interface A(Cat1)
+- method:(int)i onCat1:(double)d;
+@end
+
+@interface A()
+- method:(int)i onExtA:(double)d;
+@end
+
+@interface B()
+- method:(int)i onExtB:(double)d;
+@end
+
 @interface NSDate : NSObject
 - (signed char)isEqualToDate:(NSDate *)anotherDate;
 @end

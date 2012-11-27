@@ -92,6 +92,13 @@ public:
                            Module::AccessPathTy accessPath, Identifier name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result);
+
+  /// \brief Look for extensions associated with the given type.
+  ///
+  /// \param module The module to search.
+  ///
+  /// \param type The type for which we are looking for extensions.
+  virtual ArrayRef<ExtensionDecl*> lookupExtensions(Module *module, Type type);
 };
 
 }

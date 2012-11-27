@@ -36,10 +36,13 @@ class QualType;
 namespace swift {
 
 class ASTContext;
+class ClassDecl;
+class ExtensionDecl;
 class Identifier;
 class Pattern;
 class Type;
 class ValueDecl;
+class ClassDecl;
 
 /// \brief Implementation of the Clang importer.
 struct ClangImporter::Implementation {
@@ -60,7 +63,32 @@ struct ClangImporter::Implementation {
   std::unique_ptr<clang::SyntaxOnlyAction> Action;
 
   /// \brief Mapping of already-imported declarations.
-  llvm::DenseMap<clang::Decl *, ValueDecl *> ImportedDecls;
+  llvm::DenseMap<clang::Decl *, Decl *> ImportedDecls;
+
+  /// \brief A cached set of extensions for a particular Objective-C class.
+  struct CachedExtensions {
+    CachedExtensions() : Extensions(new SmallVector<ExtensionDecl *, 4>) { }
+    CachedExtensions(const CachedExtensions &) = delete;
+    CachedExtensions &operator=(const CachedExtensions &) = delete;
+
+    CachedExtensions(CachedExtensions &&other) : Extensions(other.Extensions) {
+      other.Extensions = nullptr;
+    }
+
+    CachedExtensions &operator=(CachedExtensions &&other) {
+      delete Extensions;
+      Extensions = other.Extensions;
+      other.Extensions = nullptr;
+      return *this;
+    }
+
+    ~CachedExtensions() { delete Extensions; }
+    
+    SmallVector<ExtensionDecl *, 4> *Extensions;
+  };
+
+  /// \brief Cache of the class extensions.
+  llvm::DenseMap<ClassDecl *, CachedExtensions> ClassExtensions;
 
 private:
   /// \brief NSObject, imported into Swift.
@@ -103,7 +131,7 @@ public:
   ///
   /// \returns The imported declaration, or null if this declaration could
   /// not be represented in Swift.
-  ValueDecl *importDecl(clang::NamedDecl *decl);
+  Decl *importDecl(clang::NamedDecl *decl);
 
   /// \brief Import the given Clang declaration context into Swift.
   ///

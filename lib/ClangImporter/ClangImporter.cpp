@@ -19,6 +19,7 @@
 #include "swift/AST/Component.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Types.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
@@ -264,7 +265,31 @@ void ClangImporter::lookupValue(Module *module,
   // FIXME: Filter based on access path? C++ access control?
   for (auto decl : lookupResult) {
     if (auto swiftDecl = Impl.importDecl(decl->getUnderlyingDecl()))
-      results.push_back(swiftDecl);
+      if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl))
+      results.push_back(valueDecl);
   }
 }
 
+ArrayRef<ExtensionDecl*>
+ClangImporter::lookupExtensions(Module *module, Type type) {
+  // Figure out if this type is actually an Objective-C class imported into
+  // Swift.
+  auto classDecl = type->getClassOrBoundGenericClass();
+  if (!classDecl)
+    return { };
+
+  auto objcClass
+    = dyn_cast_or_null<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
+  if (!objcClass)
+    return { };
+
+  auto extensions = Impl.ClassExtensions[classDecl].Extensions;
+  extensions->clear(); // FIXME: Inefficient.
+  for (auto category = objcClass->getCategoryList(); category;
+       category = category->getNextClassCategory()) {
+    if (auto imported = cast_or_null<ExtensionDecl>(Impl.importDecl(category)))
+      extensions->push_back(imported);
+  }
+
+  return *extensions;
+}
