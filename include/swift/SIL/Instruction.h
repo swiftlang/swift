@@ -31,24 +31,13 @@ class ValueDecl;
 class Type;
 class Function;
 class BasicBlock;
-class ApplyExpr;
-class AssignStmt;
 class CharacterLiteralExpr;
 class DeclRefExpr;
 class FloatLiteralExpr;
-class ImplicitConversionExpr;
 class IntegerLiteralExpr;
-class LoadExpr;
-class MaterializeExpr;
 class MetatypeExpr;
-class ReturnStmt;
-class ScalarToTupleExpr;
-class SpecializeExpr;
 class StringLiteralExpr;
 class Stmt;
-class TupleElementExpr;
-class TupleExpr;
-class TupleShuffleExpr;
 class VarDecl;
 
 /// This is the root class for all instructions that can be used as the contents
