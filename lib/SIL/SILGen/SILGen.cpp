@@ -37,6 +37,11 @@ SILGen::SILGen(Function &F, FuncExpr *FE)
   emitProlog(FE);
 }
 
+TupleInst *SILBuilder::createEmptyTuple(SILLocation Loc) {
+  return createTuple(Loc, TupleType::getEmpty(F.getContext()),
+                     ArrayRef<Value>());
+}
+
 /// SILGen destructor - called when the entire AST has been visited.  This
 /// handles "falling off the end of the function" logic.
 SILGen::~SILGen() {
@@ -45,15 +50,11 @@ SILGen::~SILGen() {
   if (!B.hasValidInsertionPoint())
     return;
   
-  // Clean up arguments.
-  Cleanups.endScope(ArgumentScope);
-
   // If we have an unterminated block, it is either an implicit return of an
   // empty tuple, or a dynamically unreachable location.
   if (hasVoidReturn) {
-    auto EmptyTuple = B.createTuple(SILLocation(),
-                                    TupleType::getEmpty(F.getContext()),
-                                    ArrayRef<Value>());
+    Cleanups.endScope(ArgumentScope);
+    auto EmptyTuple = B.createEmptyTuple(SILLocation());
     B.createReturn(SILLocation(), EmptyTuple);
   } else {
     B.createUnreachable();

@@ -202,9 +202,9 @@ void SILGen::emitCopy(SILLocation loc, Value v, Value dest, bool isAssignment) {
            "type of copy_addr destination must match source address type");
     assert(ti.isAddressOnly() &&
            "source of copy may only be an address if type is address-only");
-    B.createCopy(loc, v, dest,
-                 /*isTake=*/false,
-                 /*isInitialize=*/!isAssignment);
+    B.createCopyAddr(loc, v, dest,
+                     /*isTake=*/false,
+                     /*isInitialize=*/!isAssignment);
   } else {
     // v is a loadable type; retain it and release the old value if necessary
     // FIXME: generate appropriate retains/releases based on the
@@ -239,7 +239,7 @@ void SILGen::emitCopy(SILLocation loc, Value v, Value dest, bool isAssignment) {
 void SILGen::emitDestroy(SILLocation loc, Value v) {
   if (v->getType(0)->is<LValueType>()) {
     // v is an address-only type; destroy using the destroy_addr instruction.
-    B.createDestroy(loc, v);
+    B.createDestroyAddr(loc, v);
   } else {
     // v is a loadable type; release it if necessary.
     // FIXME: generate appropriate releases or destroy_addr based on the

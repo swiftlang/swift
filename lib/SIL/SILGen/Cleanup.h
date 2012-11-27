@@ -113,6 +113,8 @@ public:
     return pushCleanupInState<T, A...>(CleanupState::Active,
                                        ::std::forward<A>(args)...);
   }
+  
+  void endScope(CleanupsDepth depth);
 };
 
   

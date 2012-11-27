@@ -174,6 +174,8 @@ public:
   TupleInst *createTuple(SILLocation Loc, Type Ty, ArrayRef<Value> Elements) {
     return insert(TupleInst::create(Loc, Ty, Elements, F));
   }
+  
+  TupleInst *createEmptyTuple(SILLocation Loc);
 
   Value createTupleElement(SILLocation Loc, Value Operand, unsigned FieldNo,
                            Type ResultTy) {
@@ -196,8 +198,8 @@ public:
   DeallocInst *createDealloc(SILLocation Loc, Value Operand) {
     return insert(new DeallocInst(Loc, Operand));
   }
-  DestroyAddrInst *createDestroyAddr(Expr *E, Value Operand) {
-    return insert(new DestroyAddrInst(E, Operand));
+  DestroyAddrInst *createDestroyAddr(SILLocation Loc, Value Operand) {
+    return insert(new DestroyAddrInst(Loc, Operand));
   }
 
   //===--------------------------------------------------------------------===//
