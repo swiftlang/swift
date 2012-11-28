@@ -1574,12 +1574,10 @@ namespace {
       irgen::ExprVisitor<FunctionDecomposer, CalleeSource> {
     CalleeSource visitDeclRefExpr(DeclRefExpr *E) {
       if (FuncDecl *fn = dyn_cast<FuncDecl>(E->getDecl())) {
-        if (isa<ClassDecl>(fn->getDeclContext())) {
-          if (fn->getAttrs().isObjC()) {
-            return CalleeSource::forObjCMessage(fn);
-          } else {
-            return CalleeSource::forVirtual(fn);
-          }
+        if (fn->getAttrs().isObjC()) {
+          return CalleeSource::forObjCMessage(fn);
+        } else if (isa<ClassDecl>(fn->getDeclContext())) {
+          return CalleeSource::forVirtual(fn);
         } else {
           return CalleeSource::forDirect(fn);
         }
