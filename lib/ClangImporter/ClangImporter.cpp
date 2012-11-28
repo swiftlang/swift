@@ -123,7 +123,11 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
   // We now have the swift executable/library path. Adjust it to refer to Clang.
   llvm::sys::path::remove_filename(resourceDir);
   llvm::sys::path::remove_filename(resourceDir);
+#ifdef SWIFT_BUILT_WITH_CMAKE
+  // One extra level of adjustment to do.
+  // FIXME: This is unspeakably horrible.
   llvm::sys::path::remove_filename(resourceDir);
+#endif
   llvm::sys::path::append(resourceDir, "lib", "clang", CLANG_VERSION_STRING);
 
   // Set the Clang resource directory to the path we computed.
