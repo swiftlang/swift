@@ -19,16 +19,22 @@ Value SILGen::visitApplyExpr(ApplyExpr *E) {
   Value FnV = visit(E->getFn());
   llvm::SmallVector<Value, 10> ArgsV;
   
-  // Special case Arg being a TupleExpr, to inline the arguments and
-  // not create another instruction.
-  if (TupleExpr *TU = dyn_cast<TupleExpr>(E->getArg())) {
-    for (auto arg : TU->getElements())
+  Expr *argExpr = E->getArg();
+  if (ParenExpr *pe = dyn_cast<ParenExpr>(argExpr))
+    argExpr = pe->getSubExpr();
+  
+  // Special case Arg being a TupleExpr or ScalarToTupleExpr to inline the
+  // arguments and not create a tuple instruction.
+  if (TupleExpr *te = dyn_cast<TupleExpr>(argExpr)) {
+    for (auto arg : te->getElements())
       ArgsV.push_back(visit(arg));
+  } else if (ScalarToTupleExpr *se = dyn_cast<ScalarToTupleExpr>(argExpr)) {
+    ArgsV.push_back(visit(se->getSubExpr()));
   } else {
-    ArgsV.push_back(visit(E->getArg()));
+    ArgsV.push_back(visit(argExpr));
   }
   
-  return B.createApply(E, FnV, ArgsV);
+  return emitApply(E, FnV, ArgsV);
 }
 
 Value SILGen::visitDeclRefExpr(DeclRefExpr *E) {
