@@ -26,14 +26,22 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/Version.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/PathV2.h"
 #include <memory>
+#include <cstdlib>
+#include <dlfcn.h>
+#include <sys/param.h>
 
 using namespace swift;
 
 // Commonly-used Clang classes.
 using clang::CompilerInstance;
 using clang::CompilerInvocation;
+
+// Dummy function used with dladdr.
+void swift_clang_importer() { }
 
 #pragma mark Internal data structures
 namespace {
@@ -95,6 +103,32 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
     invocationArgStrs.push_back("-fmodule-cache-path");
     invocationArgStrs.push_back(moduleCachePath.str());
   }
+
+  // Figure out where Swift lives; since Clang is linked into Swift,
+  // we assume that the headers are in the same place Clang would look.
+  // This silly cast below avoids a C++ warning.
+  Dl_info info;
+  if (dladdr((void *)(uintptr_t)swift_clang_importer, &info) == 0)
+    llvm_unreachable("Call to dladdr() failed");
+
+  // Resolve symlinks.
+  char swiftPath[MAXPATHLEN];
+  if (!realpath(info.dli_fname, swiftPath)) {
+    // FIXME: Diagnose this.
+    return nullptr;
+  }
+
+  llvm::SmallString<128> resourceDir(swiftPath);
+
+  // We now have the swift executable/library path. Adjust it to refer to Clang.
+  llvm::sys::path::remove_filename(resourceDir);
+  llvm::sys::path::remove_filename(resourceDir);
+  llvm::sys::path::remove_filename(resourceDir);
+  llvm::sys::path::append(resourceDir, "lib", "clang", CLANG_VERSION_STRING);
+
+  // Set the Clang resource directory to the path we computed.
+  invocationArgStrs.push_back("-resource-dir");
+  invocationArgStrs.push_back(resourceDir.str());
 
   std::vector<const char *> invocationArgs;
   for (auto &argStr : invocationArgStrs)
