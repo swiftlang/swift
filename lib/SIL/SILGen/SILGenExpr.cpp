@@ -127,7 +127,7 @@ Value SILGen::emitArrayInjectionCall(Value ObjectPtr, Value BasePtr,
 
   Value InjectionFn = visit(ArrayInjectionFunction);
   Value InjectionArgs[] = { BasePtr, ObjectPtr, Length };
-  return B.createApply(SILLocation(), InjectionFn, InjectionArgs);
+  return emitApply(SILLocation(), InjectionFn, InjectionArgs);
 }
 
 
@@ -193,6 +193,14 @@ Value SILGen::emitTupleShuffle(Expr *E, ArrayRef<Value> InOps,
   }
 
   return B.createTuple(E, E->getType(), ResultElements);
+}
+
+Value SILGen::emitApply(SILLocation loc, Value fn, ArrayRef<Value> args) {
+  // Retain the arguments
+  for (Value arg : args) {
+    emitRetainArgument(loc, arg);
+  }
+  return B.createApply(loc, fn, args);
 }
 
 Value SILGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {

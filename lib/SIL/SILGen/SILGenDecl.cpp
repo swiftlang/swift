@@ -134,7 +134,7 @@ public:
   CleanupArgument(BBArgument *arg) : arg(arg) {}
   
   void emit(SILGen &gen) override {
-    gen.emitDestroy(SILLocation(), arg);
+    gen.emitDestroyArgument(SILLocation(), arg);
   }
 };
 
@@ -194,13 +194,12 @@ void SILGen::emitProlog(FuncExpr *FE) {
 
 void SILGen::emitCopy(SILLocation loc, Value v, Value dest, bool isAssignment) {
   Type vTy = v.getType();
-  TypeInfo ti = TypeInfo::get(vTy);
 
   if (vTy->is<LValueType>()) {
     // v is an address-only type; copy using the copy_addr instruction.
     assert(dest.getType()->getCanonicalType() == vTy->getCanonicalType() &&
            "type of copy_addr destination must match source address type");
-    assert(ti.isAddressOnly() &&
+    assert(TypeInfo::get(vTy->getRValueType()).isAddressOnly() &&
            "source of copy may only be an address if type is address-only");
     B.createCopyAddr(loc, v, dest,
                      /*isTake=*/false,
@@ -211,14 +210,14 @@ void SILGen::emitCopy(SILLocation loc, Value v, Value dest, bool isAssignment) {
     // type of v and dest. Retaining a value type should be invalid, and the
     // individual retainable members of an aggregate should be individually
     // retained.
-    
+    TypeInfo ti = TypeInfo::get(vTy);
     assert(dest.getType()->is<LValueType>() &&
            "copy destination must be an address");
     assert(dest.getType()->getRValueType()->getCanonicalType() ==
              vTy->getCanonicalType() &&
            "copy destination must be an address of the type of the source");
     assert(ti.isLoadable() &&
-           "copy of address-only type must use address for source");
+           "copy of address-only type must take address for source argument");
     Value old;
 
     if (!ti.isTrivial()) {
@@ -236,14 +235,34 @@ void SILGen::emitCopy(SILLocation loc, Value v, Value dest, bool isAssignment) {
   }
 }
 
-void SILGen::emitDestroy(SILLocation loc, Value v) {
-  if (v->getType(0)->is<LValueType>()) {
-    // v is an address-only type; destroy using the destroy_addr instruction.
-    B.createDestroyAddr(loc, v);
+void SILGen::emitRetainArgument(SILLocation loc, Value v) {
+  Type vTy = v.getType();
+  if (vTy->is<LValueType>()) {
+    // v is an address-only or byref argument; it was passed by pointer, so do
+    // nothing.
   } else {
     // v is a loadable type; release it if necessary.
-    // FIXME: generate appropriate releases or destroy_addr based on the
-    // type of v
-    B.createRelease(loc, v);
+    TypeInfo ti = TypeInfo::get(vTy);
+    assert(ti.isLoadable() &&
+           "must pass address-only argument by address");
+    
+    if (!ti.isTrivial())
+      B.createRetain(loc, v);
+  }
+}
+
+void SILGen::emitDestroyArgument(SILLocation loc, Value v) {
+  Type vTy = v.getType();
+  if (vTy->is<LValueType>()) {
+    // v is an address-only type; it was passed by pointer, so do nothing.
+    assert(TypeInfo::get(vTy->getRValueType()).isAddressOnly() &&
+           "destroyed argument may only be an address if type is address-only");
+  } else {
+    // v is a loadable type; release it if necessary.
+    TypeInfo ti = TypeInfo::get(vTy);
+    assert(ti.isLoadable() &&
+           "destroy of address-only type must take address for argument");
+    if (!ti.isTrivial())
+      B.createRelease(loc, v);
   }
 }

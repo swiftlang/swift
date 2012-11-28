@@ -125,10 +125,7 @@ void SILGen::visitAssignStmt(AssignStmt *S) {
 }
 
 void SILGen::visitReturnStmt(ReturnStmt *S) {
-  Value ArgV = S->hasResult()
-    ? visit(S->getResult())
-    : B.createTuple(S, TupleType::getEmpty(F.getContext()),
-                    ArrayRef<Value>());
+  Value ArgV = S->hasResult() ? visit(S->getResult()) : B.createEmptyTuple(S);
   Cleanups.emitReturnAndCleanups(S, ArgV);
 }
 

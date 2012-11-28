@@ -89,6 +89,16 @@ public:
   // Memory management
   //===--------------------------------------------------------------------===//
   
+  /// emitRetainArgument - Emits the instructions necessary for a caller to
+  /// retain a value in order to pass it as a function argument.
+  /// - For trivial loadable types, this is a no-op.
+  /// - For reference types, 'v' is retained.
+  /// - For loadable types with reference type members, the reference type
+  ///   members are all retained.
+  /// - For address-only types, this is a no-op. Address-only arguments are
+  ///   callee-copied.
+  void emitRetainArgument(SILLocation loc, Value v);
+    
   /// emitCopy - Emits the instructions necessary to store a copy of a value
   /// to an address.
   /// - For trivial loadable types, a 'store v to dest' is generated.
@@ -111,14 +121,15 @@ public:
   ///   and released if necessary.
   void emitCopy(SILLocation loc, Value v, Value dest, bool isAssignment);
 
-  /// emitDestroy - Emits the instructions necessary to destroy a value.
+  /// emitDestroyArgument - Emits the instructions necessary for a callee to
+  /// destroy a value passed to it as an argument.
   /// - For trivial loadable types, this is a no-op.
   /// - For reference types, 'v' is released.
-  /// - For loadable types with reference type members, the reference types
-  ///   are all released.
+  /// - For loadable types with reference type members, the reference type
+  ///   members are all released.
   /// - For address-only types, the value at the address is destroyed using
   ///   a destroy_addr instruction.
-  void emitDestroy(SILLocation loc, Value v);
+  void emitDestroyArgument(SILLocation loc, Value v);
     
   //===--------------------------------------------------------------------===//
   // Statements
@@ -180,6 +191,10 @@ public:
   Value emitTupleShuffle(Expr *E, ArrayRef<Value> InOps,
                          ArrayRef<int> ElementMapping,
                          Expr *VarargsInjectionFunction);
+
+  /// emitApply - Creates an apply instruction and retain instructions for any
+  /// arguments that require retaining.
+  Value emitApply(SILLocation loc, Value fn, ArrayRef<Value> args);
 
   //===--------------------------------------------------------------------===//
   // Declarations
