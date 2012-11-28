@@ -415,6 +415,12 @@ void ExplicitClosureExpr::GenerateVarDecls(unsigned NumDecls,
   }
 }
 
+ExplicitCastExpr::ExplicitCastExpr(ExprKind kind, Expr *lhs, Expr *rhs)
+  : Expr(kind, lhs->getType()->castTo<MetaTypeType>()->getInstanceType()),
+    LHS(lhs), RHS(rhs)
+{
+}
+
 //===----------------------------------------------------------------------===//
 // Printing for Expr and all subclasses.
 //===----------------------------------------------------------------------===//

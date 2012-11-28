@@ -1907,34 +1907,47 @@ public:
   }
 };
 
-/// CoerceExpr - Represents a function application a(b) that is actually a
-/// type coercion of the expression 'b' to the type 'a'. This expression
-/// is not used for actual casts, because those are constructor calls.
-///
-/// "a" is always a DeclRefExpr for a TypeDecl, e.g. "Int64" in "Int64(2)"
-///
-class CoerceExpr : public Expr {
+/// \brief Represents an explicit cast a(b), where "a" is a DeclRefExpr of
+/// metatype type, and "b" is the expression that will be converted to the
+/// instance type of "a".
+class ExplicitCastExpr : public Expr {
   Expr *LHS;
   Expr *RHS;
-  
+
+protected:
+  ExplicitCastExpr(ExprKind kind, Expr *lhs, Expr *rhs);
+
 public:
-  CoerceExpr(Expr *LHS, Expr *RHS)
-    : Expr(ExprKind::Coerce, RHS->getType()), LHS(LHS), RHS(RHS) { }
-           
   Expr *getLHS() const { return LHS; }
   Expr *getRHS() const { return RHS; }
-  
+
   void setLHS(Expr *E) { LHS = E; }
   void setRHS(Expr *E) { RHS = E; }
-  
-  
+
   SourceLoc getStartLoc() const { return LHS->getStartLoc(); }
   SourceLoc getEndLoc() const { return RHS->getEndLoc(); }
-  
+
   SourceRange getSourceRange() const {
     return SourceRange(LHS->getStartLoc(), RHS->getEndLoc());
   }
-  
+
+  static bool classof(const Expr *E) {
+    return E->getKind() >= ExprKind::First_ExplicitCastExpr &&
+           E->getKind() <= ExprKind::Last_ExplicitCastExpr;
+  }
+};
+
+/// \brief Represents an explicit type coercion of an expression to a specified
+/// type.
+///
+/// An explicit type coercion makes implicit conversions explicit, clarifying
+/// a type. It does not perform any casting not captured by implicit
+/// conversions.
+class CoerceExpr : public ExplicitCastExpr {
+public:
+  CoerceExpr(Expr *lhs, Expr *rhs)
+    : ExplicitCastExpr(ExprKind::Coerce, lhs, rhs) { }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Coerce;
   }
