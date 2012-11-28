@@ -2542,6 +2542,10 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     Type visitCoerceExpr(CoerceExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
+
+    Type visitDowncastExpr(DowncastExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
   };
 
   /// \brief AST walker that "sanitizes" an expression for the
@@ -3318,26 +3322,42 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
     }
 
-    // A class (or bound generic class) is a subtype of another class
-    // (or bound generic class) if it is derived from that class.
     if (type1->getClassOrBoundGenericClass() &&
         type2->getClassOrBoundGenericClass()) {
-      auto classDecl2 = type2->getClassOrBoundGenericClass();
-      for (auto super1 = TC.getSuperClassOf(type1); super1;
-           super1 = TC.getSuperClassOf(super1)) {
-        if (super1->getClassOrBoundGenericClass() != classDecl2)
-          continue;
-        
-        switch (auto result = matchTypes(super1, type2, TypeMatchKind::SameType,
-                                         subFlags, trivial)) {
-        case SolutionKind::Error:
-          continue;
+      // Determines whether the first type is derived from the second.
+      auto solveDerivedFrom =
+        [&](Type type1, Type type2) -> Optional<SolutionKind> {
+          auto classDecl2 = type2->getClassOrBoundGenericClass();
+          for (auto super1 = TC.getSuperClassOf(type1); super1;
+               super1 = TC.getSuperClassOf(super1)) {
+            if (super1->getClassOrBoundGenericClass() != classDecl2)
+              continue;
 
-        case SolutionKind::Solved:
-        case SolutionKind::TriviallySolved:
-        case SolutionKind::Unsolved:
-          return result;
-        }
+            switch (auto result = matchTypes(super1, type2, TypeMatchKind::SameType,
+                                             subFlags, trivial)) {
+              case SolutionKind::Error:
+                continue;
+
+              case SolutionKind::Solved:
+              case SolutionKind::TriviallySolved:
+              case SolutionKind::Unsolved:
+                return result;
+            }
+          }
+
+          return Nothing;
+        };
+
+      // A class (or bound generic class) is a subtype of another class
+      // (or bound generic class) if it is derived from that class.
+      if (auto upcastResult = solveDerivedFrom(type1, type2))
+        return *upcastResult;
+
+      // A class can be downcast to its subclass as part of a 'construction'
+      // constraint.
+      if (kind >= TypeMatchKind::Construction) {
+        if (auto downcastResult = solveDerivedFrom(type2, type1))
+          return *downcastResult;
       }
     }
   }
@@ -3404,7 +3424,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return SolutionKind::Solved;
     }
   }
-
 
   // A nominal type can be converted to another type via a user-defined
   // conversion function.
@@ -5425,6 +5444,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitCoerceExpr(CoerceExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    Expr *visitDowncastExpr(DowncastExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
   };

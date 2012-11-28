@@ -315,6 +315,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;
   }
 
+  Expr *visitDowncastExpr(DowncastExpr *E) {
+    Expr *LHS = doIt(E->getLHS());
+    if (!LHS) return nullptr;
+    E->setLHS(LHS);
+
+    Expr *RHS = doIt(E->getRHS());
+    if (!RHS) return nullptr;
+    E->setRHS(RHS);
+
+    return E;
+  }
+
   Stmt *visitSemiStmt(SemiStmt *SS) {
     return SS;
   }

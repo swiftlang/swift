@@ -113,7 +113,8 @@ ABSTRACT_EXPR(ImplicitConversion, Expr)
   EXPR_RANGE(ImplicitConversion, Load, ScalarToTuple)
 ABSTRACT_EXPR(ExplicitCast, Expr)
   EXPR(Coerce, ExplicitCastExpr)
-  EXPR_RANGE(ExplicitCast, Coerce, Coerce)
+  EXPR(Downcast, ExplicitCastExpr)
+  EXPR_RANGE(ExplicitCast, Coerce, Downcast)
 
 #undef EXPR_RANGE
 #undef UNCHECKED_EXPR

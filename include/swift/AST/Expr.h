@@ -1953,6 +1953,25 @@ public:
   }
 };
 
+/// \brief Represents an explicit downcast, converting from a supertype to
+/// its subtype.
+///
+/// Explicit downcasts are written as function applications a(b) where
+/// "a" is a DeclRefExpr for a TypeDecl and "b" is the expression to
+/// be converted to the type of "a".
+///
+/// FIXME: At present, only class downcasting is supported.
+/// FIXME: All downcasts are currently unchecked, which is horrible.
+class DowncastExpr : public ExplicitCastExpr {
+public:
+  DowncastExpr(Expr *lhs, Expr *rhs)
+    : ExplicitCastExpr(ExprKind::Downcast, lhs, rhs) { }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Downcast;
+  }
+};
+
 } // end namespace swift
 
 #endif

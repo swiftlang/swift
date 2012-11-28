@@ -590,12 +590,33 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     if (isConstructibleType(Ty))
       IsCast = isCoercibleToType(E2, Ty) != CoercionResult::Failed;
     if (IsCast) {
+      // If we're casting from one class to another, and it's not coercible,
+      // try downcasting.
+      if (E2->getType()->getRValueType()->getClassOrBoundGenericClass() &&
+          Ty->getClassOrBoundGenericClass() &&
+          isCoercibleToType(E2, Ty) == CoercionResult::Failed) {
+        for (auto superTy = getSuperClassOf(Ty); superTy;
+             superTy = getSuperClassOf(superTy)) {
+          if (superTy->isEqual(E2->getType()->getRValueType())) {
+            // Convert the argument to an rvalue.
+            E2 = convertToRValue(E2);
+            if (!E2) {
+              E->setType(ErrorType::get(Context));
+              return nullptr;
+            }
+
+            return new (Context) DowncastExpr(E1, E2);
+          }
+        }
+      }
+
       CoercedExpr CoercedArg = coerceToType(E2, Ty);
       switch (CoercedArg.getKind()) {
       case CoercionResult::Succeeded:
         return new (Context) CoerceExpr(E1, CoercedArg);
 
       case CoercionResult::Failed:
+        // We cannot perform this cast.
         E->setType(ErrorType::get(Context));
         return nullptr;
 
@@ -1121,6 +1142,12 @@ public:
   }
 
   Expr *visitCoerceExpr(CoerceExpr *E) {
+    // The type of the expr is always the type that the MetaType LHS specifies.
+    assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
+    return E;
+  }
+
+  Expr *visitDowncastExpr(DowncastExpr *E) {
     // The type of the expr is always the type that the MetaType LHS specifies.
     assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
     return E;

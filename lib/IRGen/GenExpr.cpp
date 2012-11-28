@@ -302,6 +302,19 @@ namespace {
       IGF.emitRValue(E->getRHS(), Out);
     }
 
+    void visitDowncastExpr(DowncastExpr *E) {
+      IGF.emitIgnored(E->getLHS());
+
+      // FIXME: These casts are unchecked, which is almost certainly not what
+      // we want in the long run.
+      Explosion subResult(ExplosionKind::Maximal);
+      IGF.emitRValue(E->getRHS(), subResult);
+      ManagedValue val = subResult.claimNext();
+      llvm::Type *subTy = IGF.getFragileTypeInfo(E->getType()).StorageType;
+      llvm::Value *castVal = IGF.Builder.CreateBitCast(val.getValue(), subTy);
+      Out.add({castVal, val.getCleanup()});
+    }
+
     void visitNewArrayExpr(NewArrayExpr *E) {
       emitNewArrayExpr(IGF, E, Out);
     }
@@ -482,6 +495,7 @@ namespace {
     NOT_LVALUE_EXPR(Metatype)
     NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
     NOT_LVALUE_EXPR(Coerce)
+    NOT_LVALUE_EXPR(Downcast)
     NOT_LVALUE_EXPR(Module)
 #undef NOT_LVALUE_EXPR
 
@@ -644,6 +658,7 @@ namespace {
     NON_LOCATEABLE(NewArrayExpr)
     NON_LOCATEABLE(MetatypeExpr)
     NON_LOCATEABLE(CoerceExpr)
+    NON_LOCATEABLE(DowncastExpr)
     NON_LOCATEABLE(ExistentialMemberRefExpr)
     NON_LOCATEABLE(ArchetypeMemberRefExpr)
     NON_LOCATEABLE(GenericMemberRefExpr)

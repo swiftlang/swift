@@ -794,6 +794,13 @@ public:
     printRec(E->getRHS());
     OS << ')';
   }
+  void visitDowncastExpr(DowncastExpr *E) {
+    printCommon(E, "downcast_expr") << '\n';
+    printRec(E->getLHS());
+    OS << '\n';
+    printRec(E->getRHS());
+    OS << ')';
+  }
 };
 
 } // end anonymous namespace.
