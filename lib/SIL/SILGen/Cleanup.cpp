@@ -133,6 +133,7 @@ void CleanupManager::setCleanupState(Cleanup &cleanup, CleanupState state) {
 
   // Do the transition now to avoid doing it in N places below.
   CleanupState oldState = cleanup.getState();
+  (void)oldState;
   cleanup.setState(state);
   
   assert(state != oldState && "cleanup state is already active");
