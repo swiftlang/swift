@@ -310,8 +310,8 @@ alloc_ref
 
 Allocates an object of reference type ``T``. The object will be initialized
 with retain count 1; its state will be otherwise uninitialized. The object
-may be allocated on the heap or stack; reference types are normally
-heap-allocated and released with a ``release`` instruction, but optimization
+may be allocated on the heap or stack; although reference types are normally
+heap-allocated and released with a ``release`` instruction, optimization
 may lower the allocation to a stack allocation and the release to a
 ``dealloc_ref``.
 
@@ -376,11 +376,12 @@ dealloc_ref
   dealloc_ref {heap|stack} %0
   ; %0 must be of a box or reference type
 
-Destroys and deallocates a box or reference type instance. The box must have a
+Deallocates a box or reference type instance. The box must have a
 retain count of one, and the ``heap`` or ``stack`` attribute must match the
-corresponding ``alloc_box`` or ``alloc_ref`` instruction. Optimization may
-lower ``release`` operations to ``dealloc_ref`` if it finds the reference
-count to always be one or if it stack-allocates the box.
+corresponding ``alloc_box`` or ``alloc_ref`` instruction. This does not
+destroy the reference type instance or the values inside the box; this must
+be done manually by ``release``-ing any releasable values inside the
+value and calling its destructor function before the value is deallocated.
 
 retain
 ``````
@@ -402,9 +403,9 @@ release
 Releases the box or reference type represented by ``%0``. If the release
 operation brings the retain count of the value to zero, the referenced object
 is destroyed and its memory is deallocated. A stack-allocated box must not
-be released to reference count zero; it must instead be deallocated with a
-``dealloc_ref stack`` instruction. Releasing an address or value type is an
-error.
+be released to reference count zero; it must instead be destroyed manually and
+then deallocated with a ``dealloc_ref stack`` instruction. Releasing an
+address or value type is an error.
 
 destroy_addr
 ````````````
