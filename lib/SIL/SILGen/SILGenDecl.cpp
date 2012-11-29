@@ -227,26 +227,6 @@ void SILGen::emitAssign(SILLocation loc, Value v, Value dest) {
   }
 }
 
-void SILGen::emitRetainArgument(SILLocation loc, Value v) {
-  if (v.getType()->is<LValueType>()) {
-    // v is an address-only or byref argument; it was passed by pointer, so do
-    // nothing.
-  } else {
-    // v is a loadable type; retain it if necessary.
-    rrLoadableValue(*this, loc, v, &SILBuilder::createRetain);
-  }
-}
-
-void SILGen::emitDestroyArgument(SILLocation loc, Value v) {
-  if (v.getType()->is<LValueType>()) {
-    // v is an address-only or byref type; it was passed by pointer, so do
-    // nothing.
-  } else {
-    // v is a loadable type; release it if necessary.
-    rrLoadableValue(*this, loc, v, &SILBuilder::createRelease);
-  }
-}
-
 void SILGen::emitRetainRValue(SILLocation loc, Value v) {
   if (v.getType()->is<LValueType>()) {
     // v is an address-only type.

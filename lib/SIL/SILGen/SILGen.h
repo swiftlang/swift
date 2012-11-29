@@ -101,29 +101,6 @@ public:
   /// - For address-only types, this generates a copy_addr assign instruction.
   void emitAssign(SILLocation loc, Value v, Value dest);
   
-  /// emitRetainArgument - Emits the instructions necessary for a caller to
-  /// retain a value in order to pass it as a function argument.
-  /// - For trivial loadable types, this is a no-op.
-  /// - For reference types, 'v' is retained.
-  /// - For loadable types with reference type members, the reference type
-  ///   members are all retained.
-  /// - For address-only types, this is a no-op. Address-only arguments are
-  ///   callee-copied.
-  void emitRetainArgument(SILLocation loc, Value v);
-    
-  /// emitDestroyArgument - Emits the instructions necessary for a callee to
-  /// destroy a value passed to it as an argument.
-  /// - For trivial loadable types, this is a no-op.
-  /// - For reference types, 'v' is released.
-  /// - For loadable types with reference type members, the reference type
-  ///   members are all released.
-  /// - For address-only types, this is a no-op. Address-only arguments are
-  ///   callee-copied, so only the callee-created copy needs to be destroyed.
-  /// This differs from emitDestroyRValue in the case of address-only types;
-  /// emitDestroyArgument does nothing with addresses, while emitDestroyRValue
-  /// generates a destroy_addr.
-  void emitDestroyArgument(SILLocation loc, Value v);
-  
   /// emitRetainRValue - Emits the instructions necessary to increase the
   /// retain count of a temporary, in order to use it as part of another
   /// independent temporary.
@@ -143,9 +120,6 @@ public:
   ///   members are all released.
   /// - For address-only types, the value at the address is destroyed using
   ///   a destroy_addr instruction.
-  /// This differs from emitDestroyArgument in the case of address-only types;
-  /// emitDestroyArgument does nothing with addresses, while emitDestroyRValue
-  /// generates a destroy_addr.
   void emitReleaseRValue(SILLocation loc, Value v);
     
   //===--------------------------------------------------------------------===//
