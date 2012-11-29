@@ -93,17 +93,14 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                 /*uncurry*/ 0, fn)
     .emitGlobalTopLevel(tunit, StartElem);
 
-  // We don't need global init to call main().
   if (tunit->Kind == TranslationUnit::Main ||
-      tunit->Kind == TranslationUnit::Repl)
-    return;
-
-  // Not all translation units need a global initialization function.
-  if (isTrivialGlobalInit(fn)) {
-    fn->eraseFromParent();
-    return;
+      tunit->Kind == TranslationUnit::Repl) {
+    // We don't need global init to call main().
   }
-
+  // Not all translation units need a global initialization function.
+  else if (isTrivialGlobalInit(fn)) {
+    fn->eraseFromParent();
+  } else {
   // Build the initializer for the global variable.
   llvm::Constant *initAndPriority[] = {
     llvm::ConstantInt::get(Int32Ty, 0),
@@ -123,6 +120,26 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                                   llvm::GlobalValue::AppendingLinkage,
                                   globalInits,
                                   "llvm.global_ctors");
+  }
+  
+  emitLLVMUsed();
+
+  // Objective-C image information.
+  // Generate module-level named metadata to convey this information to the
+  // linker and code-gen.
+  unsigned version = 0; // Version is unused?
+  const char *section = "__DATA, __objc_imageinfo, regular, no_dead_strip";
+
+  // Add the ObjC ABI version to the module flags.
+  Module.addModuleFlag(llvm::Module::Error, "Objective-C Version", 2);
+  Module.addModuleFlag(llvm::Module::Error, "Objective-C Image Info Version",
+                       version);
+  Module.addModuleFlag(llvm::Module::Error, "Objective-C Image Info Section",
+                       llvm::MDString::get(LLVMContext, section));
+
+  Module.addModuleFlag(llvm::Module::Override,
+                       "Objective-C Garbage Collection", (uint32_t)0);
+  // FIXME: Simulator flag.
 }
 
 void IRGenFunction::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) {

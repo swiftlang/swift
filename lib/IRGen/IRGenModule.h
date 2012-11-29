@@ -20,7 +20,9 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/ValueHandle.h"
 #include "llvm/CallingConv.h"
 #include "IRGen.h"
 
@@ -164,6 +166,8 @@ public:
   llvm::Constant *getAddrOfGlobalString(llvm::StringRef string);
   llvm::Constant *getAddrOfObjCSelectorRef(llvm::StringRef selector);
   llvm::Constant *getAddrOfObjCMethodName(llvm::StringRef methodName);
+  void addUsedGlobal(llvm::GlobalValue *global);
+  void emitLLVMUsed();
 
 private:
   llvm::DenseMap<LinkEntity, llvm::GlobalVariable*> GlobalVars;
@@ -171,6 +175,12 @@ private:
   llvm::StringMap<llvm::Constant*> GlobalStrings;
   llvm::StringMap<llvm::Constant*> ObjCSelectorRefs;
   llvm::StringMap<llvm::Constant*> ObjCMethodNames;
+
+  /// LLVMUsed - List of global values which are required to be
+  /// present in the object file; bitcast to i8*. This is used for
+  /// forcing visibility of symbols which may otherwise be optimized
+  /// out.
+  llvm::SmallVector<llvm::WeakVH, 4> LLVMUsed;
 
   void mangleGlobalInitializer(raw_ostream &buffer, TranslationUnit *D);
 
