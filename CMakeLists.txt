@@ -142,6 +142,8 @@ endif ()
 #     objectvar)                    # Variable to receive the object file name
 function(compile_swift_file file target objectvar)	
   parse_arguments(SWIFTFILE  "" "IS_MAIN" ${ARGN})
+  
+  set(swift_flags)
 
   # Determine where this file is.
   get_filename_component(file_path ${file} PATH) 
@@ -154,21 +156,31 @@ function(compile_swift_file file target objectvar)
   # Compute flags to be passed down to swift when compiling a swift
   # file.
   if(SWIFT_OPTIMIZED)
-    set(swift_flags "-O2")
+    list(APPEND swift_flags "-O2")
   else()
-    set(swift_flags "-O0")
+    list(APPEND swift_flags "-O0")
   endif()
   
+  # If we have a modules SDK, use it for building.
+  if (HAVE_MODULES_SDK)
+    list(APPEND swift_flags "-sdk=${MODULES_SDK}")
+  endif()
+
+  # FIXME: Cleaner way to do this?
+
   if (NOT SWIFTFILE_IS_MAIN)
     list(APPEND swift_flags -parse-as-library)
   endif()
+
+  # Use the constraint checker, because we can
+  list(APPEND swift_flags "-constraint-checker")
 
   get_filename_component(file_name ${file} NAME_WE)
   set(objfile
     "${CMAKE_CURRENT_BINARY_DIR}/${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
   add_custom_command(
     OUTPUT ${objfile}
-    COMMAND swift "-c" "-constraint-checker" ${swift_flags} "-o" "${objfile}" "${source_file}"
+    COMMAND swift "-c" ${swift_flags} "-o" "${objfile}" "${source_file}"
     DEPENDS ${source_file}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
@@ -377,6 +389,14 @@ macro(add_swift_executable name)
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")  
 endmacro(add_swift_executable)
 
+set(MODULES_SDK "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9M.sdk" CACHE PATH
+  "Path to the modules-enabled SDK to use")
+if(EXISTS "${MODULES_SDK}/System/Library/Frameworks/module.map")
+  set(HAVE_MODULES_SDK YES)
+else()
+  message(STATUS "warning: modules-enabled SDK is not available")
+endif()
+
 # We'll need this once we have generated headers
 include_directories(BEFORE
   ${CMAKE_CURRENT_BINARY_DIR}/include
@@ -389,6 +409,11 @@ add_subdirectory(tools)
 add_subdirectory(test)
 add_subdirectory(runtime)
 add_subdirectory(stdlib)
+
+if(HAVE_MODULES_SDK)
+  add_subdirectory(objc)
+endif()
+
 add_subdirectory(examples)
 add_subdirectory(unittests)
 
