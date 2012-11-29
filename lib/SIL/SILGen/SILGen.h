@@ -25,9 +25,10 @@ namespace swift {
   
 namespace Lowering {
   class Condition;
+  class ManagedValue;
 
 class LLVM_LIBRARY_VISIBILITY SILGen
-  : public ASTVisitor<SILGen, Value, void> {
+  : public ASTVisitor<SILGen, ManagedValue, void> {
 public:
   /// The Function being constructed.
   Function &F;
@@ -89,6 +90,17 @@ public:
   // Memory management
   //===--------------------------------------------------------------------===//
   
+  /// emitAssign - Emits the instructions necessary to reassign a value
+  /// to an address. 'v' should be at +1 retain count.
+  /// - For trivial loadable types, a 'store v to dest' is generated.
+  /// - For reference types, the old value at 'dest' is loaded,
+  ///   'v' is stored to 'dest', and then the old value is released.
+  /// - For loadable types with reference type members, the reference type
+  ///   members of the old value are released following the same sequence as for
+  ///   reference types.
+  /// - For address-only types, this generates a copy_addr assign instruction.
+  void emitAssign(SILLocation loc, Value v, Value dest);
+  
   /// emitRetainArgument - Emits the instructions necessary for a caller to
   /// retain a value in order to pass it as a function argument.
   /// - For trivial loadable types, this is a no-op.
@@ -99,37 +111,42 @@ public:
   ///   callee-copied.
   void emitRetainArgument(SILLocation loc, Value v);
     
-  /// emitCopy - Emits the instructions necessary to store a copy of a value
-  /// to an address.
-  /// - For trivial loadable types, a 'store v to dest' is generated.
-  /// - For reference types, 'v' is retained before being stored.
-  /// - For loadable types with reference type members, the reference type
-  ///   members are retained before being stored.
-  /// - For address-only types, this generates a copy_addr instruction.
-  /// The operation may be either an initialization, which stores the value to
-  /// uninitialized memory, or an assignment, which replaces an already existing
-  /// value stored at the destination address.
-  ///
-  /// \param loc - The location information to assign to the generated
-  ///   instructions.
-  /// \param v - The value to copy. It should be either a value of a loadable
-  ///   type or the address of a value of an address-only type.
-  /// \param dest - The value of the address to store the copy to. It should be
-  ///   an address type matching the type of v.
-  /// \param isAssignment - If true, indicates that there is already a value
-  ///   stored at the destination address. The existing value will be loaded
-  ///   and released if necessary.
-  void emitCopy(SILLocation loc, Value v, Value dest, bool isAssignment);
-
   /// emitDestroyArgument - Emits the instructions necessary for a callee to
   /// destroy a value passed to it as an argument.
   /// - For trivial loadable types, this is a no-op.
   /// - For reference types, 'v' is released.
   /// - For loadable types with reference type members, the reference type
   ///   members are all released.
+  /// - For address-only types, this is a no-op. Address-only arguments are
+  ///   callee-copied, so only the callee-created copy needs to be destroyed.
+  /// This differs from emitDestroyRValue in the case of address-only types;
+  /// emitDestroyArgument does nothing with addresses, while emitDestroyRValue
+  /// generates a destroy_addr.
+  void emitDestroyArgument(SILLocation loc, Value v);
+  
+  /// emitRetainRValue - Emits the instructions necessary to increase the
+  /// retain count of a temporary, in order to use it as part of another
+  /// independent temporary.
+  /// - For trivial loadable types, this is a no-op.
+  /// - For reference types, 'v' is retained.
+  /// - For loadable types with reference type members, the reference type
+  ///   members are all retained.
+  /// - FIXME For address-only types, this currently crashes. It should instead
+  ///   allocate and return a copy made using copy_addr.
+  void emitRetainRValue(SILLocation loc, Value v);
+    
+  /// emitReleaseRValue - Emits the instructions necessary to clean up a
+  /// temporary value.
+  /// - For trivial loadable types, this is a no-op.
+  /// - For reference types, 'v' is released.
+  /// - For loadable types with reference type members, the reference type
+  ///   members are all released.
   /// - For address-only types, the value at the address is destroyed using
   ///   a destroy_addr instruction.
-  void emitDestroyArgument(SILLocation loc, Value v);
+  /// This differs from emitDestroyArgument in the case of address-only types;
+  /// emitDestroyArgument does nothing with addresses, while emitDestroyRValue
+  /// generates a destroy_addr.
+  void emitReleaseRValue(SILLocation loc, Value v);
     
   //===--------------------------------------------------------------------===//
   // Statements
@@ -160,41 +177,37 @@ public:
   // Expressions
   //===--------------------------------------------------------------------===//
   
-  Value visitExpr(Expr *E) {
-    E->dump();
-    llvm_unreachable("Not yet implemented");
-  }
+  ManagedValue visitExpr(Expr *E);
   
-  Value visitApplyExpr(ApplyExpr *E);
-  Value visitDeclRefExpr(DeclRefExpr *E);
-  Value visitIntegerLiteralExpr(IntegerLiteralExpr *E);
-  Value visitFloatLiteralExpr(FloatLiteralExpr *E);
-  Value visitCharacterLiteralExpr(CharacterLiteralExpr *E);
-  Value visitStringLiteralExpr(StringLiteralExpr *E);
-  Value visitLoadExpr(LoadExpr *E);
-  Value visitMaterializeExpr(MaterializeExpr *E);
-  Value visitRequalifyExpr(RequalifyExpr *E);
-  Value visitFunctionConversionExpr(FunctionConversionExpr *E);
-  Value visitParenExpr(ParenExpr *E);
-  Value visitTupleExpr(TupleExpr *E);
-  Value visitScalarToTupleExpr(ScalarToTupleExpr *E);
-  Value visitGetMetatypeExpr(GetMetatypeExpr *E);
-  Value visitSpecializeExpr(SpecializeExpr *E);
-  Value visitAddressOfExpr(AddressOfExpr *E);
-  Value visitTupleElementExpr(TupleElementExpr *E);
-  Value visitTupleShuffleExpr(TupleShuffleExpr *E);
-  Value visitNewArrayExpr(NewArrayExpr *E);
-  Value visitMetatypeExpr(MetatypeExpr *E);
+  ManagedValue visitApplyExpr(ApplyExpr *E);
+  ManagedValue visitDeclRefExpr(DeclRefExpr *E);
+  ManagedValue visitIntegerLiteralExpr(IntegerLiteralExpr *E);
+  ManagedValue visitFloatLiteralExpr(FloatLiteralExpr *E);
+  ManagedValue visitCharacterLiteralExpr(CharacterLiteralExpr *E);
+  ManagedValue visitStringLiteralExpr(StringLiteralExpr *E);
+  ManagedValue visitLoadExpr(LoadExpr *E);
+  ManagedValue visitMaterializeExpr(MaterializeExpr *E);
+  ManagedValue visitRequalifyExpr(RequalifyExpr *E);
+  ManagedValue visitFunctionConversionExpr(FunctionConversionExpr *E);
+  ManagedValue visitParenExpr(ParenExpr *E);
+  ManagedValue visitTupleExpr(TupleExpr *E);
+  ManagedValue visitScalarToTupleExpr(ScalarToTupleExpr *E);
+  ManagedValue visitGetMetatypeExpr(GetMetatypeExpr *E);
+  ManagedValue visitSpecializeExpr(SpecializeExpr *E);
+  ManagedValue visitAddressOfExpr(AddressOfExpr *E);
+  ManagedValue visitTupleElementExpr(TupleElementExpr *E);
+  ManagedValue visitTupleShuffleExpr(TupleShuffleExpr *E);
+  ManagedValue visitNewArrayExpr(NewArrayExpr *E);
+  ManagedValue visitMetatypeExpr(MetatypeExpr *E);
 
-  Value emitArrayInjectionCall(Value ObjectPtr, Value BasePtr,
-                               Value Length, Expr *ArrayInjectionFunction);
-  Value emitTupleShuffle(Expr *E, ArrayRef<Value> InOps,
-                         ArrayRef<int> ElementMapping,
-                         Expr *VarargsInjectionFunction);
-
-  /// emitApply - Creates an apply instruction and retain instructions for any
-  /// arguments that require retaining.
-  Value emitApply(SILLocation loc, Value fn, ArrayRef<Value> args);
+  ManagedValue emitArrayInjectionCall(Value ObjectPtr,
+                                      Value BasePtr,
+                                      Value Length,
+                                      Expr *ArrayInjectionFunction);
+  ManagedValue emitTupleShuffle(Expr *E,
+                                ArrayRef<Value> InOps,
+                                ArrayRef<int> ElementMapping,
+                                Expr *VarargsInjectionFunction);
 
   //===--------------------------------------------------------------------===//
   // Declarations

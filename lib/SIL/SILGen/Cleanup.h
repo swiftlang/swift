@@ -74,8 +74,10 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   CleanupsDepth InnermostScope;
   
   void popAndEmitTopCleanup();
+  void popAndEmitTopDeadCleanups(CleanupsDepth end);
   
   Cleanup &initCleanup(Cleanup &cleanup, size_t allocSize, CleanupState state);
+  void setCleanupState(Cleanup &cleanup, CleanupState state);
   
   void endScope(CleanupsDepth depth);
   
@@ -123,6 +125,10 @@ public:
     return pushCleanupInState<T, A...>(CleanupState::Active,
                                        ::std::forward<A>(args)...);
   }
+
+  /// Set the state of the cleanup at the given depth.
+  /// The transition must be non-trivial and legal.
+  void setCleanupState(CleanupsDepth depth, CleanupState state);
 };
 
 } // end namespace Lowering

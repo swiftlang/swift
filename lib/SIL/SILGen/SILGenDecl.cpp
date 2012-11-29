@@ -63,6 +63,9 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
       return;
     }
 
+    // FIXME: Use escape analysis info to generate "alloc_var"/"dealloc_var"
+    // stack allocations instead of "alloc_box"/"release" for values that don't
+    // escape and thus don't need boxes.
     auto allocBox = Gen.B.createAllocBox(vd, vd->getType());
     auto addr = Value(allocBox, 1);
 
@@ -73,8 +76,10 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     // FIXME: "Default zero initialization" is a dubious concept.  When we get
     // something like typestate or another concept that allows us to model
     // definitive assignment, then we can consider removing it.
+    // FIXME: Indirect returns (such as for address-only types) could be
+    // emplaced directly into the storage for the variable.
     auto initVal = Init ? Init : Gen.B.createZeroValue(vd, vd->getType());
-    Gen.emitCopy(vd, initVal, addr, /*isAssignment=*/false);
+    Gen.B.createStore(vd, initVal, addr);
 
     Gen.Cleanups.pushCleanup<CleanupVar>(allocBox);
   }
@@ -106,37 +111,25 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
 
 
 void SILGen::visitPatternBindingDecl(PatternBindingDecl *D) {
-  // FIXME: Implement support for cleanups.
-  //Initialization I;
-  
-  // Register any cleanups with the Initialization object.
-  //RegisterPattern(*this, I).visit(D->getPattern());
+  // FIXME: Implement cleanups in a way that stands up to unwinding and handles
+  // cleanup of partial initializations.
   
   // Actually emit the code to allocate space for each declared variable, and
   // then initialize them.
 
   // If an initial value was specified by the decl, use it to produce the
-  // initial values, otherwise use the default value for the type.
-  Value Initializer = nullptr;
+  // initial values, otherwise use a "zero" placeholder value as the
+  // initializer.
+  Value initializer = nullptr;
   if (D->getInit()) {
     FullExpr Scope(Cleanups);
-    Initializer = visit(D->getInit());
+    initializer = visit(D->getInit()).forward(*this);
   }
-  InitPatternWithExpr(*this, Initializer).visit(D->getPattern());
+  InitPatternWithExpr(*this, initializer).visit(D->getPattern());
 }
 
 
 namespace {
-
-class CleanupArgument : public Cleanup {
-  BBArgument *arg;
-public:
-  CleanupArgument(BBArgument *arg) : arg(arg) {}
-  
-  void emit(SILGen &gen) override {
-    gen.emitDestroyArgument(SILLocation(), arg);
-  }
-};
 
 /// ArgumentCreatorVisitor - A visitor for traversing a pattern and creating
 /// BBArguments for each pattern variable.  This is used to create function
@@ -149,10 +142,6 @@ struct ArgumentCreatorVisitor :
 
   Value argumentWithCleanup(Type ty, BasicBlock *parent) {
     BBArgument *arg = new (f) BBArgument(ty, parent);
-    // Arguments are passed at +1 retain count and releasing is the caller's
-    // responsibility, unless the argument is byref.
-    if (!ty->is<LValueType>())
-      gen.Cleanups.pushCleanup<CleanupArgument>(arg);
     return arg;
   }
     
@@ -192,7 +181,19 @@ void SILGen::emitProlog(FuncExpr *FE) {
   }
 }
 
-void SILGen::emitCopy(SILLocation loc, Value v, Value dest, bool isAssignment) {
+template<typename X>
+static void rrLoadableValue(SILGen &gen, SILLocation loc, Value v,
+                            X (SILBuilder::*createRR)(SILLocation, Value)) {
+  TypeInfo ti = TypeInfo::get(v.getType());
+  assert(ti.isLoadable() &&
+         "must pass address-only argument by address");
+  
+  // FIXME: explode and rr reference type elements of loadable value types
+  if (!ti.isTrivial())
+    (gen.B.*createRR)(loc, v);
+}
+
+void SILGen::emitAssign(SILLocation loc, Value v, Value dest) {
   Type vTy = v.getType();
 
   if (vTy->is<LValueType>()) {
@@ -203,13 +204,9 @@ void SILGen::emitCopy(SILLocation loc, Value v, Value dest, bool isAssignment) {
            "source of copy may only be an address if type is address-only");
     B.createCopyAddr(loc, v, dest,
                      /*isTake=*/false,
-                     /*isInitialize=*/!isAssignment);
+                     /*isInitialize=*/false);
   } else {
-    // v is a loadable type; retain it and release the old value if necessary
-    // FIXME: generate appropriate retains/releases based on the
-    // type of v and dest. Retaining a value type should be invalid, and the
-    // individual retainable members of an aggregate should be individually
-    // retained.
+    // v is a loadable type; release the old value if necessary
     TypeInfo ti = TypeInfo::get(vTy);
     assert(dest.getType()->is<LValueType>() &&
            "copy destination must be an address");
@@ -220,49 +217,55 @@ void SILGen::emitCopy(SILLocation loc, Value v, Value dest, bool isAssignment) {
            "copy of address-only type must take address for source argument");
     Value old;
 
-    if (!ti.isTrivial()) {
-      B.createRetain(loc, v);
-      if (isAssignment)
-        old = B.createLoad(loc, dest);
-    }
+    if (!ti.isTrivial())
+      old = B.createLoad(loc, dest);
     
     B.createStore(loc, v, dest);
-    
-    if (!ti.isTrivial()) {
-      if (isAssignment)
-        B.createRelease(loc, old);
-    }
+
+    if (!ti.isTrivial())
+      rrLoadableValue(*this, loc, old, &SILBuilder::createRelease);
   }
 }
 
 void SILGen::emitRetainArgument(SILLocation loc, Value v) {
-  Type vTy = v.getType();
-  if (vTy->is<LValueType>()) {
+  if (v.getType()->is<LValueType>()) {
     // v is an address-only or byref argument; it was passed by pointer, so do
     // nothing.
   } else {
-    // v is a loadable type; release it if necessary.
-    TypeInfo ti = TypeInfo::get(vTy);
-    assert(ti.isLoadable() &&
-           "must pass address-only argument by address");
-    
-    if (!ti.isTrivial())
-      B.createRetain(loc, v);
+    // v is a loadable type; retain it if necessary.
+    rrLoadableValue(*this, loc, v, &SILBuilder::createRetain);
   }
 }
 
 void SILGen::emitDestroyArgument(SILLocation loc, Value v) {
-  Type vTy = v.getType();
-  if (vTy->is<LValueType>()) {
-    // v is an address-only type; it was passed by pointer, so do nothing.
-    assert(TypeInfo::get(vTy->getRValueType()).isAddressOnly() &&
-           "destroyed argument may only be an address if type is address-only");
+  if (v.getType()->is<LValueType>()) {
+    // v is an address-only or byref type; it was passed by pointer, so do
+    // nothing.
   } else {
     // v is a loadable type; release it if necessary.
-    TypeInfo ti = TypeInfo::get(vTy);
-    assert(ti.isLoadable() &&
-           "destroy of address-only type must take address for argument");
-    if (!ti.isTrivial())
-      B.createRelease(loc, v);
+    rrLoadableValue(*this, loc, v, &SILBuilder::createRelease);
+  }
+}
+
+void SILGen::emitRetainRValue(SILLocation loc, Value v) {
+  if (v.getType()->is<LValueType>()) {
+    // v is an address-only type.
+    // FIXME: should allocate, copy_addr, and return a temporary
+    llvm_unreachable("FIXME: address-only types not implemented yet");
+  } else {
+    // v is a loadable type; retain it if necessary.
+    rrLoadableValue(*this, loc, v, &SILBuilder::createRetain);
+  }
+}
+
+void SILGen::emitReleaseRValue(SILLocation loc, Value v) {
+  if (v.getType()->is<LValueType>()) {
+    // v is an address-only type; destroy it indirectly with destroy_addr.
+    assert(TypeInfo::get(v.getType()).isAddressOnly() &&
+           "released address is not of an address-only type");
+    B.createDestroyAddr(loc, v);
+  } else {
+    // v is a loadable type; release it if necessary.
+    rrLoadableValue(*this, loc, v, &SILBuilder::createRelease);
   }
 }

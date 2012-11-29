@@ -24,13 +24,6 @@ static bool hasAnyActiveCleanups(DiverseStackImpl<Cleanup>::iterator begin,
   return false;
 }
 
-/// Transition the state of a cleanup.
-/// FIXME: transition logic
-static void setCleanupState(Cleanup &cleanup,
-                            CleanupState state) {
-  cleanup.setState(state);
-}
-
 namespace {
   /// A CleanupBuffer is a location to which to temporarily copy a
   /// cleanup.
@@ -50,7 +43,6 @@ namespace {
 
 void CleanupManager::popAndEmitTopCleanup() {
   Cleanup &stackCleanup = *Stack.begin();
-  assert(stackCleanup.isDead() && "popping a living cleanup");
   
   // Copy it off the cleanups stack.
   CleanupBuffer buffer(stackCleanup);
@@ -58,8 +50,20 @@ void CleanupManager::popAndEmitTopCleanup() {
   
   // Pop now.
   Stack.pop();
-  
-  cleanup.emit(Gen);
+
+  if (cleanup.isActive())
+    cleanup.emit(Gen);
+}
+
+void CleanupManager::popAndEmitTopDeadCleanups(CleanupsDepth end) {
+  Stack.checkIterator(end);
+
+  while (Stack.stable_begin() != end && Stack.begin()->isDead()) {
+    assert(!Stack.empty());
+    
+    popAndEmitTopCleanup();
+    Stack.checkIterator(end);
+  }
 }
 
 /// Leave a scope, with all its cleanups.
@@ -75,11 +79,6 @@ void CleanupManager::endScope(CleanupsDepth depth) {
   // Iteratively mark cleanups dead and pop them.
   // Maybe we'd get better results if we marked them all dead in one shot?
   while (Stack.stable_begin() != depth) {
-    // Mark the cleanup dead.
-    if (!Stack.begin()->isDead())
-      setCleanupState(*Stack.begin(), CleanupState::Dead);
-    
-    // Pop it.
     popAndEmitTopCleanup();
   }
 }
@@ -96,7 +95,8 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest) {
   for (auto cleanup = Stack.begin();
        cleanup != end;
        ++cleanup) {
-    cleanup->emit(Gen);
+    if (cleanup->isActive())
+      cleanup->emit(Gen);
   }
   B.createBranch(Dest.getBlock());
 }
@@ -105,15 +105,41 @@ void CleanupManager::emitReturnAndCleanups(SILLocation loc, Value returnValue) {
   SILBuilder &B = Gen.getBuilder();
   assert(B.hasValidInsertionPoint() && "Inserting return in invalid spot");
   for (auto &cleanup : Stack)
-    cleanup.emit(Gen);
+    if (cleanup.isActive())
+      cleanup.emit(Gen);
   B.createReturn(loc, returnValue);
 }
 
 Cleanup &CleanupManager::initCleanup(Cleanup &cleanup,
                                      size_t allocSize,
-                                     CleanupState state)
-{
+                                     CleanupState state) {
   cleanup.allocatedSize = allocSize;
   cleanup.state = state;
   return cleanup;
+}
+
+void CleanupManager::setCleanupState(CleanupsDepth depth, CleanupState state) {
+  auto iter = Stack.find(depth);
+  assert(iter != Stack.end() && "can't change end of cleanups stack");
+  setCleanupState(*iter, state);
+  
+  if (state == CleanupState::Dead && iter == Stack.begin())
+    popAndEmitTopDeadCleanups(InnermostScope);
+}
+
+void CleanupManager::setCleanupState(Cleanup &cleanup, CleanupState state) {
+  assert((state != CleanupState::Active || Gen.B.hasValidInsertionPoint()) &&
+         "activating cleanup at invalid IP");
+
+  // Do the transition now to avoid doing it in N places below.
+  CleanupState oldState = cleanup.getState();
+  cleanup.setState(state);
+  
+  assert(state != oldState && "cleanup state is already active");
+  
+  // TODO: port the full transition logic from irgen here. For now, we only
+  // handle active and dead cleanups and only support transitions from active to
+  // dead.
+  assert(state == CleanupState::Dead && oldState == CleanupState::Active &&
+         "only active to dead transition currently supported");
 }

@@ -13,6 +13,7 @@
 #include "SILGen.h"
 #include "Scope.h"
 #include "Condition.h"
+#include "Explosion.h"
 #include "swift/AST/AST.h"
 using namespace swift;
 using namespace Lowering;
@@ -48,7 +49,7 @@ Condition SILGen::emitCondition(Stmt *TheStmt, Expr *E,
   Value V;
   {
     FullExpr Scope(Cleanups);
-    V = visit(E);
+    V = visit(E).forward(*this);
   }
   assert(V.getType()->castTo<BuiltinIntegerType>()->getBitWidth() == 1);
   
@@ -111,21 +112,31 @@ static void emitAssignStmtRecursive(AssignStmt *S, Value Src, Expr *Dest,
   }
   
   // Otherwise, emit the scalar assignment.
-  Value DstV = Gen.visit(Dest);
+  Value DstV = Gen.visit(Dest).getUnmanagedValue();
 
-  Gen.emitCopy(S, Src, DstV, /*isAssignment=*/true);
+  Gen.emitAssign(S, Src, DstV);
 }
 
 
 void SILGen::visitAssignStmt(AssignStmt *S) {
-  Value SrcV = visit(S->getSrc());
+  Value SrcV;
+  {
+    FullExpr scope(Cleanups);
+    SrcV = visit(S->getSrc()).forward(*this);
+  }
   
   // Handle tuple destinations by destructuring them if present.
   return emitAssignStmtRecursive(S, SrcV, S->getDest(), *this);
 }
 
 void SILGen::visitReturnStmt(ReturnStmt *S) {
-  Value ArgV = S->hasResult() ? visit(S->getResult()) : B.createEmptyTuple(S);
+  Value ArgV;
+  if (S->hasResult()) {
+    FullExpr scope(Cleanups);
+    ArgV = visit(S->getResult()).forward(*this);
+  } else {
+    ArgV = B.createEmptyTuple(S);
+  }
   Cleanups.emitReturnAndCleanups(S, ArgV);
 }
 

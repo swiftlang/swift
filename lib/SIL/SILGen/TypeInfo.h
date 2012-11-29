@@ -14,6 +14,7 @@
 #define SILGen_TypeInfo_h
 
 #include "SILGen.h"
+#include "Explosion.h"
 
 namespace swift {
 namespace Lowering {
