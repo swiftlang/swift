@@ -8,3 +8,4 @@ void exit(int);
 
 double pow(double, double);
 
+int puts(const char *);

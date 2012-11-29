@@ -126,6 +126,13 @@ namespace {
       if (type->getPointeeType()->isFunctionType())
         return Type();
 
+      // "const char *" maps to Swift's CString.
+      clang::ASTContext &clangContext = Impl.getClangASTContext();
+      if (clangContext.hasSameType(type->getPointeeType(),
+                                   clangContext.CharTy.withConst())) {
+        return Impl.getNamedSwiftType("CString");
+      }
+                                                
       // All other C pointers come across as raw pointers.
       return Impl.SwiftContext.TheRawPointerType;
     }
