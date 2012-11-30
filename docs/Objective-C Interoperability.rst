@@ -7,6 +7,8 @@ class models, and what it would take to merge the two as much as possible. The
 format of each section lays out the differences between Swift and Objective-C,
 then describes what needs to happen for a user to mix the two seamlessly.
 
+.. contents::
+
 Terminology used in this document:
 
 - ``id``-compatible: something that can be assigned to an ``id`` variable and
@@ -320,6 +322,56 @@ Methods marked as "overrideable API" have only Swift entry points:
 
 - Requires teaching Clang to emit Swift vtables.
 - Later exposing this method to Objective-C in a subclass may be awkward?
+
+
+Attributes for Objective-C Support
+==================================
+
+``[objc]``
+  - When applied to classes, directs the compiler to emit Objective-C metadata
+    for this class. Additionally, if no superclass is specified, the superclass
+    is implicitly ``NSObject`` rather than the default ``swift.Object``.
+    Note that Objective-C class names must be unique across the entire program,
+    not just within a single namespace or module. [#]_
+  - When applied to methods, directs the compiler to emit an Objective-C entry
+    point and entry in the Objective-C method list for this method.
+  - When applied to properties, directs the compiler to emit Objective-C methods
+    ``-``\ *foo* and ``-set``\ *Foo*\ ``:``, which wrap the getter and setter
+    for the property.
+  - *This attribute currently cannot be applied to protocols.*
+
+  This attribute is inherited (in all contexts).
+
+``[IBOutlet]``
+  Can only be applied to properties. This marks the property as being exposed
+  as an outlet in Interface Builder. **In most cases,**
+  `IBOutlets should be weak properties`__.
+
+  *The simplest implementation of this is to have* ``[IBOutlet]`` *cause an*
+  *Objective-C getter and setter to be emitted, but this is* not *part of*
+  ``[IBOutlet]``'s *contract.* 
+
+  This attribute is inherited.
+
+``[IBAction]``
+  Can only be applied to methods, which must have a signature matching the
+  requirements for target/action methods on the current platform.
+  This marks the method as being a potential action in Interface Builder.
+
+  *The simplest implementation of this is to have* ``[IBAction]`` *imply*
+  ``[objc]``, *and this may be the* only *viable implementation given how the*
+  *responder chain works. For example, a window's delegate is part of the*
+  *responder chain, even though it does not subclass* ``NSResponder`` *and may*
+  *not be an Objective-C class at all. Still, this is* not *part of*
+  ``[IBAction]``'s *contract.*
+
+  This attribute is inherited.
+
+.. [#] I'm not really sure what to do about uniquing Objective-C class names.
+   Maybe eventually [objc] will take an optional argument specifying the
+   Objective-C-equivalent name.
+
+__ http://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/LoadingResources/CocoaNibs/CocoaNibs.html#//apple_ref/doc/uid/10000051i-CH4-SW6
 
 
 Level 1: Message-passing
