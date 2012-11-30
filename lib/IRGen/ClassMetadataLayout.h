@@ -26,8 +26,8 @@ namespace irgen {
 
 class IRGenModule;
 
-/// The number of fields in a HeapMetadata object.
-const unsigned NumHeapMetadataFields = 4;
+/// The number of fields in a FullHeapMetadata object.
+const unsigned NumHeapMetadataFields = 3;
 
 /// Does the given class method require a different dispatch-table
 /// entry from from all of the methods it overrides?  The restrictions
@@ -54,16 +54,16 @@ protected:
 
 public:
   void layout() {
+    // HeapMetadata header.
+    asImpl().addDestructorFunction();
+
     // Metadata header.
     super::layout();
 
-    // HeapMetadata header.
-    asImpl().addDestructorFunction();
-    asImpl().addSizeFunction();
-
-    // ClassMetadata header.
-    asImpl().addNominalTypeDescriptor();
+    // ClassMetadata header.  This is ObjC-compatible.
     asImpl().addSuperClass();
+    asImpl().addClassCacheData();
+    asImpl().addClassDataPointer();
 
     // Class members.
     addClassMembers(TargetClass);
@@ -152,10 +152,11 @@ public:
   void addMetadataFlags() { NextIndex++; }
   void addValueWitnessTable() { NextIndex++; }
   void addDestructorFunction() { NextIndex++; }
-  void addSizeFunction() { NextIndex++; }
   void addNominalTypeDescriptor() { NextIndex++; }
   void addParentMetadataRef(ClassDecl *forClass) { NextIndex++; }
   void addSuperClass() { NextIndex++; }
+  void addClassCacheData() { NextIndex += 2; }
+  void addClassDataPointer() { NextIndex++; }
   void addMethod(FunctionRef fn) { NextIndex++; }
   void addGenericArgument(ArchetypeType *argument, ClassDecl *forClass) {
     NextIndex++;

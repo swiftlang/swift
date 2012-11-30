@@ -274,7 +274,6 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
 
   llvm::Value *metadata = emitNominalMetadataRef(IGF, curClass, thisType);
-  metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.HeapMetadataPtrTy);
 
   llvm::Value *size = layout.emitSize(IGF);
   llvm::Value *align = layout.emitAlign(IGF);

@@ -155,6 +155,11 @@ static GenericMetadataCache &getCache(GenericMetadata *metadata) {
   return *reinterpret_cast<GenericMetadataCache*>(metadata->PrivateData);
 }
 
+template <class T>
+static const T *adjustAddressPoint(const T *raw, uint32_t offset) {
+  return reinterpret_cast<const T*>(reinterpret_cast<const char*>(raw) + offset);
+}
+
 static const Metadata *
 instantiateGenericMetadata(GenericMetadata *pattern,
                            const void *arguments) {
@@ -167,11 +172,11 @@ instantiateGenericMetadata(GenericMetadata *pattern,
                                            pattern->MetadataSize);
 
   // Initialize the metadata by copying the template.
-  auto metadata = entry->getData<Metadata>(numGenericArguments);
-  memcpy(metadata, pattern->getMetadataTemplate(), pattern->MetadataSize);
+  auto fullMetadata = entry->getData<Metadata>(numGenericArguments);
+  memcpy(fullMetadata, pattern->getMetadataTemplate(), pattern->MetadataSize);
 
   // Fill in the missing spaces from the arguments.
-  void **metadataAsArray = reinterpret_cast<void**>(metadata);
+  void **metadataAsArray = reinterpret_cast<void**>(fullMetadata);
   for (auto i = pattern->fill_ops_begin(),
             e = pattern->fill_ops_end(); i != e; ++i) {
     metadataAsArray[i->ToIndex] = argumentsAsArray[i->FromIndex];
@@ -181,7 +186,9 @@ instantiateGenericMetadata(GenericMetadata *pattern,
 
   // Add the cache to the list.  This can in theory be made thread-safe,
   // but really this should use a non-linear lookup algorithm.
-  return getCache(pattern).add(entry)->getData<Metadata>(numGenericArguments);
+  auto canonFullMetadata =
+    getCache(pattern).add(entry)->getData<Metadata>(numGenericArguments);
+  return adjustAddressPoint(canonFullMetadata, pattern->AddressPoint);
 }
 
 /// The primary entrypoint.
@@ -215,7 +222,8 @@ swift::swift_getGenericMetadata(GenericMetadata *pattern,
 #if SWIFT_DEBUG_RUNTIME
     printf("found in cache!\n");
 #endif
-    return entry->getData<Metadata>(numGenericArgs);
+    return adjustAddressPoint(entry->getData<Metadata>(numGenericArgs),
+                              pattern->AddressPoint);
   }
 
 #if SWIFT_DEBUG_RUNTIME
@@ -226,50 +234,95 @@ swift::swift_getGenericMetadata(GenericMetadata *pattern,
   return instantiateGenericMetadata(pattern, arguments);
 }
 
-typedef HomogeneousCacheEntry FunctionCacheEntry;
+namespace {
+  class FunctionCacheEntry : public CacheEntry<FunctionCacheEntry> {
+    FullMetadata<FunctionTypeMetadata> Metadata;
+
+  public:
+    FunctionCacheEntry(size_t numArguments) {}
+
+    FullMetadata<FunctionTypeMetadata> *getData() {
+      return &Metadata;
+    }
+    const FullMetadata<FunctionTypeMetadata> *getData() const {
+      return &Metadata;
+    }
+
+    /// Does this cache entry match the given set of arguments?
+    bool matches(const void * const *arguments, size_t numArguments) const {
+      assert(numArguments == 2);
+      return (arguments[0] == Metadata.ArgumentType &&
+              arguments[1] == Metadata.ResultType);
+    }
+  };
+}
 
 /// The uniquing structure for function type metadata.
 static MetadataCache<FunctionCacheEntry> FunctionTypes;
+
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata(const Metadata *argMetadata,
                                      const Metadata *resultMetadata) {
   const size_t numGenericArgs = 2;
 
+  typedef FullMetadata<FunctionTypeMetadata> FullFunctionTypeMetadata;
+
   const void *args[] = { argMetadata, resultMetadata };
   if (auto entry = FunctionTypes.find(args, numGenericArgs)) {
-    return entry->getData<FunctionTypeMetadata>(numGenericArgs);
+    return entry->getData();
   }
 
   auto entry = FunctionCacheEntry::allocate(args, numGenericArgs,
                                             sizeof(FunctionTypeMetadata));
 
-  auto metadata = entry->getData<FunctionTypeMetadata>(numGenericArgs);
+  auto metadata = entry->getData();
   metadata->Kind = MetadataKind::Function;
   metadata->ValueWitnesses = &_TWVFT_T_; // standard function value witnesses
   metadata->ArgumentType = argMetadata;
   metadata->ResultType = resultMetadata;
 
-  return FunctionTypes.add(entry)->getData<FunctionTypeMetadata>(numGenericArgs);
+  return FunctionTypes.add(entry)->getData();
 }
 
 /*** Tuples ****************************************************************/
 
-typedef HeterogeneousCacheEntry TupleCacheEntry;
+namespace {
+  class TupleCacheEntry : public CacheEntry<TupleCacheEntry> {
+  public:
+    ValueWitnessTable Witnesses;
+    FullMetadata<TupleTypeMetadata> Metadata;
+
+    TupleCacheEntry(size_t numArguments) {
+      Metadata.NumElements = numArguments;
+    }
+
+    FullMetadata<TupleTypeMetadata> *getData() {
+      return &Metadata;
+    }
+    const FullMetadata<TupleTypeMetadata> *getData() const {
+      return &Metadata;
+    }
+
+    /// Does this cache entry match the given set of arguments?
+    bool matches(const void * const *arguments, size_t numArguments) const {
+      // Same number of elements.
+      if (numArguments != Metadata.NumElements)
+        return false;
+
+      // Arguments match up element-wise.
+      for (size_t i = 0; i != numArguments; ++i) {
+        if (arguments[i] != Metadata.getElements()[i].Type)
+          return false;
+      }
+
+      return true;
+    }
+  };
+}
 
 /// The uniquing structure for tuple type metadata.
 static MetadataCache<TupleCacheEntry> TupleTypes;
-
-namespace {
-  /// The data structure carried by the entries in TupleTypes.
-  ///
-  /// All of the generic tuple witnesses below expect to be able to
-  /// cast their witness-table pointers to this type.
-  struct TupleTypeData {
-    ValueWitnessTable Witnesses;
-    TupleTypeMetadata Metadata; // includes a variably-sized array of elements
-  };
-}
 
 /// Given a metatype pointer, produce the value-witness table for it.
 /// This is equivalent to metatype->ValueWitnesses but more efficient.
@@ -317,7 +370,7 @@ static void tuple_destroy(OpaqueValue *tuple, const Metadata *_metatype) {
   for (size_t i = 0, e = metadata.NumElements; i != e; ++i) {
     auto &eltInfo = metadata.getElements()[i];
     OpaqueValue *elt = eltInfo.findIn(tuple);
-    auto eltWitnesses = eltInfo.Type->ValueWitnesses;
+    auto eltWitnesses = eltInfo.Type->getValueWitnesses();
     eltWitnesses->destroy(elt, eltInfo.Type);
   }
 }
@@ -342,7 +395,7 @@ static OpaqueValue *tuple_forEachField(OpaqueValue *destTuple,
   auto metatype = *(const TupleTypeMetadata*) _metatype;
   for (size_t i = 0, e = metatype.NumElements; i != e; ++i) {
     auto &eltInfo = metatype.getElements()[i];
-    auto eltValueWitnesses = eltInfo.Type->ValueWitnesses;
+    auto eltValueWitnesses = eltInfo.Type->getValueWitnesses();
 
     OpaqueValue *destElt = eltInfo.findIn(destTuple);
     OpaqueValue *srcElt = eltInfo.findIn(srcTuple);
@@ -433,23 +486,21 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 
   auto genericArgs = (const void * const *) elements;
   if (auto entry = TupleTypes.find(genericArgs, numElements)) {
-    return &entry->getData<TupleTypeData>(numElements)->Metadata;
+    return entry->getData();
   }
 
   typedef TupleTypeMetadata::Element Element;
 
-  // This is actually a bit silly because the data is *completely*
-  // shared between the header and the tuple metadata itself.
+  // Allocate the tuple cache entry, which includes space for both the
+  // metadata and a value-witness table.
   auto entry = TupleCacheEntry::allocate(genericArgs, numElements,
-                                         sizeof(TupleTypeData) +
                                          numElements * sizeof(Element));
 
-  auto data = entry->getData<TupleTypeData>(numElements);
-  auto witnesses = &data->Witnesses;
+  auto witnesses = &entry->Witnesses;
 
-  auto metadata = &data->Metadata;
-  metadata->Base.Kind = MetadataKind::Tuple;
-  metadata->Base.ValueWitnesses = witnesses;
+  auto metadata = entry->getData();
+  metadata->Kind = MetadataKind::Tuple;
+  metadata->ValueWitnesses = witnesses;
   metadata->NumElements = numElements;
   metadata->Labels = labels;
 
@@ -462,9 +513,10 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
     metadata->getElements()[i].Offset = size;
 
     // Lay out this tuple element.
-    size = llvm::RoundUpToAlignment(size, elt->ValueWitnesses->alignment);
-    size += elt->ValueWitnesses->size;
-    alignment = std::max(alignment, elt->ValueWitnesses->alignment);
+    auto eltVWT = elt->getValueWitnesses();
+    size = llvm::RoundUpToAlignment(size, eltVWT->alignment);
+    size += eltVWT->size;
+    alignment = std::max(alignment, eltVWT->alignment);
   }
 
   witnesses->size = size;
@@ -479,12 +531,32 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
   FOR_ALL_FUNCTION_VALUE_WITNESSES(ASSIGN_TUPLE_WITNESS)
 #undef ASSIGN_TUPLE_WITNESS
 
-  return &TupleTypes.add(entry)->getData<TupleTypeData>(numElements)->Metadata;
+  return TupleTypes.add(entry)->getData();
 }
 
 /*** Metatypes *************************************************************/
 
-typedef HomogeneousCacheEntry MetatypeCacheEntry;
+namespace {
+  class MetatypeCacheEntry : public CacheEntry<MetatypeCacheEntry> {
+    FullMetadata<MetatypeMetadata> Metadata;
+
+  public:
+    MetatypeCacheEntry(size_t numArguments) {}
+
+    FullMetadata<MetatypeMetadata> *getData() {
+      return &Metadata;
+    }
+    const FullMetadata<MetatypeMetadata> *getData() const {
+      return &Metadata;
+    }
+
+    /// Does this cache entry match the given set of arguments?
+    bool matches(const void * const *arguments, size_t numArguments) const {
+      assert(numArguments == 1);
+      return (arguments[0] == Metadata.InstanceType);
+    }
+  };
+}
 
 /// The uniquing structure for metatype type metadata.
 static MetadataCache<MetatypeCacheEntry> MetatypeTypes;
@@ -503,7 +575,7 @@ getMetatypeValueWitnesses(const Metadata *instanceType) {
 
   // Metatypes preserve the triviality of their instance type.
   if (instanceType->Kind == MetadataKind::Metatype)
-    return instanceType->ValueWitnesses;
+    return instanceType->getValueWitnesses();
 
   // Everything else is trivial and can use the empty-tuple metadata.
   return &_TWVT_;
@@ -516,16 +588,15 @@ swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
 
   const void *args[] = { instanceMetadata };
   if (auto entry = MetatypeTypes.find(args, numGenericArgs)) {
-    return entry->getData<MetatypeMetadata>(numGenericArgs);
+    return entry->getData();
   }
 
-  auto entry = MetatypeCacheEntry::allocate(args, numGenericArgs,
-                                            sizeof(MetatypeMetadata));
+  auto entry = MetatypeCacheEntry::allocate(args, numGenericArgs, 0);
 
-  auto metadata = entry->getData<MetatypeMetadata>(numGenericArgs);
+  auto metadata = entry->getData();
   metadata->Kind = MetadataKind::Metatype;
   metadata->ValueWitnesses = getMetatypeValueWitnesses(instanceMetadata);
   metadata->InstanceType = instanceMetadata;
 
-  return MetatypeTypes.add(entry)->getData<MetatypeMetadata>(numGenericArgs);
+  return MetatypeTypes.add(entry)->getData();
 }

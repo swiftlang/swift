@@ -39,13 +39,6 @@ public:
              llvm::ArrayRef<const TypeInfo *> fields,
              llvm::StructType *typeToFill = 0);
 
-  /// Add the layout's required metadata fields to the given collection.
-  /// The address point of the metadata should be at the first field added.
-  ///
-  /// It may be wasteful to call this multiple times.
-  void buildMetadataInto(IRGenModule &IGM,
-                   llvm::SmallVectorImpl<llvm::Constant*> &metadata) const;
-
   /// Build a size function for this layout.
   llvm::Constant *createSizeFn(IRGenModule &IGM) const;
 
@@ -95,8 +88,6 @@ public:
 
 private:
   llvm::Constant *getPrivateMetadata(IRGenModule &IGM) const;
-  void buildMetadataInto(IRGenModule &IGM,
-                   llvm::SmallVectorImpl<llvm::Constant*> &fields) const;
 };
 
 } // end namespace irgen

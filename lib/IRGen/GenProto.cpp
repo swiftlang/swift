@@ -60,15 +60,6 @@
 using namespace swift;
 using namespace irgen;
 
-/// Given a type metadata pointer, load its value witness table.
-static llvm::Value *emitValueWitnessTableRefForMetadata(IRGenFunction &IGF,
-                                                        llvm::Value *metadata) {
-  assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
-  auto wtableSlot = IGF.Builder.CreateStructGEP(metadata, 1);
-  return IGF.Builder.CreateLoad(Address(wtableSlot,
-                                        IGF.IGM.getPointerAlignment()));
-}
-
 /// A fixed-size buffer is always 16 bytes and pointer-aligned.
 /// If we align them more, we'll need to introduce padding to
 /// make protocol types work.

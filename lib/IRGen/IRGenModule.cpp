@@ -62,47 +62,78 @@ IRGenModule::IRGenModule(ASTContext &Context,
   SlowAllocFn = nullptr;
   SlowRawDeallocFn = nullptr;
 
+  const unsigned defaultAS = 0;
+
   RefCountedStructTy =
     llvm::StructType::create(getLLVMContext(), "swift.refcounted");
   RefCountedPtrTy = RefCountedStructTy->getPointerTo(/*addrspace*/ 0);
   RefCountedNull = llvm::ConstantPointerNull::get(RefCountedPtrTy);
 
-  llvm::Type *typeMetadataElts[] = { MetadataKindTy, WitnessTablePtrTy };
+  // A type metadata is the structure pointed to by the canonical
+  // address point of a type metadata.  This is at least one word, and
+  // potentially more than that, past the start of the actual global
+  // structure.
+  llvm::Type *typeMetadataElts[] = { MetadataKindTy };
   TypeMetadataStructTy =
     llvm::StructType::create(getLLVMContext(), typeMetadataElts,
                              "swift.type");
-  TypeMetadataPtrTy = TypeMetadataStructTy->getPointerTo(/*addrspace*/ 0);
+  TypeMetadataPtrTy = TypeMetadataStructTy->getPointerTo(defaultAS);
+
+  // A full type metadata is basically just an adjustment to the
+  // address point of a type metadata.  Resilience may cause
+  // additional data to be laid out prior to this address point.
+  llvm::Type *fullTypeMetadataElts[] = {
+    WitnessTablePtrTy,
+    TypeMetadataStructTy
+  };
+  FullTypeMetadataStructTy =
+    llvm::StructType::create(getLLVMContext(), fullTypeMetadataElts,
+                             "swift.full_type");
+  FullTypeMetadataPtrTy = FullTypeMetadataStructTy->getPointerTo(defaultAS);
+
+  // A metadata pattern is a structure from which generic type
+  // metadata are allocated.  We leave this struct type intentionally
+  // opaque, because the compiler basically never needs to access
+  // anything from one.
+  TypeMetadataPatternStructTy =
+    llvm::StructType::create(getLLVMContext(), "swift.type_pattern");
+  TypeMetadataPatternPtrTy =
+    TypeMetadataPatternStructTy->getPointerTo(defaultAS);
 
   DtorTy = llvm::FunctionType::get(SizeTy, RefCountedPtrTy, false);
   llvm::Type *dtorPtrTy = DtorTy->getPointerTo();
 
-  // Note that heap metadata share a common prefix with type metadata.
-  llvm::Type *heapMetadataElts[] = {
-    MetadataKindTy, WitnessTablePtrTy, dtorPtrTy, dtorPtrTy
+  // A full heap metadata is basically just an additional small prefix
+  // on a full metadata, used for metadata corresponding to heap
+  // allocations.
+  llvm::Type *fullHeapMetadataElts[] = {
+    dtorPtrTy,
+    WitnessTablePtrTy,
+    TypeMetadataStructTy
   };
-  HeapMetadataStructTy =
-    llvm::StructType::create(getLLVMContext(), heapMetadataElts,
-                             "swift.heapmetadata");
-  HeapMetadataPtrTy = HeapMetadataStructTy->getPointerTo(/*addrspace*/ 0);
+  FullHeapMetadataStructTy =
+    llvm::StructType::create(getLLVMContext(), fullHeapMetadataElts,
+                             "swift.full_heapmetadata");
+  FullHeapMetadataPtrTy = FullHeapMetadataStructTy->getPointerTo(defaultAS);
 
-  llvm::Type *refCountedElts[] = { HeapMetadataPtrTy, SizeTy };
+  llvm::Type *refCountedElts[] = { TypeMetadataPtrTy, SizeTy };
   RefCountedStructTy->setBody(refCountedElts);
 
-  PtrSize = Size(DataLayout.getPointerSize(0));
+  PtrSize = Size(DataLayout.getPointerSize(defaultAS));
 
   llvm::Type *funcElts[] = { Int8PtrTy, RefCountedPtrTy };
   FunctionPairTy = llvm::StructType::get(LLVMContext, funcElts,
                                          /*packed*/ false);
 
   OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
-                  ->getPointerTo(0);
+                  ->getPointerTo(defaultAS);
 
   FixedBufferTy = nullptr;
   for (unsigned i = 0; i != NumValueWitnessFunctions; ++i)
     ValueWitnessTys[i] = nullptr;
 
   ObjCPtrTy = llvm::StructType::create(getLLVMContext(), "objc_object")
-                ->getPointerTo(0);
+                ->getPointerTo(defaultAS);
 
   // TODO: use "tinycc" on platforms that support it
   RuntimeCC = llvm::CallingConv::C;
@@ -124,7 +155,7 @@ static llvm::Constant *createRuntimeFunction(IRGenModule &IGM, StringRef name,
 llvm::Constant *IRGenModule::getAllocObjectFn() {
   if (AllocObjectFn) return AllocObjectFn;
 
-  llvm::Type *types[] = { HeapMetadataPtrTy, SizeTy, SizeTy };
+  llvm::Type *types[] = { TypeMetadataPtrTy, SizeTy, SizeTy };
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(RefCountedPtrTy, types, false);
   AllocObjectFn = createRuntimeFunction(*this, "swift_allocObject", fnType);
@@ -223,9 +254,9 @@ llvm::Constant *IRGenModule::getGetFunctionMetadataFn() {
 llvm::Constant *IRGenModule::getGetGenericMetadataFn() {
   if (GetGenericMetadataFn) return GetGenericMetadataFn;
 
-  // type_metadata_t *swift_getGenericMetadata(type_metadata_t *pattern,
+  // type_metadata_t *swift_getGenericMetadata(type_metadata_pattern_t *pattern,
   //                                           const void *arguments);
-  llvm::Type *argTypes[] = { TypeMetadataPtrTy, Int8PtrTy };
+  llvm::Type *argTypes[] = { TypeMetadataPatternPtrTy, Int8PtrTy };
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
   GetGenericMetadataFn =

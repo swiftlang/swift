@@ -108,31 +108,35 @@ llvm::Constant *HeapLayout::createSizeFn(IRGenModule &IGM) const {
   return fn;
 }
 
-void HeapLayout::buildMetadataInto(IRGenModule &IGM,
-                    llvm::SmallVectorImpl<llvm::Constant*> &metadata) const {
-  metadata.push_back(getMetadataKind(IGM, MetadataKind::HeapLocalVariable));
-  metadata.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
-  metadata.push_back(createDtorFn(IGM, *this));
-  metadata.push_back(createSizeFn(IGM));
-}
+static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
+                                            llvm::Constant *dtorFn,
+                                            MetadataKind kind) {
+  // Build the fields of the private metadata.
+  llvm::SmallVector<llvm::Constant*, 4> fields;
+  fields.push_back(dtorFn);
+  fields.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
+  fields.push_back(llvm::ConstantStruct::get(IGM.TypeMetadataStructTy,
+                                             getMetadataKind(IGM, kind)));
 
-static llvm::Constant *buildPrivateMetadataVar(IRGenModule &IGM,
-                                          ArrayRef<llvm::Constant*> fields) {
   llvm::Constant *init =
-    llvm::ConstantStruct::get(IGM.HeapMetadataStructTy, fields);
+    llvm::ConstantStruct::get(IGM.FullHeapMetadataStructTy, fields);
 
   llvm::GlobalVariable *var =
-    new llvm::GlobalVariable(IGM.Module, IGM.HeapMetadataStructTy,
+    new llvm::GlobalVariable(IGM.Module, IGM.FullHeapMetadataStructTy,
                              /*constant*/ true,
                              llvm::GlobalVariable::InternalLinkage, init,
                              "metadata");
-  return var;
+
+  llvm::Constant *indices[] = {
+    llvm::ConstantInt::get(IGM.Int32Ty, 0),
+    llvm::ConstantInt::get(IGM.Int32Ty, 2)
+  };
+  return llvm::ConstantExpr::getInBoundsGetElementPtr(var, indices);
 }
 
 llvm::Constant *HeapLayout::getPrivateMetadata(IRGenModule &IGM) const {
-  llvm::SmallVector<llvm::Constant*, 4> fields;
-  buildMetadataInto(IGM, fields);
-  return buildPrivateMetadataVar(IGM, fields);
+  return buildPrivateMetadata(IGM, createDtorFn(IGM, *this),
+                              MetadataKind::HeapLocalVariable);
 }
 
 /// Return the size of the array heap header, minus the array of
@@ -286,43 +290,9 @@ createArrayDtorFn(IRGenModule &IGM,
   return fn;
 }
 
-/// Create the size function for an array layout.
-/// TODO: give this some reasonable name and possibly linkage.
-static llvm::Function *
-createArraySizeFn(IRGenModule &IGM,
-                  const ArrayHeapLayout &layout,
-                  const NecessaryBindings &bindings) {
-  llvm::Function *fn =
-    llvm::Function::Create(IGM.DtorTy, llvm::Function::InternalLinkage,
-                           "arraysize", &IGM.Module);
-
-  IRGenFunction IGF(IGM, CanType(), llvm::ArrayRef<Pattern*>(),
-                    ExplosionKind::Minimal, 0, fn, Prologue::Bare);
-
-  llvm::Value *header = fn->arg_begin();
-  Address lengthPtr = layout.getLengthPointer(IGF, header);
-  llvm::Value *length = IGF.Builder.CreateLoad(lengthPtr, "length");
-
-  bindNecessaryBindings(IGF, bindings, Address(header, layout.getAlignment()));
-
-  llvm::Value *size = layout.getAllocationSize(IGF, length, false, false);
-  IGF.Builder.CreateRet(size);
-
-  return fn;
-}
-
-void ArrayHeapLayout::buildMetadataInto(IRGenModule &IGM,
-                      llvm::SmallVectorImpl<llvm::Constant*> &fields) const {
-  fields.push_back(getMetadataKind(IGM, MetadataKind::HeapArray));
-  fields.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
-  fields.push_back(createArrayDtorFn(IGM, *this, Bindings));
-  fields.push_back(createArraySizeFn(IGM, *this, Bindings));
-}
-
 llvm::Constant *ArrayHeapLayout::getPrivateMetadata(IRGenModule &IGM) const {
-  llvm::SmallVector<llvm::Constant*, 2> fields;
-  buildMetadataInto(IGM, fields);
-  return buildPrivateMetadataVar(IGM, fields);
+  return buildPrivateMetadata(IGM, createArrayDtorFn(IGM, *this, Bindings),
+                              MetadataKind::HeapArray);
 }
 
 /// Perform an arithmetic operation which saturates at SIZE_MAX.

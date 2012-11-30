@@ -90,7 +90,7 @@ void swift::swift_release(HeapObject *object) {
 
 // Declared extern "C" LLVM_LIBRARY_VISIBILITY above.
 void _swift_release_slow(HeapObject *object) {
-  size_t allocSize = object->metadata->destroy(object);
+  size_t allocSize = asFullMetadata(object->metadata)->destroy(object);
   if (allocSize) {
     swift_deallocObject(object, allocSize);
   }

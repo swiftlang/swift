@@ -604,20 +604,77 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
 }
 
 /// Fetch the declaration of the metadata (or metadata template) for a
-/// class.  If the definition type is specified, the result will
-/// always be a GlobalVariable of the given type.
+/// class.
+///
+/// If the definition type is specified, the result will always be a
+/// GlobalVariable of the given type, which may not be at the
+/// canonical address point for a type metadata.
+///
+/// If the definition type is not specified, then:
+///   - if the metadata is indirect, then the result will not be adjusted
+///     and it will have the type pointer-to-T, where T is the type
+///     of a direct metadata;
+///   - if the metadata is a pattern, then the result will not be
+///     adjusted and it will have TypeMetadataPatternPtrTy;
+///   - otherwise it will be adjusted to the canonical address point
+///     for a type metadata and it will have type TypeMetadataPtrTy.
 llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                                                    bool isIndirect,
                                                    bool isPattern,
                                                    llvm::Type *storageType) {
   assert(isPattern || !isa<UnboundGenericType>(concreteType));
 
+  llvm::Type *defaultVarTy;
+  llvm::Type *defaultVarPtrTy;
+  unsigned adjustmentIndex;
+
+  // Patterns use the pattern type and no adjustment.
+  if (isPattern) {
+    defaultVarTy = TypeMetadataPatternStructTy;
+    defaultVarPtrTy = TypeMetadataPatternPtrTy;
+    adjustmentIndex = 0;
+
+  // Class direct metadata use the heap type and require a two-word
+  // adjustment (due to the heap-metadata header).
+  } else if (isa<ClassType>(concreteType) ||
+             isa<BoundGenericClassType>(concreteType)) {
+    defaultVarTy = FullHeapMetadataStructTy;
+    defaultVarPtrTy = FullHeapMetadataPtrTy;
+    adjustmentIndex = 2;
+
+  // All other non-pattern direct metadata use the full type and
+  // require an adjustment.
+  } else {
+    defaultVarTy = FullTypeMetadataStructTy;
+    defaultVarPtrTy = FullTypeMetadataPtrTy;
+    adjustmentIndex = 1;
+  }
+
+  // When indirect, this is always a pointer variable and has no
+  // adjustment.
+  if (isIndirect) {
+    defaultVarTy = defaultVarPtrTy;
+    defaultVarPtrTy = defaultVarTy->getPointerTo();
+    adjustmentIndex = 0;
+  }
+
   LinkEntity entity =
     LinkEntity::forTypeMetadata(concreteType, isIndirect, isPattern);
 
-  return getAddrOfLLVMVariable(*this, GlobalVars, entity,
-                               storageType, TypeMetadataStructTy,
-                               TypeMetadataPtrTy);
+  auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
+                                    storageType, defaultVarTy,
+                                    defaultVarPtrTy);
+
+  // Do an adjustment if necessary.
+  if (adjustmentIndex && !storageType) {
+    llvm::Constant *indices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty, adjustmentIndex)
+    };
+    addr = llvm::ConstantExpr::getInBoundsGetElementPtr(addr, indices);
+  }
+
+  return addr;
 }
 
 /// Fetch the declaration of the given known function.

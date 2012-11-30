@@ -326,28 +326,67 @@ static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
 #endif
 }
 
+/// The header before a metadata object which appears on all type
+/// metadata.  Note that heap metadata are not necessarily type
+/// metadata, even for objects of a heap type: for example, objects of
+/// Objective-C type possess a form of heap metadata (an Objective-C
+/// Class pointer), but this metadata lacks the type metadata header.
+/// This case can be distinguished using the isTypeMetadata() flag
+/// on ClassMetadata.
+struct TypeMetadataHeader {
+  /// A pointer to the value-witnesses for this type.  This is only
+  /// present for type metadata.
+  const ValueWitnessTable *ValueWitnesses;
+};
+
+/// A "full" metadata pointer is simply an adjusted address point on a
+/// metadata object; it points to the beginning of the metadata's
+/// allocation, rather than to the canonical address point of the
+/// metadata object.
+template <class T> struct FullMetadata : T::HeaderType, T {
+  typedef typename T::HeaderType HeaderType;
+
+  FullMetadata() = default;
+  constexpr FullMetadata(const HeaderType &header, const T &metadata)
+    : HeaderType(header), T(metadata) {}
+};
+
+/// Given a canonical metadata pointer, produce the adjusted metadata
+template <class T>
+static inline FullMetadata<T> *asFullMetadata(T *metadata) {
+  return (FullMetadata<T>*) (((typename T::HeaderType*) metadata) - 1);
+}
+template <class T>
+static inline const FullMetadata<T> *asFullMetadata(const T *metadata) {
+  return asFullMetadata(const_cast<T*>(metadata));
+}
 
 /// The common structure of all type metadata.
 struct Metadata {
+  /// The basic header type.
+  typedef TypeMetadataHeader HeaderType;
+
   /// The kind.
   MetadataKind Kind;
-
-  // The rest of the first pointer-sized storage unit is reserved.
-
-  /// A pointer to the value-witnesses for this type.  This is only
-  /// meaningful for type metadata; other kinds of metadata, such as
-  /// those for (e.g.) non-class heap allocations, may have an invalid
-  /// pointer here.
-  const ValueWitnessTable *ValueWitnesses;
 
   /// Is this metadata for a class type?
   bool isClassType() const {
     return Kind == MetadataKind::Class;
   }
+
+  const ValueWitnessTable *getValueWitnesses() const {
+    return asFullMetadata(this)->ValueWitnesses;
+  }
+
+  void setValueWitnesses(const ValueWitnessTable *table) {
+    asFullMetadata(this)->ValueWitnesses = table;
+  }
 };
 
 /// The common structure of opaque metadata.  Adds nothing.
 struct OpaqueMetadata {
+  typedef TypeMetadataHeader HeaderType;
+
   // We have to represent this as a member so we can list-initialize it.
   Metadata base;
 };
@@ -355,46 +394,63 @@ struct OpaqueMetadata {
 // Standard POD opaque metadata.
 // The "Int" metadata are used for arbitrary POD data with the
 // matching characteristics.
-extern "C" const OpaqueMetadata _TMdBi8_;      // Builtin.Int8
-extern "C" const OpaqueMetadata _TMdBi16_;     // Builtin.Int16
-extern "C" const OpaqueMetadata _TMdBi32_;     // Builtin.Int32
-extern "C" const OpaqueMetadata _TMdBi64_;     // Builtin.Int64
-extern "C" const OpaqueMetadata _TMdBo;        // Builtin.ObjectPointer
-extern "C" const OpaqueMetadata _TMdBO;        // Builtin.ObjCPointer
+typedef FullMetadata<OpaqueMetadata> FullOpaqueMetadata;
+extern "C" const FullOpaqueMetadata _TMdBi8_;      // Builtin.Int8
+extern "C" const FullOpaqueMetadata _TMdBi16_;     // Builtin.Int16
+extern "C" const FullOpaqueMetadata _TMdBi32_;     // Builtin.Int32
+extern "C" const FullOpaqueMetadata _TMdBi64_;     // Builtin.Int64
+extern "C" const FullOpaqueMetadata _TMdBo;        // Builtin.ObjectPointer
+extern "C" const FullOpaqueMetadata _TMdBO;        // Builtin.ObjCPointer
 
-/// The common structure of all metadata for heap-allocated types.
-struct HeapMetadata : Metadata {
+/// The prefix on a heap metadata.
+struct HeapMetadataHeaderPrefix {
   /// Destroy the object, returning the allocated size of the object
   /// or 0 if the object shouldn't be deallocated.
   size_t (*destroy)(HeapObject *);
-
-  /// Returns the allocated size of the object.
-  size_t (*getSize)(HeapObject *);
 };
 
-/// The descriptor for a nominal type.  This should be sharable
-/// between generic instantiations.
-struct NominalTypeDescriptor {
-  /// The number of generic arguments.
-  uint32_t NumGenericArguments;
-
-  /// The offset, in bytes, to the first generic argument
-  /// relative to the address of the metadata.
-  uint32_t GenericArgumentsOffset;
-
-  // Name
-  // Component descriptor.
+/// The header present on all heap metadata.
+struct HeapMetadataHeader : HeapMetadataHeaderPrefix, TypeMetadataHeader {
 };
 
-/// The structure of all class metadata.  This structure
-/// is embedded directly within the class's heap metadata
-/// structure and therefore cannot be extended.
+/// The common structure of all metadata for heap-allocated types.  A
+/// pointer to one of these can be retrieved by loading the 'isa'
+/// field of any heap object, whether it was managed by Swift or by
+/// Objective-C.  However, when loading from an Objective-C object,
+/// this metadata may not have the heap-metadata header, and it may
+/// not be the Swift type metadata for the object's dynamic type.
+struct HeapMetadata : Metadata {
+  typedef HeapMetadataHeader HeaderType;
+};
+
+/// Information about a nominal type.  Not described for now.
+struct NominalTypeDescriptor;
+
+/// The structure of all class metadata.  This structure is embedded
+/// directly within the class's heap metadata structure and therefore
+/// cannot be extended without an ABI break.
+///
+/// Note that the layout of this type is compatible with the layout of
+/// an Objective-C class.
 struct ClassMetadata : public HeapMetadata {
-  /// An out-of-line description of the type.
-  const NominalTypeDescriptor *Description;
-
   /// The metadata for the super class.  This is null for the root class.
   const ClassMetadata *SuperClass;
+
+  /// The cache data is used for certain dynamic lookups; it is owned
+  /// by the runtime and generally needs to interoperate with
+  /// Objective-C's use.
+  void *CacheData[2];
+
+  /// The data pointer is used for out-of-line metadata and is
+  /// generally opaque, except that the compiler sets the low bit in
+  /// order to indicate that this is a Swift metatype and therefore
+  /// that the type metadata header is present.
+  uintptr_t Data;
+
+  /// Is this object a valid swift type metadata?
+  bool isTypeMetadata() const {
+    return Data & 1;
+  }
 
   // After this come the class members, laid out as follows:
   //   - class members for the base class (recursively)
@@ -464,10 +520,13 @@ struct MetatypeMetadata : public Metadata {
 };
 
 /// The structure of tuple type metadata.
-struct TupleTypeMetadata {
-  /// The base metadata.  This has to be its own thing so that we can
-  /// list-initialize it.
-  Metadata Base;
+struct TupleTypeMetadata : public Metadata {
+
+  TupleTypeMetadata() = default;
+  constexpr TupleTypeMetadata(const Metadata &base,
+                              size_t numElements,
+                              const char *labels)
+    : Metadata(base), NumElements(numElements), Labels(labels) {}
 
   /// The number of elements.
   size_t NumElements;
@@ -496,7 +555,7 @@ struct TupleTypeMetadata {
 };
 
 /// The standard metadata for the empty tuple type.
-extern "C" const TupleTypeMetadata _TMdT_;
+extern "C" const FullMetadata<TupleTypeMetadata> _TMdT_;
 
 /// \brief The header in front of a generic metadata template.
 ///
@@ -526,7 +585,10 @@ struct GenericMetadata {
   uint32_t NumFillOps;
 
   /// The size of the template in bytes.
-  size_t MetadataSize;
+  uint32_t MetadataSize;
+
+  /// The offset of the address point in the template in bytes.
+  uint32_t AddressPoint;
 
   /// Data that the runtime can use for its own purposes.  It is guaranteed
   /// to be zero-filled by the compiler.
@@ -541,9 +603,12 @@ struct GenericMetadata {
   /// A heap-metadata fill operation is an instruction to copy a
   /// pointer's worth of data from the arguments into a particular
   /// position in the allocated metadata.
+  ///
+  /// 'ToIndex' is expressed relative to the start of the full
+  /// metadata, not relative to the address point.
   struct FillOp {
     uint32_t FromIndex;
-    uint32_t ToIndex;
+    int32_t ToIndex;
   };
 
   typedef const FillOp *fill_ops_const_iterator;

@@ -117,14 +117,14 @@ llvm::Value *irgen::emitNominalMetadataRef(IRGenFunction &IGF,
     metadata = IGF.Builder.CreateLoad(addr, "metadata.direct");
   }
 
-  assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
-
   // If we don't have generic parameters, that's all we need.
   if (!generics) {
+    assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
     return metadata;
   }
 
   // Okay, we need to call swift_getGenericMetadata.
+  assert(metadata->getType() == IGF.IGM.TypeMetadataPatternPtrTy);
 
   // Grab the substitutions.
   auto boundGeneric = cast<BoundGenericType>(theType);
@@ -447,6 +447,9 @@ namespace {
     /// This is not really something we need to track.
     unsigned NumGenericWitnesses = 0;
 
+    /// The index of the address point in the type we're emitting.
+    unsigned AddressPoint = 0;
+
     struct FillOp {
       unsigned FromIndex;
       unsigned ToIndex;
@@ -457,7 +460,7 @@ namespace {
 
     SmallVector<FillOp, 8> FillOps;
 
-    enum { TemplateHeaderFieldCount = 5 };
+    enum { TemplateHeaderFieldCount = 6 };
 
   protected:
     using super::IGM;
@@ -488,19 +491,30 @@ namespace {
       //   uint32_t NumFillOps;
       Fields[1] = llvm::ConstantInt::get(IGM.Int32Ty, FillOps.size());
 
-      //   size_t MetadataSize;
+      //   uint32_t MetadataSize;
       // We compute this assuming that every entry in the metadata table
-      // is a pointer.
+      // is a pointer in size.
       Size size = this->getNextIndex() * IGM.getPointerSize();
-      Fields[2] = llvm::ConstantInt::get(IGM.SizeTy, size.getValue());
+      Fields[2] = llvm::ConstantInt::get(IGM.Int32Ty, size.getValue());
+
+      //   uint32_t AddressPoint;
+      assert(AddressPoint != 0 && "address point not noted!");
+      Size addressPoint = AddressPoint * IGM.getPointerSize();
+      Fields[3] = llvm::ConstantInt::get(IGM.Int32Ty, addressPoint.getValue());
 
       //   void *PrivateData[8];
-      Fields[3] = getPrivateDataInit();
+      Fields[4] = getPrivateDataInit();
 
       //   struct SwiftGenericHeapMetadataFillOp FillOps[NumArguments];
-      Fields[4] = getFillOpsInit();
+      Fields[5] = getFillOpsInit();
 
-      assert(TemplateHeaderFieldCount == 5);
+      assert(TemplateHeaderFieldCount == 6);
+    }
+
+    /// Write down the index of the address point.
+    void noteAddressPoint() {
+      AddressPoint = getNextIndex();
+      super::noteAddressPoint();
     }
 
     /// Ignore the preallocated header.
@@ -635,10 +649,6 @@ namespace {
       Fields.push_back(IGM.getAddrOfDestructor(TargetClass));
     }
 
-    void addSizeFunction() {
-      Fields.push_back(Layout.createSizeFn(IGM));
-    }
-
     void addNominalTypeDescriptor() {
       // FIXME!
       Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
@@ -652,6 +662,25 @@ namespace {
     void addSuperClass() {
       // FIXME!
       Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+    }
+
+    void addClassCacheData() {
+      // This is two words and always zero-initialized.
+      auto null = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+      Fields.push_back(null);
+      Fields.push_back(null);
+    }
+
+    void addClassDataPointer() {
+      // Derive the RO-data.
+      llvm::Constant *data = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+
+      // We always set the low bit.  Eventually the high bits will be
+      // a pointer of some sort.
+      data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
+      data = llvm::ConstantExpr::getAdd(data,
+                                    llvm::ConstantInt::get(IGM.IntPtrTy, 1));
+      Fields.push_back(data);
     }
 
     void addMethod(FunctionRef fn) {
@@ -701,7 +730,7 @@ namespace {
 
     llvm::Constant *getInit() {
       if (Fields.size() == NumHeapMetadataFields) {
-        return llvm::ConstantStruct::get(IGM.HeapMetadataStructTy, Fields);
+        return llvm::ConstantStruct::get(IGM.FullHeapMetadataStructTy, Fields);
       } else {
         return llvm::ConstantStruct::getAnon(Fields);
       }
@@ -912,15 +941,11 @@ bool irgen::doesMethodRequireOverrideEntry(IRGenModule &IGM, FuncDecl *fn,
 /// Emit a load from the given metadata at a constant index.
 static llvm::Value *emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
                                                 llvm::Value *metadata,
-                                                unsigned index,
+                                                int index,
                                                 llvm::PointerType *objectTy) {
   // Require the metadata to be some type that we recognize as a
   // metadata pointer.
-  assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy ||
-         metadata->getType() == IGF.IGM.HeapMetadataPtrTy);
-
-  // Some offsets are basically just never going to be right.
-  assert(index != 0 && "loading flags field?");
+  assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
 
   // We require objectType to be a pointer type so that the GEP will
   // scale by the right amount.  We could load an arbitrary type using
@@ -930,8 +955,10 @@ static llvm::Value *emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
   auto objectPtrTy = objectTy->getPointerTo();
   metadata = IGF.Builder.CreateBitCast(metadata, objectPtrTy);
 
+  auto indexV = llvm::ConstantInt::getSigned(IGF.IGM.SizeTy, index);
+
   // GEP to the slot.
-  Address slot(IGF.Builder.CreateConstInBoundsGEP1_32(metadata, index),
+  Address slot(IGF.Builder.CreateInBoundsGEP(metadata, indexV),
                IGF.IGM.getPointerAlignment());
 
   // Load.
@@ -939,10 +966,17 @@ static llvm::Value *emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
   return result;
 }
 
+/// Given a type metadata pointer, load its value witness table.
+llvm::Value *irgen::emitValueWitnessTableRefForMetadata(IRGenFunction &IGF,
+                                                        llvm::Value *metadata) {
+  return emitLoadFromMetadataAtIndex(IGF, metadata, -1,
+                                     IGF.IGM.WitnessTablePtrTy);
+}
+
 /// Load the metadata reference at the given index.
 static llvm::Value *emitLoadOfMetadataRefAtIndex(IRGenFunction &IGF,
                                                  llvm::Value *metadata,
-                                                 unsigned index) {
+                                                 int index) {
   return emitLoadFromMetadataAtIndex(IGF, metadata, index,
                                      IGF.IGM.TypeMetadataPtrTy);
 }
@@ -950,7 +984,7 @@ static llvm::Value *emitLoadOfMetadataRefAtIndex(IRGenFunction &IGF,
 /// Load the protocol witness table reference at the given index.
 static llvm::Value *emitLoadOfWitnessTableRefAtIndex(IRGenFunction &IGF,
                                                      llvm::Value *metadata,
-                                                     unsigned index) {
+                                                     int index) {
   return emitLoadFromMetadataAtIndex(IGF, metadata, index,
                                      IGF.IGM.WitnessTablePtrTy);
 }
@@ -970,6 +1004,7 @@ namespace {
   template <class Base> class MetadataSearcher : public Base {
     static const unsigned InvalidIndex = ~0U;
     unsigned TargetIndex = InvalidIndex;
+    unsigned AddressPoint = InvalidIndex;
 
   protected:
     void setTargetIndex() {
@@ -981,11 +1016,14 @@ namespace {
     template <class... T> MetadataSearcher(T &&...args)
       : Base(std::forward<T>(args)...) {}
 
-    unsigned getTargetIndex() {
+    void noteAddressPoint() { AddressPoint = this->NextIndex; }
+
+    int getTargetIndex() {
       assert(TargetIndex == InvalidIndex && "computing twice");
       this->layout();
       assert(TargetIndex != InvalidIndex && "target not found!");
-      return TargetIndex;
+      assert(AddressPoint != InvalidIndex && "address point not set");
+      return (int) TargetIndex - (int) AddressPoint;
     }
   };
 
@@ -1022,15 +1060,15 @@ llvm::Value *irgen::emitParentMetadataRef(IRGenFunction &IGF,
     llvm_unreachable("protocols never have parent types!");
 
   case DeclKind::Class: {
-    unsigned index =
+    int index =
       FindClassParentIndex(IGF.IGM, cast<ClassDecl>(decl)).getTargetIndex();
     return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
   }
 
   case DeclKind::OneOf:
   case DeclKind::Struct:
-    // In both of these cases, 'Parent' is always the fourth field.
-    return emitLoadOfMetadataRefAtIndex(IGF, metadata, 3);
+    // In both of these cases, 'Parent' is always the third field.
+    return emitLoadOfMetadataRefAtIndex(IGF, metadata, 2);
   }
   llvm_unreachable("bad decl kind!");
 }
@@ -1097,7 +1135,7 @@ llvm::Value *irgen::emitArgumentMetadataRef(IRGenFunction &IGF,
     llvm_unreachable("protocols are never generic!");
 
   case DeclKind::Class: {
-    unsigned index =
+    int index =
       FindClassArgumentIndex(IGF.IGM, cast<ClassDecl>(decl), targetArchetype)
         .getTargetIndex();
     return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
@@ -1106,7 +1144,7 @@ llvm::Value *irgen::emitArgumentMetadataRef(IRGenFunction &IGF,
   case DeclKind::OneOf:
   case DeclKind::Struct:
     // FIXME: should oneofs really be using the struct logic? (no)
-    unsigned index =
+    int index =
       FindStructArgumentIndex(IGF.IGM, cast<StructDecl>(decl), targetArchetype)
         .getTargetIndex();
     return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
@@ -1189,7 +1227,7 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
     llvm_unreachable("protocols are never generic!");
 
   case DeclKind::Class: {
-    unsigned index =
+    int index =
       FindClassWitnessTableIndex(IGF.IGM, cast<ClassDecl>(decl),
                                  targetArchetype, targetProtocol)
         .getTargetIndex();
@@ -1199,7 +1237,7 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
   case DeclKind::OneOf:
   case DeclKind::Struct:
     // FIXME: should oneofs really be using the struct logic? (no)
-    unsigned index =
+    int index =
       FindStructWitnessTableIndex(IGF.IGM, cast<StructDecl>(decl),
                                   targetArchetype, targetProtocol)
         .getTargetIndex();
@@ -1237,7 +1275,7 @@ llvm::Value *irgen::emitMetadataRefForHeapObject(IRGenFunction &IGF,
 
       // Keep drilling down to the first element type.
       auto eltTy = structTy->getElementType(0);
-      assert(isa<llvm::StructType>(eltTy) || eltTy == IGF.IGM.HeapMetadataPtrTy);
+      assert(isa<llvm::StructType>(eltTy) || eltTy == IGF.IGM.TypeMetadataPtrTy);
       structTy = dyn_cast<llvm::StructType>(eltTy);
     } while (structTy != nullptr);
 
@@ -1396,7 +1434,7 @@ namespace {
 
     llvm::Constant *getInit() {
       if (Fields.size() == NumHeapMetadataFields) {
-        return llvm::ConstantStruct::get(this->IGM.HeapMetadataStructTy,
+        return llvm::ConstantStruct::get(this->IGM.FullHeapMetadataStructTy,
                                          Fields);
       } else {
         return llvm::ConstantStruct::getAnon(Fields);
@@ -1528,7 +1566,12 @@ namespace {
     }
 
     void addMetadataFlags() {
-      Fields.push_back(getMetadataKind(IGM, MetadataKind::Existential));
+      // Box the MetadataKind in a TypeMetadataStructTy so that we can
+      // just use FullTypeMetadataStructTy below.
+      auto metadata =
+        llvm::ConstantStruct::get(IGM.TypeMetadataStructTy,
+                            getMetadataKind(IGM, MetadataKind::Existential));
+      Fields.push_back(metadata);
     }
 
     void addValueWitnessTable() {
@@ -1540,7 +1583,7 @@ namespace {
     }
 
     llvm::Constant *getInit() {
-      return llvm::ConstantStruct::get(IGM.TypeMetadataStructTy, Fields);
+      return llvm::ConstantStruct::get(IGM.FullTypeMetadataStructTy, Fields);
     }
   };
 }

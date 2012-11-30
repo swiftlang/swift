@@ -283,8 +283,9 @@ const ValueWitnessTable swift::_TWVT_ = {
 
 // Define some builtin opaque metadata.
 #define OPAQUE_METADATA(TYPE) \
-  const OpaqueMetadata swift::_TMd##TYPE = { \
-    { MetadataKind::Opaque, &_TWV##TYPE }    \
+  const FullOpaqueMetadata swift::_TMd##TYPE = { \
+    { &_TWV##TYPE },                             \
+    { { MetadataKind::Opaque } }                 \
   };
 OPAQUE_METADATA(Bi8_)
 OPAQUE_METADATA(Bi16_)
@@ -294,11 +295,11 @@ OPAQUE_METADATA(Bo)
 OPAQUE_METADATA(BO)
 
 /// The standard metadata for the empty tuple.
-const TupleTypeMetadata swift::_TMdT_ = {
+const FullMetadata<TupleTypeMetadata> swift::_TMdT_ = {
+  { &_TWVT_ },                 // ValueWitnesses
   {
-    MetadataKind::Tuple,  // Kind
-    &_TWVT_               // ValueWitnesses
-  },
-  0,                      // NumElements
-  nullptr                 // Labels
+    { MetadataKind::Tuple },   // Kind
+    0,                         // NumElements
+    nullptr                    // Labels
+  }
 };

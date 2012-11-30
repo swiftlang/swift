@@ -39,9 +39,13 @@ protected:
 public:
   void layout() {
     // Common fields.
-    asImpl().addMetadataFlags();
     asImpl().addValueWitnessTable();
+    asImpl().noteAddressPoint();
+    asImpl().addMetadataFlags();
   }
+
+  /// This is the address point.
+  void noteAddressPoint() {}
 
   /// Add fields related to the generics of this class declaration.
   /// TODO: don't add new fields that are implied by base class

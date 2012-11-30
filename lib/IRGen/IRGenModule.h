@@ -96,6 +96,7 @@ public:
   llvm::IntegerType *Int64Ty;          /// i64
   union {
     llvm::IntegerType *SizeTy;         /// usually i32 or i64
+    llvm::IntegerType *IntPtrTy;
     llvm::IntegerType *MetadataKindTy;
   };
   union {
@@ -111,10 +112,14 @@ public:
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
   llvm::FunctionType *DtorTy;          /// size_t (%swift.refcounted*)
-  llvm::StructType *HeapMetadataStructTy; /// %swift.heapmetadata = type { ... }
-  llvm::PointerType *HeapMetadataPtrTy;/// %swift.heapmetadata*
   llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
   llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
+  llvm::StructType *FullHeapMetadataStructTy; /// %swift.full_heapmetadata = type { ... }
+  llvm::PointerType *FullHeapMetadataPtrTy;/// %swift.full_heapmetadata*
+  llvm::StructType *TypeMetadataPatternStructTy;/// %swift.type_pattern = type { ... }
+  llvm::PointerType *TypeMetadataPatternPtrTy;/// %swift.type_pattern*
+  llvm::StructType *FullTypeMetadataStructTy; /// %swift.full_type = type { ... }
+  llvm::PointerType *FullTypeMetadataPtrTy;/// %swift.full_type*
   llvm::PointerType *ObjCPtrTy;        /// %objc_object*
   llvm::PointerType *OpaquePtrTy;      /// %swift.opaque*
   llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
