@@ -77,13 +77,12 @@ public:
 
 /// TypeConverter - helper class for creating and managing TypeInfos.
 class LLVM_LIBRARY_VISIBILITY TypeConverter {
-  SILGenFunction &gen;
   llvm::DenseMap<TypeBase *, TypeInfo> types;
   
   TypeInfo const &makeTypeInfo(CanType t);
   
 public:
-  TypeConverter(SILGenFunction &gen) : gen(gen) { (void)gen; }
+  TypeConverter(SILGenFunction &gen) { }
   
   TypeInfo const &getTypeInfo(Type t);
 };
