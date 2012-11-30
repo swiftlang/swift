@@ -23,13 +23,13 @@ namespace {
   public:
     CleanupRValue(Value rv) : rv(rv) {}
     
-    void emit(SILGen &gen) override {
+    void emit(SILGenFunction &gen) override {
       gen.emitReleaseRValue(SILLocation(), rv);
     }
   };
 }
 
-static ManagedValue managedRValueWithCleanup(SILGen &gen, Value v) {
+static ManagedValue managedRValueWithCleanup(SILGenFunction &gen, Value v) {
   if (v.getType()->is<LValueType>() ||
       gen.Types.getTypeInfo(v.getType()).isTrivial()) {
     return ManagedValue(v);
@@ -39,12 +39,12 @@ static ManagedValue managedRValueWithCleanup(SILGen &gen, Value v) {
   }
 }
 
-ManagedValue SILGen::visitExpr(Expr *E) {
+ManagedValue SILGenFunction::visitExpr(Expr *E) {
   E->dump();
   llvm_unreachable("Not yet implemented");
 }
 
-ManagedValue SILGen::visitApplyExpr(ApplyExpr *E) {
+ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   // FIXME: This assumes that all Swift arguments and returns lower one-to-one
   // to SIL arguments and returns, which won't hold up in the face of
   // address-only types.
@@ -69,7 +69,7 @@ ManagedValue SILGen::visitApplyExpr(ApplyExpr *E) {
   return managedRValueWithCleanup(*this, B.createApply(E, FnV, ArgsV));
 }
 
-ManagedValue SILGen::visitDeclRefExpr(DeclRefExpr *E) {
+ManagedValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E) {
   // FIXME: properties
   
   // If this is a reference to a mutable local decl, produce an lvalue.
@@ -87,20 +87,21 @@ ManagedValue SILGen::visitDeclRefExpr(DeclRefExpr *E) {
   return ManagedValue(v);
 }
 
-ManagedValue SILGen::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+ManagedValue SILGenFunction::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
   return ManagedValue(B.createIntegerLiteral(E));
 }
-ManagedValue SILGen::visitFloatLiteralExpr(FloatLiteralExpr *E) {
+ManagedValue SILGenFunction::visitFloatLiteralExpr(FloatLiteralExpr *E) {
   return ManagedValue(B.createFloatLiteral(E));
 }
-ManagedValue SILGen::visitCharacterLiteralExpr(CharacterLiteralExpr *E) {
+ManagedValue SILGenFunction::visitCharacterLiteralExpr(CharacterLiteralExpr *E)
+{
   return ManagedValue(B.createIntegerLiteral(E));
 }
-ManagedValue SILGen::visitStringLiteralExpr(StringLiteralExpr *E) {
+ManagedValue SILGenFunction::visitStringLiteralExpr(StringLiteralExpr *E) {
   return ManagedValue(B.createStringLiteral(E));
 }
 
-ManagedValue SILGen::visitLoadExpr(LoadExpr *E) {
+ManagedValue SILGenFunction::visitLoadExpr(LoadExpr *E) {
   ManagedValue SubV = visit(E->getSubExpr());
   Value loadedV = B.createLoad(E, SubV.getUnmanagedValue());
   emitRetainRValue(E, loadedV);
@@ -113,7 +114,7 @@ namespace {
   public:
     CleanupMaterialize(Value alloc) : alloc(alloc) {}
     
-    void emit(SILGen &gen) override {
+    void emit(SILGenFunction &gen) override {
       Value tmpValue = gen.B.createLoad(SILLocation(), alloc);
       gen.emitReleaseRValue(SILLocation(), tmpValue);
       gen.B.createDeallocVar(SILLocation(), AllocKind::Stack, alloc);
@@ -121,7 +122,7 @@ namespace {
   };
 }
 
-ManagedValue SILGen::visitMaterializeExpr(MaterializeExpr *E) {
+ManagedValue SILGenFunction::visitMaterializeExpr(MaterializeExpr *E) {
   // Evaluate the value, use it to initialize a new temporary and return the
   // temp's address.
   Value V = visit(E->getSubExpr()).forward(*this);
@@ -134,23 +135,25 @@ ManagedValue SILGen::visitMaterializeExpr(MaterializeExpr *E) {
   return ManagedValue(TmpMem);
 }
 
-ManagedValue SILGen::visitRequalifyExpr(RequalifyExpr *E) {
+ManagedValue SILGenFunction::visitRequalifyExpr(RequalifyExpr *E) {
   return ManagedValue(B.createConvert(E,
                                       visit(E->getSubExpr()).getValue(),
                                       E->getType()));
 }
 
-ManagedValue SILGen::visitFunctionConversionExpr(FunctionConversionExpr *E) {
+ManagedValue SILGenFunction::visitFunctionConversionExpr(
+                                                      FunctionConversionExpr *E)
+{
   return ManagedValue(B.createConvert(E,
                                       visit(E->getSubExpr()).getValue(),
                                       E->getType()));
 }
 
-ManagedValue SILGen::visitParenExpr(ParenExpr *E) {
+ManagedValue SILGenFunction::visitParenExpr(ParenExpr *E) {
   return visit(E->getSubExpr());
 }
 
-ManagedValue SILGen::visitTupleExpr(TupleExpr *E) {
+ManagedValue SILGenFunction::visitTupleExpr(TupleExpr *E) {
   llvm::SmallVector<Value, 10> ArgsV;
   for (auto &I : E->getElements())
     ArgsV.push_back(visit(I).forward(*this));
@@ -158,22 +161,22 @@ ManagedValue SILGen::visitTupleExpr(TupleExpr *E) {
                                   B.createTuple(E, E->getType(), ArgsV));
 }
 
-ManagedValue SILGen::visitGetMetatypeExpr(GetMetatypeExpr *E) {
+ManagedValue SILGenFunction::visitGetMetatypeExpr(GetMetatypeExpr *E) {
   return visit(E->getSubExpr());
 }
 
-ManagedValue SILGen::visitSpecializeExpr(SpecializeExpr *E) {
+ManagedValue SILGenFunction::visitSpecializeExpr(SpecializeExpr *E) {
   return ManagedValue(B.createSpecialize(E,
                                     visit(E->getSubExpr()).getUnmanagedValue(),
                                     E->getType()));
 }
 
-ManagedValue SILGen::visitAddressOfExpr(AddressOfExpr *E) {
+ManagedValue SILGenFunction::visitAddressOfExpr(AddressOfExpr *E) {
   return visit(E->getSubExpr());
 }
 
 
-ManagedValue SILGen::visitTupleElementExpr(TupleElementExpr *E) {
+ManagedValue SILGenFunction::visitTupleElementExpr(TupleElementExpr *E) {
   Value elt = B.createExtract(E,
                               visit(E->getBase()).getValue(),
                               E->getFieldNumber(),
@@ -186,7 +189,7 @@ ManagedValue SILGen::visitTupleElementExpr(TupleElementExpr *E) {
 /// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
 /// (which represents the retain count) a base pointer to some elements, and a
 /// length
-ManagedValue SILGen::emitArrayInjectionCall(Value ObjectPtr,
+ManagedValue SILGenFunction::emitArrayInjectionCall(Value ObjectPtr,
                                             Value BasePtr,
                                             Value Length,
                                             Expr *ArrayInjectionFunction) {
@@ -204,7 +207,7 @@ ManagedValue SILGen::emitArrayInjectionCall(Value ObjectPtr,
 }
 
 
-ManagedValue SILGen::emitTupleShuffle(Expr *E,
+ManagedValue SILGenFunction::emitTupleShuffle(Expr *E,
                                       ArrayRef<Value> InOps,
                                       ArrayRef<int> ElementMapping,
                                       Expr *VarargsInjectionFunction) {
@@ -272,7 +275,7 @@ ManagedValue SILGen::emitTupleShuffle(Expr *E,
                                                        ResultElements));
 }
 
-ManagedValue SILGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
+ManagedValue SILGenFunction::visitTupleShuffleExpr(TupleShuffleExpr *E) {
   // TupleShuffle expands out to extracts+inserts.  Start by emitting the base
   // expression that we'll shuffle.
   Value Op = visit(E->getSubExpr()).getValue();
@@ -289,7 +292,7 @@ ManagedValue SILGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
                           E->getVarargsInjectionFunctionOrNull());
 }
 
-ManagedValue SILGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
+ManagedValue SILGenFunction::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
   // Emit the argument and turn it into a trivial tuple.
   Value Arg = visit(E->getSubExpr()).getValue();
 
@@ -315,7 +318,7 @@ ManagedValue SILGen::visitScalarToTupleExpr(ScalarToTupleExpr *E) {
   return emitTupleShuffle(E, Arg, ShuffleMask,E->getVarargsInjectionFunction());
 }
 
-ManagedValue SILGen::visitNewArrayExpr(NewArrayExpr *E) {
+ManagedValue SILGenFunction::visitNewArrayExpr(NewArrayExpr *E) {
   Value NumElements = visit(E->getBounds()[0].Value).getValue();
 
   // Allocate the array.
@@ -335,7 +338,7 @@ ManagedValue SILGen::visitNewArrayExpr(NewArrayExpr *E) {
 
 
 
-ManagedValue SILGen::visitMetatypeExpr(MetatypeExpr *E) {
+ManagedValue SILGenFunction::visitMetatypeExpr(MetatypeExpr *E) {
   return ManagedValue(B.createMetatype(E));
 }
 

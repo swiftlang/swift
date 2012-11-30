@@ -29,8 +29,8 @@ namespace Lowering {
   class ManagedValue;
   class TypeConverter;
 
-class LLVM_LIBRARY_VISIBILITY SILGen
-  : public ASTVisitor<SILGen, ManagedValue, void> {
+class LLVM_LIBRARY_VISIBILITY SILGenFunction
+  : public ASTVisitor<SILGenFunction, ManagedValue, void> {
 public:
   /// The Function being constructed.
   Function &F;
@@ -57,8 +57,8 @@ public:
   bool hasVoidReturn;
 
 public:
-  SILGen(Function &F, FuncExpr *FE);
-  ~SILGen();
+  SILGenFunction(Function &F, FuncExpr *FE);
+  ~SILGenFunction();
 
   void emitProlog(FuncExpr *FE);
 

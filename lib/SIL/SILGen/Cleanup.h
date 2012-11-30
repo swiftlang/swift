@@ -26,7 +26,7 @@ namespace swift {
   class Value;
   
 namespace Lowering {
-  class SILGen;
+  class SILGenFunction;
   class CleanupOutflows;
 
 /// The valid states that a cleanup can be in.
@@ -60,13 +60,13 @@ public:
   bool isActive() const { return state == CleanupState::Active; }
   bool isDead() const { return state == CleanupState::Dead; }
 
-  virtual void emit(SILGen &Gen) = 0;
+  virtual void emit(SILGenFunction &Gen) = 0;
 };
 
 class LLVM_LIBRARY_VISIBILITY CleanupManager {
   friend class Scope;
 
-  SILGen &Gen;
+  SILGenFunction &Gen;
   
   /// Stack - Currently active cleanups in this scope tree.
   DiverseStack<Cleanup, 128> Stack;
@@ -82,7 +82,7 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   void endScope(CleanupsDepth depth);
   
 public:
-  CleanupManager(SILGen &Gen)
+  CleanupManager(SILGenFunction &Gen)
     : Gen(Gen), InnermostScope(Stack.stable_end()) {
   }
   

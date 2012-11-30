@@ -16,7 +16,7 @@ using namespace swift;
 using namespace Lowering;
 
 //===--------------------------------------------------------------------===//
-// SILGen Class implementation
+// SILGenFunction Class implementation
 //===--------------------------------------------------------------------===//
 
 // TODO: more accurately port the result schema logic from
@@ -29,7 +29,7 @@ static bool isVoidableType(Type type) {
     return false;
 }
 
-SILGen::SILGen(Function &F, FuncExpr *FE)
+SILGenFunction::SILGenFunction(Function &F, FuncExpr *FE)
   : F(F), B(new (F) BasicBlock(&F), F),
     Cleanups(*this),
     Types(*this),
@@ -43,9 +43,9 @@ TupleInst *SILBuilder::createEmptyTuple(SILLocation Loc) {
                      ArrayRef<Value>());
 }
 
-/// SILGen destructor - called when the entire AST has been visited.  This
-/// handles "falling off the end of the function" logic.
-SILGen::~SILGen() {
+/// SILGenFunction destructor - called after the entire function's AST has been
+/// visited.  This handles "falling off the end of the function" logic.
+SILGenFunction::~SILGenFunction() {
   // If the end of the function isn't reachable (e.g. it ended in an explicit
   // return), then we're done.
   if (!B.hasValidInsertionPoint())
@@ -64,7 +64,7 @@ SILGen::~SILGen() {
 Function *Function::constructSIL(FuncExpr *FE) {
   Function *C = new Function(FE->getASTContext());
 
-  SILGen(*C, FE).visit(FE->getBody());
+  SILGenFunction(*C, FE).visit(FE->getBody());
 
   C->verify();
   return C;

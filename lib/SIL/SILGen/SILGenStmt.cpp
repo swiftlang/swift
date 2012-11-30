@@ -40,7 +40,7 @@ static void emitOrDeleteBlock(SILBuilder &B, BasicBlock *BB) {
 ///        to the fallthrough.
 /// \param invertValue - true if this routine should invert the value before
 ///        testing true/false.
-Condition SILGen::emitCondition(Stmt *TheStmt, Expr *E,
+Condition SILGenFunction::emitCondition(Stmt *TheStmt, Expr *E,
                                 bool hasFalseCode, bool invertValue) {
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
@@ -74,7 +74,7 @@ Condition SILGen::emitCondition(Stmt *TheStmt, Expr *E,
 
 
 
-void SILGen::visitBraceStmt(BraceStmt *S) {
+void SILGenFunction::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
   Scope BraceScope(Cleanups);
   
@@ -99,7 +99,7 @@ void SILGen::visitBraceStmt(BraceStmt *S) {
 /// emitAssignStmtRecursive - Used to destructure (potentially) recursive
 /// assignments into tuple expressions down to their scalar stores.
 static void emitAssignStmtRecursive(AssignStmt *S, Value Src, Expr *Dest,
-                                    SILGen &Gen) {
+                                    SILGenFunction &Gen) {
   // If the destination is a tuple, recursively destructure.
   if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
     unsigned EltNo = 0;
@@ -118,7 +118,7 @@ static void emitAssignStmtRecursive(AssignStmt *S, Value Src, Expr *Dest,
 }
 
 
-void SILGen::visitAssignStmt(AssignStmt *S) {
+void SILGenFunction::visitAssignStmt(AssignStmt *S) {
   Value SrcV;
   {
     FullExpr scope(Cleanups);
@@ -129,7 +129,7 @@ void SILGen::visitAssignStmt(AssignStmt *S) {
   return emitAssignStmtRecursive(S, SrcV, S->getDest(), *this);
 }
 
-void SILGen::visitReturnStmt(ReturnStmt *S) {
+void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
   Value ArgV;
   if (S->hasResult()) {
     FullExpr scope(Cleanups);
@@ -140,7 +140,7 @@ void SILGen::visitReturnStmt(ReturnStmt *S) {
   Cleanups.emitReturnAndCleanups(S, ArgV);
 }
 
-void SILGen::visitIfStmt(IfStmt *S) {
+void SILGenFunction::visitIfStmt(IfStmt *S) {
   Condition Cond = emitCondition(S, S->getCond(), S->getElseStmt() != nullptr);
   
   if (Cond.hasTrue()) {
@@ -159,7 +159,7 @@ void SILGen::visitIfStmt(IfStmt *S) {
   Cond.complete(B);
 }
 
-void SILGen::visitWhileStmt(WhileStmt *S) {
+void SILGenFunction::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (F) BasicBlock(&F, "while");
   B.emitBlock(LoopBB);
@@ -190,7 +190,7 @@ void SILGen::visitWhileStmt(WhileStmt *S) {
   ContinueDestStack.pop_back();
 }
 
-void SILGen::visitDoWhileStmt(DoWhileStmt *S) {
+void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (F) BasicBlock(&F, "dowhile");
   B.emitBlock(LoopBB);
@@ -222,7 +222,7 @@ void SILGen::visitDoWhileStmt(DoWhileStmt *S) {
   ContinueDestStack.pop_back();
 }
 
-void SILGen::visitForStmt(ForStmt *S) {
+void SILGenFunction::visitForStmt(ForStmt *S) {
   // Enter a new scope.
   Scope ForScope(Cleanups);
   
@@ -286,7 +286,7 @@ void SILGen::visitForStmt(ForStmt *S) {
   ContinueDestStack.pop_back();
 }
 
-void SILGen::visitForEachStmt(ForEachStmt *S) {
+void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'range' variable that we'll be using for iteration.
   Scope OuterForScope(Cleanups);
   visitPatternBindingDecl(S->getRange());
@@ -332,10 +332,10 @@ void SILGen::visitForEachStmt(ForEachStmt *S) {
   ContinueDestStack.pop_back();
 }
 
-void SILGen::visitBreakStmt(BreakStmt *S) {
+void SILGenFunction::visitBreakStmt(BreakStmt *S) {
   Cleanups.emitBranchAndCleanups(BreakDestStack.back());
 }
 
-void SILGen::visitContinueStmt(ContinueStmt *S) {
+void SILGenFunction::visitContinueStmt(ContinueStmt *S) {
   Cleanups.emitBranchAndCleanups(ContinueDestStack.back());
 }

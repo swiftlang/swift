@@ -51,7 +51,7 @@ public:
 
   /// Forward this value, deactivating the cleanup and returning the
   /// underlying value.
-  Value forward(SILGen &gen) {
+  Value forward(SILGenFunction &gen) {
     if (hasCleanup())
       gen.Cleanups.setCleanupState(getCleanup(), CleanupState::Dead);
     return getValue();
@@ -170,7 +170,7 @@ public:
   }
 
   /// The next N values are being ignored; ensure they are destroyed.
-  void ignoreAndDestroy(SILGen &gen, unsigned n) {
+  void ignoreAndDestroy(SILGenFunction &gen, unsigned n) {
     // For now, just leave their cleanups active.
     markClaimed(n);
   }
@@ -233,13 +233,13 @@ public:
 
   /// Forward the next value in this explosion, deactivating its
   /// cleanup if present.
-  Value forwardNext(SILGen &gen) {
+  Value forwardNext(SILGenFunction &gen) {
     assert(NextValue < Values.size());
     return Values[NextValue++].forward(gen);
   }
 
   /// Forward a series of values out of this explosion.
-  void forward(SILGen &gen, unsigned n,
+  void forward(SILGenFunction &gen, unsigned n,
                llvm::SmallVectorImpl<Value> &out) {
     assert(NextValue + n <= Values.size());
 

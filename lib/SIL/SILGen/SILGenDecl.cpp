@@ -28,7 +28,7 @@ class CleanupVar : public Cleanup {
   AllocBoxInst *box;
 public:
   CleanupVar(AllocBoxInst *box) : box(box) {}
-  void emit(SILGen &gen) override {
+  void emit(SILGenFunction &gen) override {
     gen.B.createRelease(SILLocation(), Value(box, 0));
   }
 };
@@ -41,9 +41,9 @@ public:
 /// initializer's full-expression;  that should be pushed at the appropriate
 /// moment.
 struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
-  SILGen &Gen;
+  SILGenFunction &Gen;
   Value Init;
-  InitPatternWithExpr(SILGen &Gen, Value Init) : Gen(Gen), Init(Init) {}
+  InitPatternWithExpr(SILGenFunction &Gen, Value Init) : Gen(Gen), Init(Init) {}
   
   // Paren & Typed patterns are noops, just look through them.
   void visitParenPattern(ParenPattern *P) { visit(P->getSubPattern()); }
@@ -112,7 +112,7 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
 } // end anonymous namespace
 
 
-void SILGen::visitPatternBindingDecl(PatternBindingDecl *D) {
+void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
   // FIXME: Implement cleanups in a way that stands up to unwinding and handles
   // cleanup of partial initializations.
   
@@ -138,9 +138,9 @@ namespace {
 /// arguments and to set up cleanups to release the arguments on function exit.
 struct ArgumentCreatorVisitor :
   public PatternVisitor<ArgumentCreatorVisitor, Value> {
-  SILGen &gen;
+  SILGenFunction &gen;
   Function &f;
-  ArgumentCreatorVisitor(SILGen &gen, Function &f) : gen(gen), f(f) {}
+  ArgumentCreatorVisitor(SILGenFunction &gen, Function &f) : gen(gen), f(f) {}
 
   Value argumentWithCleanup(Type ty, BasicBlock *parent) {
     BBArgument *arg = new (f) BBArgument(ty, parent);
@@ -173,7 +173,7 @@ struct ArgumentCreatorVisitor :
 } // end anonymous namespace
 
 
-void SILGen::emitProlog(FuncExpr *FE) {
+void SILGenFunction::emitProlog(FuncExpr *FE) {
   // Emit the argument variables.
   for (auto &ParamPattern : FE->getBodyParamPatterns()) {
     // Add the BBArgument's and collect them as a Value.
@@ -184,7 +184,7 @@ void SILGen::emitProlog(FuncExpr *FE) {
 }
 
 template<typename X>
-static void rrLoadableValueElement(SILGen &gen, SILLocation loc, Value v,
+static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc, Value v,
                                    X (SILBuilder::*createRR)(SILLocation,
                                                              Value),
                                    ReferenceTypeElement const &elt) {
@@ -195,14 +195,14 @@ static void rrLoadableValueElement(SILGen &gen, SILLocation loc, Value v,
 }
 
 template<typename X>
-static void rrLoadableValue(SILGen &gen, SILLocation loc, Value v,
+static void rrLoadableValue(SILGenFunction &gen, SILLocation loc, Value v,
                             X (SILBuilder::*createRR)(SILLocation, Value),
                             ArrayRef<ReferenceTypeElement> elts) {
   for (auto &elt : elts)
     rrLoadableValueElement(gen, loc, v, createRR, elt);
 }
 
-void SILGen::emitAssign(SILLocation loc, Value v, Value dest) {
+void SILGenFunction::emitAssign(SILLocation loc, Value v, Value dest) {
   Type vTy = v.getType();
 
   if (vTy->is<LValueType>()) {
@@ -235,7 +235,7 @@ void SILGen::emitAssign(SILLocation loc, Value v, Value dest) {
   }
 }
 
-void SILGen::emitRetainRValue(SILLocation loc, Value v) {
+void SILGenFunction::emitRetainRValue(SILLocation loc, Value v) {
   if (v.getType()->is<LValueType>()) {
     // v is an address-only type.
     // FIXME: should allocate, copy_addr, and return a temporary
@@ -247,7 +247,7 @@ void SILGen::emitRetainRValue(SILLocation loc, Value v) {
   }
 }
 
-void SILGen::emitReleaseRValue(SILLocation loc, Value v) {
+void SILGenFunction::emitReleaseRValue(SILLocation loc, Value v) {
   if (v.getType()->is<LValueType>()) {
     // v is an address-only type; destroy it indirectly with destroy_addr.
     assert(Types.getTypeInfo(v.getType()).isAddressOnly() &&
