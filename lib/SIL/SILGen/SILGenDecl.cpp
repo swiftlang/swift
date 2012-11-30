@@ -103,8 +103,8 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     unsigned FieldNo = 0;
     Value TupleInit = Init;
     for (auto &elt : P->getFields()) {
-      Init = Gen.B.createTupleElement(SILLocation(), TupleInit, FieldNo++,
-                                      elt.getPattern()->getType());
+      Init = Gen.B.createExtract(SILLocation(), TupleInit, FieldNo++,
+                                 elt.getPattern()->getType());
       visit(elt.getPattern());
     }
   }
@@ -189,7 +189,7 @@ static void rrLoadableValueElement(SILGen &gen, SILLocation loc, Value v,
                                                              Value),
                                    ReferenceTypeElement const &elt) {
   for (ReferenceTypeElement::Component comp : elt.path) {
-    v = gen.B.createTupleElement(loc, v, comp.index, comp.type);
+    v = gen.B.createExtract(loc, v, comp.index, comp.type);
   }
   (gen.B.*createRR)(loc, v);
 }

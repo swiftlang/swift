@@ -154,10 +154,10 @@ ManagedValue SILGen::visitAddressOfExpr(AddressOfExpr *E) {
 
 
 ManagedValue SILGen::visitTupleElementExpr(TupleElementExpr *E) {
-  Value elt = B.createTupleElement(E,
-                                   visit(E->getBase()).getValue(),
-                                   E->getFieldNumber(),
-                                   E->getType());
+  Value elt = B.createExtract(E,
+                              visit(E->getBase()).getValue(),
+                              E->getFieldNumber(),
+                              E->getType());
   emitRetainRValue(E, elt);
   return managedRValueWithCleanup(*this, elt);
 }
@@ -259,7 +259,7 @@ ManagedValue SILGen::visitTupleShuffleExpr(TupleShuffleExpr *E) {
   SmallVector<Value, 8> InElts;
   unsigned EltNo = 0;
   for (auto &InField : Op.getType()->castTo<TupleType>()->getFields()) {
-    Value elt = B.createTupleElement(SILLocation(), Op, EltNo++,
+    Value elt = B.createExtract(SILLocation(), Op, EltNo++,
                                      InField.getType());
     emitRetainRValue(E, elt);
     InElts.push_back(elt);

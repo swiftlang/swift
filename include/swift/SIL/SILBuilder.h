@@ -177,13 +177,13 @@ public:
   
   TupleInst *createEmptyTuple(SILLocation Loc);
 
-  Value createTupleElement(SILLocation Loc, Value Operand, unsigned FieldNo,
+  Value createExtract(SILLocation Loc, Value Operand, unsigned FieldNo,
                            Type ResultTy) {
-    // Fold tupleelement(tuple(a,b,c), 1) -> b.
+    // Fold extract(tuple(a,b,c), 1) -> b.
     if (TupleInst *TI = dyn_cast<TupleInst>(Operand))
       return TI->getElements()[FieldNo];
 
-    return insert(new TupleElementInst(Loc, Operand, FieldNo, ResultTy));
+    return insert(new ExtractInst(Loc, Operand, FieldNo, ResultTy));
   }
   MetatypeInst *createMetatype(MetatypeExpr *Expr) {
     return insert(new MetatypeInst(Expr));

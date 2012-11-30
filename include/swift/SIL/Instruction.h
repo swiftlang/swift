@@ -508,19 +508,20 @@ public:
 };
 
 
-/// TupleElementInst - Extract a numbered element out of a value of tuple type.
-class TupleElementInst : public Instruction {
+/// ExtractInst - Extract a numbered element out of a value of tuple or fragile
+/// struct type.
+class ExtractInst : public Instruction {
   Value Operand;
   unsigned FieldNo;
 public:
-  TupleElementInst(SILLocation Loc, Value Operand, unsigned FieldNo,
+  ExtractInst(SILLocation Loc, Value Operand, unsigned FieldNo,
                    Type ResultTy);
   
   Value getOperand() const { return Operand; }
   unsigned getFieldNo() const { return FieldNo; }
   
   static bool classof(Value V) {
-    return V->getKind() == ValueKind::TupleElementInst;
+    return V->getKind() == ValueKind::ExtractInst;
   }
 };
 

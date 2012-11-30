@@ -190,9 +190,9 @@ public:
     }
     OS << ')';
   }
-  void visitTupleElementInst(TupleElementInst *TEI) {
-    OS << "tupleelement " << getID(TEI->getOperand()) << ", "
-       << TEI->getFieldNo();
+  void visitExtractInst(ExtractInst *EI) {
+    OS << "extract " << getID(EI->getOperand()) << ", "
+       << EI->getFieldNo();
   }
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype $" << MI->getMetaType().getString();

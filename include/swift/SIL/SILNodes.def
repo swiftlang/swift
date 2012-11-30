@@ -70,7 +70,7 @@ ABSTRACT_VALUE(Instruction, Value)
   INST(ConvertInst, Instruction)
   INST(TupleInst, Instruction)
   INST(MetatypeInst, Instruction)
-  INST(TupleElementInst, Instruction)
+  INST(ExtractInst, Instruction)
   
   INST(RetainInst, Instruction)
   INST(ReleaseInst, Instruction)

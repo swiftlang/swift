@@ -255,9 +255,9 @@ Type MetatypeInst::getMetaType() const {
   return getExpr()->getType();
 }
 
-TupleElementInst::TupleElementInst(SILLocation Loc, Value Operand,
-                                   unsigned FieldNo, Type ResultTy)
-  : Instruction(ValueKind::TupleElementInst, Loc, ResultTy),
+ExtractInst::ExtractInst(SILLocation Loc, Value Operand,
+                         unsigned FieldNo, Type ResultTy)
+  : Instruction(ValueKind::ExtractInst, Loc, ResultTy),
     Operand(Operand), FieldNo(FieldNo) {
 }
 
