@@ -15,6 +15,7 @@
 
 #include "Cleanup.h"
 #include "Scope.h"
+#include "TypeInfo.h"
 #include "swift/SIL/Function.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/AST/ASTVisitor.h"
@@ -26,6 +27,7 @@ namespace swift {
 namespace Lowering {
   class Condition;
   class ManagedValue;
+  class TypeConverter;
 
 class LLVM_LIBRARY_VISIBILITY SILGen
   : public ASTVisitor<SILGen, ManagedValue, void> {
@@ -42,6 +44,9 @@ public:
 
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
+    
+  /// Types - This stores information about types needed for SIL generation.
+  TypeConverter Types;
 
   /// VarLocs - This is the address for the box in which an emitted
   /// variable is stored.

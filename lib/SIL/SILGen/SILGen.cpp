@@ -32,6 +32,7 @@ static bool isVoidableType(Type type) {
 SILGen::SILGen(Function &F, FuncExpr *FE)
   : F(F), B(new (F) BasicBlock(&F), F),
     Cleanups(*this),
+    Types(*this),
     hasVoidReturn(isVoidableType(FE->getResultType(F.getContext()))) {
 
   emitProlog(FE);

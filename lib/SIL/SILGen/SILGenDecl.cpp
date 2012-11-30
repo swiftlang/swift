@@ -11,10 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "Explosion.h"
 #include "Scope.h"
 #include "TypeInfo.h"
 #include "swift/SIL/BBArgument.h"
 #include "swift/AST/AST.h"
+#include <iterator>
 using namespace swift;
 using namespace Lowering;
 
@@ -182,15 +184,22 @@ void SILGen::emitProlog(FuncExpr *FE) {
 }
 
 template<typename X>
+static void rrLoadableValueElement(SILGen &gen, SILLocation loc, Value v,
+                                   X (SILBuilder::*createRR)(SILLocation,
+                                                             Value),
+                                   ReferenceTypeElement const &elt) {
+  for (ReferenceTypeElement::Component comp : elt.path) {
+    v = gen.B.createTupleElement(loc, v, comp.index, comp.type);
+  }
+  (gen.B.*createRR)(loc, v);
+}
+
+template<typename X>
 static void rrLoadableValue(SILGen &gen, SILLocation loc, Value v,
-                            X (SILBuilder::*createRR)(SILLocation, Value)) {
-  TypeInfo ti = TypeInfo::get(v.getType());
-  assert(ti.isLoadable() &&
-         "must pass address-only argument by address");
-  
-  // FIXME: explode and rr reference type elements of loadable value types
-  if (!ti.isTrivial())
-    (gen.B.*createRR)(loc, v);
+                            X (SILBuilder::*createRR)(SILLocation, Value),
+                            ArrayRef<ReferenceTypeElement> elts) {
+  for (auto &elt : elts)
+    rrLoadableValueElement(gen, loc, v, createRR, elt);
 }
 
 void SILGen::emitAssign(SILLocation loc, Value v, Value dest) {
@@ -200,14 +209,14 @@ void SILGen::emitAssign(SILLocation loc, Value v, Value dest) {
     // v is an address-only type; copy using the copy_addr instruction.
     assert(dest.getType()->getCanonicalType() == vTy->getCanonicalType() &&
            "type of copy_addr destination must match source address type");
-    assert(TypeInfo::get(vTy->getRValueType()).isAddressOnly() &&
+    assert(Types.getTypeInfo(vTy->getRValueType()).isAddressOnly() &&
            "source of copy may only be an address if type is address-only");
     B.createCopyAddr(loc, v, dest,
                      /*isTake=*/false,
                      /*isInitialize=*/false);
   } else {
     // v is a loadable type; release the old value if necessary
-    TypeInfo ti = TypeInfo::get(vTy);
+    TypeInfo const &ti = Types.getTypeInfo(vTy);
     assert(dest.getType()->is<LValueType>() &&
            "copy destination must be an address");
     assert(dest.getType()->getRValueType()->getCanonicalType() ==
@@ -221,9 +230,8 @@ void SILGen::emitAssign(SILLocation loc, Value v, Value dest) {
       old = B.createLoad(loc, dest);
     
     B.createStore(loc, v, dest);
-
-    if (!ti.isTrivial())
-      rrLoadableValue(*this, loc, old, &SILBuilder::createRelease);
+    rrLoadableValue(*this, loc, old, &SILBuilder::createRelease,
+                    ti.getReferenceTypeElements());
   }
 }
 
@@ -234,18 +242,20 @@ void SILGen::emitRetainRValue(SILLocation loc, Value v) {
     llvm_unreachable("FIXME: address-only types not implemented yet");
   } else {
     // v is a loadable type; retain it if necessary.
-    rrLoadableValue(*this, loc, v, &SILBuilder::createRetain);
+    rrLoadableValue(*this, loc, v, &SILBuilder::createRetain,
+                    Types.getTypeInfo(v.getType()).getReferenceTypeElements());
   }
 }
 
 void SILGen::emitReleaseRValue(SILLocation loc, Value v) {
   if (v.getType()->is<LValueType>()) {
     // v is an address-only type; destroy it indirectly with destroy_addr.
-    assert(TypeInfo::get(v.getType()).isAddressOnly() &&
+    assert(Types.getTypeInfo(v.getType()).isAddressOnly() &&
            "released address is not of an address-only type");
     B.createDestroyAddr(loc, v);
   } else {
     // v is a loadable type; release it if necessary.
-    rrLoadableValue(*this, loc, v, &SILBuilder::createRelease);
+    rrLoadableValue(*this, loc, v, &SILBuilder::createRelease,
+                    Types.getTypeInfo(v.getType()).getReferenceTypeElements());
   }
 }

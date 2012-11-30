@@ -10,20 +10,87 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "SILGen.h"
 #include "TypeInfo.h"
 #include "TypeVisitor.h"
 
 namespace swift {
 namespace Lowering {
 
-TypeInfo TypeInfo::get(Type t) {
-  if (t->hasReferenceSemantics()) {
-    return TypeInfo(/*addressOnly=*/false, /*trivial=*/false);
-  } else {
-    /* FIXME: walk aggregate types to determine address-only-ness and
-     * triviality. */
-    return TypeInfo(/*addressOnly=*/false, /*trivial=*/true);
+/// LoadableTypeInfoVisitor - Recursively descend into fragile struct and
+/// tuple types and visit their element types, storing information about the
+/// reference type members in the TypeInfo for the type.
+class LoadableTypeInfoVisitor : public TypeVisitor<LoadableTypeInfoVisitor> {
+  TypeInfo &theInfo;
+  ReferenceTypeElement currentElement;
+public:
+  LoadableTypeInfoVisitor(TypeInfo &theInfo) : theInfo(theInfo) {}
+  
+  void pushPath() { currentElement.path.push_back({Type(), 0}); }
+  void popPath() { currentElement.path.pop_back(); }
+  void setPathType(Type t) { currentElement.path.back().type = t; }
+  void advancePath() { ++currentElement.path.back().index; }
+  
+  void visitType(TypeBase *t) {
+    if (t->hasReferenceSemantics()) {
+      theInfo.referenceTypeElements.push_back(currentElement);
+    }
   }
+  
+  void visitNominalType(NominalType *t) {
+    if (StructDecl *sd = dyn_cast<StructDecl>(t->getDecl())) {
+      // FIXME: if this struct has a resilient attribute, mark the TypeInfo
+      // as addressOnly and bail.
+      
+      pushPath();
+      for (Decl *d : sd->getMembers())
+        if (VarDecl *vd = dyn_cast<VarDecl>(d))
+          if (!vd->isProperty()) {
+            CanType ct = vd->getType()->getCanonicalType();
+            setPathType(ct);
+            visit(ct);
+            advancePath();
+          }
+      popPath();
+    } else
+      this->visitType(t);
+  }
+  
+  void visitTupleType(TupleType *t) {
+    pushPath();
+    for (TupleTypeElt const &elt : t->getFields()) {
+      CanType ct = elt.getType()->getCanonicalType();
+      setPathType(ct);
+      visit(ct);
+      advancePath();
+    }
+    popPath();
+  }
+};
+  
+TypeInfo const &TypeConverter::makeTypeInfo(CanType t) {
+  TypeInfo &theInfo = types[t.getPointer()];
+  
+  if (t->hasReferenceSemantics()) {
+    theInfo.addressOnly = false;
+    theInfo.referenceTypeElements.push_back(ReferenceTypeElement());
+  } else {
+    // walk aggregate types to determine address-only-ness and find reference
+    // type elements.
+    theInfo.addressOnly = false;
+    LoadableTypeInfoVisitor(theInfo).visit(t);
+  }
+  
+  return theInfo;
+}
+  
+TypeInfo const &TypeConverter::getTypeInfo(Type t) {
+  CanType ct = t->getCanonicalType();
+  auto existing = types.find(ct.getPointer());
+  if (existing == types.end()) {
+    return makeTypeInfo(ct);
+  } else
+    return existing->second;
 }
   
 } // namespace Lowering
