@@ -54,7 +54,8 @@ extern "C" void _TSs5printFT3valSd_T_(double l) {
 // static func String(v : Int128, radix : Int) -> String
 extern "C"
 unsigned long long
-print_int(char* TmpBuffer, __int64_t buf_len, __int128_t X, uint64_t Radix) {
+print_int(char* TmpBuffer, __int64_t buf_len, __int128_t X, uint64_t Radix,
+          bool uppercase) {
   assert(Radix != 0 && Radix <= 36 && "Invalid radix for string conversion");
   char *P = TmpBuffer;
 
@@ -71,7 +72,7 @@ print_int(char* TmpBuffer, __int64_t buf_len, __int128_t X, uint64_t Radix) {
   } else {
     unsigned Radix32 = Radix;
     while (Y) {
-      *P++ = llvm::hexdigit(Y % Radix32);
+      *P++ = llvm::hexdigit(Y % Radix32, !uppercase);
       Y /= Radix32;
     }
   }
@@ -84,7 +85,8 @@ print_int(char* TmpBuffer, __int64_t buf_len, __int128_t X, uint64_t Radix) {
 // static func String(v : UInt128, radix : Int) -> String
 extern "C"
 unsigned long long
-print_uint(char* TmpBuffer, __int64_t buf_len, __uint128_t Y, uint64_t Radix) {
+print_uint(char* TmpBuffer, __int64_t buf_len, __uint128_t Y, uint64_t Radix,
+           bool uppercase) {
   assert(Radix != 0 && Radix <= 36 && "Invalid radix for string conversion");
   char *P = TmpBuffer;
 
@@ -98,7 +100,7 @@ print_uint(char* TmpBuffer, __int64_t buf_len, __uint128_t Y, uint64_t Radix) {
   } else {
     unsigned Radix32 = Radix;
     while (Y) {
-      *P++ = llvm::hexdigit(Y % Radix32);
+      *P++ = llvm::hexdigit(Y % Radix32, !uppercase);
       Y /= Radix32;
     }
   }
