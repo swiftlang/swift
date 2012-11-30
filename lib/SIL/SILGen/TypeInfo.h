@@ -83,7 +83,7 @@ class LLVM_LIBRARY_VISIBILITY TypeConverter {
   TypeInfo const &makeTypeInfo(CanType t);
   
 public:
-  TypeConverter(SILGen &gen) : gen(gen) {}
+  TypeConverter(SILGen &gen) : gen(gen) { (void)gen; }
   
   TypeInfo const &getTypeInfo(Type t);
 };

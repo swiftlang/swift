@@ -107,8 +107,9 @@ public:
     return insert(new AllocVarInst(VD));
   }
 
-  AllocTmpInst *createAllocTmp(SILLocation Loc) {
-    return insert(new AllocTmpInst(Loc));
+  AllocVarInst *createAllocVar(SILLocation Loc, AllocKind allocKind,
+                               Type elementType) {
+    return insert(new AllocVarInst(Loc, allocKind, elementType));
   }
 
   AllocBoxInst *createAllocBox(SILLocation Loc, Type ElementType) {
@@ -195,8 +196,9 @@ public:
   ReleaseInst *createRelease(SILLocation Loc, Value Operand) {
     return insert(new ReleaseInst(Loc, Operand));
   }
-  DeallocInst *createDealloc(SILLocation Loc, Value Operand) {
-    return insert(new DeallocInst(Loc, Operand));
+  DeallocVarInst *createDeallocVar(SILLocation loc, AllocKind allocKind,
+                                   Value operand) {
+    return insert(new DeallocVarInst(loc, allocKind, operand));
   }
   DestroyAddrInst *createDestroyAddr(SILLocation Loc, Value Operand) {
     return insert(new DestroyAddrInst(Loc, Operand));

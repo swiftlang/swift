@@ -100,14 +100,27 @@ ManagedValue SILGen::visitLoadExpr(LoadExpr *E) {
   return managedRValueWithCleanup(*this, loadedV);
 }
 
+namespace {
+  class CleanupMaterialize : public Cleanup {
+    Value alloc;
+  public:
+    CleanupMaterialize(Value alloc) : alloc(alloc) {}
+    
+    void emit(SILGen &gen) override {
+      Value tmpValue = gen.B.createLoad(SILLocation(), alloc);
+      gen.emitReleaseRValue(SILLocation(), tmpValue);
+      gen.B.createDeallocVar(SILLocation(), AllocKind::Stack, alloc);
+    }
+  };
+}
+
 ManagedValue SILGen::visitMaterializeExpr(MaterializeExpr *E) {
   // Evaluate the value, use it to initialize a new temporary and return the
   // temp's address.
   Value V = visit(E->getSubExpr()).forward(*this);
-  // FIXME: eliminate AllocTmp and generate this as an AllocVar with
-  // DeallocVar cleanup.
-  Value TmpMem = B.createAllocTmp(E);
+  Value TmpMem = B.createAllocVar(E, AllocKind::Stack, V.getType());
   B.createStore(E, V, TmpMem);
+  Cleanups.pushCleanup<CleanupMaterialize>(TmpMem);
   // The DeallocVar cleanup's ownership will not be forwarded to a calling
   // function, so this ManagedValue for the temporary allocation does not
   // reference its cleanup.

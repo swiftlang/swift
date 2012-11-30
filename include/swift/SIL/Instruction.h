@@ -104,54 +104,47 @@ public:
   }
 };
 
+enum class AllocKind : uint8_t {
+  Heap, Stack, Pseudo
+};
 
 /// AllocInst - This is the abstract base class common among all the memory
 /// allocation mechanisms.  This can allocate heap or stack memory.
 class AllocInst : public Instruction {
-// Eventually: enum AllocKind { Heap, Stack, StackNoRefCount, Pseudo };
+  AllocKind allocKind;
 
 protected:
-  AllocInst(ValueKind Kind, SILLocation Loc, Type Ty)
-    : Instruction(Kind, Loc, Ty) {}
+  AllocInst(ValueKind Kind, SILLocation Loc, Type Ty, AllocKind allocKind)
+    : Instruction(Kind, Loc, Ty), allocKind(allocKind) {}
 public:
   /// getType() is ok since this is known to only have one type.
   Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
+  AllocKind getAllocKind() const { return allocKind; }
+  
   static bool classof(Value V) {
     return V->getKind() >= ValueKind::First_AllocInst &&
            V->getKind() <= ValueKind::Last_AllocInst;
   }
 };
 
-
-/// AllocVarInst - This represents the allocation of a local variable due to a
-/// 'var' declaration.  A single var declaration may allocate multiple different
-/// SIL allocations at once through its pattern.  One of these will be created
-/// for each variable in something like "var (x,y) : (Int, Int)".
+/// AllocVarInst - This represents the allocation of an unboxed variable or
+/// temporary. The memory is provided uninitialized.
 class AllocVarInst : public AllocInst {
 public:
   AllocVarInst(VarDecl *VD);
+  AllocVarInst(SILLocation loc, AllocKind allocKind, Type elementType);
 
-  /// getDecl - Return the underlying declaration.
+  /// getDecl - Return the underlying variable declaration associated with this
+  /// allocation, or null if this is a temporary allocation.
   VarDecl *getDecl() const;
+  
+  /// getElementType - Get the type of the allocated memory (as opposed to the
+  /// type of the instruction itself, which will be an address type).
+  Type getElementType() const;
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::AllocVarInst;
-  }
-};
-
-/// AllocTmpInst - This represents the allocation of a temporary variable due to
-/// a MaterializeExpr.  This occurs when an rvalue needs to be converted to an
-/// l-value, for example to be the receiver of a dot-syntax method call.
-///
-/// The initial value for the temp will be provided by an initalization-style
-/// store to the temporary.
-class AllocTmpInst : public AllocInst {
-public:
-  AllocTmpInst(SILLocation Loc);
-
-  static bool classof(Value V) {
-    return V->getKind() == ValueKind::AllocTmpInst;
   }
 };
 
@@ -552,16 +545,18 @@ public:
   }
 };
 
-/// DeallocInst - Dealloc a value, releasing any resources it owns.
-class DeallocInst : public Instruction {
+/// DeallocVarInst - Deallocate memory allocated by alloc_var.
+class DeallocVarInst : public Instruction {
+  AllocKind allocKind;
   Value Operand;
 public:
-  DeallocInst(SILLocation Loc, Value Operand);
+  DeallocVarInst(SILLocation Loc, AllocKind allocKind, Value Operand);
   
+  AllocKind getAllocKind() const { return allocKind; }
   Value getOperand() const { return Operand; }
   
   static bool classof(Value V) {
-    return V->getKind() == ValueKind::DeallocInst;
+    return V->getKind() == ValueKind::DeallocVarInst;
   }
 };
 

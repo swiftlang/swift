@@ -50,8 +50,7 @@ VALUE(BBArgument, Value)
 ABSTRACT_VALUE(Instruction, Value)
   ABSTRACT_VALUE(AllocInst, Instruction)
     INST(AllocVarInst, AllocInst)
-    INST(AllocTmpInst, AllocInst)
-    VALUE_RANGE(AllocInst, AllocVarInst, AllocTmpInst)
+    VALUE_RANGE(AllocInst, AllocVarInst, AllocVarInst)
   INST(AllocBoxInst, Instruction)
   INST(AllocArrayInst, Instruction)
   INST(ApplyInst, Instruction)
@@ -74,7 +73,7 @@ ABSTRACT_VALUE(Instruction, Value)
   
   INST(RetainInst, Instruction)
   INST(ReleaseInst, Instruction)
-  INST(DeallocInst, Instruction)
+  INST(DeallocVarInst, Instruction)
   INST(DestroyAddrInst, Instruction)
 
   // SIL-only instructions that don't have an AST analog.

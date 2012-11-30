@@ -49,18 +49,15 @@ public:
     visitAllocInst(AI);
   }
 
-  void visitAllocTmpInst(AllocTmpInst *AI) {
-    visitAllocInst(AI);
-  }
-
-
   void visitApplyInst(ApplyInst *AI) {
+    for (auto &arg : AI->getArguments()) {
+      arg.getType()->dump();
+    }
     assert(AI->getCallee().getType()->is<FunctionType>() &&
            "Callee of ApplyInst should have function type");
     FunctionType *FT = AI->getCallee().getType()->castTo<FunctionType>();
     assert(AI->getType()->isEqual(FT->getResult()) &&
            "ApplyInst result type mismatch");
-
 
     // If there is a single argument to the apply, it might be a scalar or the
     // whole tuple being presented all at once.
@@ -140,7 +137,7 @@ public:
     assert(!RI->getOperand().getType()->is<LValueType>() &&
            "Operand of release must not be lvalue");
   }
-  void visitDeallocInst(DeallocInst *DI) {
+  void visitDeallocVarInst(DeallocVarInst *DI) {
     assert(DI->getOperand().getType()->is<LValueType>() &&
            "Operand of dealloc must be lvalue");
   }

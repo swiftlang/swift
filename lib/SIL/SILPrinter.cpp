@@ -101,15 +101,27 @@ public:
   void visitInstruction(Instruction *I) {
     assert(0 && "SILPrinter not implemented for this instruction!");
   }
-
-  void visitAllocVarInst(AllocVarInst *AVI) {
-    OS << "alloc_var " << AVI->getDecl()->getName()
-       << ", $" << AVI->getType().getString();
-
+  
+  void printAllocKind(AllocKind kind) {
+    switch (kind) {
+      case AllocKind::Heap:
+        OS << "heap ";
+        break;
+      case AllocKind::Pseudo:
+        OS << "pseudo ";
+        break;
+      case AllocKind::Stack:
+        OS << "stack ";
+        break;
+    }
   }
 
-  void visitAllocTmpInst(AllocTmpInst *ATI) {
-    OS << "alloc_tmp $" << ATI->getType().getString();
+  void visitAllocVarInst(AllocVarInst *AVI) {
+    OS << "alloc_var ";
+    printAllocKind(AVI->getAllocKind());
+    OS << "$" << AVI->getElementType().getString();
+    if (VarDecl *vd = AVI->getDecl())
+      OS << "  ; var " << vd->getName();
   }
 
   void visitAllocBoxInst(AllocBoxInst *ABI) {
@@ -204,8 +216,10 @@ public:
   void visitReleaseInst(ReleaseInst *RI) {
     OS << "release " << getID(RI->getOperand());
   }
-  void visitDeallocInst(DeallocInst *DI) {
-    OS << "dealloc " << getID(DI->getOperand());
+  void visitDeallocVarInst(DeallocVarInst *DI) {
+    OS << "dealloc_var ";
+    printAllocKind(DI->getAllocKind());
+    OS << getID(DI->getOperand());
   }
   void visitDestroyAddrInst(DestroyAddrInst *DI) {
     OS << "destroy_addr " << getID(DI->getOperand());

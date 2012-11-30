@@ -83,20 +83,36 @@ void Instruction::eraseFromParent() {
 //===----------------------------------------------------------------------===//
 
 AllocVarInst::AllocVarInst(VarDecl *VD)
-  : AllocInst(ValueKind::AllocVarInst, VD, VD->getTypeOfReference()) {
+  : AllocInst(ValueKind::AllocVarInst, VD, VD->getTypeOfReference(),
+              AllocKind::Heap) {
 }
 
-/// getDecl - Return the underlying declaration.
+AllocVarInst::AllocVarInst(SILLocation loc, AllocKind allocKind,
+                           Type elementType)
+  // FIXME: LValue qualifiers being wrong can break the verifier
+  : AllocInst(ValueKind::AllocVarInst, loc,
+              LValueType::get(elementType, LValueType::Qual::DefaultForType,
+                              elementType->getASTContext()),
+              allocKind) {
+}
+
+/// getDecl - Return the underlying variable declaration associated with this
+/// allocation, or null if this is a temporary allocation.
 VarDecl *AllocVarInst::getDecl() const {
-  return getLocDecl<VarDecl>();
+  if (Decl *d = getLoc().dyn_cast<Decl*>()) {
+    return dyn_cast<VarDecl>(d);
+  } else {
+    return nullptr;
+  }
 }
 
+/// getElementType - Get the type of the allocated memory (as opposed to the
+/// type of the instruction itself, which will be an address type).
+Type AllocVarInst::getElementType() const {
+  return getType()->castTo<LValueType>()->getObjectType();
+}
 
-AllocTmpInst::AllocTmpInst(SILLocation Loc)
-// FIXME: Terrible hack, but alloc_tmp is going away anyhow.
-  : AllocInst(ValueKind::AllocTmpInst, Loc, Loc.get<Expr*>()->getType()) {}
-
-// Allocations always returns two results: Builtin.ObjectPointer & LValue[EltTy]
+// Allocations always return two results: Builtin.ObjectPointer & LValue[EltTy]
 static SILTypeList *getAllocType(Type EltTy, SILBase &B) {
   ASTContext &Ctx = EltTy->getASTContext();
 
@@ -271,8 +287,10 @@ ReleaseInst::ReleaseInst(SILLocation Loc, Value Operand)
   : Instruction(ValueKind::ReleaseInst, Loc), Operand(Operand) {
 }
 
-DeallocInst::DeallocInst(SILLocation Loc, Value Operand)
-  : Instruction(ValueKind::DeallocInst, Loc), Operand(Operand) {
+DeallocVarInst::DeallocVarInst(SILLocation loc, AllocKind allocKind,
+                               Value operand)
+  : Instruction(ValueKind::DeallocVarInst, loc), allocKind(allocKind),
+    Operand(operand) {
 }
 
 DestroyAddrInst::DestroyAddrInst(SILLocation Loc, Value Operand)
