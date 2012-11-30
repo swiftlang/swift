@@ -147,7 +147,7 @@ public:
   }
 
   void visitConstantRefInst(ConstantRefInst *DRI) {
-    OS << "constant_ref $" << DRI->getDecl()->getType().getString() << ", @"
+    OS << "constant_ref $" << DRI->getType(0).getString() << ", @"
        << DRI->getDecl()->getName();
   }
 

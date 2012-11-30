@@ -13,6 +13,7 @@
 #include "swift/SIL/Function.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/Decl.h"
 using namespace swift;
 
 namespace {
@@ -50,9 +51,6 @@ public:
   }
 
   void visitApplyInst(ApplyInst *AI) {
-    for (auto &arg : AI->getArguments()) {
-      arg.getType()->dump();
-    }
     assert(AI->getCallee().getType()->is<FunctionType>() &&
            "Callee of ApplyInst should have function type");
     FunctionType *FT = AI->getCallee().getType()->castTo<FunctionType>();
@@ -77,8 +75,8 @@ public:
   }
 
   void visitConstantRefInst(ConstantRefInst *DRI) {
-    assert(!DRI->getType()->is<LValueType>() &&
-           "ConstantRef should return not produce an lvalue");
+    assert(isa<VarDecl>(DRI->getDecl()) == DRI->getType()->is<LValueType>()
+           && "ConstantRef should only produce an lvalue for global var decls");
   }
 
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {

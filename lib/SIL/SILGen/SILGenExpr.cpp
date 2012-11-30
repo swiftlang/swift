@@ -70,14 +70,21 @@ ManagedValue SILGen::visitApplyExpr(ApplyExpr *E) {
 }
 
 ManagedValue SILGen::visitDeclRefExpr(DeclRefExpr *E) {
-  // If this is a reference to a mutable decl, produce an lvalue.
-  if (E->getType()->is<LValueType>()) {
-    assert(VarLocs.count(E->getDecl()) && "VarDecl location not generated?");
+  // FIXME: properties
+  
+  // If this is a reference to a mutable local decl, produce an lvalue.
+  if (E->getType()->is<LValueType>() && VarLocs.count(E->getDecl()) > 0) {
     return ManagedValue(VarLocs[E->getDecl()]);
   }
   
-  // Otherwise, we can only produce its value, so use a ConstantRefInst.
-  return ManagedValue(B.createConstantRef(E));
+  // Otherwise, use a ConstantRefInst.
+  // FIXME: There should be a SILGenModule over us that manages global variables
+  // on our behalf. We should assert that an lvalue VarDecl is actually a valid
+  // global reference.
+  // FIXME: local func decls need to create and evaluate to a closure
+  // FIXME: other kinds of local decl?
+  Value v = B.createConstantRef(E);
+  return ManagedValue(v);
 }
 
 ManagedValue SILGen::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
