@@ -293,7 +293,7 @@ ID SILPrinter::getID(Value V) {
 }
 
 //===----------------------------------------------------------------------===//
-// Printing for Instruction, BasicBlock, and Function
+// Printing for Instruction, BasicBlock, Function, and SILModule
 //===----------------------------------------------------------------------===//
 
 void ValueBase::dump() const {
@@ -304,6 +304,7 @@ void ValueBase::print(raw_ostream &OS) const {
   SILPrinter(OS).print(this);
 }
 
+/// Pretty-print the BasicBlock to errs.
 void BasicBlock::dump() const {
   print(llvm::errs());
 }
@@ -313,15 +314,28 @@ void BasicBlock::print(raw_ostream &OS) const {
   SILPrinter(OS).print(this);
 }
 
-/// Pretty-print the basic block.
+/// Pretty-print the Function to errs.
 void Function::dump() const {
   print(llvm::errs());
 }
 
-/// Pretty-print the basi block with the designated stream.
+/// Pretty-print the Function with the designated stream.
 void Function::print(llvm::raw_ostream &OS) const {
   SILPrinter Printer(OS);
   for (const BasicBlock &B : *this)
     Printer.print(&B);
 }
 
+/// Pretty-print the SILModule to errs.
+void SILModule::dump() const {
+  print(llvm::errs());
+}
+
+/// Pretty-print the Function with the designated stream.
+void SILModule::print(llvm::raw_ostream &OS) const {
+  for (ValueDecl *vd : functionDecls) {
+    OS << "func_decl " << vd->getName() << '\n';
+    functions.find(vd)->second->print(OS);
+    OS << "\n";
+  }
+}

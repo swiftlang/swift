@@ -29,10 +29,9 @@ static bool isVoidableType(Type type) {
     return false;
 }
 
-SILGenFunction::SILGenFunction(Function &F, FuncExpr *FE)
-  : F(F), B(new (F) BasicBlock(&F), F),
+SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE)
+  : SGM(SGM), F(F), B(new (F.getModule()) BasicBlock(&F), F),
     Cleanups(*this),
-    Types(*this),
     hasVoidReturn(isVoidableType(FE->getResultType(F.getContext()))) {
 
   emitProlog(FE);
@@ -61,13 +60,40 @@ SILGenFunction::~SILGenFunction() {
   }
 }
 
-Function *Function::constructSIL(FuncExpr *FE) {
-  Function *C = new Function(FE->getASTContext());
+//===--------------------------------------------------------------------===//
+// SILGenModule Class implementation
+//===--------------------------------------------------------------------===//
 
-  SILGenFunction(*C, FE).visit(FE->getBody());
-
-  C->verify();
-  return C;
+SILGenModule::SILGenModule(SILModule &M)
+  : M(M), Types(*this) {
 }
 
+void SILGenModule::visitFuncDecl(FuncDecl *FD) {
+  FuncExpr *FE = FD->getBody();
+  
+  // Ignore function prototypes.
+  if (FE->getBody() == nullptr) return;
+  
+  assert(M.functions.find(FD) == M.functions.end() &&
+         "already generated function for decl!");
 
+  Function *C = new (M) Function(M);
+  SILGenFunction(*this, *C, FE).visit(FE->getBody());
+  
+  C->verify();
+  M.functions[FD] = C;
+  M.functionDecls.push_back(FD);
+}
+
+//===--------------------------------------------------------------------===//
+// SILModule::constructSIL method implementation
+//===--------------------------------------------------------------------===//
+
+
+SILModule *SILModule::constructSIL(TranslationUnit *tu) {
+  SILModule *m = new SILModule(tu->getASTContext());
+  SILGenModule sgm(*m);
+  for (Decl *D : tu->Decls)
+    sgm.visit(D);
+  return m;
+}

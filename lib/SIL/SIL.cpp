@@ -11,9 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/Function.h"
+#include "swift/SIL/SILModule.h"
 using namespace swift;
 
 Function::~Function() {
 }
 
-
+SILModule::~SILModule() {
+}

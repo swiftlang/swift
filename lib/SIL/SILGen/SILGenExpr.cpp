@@ -31,7 +31,7 @@ namespace {
 
 static ManagedValue managedRValueWithCleanup(SILGenFunction &gen, Value v) {
   if (v.getType()->is<LValueType>() ||
-      gen.Types.getTypeInfo(v.getType()).isTrivial()) {
+      gen.getTypeInfo(v.getType()).isTrivial()) {
     return ManagedValue(v);
   } else {
     gen.Cleanups.pushCleanup<CleanupRValue>(v);

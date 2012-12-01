@@ -113,12 +113,14 @@ public:
   }
 
   AllocBoxInst *createAllocBox(SILLocation Loc, Type ElementType) {
-    return insert(new AllocBoxInst(Loc, ElementType, F));
+    return insert(new AllocBoxInst(Loc, ElementType,
+                                   F.getModule()));
   }
 
   AllocArrayInst *createAllocArray(Expr *E, Type ElementType,
                                    Value NumElements) {
-    return insert(new AllocArrayInst(E, ElementType, NumElements, F));
+    return insert(new AllocArrayInst(E, ElementType, NumElements,
+                                     F.getModule()));
   }
 
   ApplyInst *createApply(SILLocation Loc, Value Fn, ArrayRef<Value> Args) {

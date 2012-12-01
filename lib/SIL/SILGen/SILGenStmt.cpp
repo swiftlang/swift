@@ -161,11 +161,11 @@ void SILGenFunction::visitIfStmt(IfStmt *S) {
 
 void SILGenFunction::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block and jump into it.
-  BasicBlock *LoopBB = new (F) BasicBlock(&F, "while");
+  BasicBlock *LoopBB = new (F.getModule()) BasicBlock(&F, "while");
   B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
-  BasicBlock *EndBB = new (F) BasicBlock(&F, "while.end");
+  BasicBlock *EndBB = new (F.getModule()) BasicBlock(&F, "while.end");
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
   ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth());
   
@@ -192,11 +192,11 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S) {
 
 void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
   // Create a new basic block and jump into it.
-  BasicBlock *LoopBB = new (F) BasicBlock(&F, "dowhile");
+  BasicBlock *LoopBB = new (F.getModule()) BasicBlock(&F, "dowhile");
   B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
-  BasicBlock *EndBB = new (F) BasicBlock(&F, "dowhile.end");
+  BasicBlock *EndBB = new (F.getModule()) BasicBlock(&F, "dowhile.end");
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
   ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth());
   
@@ -242,12 +242,12 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
   if (!B.hasValidInsertionPoint()) return;
   
   // Create a new basic block and jump into it.
-  BasicBlock *LoopBB = new (F) BasicBlock(&F, "for.condition");
+  BasicBlock *LoopBB = new (F.getModule()) BasicBlock(&F, "for.condition");
   B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
-  BasicBlock *IncBB = new (F) BasicBlock(&F, "for.inc");
-  BasicBlock *EndBB = new (F) BasicBlock(&F, "for.end");
+  BasicBlock *IncBB = new (F.getModule()) BasicBlock(&F, "for.inc");
+  BasicBlock *EndBB = new (F.getModule()) BasicBlock(&F, "for.end");
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
   ContinueDestStack.emplace_back(IncBB, getCleanupsDepth());
   
@@ -296,11 +296,11 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   if (!B.hasValidInsertionPoint()) return;
   
   // Create a new basic block and jump into it.
-  BasicBlock *LoopBB = new (F) BasicBlock(&F, "foreach.cond");
+  BasicBlock *LoopBB = new (F.getModule()) BasicBlock(&F, "foreach.cond");
   B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
-  BasicBlock *EndBB = new (F) BasicBlock(&F, "foreach.end");
+  BasicBlock *EndBB = new (F.getModule()) BasicBlock(&F, "foreach.end");
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
   ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth());
   

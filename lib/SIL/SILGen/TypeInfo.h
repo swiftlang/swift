@@ -22,6 +22,7 @@
 namespace swift {
 namespace Lowering {
   class SILGenFunction;
+  class SILGenModule;
 
 /// ReferenceTypeElement - a path to a reference type element within a loadable
 /// aggregate type at an arbitrary depth.
@@ -82,7 +83,7 @@ class LLVM_LIBRARY_VISIBILITY TypeConverter {
   TypeInfo const &makeTypeInfo(CanType t);
   
 public:
-  TypeConverter(SILGenFunction &gen) { }
+  TypeConverter(SILGenModule &sgm) { }
   
   TypeInfo const &getTypeInfo(Type t);
 };

@@ -18,6 +18,7 @@
 #define SWIFT_SIL_SILFUNCTION_H
 
 #include "swift/SIL/BasicBlock.h"
+#include "swift/SIL/SILModule.h"
 
 namespace swift {
 
@@ -25,32 +26,33 @@ class ASTContext;
 class FuncExpr;
 class Instruction;
 class TranslationUnit;
+  
+namespace Lowering {
+  class SILGenModule;
+}
 
-class Function : public SILBase {
+class Function : public SILAllocated<Function> {
 public:
   typedef llvm::iplist<BasicBlock> BlockListType;
 
 private:
   friend class BasicBlock;
+  friend class Lowering::SILGenModule;
 
-  /// Context - This is the context that uniques the types used by this
-  /// Function.
-  ASTContext &Context;
+  /// Module - This is the SIL module that the function belongs to.
+  SILModule &Module;
 
   /// The collection of all BasicBlocks in the Function.
   BlockListType BlockList;
 
-  // Intentionally marked private so that we need to use 'constructSIL()'
-  // to construct a Function.
-  Function(ASTContext &Context) : Context(Context) {}
+  // Intentionally marked private so that we need to use
+  // 'SILModule::constructSIL()' to generate a Function.
+  Function(SILModule &Module) : Module(Module) {}
 public:
   ~Function();
 
-  /// Construct a SIL function from a given statement.  It is the caller's
-  /// responsibility to 'delete' this object.
-  static Function *constructSIL(FuncExpr *FE);
-
-  ASTContext &getContext() const { return Context; }
+  SILModule &getModule() const { return Module; }
+  ASTContext &getContext() const { return Module.Context; }
 
   //===--------------------------------------------------------------------===//
   // Block List Access
@@ -82,6 +84,18 @@ public:
 
   /// Pretty-print the Function with the designated stream.
   void print(raw_ostream &OS) const;
+  
+  //===--------------------------------------------------------------------===//
+  // Forwarding to the SILModule's allocator and type information
+  //===--------------------------------------------------------------------===//
+  void *allocate(unsigned Size, unsigned Align) const {
+    return Module.allocate(Size, Align);
+  }
+  
+  SILTypeList *getSILTypeList(llvm::ArrayRef<Type> Types) const {
+    return Module.getSILTypeList(Types);
+  }
+
 };
 
 } // end swift namespace

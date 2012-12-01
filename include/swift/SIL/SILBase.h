@@ -26,7 +26,7 @@ namespace swift {
 class SILTypeList;
 class Type;
 class SILBase {
-  /// Allocator that manages the memory of all the pieces of the Function.
+  /// Allocator that manages the memory of all the pieces of the SILModule.
   mutable llvm::BumpPtrAllocator BPA;
   void *TypeListUniquing;
   SILBase(const SILBase&) = delete;
@@ -57,7 +57,7 @@ public:
     ::operator delete(Ptr);
   }
 
-  /// Custom version of 'new' that uses the Function's BumpPtrAllocator with
+  /// Custom version of 'new' that uses the SILModule's BumpPtrAllocator with
   /// precise alignment knowledge.
   void *operator new(size_t Bytes, const SILBase &C,
                      size_t Alignment = llvm::AlignOf<DERIVED>::Alignment) {

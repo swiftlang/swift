@@ -143,7 +143,7 @@ struct ArgumentCreatorVisitor :
   ArgumentCreatorVisitor(SILGenFunction &gen, Function &f) : gen(gen), f(f) {}
 
   Value argumentWithCleanup(Type ty, BasicBlock *parent) {
-    BBArgument *arg = new (f) BBArgument(ty, parent);
+    BBArgument *arg = new (f.getModule()) BBArgument(ty, parent);
     return arg;
   }
     
@@ -209,14 +209,14 @@ void SILGenFunction::emitAssign(SILLocation loc, Value v, Value dest) {
     // v is an address-only type; copy using the copy_addr instruction.
     assert(dest.getType()->getCanonicalType() == vTy->getCanonicalType() &&
            "type of copy_addr destination must match source address type");
-    assert(Types.getTypeInfo(vTy->getRValueType()).isAddressOnly() &&
+    assert(getTypeInfo(vTy->getRValueType()).isAddressOnly() &&
            "source of copy may only be an address if type is address-only");
     B.createCopyAddr(loc, v, dest,
                      /*isTake=*/false,
                      /*isInitialize=*/false);
   } else {
     // v is a loadable type; release the old value if necessary
-    TypeInfo const &ti = Types.getTypeInfo(vTy);
+    TypeInfo const &ti = getTypeInfo(vTy);
     assert(dest.getType()->is<LValueType>() &&
            "copy destination must be an address");
     assert(dest.getType()->getRValueType()->getCanonicalType() ==
@@ -243,19 +243,19 @@ void SILGenFunction::emitRetainRValue(SILLocation loc, Value v) {
   } else {
     // v is a loadable type; retain it if necessary.
     rrLoadableValue(*this, loc, v, &SILBuilder::createRetain,
-                    Types.getTypeInfo(v.getType()).getReferenceTypeElements());
+                    getTypeInfo(v.getType()).getReferenceTypeElements());
   }
 }
 
 void SILGenFunction::emitReleaseRValue(SILLocation loc, Value v) {
   if (v.getType()->is<LValueType>()) {
     // v is an address-only type; destroy it indirectly with destroy_addr.
-    assert(Types.getTypeInfo(v.getType()).isAddressOnly() &&
+    assert(getTypeInfo(v.getType()).isAddressOnly() &&
            "released address is not of an address-only type");
     B.createDestroyAddr(loc, v);
   } else {
     // v is a loadable type; release it if necessary.
     rrLoadableValue(*this, loc, v, &SILBuilder::createRelease,
-                    Types.getTypeInfo(v.getType()).getReferenceTypeElements());
+                    getTypeInfo(v.getType()).getReferenceTypeElements());
   }
 }

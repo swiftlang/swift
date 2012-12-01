@@ -17,6 +17,7 @@
 #include "Scope.h"
 #include "TypeInfo.h"
 #include "swift/SIL/Function.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "llvm/ADT/DenseMap.h"
@@ -29,9 +30,31 @@ namespace Lowering {
   class ManagedValue;
   class TypeConverter;
 
+class LLVM_LIBRARY_VISIBILITY SILGenModule : public ASTVisitor<SILGenModule> {
+public:
+  /// The Module being constructed.
+  SILModule &M;
+  
+  /// Types - This creates and manages TypeInfo objects containing extra
+  /// information about types needed for SIL generation.
+  TypeConverter Types;
+
+public:
+  SILGenModule(SILModule &M);
+
+  //===--------------------------------------------------------------------===//
+  // Visitors for top-level forms
+  //===--------------------------------------------------------------------===//
+  // FIXME: visit more than just top-level func declarations
+  void visitFuncDecl(FuncDecl *fd);
+};
+  
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
   : public ASTVisitor<SILGenFunction, ManagedValue, void> {
 public:
+  /// The SILGenModule this function belongs to.
+  SILGenModule &SGM;
+    
   /// The Function being constructed.
   Function &F;
   
@@ -45,9 +68,6 @@ public:
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
     
-  /// Types - This stores information about types needed for SIL generation.
-  TypeConverter Types;
-
   /// VarLocs - This is the address for the box in which an emitted
   /// variable is stored.
   /// Entries in this map are generated when a PatternBindingDecl is emitted
@@ -57,7 +77,7 @@ public:
   bool hasVoidReturn;
 
 public:
-  SILGenFunction(Function &F, FuncExpr *FE);
+  SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE);
   ~SILGenFunction();
 
   void emitProlog(FuncExpr *FE);
@@ -69,6 +89,8 @@ public:
   
   Function &getFunction() { return F; }
   SILBuilder &getBuilder() { return B; }
+    
+  TypeInfo const &getTypeInfo(Type t) { return SGM.Types.getTypeInfo(t); }
   
   //===--------------------------------------------------------------------===//
   // Control flow
