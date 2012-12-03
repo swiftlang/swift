@@ -48,45 +48,68 @@ namespace {
 #include "clang/AST/TypeNodes.def"
 
     Type VisitBuiltinType(const clang::BuiltinType *type) {
-      auto &clangContext = Impl.getClangASTContext();
-
       switch (type->getKind()) {
       case clang::BuiltinType::Void:
-        return TupleType::getEmpty(Impl.SwiftContext);
+        return Impl.getNamedSwiftType("CVoid");
 
       case clang::BuiltinType::Bool:
-        return Impl.getNamedSwiftType("Bool");
+        return Impl.getNamedSwiftType("CBool");
 
       case clang::BuiltinType::Char_U:
-      case clang::BuiltinType::UChar:
-      case clang::BuiltinType::UShort:
-      case clang::BuiltinType::UInt:
-      case clang::BuiltinType::ULong:
-      case clang::BuiltinType::ULongLong:
-      case clang::BuiltinType::UInt128: 
-      case clang::BuiltinType::Char16: // FIXME: Do we want a UTF-16 char type?
-        return Impl.getNamedSwiftType(
-                 "UInt" + llvm::utostr(clangContext.getTypeSize(type)));
-
       case clang::BuiltinType::Char_S:
-      case clang::BuiltinType::SChar:
-      case clang::BuiltinType::Short:
-      case clang::BuiltinType::Int:
-      case clang::BuiltinType::Long:
-      case clang::BuiltinType::LongLong:
-      case clang::BuiltinType::Int128:
-        return Impl.getNamedSwiftType(
-                 "Int" + llvm::utostr(clangContext.getTypeSize(type)));
+        return Impl.getNamedSwiftType("CChar");
 
-      case clang::BuiltinType::Float:
-        return Impl.getNamedSwiftType("Float");
+      case clang::BuiltinType::UChar:
+        return Impl.getNamedSwiftType("CUnsignedChar");
 
-      case clang::BuiltinType::Double:
-        return Impl.getNamedSwiftType("Double");
+      case clang::BuiltinType::UShort:
+        return Impl.getNamedSwiftType("CUnsignedShort");
+
+      case clang::BuiltinType::UInt:
+        return Impl.getNamedSwiftType("CUnsignedInt");
+
+      case clang::BuiltinType::ULong:
+        return Impl.getNamedSwiftType("CUnsignedLong");
+
+      case clang::BuiltinType::ULongLong:
+        return Impl.getNamedSwiftType("CUnsignedLongLong");
+
+      case clang::BuiltinType::UInt128:
+        return Impl.getNamedSwiftType("CUnsignedInt128");
+
+      case clang::BuiltinType::WChar_S:
+      case clang::BuiltinType::WChar_U:
+        return Impl.getNamedSwiftType("CWideChar");
+
+      case clang::BuiltinType::Char16:
+        return Impl.getNamedSwiftType("CChar16");
 
       case clang::BuiltinType::Char32:
-        // FIXME: This mapping works, but is it the right approach?
-        return Impl.getNamedSwiftType("Char");
+        return Impl.getNamedSwiftType("CChar32");
+
+      case clang::BuiltinType::SChar:
+        return Impl.getNamedSwiftType("CSignedChar");
+
+      case clang::BuiltinType::Short:
+        return Impl.getNamedSwiftType("CShort");
+
+      case clang::BuiltinType::Int:
+        return Impl.getNamedSwiftType("CInt");
+
+      case clang::BuiltinType::Long:
+        return Impl.getNamedSwiftType("CLong");
+
+      case clang::BuiltinType::LongLong:
+        return Impl.getNamedSwiftType("CLongLong");
+
+      case clang::BuiltinType::Int128:
+        return Impl.getNamedSwiftType("CInt128");
+
+      case clang::BuiltinType::Float:
+        return Impl.getNamedSwiftType("CFloat");
+
+      case clang::BuiltinType::Double:
+        return Impl.getNamedSwiftType("CDouble");
 
       // Types that cannot be mapped into Swift, and probably won't ever be.
       case clang::BuiltinType::Dependent:
@@ -102,8 +125,6 @@ namespace {
       case clang::BuiltinType::Half:
       case clang::BuiltinType::LongDouble:
       case clang::BuiltinType::NullPtr:
-      case clang::BuiltinType::WChar_S:
-      case clang::BuiltinType::WChar_U:
         return Type();
 
       // FIXME: Objective-C types that need a mapping, but I haven't figured
