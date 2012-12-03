@@ -333,9 +333,9 @@ void SILModule::dump() const {
 
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(llvm::raw_ostream &OS) const {
-  for (ValueDecl *vd : functionDecls) {
-    OS << "func_decl " << vd->getName() << '\n';
-    functions.find(vd)->second->print(OS);
+  for (std::pair<ValueDecl*, Function*> vf : *this) {
+    OS << "func_decl " << vf.first->getName() << '\n';
+    vf.second->print(OS);
     OS << "\n";
   }
 }

@@ -19,7 +19,7 @@
 
 #include "swift/SIL/SILBase.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/MapVector.h"
 
 namespace swift {
   class TranslationUnit;
@@ -44,9 +44,7 @@ private:
   ASTContext &Context;
 
   /// The collection of all Functions in the module.
-  llvm::DenseMap<ValueDecl*, Function*> functions;
-  /// FIXME a hack so that SILModule::print dumps functions in source order
-  std::vector<ValueDecl*> functionDecls;
+  llvm::MapVector<ValueDecl*, Function*> functions;
 
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
@@ -60,13 +58,23 @@ public:
 
   ASTContext &getContext() const { return Context; }
   
-  llvm::ArrayRef<ValueDecl*> getFunctionDecls() const {
-    return functionDecls;
+  /// Returns true if a Function was generated from the given declaration.
+  bool hasFunction(ValueDecl *decl) const {
+    return functions.find(decl) != functions.end();
   }
   
-  llvm::DenseMap<ValueDecl*, Function*> const &getFunctions() const {
-    return functions;
+  /// Returns a pointer to the Function generated from the given declaration.
+  Function *getFunction(ValueDecl *decl) const {
+    auto found = functions.find(decl);
+    assert(found != functions.end() && "no Function generated for Decl");
+    return found->second;
   }
+  
+  typedef llvm::MapVector<ValueDecl*, Function*>::const_iterator iterator;
+  typedef iterator const_iterator;
+  
+  iterator begin() const { return functions.begin(); }
+  iterator end() const { return functions.end(); }
 
   /// verify - Run the SIL verifier to make sure that all Functions follow
   /// invariants.

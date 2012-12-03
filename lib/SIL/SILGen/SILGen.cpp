@@ -82,7 +82,6 @@ void SILGenModule::visitFuncDecl(FuncDecl *FD) {
   
   C->verify();
   M.functions[FD] = C;
-  M.functionDecls.push_back(FD);
 }
 
 //===--------------------------------------------------------------------===//
