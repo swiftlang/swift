@@ -343,7 +343,7 @@ ERROR(untyped_pattern_ellipsis,pattern_parsing,none,
 ERROR(expected_stmt,stmt_parsing,none,
       "expected statement", ())
 ERROR(illegal_top_level_stmt,stmt_parsing,none,
-      "statments are not allowed at the top level", ())
+      "statements are not allowed at the top level", ())
 ERROR(illegal_top_level_expr,stmt_parsing,none,
       "expressions are not allowed at the top level", ())
 
