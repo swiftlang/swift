@@ -186,10 +186,13 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       skipUntilDeclStmtRBrace();
 
     if (TLCD && !IsMainModule && !NeedParseErrorRecovery) {
-      if (TLCD->getBody().is<Stmt*>()) {
+      if (Stmt *s = TLCD->getBody().dyn_cast<Stmt*>()) {
         // Statements are not allowed at the top level outside the main module.
-        SourceLoc Loc = TLCD->getBody().get<Stmt*>()->getStartLoc();
-        diagnose(Loc, diag::illegal_top_level_stmt);
+        // Empty ';' statements are allowed.
+        if (!isa<SemiStmt>(s)) {
+          SourceLoc Loc = s->getStartLoc();
+          diagnose(Loc, diag::illegal_top_level_stmt);
+        }
       } else {
         // Expressions are not allowed at the top level outside the main module.
         SourceLoc Loc = TLCD->getBody().get<Expr*>()->getStartLoc();
