@@ -26,6 +26,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/Version.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/PathV2.h"
