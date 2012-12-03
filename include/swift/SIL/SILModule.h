@@ -30,10 +30,10 @@ namespace swift {
     class SILGenModule;
   }
 
+/// SILModule - A SIL translation unit. The module object owns all of the SIL
+/// Function and other top-level objects generated when a translation unit is
+/// lowered to SIL.
 class SILModule : public SILBase {
-public:
-  typedef llvm::iplist<BasicBlock> BlockListType;
-
 private:
   friend class BasicBlock;
   friend class Function;

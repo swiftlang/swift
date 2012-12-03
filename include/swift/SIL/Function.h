@@ -31,6 +31,9 @@ namespace Lowering {
   class SILGenModule;
 }
 
+/// Function - A function body that has been lowered to SIL. This consists of
+/// zero or more SIL BasicBlock objects that contain the Instruction objects
+/// making up the function.
 class Function : public SILAllocated<Function> {
 public:
   typedef llvm::iplist<BasicBlock> BlockListType;

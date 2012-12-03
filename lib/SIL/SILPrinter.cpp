@@ -309,7 +309,7 @@ void BasicBlock::dump() const {
   print(llvm::errs());
 }
 
-/// Pretty-print the BasicBlock with the designated stream.
+/// Pretty-print the BasicBlock to the designated stream.
 void BasicBlock::print(raw_ostream &OS) const {
   SILPrinter(OS).print(this);
 }
@@ -319,7 +319,7 @@ void Function::dump() const {
   print(llvm::errs());
 }
 
-/// Pretty-print the Function with the designated stream.
+/// Pretty-print the Function to the designated stream.
 void Function::print(llvm::raw_ostream &OS) const {
   SILPrinter Printer(OS);
   for (const BasicBlock &B : *this)
@@ -331,7 +331,7 @@ void SILModule::dump() const {
   print(llvm::errs());
 }
 
-/// Pretty-print the Function with the designated stream.
+/// Pretty-print the SILModule to the designated stream.
 void SILModule::print(llvm::raw_ostream &OS) const {
   for (ValueDecl *vd : functionDecls) {
     OS << "func_decl " << vd->getName() << '\n';
