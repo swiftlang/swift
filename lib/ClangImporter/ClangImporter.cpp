@@ -99,8 +99,14 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
     "swift.m"
   };
 
-  // If there is a module cache path, pass it along.
-  if (!moduleCachePath.empty()) {
+  // Set the module cache path.
+  if (moduleCachePath.empty()) {
+    llvm::SmallString<128> DefaultModuleCache;
+    llvm::sys::path::system_temp_directory(/*erasedOnReboot=*/false,
+                                           DefaultModuleCache);
+    invocationArgStrs.push_back("-fmodule-cache-path");
+    invocationArgStrs.push_back(DefaultModuleCache.str());
+  } else {
     invocationArgStrs.push_back("-fmodule-cache-path");
     invocationArgStrs.push_back(moduleCachePath.str());
   }
