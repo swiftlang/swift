@@ -131,7 +131,7 @@ namespace {
       // out yet.
       case clang::BuiltinType::ObjCClass:
       case clang::BuiltinType::ObjCId:
-      case clang::BuiltinType::ObjCSel: // FIXME: Questionable.
+      case clang::BuiltinType::ObjCSel:
         return Type();
       }
     }
@@ -143,7 +143,8 @@ namespace {
 
     Type VisitPointerType(const clang::PointerType *type) {
       // FIXME: Function pointer types can be mapped to Swift function types
-      // once we have the notion of a function that does not capture anything.
+      // once we have the notion of a "thin" function that does not capture
+      // anything.
       if (type->getPointeeType()->isFunctionType())
         return Type();
 
@@ -154,8 +155,11 @@ namespace {
         return Impl.getNamedSwiftType("CString");
       }
                                                 
-      // All other C pointers come across as raw pointers.
-      return Impl.SwiftContext.TheRawPointerType;
+      // All other C pointers map to CPointer<T>.
+      auto pointeeType = Impl.importType(type->getPointeeType());
+      if (!pointeeType)
+        return Type();
+      return Impl.getNamedSwiftTypeSpecialization("CPointer", pointeeType);
     }
 
     Type VisitBlockPointerType(const clang::BlockPointerType *type) {
@@ -467,6 +471,39 @@ Type ClangImporter::Implementation::getNamedSwiftType(StringRef name) {
   UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), swiftModule);
   if (auto type = lookup.getSingleTypeResult()) {
     return type->getDeclaredType();
+  }
+
+  return Type();
+}
+
+Type
+ClangImporter::Implementation::
+getNamedSwiftTypeSpecialization(StringRef name, ArrayRef<Type> args) {
+  if (!swiftModule) {
+    for (auto module : SwiftContext.LoadedModules) {
+      if (module.second->Name.str() == "swift") {
+        swiftModule = module.second;
+        break;
+      }
+    }
+
+    // The 'swift' module hasn't been loaded. There's nothing we can do.
+    if (!swiftModule)
+      return Type();
+  }
+
+  UnqualifiedLookup genericSliceLookup(SwiftContext.getIdentifier("CPointer"),
+                                       swiftModule);
+  if (TypeDecl *typeDecl = genericSliceLookup.getSingleTypeResult()) {
+    if (auto nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
+      if (auto params = nominalDecl->getGenericParams()) {
+        if (params->size() == args.size()) {
+          Type implTy = BoundGenericType::get(nominalDecl, Type(), args);
+          // FIXME: How do we ensure that this type gets validated?
+          return implTy;
+        }
+      }
+    }
   }
 
   return Type();

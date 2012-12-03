@@ -160,6 +160,16 @@ public:
   /// \returns The named type, or null if the type could not be found.
   Type getNamedSwiftType(StringRef name);
 
+  /// \brief Retrieve a specialization of the the named Swift type, e.g.,
+  /// CPointer<T>.
+  ///
+  /// \param name The name of the generic type to look up.
+  ///
+  /// \param args The arguments to use in the specialization.
+  ///
+  /// \returns The named type, or null if the type could not be found.
+  Type getNamedSwiftTypeSpecialization(StringRef name, ArrayRef<Type> args);
+
   /// \brief Retrieve the NSObject type.
   Type getNSObjectType();
 

@@ -9,3 +9,9 @@ void exit(int);
 double pow(double, double);
 
 int puts(const char *);
+
+typedef struct {
+  int inode;
+} FILE;
+
+FILE *fopen(const char *, const char *);

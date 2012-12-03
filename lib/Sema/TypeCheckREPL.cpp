@@ -70,7 +70,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
     ArgRef = TC.convertToRValue(ArgRef);
     for (unsigned i : MemberIndexes) {
       // For each index, we look through a TupleType or StructType.
-      CanType CurT = ArgRef->getType()->getCanonicalType();
+      CanType CurT = ArgRef->getType()->getRValueType()->getCanonicalType();
       if (StructType *ST = dyn_cast<StructType>(CurT)) {
         VarDecl *VD = cast<VarDecl>(ST->getDecl()->getMembers()[i]);
         ArgRef = new (Context) MemberRefExpr(ArgRef, Loc, VD, Loc);
