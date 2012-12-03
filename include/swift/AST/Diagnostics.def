@@ -357,11 +357,11 @@ ERROR(expected_rbrace_in_brace_stmt,stmt_parsing,none,
 
 // Return Statement
 ERROR(expected_expr_return,stmt_parsing,none,
-      "expected expresssion in 'return' statement", ())
+      "expected expression in 'return' statement", ())
 
 // If Statement
 ERROR(expected_expr_if,stmt_parsing,none,
-      "expected expresssion in 'if' condition", ())
+      "expected expression in 'if' condition", ())
 ERROR(expected_lbrace_after_if,stmt_parsing,none,
       "expected '{' after 'if' condition", ())
 ERROR(expected_lbrace_after_else,stmt_parsing,none,
@@ -369,7 +369,7 @@ ERROR(expected_lbrace_after_else,stmt_parsing,none,
 
 // While Statement
 ERROR(expected_expr_while,stmt_parsing,none,
-      "expected expresssion in 'while' condition", ())
+      "expected expression in 'while' condition", ())
 ERROR(expected_lbrace_after_while,stmt_parsing,none,
       "expected '{' after 'while' condition", ())
 
@@ -379,7 +379,7 @@ ERROR(expected_lbrace_after_do,stmt_parsing,none,
 ERROR(expected_while_in_dowhile,stmt_parsing,none,
       "expected 'while' in 'do-while' loop", ())
 ERROR(expected_expr_do_while,stmt_parsing,none,
-      "expected expresssion in 'do-while' condition", ())
+      "expected expression in 'do-while' condition", ())
 
 // C-Style For Stmt
 ERROR(expected_lparen_for_stmt,stmt_parsing,none,
