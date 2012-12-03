@@ -338,4 +338,10 @@ void SILModule::print(llvm::raw_ostream &OS) const {
     vf.second->print(OS);
     OS << "\n";
   }
+  
+  if (toplevel) {
+    OS << "toplevel\n";
+    toplevel->print(OS);
+    OS << "\n";
+  }
 }

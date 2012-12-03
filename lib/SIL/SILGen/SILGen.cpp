@@ -29,10 +29,16 @@ static bool isVoidableType(Type type) {
     return false;
 }
 
-SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE)
+SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F,
+                               bool hasVoidReturn)
   : SGM(SGM), F(F), B(new (F.getModule()) BasicBlock(&F), F),
     Cleanups(*this),
-    hasVoidReturn(isVoidableType(FE->getResultType(F.getContext()))) {
+    hasVoidReturn(hasVoidReturn) {
+}
+
+SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE)
+  : SILGenFunction(SGM, F,
+          /*hasVoidReturn=*/isVoidableType(FE->getResultType(F.getContext()))) {
 
   emitProlog(FE);
 }
@@ -65,7 +71,22 @@ SILGenFunction::~SILGenFunction() {
 //===--------------------------------------------------------------------===//
 
 SILGenModule::SILGenModule(SILModule &M)
-  : M(M), Types(*this) {
+  : M(M), Types(*this), ToplevelSGF(nullptr) {
+}
+
+SILGenModule::~SILGenModule() {
+  delete ToplevelSGF;
+}
+
+SILGenFunction &SILGenModule::getToplevelSGF() {
+  if (!ToplevelSGF) {
+    assert(M.toplevel == nullptr && "module toplevel created before SGF!");
+    M.toplevel = new (M) Function(M);
+    ToplevelSGF = new SILGenFunction(*this, *M.toplevel,
+                                     /*hasVoidReturn=*/true);
+  }
+  assert(M.toplevel && "no module toplevel!");
+  return *ToplevelSGF;
 }
 
 void SILGenModule::visitFuncDecl(FuncDecl *FD) {

@@ -73,7 +73,9 @@ ManagedValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E) {
   // FIXME: properties
   
   // If this is a reference to a mutable local decl, produce an lvalue.
-  if (E->getType()->is<LValueType>() && VarLocs.count(E->getDecl()) > 0) {
+  if (E->getType()->is<LValueType>() &&
+      E->getDecl()->getDeclContext()->isLocalContext()) {
+    assert(VarLocs.count(E->getDecl()) && "no location for local var decl!");
     return ManagedValue(VarLocs[E->getDecl()]);
   }
   

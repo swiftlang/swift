@@ -45,10 +45,13 @@ private:
 
   /// The collection of all Functions in the module.
   llvm::MapVector<ValueDecl*, Function*> functions;
+  
+  /// The top-level Function for the module.
+  Function *toplevel;
 
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(ASTContext &Context) : Context(Context) {}
+  SILModule(ASTContext &Context) : Context(Context), toplevel(nullptr) {}
 public:
   ~SILModule();
 
@@ -57,6 +60,17 @@ public:
   static SILModule *constructSIL(TranslationUnit *tu);
 
   ASTContext &getContext() const { return Context; }
+  
+  /// Returns true if this module has top-level code.
+  bool hasToplevelFunction() const {
+    return toplevel != nullptr;
+  }
+  
+  /// Returns the Function containing top-level code for the module.
+  Function *getToplevelFunction() const {
+    assert(toplevel && "no toplevel");
+    return toplevel;
+  }
   
   /// Returns true if a Function was generated from the given declaration.
   bool hasFunction(ValueDecl *decl) const {

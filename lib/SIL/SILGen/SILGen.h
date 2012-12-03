@@ -29,6 +29,7 @@ namespace Lowering {
   class Condition;
   class ManagedValue;
   class TypeConverter;
+  class SILGenFunction;
 
 class LLVM_LIBRARY_VISIBILITY SILGenModule : public ASTVisitor<SILGenModule> {
 public:
@@ -38,15 +39,28 @@ public:
   /// Types - This creates and manages TypeInfo objects containing extra
   /// information about types needed for SIL generation.
   TypeConverter Types;
+  
+  /// ToplevelSGF - The SILGenFunction used to visit top-level code. This is
+  /// allocated on demand when top-level code is encountered.
+  SILGenFunction *ToplevelSGF;
+  
+  /// getToplevelSGF() - Returns a reference to the SILGenFunction for top-level
+  /// code, creating it if necessary.
+  SILGenFunction &getToplevelSGF();
 
 public:
   SILGenModule(SILModule &M);
+  ~SILGenModule();
+  
+  SILGenModule(SILGenModule const &) = delete;
+  void operator=(SILGenModule const &) = delete;
 
   //===--------------------------------------------------------------------===//
   // Visitors for top-level forms
   //===--------------------------------------------------------------------===//
-  // FIXME: visit more than just top-level func declarations
+  // FIXME: visitVarDecl, visit types, etc.
   void visitFuncDecl(FuncDecl *fd);
+  void visitTopLevelCodeDecl(TopLevelCodeDecl *td);
 };
   
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
@@ -77,6 +91,7 @@ public:
   bool hasVoidReturn;
 
 public:
+  SILGenFunction(SILGenModule &SGM, Function &F, bool hasVoidReturn);
   SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE);
   ~SILGenFunction();
 

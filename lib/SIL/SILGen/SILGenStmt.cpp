@@ -18,6 +18,10 @@
 using namespace swift;
 using namespace Lowering;
 
+//===--------------------------------------------------------------------===//
+// SILGenFunction visit*Stmt implementation
+//===--------------------------------------------------------------------===//
+
 /// emitOrDeleteBlock - If there are branches to the specified basic block,
 /// emit it per emitBlock.  If there aren't, then just delete the block - it
 /// turns out to have not been needed.
@@ -338,4 +342,26 @@ void SILGenFunction::visitBreakStmt(BreakStmt *S) {
 
 void SILGenFunction::visitContinueStmt(ContinueStmt *S) {
   Cleanups.emitBranchAndCleanups(ContinueDestStack.back());
+}
+
+//===--------------------------------------------------------------------===//
+// SILGenModule visitTopLevelCodeDecl implementation
+//===--------------------------------------------------------------------===//
+
+void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
+  // Emit top-level statements and expressions into the toplevel function until we
+  // hit an unreachable point.
+  auto &SGF = getToplevelSGF();
+  if (!SGF.B.hasValidInsertionPoint())
+    return;
+  
+  auto body = td->getBody();
+  if (Expr *e = body.dyn_cast<Expr*>()) {
+    FullExpr scope(SGF.Cleanups);
+    SGF.visit(e);
+  } else if (Stmt *s = body.dyn_cast<Stmt*>()) {
+    SGF.visit(s);
+  } else {
+    llvm_unreachable("unexpected toplevel decl");
+  }
 }
