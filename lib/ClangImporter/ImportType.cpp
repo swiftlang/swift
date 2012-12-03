@@ -181,8 +181,9 @@ namespace {
     }
 
     Type VisitArrayType(const clang::ArrayType *type) {
-      // FIXME: Mapping down to a raw pointer type is probably excessive.
-      return Impl.SwiftContext.TheRawPointerType;
+      // FIXME: Array types will need to be mapped differently depending on
+      // context.
+      return Type();
     }
 
     Type VisitVectorType(const clang::VectorType *type) {
