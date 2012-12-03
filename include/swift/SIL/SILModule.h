@@ -18,8 +18,8 @@
 #define SWIFT_SIL_SILMODULE_H
 
 #include "swift/SIL/SILBase.h"
-#include <llvm/ADT/ArrayRef.h>
-#include <llvm/ADT/DenseMap.h>
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
   class TranslationUnit;

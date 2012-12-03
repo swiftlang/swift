@@ -13,10 +13,9 @@
 #ifndef SILGen_TypeInfo_h
 #define SILGen_TypeInfo_h
 
-#include <llvm/ADT/DenseMap.h>
-#include <llvm/ADT/SmallVector.h>
-#include <llvm/ADT/ArrayRef.h>
-#include <initializer_list>
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "swift/AST/Types.h"
 
 namespace swift {

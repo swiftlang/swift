@@ -16,8 +16,8 @@
 
 #include "Alloc.h"
 #include "Metadata.h"
-#include <llvm/Support/Compiler.h>
-#include <llvm/Support/MathExtras.h>
+#include "llvm/Support/Compiler.h"
+#include "llvm/Support/MathExtras.h"
 // We'll include this and do per-thread clean up once we actually have threads
 //#include <System/pthread_machdep.h>
 #include <cstdlib>

@@ -16,7 +16,7 @@
 
 #include "Parser.h"
 #include "swift/AST/ExprHandle.h"
-#include <llvm/ADT/StringMap.h>
+#include "llvm/ADT/StringMap.h"
 
 using namespace swift;
 
