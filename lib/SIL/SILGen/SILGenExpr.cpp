@@ -81,9 +81,7 @@ ManagedValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E) {
          "no location for local var decl!");
   
   // Otherwise, use a ConstantRefInst.
-  // FIXME: There should be a SILGenModule over us that manages global variables
-  // on our behalf. We should assert that an lvalue VarDecl is actually a valid
-  // global reference.
+  // FIXME: globals should be implemented in a way similar to properties
   // FIXME: local func decls need to create and evaluate to a closure
   // FIXME: other kinds of local decl?
   Value v = B.createConstantRef(E);

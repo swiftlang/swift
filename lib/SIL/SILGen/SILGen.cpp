@@ -116,17 +116,15 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 
 
 SILModule *SILModule::constructSIL(TranslationUnit *tu) {
-  bool hasTopLevel;
+  bool hasTopLevel = true;
   switch (tu->Kind) {
-    case TranslationUnit::Library:
-      hasTopLevel = false;
-      break;
-    case TranslationUnit::Main:
-    case TranslationUnit::Repl:
-      hasTopLevel = true;
-      break;
-    default:
-      llvm_unreachable("unsupported translation unit kind");
+  case TranslationUnit::Library:
+    hasTopLevel = false;
+    break;
+  case TranslationUnit::Main:
+  case TranslationUnit::Repl:
+    hasTopLevel = true;
+    break;
   }
   SILModule *m = new SILModule(tu->getASTContext(), hasTopLevel);
   SILGenModule sgm(*m);
