@@ -32,5 +32,6 @@ ATTR(auto_closure)
 ATTR(asmname)
 ATTR(postfix)
 ATTR(objc)
+ATTR(allocating)
 
 #undef ATTR

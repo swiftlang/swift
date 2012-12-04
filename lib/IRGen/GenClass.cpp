@@ -266,27 +266,36 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   // Emit the "this" variable
   Initialization I;
   I.registerObject(IGF, I.getObjectForDecl(thisDecl),
-                   thisDecl->hasFixedLifetime() ? NotOnHeap : OnHeap, classTI);
+                   thisDecl->hasFixedLifetime() ? NotOnHeap : OnHeap,
+                   classTI);
   Address addr = I.emitVariable(IGF, thisDecl, classTI);
 
-  FullExpr scope(IGF);
-  // Allocate the class.
-  // FIXME: Long-term, we clearly need a specialized runtime entry point.
+  if (!CD->getAttrs().isAllocatingConstructor()) {
+    FullExpr scope(IGF);
+    // Allocate the class.
+    // FIXME: Long-term, we clearly need a specialized runtime entry point.
 
-  llvm::Value *metadata = emitNominalMetadataRef(IGF, curClass, thisType);
+    llvm::Value *metadata = emitNominalMetadataRef(IGF, curClass, thisType);
 
-  llvm::Value *size = layout.emitSize(IGF);
-  llvm::Value *align = layout.emitAlign(IGF);
-  llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, align,
-                                             "reference.new");
-  llvm::Type *destType = layout.getType()->getPointerTo();
-  llvm::Value *castVal = IGF.Builder.CreateBitCast(val, destType);
-  IGF.Builder.CreateStore(castVal, addr);
+    llvm::Value *size = layout.emitSize(IGF);
+    llvm::Value *align = layout.emitAlign(IGF);
+    llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, align,
+                                               "reference.new");
+    llvm::Type *destType = layout.getType()->getPointerTo();
+    llvm::Value *castVal = IGF.Builder.CreateBitCast(val, destType);
+    IGF.Builder.CreateStore(castVal, addr);
 
-  scope.pop();
+    scope.pop();
 
-  I.markInitialized(IGF, I.getObjectForDecl(thisDecl));
-
+    I.markInitialized(IGF, I.getObjectForDecl(thisDecl));
+  } else {
+    // FIXME: Sema or SIL should identify where 'this' gets assigned, so we
+    // can do the initialization at that point, rather than zero'ing now
+    // and assigning later.
+    auto ptrType = layout.getType()->getPointerTo();
+    IGF.Builder.CreateStore(llvm::ConstantPointerNull::get(ptrType), addr);
+  }
+  
   IGF.emitConstructorBody(CD);
 }
 

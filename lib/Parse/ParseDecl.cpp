@@ -260,13 +260,21 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;    
   }
 
-  /// FIXME: This is a temporary hack until we can import ObjC modules.
   case AttrName::objc: {
     if (Attributes.isObjC())
       diagnose(Tok, diag::duplicate_attribute, Tok.getText());
 
     consumeToken(tok::identifier);
     Attributes.ObjC = true;
+    return false;
+  }
+
+  case AttrName::allocating: {
+    if (Attributes.isAllocatingConstructor())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+
+    consumeToken(tok::identifier);
+    Attributes.AllocatingConstructor = true;
     return false;
   }
 

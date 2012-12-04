@@ -643,6 +643,7 @@ namespace {
                                                             thisDecl,
                                                             /*GenericParams=*/0,
                                                             dc);
+      result->getMutableAttrs().AllocatingConstructor = true;
       result->setType(type);
       thisDecl->setDeclContext(result);
       setVarDeclContexts(argPatterns, result);
