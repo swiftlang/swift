@@ -96,7 +96,38 @@ Finally, because a lot of disables exceptions, many libraries actively avoid
 designing them into their APIs.   The STL in particular has very few APIs that
 throw exceptions on error cases, and those APIs have non-throwing counterparts.
 
+Error Handling Goals
+--------------------
+
+The design of an error handling system has conflicting goals based on the
+audience: some programmers don't want to think about error handling logic at
+all - yielding a more "scripting language" sort of experience, while some people
+want to control every error case and be forced to think about error handling in
+depth - yielding a more "disciplined" experience.  Neither of these is "wrong"
+or better than the other, they serve different needs and Swift should support
+both use cases.
+
+While level of strictness is negotiable and Swift should support multiple
+approaches, the error handling behavior of stable *API* is something that must
+be considered as strongly as the arguments and return value of the function.  We
+consider it a breaking change (and therefore, unacceptable) for API that was
+previously guaranteed to never return an error to start returning error codes.
+
+It's worth noting that (other than its syntax) Objective-C achieves these goals
+with NSError.  NSError "results" are explicitly part of the signature of a
+method, and one cannot be added or removed without changing the selector (a
+breaking change).  Clients who don't care about error handling can (and often
+do) completely ignore the NSError result of a method call.
+ 
+
 Swift Error Handling Model
 --------------------------
 
 TODO
+
+
+strict mode, vs sloppy mode.
+
+API means something is strict.
+
+
