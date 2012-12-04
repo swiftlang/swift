@@ -413,9 +413,11 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     break;
   }
 
-  // In containers, statements are not allowed, so a trailing semicolon can't
-  // be parsed as a SemiStmt. Just consume it here.
-  if ((Flags & PD_HasContainerType) && Tok.is(tok::semi)) {
+  // In containers, statements are not allowed, and at top level in a library
+  // module, a statement will raise an error, so in these cases, a trailing
+  // semicolon can't be parsed as a SemiStmt. Just consume it here.
+  if ((Flags & (PD_HasContainerType | PD_AllowTopLevel)) &&
+      Tok.is(tok::semi)) {
     consumeToken(tok::semi);
     // FIXME: Should we preserve the location of the semicolon for
     // diagnostic/rewriting purposes?
