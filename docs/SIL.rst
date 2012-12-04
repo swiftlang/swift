@@ -585,24 +585,24 @@ limited to conversions that will not affect how the value will codegen, such as:
 * function-to-equivalent-function conversion
 * reference-type-to-``Box`` conversion
 
-Existential types
-~~~~~~~~~~~~~~~~~
+Protocol types
+~~~~~~~~~~~~~~
 
-alloc_existential
-`````````````````
+alloc_protocol
+``````````````
 ::
 
-  %1 = alloc_existential $T, %0
-  ; %0 must be of a $SIL.Address<P> type for existential type P
+  %1 = alloc_protocol $T, %0
+  ; %0 must be of a $SIL.Address<P> type for protocol type P
   ; $T must be a type that fulfills protocol(s) P
   ; %1 will be of type $SIL.Address<T>
 
-Prepares the uninitialized existential pointed to by ``%0`` to contain a value
-of type ``$T``. ``%0`` must point to uninitialized storage for the existential
-type ``$P``. The result of the instruction is the address of the storage
-for the value; this storage is uninitialized and must be initialized
-by a ``store`` or ``copy_addr`` to ``%1``. Creating an
-existential from a value type::
+Prepares the uninitialized protocol value pointed to by ``%0`` to
+contain a value of type ``$T``. ``%0`` must point to uninitialized storage
+for the protocol type ``$P``. The result of the instruction is the address
+of the storage for the value; this storage is uninitialized and must be
+initialized by a ``store`` or ``copy_addr`` to ``%1``. Creating a
+protocol type value from a value type::
 
   var e:SomeProtocol = SomeInstance()
 
@@ -610,36 +610,36 @@ would lower to something like this::
 
   %SomeInstance = constant_ref @SomeInstance
   %1 = apply %SomeInstance()
-  %e = alloc_var $SomeProtocol  ; allocate the existential
-  %e_instance = alloc_existential $SomeInstance, %e     ; allocate its value
-  store %1 to %e_instance
+  %e = alloc_var $SomeProtocol                          ; allocate the protocol
+  %e_instance = alloc_protocol $SomeInstance, %e        ; allocate its value
+  store %1 to %e_instance                               ; initialize value
 
-existential_method_ref
-``````````````````````
+protocol_method_ref
+```````````````````
 ::
 
-  %1 = existential_method_ref %0, @method
-  ; %0 must be of a $SIL.Address<P> type for existential type P
+  %1 = protocol_method_ref %0, @method
+  ; %0 must be of a $SIL.Address<P> type for protocol type P
   ; @method must be a reference to a method of (one of the) protocol(s) P
   ; %1 will be of type $(Builtin.RawPointer, T...) -> U
   ;   for method type (T...) -> U
 
-Obtains a reference to the function implementing ``@method`` for the existential
+Obtains a reference to the function implementing ``@method`` for the protocol
 value referenced by ``%0``. The resulting function value will take a pointer
 to the ``this`` value as a ``RawPointer``; this value can be projected from
-the existential with a ``project_existential`` instruction.
+the protocol with a ``project_protocol`` instruction.
 
-project_existential
-```````````````````
+project_protocol
+````````````````
 ::
 
-  %1 = project_existential %0
-  ; %0 must be of a $SIL.Address<P> type for existential type P
+  %1 = project_protocol %0
+  ; %0 must be of a $SIL.Address<P> type for protocol type P
   ; %1 will be of type $Builtin.RawPointer
 
-Obtains a ``RawPointer`` pointing to the value inside the existential value
-referenced by ``%0``. This raw pointer can be passed to existential methods
-obtained by ``existential_method_ref``. A method call on an existential::
+Obtains a ``RawPointer`` pointing to the value inside the protocol value
+referenced by ``%0``. This raw pointer can be passed to protocol methods
+obtained by ``protocol_method_ref``. A method call on a protocol::
 
   protocol Foo {
     func bar(x:Int)
@@ -651,8 +651,8 @@ obtained by ``existential_method_ref``. A method call on an existential::
 would lower to something like this::
 
   ; ... initialize %foo
-  %bar = existential_method_ref %foo, @Foo.bar
-  %foo_p = project_existential %foo
+  %bar = protocol_method_ref %foo, @Foo.bar
+  %foo_p = project_protocol %foo
   %one_two_three = integer_literal $Builtin.Int64, 123
   %_ = apply %bar(%foo_p, %one_two_three)
 
