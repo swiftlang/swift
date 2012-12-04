@@ -144,7 +144,7 @@ public:
   bool Conversion = false;
   bool ObjC = false;
   bool Postfix = false;
-  bool AllocatingConstructor = false;
+  bool AllocatesThis = false;
   
   DeclAttributes() { }
 
@@ -160,12 +160,12 @@ public:
   bool isConversion() const { return Conversion; }
   bool isPostfix() const { return Postfix; }
   bool isObjC() const { return ObjC; }
-  bool isAllocatingConstructor() const { return AllocatingConstructor; }
+  bool isAllocatesThis() const { return AllocatesThis; }
 
   bool empty() const {
     return !isInfix() && !getResilienceData().isValid() && !isByref() &&
            !isAutoClosure() && !isAssignment() && !isConversion() &&
-           !isPostfix() && !isObjC() && !isAllocatingConstructor();
+           !isPostfix() && !isObjC() && !isAllocatesThis();
   }
 };
   

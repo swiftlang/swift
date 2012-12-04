@@ -269,12 +269,12 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;
   }
 
-  case AttrName::allocating: {
-    if (Attributes.isAllocatingConstructor())
+  case AttrName::allocates_this: {
+    if (Attributes.isAllocatesThis())
       diagnose(Tok, diag::duplicate_attribute, Tok.getText());
 
     consumeToken(tok::identifier);
-    Attributes.AllocatingConstructor = true;
+    Attributes.AllocatesThis = true;
     return false;
   }
 

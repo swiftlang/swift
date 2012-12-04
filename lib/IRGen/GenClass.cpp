@@ -270,7 +270,7 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
                    classTI);
   Address addr = I.emitVariable(IGF, thisDecl, classTI);
 
-  if (!CD->getAttrs().isAllocatingConstructor()) {
+  if (!CD->getAttrs().isAllocatesThis()) {
     FullExpr scope(IGF);
     // Allocate the class.
     // FIXME: Long-term, we clearly need a specialized runtime entry point.
