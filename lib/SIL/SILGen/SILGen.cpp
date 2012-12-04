@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "llvm/ADT/Optional.h"
 #include "swift/AST/AST.h"
 using namespace swift;
 using namespace Lowering;
@@ -71,25 +72,20 @@ SILGenFunction::~SILGenFunction() {
 //===--------------------------------------------------------------------===//
 
 SILGenModule::SILGenModule(SILModule &M)
-  : M(M), Types(*this), ToplevelSGF(nullptr) {
+  : M(M), Types(*this), TopLevelSGF(nullptr) {
+  if (M.toplevel)
+    TopLevelSGF = new SILGenFunction(*this, *M.toplevel,
+                                     /*hasVoidReturn=*/true);
 }
 
 SILGenModule::~SILGenModule() {
-  delete ToplevelSGF;
-}
-
-SILGenFunction &SILGenModule::getToplevelSGF() {
-  if (!ToplevelSGF) {
-    assert(M.toplevel == nullptr && "module toplevel created before SGF!");
-    M.toplevel = new (M) Function(M);
-    ToplevelSGF = new SILGenFunction(*this, *M.toplevel,
-                                     /*hasVoidReturn=*/true);
-  }
-  assert(M.toplevel && "no module toplevel!");
-  return *ToplevelSGF;
+  delete TopLevelSGF;
 }
 
 void SILGenModule::visitFuncDecl(FuncDecl *FD) {
+  // FIXME: if this is a toplevel module, the func will need to be generated
+  // like a closure.
+  
   FuncExpr *FE = FD->getBody();
   
   // Ignore function prototypes.
@@ -105,13 +101,34 @@ void SILGenModule::visitFuncDecl(FuncDecl *FD) {
   M.functions[FD] = C;
 }
 
+void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
+  if (TopLevelSGF) {
+    TopLevelSGF->visitPatternBindingDecl(pd);
+  } else {
+    // FIXME: generate accessor functions for global variables in non-top-level
+    // code
+  }
+}
+
 //===--------------------------------------------------------------------===//
 // SILModule::constructSIL method implementation
 //===--------------------------------------------------------------------===//
 
 
 SILModule *SILModule::constructSIL(TranslationUnit *tu) {
-  SILModule *m = new SILModule(tu->getASTContext());
+  bool hasTopLevel;
+  switch (tu->Kind) {
+    case TranslationUnit::Library:
+      hasTopLevel = false;
+      break;
+    case TranslationUnit::Main:
+    case TranslationUnit::Repl:
+      hasTopLevel = true;
+      break;
+    default:
+      llvm_unreachable("unsupported translation unit kind");
+  }
+  SILModule *m = new SILModule(tu->getASTContext(), hasTopLevel);
   SILGenModule sgm(*m);
   for (Decl *D : tu->Decls)
     sgm.visit(D);

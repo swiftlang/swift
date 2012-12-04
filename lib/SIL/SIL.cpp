@@ -17,5 +17,12 @@ using namespace swift;
 Function::~Function() {
 }
 
+SILModule::SILModule(ASTContext &Context, bool hasTopLevel) :
+  Context(Context), toplevel(nullptr) {
+    
+  if (hasTopLevel)
+    toplevel = new (*this) Function(*this);
+}
+
 SILModule::~SILModule() {
 }

@@ -349,18 +349,18 @@ void SILGenFunction::visitContinueStmt(ContinueStmt *S) {
 //===--------------------------------------------------------------------===//
 
 void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
-  // Emit top-level statements and expressions into the toplevel function until we
-  // hit an unreachable point.
-  auto &SGF = getToplevelSGF();
-  if (!SGF.B.hasValidInsertionPoint())
+  // Emit top-level statements and expressions into the toplevel function until
+  // we hit an unreachable point.
+  assert(TopLevelSGF && "top-level code in a non-main module!");
+  if (!TopLevelSGF->B.hasValidInsertionPoint())
     return;
   
   auto body = td->getBody();
   if (Expr *e = body.dyn_cast<Expr*>()) {
-    FullExpr scope(SGF.Cleanups);
-    SGF.visit(e);
+    FullExpr scope(TopLevelSGF->Cleanups);
+    TopLevelSGF->visit(e);
   } else if (Stmt *s = body.dyn_cast<Stmt*>()) {
-    SGF.visit(s);
+    TopLevelSGF->visit(s);
   } else {
     llvm_unreachable("unexpected toplevel decl");
   }

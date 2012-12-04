@@ -40,14 +40,10 @@ public:
   /// information about types needed for SIL generation.
   TypeConverter Types;
   
-  /// ToplevelSGF - The SILGenFunction used to visit top-level code. This is
-  /// allocated on demand when top-level code is encountered.
-  SILGenFunction *ToplevelSGF;
+  /// TopLevelSGF - The SILGenFunction used to visit top-level code, or null if
+  /// the module is not a main module.
+  SILGenFunction *TopLevelSGF;
   
-  /// getToplevelSGF() - Returns a reference to the SILGenFunction for top-level
-  /// code, creating it if necessary.
-  SILGenFunction &getToplevelSGF();
-
 public:
   SILGenModule(SILModule &M);
   ~SILGenModule();
@@ -58,8 +54,9 @@ public:
   //===--------------------------------------------------------------------===//
   // Visitors for top-level forms
   //===--------------------------------------------------------------------===//
-  // FIXME: visitVarDecl, visit types, etc.
+  // FIXME: visit types, etc.
   void visitFuncDecl(FuncDecl *fd);
+  void visitPatternBindingDecl(PatternBindingDecl *vd);
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td);
 };
   

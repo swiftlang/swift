@@ -40,6 +40,7 @@ public:
 
 private:
   friend class BasicBlock;
+  friend class SILModule;
   friend class Lowering::SILGenModule;
 
   /// Module - This is the SIL module that the function belongs to.
