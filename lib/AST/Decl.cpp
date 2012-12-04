@@ -744,6 +744,49 @@ Type ConstructorDecl::getArgumentType() const {
   return ArgTy;
 }
 
+/// Produce the selector for this "Objective-C method" in the given buffer.
+StringRef
+ConstructorDecl::getObjCSelector(llvm::SmallVectorImpl<char> &buffer) const {
+  assert(buffer.empty());
+
+  llvm::raw_svector_ostream out(buffer);
+
+
+  // If it's an empty tuple pattern, it's the nullary selector "init".
+  // FIXME: This leaves us without a way to describe "new".
+  auto tuple = dyn_cast<TuplePattern>(Arguments);
+  if (tuple && tuple->getNumFields() == 0) {
+    out << "init";
+    out.flush();
+    return StringRef(buffer.data(), buffer.size());
+  }
+
+  // If it's not a tuple at all, it's the unary selector "init:".
+  // FIXME: Diagnose this?
+  if (!tuple) {
+    out << "init:";
+    out.flush();
+    return StringRef(buffer.data(), buffer.size());
+  }
+
+  // For every element, add a selector component.
+  for (auto &elt : tuple->getFields()) {
+    auto eltPattern = elt.getPattern()->getSemanticsProvidingPattern();
+
+    // Add a label to the selector component if there's a tag.
+    if (auto named = dyn_cast<NamedPattern>(eltPattern)) {
+      out << named->getBoundName().str();
+    }
+
+    // Add the colon regardless.  Yes, this can sometimes create a
+    // component that's just a colon, and that's actually a legal
+    // selector.
+    out << ':';
+  }
+
+  return StringRef(buffer.data(), buffer.size());
+}
+
 Type
 DestructorDecl::computeThisType(GenericParamList **OuterGenericParams) const {
   Type ContainerType = getDeclContext()->getDeclaredTypeOfContext();

@@ -44,6 +44,7 @@
 
 @interface B()
 - method:(int)i onExtB:(double)d;
++ newWithA:(A*)a;
 @end
 
 @interface NSDate : NSObject

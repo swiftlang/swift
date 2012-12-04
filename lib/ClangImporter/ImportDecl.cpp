@@ -615,7 +615,8 @@ namespace {
                                           objcMethod->isVariadic(),
                                           argPatterns,
                                           bodyPatterns,
-                                          objcMethod->getSelector());
+                                          objcMethod->getSelector(),
+                                          /*isConstructor=*/true);
       assert(type && "Type has already been successfully converted?");
 
       // A constructor returns an object of the type, not 'id'.

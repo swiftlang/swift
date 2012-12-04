@@ -192,6 +192,8 @@ public:
   /// \param argPatterns The externally-visible patterns for the parameters.
   /// \param bodyPatterns The patterns visible inside the function body.
   /// \param selector The Objective-C method selector to use for the names.
+  /// \param isConstructor Whether we're building a function type for a
+  /// constructor.
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
@@ -200,7 +202,8 @@ public:
                           bool isVariadic,
                           SmallVectorImpl<Pattern*> &argPatterns,
                           SmallVectorImpl<Pattern*> &bodyPatterns,
-                          clang::Selector selector = clang::Selector());
+                          clang::Selector selector = clang::Selector(),
+                          bool isConstructor = false);
 };
 
 }

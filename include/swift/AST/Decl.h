@@ -1353,6 +1353,10 @@ public:
   GenericParamList *getGenericParams() const { return GenericParams; }
   bool isGeneric() const { return GenericParams != nullptr; }
 
+  /// Given that this is an Objective-C method declaration, produce
+  /// its selector in the given buffer (as UTF-8).
+  StringRef getObjCSelector(llvm::SmallVectorImpl<char> &buffer) const;
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;
   }

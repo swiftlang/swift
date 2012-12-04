@@ -361,7 +361,8 @@ Type ClangImporter::Implementation::importFunctionType(
        bool isVariadic,
        SmallVectorImpl<Pattern*> &argPatterns,
        SmallVectorImpl<Pattern*> &bodyPatterns,
-       clang::Selector selector) {
+       clang::Selector selector,
+       bool isConstructor) {
   // Cannot import variadic types.
   if (isVariadic)
     return Type();
@@ -403,9 +404,9 @@ Type ClangImporter::Implementation::importFunctionType(
     // Figure out the name for this parameter.
     Identifier bodyName = importName(param->getDeclName());
     Identifier name = bodyName;
-    if (index > 0 && index < selector.getNumArgs()) {
-      // For parameters after the first, the name comes from the selector.
-      // The first parameter is always unnamed.
+    if ((index > 0 || isConstructor) && index < selector.getNumArgs()) {
+      // For parameters after the first, or all parameters in a constructor,
+      // the name comes from the selector.
       name = importName(selector.getIdentifierInfoForSlot(index));
     }
 
