@@ -585,6 +585,77 @@ limited to conversions that will not affect how the value will codegen, such as:
 * function-to-equivalent-function conversion
 * reference-type-to-``Box`` conversion
 
+Existential types
+~~~~~~~~~~~~~~~~~
+
+alloc_existential
+`````````````````
+::
+
+  %1 = alloc_existential $T, %0
+  ; %0 must be of a $SIL.Address<P> type for existential type P
+  ; $T must be a type that fulfills protocol(s) P
+  ; %1 will be of type $SIL.Address<T>
+
+Prepares the uninitialized existential pointed to by ``%0`` to contain a value
+of type ``$T``. ``%0`` must point to uninitialized storage for the existential
+type ``$P``. The result of the instruction is the address of the storage
+for the value; this storage is uninitialized and must be initialized
+by a ``store`` or ``copy_addr`` to ``%1``. Creating an
+existential from a value type::
+
+  var e:SomeProtocol = SomeInstance()
+
+would lower to something like this::
+
+  %SomeInstance = constant_ref @SomeInstance
+  %1 = apply %SomeInstance()
+  %e = alloc_var $SomeProtocol  ; allocate the existential
+  %e_instance = alloc_existential $SomeInstance, %e     ; allocate its value
+  store %1 to %e_instance
+
+existential_method_ref
+``````````````````````
+::
+
+  %1 = existential_method_ref %0, @method
+  ; %0 must be of a $SIL.Address<P> type for existential type P
+  ; @method must be a reference to a method of (one of the) protocol(s) P
+  ; %1 will be of type $(Builtin.RawPointer, T...) -> U
+  ;   for method type (T...) -> U
+
+Obtains a reference to the function implementing ``@method`` for the existential
+value referenced by ``%0``. The resulting function value will take a pointer
+to the ``this`` value as a ``RawPointer``; this value can be projected from
+the existential with a ``project_existential`` instruction.
+
+project_existential
+```````````````````
+::
+
+  %1 = project_existential %0
+  ; %0 must be of a $SIL.Address<P> type for existential type P
+  ; %1 will be of type $Builtin.RawPointer
+
+Obtains a ``RawPointer`` pointing to the value inside the existential value
+referenced by ``%0``. This raw pointer can be passed to existential methods
+obtained by ``existential_method_ref``. A method call on an existential::
+
+  protocol Foo {
+    func bar(x:Int)
+  }
+
+  var foo:Foo
+  foo.bar(123)
+
+would lower to something like this::
+
+  ; ... initialize %foo
+  %bar = existential_method_ref %foo, @Foo.bar
+  %foo_p = project_existential %foo
+  %one_two_three = integer_literal $Builtin.Int64, 123
+  %_ = apply %bar(%foo_p, %one_two_three)
+
 Functions
 ~~~~~~~~~
 
