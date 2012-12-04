@@ -91,14 +91,14 @@ void SILGenModule::visitFuncDecl(FuncDecl *FD) {
   // Ignore function prototypes.
   if (FE->getBody() == nullptr) return;
   
-  assert(M.functions.find(FD) == M.functions.end() &&
+  assert(!M.hasFunction(FD) &&
          "already generated function for decl!");
 
   Function *C = new (M) Function(M);
   SILGenFunction(*this, *C, FE).visit(FE->getBody());
   
   C->verify();
-  M.functions[FD] = C;
+  M.functions[SILDecl(FD, 0)] = C;
 }
 
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {

@@ -20,6 +20,7 @@
 #include "swift/SIL/SILBase.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
   class TranslationUnit;
@@ -29,6 +30,22 @@ namespace swift {
   namespace Lowering {
     class SILGenModule;
   }
+
+/// SILDeclFlags - Flags to differentiate SIL Function origins that cannot be
+/// discriminated by ValueDecl alone. For instance, getters and setters are
+/// associated with the same decl.
+
+/// SILDecl - A reference to the originating declaration for a SIL Function.
+/// This consists of a reference to a ValueDecl along with flags to
+/// indicate what part of the decl the function is generated for.
+typedef llvm::PointerIntPair<ValueDecl*, 2> SILDecl;
+  
+struct SILDeclFlags {
+  enum : unsigned {
+    Get = 1 << 1,
+    Set = 1 << 2
+  };
+};
 
 /// SILModule - A SIL translation unit. The module object owns all of the SIL
 /// Function and other top-level objects generated when a translation unit is
@@ -44,7 +61,7 @@ private:
   ASTContext &Context;
 
   /// The collection of all Functions in the module.
-  llvm::MapVector<ValueDecl*, Function*> functions;
+  llvm::MapVector<SILDecl, Function*> functions;
   
   /// The top-level Function for the module.
   Function *toplevel;
@@ -74,18 +91,28 @@ public:
   }
   
   /// Returns true if a Function was generated from the given declaration.
-  bool hasFunction(ValueDecl *decl) const {
+  bool hasFunction(SILDecl decl) const {
     return functions.find(decl) != functions.end();
   }
   
+  /// Returns true if a Function was generated from the given declaration.
+  bool hasFunction(ValueDecl *decl, unsigned declFlags = 0) const {
+    return hasFunction(SILDecl(decl, declFlags));
+  }
+  
   /// Returns a pointer to the Function generated from the given declaration.
-  Function *getFunction(ValueDecl *decl) const {
+  Function *getFunction(SILDecl decl) const {
     auto found = functions.find(decl);
     assert(found != functions.end() && "no Function generated for Decl");
     return found->second;
   }
+
+  /// Returns a pointer to the Function generated from the given declaration.
+  Function *getFunction(ValueDecl *decl, unsigned declFlags = 0) const {
+    return getFunction(SILDecl(decl, declFlags));
+  }
   
-  typedef llvm::MapVector<ValueDecl*, Function*>::const_iterator iterator;
+  typedef llvm::MapVector<SILDecl, Function*>::const_iterator iterator;
   typedef iterator const_iterator;
   
   iterator begin() const { return functions.begin(); }

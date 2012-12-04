@@ -331,10 +331,23 @@ void SILModule::dump() const {
   print(llvm::errs());
 }
 
+static void printSILDecl(llvm::raw_ostream &OS, SILDecl sd) {
+  OS << sd.getPointer()->getName();
+  // TODO: bikeshed a SIL syntax for referencing get/set in a decl
+  if (sd.getInt() & SILDeclFlags::Get) {
+    OS << "#get";
+  }
+  if (sd.getInt() & SILDeclFlags::Set) {
+    OS << "#set";
+  }
+}
+
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(llvm::raw_ostream &OS) const {
-  for (std::pair<ValueDecl*, Function*> vf : *this) {
-    OS << "func_decl " << vf.first->getName() << '\n';
+  for (std::pair<SILDecl, Function*> vf : *this) {
+    OS << "func_decl ";
+    printSILDecl(OS, vf.first);
+    OS << '\n';
     vf.second->print(OS);
     OS << "\n";
   }
