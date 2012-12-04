@@ -13,13 +13,14 @@ Contents
    4 - Program Structure and Compilation Model
    5 - Memory and Ownership Model
    6 - Memory and Concurrency Model
-   7 - Memory and Error Handling Model
    DesignDecisions
+   Error Handling
    Generics
    Pattern Matching
    Resilience
    LogicalObjects
    Namespace Level Vars and Top Level Code
+   SIL
    TypeState
    TypeChecker
 
