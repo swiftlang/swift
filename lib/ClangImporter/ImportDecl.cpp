@@ -546,6 +546,112 @@ namespace {
       return result;
     }
 
+  private:
+    /// \brief Given an imported method, try to import it as a constructor.
+    ///
+    /// Objective-C methods in the 'init' and 'new' family are imported as
+    /// constructors in Swift, enabling the 'new' syntax, e.g.,
+    ///
+    /// \code
+    /// new NSArray(1024) // same as NSArray.alloc.initWithCapacity:1024
+    /// \endcode
+    ConstructorDecl *importAsConstructor(Decl *decl) {
+      // Only consider Objective-C methods...
+      auto objcMethod
+        = dyn_cast_or_null<clang::ObjCMethodDecl>(decl->getClangDecl());
+      if (!objcMethod)
+        return nullptr;
+
+      // ...in the 'init' or 'new' family...
+      switch (objcMethod->getMethodFamily()) {
+      case clang::OMF_alloc:
+      case clang::OMF_autorelease:
+      case clang::OMF_copy:
+      case clang::OMF_dealloc:
+      case clang::OMF_finalize:
+      case clang::OMF_mutableCopy:
+      case clang::OMF_None:
+      case clang::OMF_performSelector:
+      case clang::OMF_release:
+      case clang::OMF_retain:
+      case clang::OMF_retainCount:
+      case clang::OMF_self:
+        return nullptr;
+
+      case clang::OMF_init:
+      case clang::OMF_new:
+        break;
+      }
+
+      // FIXME: Hack.
+      auto name = Impl.SwiftContext.getIdentifier("constructor");
+      auto dc = decl->getDeclContext();
+
+      // Figure out the type of the container.
+      auto containerTy = dc->getDeclaredTypeOfContext();
+      assert(containerTy && "Method in non-type context?");
+
+      // Add the implicit 'this' parameter patterns.
+      SmallVector<Pattern *, 4> argPatterns;
+      SmallVector<Pattern *, 4> bodyPatterns;
+      auto thisTy = containerTy;
+      auto thisMetaTy = MetaTypeType::get(containerTy, Impl.SwiftContext);
+      auto thisName = Impl.SwiftContext.getIdentifier("this");
+      auto thisVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), thisName,
+                                                     thisMetaTy,
+                                                     Impl.firstClangModule);
+      Pattern *thisPat = new (Impl.SwiftContext) NamedPattern(thisVar);
+      thisPat
+        = new (Impl.SwiftContext) TypedPattern(thisPat,
+                                               TypeLoc::withoutLoc(thisMetaTy));
+      
+      argPatterns.push_back(thisPat);
+      bodyPatterns.push_back(thisPat);
+
+      // Import the type that this method will have.
+      auto type = Impl.importFunctionType(objcMethod->getResultType(),
+                                          { objcMethod->param_begin(),
+                                            objcMethod->param_size() },
+                                          objcMethod->isVariadic(),
+                                          argPatterns,
+                                          bodyPatterns,
+                                          objcMethod->getSelector());
+      assert(type && "Type has already been successfully converted?");
+
+      // A constructor returns an object of the type, not 'id'.
+      // This is effectively implementing related-result-type semantics.
+      // FIXME: Perhaps actually check whether the routine has a related result
+      // type?
+      type = FunctionType::get(type->castTo<FunctionType>()->getInput(),
+                               thisTy, Impl.SwiftContext);
+
+      // Add the 'this' parameter to the function type.
+      type = FunctionType::get(thisMetaTy, type, Impl.SwiftContext);
+
+      // FIXME: Poor location info.
+      auto loc = Impl.importSourceLoc(objcMethod->getLocStart());
+
+      // FIXME: Losing body patterns here.
+      VarDecl *thisDecl
+        = new (Impl.SwiftContext) VarDecl(
+                                    SourceLoc(),
+                                    Impl.SwiftContext.getIdentifier("this"),
+                                    thisTy, dc);
+
+      auto result = new (Impl.SwiftContext) ConstructorDecl(name, loc,
+                                                            argPatterns.front(),
+                                                            thisDecl,
+                                                            /*GenericParams=*/0,
+                                                            dc);
+      result->setType(type);
+      thisDecl->setDeclContext(result);
+      setVarDeclContexts(argPatterns, result);
+      setVarDeclContexts(bodyPatterns, result);
+      return result;
+    }
+
+  public:
+
     Decl *VisitObjCCategoryDecl(clang::ObjCCategoryDecl *decl) {
       // Objective-C categories and extensions map to Swift extensions.
 
@@ -586,11 +692,17 @@ namespace {
         // be found by name lookup. This eliminates the ambiguity between
         // property names and getter names (by choosing to only have a
         // variable).
-        if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd))
+        if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
           if (auto property = objcMethod->findPropertyDecl())
             if (Impl.importDecl(
                   const_cast<clang::ObjCPropertyDecl *>(property)))
               continue;
+
+          // If there is a constructor associated with this member, add it now.
+          if (auto ctor = importAsConstructor(member)) {
+            members.push_back(ctor);
+          }
+        }
 
         members.push_back(member);
       }
@@ -665,11 +777,17 @@ namespace {
         // be found by name lookup. This eliminates the ambiguity between
         // property names and getter names (by choosing to only have a
         // variable).
-        if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd))
+        if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
           if (auto property = objcMethod->findPropertyDecl())
             if (Impl.importDecl(
                   const_cast<clang::ObjCPropertyDecl *>(property)))
               continue;
+
+          // If there is a constructor associated with this member, add it now.
+          if (auto ctor = importAsConstructor(member)) {
+            members.push_back(ctor);
+          }
+        }
 
         members.push_back(member);
       }

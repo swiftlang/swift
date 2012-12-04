@@ -1,6 +1,7 @@
 @interface NSObject
 + alloc;
 - init;
++ new;
 @end
 
 @interface A : NSObject
