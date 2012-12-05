@@ -253,18 +253,13 @@ public:
 /// ConstantRefInst - Represents a reference to a *constant* declaration,
 /// evaluating to its value.
 class ConstantRefInst : public Instruction {
+  ValueDecl *Decl;
 public:
-
   /// Construct a ConstantRefInst.
   ///
-  /// \param Expr A backpointer to the original DeclRefExpr.
-  ///
-  ConstantRefInst(DeclRefExpr *E);
-  
-  /// Construct a ConstantRefInst.
-  ///
+  /// \param Loc  The location of the reference.
   /// \param Decl A backpointer to the original ValueDecl.
-  ConstantRefInst(ValueDecl *VD);
+  ConstantRefInst(SILLocation Loc, ValueDecl *VD);
 
   /// getDecl - Return the underlying declaration.
   ValueDecl *getDecl() const;

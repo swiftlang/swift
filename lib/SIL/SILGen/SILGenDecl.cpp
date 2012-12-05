@@ -67,14 +67,15 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
           break;
         }
         case CaptureKind::Constant: {
-          // Value is a constant, such as a local func.
-          llvm_unreachable("rvalue capture not implemented");
+          // Value is a constant, such as a local func. Pass on the reference.
+          ManagedValue v = emitReferenceToDecl(fd, capture);
+          capturedArgs.push_back(v.forward(*this));
           break;
         }
       }
     }
     
-    Value functionRef = B.createConstantRef(fd);
+    Value functionRef = B.createConstantRef(fd, fd);
     Value closure = B.createClosure(fd, functionRef, capturedArgs);
     Cleanups.pushCleanup<CleanupClosure>(closure);
     LocalConstants[fd] = closure;
@@ -230,13 +231,22 @@ struct ArgumentCreatorVisitor :
     return makeArgument(P->getType(), f.begin());
   }
 };
-  
+
 class CleanupCaptureBox : public Cleanup {
   Value box;
 public:
   CleanupCaptureBox(Value box) : box(box) {}
   void emit(SILGenFunction &gen) override {
     gen.B.createRelease(SILLocation(), box);
+  }
+};
+  
+class CleanupCaptureValue : public Cleanup {
+  Value v;
+public:
+  CleanupCaptureValue(Value v) : v(v) {}
+  void emit(SILGenFunction &gen) override {
+    gen.emitReleaseRValue(SILLocation(), v);
   }
 };
   
@@ -264,8 +274,12 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
     break;
   }
   case CaptureKind::Constant: {
-    // We captured a local func or other non-lvalue local.
-    llvm_unreachable("constant capture not implemented");
+    // Constants are captured by value.
+    Type ty = capture->getType();
+    assert(!ty->is<LValueType>() && "capturing byref by value?!");
+    Value value = new (gen.SGM.M) BBArgument(ty, gen.F.begin());
+    gen.LocalConstants[capture] = value;
+    gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     break;
   }
   }

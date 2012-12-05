@@ -131,12 +131,8 @@ public:
     return insert(ClosureInst::create(Loc, Fn, Args, F));
   }
 
-  ConstantRefInst *createConstantRef(DeclRefExpr *Expr) {
-    return insert(new ConstantRefInst(Expr));
-  }
-
-  ConstantRefInst *createConstantRef(ValueDecl *vd) {
-    return insert(new ConstantRefInst(vd));
+  ConstantRefInst *createConstantRef(SILLocation loc, ValueDecl *vd) {
+    return insert(new ConstantRefInst(loc, vd));
   }
 
   ZeroValueInst *createZeroValue(SILLocation Loc, Type Ty) {

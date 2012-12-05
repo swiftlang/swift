@@ -72,30 +72,35 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   return managedRValueWithCleanup(*this, B.createApply(E, FnV, ArgsV));
 }
 
-ManagedValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E) {
+ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
+                                                 ValueDecl *decl) {
   // FIXME: properties
   
   // If this is a reference to a mutable local decl, produce an address.
-  bool isLValue = E->getType()->is<LValueType>();
-  if (isLValue && VarLocs.count(E->getDecl())) {
-    return ManagedValue(VarLocs[E->getDecl()].address);
+  bool isLValue = decl->getTypeOfReference()->is<LValueType>();
+  if (isLValue && VarLocs.count(decl)) {
+    return ManagedValue(VarLocs[decl].address);
   }
-
-  assert(!(isLValue && E->getDecl()->getDeclContext()->isLocalContext()) &&
+  
+  assert(!(isLValue && decl->getDeclContext()->isLocalContext()) &&
          "no location for local var!");
   
   // If this is a reference to a local constant, grab it.
-  if (LocalConstants.count(E->getDecl())) {
-    Value constant = LocalConstants[E->getDecl()];
-    emitRetainRValue(E, constant);
+  if (LocalConstants.count(decl)) {
+    Value constant = LocalConstants[decl];
+    emitRetainRValue(loc, constant);
     return managedRValueWithCleanup(*this, constant);
   }
   
   // Otherwise, use a global ConstantRefInst.
   // FIXME: globals should be implemented in a way similar to properties
   // FIXME: other kinds of local decl?
-  Value v = B.createConstantRef(E);
-  return ManagedValue(v);
+  Value v = B.createConstantRef(loc, decl);
+  return ManagedValue(v);  
+}
+
+ManagedValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E) {
+  return emitReferenceToDecl(E, E->getDecl());
 }
 
 ManagedValue SILGenFunction::visitIntegerLiteralExpr(IntegerLiteralExpr *E) {

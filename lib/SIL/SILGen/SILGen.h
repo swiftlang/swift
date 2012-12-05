@@ -246,6 +246,8 @@ public:
                                 ArrayRef<Value> InOps,
                                 ArrayRef<int> ElementMapping,
                                 Expr *VarargsInjectionFunction);
+  ManagedValue emitReferenceToDecl(SILLocation loc,
+                                   ValueDecl *decl);
 
   //===--------------------------------------------------------------------===//
   // Declarations
