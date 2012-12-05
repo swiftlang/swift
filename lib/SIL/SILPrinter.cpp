@@ -46,6 +46,19 @@ raw_ostream &operator<<(raw_ostream &OS, ID i) {
 
 
 namespace {
+  
+static void printSILConstant(llvm::raw_ostream &OS, SILConstant sd) {
+  if (sd.hasDecl()) {
+    OS << sd.getDecl()->getName();
+  } else {
+    OS << "<anonymous function>";
+  }
+  // TODO: bikeshed a SIL syntax for referencing multiple decls
+  if (sd.id != 0) {
+    OS << "#" << sd.id;
+  }
+}
+
 /// SILPrinter class - This is the internal implementation details of printing
 /// for SIL structures.
 class SILPrinter : public SILVisitor<SILPrinter> {
@@ -157,8 +170,8 @@ public:
   }
 
   void visitConstantRefInst(ConstantRefInst *DRI) {
-    OS << "constant_ref $" << DRI->getType(0).getString() << ", @"
-       << DRI->getDecl()->getName();
+    OS << "constant_ref $" << DRI->getType(0).getString() << ", @";
+    printSILConstant(OS, DRI->getConstant());
   }
 
   void visitZeroValueInst(ZeroValueInst *ZVI) {
@@ -341,22 +354,11 @@ void SILModule::dump() const {
   print(llvm::errs());
 }
 
-static void printSILDecl(llvm::raw_ostream &OS, SILDecl sd) {
-  OS << sd.getPointer()->getName();
-  // TODO: bikeshed a SIL syntax for referencing get/set in a decl
-  if (sd.getInt() & SILDeclFlags::Get) {
-    OS << "#get";
-  }
-  if (sd.getInt() & SILDeclFlags::Set) {
-    OS << "#set";
-  }
-}
-
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(llvm::raw_ostream &OS) const {
-  for (std::pair<SILDecl, Function*> vf : *this) {
+  for (std::pair<SILConstant, Function*> vf : *this) {
     OS << "func_decl ";
-    printSILDecl(OS, vf.first);
+    printSILConstant(OS, vf.first);
     OS << '\n';
     vf.second->print(OS);
     OS << "\n";

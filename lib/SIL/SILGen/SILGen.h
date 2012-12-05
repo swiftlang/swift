@@ -59,7 +59,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *vd);
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td);
 
-  Function *emitFunction(SILDecl decl, FuncExpr *fe);
+  Function *emitFunction(SILConstant decl, FuncExpr *fe);
 };
 
 /// CaptureKind - Closure capture modes.

@@ -83,10 +83,10 @@ SILGenModule::~SILGenModule() {
 }
 
 void SILGenModule::visitFuncDecl(FuncDecl *fd) {
-  emitFunction(SILDecl(fd, 0), fd->getBody());
+  emitFunction(SILConstant(fd), fd->getBody());
 }
 
-Function *SILGenModule::emitFunction(SILDecl decl, FuncExpr *fe) {
+Function *SILGenModule::emitFunction(SILConstant decl, FuncExpr *fe) {
   // Ignore prototypes.
   if (fe->getBody() == nullptr) return nullptr;
   

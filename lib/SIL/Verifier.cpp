@@ -75,8 +75,9 @@ public:
   }
 
   void visitConstantRefInst(ConstantRefInst *DRI) {
-    assert(isa<VarDecl>(DRI->getDecl()) == DRI->getType()->is<LValueType>()
-           && "ConstantRef should only produce an lvalue for global var decls");
+    assert(DRI->getConstant().getType()->getCanonicalType() ==
+             DRI->getType()->getCanonicalType()
+           && "ConstantRef type does not match constant's type");
   }
 
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {

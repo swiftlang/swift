@@ -35,9 +35,9 @@ namespace {
 
 void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   // Generate the local function body.
-  // FIXME: SILDecl needs to have a unique closure ID for local functions in
+  // FIXME: SILConstant needs to have a unique closure ID for local functions in
   // case they get inlined or specialized.
-  SGM.emitFunction(SILDecl(fd, 0), fd->getBody());
+  SGM.emitFunction(SILConstant(fd), fd->getBody());
   
   // If there are captures, build the local closure value for the function.
   auto captures = fd->getBody()->getCaptures();
@@ -75,7 +75,7 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
       }
     }
     
-    Value functionRef = B.createConstantRef(fd, fd);
+    Value functionRef = B.createConstantRef(fd, SILConstant(fd));
     Value closure = B.createClosure(fd, functionRef, capturedArgs);
     Cleanups.pushCleanup<CleanupClosure>(closure);
     LocalConstants[fd] = closure;

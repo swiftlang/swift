@@ -12,6 +12,9 @@
 
 #include "swift/SIL/Function.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILConstant.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 using namespace swift;
 
 Function::~Function() {
@@ -25,4 +28,14 @@ SILModule::SILModule(ASTContext &Context, bool hasTopLevel) :
 }
 
 SILModule::~SILModule() {
+}
+
+Type SILConstant::getType() const {
+  // FIXME: This won't work for intermediate curry decls
+  if (ValueDecl *vd = loc.dyn_cast<ValueDecl*>()) {
+    return vd->getTypeOfReference();
+  } else if (CapturingExpr *e = loc.dyn_cast<CapturingExpr*>()) {
+    return e->getType();
+  }
+  llvm_unreachable("unexpected constant loc");
 }

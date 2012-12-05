@@ -95,7 +95,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   // Otherwise, use a global ConstantRefInst.
   // FIXME: globals should be implemented in a way similar to properties
   // FIXME: other kinds of local decl?
-  Value v = B.createConstantRef(loc, decl);
+  Value v = B.createConstantRef(loc, SILConstant(decl));
   return ManagedValue(v);  
 }
 

@@ -178,14 +178,13 @@ ClosureInst *ClosureInst::create(SILLocation Loc, Value Callee,
   return FunctionInst::create<ClosureInst>(Loc, Callee, Args, F);
 }
 
-ConstantRefInst::ConstantRefInst(SILLocation Loc, ValueDecl *VD)
-  : Instruction(ValueKind::ConstantRefInst, Loc, VD->getTypeOfReference()),
-    Decl(VD) {
+ConstantRefInst::ConstantRefInst(SILLocation Loc, SILConstant C)
+  : Instruction(ValueKind::ConstantRefInst, Loc, C.getType()),
+    Constant(C) {
 }
 
-/// getDecl - Return the underlying declaration.
-ValueDecl *ConstantRefInst::getDecl() const {
-  return Decl;
+SILConstant ConstantRefInst::getConstant() const {
+  return Constant;
 }
 
 ZeroValueInst::ZeroValueInst(SILLocation Loc, Type Ty)

@@ -19,6 +19,7 @@
 
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILSuccessor.h"
+#include "swift/SIL/SILConstant.h"
 #include "swift/SIL/Value.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
@@ -73,19 +74,19 @@ public:
   /// if it is implicitly generated.  Note that this is aborts on locations that
   /// come from statements.
   template<typename T>
-  T *getLocDecl() const { return cast_or_null<T>(Loc.template get<Decl*>()); }
+  T *getLocDecl() const { return cast_or_null<T>(Loc.get<Decl*>()); }
 
   /// Return the AST expression that this instruction is produced from, or null
   /// if it is implicitly generated.  Note that this is aborts on locations that
   /// come from statements.
   template<typename T>
-  T *getLocExpr() const { return cast_or_null<T>(Loc.template get<Expr*>()); }
+  T *getLocExpr() const { return cast_or_null<T>(Loc.get<Expr*>()); }
 
   /// Return the AST statement that this instruction is produced from, or null
   /// if it is implicitly generated.  Note that this is aborts on locations that
   /// come from statements.
   template<typename T>
-  T *getLocStmt() const { return cast_or_null<T>(Loc.template get<Stmt*>()); }
+  T *getLocStmt() const { return cast_or_null<T>(Loc.get<Stmt*>()); }
 
 
   /// removeFromParent - This method unlinks 'this' from the containing basic
@@ -253,16 +254,16 @@ public:
 /// ConstantRefInst - Represents a reference to a *constant* declaration,
 /// evaluating to its value.
 class ConstantRefInst : public Instruction {
-  ValueDecl *Decl;
+  SILConstant Constant;
 public:
   /// Construct a ConstantRefInst.
   ///
   /// \param Loc  The location of the reference.
-  /// \param Decl A backpointer to the original ValueDecl.
-  ConstantRefInst(SILLocation Loc, ValueDecl *VD);
+  /// \param C    The constant being referenced.
+  ConstantRefInst(SILLocation Loc, SILConstant C);
 
-  /// getDecl - Return the underlying declaration.
-  ValueDecl *getDecl() const;
+  /// getConstant - Return the referenced constant.
+  SILConstant getConstant() const;
 
   /// getType() is ok since this is known to only have one type.
   Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
