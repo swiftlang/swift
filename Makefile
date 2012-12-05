@@ -48,6 +48,10 @@ ifdef SWIFT_VENDOR
 CPP.Flags += -DSWIFT_VENDOR='"$(SWIFT_VENDOR) "'
 endif
 
+# Used by makefiles that need the optionally installed modules SDK. If the file exists, then
+# optional build rules will apply.
+MODULES_HACKED_SDK := /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9M.sdk
+
 ###
 # Swift Top Level specific stuff.
 

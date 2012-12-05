@@ -10,10 +10,6 @@
 #
 ##===----------------------------------------------------------------------===##
 
-# skip this if $(SWIFT_SDK) isn't installed.
-SWIFT_SDK := /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9M.sdk
-ifeq ($(shell test -d $(SWIFT_SDK) && echo OK), OK)
-
 SWIFT_LEVEL := ..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
@@ -26,6 +22,9 @@ NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
 
 include $(SWIFT_LEVEL)/Makefile
+
+# skip this if $(MODULES_HACKED_SDK) isn't installed.
+ifeq ($(shell test -d $(MODULES_HACKED_SDK) && echo OK), OK)
 
 ifeq ($(ENABLE_OPTIMIZED),1)
   SWIFT_OPTFLAG := -O2
@@ -42,7 +41,7 @@ else
 endif
 
 SWIFT_OPTFLAG := -O3
-SWIFT_SDKFLAG := -sdk=$(SWIFT_SDK)
+SWIFT_SDKFLAG := -sdk=$(MODULES_HACKED_SDK)
 
 LDFLAGS += -framework Foundation \
 	   -lswift_stdlib -lswift_runtime -Wl,-force_load,$(LibDir)/libswift_runtime.a
@@ -63,6 +62,6 @@ all-local:: $(HeaderDir)/SwiftFoundation.swift
 else
 
 all:
-	@echo "Skipping since SWIFT_SDK isn't installed."
+	@echo "Skipping since MODULES_HACKED_SDK isn't installed."
 
 endif
