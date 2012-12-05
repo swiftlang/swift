@@ -156,6 +156,14 @@ public:
   /// LoadedModules - The set of modules we have loaded.
   llvm::StringMap<Module*> LoadedModules;
 
+  /// \brief The list of definitions that were synthesized while importing
+  /// external sources.
+  ///
+  /// Various external definitions can be synthesized by the Clang module
+  /// importer, such as a constructor in an imported Objective-C class, which
+  /// actually invokes the Objective-C alloc/init or new.
+  std::vector<Decl*> ExternalDefs;
+
   /// TheBuiltinModule - The builtin module.
   Module * const TheBuiltinModule;
 

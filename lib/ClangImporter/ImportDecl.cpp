@@ -689,8 +689,7 @@ namespace {
           = new (Impl.SwiftContext) DeclRefExpr(alloc, loc,
                                                 alloc->getTypeOfReference());
 
-        auto allocCall = new (Impl.SwiftContext) DotSyntaxBaseIgnoredExpr(
-                                                                   allocRef,
+        auto allocCall = new (Impl.SwiftContext) DotSyntaxCallExpr(allocRef,
                                                                    loc,
                                                                    initExpr);
         auto emptyTuple = new (Impl.SwiftContext) TupleExpr(loc, {}, nullptr,
@@ -698,11 +697,9 @@ namespace {
         initExpr = new (Impl.SwiftContext) CallExpr(allocCall, emptyTuple);
 
         // Cast the result of the alloc call to the (metatype) 'this'.
-        auto refThisMeta2
-          = new (Impl.SwiftContext) DeclRefExpr(
-                                      thisMetaVar, loc,
-                                      thisMetaVar->getTypeOfReference());
-        initExpr = new (Impl.SwiftContext) CallExpr(refThisMeta2, initExpr);
+        auto toTypeRef = new (Impl.SwiftContext) MetatypeExpr(nullptr, loc,
+                                                              thisMetaTy);
+        initExpr = new (Impl.SwiftContext) CallExpr(toTypeRef, initExpr);
       }
 
       // Form a reference to the actual method.
@@ -710,13 +707,8 @@ namespace {
       auto funcRef
         = new (Impl.SwiftContext) DeclRefExpr(func, loc,
                                               func->getTypeOfReference());
-      if (func->isStatic())
-        initExpr = new (Impl.SwiftContext) DotSyntaxBaseIgnoredExpr(funcRef,
-                                                                    loc,
-                                                                    initExpr);
-      else
-        initExpr = new (Impl.SwiftContext) DotSyntaxCallExpr(funcRef, loc,
-                                                             initExpr);
+      initExpr = new (Impl.SwiftContext) DotSyntaxCallExpr(funcRef, loc,
+                                                           initExpr);
 
       // Form the call arguments.
       SmallVector<Expr *, 2> callArgs;
@@ -750,17 +742,22 @@ namespace {
       }
 
       // Form the method call.
-      auto callArgsCopy = Impl.SwiftContext.AllocateCopy(callArgs);
-      auto callArg = new (Impl.SwiftContext) TupleExpr(loc, callArgsCopy,
-                                                       nullptr, loc);
+      Expr *callArg;
+
+      if (callArgs.size() == 1) {
+        callArg = callArgs[0];
+      } else {
+        auto callArgsCopy = Impl.SwiftContext.AllocateCopy(callArgs);
+        callArg = new (Impl.SwiftContext) TupleExpr(loc, callArgsCopy,
+                                                    nullptr, loc);
+      }
+
       initExpr = new (Impl.SwiftContext) CallExpr(initExpr, callArg);
 
       // Cast the result of the alloc call to the (metatype) 'this'.
-      auto refThisMeta2
-        = new (Impl.SwiftContext) DeclRefExpr(
-                                    thisMetaVar, loc,
-                                    thisMetaVar->getTypeOfReference());
-      initExpr = new (Impl.SwiftContext) CallExpr(refThisMeta2, initExpr);
+      auto toTypeRef = new (Impl.SwiftContext) MetatypeExpr(nullptr, loc,
+                                                            thisMetaTy);
+      initExpr = new (Impl.SwiftContext) CallExpr(toTypeRef, initExpr);
 
       // Form the assignment statement.
       auto refThis
@@ -773,6 +770,9 @@ namespace {
                                         BraceStmt::ExprStmtOrDecl(assign),
                                         loc));
 
+      // Inform the context that we have external definitions.
+      Impl.SwiftContext.ExternalDefs.push_back(result);
+      
       return result;
     }
 

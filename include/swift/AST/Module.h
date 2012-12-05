@@ -150,7 +150,7 @@ public:
 
   /// Decls; the list of top-level declarations for a translation unit.
   std::vector<Decl*> Decls;
-  
+
   TranslationUnit(Identifier Name, Component *Comp, ASTContext &C,
                   bool IsMainModule, bool IsReplModule)
     : Module(DeclContextKind::TranslationUnit, Name, Comp, C) {

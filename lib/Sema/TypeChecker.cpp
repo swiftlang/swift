@@ -720,6 +720,25 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
   }
 
+  // Type-check any externally-sourced definition.
+  for (unsigned i = 0, n = TC.Context.ExternalDefs.size(); i != n; ++i) {
+    auto decl = TC.Context.ExternalDefs[i];
+    if (auto constructor = dyn_cast<ConstructorDecl>(decl)) {
+      prePass.FuncExprs.push_back(constructor);
+      continue;
+    }
+    if (auto destructor = dyn_cast<DestructorDecl>(decl)) {
+      prePass.FuncExprs.push_back(destructor);
+      continue;
+    }
+    if (auto func = dyn_cast<FuncDecl>(decl)) {
+      prePass.FuncExprs.push_back(func->getBody());
+      continue;
+    }
+
+    llvm_unreachable("Unknown externally-sourced definition");
+  }
+
   // Type check the body of each of the FuncExpr in turn.  Note that outside
   // FuncExprs must be visited before nested FuncExprs for type-checking to
   // work correctly.

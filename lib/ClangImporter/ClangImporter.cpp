@@ -30,6 +30,7 @@
 #include "clang/Basic/Version.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/PathV2.h"
+#include "llvm/Support/SourceMgr.h"
 #include <memory>
 #include <cstdlib>
 #include <dlfcn.h>
@@ -249,7 +250,9 @@ ClangImporter::Implementation::importSourceLoc(SourceLoc loc) {
 SourceLoc
 ClangImporter::Implementation::importSourceLoc(clang::SourceLocation loc) {
   // FIXME: Implement!
-  return SourceLoc();
+  return SourceLoc(
+           llvm::SMLoc::getFromPointer(
+             SwiftContext.SourceMgr.getBufferInfo(0).Buffer->getBufferStart()));
 }
 
 SourceRange
