@@ -1033,6 +1033,19 @@ namespace {
     
     void visitFuncDecl(FuncDecl *FD) {
       printCommon(FD, "func_decl", FuncColor);
+      if (FD->isGetterOrSetter()) {
+        
+        if (FD->getGetterDecl()) {
+          OS << " getter";
+        } else {
+          assert(FD->getSetterDecl() && "no getter or setter!");
+          OS << " setter";
+        }
+        
+        if (ValueDecl *vd = dyn_cast<ValueDecl>(FD->getGetterOrSetterDecl())) {
+          OS << "_for=" << vd->getName();
+        }
+      }
       OS << '\n';
       printRec(FD->getBody());
       OS << ')';

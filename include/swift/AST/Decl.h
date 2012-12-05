@@ -1159,13 +1159,13 @@ public:
     GetOrSetDecl.setInt(true);
   }
   
-  /// getGetterVar - If this function is a getter, retrieve the declaration for
+  /// getGetterDecl - If this function is a getter, retrieve the declaration for
   /// which it is a getter. Otherwise, returns null.
   Decl *getGetterDecl() const {
     return GetOrSetDecl.getInt()? nullptr : GetOrSetDecl.getPointer();
   }
 
-  /// getSetterVar - If this function is a setter, retrieve the declaration for
+  /// getSetterDecl - If this function is a setter, retrieve the declaration for
   /// which it is a setter. Otherwise, returns null.
   Decl *getSetterDecl() const {
     return GetOrSetDecl.getInt()? GetOrSetDecl.getPointer() : nullptr;
