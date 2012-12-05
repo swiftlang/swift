@@ -61,6 +61,16 @@ public:
 
   Function *emitFunction(SILDecl decl, FuncExpr *fe);
 };
+
+/// CaptureKind - Closure capture modes.
+enum class CaptureKind {
+  /// A local value captured as a mutable box.
+  LValue,
+  /// A local value captured by value.
+  Constant,
+  /// A byref argument captured by address.
+  Byref
+};
   
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
   : public ASTVisitor<SILGenFunction, ManagedValue, void> {
@@ -253,6 +263,17 @@ public:
     
   void visitVarDecl(VarDecl *D) {
     // We handle these in pattern binding.
+  }
+
+  /// getDeclCaptureKind - Return the CaptureKind to use when capturing a decl.
+  static CaptureKind getDeclCaptureKind(ValueDecl *capture) {
+    if (capture->getType()->is<LValueType>())
+      return CaptureKind::Byref;
+    // FIXME: Check capture analysis info here and capture Byref or
+    // Constant if we can get away with it.
+    if (capture->getTypeOfReference()->is<LValueType>())
+      return CaptureKind::LValue;
+    return CaptureKind::Constant;
   }
 };
   

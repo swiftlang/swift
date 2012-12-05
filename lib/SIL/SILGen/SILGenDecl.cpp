@@ -188,21 +188,33 @@ public:
 };
   
 static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
-  Type ty = capture->getTypeOfReference();
-  if (LValueType *lv = ty->getAs<LValueType>()) {
+  switch (gen.getDeclCaptureKind(capture)) {
+  case CaptureKind::LValue: {
     // LValues are captured as two arguments: a retained ObjectPointer that owns
     // the captured value, and the address of the value itself.
-    // FIXME: use CaptureAnalysis info to capture by value if possible
-    // FIXME: add a cleanup to release the box
-    ASTContext &ctx = lv->getASTContext();
+    Type ty = capture->getTypeOfReference();
+    ASTContext &ctx = ty->getASTContext();
     Value box = new (gen.SGM.M) BBArgument(ctx.TheObjectPointerType,
                                            gen.F.begin());
-    Value addr = new (gen.SGM.M) BBArgument(lv, gen.F.begin());
+    Value addr = new (gen.SGM.M) BBArgument(ty,
+                                            gen.F.begin());
     gen.VarLocs[capture] = {box, addr};
     gen.Cleanups.pushCleanup<CleanupCaptureBox>(box);
-  } else {
-    // We captured a local func or other non-lvalue
+    break;
+  }
+  case CaptureKind::Byref: {
+    // Byref captures are non-escaping, so it's sufficient to capture only the
+    // address.
+    Type ty = capture->getTypeOfReference();
+    Value addr = new (gen.SGM.M) BBArgument(ty, gen.F.begin());
+    gen.VarLocs[capture] = {Value(), addr};
+    break;
+  }
+  case CaptureKind::Constant: {
+    // We captured a local func or other non-lvalue local.
     llvm_unreachable("constant capture not implemented");
+    break;
+  }
   }
 }
   

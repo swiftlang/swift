@@ -74,10 +74,10 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
 
 namespace {
   
-  struct GetFunctionCaptures : ASTVisitor<GetFunctionCaptures,
-                                          /*ExprRetTy=*/void,
-                                          /*StmtRetTy=*/void,
-                                          /*DeclRetTy=*/ArrayRef<ValueDecl *>>
+  struct GetDeclCaptures : ASTVisitor<GetDeclCaptures,
+                                      /*ExprRetTy=*/void,
+                                      /*StmtRetTy=*/void,
+                                      /*DeclRetTy=*/ArrayRef<ValueDecl *>>
   {
     ArrayRef<ValueDecl *> visitDecl(Decl *d) {
       // FIXME: other types of decls have function bodies
@@ -92,7 +92,7 @@ namespace {
 } // end anonymous namespace
 
 ManagedValue SILGenFunction::emitFunctionDeclRef(DeclRefExpr *E) {
-  auto captures = GetFunctionCaptures().visit(E->getDecl());
+  auto captures = GetDeclCaptures().visit(E->getDecl());
   
   if (captures.empty()) {
     // No captures; just emit a constant_ref.
@@ -101,7 +101,8 @@ ManagedValue SILGenFunction::emitFunctionDeclRef(DeclRefExpr *E) {
     // Generate a closure over the constant_ref.
     llvm::SmallVector<Value, 4> capturedArgs;
     for (ValueDecl *capture : captures) {
-      if (capture->getTypeOfReference()->is<LValueType>()) {
+      switch (getDeclCaptureKind(capture)) {
+      case CaptureKind::LValue: {
         // LValues are captured as both the box owning the value and the address
         // of the value.
         assert(VarLocs.count(capture) &&
@@ -113,9 +114,20 @@ ManagedValue SILGenFunction::emitFunctionDeclRef(DeclRefExpr *E) {
         B.createRetain(E, loc.box);
         capturedArgs.push_back(loc.box);
         capturedArgs.push_back(loc.address);
-      } else {
+        break;
+      }
+      case CaptureKind::Byref: {
+        // Byrefs are captured by address only.
+        assert(VarLocs.count(capture) &&
+               "no location for captured var!");
+        capturedArgs.push_back(VarLocs[capture].address);
+        break;
+      }
+      case CaptureKind::Constant: {
         // Value is a constant, such as a local func.
         llvm_unreachable("rvalue capture unsupported");
+        break;
+      }
       }
     }
     
