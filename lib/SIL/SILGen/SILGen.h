@@ -58,6 +58,8 @@ public:
   void visitFuncDecl(FuncDecl *fd);
   void visitPatternBindingDecl(PatternBindingDecl *vd);
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td);
+
+  Function *emitFunction(SILDecl decl, FuncExpr *fe);
 };
   
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
@@ -78,12 +80,19 @@ public:
 
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
+
+  /// VarLoc - representation of an emitted local variable.
+  struct VarLoc {
+    /// box - the retainable box for the variable, or invalid if no box was
+    /// made for the value.
+    Value box;
+    /// address - the address at which the variable is stored.
+    Value address;
+  };
     
-  /// VarLocs - This is the address for the box in which an emitted
-  /// variable is stored.
-  /// Entries in this map are generated when a PatternBindingDecl is emitted
-  /// that contains a reference and are queried for each DeclRefExpr.
-  llvm::DenseMap<ValueDecl*, Value> VarLocs;
+  /// VarLocs - Entries in this map are generated when a PatternBindingDecl is
+  /// emitted. The map is queried to produce the lvalue for a DeclRefExpr.
+  llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
     
   bool hasVoidReturn;
 
@@ -232,10 +241,10 @@ public:
   }
 
   // ClassDecl - emitClassDecl
-  // FuncDecl - emitLocalFunction
   // OneOfDecl - emitOneOfDecl
-  void visitPatternBindingDecl(PatternBindingDecl *D);
   // StructDecl - emitStructDecl
+  void visitFuncDecl(FuncDecl *D);
+  void visitPatternBindingDecl(PatternBindingDecl *D);
     
   void visitTypeAliasDecl(TypeAliasDecl *D) {
     // No lowering support needed.

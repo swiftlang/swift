@@ -22,6 +22,12 @@ using namespace Lowering;
 
 #include "llvm/Support/raw_ostream.h"
 
+void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
+  // FIXME: SILDecl needs to have a unique closure ID for local functions in
+  // case they get inlined or specialized.
+  SGM.emitFunction(SILDecl(fd, 0), fd->getBody());
+}
+
 namespace {
 
 class CleanupVar : public Cleanup {
@@ -32,7 +38,7 @@ public:
     gen.B.createRelease(SILLocation(), Value(box, 0));
   }
 };
-
+  
 /// InitPatternWithExpr - A visitor for traversing a pattern and generating SIL
 /// code to allocate the declared variables and generate initialization
 /// sequences for their values.  If an initial value is specified by the "Init"
@@ -60,8 +66,9 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
 
     // If this is a [byref] argument, just use the argument lvalue as our
     // address.
+    // FIXME: capturing byrefs?
     if (vd->getType()->is<LValueType>()) {
-      Gen.VarLocs[vd] = Init;
+      Gen.VarLocs[vd] = {Value(), Init};
       return;
     }
 
@@ -69,11 +76,12 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     // stack allocations instead of "alloc_box"/"release" for values that don't
     // escape and thus don't need boxes.
     auto allocBox = Gen.B.createAllocBox(vd, vd->getType());
+    auto box = Value(allocBox, 0);
     auto addr = Value(allocBox, 1);
 
     /// Remember that this is the memory location that we're emitting the
     /// decl to.
-    Gen.VarLocs[vd] = Value(allocBox, 1);
+    Gen.VarLocs[vd] = {box, addr};
 
     // FIXME: "Default zero initialization" is a dubious concept.  When we get
     // something like typestate or another concept that allows us to model
@@ -142,9 +150,8 @@ struct ArgumentCreatorVisitor :
   Function &f;
   ArgumentCreatorVisitor(SILGenFunction &gen, Function &f) : gen(gen), f(f) {}
 
-  Value argumentWithCleanup(Type ty, BasicBlock *parent) {
-    BBArgument *arg = new (f.getModule()) BBArgument(ty, parent);
-    return arg;
+  Value makeArgument(Type ty, BasicBlock *parent) {
+    return new (f.getModule()) BBArgument(ty, parent);
   }
     
   // Paren & Typed patterns are noops, just look through them.
@@ -163,20 +170,53 @@ struct ArgumentCreatorVisitor :
   }
 
   Value visitAnyPattern(AnyPattern *P) {
-    return argumentWithCleanup(P->getType(), f.begin());
+    return makeArgument(P->getType(), f.begin());
   }
 
   Value visitNamedPattern(NamedPattern *P) {
-    return argumentWithCleanup(P->getType(), f.begin());
+    return makeArgument(P->getType(), f.begin());
   }
 };
+  
+  class CleanupCaptureBox : public Cleanup {
+    Value box;
+  public:
+    CleanupCaptureBox(Value box) : box(box) {}
+    void emit(SILGenFunction &gen) override {
+      gen.B.createRelease(SILLocation(), box);
+    }
+  };
+  
+static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
+  Type ty = capture->getTypeOfReference();
+  if (LValueType *lv = ty->getAs<LValueType>()) {
+    // LValues are captured as two arguments: a retained ObjectPointer that owns
+    // the captured value, and the address of the value itself.
+    // FIXME: use CaptureAnalysis info to capture by value if possible
+    // FIXME: add a cleanup to release the box
+    ASTContext &ctx = lv->getASTContext();
+    Value box = new (gen.SGM.M) BBArgument(ctx.TheObjectPointerType,
+                                           gen.F.begin());
+    Value addr = new (gen.SGM.M) BBArgument(lv, gen.F.begin());
+    gen.VarLocs[capture] = {box, addr};
+    gen.Cleanups.pushCleanup<CleanupCaptureBox>(box);
+  } else {
+    // We captured a local func or other non-lvalue
+    llvm_unreachable("constant capture not implemented");
+  }
+}
+  
 } // end anonymous namespace
 
-
 void SILGenFunction::emitProlog(FuncExpr *FE) {
+  // Emit the capture variables.
+  for (auto capture : FE->getCaptures()) {
+    makeCaptureBBArguments(*this, capture);
+  }
+  
   // Emit the argument variables.
   for (auto &ParamPattern : FE->getBodyParamPatterns()) {
-    // Add the BBArgument's and collect them as a Value.
+    // Add the BBArguments and collect them as a Value.
     Value ArgInit = ArgumentCreatorVisitor(*this, F).visit(ParamPattern);
     // Use the value to initialize a (mutable) variable allocation.
     InitPatternWithExpr(*this, ArgInit).visit(ParamPattern);

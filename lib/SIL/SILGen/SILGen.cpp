@@ -82,23 +82,24 @@ SILGenModule::~SILGenModule() {
   delete TopLevelSGF;
 }
 
-void SILGenModule::visitFuncDecl(FuncDecl *FD) {
-  // FIXME: if this is a toplevel module, the func will need to be generated
-  // like a closure.
-  
-  FuncExpr *FE = FD->getBody();
-  
-  // Ignore function prototypes.
-  if (FE->getBody() == nullptr) return;
-  
-  assert(!M.hasFunction(FD) &&
-         "already generated function for decl!");
+void SILGenModule::visitFuncDecl(FuncDecl *fd) {
+  emitFunction(SILDecl(fd, 0), fd->getBody());
+}
 
-  Function *C = new (M) Function(M);
-  SILGenFunction(*this, *C, FE).visit(FE->getBody());
+Function *SILGenModule::emitFunction(SILDecl decl, FuncExpr *fe) {
+  // Ignore prototypes.
+  if (fe->getBody() == nullptr) return nullptr;
   
-  C->verify();
-  M.functions[SILDecl(FD, 0)] = C;
+  assert(!M.hasFunction(decl) &&
+         "already generated function for decl!");
+  
+  Function *f = new (M) Function(M);
+  SILGenFunction(*this, *f, fe).visit(fe->getBody());
+  
+  f->verify();
+  M.functions[decl] = f;
+  
+  return f;
 }
 
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {

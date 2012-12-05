@@ -14,6 +14,8 @@
 #include "swift/AST/AST.h"
 #include "Explosion.h"
 #include "TypeInfo.h"
+#include "llvm/Support/raw_ostream.h"
+
 using namespace swift;
 using namespace Lowering;
 
@@ -72,13 +74,14 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
 ManagedValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E) {
   // FIXME: properties
   
-  // If this is a reference to a mutable local decl, produce an lvalue.
-  if (E->getType()->is<LValueType>() && VarLocs.count(E->getDecl())) {
-    return ManagedValue(VarLocs[E->getDecl()]);
+  // If this is a reference to a mutable local decl, produce an address.
+  bool isLValue = E->getType()->is<LValueType>();
+  if (isLValue && VarLocs.count(E->getDecl())) {
+    return ManagedValue(VarLocs[E->getDecl()].address);
   }
 
-  assert(!E->getDecl()->getDeclContext()->isLocalContext() &&
-         "no location for local var decl!");
+  assert(!(isLValue && E->getDecl()->getDeclContext()->isLocalContext()) &&
+         "no location for local var!");
   
   // Otherwise, use a ConstantRefInst.
   // FIXME: globals should be implemented in a way similar to properties
