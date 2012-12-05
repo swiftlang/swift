@@ -389,6 +389,7 @@ public:
   void emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem);
 private:
   void emitGlobalDecl(Decl *D);
+  void emitExternalDefinition(Decl *D);
 
 //--- Type emission ------------------------------------------------------------
 public:

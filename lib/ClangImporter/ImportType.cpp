@@ -451,8 +451,10 @@ Type ClangImporter::Implementation::importFunctionType(
   // Form the body and argument patterns.
   bodyPatterns.push_back(TuplePattern::create(SwiftContext, SourceLoc(),
                                               bodyPatternElts, SourceLoc()));
+  bodyPatterns.back()->setType(paramsTy);
   argPatterns.push_back(TuplePattern::create(SwiftContext, SourceLoc(),
                                              argPatternElts, SourceLoc()));
+  argPatterns.back()->setType(paramsTy);
 
   // Form the function type.
   return FunctionType::get(paramsTy, swiftResultTy, SwiftContext);

@@ -252,6 +252,7 @@ public:
   void emitStaticMethod(FuncDecl *D);
   void emitInstanceMethod(FuncDecl *D);
   void emitConstructor(ConstructorDecl *D);
+  void emitClassConstructor(ConstructorDecl *D);
 
   llvm::FunctionType *getFunctionType(CanType fnType, ExplosionKind kind,
                                       unsigned uncurryLevel,

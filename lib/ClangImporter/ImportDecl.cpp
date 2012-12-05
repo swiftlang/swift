@@ -472,9 +472,11 @@ namespace {
                                                      thisTy,
                                                      Impl.firstClangModule);
       Pattern *thisPat = new (Impl.SwiftContext) NamedPattern(thisVar);
+      thisPat->setType(thisVar->getType());
       thisPat
         = new (Impl.SwiftContext) TypedPattern(thisPat,
                                                TypeLoc::withoutLoc(thisTy));
+      thisPat->setType(thisVar->getType());
       argPatterns.push_back(thisPat);
       bodyPatterns.push_back(thisPat);
       
@@ -628,10 +630,12 @@ namespace {
                                                          thisMetaTy,
                                                          Impl.firstClangModule);
       Pattern *thisPat = new (Impl.SwiftContext) NamedPattern(thisMetaVar);
+      thisPat->setType(thisMetaTy);
       thisPat
         = new (Impl.SwiftContext) TypedPattern(thisPat,
                                                TypeLoc::withoutLoc(thisMetaTy));
-      
+      thisPat->setType(thisMetaTy);
+
       argPatterns.push_back(thisPat);
       bodyPatterns.push_back(thisPat);
 
@@ -665,7 +669,7 @@ namespace {
       // Create the actual constructor.
       // FIXME: Losing body patterns here.
       auto result = new (Impl.SwiftContext) ConstructorDecl(name, loc,
-                                                            argPatterns.front(),
+                                                            argPatterns.back(),
                                                             thisVar,
                                                             /*GenericParams=*/0,
                                                             dc);
@@ -677,11 +681,10 @@ namespace {
 
       // Create the body of the constructor, which will call the appropriate
       // underlying method (and 'alloc', if needed).
-      auto refThisMeta
-        = new (Impl.SwiftContext) DeclRefExpr(
-                                    thisMetaVar, loc,
-                                    thisMetaVar->getTypeOfReference());
-      Expr* initExpr = refThisMeta;
+      // FIXME: Use the 'this' of metaclass type rather than a metatype
+      // expression.
+      Expr* initExpr = new (Impl.SwiftContext) MetatypeExpr(nullptr, loc,
+                                                            thisMetaTy);
 
       if (objcMethod->getMethodFamily() == clang::OMF_init) {
         // For an 'init' method, we need to call alloc first.

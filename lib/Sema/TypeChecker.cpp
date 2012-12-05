@@ -720,48 +720,60 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
   }
 
-  // Type-check any externally-sourced definition.
-  for (auto imported : TC.TU.getImportedModules()) {
-    auto clangModule = dyn_cast<ClangModule>(imported.second);
-    if (!clangModule)
-      continue;
+  // FIXME: This is a painful hack. There are interesting architectural issues
+  // with the organization of name binding/type checking/IR generation.
+  llvm::SmallPtrSet<Decl *, 16> externalDefinitionsChecked;
+  unsigned currentFuncExpr = 0;
+  do {
+    // Type check the body of each of the FuncExpr in turn.  Note that outside
+    // FuncExprs must be visited before nested FuncExprs for type-checking to
+    // work correctly.
+    for (unsigned n = prePass.FuncExprs.size(); currentFuncExpr != n;
+         ++currentFuncExpr) {
+      auto func = prePass.FuncExprs[currentFuncExpr];
 
-    for (auto decl : clangModule->getExternalDefinitions()) {
-      if (auto constructor = dyn_cast<ConstructorDecl>(decl)) {
-        prePass.FuncExprs.push_back(constructor);
+      if (ConstructorDecl *CD = func.dyn_cast<ConstructorDecl*>()) {
+        TC.typeCheckConstructorBody(CD);
         continue;
       }
-      if (auto destructor = dyn_cast<DestructorDecl>(decl)) {
-        prePass.FuncExprs.push_back(destructor);
+      if (DestructorDecl *DD = func.dyn_cast<DestructorDecl*>()) {
+        TC.typeCheckDestructorBody(DD);
         continue;
       }
-      if (auto func = dyn_cast<FuncDecl>(decl)) {
-        prePass.FuncExprs.push_back(func->getBody());
+      FuncExpr *FE = func.get<FuncExpr*>();
+      PrettyStackTraceExpr StackEntry(TC.Context, "type-checking", FE);
+
+      TC.typeCheckFunctionBody(FE);
+    }
+
+    // Type-check any externally-sourced definition.
+    for (auto imported : TC.TU.getImportedModules()) {
+      auto clangModule = dyn_cast<ClangModule>(imported.second);
+      if (!clangModule)
         continue;
+
+      for (auto decl : clangModule->getExternalDefinitions()) {
+        if (!externalDefinitionsChecked.insert(decl))
+          continue;
+
+        if (auto constructor = dyn_cast<ConstructorDecl>(decl)) {
+          prePass.FuncExprs.push_back(constructor);
+          continue;
+        }
+        if (auto destructor = dyn_cast<DestructorDecl>(decl)) {
+          prePass.FuncExprs.push_back(destructor);
+          continue;
+        }
+        if (auto func = dyn_cast<FuncDecl>(decl)) {
+          prePass.FuncExprs.push_back(func->getBody());
+          continue;
+        }
+
+        llvm_unreachable("Unknown externally-sourced definition");
       }
-
-      llvm_unreachable("Unknown externally-sourced definition");
     }
-  }
-
-  // Type check the body of each of the FuncExpr in turn.  Note that outside
-  // FuncExprs must be visited before nested FuncExprs for type-checking to
-  // work correctly.
-  for (auto func : prePass.FuncExprs) {
-    if (ConstructorDecl *CD = func.dyn_cast<ConstructorDecl*>()) {
-      TC.typeCheckConstructorBody(CD);
-      continue;
-    }
-    if (DestructorDecl *DD = func.dyn_cast<DestructorDecl*>()) {
-      TC.typeCheckDestructorBody(DD);
-      continue;
-    }
-    FuncExpr *FE = func.get<FuncExpr*>();
-    PrettyStackTraceExpr StackEntry(TC.Context, "type-checking", FE);
-
-    TC.typeCheckFunctionBody(FE);
-  }
-
+  } while (currentFuncExpr < prePass.FuncExprs.size());
+  
   // Verify that we've checked types correctly.
   TU->ASTStage = TranslationUnit::TypeChecked;
   verify(TU);

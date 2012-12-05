@@ -147,6 +147,23 @@ void IRGenFunction::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) 
     assert(Builder.hasValidIP());
     emitGlobalDecl(TU->Decls[i]);
   }
+
+  // For any Clang modules imported by this translation unit, emit external
+  // definitions.
+  for (auto mod : TU->getImportedModules()) {
+    auto clangMod = dyn_cast<ClangModule>(mod.second);
+    if (!clangMod)
+      continue;
+    
+    for (auto def : clangMod->getExternalDefinitions()) {
+      emitExternalDefinition(def);
+    }
+
+    // FIXME: Total hack. Removing these declarations makes sure that we
+    // don't generate them again. We need to teach either IRGenModule or the
+    // REPL code to track which declarations have been IRgenerated already.
+    clangMod->clearExternalDefinitions();
+  }
 }
 
 static bool isLocalLinkageDecl(Decl *D) {
@@ -428,6 +445,41 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
   }
 
   llvm_unreachable("bad decl kind!");
+}
+
+void IRGenFunction::emitExternalDefinition(Decl *D) {
+  switch (D->getKind()) {
+    case DeclKind::Extension:
+    case DeclKind::Protocol:
+    case DeclKind::PatternBinding:
+    case DeclKind::OneOfElement:
+    case DeclKind::OneOf:
+    case DeclKind::Class:
+    case DeclKind::Struct:
+    case DeclKind::TopLevelCode:
+    case DeclKind::TypeAlias:
+    case DeclKind::Var:
+    case DeclKind::Func:
+    case DeclKind::Import:
+      llvm_unreachable("Not a valid external definition for IRgen");
+
+    case DeclKind::Constructor:
+      if (D->getDeclContext()->getDeclaredTypeOfContext()
+            ->getClassOrBoundGenericClass()) {
+        IGM.emitClassConstructor(cast<ConstructorDecl>(D));
+      } else {
+        IGM.emitConstructor(cast<ConstructorDecl>(D));
+      }
+      break;
+
+    case DeclKind::Destructor:
+      llvm_unreachable("Cannot handle destructors yet");
+      break;
+
+    case DeclKind::Subscript:
+      llvm_unreachable("Cannot handle subscripts yet");
+      break;
+  }
 }
 
 /// Find the address of a (fragile, constant-size) global variable

@@ -299,6 +299,10 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   IGF.emitConstructorBody(CD);
 }
 
+void IRGenModule::emitClassConstructor(ConstructorDecl *D) {
+  return ::emitClassConstructor(*this, D);
+}
+
 /// emitClassDecl - Emit all the declarations associated with this class type.
 void IRGenModule::emitClassDecl(ClassDecl *D) {
   auto &classTI = Types.getFragileTypeInfo(D).as<ClassTypeInfo>();
@@ -357,7 +361,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       continue;
     }
     case DeclKind::Constructor: {
-      emitClassConstructor(*this, cast<ConstructorDecl>(member));
+      ::emitClassConstructor(*this, cast<ConstructorDecl>(member));
       continue;
     }
     case DeclKind::Destructor: {

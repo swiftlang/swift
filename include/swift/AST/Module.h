@@ -259,6 +259,12 @@ public:
   /// actually invokes the Objective-C alloc/init or new.
   ArrayRef<Decl *> getExternalDefinitions() const { return ExternalDefs; }
 
+  /// \brief Clear out the external definitions.
+  /// FIXME: This is a hack that should go away.
+  void clearExternalDefinitions() {
+    std::vector<Decl*>().swap(ExternalDefs);
+  }
+
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::ClangModule;
   }
