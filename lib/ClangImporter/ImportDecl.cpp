@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclVisitor.h"
@@ -563,6 +564,8 @@ namespace {
         return nullptr;
 
       // ...in the 'init' or 'new' family...
+      FuncDecl *alloc = nullptr;
+      
       switch (objcMethod->getMethodFamily()) {
       case clang::OMF_alloc:
       case clang::OMF_autorelease:
@@ -578,7 +581,31 @@ namespace {
       case clang::OMF_self:
         return nullptr;
 
-      case clang::OMF_init:
+      case clang::OMF_init: {
+        // Make sure we have a usable 'alloc' method. Otherwise, we can't
+        // build this constructor anyway.
+        // FIXME: Can we do this for protocol methods as well? Do we want to?
+        auto interface = objcMethod->getClassInterface();
+        if (!interface)
+          return nullptr;
+
+        // Form the Objective-C selector for alloc.
+        auto &clangContext = Impl.getClangASTContext();
+        auto allocId = &clangContext.Idents.get("alloc");
+        auto allocSel = clangContext.Selectors.getNullarySelector(allocId);
+
+        // Find the 'alloc' class method.
+        auto allocMethod = interface->lookupClassMethod(allocSel);
+        if (!allocMethod)
+          return nullptr;
+
+        // Import the 'alloc' class method.
+        alloc = cast_or_null<FuncDecl>(Impl.importDecl(allocMethod));
+        if (!alloc)
+          return nullptr;
+        break;
+      }
+
       case clang::OMF_new:
         break;
       }
@@ -597,10 +624,10 @@ namespace {
       auto thisTy = containerTy;
       auto thisMetaTy = MetaTypeType::get(containerTy, Impl.SwiftContext);
       auto thisName = Impl.SwiftContext.getIdentifier("this");
-      auto thisVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), thisName,
-                                                     thisMetaTy,
-                                                     Impl.firstClangModule);
-      Pattern *thisPat = new (Impl.SwiftContext) NamedPattern(thisVar);
+      auto thisMetaVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), thisName,
+                                                         thisMetaTy,
+                                                         Impl.firstClangModule);
+      Pattern *thisPat = new (Impl.SwiftContext) NamedPattern(thisMetaVar);
       thisPat
         = new (Impl.SwiftContext) TypedPattern(thisPat,
                                                TypeLoc::withoutLoc(thisMetaTy));
@@ -632,23 +659,120 @@ namespace {
       // FIXME: Poor location info.
       auto loc = Impl.importSourceLoc(objcMethod->getLocStart());
 
-      // FIXME: Losing body patterns here.
-      VarDecl *thisDecl
-        = new (Impl.SwiftContext) VarDecl(
-                                    SourceLoc(),
-                                    Impl.SwiftContext.getIdentifier("this"),
-                                    thisTy, dc);
+      VarDecl *thisVar = new (Impl.SwiftContext) VarDecl(SourceLoc(),
+                                                          thisName, thisTy, dc);
 
+      // Create the actual constructor.
+      // FIXME: Losing body patterns here.
       auto result = new (Impl.SwiftContext) ConstructorDecl(name, loc,
                                                             argPatterns.front(),
-                                                            thisDecl,
+                                                            thisVar,
                                                             /*GenericParams=*/0,
                                                             dc);
       result->getMutableAttrs().AllocatesThis = true;
       result->setType(type);
-      thisDecl->setDeclContext(result);
+      thisVar->setDeclContext(result);
       setVarDeclContexts(argPatterns, result);
       setVarDeclContexts(bodyPatterns, result);
+
+      // Create the body of the constructor, which will call the appropriate
+      // underlying method (and 'alloc', if needed).
+      auto refThisMeta
+        = new (Impl.SwiftContext) DeclRefExpr(
+                                    thisMetaVar, loc,
+                                    thisMetaVar->getTypeOfReference());
+      Expr* initExpr = refThisMeta;
+
+      if (objcMethod->getMethodFamily() == clang::OMF_init) {
+        // For an 'init' method, we need to call alloc first.
+        Expr *allocRef
+          = new (Impl.SwiftContext) DeclRefExpr(alloc, loc,
+                                                alloc->getTypeOfReference());
+
+        auto allocCall = new (Impl.SwiftContext) DotSyntaxBaseIgnoredExpr(
+                                                                   allocRef,
+                                                                   loc,
+                                                                   initExpr);
+        auto emptyTuple = new (Impl.SwiftContext) TupleExpr(loc, {}, nullptr,
+                                                            loc);
+        initExpr = new (Impl.SwiftContext) CallExpr(allocCall, emptyTuple);
+
+        // Cast the result of the alloc call to the (metatype) 'this'.
+        auto refThisMeta2
+          = new (Impl.SwiftContext) DeclRefExpr(
+                                      thisMetaVar, loc,
+                                      thisMetaVar->getTypeOfReference());
+        initExpr = new (Impl.SwiftContext) CallExpr(refThisMeta2, initExpr);
+      }
+
+      // Form a reference to the actual method.
+      auto func = cast<FuncDecl>(decl);
+      auto funcRef
+        = new (Impl.SwiftContext) DeclRefExpr(func, loc,
+                                              func->getTypeOfReference());
+      if (func->isStatic())
+        initExpr = new (Impl.SwiftContext) DotSyntaxBaseIgnoredExpr(funcRef,
+                                                                    loc,
+                                                                    initExpr);
+      else
+        initExpr = new (Impl.SwiftContext) DotSyntaxCallExpr(funcRef, loc,
+                                                             initExpr);
+
+      // Form the call arguments.
+      SmallVector<Expr *, 2> callArgs;
+      auto tuple = dyn_cast<TuplePattern>(argPatterns[1]);
+      if (!tuple) {
+        // FIXME: We don't want this to be the case. We should always ensure
+        // that the body has names, even if the interface does not.
+        return nullptr;
+      }
+
+      for (auto elt : tuple->getFields()) {
+        auto named = dyn_cast<NamedPattern>(
+                       elt.getPattern()->getSemanticsProvidingPattern());
+        if (!named) {
+          // FIXME: We don't want this to be the case. Can we fake up names
+          // in the body parameters so this doesn't happen?
+          return nullptr;
+        }
+
+        // Create a reference to this parameter.
+        Expr *ref = new (Impl.SwiftContext) DeclRefExpr(named->getDecl(),
+                                                        loc,
+                                                        named->getType());
+
+        // If the parameter is [byref], take its address.
+        if (named->getDecl()->getType()->is<LValueType>())
+          ref = new (Impl.SwiftContext) AddressOfExpr(loc, ref,
+                                                      ref->getType());
+
+        callArgs.push_back(ref);
+      }
+
+      // Form the method call.
+      auto callArgsCopy = Impl.SwiftContext.AllocateCopy(callArgs);
+      auto callArg = new (Impl.SwiftContext) TupleExpr(loc, callArgsCopy,
+                                                       nullptr, loc);
+      initExpr = new (Impl.SwiftContext) CallExpr(initExpr, callArg);
+
+      // Cast the result of the alloc call to the (metatype) 'this'.
+      auto refThisMeta2
+        = new (Impl.SwiftContext) DeclRefExpr(
+                                    thisMetaVar, loc,
+                                    thisMetaVar->getTypeOfReference());
+      initExpr = new (Impl.SwiftContext) CallExpr(refThisMeta2, initExpr);
+
+      // Form the assignment statement.
+      auto refThis
+        = new (Impl.SwiftContext) DeclRefExpr(thisVar, loc,
+                                              thisVar->getTypeOfReference());
+      auto assign = new (Impl.SwiftContext) AssignStmt(refThis, loc, initExpr);
+
+      // Set the body of the constructor.
+      result->setBody(BraceStmt::create(Impl.SwiftContext, loc,
+                                        BraceStmt::ExprStmtOrDecl(assign),
+                                        loc));
+
       return result;
     }
 

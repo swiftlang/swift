@@ -416,9 +416,11 @@ Type ClangImporter::Implementation::importFunctionType(
                                    bodyName, swiftParamTy, firstClangModule);
     bodyVar->setClangDecl(param);
     Pattern *bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
+    bodyPattern->setType(bodyVar->getType());
     bodyPattern
       = new (SwiftContext) TypedPattern(bodyPattern,
                                         TypeLoc::withoutLoc(swiftParamTy));
+    bodyPattern->setType(bodyVar->getType());
     bodyPatternElts.push_back(TuplePatternElt(bodyPattern));
 
     // Compute the pattern to put into the argument list, which may be
@@ -430,9 +432,11 @@ Type ClangImporter::Implementation::importFunctionType(
                                           name, swiftParamTy, firstClangModule);
       argVar->setClangDecl(param);
       argPattern = new (SwiftContext) NamedPattern(argVar);
+      argPattern->setType(argVar->getType());
       argPattern
         = new (SwiftContext) TypedPattern(argPattern,
                                           TypeLoc::withoutLoc(swiftParamTy));
+      argPattern->setType(argVar->getType());
     }
     argPatternElts.push_back(TuplePatternElt(argPattern));
 
