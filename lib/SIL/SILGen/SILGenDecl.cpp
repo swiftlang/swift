@@ -35,48 +35,13 @@ namespace {
 
 void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   // Generate the local function body.
-  // FIXME: SILConstant needs to have a unique closure ID for local functions in
-  // case they get inlined or specialized.
   SGM.emitFunction(SILConstant(fd), fd->getBody());
   
-  // If there are captures, build the local closure value for the function.
-  auto captures = fd->getBody()->getCaptures();
-  if (!captures.empty()) {
-    llvm::SmallVector<Value, 4> capturedArgs;
-    for (ValueDecl *capture : captures) {
-      switch (getDeclCaptureKind(capture)) {
-        case CaptureKind::LValue: {
-          // LValues are captured as both the box owning the value and the address
-          // of the value.
-          assert(VarLocs.count(capture) &&
-                 "no location for captured var!");
-          
-          VarLoc const &loc = VarLocs[capture];
-          assert(loc.box && "no box for captured var!");
-          assert(loc.address && "no address for captured var!");
-          B.createRetain(fd, loc.box);
-          capturedArgs.push_back(loc.box);
-          capturedArgs.push_back(loc.address);
-          break;
-        }
-        case CaptureKind::Byref: {
-          // Byrefs are captured by address only.
-          assert(VarLocs.count(capture) &&
-                 "no location for captured var!");
-          capturedArgs.push_back(VarLocs[capture].address);
-          break;
-        }
-        case CaptureKind::Constant: {
-          // Value is a constant, such as a local func. Pass on the reference.
-          ManagedValue v = emitReferenceToDecl(fd, capture);
-          capturedArgs.push_back(v.forward(*this));
-          break;
-        }
-      }
-    }
-    
-    Value functionRef = B.createConstantRef(fd, SILConstant(fd));
-    Value closure = B.createClosure(fd, functionRef, capturedArgs);
+  // If there are captures, build the local closure value for the function and
+  // store it as a local constant.
+  if (!fd->getBody()->getCaptures().empty()) {
+    Value closure = emitClosureForFuncExpr(fd, SILConstant(fd), fd->getBody())
+      .forward(*this);
     Cleanups.pushCleanup<CleanupClosure>(closure);
     LocalConstants[fd] = closure;
   }

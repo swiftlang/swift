@@ -215,6 +215,7 @@ public:
   // Expressions
   //===--------------------------------------------------------------------===//
   
+  /// Unreachable default case for unimplemented expr nodes.
   ManagedValue visitExpr(Expr *E);
   
   ManagedValue visitApplyExpr(ApplyExpr *E);
@@ -237,6 +238,7 @@ public:
   ManagedValue visitTupleShuffleExpr(TupleShuffleExpr *E);
   ManagedValue visitNewArrayExpr(NewArrayExpr *E);
   ManagedValue visitMetatypeExpr(MetatypeExpr *E);
+  ManagedValue visitFuncExpr(FuncExpr *E);
 
   ManagedValue emitArrayInjectionCall(Value ObjectPtr,
                                       Value BasePtr,
@@ -248,6 +250,10 @@ public:
                                 Expr *VarargsInjectionFunction);
   ManagedValue emitReferenceToDecl(SILLocation loc,
                                    ValueDecl *decl);
+
+  ManagedValue emitClosureForFuncExpr(SILLocation loc,
+                                      SILConstant function,
+                                      FuncExpr *body);
 
   //===--------------------------------------------------------------------===//
   // Declarations

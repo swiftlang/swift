@@ -358,3 +358,59 @@ ManagedValue SILGenFunction::visitMetatypeExpr(MetatypeExpr *E) {
   return ManagedValue(B.createMetatype(E));
 }
 
+ManagedValue SILGenFunction::emitClosureForFuncExpr(SILLocation loc,
+                                                    SILConstant constant,
+                                                    FuncExpr *body) {
+  auto captures = body->getCaptures();
+  if (!captures.empty()) {
+    
+    llvm::SmallVector<Value, 4> capturedArgs;
+    for (ValueDecl *capture : captures) {
+      switch (getDeclCaptureKind(capture)) {
+        case CaptureKind::LValue: {
+          // LValues are captured as both the box owning the value and the address
+          // of the value.
+          assert(VarLocs.count(capture) &&
+                 "no location for captured var!");
+          
+          VarLoc const &vl = VarLocs[capture];
+          assert(vl.box && "no box for captured var!");
+          assert(vl.address && "no address for captured var!");
+          B.createRetain(loc, vl.box);
+          capturedArgs.push_back(vl.box);
+          capturedArgs.push_back(vl.address);
+          break;
+        }
+        case CaptureKind::Byref: {
+          // Byrefs are captured by address only.
+          assert(VarLocs.count(capture) &&
+                 "no location for captured var!");
+          capturedArgs.push_back(VarLocs[capture].address);
+          break;
+        }
+        case CaptureKind::Constant: {
+          // Value is a constant such as a local func. Pass on the reference.
+          ManagedValue v = emitReferenceToDecl(loc, capture);
+          capturedArgs.push_back(v.forward(*this));
+          break;
+        }
+      }
+    }
+    
+    Value functionRef = B.createConstantRef(loc, constant);
+    return managedRValueWithCleanup(*this,
+                                    B.createClosure(loc,
+                                                    functionRef, capturedArgs));
+  } else {
+    return ManagedValue(B.createConstantRef(loc, constant));
+  }
+}
+
+ManagedValue SILGenFunction::visitFuncExpr(FuncExpr *e) {
+  // Generate the local function body.
+  SGM.emitFunction(SILConstant(e), e);
+
+  // Generate the closure (if any) for the function reference.
+  return emitClosureForFuncExpr(e, SILConstant(e), e);
+}
+
