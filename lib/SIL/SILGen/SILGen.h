@@ -230,6 +230,7 @@ public:
                                 ArrayRef<Value> InOps,
                                 ArrayRef<int> ElementMapping,
                                 Expr *VarargsInjectionFunction);
+  ManagedValue emitFunctionDeclRef(DeclRefExpr *E);
 
   //===--------------------------------------------------------------------===//
   // Declarations

@@ -178,14 +178,14 @@ struct ArgumentCreatorVisitor :
   }
 };
   
-  class CleanupCaptureBox : public Cleanup {
-    Value box;
-  public:
-    CleanupCaptureBox(Value box) : box(box) {}
-    void emit(SILGenFunction &gen) override {
-      gen.B.createRelease(SILLocation(), box);
-    }
-  };
+class CleanupCaptureBox : public Cleanup {
+  Value box;
+public:
+  CleanupCaptureBox(Value box) : box(box) {}
+  void emit(SILGenFunction &gen) override {
+    gen.B.createRelease(SILLocation(), box);
+  }
+};
   
 static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
   Type ty = capture->getTypeOfReference();

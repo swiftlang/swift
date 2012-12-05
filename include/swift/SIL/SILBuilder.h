@@ -127,6 +127,10 @@ public:
     return insert(ApplyInst::create(Loc, Fn, Args, F));
   }
 
+  ClosureInst *createClosure(SILLocation Loc, Value Fn, ArrayRef<Value> Args) {
+    return insert(ClosureInst::create(Loc, Fn, Args, F));
+  }
+
   ConstantRefInst *createConstantRef(DeclRefExpr *Expr) {
     return insert(new ConstantRefInst(Expr));
   }
