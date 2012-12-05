@@ -701,8 +701,22 @@ public:
     }
     OS << ')';
   }
+  
+  llvm::raw_ostream &printCapturing(CapturingExpr *E, char const *name) {
+    printCommon(E, name);
+    if (!E->getCaptures().empty()) {
+      OS << " captures=(";
+      OS << E->getCaptures()[0]->getName();
+      for (auto capture : E->getCaptures().slice(1)) {
+        OS << ' ' << capture->getName();
+      }
+      OS << ')';
+    }
+    return OS;
+  }
+  
   void visitFuncExpr(FuncExpr *E) {
-    printCommon(E, "func_expr");
+    printCapturing(E, "func_expr");
     if (E->getBody()) {
       OS << '\n';
       printRec(E->getBody());
@@ -710,12 +724,12 @@ public:
     OS << ')';
   }
   void visitExplicitClosureExpr(ExplicitClosureExpr *E) {
-    printCommon(E, "explicit_closure_expr") << '\n';
+    printCapturing(E, "explicit_closure_expr") << '\n';
     printRec(E->getBody());
     OS << ')';
   }
   void visitImplicitClosureExpr(ImplicitClosureExpr *E) {
-    printCommon(E, "implicit_closure_expr") << '\n';
+    printCapturing(E, "implicit_closure_expr") << '\n';
     printRec(E->getBody());
     OS << ')';
   }
