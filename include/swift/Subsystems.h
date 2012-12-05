@@ -61,9 +61,10 @@ namespace swift {
   /// analysis in the main module.
   void performCaptureAnalysis(TranslationUnit *TU, unsigned StartElem = 0);
 
-  /// performIRGeneration - Turn the given translation unit into
-  /// either LLVM IR or native code.  StartElem indicates where to start for
-  /// incremental IRGen in the main module.
+  /// Turn the given translation unit into either LLVM IR or native code.
+  ///
+  /// \param StartElem indicates where to start for incremental IRGen in the
+  /// main module.
   void performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
                            TranslationUnit *TU, unsigned StartElem = 0);
 

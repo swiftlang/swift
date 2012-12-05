@@ -771,7 +771,7 @@ namespace {
                                         loc));
 
       // Inform the context that we have external definitions.
-      Impl.SwiftContext.ExternalDefs.push_back(result);
+      Impl.firstClangModule->addExternalDefinition(result);
       
       return result;
     }

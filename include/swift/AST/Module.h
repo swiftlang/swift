@@ -229,12 +229,35 @@ public:
 /// \brief Represents a Clang module that has been imported into Swift.
 class ClangModule : public Module {
   clang::Module *clangModule;
-  
+
+  /// \brief The list of definitions that were synthesized while importing
+  /// from the Clang module.
+  ///
+  /// Various external definitions can be synthesized by the Clang module
+  /// importer, such as a constructor in an imported Objective-C class, which
+  /// actually invokes the Objective-C alloc/init or new.
+  ///
+  /// FIXME: Make sure this gets freed.
+  std::vector<Decl*> ExternalDefs;
+
 public:
   ClangModule(ASTContext &ctx, Component *comp, clang::Module *clangModule);
 
   /// \brief Retrieve the underlying Clang module.
   clang::Module *getClangModule() const { return clangModule; }
+
+  /// \brief Add the given external definition to this module.
+  void addExternalDefinition(Decl *def) {
+    ExternalDefs.push_back(def);
+  }
+
+  /// \brief Retrieve the list of definitions that were synthesized while
+  /// importing from the Clang module.
+  ///
+  /// Various external definitions can be synthesized by the Clang module
+  /// importer, such as a constructor in an imported Objective-C class, which
+  /// actually invokes the Objective-C alloc/init or new.
+  ArrayRef<Decl *> getExternalDefinitions() const { return ExternalDefs; }
 
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::ClangModule;
