@@ -136,21 +136,47 @@ AllocArrayInst::AllocArrayInst(SILLocation Loc, Type ElementType,
     ElementType(ElementType), NumElements(NumElements) {
 }
 
-ApplyInst::ApplyInst(SILLocation Loc, Type Ty, Value Callee,
-                     ArrayRef<Value> Args)
-  : Instruction(ValueKind::ApplyInst, Loc, Ty), Callee(Callee),
+FunctionInst::FunctionInst(ValueKind kind,
+                           SILLocation Loc, Type Ty, Value Callee,
+                           ArrayRef<Value> Args)
+  : Instruction(kind, Loc, Ty), Callee(Callee),
     NumArgs(Args.size()) {
   memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(Value));
 }
 
-ApplyInst *ApplyInst::create(SILLocation Loc, Value Callee,
-                             ArrayRef<Value> Args, Function &F) {
-  void *Buffer = F.allocate(sizeof(ApplyInst) + Args.size() * sizeof(Value),
-                            llvm::AlignOf<ApplyInst>::Alignment);
-  Type ResTy = Callee.getType()->castTo<FunctionType>()->getResult();
-  return ::new(Buffer) ApplyInst(Loc, ResTy, Callee, Args);
+template<typename DERIVED>
+DERIVED *FunctionInst::create(SILLocation Loc, Value Callee,
+                              ArrayRef<Value> Args, Function &F) {
+  void *Buffer = F.allocate(sizeof(DERIVED) + Args.size() * sizeof(Value),
+                            llvm::AlignOf<DERIVED>::Alignment);
+  return ::new(Buffer) DERIVED(Loc, Callee, Args);
 }
 
+ApplyInst::ApplyInst(SILLocation Loc, Value Callee, ArrayRef<Value> Args)
+  : FunctionInst(ValueKind::ApplyInst, Loc,
+                 Callee.getType()->castTo<FunctionType>()->getResult(),
+                 Callee, Args) {
+  
+}
+
+ApplyInst *ApplyInst::create(SILLocation Loc, Value Callee,
+                             ArrayRef<Value> Args, Function &F) {
+  return FunctionInst::create<ApplyInst>(Loc, Callee, Args, F);
+}
+
+ClosureInst::ClosureInst(SILLocation Loc, Value Callee, ArrayRef<Value> Args)
+// FIXME: the callee should have a lowered SIL function type, and ClosureInst
+// should derive the type of its result by partially applying the callee's type.
+  : FunctionInst(ValueKind::ClosureInst, Loc,
+                 Callee.getType(),
+                 Callee, Args) {
+  
+}
+
+ClosureInst *ClosureInst::create(SILLocation Loc, Value Callee,
+                                 ArrayRef<Value> Args, Function &F) {
+  return FunctionInst::create<ClosureInst>(Loc, Callee, Args, F);
+}
 
 ConstantRefInst::ConstantRefInst(DeclRefExpr *E)
   : Instruction(ValueKind::ConstantRefInst, E, E->getType()) {}

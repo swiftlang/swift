@@ -132,11 +132,11 @@ public:
     OS << "alloc_array $" << AAI->getElementType().getString()
        << ", " << getID(AAI->getNumElements());
   }
-
-  void visitApplyInst(ApplyInst *AI) {
-    OS << "apply " << getID(AI->getCallee()) << '(';
+  
+  void printFunctionInst(FunctionInst *FI) {
+    OS << getID(FI->getCallee()) << '(';
     bool first = true;
-    for (auto arg : AI->getArguments()) {
+    for (auto arg : FI->getArguments()) {
       if (first)
         first = false;
       else
@@ -144,6 +144,16 @@ public:
       OS << getID(arg);
     }
     OS << ')';
+  }
+
+  void visitApplyInst(ApplyInst *AI) {
+    OS << "apply ";
+    printFunctionInst(AI);
+  }
+  
+  void visitClosureInst(ClosureInst *CI) {
+    OS << "closure ";
+    printFunctionInst(CI);
   }
 
   void visitConstantRefInst(ConstantRefInst *DRI) {

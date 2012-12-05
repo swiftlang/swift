@@ -53,8 +53,12 @@ ABSTRACT_VALUE(Instruction, Value)
     VALUE_RANGE(AllocInst, AllocVarInst, AllocVarInst)
   INST(AllocBoxInst, Instruction)
   INST(AllocArrayInst, Instruction)
-  INST(ApplyInst, Instruction)
   INST(ConstantRefInst, Instruction)
+
+  ABSTRACT_VALUE(FunctionInst, Instruction)
+    INST(ApplyInst, FunctionInst)
+    INST(ClosureInst, FunctionInst)
+    VALUE_RANGE(FunctionInst, ApplyInst, ClosureInst)
 
   // Literals
   INST(ZeroValueInst, Instruction)

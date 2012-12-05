@@ -190,40 +190,64 @@ public:
 };
 
 
-/// ApplyInst - Represents application of an argument to a function.
-class ApplyInst : public Instruction {
+/// FunctionInst - Abstract instruction type that represents full or partial
+/// application of a function.
+class FunctionInst : public Instruction {
   /// The instruction representing the called function.
   Value Callee;
 
   unsigned NumArgs;
   Value *getArgsStorage() { return reinterpret_cast<Value*>(this + 1); }
-  
+
+protected:
   /// Construct an ApplyInst from a given call expression and the provided
   /// arguments.
-  ApplyInst(SILLocation Loc, Type Ty, Value Callee, ArrayRef<Value> Args);
+  FunctionInst(ValueKind kind,
+               SILLocation Loc, Type Ty, Value Callee, ArrayRef<Value> Args);
+
+  template<typename DERIVED>
+  static DERIVED *create(SILLocation Loc, Value Callee,
+                         ArrayRef<Value> Args, Function &F);
 
 public:
-  static ApplyInst *create(SILLocation Loc, Value Callee,
-                           ArrayRef<Value> Args, Function &F);
-  
   Value getCallee() { return Callee; }
   
-  /// The arguments passed to this ApplyInst.
+  /// The arguments passed to this instruction.
   MutableArrayRef<Value> getArguments() {
     return MutableArrayRef<Value>(getArgsStorage(), NumArgs);
   }
 
-  /// The arguments passed to this ApplyInst.
+  /// The arguments passed to this instruction.
   ArrayRef<Value> getArguments() const {
-    return const_cast<ApplyInst*>(this)->getArguments();
+    return const_cast<FunctionInst*>(this)->getArguments();
   }
 
   /// getType() is ok since this is known to only have one type.
   Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
-    return V->getKind() == ValueKind::ApplyInst;
+    return V->getKind() >= ValueKind::First_FunctionInst &&
+           V->getKind() <= ValueKind::Last_FunctionInst;
   }
+};
+  
+/// ApplyInst - Represents the full application of a function value.
+class ApplyInst : public FunctionInst {
+  friend class FunctionInst;
+  ApplyInst(SILLocation Loc, Value Callee, ArrayRef<Value> Args);
+public:
+  static ApplyInst *create(SILLocation Loc, Value Callee,
+                           ArrayRef<Value> Args, Function &F);
+};
+
+/// ClosureInst - Represents the creation of a closure object by partial
+/// application of a function value.
+class ClosureInst : public FunctionInst {
+  friend class FunctionInst;
+  ClosureInst(SILLocation Loc, Value Callee, ArrayRef<Value> Args);
+public:
+  static ClosureInst *create(SILLocation Loc, Value Callee,
+                             ArrayRef<Value> Args, Function &F);
 };
 
 /// ConstantRefInst - Represents a reference to a *constant* declaration,
