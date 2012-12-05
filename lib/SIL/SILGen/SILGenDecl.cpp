@@ -22,10 +22,63 @@ using namespace Lowering;
 
 #include "llvm/Support/raw_ostream.h"
 
+namespace {
+  class CleanupClosure : public Cleanup {
+    Value closure;
+  public:
+    CleanupClosure(Value closure) : closure(closure) {}
+    void emit(SILGenFunction &gen) override {
+      gen.B.createRelease(SILLocation(), closure);
+    }
+  };
+}
+
 void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
+  // Generate the local function body.
   // FIXME: SILDecl needs to have a unique closure ID for local functions in
   // case they get inlined or specialized.
   SGM.emitFunction(SILDecl(fd, 0), fd->getBody());
+  
+  // If there are captures, build the local closure value for the function.
+  auto captures = fd->getBody()->getCaptures();
+  if (!captures.empty()) {
+    llvm::SmallVector<Value, 4> capturedArgs;
+    for (ValueDecl *capture : captures) {
+      switch (getDeclCaptureKind(capture)) {
+        case CaptureKind::LValue: {
+          // LValues are captured as both the box owning the value and the address
+          // of the value.
+          assert(VarLocs.count(capture) &&
+                 "no location for captured var!");
+          
+          VarLoc const &loc = VarLocs[capture];
+          assert(loc.box && "no box for captured var!");
+          assert(loc.address && "no address for captured var!");
+          B.createRetain(fd, loc.box);
+          capturedArgs.push_back(loc.box);
+          capturedArgs.push_back(loc.address);
+          break;
+        }
+        case CaptureKind::Byref: {
+          // Byrefs are captured by address only.
+          assert(VarLocs.count(capture) &&
+                 "no location for captured var!");
+          capturedArgs.push_back(VarLocs[capture].address);
+          break;
+        }
+        case CaptureKind::Constant: {
+          // Value is a constant, such as a local func.
+          llvm_unreachable("rvalue capture not implemented");
+          break;
+        }
+      }
+    }
+    
+    Value functionRef = B.createConstantRef(fd);
+    Value closure = B.createClosure(fd, functionRef, capturedArgs);
+    Cleanups.pushCleanup<CleanupClosure>(closure);
+    LocalConstants[fd] = closure;
+  }
 }
 
 namespace {

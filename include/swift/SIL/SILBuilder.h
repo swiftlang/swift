@@ -135,6 +135,10 @@ public:
     return insert(new ConstantRefInst(Expr));
   }
 
+  ConstantRefInst *createConstantRef(ValueDecl *vd) {
+    return insert(new ConstantRefInst(vd));
+  }
+
   ZeroValueInst *createZeroValue(SILLocation Loc, Type Ty) {
     return insert(new ZeroValueInst(Loc, Ty));
   }

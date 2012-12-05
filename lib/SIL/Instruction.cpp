@@ -179,15 +179,21 @@ ClosureInst *ClosureInst::create(SILLocation Loc, Value Callee,
 }
 
 ConstantRefInst::ConstantRefInst(DeclRefExpr *E)
-  : Instruction(ValueKind::ConstantRefInst, E, E->getType()) {}
+  : Instruction(ValueKind::ConstantRefInst, E, E->getType()) {
+}
 
-DeclRefExpr *ConstantRefInst::getExpr() const {
-  return getLocExpr<DeclRefExpr>();
+ConstantRefInst::ConstantRefInst(ValueDecl *VD)
+  : Instruction(ValueKind::ConstantRefInst, VD, VD->getTypeOfReference()) {
 }
 
 /// getDecl - Return the underlying declaration.
 ValueDecl *ConstantRefInst::getDecl() const {
-  return getExpr()->getDecl();
+  if (Expr *e = getLoc().dyn_cast<Expr*>()) {
+    return cast<DeclRefExpr>(e)->getDecl();
+  } else if (Decl *d = getLoc().dyn_cast<Decl*>()) {
+    return cast<ValueDecl>(d);
+  } else
+    llvm_unreachable("constant_ref associated with unexpected ast node!");
 }
 
 ZeroValueInst::ZeroValueInst(SILLocation Loc, Type Ty)

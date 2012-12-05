@@ -72,71 +72,6 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   return managedRValueWithCleanup(*this, B.createApply(E, FnV, ArgsV));
 }
 
-namespace {
-  
-  struct GetDeclCaptures : ASTVisitor<GetDeclCaptures,
-                                      /*ExprRetTy=*/void,
-                                      /*StmtRetTy=*/void,
-                                      /*DeclRetTy=*/ArrayRef<ValueDecl *>>
-  {
-    ArrayRef<ValueDecl *> visitDecl(Decl *d) {
-      // FIXME: other types of decls have function bodies
-      return {};
-    }
-    
-    ArrayRef<ValueDecl *> visitFuncDecl(FuncDecl *fd) {
-      return fd->getBody()->getCaptures();
-    }
-  };
-  
-} // end anonymous namespace
-
-ManagedValue SILGenFunction::emitFunctionDeclRef(DeclRefExpr *E) {
-  auto captures = GetDeclCaptures().visit(E->getDecl());
-  
-  if (captures.empty()) {
-    // No captures; just emit a constant_ref.
-    return ManagedValue(B.createConstantRef(E));
-  } else {
-    // Generate a closure over the constant_ref.
-    llvm::SmallVector<Value, 4> capturedArgs;
-    for (ValueDecl *capture : captures) {
-      switch (getDeclCaptureKind(capture)) {
-      case CaptureKind::LValue: {
-        // LValues are captured as both the box owning the value and the address
-        // of the value.
-        assert(VarLocs.count(capture) &&
-               "no location for captured var!");
-        
-        VarLoc const &loc = VarLocs[capture];
-        assert(loc.box && "no box for captured var!");
-        assert(loc.address && "no address for captured var!");
-        B.createRetain(E, loc.box);
-        capturedArgs.push_back(loc.box);
-        capturedArgs.push_back(loc.address);
-        break;
-      }
-      case CaptureKind::Byref: {
-        // Byrefs are captured by address only.
-        assert(VarLocs.count(capture) &&
-               "no location for captured var!");
-        capturedArgs.push_back(VarLocs[capture].address);
-        break;
-      }
-      case CaptureKind::Constant: {
-        // Value is a constant, such as a local func.
-        llvm_unreachable("rvalue capture unsupported");
-        break;
-      }
-      }
-    }
-    
-    Value functionRef = B.createConstantRef(E);
-    return managedRValueWithCleanup(*this, B.createClosure(E,
-                                                    functionRef, capturedArgs));
-  }
-}
-
 ManagedValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E) {
   // FIXME: properties
   
@@ -149,14 +84,15 @@ ManagedValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E) {
   assert(!(isLValue && E->getDecl()->getDeclContext()->isLocalContext()) &&
          "no location for local var!");
   
-  // If this is a reference to a function, build the function object.
-  if (E->getType()->is<AnyFunctionType>()) {
-    return emitFunctionDeclRef(E);
+  // If this is a reference to a local constant, grab it.
+  if (LocalConstants.count(E->getDecl())) {
+    Value constant = LocalConstants[E->getDecl()];
+    emitRetainRValue(E, constant);
+    return managedRValueWithCleanup(*this, constant);
   }
   
-  // Otherwise, use a ConstantRefInst.
+  // Otherwise, use a global ConstantRefInst.
   // FIXME: globals should be implemented in a way similar to properties
-  // FIXME: local func decls need to create and evaluate to a closure
   // FIXME: other kinds of local decl?
   Value v = B.createConstantRef(E);
   return ManagedValue(v);

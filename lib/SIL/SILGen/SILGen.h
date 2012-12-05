@@ -101,8 +101,14 @@ public:
   };
     
   /// VarLocs - Entries in this map are generated when a PatternBindingDecl is
-  /// emitted. The map is queried to produce the lvalue for a DeclRefExpr.
+  /// emitted. The map is queried to produce the lvalue for a DeclRefExpr to
+  /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
+    
+  /// LocalConstants - Entries in this map are generated when a local constant
+  /// declaration, such as a func, is emitted. This map is queried to produce
+  /// the constant value for a DeclRefExpr to a local constant.
+  llvm::DenseMap<ValueDecl*, Value> LocalConstants;
     
   bool hasVoidReturn;
 
@@ -240,7 +246,6 @@ public:
                                 ArrayRef<Value> InOps,
                                 ArrayRef<int> ElementMapping,
                                 Expr *VarargsInjectionFunction);
-  ManagedValue emitFunctionDeclRef(DeclRefExpr *E);
 
   //===--------------------------------------------------------------------===//
   // Declarations

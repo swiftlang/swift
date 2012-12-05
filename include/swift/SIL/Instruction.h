@@ -260,8 +260,11 @@ public:
   /// \param Expr A backpointer to the original DeclRefExpr.
   ///
   ConstantRefInst(DeclRefExpr *E);
-
-  DeclRefExpr *getExpr() const;
+  
+  /// Construct a ConstantRefInst.
+  ///
+  /// \param Decl A backpointer to the original ValueDecl.
+  ConstantRefInst(ValueDecl *VD);
 
   /// getDecl - Return the underlying declaration.
   ValueDecl *getDecl() const;
