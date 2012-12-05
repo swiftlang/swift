@@ -565,6 +565,29 @@ namespace {
       if (!objcMethod)
         return nullptr;
 
+      // Figure out the type of the container.
+      auto dc = decl->getDeclContext();
+      auto containerTy = dc->getDeclaredTypeOfContext();
+      assert(containerTy && "Method in non-type context?");
+
+      // Make sure that NSObject is a supertype of the container.
+      // FIXME: This is a hack because we don't have a suitable 'top' type for
+      // Objective-C classes.
+      auto checkTy = containerTy;
+      do {
+        auto classDecl = checkTy->getClassOrBoundGenericClass();
+        if (!classDecl) {
+          return nullptr;
+        }
+
+        if (classDecl->getName().str() == "NSObject")
+          break;
+
+        checkTy = classDecl->getBaseClass();
+        if (!checkTy)
+          return nullptr;
+      } while (true);
+
       // ...in the 'init' or 'new' family...
       FuncDecl *alloc = nullptr;
       
@@ -609,16 +632,13 @@ namespace {
       }
 
       case clang::OMF_new:
+        if (!objcMethod->isClassMethod())
+          return nullptr;
         break;
       }
 
       // FIXME: Hack.
       auto name = Impl.SwiftContext.getIdentifier("constructor");
-      auto dc = decl->getDeclContext();
-
-      // Figure out the type of the container.
-      auto containerTy = dc->getDeclaredTypeOfContext();
-      assert(containerTy && "Method in non-type context?");
 
       // Add the implicit 'this' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;

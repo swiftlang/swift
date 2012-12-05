@@ -52,3 +52,11 @@
 @end
 
 NSDate *swift_createDate(void);
+
+@interface NSProxy
++ alloc;
+@end
+
+@interface AProxy : NSProxy
+- initWithInt:(int)i;
+@end
