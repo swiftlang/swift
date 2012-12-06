@@ -996,7 +996,6 @@ namespace {
                                              Identifier(), SourceLoc(), nullptr,
                                              setterType, funcExpr,
                                              setter->getDeclContext());
-        setterThunk->setClangDecl(setter->getClangDecl());
 
         // Create the body of the thunk, which calls the Objective-C setter.
         auto thisVar = getSingleVar(getterArgs[0]);
