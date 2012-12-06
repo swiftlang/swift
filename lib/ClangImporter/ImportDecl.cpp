@@ -308,6 +308,10 @@ namespace {
         auto pat = pattern->getSemanticsProvidingPattern();
         if (auto named = dyn_cast<NamedPattern>(pat))
           named->getDecl()->setDeclContext(dc);
+        if (auto tuple = dyn_cast<TuplePattern>(pat)) {
+          for (auto elt : tuple->getFields())
+            setVarDeclContexts(elt.getPattern(), dc);
+        }
       }
     }
 
@@ -911,13 +915,93 @@ namespace {
       auto elementTy
         = getter->getType()->castTo<AnyFunctionType>()->getResult()
             ->castTo<AnyFunctionType>()->getResult();
-      auto getterTuple = dyn_cast<TuplePattern>(
-                           getter->getBody()->getArgParamPatterns()[1]);
-      if (getterTuple && getterTuple->getFields().size() != 1)
-        return nullptr;
+
+      // Check the form of the getter.
+      FuncDecl *getterThunk = nullptr;
+      auto &context = Impl.SwiftContext;
+      {
+        auto tuple = dyn_cast<TuplePattern>(
+                       getter->getBody()->getArgParamPatterns()[1]);
+        if (tuple && tuple->getFields().size() != 1)
+          return nullptr;
+
+        // Build a thunk for the getter.
+        auto loc = getter->getLoc();
+        auto indexPattern = tuple->getFields()[0].getPattern()->clone(context);
+        Pattern *getterArgs[3] = {
+          // this
+          getter->getBody()->getBodyParamPatterns()[0]->clone(context),
+          // index
+          TuplePattern::create(context, loc, TuplePatternElt(indexPattern),
+                               loc),
+          // empty
+          TuplePattern::create(context, loc, { }, loc)
+        };
+        getterArgs[1]->setType(
+          TupleType::get(TupleTypeElt(indexPattern->getType(),
+                                      indexPattern->getBoundName()),
+                         context));
+        getterArgs[2]->setType(TupleType::getEmpty(context));
+
+        // Form the type of the getter.
+        auto getterType = FunctionType::get(getterArgs[2]->getType(),
+                                            elementTy,
+                                            context);
+        getterType = FunctionType::get(getterArgs[1]->getType(),
+                                       getterType,
+                                       context);
+        getterType = FunctionType::get(getterArgs[0]->getType(),
+                                       getterType,
+                                       context);
+
+        // Create the getter body.
+        auto funcExpr = FuncExpr::create(context, getter->getLoc(),
+                                         getterArgs,
+                                         getterArgs,
+                                         TypeLoc::withoutLoc(elementTy),
+                                         nullptr,
+                                         getter->getDeclContext());
+        funcExpr->setType(getterType);
+        setVarDeclContexts(getterArgs, funcExpr);
+
+        // Create the getter thunk.
+        getterThunk = new (context) FuncDecl(SourceLoc(), getter->getLoc(),
+                                             Identifier(), SourceLoc(), nullptr,
+                                             getterType, funcExpr,
+                                             getter->getDeclContext());
+
+        // Create the body of the thunk, which calls the Objective-C getter.
+        auto thisVar = getSingleVar(getterArgs[0]);
+        auto indexVar = getSingleVar(getterArgs[1]);
+
+        auto thisRef = new (context) DeclRefExpr(thisVar, loc,
+                                                 thisVar->getTypeOfReference());
+        auto indexRef
+          = new (context) DeclRefExpr(indexVar, loc,
+                                      indexVar->getTypeOfReference());
+        auto getterRef
+          = new (context) DeclRefExpr(getter, loc,
+                                      getter->getTypeOfReference());
+
+        // First, bind 'this' to the method.
+        Expr *call = new (context) DotSyntaxCallExpr(getterRef, loc, thisRef);
+
+        // Next, call the Objective-C getter.
+        call = new (context) CallExpr(call, indexRef);
+
+        // Create the return statement.
+        auto ret = new (context) ReturnStmt(loc, call);
+        
+        // Finally, set the body.
+        funcExpr->setBody(BraceStmt::create(context, loc,
+                                            BraceStmt::ExprStmtOrDecl(ret),
+                                            loc));
+        
+        // Register this thunk as an external definition.
+        Impl.firstClangModule->addExternalDefinition(getterThunk);
+      }
 
       // Check the form of the setter.
-      auto &context = Impl.SwiftContext;
       FuncDecl *setterThunk = nullptr;
       if (setter) {
         auto tuple = dyn_cast<TuplePattern>(
@@ -944,14 +1028,14 @@ namespace {
         //
         //   (this) -> (index)(value) -> ()
         //
-        // Build a getter thunk with the latter signature that maps to the
+        // Build a setter thunk with the latter signature that maps to the
         // former.
         auto loc = setter->getLoc();
         auto indexPattern = tuple->getFields()[1].getPattern()->clone(context);
         auto valuePattern = tuple->getFields()[0].getPattern()->clone(context);
-        Pattern *getterArgs[3] = {
+        Pattern *setterArgs[3] = {
           // this
-          getter->getBody()->getBodyParamPatterns()[0]->clone(context),
+          setter->getBody()->getBodyParamPatterns()[0]->clone(context),
           // index
           TuplePattern::create(context, loc, TuplePatternElt(indexPattern),
                                loc),
@@ -960,36 +1044,36 @@ namespace {
                                loc),
         };
 
-        getterArgs[1]->setType(
+        setterArgs[1]->setType(
           TupleType::get(TupleTypeElt(indexPattern->getType(),
                                       indexPattern->getBoundName()),
                          context));
-        getterArgs[2]->setType(
+        setterArgs[2]->setType(
           TupleType::get(TupleTypeElt(valuePattern->getType(),
                                      valuePattern->getBoundName()),
                          context));
 
         // Form the type of the setter.        
-        auto setterType = FunctionType::get(getterArgs[2]->getType(),
+        auto setterType = FunctionType::get(setterArgs[2]->getType(),
                                             TupleType::getEmpty(context),
                                             context);
-        setterType = FunctionType::get(getterArgs[1]->getType(),
+        setterType = FunctionType::get(setterArgs[1]->getType(),
                                        setterType,
                                        context);
-        setterType = FunctionType::get(getterArgs[0]->getType(),
+        setterType = FunctionType::get(setterArgs[0]->getType(),
                                        setterType,
                                        context);
 
         // Create the setter body.
         auto funcExpr = FuncExpr::create(context, setter->getLoc(),
-                                           getterArgs,
-                                           getterArgs,
+                                           setterArgs,
+                                           setterArgs,
                                            TypeLoc::withoutLoc(
                                              TupleType::getEmpty(context)),
                                            nullptr,
                                            setter->getDeclContext());
         funcExpr->setType(setterType);
-        setVarDeclContexts(getterArgs, funcExpr);
+        setVarDeclContexts(setterArgs, funcExpr);
 
         // Create the setter thunk.
         setterThunk = new (context) FuncDecl(SourceLoc(), setter->getLoc(),
@@ -998,9 +1082,9 @@ namespace {
                                              setter->getDeclContext());
 
         // Create the body of the thunk, which calls the Objective-C setter.
-        auto thisVar = getSingleVar(getterArgs[0]);
-        auto indexVar = getSingleVar(getterArgs[1]);
-        auto valueVar = getSingleVar(getterArgs[2]);
+        auto thisVar = getSingleVar(setterArgs[0]);
+        auto indexVar = getSingleVar(setterArgs[1]);
+        auto valueVar = getSingleVar(setterArgs[2]);
 
         auto thisRef = new (context) DeclRefExpr(thisVar, loc,
                                                  thisVar->getTypeOfReference());
@@ -1037,20 +1121,22 @@ namespace {
 
       // Build the subscript declaration.
       auto dc = decl->getDeclContext();
+      auto argPatterns
+        = getterThunk->getBody()->getArgParamPatterns()[1]->clone(context);
       auto subscript
         = new (context) SubscriptDecl(
                           context.getIdentifier("__subscript"),
                           decl->getLoc(),
-                          getter->getBody()->getArgParamPatterns()[1]
-                            ->clone(context),
+                          argPatterns,
                           decl->getLoc(),
                           TypeLoc::withoutLoc(elementTy),
-                          SourceRange(), getter, setterThunk, dc);
+                          SourceRange(), getterThunk, setterThunk, dc);
+      setVarDeclContexts(argPatterns, subscript->getDeclContext());
 
       subscript->setType(FunctionType::get(subscript->getIndices()->getType(),
                                            subscript->getElementType(),
                                            context));
-
+      getterThunk->makeGetter(subscript);
       if (setterThunk)
         setterThunk->makeSetter(subscript);
 
