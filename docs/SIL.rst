@@ -278,8 +278,9 @@ string_literal
   %1 = string_literal {ascii|utf8} "asdf"
   ; %1 has type $Builtin.RawPointer
 
-Retrieves a pointer to a string literal in the string table. The result will be
-of the builtin ``RawPointer`` type.
+Retrieves a pointer to a string literal in the string table. The result will
+be a ``Builtin.RawPointer`` pointing to the first byte of a zero-terminated
+string in the specified ``ascii`` or ``utf8`` encoding.
 
 metatype
 ````````
@@ -318,6 +319,7 @@ alloc_ref
   %1 = alloc_ref {heap|stack} $T
   ; $T must be a reference type
   ; %1 has type $T
+  ; TODO: not implemented
 
 Allocates an object of reference type ``T``. The object will be initialized
 with retain count 1; its state will be otherwise uninitialized. The object
@@ -337,6 +339,7 @@ alloc_box
   ;   %1#2 has type SIL.Address<T2>
   ;               ⋮
   ;   %1#N has type SIL.Address<TN>
+  ; TODO: alloc_box is only implemented for a single type argument
 
 Allocates a box large enough to hold ``N`` values of types ``T1`` through
 ``TN``. The result of the instruction is a multiple-value operand consisting of
@@ -386,6 +389,7 @@ dealloc_ref
 
   dealloc_ref {heap|stack} %0
   ; %0 must be of a box or reference type
+  ; TODO: not implemented
 
 Deallocates a box or reference type instance. The box must have a
 retain count of one, and the ``heap`` or ``stack`` attribute must match the
@@ -528,6 +532,7 @@ construct
   ; $T must be a loadable aggregate type
   ; %0, %1, etc. must be of the types of the fields of $T in order
   ; %N will be of type $T
+  ; TODO: not implemented
 
 Creates a value of a loadable aggregate type with zero or more elements.
 This does not allocate any memory or retain any inputs.
@@ -550,6 +555,7 @@ insert
   ; %0 must be of a loadable aggregate type
   ; %1 must be of the type of the 123rd element of %0
   ; %2 will be of the same type as %0
+  ; TODO: not implemented
 
 Create a new value of a loadable aggregate value equal to another value of
 that type with a single element replaced.
@@ -562,6 +568,7 @@ element_addr
   ; %0 must of a $SIL.Address<T> type for a loadable aggregate type T
   ; %1 will be of type $SIL.Address<U> where U is the type of the 123rd
   ;   element of T
+  ; TODO: not implemented
 
 Given the address of a loadable aggregate value in memory, creates a
 value representing the address of an element within that value.
@@ -607,6 +614,7 @@ alloc_protocol
   ; %0 must be of a $SIL.Address<P> type for protocol type P
   ; $T must be a type that fulfills protocol(s) P
   ; %1 will be of type $SIL.Address<T>
+  ; TODO: not implemented
 
 Prepares the uninitialized protocol value pointed to by ``%0`` to
 contain a value of type ``$T``. ``%0`` must point to uninitialized storage
@@ -634,6 +642,7 @@ protocol_method_ref
   ; @method must be a reference to a method of (one of the) protocol(s) P
   ; %1 will be of type $(Builtin.RawPointer, T...) -> U
   ;   for method type (T...) -> U
+  ; TODO: not implemented
 
 Obtains a reference to the function implementing ``@method`` for the protocol
 value referenced by ``%0``. The resulting function value will take a pointer
@@ -647,6 +656,7 @@ project_protocol
   %1 = project_protocol %0
   ; %0 must be of a $SIL.Address<P> type for protocol type P
   ; %1 will be of type $Builtin.RawPointer
+  ; TODO: not implemented
 
 Obtains a ``RawPointer`` pointing to the value inside the protocol value
 referenced by ``%0``. This raw pointer can be passed to protocol methods
