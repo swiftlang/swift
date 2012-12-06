@@ -40,7 +40,8 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   // If there are captures, build the local closure value for the function and
   // store it as a local constant.
   if (!fd->getBody()->getCaptures().empty()) {
-    Value closure = emitClosureForFuncExpr(fd, SILConstant(fd), fd->getBody())
+    Value closure = emitClosureForCapturingExpr(fd, SILConstant(fd),
+                                                fd->getBody())
       .forward(*this);
     Cleanups.pushCleanup<CleanupClosure>(closure);
     LocalConstants[fd] = closure;
@@ -252,14 +253,15 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
   
 } // end anonymous namespace
 
-void SILGenFunction::emitProlog(FuncExpr *FE) {
+void SILGenFunction::emitProlog(CapturingExpr *ce,
+                                ArrayRef<Pattern*> paramPatterns) {
   // Emit the capture variables.
-  for (auto capture : FE->getCaptures()) {
+  for (auto capture : ce->getCaptures()) {
     makeCaptureBBArguments(*this, capture);
   }
   
   // Emit the argument variables.
-  for (auto &ParamPattern : FE->getBodyParamPatterns()) {
+  for (auto &ParamPattern : paramPatterns) {
     // Add the BBArguments and collect them as a Value.
     Value ArgInit = ArgumentCreatorVisitor(*this, F).visit(ParamPattern);
     // Use the value to initialize a (mutable) variable allocation.

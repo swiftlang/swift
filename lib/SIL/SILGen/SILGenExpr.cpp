@@ -358,9 +358,9 @@ ManagedValue SILGenFunction::visitMetatypeExpr(MetatypeExpr *E) {
   return ManagedValue(B.createMetatype(E));
 }
 
-ManagedValue SILGenFunction::emitClosureForFuncExpr(SILLocation loc,
-                                                    SILConstant constant,
-                                                    FuncExpr *body) {
+ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
+                                                         SILConstant constant,
+                                                         CapturingExpr *body) {
   auto captures = body->getCaptures();
   if (!captures.empty()) {
     
@@ -368,8 +368,8 @@ ManagedValue SILGenFunction::emitClosureForFuncExpr(SILLocation loc,
     for (ValueDecl *capture : captures) {
       switch (getDeclCaptureKind(capture)) {
         case CaptureKind::LValue: {
-          // LValues are captured as both the box owning the value and the address
-          // of the value.
+          // LValues are captured as both the box owning the value and the
+          // address of the value.
           assert(VarLocs.count(capture) &&
                  "no location for captured var!");
           
@@ -411,6 +411,25 @@ ManagedValue SILGenFunction::visitFuncExpr(FuncExpr *e) {
   SGM.emitFunction(SILConstant(e), e);
 
   // Generate the closure (if any) for the function reference.
-  return emitClosureForFuncExpr(e, SILConstant(e), e);
+  return emitClosureForCapturingExpr(e, SILConstant(e), e);
 }
 
+ManagedValue SILGenFunction::visitClosureExpr(ClosureExpr *e) {
+  // Generate the closure body.
+  SGM.emitClosure(e);
+  
+  // Generate the closure value (if any) for the closure expr's function
+  // reference.
+  return emitClosureForCapturingExpr(e, SILConstant(e), e);
+}
+
+void SILGenFunction::emitClosureBody(Expr *body) {
+  // Closure expressions implicitly return the result of their body expression.
+  Value result;
+  {
+    FullExpr scope(Cleanups);
+    result = visit(body).forward(*this);
+  }
+  if (B.hasValidInsertionPoint())
+    Cleanups.emitReturnAndCleanups(body, result);
+}

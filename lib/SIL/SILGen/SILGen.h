@@ -60,6 +60,7 @@ public:
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td);
 
   Function *emitFunction(SILConstant decl, FuncExpr *fe);
+  Function *emitClosure(ClosureExpr *ce);
 };
 
 /// CaptureKind - Closure capture modes.
@@ -115,9 +116,11 @@ public:
 public:
   SILGenFunction(SILGenModule &SGM, Function &F, bool hasVoidReturn);
   SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE);
+  SILGenFunction(SILGenModule &SGM, Function &F, ClosureExpr *CE);
   ~SILGenFunction();
 
-  void emitProlog(FuncExpr *FE);
+  void emitProlog(CapturingExpr *ce, ArrayRef<Pattern*> paramPatterns);
+  void emitClosureBody(Expr *body);
 
   /// Return a stable reference to the current cleanup.
   CleanupsDepth getCleanupsDepth() const {
@@ -239,6 +242,7 @@ public:
   ManagedValue visitNewArrayExpr(NewArrayExpr *E);
   ManagedValue visitMetatypeExpr(MetatypeExpr *E);
   ManagedValue visitFuncExpr(FuncExpr *E);
+  ManagedValue visitClosureExpr(ClosureExpr *E);
 
   ManagedValue emitArrayInjectionCall(Value ObjectPtr,
                                       Value BasePtr,
@@ -251,9 +255,9 @@ public:
   ManagedValue emitReferenceToDecl(SILLocation loc,
                                    ValueDecl *decl);
 
-  ManagedValue emitClosureForFuncExpr(SILLocation loc,
-                                      SILConstant function,
-                                      FuncExpr *body);
+  ManagedValue emitClosureForCapturingExpr(SILLocation loc,
+                                           SILConstant function,
+                                           CapturingExpr *body);
 
   //===--------------------------------------------------------------------===//
   // Declarations

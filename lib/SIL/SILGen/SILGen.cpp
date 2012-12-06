@@ -41,7 +41,13 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE)
   : SILGenFunction(SGM, F,
           /*hasVoidReturn=*/isVoidableType(FE->getResultType(F.getContext()))) {
 
-  emitProlog(FE);
+  emitProlog(FE, FE->getBodyParamPatterns());
+}
+
+SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F, ClosureExpr *CE)
+  : SILGenFunction(SGM, F, /*hasVoidReturn=*/false) {
+
+  emitProlog(CE, CE->getParamPatterns());
 }
 
 TupleInst *SILBuilder::createEmptyTuple(SILLocation Loc) {
@@ -86,18 +92,32 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) {
   emitFunction(SILConstant(fd), fd->getBody());
 }
 
-Function *SILGenModule::emitFunction(SILConstant decl, FuncExpr *fe) {
+Function *SILGenModule::emitFunction(SILConstant constant, FuncExpr *fe) {
   // Ignore prototypes.
   if (fe->getBody() == nullptr) return nullptr;
   
-  assert(!M.hasFunction(decl) &&
+  assert(!M.hasFunction(constant) &&
          "already generated function for decl!");
   
   Function *f = new (M) Function(M);
   SILGenFunction(*this, *f, fe).visit(fe->getBody());
   
   f->verify();
-  M.functions[decl] = f;
+  M.functions[constant] = f;
+  
+  return f;
+}
+
+Function *SILGenModule::emitClosure(ClosureExpr *ce) {
+  SILConstant constant(ce);
+  assert(!M.hasFunction(constant) &&
+         "already generated function for closure!");
+  
+  Function *f = new (M) Function(M);
+  SILGenFunction(*this, *f, ce).emitClosureBody(ce->getBody());
+  
+  f->verify();
+  M.functions[constant] = f;
   
   return f;
 }
