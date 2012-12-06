@@ -173,6 +173,11 @@ static bool isLocalLinkageDecl(Decl *D) {
       return true;
     DC = DC->getParent();
   }
+
+  // Constructors synthesized in the mapping to Clang modules are local.
+  if (isa<ClangModule>(DC) && isa<ConstructorDecl>(D))
+    return true;
+
   return false;
 }
 
