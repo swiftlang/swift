@@ -137,17 +137,28 @@ are two broad categories of types based on value semantics:
 
 SIL classifies types into two additional subgroups based on ABI stability:
 
-* *loadable types* are types with a fully exposed concrete representation. All
-  reference types are loadable. A value types is loadable if it is a builtin
-  value type, if it is a fragile struct and all of its element types
-  are loadable, or if it is a tuple and all of its element types are
-  loadable. A *loadable aggregate type* is a tuple or struct type that is
-  loadable.
-* *address-only types* are value types for which the compiler cannot access a
-  full concrete representation, such as resilient value types or types that
-  contain resilient types. Memory that contains an address-only type may be
-  referred to by an address, but those addresses cannot be directly loaded or
-  stored.
+* *Loadable types* are types with a fully exposed concrete representation:
+
+  * Reference types,
+  * Builtin value types,
+  * Fragile struct types in which all element types are loadable, and
+  * Tuple types in which all element types are loadable.
+
+  A *loadable aggregate type* is a tuple or struct type that is loadable.
+
+* *Address-only types* are value types for which the compiler cannot access a
+  full concrete representation:
+  
+  * Resilient value types,
+  * Fragile struct or tuple types that contain resilient types as elements at
+    any depth,
+  * Protocol types, and
+  * Generic archetypes.
+
+  Values of address-only types must reside in memory and can only be referenced
+  in SIL by address. Address-only type addresses cannot be loaded from or
+  stored to. SIL provides special instructions for indirectly accessing
+  address-only values.
 
 SIL adds some additional types of its own, which are not first-class Swift
 types but are needed for some operations:
