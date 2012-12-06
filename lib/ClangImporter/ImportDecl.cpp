@@ -302,7 +302,7 @@ namespace {
 
     /// \brief Set the declaration context of each variable within the given
     /// patterns to \p dc.
-    static void setVarDeclContexts(SmallVectorImpl<Pattern *> &patterns,
+    static void setVarDeclContexts(ArrayRef<Pattern *> patterns,
                                    DeclContext *dc) {
       for (auto pattern : patterns) {
         auto pat = pattern->getSemanticsProvidingPattern();
@@ -840,6 +840,20 @@ namespace {
       return result;
     }
 
+    /// \brief Retrieve the single variable described in the given pattern.
+    ///
+    /// This routine assumes that the pattern is something very simple
+    /// like (x : type) or (x).
+    VarDecl *getSingleVar(Pattern *pattern) {
+      pattern = pattern->getSemanticsProvidingPattern();
+      if (auto tuple = dyn_cast<TuplePattern>(pattern)) {
+        pattern = tuple->getFields()[0].getPattern()
+                    ->getSemanticsProvidingPattern();
+      }
+
+      return cast<NamedPattern>(pattern)->getDecl();
+    }
+
     /// \brief Given either the getter or setter for a subscript operation,
     /// create the Swift subscript declaration.
     SubscriptDecl *importSubscript(Decl *decl,
@@ -903,9 +917,11 @@ namespace {
         return nullptr;
 
       // Check the form of the setter.
+      auto &context = Impl.SwiftContext;
+      FuncDecl *setterThunk = nullptr;
       if (setter) {
         auto tuple = dyn_cast<TuplePattern>(
-                       setter->getBody()->getArgParamPatterns()[1]);
+                       setter->getBody()->getBodyParamPatterns()[1]);
         if (!tuple)
           return nullptr;
 
@@ -918,26 +934,126 @@ namespace {
         auto setterElementTy = tuple->getFields()[0].getPattern()->getType();
         if (!elementTy->isEqual(setterElementTy))
           return nullptr;
+
+        // Objective-C subscript setters are imported with a function type
+        // such as:
+        //
+        //   (this) -> (value, index) -> ()
+        //
+        // while Swift subscript setters are curried as
+        //
+        //   (this) -> (index)(value) -> ()
+        //
+        // Build a getter thunk with the latter signature that maps to the
+        // former.
+        auto loc = setter->getLoc();
+        auto indexPattern = tuple->getFields()[1].getPattern()->clone(context);
+        auto valuePattern = tuple->getFields()[0].getPattern()->clone(context);
+        Pattern *getterArgs[3] = {
+          // this
+          getter->getBody()->getBodyParamPatterns()[0]->clone(context),
+          // index
+          TuplePattern::create(context, loc, TuplePatternElt(indexPattern),
+                               loc),
+          // value
+          TuplePattern::create(context, loc, TuplePatternElt(valuePattern),
+                               loc),
+        };
+
+        getterArgs[1]->setType(
+          TupleType::get(TupleTypeElt(indexPattern->getType(),
+                                      indexPattern->getBoundName()),
+                         context));
+        getterArgs[2]->setType(
+          TupleType::get(TupleTypeElt(valuePattern->getType(),
+                                     valuePattern->getBoundName()),
+                         context));
+
+        // Form the type of the setter.        
+        auto setterType = FunctionType::get(getterArgs[2]->getType(),
+                                            TupleType::getEmpty(context),
+                                            context);
+        setterType = FunctionType::get(getterArgs[1]->getType(),
+                                       setterType,
+                                       context);
+        setterType = FunctionType::get(getterArgs[0]->getType(),
+                                       setterType,
+                                       context);
+
+        // Create the setter body.
+        auto funcExpr = FuncExpr::create(context, setter->getLoc(),
+                                           getterArgs,
+                                           getterArgs,
+                                           TypeLoc::withoutLoc(
+                                             TupleType::getEmpty(context)),
+                                           nullptr,
+                                           setter->getDeclContext());
+        funcExpr->setType(setterType);
+        setVarDeclContexts(getterArgs, funcExpr);
+
+        // Create the setter thunk.
+        setterThunk = new (context) FuncDecl(SourceLoc(), setter->getLoc(),
+                                             Identifier(), SourceLoc(), nullptr,
+                                             setterType, funcExpr,
+                                             setter->getDeclContext());
+        setterThunk->setClangDecl(setter->getClangDecl());
+
+        // Create the body of the thunk, which calls the Objective-C setter.
+        auto thisVar = getSingleVar(getterArgs[0]);
+        auto indexVar = getSingleVar(getterArgs[1]);
+        auto valueVar = getSingleVar(getterArgs[2]);
+
+        auto thisRef = new (context) DeclRefExpr(thisVar, loc,
+                                                 thisVar->getTypeOfReference());
+        auto indexRef
+          = new (context) DeclRefExpr(indexVar, loc,
+                                      indexVar->getTypeOfReference());
+        auto valueRef
+          = new (context) DeclRefExpr(valueVar, loc,
+                                      valueVar->getTypeOfReference());
+        auto setterRef
+          = new (context) DeclRefExpr(setter, loc,
+                                      setter->getTypeOfReference());
+
+        // First, bind 'this' to the method.
+        Expr *call = new (context) DotSyntaxCallExpr(setterRef, loc, thisRef);
+
+        // Next, call the Objective-C setter.
+        Expr *callArgsArray[2] = { valueRef, indexRef };
+        auto callArgs
+          = new (context) TupleExpr(loc,
+                                    context.AllocateCopy(
+                                      MutableArrayRef<Expr*>(callArgsArray)),
+                                    nullptr, loc);
+        call = new (context) CallExpr(call, callArgs);
+
+        // Finally, set the body.
+        funcExpr->setBody(BraceStmt::create(context, loc,
+                                            BraceStmt::ExprStmtOrDecl(call),
+                                            loc));
+
+        // Register this thunk as an external definition.
+        Impl.firstClangModule->addExternalDefinition(setterThunk);
       }
 
       // Build the subscript declaration.
-      // FIXME: The getter actually matches directly, but the setter should
-      // be curried as (index)(value) rather than being (index, value), so
-      // we'll have to synthesize a setter.
-      auto &context = Impl.SwiftContext;
       auto dc = decl->getDeclContext();
       auto subscript
         = new (context) SubscriptDecl(
                           context.getIdentifier("__subscript"),
                           decl->getLoc(),
-                          getter->getBody()->getArgParamPatterns()[1],
+                          getter->getBody()->getArgParamPatterns()[1]
+                            ->clone(context),
                           decl->getLoc(),
                           TypeLoc::withoutLoc(elementTy),
-                          SourceRange(), getter, setter, dc);
+                          SourceRange(), getter, setterThunk, dc);
 
       subscript->setType(FunctionType::get(subscript->getIndices()->getType(),
                                            subscript->getElementType(),
                                            context));
+
+      if (setterThunk)
+        setterThunk->makeSetter(subscript);
 
       // FIXME: Figure out overriding.
 

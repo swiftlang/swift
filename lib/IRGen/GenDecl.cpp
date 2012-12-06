@@ -473,9 +473,18 @@ void IRGenFunction::emitExternalDefinition(Decl *D) {
     case DeclKind::TopLevelCode:
     case DeclKind::TypeAlias:
     case DeclKind::Var:
-    case DeclKind::Func:
     case DeclKind::Import:
+    case DeclKind::Subscript:
+    case DeclKind::Destructor:
       llvm_unreachable("Not a valid external definition for IRgen");
+
+    case DeclKind::Func:
+      // The only functions available are subscript setters.
+      assert(cast<FuncDecl>(D)->isGetterOrSetter() &&
+             isa<SubscriptDecl>(cast<FuncDecl>(D)->getSetterDecl()) &&
+             "Not a synthesized setter");
+      IGM.emitInstanceMethod(cast<FuncDecl>(D));
+      break;
 
     case DeclKind::Constructor:
       if (D->getDeclContext()->getDeclaredTypeOfContext()
@@ -484,14 +493,6 @@ void IRGenFunction::emitExternalDefinition(Decl *D) {
       } else {
         IGM.emitConstructor(cast<ConstructorDecl>(D));
       }
-      break;
-
-    case DeclKind::Destructor:
-      llvm_unreachable("Cannot handle destructors yet");
-      break;
-
-    case DeclKind::Subscript:
-      llvm_unreachable("Cannot handle subscripts yet");
       break;
   }
 }
