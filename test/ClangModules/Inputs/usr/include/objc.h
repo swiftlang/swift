@@ -47,6 +47,11 @@
 + newWithA:(A*)a;
 @end
 
+@interface A(Subscripting)
+- objectAtIndexedSubscript:(unsigned)idx;
+- (void)setObject:(id)object atIndexedSubscript:(unsigned)idx;
+@end
+
 @interface NSDate : NSObject
 - (signed char)isEqualToDate:(NSDate *)anotherDate;
 @end

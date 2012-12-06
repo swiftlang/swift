@@ -197,6 +197,19 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
   // doing, and TUScope has gone stale.
   instance.getSema().TUScope = nullptr;
 
+  // Create the selectors we'll be looking for.
+  auto &clangContext = importer->Impl.Instance->getASTContext();
+  importer->Impl.objectAtIndexedSubscript
+    = clangContext.Selectors.getUnarySelector(
+        &clangContext.Idents.get("objectAtIndexedSubscript"));
+  clang::IdentifierInfo *setObjectAtIndexedSubscriptIdents[2] = {
+    &clangContext.Idents.get("setObject"),
+    &clangContext.Idents.get("atIndexedSubscript")
+  };
+  importer->Impl.setObjectAtIndexedSubscript
+    = clangContext.Selectors.getSelector(2, setObjectAtIndexedSubscriptIdents);
+
+
   return importer.release();
 }
 

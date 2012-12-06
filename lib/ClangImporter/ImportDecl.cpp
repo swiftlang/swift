@@ -550,6 +550,54 @@ namespace {
     }
 
   private:
+    /// \brief Given an imported method, try to import it as some kind of
+    /// special declaration, e.g., a constructor or subscript.
+    Decl *importSpecialMethod(Decl *decl) {
+      // Only consider Objective-C methods...
+      auto objcMethod
+        = dyn_cast_or_null<clang::ObjCMethodDecl>(decl->getClangDecl());
+      if (!objcMethod)
+        return nullptr;
+
+      switch (objcMethod->getMethodFamily()) {
+      case clang::OMF_None:
+        // Check for one of the subscripting selectors.
+        if (objcMethod->isInstanceMethod() &&
+            (objcMethod->getSelector() == Impl.objectAtIndexedSubscript ||
+             objcMethod->getSelector() == Impl.setObjectAtIndexedSubscript))
+          return importSubscript(decl, objcMethod);
+          
+        return nullptr;
+
+      case clang::OMF_alloc:
+      case clang::OMF_autorelease:
+      case clang::OMF_copy:
+      case clang::OMF_dealloc:
+      case clang::OMF_finalize:
+      case clang::OMF_mutableCopy:
+      case clang::OMF_performSelector:
+      case clang::OMF_release:
+      case clang::OMF_retain:
+      case clang::OMF_retainCount:
+      case clang::OMF_self:
+        // None of these methods have special consideration.
+        return nullptr;
+
+      case clang::OMF_init:
+        // An init instance method can be a constructor.
+        if (objcMethod->isInstanceMethod())
+          return importConstructor(decl, objcMethod);
+        return nullptr;
+
+      case clang::OMF_new:
+        // A new class method can be a constructor.
+        if (objcMethod->isClassMethod())
+          return importConstructor(decl, objcMethod);
+        return nullptr;
+      }
+
+    }
+
     /// \brief Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' and 'new' family are imported as
@@ -558,13 +606,8 @@ namespace {
     /// \code
     /// new NSArray(1024) // same as NSArray.alloc.initWithCapacity:1024
     /// \endcode
-    ConstructorDecl *importAsConstructor(Decl *decl) {
-      // Only consider Objective-C methods...
-      auto objcMethod
-        = dyn_cast_or_null<clang::ObjCMethodDecl>(decl->getClangDecl());
-      if (!objcMethod)
-        return nullptr;
-
+    ConstructorDecl *importConstructor(Decl *decl,
+                                       clang::ObjCMethodDecl *objcMethod) {
       // Figure out the type of the container.
       auto dc = decl->getDeclContext();
       auto containerTy = dc->getDeclaredTypeOfContext();
@@ -588,9 +631,8 @@ namespace {
           return nullptr;
       } while (true);
 
-      // ...in the 'init' or 'new' family...
+      // Only methods in the 'init' and 'new' family can become constructors.
       FuncDecl *alloc = nullptr;
-      
       switch (objcMethod->getMethodFamily()) {
       case clang::OMF_alloc:
       case clang::OMF_autorelease:
@@ -604,7 +646,7 @@ namespace {
       case clang::OMF_retain:
       case clang::OMF_retainCount:
       case clang::OMF_self:
-        return nullptr;
+        llvm_unreachable("Caller did not filter non-constructor methods");
 
       case clang::OMF_init: {
         // Make sure we have a usable 'alloc' method. Otherwise, we can't
@@ -632,8 +674,7 @@ namespace {
       }
 
       case clang::OMF_new:
-        if (!objcMethod->isClassMethod())
-          return nullptr;
+        assert(objcMethod->isClassMethod() && "Caller did not filter inputs");
         break;
       }
 
@@ -799,8 +840,113 @@ namespace {
       return result;
     }
 
-  public:
+    /// \brief Given either the getter or setter for a subscript operation,
+    /// create the Swift subscript declaration.
+    SubscriptDecl *importSubscript(Decl *decl,
+                                   clang::ObjCMethodDecl *objcMethod) {
+      assert(objcMethod->isInstanceMethod() && "Caller must filter");
 
+      // Make sure we have a usable 'alloc' method. Otherwise, we can't
+      // build this constructor anyway.
+      // FIXME: Can we do this for protocol methods as well? Do we want to?
+      auto interface = objcMethod->getClassInterface();
+      if (!interface)
+        return nullptr;
+
+      FuncDecl *getter = nullptr, *setter = nullptr;
+      if (objcMethod->getSelector() == Impl.objectAtIndexedSubscript) {
+        getter = cast<FuncDecl>(decl);
+
+        // Find the setter
+        if (auto objcSetter = interface->lookupInstanceMethod(
+                                Impl.setObjectAtIndexedSubscript)) {
+          setter = cast_or_null<FuncDecl>(Impl.importDecl(objcSetter));
+
+          // Don't allow static setters.
+          if (setter && setter->isStatic())
+            setter = nullptr;
+        }
+      } else if (objcMethod->getSelector() == Impl.setObjectAtIndexedSubscript){
+        setter = cast<FuncDecl>(decl);
+
+        // Find the getter.
+        if (auto objcGetter = interface->lookupInstanceMethod(
+                                Impl.objectAtIndexedSubscript)) {
+          getter = cast_or_null<FuncDecl>(Impl.importDecl(objcGetter));
+
+          // Don't allow static getters.
+          if (getter && getter->isStatic())
+            return nullptr;
+        }
+
+        // FIXME: Swift doesn't have write-only subscripting.
+        if (!getter)
+          return nullptr;
+      } else {
+        // Not a known getter or setter.
+        return nullptr;
+      }
+
+      // Check whether we've already created a subscript operation for
+      // this getter/setter pair.
+      if (Impl.Subscripts[{getter, setter}])
+        return nullptr;
+
+      // Compute the element type, looking through the implicit 'this'
+      // parameter and the normal function parameters.
+      auto elementTy
+        = getter->getType()->castTo<AnyFunctionType>()->getResult()
+            ->castTo<AnyFunctionType>()->getResult();
+      auto getterTuple = dyn_cast<TuplePattern>(
+                           getter->getBody()->getArgParamPatterns()[1]);
+      if (getterTuple && getterTuple->getFields().size() != 1)
+        return nullptr;
+
+      // Check the form of the setter.
+      if (setter) {
+        auto tuple = dyn_cast<TuplePattern>(
+                       setter->getBody()->getArgParamPatterns()[1]);
+        if (!tuple)
+          return nullptr;
+
+        if (tuple->getFields().size() != 2)
+          return nullptr;
+
+        // The setter must accept elements of the same type as the getter
+        // returns.
+        // FIXME: Adjust C++ references?
+        auto setterElementTy = tuple->getFields()[0].getPattern()->getType();
+        if (!elementTy->isEqual(setterElementTy))
+          return nullptr;
+      }
+
+      // Build the subscript declaration.
+      // FIXME: The getter actually matches directly, but the setter should
+      // be curried as (index)(value) rather than being (index, value), so
+      // we'll have to synthesize a setter.
+      auto &context = Impl.SwiftContext;
+      auto dc = decl->getDeclContext();
+      auto subscript
+        = new (context) SubscriptDecl(
+                          context.getIdentifier("__subscript"),
+                          decl->getLoc(),
+                          getter->getBody()->getArgParamPatterns()[1],
+                          decl->getLoc(),
+                          TypeLoc::withoutLoc(elementTy),
+                          SourceRange(), getter, setter, dc);
+
+      subscript->setType(FunctionType::get(subscript->getIndices()->getType(),
+                                           subscript->getElementType(),
+                                           context));
+
+      // FIXME: Figure out overriding.
+
+      // Note that we've created this subscript.
+      Impl.Subscripts[{getter, setter}] = subscript;
+      return subscript;
+    }
+
+  public:
     Decl *VisitObjCCategoryDecl(clang::ObjCCategoryDecl *decl) {
       // Objective-C categories and extensions map to Swift extensions.
 
@@ -847,9 +993,10 @@ namespace {
                   const_cast<clang::ObjCPropertyDecl *>(property)))
               continue;
 
-          // If there is a constructor associated with this member, add it now.
-          if (auto ctor = importAsConstructor(member)) {
-            members.push_back(ctor);
+          // If there is a special declaration associated with this member,
+          // add it now.
+          if (auto special = importSpecialMethod(member)) {
+            members.push_back(special);
           }
         }
 
@@ -932,9 +1079,10 @@ namespace {
                   const_cast<clang::ObjCPropertyDecl *>(property)))
               continue;
 
-          // If there is a constructor associated with this member, add it now.
-          if (auto ctor = importAsConstructor(member)) {
-            members.push_back(ctor);
+          // If there is a special declaration associated with this member,
+          // add it now.
+          if (auto special = importSpecialMethod(member)) {
+            members.push_back(special);
           }
         }
 

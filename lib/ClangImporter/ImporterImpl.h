@@ -38,11 +38,12 @@ namespace swift {
 class ASTContext;
 class ClassDecl;
 class ExtensionDecl;
+class FuncDecl;
 class Identifier;
 class Pattern;
+class SubscriptDecl;
 class Type;
 class ValueDecl;
-class ClassDecl;
 
 /// \brief Implementation of the Clang importer.
 struct ClangImporter::Implementation {
@@ -106,12 +107,15 @@ struct ClangImporter::Implementation {
   /// \brief Cache of the class extensions.
   llvm::DenseMap<ClassDecl *, CachedExtensions> ClassExtensions;
 
+  /// \brief Keep track of subscript declarations based on getter/setter
+  /// pairs.
+  llvm::DenseMap<std::pair<FuncDecl *, FuncDecl *>, SubscriptDecl *> Subscripts;
+
 private:
   /// \brief NSObject, imported into Swift.
   Type NSObjectTy;
 
 public:
-  
   ///\ brief The Swift standard library module.
   Module *swiftModule = nullptr;
 
@@ -122,6 +126,12 @@ public:
   /// It also means building ClangModules for all of the dependencies of a
   /// Clang module.
   ClangModule *firstClangModule = nullptr;
+
+  /// \brief Clang's objectAtIndexedSubscript: selector.
+  clang::Selector objectAtIndexedSubscript;
+
+  /// \brief Clang's setObjectAt:indexedSubscript: selector.
+  clang::Selector setObjectAtIndexedSubscript;
 
   /// \brief Retrieve the Clang AST context.
   clang::ASTContext &getClangASTContext() const {
