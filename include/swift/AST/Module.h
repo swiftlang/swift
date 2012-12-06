@@ -226,6 +226,39 @@ public:
   }
 };
 
+/// \brief Describes an externally-synthesized definition.
+///
+/// Externally synthesized definitions are generated when the Clang module
+/// importer generates a Swift stub definition to provide a better Swift
+/// interface for a C/Objective-C/C++ construct, such a Swift constructor
+/// implemented on top of Objective-C alloc/init.
+class ExternalDefinition {
+public:
+  /// \brief Describes the stage to which this external definition has been
+  /// processed.
+  ///
+  /// External definitions always start in the 'name-bound' stage.
+  enum Stage {
+    /// \brief All names in the definition have been bound.
+    NameBound,
+    /// \brief The definition has been type-checked.
+    TypeChecked,
+    /// \brief IR for the definition has been generated.
+    IRGenerated
+  };
+
+private:
+  llvm::PointerIntPair<Decl *, 2, Stage> Data;
+
+public:
+  ExternalDefinition(Decl *decl, Stage stage = NameBound) : Data(decl, stage) {}
+
+  Decl *getDecl() const { return Data.getPointer(); }
+  
+  Stage getStage() const { return Data.getInt(); }
+  void setStage(Stage stage) { Data.setInt(stage); }
+};
+
 /// \brief Represents a Clang module that has been imported into Swift.
 class ClangModule : public Module {
   clang::Module *clangModule;
@@ -238,7 +271,7 @@ class ClangModule : public Module {
   /// actually invokes the Objective-C alloc/init or new.
   ///
   /// FIXME: Make sure this gets freed.
-  std::vector<Decl*> ExternalDefs;
+  std::vector<ExternalDefinition> ExternalDefs;
 
 public:
   ClangModule(ASTContext &ctx, Component *comp, clang::Module *clangModule);
@@ -257,12 +290,18 @@ public:
   /// Various external definitions can be synthesized by the Clang module
   /// importer, such as a constructor in an imported Objective-C class, which
   /// actually invokes the Objective-C alloc/init or new.
-  ArrayRef<Decl *> getExternalDefinitions() const { return ExternalDefs; }
+  MutableArrayRef<ExternalDefinition> getExternalDefinitions() {
+    return ExternalDefs;
+  }
 
-  /// \brief Clear out the external definitions.
-  /// FIXME: This is a hack that should go away.
-  void clearExternalDefinitions() {
-    std::vector<Decl*>().swap(ExternalDefs);
+  /// \brief Retrieve the list of definitions that were synthesized while
+  /// importing from the Clang module.
+  ///
+  /// Various external definitions can be synthesized by the Clang module
+  /// importer, such as a constructor in an imported Objective-C class, which
+  /// actually invokes the Objective-C alloc/init or new.
+  ArrayRef<ExternalDefinition> getExternalDefinitions() const {
+    return ExternalDefs;
   }
 
   static bool classof(const DeclContext *DC) {

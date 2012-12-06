@@ -720,9 +720,6 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
   }
 
-  // FIXME: This is a painful hack. There are interesting architectural issues
-  // with the organization of name binding/type checking/IR generation.
-  llvm::SmallPtrSet<Decl *, 16> externalDefinitionsChecked;
   unsigned currentFuncExpr = 0;
   do {
     // Type check the body of each of the FuncExpr in turn.  Note that outside
@@ -747,25 +744,36 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
 
     // Type-check any externally-sourced definition.
+    // FIXME: This is O(N^2), because we're not tracking new definitions.
     for (auto imported : TC.TU.getImportedModules()) {
       auto clangModule = dyn_cast<ClangModule>(imported.second);
       if (!clangModule)
         continue;
 
-      for (auto decl : clangModule->getExternalDefinitions()) {
-        if (!externalDefinitionsChecked.insert(decl))
+      for (auto &def : clangModule->getExternalDefinitions()) {
+        switch (def.getStage()) {
+        case ExternalDefinition::IRGenerated:
+        case ExternalDefinition::TypeChecked:
           continue;
 
+        case ExternalDefinition::NameBound:
+          break;
+        }
+
+        auto decl = def.getDecl();
         if (auto constructor = dyn_cast<ConstructorDecl>(decl)) {
           prePass.FuncExprs.push_back(constructor);
+          def.setStage(ExternalDefinition::TypeChecked);
           continue;
         }
         if (auto destructor = dyn_cast<DestructorDecl>(decl)) {
           prePass.FuncExprs.push_back(destructor);
+          def.setStage(ExternalDefinition::TypeChecked);
           continue;
         }
         if (auto func = dyn_cast<FuncDecl>(decl)) {
           prePass.FuncExprs.push_back(func->getBody());
+          def.setStage(ExternalDefinition::TypeChecked);
           continue;
         }
 

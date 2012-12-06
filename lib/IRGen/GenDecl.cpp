@@ -150,19 +150,28 @@ void IRGenFunction::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) 
 
   // For any Clang modules imported by this translation unit, emit external
   // definitions.
+  // FIXME: This can be O(N^2), since we can see the same Clang module in
+  // different modules.
   for (auto mod : TU->getImportedModules()) {
     auto clangMod = dyn_cast<ClangModule>(mod.second);
     if (!clangMod)
       continue;
     
-    for (auto def : clangMod->getExternalDefinitions()) {
-      emitExternalDefinition(def);
-    }
+    for (auto &def : clangMod->getExternalDefinitions()) {
+      switch (def.getStage()) {
+      case ExternalDefinition::NameBound:
+        llvm_unreachable("external definition not type-checked");
 
-    // FIXME: Total hack. Removing these declarations makes sure that we
-    // don't generate them again. We need to teach either IRGenModule or the
-    // REPL code to track which declarations have been IRgenerated already.
-    clangMod->clearExternalDefinitions();
+      case ExternalDefinition::TypeChecked:
+        emitExternalDefinition(def.getDecl());
+        def.setStage(ExternalDefinition::IRGenerated);
+        break;
+
+      case ExternalDefinition::IRGenerated:
+        // Already generated IR.
+        break;
+      }
+    }
   }
 }
 
