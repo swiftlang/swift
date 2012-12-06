@@ -78,6 +78,58 @@ SourceLoc Pattern::getLoc() const {
   return getStartLoc();
 }
 
+Pattern *Pattern::clone(ASTContext &context) const {
+  Pattern *result;
+  switch (getKind()) {
+    case PatternKind::Any:
+      result = new (context) AnyPattern(cast<AnyPattern>(this)->getLoc());
+      break;
+
+    case PatternKind::Named: {
+      auto named = cast<NamedPattern>(this);
+      VarDecl *var = new (context) VarDecl(named->getLoc(),
+                                           named->getBoundName(),
+                                           named->getDecl()->hasType()
+                                             ? named->getDecl()->getType()
+                                             : Type(),
+                                           named->getDecl()->getDeclContext());
+      result = new (context) NamedPattern(var);
+      break;
+    }
+
+    case PatternKind::Paren: {
+      auto paren = cast<ParenPattern>(this);
+      return new (context) ParenPattern(paren->getLParenLoc(),
+                                        paren->getSubPattern()->clone(context),
+                                        paren->getRParenLoc());
+    }
+
+    case PatternKind::Tuple: {
+      auto tuple = cast<TuplePattern>(this);
+      SmallVector<TuplePatternElt, 2> elts;
+      elts.reserve(tuple->getNumFields());
+      for (const auto &elt : tuple->getFields())
+        elts.push_back(TuplePatternElt(elt.getPattern()->clone(context),
+                                       elt.getInit(), elt.getVarargBaseType()));
+      result = TuplePattern::create(context, tuple->getLParenLoc(), elts,
+                                    tuple->getRParenLoc());
+      break;
+    }
+
+    case PatternKind::Typed: {
+      auto typed = cast<TypedPattern>(this);
+      result = new(context) TypedPattern(typed->getSubPattern()->clone(context),
+                                         typed->getTypeLoc());
+      break;
+    }
+  }
+
+  if (hasType())
+    result->setType(getType());
+
+  return result;
+}
+
 /// Standard allocator for Patterns.
 void *Pattern::operator new(size_t numBytes, ASTContext &C) {
   return C.Allocate(numBytes, Pattern::Alignment);

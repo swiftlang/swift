@@ -666,68 +666,6 @@ void Parser::addVarsToScope(Pattern *Pat,
   llvm_unreachable("bad pattern kind!");
 }
 
-/// clonePattern - Clone the given pattern.
-static Pattern *clonePattern(ASTContext &Context, Pattern *Pat);
-
-/// cloneTuplePatternElts - Clone the given tuple pattern elements into the
-/// 'to' list.
-static void cloneTuplePatternElts(ASTContext &Context, Pattern &From,
-                                  SmallVectorImpl<TuplePatternElt> &To) {
-  if (TuplePattern *FromTuple = dyn_cast<TuplePattern>(&From)) {
-    for (auto &Elt : FromTuple->getFields())
-      To.push_back(TuplePatternElt(clonePattern(Context, Elt.getPattern()),
-                                   Elt.getInit(), Elt.getVarargBaseType()));
-    return;
-  }
-  
-  ParenPattern *FromParen = cast<ParenPattern>(&From);
-  To.push_back(TuplePatternElt(clonePattern(Context,
-                                            FromParen->getSubPattern())));
-}
-
-/// clonePattern - Clone the given pattern.
-static Pattern *clonePattern(ASTContext &Context, Pattern *Pat) {
-  switch (Pat->getKind()) {
-  case PatternKind::Any:
-    return new (Context) AnyPattern(cast<AnyPattern>(Pat)->getLoc());
-      
-  case PatternKind::Named: {
-    NamedPattern *Named = cast<NamedPattern>(Pat);
-    VarDecl *Var = new (Context) VarDecl(Named->getLoc(),
-                                         Named->getBoundName(),
-                                         Named->hasType()? Named->getType()
-                                                         : Type(),
-                                         Named->getDecl()->getDeclContext());
-    return new (Context) NamedPattern(Var);
-  }
-    
-  case PatternKind::Paren: {
-    ParenPattern *Paren = cast<ParenPattern>(Pat);
-    return new (Context) ParenPattern(Paren->getLParenLoc(),
-                                      clonePattern(Context,
-                                                   Paren->getSubPattern()),
-                                      Paren->getRParenLoc());
-  }
-    
-  case PatternKind::Tuple: {
-    TuplePattern *Tuple = cast<TuplePattern>(Pat);
-    SmallVector<TuplePatternElt, 2> Elts;
-    Elts.reserve(Tuple->getNumFields());
-    cloneTuplePatternElts(Context, *Tuple, Elts);
-    return TuplePattern::create(Context, Tuple->getLParenLoc(), Elts,
-                                Tuple->getRParenLoc());
-  }
-    
-  case PatternKind::Typed: {
-    TypedPattern *Typed = cast<TypedPattern>(Pat);
-    return new (Context) TypedPattern(clonePattern(Context,
-                                                   Typed->getSubPattern()),
-                                      Typed->getTypeLoc());
-  }
-  }
-}
-
-
 /// parseSetGet - Parse a get-set clause, containing a getter and (optionally)
 /// a setter.
 ///
@@ -795,10 +733,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
       // Add the index clause if necessary.
       if (Indices) {
-        SmallVector<TuplePatternElt, 2> TupleElts;
-        cloneTuplePatternElts(Context, *Indices, TupleElts);
-        Params.push_back(TuplePattern::create(Context, SourceLoc(), TupleElts,
-                                              SourceLoc()));
+        Params.push_back(Indices->clone(Context));
       }
       
       // Add a no-parameters clause.
@@ -896,10 +831,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
     // Add the index parameters, if necessary.
     if (Indices) {
-      SmallVector<TuplePatternElt, 2> TupleElts;
-      cloneTuplePatternElts(Context, *Indices, TupleElts);
-      Params.push_back(TuplePattern::create(Context, SourceLoc(), TupleElts,
-                                            SourceLoc()));
+      Params.push_back(Indices->clone(Context));
     }
     
     // Add the parameter. If no name was specified, the name defaults to

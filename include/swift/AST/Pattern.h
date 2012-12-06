@@ -94,6 +94,8 @@ public:
   SourceLoc getEndLoc() const { return getSourceRange().End; }
   SourceLoc getLoc() const;
 
+  Pattern *clone(ASTContext &context) const;
+  
   static bool classof(const Pattern *P) { return true; }
   
   //*** Allocation Routines ************************************************/
@@ -239,6 +241,7 @@ public:
 
   Pattern *getSubPattern() const { return SubPattern; }
   TypeLoc &getTypeLoc() { return PatType; }
+  TypeLoc getTypeLoc() const { return PatType; }
 
   SourceLoc getLoc() const { return SubPattern->getLoc(); }
   SourceRange getSourceRange() const;
