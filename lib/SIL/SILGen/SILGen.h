@@ -59,7 +59,13 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *vd);
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td);
 
+  /// emitFunction - Generates code for the given FuncExpr and adds the
+  /// Function to the current SILModule under the name SILConstant(decl). For
+  /// curried functions, curried entry point Functions are also generated and
+  /// added to the current SILModule.
   Function *emitFunction(SILConstant decl, FuncExpr *fe);
+  /// emitClosure - Generates code for the given ClosureExpr and adds the
+  /// Function to the current SILModule under the name SILConstant(ce).
   Function *emitClosure(ClosureExpr *ce);
 };
 
@@ -119,7 +125,11 @@ public:
   SILGenFunction(SILGenModule &SGM, Function &F, ClosureExpr *CE);
   ~SILGenFunction();
 
+  /// emitProlog - Generates prolog code to allocate and clean up mutable
+  /// storage for closure captures and local arguments.
   void emitProlog(CapturingExpr *ce, ArrayRef<Pattern*> paramPatterns);
+  /// emitClosureBody - Generates code for a ClosureExpr body. This is akin
+  /// to visiting the body as if wrapped in a ReturnStmt.
   void emitClosureBody(Expr *body);
 
   /// Return a stable reference to the current cleanup.
