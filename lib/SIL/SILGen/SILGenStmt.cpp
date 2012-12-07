@@ -110,7 +110,8 @@ static void emitAssignStmtRecursive(AssignStmt *S, Value Src, Expr *Dest,
     unsigned EltNo = 0;
     for (Expr *DestElem : TE->getElements()) {
       Value SrcVal = Gen.B.createExtract(SILLocation(), Src,
-                                         EltNo++, DestElem->getType());
+                                         EltNo++,
+                                         DestElem->getType()->getRValueType());
       emitAssignStmtRecursive(S, SrcVal, DestElem, Gen);
     }
     return;
