@@ -183,10 +183,11 @@ static bool isLocalLinkageDecl(Decl *D) {
     DC = DC->getParent();
   }
 
-  // Constructors and subscripts synthesized in the mapping to Clang modules
-  // are local.
+  // Constructors, subscripts, and properties synthesized in the mapping to
+  // Clang modules are local.
   if (isa<ClangModule>(DC) &&
-      (isa<ConstructorDecl>(D) || isa<SubscriptDecl>(D)))
+      (isa<ConstructorDecl>(D) || isa<SubscriptDecl>(D) ||
+       (isa<VarDecl>(D) && cast<VarDecl>(D)->isProperty())))
     return true;
 
   return false;
@@ -481,9 +482,8 @@ void IRGenFunction::emitExternalDefinition(Decl *D) {
       llvm_unreachable("Not a valid external definition for IRgen");
 
     case DeclKind::Func:
-      // The only functions available are subscript setters.
+      // The only functions available are getters and setters.
       assert(cast<FuncDecl>(D)->isGetterOrSetter() &&
-             isa<SubscriptDecl>(cast<FuncDecl>(D)->getGetterOrSetterDecl()) &&
              "Not a synthesized getter/setter");
       IGM.emitInstanceMethod(cast<FuncDecl>(D));
       break;
