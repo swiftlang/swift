@@ -531,13 +531,30 @@ class ExtractInst : public Instruction {
   unsigned FieldNo;
 public:
   ExtractInst(SILLocation Loc, Value Operand, unsigned FieldNo,
-                   Type ResultTy);
+              Type ResultTy);
   
   Value getOperand() const { return Operand; }
   unsigned getFieldNo() const { return FieldNo; }
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ExtractInst;
+  }
+};
+
+/// ElementAddrInst - Derive the address of a numbered element from the address
+/// of a tuple or fragile struct type.
+class ElementAddrInst : public Instruction {
+  Value Operand;
+  unsigned FieldNo;
+public:
+  ElementAddrInst(SILLocation Loc, Value Operand, unsigned FieldNo,
+                  Type ResultTy);
+  
+  Value getOperand() const { return Operand; }
+  unsigned getFieldNo() const { return FieldNo; }
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ElementAddrInst;
   }
 };
 

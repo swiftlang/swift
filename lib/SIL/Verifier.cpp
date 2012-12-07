@@ -145,12 +145,36 @@ public:
            "Operand of destroy must be lvalue");
   }
 
-  void visitIndexLValueInst(IndexAddrInst *IAI) {
+  void visitIndexAddrInst(IndexAddrInst *IAI) {
     assert(IAI->getType()->is<LValueType>() &&
            IAI->getType()->isEqual(IAI->getOperand().getType()) &&
            "invalid IndexAddrInst");
   }
+  
+  void visitExtractInst(ExtractInst *EI) {
+#ifndef NDEBUG
+    Type operandTy = EI->getOperand().getType();
+    assert(!operandTy->is<LValueType>() &&
+           "cannot extract from address");
+    assert(!operandTy->hasReferenceSemantics() &&
+           "cannot extract from reference type");
+    assert(!EI->getType(0)->is<LValueType>() &&
+           "result of extract cannot be address");
+#endif
+  }
 
+  void visitElementAddrInst(ElementAddrInst *EI) {
+#ifndef NDEBUG
+    Type operandTy = EI->getOperand().getType();
+    assert(operandTy->is<LValueType>() &&
+           "must derive element_addr from address");
+    assert(!operandTy->hasReferenceSemantics() &&
+           "cannot derive element_addr from reference type");
+    assert(EI->getType(0)->is<LValueType>() &&
+           "result of element_addr must be lvalue");
+#endif
+  }
+  
   void visitIntegerValueInst(IntegerValueInst *IVI) {
     assert(IVI->getType()->is<BuiltinIntegerType>());
   }

@@ -568,7 +568,6 @@ element_addr
   ; %0 must of a $SIL.Address<T> type for a loadable aggregate type T
   ; %1 will be of type $SIL.Address<U> where U is the type of the 123rd
   ;   element of T
-  ; TODO: not implemented
 
 Given the address of a loadable aggregate value in memory, creates a
 value representing the address of an element within that value.

@@ -300,6 +300,11 @@ ExtractInst::ExtractInst(SILLocation Loc, Value Operand,
     Operand(Operand), FieldNo(FieldNo) {
 }
 
+ElementAddrInst::ElementAddrInst(SILLocation Loc, Value Operand,
+                                 unsigned FieldNo, Type ResultTy)
+  : Instruction(ValueKind::ElementAddrInst, Loc, ResultTy),
+    Operand(Operand), FieldNo(FieldNo) {
+}
 
 RetainInst::RetainInst(SILLocation Loc, Value Operand)
   : Instruction(ValueKind::RetainInst, Loc, Operand.getType()),

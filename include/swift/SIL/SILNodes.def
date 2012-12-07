@@ -74,7 +74,8 @@ ABSTRACT_VALUE(Instruction, Value)
   INST(TupleInst, Instruction)
   INST(MetatypeInst, Instruction)
   INST(ExtractInst, Instruction)
-  
+  INST(ElementAddrInst, Instruction)
+
   INST(RetainInst, Instruction)
   INST(ReleaseInst, Instruction)
   INST(DeallocVarInst, Instruction)

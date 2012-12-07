@@ -229,6 +229,10 @@ public:
     OS << "extract " << getID(EI->getOperand()) << ", "
        << EI->getFieldNo();
   }
+  void visitElementAddrInst(ElementAddrInst *EI) {
+    OS << "element_addr " << getID(EI->getOperand()) << ", "
+       << EI->getFieldNo();
+  }
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype $" << MI->getMetaType().getString();
   }
