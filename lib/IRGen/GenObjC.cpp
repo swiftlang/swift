@@ -18,6 +18,7 @@
 #include "llvm/DerivedTypes.h"
 #include "llvm/Module.h"
 
+#include "swift/IRGen/Options.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 
@@ -66,6 +67,17 @@ llvm::Constant *IRGenModule::getObjCMsgSendStretFn() {
   ObjCMsgSendStretFn =
     createObjCRuntimeFunction(*this, "objc_msgSend_stret", fnType);
   return ObjCMsgSendStretFn;
+}
+
+llvm::Constant *IRGenModule::getObjCSelRegisterNameFn() {
+  if (ObjCSelRegisterNameFn) return ObjCSelRegisterNameFn;
+
+  // SEL sel_registerName(const char *str);
+  llvm::Type *argTypes[1] = { Int8PtrTy };
+  auto fnType = llvm::FunctionType::get(Int8PtrTy, argTypes, false);
+  ObjCSelRegisterNameFn = createObjCRuntimeFunction(*this, "sel_registerName",
+                                                    fnType);
+  return ObjCSelRegisterNameFn;
 }
 
 #define DEFINE_OBJC_RUNTIME_FUNCTION(LABEL, NAME, RETTY)            \
@@ -418,10 +430,24 @@ CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF, FuncDecl *method,
   selfValues.addUnmanaged(value.getValue());
 
   // Add the selector value.
+  llvm::Value *selectorV;
   Selector selector(method);
-  auto selectorRef = IGF.IGM.getAddrOfObjCSelectorRef(selector.str());
-  auto selectorV =
-    IGF.Builder.CreateLoad(Address(selectorRef, IGF.IGM.getPointerAlignment()));
+  if (IGF.IGM.Opts.UseJIT) {
+    // When generating JIT'd code, we need to call sel_registerName() to force
+    // the runtime to unique the selector.
+    auto selectorRef = IGF.IGM.getAddrOfObjCSelectorRef(selector.str());
+    selectorV = IGF.Builder.CreateLoad(Address(selectorRef,
+                                               IGF.IGM.getPointerAlignment()));
+    selectorV = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
+                                       selectorV);
+  } else {
+    // When generating statically-compiled code, just build a reference to
+    // the selector.
+    auto selectorRef = IGF.IGM.getAddrOfObjCSelectorRef(selector.str());
+    selectorV = IGF.Builder.CreateLoad(Address(selectorRef,
+                                               IGF.IGM.getPointerAlignment()));
+  }
+  
   selfValues.addUnmanaged(selectorV);
 
   // Add that to the emission.

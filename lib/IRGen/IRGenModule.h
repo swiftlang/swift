@@ -208,6 +208,8 @@ public:
   llvm::Constant *getObjCMsgSendFn();
   llvm::Constant *getObjCMsgSendStretFn();
 
+  llvm::Constant *getObjCSelRegisterNameFn();
+
   llvm::Constant *getGetFunctionMetadataFn();
   llvm::Constant *getGetGenericMetadataFn();
   llvm::Constant *getGetMetatypeMetadataFn();
@@ -232,6 +234,7 @@ private:
   llvm::Constant *ObjCReleaseFn = nullptr;
   llvm::Constant *ObjCMsgSendFn = nullptr;
   llvm::Constant *ObjCMsgSendStretFn = nullptr;
+  llvm::Constant *ObjCSelRegisterNameFn = nullptr;
 
 //--- Generic ---------------------------------------------------------------
 public:

@@ -143,7 +143,8 @@ void swift::RunImmediately(TranslationUnit *TU) {
   Options.Triple = llvm::sys::getDefaultTargetTriple();
   Options.OptLevel = 2;
   Options.OutputKind = irgen::OutputKind::Module;
-
+  Options.UseJIT = true;
+  
   // IRGen the main module.
   llvm::LLVMContext LLVMContext;
   llvm::Module Module(TU->Name.str(), LLVMContext);
@@ -299,7 +300,8 @@ void swift::REPL(ASTContext &Context) {
   Options.Triple = llvm::sys::getDefaultTargetTriple();
   Options.OptLevel = 0;
   Options.OutputKind = irgen::OutputKind::Module;
-
+  Options.UseJIT = true;
+  
   EditLineWrapper e;
 
   char* CurBuffer = const_cast<char*>(Buffer->getBufferStart());
