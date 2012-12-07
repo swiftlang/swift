@@ -69,3 +69,8 @@ NSDate *swift_createDate(void);
 - initWithInt:(int)i;
 @end
 
+typedef signed char BOOL;
+
+@interface A(BoolStuff)
+- setEnabled:(BOOL)enabled;
+@end

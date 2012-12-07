@@ -81,7 +81,18 @@ namespace {
       if (!dc)
         return nullptr;
 
-      auto type = Impl.importType(decl->getUnderlyingType());
+      Type type;
+
+      // If this is the Objective-C BOOL type, map it to ObjCBool.
+      auto &clangContext = Impl.getClangASTContext();
+      if (name.str() == "BOOL" &&
+          clangContext.hasSameType(decl->getUnderlyingType(),
+                                   clangContext.ObjCBuiltinBoolTy)) {
+        type = Impl.getNamedSwiftType("ObjCBool");
+      } else {
+        type = Impl.importType(decl->getUnderlyingType());
+      }
+
       if (!type)
         return nullptr;
 
