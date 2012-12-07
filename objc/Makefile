@@ -21,7 +21,7 @@ LIBRARYNAME := swiftFoundation
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
 SWIFT_SOURCES := SwiftFoundation.swift
-SOURCES := SwiftFoundation.swift
+SOURCES := SwiftFoundation.swift BridgeNSString.mm
 NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
 
