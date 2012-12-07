@@ -53,9 +53,16 @@ static void printSILConstant(llvm::raw_ostream &OS, SILConstant sd) {
   } else {
     OS << "<anonymous function>";
   }
-  // TODO: bikeshed a SIL syntax for referencing multiple decls
-  if (sd.id != 0) {
-    OS << "#" << sd.id;
+  // TODO: bikeshed a SIL syntax for decl ids
+  if (sd.id & SILConstant::Getter) {
+    OS << ".getter";
+  }
+  if (sd.id & SILConstant::Setter) {
+    OS << ".setter";
+  }
+  unsigned id = sd.id & ~(SILConstant::Getter | SILConstant::Setter);
+  if (id != 0) {
+    OS << "." << id;
   }
 }
 
@@ -117,15 +124,15 @@ public:
   
   void printAllocKind(AllocKind kind) {
     switch (kind) {
-      case AllocKind::Heap:
-        OS << "heap ";
-        break;
-      case AllocKind::Pseudo:
-        OS << "pseudo ";
-        break;
-      case AllocKind::Stack:
-        OS << "stack ";
-        break;
+    case AllocKind::Heap:
+      OS << "heap ";
+      break;
+    case AllocKind::Pseudo:
+      OS << "pseudo ";
+      break;
+    case AllocKind::Stack:
+      OS << "stack ";
+      break;
     }
   }
 

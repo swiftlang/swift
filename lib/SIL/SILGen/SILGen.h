@@ -269,6 +269,8 @@ public:
   ManagedValue emitClosureForCapturingExpr(SILLocation loc,
                                            SILConstant function,
                                            CapturingExpr *body);
+  
+  ManagedValue emitGetProperty(SILLocation loc, ManagedValue getter);
 
   //===--------------------------------------------------------------------===//
   // Declarations

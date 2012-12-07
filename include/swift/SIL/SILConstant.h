@@ -39,9 +39,18 @@ struct SILConstant {
   Loc loc;
   unsigned id;
   
+  enum : unsigned {
+    /// Getter - this id references the getter for the associated decl.
+    Getter = 1U << 31U,
+    /// Setter - this id references the setter for the associated decl.
+    Setter = 1U << 30U,
+  };
+  
   SILConstant() : loc(), id(0) {}
-  explicit SILConstant(Loc loc, unsigned id = 0)
+  explicit SILConstant(Loc loc, unsigned id)
     : loc(loc), id(id) {}
+  
+  SILConstant(Loc loc);
   
   bool hasDecl() const { return loc.is<ValueDecl*>(); }
   bool hasExpr() const { return loc.is<CapturingExpr*>(); }

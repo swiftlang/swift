@@ -25,7 +25,12 @@
 namespace swift {
 namespace Lowering {
 
-/// A managed value is a pair of a SIL value and an optional cleanup.
+/// ManagedValue - represents a SIL rvalue. It constists of a Value and an
+/// optional cleanup. Ownership of the ManagedValue can be "forwarded" to
+/// disable its cleanup when the rvalue is consumed. Read-only addresses may
+/// also be stored in a ManagedValue, but for general lvalues, the LValue type
+/// must be used instead, which also handles writeback through logical
+/// properties.
 class ManagedValue {
   Value value;
   CleanupsDepth cleanup;

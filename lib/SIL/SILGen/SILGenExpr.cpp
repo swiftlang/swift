@@ -74,10 +74,16 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
 
 ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
                                                  ValueDecl *decl) {
-  // FIXME: properties
-  
-  // If this is a reference to a mutable decl, produce an address.
-  if (decl->getTypeOfReference()->is<LValueType>()) {
+  // If this is a reference to a var, produce an address.
+  if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
+    // If it's a property, invoke its getter.
+    if (var->isProperty()) {
+      // FIXME: closure for local getter
+      Value get = B.createConstantRef(loc,
+                                      SILConstant(decl, SILConstant::Getter));
+      return emitGetProperty(loc, ManagedValue(get));
+    }
+    
     // For local decls, we should have the address we allocated on hand.
     if (VarLocs.count(decl)) {
       return ManagedValue(VarLocs[decl].address);
@@ -86,7 +92,6 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
            "no location for local var!");
     // If this is a global variable, invoke its accessor function to get its
     // address.
-    // FIXME: or call its getter if it's a property.
     Value accessor = B.createConstantRef(loc, SILConstant(decl));
     Value address = B.createApply(loc, accessor, {});
     return ManagedValue(address);
@@ -144,19 +149,24 @@ namespace {
       gen.B.createDeallocVar(SILLocation(), AllocKind::Stack, alloc);
     }
   };
+
+  static ManagedValue emitMaterialize(SILGenFunction &gen,
+                                      SILLocation loc, Value v) {
+    Value tmpMem = gen.B.createAllocVar(loc, AllocKind::Stack, v.getType());
+    gen.B.createStore(loc, v, tmpMem);
+    // Ownership of the temporary buffer does not leave the current scope, so
+    // the ManagedValue for the temporary allocation does not reference its
+    // cleanup.
+    gen.Cleanups.pushCleanup<CleanupMaterialize>(tmpMem);
+    return ManagedValue(tmpMem);
+  }
 }
 
 ManagedValue SILGenFunction::visitMaterializeExpr(MaterializeExpr *E) {
-  // Evaluate the value, use it to initialize a new temporary and return the
-  // temp's address.
+  // Evaluate the value, then use it to initialize a new temporary and return
+  // the temp's address.
   Value V = visit(E->getSubExpr()).forward(*this);
-  Value TmpMem = B.createAllocVar(E, AllocKind::Stack, V.getType());
-  B.createStore(E, V, TmpMem);
-  Cleanups.pushCleanup<CleanupMaterialize>(TmpMem);
-  // The DeallocVar cleanup's ownership will not be forwarded to a calling
-  // function, so this ManagedValue for the temporary allocation does not
-  // reference its cleanup.
-  return ManagedValue(TmpMem);
+  return emitMaterialize(*this, E, V);
 }
 
 ManagedValue SILGenFunction::visitRequalifyExpr(RequalifyExpr *E) {
@@ -230,11 +240,24 @@ ManagedValue SILGenFunction::visitMemberRefExpr(MemberRefExpr *E) {
                                                ->getRValueType());
   
   if (ti.hasFragileElement(E->getDecl()->getName())) {
+    // We can get to the element directly with element_addr.
     FragileElement element = ti.getFragileElement(E->getDecl()->getName());
     return emitExtractLoadableElement(*this, E, visit(E->getBase()),
                                       element.index);
   } else {
-    llvm_unreachable("member ref of non-struct not yet implemented");
+    // We have to load the element indirectly through a property.
+    Value base = visit(E->getBase()).getUnmanagedValue();
+    assert(E->getBase()->getType()->is<LValueType>() &&
+           "member ref of a non-lvalue?!");
+    // Get the getter function, which will have type This -> () -> T.
+    Value getterMethod = B.createConstantRef(E,
+                                             SILConstant(E->getDecl(),
+                                                         SILConstant::Getter));
+    // Apply the "this" parameter.
+    Value getter = B.createApply(E, getterMethod, base);
+    
+    // Apply the getter.
+    return emitGetProperty(E, managedRValueWithCleanup(*this, getter));
   }
 }
 
@@ -427,7 +450,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
         case CaptureKind::Byref: {
           // Byrefs are captured by address only.
           assert(VarLocs.count(capture) &&
-                 "no location for captured var!");
+                 "no location for captured byref!");
           capturedArgs.push_back(VarLocs[capture].address);
           break;
         }
@@ -447,6 +470,13 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
   } else {
     return ManagedValue(B.createConstantRef(loc, constant));
   }
+}
+
+ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
+                                             ManagedValue getter) {
+  // Call the getter and then materialize the return value as an lvalue.
+  Value result = B.createApply(loc, getter.forward(*this), {});
+  return emitMaterialize(*this, loc, result);
 }
 
 ManagedValue SILGenFunction::visitFuncExpr(FuncExpr *e) {
