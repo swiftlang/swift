@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "FastEntryPoints.h"
+#include "swift/Runtime/FastEntryPoints.h"
 
 #ifdef __x86_64__
 // The custom swift runtime ABI for x86_64 is as follows.
