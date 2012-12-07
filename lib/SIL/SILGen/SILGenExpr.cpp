@@ -13,7 +13,7 @@
 #include "SILGen.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
-#include "Explosion.h"
+#include "ManagedValue.h"
 #include "TypeInfo.h"
 #include "llvm/Support/raw_ostream.h"
 

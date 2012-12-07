@@ -13,8 +13,9 @@
 #include "SILGen.h"
 #include "Scope.h"
 #include "Condition.h"
-#include "Explosion.h"
+#include "ManagedValue.h"
 #include "swift/AST/AST.h"
+
 using namespace swift;
 using namespace Lowering;
 

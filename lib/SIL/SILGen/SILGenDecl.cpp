@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
-#include "Explosion.h"
+#include "ManagedValue.h"
 #include "Scope.h"
 #include "TypeInfo.h"
 #include "swift/SIL/BBArgument.h"
