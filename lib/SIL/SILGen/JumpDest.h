@@ -30,7 +30,7 @@ typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
 
 /// The destination of a direct jump.  Swift currently does not
 /// support indirect branches or goto, so the jump mechanism only
-/// needs to worry about branches into scopes, not out of them.
+/// needs to worry about branches out of scopes, not into them.
 class LLVM_LIBRARY_VISIBILITY JumpDest {
   BasicBlock *Block;
   CleanupsDepth Depth;
