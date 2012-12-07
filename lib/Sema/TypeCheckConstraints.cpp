@@ -3463,6 +3463,39 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   return SolutionKind::Error;
 }
 
+/// \brief Retrieve the fully-materialized form of the given type.
+static Type getMateralizedType(Type type, ASTContext &context) {
+  if (auto lvalue = type->getAs<LValueType>()) {
+    return lvalue->getObjectType();
+  }
+
+  if (auto tuple = type->getAs<TupleType>()) {
+    bool anyChanged = false;
+    SmallVector<TupleTypeElt, 4> elements;
+    for (unsigned i = 0, n = tuple->getFields().size(); i != n; ++i) {
+      auto elt = tuple->getFields()[i];
+      auto eltType = getMateralizedType(elt.getType(), context);
+      if (anyChanged) {
+        elements.push_back(elt.getWithType(eltType));
+        continue;
+      }
+
+      if (eltType.getPointer() != elt.getType().getPointer()) {
+        elements.append(tuple->getFields().begin(),
+                        tuple->getFields().begin() + i);
+        elements.push_back(elt.getWithType(eltType));
+        anyChanged = true;
+      }
+    }
+
+    if (anyChanged) {
+      return TupleType::get(elements, context);
+    }
+  }
+
+  return type;
+}
+
 void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
   // Determie the type to which we'll bind the overload set's type.
   auto &choice = ovl->getChoices()[idx];
@@ -3498,16 +3531,18 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
     break;
 
   case OverloadChoiceKind::TupleIndex: {
-    TupleType *tupleTy;
-    auto lvalueTy = choice.getBaseType()->getAs<LValueType>();
-    if (lvalueTy)
-      tupleTy = lvalueTy->getObjectType()->castTo<TupleType>();
-    else
-      tupleTy = choice.getBaseType()->castTo<TupleType>();
-    refType = tupleTy->getElementType(choice.getTupleIndex());
-    if (lvalueTy && !refType->is<LValueType>()) {
+    if (auto lvalueTy = choice.getBaseType()->getAs<LValueType>()) {
+      // When the base of a tuple lvalue, the member is always an lvalue.
+      auto tuple = lvalueTy->getObjectType()->castTo<TupleType>();
+      refType = tuple->getElementType(choice.getTupleIndex())->getRValueType();
       refType = LValueType::get(refType, lvalueTy->getQualifiers(),
                                 getASTContext());
+    } else {
+      // When the base is a tuple rvalue, the member is always an rvalue.
+      // FIXME: Do we have to strip several levels here? Possible.
+      auto tuple = choice.getBaseType()->castTo<TupleType>();
+      refType =getMateralizedType(tuple->getElementType(choice.getTupleIndex()),
+                                  getASTContext());
     }
     break;
   }
@@ -5102,13 +5137,23 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
                               selected.first.getDecl(), expr->getNameLoc(),
                               selected.second);
 
-      case OverloadChoiceKind::TupleIndex:
+      case OverloadChoiceKind::TupleIndex: {
+        auto base = expr->getBase();
+        // If the base expression is not an lvalue, make everything inside it
+        // materializable.
+        if (!base->getType()->is<LValueType>()) {
+          base = CS.getTypeChecker().convertToMaterializable(base);
+          if (!base)
+            return nullptr;
+        }
+
         return new (CS.getASTContext()) TupleElementExpr(
-                                          expr->getBase(),
+                                          base,
                                           expr->getDotLoc(),
                                           selected.first.getTupleIndex(),
                                           expr->getNameLoc(),
                                           CS.simplifyType(expr->getType()));
+      }
 
       case OverloadChoiceKind::BaseType:
       case OverloadChoiceKind::FunctionReturningBaseType:

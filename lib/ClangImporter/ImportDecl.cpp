@@ -980,10 +980,6 @@ namespace {
       auto tuple = cast<TuplePattern>(
                      setter->getBody()->getBodyParamPatterns()[1]);
 
-      // Figure out the element type.
-      // FIXME: Adjust C++ references?
-      auto elementTy = tuple->getFields()[0].getPattern()->getType();
-
       // Objective-C subscript setters are imported with a function type
       // such as:
       //

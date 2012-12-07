@@ -1323,6 +1323,16 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   if (BaseTy->is<ErrorType>())
     return 0;  // Squelch an erroneous subexpression.
 
+  // If the base expression is not an lvalue, make everything inside it
+  // materializable.
+  if (!BaseTy->is<LValueType>()) {
+    Base = convertToMaterializable(Base);
+    if (!Base)
+      return nullptr;
+
+    BaseTy = Base->getType();
+  }
+
   if (TupleType *TT = BaseTy->getRValueType()->getAs<TupleType>()) {
     // Try to look up the field by name; if that doesn't work, look for a
     // numbered field.
