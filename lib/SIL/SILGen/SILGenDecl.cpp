@@ -35,7 +35,7 @@ namespace {
 
 void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   // Generate the local function body.
-  SGM.emitFunction(SILConstant(fd), fd->getBody());
+  SGM.emitFunction(fd, fd->getBody());
   
   // If there are captures, build the local closure value for the function and
   // store it as a local constant.

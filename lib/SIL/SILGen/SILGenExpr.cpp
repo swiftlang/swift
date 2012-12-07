@@ -408,7 +408,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
 
 ManagedValue SILGenFunction::visitFuncExpr(FuncExpr *e) {
   // Generate the local function body.
-  SGM.emitFunction(SILConstant(e), e);
+  SGM.emitFunction(e, e);
 
   // Generate the closure (if any) for the function reference.
   return emitClosureForCapturingExpr(e, SILConstant(e), e);

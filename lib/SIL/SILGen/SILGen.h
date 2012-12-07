@@ -63,7 +63,7 @@ public:
   /// Function to the current SILModule under the name SILConstant(decl). For
   /// curried functions, curried entry point Functions are also generated and
   /// added to the current SILModule.
-  Function *emitFunction(SILConstant decl, FuncExpr *fe);
+  Function *emitFunction(SILConstant::Loc decl, FuncExpr *fe);
   /// emitClosure - Generates code for the given ClosureExpr and adds the
   /// Function to the current SILModule under the name SILConstant(ce).
   Function *emitClosure(ClosureExpr *ce);

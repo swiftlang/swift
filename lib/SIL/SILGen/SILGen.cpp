@@ -89,13 +89,14 @@ SILGenModule::~SILGenModule() {
 }
 
 void SILGenModule::visitFuncDecl(FuncDecl *fd) {
-  emitFunction(SILConstant(fd), fd->getBody());
+  emitFunction(fd, fd->getBody());
 }
 
-Function *SILGenModule::emitFunction(SILConstant constant, FuncExpr *fe) {
+Function *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   // Ignore prototypes.
   if (fe->getBody() == nullptr) return nullptr;
   
+  SILConstant constant(decl);
   assert(!M.hasFunction(constant) &&
          "already generated function for decl!");
   
