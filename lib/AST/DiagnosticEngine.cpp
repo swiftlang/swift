@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/SmallString.h"
@@ -51,6 +52,8 @@ void InFlightDiagnostic::flush() {
   if (Engine)
     Engine->flushActiveDiagnostic();
 }
+
+
 
 /// \brief Skip forward to one of the given delimiters.
 ///
@@ -231,19 +234,33 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   case DiagnosticKind::Warning:
     break;
   }
-  
+
+  // Figure out the source location.
+  SourceLoc loc = ActiveDiagnosticLoc;
+  if (loc.isInvalid() && ActiveDiagnosticDecl) {
+    // If a declaration was provided instead of a location, and that declaration
+    // has a location we can point to, use that location.
+    if (!ActiveDiagnosticDecl->getClangDecl() &&
+        ActiveDiagnosticDecl->getLoc().isValid()) {
+      loc = ActiveDiagnosticDecl->getLoc();
+    } else {
+      // There is no location we can point to.
+      // FIXME: We'd love to pretty-print the declaration so we can point
+      // at it in the diagnostic. For now, just provide a poor diagnostic.
+    }
+  }
+
   // Actually substitute the diagnostic arguments into the diagnostic text.
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
     formatDiagnosticText(StoredInfo.Text, ActiveDiagnostic->getArgs(), Out);
   }
-  
+
   // Pass the diagnostic off to the consumer.
   DiagnosticInfo Info;
   Info.Ranges = ActiveDiagnostic->getRanges();
-  Consumer.handleDiagnostic(SourceMgr, ActiveDiagnosticLoc, StoredInfo.Kind,
-                            Text, Info);
+  Consumer.handleDiagnostic(SourceMgr, loc, StoredInfo.Kind, Text, Info);
   
   // Reset the active diagnostic.
   ActiveDiagnostic.reset();

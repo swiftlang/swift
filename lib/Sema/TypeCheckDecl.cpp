@@ -212,7 +212,7 @@ public:
         Type DestTy = PBD->getPattern()->getType();
         if (TC.typeCheckExpression(Init, DestTy)) {
           if (DestTy)
-            TC.diagnose(PBD->getStartLoc(), diag::while_converting_var_init,
+            TC.diagnose(PBD, diag::while_converting_var_init,
                         DestTy);
         } else {
           PBD->setInit(Init);
@@ -231,7 +231,7 @@ public:
       Expr *Init = PBD->getInit();
       if (TC.typeCheckExpression(Init, DestTy)) {
         if (DestTy)
-          TC.diagnose(PBD->getStartLoc(), diag::while_converting_var_init,
+          TC.diagnose(PBD, diag::while_converting_var_init,
                       DestTy);
         return;
       }

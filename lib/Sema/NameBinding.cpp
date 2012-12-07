@@ -279,7 +279,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
         << SourceRange(Loc, Components.back().Loc);
       for (auto Result : Globals.Results) {
         if (Globals.Results[0].hasValueDecl())
-          diagnose(Result.getValueDecl()->getStartLoc(), diag::found_candidate);
+          diagnose(Result.getValueDecl(), diag::found_candidate);
         else
           diagnose(Loc, diag::found_candidate);
       }
@@ -435,7 +435,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
         if (PrevD && !((isa<VarDecl>(VD)    || isa<FuncDecl>(VD)) &&
                        (isa<VarDecl>(PrevD) || isa<FuncDecl>(PrevD)))) {
           Binder.diagnose(VD->getStartLoc(), diag::invalid_redecl);
-          Binder.diagnose(PrevD->getStartLoc(), diag::invalid_redecl_prev,
+          Binder.diagnose(PrevD, diag::invalid_redecl_prev,
                           VD->getName());
         }
       }

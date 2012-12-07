@@ -87,7 +87,7 @@ void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,
 
 void TypeChecker::printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates) {
   for (auto TheDecl : Candidates)
-    diagnose(TheDecl->getStartLoc(), diag::found_candidate);
+    diagnose(TheDecl, diag::found_candidate);
 }
 
 static void
@@ -1018,7 +1018,7 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
   if (!baseIsInstance && isa<VarDecl>(Decls[0])) {
     diagnose(MemberLoc, diag::member_ref_metatype_variable,
              Decls[0]->getName(), baseTy);
-    diagnose(Decls[0]->getLoc(), diag::decl_declared_here, Decls[0]->getName());
+    diagnose(Decls[0], diag::decl_declared_here, Decls[0]->getName());
 
     Expr *BadExpr = new (Context) UnresolvedDotExpr(Base, DotLoc,
                                                     Decls[0]->getName(),

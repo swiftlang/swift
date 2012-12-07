@@ -847,8 +847,6 @@ ERROR(existential_member_assoc_types,sema_tca,none,
 
 ERROR(closure_not_function_type,sema_tce,none,
       "closure inferred to have non-function type %0", (Type))
-NOTE(while_converting_closure_body_to_inferred_return_type,sema,none,
-     "while converting closure body to inferred return type %0", (Type))
 
 // Operators
 ERROR(binop_not_infix,sema_tce,none,

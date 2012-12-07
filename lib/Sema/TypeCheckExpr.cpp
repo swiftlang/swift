@@ -298,7 +298,7 @@ Expr *TypeChecker::semaSubscriptExpr(ExistentialSubscriptExpr *E) {
   if (!SubstIndexType->isEqual(IndexType)) {
     diagnose(E->getLBracketLoc(), diag::existential_subscript_assoc_types,
              Proto->getDeclaredType(), true, IndexType);
-    diagnose(E->getDecl()->getLoc(), diag::subscript_decl_here);
+    diagnose(E->getDecl(), diag::subscript_decl_here);
     
     IndexType = SubstIndexType;
   }
@@ -330,7 +330,7 @@ Expr *TypeChecker::semaSubscriptExpr(ExistentialSubscriptExpr *E) {
   if (!SubstValueType->isEqual(ValueType)) {
     diagnose(E->getLBracketLoc(), diag::existential_subscript_assoc_types,
              Proto->getDeclaredType(), false, ValueType);
-    diagnose(E->getDecl()->getLoc(), diag::subscript_decl_here);
+    diagnose(E->getDecl(), diag::subscript_decl_here);
     ValueType = SubstValueType;
   }
   
@@ -853,7 +853,7 @@ public:
       TC.diagnose(E->getDotLoc(), diag::existential_member_assoc_types,
                   E->getDecl()->getName(), Proto->getDeclaredType(),
                   MemberTy);
-      TC.diagnose(E->getDecl()->getLoc(), diag::decl_declared_here,
+      TC.diagnose(E->getDecl(), diag::decl_declared_here,
                   E->getDecl()->getName());
     }
     
@@ -1411,8 +1411,8 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
       
       if (Infix.isValid() && Infix != D->getAttrs().getInfixData()) {
         TC.diagnose(OO->getLoc(), diag::binop_mismatched_infix);
-        TC.diagnose(FirstDecl->getStartLoc(), diag::first_declaration);
-        TC.diagnose(D->getStartLoc(), diag::second_declaration);
+        TC.diagnose(FirstDecl, diag::first_declaration);
+        TC.diagnose(D, diag::second_declaration);
         return Infix;
       }
       

@@ -213,7 +213,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
             << SourceRange(Loc, Components.back().Loc);
           for (auto Result : Globals.Results) {
             if (Globals.Results[0].hasValueDecl())
-              diagnose(Result.getValueDecl()->getStartLoc(), diag::found_candidate);
+              diagnose(Result.getValueDecl(), diag::found_candidate);
             else
               diagnose(Loc, diag::found_candidate);
           }

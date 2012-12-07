@@ -246,7 +246,7 @@ public:
     if (!isa<FuncDecl>(Lookup.Results.front().D)) {
       TC.diagnose(Loc, NonFuncMember, BaseType)
         << Base->getSourceRange();
-      TC.diagnose(Lookup.Results.front().D->getStartLoc(),
+      TC.diagnose(Lookup.Results.front().D,
                   diag::decl_declared_here,
                   Lookup.Results.front().D->getName());
       return nullptr;

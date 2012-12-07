@@ -36,6 +36,7 @@ namespace llvm {
 namespace swift {
   using llvm::ArrayRef;
   using llvm::StringRef;
+  class Decl;
   class DiagnosticEngine;
   
   /// \brief Enumeration describing all of possible diagnostics.
@@ -241,6 +242,10 @@ namespace swift {
     /// HadAnyError - True if any error diagnostics have been emitted.
     bool HadAnyError;
 
+    /// \brief The declaration of the currently active diagnostic, if there is
+    /// one.
+    Decl *ActiveDiagnosticDecl = nullptr;
+
     /// \brief The source location of the currently active diagnostic, if there
     /// is one.
     SourceLoc ActiveDiagnosticLoc;
@@ -282,6 +287,7 @@ namespace swift {
                                 ArrayRef<DiagnosticArgument> Args) {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
       ActiveDiagnosticLoc = Loc;
+      ActiveDiagnosticDecl = nullptr;
       ActiveDiagnostic = Diagnostic(ID, Args);
       return InFlightDiagnostic(*this);
     }
@@ -298,6 +304,7 @@ namespace swift {
     InFlightDiagnostic diagnose(SourceLoc Loc, const Diagnostic &D) {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
       ActiveDiagnosticLoc = Loc;
+      ActiveDiagnosticDecl = nullptr;
       ActiveDiagnostic = D;
       return InFlightDiagnostic(*this);
     }
@@ -317,9 +324,69 @@ namespace swift {
              typename detail::PassArgument<ArgTypes>::type... Args) {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
       ActiveDiagnosticLoc = Loc;
+      ActiveDiagnosticDecl = nullptr;
       ActiveDiagnostic = Diagnostic(ID, std::move(Args)...);
       return InFlightDiagnostic(*this);
-    }  
+    }
+
+    /// \brief Emit a diagnostic using a preformatted array of diagnostic
+    /// arguments.
+    ///
+    /// \param decl The declaration to which this diagnostic refers, which
+    /// may or may not have associated source-location information.
+    ///
+    /// \param id The diagnostic ID.
+    ///
+    /// \param args The preformatted set of diagnostic arguments. The caller
+    /// must ensure that the diagnostic arguments have the appropriate type.
+    ///
+    /// \returns An in-flight diagnostic, to which additional information can
+    /// be attached.
+    InFlightDiagnostic diagnose(Decl *decl, DiagID id,
+                                ArrayRef<DiagnosticArgument> args) {
+      assert(!ActiveDiagnostic && "Already have an active diagnostic");
+      ActiveDiagnosticLoc = SourceLoc();
+      ActiveDiagnosticDecl = decl;
+      ActiveDiagnostic = Diagnostic(id, args);
+      return InFlightDiagnostic(*this);
+    }
+
+    /// \brief Emit an already-constructed diagnostic referencing the given
+    /// declaration.
+    ///
+    /// \param decl The declaration to which this diagnostic refers, which
+    /// may or may not have associated source-location information.
+    ///
+    /// \param diag The diagnostic.
+    ///
+    /// \returns An in-flight diagnostic, to which additional information can
+    /// be attached.
+    InFlightDiagnostic diagnose(Decl *decl, const Diagnostic &diag) {
+      assert(!ActiveDiagnostic && "Already have an active diagnostic");
+      ActiveDiagnosticLoc = SourceLoc();
+      ActiveDiagnosticDecl = decl;
+      ActiveDiagnostic = diag;
+      return InFlightDiagnostic(*this);
+    }
+
+    /// \brief Emit a diagnostic with the given set of diagnostic arguments.
+    ///
+    /// \param decl The declaration to which this diagnostic refers, which
+    /// may or may not have associated source-location information.
+    ///
+    /// \param id The diagnostic to be emitted.
+    ///
+    /// \param args The diagnostic arguments, which will be converted to
+    /// the types expected by the diagnostic \p ID.
+    template<typename ...ArgTypes>
+    InFlightDiagnostic
+    diagnose(Decl *decl, Diag<ArgTypes...> id,
+             typename detail::PassArgument<ArgTypes>::type... args) {
+      ActiveDiagnosticLoc = SourceLoc();
+      ActiveDiagnosticDecl = decl;
+      ActiveDiagnostic = Diagnostic(id, std::move(args)...);
+      return InFlightDiagnostic(*this);
+    }
        
   private:
     /// \brief Flush the active diagnostic.

@@ -271,9 +271,7 @@ ClangImporter::Implementation::importSourceLoc(SourceLoc loc) {
 SourceLoc
 ClangImporter::Implementation::importSourceLoc(clang::SourceLocation loc) {
   // FIXME: Implement!
-  return SourceLoc(
-           llvm::SMLoc::getFromPointer(
-             SwiftContext.SourceMgr.getBufferInfo(0).Buffer->getBufferStart()));
+  return SourceLoc();
 }
 
 SourceRange

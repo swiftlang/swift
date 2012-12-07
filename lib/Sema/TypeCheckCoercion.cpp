@@ -435,7 +435,7 @@ public:
     if (DED == 0) {
       diagnose(UME->getLoc(), diag::invalid_member_in_type,
                DT, UME->getName());
-      diagnose(D->getLoc(), diag::type_declared_here);
+      diagnose(D, diag::type_declared_here);
       return nullptr;
     }
 
@@ -665,7 +665,7 @@ TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
     if (Complain) {
       diagnose(Loc, diag::type_ambiguous_literal_conversion, Ty, MethodName);
       for (MemberLookupResult Res : Lookup.Results)
-        diagnose(Res.D->getLoc(), diag::found_candidate);
+        diagnose(Res.D, diag::found_candidate);
     }
     return std::pair<FuncDecl*, Type>();
   }
@@ -1811,7 +1811,7 @@ static bool recordDeduction(CoercionContext &CC, SourceLoc Loc,
     if (Flags & CF_Apply) {
       TC.diagnose(Loc, diag::type_does_not_conform, DeducedTy,
                   Proto->getDeclaredType());
-      TC.diagnose(Proto->getLoc(), diag::protocol_here, Proto->getName());
+      TC.diagnose(Proto, diag::protocol_here, Proto->getName());
     }
 
     return true;

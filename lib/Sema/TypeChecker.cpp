@@ -551,7 +551,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
             TC.diagnose(Protocol->getLoc(), diag::circular_protocol_def,
                         PathStr);
             for (unsigned I = Path.size(); I != 1; --I) {
-              TC.diagnose(Path[I-1]->getLoc(), diag::protocol_here,
+              TC.diagnose(Path[I-1], diag::protocol_here,
                           Path[I-1]->getName());
             }
           }
@@ -711,7 +711,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         for (ValueDecl *PrevD : PrevOv) {
           if (PrevD->getType()->isEqual(VD->getType())) {
             TC.diagnose(VD->getStartLoc(), diag::invalid_redecl);
-            TC.diagnose(PrevD->getStartLoc(), diag::invalid_redecl_prev,
+            TC.diagnose(PrevD, diag::invalid_redecl_prev,
                         VD->getName());
           }
         }
