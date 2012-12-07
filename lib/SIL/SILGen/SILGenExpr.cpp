@@ -201,12 +201,25 @@ ManagedValue SILGenFunction::visitAddressOfExpr(AddressOfExpr *E) {
 
 
 ManagedValue SILGenFunction::visitTupleElementExpr(TupleElementExpr *E) {
-  Value elt = B.createExtract(E,
-                              visit(E->getBase()).getValue(),
-                              E->getFieldNumber(),
-                              E->getType());
-  emitRetainRValue(E, elt);
-  return managedRValueWithCleanup(*this, elt);
+  // FIXME: address-only tuples
+  
+  if (E->getType()->is<LValueType>()) {
+    // Get the element address relative to the tuple address.
+    Value address = B.createElementAddr(E,
+                                        visit(E->getBase()).getValue(),
+                                        E->getFieldNumber(),
+                                        E->getType());
+    return ManagedValue(address);
+  } else {
+    // Extract the element from the original tuple value.
+    Value elt = B.createExtract(E,
+                                visit(E->getBase()).getValue(),
+                                E->getFieldNumber(),
+                                E->getType());
+    
+    emitRetainRValue(E, elt);
+    return managedRValueWithCleanup(*this, elt);
+  }
 }
 
 

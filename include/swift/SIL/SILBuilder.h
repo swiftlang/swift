@@ -192,6 +192,12 @@ public:
 
     return insert(new ExtractInst(Loc, Operand, FieldNo, ResultTy));
   }
+
+  Value createElementAddr(SILLocation Loc, Value Operand, unsigned FieldNo,
+                          Type ResultTy) {
+    return insert(new ElementAddrInst(Loc, Operand, FieldNo, ResultTy));
+  }
+  
   MetatypeInst *createMetatype(MetatypeExpr *Expr) {
     return insert(new MetatypeInst(Expr));
   }
