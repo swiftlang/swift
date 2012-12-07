@@ -5588,7 +5588,7 @@ namespace {
                             /*isFirstPass=*/false))
           return nullptr;
 
-        // Check array bounds. They are subproblems that on't interact with
+        // Check array bounds. They are subproblems that don't interact with
         // the surrounding expression context.
         for (unsigned i = newArray->getBounds().size(); i != 1; --i) {
           auto &bound = newArray->getBounds()[i-1];
