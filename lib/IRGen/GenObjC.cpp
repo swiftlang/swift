@@ -74,7 +74,7 @@ llvm::Constant *IRGenModule::getObjCSelRegisterNameFn() {
 
   // SEL sel_registerName(const char *str);
   llvm::Type *argTypes[1] = { Int8PtrTy };
-  auto fnType = llvm::FunctionType::get(Int8PtrTy, argTypes, false);
+  auto fnType = llvm::FunctionType::get(ObjCSELTy, argTypes, false);
   ObjCSelRegisterNameFn = createObjCRuntimeFunction(*this, "sel_registerName",
                                                     fnType);
   return ObjCSelRegisterNameFn;
@@ -320,7 +320,7 @@ namespace {
       argTys.push_back(IGM.getFragileType(CanType(selfFnType->getInput())));
 
       // Add the _cmd argument.
-      argTys.push_back(IGM.Int8PtrTy);
+      argTys.push_back(IGM.ObjCSELTy);
 
       // Add the formal arguments.
       auto argSchema = IGM.getSchema(CanType(formalFnType->getInput()),

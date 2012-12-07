@@ -102,6 +102,7 @@ public:
   union {
     llvm::PointerType *Int8PtrTy;      /// i8*
     llvm::PointerType *WitnessTableTy;
+    llvm::PointerType *ObjCSELTy;
   };
   union {
     llvm::PointerType *Int8PtrPtrTy;   /// i8**
