@@ -124,12 +124,7 @@ Function *SILGenModule::emitClosure(ClosureExpr *ce) {
 }
 
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
-  if (TopLevelSGF) {
-    TopLevelSGF->visitPatternBindingDecl(pd);
-  } else {
-    // FIXME: generate accessor functions for global variables in non-top-level
-    // code
-  }
+  // FIXME: generate accessor functions for global variables
 }
 
 //===--------------------------------------------------------------------===//

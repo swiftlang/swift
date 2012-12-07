@@ -15,6 +15,7 @@
 #include "swift/SIL/SILConstant.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Types.h"
 using namespace swift;
 
 Function::~Function() {
@@ -31,8 +32,15 @@ SILModule::~SILModule() {
 }
 
 Type SILConstant::getType() const {
-  // FIXME: This won't work for intermediate curry decls
+  // FIXME: This won't work for intermediate curry decls. This should probably
+  // live on the SILModule.
   if (ValueDecl *vd = loc.dyn_cast<ValueDecl*>()) {
+    if (VarDecl *var = dyn_cast<VarDecl>(vd)) {
+      // Global vars of type T are handled by () -> [byref] T functions.
+      ASTContext &C = var->getASTContext();
+      return FunctionType::get(TupleType::getEmpty(C),
+                               var->getTypeOfReference(), C);
+    }
     return vd->getTypeOfReference();
   } else if (CapturingExpr *e = loc.dyn_cast<CapturingExpr*>()) {
     return e->getType();
