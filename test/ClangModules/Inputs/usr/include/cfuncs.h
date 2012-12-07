@@ -15,3 +15,5 @@ typedef struct {
 } FILE;
 
 FILE *fopen(const char *, const char *);
+
+inline int createSomething(void);

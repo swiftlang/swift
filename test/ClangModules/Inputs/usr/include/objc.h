@@ -68,3 +68,4 @@ NSDate *swift_createDate(void);
 @interface AProxy : NSProxy
 - initWithInt:(int)i;
 @end
+

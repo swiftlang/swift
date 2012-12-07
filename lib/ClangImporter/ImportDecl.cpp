@@ -25,6 +25,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/DeclVisitor.h"
 #include "llvm/ADT/StringExtras.h"
 
@@ -316,6 +317,11 @@ namespace {
     }
 
     Decl *VisitFunctionDecl(clang::FunctionDecl *decl) {
+      // FIXME: We can't IRgen inline functions, so don't import them.
+      if (decl->isInlined() || decl->hasAttr<clang::AlwaysInlineAttr>()) {
+        return nullptr;
+      }
+
       auto dc = Impl.importDeclContext(decl->getDeclContext());
       if (!dc)
         return nullptr;
