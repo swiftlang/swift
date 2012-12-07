@@ -133,6 +133,12 @@ public:
   /// \brief Clang's setObjectAt:indexedSubscript: selector.
   clang::Selector setObjectAtIndexedSubscript;
 
+  /// \brief Clang's objectForKeyedSubscript: selector.
+  clang::Selector objectForKeyedSubscript;
+
+  /// \brief Clang's setObject:forKeyedSubscript: selector.
+  clang::Selector setObjectForKeyedSubscript;
+  
   /// \brief Retrieve the Clang AST context.
   clang::ASTContext &getClangASTContext() const {
     return Instance->getASTContext();

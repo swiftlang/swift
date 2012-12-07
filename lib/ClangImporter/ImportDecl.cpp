@@ -568,7 +568,9 @@ namespace {
         // Check for one of the subscripting selectors.
         if (objcMethod->isInstanceMethod() &&
             (objcMethod->getSelector() == Impl.objectAtIndexedSubscript ||
-             objcMethod->getSelector() == Impl.setObjectAtIndexedSubscript))
+             objcMethod->getSelector() == Impl.setObjectAtIndexedSubscript ||
+             objcMethod->getSelector() == Impl.objectForKeyedSubscript ||
+             objcMethod->getSelector() == Impl.setObjectForKeyedSubscript))
           return importSubscript(decl, objcMethod);
           
         return nullptr;
@@ -900,9 +902,37 @@ namespace {
         // FIXME: Swift doesn't have write-only subscripting.
         if (!getter)
           return nullptr;
+      } else if (objcMethod->getSelector() == Impl.objectForKeyedSubscript) {
+        getter = cast<FuncDecl>(decl);
+
+        // Find the setter
+        if (auto objcSetter = interface->lookupInstanceMethod(
+                                Impl.setObjectForKeyedSubscript)) {
+          setter = cast_or_null<FuncDecl>(Impl.importDecl(objcSetter));
+
+          // Don't allow static setters.
+          if (setter && setter->isStatic())
+            setter = nullptr;
+        }
+      } else if (objcMethod->getSelector() == Impl.setObjectForKeyedSubscript) {
+        setter = cast<FuncDecl>(decl);
+
+        // Find the getter.
+        if (auto objcGetter = interface->lookupInstanceMethod(
+                                Impl.objectForKeyedSubscript)) {
+          getter = cast_or_null<FuncDecl>(Impl.importDecl(objcGetter));
+
+          // Don't allow static getters.
+          if (getter && getter->isStatic())
+            return nullptr;
+        }
+
+        // FIXME: Swift doesn't have write-only subscripting.
+        if (!getter)
+          return nullptr;
+
       } else {
-        // Not a known getter or setter.
-        return nullptr;
+        llvm_unreachable("Unknown getter/setter selector");
       }
 
       // Check whether we've already created a subscript operation for

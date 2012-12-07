@@ -208,7 +208,15 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
   };
   importer->Impl.setObjectAtIndexedSubscript
     = clangContext.Selectors.getSelector(2, setObjectAtIndexedSubscriptIdents);
-
+  importer->Impl.objectForKeyedSubscript
+    = clangContext.Selectors.getUnarySelector(
+        &clangContext.Idents.get("objectForKeyedSubscript"));
+  clang::IdentifierInfo *setObjectForKeyedSubscriptIdents[2] = {
+    &clangContext.Idents.get("setObject"),
+    &clangContext.Idents.get("forKeyedSubscript")
+  };
+  importer->Impl.setObjectForKeyedSubscript
+    = clangContext.Selectors.getSelector(2, setObjectForKeyedSubscriptIdents);
 
   return importer.release();
 }

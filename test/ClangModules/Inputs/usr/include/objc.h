@@ -50,6 +50,9 @@
 @interface A(Subscripting)
 - objectAtIndexedSubscript:(unsigned)idx;
 - (void)setObject:(id)object atIndexedSubscript:(unsigned)idx;
+
+- objectForKeyedSubscript:(id)key;
+- (void)setObject:(id)object forKeyedSubscript:(id)key;
 @end
 
 @interface NSDate : NSObject
