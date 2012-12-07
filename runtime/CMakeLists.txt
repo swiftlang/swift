@@ -6,8 +6,7 @@ add_swift_library(swift_runtime
   KnownMetadata.cpp
   Metadata.cpp
   Stubs.cpp
-  SwiftObject.mm
-  ObjCBridge.mm)
+  SwiftObject.mm)
 
 if(SWIFT_OPTIMIZED)
   if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")

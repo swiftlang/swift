@@ -7,6 +7,7 @@ endif()
 set(SHARED_LIBRARY ON)
 add_swift_library(swiftFoundation
   SwiftFoundation.swift
+  BridgeNSString.mm
   DEPENDS swift_stdlib)
 
 if(SWIFT_OPTIMIZED)
