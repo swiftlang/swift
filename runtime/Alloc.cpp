@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Alloc.h"
-#include "Metadata.h"
+#include "swift/Runtime/Alloc.h"
+#include "swift/Runtime/Metadata.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 // We'll include this and do per-thread clean up once we actually have threads

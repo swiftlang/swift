@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_ABI_ALLOC_H
-#define SWIFT_ABI_ALLOC_H
+#ifndef SWIFT_RUNTIME_ALLOC_H
+#define SWIFT_RUNTIME_ALLOC_H
 
 #include <cstddef>
 #include <cstdint>
@@ -186,4 +186,4 @@ extern "C" void swift_deallocObject(HeapObject *object, size_t allocatedSize);
 
 } // end namespace swift
 
-#endif /* SWIFT_ABI_ALLOC_H */
+#endif /* SWIFT_RUNTIME_ALLOC_H */

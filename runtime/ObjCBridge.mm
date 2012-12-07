@@ -17,7 +17,7 @@
 
 #include <Foundation/Foundation.h>
 #include <objc/runtime.h>
-#include "Alloc.h"
+#include "swift/Runtime/Alloc.h"
 
 using namespace swift;
 

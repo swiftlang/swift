@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Metadata.h"
-#include "Alloc.h"
+#include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Alloc.h"
 
 using namespace swift;
 

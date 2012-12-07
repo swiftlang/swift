@@ -15,8 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/MathExtras.h"
-#include "Alloc.h"
-#include "Metadata.h"
+#include "swift/Runtime/Alloc.h"
+#include "swift/Runtime/Metadata.h"
 #include <algorithm>
 #include <new>
 #include <string.h>

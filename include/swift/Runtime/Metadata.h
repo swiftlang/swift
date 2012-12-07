@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_ABI_METADATA_H
-#define SWIFT_ABI_METADATA_H
+#ifndef SWIFT_RUNTIME_METADATA_H
+#define SWIFT_RUNTIME_METADATA_H
 
 #include <cstddef>
 #include <cstdint>
@@ -691,4 +691,4 @@ swift_getMetatypeMetadata(const Metadata *instanceType);
 
 } // end namespace swift
 
-#endif /* SWIFT_ABI_METADATA_H */
+#endif /* SWIFT_RUNTIME_METADATA_H */
