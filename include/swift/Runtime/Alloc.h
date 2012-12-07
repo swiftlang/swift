@@ -19,7 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include "FastEntryPoints.h"
+#include "swift/Runtime/FastEntryPoints.h"
 
 namespace swift {
 

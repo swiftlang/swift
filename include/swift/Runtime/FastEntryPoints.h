@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef _SWIFT_FASTENTRYPOINTS_
-#define _SWIFT_FASTENTRYPOINTS_
+#ifndef SWIFT_RUNTIME_FASTENTRYPOINTS_H
+#define SWIFT_RUNTIME_FASTENTRYPOINTS_H
 
 #define SWIFT_TSD_ALLOC_BASE 1024
 #define SWIFT_TSD_RAW_ALLOC_BASE 1536
@@ -27,4 +27,5 @@
 #define SWIFT_RAWALLOC 0x0002
 #define SWIFT_TRYRAWALLOC 0x0003
 
-#endif
+#endif // SWIFT_RUNTIME_FASTENTRYPOINTS_H
+
