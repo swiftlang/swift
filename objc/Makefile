@@ -20,8 +20,8 @@ include $(SWIFT_LEVEL)/../../Makefile.config
 LIBRARYNAME := swiftFoundation
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
-SWIFT_SOURCES := SwiftFoundation.swift
-SOURCES := SwiftFoundation.swift BridgeNSString.mm
+SWIFT_SOURCES := Foundation.swift
+SOURCES := Foundation.swift BridgeNSString.mm
 NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
 
@@ -49,16 +49,16 @@ LDFLAGS += -framework Foundation \
 
 HeaderDir := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift/
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
-$(HeaderDir)/SwiftFoundation.swift: $(PATH_TO_SWIFT_SOURCES) $(HeaderDir)/.dir
+$(HeaderDir)/Foundation.swift: $(PATH_TO_SWIFT_SOURCES) $(HeaderDir)/.dir
 	$(Echo) FIXME -- HACK -- Concatenating $(SWIFT_SOURCES) to build dir
 	$(Verb) cat $(PATH_TO_SWIFT_SOURCES) > $@
 
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
-$(ObjDir)/SwiftFoundation.o: $(HeaderDir)/SwiftFoundation.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
+$(ObjDir)/Foundation.o: $(HeaderDir)/Foundation.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
 	$(Verb) $(SWIFT_COMPILER) -c $(SWIFT_SDKFLAG) $< -o $@ -parse-as-library -constraint-checker $(SWIFT_OPTFLAG)
 
-all-local:: $(HeaderDir)/SwiftFoundation.swift
+all-local:: $(HeaderDir)/Foundation.swift
 
 else
 

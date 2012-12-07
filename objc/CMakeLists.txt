@@ -6,7 +6,7 @@ endif()
 
 set(SHARED_LIBRARY ON)
 add_swift_library(swiftFoundation
-  SwiftFoundation.swift
+  Foundation.swift
   BridgeNSString.mm
   DEPENDS swift_stdlib)
 
@@ -20,7 +20,7 @@ if(SWIFT_OPTIMIZED)
  endif()
 endif()
 
-# Install SwiftFoundation.swift
+# Install Foundation.swift
 if(XCODE)
   set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}")
 else()
@@ -28,10 +28,10 @@ else()
 endif()
 
 add_custom_command(
-  OUTPUT "${SWIFTLIB_DIR}/swift/SwiftFoundation.swift"
+  OUTPUT "${SWIFTLIB_DIR}/swift/Foundation.swift"
   COMMAND mkdir -p "${SWIFTLIB_DIR}/swift"
-  COMMAND cp SwiftFoundation.swift "${SWIFTLIB_DIR}/swift/SwiftFoundation.swift"
-  DEPENDS SwiftFoundation.swift
+  COMMAND cp Foundation.swift "${SWIFTLIB_DIR}/swift/Foundation.swift"
+  DEPENDS Foundation.swift
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Link against Foundation

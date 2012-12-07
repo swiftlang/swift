@@ -134,15 +134,17 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
     return TU->Ctx.TheBuiltinModule;
   }
 
-  Module *M = Context.LoadedModules.lookup(ModuleID.first.str());
-  if (M) return M;
-
   // If the imported module name is the same as the current translation unit,
   // skip the Swift module loader and use the Clang module loader instead.
   // This allows a Swift module to extend a Clang module of the same name.
   bool useClangModule = false;
   if (ModuleID.first == TU->Name && Context.hasModuleLoader())
     useClangModule = true;
+
+  Module *M = Context.LoadedModules.lookup(ModuleID.first.str());
+  if (M && !(useClangModule && !isa<ClangModule>(M))) {
+    return M;
+  }
 
   // Open the input file.
   llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
@@ -214,6 +216,28 @@ void NameBinder::addImport(ImportDecl *ID,
   }
   
   Result.push_back(std::make_pair(Path.slice(1), M));
+
+  // If the module we loaded is a translation unit that imports a Clang
+  // module with the same name, add that Clang module to
+  // FIXME: This is a horrible, horrible way to provide transitive inclusion.
+  // We really need a re-export syntax.
+  if (Context.hasModuleLoader()) {
+    if (auto tu = dyn_cast<TranslationUnit>(M)) {
+      for (auto imported : tu->getImportedModules()) {
+        // Only check for Clang modules.
+        auto clangMod = dyn_cast<ClangModule>(imported.second);
+        if (!clangMod)
+          continue;
+
+        // With the same name as the module we imported.
+        if (clangMod->Name != Path[0].first)
+          continue;
+
+        Result.push_back(std::make_pair(Path.slice(1), clangMod));
+        break;
+      }
+    }
+  }
 }
 
 void NameBinder::
