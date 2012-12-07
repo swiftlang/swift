@@ -29,6 +29,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Host.h"
@@ -54,15 +55,19 @@
 
 using namespace swift;
 
-static void LoadSwiftRuntime() {
+static void loadRuntimeLib(StringRef sharedLibName) {
   // FIXME: Need error-checking.
   llvm::sys::Path LibPath =
-      llvm::sys::Path::GetMainExecutable(0, (void*)&swift::RunImmediately);
+  llvm::sys::Path::GetMainExecutable(0, (void*)&swift::RunImmediately);
   LibPath.eraseComponent();
   LibPath.eraseComponent();
   LibPath.appendComponent("lib");
-  LibPath.appendComponent("libswift_stdlib.dylib");
+  LibPath.appendComponent(sharedLibName);
   dlopen(LibPath.c_str(), 0);
+}
+
+static void loadSwiftRuntime() {
+  loadRuntimeLib("libswift_stdlib.dylib");
 }
 
 static bool IRGenImportedModules(TranslationUnit *TU,
@@ -114,6 +119,18 @@ static bool IRGenImportedModules(TranslationUnit *TU,
     llvm::Function *InitFn = Module.getFunction(InitFnName);
     if (InitFn)
       InitFns.push_back(InitFn);
+
+    // Load the shared library corresponding to this module.
+    // FIXME: Swift and Clang modules alike need to record the dylibs against
+    // which one needs to link when using the module. For now, just hardcode
+    // the Swift libraries we care about.
+    StringRef sharedLibName
+      = llvm::StringSwitch<StringRef>(SubTU->Name.str())
+          .Case("SwiftFoundation", "libswiftFoundation.dylib")
+          .Default("");
+    if (!sharedLibName.empty()) {
+      loadRuntimeLib(sharedLibName);
+    }
   }
 
   return false;
@@ -150,7 +167,7 @@ void swift::RunImmediately(TranslationUnit *TU) {
   PMBuilder.populateModulePassManager(ModulePasses);
   ModulePasses.run(Module);
 
-  LoadSwiftRuntime();
+  loadSwiftRuntime();
 
   // Build the ExecutionEngine.
   llvm::EngineBuilder builder(&Module);
@@ -266,7 +283,7 @@ void swift::REPL(ASTContext &Context) {
   llvm::Module DumpModule("REPL", LLVMContext);
   llvm::SmallString<128> DumpSource;
 
-  LoadSwiftRuntime();
+  loadSwiftRuntime();
 
   llvm::EngineBuilder builder(&Module);
   std::string ErrorMsg;
