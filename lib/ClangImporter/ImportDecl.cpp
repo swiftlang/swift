@@ -85,11 +85,12 @@ namespace {
       if (!type)
         return nullptr;
 
+      auto loc = Impl.importSourceLoc(decl->getLocation());
       return new (Impl.SwiftContext) TypeAliasDecl(
                                       Impl.importSourceLoc(decl->getLocStart()),
                                       name,
-                                      Impl.importSourceLoc(decl->getLocation()),
-                                      TypeLoc::withoutLoc(type),
+                                      loc,
+                                      TypeLoc(type, loc),
                                       dc,
                                       { });
     }
@@ -343,16 +344,16 @@ namespace {
         return nullptr;
 
       auto resultTy = type->castTo<FunctionType>()->getResult();
+      auto loc = Impl.importSourceLoc(decl->getLocation());
 
       auto name = Impl.importName(decl->getDeclName());
       if (name.empty())
         return nullptr;
 
       // FIXME: Poor location info.
-      auto loc = Impl.importSourceLoc(decl->getLocStart());
       auto funcExpr = FuncExpr::create(Impl.SwiftContext, loc,
                                        argPatterns, bodyPatterns,
-                                       TypeLoc::withoutLoc(resultTy),
+                                       TypeLoc(resultTy, loc),
                                        nullptr, dc);
       funcExpr->setType(type);
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
@@ -457,6 +458,7 @@ namespace {
     }
 
     Decl *VisitObjCMethodDecl(clang::ObjCMethodDecl *decl) {
+      auto loc = Impl.importSourceLoc(decl->getLocStart());
       auto dc = Impl.importDeclContext(decl->getDeclContext());
       if (!dc)
         return nullptr;
@@ -485,7 +487,7 @@ namespace {
       thisPat->setType(thisVar->getType());
       thisPat
         = new (Impl.SwiftContext) TypedPattern(thisPat,
-                                               TypeLoc::withoutLoc(thisTy));
+                                               TypeLoc(thisTy, loc));
       thisPat->setType(thisVar->getType());
       argPatterns.push_back(thisPat);
       bodyPatterns.push_back(thisPat);
@@ -510,11 +512,10 @@ namespace {
       // working.
 
       // FIXME: Poor location info.
-      auto loc = Impl.importSourceLoc(decl->getLocStart());
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto funcExpr = FuncExpr::create(Impl.SwiftContext, loc,
                                        argPatterns, bodyPatterns,
-                                       TypeLoc::withoutLoc(resultTy),
+                                       TypeLoc(resultTy, loc),
                                        nullptr, dc);
       funcExpr->setType(type);
 
@@ -691,6 +692,7 @@ namespace {
       }
 
       // FIXME: Hack.
+      auto loc = decl->getLoc();
       auto name = Impl.SwiftContext.getIdentifier("constructor");
 
       // Add the implicit 'this' parameter patterns.
@@ -706,7 +708,7 @@ namespace {
       thisPat->setType(thisMetaTy);
       thisPat
         = new (Impl.SwiftContext) TypedPattern(thisPat,
-                                               TypeLoc::withoutLoc(thisMetaTy));
+                                               TypeLoc(thisMetaTy, loc));
       thisPat->setType(thisMetaTy);
 
       argPatterns.push_back(thisPat);
@@ -732,9 +734,6 @@ namespace {
 
       // Add the 'this' parameter to the function type.
       type = FunctionType::get(thisMetaTy, type, Impl.SwiftContext);
-
-      // FIXME: Poor location info.
-      auto loc = Impl.importSourceLoc(objcMethod->getLocStart());
 
       VarDecl *thisVar = new (Impl.SwiftContext) VarDecl(SourceLoc(),
                                                           thisName, thisTy, dc);
@@ -920,7 +919,7 @@ namespace {
       auto funcExpr = FuncExpr::create(context, getter->getLoc(),
                                        getterArgs,
                                        getterArgs,
-                                       TypeLoc::withoutLoc(elementTy),
+                                       TypeLoc(elementTy, loc),
                                        nullptr,
                                        getter->getDeclContext());
       funcExpr->setType(getterType);
@@ -1043,8 +1042,8 @@ namespace {
       auto funcExpr = FuncExpr::create(context, setter->getLoc(),
                                        setterArgs,
                                        setterArgs,
-                                       TypeLoc::withoutLoc(
-                                         TupleType::getEmpty(context)),
+                                       TypeLoc(TupleType::getEmpty(context),
+                                               loc),
                                        nullptr,
                                        setter->getDeclContext());
       funcExpr->setType(setterType);
@@ -1225,6 +1224,7 @@ namespace {
       }
 
       // Build the subscript declaration.
+      auto loc = decl->getLoc();
       auto dc = decl->getDeclContext();
       auto argPatterns
         = getterThunk->getBody()->getArgParamPatterns()[1]->clone(context);
@@ -1234,7 +1234,7 @@ namespace {
                           decl->getLoc(),
                           argPatterns,
                           decl->getLoc(),
-                          TypeLoc::withoutLoc(elementTy),
+                          TypeLoc(elementTy, loc),
                           SourceRange(), getterThunk, setterThunk, dc);
       setVarDeclContexts(argPatterns, subscript->getDeclContext());
 
@@ -1269,10 +1269,10 @@ namespace {
       // FIXME: Import protocols, add them to 'inherited' list.
       
       // Create the extension declaration and record it.
+      auto loc = Impl.importSourceLoc(decl->getLocStart());
       auto result
         = new (Impl.SwiftContext)
-            ExtensionDecl(Impl.importSourceLoc(decl->getLocStart()),
-                          TypeLoc::withoutLoc(objcClass->getDeclaredType()),
+            ExtensionDecl(loc, TypeLoc(objcClass->getDeclaredType(), loc),
                           { }, dc);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
