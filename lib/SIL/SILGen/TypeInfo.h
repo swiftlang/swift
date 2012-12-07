@@ -23,28 +23,39 @@ namespace Lowering {
   class SILGenFunction;
   class SILGenModule;
 
+/// FragileElement - a description of the index of a fragile aggregate element
+/// and its type.
+struct FragileElement {
+  Type type;
+  unsigned index;
+};
+
 /// ReferenceTypeElement - a path to a reference type element within a loadable
 /// aggregate type at an arbitrary depth.
 struct ReferenceTypeElement {
-  struct Component {
-    Type type;
-    unsigned index;
-  };
-  /// index - The index chain leading to the reference type element. For
+  /// path - The index chain leading to the reference type element. For
   /// example, {0} refers to element zero, {0, 1} refers to element
   /// one of element zero, etc. An empty index list {} refers to the value
   /// itself, for reference types.
-  llvm::SmallVector<Component, 4> path;
+  llvm::SmallVector<FragileElement, 4> path;
 };
 
+/// TypeInfo - Extended type information used by SILGen.
 class LLVM_LIBRARY_VISIBILITY TypeInfo {
   friend class TypeConverter;
   friend class LoadableTypeInfoVisitor;
 
+  /// referenceTypeElements - For a loadable type, this contains element index
+  /// paths to every element inside the aggregate that must be retained and
+  /// released.
   llvm::SmallVector<ReferenceTypeElement, 4> referenceTypeElements;
   
-  bool addressOnly : 1;
+  /// fragileElements - For a loadable struct type, this contains mappings from
+  /// member identifiers to SIL element indexes. Empty for address-only or
+  /// non-struct types.
+  llvm::DenseMap<Identifier, FragileElement> fragileElements;
   
+  bool addressOnly : 1;
 
 public:
   TypeInfo() : addressOnly(false) {}
@@ -73,6 +84,22 @@ public:
   llvm::ArrayRef<ReferenceTypeElement> getReferenceTypeElements() const {
     return referenceTypeElements;
   }
+  
+  /// hasFragileElement - Returns true if this TypeInfo represents a loadable
+  /// struct type and it has a physical member with the given name.
+  bool hasFragileElement(Identifier name) const {
+    return fragileElements.count(name);
+  }
+  
+  /// getFragileElement - For a loadable struct type, returns the index and type
+  /// of the element named by the given identifier. The named element must exist
+  /// in the type and be a physical member.
+  FragileElement getFragileElement(Identifier name) const {
+    auto found = fragileElements.find(name);
+    assert(found != fragileElements.end() &&
+           "element name does not exist in type, or type isn't loadable");
+    return found->second;
+  }
 };
 
 /// TypeConverter - helper class for creating and managing TypeInfos.
@@ -80,7 +107,8 @@ class LLVM_LIBRARY_VISIBILITY TypeConverter {
   llvm::DenseMap<TypeBase *, TypeInfo> types;
   
   TypeInfo const &makeTypeInfo(CanType t);
-  
+  void makeFragileElements(TypeInfo &theInfo, CanType t);
+
 public:
   TypeConverter(SILGenModule &sgm) { }
   

@@ -247,6 +247,7 @@ public:
   ManagedValue visitGetMetatypeExpr(GetMetatypeExpr *E);
   ManagedValue visitSpecializeExpr(SpecializeExpr *E);
   ManagedValue visitAddressOfExpr(AddressOfExpr *E);
+  ManagedValue visitMemberRefExpr(MemberRefExpr *E);
   ManagedValue visitTupleElementExpr(TupleElementExpr *E);
   ManagedValue visitTupleShuffleExpr(TupleShuffleExpr *E);
   ManagedValue visitNewArrayExpr(NewArrayExpr *E);

@@ -274,7 +274,7 @@ static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc, Value v
                                    X (SILBuilder::*createRR)(SILLocation,
                                                              Value),
                                    ReferenceTypeElement const &elt) {
-  for (ReferenceTypeElement::Component comp : elt.path) {
+  for (FragileElement comp : elt.path) {
     v = gen.B.createExtract(loc, v, comp.index, comp.type);
   }
   (gen.B.*createRR)(loc, v);

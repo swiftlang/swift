@@ -199,32 +199,54 @@ ManagedValue SILGenFunction::visitAddressOfExpr(AddressOfExpr *E) {
   return visit(E->getSubExpr());
 }
 
+namespace {
+
+static ManagedValue emitExtractLoadableElement(SILGenFunction &gen,
+                                               Expr *e, ManagedValue base,
+                                               unsigned elt) {
+  if (e->getType()->is<LValueType>()) {
+    // Get the element address relative to the aggregate's address.
+    Value address = gen.B.createElementAddr(e,
+                                            base.getUnmanagedValue(),
+                                            elt,
+                                            e->getType());
+    return ManagedValue(address);
+  } else {
+    // Extract the element from the original aggregate value.
+    Value extract = gen.B.createExtract(e,
+                                        base.getValue(),
+                                        elt,
+                                        e->getType());
+    
+    gen.emitRetainRValue(e, extract);
+    return managedRValueWithCleanup(gen, extract);
+  }
+}
+
+} // end anonymous namespace
+
+ManagedValue SILGenFunction::visitMemberRefExpr(MemberRefExpr *E) {
+  TypeInfo const &ti = SGM.Types.getTypeInfo(E->getBase()->getType()
+                                               ->getRValueType());
+  
+  if (ti.hasFragileElement(E->getDecl()->getName())) {
+    FragileElement element = ti.getFragileElement(E->getDecl()->getName());
+    return emitExtractLoadableElement(*this, E, visit(E->getBase()),
+                                      element.index);
+  } else {
+    llvm_unreachable("member ref of non-struct not yet implemented");
+  }
+}
 
 ManagedValue SILGenFunction::visitTupleElementExpr(TupleElementExpr *E) {
   // FIXME: address-only tuples
-  
-  if (E->getType()->is<LValueType>()) {
-    // Get the element address relative to the tuple address.
-    Value address = B.createElementAddr(E,
-                                        visit(E->getBase()).getValue(),
-                                        E->getFieldNumber(),
-                                        E->getType());
-    return ManagedValue(address);
-  } else {
-    // Extract the element from the original tuple value.
-    Value elt = B.createExtract(E,
-                                visit(E->getBase()).getValue(),
-                                E->getFieldNumber(),
-                                E->getType());
-    
-    emitRetainRValue(E, elt);
-    return managedRValueWithCleanup(*this, elt);
-  }
+  return emitExtractLoadableElement(*this, E, visit(E->getBase()),
+                                    E->getFieldNumber());
 }
 
 
 /// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
-/// (which represents the retain count) a base pointer to some elements, and a
+/// (which represents the retain count), a base pointer to some elements, and a
 /// length
 ManagedValue SILGenFunction::emitArrayInjectionCall(Value ObjectPtr,
                                             Value BasePtr,
