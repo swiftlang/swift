@@ -223,13 +223,13 @@ public:
   
 static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
   // FIXME: capture local properties
+  ASTContext &c = capture->getASTContext();
   switch (gen.getDeclCaptureKind(capture)) {
   case CaptureKind::LValue: {
     // LValues are captured as two arguments: a retained ObjectPointer that owns
     // the captured value, and the address of the value itself.
     Type ty = capture->getTypeOfReference();
-    ASTContext &ctx = ty->getASTContext();
-    Value box = new (gen.SGM.M) BBArgument(ctx.TheObjectPointerType,
+    Value box = new (gen.SGM.M) BBArgument(c.TheObjectPointerType,
                                            gen.F.begin());
     Value addr = new (gen.SGM.M) BBArgument(ty,
                                             gen.F.begin());
@@ -251,6 +251,24 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
     assert(!ty->is<LValueType>() && "capturing byref by value?!");
     Value value = new (gen.SGM.M) BBArgument(ty, gen.F.begin());
     gen.LocalConstants[SILConstant(capture)] = value;
+    gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
+    break;
+  }
+  case CaptureKind::GetterSetter: {
+    // Capture the setter and getter closures by value.
+    Type setTy = FunctionType::get(capture->getType(),
+                                   TupleType::getEmpty(c), c);
+    Value value = new (gen.SGM.M) BBArgument(setTy, gen.F.begin());
+    gen.LocalConstants[SILConstant(capture, SILConstant::Setter)] = value;
+    gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
+    /* FALLTHROUGH */
+  }
+  case CaptureKind::Getter: {
+    // Capture the getter closure by value.
+    Type getTy = FunctionType::get(TupleType::getEmpty(c),
+                                   capture->getType(), c);
+    Value value = new (gen.SGM.M) BBArgument(getTy, gen.F.begin());
+    gen.LocalConstants[SILConstant(capture, SILConstant::Getter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     break;
   }

@@ -76,7 +76,11 @@ enum class CaptureKind {
   /// A local value captured by value.
   Constant,
   /// A byref argument captured by address.
-  Byref
+  Byref,
+  /// A getter-only property.
+  Getter,
+  /// A settable property.
+  GetterSetter
 };
   
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
@@ -298,6 +302,14 @@ public:
 
   /// getDeclCaptureKind - Return the CaptureKind to use when capturing a decl.
   static CaptureKind getDeclCaptureKind(ValueDecl *capture) {
+    if (VarDecl *var = dyn_cast<VarDecl>(capture)) {
+      if (var->isProperty()) {
+        return var->isSettable()
+          ? CaptureKind::GetterSetter
+          : CaptureKind::Getter;
+      }
+    }
+    
     if (capture->getType()->is<LValueType>())
       return CaptureKind::Byref;
     // FIXME: Check capture analysis info here and capture Byref or

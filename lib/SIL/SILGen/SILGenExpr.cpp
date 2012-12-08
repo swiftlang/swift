@@ -471,6 +471,22 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
           capturedArgs.push_back(v.forward(*this));
           break;
         }
+        case CaptureKind::GetterSetter: {
+          // Pass the setter and getter closure references on.
+          ManagedValue v = emitConstantRef(*this, loc,
+                                           SILConstant(capture,
+                                                       SILConstant::Setter));
+          capturedArgs.push_back(v.forward(*this));
+          /* FALLTHROUGH */
+        }
+        case CaptureKind::Getter: {
+          // Pass the getter closure reference on.
+          ManagedValue v = emitConstantRef(*this, loc,
+                                           SILConstant(capture,
+                                                       SILConstant::Getter));
+          capturedArgs.push_back(v.forward(*this));
+          break;
+        }
       }
     }
     
