@@ -342,28 +342,28 @@ Attributes for Objective-C Support
 
   This attribute is inherited (in all contexts).
 
-``[IBOutlet]``
+``[iboutlet]``
   Can only be applied to properties. This marks the property as being exposed
   as an outlet in Interface Builder. **In most cases,**
-  `IBOutlets should be weak properties`__.
+  `outlets should be weak properties`__.
 
-  *The simplest implementation of this is to have* ``[IBOutlet]`` *cause an*
+  *The simplest implementation of this is to have* ``[iboutlet]`` *cause an*
   *Objective-C getter and setter to be emitted, but this is* not *part of*
-  ``[IBOutlet]``'s *contract.* 
+  ``[iboutlet]``'s *contract.*
 
   This attribute is inherited.
 
-``[IBAction]``
+``[ibaction]``
   Can only be applied to methods, which must have a signature matching the
   requirements for target/action methods on the current platform.
   This marks the method as being a potential action in Interface Builder.
 
-  *The simplest implementation of this is to have* ``[IBAction]`` *imply*
+  *The simplest implementation of this is to have* ``[ibaction]`` *imply*
   ``[objc]``, *and this may be the* only *viable implementation given how the*
   *responder chain works. For example, a window's delegate is part of the*
   *responder chain, even though it does not subclass* ``NSResponder`` *and may*
   *not be an Objective-C class at all. Still, this is* not *part of*
-  ``[IBAction]``'s *contract.*
+  ``[ibaction]``'s *contract.*
 
   This attribute is inherited.
 

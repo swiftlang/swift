@@ -1567,6 +1567,12 @@ CallEmission CalleeSource::prepareRootCall(IRGenFunction &IGF,
   llvm_unreachable("bad CalleeSource kind");
 }
 
+static bool needsObjCImplementation(const FuncDecl *FD) {
+  return FD->getAttrs().isObjC() ||
+         FD->getAttrs().isIBOutlet() ||
+         FD->getAttrs().isIBAction();
+}
+
 namespace {
   /// A class for decomposing an expression into a function reference
   /// which can, hopefully, be called more efficiently.
@@ -1574,7 +1580,10 @@ namespace {
       irgen::ExprVisitor<FunctionDecomposer, CalleeSource> {
     CalleeSource visitDeclRefExpr(DeclRefExpr *E) {
       if (FuncDecl *fn = dyn_cast<FuncDecl>(E->getDecl())) {
-        if (fn->getAttrs().isObjC()) {
+        // FIXME: The test we really want is to ask if this function ONLY has an
+        // Objective-C implementation, but for now we'll just always go through
+        // the Objective-C version.
+        if (needsObjCImplementation(fn)) {
           return CalleeSource::forObjCMessage(fn);
         } else if (isa<ClassDecl>(fn->getDeclContext())) {
           return CalleeSource::forVirtual(fn);

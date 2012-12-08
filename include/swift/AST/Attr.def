@@ -33,5 +33,7 @@ ATTR(asmname)
 ATTR(postfix)
 ATTR(objc)
 ATTR(allocates_this)
+ATTR(iboutlet)
+ATTR(ibaction)
 
 #undef ATTR

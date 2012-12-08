@@ -690,7 +690,40 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       return;
     }
   }
-  
+
+  if (Attrs.isIBOutlet()) {
+    // Only instance properties can be IBOutlets.
+    // FIXME: This could do some type validation as well (all IBOutlets refer
+    // to objects).
+    if (!(isa<VarDecl>(VD) && isa<ClassDecl>(VD->getDeclContext()))) {
+      TC.diagnose(VD->getStartLoc(), diag::invalid_iboutlet);
+      VD->getMutableAttrs().IBOutlet = false;
+      return;
+    }
+  }
+
+  if (Attrs.isIBAction()) {
+    // Only instance methods returning () can be IBActions.
+    const FuncDecl *FD = dyn_cast<FuncDecl>(VD);
+    if (!FD || !isa<ClassDecl>(VD->getDeclContext()) || FD->isStatic() ||
+        FD->isGetterOrSetter()) {
+      TC.diagnose(VD->getStartLoc(), diag::invalid_ibaction_decl);
+      VD->getMutableAttrs().IBAction = false;
+      return;
+    }
+
+    // IBActions instance methods must have type Class -> (...) -> ().
+    // FIXME: This could do some argument type validation as well (only certain
+    // method signatures are allowed for IBActions).
+    Type CurriedTy = VD->getType()->castTo<AnyFunctionType>()->getResult();
+    Type ResultTy = CurriedTy->castTo<AnyFunctionType>()->getResult();
+    if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context))) {
+      TC.diagnose(VD->getStartLoc(), diag::invalid_ibaction_result, ResultTy);
+      VD->getMutableAttrs().IBAction = false;
+      return;
+    }
+  }
+
   if (Attrs.isInfix()) {
     // Only operator functions can be infix.
     if (!isOperator) {

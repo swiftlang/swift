@@ -260,6 +260,24 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;    
   }
 
+  case AttrName::iboutlet: {
+    if (Attributes.isIBOutlet())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+
+    consumeToken(tok::identifier);
+    Attributes.IBOutlet = true;
+    return false;
+  }
+
+  case AttrName::ibaction: {
+    if (Attributes.isIBAction())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+
+    consumeToken(tok::identifier);
+    Attributes.IBAction = true;
+    return false;
+  }
+
   case AttrName::objc: {
     if (Attributes.isObjC())
       diagnose(Tok, diag::duplicate_attribute, Tok.getText());
