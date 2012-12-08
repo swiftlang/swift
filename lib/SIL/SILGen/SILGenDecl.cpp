@@ -44,7 +44,7 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
                                                 fd->getBody())
       .forward(*this);
     Cleanups.pushCleanup<CleanupClosure>(closure);
-    LocalConstants[fd] = closure;
+    LocalConstants[SILConstant(fd)] = closure;
   }
 }
 
@@ -83,6 +83,11 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
   // with the initial value.
   void visitNamedPattern(NamedPattern *P) {
     VarDecl *vd = P->getDecl();
+    
+    // If this is a property, we don't need to do anything here. We'll generate
+    // the getter and setter when we see their FuncDecls.
+    if (vd->isProperty())
+      return;
 
     // If this is a [byref] argument, just use the argument lvalue as our
     // address.
@@ -217,6 +222,7 @@ public:
 };
   
 static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
+  // FIXME: capture local properties
   switch (gen.getDeclCaptureKind(capture)) {
   case CaptureKind::LValue: {
     // LValues are captured as two arguments: a retained ObjectPointer that owns
@@ -244,7 +250,7 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
     Type ty = capture->getType();
     assert(!ty->is<LValueType>() && "capturing byref by value?!");
     Value value = new (gen.SGM.M) BBArgument(ty, gen.F.begin());
-    gen.LocalConstants[capture] = value;
+    gen.LocalConstants[SILConstant(capture)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     break;
   }

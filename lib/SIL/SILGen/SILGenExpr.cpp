@@ -72,16 +72,34 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   return managedRValueWithCleanup(*this, B.createApply(E, FnV, ArgsV));
 }
 
+namespace {
+
+ManagedValue emitConstantRef(SILGenFunction &gen, SILLocation loc,
+                             SILConstant constant) {
+  // If this is a reference to a local constant, grab it.
+  if (gen.LocalConstants.count(constant)) {
+    Value v = gen.LocalConstants[constant];
+    gen.emitRetainRValue(loc, v);
+    return managedRValueWithCleanup(gen, v);
+  }
+  
+  // Otherwise, use a global ConstantRefInst.
+  Value c = gen.B.createConstantRef(loc, constant);
+  return ManagedValue(c);
+}
+  
+}
+
 ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
                                                  ValueDecl *decl) {
+  
   // If this is a reference to a var, produce an address.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     // If it's a property, invoke its getter.
     if (var->isProperty()) {
-      // FIXME: closure for local getter
-      Value get = B.createConstantRef(loc,
-                                      SILConstant(decl, SILConstant::Getter));
-      return emitGetProperty(loc, ManagedValue(get));
+      ManagedValue get = emitConstantRef(*this, loc,
+                                        SILConstant(decl, SILConstant::Getter));
+      return emitGetProperty(loc, get);
     }
     
     // For local decls, we should have the address we allocated on hand.
@@ -97,19 +115,12 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
     return ManagedValue(address);
   }
   
-  // If this is a reference to a local constant, grab it.
-  if (LocalConstants.count(decl)) {
-    Value constant = LocalConstants[decl];
-    emitRetainRValue(loc, constant);
-    return managedRValueWithCleanup(*this, constant);
-  }
-  
-  
-  // Otherwise, use a global ConstantRefInst.
-  // FIXME: other kinds of local decl?
-  
-  Value v = B.createConstantRef(loc, SILConstant(decl));
-  return ManagedValue(v);  
+  // If the referenced decl isn't a VarDecl, it should be a constant of some
+  // sort.
+  assert(!decl->getTypeOfReference()->is<LValueType>() &&
+         "unexpected lvalue decl ref?!");
+
+  return emitConstantRef(*this, loc, SILConstant(decl));
 }
 
 ManagedValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E) {
