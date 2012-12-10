@@ -21,6 +21,8 @@
 #include <cstdint>
 #include "swift/ABI/MetadataValues.h"
 
+struct objc_class;
+
 namespace swift {
 
 struct HeapObject;
@@ -492,6 +494,13 @@ struct HeapArrayMetadata : public HeapMetadata {
   // No extra fields for now.
 };
 
+/// The structure of wrapper metadata for Objective-C classes.  This
+/// is used as a type metadata pointer when the actual class isn't
+/// Swift-compiled.
+struct ObjCClassWrapperMetadata : public Metadata {
+  struct objc_class *Class;
+};
+
 /// The structure of type metadata for structs.
 struct StructMetadata : public Metadata {
   /// An out-of-line description of the type.
@@ -655,6 +664,10 @@ swift_getGenericMetadata(GenericMetadata *pattern,
 extern "C" const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata(const Metadata *argMetadata,
                               const Metadata *resultMetadata);
+
+/// \brief Fetch a uniqued type metadata for an ObjC class.
+extern "C" const Metadata *
+swift_getObjCClassMetadata(struct objc_class *theClass);
 
 /// \brief Fetch a uniqued metadata for a tuple type.
 ///

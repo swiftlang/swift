@@ -52,6 +52,20 @@ static llvm::ConstantInt *getMetadataKind(IRGenModule &IGM,
   return llvm::ConstantInt::get(IGM.MetadataKindTy, uint8_t(kind));
 }
 
+/// Emit a reference to the Swift metadata for an Objective-C class.
+static llvm::Value *emitObjCMetadataRef(IRGenFunction &IGF,
+                                        ClassDecl *theClass) {
+  // Derive a pointer to the Objective-C class.
+  auto classPtr = IGF.IGM.getAddrOfObjCClass(theClass);
+
+  // Fetch the metadata for that class.
+  auto call = IGF.Builder.CreateCall(IGF.IGM.getGetObjCClassMetadataFn(),
+                                     classPtr);
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  return call;
+}
+
 namespace {
   /// A structure for collecting generic arguments for emitting a
   /// nominal metadata reference.  The structure produced here is
@@ -89,6 +103,16 @@ namespace {
 llvm::Value *irgen::emitNominalMetadataRef(IRGenFunction &IGF,
                                            NominalTypeDecl *theDecl,
                                            CanType theType) {
+  // If this is a class that might not have Swift metadata, we need to
+  // transform it.
+  if (auto theClass = dyn_cast<ClassDecl>(theDecl)) {
+    if (!hasKnownSwiftMetadata(IGF.IGM, theClass)) {
+      assert(!theDecl->getGenericParamsOfContext() &&
+             "ObjC class cannot be generic");
+      return emitObjCMetadataRef(IGF, theClass);
+    }
+  }
+
   auto generics = theDecl->getGenericParamsOfContext();
 
   bool isPattern = (generics != nullptr);
@@ -156,6 +180,15 @@ llvm::Value *irgen::emitNominalMetadataRef(IRGenFunction &IGF,
 
   IGF.setScopedLocalTypeData(theType, LocalTypeData::Metatype, result);
   return result;
+}
+
+/// Is the given class known to have Swift-compatible metadata?
+bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass) {
+  // For now, the fact that a declaration was imported from ObjC is
+  // enough to conclusively force us into a slower path.  Eventually
+  // we might have an attribute here or something based on the
+  // deployment target.
+  return !theClass->hasClangDecl();
 }
 
 /// Emit a string encoding the labels in the given tuple type.

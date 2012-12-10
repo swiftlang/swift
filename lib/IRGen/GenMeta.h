@@ -41,6 +41,9 @@ namespace irgen {
   class IRGenModule;
   class StructLayout;
 
+  /// Is the given class known to have Swift-compatible metadata?
+  bool hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass);
+
   /// Emit a reference to the type metadata for a nominal type.
   ///
   /// \param classType - the actual type, including any generic arguments

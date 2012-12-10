@@ -276,6 +276,18 @@ llvm::Constant *IRGenModule::getGetMetatypeMetadataFn() {
   return GetMetatypeMetadataFn;
 }
 
+llvm::Constant *IRGenModule::getGetObjCClassMetadataFn() {
+  if (GetObjCClassMetadataFn) return GetObjCClassMetadataFn;
+
+  // type_metadata_t *swift_getObjCClassMetadata(type_metadata_t *theClass);
+  llvm::Type *argTypes[] = { TypeMetadataPtrTy };
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
+  GetObjCClassMetadataFn =
+    createRuntimeFunction(*this, "swift_getObjCClassMetadata", fnType);
+  return GetObjCClassMetadataFn;
+}
+
 llvm::Constant *IRGenModule::getGetTupleMetadataFn() {
   if (GetTupleMetadataFn) return GetTupleMetadataFn;
 

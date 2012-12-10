@@ -687,6 +687,12 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     }
   }
 
+  // Objective-C class references also have a custom mangling.
+  if (getKind() == Kind::ObjCClass) {
+    buffer << "OBJC_CLASS_$_" << getDecl()->getName().str();
+    return;
+  }
+
   // Otherwise, everything gets the common prefix.
   //   mangled-name ::= '_T' global
   buffer << "_T";
@@ -771,6 +777,10 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
     buffer << 's';
     return;
+
+  //   These aren't swift entities and are special-cased above.
+  case Kind::ObjCClass:
+    llvm_unreachable("not a swift entity");
   }
   llvm_unreachable("bad entity kind!");
 }

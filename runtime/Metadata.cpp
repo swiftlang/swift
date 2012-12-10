@@ -235,6 +235,55 @@ swift::swift_getGenericMetadata(GenericMetadata *pattern,
 }
 
 namespace {
+  class ObjCClassCacheEntry : public CacheEntry<ObjCClassCacheEntry> {
+    FullMetadata<ObjCClassWrapperMetadata> Metadata;
+
+  public:
+    ObjCClassCacheEntry(size_t numArguments) {}
+
+    FullMetadata<ObjCClassWrapperMetadata> *getData() {
+      return &Metadata;
+    }
+    const FullMetadata<ObjCClassWrapperMetadata> *getData() const {
+      return &Metadata;
+    }
+
+    /// Does this cache entry match the given set of arguments?
+    bool matches(const void * const *arguments, size_t numArguments) const {
+      assert(numArguments == 1);
+      return (arguments[0] == Metadata.Class);
+    }
+  };
+}
+
+/// The uniquing structure for ObjC class-wrapper metadata.
+static MetadataCache<ObjCClassCacheEntry> ObjCClassWrappers;
+
+const Metadata *
+swift::swift_getObjCClassMetadata(struct objc_class *theClass) {
+  // If the class pointer is valid as metadata, no translation is required.
+  if (reinterpret_cast<ClassMetadata*>(theClass)->isTypeMetadata()) {
+    return reinterpret_cast<ClassMetadata*>(theClass);
+  }
+
+  // Look for an existing entry.
+  const size_t numGenericArgs = 1;
+  const void *args[] = { theClass };
+  if (auto entry = ObjCClassWrappers.find(args, numGenericArgs)) {
+    return entry->getData();
+  }
+
+  auto entry = ObjCClassCacheEntry::allocate(args, numGenericArgs, 0);
+
+  auto metadata = entry->getData();
+  metadata->Kind = MetadataKind::ObjCClassWrapper;
+  metadata->ValueWitnesses = &_TWVBO;
+  metadata->Class = theClass;
+
+  return ObjCClassWrappers.add(entry)->getData();
+}
+
+namespace {
   class FunctionCacheEntry : public CacheEntry<FunctionCacheEntry> {
     FullMetadata<FunctionTypeMetadata> Metadata;
 
@@ -273,8 +322,7 @@ swift::swift_getFunctionTypeMetadata(const Metadata *argMetadata,
     return entry->getData();
   }
 
-  auto entry = FunctionCacheEntry::allocate(args, numGenericArgs,
-                                            sizeof(FunctionTypeMetadata));
+  auto entry = FunctionCacheEntry::allocate(args, numGenericArgs, 0);
 
   auto metadata = entry->getData();
   metadata->Kind = MetadataKind::Function;

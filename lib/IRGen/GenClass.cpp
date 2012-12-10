@@ -308,8 +308,10 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   auto &classTI = Types.getFragileTypeInfo(D).as<ClassTypeInfo>();
   auto &layout = classTI.getLayout(*this);
 
-  // Emit the class metadata.
-  emitClassMetadata(*this, D, layout);
+  // Emit the class metadata.  [objc] on a class is basically an
+  // 'extern' declaration and suppresses this.
+  if (!D->getAttrs().isObjC())
+    emitClassMetadata(*this, D, layout);
 
   bool emittedDtor = false;
 

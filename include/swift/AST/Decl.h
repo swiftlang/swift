@@ -157,6 +157,12 @@ public:
   /// \brief Mark this declaration invalid.
   void setInvalid() { DeclBits.Invalid = true; }
 
+  /// \brief Returns true if there's a clang declaration associated
+  /// with this.
+  bool hasClangDecl() {
+    return DeclBits.FromClang;
+  }
+
   /// \brief Retrieve the Clang declaration from which this declaration was
   /// synthesized, if any.
   clang::Decl *getClangDecl() {

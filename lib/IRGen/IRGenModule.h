@@ -215,6 +215,7 @@ public:
   llvm::Constant *getGetGenericMetadataFn();
   llvm::Constant *getGetMetatypeMetadataFn();
   llvm::Constant *getGetTupleMetadataFn();
+  llvm::Constant *getGetObjCClassMetadataFn();
 
 private:
   llvm::Function *MemCpyFn;
@@ -229,6 +230,7 @@ private:
   llvm::Constant *GetFunctionMetadataFn = nullptr;
   llvm::Constant *GetGenericMetadataFn = nullptr;
   llvm::Constant *GetMetatypeMetadataFn = nullptr;
+  llvm::Constant *GetObjCClassMetadataFn = nullptr;
   llvm::Constant *GetTupleMetadataFn = nullptr;
   llvm::Constant *ObjCRetainFn = nullptr;
   llvm::Constant *ObjCRetainAutoreleasedReturnValueFn = nullptr;
@@ -285,6 +287,7 @@ public:
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,
                                         bool isIndirect, bool isPattern,
                                         llvm::Type *definitionType = nullptr);
+  llvm::Constant *getAddrOfObjCClass(ClassDecl *D);
 };
 
 } // end namespace irgen

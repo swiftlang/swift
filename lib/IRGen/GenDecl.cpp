@@ -317,6 +317,7 @@ bool LinkEntity::isLocalLinkage() const {
   case Kind::Getter:
   case Kind::Setter:
   case Kind::Other:
+  case Kind::ObjCClass:
     return isLocalLinkageDecl(getDecl());
   }
   llvm_unreachable("bad link entity kind");
@@ -670,6 +671,17 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
   // Cache and return.
   entry = var;
   return var;
+}
+
+/// Fetch a global reference to the given Objective-C class.  The
+/// result is always a TypeMetadataPtrTy, but it may not be compatible
+/// with IR-generation.
+llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass) {
+  LinkEntity entity = LinkEntity::forObjCClass(theClass);
+  auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
+                                    TypeMetadataStructTy, TypeMetadataStructTy,
+                                    TypeMetadataPtrTy);
+  return addr;
 }
 
 /// Fetch the declaration of the metadata (or metadata template) for a
