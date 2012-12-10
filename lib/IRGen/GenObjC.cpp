@@ -21,6 +21,8 @@
 #include "swift/IRGen/Options.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "clang/AST/Attr.h"
+#include "clang/AST/DeclObjC.h"
 
 #include "ASTVisitor.h"
 #include "CallEmission.h"
@@ -459,17 +461,75 @@ namespace {
       return CanType(cast<MetaTypeType>(type)->getInstanceType());
     }
   };
+
+  /// Ownership conventions derived from a Clang method declaration.
+  class ObjCMethodConventions : public OwnershipConventions {
+    clang::ObjCMethodDecl *Method;
+  public:
+    ObjCMethodConventions(clang::ObjCMethodDecl *method) : Method(method) {}
+
+    bool isResultAutoreleased() const override {
+      return (Method->getResultType()->isObjCRetainableType() &&
+              !Method->hasAttr<clang::NSReturnsRetainedAttr>());
+    }
+
+    bool isArgConsumed(unsigned index) const override {
+      // 'self'
+      if (index == 0) {
+        return Method->hasAttr<clang::NSConsumesSelfAttr>();
+      // 'cmd'
+      } else if (index == 1) {
+        return false;
+      // Formal parameters.
+      } else {
+        assert(index - 2 < Method->param_size());
+        auto param = *(Method->param_begin() + (index - 2));
+        assert(param);
+        return param->hasAttr<clang::NSConsumedAttr>();
+      }
+    }
+  };
+
+  /// Ownership conventions derived from a selector family.
+  class ObjCSelectorConventions : public OwnershipConventions {
+    CanType SubstResultType;
+    Selector::Family Family;
+  public:
+    ObjCSelectorConventions(CanType substResultType, Selector::Family family)
+      : SubstResultType(substResultType), Family(family) {}
+
+    bool isResultAutoreleased() const override {
+      // If the result type isn't a retainable object pointer, this
+      // isn't applicable.
+      if (!SubstResultType->getClassOrBoundGenericClass())
+        return false;
+
+      switch (Family) {
+      case Selector::Family::Alloc:
+      case Selector::Family::Init:
+      case Selector::Family::Copy:
+      case Selector::Family::MutableCopy:
+      case Selector::Family::New:
+        return false;
+
+      case Selector::Family::None:
+        return true;
+      }
+      llvm_unreachable("bad selector family!");
+    }
+
+    bool isArgConsumed(unsigned index) const override {
+      // The only conventionally-consumed argument is an init method's
+      // 'self'.
+      return (index == 0 && Family == Selector::Family::Init);
+    }
+  };
 }
 
 /// Emit the given expression (of class-metatype type) as an
 /// Objective-C class reference.
 static void emitObjCClassRValue(IRGenFunction &IGF, Expr *E, Explosion &out) {
   out.addUnmanaged(ObjCClassEmitter(IGF).visit(E));
-}
-
-static bool isConsumesSelf(FuncDecl *method, Selector::Family family) {
-  // FIXME: use the clang-decl information.
-  return family == Selector::Family::Init;
 }
 
 /// Prepare a call using ObjC method dispatch.
@@ -504,6 +564,20 @@ CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF, FuncDecl *method,
                                                       ExplosionKind::Minimal,
                                                       /*uncurry*/ 1));
 
+  // Compute the selector.
+  Selector selector(method);
+
+  // Respect conventions.
+  Callee &callee = emission.getMutableCallee();
+  if (auto clangDecl = method->getClangDecl()) {
+    callee.setOwnershipConventions<ObjCMethodConventions>(
+                                     cast<clang::ObjCMethodDecl>(clangDecl));
+  } else {
+    auto selectorFamily = selector.getFamily();
+    callee.setOwnershipConventions<ObjCSelectorConventions>(substResultType,
+                                                            selectorFamily);
+  }
+
   // Emit the self argument.
   Explosion selfValues(ExplosionKind::Minimal);
   if (method->isInstanceMember()) {
@@ -512,17 +586,6 @@ CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF, FuncDecl *method,
     emitObjCClassRValue(IGF, self, selfValues);
   }
   assert(selfValues.size() == 1);
-
-  Selector selector(method);
-  auto selectorFamily = selector.getFamily();
-
-  // Pull the 'self' value out of the explosion, clear its cleanup,
-  // and re-add it.  FIXME: this is a hack to pass the value at +0.
-  if (method->isInstanceMember() && !isConsumesSelf(method, selectorFamily)) {
-    ManagedValue value = selfValues.claimNext();
-    selfValues.reset();
-    selfValues.addUnmanaged(value.getValue());
-  }
 
   // Add the selector value.
   auto selectorRef = IGF.IGM.getAddrOfObjCSelectorRef(selector.str());

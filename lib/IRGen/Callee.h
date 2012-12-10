@@ -86,12 +86,24 @@ namespace irgen {
     unsigned getMinUncurryLevel() const { return MinUncurryLevel; }
   };
 
+  class OwnershipConventions {
+  protected:
+    ~OwnershipConventions() = default;
+  public:
+    virtual bool isResultAutoreleased() const = 0;
+    virtual bool isArgConsumed(unsigned index) const = 0;
+  };
+
   class Callee {
     /// The explosion level to use for this function.
     ExplosionKind ExplosionLevel;
 
     /// The abstract calling convention used by this function.
     AbstractCC Convention;
+
+    /// Whether this function has non-standard ownership conventions.
+    /// If true, OwnershipConventions will be appropriately initialized.
+    bool HasOwnershipConventions;
 
     /// The number of function applications at which this function is
     /// being called.
@@ -113,6 +125,9 @@ namespace irgen {
     /// The archetype substitutions under which the function is being
     /// called.
     ArrayRef<Substitution> Substitutions;
+
+    /// A buffer for storing an OwnershipConventions implementation.
+    void *OwnershipConventionsBuffer[4];
 
   public:
     Callee() = default;
@@ -163,6 +178,7 @@ namespace irgen {
 
       Callee result;
       result.ExplosionLevel = explosionLevel;
+      result.HasOwnershipConventions = false;
       result.Convention = convention;
       result.UncurryLevel = uncurryLevel;
       result.OrigFormalType = origFormalType;
@@ -208,6 +224,28 @@ namespace irgen {
 
     /// Return the data pointer as a %swift.refcounted*.
     ManagedValue getDataPointer(IRGenFunction &IGF) const;
+
+    /// Construct an OwnershipConventions in this callee.
+    template <class T, class... Args>
+    void setOwnershipConventions(Args &&...args) {
+      assert(!HasOwnershipConventions);
+      static_assert(sizeof(T) <= sizeof(OwnershipConventionsBuffer),
+                    "conventions type overruns buffer size");
+      static_assert(alignof(T) <= alignof(void*),
+                    "conventions type requires extra alignment");
+      HasOwnershipConventions = true;
+      new (static_cast<void*>(&OwnershipConventionsBuffer))
+             T(std::forward<Args>(args)...);
+    }
+
+    bool hasOwnershipConventions() const {
+      return HasOwnershipConventions;
+    }
+
+    const OwnershipConventions &getOwnershipConventions() const {
+      auto &buffer = OwnershipConventionsBuffer;
+      return reinterpret_cast<const OwnershipConventions &>(buffer);
+    }
   };
 
 } // end namespace irgen

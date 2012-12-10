@@ -81,6 +81,7 @@ public:
   CallEmission &operator=(const CallEmission &other) = delete;
   ~CallEmission();
 
+  Callee &getMutableCallee() { return CurCallee; }
   const Callee &getCallee() const { return CurCallee; }
 
   static CallEmission forExpr(IRGenFunction &IGF, Expr *fn,

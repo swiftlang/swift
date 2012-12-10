@@ -1672,13 +1672,11 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   llvm::Value *result = call.getInstruction();
   if (result->getType()->isVoidTy()) return;
 
-  // HACK: the Objective-C convention is to return at +0.
-  if (getCallee().getConvention() == AbstractCC::C) {
-    if (auto theClass = CurOrigType->getClassOrBoundGenericClass()) {
-      if (theClass->getAttrs().isObjC()) {
-        result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
-      }
-    }
+  // If the callee has non-standard conventions, we may need to
+  // reclaim an autoreleased result.
+  if (getCallee().hasOwnershipConventions() &&
+      getCallee().getOwnershipConventions().isResultAutoreleased()) {
+    result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
   }
 
   // Extract out the scalar results.
@@ -2307,12 +2305,26 @@ void CallEmission::addArg(Explosion &arg) {
     targetIndex = newLastArgWritten;
   }
 
-  LastArgWritten = newLastArgWritten;
+  // The argument index of the first value in this explosion, for
+  // the purposes of the ownership conventions.
+  unsigned firstArgIndex = unsigned(Args.size() - LastArgWritten);
 
   auto argIterator = Args.begin() + targetIndex;
-  for (auto value : arg.claimAll()) {
-    *argIterator++ = value.split(Cleanups);
+  auto values = arg.claimAll();
+  for (unsigned i = 0, e = values.size(); i != e; ++i) {
+    auto value = values[i];
+    // The default rule is that arguments are consumed, in which case
+    // we need to deactivate cleanups when making the call.
+    if (getCallee().hasOwnershipConventions() &&
+        !getCallee().getOwnershipConventions().isArgConsumed(firstArgIndex+i)) {
+      // But if the argument isn't consumed, don't collect the cleanup.
+      *argIterator++ = value.getValue();
+    } else {
+      *argIterator++ = value.split(Cleanups);
+    }
   }
+
+  LastArgWritten = newLastArgWritten;
 
   // Walk into the original function type.
   drillIntoOrigFnType(CurOrigType);
