@@ -221,7 +221,8 @@ function(compile_assembler_file file target objectvar)
     "${CMAKE_CURRENT_BINARY_DIR}/${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
   add_custom_command(
     OUTPUT ${objfile}
-    COMMAND "clang" "-c" "-o" "${objfile}" "${source_file}"
+    COMMAND "clang" "-c" "-o" "${objfile}" "${source_file}" 
+            "-I${SWIFT_SOURCE_DIR}/include"
     DEPENDS ${source_file}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
