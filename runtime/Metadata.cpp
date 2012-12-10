@@ -260,10 +260,10 @@ namespace {
 static MetadataCache<ObjCClassCacheEntry> ObjCClassWrappers;
 
 const Metadata *
-swift::swift_getObjCClassMetadata(struct objc_class *theClass) {
+swift::swift_getObjCClassMetadata(ClassMetadata *theClass) {
   // If the class pointer is valid as metadata, no translation is required.
-  if (reinterpret_cast<ClassMetadata*>(theClass)->isTypeMetadata()) {
-    return reinterpret_cast<ClassMetadata*>(theClass);
+  if (theClass->isTypeMetadata()) {
+    return theClass;
   }
 
   // Look for an existing entry.

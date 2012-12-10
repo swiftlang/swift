@@ -211,7 +211,8 @@ static void emitGetMetatype(IRGenFunction &IGF, Expr *base, Explosion &out) {
     Explosion temp(ExplosionKind::Maximal);
     IGF.emitRValue(base, temp);
     auto value = temp.claimNext().getValue(); // let the cleanup happen
-    out.addUnmanaged(emitMetadataRefForHeapObject(IGF, value));
+    auto baseType = base->getType()->getCanonicalType();
+    out.addUnmanaged(emitTypeMetadataRefForHeapObject(IGF, value, baseType));
     return;
   }
 

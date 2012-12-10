@@ -21,8 +21,6 @@
 #include <cstdint>
 #include "swift/ABI/MetadataValues.h"
 
-struct objc_class;
-
 namespace swift {
 
 struct HeapObject;
@@ -498,7 +496,7 @@ struct HeapArrayMetadata : public HeapMetadata {
 /// is used as a type metadata pointer when the actual class isn't
 /// Swift-compiled.
 struct ObjCClassWrapperMetadata : public Metadata {
-  struct objc_class *Class;
+  const ClassMetadata *Class;
 };
 
 /// The structure of type metadata for structs.
@@ -634,11 +632,6 @@ struct GenericMetadata {
   }
 };
 
-/// \brief Simple proof of concept dynamic_cast API
-extern "C" const void *
-swift_dynamicCast(const void *object, const ClassMetadata *targetType);
-
-
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
 ///
 /// The basic algorithm for fetching a metadata object is:
@@ -667,7 +660,7 @@ swift_getFunctionTypeMetadata(const Metadata *argMetadata,
 
 /// \brief Fetch a uniqued type metadata for an ObjC class.
 extern "C" const Metadata *
-swift_getObjCClassMetadata(struct objc_class *theClass);
+swift_getObjCClassMetadata(ClassMetadata *theClass);
 
 /// \brief Fetch a uniqued metadata for a tuple type.
 ///
@@ -701,6 +694,10 @@ swift_getTupleTypeMetadata(size_t numElements,
 /// \brief Fetch a uniqued metadata for a metatype type.
 extern "C" const MetatypeMetadata *
 swift_getMetatypeMetadata(const Metadata *instanceType);
+
+/// \brief Simple proof of concept dynamic_cast API
+extern "C" const void *
+swift_dynamicCast(const void *object, const ClassMetadata *targetType);
 
 } // end namespace swift
 

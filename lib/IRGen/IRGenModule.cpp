@@ -152,6 +152,49 @@ static llvm::Constant *createRuntimeFunction(IRGenModule &IGM, StringRef name,
   return addr;
 }
 
+/// Create a readonly runtime function.
+///
+/// 'readonly' permits calls to this function to be removed, GVN'ed,
+/// and re-ordered, but not necessarily around writes to memory.  It
+/// is a promise that the function has no side effects.  We actually
+/// apply this attribute to functions that do have side effects, but
+/// those side effects are things like allocating a cache entry: that
+/// is, they are not visible outside of the abstraction of the
+/// function (except by e.g. monitoring memory usage).  This is
+/// permitted, as it does not affect the validity of transformations.
+static llvm::Constant *createReadonlyRuntimeFunction(IRGenModule &IGM,
+                                                     StringRef name,
+                                               llvm::FunctionType *fnType) {
+  llvm::Constant *addr = createRuntimeFunction(IGM, name, fnType);
+  if (auto fn = dyn_cast<llvm::Function>(addr)) {
+    fn->setOnlyReadsMemory();
+  }
+  return addr;
+}
+
+/// Create a readnone runtime function.
+///
+/// 'readnone' is a stronger version of 'readonly'; it permits calls
+/// to this function to be removed, GVN'ed, and re-ordered regardless
+/// of any intervening writes to memory.  It is an additional promise
+/// that the function does not depend on the current state of memory.
+/// We actually apply this attribute to functions that do depend on
+/// the current state of memory, but only when that memory is known to
+/// be immutable.  This is permitted, as it does not affect the
+/// validity of transformations.
+///
+/// Note that functions like swift_getTupleMetadata which read values
+/// out of a local array cannot be marked 'readnone'.
+static llvm::Constant *createReadnoneRuntimeFunction(IRGenModule &IGM,
+                                                     StringRef name,
+                                               llvm::FunctionType *fnType) {
+  llvm::Constant *addr = createRuntimeFunction(IGM, name, fnType);
+  if (auto fn = dyn_cast<llvm::Function>(addr)) {
+    fn->setDoesNotAccessMemory();
+  }
+  return addr;
+}
+
 llvm::Constant *IRGenModule::getAllocObjectFn() {
   if (AllocObjectFn) return AllocObjectFn;
 
@@ -247,7 +290,7 @@ llvm::Constant *IRGenModule::getGetFunctionMetadataFn() {
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
   GetFunctionMetadataFn =
-    createRuntimeFunction(*this, "swift_getFunctionMetadata", fnType);
+    createReadnoneRuntimeFunction(*this, "swift_getFunctionMetadata", fnType);
   return GetFunctionMetadataFn;
 }
 
@@ -272,19 +315,19 @@ llvm::Constant *IRGenModule::getGetMetatypeMetadataFn() {
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
   GetMetatypeMetadataFn =
-    createRuntimeFunction(*this, "swift_getMetatypeMetadata", fnType);
+    createReadnoneRuntimeFunction(*this, "swift_getMetatypeMetadata", fnType);
   return GetMetatypeMetadataFn;
 }
 
 llvm::Constant *IRGenModule::getGetObjCClassMetadataFn() {
   if (GetObjCClassMetadataFn) return GetObjCClassMetadataFn;
 
-  // type_metadata_t *swift_getObjCClassMetadata(type_metadata_t *theClass);
+  // type_metadata_t *swift_getObjCClassMetadata(struct objc_class *theClass);
   llvm::Type *argTypes[] = { TypeMetadataPtrTy };
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
   GetObjCClassMetadataFn =
-    createRuntimeFunction(*this, "swift_getObjCClassMetadata", fnType);
+    createReadnoneRuntimeFunction(*this, "swift_getObjCClassMetadata", fnType);
   return GetObjCClassMetadataFn;
 }
 
@@ -303,9 +346,39 @@ llvm::Constant *IRGenModule::getGetTupleMetadataFn() {
   };
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
+  // This could be 'readnone' except for the elements buffer.
   GetTupleMetadataFn =
-    createRuntimeFunction(*this, "swift_getTupleMetadata", fnType);
+    createReadonlyRuntimeFunction(*this, "swift_getTupleMetadata", fnType);
   return GetTupleMetadataFn;
+}
+
+llvm::Constant *IRGenModule::getGetObjectClassFn() {
+  if (GetObjectClassFn) return GetObjectClassFn;
+
+  // Class object_getClass(id object);
+  // This is an Objective-C runtime function.
+  // We have to mark it readonly instead of readnone because isa-rewriting
+  // can have a noticeable effect here.
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(TypeMetadataPtrTy, ObjCPtrTy, false);
+  GetObjectClassFn = Module.getOrInsertFunction("object_getClass", fnType);
+  if (auto fn = dyn_cast<llvm::Function>(GetObjectClassFn))
+    fn->setOnlyReadsMemory();
+  return GetObjectClassFn;
+}
+
+llvm::Constant *IRGenModule::getGetObjectTypeFn() {
+  if (GetObjectTypeFn) return GetObjectTypeFn;
+
+  // type_metadata_t *swift_getObjectType(id object);
+  // Since this supposedly looks through dynamic subclasses, it's
+  // invariant across reasonable isa-rewriting schemes and therefore
+  // can be readnone.
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(TypeMetadataPtrTy, ObjCPtrTy, false);
+  GetObjectTypeFn =
+    createReadnoneRuntimeFunction(*this, "swift_getObjectType", fnType);
+  return GetObjectTypeFn;
 }
 
 void IRGenModule::unimplemented(SourceLoc loc, StringRef message) {

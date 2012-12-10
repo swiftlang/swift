@@ -253,7 +253,6 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   CanType thisType = thisDecl->getType()->getCanonicalType();
   auto &classTI = IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();
   auto &layout = classTI.getLayout(IGM);
-  ClassDecl *curClass = classTI.getClass();
 
   Pattern* pats[] = {
     new (IGM.Context) AnyPattern(SourceLoc()),
@@ -275,7 +274,7 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
     // Allocate the class.
     // FIXME: Long-term, we clearly need a specialized runtime entry point.
 
-    llvm::Value *metadata = emitNominalMetadataRef(IGF, curClass, thisType);
+    llvm::Value *metadata = emitClassHeapMetadataRef(IGF, thisType);
 
     llvm::Value *size = layout.emitSize(IGF);
     llvm::Value *align = layout.emitAlign(IGF);

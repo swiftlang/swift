@@ -62,6 +62,7 @@ static llvm::Value *emitObjCMetadataRef(IRGenFunction &IGF,
   auto call = IGF.Builder.CreateCall(IGF.IGM.getGetObjCClassMetadataFn(),
                                      classPtr);
   call->setDoesNotThrow();
+  call->setDoesNotAccessMemory();
   call->setCallingConv(IGF.IGM.RuntimeCC);
   return call;
 }
@@ -100,7 +101,7 @@ namespace {
 }
 
 /// Returns a metadata reference for a class type.
-llvm::Value *irgen::emitNominalMetadataRef(IRGenFunction &IGF,
+static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
                                            NominalTypeDecl *theDecl,
                                            CanType theType) {
   // If this is a class that might not have Swift metadata, we need to
@@ -412,6 +413,27 @@ namespace {
 /// Produce the type metadata pointer for the given type.
 llvm::Value *irgen::emitTypeMetadataRef(IRGenFunction &IGF, CanType type) {
   return EmitTypeMetadataRef(IGF).visit(type);
+}
+
+/// Produce the heap metadata pointer for the given class type.  For
+/// Swift-defined types, this is equivalent to the metatype for the
+/// class, but for Objective-C-defined types, this is the class
+/// object.
+llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type) {
+  assert(isa<ClassType>(type) || isa<BoundGenericClassType>(type));
+
+  // ObjC-defined classes will always be top-level non-generic classes.
+
+  if (auto classType = dyn_cast<ClassType>(type)) {
+    auto theClass = classType->getDecl();
+    if (hasKnownSwiftMetadata(IGF.IGM, theClass))
+      return EmitTypeMetadataRef(IGF).visitClassType(classType);
+    return IGF.IGM.getAddrOfObjCClass(theClass);
+  }
+
+  auto classType = cast<BoundGenericClassType>(type);
+  assert(hasKnownSwiftMetadata(IGF.IGM, classType->getDecl()));
+  return EmitTypeMetadataRef(IGF).visitBoundGenericClassType(classType);
 }
 
 namespace {
@@ -1279,10 +1301,11 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
   llvm_unreachable("bad decl kind!");
 }
 
-/// Given a heap pointer, load the metadata reference as a %type*.
-llvm::Value *irgen::emitMetadataRefForHeapObject(IRGenFunction &IGF,
-                                                 llvm::Value *object,
-                                                 bool suppressCast) {
+/// Given a pointer to a heap object (i.e. definitely not a tagged
+/// pointer), load its heap metadata pointer.
+static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
+                                              llvm::Value *object,
+                                              bool suppressCast) {
   // Drill into the object pointer.  Rather than bitcasting, we make
   // an effort to do something that should explode if we get something
   // mistyped.
@@ -1324,6 +1347,109 @@ llvm::Value *irgen::emitMetadataRefForHeapObject(IRGenFunction &IGF,
                                              IGF.IGM.getPointerAlignment()));
   metadata->setName(llvm::Twine(object->getName()) + ".metadata");
   return metadata;
+}
+
+static bool isKnownNotTaggedPointer(IRGenModule &IGM, ClassDecl *theClass) {
+  // For now, assume any class type defined in Clang might be tagged.
+  return hasKnownSwiftMetadata(IGM, theClass);
+}
+
+/// Given an object of class type, produce the heap metadata reference
+/// as a %type*.
+llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
+                                                     llvm::Value *object,
+                                                     CanType objectType,
+                                                     bool suppressCast) {
+  ClassDecl *theClass = objectType->getClassOrBoundGenericClass();
+  if (isKnownNotTaggedPointer(IGF.IGM, theClass))
+    return emitLoadOfHeapMetadataRef(IGF, object, suppressCast);
+
+  // Okay, ask the runtime for the class pointer of this
+  // potentially-ObjC object.
+  object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
+  auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectClassFn(),
+                                         object,
+                                         object->getName() + ".class");
+  metadata->setCallingConv(IGF.IGM.RuntimeCC);
+  metadata->setDoesNotThrow();
+  metadata->setDoesNotAccessMemory();
+  return metadata;
+}
+
+/// Given an object of class type, produce the type metadata reference
+/// as a %type*.
+llvm::Value *irgen::emitTypeMetadataRefForHeapObject(IRGenFunction &IGF,
+                                                     llvm::Value *object,
+                                                     CanType objectType,
+                                                     bool suppressCast) {
+  // If it is known to have swift metadata, just load.
+  ClassDecl *theClass = objectType->getClassOrBoundGenericClass();
+  if (hasKnownSwiftMetadata(IGF.IGM, theClass)) {
+    assert(isKnownNotTaggedPointer(IGF.IGM, theClass));
+    return emitLoadOfHeapMetadataRef(IGF, object, suppressCast);
+  }
+
+  // Okay, ask the runtime for the type metadata of this
+  // potentially-ObjC object.
+  object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
+  auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectTypeFn(),
+                                         object,
+                                         object->getName() + ".metatype");
+  metadata->setCallingConv(IGF.IGM.RuntimeCC);
+  metadata->setDoesNotThrow();
+  metadata->setDoesNotAccessMemory();
+  return metadata;
+}
+
+/// Given a class metatype, produce the necessary heap metadata
+/// reference.  This is generally the metatype pointer, but may
+/// instead be a reference type.
+llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
+                                                        llvm::Value *metatype,
+                                                        CanType type) {
+  // If the type is known to have Swift metadata, this is trivial.
+  if (hasKnownSwiftMetadata(IGF.IGM, type->getClassOrBoundGenericClass()))
+    return metatype;
+
+  // Otherwise, we inline a little operation here.
+
+  // Load the metatype kind.
+  auto metatypeKindAddr =
+    Address(IGF.Builder.CreateStructGEP(metatype, 0),
+            IGF.IGM.getPointerAlignment());
+  auto metatypeKind =
+    IGF.Builder.CreateLoad(metatypeKindAddr, metatype->getName() + ".kind");
+
+  // Compare it with the class wrapper kind.
+  auto classWrapperKind =
+    llvm::ConstantInt::get(IGF.IGM.MetadataKindTy,
+                           unsigned(MetadataKind::ObjCClassWrapper));
+  auto isObjCClassWrapper =
+    IGF.Builder.CreateICmpEQ(metatypeKind, classWrapperKind,
+                             "isObjCClassWrapper");
+
+  // Branch based on that.
+  llvm::BasicBlock *contBB = IGF.createBasicBlock("metadataForClass.cont");
+  llvm::BasicBlock *wrapBB = IGF.createBasicBlock("isWrapper");
+  IGF.Builder.CreateCondBr(isObjCClassWrapper, wrapBB, contBB);
+  llvm::BasicBlock *origBB = IGF.Builder.GetInsertBlock();
+
+  // If it's a wrapper, load from the 'Class' field, which is at index 1.
+  // TODO: if we guaranteed that this load couldn't crash, we could use
+  // a select here instead, which might be profitable.
+  IGF.Builder.emitBlock(wrapBB);
+  auto classFromWrapper = 
+    emitLoadFromMetadataAtIndex(IGF, metatype, 1, IGF.IGM.TypeMetadataPtrTy);
+  IGF.Builder.CreateBr(contBB);
+
+  // Continuation block.
+  IGF.Builder.emitBlock(contBB);
+  auto phi = IGF.Builder.CreatePHI(IGF.IGM.TypeMetadataPtrTy, 2,
+                                   metatype->getName() + ".class");
+  phi->addIncoming(metatype, origBB);
+  phi->addIncoming(classFromWrapper, origBB);
+
+  return phi;
 }
 
 namespace {
@@ -1379,7 +1505,8 @@ static FuncDecl *findOverriddenFunction(IRGenModule &IGM,
 }
 
 /// Load the correct virtual function for the given class method.
-Callee irgen::emitVirtualCallee(IRGenFunction &IGF, llvm::Value *base,
+Callee irgen::emitVirtualCallee(IRGenFunction &IGF,
+                                llvm::Value *base, CanType baseType,
                                 FuncDecl *method, CanType substResultType,
                                 llvm::ArrayRef<Substitution> substitutions,
                                 ExplosionKind maxExplosion,
@@ -1399,7 +1526,8 @@ Callee irgen::emitVirtualCallee(IRGenFunction &IGF, llvm::Value *base,
   if (method->isStatic()) {
     metadata = base;
   } else {
-    metadata = emitMetadataRefForHeapObject(IGF, base, /*suppress cast*/ true);
+    metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType,
+                                                /*suppress cast*/ true);
   }
 
   // Use the type of the method we were type-checked against, not the

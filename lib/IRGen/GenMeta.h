@@ -44,19 +44,20 @@ namespace irgen {
   /// Is the given class known to have Swift-compatible metadata?
   bool hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass);
 
-  /// Emit a reference to the type metadata for a nominal type.
-  ///
-  /// \param classType - the actual type, including any generic arguments
-  /// \return a value of TypeMetadataPtrTy
-  llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
-                                      NominalTypeDecl *theDecl,
-                                      CanType classType);
-
   /// Emit a declaration reference to a metatype object.
   void emitMetaTypeRef(IRGenFunction &IGF, CanType type, Explosion &explosion);
 
   /// Emit a reference to a piece of type metadata.
   llvm::Value *emitTypeMetadataRef(IRGenFunction &IGF, CanType type);
+
+  /// Emit a reference to the heap metadata for a class.
+  llvm::Value *emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type);
+
+  /// Given a class metadata reference, produce the appropriate heap
+  /// metadata reference for it.
+  llvm::Value *emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
+                                                   llvm::Value *metatype,
+                                                   CanType type);
 
   /// Given a reference to type metadata, produce the type's value
   /// witness table reference.
@@ -95,10 +96,18 @@ namespace irgen {
                                            llvm::Value *metadata);
 
   /// Given a heap-object instance, with some heap-object type,
-  /// produce a reference to its metadata.
-  llvm::Value *emitMetadataRefForHeapObject(IRGenFunction &IGF,
+  /// produce a reference to its type metadata.
+  llvm::Value *emitTypeMetadataRefForHeapObject(IRGenFunction &IGF,
                                             llvm::Value *object,
+                                            CanType objectType,
                                             bool suppressCast = false);
+
+  /// Given a heap-object instance, with some heap-object type,
+  /// produce a reference to its heap metadata.
+  llvm::Value *emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
+                                                llvm::Value *object,
+                                                CanType objectType,
+                                                bool suppressCast = false);
 
   /// Derive the abstract callee for a virtual call to the given method.
   AbstractCallee getAbstractVirtualCallee(IRGenFunction &IGF,
@@ -106,7 +115,8 @@ namespace irgen {
 
   /// Given an instance pointer (or, for a static method, a class
   /// pointer), emit the callee for the given method.
-  Callee emitVirtualCallee(IRGenFunction &IGF, llvm::Value *base,
+  Callee emitVirtualCallee(IRGenFunction &IGF,
+                           llvm::Value *base, CanType baseType,
                            FuncDecl *method, CanType substResultType,
                            llvm::ArrayRef<Substitution> substitutions,
                            ExplosionKind maxExplosion,

@@ -22,10 +22,12 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 
+#include "ASTVisitor.h"
 #include "CallEmission.h"
 #include "Cleanup.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
+#include "GenMeta.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
 #include "IRGenFunction.h"
@@ -384,6 +386,90 @@ namespace {
 
 #undef FOREACH_FAMILY
   };
+
+  /// A CRTP class for emitting an expression as an ObjC class
+  /// reference.
+  class ObjCClassEmitter
+      : public irgen::ExprVisitor<ObjCClassEmitter, llvm::Value*> {
+    IRGenFunction &IGF;
+    typedef irgen::ExprVisitor<ObjCClassEmitter,llvm::Value*> super;
+  public:
+    ObjCClassEmitter(IRGenFunction &IGF) : IGF(IGF) {}
+
+    llvm::Value *visit(Expr *E) {
+      assert(E->getType()->is<MetaTypeType>());
+      assert(E->getType()->castTo<MetaTypeType>()->getInstanceType()
+                         ->getClassOrBoundGenericClass() != nullptr);
+      return super::visit(E);
+    }
+
+    /// Look through metatype conversions.
+    llvm::Value *visitMetatypeConversionExpr(MetatypeConversionExpr *E) {
+      return visit(E->getSubExpr());
+    }
+
+    llvm::Value *emitGetMetatype(Expr *base) {
+      Explosion temp(ExplosionKind::Maximal);
+      IGF.emitRValue(base, temp);
+      auto value = temp.claimNext().getValue(); // let the cleanup happen
+      auto baseType = base->getType()->getCanonicalType();
+      return emitHeapMetadataRefForHeapObject(IGF, value, baseType);
+    }
+
+    /// Special-case the .metatype implicit conversion.
+    llvm::Value *visitGetMetatypeExpr(GetMetatypeExpr *E) {
+      return emitGetMetatype(E->getSubExpr());
+    }
+
+    /// Special-case explicit .metatype expressions.
+    llvm::Value *visitMetatypeExpr(MetatypeExpr *E) {
+      // If there's a base, we need to evaluate it and then grab the
+      // ObjC class for that.
+      if (Expr *base = E->getBase()) {
+        return emitGetMetatype(base);
+      }
+
+      // Otherwise, we need to emit a class reference.
+      return emitClassHeapMetadataRef(IGF, getInstanceType(E));
+    }
+
+    /// Special-case direct type references.
+    llvm::Value *visitDeclRefExpr(DeclRefExpr *E) {
+      assert(isa<TypeDecl>(E->getDecl()));
+      auto typeDecl = cast<TypeDecl>(E->getDecl());
+      auto type = typeDecl->getDeclaredType()->getCanonicalType();
+      return emitClassHeapMetadataRef(IGF, type);
+    }
+
+    /// In the fallback case, emit as a swift metatype and remap it to
+    /// an ObjC class type.
+    llvm::Value *visitExpr(Expr *E) {
+      Explosion temp(ExplosionKind::Maximal);
+      IGF.emitRValue(E, temp);
+      assert(temp.size() == 1);
+      llvm::Value *metatype = temp.claimUnmanagedNext();
+      return emitClassHeapMetadataRefForMetatype(IGF, metatype,
+                                                 getInstanceType(E));
+    }
+
+    /// Given an expression of metatype type, return the instance
+    /// type of the metatype.
+    static CanType getInstanceType(Expr *E) {
+      auto type = E->getType()->getCanonicalType();
+      return CanType(cast<MetaTypeType>(type)->getInstanceType());
+    }
+  };
+}
+
+/// Emit the given expression (of class-metatype type) as an
+/// Objective-C class reference.
+static void emitObjCClassRValue(IRGenFunction &IGF, Expr *E, Explosion &out) {
+  out.addUnmanaged(ObjCClassEmitter(IGF).visit(E));
+}
+
+static bool isConsumesSelf(FuncDecl *method, Selector::Family family) {
+  // FIXME: use the clang-decl information.
+  return family == Selector::Family::Init;
 }
 
 /// Prepare a call using ObjC method dispatch.
@@ -420,22 +506,30 @@ CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF, FuncDecl *method,
 
   // Emit the self argument.
   Explosion selfValues(ExplosionKind::Minimal);
-  IGF.emitRValue(self, selfValues);
+  if (method->isInstanceMember()) {
+    IGF.emitRValue(self, selfValues);
+  } else {
+    emitObjCClassRValue(IGF, self, selfValues);
+  }
   assert(selfValues.size() == 1);
+
+  Selector selector(method);
+  auto selectorFamily = selector.getFamily();
 
   // Pull the 'self' value out of the explosion, clear its cleanup,
   // and re-add it.  FIXME: this is a hack to pass the value at +0.
-  ManagedValue value = selfValues.claimNext();
-  selfValues.reset();
-  selfValues.addUnmanaged(value.getValue());
+  if (method->isInstanceMember() && !isConsumesSelf(method, selectorFamily)) {
+    ManagedValue value = selfValues.claimNext();
+    selfValues.reset();
+    selfValues.addUnmanaged(value.getValue());
+  }
 
   // Add the selector value.
+  auto selectorRef = IGF.IGM.getAddrOfObjCSelectorRef(selector.str());
   llvm::Value *selectorV;
-  Selector selector(method);
   if (IGF.IGM.Opts.UseJIT) {
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
-    auto selectorRef = IGF.IGM.getAddrOfObjCSelectorRef(selector.str());
     selectorV = IGF.Builder.CreateLoad(Address(selectorRef,
                                                IGF.IGM.getPointerAlignment()));
     selectorV = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
@@ -443,11 +537,9 @@ CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF, FuncDecl *method,
   } else {
     // When generating statically-compiled code, just build a reference to
     // the selector.
-    auto selectorRef = IGF.IGM.getAddrOfObjCSelectorRef(selector.str());
     selectorV = IGF.Builder.CreateLoad(Address(selectorRef,
                                                IGF.IGM.getPointerAlignment()));
   }
-  
   selfValues.addUnmanaged(selectorV);
 
   // Add that to the emission.

@@ -1515,14 +1515,16 @@ CallEmission CalleeSource::prepareRootCall(IRGenFunction &IGF,
 
   case Kind::Virtual: {
     // Emit the base.
+    auto baseExpr = getCallSites().front().getArg();
     Explosion baseValues(ExplosionKind::Minimal);
-    IGF.emitRValue(getCallSites().front().getArg(), baseValues);
+    IGF.emitRValue(baseExpr, baseValues);
     CallSites.erase(CallSites.begin());
 
     // Grab the base value before adding it as an argument.
     llvm::Value *base = baseValues.begin()->getValue();
+    auto baseType = baseExpr->getType()->getCanonicalType();
 
-    CallEmission emission(IGF, emitVirtualCallee(IGF, base,
+    CallEmission emission(IGF, emitVirtualCallee(IGF, base, baseType,
                                                  getVirtualFunction(),
                                                  SubstResultType,
                                                  getSubstitutions(),

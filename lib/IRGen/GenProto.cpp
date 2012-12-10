@@ -2818,6 +2818,10 @@ namespace {
     void emit(Explosion &in);
 
   private:
+    CanType getArgType() const {
+      return stripLabel(CanType(cast<AnyFunctionType>(FnType)->getInput()));
+    }
+
     /// Emit the source value for parameters.
     llvm::Value *emitSourceForParameters(Explosion &in) {
       switch (getSourceKind()) {
@@ -2825,16 +2829,16 @@ namespace {
         return nullptr;
 
       case SourceKind::ClassPointer:
-        return emitMetadataRefForHeapObject(IGF, in.getLastClaimed(),
-                                            /*suppress cast*/ true);
+        return emitHeapMetadataRefForHeapObject(IGF, in.getLastClaimed(),
+                                                getArgType(),
+                                                /*suppress cast*/ true);
 
       case SourceKind::GenericLValueMetadata: {
         llvm::Value *metatype = in.claimUnmanagedNext();
         metatype->setName("This");
 
         // Mark this as the cached metatype for the l-value's object type.
-        CanType argTy = CanType(cast<AnyFunctionType>(FnType)->getInput());
-        argTy = CanType(cast<LValueType>(stripLabel(argTy))->getObjectType());
+        CanType argTy = CanType(cast<LValueType>(getArgType())->getObjectType());
         IGF.setUnscopedLocalTypeData(argTy, LocalTypeData::Metatype, metatype);
         return metatype;
       }

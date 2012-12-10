@@ -1,7 +1,7 @@
 @interface NSObject
-+ alloc;
-- init;
-+ new;
++ (NSObject*) alloc;
+- (NSObject*) init;
++ (NSObject*) new;
 @end
 
 @interface Gizmo : NSObject
