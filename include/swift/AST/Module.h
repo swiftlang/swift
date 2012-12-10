@@ -34,6 +34,7 @@ namespace swift {
   class ExtensionDecl;
   class OneOfElementDecl;
   class NameAliasType;
+  struct PrintOptions;
   class TupleType;
   class Type;
   class TypeAliasDecl;
@@ -204,7 +205,19 @@ public:
   void clearLookupCache();
 
   void dump() const;
-  
+
+  /// \brief Pretty-print the entire contents of this translation unit.
+  ///
+  /// \param os The stream to which the contents will be printed.
+  void print(raw_ostream &os);
+
+  /// \brief Pretty-print the contents of this translation unit.
+  ///
+  /// \param os The stream to which the contents will be printed.
+  ///
+  /// \param options Options controlling the printing process.
+  void print(raw_ostream &os, const PrintOptions &options);
+
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::TranslationUnit;
   }

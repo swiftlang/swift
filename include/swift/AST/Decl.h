@@ -46,6 +46,7 @@ namespace swift {
   class OneOfElementDecl;
   class NameAliasType;
   class Pattern;
+  struct PrintOptions;
   class ProtocolType;
   enum class Resilience : unsigned char;
   class TypeAliasDecl;
@@ -147,7 +148,28 @@ public:
   SourceRange getSourceRange() const;
 
   void dump() const;
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
+  void dump(unsigned Indent) const;
+
+  /// \brief Pretty-print the given declaration.
+  ///
+  /// \param os Output stream to which the declaration will be printed.
+  void print(raw_ostream &OS) const;
+
+  /// \brief Pretty-print the given declaration.
+  ///
+  /// \param os Output stream to which the declaration will be printed.
+  ///
+  /// \param options Options to control how pretty-printing is performed.
+  ///
+  /// \param declOffsets If non-null, will be populated with the stream offsets
+  /// at which each declaration encountered is printed.
+  void print(raw_ostream &os, const PrintOptions &options,
+             llvm::SmallVectorImpl<std::pair<Decl *, uint64_t>> *declOffsets
+               = nullptr) const;
+
+  /// \brief Determine whether this declaration should be printed when
+  /// encountered in its declaration context's list of members.
+  bool shouldPrintInContext() const;
 
   bool walk(ASTWalker &walker);
   

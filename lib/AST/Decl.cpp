@@ -871,7 +871,7 @@ namespace {
 	ShowColors = llvm::errs().is_displayed() && llvm::outs().is_displayed();
     }
     
-    void printRec(Decl *D) { D->print(OS, Indent+2); }
+    void printRec(Decl *D) { PrintDecl(OS, Indent + 2).visit(D); }
     void printRec(Expr *E) { E->print(OS, Indent+2); }
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
 
@@ -1146,12 +1146,15 @@ namespace {
   };
 } // end anonymous namespace.
 
-void Decl::print(raw_ostream &OS, unsigned Indent) const {
-  PrintDecl(OS, Indent).visit(const_cast<Decl*>(this));
-}
-
 void Decl::dump() const {
   print(llvm::errs());
+  PrintDecl(llvm::errs(), 0).visit(const_cast<Decl *>(this));
+  llvm::errs() << '\n';
+}
+
+void Decl::dump(unsigned Indent) const {
+  print(llvm::errs());
+  PrintDecl(llvm::errs(), Indent).visit(const_cast<Decl *>(this));
   llvm::errs() << '\n';
 }
 

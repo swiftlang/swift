@@ -376,7 +376,7 @@ SourceRange FuncExpr::getSourceRange() const {
 
 Type FuncExpr::getResultType(ASTContext &Ctx) const {
   Type resultTy = getType();
-  if (resultTy->is<ErrorType>())
+  if (!resultTy || resultTy->is<ErrorType>())
     return resultTy;
 
   for (unsigned i = 0, e = getNumParamPatterns(); i != e; ++i)
@@ -446,7 +446,7 @@ public:
   
   /// FIXME: This should use ExprWalker to print children.
   
-  void printRec(Decl *D) { D->print(OS, Indent+2); }
+  void printRec(Decl *D) { D->dump(Indent+2); }
   void printRec(Stmt *S) { S->print(OS, Indent+2); }
 
   void printSubstitutions(ArrayRef<Substitution> Substitutions) {

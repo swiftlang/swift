@@ -17,11 +17,13 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/PrintOptions.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -242,6 +244,20 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
 //===----------------------------------------------------------------------===//
 // TranslationUnit Implementation
 //===----------------------------------------------------------------------===//
+
+void TranslationUnit::print(raw_ostream &os) {
+  print(os, PrintOptions::printEverything());
+}
+
+void TranslationUnit::print(raw_ostream &os, const PrintOptions &options) {
+  for (auto decl : Decls) {
+    if (!decl->shouldPrintInContext())
+      continue;
+
+    decl->print(os, options);
+    os << "\n";
+  }
+}
 
 void TranslationUnit::clearLookupCache() {
   freeTUCachePimpl(LookupCachePimpl);

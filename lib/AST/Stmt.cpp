@@ -126,7 +126,7 @@ public:
     Indent -= 2;
   }
   
-  void printRec(Decl *D) { D->print(OS, Indent+2); }
+  void printRec(Decl *D) { D->dump(Indent+2); }
   void printRec(Expr *E) { E->print(OS, Indent+2); }
 
   void visitSemiStmt(SemiStmt *S) {
