@@ -1718,7 +1718,7 @@ llvm::CallSite CallEmission::emitCallSite(bool hasIndirectResult) {
   // Make the call and clear the arguments array.
   auto fnPtr = getCallee().getFunctionPointer();
   llvm::CallSite call = IGF.emitInvoke(cc, fnPtr, Args,
-                                     llvm::AttrListPtr::get(fnPtr->getContext(),
+                                     llvm::AttributeSet::get(fnPtr->getContext(),
                                                               attrs));
   Args.clear();
 

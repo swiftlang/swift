@@ -329,7 +329,7 @@ static void setHelperAttributesForAggResult(llvm::CallInst *call,
   attrs.push_back(llvm::AttributeWithIndex::get(call->getContext(), ~0,
                                                 llvm::Attributes::NoUnwind));
 
-  call->setAttributes(llvm::AttrListPtr::get(call->getContext(), attrs));
+  call->setAttributes(llvm::AttributeSet::get(call->getContext(), attrs));
 }
 
 /// Given a call to a helper function, set attributes appropriately.
@@ -339,7 +339,7 @@ static void setHelperAttributes(llvm::CallInst *call) {
   attrs.push_back(llvm::AttributeWithIndex::get(call->getContext(), ~0,
                                                 llvm::Attributes::NoUnwind));
 
-  call->setAttributes(llvm::AttrListPtr::get(call->getContext(), attrs));
+  call->setAttributes(llvm::AttributeSet::get(call->getContext(), attrs));
 }
 
 /// Emit a call to do an 'initializeBufferWithCopyOfBuffer' operation.

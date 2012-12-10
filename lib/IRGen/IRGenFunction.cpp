@@ -84,12 +84,12 @@ static AllocToken getAllocToken(IRGenModule &IGM, uint64_t size) {
   llvm_unreachable("everything is terrible");
 }
 
-static llvm::AttrListPtr getAllocAttrs(llvm::LLVMContext &ctx) {
+static llvm::AttributeSet getAllocAttrs(llvm::LLVMContext &ctx) {
   llvm::AttributeWithIndex attrValues[] = {
     llvm::AttributeWithIndex::get(ctx, 0, llvm::Attributes::NoAlias),
     llvm::AttributeWithIndex::get(ctx, ~0, llvm::Attributes::NoUnwind)
   };
-  return llvm::AttrListPtr::get(ctx, attrValues);
+  return llvm::AttributeSet::get(ctx, attrValues);
 }
 
 static llvm::Value *emitAllocatingCall(IRGenFunction &IGF,

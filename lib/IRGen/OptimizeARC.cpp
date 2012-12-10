@@ -114,7 +114,7 @@ static RT_Kind classifyInstruction(const Instruction &I) {
 static Constant *getRetain(Function &F, Type *ObjectPtrTy, Constant *&Cache) {
   if (Cache) return Cache;
   
-  auto AttrList = AttrListPtr::get(F.getContext(),
+  auto AttrList = AttributeSet::get(F.getContext(),
                                    AttributeWithIndex::get(F.getContext(), ~0U,
                                                          Attributes::NoUnwind));
 
@@ -135,7 +135,7 @@ static Constant *getRetainNoResult(Function &F, Type *ObjectPtrTy,
     AttributeWithIndex::get(F.getContext(), 1, Attributes::NoCapture),
     AttributeWithIndex::get(F.getContext(), ~0U, Attributes::NoUnwind)
   };
-  auto AttrList = AttrListPtr::get(F.getContext(), Attrs);
+  auto AttrList = AttributeSet::get(F.getContext(), Attrs);
   Module *M = F.getParent();
   return Cache = M->getOrInsertFunction("swift_retain_noresult", AttrList,
                                         Type::getVoidTy(F.getContext()),
@@ -153,7 +153,7 @@ static Constant *getRetainAndReturnThree(Function &F, Type *ObjectPtrTy,
   AttributeWithIndex Attrs[] = {
     AttributeWithIndex::get(F.getContext(), ~0U, Attributes::NoUnwind)
   };
-  auto AttrList = AttrListPtr::get(F.getContext(), Attrs);
+  auto AttrList = AttributeSet::get(F.getContext(), Attrs);
   Module *M = F.getParent();
   
   Type *Int64Ty = Type::getInt64Ty(F.getContext());

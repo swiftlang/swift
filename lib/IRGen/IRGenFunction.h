@@ -224,7 +224,7 @@ public:
 
   llvm::CallSite emitInvoke(llvm::CallingConv::ID cc, llvm::Value *fn,
                             ArrayRef<llvm::Value*> args,
-                            const llvm::AttrListPtr &attrs);
+                            const llvm::AttributeSet &attrs);
 
 private:
   DiverseStack<Cleanup, 128> Cleanups;

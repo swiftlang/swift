@@ -279,7 +279,7 @@ llvm::BasicBlock *IRGenFunction::getUnreachableBlock() {
 llvm::CallSite IRGenFunction::emitInvoke(llvm::CallingConv::ID convention,
                                          llvm::Value *fn,
                                          ArrayRef<llvm::Value*> args,
-                                         const llvm::AttrListPtr &attrs) {
+                                         const llvm::AttributeSet &attrs) {
   // TODO: exceptions!
   llvm::CallInst *call = Builder.CreateCall(fn, args);
   call->setAttributes(attrs);
