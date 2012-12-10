@@ -1447,7 +1447,7 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
   auto phi = IGF.Builder.CreatePHI(IGF.IGM.TypeMetadataPtrTy, 2,
                                    metatype->getName() + ".class");
   phi->addIncoming(metatype, origBB);
-  phi->addIncoming(classFromWrapper, origBB);
+  phi->addIncoming(classFromWrapper, wrapBB);
 
   return phi;
 }
