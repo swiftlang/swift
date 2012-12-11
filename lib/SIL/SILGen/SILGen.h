@@ -344,22 +344,26 @@ class LLVM_LIBRARY_VISIBILITY SILGenLValue
 public:
   SILGenLValue(SILGenFunction &gen) : gen(gen) {}
   
-  /// Dummy handler to log unimplemented AST nodes.
+  /// Dummy handler to log unimplemented nodes
+  
   LValue visitExpr(Expr *e);
-  
-  // Nodes that make up lvalue paths
-  
+
+  // Nodes that form the root of lvalue paths
+
   LValue visitDeclRefExpr(DeclRefExpr *e);
+  LValue visitMaterializeExpr(MaterializeExpr *e);
+
+  // Nodes that make up components of lvalue paths
+  
   LValue visitMemberRefExpr(MemberRefExpr *e);
-  //LValue visitSubscriptExpr(SubscriptExpr *e);
+  //TODO: LValue visitSubscriptExpr(SubscriptExpr *e);
   LValue visitTupleElementExpr(TupleElementExpr *e);
   
-  // Aggregating expressions that can wrap LValues
+  // Expressions that wrap lvalues
   
   LValue visitAddressOfExpr(AddressOfExpr *e);
   LValue visitParenExpr(ParenExpr *e);
   LValue visitRequalifyExpr(RequalifyExpr *e); // FIXME kill lvalue qualifiers
-  // LValue visitTupleExpr(TupleExpr *e);
 };
   
 } // end namespace Lowering

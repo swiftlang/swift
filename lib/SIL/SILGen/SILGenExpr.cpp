@@ -13,6 +13,7 @@
 #include "SILGen.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
+#include "LValue.h"
 #include "ManagedValue.h"
 #include "TypeInfo.h"
 #include "llvm/Support/raw_ostream.h"
@@ -47,6 +48,30 @@ ManagedValue SILGenFunction::visitExpr(Expr *E) {
   llvm_unreachable("Not yet implemented");
 }
 
+namespace {
+
+struct Writeback {
+  LValue lvalue;
+  Value tempAddress;
+};
+  
+static Value visitApplyArgument(SILGenFunction &gen, Expr *arg,
+                                llvm::SmallVectorImpl<Writeback> &writebacks) {
+  if (arg->getType()->is<LValueType>()) {
+    LValue lv = SILGenLValue(gen).visit(arg);
+    Value addr = gen.emitMaterializedLoadFromLValue(arg, lv)
+      .getUnmanagedValue();
+    if (!lv.isPhysical()) {
+      writebacks.push_back({::std::move(lv), addr});
+    }
+    return addr;
+  } else {
+    return gen.visit(arg).forward(gen);
+  }
+}
+
+} // end anonymous namespace
+
 ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   // FIXME: This assumes that all Swift arguments and returns lower one-to-one
   // to SIL arguments and returns, which won't hold up in the face of
@@ -58,18 +83,27 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   if (ParenExpr *pe = dyn_cast<ParenExpr>(argExpr))
     argExpr = pe->getSubExpr();
   
+  llvm::SmallVector<Writeback, 2> writebacks;
+  
   // Special case Arg being a TupleExpr or ScalarToTupleExpr to inline the
   // arguments and not create a tuple instruction.
   if (TupleExpr *te = dyn_cast<TupleExpr>(argExpr)) {
     for (auto arg : te->getElements())
-      ArgsV.push_back(visit(arg).forward(*this));
+      ArgsV.push_back(visitApplyArgument(*this, arg, writebacks));
   } else if (ScalarToTupleExpr *se = dyn_cast<ScalarToTupleExpr>(argExpr)) {
-    ArgsV.push_back(visit(se->getSubExpr()).forward(*this));
+    ArgsV.push_back(visitApplyArgument(*this, se->getSubExpr(), writebacks));
   } else {
-    ArgsV.push_back(visit(argExpr).forward(*this));
+    ArgsV.push_back(visitApplyArgument(*this, argExpr, writebacks));
   }
   
-  return emitManagedRValueWithCleanup(B.createApply(E, FnV, ArgsV));
+  ManagedValue r = emitManagedRValueWithCleanup(B.createApply(E, FnV, ArgsV));
+  
+  for (auto &wb : writebacks) {
+    Value newValue = B.createLoad(E, wb.tempAddress);
+    emitStoreToLValue(E, newValue, wb.lvalue);
+  }
+  
+  return r;
 }
 
 Value SILGenFunction::emitUnmanagedConstantRef(SILLocation loc,

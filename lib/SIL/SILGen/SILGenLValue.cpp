@@ -27,10 +27,10 @@ void PhysicalPathComponent::_anchor() {}
 void LogicalPathComponent::_anchor() {}
 
 namespace {
-  class VarComponent : public PhysicalPathComponent {
+  class AddressComponent : public PhysicalPathComponent {
     Value address;
   public:
-    VarComponent(Value address) : address(address) {
+    AddressComponent(Value address) : address(address) {
       assert(address.getType()->is<LValueType>() &&
              "var component value must be an address");
     }
@@ -138,7 +138,14 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
   Value address = gen.emitReferenceToDecl(e, decl).getUnmanagedValue();
   assert(address.getType()->is<LValueType>() &&
          "physical lvalue decl ref must evaluate to an address");
-  lv.add<VarComponent>(address);
+  lv.add<AddressComponent>(address);
+  return ::std::move(lv);
+}
+
+LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
+  LValue lv;
+  Value materialized = gen.visitMaterializeExpr(e).getUnmanagedValue();
+  lv.add<AddressComponent>(materialized);
   return ::std::move(lv);
 }
 
