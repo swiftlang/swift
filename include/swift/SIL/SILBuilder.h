@@ -202,11 +202,15 @@ public:
     return insert(new MetatypeInst(Expr));
   }
   
-  RetainInst *createRetain(SILLocation Loc, Value Operand) {
-    return insert(new RetainInst(Loc, Operand));
+  void createRetain(SILLocation Loc, Value Operand) {
+    // Retaining a constant_ref is a no-op.
+    if (!isa<ConstantRefInst>(Operand))
+      insert(new RetainInst(Loc, Operand));
   }
-  ReleaseInst *createRelease(SILLocation Loc, Value Operand) {
-    return insert(new ReleaseInst(Loc, Operand));
+  void createRelease(SILLocation Loc, Value Operand) {
+    // Releasing a constant_ref is a no-op.
+    if (!isa<ConstantRefInst>(Operand))
+      insert(new ReleaseInst(Loc, Operand));
   }
   DeallocVarInst *createDeallocVar(SILLocation loc, AllocKind allocKind,
                                    Value operand) {

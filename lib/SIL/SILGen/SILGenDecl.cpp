@@ -293,10 +293,9 @@ void SILGenFunction::emitProlog(CapturingExpr *ce,
   }
 }
 
-template<typename X>
 static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc, Value v,
-                                   X (SILBuilder::*createRR)(SILLocation,
-                                                             Value),
+                                   void (SILBuilder::*createRR)(SILLocation,
+                                                                Value),
                                    ReferenceTypeElement const &elt) {
   for (FragileElement comp : elt.path) {
     v = gen.B.createExtract(loc, v, comp.index, comp.type);
@@ -304,9 +303,8 @@ static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc, Value v
   (gen.B.*createRR)(loc, v);
 }
 
-template<typename X>
 static void rrLoadableValue(SILGenFunction &gen, SILLocation loc, Value v,
-                            X (SILBuilder::*createRR)(SILLocation, Value),
+                            void (SILBuilder::*createRR)(SILLocation, Value),
                             ArrayRef<ReferenceTypeElement> elts) {
   for (auto &elt : elts)
     rrLoadableValueElement(gen, loc, v, createRR, elt);
