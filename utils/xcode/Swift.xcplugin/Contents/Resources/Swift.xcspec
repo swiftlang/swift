@@ -1,0 +1,79 @@
+(
+	{
+		Type = Compiler;
+		Identifier = "com.apple.xcode.tools.swift.compiler";
+		Name = "Swift Compiler";
+		Description = "Compiles Swift source code into object files.";
+		CommandLine = "$(SWIFT_EXEC) [options] [input] -c -o $(ObjectsDir)/$(InputFileBase)$(InputFileBaseUniquefier).o";
+		Architectures = (
+			"x86_64"
+		);
+    CommandResultsPostprocessor = "XCClangResultsPostprocessor";
+		SynthesizeBuildRule = YES;
+		InputFileTypes = (
+			"sourcecode.swift",
+		);
+		ExecDescription = "Compiling Swift source $(InputFile)";
+		RuleName = "Compile $(InputFile)";
+		CommandOutputParser = XCSimpleBufferedCommandOutputParser;
+    Outputs = (
+        "$(ObjectsDir)/$(InputFileBase)$(InputFileBaseUniquefier).o"
+    );
+		Options = (
+			{
+				Name = "SWIFT_EXEC";
+				Type = Path;
+				DefaultValue = "$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift";
+				Category = CodeGeneration;
+				Description = "Path to the Swift compiler.";
+			},
+			{
+				Name = "SWIFT_LIBRARIES_ONLY";
+				Type = Boolean;
+				DefaultValue = YES;
+				CommandLineArgs = {
+					YES = (
+						"-parse-as-library"
+					);
+					NO = ();
+				};
+				FileTypes = (
+					"sourcecode.swift"
+				);
+				Category = CodeGeneration;
+				Description = "When YES, compiles all Swift input files as libraries (-parse-as-library).";
+			},
+			{
+				Name = "SWIFT_LIBRARY_PATH";
+				/* Must appear before SWIFT_STDLIB. */
+				Type = Path;
+				DefaultValue = "$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/";
+				AdditionalLinkerArgs = (
+					"-L$(value)"
+				);
+				FileTypes = (
+					"sourcecode.swift",
+				);
+				Category = CodeGeneration;
+				Description = "Path to directory containing libswift_stdlib.";
+			},
+			{
+				Name = "SWIFT_STDLIB";
+				/* Must appear after SWIFT_LIBRARY_PATH. */
+				Type = String;
+				DefaultValue = "swift_stdlib";
+				AdditionalLinkerArgs = (
+					"-l$(value)"
+				);
+				FileTypes = (
+					"sourcecode.swift",
+				);
+			},
+			{
+				Name = SDKROOT;
+				Type = Path;
+				CommandLineFlag = "-sdk";
+			}
+		);
+	},
+)

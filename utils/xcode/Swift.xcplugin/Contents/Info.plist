@@ -1,0 +1,15 @@
+{
+	CFBundleDevelopmentRegion = "English";
+	CFBundleInfoDictionaryVersion = "6.0";
+	CFBundleName = "Swift Xcode Plug-in";
+	CFBundlePackageType = "BNDL";
+	CFBundleShortVersionString = "0.9";
+	CFBundleVersion = "1";
+	DTSDKBuild = "12A269";
+	DTSDKName = "";
+	DTXcode = "0460";
+	DTXcodeBuild = "";
+	"XC4Compatible" = :true;
+	XCGCReady = "YES";
+	XCPluginHasUI = "NO";
+}

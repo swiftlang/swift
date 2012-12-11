@@ -1,0 +1,12 @@
+(
+{
+    Identifier = sourcecode.swift;
+    BasedOn = sourcecode;
+    Name = "Swift source files";
+    Extensions = (swift);
+    ComputerLanguage = swift;
+    Language = "xcode.lang.swift";
+    AppliesToBuildRules = yes;
+    CanSetIncludeInIndex = YES;
+}
+)
