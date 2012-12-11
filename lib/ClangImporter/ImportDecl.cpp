@@ -397,9 +397,16 @@ namespace {
       if (!dc)
         return nullptr;
 
-      return new (Impl.SwiftContext)
-               VarDecl(Impl.importSourceLoc(decl->getLocation()),
-                       name, type, dc);
+      auto result = new (Impl.SwiftContext)
+                      VarDecl(Impl.importSourceLoc(decl->getLocation()),
+                              name, type, dc);
+
+      // Handle attributes.
+      if (decl->hasAttr<clang::IBOutletAttr>())
+        result->getMutableAttrs().IBOutlet = true;
+      // FIXME: Handle IBOutletCollection.
+
+      return result;
     }
 
     Decl *VisitObjCIvarDecl(clang::ObjCIvarDecl *decl) {
@@ -567,6 +574,10 @@ namespace {
           result->setOverriddenDecl(
             cast_or_null<FuncDecl>(Impl.importDecl(categoryResult)));
       }
+
+      // Handle attributes.
+      if (decl->hasAttr<clang::IBActionAttr>())
+        result->getMutableAttrs().IBAction = true;
 
       return result;
     }
@@ -1480,6 +1491,11 @@ namespace {
       result->setProperty(Impl.SwiftContext, SourceLoc(),
                           getterThunk, setterThunk,
                           SourceLoc());
+
+      // Handle attributes.
+      if (decl->hasAttr<clang::IBOutletAttr>())
+        result->getMutableAttrs().IBOutlet = true;
+      // FIXME: Handle IBOutletCollection.
 
       if (overridden) {
         result->setOverriddenDecl(overridden);
