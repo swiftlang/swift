@@ -604,6 +604,7 @@ namespace {
           
         return nullptr;
 
+      case clang::OMF_new:
       case clang::OMF_alloc:
       case clang::OMF_autorelease:
       case clang::OMF_copy:
@@ -623,14 +624,7 @@ namespace {
         if (objcMethod->isInstanceMethod())
           return importConstructor(decl, objcMethod);
         return nullptr;
-
-      case clang::OMF_new:
-        // A new class method can be a constructor.
-        if (objcMethod->isClassMethod())
-          return importConstructor(decl, objcMethod);
-        return nullptr;
       }
-
     }
 
     /// \brief Given an imported method, try to import it as a constructor.
