@@ -72,6 +72,17 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   return emitManagedRValueWithCleanup(B.createApply(E, FnV, ArgsV));
 }
 
+Value SILGenFunction::emitUnmanagedConstantRef(SILLocation loc,
+                                               SILConstant constant) {
+  // If this is a reference to a local constant, grab it.
+  if (LocalConstants.count(constant)) {
+    return LocalConstants[constant];
+  }
+  
+  // Otherwise, use a global ConstantRefInst.
+  return B.createConstantRef(loc, constant);
+}
+
 ManagedValue SILGenFunction::emitConstantRef(SILLocation loc,
                                              SILConstant constant) {
   // If this is a reference to a local constant, grab it.

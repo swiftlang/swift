@@ -273,6 +273,7 @@ public:
                                 ArrayRef<Value> InOps,
                                 ArrayRef<int> ElementMapping,
                                 Expr *VarargsInjectionFunction);
+  Value emitUnmanagedConstantRef(SILLocation loc, SILConstant constant);
   ManagedValue emitConstantRef(SILLocation loc, SILConstant constant);
 
   ManagedValue emitReferenceToDecl(SILLocation loc,

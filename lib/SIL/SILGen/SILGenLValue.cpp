@@ -125,11 +125,11 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
   // If it's a property, push a reference to the getter and setter.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     if (var->isProperty()) {
-      ManagedValue get = gen.emitConstantRef(e,
+      Value get = gen.emitUnmanagedConstantRef(e,
                                         SILConstant(var, SILConstant::Getter));
-      ManagedValue set = gen.emitConstantRef(e,
+      Value set = gen.emitUnmanagedConstantRef(e,
                                         SILConstant(var, SILConstant::Setter));
-      lv.add<GetterSetterComponent>(get.forward(gen), set.forward(gen));
+      lv.add<GetterSetterComponent>(get, set);
       return ::std::move(lv);
     }
   }
@@ -151,11 +151,12 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   if (ti.hasFragileElement(decl->getName())) {
     lv.add<FragileElementComponent>(ti.getFragileElement(decl->getName()));
   } else {
-    ManagedValue get = gen.emitConstantRef(e,
+    //FIXME: leaks a retain on the getter and setter if they're local closures
+    Value get = gen.emitUnmanagedConstantRef(e,
                                         SILConstant(decl, SILConstant::Getter));
-    ManagedValue set = gen.emitConstantRef(e,
+    Value set = gen.emitUnmanagedConstantRef(e,
                                         SILConstant(decl, SILConstant::Setter));
-    lv.add<GetterSetterComponent>(get.forward(gen), set.forward(gen));
+    lv.add<GetterSetterComponent>(get, set);
   }
   
   return ::std::move(lv);
