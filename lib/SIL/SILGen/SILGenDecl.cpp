@@ -312,34 +312,30 @@ static void rrLoadableValue(SILGenFunction &gen, SILLocation loc, Value v,
     rrLoadableValueElement(gen, loc, v, createRR, elt);
 }
 
-void SILGenFunction::emitAssign(SILLocation loc, Value v, Value dest) {
+void SILGenFunction::emitAssign(SILLocation loc, Value v,
+                                LValue const &destLV) {
+  FullExpr scope(Cleanups);
   Type vTy = v.getType();
 
   if (vTy->is<LValueType>()) {
     // v is an address-only type; copy using the copy_addr instruction.
-    assert(dest.getType()->getCanonicalType() == vTy->getCanonicalType() &&
-           "type of copy_addr destination must match source address type");
     assert(getTypeInfo(vTy->getRValueType()).isAddressOnly() &&
            "source of copy may only be an address if type is address-only");
-    B.createCopyAddr(loc, v, dest,
-                     /*isTake=*/false,
-                     /*isInitialize=*/false);
+    llvm_unreachable("assignment to address-only unimplemented");
   } else {
-    // v is a loadable type; release the old value if necessary
+    // v is a loadable type; release the old value if necessary.
     TypeInfo const &ti = getTypeInfo(vTy);
-    assert(dest.getType()->is<LValueType>() &&
-           "copy destination must be an address");
-    assert(dest.getType()->getRValueType()->getCanonicalType() ==
-             vTy->getCanonicalType() &&
-           "copy destination must be an address of the type of the source");
     assert(ti.isLoadable() &&
            "copy of address-only type must take address for source argument");
+    
     Value old;
 
-    if (!ti.isTrivial())
-      old = B.createLoad(loc, dest);
-    
-    B.createStore(loc, v, dest);
+    if (!ti.isTrivial()) {
+      ManagedValue destTemp = emitMaterializedLoadFromLValue(loc, destLV);
+      old = B.createLoad(loc, destTemp.getUnmanagedValue());
+    }
+
+    emitStoreToLValue(loc, v, destLV);
     rrLoadableValue(*this, loc, old, &SILBuilder::createRelease,
                     ti.getReferenceTypeElements());
   }

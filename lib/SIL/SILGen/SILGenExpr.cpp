@@ -32,13 +32,13 @@ namespace {
   };
 }
 
-static ManagedValue managedRValueWithCleanup(SILGenFunction &gen, Value v) {
+ManagedValue SILGenFunction::emitManagedRValueWithCleanup(Value v) {
   if (v.getType()->is<LValueType>() ||
-      gen.getTypeInfo(v.getType()).isTrivial()) {
+      getTypeInfo(v.getType()).isTrivial()) {
     return ManagedValue(v);
   } else {
-    gen.Cleanups.pushCleanup<CleanupRValue>(v);
-    return ManagedValue(v, gen.getCleanupsDepth());
+    Cleanups.pushCleanup<CleanupRValue>(v);
+    return ManagedValue(v, getCleanupsDepth());
   }
 }
 
@@ -69,25 +69,21 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
     ArgsV.push_back(visit(argExpr).forward(*this));
   }
   
-  return managedRValueWithCleanup(*this, B.createApply(E, FnV, ArgsV));
+  return emitManagedRValueWithCleanup(B.createApply(E, FnV, ArgsV));
 }
 
-namespace {
-
-ManagedValue emitConstantRef(SILGenFunction &gen, SILLocation loc,
-                             SILConstant constant) {
+ManagedValue SILGenFunction::emitConstantRef(SILLocation loc,
+                                             SILConstant constant) {
   // If this is a reference to a local constant, grab it.
-  if (gen.LocalConstants.count(constant)) {
-    Value v = gen.LocalConstants[constant];
-    gen.emitRetainRValue(loc, v);
-    return managedRValueWithCleanup(gen, v);
+  if (LocalConstants.count(constant)) {
+    Value v = LocalConstants[constant];
+    emitRetainRValue(loc, v);
+    return emitManagedRValueWithCleanup(v);
   }
   
   // Otherwise, use a global ConstantRefInst.
-  Value c = gen.B.createConstantRef(loc, constant);
+  Value c = B.createConstantRef(loc, constant);
   return ManagedValue(c);
-}
-  
 }
 
 ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
@@ -97,7 +93,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     // If it's a property, invoke its getter.
     if (var->isProperty()) {
-      ManagedValue get = emitConstantRef(*this, loc,
+      ManagedValue get = emitConstantRef(loc,
                                         SILConstant(decl, SILConstant::Getter));
       return emitGetProperty(loc, get);
     }
@@ -120,7 +116,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   assert(!decl->getTypeOfReference()->is<LValueType>() &&
          "unexpected lvalue decl ref?!");
 
-  return emitConstantRef(*this, loc, SILConstant(decl));
+  return emitConstantRef(loc, SILConstant(decl));
 }
 
 ManagedValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E) {
@@ -145,7 +141,7 @@ ManagedValue SILGenFunction::visitLoadExpr(LoadExpr *E) {
   ManagedValue SubV = visit(E->getSubExpr());
   Value loadedV = B.createLoad(E, SubV.getUnmanagedValue());
   emitRetainRValue(E, loadedV);
-  return managedRValueWithCleanup(*this, loadedV);
+  return emitManagedRValueWithCleanup(loadedV);
 }
 
 namespace {
@@ -202,8 +198,7 @@ ManagedValue SILGenFunction::visitTupleExpr(TupleExpr *E) {
   llvm::SmallVector<Value, 10> ArgsV;
   for (auto &I : E->getElements())
     ArgsV.push_back(visit(I).forward(*this));
-  return managedRValueWithCleanup(*this,
-                                  B.createTuple(E, E->getType(), ArgsV));
+  return emitManagedRValueWithCleanup(B.createTuple(E, E->getType(), ArgsV));
 }
 
 ManagedValue SILGenFunction::visitGetMetatypeExpr(GetMetatypeExpr *E) {
@@ -240,7 +235,7 @@ static ManagedValue emitExtractLoadableElement(SILGenFunction &gen,
                                         e->getType());
     
     gen.emitRetainRValue(e, extract);
-    return managedRValueWithCleanup(gen, extract);
+    return gen.emitManagedRValueWithCleanup(extract);
   }
 }
 
@@ -268,7 +263,7 @@ ManagedValue SILGenFunction::visitMemberRefExpr(MemberRefExpr *E) {
     Value getter = B.createApply(E, getterMethod, base);
     
     // Apply the getter.
-    return emitGetProperty(E, managedRValueWithCleanup(*this, getter));
+    return emitGetProperty(E, emitManagedRValueWithCleanup(getter));
   }
 }
 
@@ -294,9 +289,8 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(Value ObjectPtr,
 
   Value InjectionFn = visit(ArrayInjectionFunction).getUnmanagedValue();
   Value InjectionArgs[] = { BasePtr, ObjectPtr, Length };
-  return managedRValueWithCleanup(*this,
-                                  B.createApply(SILLocation(),
-                                                InjectionFn, InjectionArgs));
+  return emitManagedRValueWithCleanup(B.createApply(SILLocation(),
+                                                   InjectionFn, InjectionArgs));
 }
 
 
@@ -364,7 +358,7 @@ ManagedValue SILGenFunction::emitTupleShuffle(Expr *E,
     break;
   }
 
-  return managedRValueWithCleanup(*this, B.createTuple(E, E->getType(),
+  return emitManagedRValueWithCleanup(B.createTuple(E, E->getType(),
                                                        ResultElements));
 }
 
@@ -473,16 +467,14 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
         }
         case CaptureKind::GetterSetter: {
           // Pass the setter and getter closure references on.
-          ManagedValue v = emitConstantRef(*this, loc,
-                                           SILConstant(capture,
+          ManagedValue v = emitConstantRef(loc, SILConstant(capture,
                                                        SILConstant::Setter));
           capturedArgs.push_back(v.forward(*this));
           /* FALLTHROUGH */
         }
         case CaptureKind::Getter: {
           // Pass the getter closure reference on.
-          ManagedValue v = emitConstantRef(*this, loc,
-                                           SILConstant(capture,
+          ManagedValue v = emitConstantRef(loc, SILConstant(capture,
                                                        SILConstant::Getter));
           capturedArgs.push_back(v.forward(*this));
           break;
@@ -491,8 +483,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
     }
     
     Value functionRef = B.createConstantRef(loc, constant);
-    return managedRValueWithCleanup(*this,
-                                    B.createClosure(loc,
+    return emitManagedRValueWithCleanup(B.createClosure(loc,
                                                     functionRef, capturedArgs));
   } else {
     return ManagedValue(B.createConstantRef(loc, constant));

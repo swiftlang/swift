@@ -27,10 +27,13 @@ namespace swift {
   
 namespace Lowering {
   class Condition;
+  class LValue;
   class ManagedValue;
   class TypeConverter;
   class SILGenFunction;
 
+/// SILGenModule - an ASTVisitor for generating SIL from top-level definitions
+/// in a translation unit.
 class LLVM_LIBRARY_VISIBILITY SILGenModule : public ASTVisitor<SILGenModule> {
 public:
   /// The Module being constructed.
@@ -82,7 +85,9 @@ enum class CaptureKind {
   /// A settable property.
   GetterSetter
 };
+
   
+/// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
   : public ASTVisitor<SILGenFunction, ManagedValue, void> {
 public:
@@ -181,7 +186,7 @@ public:
   ///   members of the old value are released following the same sequence as for
   ///   reference types.
   /// - For address-only types, this generates a copy_addr assign instruction.
-  void emitAssign(SILLocation loc, Value v, Value dest);
+  void emitAssign(SILLocation loc, Value v, LValue const &dest);
   
   /// emitRetainRValue - Emits the instructions necessary to increase the
   /// retain count of a temporary, in order to use it as part of another
@@ -268,6 +273,8 @@ public:
                                 ArrayRef<Value> InOps,
                                 ArrayRef<int> ElementMapping,
                                 Expr *VarargsInjectionFunction);
+  ManagedValue emitConstantRef(SILLocation loc, SILConstant constant);
+
   ManagedValue emitReferenceToDecl(SILLocation loc,
                                    ValueDecl *decl);
 
@@ -276,6 +283,12 @@ public:
                                            CapturingExpr *body);
   
   ManagedValue emitGetProperty(SILLocation loc, ManagedValue getter);
+    
+  ManagedValue emitManagedRValueWithCleanup(Value v);
+    
+  void emitStoreToLValue(SILLocation loc, Value src, LValue const &dest);
+  ManagedValue emitMaterializedLoadFromLValue(SILLocation loc,
+                                              LValue const &src);
 
   //===--------------------------------------------------------------------===//
   // Declarations
@@ -318,6 +331,34 @@ public:
       return CaptureKind::LValue;
     return CaptureKind::Constant;
   }
+};
+  
+/// SILGenLValue - An ASTVisitor for building logical lvalues.
+/// Used to visit the left-hand sides of AssignStmts and [byref] arguments of
+/// ApplyExprs.
+class LLVM_LIBRARY_VISIBILITY SILGenLValue
+  : public ExprVisitor<SILGenLValue, LValue>
+{
+  SILGenFunction &gen;
+public:
+  SILGenLValue(SILGenFunction &gen) : gen(gen) {}
+  
+  /// Dummy handler to log unimplemented AST nodes.
+  LValue visitExpr(Expr *e);
+  
+  // Nodes that make up lvalue paths
+  
+  LValue visitDeclRefExpr(DeclRefExpr *e);
+  LValue visitMemberRefExpr(MemberRefExpr *e);
+  //LValue visitSubscriptExpr(SubscriptExpr *e);
+  LValue visitTupleElementExpr(TupleElementExpr *e);
+  
+  // Aggregating expressions that can wrap LValues
+  
+  LValue visitAddressOfExpr(AddressOfExpr *e);
+  LValue visitParenExpr(ParenExpr *e);
+  LValue visitRequalifyExpr(RequalifyExpr *e); // FIXME kill lvalue qualifiers
+  // LValue visitTupleExpr(TupleExpr *e);
 };
   
 } // end namespace Lowering

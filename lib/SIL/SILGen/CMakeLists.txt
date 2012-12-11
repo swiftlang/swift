@@ -4,6 +4,7 @@ add_swift_library(swiftSILGen
   SILGen.cpp
   SILGenDecl.cpp
   SILGenExpr.cpp
+  SILGenLValue.cpp
   SILGenStmt.cpp
   TypeInfo.cpp
   DEPENDS swiftSIL)

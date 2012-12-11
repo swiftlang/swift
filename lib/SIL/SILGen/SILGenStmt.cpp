@@ -13,6 +13,7 @@
 #include "SILGen.h"
 #include "Scope.h"
 #include "Condition.h"
+#include "LValue.h"
 #include "ManagedValue.h"
 #include "swift/AST/AST.h"
 
@@ -118,9 +119,8 @@ static void emitAssignStmtRecursive(AssignStmt *S, Value Src, Expr *Dest,
   }
   
   // Otherwise, emit the scalar assignment.
-  Value DstV = Gen.visit(Dest).getUnmanagedValue();
-
-  Gen.emitAssign(S, Src, DstV);
+  LValue DstLV = SILGenLValue(Gen).visit(Dest);
+  Gen.emitAssign(S, Src, DstLV);
 }
 
 
@@ -128,6 +128,8 @@ void SILGenFunction::visitAssignStmt(AssignStmt *S) {
   Value SrcV;
   {
     FullExpr scope(Cleanups);
+    // FIXME: don't forward components of SrcV until they're consumed by a
+    // store.
     SrcV = visit(S->getSrc()).forward(*this);
   }
   
@@ -344,6 +346,76 @@ void SILGenFunction::visitBreakStmt(BreakStmt *S) {
 
 void SILGenFunction::visitContinueStmt(ContinueStmt *S) {
   Cleanups.emitBranchAndCleanups(ContinueDestStack.back());
+}
+
+ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
+                                                            LValue const &src) {
+  Value addr;
+  
+  assert(src.begin() != src.end() && "lvalue must have at least one component");
+  for (auto &component : src) {
+    if (component.isPhysical()) {
+      addr = component.asPhysical().offset(*this, loc, addr);
+    } else {
+      addr = component.asLogical()
+        .loadAndMaterialize(*this, loc, addr,
+                            ShouldPreserveValues::PreserveValues)
+        .getUnmanagedValue();
+    }
+    assert(addr.getType()->is<LValueType>() &&
+           "resolving lvalue component did not give an address");
+  }
+  return ManagedValue(addr);
+}
+
+void SILGenFunction::emitStoreToLValue(SILLocation loc,
+                                       Value src, LValue const &dest) {
+  struct StoreWriteback {
+    Value base, member;
+    LogicalPathComponent const *component;
+  };
+  Value destAddr;
+  SmallVector<StoreWriteback, 4> writebacks;
+  
+  auto component = dest.begin(), next = dest.begin(), end = dest.end();
+  ++next;
+  
+  // Resolve all components up to the last, keeping track of value-type logical
+  // properties we need to write back to.
+  for (; next != end; component = next, ++next) {
+    if (component->isPhysical()) {
+      destAddr = component->asPhysical().offset(*this, loc, destAddr);
+    } else {
+      LogicalPathComponent const &lcomponent = component->asLogical();
+      Value newDestAddr = lcomponent
+        .loadAndMaterialize(*this, loc, destAddr,
+                            ShouldPreserveValues::PreserveValues)
+        .getUnmanagedValue();
+      if (destAddr.getType()->getRValueType()->hasReferenceSemantics())
+        writebacks.clear();
+      else
+        writebacks.push_back({destAddr, newDestAddr, &lcomponent});
+      destAddr = newDestAddr;
+    }
+  }
+  
+  // Write to the tail component.
+  if (component->isPhysical()) {
+    Value finalDestAddr = component->asPhysical().offset(*this, loc, destAddr);
+    B.createStore(loc, src, finalDestAddr);
+  } else {
+    component->asLogical().storeRValue(*this, loc,
+                                       src, destAddr,
+                                       ShouldPreserveValues::ConsumeValues);
+  }
+  
+  // Write back through value-type logical properties.
+  for (auto wb = writebacks.rbegin(), wend = writebacks.rend();
+       wb != wend; ++wb) {
+    Value wbValue = B.createLoad(loc, wb->member);
+    wb->component->storeRValue(*this, loc, wbValue, wb->base,
+                               ShouldPreserveValues::ConsumeValues);
+  }
 }
 
 //===--------------------------------------------------------------------===//
