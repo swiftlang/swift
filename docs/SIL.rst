@@ -572,6 +572,19 @@ element_addr
 Given the address of a loadable aggregate value in memory, creates a
 value representing the address of an element within that value.
 
+ref_element_addr
+````````````````
+::
+
+  %1 = ref_element_addr %0, 123
+  ; %0 must be of a reference type $T
+  ; %1 will be of type $SIL.Address<U> where U is the type of the 123rd
+  ;   element of T
+  ; TODO: not implemented
+
+Given a value of a reference type, creates a value representing the address
+of an element within the referenced instance.
+
 index_addr
 ``````````
 ::
@@ -589,7 +602,6 @@ convert
 ::
 
   %1 = convert %0, $T
-  ; $T must be a type
   ; %0 must be of a type $U implicitly convertible to $T
   ; %1 will be of type $T
 
@@ -601,6 +613,18 @@ limited to conversions that will not affect how the value will codegen, such as:
 * scalar-to-equivalent-tuple conversion
 * function-to-equivalent-function conversion
 * reference-type-to-``Box`` conversion
+
+generalize
+``````````
+::
+
+  %1 = generalize %0, $T
+  ; $T must be a generic type
+  ; %1 will be of type $T
+  ; TODO: not implemented
+
+Performs a representation conversion of ``%0`` to type ``T``, which must be a
+generic type compatible with the type of ``%0``.
 
 Protocol types
 ~~~~~~~~~~~~~~
