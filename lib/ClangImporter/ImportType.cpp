@@ -411,32 +411,42 @@ Type ClangImporter::Implementation::importFunctionType(
     }
 
     // Compute the pattern to put into the body.
-    auto bodyVar
-      = new (SwiftContext) VarDecl(importSourceLoc(param->getLocation()),
-                                   bodyName, swiftParamTy, firstClangModule);
-    bodyVar->setClangDecl(param);
-    Pattern *bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
-    bodyPattern->setType(bodyVar->getType());
+    Pattern *bodyPattern;
+    if (bodyName.empty()) {
+      bodyPattern = new (SwiftContext) AnyPattern(SourceLoc());
+    } else {
+      auto bodyVar
+        = new (SwiftContext) VarDecl(importSourceLoc(param->getLocation()),
+                                     bodyName, swiftParamTy, firstClangModule);
+      bodyVar->setClangDecl(param);
+      bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
+    }
+    bodyPattern->setType(swiftParamTy);
     bodyPattern
       = new (SwiftContext) TypedPattern(bodyPattern,
                                         TypeLoc::withoutLoc(swiftParamTy));
-    bodyPattern->setType(bodyVar->getType());
+    bodyPattern->setType(swiftParamTy);
     bodyPatternElts.push_back(TuplePatternElt(bodyPattern));
 
     // Compute the pattern to put into the argument list, which may be
     // different (when there is a selector involved).
-    auto argVar = bodyVar;
-    auto argPattern = bodyPattern;
+    Pattern *argPattern = bodyPattern;
     if (bodyName != name) {
-      argVar = new (SwiftContext) VarDecl(importSourceLoc(param->getLocation()),
-                                          name, swiftParamTy, firstClangModule);
-      argVar->setClangDecl(param);
-      argPattern = new (SwiftContext) NamedPattern(argVar);
-      argPattern->setType(argVar->getType());
+      if (name.empty()) {
+        argPattern = new (SwiftContext) AnyPattern(SourceLoc());
+      } else {
+        auto argVar = new (SwiftContext) VarDecl(SourceLoc(), name,
+                                                 swiftParamTy,
+                                                 firstClangModule);
+        argVar->setClangDecl(param);
+        argPattern = new (SwiftContext) NamedPattern(argVar);
+      }
+      argPattern->setType(swiftParamTy);
+
       argPattern
         = new (SwiftContext) TypedPattern(argPattern,
                                           TypeLoc::withoutLoc(swiftParamTy));
-      argPattern->setType(argVar->getType());
+      argPattern->setType(swiftParamTy);
     }
     argPatternElts.push_back(TuplePatternElt(argPattern));
 

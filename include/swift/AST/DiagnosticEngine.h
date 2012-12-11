@@ -25,6 +25,7 @@
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
 #include <utility>
@@ -252,7 +253,11 @@ namespace swift {
     
     /// \brief The currently active diagnostic, if there is one.
     Optional<Diagnostic> ActiveDiagnostic;
-    
+
+    /// \brief The set of declarations for which we have pretty-printed
+    /// results that we can point to on the command line.
+    llvm::DenseMap<Decl *, SourceLoc> PrettyPrintedDeclarations;
+
     friend class InFlightDiagnostic;
     
   public:

@@ -17,6 +17,9 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/PrintOptions.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -244,9 +247,86 @@ void DiagnosticEngine::flushActiveDiagnostic() {
         ActiveDiagnosticDecl->getLoc().isValid()) {
       loc = ActiveDiagnosticDecl->getLoc();
     } else {
-      // There is no location we can point to.
-      // FIXME: We'd love to pretty-print the declaration so we can point
-      // at it in the diagnostic. For now, just provide a poor diagnostic.
+      // There is no location we can point to. Pretty-print the declaration
+      // so we can point to it.
+      SourceLoc ppLoc = PrettyPrintedDeclarations[ActiveDiagnosticDecl];
+      if (ppLoc.isInvalid()) {
+        SmallVector<std::pair<Decl *, uint64_t>, 8> entries;
+        llvm::SmallString<128> buffer;
+        llvm::SmallString<128> bufferName;
+        {
+          // Figure out which declaration to print. It's the top-most
+          // declaration (not a module).
+          Decl *ppDecl = ActiveDiagnosticDecl;
+          auto dc = ActiveDiagnosticDecl->getDeclContext();
+          while (!dc->isModuleContext()) {
+            switch (dc->getContextKind()) {
+            case DeclContextKind::BuiltinModule:
+            case DeclContextKind::ClangModule:
+            case DeclContextKind::TranslationUnit:
+            case DeclContextKind::TopLevelCodeDecl:
+              llvm_unreachable("Not in a module context!");
+              break;
+
+            case DeclContextKind::ExtensionDecl:
+              ppDecl = cast<ExtensionDecl>(dc);
+              break;
+
+            case DeclContextKind::NominalTypeDecl:
+              ppDecl = cast<NominalTypeDecl>(dc);
+              break;
+
+            case DeclContextKind::CapturingExpr:
+            case DeclContextKind::ConstructorDecl:
+            case DeclContextKind::DestructorDecl:
+              break;
+            }
+
+            dc = dc->getParent();
+          }
+
+          // Build the module name path (in reverse), which we use to
+          // build the name of the buffer.
+          SmallVector<StringRef, 4> nameComponents;
+          while (dc) {
+            nameComponents.push_back(cast<Module>(dc)->Name.str());
+            dc = dc->getParent();
+          }
+
+          for (unsigned i = nameComponents.size(); i; --i) {
+            bufferName += nameComponents[i-1];
+            bufferName += '.';
+          }
+
+          if (auto value = dyn_cast<ValueDecl>(ppDecl)) {
+            bufferName += value->getName().str();
+          } else if (auto ext = dyn_cast<ExtensionDecl>(ppDecl)) {
+            bufferName += ext->getExtendedType().getString();
+          }
+
+          // Pretty-print the declaration we've picked.
+          llvm::raw_svector_ostream out(buffer);
+          ppDecl->print(out, PrintOptions::printEverything(), &entries);
+        }
+
+        // Build a buffer with the pretty-printed declaration.
+        auto memBuffer = llvm::MemoryBuffer::getMemBufferCopy(buffer,
+                                                              bufferName);
+        SourceMgr.AddNewSourceBuffer(memBuffer, llvm::SMLoc());
+
+        // Go through all of the pretty-printed entries and record their
+        // locations.
+        for (auto entry : entries) {
+          PrettyPrintedDeclarations[entry.first]
+            = SourceLoc(llvm::SMLoc::getFromPointer(memBuffer->getBufferStart()
+                                                    + entry.second));
+        }
+
+        // Grab the pretty-printed location.
+        ppLoc = PrettyPrintedDeclarations[ActiveDiagnosticDecl];
+      }
+
+      loc = ppLoc;
     }
   }
 

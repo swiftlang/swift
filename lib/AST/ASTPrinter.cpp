@@ -168,7 +168,7 @@ void PrintAST::printAttributes(const DeclAttributes &attrs) {
     comma();
     OS << "ibaction";
   }
-  OS << "]";
+  OS << "] ";
 }
 
 void PrintAST::printPattern(Pattern *pattern) {
