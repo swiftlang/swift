@@ -376,6 +376,9 @@ void SILGenFunction::emitStoreToLValue(SILLocation loc,
   };
   Value destAddr;
   SmallVector<StoreWriteback, 4> writebacks;
+
+  assert(dest.begin() != dest.end() &&
+         "lvalue must have at least one component");
   
   auto component = dest.begin(), next = dest.begin(), end = dest.end();
   ++next;
@@ -383,6 +386,11 @@ void SILGenFunction::emitStoreToLValue(SILLocation loc,
   // Resolve all components up to the last, keeping track of value-type logical
   // properties we need to write back to.
   for (; next != end; component = next, ++next) {
+    bool hasReferenceSemantics = !destAddr ||
+                  destAddr.getType()->getRValueType()->hasReferenceSemantics();
+    if (hasReferenceSemantics)
+      writebacks.clear();
+
     if (component->isPhysical()) {
       destAddr = component->asPhysical().offset(*this, loc, destAddr);
     } else {
@@ -391,9 +399,7 @@ void SILGenFunction::emitStoreToLValue(SILLocation loc,
         .loadAndMaterialize(*this, loc, destAddr,
                             ShouldPreserveValues::PreserveValues)
         .getUnmanagedValue();
-      if (destAddr.getType()->getRValueType()->hasReferenceSemantics())
-        writebacks.clear();
-      else
+      if (!hasReferenceSemantics)
         writebacks.push_back({destAddr, newDestAddr, &lcomponent});
       destAddr = newDestAddr;
     }
