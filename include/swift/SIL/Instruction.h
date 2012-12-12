@@ -260,7 +260,8 @@ public:
   ///
   /// \param Loc  The location of the reference.
   /// \param C    The constant being referenced.
-  ConstantRefInst(SILLocation Loc, SILConstant C);
+  /// \param F    The SIL Function in which the constant is being referenced.
+  ConstantRefInst(SILLocation Loc, SILConstant C, Function &F);
 
   /// getConstant - Return the referenced constant.
   SILConstant getConstant() const;

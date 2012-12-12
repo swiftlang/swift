@@ -64,8 +64,6 @@ struct SILConstant {
   bool operator!=(SILConstant rhs) const {
     return loc.getOpaqueValue() != rhs.loc.getOpaqueValue() || id != rhs.id;
   }
-  
-  Type getType() const;
 };
 
 } // end swift namespace

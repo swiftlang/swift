@@ -282,6 +282,7 @@ public:
   ManagedValue visitAddressOfExpr(AddressOfExpr *E);
   ManagedValue visitMemberRefExpr(MemberRefExpr *E);
   ManagedValue visitTupleElementExpr(TupleElementExpr *E);
+  ManagedValue visitSubscriptExpr(SubscriptExpr *E);
   ManagedValue visitTupleShuffleExpr(TupleShuffleExpr *E);
   ManagedValue visitNewArrayExpr(NewArrayExpr *E);
   ManagedValue visitMetatypeExpr(MetatypeExpr *E);

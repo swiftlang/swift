@@ -20,7 +20,9 @@ namespace {
 /// SILVerifier class - This class implements the SIL verifier, which walks over
 /// SIL, checking and enforcing its invariants.
 class SILVerifier : public SILVisitor<SILVerifier> {
+  SILModule &M;
 public:
+  SILVerifier(SILModule &M) : M(M) {}
   
   void visit(Instruction *I) {
     
@@ -75,7 +77,7 @@ public:
   }
 
   void visitConstantRefInst(ConstantRefInst *DRI) {
-    assert(DRI->getConstant().getType()->getCanonicalType() ==
+    assert(M.getConstantType(DRI->getConstant())->getCanonicalType() ==
              DRI->getType()->getCanonicalType()
            && "ConstantRef type does not match constant's type");
   }
@@ -197,5 +199,5 @@ public:
 /// verify - Run the IR verifier to make sure that the Function follows
 /// invariants.
 void Function::verify() const {
-  SILVerifier().visitFunction(const_cast<Function*>(this));
+  SILVerifier(Module).visitFunction(const_cast<Function*>(this));
 }

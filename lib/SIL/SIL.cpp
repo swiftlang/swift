@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 using namespace swift;
 
@@ -57,7 +58,7 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc) {
   id = 0;
 }
 
-static Type propertyThisType(Type thisType, ASTContext &C) {
+static Type getPropertyThisType(Type thisType, ASTContext &C) {
   if (thisType->hasReferenceSemantics()) {
     return thisType;
   } else {
@@ -65,38 +66,56 @@ static Type propertyThisType(Type thisType, ASTContext &C) {
   }
 }
 
-Type SILConstant::getType() const {
-  // FIXME: This should probably be a method on SILModule that caches the
-  // type information.
-  if (ValueDecl *vd = loc.dyn_cast<ValueDecl*>()) {
+static Type getPropertyType(unsigned id, Type valueType, ASTContext &C) {
+  if (id & SILConstant::Getter) {
+    return FunctionType::get(TupleType::getEmpty(C), valueType, C);
+  }
+  if (id & SILConstant::Setter) {
+    TupleTypeElt valueParam(valueType, C.getIdentifier("value"));
+    return FunctionType::get(TupleType::get(valueParam, C),
+                                     TupleType::getEmpty(C), C);
+  }
+  llvm_unreachable("not a property constant");
+}
+
+Type SILModule::makeConstantType(SILConstant c) {
+  // TODO: mangle function types for address-only indirect arguments and returns
+  if (ValueDecl *vd = c.loc.dyn_cast<ValueDecl*>()) {
     ASTContext &C = vd->getASTContext();
     Type contextType = vd->getDeclContext()->getDeclaredTypeOfContext();
-    Type propertyType;
-    // If this is a property accessor, derive the property type.
-    // FIXME: this is a dumb get-things-working kludge. we can get the getter/
-    // setter types from somewhere else.
-    if (id & SILConstant::Getter) {
-      propertyType = FunctionType::get(TupleType::getEmpty(C),
-                                       vd->getType(), C);
-    }
-    if (id & SILConstant::Setter) {
-      TupleTypeElt valueParam(vd->getType(), C.getIdentifier("value"));
-      propertyType = FunctionType::get(TupleType::get(valueParam, C),
-                                       TupleType::getEmpty(C), C);
-    }
-    if (propertyType)
+    if (SubscriptDecl *sd = dyn_cast<SubscriptDecl>(vd)) {
+      // If this is a subscript accessor, derive the accessor type.
+      Type indexType = sd->getIndices()->getType();
+      Type elementType = sd->getElementType();
+      Type propertyType = getPropertyType(c.id, elementType, C);
+      Type subscriptType = FunctionType::get(indexType, propertyType, C);
       return contextType
-        ? FunctionType::get(propertyThisType(contextType, C),
-                            propertyType, C)
-        : propertyType;
+        ? FunctionType::get(getPropertyThisType(contextType, C),
+                            subscriptType, C)
+        : subscriptType;
+    } else {
+      Type propertyType;
+      // If this is a property accessor, derive the property type.
+      if (c.id & (SILConstant::Getter | SILConstant::Setter)) {
+        propertyType = getPropertyType(c.id, vd->getType(), C);
+        return contextType
+          ? FunctionType::get(getPropertyThisType(contextType, C),
+                              propertyType, C)
+          : propertyType;
+      }
 
-    if (VarDecl *var = dyn_cast<VarDecl>(vd)) {
-      // Global vars of type T are handled by () -> [byref] T functions.
-      return FunctionType::get(TupleType::getEmpty(C),
-                               var->getTypeOfReference(), C);
+      // If it's a global var, derive the initializer/accessor function type
+      // () -> [byref] T
+      if (VarDecl *var = dyn_cast<VarDecl>(vd)) {
+        assert(!var->isProperty() && "constant ref to non-physical global var");
+        return FunctionType::get(TupleType::getEmpty(C),
+                                 var->getTypeOfReference(), C);
+      }
+      
+      // Otherwise, return the Swift-level type.
+      return vd->getTypeOfReference();
     }
-    return vd->getTypeOfReference();
-  } else if (CapturingExpr *e = loc.dyn_cast<CapturingExpr*>()) {
+  } else if (CapturingExpr *e = c.loc.dyn_cast<CapturingExpr*>()) {
     return e->getType();
   }
   llvm_unreachable("unexpected constant loc");

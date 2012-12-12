@@ -44,8 +44,11 @@ private:
   /// Context - This is the context that uniques the types used by this
   /// Function.
   ASTContext &Context;
+  
+  /// A mapping of referenced global constants to their SIL-level types.
+  llvm::DenseMap<SILConstant, Type> constantTypes;
 
-  /// The collection of all Functions in the module.
+  /// The collection of all codegenned Functions in the module.
   llvm::MapVector<SILConstant, Function*> functions;
   
   /// The top-level Function for the module.
@@ -54,6 +57,8 @@ private:
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
   SILModule(ASTContext &Context, bool hasTopLevel);
+  
+  Type makeConstantType(SILConstant constant);
   
 public:
   ~SILModule();
@@ -86,8 +91,8 @@ public:
   }
   
   /// Returns a pointer to the Function generated from the given declaration.
-  Function *getFunction(SILConstant decl) const {
-    auto found = functions.find(decl);
+  Function *getFunction(SILConstant constant) const {
+    auto found = functions.find(constant);
     assert(found != functions.end() && "no Function generated for Decl");
     return found->second;
   }
@@ -95,6 +100,17 @@ public:
   /// Returns a pointer to the Function generated from the given declaration.
   Function *getFunction(ValueDecl *decl) const {
     return getFunction(SILConstant(decl));
+  }
+  
+  /// Returns the SIL type of a constant reference.
+  Type getConstantType(SILConstant constant) {
+    auto found = constantTypes.find(constant);
+    if (found == constantTypes.end()) {
+      Type ty = makeConstantType(constant);
+      constantTypes[constant] = ty;
+      return ty;
+    } else
+      return found->second;
   }
   
   typedef llvm::MapVector<SILConstant, Function*>::const_iterator iterator;

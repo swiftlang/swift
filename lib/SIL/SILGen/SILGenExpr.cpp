@@ -55,7 +55,7 @@ struct Writeback {
   Value tempAddress;
 };
   
-static Value visitApplyArgument(SILGenFunction &gen, Expr *arg,
+static Value emitApplyArgument(SILGenFunction &gen, Expr *arg,
                                 llvm::SmallVectorImpl<Writeback> &writebacks) {
   if (arg->getType()->is<LValueType>()) {
     LValue lv = SILGenLValue(gen).visit(arg);
@@ -69,6 +69,24 @@ static Value visitApplyArgument(SILGenFunction &gen, Expr *arg,
     return gen.visit(arg).forward(gen);
   }
 }
+  
+static void emitApplyArguments(SILGenFunction &gen, Expr *argsExpr,
+                               llvm::SmallVectorImpl<Value> &ArgsV,
+                               llvm::SmallVectorImpl<Writeback> &writebacks) {
+  if (ParenExpr *pe = dyn_cast<ParenExpr>(argsExpr))
+    argsExpr = pe->getSubExpr();
+  
+  // Special case Arg being a TupleExpr or ScalarToTupleExpr to inline the
+  // arguments and not create a tuple instruction.
+  if (TupleExpr *te = dyn_cast<TupleExpr>(argsExpr)) {
+    for (auto arg : te->getElements())
+      ArgsV.push_back(emitApplyArgument(gen, arg, writebacks));
+  } else if (ScalarToTupleExpr *se = dyn_cast<ScalarToTupleExpr>(argsExpr)) {
+    ArgsV.push_back(emitApplyArgument(gen, se->getSubExpr(), writebacks));
+  } else {
+    ArgsV.push_back(emitApplyArgument(gen, argsExpr, writebacks));
+  }
+}
 
 } // end anonymous namespace
 
@@ -78,23 +96,9 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   // address-only types.
   Value FnV = visit(E->getFn()).forward(*this);
   llvm::SmallVector<Value, 10> ArgsV;
-  
-  Expr *argExpr = E->getArg();
-  if (ParenExpr *pe = dyn_cast<ParenExpr>(argExpr))
-    argExpr = pe->getSubExpr();
-  
   llvm::SmallVector<Writeback, 2> writebacks;
   
-  // Special case Arg being a TupleExpr or ScalarToTupleExpr to inline the
-  // arguments and not create a tuple instruction.
-  if (TupleExpr *te = dyn_cast<TupleExpr>(argExpr)) {
-    for (auto arg : te->getElements())
-      ArgsV.push_back(visitApplyArgument(*this, arg, writebacks));
-  } else if (ScalarToTupleExpr *se = dyn_cast<ScalarToTupleExpr>(argExpr)) {
-    ArgsV.push_back(visitApplyArgument(*this, se->getSubExpr(), writebacks));
-  } else {
-    ArgsV.push_back(visitApplyArgument(*this, argExpr, writebacks));
-  }
+  emitApplyArguments(*this, E->getArg(), ArgsV, writebacks);
   
   ManagedValue r = emitManagedRValueWithCleanup(B.createApply(E, FnV, ArgsV));
   
@@ -114,7 +118,7 @@ Value SILGenFunction::emitUnmanagedConstantRef(SILLocation loc,
   }
   
   // Otherwise, use a global ConstantRefInst.
-  return B.createConstantRef(loc, constant);
+  return B.createConstantRef(loc, constant, F);
 }
 
 ManagedValue SILGenFunction::emitConstantRef(SILLocation loc,
@@ -127,7 +131,7 @@ ManagedValue SILGenFunction::emitConstantRef(SILLocation loc,
   }
   
   // Otherwise, use a global ConstantRefInst.
-  Value c = B.createConstantRef(loc, constant);
+  Value c = B.createConstantRef(loc, constant, F);
   return ManagedValue(c);
 }
 
@@ -151,7 +155,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
            "no location for local var!");
     // If this is a global variable, invoke its accessor function to get its
     // address.
-    Value accessor = B.createConstantRef(loc, SILConstant(decl));
+    Value accessor = B.createConstantRef(loc, SILConstant(decl), F);
     Value address = B.createApply(loc, accessor, {});
     return ManagedValue(address);
   }
@@ -310,17 +314,40 @@ ManagedValue SILGenFunction::visitMemberRefExpr(MemberRefExpr *E) {
     assert((E->getBase()->getType()->is<LValueType>() ||
             E->getBase()->getType()->hasReferenceSemantics()) &&
            "member ref of a non-lvalue?!");
-    Value base = visit(E->getBase()).forward(*this);
+    ManagedValue base = visit(E->getBase());
     // Get the getter function, which will have type This -> () -> T.
     Value getterMethod = B.createConstantRef(E,
                                              SILConstant(E->getDecl(),
-                                                         SILConstant::Getter));
+                                                         SILConstant::Getter),
+                                             F);
     // Apply the "this" parameter.
-    Value getter = B.createApply(E, getterMethod, base);
-    
+    Value getter = B.createApply(E, getterMethod, base.forward(*this));
     // Apply the getter.
     return emitGetProperty(E, emitManagedRValueWithCleanup(getter));
   }
+}
+
+ManagedValue SILGenFunction::visitSubscriptExpr(SubscriptExpr *E) {
+  SubscriptDecl *sd = E->getDecl();
+  ManagedValue base = visit(E->getBase());
+  llvm::SmallVector<Value, 2> indexArgs;
+  llvm::SmallVector<Writeback, 2> writebacks;
+  
+  emitApplyArguments(*this, E->getIndex(), indexArgs, writebacks);
+  assert(writebacks.empty() && "subscript should not have byref args");
+  
+  // Get the getter function, which will have type This -> Index -> () -> T.
+  Value getterMethod = B.createConstantRef(E, SILConstant(sd,
+                                                          SILConstant::Getter),
+                                           F);
+  
+  
+  // Apply the "this" parameter.
+  Value getterDelegate = B.createApply(E, getterMethod, base.forward(*this));
+  // Apply the index parameter.
+  Value getter = B.createApply(E, getterDelegate, indexArgs);
+  // Apply the getter.
+  return emitGetProperty(E, emitManagedRValueWithCleanup(getter));
 }
 
 ManagedValue SILGenFunction::visitTupleElementExpr(TupleElementExpr *E) {
@@ -538,11 +565,11 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
       }
     }
     
-    Value functionRef = B.createConstantRef(loc, constant);
+    Value functionRef = B.createConstantRef(loc, constant, F);
     return emitManagedRValueWithCleanup(B.createClosure(loc,
                                                     functionRef, capturedArgs));
   } else {
-    return ManagedValue(B.createConstantRef(loc, constant));
+    return ManagedValue(B.createConstantRef(loc, constant, F));
   }
 }
 

@@ -178,8 +178,9 @@ ClosureInst *ClosureInst::create(SILLocation Loc, Value Callee,
   return FunctionInst::create<ClosureInst>(Loc, Callee, Args, F);
 }
 
-ConstantRefInst::ConstantRefInst(SILLocation Loc, SILConstant C)
-  : Instruction(ValueKind::ConstantRefInst, Loc, C.getType()),
+ConstantRefInst::ConstantRefInst(SILLocation Loc, SILConstant C, Function &F)
+  : Instruction(ValueKind::ConstantRefInst, Loc,
+                F.getModule().getConstantType(C)),
     Constant(C) {
 }
 
