@@ -77,6 +77,7 @@ namespace {
              "base for load must be address");
       
       LValueType *baseType = base.getType()->castTo<LValueType>();
+      (void)baseType;
       assert(baseType->getObjectType()->hasReferenceSemantics() &&
              "lvalue load must be of a ref type");
       return gen.B.createLoad(loc, base);
