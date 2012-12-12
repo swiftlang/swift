@@ -104,6 +104,8 @@ namespace {
              "base of getter/setter component must be invalid, lvalue, or "
              "of reference type");
       gen.B.createRetain(loc, accessor);
+      if (base.getType()->hasReferenceSemantics())
+        gen.B.createRetain(loc, base);
       // Apply the base "this" argument, if any.
       ManagedValue appliedThis = base
         ? gen.emitManagedRValueWithCleanup(gen.B.createApply(loc,
