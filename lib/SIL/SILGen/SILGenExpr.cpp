@@ -195,8 +195,10 @@ namespace {
     CleanupMaterialize(Value alloc) : alloc(alloc) {}
     
     void emit(SILGenFunction &gen) override {
-      Value tmpValue = gen.B.createLoad(SILLocation(), alloc);
-      gen.emitReleaseRValue(SILLocation(), tmpValue);
+      if (!gen.getTypeInfo(alloc.getType()->getRValueType()).isTrivial()) {
+        Value tmpValue = gen.B.createLoad(SILLocation(), alloc);
+        gen.emitReleaseRValue(SILLocation(), tmpValue);
+      }
       gen.B.createDeallocVar(SILLocation(), AllocKind::Stack, alloc);
     }
   };
