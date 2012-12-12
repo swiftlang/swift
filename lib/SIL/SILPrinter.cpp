@@ -240,6 +240,10 @@ public:
     OS << "element_addr " << getID(EI->getOperand()) << ", "
        << EI->getFieldNo();
   }
+  void visitRefElementAddrInst(RefElementAddrInst *EI) {
+    OS << "ref_element_addr " << getID(EI->getOperand()) << ", "
+       << EI->getFieldNo();
+  }
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype $" << MI->getMetaType().getString();
   }

@@ -558,6 +558,23 @@ public:
   }
 };
 
+/// RefElementAddrInst - Derive the address of a numbered element in a reference
+/// type instance.
+class RefElementAddrInst : public Instruction {
+  Value Operand;
+  unsigned FieldNo;
+public:
+  RefElementAddrInst(SILLocation Loc, Value Operand, unsigned FieldNo,
+                  Type ResultTy);
+  
+  Value getOperand() const { return Operand; }
+  unsigned getFieldNo() const { return FieldNo; }
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::RefElementAddrInst;
+  }
+};
+  
 /// RetainInst - Increase the retain count of a value.
 class RetainInst : public Instruction {
   Value Operand;

@@ -198,6 +198,11 @@ public:
     return insert(new ElementAddrInst(Loc, Operand, FieldNo, ResultTy));
   }
   
+  Value createRefElementAddr(SILLocation Loc, Value Operand, unsigned FieldNo,
+                          Type ResultTy) {
+    return insert(new RefElementAddrInst(Loc, Operand, FieldNo, ResultTy));
+  }
+  
   MetatypeInst *createMetatype(MetatypeExpr *Expr) {
     return insert(new MetatypeInst(Expr));
   }

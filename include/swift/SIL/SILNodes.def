@@ -75,6 +75,7 @@ ABSTRACT_VALUE(Instruction, Value)
   INST(MetatypeInst, Instruction)
   INST(ExtractInst, Instruction)
   INST(ElementAddrInst, Instruction)
+  INST(RefElementAddrInst, Instruction)
 
   INST(RetainInst, Instruction)
   INST(ReleaseInst, Instruction)
