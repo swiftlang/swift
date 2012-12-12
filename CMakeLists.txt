@@ -102,6 +102,7 @@ set(SWIFT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(SWIFT_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
+option(SWIFT_ASSERTS "Enable assertions for the Swift standard library" YES)
 
 # Xcode: use libc++ and c++'0x using proper build settings.
 if ( XCODE )
