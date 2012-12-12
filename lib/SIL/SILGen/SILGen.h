@@ -31,6 +31,7 @@ namespace Lowering {
   class ManagedValue;
   class TypeConverter;
   class SILGenFunction;
+  struct Writeback;
 
 /// SILGenModule - an ASTVisitor for generating SIL from top-level declarations
 /// in a translation unit.
@@ -288,7 +289,10 @@ public:
   ManagedValue visitMetatypeExpr(MetatypeExpr *E);
   ManagedValue visitFuncExpr(FuncExpr *E);
   ManagedValue visitClosureExpr(ClosureExpr *E);
-
+    
+  void emitApplyArguments(Expr *argsExpr,
+                          llvm::SmallVectorImpl<Value> &args,
+                          llvm::SmallVectorImpl<Writeback> &writebacks);
   ManagedValue emitArrayInjectionCall(Value ObjectPtr,
                                       Value BasePtr,
                                       Value Length,
@@ -379,7 +383,7 @@ public:
   
   LValue visitLoadExpr(LoadExpr *e);
   LValue visitMemberRefExpr(MemberRefExpr *e);
-  //TODO: LValue visitSubscriptExpr(SubscriptExpr *e);
+  LValue visitSubscriptExpr(SubscriptExpr *e);
   LValue visitTupleElementExpr(TupleElementExpr *e);
   
   // Expressions that wrap lvalues

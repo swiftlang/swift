@@ -209,6 +209,16 @@ public:
   const_iterator begin() const { return Path.begin(); }
   const_iterator end() const { return Path.end(); }
 };
+  
+/// Writeback - Represents a writeback of a temporary value to a logical
+/// property.
+struct Writeback {
+  /// lvalue - The logical lvalue representing the destination of the writeback.
+  LValue lvalue;
+  /// tempAddress - The address containing the source value to write back to
+  /// the lvalue.
+  Value tempAddress;
+};
 
 } // end namespace Lowering
 } // end namespace swift

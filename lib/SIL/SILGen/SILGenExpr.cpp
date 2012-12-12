@@ -50,11 +50,6 @@ ManagedValue SILGenFunction::visitExpr(Expr *E) {
 
 namespace {
 
-struct Writeback {
-  LValue lvalue;
-  Value tempAddress;
-};
-  
 static Value emitApplyArgument(SILGenFunction &gen, Expr *arg,
                                 llvm::SmallVectorImpl<Writeback> &writebacks) {
   if (arg->getType()->is<LValueType>()) {
@@ -70,7 +65,9 @@ static Value emitApplyArgument(SILGenFunction &gen, Expr *arg,
   }
 }
   
-static void emitApplyArguments(SILGenFunction &gen, Expr *argsExpr,
+} // end anonymous namespace
+
+void SILGenFunction::emitApplyArguments(Expr *argsExpr,
                                llvm::SmallVectorImpl<Value> &ArgsV,
                                llvm::SmallVectorImpl<Writeback> &writebacks) {
   if (ParenExpr *pe = dyn_cast<ParenExpr>(argsExpr))
@@ -80,15 +77,13 @@ static void emitApplyArguments(SILGenFunction &gen, Expr *argsExpr,
   // arguments and not create a tuple instruction.
   if (TupleExpr *te = dyn_cast<TupleExpr>(argsExpr)) {
     for (auto arg : te->getElements())
-      ArgsV.push_back(emitApplyArgument(gen, arg, writebacks));
+      ArgsV.push_back(emitApplyArgument(*this, arg, writebacks));
   } else if (ScalarToTupleExpr *se = dyn_cast<ScalarToTupleExpr>(argsExpr)) {
-    ArgsV.push_back(emitApplyArgument(gen, se->getSubExpr(), writebacks));
+    ArgsV.push_back(emitApplyArgument(*this, se->getSubExpr(), writebacks));
   } else {
-    ArgsV.push_back(emitApplyArgument(gen, argsExpr, writebacks));
+    ArgsV.push_back(emitApplyArgument(*this, argsExpr, writebacks));
   }
 }
-
-} // end anonymous namespace
 
 ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   // FIXME: This assumes that all Swift arguments and returns lower one-to-one
@@ -98,7 +93,7 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   llvm::SmallVector<Value, 10> ArgsV;
   llvm::SmallVector<Writeback, 2> writebacks;
   
-  emitApplyArguments(*this, E->getArg(), ArgsV, writebacks);
+  emitApplyArguments(E->getArg(), ArgsV, writebacks);
   
   ManagedValue r = emitManagedRValueWithCleanup(B.createApply(E, FnV, ArgsV));
   
@@ -333,7 +328,7 @@ ManagedValue SILGenFunction::visitSubscriptExpr(SubscriptExpr *E) {
   llvm::SmallVector<Value, 2> indexArgs;
   llvm::SmallVector<Writeback, 2> writebacks;
   
-  emitApplyArguments(*this, E->getIndex(), indexArgs, writebacks);
+  emitApplyArguments(E->getIndex(), indexArgs, writebacks);
   assert(writebacks.empty() && "subscript should not have byref args");
   
   // Get the getter function, which will have type This -> Index -> () -> T.

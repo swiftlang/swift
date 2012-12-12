@@ -87,7 +87,15 @@ namespace {
   class GetterSetterComponent : public LogicalPathComponent {
     Value getter;
     Value setter;
-    Value subscript;
+    Expr *subscriptExpr;
+    
+    void getSubscriptArguments(SILGenFunction &gen,
+                               llvm::SmallVectorImpl<Value> &args) const {
+      llvm::SmallVector<Writeback, 2> writebacks;
+      subscriptExpr->dump();
+      gen.emitApplyArguments(subscriptExpr, args, writebacks);
+      assert(writebacks.empty() && "subscript shouldn't have byref args");
+    }
     
     ManagedValue partialApplyAccessor(SILGenFunction &gen, SILLocation loc,
                                       Value accessor, Value base) const {
@@ -98,22 +106,33 @@ namespace {
       gen.B.createRetain(loc, accessor);
       // Apply the base "this" argument, if any.
       ManagedValue appliedThis = base
-        ? gen.emitManagedRValueWithCleanup(gen.B.createApply(loc, accessor, base))
+        ? gen.emitManagedRValueWithCleanup(gen.B.createApply(loc,
+                                                             accessor, base))
         : ManagedValue(accessor);
       // Apply the subscript argument, if any.
-      ManagedValue appliedSubscript = subscript
-        ? gen.emitManagedRValueWithCleanup(gen.B.createApply(loc,
-                                                      appliedThis.forward(gen),
-                                                      subscript))
-        : ManagedValue(appliedThis);
-      return appliedSubscript;
+      if (subscriptExpr) {
+        llvm::SmallVector<Value, 2> args;
+        getSubscriptArguments(gen, args);
+        Value appliedSubscript = gen.B.createApply(loc,
+                                                   appliedThis.forward(gen),
+                                                   args);
+        return gen.emitManagedRValueWithCleanup(appliedSubscript);
+      } else
+        return appliedThis;
     }
     
   public:
+    GetterSetterComponent(Value getter, Value setter)
+      : getter(getter), setter(setter), subscriptExpr(nullptr)
+    {
+      assert(getter && setter &&
+             "settable lvalue must have both getter and setter");
+    }
+
     GetterSetterComponent(Value getter, Value setter,
-                          Value subscript = {})
-      : getter(getter), setter(setter), subscript(subscript) {
-      
+                          Expr *subscriptExpr)
+      : getter(getter), setter(setter), subscriptExpr(subscriptExpr)
+    {
       assert(getter && setter &&
              "settable lvalue must have both getter and setter");
     }
@@ -192,7 +211,6 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   if (ti.hasFragileElement(decl->getName())) {
     lv.add<FragileElementComponent>(ti.getFragileElement(decl->getName()));
   } else {
-    //FIXME: leaks a retain on the getter and setter if they're local closures
     Value get = gen.emitUnmanagedConstantRef(e,
                                         SILConstant(decl, SILConstant::Getter));
     Value set = gen.emitUnmanagedConstantRef(e,
@@ -200,6 +218,17 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
     lv.add<GetterSetterComponent>(get, set);
   }
   
+  return ::std::move(lv);
+}
+
+LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
+  LValue lv = visit(e->getBase());
+  SubscriptDecl *sd = e->getDecl();
+  Value get = gen.emitUnmanagedConstantRef(e,
+                                       SILConstant(sd, SILConstant::Getter));
+  Value set = gen.emitUnmanagedConstantRef(e,
+                                       SILConstant(sd, SILConstant::Setter));
+  lv.add<GetterSetterComponent>(get, set, e->getIndex());
   return ::std::move(lv);
 }
 
