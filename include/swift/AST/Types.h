@@ -219,6 +219,11 @@ public:
   /// (possibly generic) class.
   ClassDecl *getClassOrBoundGenericClass();
 
+  /// \brief Determine whether this type may have a superclass, which holds for
+  /// classes, bound generic classes, and archetypes that are only instantiable
+  /// with a class type.
+  bool mayHaveSuperclass();
+
   /// \brief If this is a nominal type or a bound generic nominal type,
   /// returns the (possibly generic) nominal type declaration.
   NominalTypeDecl *getNominalOrBoundGenericNominal();
@@ -1418,12 +1423,14 @@ public:
 /// an archetype or a generic parameter.
 class SubstitutableType : public TypeBase {
   ArrayRef<ProtocolDecl *> ConformsTo;
-  
+  Type Superclass;
+
 protected:
   SubstitutableType(TypeKind K, ASTContext *C, bool Unresolved,
-                    ArrayRef<ProtocolDecl *> ConformsTo)
+                    ArrayRef<ProtocolDecl *> ConformsTo,
+                    Type Superclass)
     : TypeBase(K, C, Unresolved, /*HasTypeVariable=*/false),
-      ConformsTo(ConformsTo) { }
+      ConformsTo(ConformsTo), Superclass(Superclass) { }
 
 public:
   /// \brief Retrieve the name of this type.
@@ -1443,6 +1450,9 @@ public:
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
   ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
+
+  /// \brief Retrieve the superclass of this type, if such a requirement exists.
+  Type getSuperclass() const { return Superclass; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1468,6 +1478,7 @@ public:
   /// The ConformsTo array will be copied into the ASTContext by this routine.
   static ArchetypeType *getNew(ASTContext &Ctx, ArchetypeType *Parent,
                                Identifier Name, ArrayRef<Type> ConformsTo,
+                               Type Superclass,
                                Optional<unsigned> Index = Optional<unsigned>());
 
   /// getNew - Create a new archetype with the given name.
@@ -1477,6 +1488,7 @@ public:
   static ArchetypeType *getNew(ASTContext &Ctx, ArchetypeType *Parent,
                           Identifier Name,
                           llvm::SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                          Type Superclass,
                           Optional<unsigned> Index = Optional<unsigned>());
 
   void print(raw_ostream &OS) const;
@@ -1523,9 +1535,9 @@ public:
 private:
   ArchetypeType(ASTContext &Ctx, ArchetypeType *Parent,
                 Identifier Name, ArrayRef<ProtocolDecl *> ConformsTo,
-                Optional<unsigned> Index)
+                Type Superclass, Optional<unsigned> Index)
     : SubstitutableType(TypeKind::Archetype, &Ctx, /*Unresolved=*/false,
-                        ConformsTo),
+                        ConformsTo, Superclass),
       Parent(Parent), Name(Name), IndexIfPrimary(Index? *Index + 1 : 0) { }
 };
 
@@ -1548,7 +1560,8 @@ class DeducibleGenericParamType : public SubstitutableType {
                             DeducibleGenericParamType *Parent,
                             ArchetypeType *Archetype)
     : SubstitutableType(TypeKind::DeducibleGenericParam, &Ctx,
-                        /*Unresolved=*/true, Archetype->getConformsTo()),
+                        /*Unresolved=*/true, Archetype->getConformsTo(),
+                        Archetype->getSuperclass()),
       Parent(Parent), Archetype(Archetype)
   {
   }
@@ -1685,6 +1698,17 @@ inline bool TypeBase::isSettableLValue() {
     return false;
   
   return castTo<LValueType>()->isSettable();
+}
+
+inline bool TypeBase::mayHaveSuperclass() {
+  if (getClassOrBoundGenericClass())
+    return true;
+
+  auto archetype = getAs<ArchetypeType>();
+  if (!archetype)
+    return nullptr;
+
+  return archetype->getSuperclass();
 }
 
 inline Identifier SubstitutableType::getName() const {

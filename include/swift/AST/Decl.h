@@ -250,7 +250,7 @@ enum class RequirementKind : unsigned int {
 
 /// \brief A single requirement in a requires clause, which places additional
 /// restrictions on the generic parameters or associated types of a generic
-/// function, class, or protocol.
+/// function, type, or protocol.
 class Requirement {
   SourceLoc SeparatorLoc;
   RequirementKind Kind : 1;
@@ -266,15 +266,15 @@ public:
   /// \brief Construct a new conformance requirement.
   ///
   /// \param Subject The type that must conform to the given protocol or
-  /// composition.
+  /// composition, or be a subclass of the given class type.
   /// \param ColonLoc The location of the ':', or an invalid location if
   /// this requirement was implied.
-  /// \param Protocol The protocol or protocol composition to which the
-  /// subject must conform.
+  /// \param Constraint The protocol or protocol composition to which the
+  /// subject must conform, or superclass from which the subject must inherit.
   static Requirement getConformance(TypeLoc Subject,
                                     SourceLoc ColonLoc,
-                                    TypeLoc Protocol) {
-    return { ColonLoc, RequirementKind::Conformance, Subject, Protocol };
+                                    TypeLoc Constraint) {
+    return { ColonLoc, RequirementKind::Conformance, Subject, Constraint };
   }
 
   /// \brief Construct a new same-type requirement.
@@ -315,14 +315,14 @@ public:
     return Types[0];
   }
 
-  /// \brief For a conformance requirement, return the protocol to which
-  /// the subject conforms.
-  Type getProtocol() const {
+  /// \brief For a conformance requirement, return the protocol or to which
+  /// the subject conforms or superclass it inherits.
+  Type getConstraint() const {
     assert(getKind() == RequirementKind::Conformance);
     return Types[1].getType();
   }
 
-  TypeLoc &getProtocolLoc() {
+  TypeLoc &getConstraintLoc() {
     assert(getKind() == RequirementKind::Conformance);
     return Types[1];
   }

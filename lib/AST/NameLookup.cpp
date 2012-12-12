@@ -191,6 +191,9 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
     for (auto Proto : Archetype->getConformsTo())
       doIt(Proto->getDeclaredType(), M, Visited);
 
+    if (auto superclass = Archetype->getSuperclass())
+      doIt(superclass, M, Visited);
+
     // Change existential and metatype members to archetype members, since
     // we're in an archetype.
     for (auto &Result : Results) {
@@ -203,9 +206,11 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
         Result.Kind = MemberLookupResult::MetaArchetypeMember;
         break;
 
-      case MemberLookupResult::MetaArchetypeMember:
       case MemberLookupResult::MemberProperty:
       case MemberLookupResult::MemberFunction:
+        break;
+          
+      case MemberLookupResult::MetaArchetypeMember:
       case MemberLookupResult::ArchetypeMember:
         llvm_unreachable("wrong member lookup result in archetype");
         break;

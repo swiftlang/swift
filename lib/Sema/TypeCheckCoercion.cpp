@@ -2106,7 +2106,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
 
   // A value of class type can be converted to a value of the type of its
   // base class.
-  if (E->getType()->getClassOrBoundGenericClass() &&
+  if (E->getType()->mayHaveSuperclass() &&
       DestTy->getClassOrBoundGenericClass()) {
     bool Trivial;
     if (TC.isSubtypeOf(E->getType(), DestTy, Trivial, &CC)) {
@@ -2426,8 +2426,7 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
 
   if (Flags & ST_AllowSubtype) {
     // Check for a base-class/super-class relationship.
-    if (T1->getClassOrBoundGenericClass() &&
-        T2->getClassOrBoundGenericClass()) {
+    if (T1->mayHaveSuperclass() && T2->getClassOrBoundGenericClass()) {
       auto classDecl2 = T2->getClassOrBoundGenericClass();
       for (auto super1 = TC.getSuperClassOf(T1); super1;
            super1 = TC.getSuperClassOf(super1)) {

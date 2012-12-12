@@ -1708,6 +1708,12 @@ Type ConstraintSystem::openType(
       // Create a new type variable to replace this archetype.
       auto tv = CS.createTypeVariable(archetype);
 
+      // If there is a superclass for the archetype, add the appropriate
+      // trivial subtype requirement on the type variable.
+      if (auto superclass = archetype->getSuperclass()) {
+        CS.addConstraint(ConstraintKind::TrivialSubtype, tv, superclass);
+      }
+
       // The type variable must be convertible of the composition of all of
       // its protocol conformance requirements, i.e., it must conform to
       // each of those protocols.
@@ -2702,7 +2708,7 @@ SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
       result.push_back(functionTy->getResult());
   }
 
-  if (type->getClassOrBoundGenericClass()) {
+  if (type->mayHaveSuperclass()) {
     // FIXME: Can also weaken to the set of protocol constraints, but only
     // if there are any protocols that the type conforms to but the superclass
     // does not.
@@ -3192,7 +3198,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // metatype<B> < metatype<A> if A < B and both A and B are classes.
       TypeMatchKind subKind = TypeMatchKind::SameType;
       if (kind != TypeMatchKind::SameType &&
-          (meta1->getInstanceType()->getClassOrBoundGenericClass() ||
+          (meta1->getInstanceType()->mayHaveSuperclass() ||
            meta2->getInstanceType()->getClassOrBoundGenericClass()))
         subKind = std::min(kind, TypeMatchKind::Subtype);
       
@@ -3322,12 +3328,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
     }
 
-    if (type1->getClassOrBoundGenericClass() &&
-        type2->getClassOrBoundGenericClass()) {
+    if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass()) {
       // Determines whether the first type is derived from the second.
       auto solveDerivedFrom =
         [&](Type type1, Type type2) -> Optional<SolutionKind> {
+          if (auto archetype2 = type2->getAs<ArchetypeType>()) {
+            type2 = archetype2->getSuperclass();
+          }
           auto classDecl2 = type2->getClassOrBoundGenericClass();
+
           for (auto super1 = TC.getSuperClassOf(type1); super1;
                super1 = TC.getSuperClassOf(super1)) {
             if (super1->getClassOrBoundGenericClass() != classDecl2)

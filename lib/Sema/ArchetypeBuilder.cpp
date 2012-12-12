@@ -55,6 +55,9 @@ struct ArchetypeBuilder::PotentialArchetype {
   /// to which this potential archetype belongs.
   PotentialArchetype *Representative;
 
+  /// \brief The superclass of this archetype, if specified.
+  Type Superclass;
+
   /// \brief The list of protocols to which this archetype will conform.
   llvm::SetVector<ProtocolDecl *> ConformsTo;
 
@@ -152,7 +155,7 @@ public:
       SmallVector<ProtocolDecl *, 4> Protos(ConformsTo.begin(),
                                             ConformsTo.end());
       Archetype = ArchetypeType::getNew(TC.Context, ParentArchetype,
-                                        Name, Protos, Index);
+                                        Name, Protos, Superclass, Index);
 
       // Collect the set of nested types of this archetype, and put them into
       // the archetype itself.
@@ -171,9 +174,16 @@ public:
     // Print name.
     Out.indent(Indent) << getName();
 
+    // Print superclass.
+    if (Superclass) {
+      Out << " : ";
+      Superclass.print(Out);
+    }
+
     // Print requirements.
     if (!ConformsTo.empty()) {
       Out << " : ";
+
       if (ConformsTo.size() != 1)
         Out << "protocol<";
 
@@ -263,6 +273,9 @@ bool ArchetypeBuilder::addGenericParameter(TypeAliasDecl *GenericParam,
       for (auto Proto : ConformsTo)
         if (addConformanceRequirement(PA, Proto))
           return true;
+    } else if (Inherited.getType()->getClassOrBoundGenericClass()) {
+      // FIXME: Poor location info.
+      addSuperclassRequirement(PA, GenericParam->getLoc(), Inherited.getType());
     }
   }
 
@@ -311,6 +324,29 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
     // FIXME: Requirement declarations.
   }
 
+  return false;
+}
+
+bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
+                                                SourceLoc ColonLoc,
+                                                Type Superclass) {
+  // If T already has a superclass, make sure it's the same superclass.
+  // FIXME: We should compute the meet here.
+  if (T->Superclass) {
+    if (!T->Superclass->isEqual(Superclass)) {
+      TC.diagnose(ColonLoc, diag::requires_superclass_conflict, T->Name,
+                  T->Superclass, Superclass);
+      return true;
+    }
+
+    return false;
+  }
+
+  // Set the superclass.
+  T->Superclass = Superclass;
+
+  // FIXME: Add protocol conformances for all of the protocols to which this
+  // class conforms? Needed for type checking.
   return false;
 }
 
@@ -377,8 +413,14 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
       return true;
     }
 
+    // Check whether this is a supertype requirement.
+    if (Req.getConstraint()->getClassOrBoundGenericClass()) {
+      return addSuperclassRequirement(PA, Req.getColonLoc(),
+                                      Req.getConstraint());
+    }
+
     SmallVector<ProtocolDecl *, 4> ConformsTo;
-    if (!Req.getProtocol()->isExistentialType(ConformsTo)) {
+    if (!Req.getConstraint()->isExistentialType(ConformsTo)) {
       // FIXME: Diagnose this failure here, rather than over in type-checking.
       return true;
     }

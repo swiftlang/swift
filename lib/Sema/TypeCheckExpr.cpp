@@ -592,12 +592,19 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     if (IsCast) {
       // If we're casting from one class to another, and it's not coercible,
       // try downcasting.
-      if (E2->getType()->getRValueType()->getClassOrBoundGenericClass() &&
-          Ty->getClassOrBoundGenericClass() &&
+      if (E2->getType()->getRValueType()->mayHaveSuperclass() &&
+          Ty->mayHaveSuperclass() &&
           isCoercibleToType(E2, Ty) == CoercionResult::Failed) {
+        // Figure out the source type, which may need to look through 
+        auto srcTy = E2->getType()->getRValueType();
+        if (auto srcArchetype = srcTy->getAs<ArchetypeType>()) {
+          srcTy = srcArchetype->getSuperclass();
+          assert(srcTy->getClassOrBoundGenericClass());
+        }
+
         for (auto superTy = getSuperClassOf(Ty); superTy;
              superTy = getSuperClassOf(superTy)) {
-          if (superTy->isEqual(E2->getType()->getRValueType())) {
+          if (superTy->isEqual(srcTy)) {
             // Convert the argument to an rvalue.
             E2 = convertToRValue(E2);
             if (!E2) {

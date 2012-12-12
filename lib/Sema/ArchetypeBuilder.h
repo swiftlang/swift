@@ -59,6 +59,11 @@ class ArchetypeBuilder {
   bool addConformanceRequirement(PotentialArchetype *T,
                                  ProtocolDecl *Proto);
 
+  /// \brief Add a new superclass requirement specifying that the given
+  /// potential archetype has the given type as an ancestor.
+  bool addSuperclassRequirement(PotentialArchetype *T, SourceLoc ColonLoc,
+                                Type Superclass);
+
   /// \brief Add a new same-type requirement specifying that the given potential
   /// archetypes should map to the equivalent archetype.
   bool addSameTypeRequirement(PotentialArchetype *T1,

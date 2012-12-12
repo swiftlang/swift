@@ -886,6 +886,7 @@ void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy) {
 
 ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, ArchetypeType *Parent,
                                      Identifier Name, ArrayRef<Type> ConformsTo,
+                                     Type Superclass,
                                      Optional<unsigned> Index) {
   // Gather the set of protocol declarations to which this archetype conforms.
   SmallVector<ProtocolDecl *, 4> ConformsToProtos;
@@ -899,21 +900,22 @@ ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, ArchetypeType *Parent,
   auto arena = AllocationArena::Permanent;
   return new (Ctx, arena) ArchetypeType(Ctx, Parent, Name,
                                         Ctx.AllocateCopy(ConformsToProtos),
-                                        Index);
+                                        Superclass, Index);
 }
 
 ArchetypeType *
 ArchetypeType::getNew(ASTContext &Ctx, ArchetypeType *Parent,
                       Identifier Name,
                       llvm::SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                      Optional<unsigned> Index) {
+                      Type Superclass, Optional<unsigned> Index) {
   // Gather the set of protocol declarations to which this archetype conforms.
   minimizeProtocols(ConformsTo);
   llvm::array_pod_sort(ConformsTo.begin(), ConformsTo.end(), compareProtocols);
 
   auto arena = AllocationArena::Permanent;
   return new (Ctx, arena) ArchetypeType(Ctx, Parent, Name,
-                                        Ctx.AllocateCopy(ConformsTo), Index);
+                                        Ctx.AllocateCopy(ConformsTo),
+                                        Superclass, Index);
 }
 
 namespace {

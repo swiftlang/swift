@@ -53,8 +53,11 @@ public:
         continue;
       }
 
+      // FIXME: TypeAliasDecl check here is bogus.
       if (!Inherited[i].getType()->isExistentialType() &&
-          !Inherited[i].getType()->is<ErrorType>()) {
+          !Inherited[i].getType()->is<ErrorType>() &&
+          !(Inherited[i].getType()->getClassOrBoundGenericClass() &&
+            isa<TypeAliasDecl>(D))) {
         // FIXME: Terrible location information.
         TC.diagnose(D->getStartLoc(), diag::nonprotocol_inherit,
                     Inherited[i].getType());
@@ -98,16 +101,17 @@ public:
       
       switch (Req.getKind()) {
       case RequirementKind::Conformance: {
-        if (TC.validateType(Req.getProtocolLoc(), IsFirstPass)) {
+        if (TC.validateType(Req.getConstraintLoc(), IsFirstPass)) {
           Req.setInvalid();
           continue;
         }
 
-        if (!Req.getProtocol()->isExistentialType()) {
+        if (!Req.getConstraint()->isExistentialType() &&
+            !Req.getConstraint()->getClassOrBoundGenericClass()) {
           TC.diagnose(GenericParams->getRequiresLoc(),
                       diag::requires_conformance_nonprotocol,
-                      Req.getSubject(), Req.getProtocol());
-          Req.getProtocolLoc().setInvalidType(TC.Context);
+                      Req.getSubject(), Req.getConstraint());
+          Req.getConstraintLoc().setInvalidType(TC.Context);
           Req.setInvalid();
           continue;
         }

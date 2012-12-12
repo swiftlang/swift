@@ -943,7 +943,6 @@ Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {
-
   Type baseTy;
   Type specializedTy;
   if (auto classTy = type->getAs<ClassType>()) {
@@ -957,6 +956,8 @@ Type TypeChecker::getSuperClassOf(Type type) {
       baseTy = classDecl->getBaseClass();
       specializedTy = type;
     }
+  } else if (auto archetypeTy = type->getAs<ArchetypeType>()) {
+    baseTy = archetypeTy->getSuperclass();
   } else {
     // No other types have base classes.
     return nullptr;

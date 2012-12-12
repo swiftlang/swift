@@ -511,6 +511,12 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
     if (RecordSubstitutions)
       (*RecordSubstitutions)[archetype] = T;
 
+    // If the archetype has a superclass requirement, check that now.
+    if (auto superclass = archetype->getSuperclass()) {
+      if (!isSubtypeOf(T, superclass))
+        return true;
+    }
+
     SmallVectorImpl<ProtocolConformance *> &Conformances
       = Conformance[archetype];
     if (Conformances.empty()) {
