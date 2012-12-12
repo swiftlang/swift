@@ -316,35 +316,6 @@ static void rrLoadableValue(SILGenFunction &gen, SILLocation loc, Value v,
     rrLoadableValueElement(gen, loc, v, createRR, elt);
 }
 
-void SILGenFunction::emitAssign(SILLocation loc, Value v,
-                                LValue const &destLV) {
-  FullExpr scope(Cleanups);
-  Type vTy = v.getType();
-
-  if (vTy->is<LValueType>()) {
-    // v is an address-only type; copy using the copy_addr instruction.
-    assert(getTypeInfo(vTy->getRValueType()).isAddressOnly() &&
-           "source of copy may only be an address if type is address-only");
-    llvm_unreachable("assignment to address-only unimplemented");
-  } else {
-    // v is a loadable type; release the old value if necessary.
-    TypeInfo const &ti = getTypeInfo(vTy);
-    assert(ti.isLoadable() &&
-           "copy of address-only type must take address for source argument");
-    
-    Value old;
-
-    if (!ti.isTrivial()) {
-      ManagedValue destTemp = emitMaterializedLoadFromLValue(loc, destLV);
-      old = B.createLoad(loc, destTemp.getUnmanagedValue());
-    }
-
-    emitStoreToLValue(loc, v, destLV);
-    rrLoadableValue(*this, loc, old, &SILBuilder::createRelease,
-                    ti.getReferenceTypeElements());
-  }
-}
-
 void SILGenFunction::emitRetainRValue(SILLocation loc, Value v) {
   if (v.getType()->is<LValueType>()) {
     // v is an address-only type.

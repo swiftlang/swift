@@ -214,17 +214,6 @@ public:
   // Memory management
   //===--------------------------------------------------------------------===//
   
-  /// emitAssign - Emits the instructions necessary to reassign a value
-  /// to an address. 'v' should be at +1 retain count.
-  /// - For trivial loadable types, a 'store v to dest' is generated.
-  /// - For reference types, the old value at 'dest' is loaded,
-  ///   'v' is stored to 'dest', and then the old value is released.
-  /// - For loadable types with reference type members, the reference type
-  ///   members of the old value are released following the same sequence as for
-  ///   reference types.
-  /// - For address-only types, this generates a copy_addr assign instruction.
-  void emitAssign(SILLocation loc, Value v, LValue const &dest);
-  
   /// emitRetainRValue - Emits the instructions necessary to increase the
   /// retain count of a temporary, in order to use it as part of another
   /// independent temporary.
@@ -328,7 +317,7 @@ public:
     
   ManagedValue emitManagedRValueWithCleanup(Value v);
     
-  void emitStoreToLValue(SILLocation loc, Value src, LValue const &dest);
+  void emitAssignToLValue(SILLocation loc, Value src, LValue const &dest);
   ManagedValue emitMaterializedLoadFromLValue(SILLocation loc,
                                               LValue const &src);
 

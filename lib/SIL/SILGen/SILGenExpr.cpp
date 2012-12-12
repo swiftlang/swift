@@ -99,7 +99,7 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   
   for (auto &wb : writebacks) {
     Value newValue = B.createLoad(E, wb.tempAddress);
-    emitStoreToLValue(E, newValue, wb.lvalue);
+    emitAssignToLValue(E, newValue, wb.lvalue);
   }
   
   return r;

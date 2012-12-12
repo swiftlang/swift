@@ -120,21 +120,24 @@ static void emitAssignStmtRecursive(AssignStmt *S, Value Src, Expr *Dest,
   
   // Otherwise, emit the scalar assignment.
   LValue DstLV = SILGenLValue(Gen).visit(Dest);
-  Gen.emitAssign(S, Src, DstLV);
+  Gen.emitAssignToLValue(S, Src, DstLV);
 }
 
 
 void SILGenFunction::visitAssignStmt(AssignStmt *S) {
   Value SrcV;
   {
-    FullExpr scope(Cleanups);
+    FullExpr rhsScope(Cleanups);
     // FIXME: don't forward components of SrcV until they're consumed by a
     // store.
     SrcV = visit(S->getSrc()).forward(*this);
   }
   
-  // Handle tuple destinations by destructuring them if present.
-  return emitAssignStmtRecursive(S, SrcV, S->getDest(), *this);
+  {
+    FullExpr lhsScope(Cleanups);
+    // Handle tuple destinations by destructuring them if present.
+    return emitAssignStmtRecursive(S, SrcV, S->getDest(), *this);
+  }
 }
 
 void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
@@ -440,7 +443,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   // Write to the tail component.
   if (component->isPhysical()) {
     Value finalDestAddr = component->asPhysical().offset(*this, loc, destAddr);
-    B.createStore(loc, src, finalDestAddr);
+    assignPhysicalAddress(*this, loc, src, finalDestAddr);
   } else {
     component->asLogical().storeRValue(*this, loc,
                                        src, destAddr,
