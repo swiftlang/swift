@@ -148,10 +148,10 @@ public:
 
   /// Perform a load operation from this path into temporary
   /// memory.
-  virtual ManagedValue loadAndMaterialize(SILGenFunction &gen, SILLocation loc,
-                                          Value base,
-                                          ShouldPreserveValues preserve)
-                                          const = 0;
+  virtual Materialize loadAndMaterialize(SILGenFunction &gen, SILLocation loc,
+                                         Value base,
+                                         ShouldPreserveValues preserve)
+                                         const = 0;
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {

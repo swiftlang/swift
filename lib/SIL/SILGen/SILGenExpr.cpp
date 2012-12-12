@@ -139,7 +139,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
     if (var->isProperty()) {
       ManagedValue get = emitConstantRef(loc,
                                         SILConstant(decl, SILConstant::Getter));
-      return emitGetProperty(loc, get);
+      return ManagedValue(emitGetProperty(loc, get).address);
     }
     
     // For local decls, we should have the address we allocated on hand.
@@ -189,37 +189,54 @@ ManagedValue SILGenFunction::visitLoadExpr(LoadExpr *E) {
 }
 
 namespace {
-  class CleanupMaterialize : public Cleanup {
+  class CleanupMaterializeAllocation : public Cleanup {
     Value alloc;
   public:
-    CleanupMaterialize(Value alloc) : alloc(alloc) {}
+    CleanupMaterializeAllocation(Value alloc) : alloc(alloc) {}
     
     void emit(SILGenFunction &gen) override {
-      if (!gen.getTypeInfo(alloc.getType()->getRValueType()).isTrivial()) {
-        Value tmpValue = gen.B.createLoad(SILLocation(), alloc);
-        gen.emitReleaseRValue(SILLocation(), tmpValue);
-      }
       gen.B.createDeallocVar(SILLocation(), AllocKind::Stack, alloc);
     }
   };
+  
+  class CleanupMaterializeValue : public Cleanup {
+    Value address;
+  public:
+    CleanupMaterializeValue(Value address) : address(address) {}
+    
+    void emit(SILGenFunction &gen) override {
+      Value tmpValue = gen.B.createLoad(SILLocation(), address);
+      gen.emitReleaseRValue(SILLocation(), tmpValue);      
+    }
+  };
 
-  static ManagedValue emitMaterialize(SILGenFunction &gen,
+  static Materialize emitMaterialize(SILGenFunction &gen,
                                       SILLocation loc, Value v) {
     Value tmpMem = gen.B.createAllocVar(loc, AllocKind::Stack, v.getType());
+    gen.Cleanups.pushCleanup<CleanupMaterializeAllocation>(tmpMem);
     gen.B.createStore(loc, v, tmpMem);
-    // Ownership of the temporary buffer does not leave the current scope, so
-    // the ManagedValue for the temporary allocation does not reference its
-    // cleanup.
-    gen.Cleanups.pushCleanup<CleanupMaterialize>(tmpMem);
-    return ManagedValue(tmpMem);
+    
+    CleanupsDepth valueCleanup = CleanupsDepth::invalid();
+    if (!gen.getTypeInfo(v.getType()).isTrivial()) {
+      gen.Cleanups.pushCleanup<CleanupMaterializeValue>(tmpMem);
+      valueCleanup = gen.getCleanupsDepth();
+    }
+    
+    return Materialize{tmpMem, valueCleanup};
   }
+}
+
+ManagedValue Materialize::consume(SILGenFunction &gen, SILLocation loc) {
+  if (valueCleanup.isValid())
+    gen.Cleanups.setCleanupState(valueCleanup, CleanupState::Dead);
+  return gen.emitManagedRValueWithCleanup(gen.B.createLoad(loc, address));
 }
 
 ManagedValue SILGenFunction::visitMaterializeExpr(MaterializeExpr *E) {
   // Evaluate the value, then use it to initialize a new temporary and return
   // the temp's address.
   Value V = visit(E->getSubExpr()).forward(*this);
-  return emitMaterialize(*this, E, V);
+  return ManagedValue(emitMaterialize(*this, E, V).address);
 }
 
 ManagedValue SILGenFunction::visitRequalifyExpr(RequalifyExpr *E) {
@@ -320,7 +337,9 @@ ManagedValue SILGenFunction::visitMemberRefExpr(MemberRefExpr *E) {
     // Apply the "this" parameter.
     Value getter = B.createApply(E, getterMethod, base.forward(*this));
     // Apply the getter.
-    return emitGetProperty(E, emitManagedRValueWithCleanup(getter));
+    Materialize propTemp = emitGetProperty(E,
+                                         emitManagedRValueWithCleanup(getter));
+    return ManagedValue(propTemp.address);
   }
 }
 
@@ -344,7 +363,9 @@ ManagedValue SILGenFunction::visitSubscriptExpr(SubscriptExpr *E) {
   // Apply the index parameter.
   Value getter = B.createApply(E, getterDelegate, indexArgs);
   // Apply the getter.
-  return emitGetProperty(E, emitManagedRValueWithCleanup(getter));
+  Materialize propTemp = emitGetProperty(E,
+                                         emitManagedRValueWithCleanup(getter));
+  return ManagedValue(propTemp.address);
 }
 
 ManagedValue SILGenFunction::visitTupleElementExpr(TupleElementExpr *E) {
@@ -570,7 +591,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
   }
 }
 
-ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
+Materialize SILGenFunction::emitGetProperty(SILLocation loc,
                                              ManagedValue getter) {
   // Call the getter and then materialize the return value as an lvalue.
   Value result = B.createApply(loc, getter.forward(*this), {});

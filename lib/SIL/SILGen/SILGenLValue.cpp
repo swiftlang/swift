@@ -104,7 +104,7 @@ namespace {
              "base of getter/setter component must be invalid, lvalue, or "
              "of reference type");
       gen.B.createRetain(loc, accessor);
-      if (base.getType()->hasReferenceSemantics())
+      if (base && base.getType()->hasReferenceSemantics())
         gen.B.createRetain(loc, base);
       // Apply the base "this" argument, if any.
       ManagedValue appliedThis = base
@@ -147,10 +147,10 @@ namespace {
       gen.B.createApply(loc, appliedSetter.forward(gen), rvalue);
     }
     
-    ManagedValue loadAndMaterialize(SILGenFunction &gen, SILLocation loc,
-                                    Value base,
-                                    ShouldPreserveValues preserve)
-                                    const override
+    Materialize loadAndMaterialize(SILGenFunction &gen, SILLocation loc,
+                                   Value base,
+                                   ShouldPreserveValues preserve)
+                                   const override
     {
       // FIXME: ignores base and preserve
       ManagedValue appliedGetter = partialApplyAccessor(gen, loc,

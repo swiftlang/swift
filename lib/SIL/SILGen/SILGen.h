@@ -110,6 +110,19 @@ enum class CaptureKind {
   GetterSetter
 };
 
+/// Materialize - Represents a temporary allocation.
+struct Materialize {
+  /// The address of the allocation.
+  Value address;
+  /// The cleanup to dispose of the value before deallocating the buffer.
+  /// This cleanup can be killed by calling the consume method.
+  CleanupsDepth valueCleanup;
+  
+  /// Load the value out of the temporary buffer and deactivate its value
+  /// cleanup. Returns the loaded value, which becomes the caller's
+  /// responsibility to release.
+  ManagedValue consume(SILGenFunction &gen, SILLocation loc);
+};
   
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
@@ -311,7 +324,7 @@ public:
                                            SILConstant function,
                                            CapturingExpr *body);
   
-  ManagedValue emitGetProperty(SILLocation loc, ManagedValue getter);
+  Materialize emitGetProperty(SILLocation loc, ManagedValue getter);
     
   ManagedValue emitManagedRValueWithCleanup(Value v);
     

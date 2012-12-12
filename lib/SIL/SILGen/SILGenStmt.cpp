@@ -349,7 +349,7 @@ void SILGenFunction::visitContinueStmt(ContinueStmt *S) {
 }
 
 ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
-                                                            LValue const &src) {
+                                                           LValue const &src) {
   Value addr;
   
   assert(src.begin() != src.end() && "lvalue must have at least one component");
@@ -360,7 +360,7 @@ ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
       addr = component.asLogical()
         .loadAndMaterialize(*this, loc, addr,
                             ShouldPreserveValues::PreserveValues)
-        .getUnmanagedValue();
+        .address;
     }
     assert(addr.getType()->is<LValueType>() &&
            "resolving lvalue component did not give an address");
@@ -371,7 +371,8 @@ ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
 void SILGenFunction::emitStoreToLValue(SILLocation loc,
                                        Value src, LValue const &dest) {
   struct StoreWriteback {
-    Value base, member;
+    Value base;
+    Materialize member;
     LogicalPathComponent const *component;
   };
   Value destAddr;
@@ -390,16 +391,15 @@ void SILGenFunction::emitStoreToLValue(SILLocation loc,
       destAddr = component->asPhysical().offset(*this, loc, destAddr);
     } else {
       LogicalPathComponent const &lcomponent = component->asLogical();
-      Value newDestAddr = lcomponent
+      Materialize newDest = lcomponent
         .loadAndMaterialize(*this, loc, destAddr,
-                            ShouldPreserveValues::PreserveValues)
-        .getUnmanagedValue();
-      if (!newDestAddr.getType()->getRValueType()->hasReferenceSemantics())
-        writebacks.push_back({destAddr, newDestAddr, &lcomponent});
-      destAddr = newDestAddr;
+                            ShouldPreserveValues::PreserveValues);
+      if (!newDest.address.getType()->getRValueType()->hasReferenceSemantics())
+        writebacks.push_back({destAddr, newDest, &lcomponent});
+      destAddr = newDest.address;
     }
     
-    if (destAddr.getType()->getRValueType()->hasReferenceSemantics())
+    if (destAddr.getType()->hasReferenceSemantics())
       writebacks.clear();
   }
   
@@ -416,8 +416,9 @@ void SILGenFunction::emitStoreToLValue(SILLocation loc,
   // Write back through value-type logical properties.
   for (auto wb = writebacks.rbegin(), wend = writebacks.rend();
        wb != wend; ++wb) {
-    Value wbValue = B.createLoad(loc, wb->member);
-    wb->component->storeRValue(*this, loc, wbValue, wb->base,
+    ManagedValue wbValue = wb->member.consume(*this, loc);
+    wb->component->storeRValue(*this, loc,
+                               wbValue.forward(*this), wb->base,
                                ShouldPreserveValues::ConsumeValues);
   }
 }
