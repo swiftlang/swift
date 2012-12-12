@@ -50,16 +50,39 @@ namespace {
     Value offset(SILGenFunction &gen, SILLocation loc,
                  Value base) const override {
       assert(base && "invalid value for element base");
-      assert(base.getType()->is<LValueType>() &&
-             "base for element component must be an address");
-      LValueType *baseType = base.getType()->castTo<LValueType>();
-      return gen.B.createElementAddr(loc, base, element.index,
-                                     LValueType::get(element.type,
-                                                    baseType->getQualifiers(),
-                                                    baseType->getASTContext()));
+      Type baseType = base.getType();
+      ASTContext &C = baseType->getASTContext();
+      if (LValueType *baseLT = base.getType()->getAs<LValueType>()) {
+        return gen.B.createElementAddr(loc, base, element.index,
+                                       LValueType::get(element.type,
+                                                   baseLT->getQualifiers(), C));
+      } else if (baseType->hasReferenceSemantics()) {
+        return gen.B.createRefElementAddr(loc, base, element.index,
+                  LValueType::get(element.type,
+                                  LValueType::Qual::DefaultForMemberAccess, C));
+      } else
+        llvm_unreachable("base for element component must have ref type "
+                         "or be an address");
     }
   };
-  
+
+  class LoadRefComponent : public PhysicalPathComponent {
+  public:
+    LoadRefComponent() = default;
+    
+    Value offset(SILGenFunction &gen, SILLocation loc,
+                 Value base) const override {
+      assert(base && "invalid value for load base");
+      assert(base.getType()->is<LValueType>() &&
+             "base for load must be address");
+      
+      LValueType *baseType = base.getType()->castTo<LValueType>();
+      assert(baseType->getObjectType()->hasReferenceSemantics() &&
+             "lvalue load must be of a ref type");
+      return gen.B.createLoad(loc, base);
+    }
+  };
+
   class GetterSetterComponent : public LogicalPathComponent {
     Value getter;
     Value setter;
@@ -67,8 +90,10 @@ namespace {
     
     ManagedValue partialApplyAccessor(SILGenFunction &gen, SILLocation loc,
                                       Value accessor, Value base) const {
-      assert((!base || base.getType()->is<LValueType>()) &&
-             "base of getter/setter component must be invalid or lvalue");
+      assert((!base || base.getType()->is<LValueType>() ||
+              base.getType()->hasReferenceSemantics()) &&
+             "base of getter/setter component must be invalid, lvalue, or "
+             "of reference type");
       gen.B.createRetain(loc, accessor);
       // Apply the base "this" argument, if any.
       ManagedValue appliedThis = base
@@ -146,6 +171,14 @@ LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
   LValue lv;
   Value materialized = gen.visitMaterializeExpr(e).getUnmanagedValue();
   lv.add<AddressComponent>(materialized);
+  return ::std::move(lv);
+}
+
+LValue SILGenLValue::visitLoadExpr(LoadExpr *e) {
+  assert(e->getType()->hasReferenceSemantics() &&
+         "lvalue load must be of ref type");
+  LValue lv = visit(e->getSubExpr());
+  lv.add<LoadRefComponent>();
   return ::std::move(lv);
 }
 

@@ -57,6 +57,14 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc) {
   id = 0;
 }
 
+static Type propertyThisType(Type thisType, ASTContext &C) {
+  if (thisType->hasReferenceSemantics()) {
+    return thisType;
+  } else {
+    return LValueType::get(thisType, LValueType::Qual::DefaultForType, C);
+  }
+}
+
 Type SILConstant::getType() const {
   // FIXME: This should probably be a method on SILModule that caches the
   // type information.
@@ -78,9 +86,7 @@ Type SILConstant::getType() const {
     }
     if (propertyType)
       return contextType
-        ? FunctionType::get(LValueType::get(contextType,
-                                            LValueType::Qual::DefaultForType,
-                                            C),
+        ? FunctionType::get(propertyThisType(contextType, C),
                             propertyType, C)
         : propertyType;
 

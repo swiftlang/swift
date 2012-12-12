@@ -386,11 +386,6 @@ void SILGenFunction::emitStoreToLValue(SILLocation loc,
   // Resolve all components up to the last, keeping track of value-type logical
   // properties we need to write back to.
   for (; next != end; component = next, ++next) {
-    bool hasReferenceSemantics = !destAddr ||
-                  destAddr.getType()->getRValueType()->hasReferenceSemantics();
-    if (hasReferenceSemantics)
-      writebacks.clear();
-
     if (component->isPhysical()) {
       destAddr = component->asPhysical().offset(*this, loc, destAddr);
     } else {
@@ -399,10 +394,13 @@ void SILGenFunction::emitStoreToLValue(SILLocation loc,
         .loadAndMaterialize(*this, loc, destAddr,
                             ShouldPreserveValues::PreserveValues)
         .getUnmanagedValue();
-      if (!hasReferenceSemantics)
+      if (!newDestAddr.getType()->getRValueType()->hasReferenceSemantics())
         writebacks.push_back({destAddr, newDestAddr, &lcomponent});
       destAddr = newDestAddr;
     }
+    
+    if (destAddr.getType()->getRValueType()->hasReferenceSemantics())
+      writebacks.clear();
   }
   
   // Write to the tail component.

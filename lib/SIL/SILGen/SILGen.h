@@ -355,6 +355,7 @@ public:
 
   // Nodes that make up components of lvalue paths
   
+  LValue visitLoadExpr(LoadExpr *e);
   LValue visitMemberRefExpr(MemberRefExpr *e);
   //TODO: LValue visitSubscriptExpr(SubscriptExpr *e);
   LValue visitTupleElementExpr(TupleElementExpr *e);

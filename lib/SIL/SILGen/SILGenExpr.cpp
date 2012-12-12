@@ -267,10 +267,20 @@ static ManagedValue emitExtractLoadableElement(SILGenFunction &gen,
                                                unsigned elt) {
   if (e->getType()->is<LValueType>()) {
     // Get the element address relative to the aggregate's address.
-    Value address = gen.B.createElementAddr(e,
-                                            base.getUnmanagedValue(),
-                                            elt,
-                                            e->getType());
+    Value address;
+    if (base.getValue().getType()->hasReferenceSemantics()) {
+      address = gen.B.createRefElementAddr(e,
+                                           base.getValue(),
+                                           elt,
+                                           e->getType());
+    } else {
+      assert(base.getValue().getType()->is<LValueType>() &&
+             "base of lvalue member ref must be ref type or address");
+      address = gen.B.createElementAddr(e,
+                                        base.getUnmanagedValue(),
+                                        elt,
+                                        e->getType());
+    }
     return ManagedValue(address);
   } else {
     // Extract the element from the original aggregate value.
@@ -297,9 +307,10 @@ ManagedValue SILGenFunction::visitMemberRefExpr(MemberRefExpr *E) {
                                       element.index);
   } else {
     // We have to load the element indirectly through a property.
-    Value base = visit(E->getBase()).getUnmanagedValue();
-    assert(E->getBase()->getType()->is<LValueType>() &&
+    assert((E->getBase()->getType()->is<LValueType>() ||
+            E->getBase()->getType()->hasReferenceSemantics()) &&
            "member ref of a non-lvalue?!");
+    Value base = visit(E->getBase()).forward(*this);
     // Get the getter function, which will have type This -> () -> T.
     Value getterMethod = B.createConstantRef(E,
                                              SILConstant(E->getDecl(),

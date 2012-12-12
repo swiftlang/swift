@@ -70,15 +70,13 @@ public:
 
 void TypeConverter::makeFragileElements(TypeInfo &theInfo, CanType t) {
   if (NominalType *nt = t->getAs<NominalType>()) {
-    if (StructDecl *sd = dyn_cast<StructDecl>(nt->getDecl())) {
-      unsigned elementIndex = 0;
-      for (Decl *d : sd->getMembers()) {
-        if (VarDecl *vd = dyn_cast<VarDecl>(d)) {
-          if (!vd->isProperty()) {
-            theInfo.fragileElements[vd->getName()] = {vd->getType(),
-                                                      elementIndex};
-            ++elementIndex;
-          }
+    unsigned elementIndex = 0;
+    for (Decl *d : nt->getDecl()->getMembers()) {
+      if (VarDecl *vd = dyn_cast<VarDecl>(d)) {
+        if (!vd->isProperty()) {
+          theInfo.fragileElements[vd->getName()] = {vd->getType(),
+                                                    elementIndex};
+          ++elementIndex;
         }
       }
     }
@@ -96,10 +94,9 @@ TypeInfo const &TypeConverter::makeTypeInfo(CanType t) {
     // type elements.
     theInfo.addressOnly = false;
     LoadableTypeInfoVisitor(theInfo).visit(t);
-    
-    // If this is a struct type, find its fragile elements.
-    makeFragileElements(theInfo, t);
   }
+  // If this is a struct or class type, find its fragile elements.
+  makeFragileElements(theInfo, t);
   
   return theInfo;
 }
