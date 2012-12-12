@@ -66,21 +66,18 @@ namespace {
     }
   };
 
-  class LoadRefComponent : public PhysicalPathComponent {
+  class RefComponent : public PhysicalPathComponent {
+    Value value;
   public:
-    LoadRefComponent() = default;
+    RefComponent(ManagedValue value) : value(value.getValue()) {
+      assert(value.getValue().getType()->hasReferenceSemantics() &&
+             "ref component must be of reference type");
+    }
     
     Value offset(SILGenFunction &gen, SILLocation loc,
                  Value base) const override {
-      assert(base && "invalid value for load base");
-      assert(base.getType()->is<LValueType>() &&
-             "base for load must be address");
-      
-      LValueType *baseType = base.getType()->castTo<LValueType>();
-      (void)baseType;
-      assert(baseType->getObjectType()->hasReferenceSemantics() &&
-             "lvalue load must be of a ref type");
-      return gen.B.createLoad(loc, base);
+      assert(!base && "ref component must be root of lvalue path");
+      return value;
     }
   };
 
@@ -92,7 +89,6 @@ namespace {
     void getSubscriptArguments(SILGenFunction &gen,
                                llvm::SmallVectorImpl<Value> &args) const {
       llvm::SmallVector<Writeback, 2> writebacks;
-      subscriptExpr->dump();
       gen.emitApplyArguments(subscriptExpr, args, writebacks);
       assert(writebacks.empty() && "subscript shouldn't have byref args");
     }
@@ -160,6 +156,17 @@ namespace {
   };
 }
 
+LValue SILGenLValue::visitRec(Expr *e) {
+  if (e->getType()->hasReferenceSemantics()) {
+    // Any reference type expression can form the root of a logical lvalue.
+    LValue lv;
+    lv.add<RefComponent>(gen.visit(e));
+    return ::std::move(lv);
+  } else {
+    return visit(e);
+  }
+}
+
 LValue SILGenLValue::visitExpr(Expr *e) {
   e->dump();
   llvm_unreachable("unimplemented lvalue expr");
@@ -181,7 +188,7 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
     }
   }
 
-  // If it's a physical value, push the address.
+  // If it's a physical value, push its address.
   Value address = gen.emitReferenceToDecl(e, decl).getUnmanagedValue();
   assert(address.getType()->is<LValueType>() &&
          "physical lvalue decl ref must evaluate to an address");
@@ -196,16 +203,8 @@ LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
   return ::std::move(lv);
 }
 
-LValue SILGenLValue::visitLoadExpr(LoadExpr *e) {
-  assert(e->getType()->hasReferenceSemantics() &&
-         "lvalue load must be of ref type");
-  LValue lv = visit(e->getSubExpr());
-  lv.add<LoadRefComponent>();
-  return ::std::move(lv);
-}
-
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
-  LValue lv = visit(e->getBase());
+  LValue lv = visitRec(e->getBase());
   VarDecl *decl = e->getDecl();
   TypeInfo const &ti = gen.getTypeInfo(
                                       e->getBase()->getType()->getRValueType());
@@ -224,7 +223,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
 }
 
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
-  LValue lv = visit(e->getBase());
+  LValue lv = visitRec(e->getBase());
   SubscriptDecl *sd = e->getDecl();
   Value get = gen.emitUnmanagedConstantRef(e,
                                        SILConstant(sd, SILConstant::Getter));
@@ -235,7 +234,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
 }
 
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
-  LValue lv = visit(e->getBase());
+  LValue lv = visitRec(e->getBase());
   // FIXME: address-only tuples
   lv.add<FragileElementComponent>(FragileElement{e->getType()->getRValueType(),
                                                  e->getFieldNumber()});
@@ -243,15 +242,15 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
 }
 
 LValue SILGenLValue::visitAddressOfExpr(AddressOfExpr *e) {
-  return visit(e->getSubExpr());
+  return visitRec(e->getSubExpr());
 }
 
 LValue SILGenLValue::visitParenExpr(ParenExpr *e) {
-  return visit(e->getSubExpr());
+  return visitRec(e->getSubExpr());
 }
 
 LValue SILGenLValue::visitRequalifyExpr(RequalifyExpr *e) {
   assert(e->getType()->is<LValueType>() &&
          "non-lvalue requalify in lvalue expression");
-  return visit(e->getSubExpr());
+  return visitRec(e->getSubExpr());
 }

@@ -362,14 +362,48 @@ ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
                             ShouldPreserveValues::PreserveValues)
         .address;
     }
-    assert(addr.getType()->is<LValueType>() &&
-           "resolving lvalue component did not give an address");
+    assert((addr.getType()->is<LValueType>() ||
+            addr.getType()->hasReferenceSemantics()) &&
+           "resolving lvalue component did not give an address "
+           "or reference type");
   }
+  assert(addr.getType()->is<LValueType>() &&
+         "resolving lvalue did not give an address");
   return ManagedValue(addr);
 }
 
-void SILGenFunction::emitStoreToLValue(SILLocation loc,
-                                       Value src, LValue const &dest) {
+static void assignPhysicalAddress(SILGenFunction &gen,
+                                  SILLocation loc,
+                                  Value src,
+                                  Value addr) {
+  Type srcTy = src.getType();
+  
+  if (srcTy->is<LValueType>()) {
+    // src is an address-only type; copy using the copy_addr instruction.
+    assert(gen.getTypeInfo(srcTy->getRValueType()).isAddressOnly() &&
+           "source of copy may only be an address if type is address-only");
+    llvm_unreachable("assignment to address-only unimplemented");
+  } else {
+    // src is a loadable type; release the old value if necessary and store
+    // the new.
+    TypeInfo const &ti = gen.getTypeInfo(srcTy);
+    assert(ti.isLoadable() &&
+           "copy of address-only type must take address for source argument");
+    
+    Value old;
+    
+    if (!ti.isTrivial()) {
+      old = gen.B.createLoad(loc, addr);
+    }
+    
+    gen.B.createStore(loc, src, addr);
+    if (old)
+      gen.emitReleaseRValue(loc, old);
+  }
+}
+
+void SILGenFunction::emitAssignToLValue(SILLocation loc,
+                                        Value src, LValue const &dest) {
   struct StoreWriteback {
     Value base;
     Materialize member;

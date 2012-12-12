@@ -383,6 +383,8 @@ class LLVM_LIBRARY_VISIBILITY SILGenLValue
 public:
   SILGenLValue(SILGenFunction &gen) : gen(gen) {}
   
+  LValue visitRec(Expr *e);
+  
   /// Dummy handler to log unimplemented nodes
   
   LValue visitExpr(Expr *e);
@@ -394,7 +396,6 @@ public:
 
   // Nodes that make up components of lvalue paths
   
-  LValue visitLoadExpr(LoadExpr *e);
   LValue visitMemberRefExpr(MemberRefExpr *e);
   LValue visitSubscriptExpr(SubscriptExpr *e);
   LValue visitTupleElementExpr(TupleElementExpr *e);
