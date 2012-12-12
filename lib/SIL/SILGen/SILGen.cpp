@@ -149,3 +149,10 @@ SILModule *SILModule::constructSIL(TranslationUnit *tu) {
     sgm.visit(D);
   return m;
 }
+
+//===--------------------------------------------------------------------===//
+// SILGenType Class implementation
+//===--------------------------------------------------------------------===//
+
+SILGenType::SILGenType(SILGenModule &SGM) : SGM(SGM) {}
+SILGenType::~SILGenType() {}

@@ -32,7 +32,7 @@ namespace Lowering {
   class TypeConverter;
   class SILGenFunction;
 
-/// SILGenModule - an ASTVisitor for generating SIL from top-level definitions
+/// SILGenModule - an ASTVisitor for generating SIL from top-level declarations
 /// in a translation unit.
 class LLVM_LIBRARY_VISIBILITY SILGenModule : public ASTVisitor<SILGenModule> {
 public:
@@ -57,10 +57,11 @@ public:
   //===--------------------------------------------------------------------===//
   // Visitors for top-level forms
   //===--------------------------------------------------------------------===//
-  // FIXME: visit types, etc.
+  // FIXME: visit other decls
   void visitFuncDecl(FuncDecl *fd);
   void visitPatternBindingDecl(PatternBindingDecl *vd);
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td);
+  void visitNominalTypeDecl(NominalTypeDecl *ntd);
 
   /// emitFunction - Generates code for the given FuncExpr and adds the
   /// Function to the current SILModule under the name SILConstant(decl). For
@@ -70,6 +71,28 @@ public:
   /// emitClosure - Generates code for the given ClosureExpr and adds the
   /// Function to the current SILModule under the name SILConstant(ce).
   Function *emitClosure(ClosureExpr *ce);
+};
+  
+/// SILGenType - an ASTVisitor for generating SIL from method declarations
+/// inside nominal types.
+class LLVM_LIBRARY_VISIBILITY SILGenType : public ASTVisitor<SILGenType> {
+public:
+  SILGenModule &SGM;
+  
+public:
+  SILGenType(SILGenModule &SGM);
+  ~SILGenType();
+
+  //===--------------------------------------------------------------------===//
+  // Visitors for subdeclarations
+  //===--------------------------------------------------------------------===//
+  void visitNominalTypeDecl(NominalTypeDecl *ntd);
+  void visitFuncDecl(FuncDecl *fd);
+  // FIXME: constructor, destructor, other special members
+  
+  // no-ops. We don't deal with the layout of types.
+  void visitPatternBindingDecl(PatternBindingDecl *) {}
+  void visitVarDecl(VarDecl *) {}
 };
 
 /// CaptureKind - Closure capture modes.
@@ -300,9 +323,7 @@ public:
     llvm_unreachable("Not yet implemented");
   }
 
-  // ClassDecl - emitClassDecl
-  // OneOfDecl - emitOneOfDecl
-  // StructDecl - emitStructDecl
+  void visitNominalTypeDecl(NominalTypeDecl *D);
   void visitFuncDecl(FuncDecl *D);
   void visitPatternBindingDecl(PatternBindingDecl *D);
     

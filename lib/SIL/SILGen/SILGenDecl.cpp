@@ -181,7 +181,13 @@ struct ArgumentCreatorVisitor :
     
   // Paren & Typed patterns are noops, just look through them.
   Value visitParenPattern(ParenPattern *P) {return visit(P->getSubPattern());}
-  Value visitTypedPattern(TypedPattern *P) {return visit(P->getSubPattern());}
+  Value visitTypedPattern(TypedPattern *P) {
+    // FIXME: work around a bug in visiting the "this" argument of methods
+    if (isa<NamedPattern>(P->getSubPattern()))
+      return makeArgument(P->getType(), f.begin());
+    else
+      return visit(P->getSubPattern());
+  }
 
   // Bind to a tuple pattern by first trying to see if we can emit
   // the initializers independently.
@@ -285,11 +291,11 @@ void SILGenFunction::emitProlog(CapturingExpr *ce,
   }
   
   // Emit the argument variables.
-  for (auto &ParamPattern : paramPatterns) {
+  for (auto &paramPattern : paramPatterns) {
     // Add the BBArguments and collect them as a Value.
-    Value ArgInit = ArgumentCreatorVisitor(*this, F).visit(ParamPattern);
+    Value ArgInit = ArgumentCreatorVisitor(*this, F).visit(paramPattern);
     // Use the value to initialize a (mutable) variable allocation.
-    InitPatternWithExpr(*this, ArgInit).visit(ParamPattern);
+    InitPatternWithExpr(*this, ArgInit).visit(paramPattern);
   }
 }
 
@@ -362,4 +368,21 @@ void SILGenFunction::emitReleaseRValue(SILLocation loc, Value v) {
     rrLoadableValue(*this, loc, v, &SILBuilder::createRelease,
                     getTypeInfo(v.getType()).getReferenceTypeElements());
   }
+}
+
+void SILGenModule::visitNominalTypeDecl(NominalTypeDecl *ntd) {
+  SILGenType(*this).visit(ntd);
+}
+
+void SILGenFunction::visitNominalTypeDecl(NominalTypeDecl *ntd) {
+  SILGenType(SGM).visit(ntd);
+}
+
+void SILGenType::visitNominalTypeDecl(NominalTypeDecl *ntd) {
+  for (Decl *member : ntd->getMembers())
+    visit(member);
+}
+
+void SILGenType::visitFuncDecl(FuncDecl *fd) {
+  SGM.emitFunction(fd, fd->getBody());
 }
