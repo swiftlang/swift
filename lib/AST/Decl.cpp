@@ -1162,3 +1162,12 @@ void TranslationUnit::dump() const {
   PrintDecl(llvm::errs(), 0).visitTranslationUnit(this);
   llvm::errs() << '\n';
 }
+
+void Pattern::print(llvm::raw_ostream &OS) const {
+  PrintPattern(OS).visit(const_cast<Pattern*>(this));
+}
+
+void Pattern::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}

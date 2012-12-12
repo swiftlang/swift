@@ -108,6 +108,9 @@ public:
   void *operator new(size_t bytes) = delete;
   void operator delete(void *data) = delete;
   void *operator new(size_t bytes, void *data) = delete;
+  
+  void print(llvm::raw_ostream &OS) const;
+  void dump() const;
 };
 
 /// A pattern consisting solely of grouping parentheses around a
