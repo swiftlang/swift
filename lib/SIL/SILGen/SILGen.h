@@ -284,6 +284,8 @@ public:
   ManagedValue visitSpecializeExpr(SpecializeExpr *E);
   ManagedValue visitAddressOfExpr(AddressOfExpr *E);
   ManagedValue visitMemberRefExpr(MemberRefExpr *E);
+  ManagedValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E);
+  ManagedValue visitModuleExpr(ModuleExpr *E);
   ManagedValue visitTupleElementExpr(TupleElementExpr *E);
   ManagedValue visitSubscriptExpr(SubscriptExpr *E);
   ManagedValue visitTupleShuffleExpr(TupleShuffleExpr *E);
@@ -394,6 +396,7 @@ public:
   LValue visitAddressOfExpr(AddressOfExpr *e);
   LValue visitParenExpr(ParenExpr *e);
   LValue visitRequalifyExpr(RequalifyExpr *e); // FIXME kill lvalue qualifiers
+  LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e);
 };
   
 } // end namespace Lowering

@@ -343,6 +343,18 @@ ManagedValue SILGenFunction::visitMemberRefExpr(MemberRefExpr *E) {
   }
 }
 
+ManagedValue SILGenFunction::visitDotSyntaxBaseIgnoredExpr(
+                                                  DotSyntaxBaseIgnoredExpr *E) {
+  visit(E->getLHS());
+  return visit(E->getRHS());
+}
+
+ManagedValue SILGenFunction::visitModuleExpr(ModuleExpr *E) {
+  // FIXME: modules are currently empty types. if we end up having module
+  // metatypes this will need to change.
+  return ManagedValue(B.createZeroValue(E, E->getType()));
+}
+
 ManagedValue SILGenFunction::visitSubscriptExpr(SubscriptExpr *E) {
   SubscriptDecl *sd = E->getDecl();
   ManagedValue base = visit(E->getBase());

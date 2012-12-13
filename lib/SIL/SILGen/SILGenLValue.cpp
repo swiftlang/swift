@@ -203,6 +203,12 @@ LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
   return ::std::move(lv);
 }
 
+LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e)
+{
+  gen.visit(e->getLHS());
+  return visitRec(e->getRHS());
+}
+
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   LValue lv = visitRec(e->getBase());
   VarDecl *decl = e->getDecl();
