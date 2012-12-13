@@ -1213,8 +1213,8 @@ public:
   }
 };
 
-/// GetMetatypeExpr - Convert a value of class type to a value of base class
-/// type.
+/// \brief Describes an implicit conversion from a derived class to one of its
+/// base classes.
 class DerivedToBaseExpr : public ImplicitConversionExpr {
 public:
   DerivedToBaseExpr(Expr *subExpr, Type type)
@@ -1222,6 +1222,18 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DerivedToBase;
+  }
+};
+
+/// \brief Describes an implicit conversion from a value of archetype type to
+/// its concrete superclass.
+class ArchetypeToSuperExpr : public ImplicitConversionExpr {
+public:
+  ArchetypeToSuperExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::ArchetypeToSuper, subExpr, type) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ArchetypeToSuper;
   }
 };
 

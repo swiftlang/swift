@@ -24,6 +24,7 @@ namespace llvm {
 namespace swift {
   class ArchetypeMemberRefExpr;
   class ArchetypeSubscriptExpr;
+  class ArchetypeToSuperExpr;
   class CanType;
   class ErasureExpr;
   class ExistentialMemberRefExpr;

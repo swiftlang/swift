@@ -597,7 +597,8 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
           isCoercibleToType(E2, Ty) == CoercionResult::Failed) {
         // Figure out the source type, which may need to look through 
         auto srcTy = E2->getType()->getRValueType();
-        if (auto srcArchetype = srcTy->getAs<ArchetypeType>()) {
+        auto srcArchetype = srcTy->getAs<ArchetypeType>();
+        if (srcArchetype) {
           srcTy = srcArchetype->getSuperclass();
           assert(srcTy->getClassOrBoundGenericClass());
         }
@@ -612,6 +613,13 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
               return nullptr;
             }
 
+            // If the source had archetype type, convert to its superclass
+            // first. Then, we downcast that object.
+            if (srcArchetype) {
+              E2 = new (Context) ArchetypeToSuperExpr(
+                                   E2,
+                                   srcArchetype->getSuperclass());
+            }
             return new (Context) DowncastExpr(E1, E2);
           }
         }

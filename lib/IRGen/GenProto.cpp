@@ -3642,3 +3642,4 @@ LValue irgen::emitArchetypeSubscriptLValue(IRGenFunction &IGF,
   IGF.unimplemented(E->getLoc(), "l-value subscript into archetype");
   return IGF.emitFakeLValue(E->getType());
 }
+

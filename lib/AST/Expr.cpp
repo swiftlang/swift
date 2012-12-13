@@ -680,6 +680,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E) {
+    printCommon(E, "archetype_to_super_expr") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   void visitScalarToTupleExpr(ScalarToTupleExpr *E) {
     printCommon(E, "scalar_to_tuple_expr");
     OS << " field=" << E->getScalarField();

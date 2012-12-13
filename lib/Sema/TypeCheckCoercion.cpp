@@ -2113,6 +2113,18 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
       if (!(Flags & CF_Apply))
         return DestTy;
 
+      // If we're coming from an archetype, retrieve the superclass from the
+      // archetype and convert to it.
+      if (auto srcArchetype = E->getType()->getAs<ArchetypeType>()) {
+        E = new (TC.Context)ArchetypeToSuperExpr(E,
+                                                 srcArchetype->getSuperclass());
+
+        // If the superclass of the archetype is what we were looking for,
+        // were done.
+        if (E->getType()->isEqual(DestTy))
+          return coerced(E, Flags);
+      }
+
       return coerced(new (TC.Context) DerivedToBaseExpr(E, DestTy),
                      Flags);
     }

@@ -286,6 +286,10 @@ namespace {
       llvm::Value *castVal = IGF.Builder.CreateBitCast(val.getValue(), baseTy);
       Out.add({castVal, val.getCleanup()});
     }
+    void visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E) {
+      IGF.unimplemented(E->getLoc(), "archetype-to-super");
+    }
+
     void visitScalarToTupleExpr(ScalarToTupleExpr *E) {
       emitScalarToTuple(IGF, E, Out);
     }
@@ -486,6 +490,7 @@ namespace {
     NOT_LVALUE_EXPR(Specialize) // FIXME: Generic subscripts?
     NOT_LVALUE_EXPR(GetMetatype)
     NOT_LVALUE_EXPR(DerivedToBase)
+    NOT_LVALUE_EXPR(ArchetypeToSuper)
     NOT_LVALUE_EXPR(ScalarToTuple)
     NOT_LVALUE_EXPR(Func)
     NOT_LVALUE_EXPR(Closure)
@@ -649,6 +654,7 @@ namespace {
     NON_LOCATEABLE(SpecializeExpr) // FIXME: Generic subscripts?
     NON_LOCATEABLE(GetMetatypeExpr)
     NON_LOCATEABLE(DerivedToBaseExpr)
+    NON_LOCATEABLE(ArchetypeToSuperExpr)
     NON_LOCATEABLE(ScalarToTupleExpr)
     NON_LOCATEABLE(FunctionConversionExpr)
     NON_LOCATEABLE(MetatypeConversionExpr)
