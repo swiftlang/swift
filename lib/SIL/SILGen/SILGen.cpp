@@ -103,6 +103,9 @@ Function *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   Function *f = new (M) Function(M);
   SILGenFunction(*this, *f, fe).visit(fe->getBody());
   
+  constant.dump();
+  fe->dump();
+  f->dump();
   f->verify();
   M.functions[constant] = f;
   
@@ -117,6 +120,9 @@ Function *SILGenModule::emitClosure(ClosureExpr *ce) {
   Function *f = new (M) Function(M);
   SILGenFunction(*this, *f, ce).emitClosureBody(ce->getBody());
   
+  constant.dump();
+  ce->dump();
+  f->dump();
   f->verify();
   M.functions[constant] = f;
   

@@ -13,6 +13,7 @@
 #include "SILGen.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Types.h"
 #include "LValue.h"
 #include "ManagedValue.h"
 #include "TypeInfo.h"
@@ -65,6 +66,11 @@ static Value emitApplyArgument(SILGenFunction &gen, Expr *arg,
   }
 }
   
+static bool isSingleElementTupleType(Type t) {
+  TupleType *tt = t->getAs<TupleType>();
+  return tt && tt->getFields().size() == 1;
+}
+  
 } // end anonymous namespace
 
 void SILGenFunction::emitApplyArguments(Expr *argsExpr,
@@ -73,13 +79,16 @@ void SILGenFunction::emitApplyArguments(Expr *argsExpr,
   if (ParenExpr *pe = dyn_cast<ParenExpr>(argsExpr))
     argsExpr = pe->getSubExpr();
   
-  // Special case Arg being a TupleExpr or ScalarToTupleExpr to inline the
-  // arguments and not create a tuple instruction.
+  // Special case Arg being a TupleExpr or single-element ScalarToTupleExpr to
+  // inline the arguments and not create a tuple instruction.
   if (TupleExpr *te = dyn_cast<TupleExpr>(argsExpr)) {
     for (auto arg : te->getElements())
       ArgsV.push_back(emitApplyArgument(*this, arg, writebacks));
-  } else if (ScalarToTupleExpr *se = dyn_cast<ScalarToTupleExpr>(argsExpr)) {
-    ArgsV.push_back(emitApplyArgument(*this, se->getSubExpr(), writebacks));
+  } else if (isa<ScalarToTupleExpr>(argsExpr) &&
+             isSingleElementTupleType(argsExpr->getType())) {
+    ArgsV.push_back(emitApplyArgument(*this,
+                            dyn_cast<ScalarToTupleExpr>(argsExpr)->getSubExpr(),
+                            writebacks));
   } else {
     ArgsV.push_back(emitApplyArgument(*this, argsExpr, writebacks));
   }
@@ -385,7 +394,6 @@ ManagedValue SILGenFunction::visitTupleElementExpr(TupleElementExpr *E) {
   return emitExtractLoadableElement(*this, E, visit(E->getBase()),
                                     E->getFieldNumber());
 }
-
 
 /// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
 /// (which represents the retain count), a base pointer to some elements, and a
