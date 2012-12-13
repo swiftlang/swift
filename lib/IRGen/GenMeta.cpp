@@ -100,6 +100,35 @@ namespace {
   };
 }
 
+static bool isMetadataIndirect(IRGenModule &IGM, NominalTypeDecl *theDecl) {
+  // FIXME
+  return false;
+}
+
+/// Attempts to return a constant heap metadata reference for a
+/// nominal type.
+static llvm::Constant *tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
+                                                      CanType type) {
+  assert(isa<NominalType>(type) || isa<BoundGenericType>(type));
+
+  // We can't do this for any types with generic parameters, either
+  // directly or inherited from the context.
+  if (isa<BoundGenericType>(type))
+    return nullptr;
+  auto theDecl = cast<NominalType>(type)->getDecl();
+  if (theDecl->getGenericParamsOfContext())
+    return nullptr;
+
+  if (auto theClass = dyn_cast<ClassDecl>(theDecl))
+    if (!hasKnownSwiftMetadata(IGM, theClass))
+      return IGM.getAddrOfObjCClass(theClass);
+
+  if (isMetadataIndirect(IGM, theDecl))
+    return nullptr;
+
+  return IGM.getAddrOfTypeMetadata(type, false, false);
+}
+
 /// Returns a metadata reference for a class type.
 static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
                                            NominalTypeDecl *theDecl,
@@ -127,7 +156,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
       return cache;
   }
 
-  bool isIndirect = false; // FIXME
+  bool isIndirect = isMetadataIndirect(IGF.IGM, theDecl);
 
   // Grab a reference to the metadata or metadata template.
   CanType declaredType = theDecl->getDeclaredType()->getCanonicalType();
@@ -710,13 +739,30 @@ namespace {
     }
 
     void addParentMetadataRef(ClassDecl *forClass) {
-      // FIXME!
-      Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+      // FIXME: this is wrong for multiple levels of generics; we need
+      // to apply substitutions through.
+      Type parentType =
+        forClass->getDeclContext()->getDeclaredTypeInContext();
+      addReferenceToType(parentType->getCanonicalType());
     }
 
     void addSuperClass() {
-      // FIXME!
-      Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+      // If this is a root class, just put 'null' here.
+      if (!TargetClass->hasBaseClass()) {
+        Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+        return;
+      }
+
+      addReferenceToType(TargetClass->getBaseClass()->getCanonicalType());
+    }
+
+    void addReferenceToType(CanType type) {
+      if (llvm::Constant *metadata
+            = tryEmitConstantHeapMetadataRef(IGM, type)) {
+        Fields.push_back(metadata);
+      } else {
+        Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+      }
     }
 
     void addClassCacheData() {
