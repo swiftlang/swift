@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILConstant.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -44,28 +45,32 @@ raw_ostream &operator<<(raw_ostream &OS, ID i) {
   return OS;
 }
 
-
-namespace {
-  
-static void printSILConstant(llvm::raw_ostream &OS, SILConstant sd) {
-  if (sd.hasDecl()) {
-    OS << sd.getDecl()->getName();
+void SILConstant::print(llvm::raw_ostream &OS) const {
+  if (hasDecl()) {
+    OS << getDecl()->getName();
   } else {
     OS << "<anonymous function>";
   }
   // TODO: bikeshed a SIL syntax for decl ids
-  if (sd.id & SILConstant::Getter) {
+  if (id & SILConstant::Getter) {
     OS << ".getter";
   }
-  if (sd.id & SILConstant::Setter) {
+  if (id & SILConstant::Setter) {
     OS << ".setter";
   }
-  unsigned id = sd.id & ~(SILConstant::Getter | SILConstant::Setter);
-  if (id != 0) {
-    OS << "." << id;
+  unsigned number = id & ~(SILConstant::Getter | SILConstant::Setter);
+  if (number != 0) {
+    OS << "." << number;
   }
 }
 
+void SILConstant::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+namespace {
+  
 /// SILPrinter class - This is the internal implementation details of printing
 /// for SIL structures.
 class SILPrinter : public SILVisitor<SILPrinter> {
@@ -178,7 +183,7 @@ public:
 
   void visitConstantRefInst(ConstantRefInst *DRI) {
     OS << "constant_ref $" << DRI->getType(0).getString() << ", @";
-    printSILConstant(OS, DRI->getConstant());
+    DRI->getConstant().print(OS);
   }
 
   void visitZeroValueInst(ZeroValueInst *ZVI) {
@@ -373,7 +378,7 @@ void SILModule::dump() const {
 void SILModule::print(llvm::raw_ostream &OS) const {
   for (std::pair<SILConstant, Function*> vf : *this) {
     OS << "func_decl ";
-    printSILConstant(OS, vf.first);
+    vf.first.print(OS);
     OS << '\n';
     vf.second->print(OS);
     OS << "\n";

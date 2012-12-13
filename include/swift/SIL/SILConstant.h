@@ -21,6 +21,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
   class ValueDecl;
@@ -64,6 +65,9 @@ struct SILConstant {
   bool operator!=(SILConstant rhs) const {
     return loc.getOpaqueValue() != rhs.loc.getOpaqueValue() || id != rhs.id;
   }
+    
+  void print(llvm::raw_ostream &os) const;
+  void dump() const;
 };
 
 } // end swift namespace
