@@ -77,6 +77,7 @@ public:
   }
 
   void visitConstantRefInst(ConstantRefInst *DRI) {
+    (void)M; // suppress "unused private field" warning for release builds
     assert(M.getConstantType(DRI->getConstant())->getCanonicalType() ==
              DRI->getType()->getCanonicalType()
            && "ConstantRef type does not match constant's type");
