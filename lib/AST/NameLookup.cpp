@@ -219,11 +219,10 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
     return;
   }
 
-  llvm::SmallPtrSet<ValueDecl*, 8> OverriddenMethods;
   do {
     // Look in for members of a nominal type.
     SmallVector<ValueDecl*, 8> ExtensionMethods;
-    lookupMembers(BaseTy, M, OverriddenMethods, ExtensionMethods);
+    lookupMembers(BaseTy, M, ExtensionMethods);
 
     for (ValueDecl *VD : ExtensionMethods) {
       if (TypeDecl *TAD = dyn_cast<TypeDecl>(VD)) {
@@ -261,10 +260,33 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
       break;
     }
   } while (1);
+
+  // Find any overridden methods.
+  llvm::SmallPtrSet<ValueDecl*, 8> Overridden;
+  for (const auto &Result : Results) {
+    if (auto FD = dyn_cast<FuncDecl>(Result.D)) {
+      if (FD->getOverriddenDecl())
+        Overridden.insert(FD->getOverriddenDecl());
+    } else if (auto VarD = dyn_cast<VarDecl>(Result.D)) {
+      if (VarD->getOverriddenDecl())
+        Overridden.insert(VarD->getOverriddenDecl());
+    } else if (auto SD = dyn_cast<SubscriptDecl>(Result.D)) {
+      if (SD->getOverriddenDecl())
+        Overridden.insert(SD->getOverriddenDecl());
+    }
+  }
+
+  // If any methods were overridden, remove them from the results.
+  if (!Overridden.empty()) {
+    Results.erase(std::remove_if(Results.begin(), Results.end(),
+                                 [&](MemberLookupResult &Res) -> bool {
+                                   return Overridden.count(Res.D);
+                                 }),
+                  Results.end());
+  }
 }
 
 void MemberLookup::lookupMembers(Type BaseType, Module &M,
-                                 llvm::SmallPtrSet<ValueDecl*, 8> &Overridden,
                                  SmallVectorImpl<ValueDecl*> &Result) {
   NominalTypeDecl *D;
   ArrayRef<ValueDecl*> BaseMembers;
@@ -282,18 +304,7 @@ void MemberLookup::lookupMembers(Type BaseType, Module &M,
 
   for (Decl* Member : D->getMembers()) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
-      if (auto FD = dyn_cast<FuncDecl>(VD)) {
-        if (FD->getOverriddenDecl())
-          Overridden.insert(FD->getOverriddenDecl());
-      } else if (auto VarD = dyn_cast<VarDecl>(VD)) {
-        if (VarD->getOverriddenDecl())
-          Overridden.insert(VarD->getOverriddenDecl());
-      } else if (auto SD = dyn_cast<SubscriptDecl>(VD)) {
-        if (SD->getOverriddenDecl())
-          Overridden.insert(SD->getOverriddenDecl());
-      }
-      if (!Overridden.count(VD))
-        BaseMembersStorage.push_back(VD);
+      BaseMembersStorage.push_back(VD);
     }
   }
   if (D->getGenericParams())
