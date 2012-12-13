@@ -31,6 +31,7 @@ namespace swift {
   class Substitution;
 
 namespace irgen {
+  class Callee;
   class IRGenFunction;
 
   /// Abstract information about how we can emit a call.
@@ -90,8 +91,17 @@ namespace irgen {
   protected:
     ~OwnershipConventions() = default;
   public:
-    virtual bool isResultAutoreleased() const = 0;
-    virtual bool isArgConsumed(unsigned index) const = 0;
+    virtual bool isResultAutoreleased(IRGenModule &IGM,
+                                      const Callee &callee) const = 0;
+
+    /// Collect the indexes of all the consumed arguments in the given
+    /// callee.  These are indexes into the explosion schema of the
+    /// callee's appropriately-uncurried original formal type.
+    ///
+    /// \param set - initially empty; filled with indexes in increasing
+    ///   order
+    virtual void getConsumedArgs(IRGenModule &IGM, const Callee &callee,
+                           llvm::SmallVectorImpl<unsigned> &set) const = 0;
   };
 
   class Callee {

@@ -466,27 +466,53 @@ namespace {
   class ObjCMethodConventions : public OwnershipConventions {
     clang::ObjCMethodDecl *Method;
   public:
-    ObjCMethodConventions(clang::ObjCMethodDecl *method) : Method(method) {}
+    ObjCMethodConventions(clang::ObjCMethodDecl *method)
+      : Method(method) {}
 
-    bool isResultAutoreleased() const override {
+    bool isResultAutoreleased(IRGenModule &IGM,
+                              const Callee &callee) const override {
       return (Method->getResultType()->isObjCRetainableType() &&
               !Method->hasAttr<clang::NSReturnsRetainedAttr>());
     }
 
-    bool isArgConsumed(unsigned index) const override {
+    void getConsumedArgs(IRGenModule &IGM, const Callee &callee,
+                         SmallVectorImpl<unsigned> &set) const override {
       // 'self'
-      if (index == 0) {
-        return Method->hasAttr<clang::NSConsumesSelfAttr>();
-      // 'cmd'
-      } else if (index == 1) {
-        return false;
+      if (Method->hasAttr<clang::NSConsumesSelfAttr>())
+        set.push_back(0);
+
       // Formal parameters.
-      } else {
-        assert(index - 2 < Method->param_size());
-        auto param = *(Method->param_begin() + (index - 2));
-        assert(param);
-        return param->hasAttr<clang::NSConsumedAttr>();
+      unsigned nextArgIndex = 2;
+      unsigned methodParamIndex = 0;
+
+      auto type = cast<FunctionType>(callee.getOrigFormalType());
+      type = cast<FunctionType>(CanType(type->getResult()));
+      addConsumedArgs(IGM, callee, set, CanType(type->getInput()),
+                      nextArgIndex, methodParamIndex);
+    }
+
+    void addConsumedArgs(IRGenModule &IGM, const Callee &callee,
+                         SmallVectorImpl<unsigned> &set, CanType argType,
+                         unsigned &nextArgIndex,
+                         unsigned &methodParamIndex) const {
+      if (auto tuple = dyn_cast<TupleType>(argType)) {
+        for (auto &elt : tuple->getFields()) {
+          addConsumedArgs(IGM, callee, set, CanType(elt.getType()),
+                          nextArgIndex, methodParamIndex);
+        }
+        return;
       }
+
+      assert(methodParamIndex < Method->param_size());
+      auto param = *(Method->param_begin() + methodParamIndex);
+      assert(param);
+      if (param->hasAttr<clang::NSConsumedAttr>()) {
+        set.push_back(nextArgIndex++);
+      } else {
+        nextArgIndex +=
+          IGM.getExplosionSize(argType, callee.getExplosionLevel());
+      }
+      methodParamIndex++;
     }
   };
 
@@ -498,7 +524,8 @@ namespace {
     ObjCSelectorConventions(CanType substResultType, Selector::Family family)
       : SubstResultType(substResultType), Family(family) {}
 
-    bool isResultAutoreleased() const override {
+    bool isResultAutoreleased(IRGenModule &IGM,
+                              const Callee &callee) const override {
       // If the result type isn't a retainable object pointer, this
       // isn't applicable.
       if (!SubstResultType->getClassOrBoundGenericClass())
@@ -518,10 +545,11 @@ namespace {
       llvm_unreachable("bad selector family!");
     }
 
-    bool isArgConsumed(unsigned index) const override {
-      // The only conventionally-consumed argument is an init method's
-      // 'self'.
-      return (index == 0 && Family == Selector::Family::Init);
+    void getConsumedArgs(IRGenModule &IGM, const Callee &callee,
+                         SmallVectorImpl<unsigned> &set) const override {
+      // The only conventionally-consumed argument is an init method's self.
+      if (Family == Selector::Family::Init)
+        set.push_back(0);
     }
   };
 }
