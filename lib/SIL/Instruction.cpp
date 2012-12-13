@@ -259,11 +259,24 @@ CopyAddrInst::CopyAddrInst(SILLocation Loc, Value SrcLValue, Value DestLValue,
     IsTakeOfSrc(IsTakeOfSrc), IsInitializationOfDest(IsInitializationOfDest) {
 }
 
-
-SpecializeInst::SpecializeInst(SILLocation Loc, Value Operand, Type DestTy)
-  : Instruction(ValueKind::SpecializeInst, Loc, DestTy), Operand(Operand) {
+SpecializeInst *SpecializeInst::create(SILLocation Loc, Value Operand,
+                                       ArrayRef<Substitution> Substitutions,
+                                       Type DestTy, Function &F) {
+ void *Buffer = F.allocate(
+           sizeof(SpecializeInst) + Substitutions.size() * sizeof(Substitution),
+           llvm::AlignOf<SpecializeInst>::Alignment);
+  return ::new(Buffer) SpecializeInst(Loc, Operand, Substitutions, DestTy);
 }
 
+SpecializeInst::SpecializeInst(SILLocation Loc, Value Operand,
+                               ArrayRef<Substitution> Substitutions,
+                               Type DestTy)
+  : Instruction(ValueKind::SpecializeInst, Loc, DestTy), Operand(Operand),
+    NumSubstitutions(Substitutions.size())
+{
+  memcpy(getSubstitutionsStorage(), Substitutions.data(),
+         Substitutions.size() * sizeof(Substitution));
+}
 
 ConvertInst::ConvertInst(SILLocation Loc, Value Operand, Type Ty)
   : Instruction(ValueKind::ConvertInst, Loc, Ty), Operand(Operand) {

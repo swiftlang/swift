@@ -40,6 +40,7 @@ class MetatypeExpr;
 class StringLiteralExpr;
 class Stmt;
 class VarDecl;
+class Substitution;
 
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift BasicBlock.
@@ -428,14 +429,32 @@ public:
 /// cases as well.
 ///
 class SpecializeInst : public Instruction {
-  /// The value being specialized.  It always has FunctionType.
+  /// The value being specialized.  It always has PolymorphicFunctionType.
   Value Operand;
-public:
+  unsigned NumSubstitutions;
+  Substitution *getSubstitutionsStorage() {
+    return reinterpret_cast<Substitution *>(this + 1);
+  }
+  Substitution const *getSubstitutionsStorage() const {
+    return reinterpret_cast<Substitution const *>(this + 1);
+  }
 
-  SpecializeInst(SILLocation Loc, Value Operand, Type DestTy);
+  SpecializeInst(SILLocation Loc, Value Operand,
+                 ArrayRef<Substitution> Substitutions,
+                 Type DestTy);
+
+public:
+  static SpecializeInst *create(SILLocation Loc, Value Operand,
+                                ArrayRef<Substitution> Substitutions,
+                                Type DestTy,
+                                Function &F);
 
   Value getOperand() const { return Operand; }
-
+  
+  ArrayRef<Substitution> getSubstitutions() const {
+    return ArrayRef<Substitution>(getSubstitutionsStorage(), NumSubstitutions);
+  }
+  
   /// getType() is ok since this is known to only have one type.
   Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
 

@@ -170,8 +170,10 @@ public:
   }
   
   SpecializeInst *createSpecialize(SILLocation Loc, Value Operand,
+                                   ArrayRef<Substitution> Substitutions,
                                    Type DestTy) {
-    return insert(new SpecializeInst(Loc, Operand, DestTy));
+    return insert(SpecializeInst::create(Loc, Operand, Substitutions, DestTy,
+                                         F));
   }
 
 

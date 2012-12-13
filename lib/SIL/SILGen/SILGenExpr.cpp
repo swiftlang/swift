@@ -280,6 +280,7 @@ ManagedValue SILGenFunction::visitGetMetatypeExpr(GetMetatypeExpr *E) {
 ManagedValue SILGenFunction::visitSpecializeExpr(SpecializeExpr *E) {
   return ManagedValue(B.createSpecialize(E,
                                     visit(E->getSubExpr()).getUnmanagedValue(),
+                                    E->getSubstitutions(),
                                     E->getType()));
 }
 
