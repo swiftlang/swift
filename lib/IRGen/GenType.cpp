@@ -495,3 +495,17 @@ llvm::PointerType *IRGenModule::requiresIndirectResult(CanType type,
     return ti.getStorageType()->getPointerTo();
   return nullptr;
 }
+
+/// Determine whether this type is known to be POD.
+bool IRGenModule::isPOD(CanType type, ResilienceScope scope) {
+  if (isa<ArchetypeType>(type)) return false;
+  if (isa<ClassType>(type)) return false;
+  if (isa<BoundGenericClassType>(type)) return false;
+  if (auto tuple = dyn_cast<TupleType>(type)) {
+    for (auto &elt : tuple->getFields())
+      if (!isPOD(CanType(elt.getType()), scope))
+        return false;
+    return true;
+  }
+  return getFragileTypeInfo(type).isPOD(scope);
+}

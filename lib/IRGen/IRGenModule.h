@@ -160,6 +160,7 @@ public:
   llvm::PointerType *isSingleIndirectValue(CanType T, ExplosionKind kind);
   llvm::PointerType *requiresIndirectResult(CanType T, ExplosionKind kind);
   bool hasTrivialMetatype(CanType type);
+  bool isPOD(CanType type, ResilienceScope scope);
 
   bool isResilient(Decl *decl) { return false; }
 
