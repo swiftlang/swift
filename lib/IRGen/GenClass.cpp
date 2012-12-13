@@ -82,16 +82,29 @@ namespace {
 
     ClassDecl *getClass() const { return TheClass; }
 
+    static void addFieldsFromClass(IRGenModule &IGM,
+                                   ClassDecl *theClass,
+                              SmallVectorImpl<const TypeInfo*> &fieldTypes) {
+      // Recursively add members from the base.  This really only
+      // works under an assumption that the class is a base
+      if (theClass->hasBaseClass()) {
+        auto baseClass =
+          theClass->getBaseClass()->getClassOrBoundGenericClass();
+        addFieldsFromClass(IGM, baseClass, fieldTypes);
+      }
+      for (Decl *member : theClass->getMembers())
+        if (VarDecl *var = dyn_cast<VarDecl>(member))
+          if (!var->isProperty())
+            fieldTypes.push_back(&IGM.getFragileTypeInfo(var->getType()));
+    }
+
     const HeapLayout &getLayout(IRGenModule &IGM) const {
       if (Layout)
         return *Layout;
 
       // Collect all the fields from the type.
       SmallVector<const TypeInfo*, 8> fieldTypes;
-      for (Decl *member : getClass()->getMembers())
-        if (VarDecl *VD = dyn_cast<VarDecl>(member))
-          if (!VD->isProperty())
-            fieldTypes.push_back(&IGM.getFragileTypeInfo(VD->getType()));
+      addFieldsFromClass(IGM, getClass(), fieldTypes);
 
       llvm::PointerType *Ptr = cast<llvm::PointerType>(getStorageType());
       llvm::StructType *STy = cast<llvm::StructType>(Ptr->getElementType());
@@ -108,9 +121,20 @@ namespace {
   };
 }  // end anonymous namespace.
 
+static unsigned getNumFieldsInBases(ClassDecl *derived, unsigned count = 0) {
+  if (!derived->hasBaseClass()) return count;
+  auto base = derived->getBaseClass()->getClassOrBoundGenericClass();
+  for (Decl *member : base->getMembers()) {
+    if (auto var = dyn_cast<VarDecl>(member))
+      if (!var->isProperty())
+        ++count;
+  }
+  return getNumFieldsInBases(base, count);
+}
+
 static unsigned getFieldIndex(ClassDecl *base, VarDecl *target) {
   // FIXME: This is an ugly hack.
-  unsigned index = 0;
+  unsigned index = getNumFieldsInBases(base);
   for (Decl *member : base->getMembers()) {
     if (member == target) return index;
     if (auto var = dyn_cast<VarDecl>(member))
