@@ -728,7 +728,7 @@ namespace {
 
     void addClassDataPointer() {
       // Derive the RO-data.
-      llvm::Constant *data = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+      llvm::Constant *data = emitClassPrivateData(IGM, TargetClass);
 
       // We always set the low bit.  Eventually the high bits will be
       // a pointer of some sort.

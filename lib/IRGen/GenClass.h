@@ -17,6 +17,10 @@
 #ifndef SWIFT_IRGEN_GENCLASS_H
 #define SWIFT_IRGEN_GENCLASS_H
 
+namespace llvm {
+  class Constant;
+}
+
 namespace swift {
   class ClassDecl;
   class GenericMemberRefExpr;
@@ -31,6 +35,8 @@ namespace irgen {
   LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF, MemberRefExpr *E);
   LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
                                        GenericMemberRefExpr *E);
+
+  llvm::Constant *emitClassPrivateData(IRGenModule &IGM, ClassDecl *theClass);
 
 } // end namespace irgen
 } // end namespace swift

@@ -16,10 +16,12 @@
 
 #include "GenClass.h"
 
+#include "swift/ABI/Class.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
@@ -378,6 +380,324 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   // Emit a defaulted class destructor if we didn't see one explicitly.
   if (!emittedDtor)
     emitClassDestructor(*this, D, nullptr);
+}
+
+namespace {
+  /// A class for building class data.
+  class ClassDataBuilder : public ClassMemberVisitor<ClassDataBuilder> {
+    IRGenModule &IGM;
+    ClassDecl *TheClass;
+    bool HasNonTrivialDestructor = false;
+    bool HasNonTrivialConstructor = false;
+    SmallVector<VarDecl*, 8> Ivars;
+    SmallVector<FuncDecl*, 16> InstanceMethods;
+    SmallVector<FuncDecl*, 16> ClassMethods;
+    SmallVector<ProtocolDecl*, 4> Protocols;
+    SmallVector<VarDecl*, 8> Properties;
+  public:
+    ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass)
+      : IGM(IGM), TheClass(theClass) {}
+
+    llvm::Constant *emit() {
+      visitMembers(TheClass);
+
+      SmallVector<llvm::Constant*, 11> fields;
+      // struct _class_ro_t {
+      //   uint32_t flags;
+      fields.push_back(buildFlags());
+
+      //   uint32_t instanceStart;
+      //   uint32_t instanceSize;
+      // These are generally filled in by the runtime.
+      // TODO: it's an optimization to have them have the right values
+      // at launch-time.
+      auto zero32 = llvm::ConstantInt::get(IGM.Int32Ty, 0);
+      fields.push_back(zero32);
+      fields.push_back(zero32);
+
+      //   uint32_t reserved;  // only when building for 64bit targets
+      if (IGM.getPointerAlignment().getValue() > 4) {
+        assert(IGM.getPointerAlignment().getValue() == 8);
+        fields.push_back(zero32);
+      }
+
+      //   const uint8_t *ivarLayout;
+      // GC/ARC layout.  TODO.
+      fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+
+      //   const char *name;
+      fields.push_back(buildName());
+
+      //   const method_list_t *baseMethods;
+      fields.push_back(buildInstanceMethodList());
+
+      //   const protocol_list_t *baseProtocols;
+      fields.push_back(buildProtocolList());
+
+      //   const ivar_list_t *ivars;
+      fields.push_back(buildIvarList());
+
+      //   const uint8_t *weakIvarLayout;
+      // More GC/ARC layout.  TODO.
+      fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+
+      //   const property_list_t *baseProperties;
+      fields.push_back(buildPropertyList());
+
+      // };
+
+      return buildGlobalVariable(fields, "_DATA_");
+    }
+
+  private:
+    llvm::Constant *buildFlags() {
+      ClassFlags flags = ClassFlags::CompiledByARC;
+      if (HasNonTrivialDestructor || HasNonTrivialConstructor) {
+        flags |= ClassFlags::HasCXXStructors;
+        if (!HasNonTrivialConstructor)
+          flags |= ClassFlags::HasCXXDestructorOnly;
+      }
+
+      // FIXME: set ClassFlags::Hidden when appropriate
+      return llvm::ConstantInt::get(IGM.Int32Ty, uint32_t(flags));
+    }
+
+    llvm::Constant *buildName() {
+      return IGM.getAddrOfGlobalString(TheClass->getName().str());
+    }
+
+    /*** Methods ***********************************************************/
+
+  public:
+    /// Methods need to be collected into the appropriate methods list.
+    void visitFuncDecl(FuncDecl *method) {
+      if (!method->isStatic()) {
+        visitInstanceMethod(method);
+      } else {
+        visitClassMethod(method);
+      }
+    }
+
+  private:
+    void visitInstanceMethod(FuncDecl *method) {
+      InstanceMethods.push_back(method);
+    }
+
+    void visitClassMethod(FuncDecl *method) {
+      ClassMethods.push_back(method);
+    }    
+
+    /// struct method_t {
+    ///   SEL name;
+    ///   const char *types;
+    ///   IMP imp;
+    /// };
+    llvm::Constant *buildMethod(FuncDecl *method) {
+      // FIXME
+      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    }
+
+    llvm::Constant *buildInstanceMethodList()  {
+      return buildMethodList(InstanceMethods, "_INSTANCE_METHODS_");
+    }
+
+    /// struct method_list_t {
+    ///   uint32_t entsize; // runtime uses low bits for its own purposes
+    ///   uint32_t count;
+    ///   method_t list[count];
+    /// };
+    ///
+    /// This method does not return a value of a predictable type.
+    llvm::Constant *buildMethodList(ArrayRef<FuncDecl*> methods,
+                                    StringRef name) {
+      return buildOptionalList<FuncDecl*>(methods, 3 * IGM.getPointerSize(), name,
+                                          &ClassDataBuilder::buildMethod);
+    }
+
+    /*** Protocols *********************************************************/
+
+    /// typedef uintptr_t protocol_ref_t;  // protocol_t*, but unremapped
+    llvm::Constant *buildProtocolRef(ProtocolDecl *protocol) {
+      // FIXME
+      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    }
+    
+    /// struct protocol_list_t {
+    ///   uintptr_t count;
+    ///   protocol_ref_t[count];
+    /// };
+    ///
+    /// This method does not return a value of a predictable type.
+    llvm::Constant *buildProtocolList() {
+      return buildOptionalList<ProtocolDecl*>(Protocols, Size(0), "_PROTOCOLS_",
+                                              &ClassDataBuilder::buildProtocolRef);
+    }
+
+    /*** Ivars *************************************************************/
+
+  public:
+    /// Variables might be properties or ivars.
+    void visitVarDecl(VarDecl *var) {
+      if (var->isProperty()) {
+        visitProperty(var);
+      } else {
+        visitIvar(var);
+      }
+    }
+
+  private:
+    /// Ivars need to be collected in the ivars list, and they also
+    /// affect flags.
+    void visitIvar(VarDecl *var) {
+      Ivars.push_back(var);
+      if (!IGM.isPOD(var->getType()->getCanonicalType(),
+                     ResilienceScope::Local)) {
+        HasNonTrivialDestructor = true;
+      }
+    }
+
+    /// struct ivar_t {
+    ///   uintptr_t *offset;
+    ///   const char *name;
+    ///   const char *type;
+    ///   uint32_t alignment;
+    ///   uint32_t size;
+    /// };
+    llvm::Constant *buildIvar(VarDecl *ivar) {
+      // FIXME
+      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    }
+
+    /// struct ivar_list_t {
+    ///   uint32_t entsize;
+    ///   uint32_t count;
+    ///   ivar_t list[count];
+    /// };
+    ///
+    /// This method does not return a value of a predictable type.
+    llvm::Constant *buildIvarList() {
+      Size eltSize = 3 * IGM.getPointerSize() + Size(8);
+      return buildOptionalList<VarDecl*>(Ivars, eltSize, "_IVARS_",
+                                         &ClassDataBuilder::buildIvar);
+    }
+
+    /*** Properties ********************************************************/
+
+    /// Properties need to be collected in the properties list.
+    void visitProperty(VarDecl *var) {
+      Properties.push_back(var);
+    }
+
+    /// struct property_t {
+    ///   const char *name;
+    ///   const char *attributes;
+    /// };
+    llvm::Constant *buildProperty(VarDecl *prop) {
+      // FIXME
+      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    }
+
+    /// struct property_list_t {
+    ///   uint32_t entsize;
+    ///   uint32_t count;
+    ///   property_t list[count];
+    /// };
+    ///
+    /// This method does not return a value of a predictable type.
+    llvm::Constant *buildPropertyList() {
+      Size eltSize = 2 * IGM.getPointerSize();
+      return buildOptionalList<VarDecl*>(Properties, eltSize, "_PROPERTIES_",
+                                         &ClassDataBuilder::buildProperty);
+    }
+
+    /*** General ***********************************************************/
+
+    /// Build a list structure from the given array of objects.
+    /// If the array is empty, use null.  The assumption is that every
+    /// initializer has the same size.
+    ///
+    /// \param optionalEltSize - if non-zero, a size which needs
+    ///   to be placed in the list header
+    template <class T>
+    llvm::Constant *buildOptionalList(ArrayRef<T> objects,
+                                      Size optionalEltSize,
+                                      StringRef nameBase,
+                          llvm::Constant *(ClassDataBuilder::*build)(T)) {
+      if (objects.empty())
+        return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+
+      SmallVector<llvm::Constant*, 3> fields;
+
+      // In all of the foo_list_t structs, either:
+      //   - there's a 32-bit entry size and a 32-bit count or
+      //   - there's no entry size and a uintptr_t count.
+      if (!optionalEltSize.isZero()) {
+        fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty,
+                                                optionalEltSize.getValue()));
+        fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, objects.size()));
+      } else {
+        fields.push_back(llvm::ConstantInt::get(IGM.IntPtrTy, objects.size()));
+      }
+
+      SmallVector<llvm::Constant*, 8> objectInits;
+      objectInits.reserve(objects.size());
+      for (auto &object : objects) {
+        objectInits.push_back((this->*build)(object));
+      }
+
+      auto arrayTy =
+        llvm::ArrayType::get(objectInits[0]->getType(), objectInits.size());
+      fields.push_back(llvm::ConstantArray::get(arrayTy, objectInits));
+
+      return buildGlobalVariable(fields, nameBase);
+    }
+
+    /// Build a private global variable as a structure containing the
+    /// given fields.
+    llvm::Constant *buildGlobalVariable(ArrayRef<llvm::Constant*> fields,
+                                        StringRef nameBase) {
+      auto init = llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
+      auto var = new llvm::GlobalVariable(IGM.Module, init->getType(),
+                                          /*constant*/ true,
+                                          llvm::GlobalVariable::PrivateLinkage,
+                                          init,
+                                          Twine(nameBase) 
+                                            + TheClass->getName().str());
+      var->setAlignment(IGM.getPointerAlignment().getValue());
+      var->setSection("__DATA, __objc_const");
+      return var;
+    }
+
+  public:
+    /// Member types don't get any representation.
+    /// Maybe this should change for reflection purposes?
+    void visitTypeDecl(TypeDecl *type) {}
+
+    /// Pattern-bindings don't require anything special as long as
+    /// these initializations are performed in the constructor, not
+    /// .cxx_construct.
+    void visitPatternBindingDecl(PatternBindingDecl *binding) {}
+
+    /// Subscripts should probably be collected in extended metadata.
+    void visitSubscriptDecl(SubscriptDecl *subscript) {
+      // TODO
+    }
+
+    /// Constructors should probably be collected in extended metadata.
+    void visitConstructorDecl(ConstructorDecl *ctor) {
+      // TODO
+    }
+
+    /// The destructor doesn't really require any special
+    /// representation here.
+    void visitDestructorDecl(DestructorDecl *dtor) {}
+  };
+}
+
+/// Emit the private data (RO-data) associated with a class.
+llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
+                                            ClassDecl *forClass) {
+  return ClassDataBuilder(IGM, forClass).emit();
 }
 
 const TypeInfo *TypeConverter::convertClassType(ClassDecl *D) {
