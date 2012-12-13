@@ -1,0 +1,64 @@
+//===--- Class.h - Compiler/runtime class-metadata values -------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This header provides target-independent information about class
+// metadata.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_ABI_CLASS_H
+#define SWIFT_ABI_CLASS_H
+
+#include <stdint.h>
+
+namespace swift {
+
+/// Flags which 
+enum class ClassFlags : uint32_t {
+  /// This class is a meta-class.
+  Meta                 = 0x00001,
+
+  /// This class is a root class.
+  Root                 = 0x00002,
+
+  /// This class provides a non-trivial .cxx_construct or .cxx_destruct
+  /// implementation.
+  HasCXXStructors      = 0x00004,
+
+  /// This class has hidden visibility.
+  Hidden               = 0x00010,
+
+  /// This class has the exception attribute.
+  Exception            = 0x00020,
+
+  /// (Obsolete) ARC-specific: this class has a .release_ivars method
+  HasIvarReleaser      = 0x00040,
+
+  /// This class implementation was compiled under ARC.
+  CompiledByARC        = 0x00080,
+
+  /// This class provides a non-trivial .cxx_destruct method, but
+  /// its .cxx_construct is trivial.  For backwards compatibility,
+  /// when setting this flag, HasCXXStructors must be set as well.
+  HasCXXDestructorOnly = 0x00100
+};
+inline ClassFlags &operator|=(ClassFlags &lhs, ClassFlags rhs) {
+  lhs = ClassFlags(uint32_t(lhs) | uint32_t(rhs));
+  return lhs;
+}
+inline ClassFlags operator|(ClassFlags lhs, ClassFlags rhs) {
+  return (lhs |= rhs);
+}
+
+}
+
+#endif
