@@ -99,6 +99,7 @@ namespace {
                       unsigned uncurryingLevel);
     void mangleNominalType(NominalTypeDecl *decl, ExplosionKind explosionKind);
     void mangleType(Type type, ExplosionKind kind, unsigned uncurryingLevel);
+    void mangleDirectness(bool isIndirect);
 
   private:
     void mangleFunctionType(AnyFunctionType *fn, ExplosionKind explosionKind,
@@ -669,6 +670,10 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   llvm_unreachable("bad witness kind");
 }
 
+void Mangler::mangleDirectness(bool isIndirect) {
+  Buffer << (isIndirect ? 'i': 'd');
+}
+
 void LinkEntity::mangle(raw_ostream &buffer) const {
   if (getKind() == Kind::Function) {
     // As a special case, functions can have external asm names.
@@ -720,7 +725,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     buffer << 'M';
     bool isPattern = isMetadataPattern();
     if (isPattern) buffer << 'P';
-    buffer << (isMetadataIndirect() ? 'i': 'd');
+    mangler.mangleDirectness(isMetadataIndirect());
     if (!isPattern) {
       mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
       return;
@@ -744,6 +749,12 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
     return;
 
+  //   global ::= 'Wv' directness entity
+  case Kind::FieldOffset:
+    buffer << "Wv";
+    mangler.mangleDirectness(isOffsetIndirect());
+    mangler.mangleEntity(getDecl(), ExplosionKind::Minimal, 0);
+    return;
 
   // For all the following, this rule was imposed above:
   //   global ::= local-marker? entity            // some identifiable thing

@@ -15,6 +15,7 @@ All Swift-mangled names begin with this prefix.
   global ::= 'w' value-witness-kind type     // value witness
   global ::= 'WV' type                       // value witness table
   global ::= 'Wo' entity                     // witness table offset
+  global ::= 'Wv' directness entity          // field offset
   global ::= local-marker? entity            // some identifiable thing
   entity ::= context 'D'                     // destructor
   entity ::= context 'C' type                // constructor
@@ -35,6 +36,16 @@ A direct symbol resolves directly to the address of an object.  An
 indirect symbol resolves to the address of a pointer to the object.
 They are distinct manglings to make a certain class of bugs
 immediately obvious.
+
+The terminology is slightly overloaded when discussing offsets.  A
+direct offset resolves to a variable holding the true offset.  An
+indirect offset resolves to a variable holding an offset to be applied
+to type metadata to get the address of the true offset.  (Offset
+variables are required when the object being accessed lies within a
+resilient structure.  When the layout of the object may depend on
+generic arguments, these offsets must be kept in metadata.  Indirect
+field offsets are therefore required when accessing fields in generic
+types where the metadata itself has unknown layout.)
 
   context ::= module
   context ::= function

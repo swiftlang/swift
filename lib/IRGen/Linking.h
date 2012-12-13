@@ -91,6 +91,9 @@ class LinkEntity {
     /// pointer is a ValueDecl*.
     WitnessTableOffset,
 
+    /// A field offset.  The pointer is a VarDecl*.
+    FieldOffset,
+
     /// An Objective-C class reference.
     ObjCClass,
 
@@ -181,6 +184,14 @@ public:
     return entity;
   }
 
+  static LinkEntity forFieldOffset(VarDecl *decl, bool isIndirect) {
+    LinkEntity entity;
+    entity.Pointer = decl;
+    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::FieldOffset))
+                | LINKENTITY_SET_FIELD(IsIndirect, unsigned(isIndirect));
+    return entity;
+  }
+
   static LinkEntity forDestructor(ClassDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::Destructor, decl, ExplosionKind::Minimal, 0);
@@ -249,6 +260,11 @@ public:
   bool isMetadataPattern() const {
     assert(getKind() == Kind::TypeMetadata);
     return LINKENTITY_GET_FIELD(Data, IsPattern);
+  }
+
+  bool isOffsetIndirect() const {
+    assert(getKind() == Kind::FieldOffset);
+    return LINKENTITY_GET_FIELD(Data, IsIndirect);
   }
 
 #undef LINKENTITY_GET_FIELD

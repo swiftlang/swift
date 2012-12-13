@@ -318,6 +318,7 @@ bool LinkEntity::isLocalLinkage() const {
   case Kind::Setter:
   case Kind::Other:
   case Kind::ObjCClass:
+  case Kind::FieldOffset:
     return isLocalLinkageDecl(getDecl());
   }
   llvm_unreachable("bad link entity kind");
@@ -948,27 +949,28 @@ llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
   return entry;
 }
 
-static Address getAddrOfWitnessTableOffset(IRGenModule &IGM,
+static Address getAddrOfSimpleVariable(IRGenModule &IGM,
                     llvm::DenseMap<LinkEntity, llvm::GlobalVariable*> &cache,
-                                           LinkEntity entity) {
+                                       LinkEntity entity,
+                                       llvm::Type *type,
+                                       Alignment alignment) {
   // Check whether it's already cached.
   llvm::GlobalVariable *&entry = cache[entity];
   if (entry) {
-    return Address(entry, Alignment(entry->getAlignment()));
+    assert(alignment == Alignment(entry->getAlignment()));
+    return Address(entry, alignment);
   }
 
-  // Otherwise, we need to create it.  It's always a ptrdiff_t.
+  // Otherwise, we need to create it.
   LinkInfo link = LinkInfo::get(IGM, entity);
-  auto addr = link.createVariable(IGM, IGM.SizeTy);
+  auto addr = link.createVariable(IGM, type);
   addr->setConstant(true);
 
-  Alignment align = IGM.getPointerAlignment();
-  addr->setAlignment(align.getValue());
+  addr->setAlignment(alignment.getValue());
 
   entry = addr;
-  return Address(addr, align);
+  return Address(addr, alignment);
 }
-                                           
 
 /// getAddrOfWitnessTableOffset - Get the address of the global
 /// variable which contains an offset within a witness table for the
@@ -977,7 +979,8 @@ Address IRGenModule::getAddrOfWitnessTableOffset(CodeRef code) {
   LinkEntity entity =
     LinkEntity::forWitnessTableOffset(code.getDecl(), code.getExplosionLevel(),
                                       code.getUncurryLevel());
-  return ::getAddrOfWitnessTableOffset(*this, GlobalVars, entity);
+  return getAddrOfSimpleVariable(*this, GlobalVars, entity,
+                                 SizeTy, getPointerAlignment());
 }
 
 /// getAddrOfWitnessTableOffset - Get the address of the global
@@ -986,7 +989,20 @@ Address IRGenModule::getAddrOfWitnessTableOffset(CodeRef code) {
 Address IRGenModule::getAddrOfWitnessTableOffset(VarDecl *field) {
   LinkEntity entity =
     LinkEntity::forWitnessTableOffset(field, ExplosionKind::Minimal, 0);
-  return ::getAddrOfWitnessTableOffset(*this, GlobalVars, entity);
+  return ::getAddrOfSimpleVariable(*this, GlobalVars, entity,
+                                   SizeTy, getPointerAlignment());
+}
+
+/// getAddrOfFieldOffset - Get the address of the global variable
+/// which contains an offset to apply to either an object (if direct)
+/// or a metadata object in order to find an offset to apply to an
+/// object (if indirect).
+///
+/// The result is always a GlobalVariable.
+Address IRGenModule::getAddrOfFieldOffset(VarDecl *var, bool isIndirect) {
+  LinkEntity entity = LinkEntity::forFieldOffset(var, isIndirect);
+  return getAddrOfSimpleVariable(*this, GlobalVars, entity,
+                                 SizeTy, getPointerAlignment());
 }
 
 /// Emit a type extension.

@@ -273,6 +273,7 @@ public:
   FormalType getTypeOfSetter(ValueDecl *D);
 
   Address getAddrOfGlobalVariable(VarDecl *D);
+  Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect);
   llvm::Function *getAddrOfFunction(FunctionRef ref, ExtraData data);
   llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);
   llvm::Function *getAddrOfGetter(ValueDecl *D, FormalType type,
