@@ -284,6 +284,7 @@ public:
   ManagedValue visitSpecializeExpr(SpecializeExpr *E);
   ManagedValue visitAddressOfExpr(AddressOfExpr *E);
   ManagedValue visitMemberRefExpr(MemberRefExpr *E);
+  ManagedValue visitGenericMemberRefExpr(GenericMemberRefExpr *E);
   ManagedValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E);
   ManagedValue visitModuleExpr(ModuleExpr *E);
   ManagedValue visitTupleElementExpr(TupleElementExpr *E);
@@ -388,6 +389,7 @@ public:
   // Nodes that make up components of lvalue paths
   
   LValue visitMemberRefExpr(MemberRefExpr *e);
+  LValue visitGenericMemberRefExpr(GenericMemberRefExpr *e);
   LValue visitSubscriptExpr(SubscriptExpr *e);
   LValue visitTupleElementExpr(TupleElementExpr *e);
   

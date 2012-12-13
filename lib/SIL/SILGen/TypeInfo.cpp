@@ -68,18 +68,27 @@ public:
   }
 };
 
-void TypeConverter::makeFragileElements(TypeInfo &theInfo, CanType t) {
-  if (NominalType *nt = t->getAs<NominalType>()) {
-    unsigned elementIndex = 0;
-    for (Decl *d : nt->getDecl()->getMembers()) {
-      if (VarDecl *vd = dyn_cast<VarDecl>(d)) {
-        if (!vd->isProperty()) {
-          theInfo.fragileElements[vd->getName()] = {vd->getType(),
-                                                    elementIndex};
-          ++elementIndex;
-        }
+void TypeConverter::makeFragileElementsForDecl(TypeInfo &theInfo,
+                                               NominalTypeDecl *decl) {
+  unsigned elementIndex = 0;
+  for (Decl *d : decl->getMembers()) {
+    if (VarDecl *vd = dyn_cast<VarDecl>(d)) {
+      if (!vd->isProperty()) {
+        theInfo.fragileElements[vd->getName()] = {vd->getType(),
+          elementIndex};
+        ++elementIndex;
       }
     }
+  }
+}
+
+void TypeConverter::makeFragileElements(TypeInfo &theInfo, CanType t) {
+  if (NominalType *nt = t->getAs<NominalType>()) {
+    makeFragileElementsForDecl(theInfo, nt->getDecl());
+  } else if (UnboundGenericType *ugt = t->getAs<UnboundGenericType>()) {
+    makeFragileElementsForDecl(theInfo, ugt->getDecl());
+  } else if (BoundGenericType *bgt = t->getAs<BoundGenericType>()) {
+    makeFragileElementsForDecl(theInfo, bgt->getDecl());
   }
 }
   

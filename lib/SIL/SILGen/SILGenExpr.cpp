@@ -320,36 +320,47 @@ static ManagedValue emitExtractLoadableElement(SILGenFunction &gen,
     return gen.emitManagedRValueWithCleanup(extract);
   }
 }
-
-} // end anonymous namespace
-
-ManagedValue SILGenFunction::visitMemberRefExpr(MemberRefExpr *E) {
-  TypeInfo const &ti = SGM.Types.getTypeInfo(E->getBase()->getType()
-                                               ->getRValueType());
+  
+template<typename ANY_MEMBER_REF_EXPR>
+ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
+                                  ANY_MEMBER_REF_EXPR *E) {
+  TypeInfo const &ti = gen.getTypeInfo(E->getBase()->getType()
+                                       ->getRValueType());
   
   if (ti.hasFragileElement(E->getDecl()->getName())) {
     // We can get to the element directly with element_addr.
     FragileElement element = ti.getFragileElement(E->getDecl()->getName());
-    return emitExtractLoadableElement(*this, E, visit(E->getBase()),
+    return emitExtractLoadableElement(gen, E, gen.visit(E->getBase()),
                                       element.index);
   } else {
+    Type baseTy = E->getBase()->getType();
     // We have to load the element indirectly through a property.
-    assert((E->getBase()->getType()->is<LValueType>() ||
-            E->getBase()->getType()->hasReferenceSemantics()) &&
+    assert((baseTy->is<LValueType>() || baseTy->hasReferenceSemantics()) &&
            "member ref of a non-lvalue?!");
-    ManagedValue base = visit(E->getBase());
+    ManagedValue base = gen.visit(E->getBase());
     // Get the getter function, which will have type This -> () -> T.
-    Value getterMethod = B.createConstantRef(E,
+    Value getterMethod = gen.B.createConstantRef(E,
                                              SILConstant(E->getDecl(),
                                                          SILConstant::Getter),
-                                             F);
+                                             gen.F);
     // Apply the "this" parameter.
-    Value getter = B.createApply(E, getterMethod, base.forward(*this));
+    Value getter = gen.B.createApply(E, getterMethod, base.forward(gen));
     // Apply the getter.
-    Materialize propTemp = emitGetProperty(E,
-                                         emitManagedRValueWithCleanup(getter));
+    Materialize propTemp = gen.emitGetProperty(E,
+                                      gen.emitManagedRValueWithCleanup(getter));
     return ManagedValue(propTemp.address);
-  }
+  }  
+}
+
+} // end anonymous namespace
+
+ManagedValue SILGenFunction::visitMemberRefExpr(MemberRefExpr *E) {
+  return emitAnyMemberRefExpr(*this, E);
+}
+
+ManagedValue SILGenFunction::visitGenericMemberRefExpr(GenericMemberRefExpr *E)
+{
+  return emitAnyMemberRefExpr(*this, E);
 }
 
 ManagedValue SILGenFunction::visitDotSyntaxBaseIgnoredExpr(

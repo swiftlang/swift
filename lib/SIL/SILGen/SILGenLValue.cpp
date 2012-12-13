@@ -209,23 +209,38 @@ LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e)
   return visitRec(e->getRHS());
 }
 
-LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
-  LValue lv = visitRec(e->getBase());
-  VarDecl *decl = e->getDecl();
+namespace {
+  
+template<typename ANY_MEMBER_REF_EXPR>
+LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
+                            SILGenFunction &gen,
+                            ANY_MEMBER_REF_EXPR *e) {
+  LValue lv = sgl.visitRec(e->getBase());
+  ValueDecl *decl = e->getDecl();
   TypeInfo const &ti = gen.getTypeInfo(
-                                      e->getBase()->getType()->getRValueType());
+                                     e->getBase()->getType()->getRValueType());
   
   if (ti.hasFragileElement(decl->getName())) {
     lv.add<FragileElementComponent>(ti.getFragileElement(decl->getName()));
   } else {
     Value get = gen.emitUnmanagedConstantRef(e,
-                                        SILConstant(decl, SILConstant::Getter));
+                                       SILConstant(decl, SILConstant::Getter));
     Value set = gen.emitUnmanagedConstantRef(e,
-                                        SILConstant(decl, SILConstant::Setter));
+                                       SILConstant(decl, SILConstant::Setter));
     lv.add<GetterSetterComponent>(get, set);
   }
   
   return ::std::move(lv);
+}
+  
+} // end anonymous namespace
+
+LValue SILGenLValue::visitGenericMemberRefExpr(GenericMemberRefExpr *e) {
+  return emitAnyMemberRefExpr(*this, gen, e);
+}
+
+LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
+  return emitAnyMemberRefExpr(*this, gen, e);
 }
 
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {

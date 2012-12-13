@@ -108,6 +108,7 @@ class LLVM_LIBRARY_VISIBILITY TypeConverter {
   
   TypeInfo const &makeTypeInfo(CanType t);
   void makeFragileElements(TypeInfo &theInfo, CanType t);
+  void makeFragileElementsForDecl(TypeInfo &theInfo, NominalTypeDecl *decl);
 
 public:
   TypeConverter(SILGenModule &sgm) { }
