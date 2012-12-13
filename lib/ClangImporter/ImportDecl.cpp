@@ -881,15 +881,40 @@ namespace {
       return cast<NamedPattern>(pattern)->getDecl();
     }
 
+    /// \brief Add the implicit 'this' pattern to the given list of patterns.
+    ///
+    /// \param thisTy The type of the 'this' parameter.
+    ///
+    /// \param args The set of arguments 
+    VarDecl *addImplicitThisParameter(Type thisTy,
+                                      SmallVectorImpl<Pattern *> &args) {
+      auto thisName = Impl.SwiftContext.getIdentifier("this");
+      auto thisVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), thisName,
+                                                     thisTy,
+                                                     Impl.firstClangModule);
+      Pattern *thisPat = new (Impl.SwiftContext) NamedPattern(thisVar);
+      thisPat->setType(thisVar->getType());
+      thisPat = new (Impl.SwiftContext) TypedPattern(
+                                          thisPat,
+                                          TypeLoc::withoutLoc(thisTy));
+      thisPat->setType(thisVar->getType());
+      args.push_back(thisPat);
+
+      return thisVar;
+    }
+
     /// \brief Build a thunk for an Objective-C getter.
     ///
     /// \param getter The Objective-C getter method.
+    ///
+    /// \param dc The declaration context into which the thunk will be added.
     ///
     /// \param indices If non-null, the indices for a subscript getter. Null
     /// indicates that we're generating a getter thunk for a property getter.
     ///
     /// \returns The getter thunk.
-    FuncDecl *buildGetterThunk(FuncDecl *getter, Pattern *indices) {
+    FuncDecl *buildGetterThunk(FuncDecl *getter, DeclContext *dc,
+                               Pattern *indices) {
       auto &context = Impl.SwiftContext;
       auto loc = getter->getLoc();
 
@@ -900,11 +925,11 @@ namespace {
             ->castTo<FunctionType>()->getResult();
 
       // Form the argument patterns.
-      llvm::SmallVector<Pattern *, 3> getterArgs;
+      SmallVector<Pattern *, 3> getterArgs;
 
       // 'this'
-      getterArgs.push_back(
-        getter->getBody()->getBodyParamPatterns()[0]->clone(context));
+      auto thisVar = addImplicitThisParameter(dc->getDeclaredTypeOfContext(),
+                                              getterArgs);
 
       // index, for subscript operations.
       if (indices) {
@@ -948,8 +973,6 @@ namespace {
                                           getter->getDeclContext());
 
       // Create the body of the thunk, which calls the Objective-C getter.
-      auto thisVar = getSingleVar(getterArgs[0]);
-
       auto thisRef = new (context) DeclRefExpr(thisVar, loc,
                                                thisVar->getTypeOfReference());
       auto getterRef
@@ -991,11 +1014,14 @@ namespace {
     ///
     /// \param setter The Objective-C setter method.
     ///
+    /// \param dc The declaration context into which the thunk will be added.
+    ///
     /// \param indices If non-null, the indices for a subscript setter. Null
     /// indicates that we're generating a setter thunk for a property setter.
     ///
     /// \returns The getter thunk.
-    FuncDecl *buildSetterThunk(FuncDecl *setter, Pattern *indices) {
+    FuncDecl *buildSetterThunk(FuncDecl *setter, DeclContext *dc,
+                               Pattern *indices) {
       auto &context = Impl.SwiftContext;
       auto loc = setter->getLoc();
       auto tuple = cast<TuplePattern>(
@@ -1019,8 +1045,8 @@ namespace {
       llvm::SmallVector<Pattern *, 3> setterArgs;
 
       // 'this'
-      setterArgs.push_back(
-        setter->getBody()->getBodyParamPatterns()[0]->clone(context));
+      auto thisVar = addImplicitThisParameter(dc->getDeclaredTypeOfContext(),
+                                              setterArgs);
 
       // index, for subscript operations.
       if (indices) {
@@ -1068,11 +1094,9 @@ namespace {
       // Create the setter thunk.
       auto thunk = new (context) FuncDecl(SourceLoc(), setter->getLoc(),
                                           Identifier(), SourceLoc(), nullptr,
-                                          setterType, funcExpr,
-                                          setter->getDeclContext());
+                                          setterType, funcExpr, dc);
 
       // Create the body of the thunk, which calls the Objective-C setter.
-      auto thisVar = getSingleVar(setterArgs[0]);
       auto valueVar = getSingleVar(setterArgs.back());
 
       auto thisRef = new (context) DeclRefExpr(thisVar, loc,
@@ -1205,6 +1229,7 @@ namespace {
             ->castTo<AnyFunctionType>()->getResult();
 
       // Check the form of the getter.
+      auto dc = decl->getDeclContext();
       FuncDecl *getterThunk = nullptr;
       auto &context = Impl.SwiftContext;
       {
@@ -1214,7 +1239,7 @@ namespace {
           return nullptr;
 
         auto indices = tuple->getFields()[0].getPattern();
-        getterThunk = buildGetterThunk(getter, indices);
+        getterThunk = buildGetterThunk(getter, dc, indices);
       }
 
       // Check the form of the setter.
@@ -1236,22 +1261,19 @@ namespace {
           return nullptr;
 
         auto indices = tuple->getFields()[1].getPattern();
-        setterThunk = buildSetterThunk(setter, indices);
+        setterThunk = buildSetterThunk(setter, dc, indices);
       }
 
       // Build the subscript declaration.
       auto loc = decl->getLoc();
-      auto dc = decl->getDeclContext();
       auto argPatterns
         = getterThunk->getBody()->getArgParamPatterns()[1]->clone(context);
+      auto name = context.getIdentifier("__subscript");
       auto subscript
-        = new (context) SubscriptDecl(
-                          context.getIdentifier("__subscript"),
-                          decl->getLoc(),
-                          argPatterns,
-                          decl->getLoc(),
-                          TypeLoc(elementTy, loc),
-                          SourceRange(), getterThunk, setterThunk, dc);
+        = new (context) SubscriptDecl(name, decl->getLoc(), argPatterns,
+                                      decl->getLoc(), TypeLoc(elementTy, loc),
+                                      SourceRange(), getterThunk, setterThunk,
+                                      dc);
       setVarDeclContexts(argPatterns, subscript->getDeclContext());
 
       subscript->setType(FunctionType::get(subscript->getIndices()->getType(),
@@ -1261,7 +1283,44 @@ namespace {
       if (setterThunk)
         setterThunk->makeSetter(subscript);
 
-      // FIXME: Figure out overriding.
+      // Determine whether this subscript operation overrides another subscript
+      // operation.
+      // FIXME: This ends up looking in the superclass for entirely bogus
+      // reasons. Fix it.
+      auto containerTy = dc->getDeclaredTypeInContext();
+      MemberLookup lookup(containerTy, name, *Impl.firstClangModule);
+      Type unlabeledIndices;
+      for (const auto &result : lookup.Results) {
+        auto parentSub = dyn_cast<SubscriptDecl>(result.D);
+        if (!parentSub)
+          continue;
+
+        // Compute the type of indices for our own subscript operation, lazily.
+        if (!unlabeledIndices) {
+          unlabeledIndices = subscript->getIndices()->getType()
+                               ->getUnlabeledType(Impl.SwiftContext);
+        }
+
+        // Compute the type of indices for the subscript we found.
+        auto parentUnlabeledIndices = parentSub->getIndices()->getType()
+                                       ->getUnlabeledType(Impl.SwiftContext);
+        if (!unlabeledIndices->isEqual(parentUnlabeledIndices))
+          continue;
+
+        // The index types match. This is an override, so mark it as such.
+        subscript->setOverriddenDecl(parentSub);
+        if (auto parentGetter = parentSub->getGetter()) {
+          if (getterThunk)
+              getterThunk->setOverriddenDecl(parentGetter);
+        }
+        if (auto parentSetter = parentSub->getSetter()) {
+          if (setterThunk)
+            setterThunk->setOverriddenDecl(parentSetter);
+        }
+
+        // FIXME: Eventually, deal with multiple overrides.
+        break;
+      }
 
       // Note that we've created this subscript.
       Impl.Subscripts[{getter, setter}] = subscript;
@@ -1471,12 +1530,12 @@ namespace {
                               name, type, dc);
 
       // Build thunks.
-      FuncDecl *getterThunk = buildGetterThunk(getter, nullptr);
+      FuncDecl *getterThunk = buildGetterThunk(getter, dc, nullptr);
       getterThunk->makeGetter(result);
 
       FuncDecl *setterThunk = nullptr;
       if (setter) {
-        setterThunk = buildSetterThunk(setter, nullptr);
+        setterThunk = buildSetterThunk(setter, dc, nullptr);
         setterThunk->makeSetter(result);
       }
 

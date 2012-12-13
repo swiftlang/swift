@@ -52,6 +52,9 @@
 - (void)setObject:(id)object atIndexedSubscript:(unsigned)idx;
 
 - objectForKeyedSubscript:(id)key;
+@end
+
+@interface B(Subscripting)
 - (void)setObject:(id)object forKeyedSubscript:(id)key;
 @end
 
