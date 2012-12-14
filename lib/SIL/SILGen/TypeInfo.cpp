@@ -85,8 +85,6 @@ void TypeConverter::makeFragileElementsForDecl(TypeInfo &theInfo,
 void TypeConverter::makeFragileElements(TypeInfo &theInfo, CanType t) {
   if (NominalType *nt = t->getAs<NominalType>()) {
     makeFragileElementsForDecl(theInfo, nt->getDecl());
-  } else if (UnboundGenericType *ugt = t->getAs<UnboundGenericType>()) {
-    makeFragileElementsForDecl(theInfo, ugt->getDecl());
   } else if (BoundGenericType *bgt = t->getAs<BoundGenericType>()) {
     makeFragileElementsForDecl(theInfo, bgt->getDecl());
   }
