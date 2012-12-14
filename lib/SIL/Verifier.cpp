@@ -130,6 +130,8 @@ public:
            "Tuple field count mismatch!");
   }
   void visitMetatypeInst(MetatypeInst *MI) {
+    assert(MI->getType(0)->is<MetaTypeType>() &&
+           "Metatype instruction must be of metatype type");
   }
   
   void visitRetainInst(RetainInst *RI) {

@@ -560,9 +560,9 @@ public:
   ///
   /// \param Expr A backpointer to the original MetatypeExpr.
   ///
-  MetatypeInst(MetatypeExpr *E);
+  MetatypeInst(Expr *E);
 
-  MetatypeExpr *getExpr() const;
+  Expr *getExpr() const;
 
   /// getMetaType - Return the type of the metatype that this instruction
   /// returns.

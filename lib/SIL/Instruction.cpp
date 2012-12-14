@@ -308,11 +308,11 @@ TupleInst::TupleInst(SILLocation Loc, Type Ty, ArrayRef<Value> Elems)
   memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(Value));
 }
 
-MetatypeInst::MetatypeInst(MetatypeExpr *E)
+MetatypeInst::MetatypeInst(Expr *E)
   : Instruction(ValueKind::MetatypeInst, E, E->getType()) {}
 
-MetatypeExpr *MetatypeInst::getExpr() const {
-  return getLocExpr<MetatypeExpr>();
+Expr *MetatypeInst::getExpr() const {
+  return getLocExpr<Expr>();
 }
 
 /// getMetaType - Return the type of the metatype that this instruction

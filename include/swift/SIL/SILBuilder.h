@@ -215,7 +215,7 @@ public:
     return insert(new RefElementAddrInst(Loc, Operand, FieldNo, ResultTy));
   }
   
-  MetatypeInst *createMetatype(MetatypeExpr *Expr) {
+  MetatypeInst *createMetatype(Expr *Expr) {
     return insert(new MetatypeInst(Expr));
   }
   
