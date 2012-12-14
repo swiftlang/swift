@@ -737,3 +737,9 @@ void SILGenFunction::emitClosureBody(Expr *body) {
   if (B.hasValidInsertionPoint())
     Cleanups.emitReturnAndCleanups(body, result);
 }
+
+ManagedValue SILGenFunction::visitInterpolatedStringLiteralExpr(
+                                              InterpolatedStringLiteralExpr *E)
+{
+  return visit(E->getSemanticExpr());
+}

@@ -301,6 +301,8 @@ public:
   ManagedValue visitMetatypeExpr(MetatypeExpr *E);
   ManagedValue visitFuncExpr(FuncExpr *E);
   ManagedValue visitClosureExpr(ClosureExpr *E);
+  ManagedValue visitInterpolatedStringLiteralExpr(
+                                              InterpolatedStringLiteralExpr *E);
     
   void emitApplyArguments(Expr *argsExpr,
                           llvm::SmallVectorImpl<Value> &args,
