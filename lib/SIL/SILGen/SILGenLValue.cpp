@@ -224,17 +224,33 @@ LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
   if (ti.hasFragileElement(decl->getName())) {
     lv.add<FragileElementComponent>(ti.getFragileElement(decl->getName()));
   } else {
-    Value get = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
+    ManagedValue get = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
                                        SILConstant(decl, SILConstant::Getter),
-                                       substitutions)
-                   .getValue();
-    Value set = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
+                                       substitutions);
+    ManagedValue set = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
                                        SILConstant(decl, SILConstant::Setter),
-                                       substitutions)
-                   .getValue();
-    lv.add<GetterSetterComponent>(get, set);
+                                       substitutions);
+    lv.add<GetterSetterComponent>(get.getValue(), set.getValue());
   }
   
+  return ::std::move(lv);
+}
+  
+template<typename ANY_SUBSCRIPT_EXPR>
+LValue emitAnySubscriptExpr(SILGenLValue &sgl,
+                            SILGenFunction &gen,
+                            ANY_SUBSCRIPT_EXPR *e,
+                            ArrayRef<Substitution> substitutions) {
+  LValue lv = sgl.visitRec(e->getBase());
+  SubscriptDecl *sd = e->getDecl();
+  ManagedValue get = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
+                                           SILConstant(sd, SILConstant::Getter),
+                                           substitutions);
+  ManagedValue set = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
+                                           SILConstant(sd, SILConstant::Setter),
+                                           substitutions);
+  lv.add<GetterSetterComponent>(get.getValue(), set.getValue(),
+                                e->getIndex());
   return ::std::move(lv);
 }
   
@@ -248,15 +264,12 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   return emitAnyMemberRefExpr(*this, gen, e, {});
 }
 
+LValue SILGenLValue::visitGenericSubscriptExpr(GenericSubscriptExpr *e) {
+  return emitAnySubscriptExpr(*this, gen, e, e->getSubstitutions());
+}
+
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
-  LValue lv = visitRec(e->getBase());
-  SubscriptDecl *sd = e->getDecl();
-  Value get = gen.emitUnmanagedConstantRef(e,
-                                       SILConstant(sd, SILConstant::Getter));
-  Value set = gen.emitUnmanagedConstantRef(e,
-                                       SILConstant(sd, SILConstant::Setter));
-  lv.add<GetterSetterComponent>(get, set, e->getIndex());
-  return ::std::move(lv);
+  return emitAnySubscriptExpr(*this, gen, e, {});
 }
 
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {

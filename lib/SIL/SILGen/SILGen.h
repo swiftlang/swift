@@ -291,6 +291,7 @@ public:
   ManagedValue visitModuleExpr(ModuleExpr *E);
   ManagedValue visitTupleElementExpr(TupleElementExpr *E);
   ManagedValue visitSubscriptExpr(SubscriptExpr *E);
+  ManagedValue visitGenericSubscriptExpr(GenericSubscriptExpr *E);
   ManagedValue visitTupleShuffleExpr(TupleShuffleExpr *E);
   ManagedValue visitNewArrayExpr(NewArrayExpr *E);
   ManagedValue visitMetatypeExpr(MetatypeExpr *E);
@@ -396,6 +397,7 @@ public:
   LValue visitMemberRefExpr(MemberRefExpr *e);
   LValue visitGenericMemberRefExpr(GenericMemberRefExpr *e);
   LValue visitSubscriptExpr(SubscriptExpr *e);
+  LValue visitGenericSubscriptExpr(GenericSubscriptExpr *e);
   LValue visitTupleElementExpr(TupleElementExpr *e);
   
   // Expressions that wrap lvalues

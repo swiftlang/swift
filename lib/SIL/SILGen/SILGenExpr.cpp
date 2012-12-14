@@ -390,6 +390,12 @@ ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
     SILModule &m = F.getModule();
     Type propType = m.getPropertyType(constant.id,
                                       expr->getType()->getRValueType());
+    if (SubscriptDecl *sd =
+        dyn_cast_or_null<SubscriptDecl>(constant.loc.dyn_cast<ValueDecl*>())) {
+      propType = m.getSubscriptPropertyType(constant.id,
+                                            sd->getIndices()->getType(),
+                                            sd->getElementType());
+    }
     propType = m.getMethodTypeInContext(baseExpr->getType()->getRValueType(),
                                         propType);
     method = emitManagedRValueWithCleanup(
@@ -422,29 +428,48 @@ ManagedValue SILGenFunction::visitModuleExpr(ModuleExpr *E) {
   return ManagedValue(B.createZeroValue(E, E->getType()));
 }
 
-ManagedValue SILGenFunction::visitSubscriptExpr(SubscriptExpr *E) {
-  SubscriptDecl *sd = E->getDecl();
-  ManagedValue base = visit(E->getBase());
+namespace {
+
+template<typename ANY_SUBSCRIPT_EXPR>
+ManagedValue emitAnySubscriptExpr(SILGenFunction &gen,
+                                  ANY_SUBSCRIPT_EXPR *e,
+                                  ArrayRef<Substitution> substitutions)
+{
+  SubscriptDecl *sd = e->getDecl();
+  ManagedValue base = gen.visit(e->getBase());
   llvm::SmallVector<Value, 2> indexArgs;
   llvm::SmallVector<Writeback, 2> writebacks;
   
-  emitApplyArguments(E->getIndex(), indexArgs, writebacks);
+  gen.emitApplyArguments(e->getIndex(), indexArgs, writebacks);
   assert(writebacks.empty() && "subscript should not have byref args");
   
   // Get the getter function, which will have type This -> Index -> () -> T.
-  Value getterMethod = B.createConstantRef(E, SILConstant(sd,
-                                                          SILConstant::Getter),
-                                           F);
-  
+  ManagedValue getterMethod = gen.emitSpecializedPropertyConstantRef(
+                                          e, e->getBase(),
+                                          SILConstant(sd, SILConstant::Getter),
+                                          substitutions);
   
   // Apply the "this" parameter.
-  Value getterDelegate = B.createApply(E, getterMethod, base.forward(*this));
+  Value getterDelegate = gen.B.createApply(e,
+                                           getterMethod.forward(gen),
+                                           base.forward(gen));
   // Apply the index parameter.
-  Value getter = B.createApply(E, getterDelegate, indexArgs);
+  Value getter = gen.B.createApply(e, getterDelegate, indexArgs);
   // Apply the getter.
-  Materialize propTemp = emitGetProperty(E,
-                                         emitManagedRValueWithCleanup(getter));
+  Materialize propTemp = gen.emitGetProperty(e,
+                                      gen.emitManagedRValueWithCleanup(getter));
   return ManagedValue(propTemp.address);
+}
+
+}
+
+ManagedValue SILGenFunction::visitSubscriptExpr(SubscriptExpr *E) {
+  return emitAnySubscriptExpr(*this, E, {});
+}
+
+ManagedValue SILGenFunction::visitGenericSubscriptExpr(GenericSubscriptExpr *E)
+{
+  return emitAnySubscriptExpr(*this, E, E->getSubstitutions());
 }
 
 ManagedValue SILGenFunction::visitTupleElementExpr(TupleElementExpr *E) {
