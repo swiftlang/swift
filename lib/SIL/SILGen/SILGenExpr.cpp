@@ -413,6 +413,15 @@ ManagedValue SILGenFunction::visitMemberRefExpr(MemberRefExpr *E) {
 
 ManagedValue SILGenFunction::visitGenericMemberRefExpr(GenericMemberRefExpr *E)
 {
+  // FIXME: Kludge to handle type variable references, which currently manifest
+  // as GenericMemberRefExprs off the generic type. According to John this might
+  // be an AST problem.
+  if (E->getType()->is<MetaTypeType>() &&
+      E->getBase()->getType()->is<MetaTypeType>()) {
+    visit(E->getBase());
+    return ManagedValue(B.createMetatype(E));
+  }
+  
   return emitAnyMemberRefExpr(*this, E, E->getSubstitutions());
 }
 
