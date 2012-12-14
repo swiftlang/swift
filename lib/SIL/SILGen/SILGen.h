@@ -333,6 +333,7 @@ public:
   ManagedValue emitMaterializedLoadFromLValue(SILLocation loc,
                                               LValue const &src);
   ManagedValue emitSpecializedPropertyConstantRef(Expr *expr, Expr *baseExpr,
+                                            Expr /*nullable*/ *subscriptExpr,
                                             SILConstant constant,
                                             ArrayRef<Substitution> substs);
 

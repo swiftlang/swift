@@ -225,9 +225,11 @@ LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
     lv.add<FragileElementComponent>(ti.getFragileElement(decl->getName()));
   } else {
     ManagedValue get = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
+                                       /*subscriptExpr=*/nullptr,
                                        SILConstant(decl, SILConstant::Getter),
                                        substitutions);
     ManagedValue set = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
+                                       /*subscriptExpr=*/nullptr,
                                        SILConstant(decl, SILConstant::Setter),
                                        substitutions);
     lv.add<GetterSetterComponent>(get.getValue(), set.getValue());
@@ -244,9 +246,11 @@ LValue emitAnySubscriptExpr(SILGenLValue &sgl,
   LValue lv = sgl.visitRec(e->getBase());
   SubscriptDecl *sd = e->getDecl();
   ManagedValue get = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
+                                           e->getIndex(),
                                            SILConstant(sd, SILConstant::Getter),
                                            substitutions);
   ManagedValue set = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
+                                           e->getIndex(),
                                            SILConstant(sd, SILConstant::Setter),
                                            substitutions);
   lv.add<GetterSetterComponent>(get.getValue(), set.getValue(),

@@ -359,6 +359,7 @@ ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
     // The type will be a polymorphic function if the This type is generic.
     ManagedValue getter = gen.emitSpecializedPropertyConstantRef(e,
                                               e->getBase(),
+                                              /*subscriptExpr=*/nullptr,
                                               SILConstant(e->getDecl(),
                                                           SILConstant::Getter),
                                               substitutions);
@@ -377,6 +378,7 @@ ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
 
 ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
                                           Expr *expr, Expr *baseExpr,
+                                          Expr /*nullable*/ *subscriptExpr,
                                           SILConstant constant,
                                           ArrayRef<Substitution> substitutions)
 {
@@ -388,13 +390,14 @@ ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
     assert(method.getValue().getType()->is<PolymorphicFunctionType>() &&
            "generic getter is not of a poly function type");
     SILModule &m = F.getModule();
-    Type propType = m.getPropertyType(constant.id,
-                                      expr->getType()->getRValueType());
-    if (SubscriptDecl *sd =
-        dyn_cast_or_null<SubscriptDecl>(constant.loc.dyn_cast<ValueDecl*>())) {
+    Type propType;
+    if (subscriptExpr) {
       propType = m.getSubscriptPropertyType(constant.id,
-                                            sd->getIndices()->getType(),
-                                            sd->getElementType());
+                                            subscriptExpr->getType(),
+                                            expr->getType()->getRValueType());
+    } else {
+      propType = m.getPropertyType(constant.id,
+                                   expr->getType()->getRValueType());
     }
     propType = m.getMethodTypeInContext(baseExpr->getType()->getRValueType(),
                                         propType);
@@ -454,7 +457,7 @@ ManagedValue emitAnySubscriptExpr(SILGenFunction &gen,
   
   // Get the getter function, which will have type This -> Index -> () -> T.
   ManagedValue getterMethod = gen.emitSpecializedPropertyConstantRef(
-                                          e, e->getBase(),
+                                          e, e->getBase(), e->getIndex(),
                                           SILConstant(sd, SILConstant::Getter),
                                           substitutions);
   
