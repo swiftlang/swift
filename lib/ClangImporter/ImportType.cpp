@@ -510,9 +510,8 @@ getNamedSwiftTypeSpecialization(StringRef name, ArrayRef<Type> args) {
       return Type();
   }
 
-  UnqualifiedLookup genericSliceLookup(SwiftContext.getIdentifier("CPointer"),
-                                       swiftModule);
-  if (TypeDecl *typeDecl = genericSliceLookup.getSingleTypeResult()) {
+  UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), swiftModule);
+  if (TypeDecl *typeDecl = lookup.getSingleTypeResult()) {
     if (auto nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
       if (auto params = nominalDecl->getGenericParams()) {
         if (params->size() == args.size()) {
