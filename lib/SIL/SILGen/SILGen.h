@@ -48,8 +48,12 @@ public:
   /// the module is not a main module.
   SILGenFunction *TopLevelSGF;
   
+  /// Verbose - If true, dumps input ASTs and output SIL to errs as they are
+  /// generated.
+  bool Verbose;
+  
 public:
-  SILGenModule(SILModule &M);
+  SILGenModule(SILModule &M, bool Verbose);
   ~SILGenModule();
   
   SILGenModule(SILGenModule const &) = delete;

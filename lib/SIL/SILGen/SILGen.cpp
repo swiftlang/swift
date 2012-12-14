@@ -77,8 +77,8 @@ SILGenFunction::~SILGenFunction() {
 // SILGenModule Class implementation
 //===--------------------------------------------------------------------===//
 
-SILGenModule::SILGenModule(SILModule &M)
-  : M(M), Types(*this), TopLevelSGF(nullptr) {
+SILGenModule::SILGenModule(SILModule &M, bool verbose)
+  : M(M), Types(*this), TopLevelSGF(nullptr), Verbose(verbose) {
   if (M.toplevel)
     TopLevelSGF = new SILGenFunction(*this, *M.toplevel,
                                      /*hasVoidReturn=*/true);
@@ -100,9 +100,17 @@ Function *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   assert(!M.hasFunction(constant) &&
          "already generated function for decl!");
 
+  if (Verbose) {
+    constant.dump();
+    fe->dump();
+  }
+  
   Function *f = new (M) Function(M);
   SILGenFunction(*this, *f, fe).visit(fe->getBody());
   
+  if (Verbose) {
+    f->dump();
+  }
   f->verify();
   M.functions[constant] = f;
   
@@ -114,9 +122,17 @@ Function *SILGenModule::emitClosure(ClosureExpr *ce) {
   assert(!M.hasFunction(constant) &&
          "already generated function for closure!");
   
+  if (Verbose) {
+    constant.dump();
+    ce->dump();
+  }
+  
   Function *f = new (M) Function(M);
   SILGenFunction(*this, *f, ce).emitClosureBody(ce->getBody());
-  
+
+  if (Verbose) {
+    f->dump();
+  }
   f->verify();
   M.functions[constant] = f;
   
@@ -132,7 +148,7 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 //===--------------------------------------------------------------------===//
 
 
-SILModule *SILModule::constructSIL(TranslationUnit *tu) {
+SILModule *SILModule::constructSIL(TranslationUnit *tu, bool verbose) {
   bool hasTopLevel = true;
   switch (tu->Kind) {
   case TranslationUnit::Library:
@@ -144,7 +160,7 @@ SILModule *SILModule::constructSIL(TranslationUnit *tu) {
     break;
   }
   SILModule *m = new SILModule(tu->getASTContext(), hasTopLevel);
-  SILGenModule sgm(*m);
+  SILGenModule sgm(*m, verbose);
   for (Decl *D : tu->Decls)
     sgm.visit(D);
   return m;
