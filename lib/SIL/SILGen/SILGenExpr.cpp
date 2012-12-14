@@ -288,7 +288,8 @@ ManagedValue SILGenFunction::visitTupleExpr(TupleExpr *E) {
 }
 
 ManagedValue SILGenFunction::visitGetMetatypeExpr(GetMetatypeExpr *E) {
-  return visit(E->getSubExpr());
+  visit(E->getSubExpr());
+  return ManagedValue(B.createMetatype(E));
 }
 
 ManagedValue SILGenFunction::visitSpecializeExpr(SpecializeExpr *E) {
