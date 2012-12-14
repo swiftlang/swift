@@ -221,8 +221,8 @@ public:
     OS << "specialize " << getID(SI->getOperand()) << ", $"
        << SI->getType().getString();
   }
-  void visitConvertInst(ConvertInst *CI) {
-    OS << "convert " << getID(CI->getOperand()) << ", $"
+  void visitImplicitConvertInst(ImplicitConvertInst *CI) {
+    OS << "implicit_convert " << getID(CI->getOperand()) << ", $"
        << CI->getType().getString();
   }
   void visitTupleInst(TupleInst *TI) {

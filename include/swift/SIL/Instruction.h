@@ -463,24 +463,54 @@ public:
   }
 };
 
-
-/// ConvertInst - Change the Type of some value without affecting how it
-/// will codegen.
-class ConvertInst : public Instruction {
+/// ConversionInst - Abstract class representing instructions that convert
+/// values
+class ConversionInst : public Instruction {
   Value Operand;
 public:
-  ConvertInst(SILLocation Loc, Value Operand, Type Ty);
-
+  ConversionInst(ValueKind Kind, SILLocation Loc, Value Operand, Type Ty);
+  
   Value getOperand() const { return Operand; }
-
+  
   /// getType() is ok since this is known to only have one type.
   Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
+  
   static bool classof(Value V) {
-    return V->getKind() == ValueKind::ConvertInst;
+    return V->getKind() >= ValueKind::First_ConversionInst &&
+      V->getKind() <= ValueKind::Last_ConversionInst;
   }
 };
 
+/// ImplicitConvertInst - Change the type of some value without affecting how it
+/// will codegen.
+class ImplicitConvertInst : public ConversionInst {
+public:
+  ImplicitConvertInst(SILLocation Loc, Value Operand, Type Ty);
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ImplicitConvertInst;
+  }
+};
+
+/// CoerceInst - Convert a value to a type with an explicit T(x) cast.
+class CoerceInst : public ConversionInst {
+public:
+  CoerceInst(SILLocation Loc, Value Operand, Type ty);
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::CoerceInst;
+  }
+};
+
+/// DowncastInst - Perform a checked conversion of a value to a subclass type.
+class DowncastInst : public ConversionInst {
+public:
+  DowncastInst(SILLocation Loc, Value Operand, Type ty);
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::DowncastInst;
+  }
+};
 
 /// TupleInst - Represents a constructed tuple.
 class TupleInst : public Instruction {

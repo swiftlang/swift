@@ -177,10 +177,19 @@ public:
   }
 
 
-  ConvertInst *createConvert(SILLocation Loc, Value Op, Type Ty) {
-    return insert(new ConvertInst(Loc, Op, Ty));
+  ImplicitConvertInst *createImplicitConvert(SILLocation Loc, Value Op,
+                                             Type Ty) {
+    return insert(new ImplicitConvertInst(Loc, Op, Ty));
   }
 
+  CoerceInst *createCoerce(SILLocation Loc, Value Op, Type Ty) {
+    return insert(new CoerceInst(Loc, Op, Ty));
+  }
+  
+  DowncastInst *createDowncast(SILLocation Loc, Value Op, Type Ty) {
+    return insert(new DowncastInst(Loc, Op, Ty));
+  }
+  
   TupleInst *createTuple(SILLocation Loc, Type Ty, ArrayRef<Value> Elements) {
     return insert(TupleInst::create(Loc, Ty, Elements, F));
   }

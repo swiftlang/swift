@@ -249,7 +249,7 @@ ManagedValue SILGenFunction::visitMaterializeExpr(MaterializeExpr *E) {
 }
 
 ManagedValue SILGenFunction::visitRequalifyExpr(RequalifyExpr *E) {
-  return ManagedValue(B.createConvert(E,
+  return ManagedValue(B.createImplicitConvert(E,
                                       visit(E->getSubExpr()).getValue(),
                                       E->getType()));
 }
@@ -257,7 +257,7 @@ ManagedValue SILGenFunction::visitRequalifyExpr(RequalifyExpr *E) {
 ManagedValue SILGenFunction::visitFunctionConversionExpr(
                                                       FunctionConversionExpr *E)
 {
-  return ManagedValue(B.createConvert(E,
+  return ManagedValue(B.createImplicitConvert(E,
                                       visit(E->getSubExpr()).getValue(),
                                       E->getType()));
 }
@@ -416,7 +416,7 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(Value ObjectPtr,
                                             Expr *ArrayInjectionFunction) {
   // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
   if (!BasePtr.getType()->isEqual(F.getContext().TheRawPointerType))
-    BasePtr = B.createConvert(SILLocation(),
+    BasePtr = B.createImplicitConvert(SILLocation(),
                               BasePtr,
                               F.getContext().TheRawPointerType);
 

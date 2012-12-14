@@ -278,10 +278,23 @@ SpecializeInst::SpecializeInst(SILLocation Loc, Value Operand,
          Substitutions.size() * sizeof(Substitution));
 }
 
-ConvertInst::ConvertInst(SILLocation Loc, Value Operand, Type Ty)
-  : Instruction(ValueKind::ConvertInst, Loc, Ty), Operand(Operand) {
+ConversionInst::ConversionInst(ValueKind Kind,
+                               SILLocation Loc, Value Operand, Type Ty)
+  : Instruction(Kind, Loc, Ty), Operand(Operand) {
 }
 
+ImplicitConvertInst::ImplicitConvertInst(SILLocation Loc, Value Operand,
+                                         Type Ty)
+  : ConversionInst(ValueKind::ImplicitConvertInst, Loc, Operand, Ty) {
+}
+
+CoerceInst::CoerceInst(SILLocation Loc, Value Operand, Type Ty)
+  : ConversionInst(ValueKind::CoerceInst, Loc, Operand, Ty) {
+}
+
+DowncastInst::DowncastInst(SILLocation Loc, Value Operand, Type Ty)
+  : ConversionInst(ValueKind::DowncastInst, Loc, Operand, Ty) {
+}
 
 TupleInst *TupleInst::createImpl(SILLocation Loc, Type Ty,
                                  ArrayRef<Value> Elements, Function &F) {
