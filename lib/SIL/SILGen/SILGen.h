@@ -325,6 +325,9 @@ public:
   void emitAssignToLValue(SILLocation loc, Value src, LValue const &dest);
   ManagedValue emitMaterializedLoadFromLValue(SILLocation loc,
                                               LValue const &src);
+  ManagedValue emitSpecializedPropertyConstantRef(Expr *expr, Expr *baseExpr,
+                                            SILConstant constant,
+                                            ArrayRef<Substitution> substs);
 
   //===--------------------------------------------------------------------===//
   // Declarations

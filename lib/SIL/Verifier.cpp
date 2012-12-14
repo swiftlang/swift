@@ -117,8 +117,9 @@ public:
   
   void visitSpecializeInst(SpecializeInst *SI) {
     assert(SI->getType()->is<FunctionType>() &&
-           SI->getOperand().getType()->is<PolymorphicFunctionType>() &&
-           "SpecializeInst only works on function types");
+           "Specialize dest should be a function type");
+    assert(SI->getOperand().getType()->is<PolymorphicFunctionType>() &&
+           "Specialize source should be a polymorphic function type");
   }
 
   void visitTupleInst(TupleInst *TI) {

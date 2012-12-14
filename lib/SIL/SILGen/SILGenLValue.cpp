@@ -214,7 +214,8 @@ namespace {
 template<typename ANY_MEMBER_REF_EXPR>
 LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
                             SILGenFunction &gen,
-                            ANY_MEMBER_REF_EXPR *e) {
+                            ANY_MEMBER_REF_EXPR *e,
+                            ArrayRef<Substitution> substitutions) {
   LValue lv = sgl.visitRec(e->getBase());
   ValueDecl *decl = e->getDecl();
   TypeInfo const &ti = gen.getTypeInfo(
@@ -223,10 +224,14 @@ LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
   if (ti.hasFragileElement(decl->getName())) {
     lv.add<FragileElementComponent>(ti.getFragileElement(decl->getName()));
   } else {
-    Value get = gen.emitUnmanagedConstantRef(e,
-                                       SILConstant(decl, SILConstant::Getter));
-    Value set = gen.emitUnmanagedConstantRef(e,
-                                       SILConstant(decl, SILConstant::Setter));
+    Value get = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
+                                       SILConstant(decl, SILConstant::Getter),
+                                       substitutions)
+                   .getValue();
+    Value set = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
+                                       SILConstant(decl, SILConstant::Setter),
+                                       substitutions)
+                   .getValue();
     lv.add<GetterSetterComponent>(get, set);
   }
   
@@ -236,11 +241,11 @@ LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
 } // end anonymous namespace
 
 LValue SILGenLValue::visitGenericMemberRefExpr(GenericMemberRefExpr *e) {
-  return emitAnyMemberRefExpr(*this, gen, e);
+  return emitAnyMemberRefExpr(*this, gen, e, e->getSubstitutions());
 }
 
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
-  return emitAnyMemberRefExpr(*this, gen, e);
+  return emitAnyMemberRefExpr(*this, gen, e, {});
 }
 
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {

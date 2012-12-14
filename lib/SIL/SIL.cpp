@@ -60,52 +60,49 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc) {
 
 /// Get the type of a property accessor, () -> T for a getter or (value:T) -> ()
 /// for a setter.
-static Type getPropertyType(unsigned id, Type valueType, ASTContext &C) {
+Type SILModule::getPropertyType(unsigned id, Type valueType) const {
   if (id & SILConstant::Getter) {
-    return FunctionType::get(TupleType::getEmpty(C), valueType, C);
+    return FunctionType::get(TupleType::getEmpty(Context), valueType, Context);
   }
   if (id & SILConstant::Setter) {
-    TupleTypeElt valueParam(valueType, C.getIdentifier("value"));
-    return FunctionType::get(TupleType::get(valueParam, C),
-                                     TupleType::getEmpty(C), C);
+    TupleTypeElt valueParam(valueType, Context.getIdentifier("value"));
+    return FunctionType::get(TupleType::get(valueParam, Context),
+                             TupleType::getEmpty(Context),
+                             Context);
   }
   llvm_unreachable("not a property constant");
 }
 
 /// Get the type of a subscript accessor, Index -> PropertyAccessor.
-static Type getSubscriptPropertyType(unsigned id,
+Type SILModule::getSubscriptPropertyType(unsigned id,
                                      Type indexType,
-                                     Type elementType,
-                                     ASTContext &C) {
-  Type propertyType = getPropertyType(id, elementType, C);
-  return FunctionType::get(indexType, propertyType, C);
+                                     Type elementType) const {
+  Type propertyType = getPropertyType(id, elementType);
+  return FunctionType::get(indexType, propertyType, Context);
 }
 
 /// Get the type of the 'this' parameter for methods of a type.
-static Type getMethodThisType(Type thisType, ASTContext &C) {
+Type SILModule::getMethodThisType(Type thisType) const {
   if (thisType->hasReferenceSemantics()) {
     return thisType;
   } else {
-    return LValueType::get(thisType, LValueType::Qual::DefaultForType, C);
+    return LValueType::get(thisType, LValueType::Qual::DefaultForType, Context);
   }
 }
 
-/// Get the type of a method of function type M in context type This,
-/// <T,U,...> This -> M,
-/// or the type M of the function itself if there is no context type.
-static Type getMethodTypeInContext(Type /*nullable*/ contextType,
-                                   Type methodType,
-                                   ASTContext &C) {
+Type SILModule::getMethodTypeInContext(Type /*nullable*/ contextType,
+                                       Type methodType) const {
   if (!contextType)
     return methodType;
-  Type thisType = getMethodThisType(contextType, C);
+  Type thisType = getMethodThisType(contextType);
   
   if (UnboundGenericType *ugt = contextType->getAs<UnboundGenericType>()) {
     return PolymorphicFunctionType::get(thisType, methodType,
-                                        ugt->getDecl()->getGenericParams(), C);
+                                        ugt->getDecl()->getGenericParams(),
+                                        Context);
   }
 
-  return FunctionType::get(thisType, methodType, C);
+  return FunctionType::get(thisType, methodType, Context);
 }
 
 /// Get the type of a global variable accessor function, () -> [byref] T.
@@ -117,28 +114,27 @@ static Type getGlobalAccessorType(Type varAddressType, ASTContext &C) {
 Type SILModule::makeConstantType(SILConstant c) {
   // TODO: mangle function types for address-only indirect arguments and returns
   if (ValueDecl *vd = c.loc.dyn_cast<ValueDecl*>()) {
-    ASTContext &C = vd->getASTContext();
     Type /*nullable*/ contextType =
       vd->getDeclContext()->getDeclaredTypeOfContext();
     if (SubscriptDecl *sd = dyn_cast<SubscriptDecl>(vd)) {
       // If this is a subscript accessor, derive the accessor type.
       Type subscriptType = getSubscriptPropertyType(c.id,
                                                     sd->getIndices()->getType(),
-                                                    sd->getElementType(), C);
-      return getMethodTypeInContext(contextType, subscriptType, C);
+                                                    sd->getElementType());
+      return getMethodTypeInContext(contextType, subscriptType);
     } else {
       Type propertyType;
       // If this is a property accessor, derive the property type.
       if (c.id & (SILConstant::Getter | SILConstant::Setter)) {
-        Type propertyType = getPropertyType(c.id, vd->getType(), C);
-        return getMethodTypeInContext(contextType, propertyType, C);
+        Type propertyType = getPropertyType(c.id, vd->getType());
+        return getMethodTypeInContext(contextType, propertyType);
       }
 
       // If it's a global var, derive the initializer/accessor function type
       // () -> [byref] T
       if (VarDecl *var = dyn_cast<VarDecl>(vd)) {
         assert(!var->isProperty() && "constant ref to non-physical global var");
-        return getGlobalAccessorType(var->getTypeOfReference(), C);
+        return getGlobalAccessorType(var->getTypeOfReference(), Context);
       }
       
       // Otherwise, return the Swift-level type.

@@ -292,7 +292,8 @@ ManagedValue SILGenFunction::visitGetMetatypeExpr(GetMetatypeExpr *E) {
 }
 
 ManagedValue SILGenFunction::visitSpecializeExpr(SpecializeExpr *E) {
-  return ManagedValue(B.createSpecialize(E,
+  return emitManagedRValueWithCleanup(B.createSpecialize(
+                                     E,
                                     visit(E->getSubExpr()).getUnmanagedValue(),
                                     E->getSubstitutions(),
                                     E->getType()));
@@ -338,44 +339,75 @@ static ManagedValue emitExtractLoadableElement(SILGenFunction &gen,
   
 template<typename ANY_MEMBER_REF_EXPR>
 ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
-                                  ANY_MEMBER_REF_EXPR *E) {
-  TypeInfo const &ti = gen.getTypeInfo(E->getBase()->getType()
+                                  ANY_MEMBER_REF_EXPR *e,
+                                  ArrayRef<Substitution> substitutions) {
+  TypeInfo const &ti = gen.getTypeInfo(e->getBase()->getType()
                                        ->getRValueType());
   
-  if (ti.hasFragileElement(E->getDecl()->getName())) {
+  if (ti.hasFragileElement(e->getDecl()->getName())) {
     // We can get to the element directly with element_addr.
-    FragileElement element = ti.getFragileElement(E->getDecl()->getName());
-    return emitExtractLoadableElement(gen, E, gen.visit(E->getBase()),
+    FragileElement element = ti.getFragileElement(e->getDecl()->getName());
+    return emitExtractLoadableElement(gen, e, gen.visit(e->getBase()),
                                       element.index);
   } else {
-    Type baseTy = E->getBase()->getType();
+    Type baseTy = e->getBase()->getType();
     // We have to load the element indirectly through a property.
     assert((baseTy->is<LValueType>() || baseTy->hasReferenceSemantics()) &&
            "member ref of a non-lvalue?!");
-    ManagedValue base = gen.visit(E->getBase());
+    ManagedValue base = gen.visit(e->getBase());
     // Get the getter function, which will have type This -> () -> T.
-    Value getterMethod = gen.B.createConstantRef(E,
-                                             SILConstant(E->getDecl(),
-                                                         SILConstant::Getter),
-                                             gen.F);
+    // The type will be a polymorphic function if the This type is generic.
+    ManagedValue getter = gen.emitSpecializedPropertyConstantRef(e,
+                                              e->getBase(),
+                                              SILConstant(e->getDecl(),
+                                                          SILConstant::Getter),
+                                              substitutions);
     // Apply the "this" parameter.
-    Value getter = gen.B.createApply(E, getterMethod, base.forward(gen));
+    Value getterDel = gen.B.createApply(e,
+                                        getter.forward(gen),
+                                        base.forward(gen));
     // Apply the getter.
-    Materialize propTemp = gen.emitGetProperty(E,
-                                      gen.emitManagedRValueWithCleanup(getter));
+    Materialize propTemp = gen.emitGetProperty(e,
+                                  gen.emitManagedRValueWithCleanup(getterDel));
     return ManagedValue(propTemp.address);
   }  
 }
 
 } // end anonymous namespace
 
+ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
+                                          Expr *expr, Expr *baseExpr,
+                                          SILConstant constant,
+                                          ArrayRef<Substitution> substitutions)
+{
+  // Get the accessor function. The type will be a polymorphic function if
+  // the This type is generic.
+  ManagedValue method(B.createConstantRef(expr, constant, F));
+  // If there are substitutions, specialize the generic getter.
+  if (!substitutions.empty()) {
+    assert(method.getValue().getType()->is<PolymorphicFunctionType>() &&
+           "generic getter is not of a poly function type");
+    SILModule &m = F.getModule();
+    Type propType = m.getPropertyType(constant.id,
+                                      expr->getType()->getRValueType());
+    propType = m.getMethodTypeInContext(baseExpr->getType()->getRValueType(),
+                                        propType);
+    method = emitManagedRValueWithCleanup(
+                            B.createSpecialize(expr, method.getUnmanagedValue(),
+                                               substitutions, propType));
+  }
+  assert(method.getValue().getType()->is<FunctionType>() &&
+         "getter is not of a concrete function type");
+  return method;
+}
+
 ManagedValue SILGenFunction::visitMemberRefExpr(MemberRefExpr *E) {
-  return emitAnyMemberRefExpr(*this, E);
+  return emitAnyMemberRefExpr(*this, E, {});
 }
 
 ManagedValue SILGenFunction::visitGenericMemberRefExpr(GenericMemberRefExpr *E)
 {
-  return emitAnyMemberRefExpr(*this, E);
+  return emitAnyMemberRefExpr(*this, E, E->getSubstitutions());
 }
 
 ManagedValue SILGenFunction::visitDotSyntaxBaseIgnoredExpr(

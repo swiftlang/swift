@@ -18,6 +18,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
@@ -219,7 +220,16 @@ public:
   }
   void visitSpecializeInst(SpecializeInst *SI) {
     OS << "specialize " << getID(SI->getOperand()) << ", $"
-       << SI->getType().getString();
+       << SI->getType().getString() << "  ; ";
+    bool first = true;
+    for (Substitution const &s : SI->getSubstitutions()) {
+      if (!first)
+        OS << ", ";
+      s.Archetype->print(OS);
+      OS << " = ";
+      s.Replacement->print(OS);
+      first = false;
+    }
   }
   
   void printConversionInst(ConversionInst *CI, llvm::StringRef name) {
