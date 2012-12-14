@@ -75,6 +75,7 @@ ABSTRACT_VALUE(Instruction, Value)
   INST(ExtractInst, Instruction)
   INST(ElementAddrInst, Instruction)
   INST(RefElementAddrInst, Instruction)
+  INST(ArchetypeMethodInst, Instruction)
 
   INST(RetainInst, Instruction)
   INST(ReleaseInst, Instruction)

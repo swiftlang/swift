@@ -615,13 +615,30 @@ class RefElementAddrInst : public Instruction {
   unsigned FieldNo;
 public:
   RefElementAddrInst(SILLocation Loc, Value Operand, unsigned FieldNo,
-                  Type ResultTy);
+                     Type ResultTy);
   
   Value getOperand() const { return Operand; }
   unsigned getFieldNo() const { return FieldNo; }
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::RefElementAddrInst;
+  }
+};
+  
+/// ArchetypeMethodInst - Given the address of an archetype value and a method
+/// constant, extracts the implementation of that method for the archetype.
+class ArchetypeMethodInst : public Instruction {
+  Value Operand;
+  SILConstant Member;
+public:
+  ArchetypeMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
+                      Function &F);
+  
+  Value getOperand() const { return Operand; }
+  SILConstant getMember() const { return Member; }
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ArchetypeMethodInst;
   }
 };
   

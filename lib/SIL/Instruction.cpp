@@ -339,6 +339,14 @@ RefElementAddrInst::RefElementAddrInst(SILLocation Loc, Value Operand,
     Operand(Operand), FieldNo(FieldNo) {
 }
 
+ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, Value Operand,
+                                         SILConstant Member, Function &F)
+  : Instruction(ValueKind::ArchetypeMethodInst, Loc,
+                F.getModule().getConstantType(Member)),
+    Operand(Operand), Member(Member) {
+  
+}
+
 RetainInst::RetainInst(SILLocation Loc, Value Operand)
   : Instruction(ValueKind::RetainInst, Loc, Operand.getType()),
     Operand(Operand) {

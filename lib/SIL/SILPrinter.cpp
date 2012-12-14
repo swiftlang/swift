@@ -271,6 +271,10 @@ public:
     OS << "ref_element_addr " << getID(EI->getOperand()) << ", "
        << EI->getFieldNo();
   }
+  void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
+    OS << "archetype_method " << getID(AMI->getOperand()) << ", @";
+    AMI->getMember().print(OS);
+  }
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype $" << MI->getMetaType().getString();
   }

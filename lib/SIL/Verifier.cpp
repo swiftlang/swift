@@ -181,6 +181,25 @@ public:
 #endif
   }
   
+  void visitRefElementAddrInst(RefElementAddrInst *EI) {
+#ifndef NDEBUG
+    Type operandTy = EI->getOperand().getType();
+    assert(operandTy->hasReferenceSemantics() &&
+           "must derive ref_element_addr from reference type");
+    assert(EI->getType(0)->is<LValueType>() &&
+           "result of element_addr must be lvalue");
+#endif
+  }
+  
+  void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
+    assert(AMI->getType(0)->is<FunctionType>() &&
+           "type of archetype_method must be a concrete function type");
+    assert(AMI->getOperand().getType()->is<LValueType>() &&
+           "type of archetype_method operand must be an address");
+    assert(AMI->getOperand().getType()->getRValueType()->is<ArchetypeType>() &&
+           "archetype_method operand must be address of archetype value");
+  }
+  
   void visitIntegerValueInst(IntegerValueInst *IVI) {
     assert(IVI->getType()->is<BuiltinIntegerType>());
   }

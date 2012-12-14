@@ -122,7 +122,7 @@ Value SILGenFunction::emitUnmanagedConstantRef(SILLocation loc,
   }
   
   // Otherwise, use a global ConstantRefInst.
-  return B.createConstantRef(loc, constant, F);
+  return B.createConstantRef(loc, constant);
 }
 
 ManagedValue SILGenFunction::emitConstantRef(SILLocation loc,
@@ -135,7 +135,7 @@ ManagedValue SILGenFunction::emitConstantRef(SILLocation loc,
   }
   
   // Otherwise, use a global ConstantRefInst.
-  Value c = B.createConstantRef(loc, constant, F);
+  Value c = B.createConstantRef(loc, constant);
   return ManagedValue(c);
 }
 
@@ -159,7 +159,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
            "no location for local var!");
     // If this is a global variable, invoke its accessor function to get its
     // address.
-    Value accessor = B.createConstantRef(loc, SILConstant(decl), F);
+    Value accessor = B.createConstantRef(loc, SILConstant(decl));
     Value address = B.createApply(loc, accessor, {});
     return ManagedValue(address);
   }
@@ -385,7 +385,7 @@ ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
 {
   // Get the accessor function. The type will be a polymorphic function if
   // the This type is generic.
-  ManagedValue method(B.createConstantRef(expr, constant, F));
+  ManagedValue method(B.createConstantRef(expr, constant));
   // If there are substitutions, specialize the generic getter.
   if (!substitutions.empty()) {
     assert(method.getValue().getType()->is<PolymorphicFunctionType>() &&
@@ -699,11 +699,11 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
       }
     }
     
-    Value functionRef = B.createConstantRef(loc, constant, F);
+    Value functionRef = B.createConstantRef(loc, constant);
     return emitManagedRValueWithCleanup(B.createClosure(loc,
                                                     functionRef, capturedArgs));
   } else {
-    return ManagedValue(B.createConstantRef(loc, constant, F));
+    return ManagedValue(B.createConstantRef(loc, constant));
   }
 }
 

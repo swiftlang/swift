@@ -131,9 +131,8 @@ public:
     return insert(ClosureInst::create(Loc, Fn, Args, F));
   }
 
-  ConstantRefInst *createConstantRef(SILLocation loc, SILConstant c,
-                                     Function &f) {
-    return insert(new ConstantRefInst(loc, c, f));
+  ConstantRefInst *createConstantRef(SILLocation loc, SILConstant c) {
+    return insert(new ConstantRefInst(loc, c, F));
   }
 
   ZeroValueInst *createZeroValue(SILLocation Loc, Type Ty) {
@@ -213,6 +212,11 @@ public:
   Value createRefElementAddr(SILLocation Loc, Value Operand, unsigned FieldNo,
                           Type ResultTy) {
     return insert(new RefElementAddrInst(Loc, Operand, FieldNo, ResultTy));
+  }
+  
+  ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc, Value Operand,
+                                             SILConstant Member) {
+    return insert(new ArchetypeMethodInst(Loc, Operand, Member, F));
   }
   
   MetatypeInst *createMetatype(Expr *Expr) {
