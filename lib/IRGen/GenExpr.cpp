@@ -287,7 +287,18 @@ namespace {
       Out.add({castVal, val.getCleanup()});
     }
     void visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E) {
-      IGF.unimplemented(E->getLoc(), "archetype-to-super");
+      // Load the 
+      Explosion subResult(ExplosionKind::Maximal);
+      IGF.emitRValue(E->getSubExpr(), subResult);
+      ManagedValue val = subResult.claimNext();
+      const TypeInfo &baseTypeInfo = IGF.getFragileTypeInfo(E->getType());
+      llvm::Type *baseTy = baseTypeInfo.StorageType;
+      llvm::Type *basePtrTy = baseTy->getPointerTo();
+      llvm::Value *castPtrVal = IGF.Builder.CreateBitCast(val.getValue(),
+                                                          basePtrTy);
+      llvm::Value *castVal
+        = IGF.Builder.CreateLoad(castPtrVal, IGF.IGM.getPointerAlignment());
+      Out.add({castVal, val.getCleanup()});
     }
 
     void visitScalarToTupleExpr(ScalarToTupleExpr *E) {
