@@ -429,6 +429,24 @@ ManagedValue SILGenFunction::visitGenericMemberRefExpr(GenericMemberRefExpr *E)
   return emitAnyMemberRefExpr(*this, E, E->getSubstitutions());
 }
 
+ManagedValue SILGenFunction::visitArchetypeMemberRefExpr(
+                                                    ArchetypeMemberRefExpr *E) {
+  Value archetype = visit(E->getBase()).getUnmanagedValue();
+  assert((archetype.getType()->is<LValueType>() ||
+          archetype.getType()->is<MetaTypeType>()) &&
+         "archetype must be an address or metatype");
+  if (isa<FuncDecl>(E->getDecl())) {
+    // This is a method reference. Extract the method implementation from the
+    // archetype and apply the "this" argument.
+    Value method = B.createArchetypeMethod(E, archetype,
+                                           SILConstant(E->getDecl()));
+    Value delegate = B.createApply(E, method, archetype);
+    return emitManagedRValueWithCleanup(delegate);
+  } else {
+    llvm_unreachable("archetype properties not yet implemented");
+  }
+}
+
 ManagedValue SILGenFunction::visitDotSyntaxBaseIgnoredExpr(
                                                   DotSyntaxBaseIgnoredExpr *E) {
   visit(E->getLHS());

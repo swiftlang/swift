@@ -192,12 +192,24 @@ public:
   }
   
   void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
-    assert(AMI->getType(0)->is<FunctionType>() &&
-           "type of archetype_method must be a concrete function type");
-    assert(AMI->getOperand().getType()->is<LValueType>() &&
-           "type of archetype_method operand must be an address");
-    assert(AMI->getOperand().getType()->getRValueType()->is<ArchetypeType>() &&
-           "archetype_method operand must be address of archetype value");
+#ifndef NDEBUG
+    FunctionType *methodType = AMI->getType(0)->getAs<FunctionType>();
+    assert(methodType &&
+           "result type of archetype_method must be a concrete function type");
+    Type operandType = AMI->getOperand().getType();
+    if (LValueType *lvt = operandType->getAs<LValueType>()) {
+      assert(lvt->getObjectType()->is<ArchetypeType>() &&
+             "archetype_method must apply to an archetype address");
+    } else if (MetaTypeType *mt = operandType->getAs<MetaTypeType>()) {
+      assert(mt->getInstanceType()->is<ArchetypeType>() &&
+             "archetype_method must apply to an archetype metatype");
+    } else
+      llvm_unreachable("archetype_method must apply to an address or metatype");
+    assert(methodType->getInput()->isEqual(operandType) &&
+           "result type of archetype_method must be a method of the operand");
+    assert(methodType->getResult()->is<FunctionType>() &&
+           "result type of archetype_method must be a method");
+#endif
   }
   
   void visitIntegerValueInst(IntegerValueInst *IVI) {
