@@ -100,13 +100,9 @@ Function *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   assert(!M.hasFunction(constant) &&
          "already generated function for decl!");
 
-  constant.dump();
-  fe->dump();
-
   Function *f = new (M) Function(M);
   SILGenFunction(*this, *f, fe).visit(fe->getBody());
   
-  f->dump();
   f->verify();
   M.functions[constant] = f;
   
@@ -118,13 +114,9 @@ Function *SILGenModule::emitClosure(ClosureExpr *ce) {
   assert(!M.hasFunction(constant) &&
          "already generated function for closure!");
   
-  constant.dump();
-  ce->dump();
-
   Function *f = new (M) Function(M);
   SILGenFunction(*this, *f, ce).emitClosureBody(ce->getBody());
   
-  f->dump();
   f->verify();
   M.functions[constant] = f;
   
