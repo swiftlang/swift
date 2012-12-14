@@ -262,6 +262,20 @@ ManagedValue SILGenFunction::visitFunctionConversionExpr(
                                       E->getType()));
 }
 
+ManagedValue SILGenFunction::visitCoerceExpr(CoerceExpr *E) {
+  // FIXME: do something with lhs value?
+  visit(E->getLHS());
+  return ManagedValue(B.createCoerce(E, visit(E->getRHS()).getValue(),
+                                     E->getType()));
+}
+
+ManagedValue SILGenFunction::visitDowncastExpr(DowncastExpr *E) {
+  // FIXME: do something with lhs value?
+  visit(E->getLHS());
+  return ManagedValue(B.createDowncast(E, visit(E->getRHS()).getValue(),
+                                       E->getType()));
+}
+
 ManagedValue SILGenFunction::visitParenExpr(ParenExpr *E) {
   return visit(E->getSubExpr());
 }

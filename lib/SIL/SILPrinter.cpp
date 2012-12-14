@@ -221,10 +221,22 @@ public:
     OS << "specialize " << getID(SI->getOperand()) << ", $"
        << SI->getType().getString();
   }
-  void visitImplicitConvertInst(ImplicitConvertInst *CI) {
-    OS << "implicit_convert " << getID(CI->getOperand()) << ", $"
-       << CI->getType().getString();
+  
+  void printConversionInst(ConversionInst *CI, llvm::StringRef name) {
+    OS << name << " " << getID(CI->getOperand()) << ", $"
+      << CI->getType().getString();
   }
+  
+  void visitImplicitConvertInst(ImplicitConvertInst *CI) {
+    printConversionInst(CI, "implicit_convert");
+  }
+  void visitCoerceInst(CoerceInst *CI) {
+    printConversionInst(CI, "coerce");
+  }
+  void visitDowncastInst(DowncastInst *CI) {
+    printConversionInst(CI, "downcast");
+  }
+  
   void visitTupleInst(TupleInst *TI) {
     OS << "tuple (";
     bool isFirst = true;
