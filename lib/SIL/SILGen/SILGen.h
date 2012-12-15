@@ -292,6 +292,7 @@ public:
   ManagedValue visitMemberRefExpr(MemberRefExpr *E);
   ManagedValue visitGenericMemberRefExpr(GenericMemberRefExpr *E);
   ManagedValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E);
+  ManagedValue visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E);
   ManagedValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E);
   ManagedValue visitModuleExpr(ModuleExpr *E);
   ManagedValue visitTupleElementExpr(TupleElementExpr *E);

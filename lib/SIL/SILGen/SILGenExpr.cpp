@@ -448,6 +448,24 @@ ManagedValue SILGenFunction::visitArchetypeMemberRefExpr(
   }
 }
 
+ManagedValue SILGenFunction::visitExistentialMemberRefExpr(
+                                                 ExistentialMemberRefExpr *E) {
+  Value existential = visit(E->getBase()).getUnmanagedValue();
+  assert(existential.getType()->is<LValueType>() &&
+         "archetype must be an address or metatype");
+  if (isa<FuncDecl>(E->getDecl())) {
+    // This is a method reference. Extract the method implementation from the
+    // archetype and apply the "this" argument.
+    Value method = B.createExistentialMethod(E, existential,
+                                             SILConstant(E->getDecl()),
+                                             E->getType());
+    Value delegate = B.createApply(E, method, existential);
+    return emitManagedRValueWithCleanup(delegate);
+  } else {
+    llvm_unreachable("existential properties not yet implemented");
+  }
+}
+
 ManagedValue SILGenFunction::visitDotSyntaxBaseIgnoredExpr(
                                                   DotSyntaxBaseIgnoredExpr *E) {
   visit(E->getLHS());
