@@ -248,18 +248,27 @@ ManagedValue SILGenFunction::visitMaterializeExpr(MaterializeExpr *E) {
   return ManagedValue(emitMaterialize(*this, E, V).address);
 }
 
+static ManagedValue emitImplicitConvert(SILGenFunction &gen,
+                                        ImplicitConversionExpr *e) {
+  ManagedValue original = gen.visit(e->getSubExpr());
+  Value converted = gen.B.createImplicitConvert(e,
+                                        original.getValue(),
+                                        e->getType());
+  return ManagedValue(converted, original.getCleanup());
+}
+
+ManagedValue SILGenFunction::visitDerivedToBaseExpr(DerivedToBaseExpr *E) {
+  return emitImplicitConvert(*this, E);
+}
+
 ManagedValue SILGenFunction::visitRequalifyExpr(RequalifyExpr *E) {
-  return ManagedValue(B.createImplicitConvert(E,
-                                      visit(E->getSubExpr()).getValue(),
-                                      E->getType()));
+  return emitImplicitConvert(*this, E);
 }
 
 ManagedValue SILGenFunction::visitFunctionConversionExpr(
                                                       FunctionConversionExpr *E)
 {
-  return ManagedValue(B.createImplicitConvert(E,
-                                      visit(E->getSubExpr()).getValue(),
-                                      E->getType()));
+  return emitImplicitConvert(*this, E);
 }
 
 ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E) {
@@ -561,7 +570,7 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(Value ObjectPtr,
                               BasePtr,
                               F.getContext().TheRawPointerType);
 
-  Value InjectionFn = visit(ArrayInjectionFunction).getUnmanagedValue();
+  Value InjectionFn = visit(ArrayInjectionFunction).forward(*this);
   Value InjectionArgs[] = { BasePtr, ObjectPtr, Length };
   return emitManagedRValueWithCleanup(B.createApply(SILLocation(),
                                                    InjectionFn, InjectionArgs));

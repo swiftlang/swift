@@ -279,6 +279,7 @@ public:
   ManagedValue visitStringLiteralExpr(StringLiteralExpr *E);
   ManagedValue visitLoadExpr(LoadExpr *E);
   ManagedValue visitMaterializeExpr(MaterializeExpr *E);
+  ManagedValue visitDerivedToBaseExpr(DerivedToBaseExpr *E);
   ManagedValue visitRequalifyExpr(RequalifyExpr *E);
   ManagedValue visitFunctionConversionExpr(FunctionConversionExpr *E);
   ManagedValue visitErasureExpr(ErasureExpr *E);
