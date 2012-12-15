@@ -215,8 +215,9 @@ public:
   }
   
   ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc, Value Operand,
-                                             SILConstant Member) {
-    return insert(new ArchetypeMethodInst(Loc, Operand, Member, F));
+                                             SILConstant Member, Type MethodTy)
+  {
+    return insert(new ArchetypeMethodInst(Loc, Operand, Member, MethodTy, F));
   }
   
   MetatypeInst *createMetatype(Expr *Expr) {

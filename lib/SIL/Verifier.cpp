@@ -96,6 +96,9 @@ public:
   }
 
   void visitStoreInst(StoreInst *SI) {
+    SI->dump();
+    SI->getSrc().getType()->dump();
+    SI->getDest().getType()->dump();
     assert(!SI->getSrc().getType()->is<LValueType>() &&
            "Src value should be rvalue");
     assert(SI->getDest().getType()->is<LValueType>() &&

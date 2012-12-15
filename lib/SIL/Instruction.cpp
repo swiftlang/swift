@@ -339,20 +339,11 @@ RefElementAddrInst::RefElementAddrInst(SILLocation Loc, Value Operand,
     Operand(Operand), FieldNo(FieldNo) {
 }
 
-/// Substitute the "This" type of a protocol method with a specific archetype
-static Type getProtocolMethodTypeForArchetype(Value archetype,
-                                              SILConstant method,
-                                              SILModule &m) {
-  FunctionType *methodType = m.getConstantType(method)->castTo<FunctionType>();
-  FunctionType *delegateType = methodType->getResult()->castTo<FunctionType>();
-  return FunctionType::get(archetype.getType(), delegateType, m.getContext());
-}
-
 ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, Value Operand,
-                                         SILConstant Member, Function &F)
+                                         SILConstant Member, Type MethodTy,
+                                         Function &F)
   : Instruction(ValueKind::ArchetypeMethodInst, Loc,
-                getProtocolMethodTypeForArchetype(Operand, Member,
-                                                  F.getModule())),
+                FunctionType::get(Operand.getType(), MethodTy, F.getContext())),
     Operand(Operand), Member(Member) {
   
 }

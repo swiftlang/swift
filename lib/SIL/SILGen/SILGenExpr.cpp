@@ -439,7 +439,8 @@ ManagedValue SILGenFunction::visitArchetypeMemberRefExpr(
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
     Value method = B.createArchetypeMethod(E, archetype,
-                                           SILConstant(E->getDecl()));
+                                           SILConstant(E->getDecl()),
+                                           E->getType());
     Value delegate = B.createApply(E, method, archetype);
     return emitManagedRValueWithCleanup(delegate);
   } else {

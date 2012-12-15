@@ -632,7 +632,7 @@ class ArchetypeMethodInst : public Instruction {
   SILConstant Member;
 public:
   ArchetypeMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
-                      Function &F);
+                      Type methodTy, Function &F);
   
   Value getOperand() const { return Operand; }
   SILConstant getMember() const { return Member; }
