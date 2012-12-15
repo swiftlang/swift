@@ -220,6 +220,13 @@ public:
     return insert(new ArchetypeMethodInst(Loc, Operand, Member, MethodTy, F));
   }
   
+  ExistentialMethodInst *createExistentialMethod(SILLocation Loc,
+                                                 Value Operand,
+                                                 SILConstant Member,
+                                                 Type MethodTy) {
+    return insert(new ExistentialMethodInst(Loc, Operand, Member, MethodTy, F));
+  }
+  
   MetatypeInst *createMetatype(Expr *Expr) {
     return insert(new MetatypeInst(Expr));
   }

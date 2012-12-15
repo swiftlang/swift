@@ -339,13 +339,30 @@ RefElementAddrInst::RefElementAddrInst(SILLocation Loc, Value Operand,
     Operand(Operand), FieldNo(FieldNo) {
 }
 
-ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, Value Operand,
-                                         SILConstant Member, Type MethodTy,
-                                         Function &F)
-  : Instruction(ValueKind::ArchetypeMethodInst, Loc,
+WitnessTableMethodInst::WitnessTableMethodInst(ValueKind Kind,
+                                               SILLocation Loc, Value Operand,
+                                               SILConstant Member,
+                                               Type MethodTy,
+                                               Function &F)
+  : Instruction(Kind, Loc,
                 FunctionType::get(Operand.getType(), MethodTy, F.getContext())),
     Operand(Operand), Member(Member) {
-  
+}
+
+ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, Value Operand,
+                                         SILConstant Member,
+                                         Type MethodTy,
+                                         Function &F)
+  : WitnessTableMethodInst(ValueKind::ArchetypeMethodInst,
+                           Loc, Operand, Member, MethodTy, F) {
+}
+
+ExistentialMethodInst::ExistentialMethodInst(SILLocation Loc, Value Operand,
+                                             SILConstant Member,
+                                             Type MethodTy,
+                                             Function &F)
+  : WitnessTableMethodInst(ValueKind::ExistentialMethodInst,
+                           Loc, Operand, Member, MethodTy, F) {
 }
 
 RetainInst::RetainInst(SILLocation Loc, Value Operand)

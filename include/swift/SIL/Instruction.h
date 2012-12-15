@@ -625,20 +625,46 @@ public:
   }
 };
   
-/// ArchetypeMethodInst - Given the address of an archetype value and a method
-/// constant, extracts the implementation of that method for the archetype.
-class ArchetypeMethodInst : public Instruction {
+/// WitnessTableMethodInst - Abstract base for instructions that query
+/// protocol witness tables for method implementations.
+class WitnessTableMethodInst : public Instruction {
   Value Operand;
   SILConstant Member;
 public:
-  ArchetypeMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
-                      Type methodTy, Function &F);
+  WitnessTableMethodInst(ValueKind Kind,
+                         SILLocation Loc, Value Operand, SILConstant Member,
+                         Type methodTy, Function &F);
   
   Value getOperand() const { return Operand; }
   SILConstant getMember() const { return Member; }
   
   static bool classof(Value V) {
+    return V->getKind() >= ValueKind::First_WitnessTableMethodInst &&
+      V->getKind() <= ValueKind::Last_WitnessTableMethodInst;
+  }
+};
+  
+/// ArchetypeMethodInst - Given the address of an archetype value and a method
+/// constant, extracts the implementation of that method for the archetype.
+class ArchetypeMethodInst : public WitnessTableMethodInst {
+public:
+  ArchetypeMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
+                      Type methodTy, Function &F);
+  
+  static bool classof(Value V) {
     return V->getKind() == ValueKind::ArchetypeMethodInst;
+  }
+};
+
+/// ExistentialMethodInst - Given the address of an existential and a method
+/// constant, extracts the implementation of that method for the existential.
+class ExistentialMethodInst : public WitnessTableMethodInst {
+public:
+  ExistentialMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
+                        Type methodTy, Function &F);
+
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ExistentialMethodInst;
   }
 };
   

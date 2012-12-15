@@ -275,6 +275,10 @@ public:
     OS << "archetype_method " << getID(AMI->getOperand()) << ", @";
     AMI->getMember().print(OS);
   }
+  void visitExistentialMethodInst(ExistentialMethodInst *AMI) {
+    OS << "existential_method " << getID(AMI->getOperand()) << ", @";
+    AMI->getMember().print(OS);
+  }
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype $" << MI->getMetaType().getString();
   }

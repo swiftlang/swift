@@ -191,11 +191,22 @@ public:
 #endif
   }
   
+  void verifyWitnessTableInst(WitnessTableMethodInst *WMI) {
+#ifndef NDEBUG
+    FunctionType *methodType = WMI->getType(0)->getAs<FunctionType>();
+    assert(methodType &&
+           "result method must be of a concrete function type");
+    Type operandType = WMI->getOperand().getType();
+    assert(methodType->getInput()->isEqual(operandType) &&
+           "result must be a method of the operand");
+    assert(methodType->getResult()->is<FunctionType>() &&
+           "result must be a method");
+#endif
+  }
+  
   void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
 #ifndef NDEBUG
-    FunctionType *methodType = AMI->getType(0)->getAs<FunctionType>();
-    assert(methodType &&
-           "result type of archetype_method must be a concrete function type");
+    verifyWitnessTableInst(AMI);
     Type operandType = AMI->getOperand().getType();
     if (LValueType *lvt = operandType->getAs<LValueType>()) {
       assert(lvt->getObjectType()->is<ArchetypeType>() &&
@@ -204,11 +215,18 @@ public:
       assert(mt->getInstanceType()->is<ArchetypeType>() &&
              "archetype_method must apply to an archetype metatype");
     } else
-      llvm_unreachable("archetype_method must apply to an address or metatype");
-    assert(methodType->getInput()->isEqual(operandType) &&
-           "result type of archetype_method must be a method of the operand");
-    assert(methodType->getResult()->is<FunctionType>() &&
-           "result type of archetype_method must be a method");
+      llvm_unreachable("method must apply to an address or metatype");
+#endif
+  }
+  
+  void visitExistentialMethodInst(ExistentialMethodInst *EMI) {
+#ifndef DEBUG
+    verifyWitnessTableInst(EMI);
+    LValueType *operandType = EMI->getOperand().getType()->getAs<LValueType>();
+    assert(operandType &&
+           "existential_method must apply to an existential address");
+    assert(operandType->getObjectType()->isExistentialType() &&
+           "existential_method must apply to an existential address");    
 #endif
   }
   

@@ -75,7 +75,11 @@ ABSTRACT_VALUE(Instruction, Value)
   INST(ExtractInst, Instruction)
   INST(ElementAddrInst, Instruction)
   INST(RefElementAddrInst, Instruction)
-  INST(ArchetypeMethodInst, Instruction)
+  
+  ABSTRACT_VALUE(WitnessTableMethodInst, Instruction)
+    INST(ArchetypeMethodInst, WitnessTableMethodInst)
+    INST(ExistentialMethodInst, WitnessTableMethodInst)
+    VALUE_RANGE(WitnessTableMethodInst, ArchetypeMethodInst, ExistentialMethodInst)
 
   INST(RetainInst, Instruction)
   INST(ReleaseInst, Instruction)
@@ -83,9 +87,9 @@ ABSTRACT_VALUE(Instruction, Value)
   INST(DestroyAddrInst, Instruction)
   
   ABSTRACT_VALUE(ConversionInst, Instruction)
-    INST(ImplicitConvertInst, Instruction)
-    INST(CoerceInst, Instruction)
-    INST(DowncastInst, Instruction)
+    INST(ImplicitConvertInst, ConversionInst)
+    INST(CoerceInst, ConversionInst)
+    INST(DowncastInst, ConversionInst)
     VALUE_RANGE(ConversionInst, ImplicitConvertInst, DowncastInst)
 
   // SIL-only instructions that don't have an AST analog.
