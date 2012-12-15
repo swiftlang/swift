@@ -262,6 +262,25 @@ ManagedValue SILGenFunction::visitFunctionConversionExpr(
                                       E->getType()));
 }
 
+ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E) {
+  // FIXME: Existentials are address-only. The load and value cleanup in here
+  // are bogus.
+
+  ManagedValue concrete = visit(E->getSubExpr());
+  // Allocate the existential.
+  Value existential = B.createAllocVar(E, AllocKind::Stack, E->getType());
+  Cleanups.pushCleanup<CleanupMaterializeAllocation>(existential);
+  // Allocate its internal value.
+  Value valueAddr = B.createAllocExistential(E, existential,
+                                             concrete.getValue().getType());
+  // Initialize the internal value.
+  B.createStore(E, concrete.forward(*this), valueAddr);
+  
+  // FIXME Since we don't support address-only types yet, "load" the existential
+  // as a hack.
+  return emitManagedRValueWithCleanup(B.createLoad(E, existential));
+}
+
 ManagedValue SILGenFunction::visitCoerceExpr(CoerceExpr *E) {
   // FIXME: do something with lhs value?
   visit(E->getLHS());

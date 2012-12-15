@@ -281,6 +281,7 @@ public:
   ManagedValue visitMaterializeExpr(MaterializeExpr *E);
   ManagedValue visitRequalifyExpr(RequalifyExpr *E);
   ManagedValue visitFunctionConversionExpr(FunctionConversionExpr *E);
+  ManagedValue visitErasureExpr(ErasureExpr *E);
   ManagedValue visitCoerceExpr(CoerceExpr *E);
   ManagedValue visitDowncastExpr(DowncastExpr *E);
   ManagedValue visitParenExpr(ParenExpr *E);
