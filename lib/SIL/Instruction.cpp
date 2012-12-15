@@ -342,10 +342,10 @@ RefElementAddrInst::RefElementAddrInst(SILLocation Loc, Value Operand,
 WitnessTableMethodInst::WitnessTableMethodInst(ValueKind Kind,
                                                SILLocation Loc, Value Operand,
                                                SILConstant Member,
-                                               Type MethodTy,
+                                               Type ThisTy, Type MethodTy,
                                                Function &F)
   : Instruction(Kind, Loc,
-                FunctionType::get(Operand.getType(), MethodTy, F.getContext())),
+                FunctionType::get(ThisTy, MethodTy, F.getContext())),
     Operand(Operand), Member(Member) {
 }
 
@@ -354,7 +354,8 @@ ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, Value Operand,
                                          Type MethodTy,
                                          Function &F)
   : WitnessTableMethodInst(ValueKind::ArchetypeMethodInst,
-                           Loc, Operand, Member, MethodTy, F) {
+                           Loc, Operand, Member,
+                           Operand.getType(), MethodTy, F) {
 }
 
 ExistentialMethodInst::ExistentialMethodInst(SILLocation Loc, Value Operand,
@@ -362,7 +363,29 @@ ExistentialMethodInst::ExistentialMethodInst(SILLocation Loc, Value Operand,
                                              Type MethodTy,
                                              Function &F)
   : WitnessTableMethodInst(ValueKind::ExistentialMethodInst,
-                           Loc, Operand, Member, MethodTy, F) {
+                           Loc, Operand, Member,
+                           F.getContext().TheRawPointerType, MethodTy, F) {
+}
+
+ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc, Value Operand,
+                                               Function &F)
+  : Instruction(ValueKind::ProjectExistentialInst, Loc,
+                F.getContext().TheRawPointerType),
+    Operand(Operand) {
+}
+
+AllocExistentialInst::AllocExistentialInst(SILLocation Loc, Value Existential,
+                                           Type ConcreteType)
+  : Instruction(ValueKind::AllocExistentialInst, Loc,
+                LValueType::get(ConcreteType,
+                                LValueType::Qual::DefaultForType,
+                                ConcreteType->getASTContext())),
+    Existential(Existential) {
+  
+}
+
+Type AllocExistentialInst::getConcreteType() const {
+  return getType(0)->castTo<LValueType>()->getObjectType();
 }
 
 RetainInst::RetainInst(SILLocation Loc, Value Operand)

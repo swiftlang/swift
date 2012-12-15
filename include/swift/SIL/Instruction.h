@@ -633,7 +633,7 @@ class WitnessTableMethodInst : public Instruction {
 public:
   WitnessTableMethodInst(ValueKind Kind,
                          SILLocation Loc, Value Operand, SILConstant Member,
-                         Type methodTy, Function &F);
+                         Type thisTy, Type methodTy, Function &F);
   
   Value getOperand() const { return Operand; }
   SILConstant getMember() const { return Member; }
@@ -658,6 +658,9 @@ public:
 
 /// ExistentialMethodInst - Given the address of an existential and a method
 /// constant, extracts the implementation of that method for the existential.
+/// The result will be of the type RawPointer -> F for a method of function type
+/// F. The RawPointer "this" argument can be derived from the same existential
+/// using a ProjectExistentialInst.
 class ExistentialMethodInst : public WitnessTableMethodInst {
 public:
   ExistentialMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
@@ -666,6 +669,34 @@ public:
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ExistentialMethodInst;
   }
+};
+  
+/// ProjectExistentialInst - Given the address of an existential, returns a
+/// RawPointer pointing to the value inside the existential.
+class ProjectExistentialInst : public Instruction {
+  Value Operand;
+public:
+  ProjectExistentialInst(SILLocation Loc, Value Operand, Function &F);
+  
+  Value getOperand() const { return Operand; }
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ProjectExistentialInst;
+  }
+};
+  
+/// AllocExistentialInst - Given an address to an uninitialized buffer of
+/// an existential type, initializes the existential to contain a value of
+/// a given concrete type, and returns the address of an uninitialized buffer
+/// of the concrete type that then must be initialized.
+class AllocExistentialInst : public Instruction {
+  Value Existential;
+public:
+  AllocExistentialInst(SILLocation Loc,
+                       Value Existential, Type ConcreteType);
+  
+  Value getExistential() const { return Existential; }
+  Type getConcreteType() const;
 };
   
 /// RetainInst - Increase the retain count of a value.

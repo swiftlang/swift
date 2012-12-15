@@ -12,6 +12,7 @@
 
 #include "swift/SIL/Function.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 using namespace swift;
@@ -191,23 +192,16 @@ public:
 #endif
   }
   
-  void verifyWitnessTableInst(WitnessTableMethodInst *WMI) {
+  void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
 #ifndef NDEBUG
-    FunctionType *methodType = WMI->getType(0)->getAs<FunctionType>();
+    FunctionType *methodType = AMI->getType(0)->getAs<FunctionType>();
     assert(methodType &&
            "result method must be of a concrete function type");
-    Type operandType = WMI->getOperand().getType();
+    Type operandType = AMI->getOperand().getType();
     assert(methodType->getInput()->isEqual(operandType) &&
            "result must be a method of the operand");
     assert(methodType->getResult()->is<FunctionType>() &&
            "result must be a method");
-#endif
-  }
-  
-  void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
-#ifndef NDEBUG
-    verifyWitnessTableInst(AMI);
-    Type operandType = AMI->getOperand().getType();
     if (LValueType *lvt = operandType->getAs<LValueType>()) {
       assert(lvt->getObjectType()->is<ArchetypeType>() &&
              "archetype_method must apply to an archetype address");
@@ -220,13 +214,39 @@ public:
   }
   
   void visitExistentialMethodInst(ExistentialMethodInst *EMI) {
-#ifndef DEBUG
-    verifyWitnessTableInst(EMI);
-    LValueType *operandType = EMI->getOperand().getType()->getAs<LValueType>();
-    assert(operandType &&
+#ifndef NDEBUG
+    FunctionType *methodType = EMI->getType(0)->getAs<FunctionType>();
+    assert(methodType &&
+           "result method must be of a concrete function type");
+    Type operandType = EMI->getOperand().getType();
+    assert(methodType->getInput()->isEqual(
+                            operandType->getASTContext().TheRawPointerType) &&
+           "result must be a method of the operand");
+    assert(methodType->getResult()->is<FunctionType>() &&
+           "result must be a method");
+    LValueType *operandLVT = operandType->getAs<LValueType>();
+    assert(operandLVT &&
            "existential_method must apply to an existential address");
-    assert(operandType->getObjectType()->isExistentialType() &&
+    assert(operandLVT->getObjectType()->isExistentialType() &&
            "existential_method must apply to an existential address");    
+#endif
+  }
+  
+  void visitProjectExistentialInst(ProjectExistentialInst *PEI) {
+#ifndef NDEBUG
+    LValueType *operandLVT = PEI->getOperand().getType()->getAs<LValueType>();
+    assert(operandLVT && "project_existential must be applied to address");
+    assert(operandLVT->getObjectType()->isExistentialType() &&
+           "project_existential must be applied to address of existential");
+#endif
+  }
+  
+  void visitAllocExistentialInst(AllocExistentialInst *AEI) {
+#ifndef NDEBUG
+    LValueType *exLVT = AEI->getExistential().getType()->getAs<LValueType>();
+    assert(exLVT && "alloc_existential must be applied to an address");
+    assert(exLVT->getObjectType()->isExistentialType() &&
+           "alloc_existential must be applied to address of existential");
 #endif
   }
   

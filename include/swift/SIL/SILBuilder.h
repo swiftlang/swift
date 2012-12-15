@@ -227,6 +227,17 @@ public:
     return insert(new ExistentialMethodInst(Loc, Operand, Member, MethodTy, F));
   }
   
+  ProjectExistentialInst *createProjectExistential(SILLocation Loc,
+                                                   Value Operand) {
+    return insert(new ProjectExistentialInst(Loc, Operand, F));
+  }
+  
+  AllocExistentialInst *createAllocExistential(SILLocation Loc,
+                                               Value Existential,
+                                               Type ConcreteType) {
+    return insert(new AllocExistentialInst(Loc, Existential, ConcreteType));
+  }
+  
   MetatypeInst *createMetatype(Expr *Expr) {
     return insert(new MetatypeInst(Expr));
   }

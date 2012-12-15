@@ -459,7 +459,8 @@ ManagedValue SILGenFunction::visitExistentialMemberRefExpr(
     Value method = B.createExistentialMethod(E, existential,
                                              SILConstant(E->getDecl()),
                                              E->getType());
-    Value delegate = B.createApply(E, method, existential);
+    Value projection = B.createProjectExistential(E, existential);
+    Value delegate = B.createApply(E, method, projection);
     return emitManagedRValueWithCleanup(delegate);
   } else {
     llvm_unreachable("existential properties not yet implemented");

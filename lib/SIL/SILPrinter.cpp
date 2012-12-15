@@ -279,6 +279,13 @@ public:
     OS << "existential_method " << getID(AMI->getOperand()) << ", @";
     AMI->getMember().print(OS);
   }
+  void visitProjectExistentialInst(ProjectExistentialInst *PI) {
+    OS << "project_existential " << getID(PI->getOperand());
+  }
+  void visitAllocExistentialInst(AllocExistentialInst *AEI) {
+    OS << "alloc_existential " << getID(AEI->getExistential()) << ", $";
+    AEI->getConcreteType()->print(OS);
+  }
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype $" << MI->getMetaType().getString();
   }
