@@ -951,9 +951,10 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool hasContainerType) {
   if (Invalid) {
     skipUntilDeclRBrace();
     RBLoc = LastValidLoc;
-  } else if (parseMatchingToken(tok::r_brace, RBLoc,
-                                diag::expected_rbrace_in_getset,
-                                LBLoc, diag::opening_brace)) {
+  }
+
+  if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
+                         LBLoc, diag::opening_brace)) {
     RBLoc = LastValidLoc;
   }
   
@@ -1647,9 +1648,10 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   if (Invalid) {
     skipUntilDeclRBrace();
     RBLoc = LastValidLoc;
-  } else if (parseMatchingToken(tok::r_brace, RBLoc,
-                                diag::expected_rbrace_in_getset,
-                                LBLoc, diag::opening_brace)) {
+  }
+
+  if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
+                         LBLoc, diag::opening_brace)) {
     RBLoc = LastValidLoc;
   }
 

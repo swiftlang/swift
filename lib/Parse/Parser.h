@@ -128,7 +128,16 @@ public:
 
   /// skipUntilDeclStmtRBrace - Skip to the next decl, statement or '}'.
   void skipUntilDeclStmtRBrace();
-  
+
+private:
+  /// Skip a single token, but match parentheses, braces, and square brackets.
+  ///
+  /// Note: this does /not/ matches angle brackets ("<" and ">")! These are
+  /// matched when they refer to a generic type, but not when used as comparison
+  /// operators.
+  void skipSingle();
+
+public:
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(SourceLoc Loc, ArgTypes... Args) {
     return Diags.diagnose(Loc, Diagnostic(Args...));
