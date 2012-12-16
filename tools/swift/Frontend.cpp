@@ -30,7 +30,9 @@
 
 using namespace swift;
 
-static Identifier getModuleIdentifier(const llvm::MemoryBuffer *Buffer, ASTContext &Context) {
+static Identifier getModuleIdentifier(const llvm::MemoryBuffer *Buffer,
+                                      ASTContext &Context,
+                                      bool IsMainModule) {
   StringRef moduleName = Buffer->getBufferIdentifier();
 
   // As a special case, recognize <stdin>.
@@ -42,9 +44,13 @@ static Identifier getModuleIdentifier(const llvm::MemoryBuffer *Buffer, ASTConte
 
   // Complain about non-identifier characters in the module name.
   if (!Lexer::isIdentifier(moduleName)) {
-    SourceLoc Loc = SourceLoc(llvm::SMLoc::getFromPointer(Buffer->getBuffer().begin()));
-    Context.Diags.diagnose(Loc, diag::bad_module_name);
-    moduleName = "bad";
+    if (IsMainModule) {
+      moduleName = "main";
+    } else {
+      SourceLoc Loc = SourceLoc(llvm::SMLoc::getFromPointer(Buffer->getBuffer().begin()));
+      Context.Diags.diagnose(Loc, diag::bad_module_name);
+      moduleName = "bad";
+    }
   }
 
   return Context.getIdentifier(moduleName);
@@ -55,7 +61,7 @@ swift::buildSingleTranslationUnit(ASTContext &Context, unsigned BufferID,
                                   bool ParseOnly, bool IsMainModule) {
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
   const llvm::MemoryBuffer *Buffer = Context.SourceMgr.getMemoryBuffer(BufferID);
-  Identifier ID = getModuleIdentifier(Buffer, Context);
+  Identifier ID = getModuleIdentifier(Buffer, Context, IsMainModule);
   TranslationUnit *TU = new (Context) TranslationUnit(ID, Comp, Context,
                                                       IsMainModule,
                                                       /*IsReplModule=*/false);
