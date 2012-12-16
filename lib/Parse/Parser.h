@@ -132,9 +132,9 @@ public:
 private:
   /// Skip a single token, but match parentheses, braces, and square brackets.
   ///
-  /// Note: this does /not/ matches angle brackets ("<" and ">")! These are
-  /// matched when they refer to a generic type, but not when used as comparison
-  /// operators.
+  /// Note: this does \em not match angle brackets ("<" and ">")! These are
+  /// matched in the source when they refer to a generic type, 
+  /// but not when used as comparison operators.
   void skipSingle();
 
 public:
