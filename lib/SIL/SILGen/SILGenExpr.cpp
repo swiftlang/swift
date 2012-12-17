@@ -398,6 +398,7 @@ ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
                                       element.index);
   } else {
     Type baseTy = e->getBase()->getType();
+    (void)baseTy;
     // We have to load the element indirectly through a property.
     assert((baseTy->is<LValueType>() || baseTy->hasReferenceSemantics()) &&
            "member ref of a non-lvalue?!");
