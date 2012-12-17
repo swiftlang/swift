@@ -163,7 +163,7 @@ SIL classifies types into two additional subgroups based on ABI stability:
 SIL adds some additional types of its own, which are not first-class Swift
 types but are needed for some operations:
 
-* The *address of T* ``$SIL.Address<T>``, a pointer to memory containing a
+* The *address of T* ``$*T``, a pointer to memory containing a
   value of any reference or value type ``$T``.  This can be an internal pointer
   into a data structure. Addresses of loadable types can be loaded and stored
   to access values of those types. Addresses of address-only types can only be
@@ -302,7 +302,7 @@ alloc_var
 ::
 
   %1 = alloc_var {heap|stack|pseudo} $T
-  ; %1 has type $SIL.Address<T>
+  ; %1 has type $*T
 
 Allocates enough uninitialized memory to contain a value of type ``T``, either
 from the heap or from the stack. The result of the instruction is the address
@@ -337,16 +337,16 @@ alloc_box
   %1 = alloc_box {heap|stack} $T1, $T2, ..., $TN
   ; %1 is N+1 values:
   ;   %1#0 has type SIL.Box
-  ;   %1#1 has type SIL.Address<T1>
-  ;   %1#2 has type SIL.Address<T2>
+  ;   %1#1 has type *T1
+  ;   %1#2 has type *T2
   ;               ⋮
-  ;   %1#N has type SIL.Address<TN>
+  ;   %1#N has type *TN
   ; TODO: alloc_box is only implemented for a single type argument
 
 Allocates a box large enough to hold ``N`` values of types ``T1`` through
 ``TN``. The result of the instruction is a multiple-value operand consisting of
 an object pointer to the box as its first element followed by addresses of type
-``SIL.Address<T1>`` through ``SIL.Address<TN>`` pointing into the
+``*T1`` through ``*TN`` pointing into the
 storage for the values inside the box. The box will be initialized
 with a retain count of 1; the storage will be uninitialized and must
 be initialized with ``store`` instructions before the address can be
@@ -363,7 +363,7 @@ alloc_array
   %1 = alloc_array $T, %0
   ; $T must be a type
   ; %0 must be of a builtin integer type
-  ; %1 has type $(SIL.Box,SIL.Address<T>)
+  ; %1 has type $(SIL.Box,*T)
 
 Allocates a box large enough to hold an array of ``%0`` values of type ``T``.
 The result of the instruction is a pair containing an object pointer to the box
@@ -379,7 +379,7 @@ dealloc_var
 ::
 
   dealloc_var {heap|stack} %0
-  ; %0 must be of a $SIL.Address<T> type
+  ; %0 must be of a $*T type
 
 Deallocates memory previously allocated by ``alloc_var``. The value in memory
 must be destroyed prior to being deallocated, and the ``heap`` or ``stack``
@@ -429,7 +429,7 @@ destroy_addr
 ::
 
   destroy_addr %0
-  ; %0 must be of a $SIL.Address<T> type
+  ; %0 must be of a $*T type
 
 Destroys the value in memory at address ``%0``. This is equivalent to::
 
@@ -445,7 +445,7 @@ load
 ::
 
   %1 = load %0
-  ; %0 must be of a $SIL.Address<T> type for a loadable type $T
+  ; %0 must be of a $*T type for a loadable type $T
   ; %1 will be of type $T
 
 Loads the value at address ``%0`` from memory. ``T`` must be a loadable type.
@@ -458,7 +458,7 @@ store
 
   store %0 to %1
   ; Given a %0 of loadable type $T,
-  ; %1 must be of type $SIL.Address<T>
+  ; %1 must be of type $*T
 
 Stores the value ``%0`` to memory at address ``%1``. ``%0`` must be of a
 loadable type. This will overwrite the memory at ``%1``; any existing value at
@@ -469,7 +469,7 @@ copy_addr
 ::
 
   copy_addr [take] %0 to [assign] %1
-  ; %0 and %1 must be of the same $SIL.Address<T> type
+  ; %0 and %1 must be of the same $*T type
 
 Loads the value at address ``%0`` from memory and stores it back into memory at
 address ``%1``. A bare ``copy_addr`` instruction::
@@ -567,8 +567,8 @@ element_addr
 ::
 
   %1 = element_addr %0, 123
-  ; %0 must of a $SIL.Address<T> type for a loadable aggregate type T
-  ; %1 will be of type $SIL.Address<U> where U is the type of the 123rd
+  ; %0 must of a $*T type for a loadable aggregate type T
+  ; %1 will be of type $*U where U is the type of the 123rd
   ;   element of T
 
 Given the address of a loadable aggregate value in memory, creates a
@@ -580,7 +580,7 @@ ref_element_addr
 
   %1 = ref_element_addr %0, 123
   ; %0 must be of a reference type $T
-  ; %1 will be of type $SIL.Address<U> where U is the type of the 123rd
+  ; %1 will be of type $*U where U is the type of the 123rd
   ;   element of T
   ; TODO: not implemented
 
@@ -592,9 +592,9 @@ index_addr
 ::
 
   %2 = index_addr %0, %1
-  ; %0 must be of a $SIL.Address<T> type
+  ; %0 must be of a $*T type
   ; %1 must be of a builtin integer type
-  ; %2 will be of the same $SIL.Address<T> type as %0
+  ; %2 will be of the same $*T type as %0
 
 Given a pointer into an array of values, returns the address of the
 ``%1``-th element relative to ``%0``.
@@ -670,9 +670,8 @@ archetype_to_super
 ::
 
   %1 = archetype_to_super %0, $T
-  ; %0 must be an address of an archetype with base class constraint
-  ; $SIL.Address<U:B>
-  ; $T must be either the base constraint type B or a supertype of B
+  ; %0 must be an address of an archetype $*U with base class constraint U : B
+  ; $T must be the base constraint type B or a supertype of B
   ; %1 will be of the base type $T
 
 Performs an upcast operation on the archetype value referenced by ``%0``.
@@ -682,7 +681,7 @@ archetype_method
 ::
 
   %1 = archetype_method %0, @method
-  ; %0 must be an address of an archetype $SIL.Address<T>
+  ; %0 must be an address of an archetype $*T
   ; @method must be a reference to a method of one of the constraints of T
   ; %1 will be of type T -> U' -> V' for method type U -> V,
   ;   where self and associated types in U and V are bound relative to T in
@@ -702,9 +701,9 @@ alloc_existential
 ::
 
   %1 = alloc_existential $T, %0
-  ; %0 must be of a $SIL.Address<P> type for existential type P
+  ; %0 must be of a $*P type for existential type P
   ; $T must be a type that fulfills protocol(s) P
-  ; %1 will be of type $SIL.Address<T>
+  ; %1 will be of type $*T
 
 Prepares the uninitialized existential buffer pointed to by ``%0`` to
 contain a value of type ``$T``. ``%0`` must point to uninitialized storage
@@ -728,7 +727,7 @@ existential_method
 ::
 
   %1 = existential_method %0, @method
-  ; %0 must be of a $SIL.Address<P> type for existential type P
+  ; %0 must be of a $*P type for existential type P
   ; @method must be a reference to a method of (one of the) protocol(s) P
   ; %1 will be of type $Builtin.RawPointer -> T -> U
   ;   for method type T -> U
@@ -743,7 +742,7 @@ project_existential
 ::
 
   %1 = project_existential %0
-  ; %0 must be of a $SIL.Address<P> type for existential type P
+  ; %0 must be of a $*P type for existential type P
   ; %1 will be of type $Builtin.RawPointer
 
 Obtains a ``RawPointer`` pointing to the value inside the existential value
@@ -955,7 +954,7 @@ will be emitted as SIL::
     store %x to %x_alloc#1
 
     ; expression "func(y)..."
-    %1 = constant_ref $(SIL.Box, SIL.Address<Int>, Int) -> Int, \
+    %1 = constant_ref $(SIL.Box, *Int, Int) -> Int, \
                       @adder_1
     retain %x_alloc#0
     %2 = closure %1(%x_alloc#0, %x_alloc#1)
@@ -966,8 +965,8 @@ will be emitted as SIL::
   }
 
   ; decl for anonymous function
-  func @adder_1: $(SIL.Box, SIL.Address<Int>, Int) -> Int {
-  entry(%x_box:SIL.Box, %x_addr:SIL.Address<Int>, %y:Int):
+  func @adder_1: $(SIL.Box, *Int, Int) -> Int {
+  entry(%x_box:SIL.Box, %x_addr:*Int, %y:Int):
     ; prologue
     %y_alloc = alloc_box $Int
     store %y to %y_alloc#1
@@ -1039,8 +1038,8 @@ A function that operates on a resilient type::
 
 will be emitted as SIL that operates on addresses of the type indirectly::
 
-  func @reflect: $(SIL.Address<Point>) -> SIL.Address<Point> {
-  entry(%point:SIL.Address<Point>):
+  func @reflect: $(*Point, *Point) {
+  entry(%point:*Point, %ret:*Point):
     ; prologue
     %point_alloc = alloc_box $Point
     copy_addr %point to %point_alloc#1 ; copy_addr, not load/store
@@ -1049,14 +1048,14 @@ will be emitted as SIL that operates on addresses of the type indirectly::
     %reflected_alloc = alloc_box $Point
 
     ; expression "point.x"
-    %1 = constant_ref $(SIL.Address<Point>) -> Float, @"Point.x get"
+    %1 = constant_ref $(*Point) -> Float, @"Point.x get"
     %2 = apply %1(%point_alloc#1)
     ; expression "-point.x"
     %3 = constant_ref $(Float) -> Float, @-
     %4 = apply %3(%2)
 
     ; expression "point.y"
-    %5 = constant_ref $(SIL.Address<Point>) -> Float, @"Point.y get"
+    %5 = constant_ref $(*Point) -> Float, @"Point.y get"
     %6 = apply %5(%point_alloc#1)
     ; expression "-point.y"
     %7 = constant_ref $(Float) -> Float, @-
@@ -1065,7 +1064,7 @@ will be emitted as SIL that operates on addresses of the type indirectly::
     ; expression "Point"
     %9 = metatype $Point
     %10 = constant_ref $(Point.metatype) -> (Float, Float) \
-                                         -> SIL.Address<Point>, \
+                                         -> *Point, \
                        @constructor
     %11 = apply %10(%3)
 
@@ -1079,15 +1078,14 @@ will be emitted as SIL that operates on addresses of the type indirectly::
     dealloc_var heap %12
 
     ; statement "return reflected"
-    %returned = alloc_var heap $Point
-    copy_addr %reflected_alloc#1 to %returned
+    copy_addr %reflected_alloc#1 to %ret
 
     ; cleanup for block
     release %reflected_alloc#0
 
     ; epilogue
     release %point_alloc#0
-    return %returned
+    return
   }
 
 Note that although resilient types are manipulated through pointers, they still
