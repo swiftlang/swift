@@ -265,6 +265,12 @@ ManagedValue SILGenFunction::visitDerivedToBaseExpr(DerivedToBaseExpr *E) {
   return emitImplicitConvert(*this, E);
 }
 
+ManagedValue SILGenFunction::visitMetatypeConversionExpr(
+                                                   MetatypeConversionExpr *E) {
+  visit(E->getSubExpr());
+  return ManagedValue(B.createMetatype(E));
+}
+
 ManagedValue SILGenFunction::visitRequalifyExpr(RequalifyExpr *E) {
   return emitImplicitConvert(*this, E);
 }
