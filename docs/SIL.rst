@@ -276,11 +276,13 @@ string_literal
 ::
 
   %1 = string_literal {ascii|utf8} "asdf"
-  ; %1 has type $Builtin.RawPointer
+  ; %1 has type $(Builtin.RawPointer, Builtin.Int64)
 
 Retrieves a pointer to a string literal in the string table. The result will
-be a ``Builtin.RawPointer`` pointing to the first byte of a zero-terminated
-string in the specified ``ascii`` or ``utf8`` encoding.
+be a pair, the first element of which is a ``Builtin.RawPointer`` pointing to
+the first byte of a zero-terminated string in the specified ``ascii`` or
+``utf8`` encoding, and the second element of which is a ``Builtin.Int64`` value
+representing the size in bytes of the encoded string.
 
 metatype
 ````````
@@ -597,22 +599,59 @@ index_addr
 Given a pointer into an array of values, returns the address of the
 ``%1``-th element relative to ``%0``.
 
-convert
-```````
+implicit_convert
+````````````````
 ::
 
-  %1 = convert %0, $T
-  ; %0 must be of a type $U implicitly convertible to $T
+  %1 = implicit_convert %0, $T
+  ; %0 must be of a type $U implicitly convertible to $T (see below)
   ; %1 will be of type $T
 
 Performs an implicit conversion of ``%0`` to type ``T``. This instruction is
-limited to conversions that will not affect how the value will codegen, such as:
+limited to conversions that have no runtime effect, such as:
 
 * derived-to-base conversion
-* metatype-to-metatype conversion
 * scalar-to-equivalent-tuple conversion
 * function-to-equivalent-function conversion
 * reference-type-to-``Box`` conversion
+
+downcast
+````````
+::
+
+  %1 = downcast %0, $T
+  ; %0 must be of a reference type that is a subclass of $T
+  ; $T must be a class type
+  ; %1 will be of type T
+
+Performs a checked downcast conversion of ``%0`` to subclass ``T``.
+
+coerce
+``````
+::
+
+  %1 = coerce %0, $T
+  ; %0 must be of type $T
+  ; %1 will be of type $T
+
+Represents an explicit type coercion with no runtime effect. ``%1`` will be
+equivalent to ``%0``.
+
+Generics
+~~~~~~~~
+
+specialize
+``````````
+::
+
+  %1 = specialize %0, $T
+  ; %0 must be of a generic function type $<T1, T2, ...> A -> R
+  ; $T must be of either the concrete function type $A -> R or a generic
+  ; function type $<T3, ...> A -> R with some type variables removed.
+  ; %1 will be of the function type $T
+
+Specializes a generic function ``%0`` to the generic or concrete function type
+``T``, binding some or all of its generic type variables.
 
 generalize
 ``````````
@@ -626,64 +665,90 @@ generalize
 Performs a representation conversion of ``%0`` to type ``T``, which must be a
 generic type compatible with the type of ``%0``.
 
-Protocol types
-~~~~~~~~~~~~~~
-
-alloc_protocol
-``````````````
+archetype_to_super
+``````````````````
 ::
 
-  %1 = alloc_protocol $T, %0
-  ; %0 must be of a $SIL.Address<P> type for protocol type P
-  ; $T must be a type that fulfills protocol(s) P
-  ; %1 will be of type $SIL.Address<T>
-  ; TODO: not implemented
+  %1 = archetype_to_super %0, $T
+  ; %0 must be an address of an archetype with base class constraint
+  ; $SIL.Address<U:B>
+  ; $T must be either the base constraint type B or a supertype of B
+  ; %1 will be of the base type $T
 
-Prepares the uninitialized protocol value pointed to by ``%0`` to
-contain a value of type ``$T``. ``%0`` must point to uninitialized storage
-for the protocol type ``$P``. The result of the instruction is the address
-of the storage for the value; this storage is uninitialized and must be
-initialized by a ``store`` or ``copy_addr`` to ``%1``. Creating a
-protocol type value from a value type::
+Performs an upcast operation on the archetype value referenced by ``%0``.
 
-  var e:SomeProtocol = SomeInstance()
-
-would lower to something like this::
-
-  %SomeInstance = constant_ref @SomeInstance
-  %1 = apply %SomeInstance()
-  %e = alloc_var $SomeProtocol                          ; allocate the protocol
-  %e_instance = alloc_protocol $SomeInstance, %e        ; allocate its value
-  store %1 to %e_instance                               ; initialize value
-
-protocol_method_ref
-```````````````````
-::
-
-  %1 = protocol_method_ref %0, @method
-  ; %0 must be of a $SIL.Address<P> type for protocol type P
-  ; @method must be a reference to a method of (one of the) protocol(s) P
-  ; %1 will be of type $(Builtin.RawPointer, T...) -> U
-  ;   for method type (T...) -> U
-  ; TODO: not implemented
-
-Obtains a reference to the function implementing ``@method`` for the protocol
-value referenced by ``%0``. The resulting function value will take a pointer
-to the ``this`` value as a ``RawPointer``; this value can be projected from
-the protocol with a ``project_protocol`` instruction.
-
-project_protocol
+archetype_method
 ````````````````
 ::
 
-  %1 = project_protocol %0
-  ; %0 must be of a $SIL.Address<P> type for protocol type P
-  ; %1 will be of type $Builtin.RawPointer
-  ; TODO: not implemented
+  %1 = archetype_method %0, @method
+  ; %0 must be an address of an archetype $SIL.Address<T>
+  ; @method must be a reference to a method of one of the constraints of T
+  ; %1 will be of type T -> U' -> V' for method type U -> V,
+  ;   where self and associated types in U and V are bound relative to T in
+  ;   U' and V'
+  ;   e.g. method `(This, Foo) -> Protocol.Bar` becomes `(T, Foo) -> T.Bar`
 
-Obtains a ``RawPointer`` pointing to the value inside the protocol value
-referenced by ``%0``. This raw pointer can be passed to protocol methods
-obtained by ``protocol_method_ref``. A method call on a protocol::
+Obtains a reference to function implementing ``@method`` for the archetype
+referenced by ``%0``. Self and associated types in the signature of ``@method``
+are bound relative to the type referenced by ``%0`` in the resulting function
+value.
+
+Existential types
+~~~~~~~~~~~~~~~~~
+
+alloc_existential
+`````````````````
+::
+
+  %1 = alloc_existential $T, %0
+  ; %0 must be of a $SIL.Address<P> type for existential type P
+  ; $T must be a type that fulfills protocol(s) P
+  ; %1 will be of type $SIL.Address<T>
+
+Prepares the uninitialized existential buffer pointed to by ``%0`` to
+contain a value of type ``$T``. ``%0`` must point to uninitialized storage
+for the existential type ``$P``. The result of the instruction is the address
+of the storage for the value; this storage is uninitialized and must be
+initialized by a ``store`` or ``copy_addr`` to ``%1``. Creating a
+existential value from a value type::
+
+  var e:SomeProtocol = SomeInstance()
+
+lowers to something like this::
+
+  %SomeInstance = constant_ref @SomeInstance
+  %1 = apply %SomeInstance()
+  %e = alloc_var $SomeProtocol                      ; allocate the existential
+  %e_instance = alloc_protocol $SomeInstance, %e    ; allocate its value
+  store %1 to %e_instance                           ; initialize value
+
+existential_method
+``````````````````
+::
+
+  %1 = existential_method %0, @method
+  ; %0 must be of a $SIL.Address<P> type for existential type P
+  ; @method must be a reference to a method of (one of the) protocol(s) P
+  ; %1 will be of type $Builtin.RawPointer -> T -> U
+  ;   for method type T -> U
+
+Obtains a reference to the function implementing ``@method`` for the existential
+referenced by ``%0``. The resulting function value will take a pointer
+to the ``this`` value as a ``RawPointer``; this value can be projected from
+the existential with a ``project_existential`` instruction.
+
+project_existential
+```````````````````
+::
+
+  %1 = project_existential %0
+  ; %0 must be of a $SIL.Address<P> type for existential type P
+  ; %1 will be of type $Builtin.RawPointer
+
+Obtains a ``RawPointer`` pointing to the value inside the existential value
+referenced by ``%0``. This raw pointer can be passed to existential methods
+obtained by ``existential_method``. A method call on an existential::
 
   protocol Foo {
     func bar(x:Int)
@@ -695,8 +760,8 @@ obtained by ``protocol_method_ref``. A method call on a protocol::
 would lower to something like this::
 
   ; ... initialize %foo
-  %bar = protocol_method_ref %foo, @Foo.bar
-  %foo_p = project_protocol %foo
+  %bar = existential_method %foo, @Foo.bar
+  %foo_p = project_existential %foo
   %one_two_three = integer_literal $Builtin.Int64, 123
   %_ = apply %bar(%foo_p, %one_two_three)
 
@@ -716,19 +781,6 @@ Allocates a closure by partially applying the function ``%0`` in its first
 N arguments. The closure will be a allocated as a box with retain count 1
 containing the values ``%1``, ``%2``, etc. The closed-over values will not be
 retained; that must be done separately if necessary.
-
-specialize
-``````````
-::
-
-  %1 = specialize %0, $T
-  ; %0 must be of a generic function type $<T1, T2, ...> A -> R
-  ; $T must be of either the concrete function type $A -> R or a generic
-  ; function type $<T3, ...> A -> R with some type variables removed.
-  ; %1 will be of the function type $T
-
-Specializes a generic function ``%0`` to the generic or concrete function type
-``T``, binding some or all of its generic type variables.
 
 apply
 `````
