@@ -861,7 +861,51 @@ TBD
 Calling convention
 ------------------
 
-TODO: describe how swift functions translate to SIL functions call sequences
+Calling a function with trivial value types as inputs and outputs simply passes
+everything by value. This Swift function::
+
+  func foo(x:Int, y:Float) -> Char
+
+gets called in SIL as::
+
+  %foo = constant_ref $(Int, Float) -> Char, @foo
+  %z = apply %foo(%x, %y)
+
+Reference type arguments get retained, and reference type return values must
+be released. Value types with reference type components have their reference
+type components retained and released the same way. This Swift function::
+
+  class A {}
+
+  func bar(x:A) -> (Int, A)
+
+gets called in SIL as::
+
+  %bar = constant_ref $(A) -> (Int, A), @bar
+  retain %x
+  %z = apply %bar(%x)
+  ; ... use %z ...
+  %z.1 = extract %z, 1
+  release %z.1
+
+Address-only arguments are passed by address and are callee-copied. The
+caller maintains ownership of the referenced arguments, and the callee must
+not modify them. An address-only return value is handled by passing the address
+of a caller-owned uninitialized buffer as the final argument to the callee. The
+callee must initialize this buffer before returning. This Swift function::
+
+  struct [API] A {}
+
+  func bas(x:A, y:Int) -> A
+
+gets called in SIL as::
+
+  %bas = constant_ref $(*A, Int, *A) -> ()
+  %z = alloc_var stack $A
+  apply %bas(%x, %y, %z)
+  ; ... use %z ...
+  destroy_addr %z
+  dealloc_var stack %z
 
 Examples
 --------
