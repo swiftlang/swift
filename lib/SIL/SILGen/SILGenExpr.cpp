@@ -141,6 +141,10 @@ ManagedValue SILGenFunction::emitConstantRef(SILLocation loc,
 
 ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
                                                  ValueDecl *decl) {
+  // If this is a reference to a type, produce a metatype.
+  if (decl->getType()->is<MetaTypeType>()) {
+    return ManagedValue(B.createMetatype(loc.get<Expr*>()));
+  }
   
   // If this is a reference to a var, produce an address.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
