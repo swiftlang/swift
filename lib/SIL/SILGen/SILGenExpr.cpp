@@ -271,6 +271,14 @@ ManagedValue SILGenFunction::visitMetatypeConversionExpr(
   return ManagedValue(B.createMetatype(E));
 }
 
+ManagedValue SILGenFunction::visitArchetypeToSuperExpr(
+                                               swift::ArchetypeToSuperExpr *E) {
+  Value base = B.createArchetypeToSuper(E,
+                                        visit(E->getSubExpr()).forward(*this),
+                                        E->getType());
+  return emitManagedRValueWithCleanup(base);
+}
+
 ManagedValue SILGenFunction::visitRequalifyExpr(RequalifyExpr *E) {
   return emitImplicitConvert(*this, E);
 }

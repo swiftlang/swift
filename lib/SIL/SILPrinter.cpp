@@ -246,6 +246,9 @@ public:
   void visitDowncastInst(DowncastInst *CI) {
     printConversionInst(CI, "downcast");
   }
+  void visitArchetypeToSuperInst(ArchetypeToSuperInst *CI) {
+    printConversionInst(CI, "archetype_to_super");
+  }
   
   void visitTupleInst(TupleInst *TI) {
     OS << "tuple (";

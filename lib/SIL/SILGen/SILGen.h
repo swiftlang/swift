@@ -281,6 +281,7 @@ public:
   ManagedValue visitMaterializeExpr(MaterializeExpr *E);
   ManagedValue visitDerivedToBaseExpr(DerivedToBaseExpr *E);
   ManagedValue visitMetatypeConversionExpr(MetatypeConversionExpr *E);
+  ManagedValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E);
   ManagedValue visitRequalifyExpr(RequalifyExpr *E);
   ManagedValue visitFunctionConversionExpr(FunctionConversionExpr *E);
   ManagedValue visitErasureExpr(ErasureExpr *E);

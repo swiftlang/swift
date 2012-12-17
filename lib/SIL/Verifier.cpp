@@ -250,6 +250,21 @@ public:
 #endif
   }
   
+  void visitArchetypeToSuperInst(ArchetypeToSuperInst *ASI) {
+    // FIXME: archetypes should be address-only
+    assert(ASI->getOperand().getType()->is<ArchetypeType>() &&
+           "archetype_to_super operand must be archetype");
+    assert(ASI->getType()->hasReferenceSemantics() &&
+           "archetype_to_super must convert to a reference type");
+  }
+  
+  void visitDowncastInst(DowncastInst *DI) {
+    assert(DI->getOperand().getType()->hasReferenceSemantics() &&
+           "downcast operand must be a reference type");
+    assert(DI->getType()->hasReferenceSemantics() &&
+           "downcast must convert to a reference type");
+  }
+  
   void visitIntegerValueInst(IntegerValueInst *IVI) {
     assert(IVI->getType()->is<BuiltinIntegerType>());
   }

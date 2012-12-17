@@ -299,7 +299,8 @@ void SILGenFunction::emitProlog(CapturingExpr *ce,
   }
 }
 
-static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc, Value v,
+static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc,
+                                   Value v,
                                    void (SILBuilder::*createRR)(SILLocation,
                                                                 Value),
                                    ReferenceTypeElement const &elt) {

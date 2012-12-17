@@ -189,6 +189,11 @@ public:
     return insert(new DowncastInst(Loc, Op, Ty));
   }
   
+  ArchetypeToSuperInst *createArchetypeToSuper(SILLocation Loc,
+                                               Value Archetype, Type BaseTy) {
+    return insert(new ArchetypeToSuperInst(Loc, Archetype, BaseTy));
+  }
+  
   TupleInst *createTuple(SILLocation Loc, Type Ty, ArrayRef<Value> Elements) {
     return insert(TupleInst::create(Loc, Ty, Elements, F));
   }

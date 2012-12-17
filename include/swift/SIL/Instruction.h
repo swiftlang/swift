@@ -511,6 +511,17 @@ public:
     return V->getKind() == ValueKind::DowncastInst;
   }
 };
+  
+/// ArchetypeToSuperInst - Given the address of an archetype value with a base
+/// class constraint, returns a reference to the base class instance.
+class ArchetypeToSuperInst : public ConversionInst {
+public:
+  ArchetypeToSuperInst(SILLocation Loc, Value Archetype, Type BaseTy);
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ArchetypeToSuperInst;
+  }
+};
 
 /// TupleInst - Represents a constructed tuple.
 class TupleInst : public Instruction {
@@ -655,7 +666,7 @@ public:
     return V->getKind() == ValueKind::ArchetypeMethodInst;
   }
 };
-
+  
 /// ExistentialMethodInst - Given the address of an existential and a method
 /// constant, extracts the implementation of that method for the existential.
 /// The result will be of the type RawPointer -> F for a method of function type

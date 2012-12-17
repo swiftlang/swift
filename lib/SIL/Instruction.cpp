@@ -296,6 +296,11 @@ DowncastInst::DowncastInst(SILLocation Loc, Value Operand, Type Ty)
   : ConversionInst(ValueKind::DowncastInst, Loc, Operand, Ty) {
 }
 
+ArchetypeToSuperInst::ArchetypeToSuperInst(SILLocation Loc,
+                                           Value Operand, Type Ty)
+  : ConversionInst(ValueKind::ArchetypeToSuperInst, Loc, Operand, Ty) {
+}
+
 TupleInst *TupleInst::createImpl(SILLocation Loc, Type Ty,
                                  ArrayRef<Value> Elements, Function &F) {
   void *Buffer = F.allocate(sizeof(TupleInst) + Elements.size() * sizeof(Value),
