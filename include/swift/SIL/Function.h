@@ -47,8 +47,7 @@ private:
   SILModule &Module;
 
   /// The lowered type of the function. This will differ from the type of the
-  /// original function if the function is a method, is curried, has captures,
-  /// or consumes or returns address-only values.
+  /// original function if the function consumes or returns address-only values.
   Type LoweredType;
   
   /// The collection of all BasicBlocks in the Function.
@@ -56,7 +55,8 @@ private:
 
   // Intentionally marked private so that we need to use
   // 'SILModule::constructSIL()' to generate a Function.
-  Function(SILModule &Module) : Module(Module) {}
+  Function(SILModule &Module, Type LoweredType)
+    : Module(Module), LoweredType(LoweredType) {}
   
 public:
   ~Function();

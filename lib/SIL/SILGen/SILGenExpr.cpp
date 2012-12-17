@@ -114,6 +114,11 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   return r;
 }
 
+Value SILGenFunction::emitGlobalConstantRef(SILLocation loc,
+                                            SILConstant constant) {
+  return B.createConstantRef(loc, constant, SGM.getConstantType(constant));
+}
+
 Value SILGenFunction::emitUnmanagedConstantRef(SILLocation loc,
                                                SILConstant constant) {
   // If this is a reference to a local constant, grab it.
@@ -122,7 +127,7 @@ Value SILGenFunction::emitUnmanagedConstantRef(SILLocation loc,
   }
   
   // Otherwise, use a global ConstantRefInst.
-  return B.createConstantRef(loc, constant);
+  return emitGlobalConstantRef(loc, constant);
 }
 
 ManagedValue SILGenFunction::emitConstantRef(SILLocation loc,
@@ -135,7 +140,7 @@ ManagedValue SILGenFunction::emitConstantRef(SILLocation loc,
   }
   
   // Otherwise, use a global ConstantRefInst.
-  Value c = B.createConstantRef(loc, constant);
+  Value c = emitGlobalConstantRef(loc, constant);
   return ManagedValue(c);
 }
 
@@ -163,7 +168,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
            "no location for local var!");
     // If this is a global variable, invoke its accessor function to get its
     // address.
-    Value accessor = B.createConstantRef(loc, SILConstant(decl));
+    Value accessor = emitGlobalConstantRef(loc, SILConstant(decl));
     Value address = B.createApply(loc, accessor, {});
     return ManagedValue(address);
   }
@@ -432,22 +437,22 @@ ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
 {
   // Get the accessor function. The type will be a polymorphic function if
   // the This type is generic.
-  ManagedValue method(B.createConstantRef(expr, constant));
+  ManagedValue method(emitGlobalConstantRef(expr, constant));
   // If there are substitutions, specialize the generic getter.
   if (!substitutions.empty()) {
     assert(method.getValue().getType()->is<PolymorphicFunctionType>() &&
            "generic getter is not of a poly function type");
-    SILModule &m = F.getModule();
+    TypeConverter &tc = SGM.Types;
     Type propType;
     if (subscriptExpr) {
-      propType = m.getSubscriptPropertyType(constant.id,
+      propType = tc.getSubscriptPropertyType(constant.id,
                                             subscriptExpr->getType(),
                                             expr->getType()->getRValueType());
     } else {
-      propType = m.getPropertyType(constant.id,
+      propType = tc.getPropertyType(constant.id,
                                    expr->getType()->getRValueType());
     }
-    propType = m.getMethodTypeInContext(baseExpr->getType()->getRValueType(),
+    propType = tc.getMethodTypeInContext(baseExpr->getType()->getRValueType(),
                                         propType);
     method = emitManagedRValueWithCleanup(
                             B.createSpecialize(expr, method.getUnmanagedValue(),
@@ -784,11 +789,11 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
       }
     }
     
-    Value functionRef = B.createConstantRef(loc, constant);
+    Value functionRef = emitGlobalConstantRef(loc, constant);
     return emitManagedRValueWithCleanup(B.createClosure(loc,
                                                     functionRef, capturedArgs));
   } else {
-    return ManagedValue(B.createConstantRef(loc, constant));
+    return ManagedValue(emitGlobalConstantRef(loc, constant));
   }
 }
 

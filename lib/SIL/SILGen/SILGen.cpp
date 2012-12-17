@@ -88,6 +88,10 @@ SILGenModule::~SILGenModule() {
   delete TopLevelSGF;
 }
 
+Type SILGenModule::getConstantType(SILConstant constant) {
+  return Types.getConstantType(constant);
+}
+
 void SILGenModule::visitFuncDecl(FuncDecl *fd) {
   emitFunction(fd, fd->getBody());
 }
@@ -105,7 +109,7 @@ Function *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
     fe->dump();
   }
   
-  Function *f = new (M) Function(M);
+  Function *f = new (M) Function(M, getConstantType(constant));
   SILGenFunction(*this, *f, fe).visit(fe->getBody());
   
   if (Verbose) {
@@ -127,7 +131,7 @@ Function *SILGenModule::emitClosure(ClosureExpr *ce) {
     ce->dump();
   }
   
-  Function *f = new (M) Function(M);
+  Function *f = new (M) Function(M, getConstantType(constant));
   SILGenFunction(*this, *f, ce).emitClosureBody(ce->getBody());
 
   if (Verbose) {

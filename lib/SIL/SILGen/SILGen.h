@@ -46,7 +46,7 @@ public:
   
   /// TopLevelSGF - The SILGenFunction used to visit top-level code, or null if
   /// the module is not a main module.
-  SILGenFunction *TopLevelSGF;
+  SILGenFunction /*nullable*/ *TopLevelSGF;
   
   /// Verbose - If true, dumps input ASTs and output SIL to errs as they are
   /// generated.
@@ -58,6 +58,9 @@ public:
   
   SILGenModule(SILGenModule const &) = delete;
   void operator=(SILGenModule const &) = delete;
+  
+  /// Returns the type of a constant reference.
+  Type getConstantType(SILConstant constant);
 
   //===--------------------------------------------------------------------===//
   // Visitors for top-level forms
@@ -321,7 +324,18 @@ public:
                                 ArrayRef<Value> InOps,
                                 ArrayRef<int> ElementMapping,
                                 Expr *VarargsInjectionFunction);
+
+  /// Returns a reference to a constant in global context. For local func decls
+  /// this returns the function constant with unapplied closure context.
+  Value emitGlobalConstantRef(SILLocation loc, SILConstant constant);
+  /// Returns a reference to a constant in local context. This will return a
+  /// closure object reference if the constant refers to a local func decl.
+  /// In rvalue contexts, emitConstantRef should be used instead, which retains
+  /// a local constant and returns a ManagedValue with a cleanup.
   Value emitUnmanagedConstantRef(SILLocation loc, SILConstant constant);
+  /// Returns a reference to a constant in local context. This will return a
+  /// retained closure object reference if the constant refers to a local func
+  /// decl.
   ManagedValue emitConstantRef(SILLocation loc, SILConstant constant);
 
   ManagedValue emitReferenceToDecl(SILLocation loc,
