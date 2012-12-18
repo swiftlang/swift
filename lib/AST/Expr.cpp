@@ -820,6 +820,13 @@ public:
     printRec(E->getRHS());
     OS << ')';
   }
+  void visitSuperToArchetypeExpr(SuperToArchetypeExpr *E) {
+    printCommon(E, "super_to_archetype_expr") << '\n';
+    printRec(E->getLHS());
+    OS << '\n';
+    printRec(E->getRHS());
+    OS << ')';
+  }
 };
 
 } // end anonymous namespace.

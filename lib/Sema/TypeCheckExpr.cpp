@@ -620,6 +620,13 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
                                    E2,
                                    srcArchetype->getSuperclass());
             }
+
+            // If the destination type is an archetype, this is a
+            // super-to-archetype cast.
+            if (Ty->is<ArchetypeType>()) {
+              return new (Context) SuperToArchetypeExpr(E1, E2);
+            }
+
             return new (Context) DowncastExpr(E1, E2);
           }
         }
@@ -1163,6 +1170,12 @@ public:
   }
 
   Expr *visitDowncastExpr(DowncastExpr *E) {
+    // The type of the expr is always the type that the MetaType LHS specifies.
+    assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
+    return E;
+  }
+
+  Expr *visitSuperToArchetypeExpr(SuperToArchetypeExpr *E) {
     // The type of the expr is always the type that the MetaType LHS specifies.
     assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
     return E;

@@ -331,6 +331,12 @@ namespace {
       Out.add({castVal, val.getCleanup()});
     }
 
+    void visitSuperToArchetypeExpr(SuperToArchetypeExpr *E) {
+      IGF.emitIgnored(E->getLHS());
+      IGF.unimplemented(E->getLoc(), "super-to-archetype casts");
+      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
+    }
+
     void visitNewArrayExpr(NewArrayExpr *E) {
       emitNewArrayExpr(IGF, E, Out);
     }
@@ -513,6 +519,7 @@ namespace {
     NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
     NOT_LVALUE_EXPR(Coerce)
     NOT_LVALUE_EXPR(Downcast)
+    NOT_LVALUE_EXPR(SuperToArchetype)
     NOT_LVALUE_EXPR(Module)
 #undef NOT_LVALUE_EXPR
 
@@ -677,6 +684,7 @@ namespace {
     NON_LOCATEABLE(MetatypeExpr)
     NON_LOCATEABLE(CoerceExpr)
     NON_LOCATEABLE(DowncastExpr)
+    NON_LOCATEABLE(SuperToArchetypeExpr)
     NON_LOCATEABLE(ExistentialMemberRefExpr)
     NON_LOCATEABLE(ArchetypeMemberRefExpr)
     NON_LOCATEABLE(GenericMemberRefExpr)

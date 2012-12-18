@@ -115,7 +115,8 @@ ABSTRACT_EXPR(ImplicitConversion, Expr)
 ABSTRACT_EXPR(ExplicitCast, Expr)
   EXPR(Coerce, ExplicitCastExpr)
   EXPR(Downcast, ExplicitCastExpr)
-  EXPR_RANGE(ExplicitCast, Coerce, Downcast)
+  EXPR(SuperToArchetype, ExplicitCastExpr)
+  EXPR_RANGE(ExplicitCast, Coerce, SuperToArchetype)
 
 #undef EXPR_RANGE
 #undef UNCHECKED_EXPR

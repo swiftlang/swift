@@ -2552,6 +2552,10 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     Type visitDowncastExpr(DowncastExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
+
+    Type visitSuperToArchetypeExpr(SuperToArchetypeExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
   };
 
   /// \brief AST walker that "sanitizes" an expression for the
@@ -5502,6 +5506,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitDowncastExpr(DowncastExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    Expr *visitSuperToArchetypeExpr(SuperToArchetypeExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
   };

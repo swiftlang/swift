@@ -1984,6 +1984,25 @@ public:
   }
 };
 
+/// \brief Represents an explicit downcast from a superclass of an archetype to
+/// the archetype iself.
+///
+/// Super-to-archetype casts are written as function applications a(b) where
+/// "a" is a DeclRefExpr for a TypeDecl and "b" is the expression to
+/// be converted to the type of "a".
+///
+/// FIXME: At present, only class downcasting is supported.
+/// FIXME: All downcasts are currently unchecked, which is horrible.
+class SuperToArchetypeExpr : public ExplicitCastExpr {
+public:
+  SuperToArchetypeExpr(Expr *lhs, Expr *rhs)
+    : ExplicitCastExpr(ExprKind::SuperToArchetype, lhs, rhs) { }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::SuperToArchetype;
+  }
+};
+
 } // end namespace swift
 
 #endif
