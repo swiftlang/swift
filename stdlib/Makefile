@@ -21,8 +21,7 @@ SWIFT_SOURCES := Bool.swift FixedPoint.swift FloatingPoint.swift CTypes.swift \
 		 String.swift Dictionary.swift Vector.swift Algorithm.swift \
 		 Demangle.swift InputStream.swift OutputStream.swift \
 		 CString.swift \
-		 POSIX/Descriptor.swift POSIX/File.swift POSIX/Misc.swift \
-	         ObjCTypes.swift
+		 POSIX/Descriptor.swift POSIX/File.swift POSIX/Misc.swift
 ifeq ($(DISABLE_ASSERTIONS),1)
   SWIFT_SOURCES += Assert.swift
 else

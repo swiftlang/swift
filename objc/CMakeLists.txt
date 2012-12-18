@@ -20,12 +20,19 @@ if(SWIFT_OPTIMIZED)
  endif()
 endif()
 
-# Install Foundation.swift
+# Install objc.swift and Foundation.swift
 if(XCODE)
   set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}")
 else()
   set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib")
 endif()
+
+add_custom_command(
+  OUTPUT "${SWIFTLIB_DIR}/swift/objc.swift"
+  COMMAND mkdir -p "${SWIFTLIB_DIR}/swift"
+  COMMAND cp objc.swift "${SWIFTLIB_DIR}/swift/objc.swift"
+  DEPENDS objc.swift
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_custom_command(
   OUTPUT "${SWIFTLIB_DIR}/swift/Foundation.swift"
