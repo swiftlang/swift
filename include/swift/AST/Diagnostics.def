@@ -932,9 +932,9 @@ ERROR(foreach_missing_enumerable,sema_tcs,none,
 ERROR(enumerable_protocol_broken,sema_tcs,none,
       "Enumerable protocol definition is broken", ())
 ERROR(foreach_missing_range,sema_tcs,none,
-      "for-each loop requires the 'Range' protocol to be defined", ())
+      "for-each loop requires the 'Enumerator' protocol to be defined", ())
 ERROR(range_protocol_broken,sema_tcs,none,
-      "Range protocol definition is broken", ())
+      "Enumerator protocol definition is broken", ())
 
 ERROR(break_outside_loop,sema_tcs,none,
       "'break' is only allowed inside a loop", ())

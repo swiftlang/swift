@@ -1066,8 +1066,8 @@ token following the opening '{' is either 'set' or 'get'.</p>
 
   <pre class="example">
     protocol Enumerable {
-      typename RangeType : Range
-      func getElements() -> RangeType
+      typename EnumeratorType : Enumerator
+      func getElements() -> EnumeratorType
     }
 </pre>
 
@@ -1709,9 +1709,9 @@ protocol C : A, B { }
     <i>// A value that represents any type</i>
     var any : protocol&lt;&gt; = 17
 
-    <i>// A value that conforms to both the Document and Range protocols</i>
-    var doc : protocol&lt;Document,Range&gt;
-    doc.isEmpty()       <i>// uses Range.isEmpty()</i>
+    <i>// A value that conforms to both the Document and Enumerator protocols</i>
+    var doc : protocol&lt;Document,Enumerator&gt;
+    doc.isEmpty()       <i>// uses Enumerator.isEmpty()</i>
     doc.title = "Hello" <i>// uses Document.title</i>
 </pre>
 
@@ -2624,7 +2624,7 @@ ill-formed if the type does not conform to the protocol.</p>
     stmt-for-each ::= 'for' <a href="#pattern">pattern</a> 'in' <a href="#expr">expr</a> <a href="#stmt-brace">stmt-brace</a>
   </pre>
   
-  <p>Range-based 'for' statements provide iteration over the values in a
+  <p>Enumerator-based 'for' statements provide iteration over the values in a
  container. The <tt>expr</tt> is the container, and shall have a
  method <tt>getElements()</tt> that, when called, returns the range
  over which the loop will iterate.</p>
@@ -2640,7 +2640,7 @@ ill-formed if the type does not conform to the protocol.</p>
     should terminate.</dd>
   </dl>
 
-  <dt><tt>getFirstAndAdvance() -> T</tt></dt>
+  <dt><tt>next() -> T</tt></dt>
   <dd>Retrieves the first element in the range then advances to the
     next element in the range, reducing the length of the range by
     one. The type <tt>T</tt> can be any materializable type, and will

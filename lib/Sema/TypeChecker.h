@@ -278,12 +278,12 @@ public:
   TranslationUnit &TU;
   ASTContext &Context;
 
-private:  
+private:
   /// \brief The 'Enumerable' protocol, used by the for-each loop.
   ProtocolDecl *EnumerableProto;
 
-  /// \brief The 'Range' protocol, used by the for-each loop.
-  ProtocolDecl *RangeProto;
+  /// \brief The 'Enumerator' protocol, used by the for-each loop.
+  ProtocolDecl *EnumeratorProto;
   
   Type IntLiteralType;
   Type FloatLiteralType;
@@ -292,7 +292,7 @@ private:
 
 public:
   TypeChecker(TranslationUnit &TU)
-    : TU(TU), Context(TU.Ctx), EnumerableProto(0), RangeProto(0) {}
+    : TU(TU), Context(TU.Ctx), EnumerableProto(0), EnumeratorProto(0) {}
 
   LangOptions &getLangOpts() const { return Context.LangOpts; }
   
@@ -747,14 +747,14 @@ public:
   /// \brief Retrieve the Enumerable protocol declaration, if it exists.
   ProtocolDecl *getEnumerableProtocol();
 
-  /// \brief Retrieve the Range protocol declaration, if it exists.
-  ProtocolDecl *getRangeProtocol();
+  /// \brief Retrieve the Enumerator protocol declaration, if it exists.
+  ProtocolDecl *getEnumeratorProtocol();
 
-  
+
 };
 
-  
-  
+
+
 } // end namespace swift
 
 #endif

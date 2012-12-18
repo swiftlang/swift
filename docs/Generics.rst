@@ -569,30 +569,30 @@ Note that find<C> is shorthand for (and equivalent to) find<C : Any>, since
 every type conforms to the Any protocol composition.
 
 There are two other important kinds of constraints that need to be
-expressible. Before we get to those, consider a simple "Range" protocol that
-lets us describe a range of values of some given value type::
-  
-  protocol Range {
+expressible. Before we get to those, consider a simple "Enumerator" protocol that
+lets us describe an iteration of values of some given value type::
+
+  protocol Enumerator {
     typealias Element
     func isEmpty() -> Bool
-    func getFirstAndAdvance() -> Element
+    func next() -> Element
   }
 
 Now, we want to express the notion of an enumerable collection, which provides a
-range, which we do by adding requirements into the protocol::
+iteration, which we do by adding requirements into the protocol::
 
   protocol EnumerableCollection : Collection {
-    typealias RangeType : Range
-    requires RangeType.Element == Element
-    func getRange() -> RangeType
+    typealias EnumeratorType : Enumerator
+    requires EnumeratorType.Element == Element
+    func getEnumeratorType() -> EnumeratorType
   }
 
-Here, we are specifying constraints on an associated type (RangeType must
-conform to the Range protocol), by adding a conformance clause (: Range) to the
-associated type definition. We also use a separate requires clause to require
-that the type of values produced by querying the range is the same as the type
-of values stored in the container. This is important, for example, for use with
-the Comparable protocol (and any protocol using This types), because it
+Here, we are specifying constraints on an associated type (EnumeratorType must
+conform to the Enumerator protocol), by adding a conformance clause (: Enumerator)
+to the associated type definition. We also use a separate requires clause to
+require that the type of values produced by querying the iterator is the same as
+the type of values stored in the container. This is important, for example, for
+use with the Comparable protocol (and any protocol using This types), because it
 maintains type identity within the generic function or type.
 
 Constraint Inference
@@ -723,23 +723,23 @@ Overloading
 Generic functions can be overloaded based entirely on constraints. For example,
 consider a binary search algorithm::
   
-  func binarySearch<C : EnumerableCollection>(collection : C, value : C.Element) -> C.RangeType
+  func binarySearch<C : EnumerableCollection>(collection : C, value : C.Element) -> C.EnumeratorType
   requires C.Element : Comparable {
     // We can perform log(N) comparisons, but EnumerableCollection only supports linear
     // walks, so this is linear time
   }
   
-  protocol RandomAccessRange : Range {
-    func split() -> (Range, Range) // splits a range in half, returning both halves
+  protocol RandomAccessEnumerator : Enumerator {
+    func split() -> (Enumerator, Enumerator) // splits a range in half, returning both halves
   }
 
-  func binarySearch<C : EnumerableCollection>(collection : C, value : C.Element) -> C.RangeType
-  requires C.Element : Comparable, C.RangeType : RandomAccessRange {
+  func binarySearch<C : EnumerableCollection>(collection : C, value : C.Element) -> C.EnumeratorType
+  requires C.Element : Comparable, C.EnumeratorType : RandomAccessEnumerator {
     // We can perform log(N) comparisons and log(N) range splits, so this is logarithmic time
   }
 
 If binarySearch is called with a sequence whose range type conforms to
-RandomAccessRange, both of the generic functions match. However, the second
+RandomAccessEnumerator, both of the generic functions match. However, the second
 function is more specialized , because it's constraints are a superset of the
 constraints of the first function. In such a case, overloading should pick the
 more specialized function.
@@ -748,15 +748,15 @@ There is a question as to when this overloading occurs. For example,
 binarySearch might be called as a subroutine of another generic function with
 minimal requirements::
 
-  func doSomethingWithSearch<C : EnumerableCollection>(collection : C, value : C.Element) -> C.RangeType requires C.Element : Ordered {
+  func doSomethingWithSearch<C : EnumerableCollection>(collection : C, value : C.Element) -> C.EnumeratorType requires C.Element : Ordered {
     binarySearch(collection, value);
   }
 
 At the time when the generic definition of doSomethingWithSearch is
 type-checked, only the first binarySearch() function applies, since we don't
-know that C.RangeType conforms to RandomAccessRange. However, when
-doSomethingWithSearch is actually invoked, C.RangeType might conform to the
-RandomAccessRange, in which case we'd be better off picking the second
+know that C.EnumeratorType conforms to RandomAccessEnumerator. However, when
+doSomethingWithSearch is actually invoked, C.EnumeratorType might conform to the
+RandomAccessEnumerator, in which case we'd be better off picking the second
 binarySearch. This amounts to run-time overload resolution, which may be
 desirable , but also has downsides, such as the potential for run-time failures
 due to ambiguities and the cost of performing such an expensive operation at

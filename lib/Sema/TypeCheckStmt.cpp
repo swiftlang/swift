@@ -280,9 +280,9 @@ public:
       return nullptr;
     }
 
-    // Retrieve the 'Range' protocol.
-    ProtocolDecl *RangeProto = TC.getRangeProtocol();
-    if (!RangeProto) {
+    // Retrieve the 'Enumerator' protocol.
+    ProtocolDecl *EnumeratorProto = TC.getEnumeratorProtocol();
+    if (!EnumeratorProto) {
       TC.diagnose(S->getForLoc(), diag::foreach_missing_range);
       return nullptr;
     }
@@ -309,7 +309,7 @@ public:
           continue;
         
         StringRef Name = Value->getName().str();
-        if (Name.equals("Elements") && isa<TypeDecl>(Value)) {
+        if (Name.equals("EnumeratorType") && isa<TypeDecl>(Value)) {
           if (Conformance) {
             ArchetypeType *Archetype
               = cast<TypeDecl>(Value)->getDeclaredType()->getAs<ArchetypeType>();
@@ -318,7 +318,7 @@ public:
             RangeTy = cast<TypeDecl>(Value)->getDeclaredType();
           }
           RangeTy = TC.substMemberTypeWithBase(RangeTy, Value, ContainerType);
-        } else if (Name.equals("getElements") && isa<FuncDecl>(Value)) {
+        } else if (Name.equals("getEnumeratorType") && isa<FuncDecl>(Value)) {
           if (Conformance)
             getElementsFn = cast<FuncDecl>(Conformance->Mapping[Value]);
           else
@@ -352,17 +352,17 @@ public:
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
     ProtocolConformance *Conformance = nullptr;
-    if (!TC.conformsToProtocol(RangeTy, RangeProto, &Conformance,
+    if (!TC.conformsToProtocol(RangeTy, EnumeratorProto, &Conformance,
                                Container->getLoc()))
       return nullptr;
     
     // Gather the witnesses from the Range protocol conformance. These are
     // the functions we'll call.
     FuncDecl *isEmptyFn = 0;
-    FuncDecl *getFirstAndAdvanceFn = 0;
+    FuncDecl *nextFn = 0;
     Type ElementTy;
     
-    for (auto Member : RangeProto->getMembers()) {
+    for (auto Member : EnumeratorProto->getMembers()) {
       auto Value = dyn_cast<ValueDecl>(Member);
       if (!Value)
         continue;
@@ -383,16 +383,16 @@ public:
         else
           isEmptyFn = cast<FuncDecl>(Value);
       }
-      else if (Name.equals("getFirstAndAdvance") && isa<FuncDecl>(Value)) {
+      else if (Name.equals("next") && isa<FuncDecl>(Value)) {
         if (Conformance)
-          getFirstAndAdvanceFn = cast<FuncDecl>(Conformance->Mapping[Value]);
+          nextFn = cast<FuncDecl>(Conformance->Mapping[Value]);
         else
-          getFirstAndAdvanceFn = cast<FuncDecl>(Value);
+          nextFn = cast<FuncDecl>(Value);
       }
     }
     
-    if (!isEmptyFn || !getFirstAndAdvanceFn || !ElementTy) {
-      TC.diagnose(RangeProto->getLoc(), diag::range_protocol_broken);
+    if (!isEmptyFn || !nextFn || !ElementTy) {
+      TC.diagnose(EnumeratorProto->getLoc(), diag::range_protocol_broken);
       return nullptr;
     }
     
@@ -411,7 +411,7 @@ public:
       = callNullaryMethodOf(
           new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
                                        Range->getTypeOfReference()),
-          getFirstAndAdvanceFn,
+          nextFn,
           S->getInLoc());
     if (!GetFirstAndAdvance) return nullptr;
     
@@ -554,11 +554,11 @@ ProtocolDecl *TypeChecker::getEnumerableProtocol() {
   return EnumerableProto;
 }
 
-ProtocolDecl *TypeChecker::getRangeProtocol() {
-  if (!RangeProto) {
-    UnqualifiedLookup Globals(Context.getIdentifier("Range"), &TU);
-    RangeProto = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
+ProtocolDecl *TypeChecker::getEnumeratorProtocol() {
+  if (!EnumeratorProto) {
+    UnqualifiedLookup Globals(Context.getIdentifier("Enumerator"), &TU);
+    EnumeratorProto = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
   }
   
-  return RangeProto;
+  return EnumeratorProto;
 }
