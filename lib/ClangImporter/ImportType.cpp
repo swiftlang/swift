@@ -330,28 +330,26 @@ namespace {
     }
 
     Type VisitObjCObjectType(const clang::ObjCObjectType *type) {
-      // FIXME: Objective-C types are only exposed when referenced via an
-      // Objective-C object pointer type. Revisit this.
-      return Type();
+      // FIXME: Swift cannot express qualified object pointer types, e.g.,
+      // NSObject<Proto>, so we drop the <Proto> part.
+      return Visit(type->getBaseType().getTypePtr());
     }
 
     Type VisitObjCInterfaceType(const clang::ObjCInterfaceType *type) {
-      // FIXME: Objective-C classes are only exposed when referenced via an
-      // Objective-C object pointer type. Revisit this.
-      return Type();
+      auto imported = cast_or_null<ClassDecl>(Impl.importDecl(type->getDecl()));
+      if (!imported)
+        return nullptr;
+
+      return imported->getDeclaredType();
     }
 
     Type VisitObjCObjectPointerType(const clang::ObjCObjectPointerType *type) {
       // If this object pointer refers to an Objective-C class (possibly
-      // qualified), 
-      if (auto interface = type->getInterfaceDecl()) {
-        auto imported = cast_or_null<ClassDecl>(Impl.importDecl(interface));
-        if (!imported)
-          return nullptr;
-
+      // qualified),
+      if (auto interface = type->getInterfaceType()) {
         // FIXME: Swift cannot express qualified object pointer types, e.g.,
         // NSObject<Proto>, so we drop the <Proto> part.
-        return imported->getDeclaredType();
+        return VisitObjCInterfaceType(interface);
       }
 
       // FIXME: We fake 'id' and 'Class' by using NSObject. We need a proper
@@ -522,7 +520,7 @@ getNamedSwiftTypeSpecialization(Module *module, StringRef name,
   if (!module)
     return Type();
 
-  UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), swiftModule);
+  UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), module);
   if (TypeDecl *typeDecl = lookup.getSingleTypeResult()) {
     if (auto nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
       if (auto params = nominalDecl->getGenericParams()) {

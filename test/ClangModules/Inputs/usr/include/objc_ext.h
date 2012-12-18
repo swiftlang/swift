@@ -1,4 +1,4 @@
-#include "objc.h"
+@import objc;
 
 @interface B(Separate)
 - method:(int)i separateExtMethod:(double)d;

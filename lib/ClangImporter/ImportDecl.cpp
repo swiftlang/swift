@@ -28,6 +28,7 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclVisitor.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
 
@@ -85,7 +86,8 @@ namespace {
 
       // If this is the Objective-C BOOL type, map it to ObjCBool.
       auto &clangContext = Impl.getClangASTContext();
-      if (name.str() == "BOOL" &&
+      if (clangContext.getLangOpts().ObjC1 &&
+          name.str() == "BOOL" &&
           clangContext.hasSameType(decl->getUnderlyingType(),
                                    clangContext.ObjCBuiltinBoolTy)) {
         type = Impl.getNamedSwiftType(Impl.getNamedModule("objc"), "ObjCBool");
@@ -1485,6 +1487,37 @@ namespace {
       return nullptr;
     }
 
+    /// \brief Given an untyped collection and an element type,
+    /// produce the typed collection (if possible) or return the collection
+    /// itself (if there is no known corresponding typed collection).
+    Type getTypedCollection(Type collectionTy, Type elementTy) {
+      auto classTy = collectionTy->getAs<ClassType>();
+      if (!classTy) {
+        return collectionTy;
+      }
+      
+      // Map known collections to their typed equivalents.
+      // FIXME: This is very hacky.
+      typedef std::pair<StringRef, StringRef> StringRefPair;
+      StringRefPair typedCollection
+        = llvm::StringSwitch<StringRefPair>(classTy->getDecl()->getName().str())
+            .Case("NSArray", StringRefPair("Foundation", "NSTypedArray"))
+            .Default(StringRefPair(StringRef(), StringRef()));
+      if (typedCollection.first.empty()) {
+        return collectionTy;
+      }
+
+      // Form the specialization.
+      if (auto typed = Impl.getNamedSwiftTypeSpecialization(
+                         Impl.getNamedModule(typedCollection.first),
+                         typedCollection.second,
+                         elementTy)) {
+        return typed;
+      }
+
+      return collectionTy;
+    }
+
     Decl *VisitObjCPropertyDecl(clang::ObjCPropertyDecl *decl) {
       // Properties are imported as variables.
       auto dc = Impl.importDeclContext(decl->getDeclContext());
@@ -1512,6 +1545,14 @@ namespace {
       auto type = Impl.importType(decl->getType());
       if (!type)
         return nullptr;
+
+      // Look for an iboutletcollection attribute, which provides additional
+      // typing information for known containers.
+      if (auto collectionAttr = decl->getAttr<clang::IBOutletCollectionAttr>()){
+        if (auto elementType = Impl.importType(collectionAttr->getInterface())){
+          type = getTypedCollection(type, elementType);
+        }
+      }
 
       // Import the getter.
       auto getter
