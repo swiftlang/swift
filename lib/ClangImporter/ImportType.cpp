@@ -133,6 +133,15 @@ namespace {
       case clang::BuiltinType::ObjCId:
       case clang::BuiltinType::ObjCSel:
         return Type();
+
+      // OpenCL types that don't have Swift equivalents.
+      case clang::BuiltinType::OCLImage1d:
+      case clang::BuiltinType::OCLImage1dArray:
+      case clang::BuiltinType::OCLImage1dBuffer:
+      case clang::BuiltinType::OCLImage2d:
+      case clang::BuiltinType::OCLImage2dArray:
+      case clang::BuiltinType::OCLImage3d:
+        return Type();
       }
     }
 
