@@ -391,7 +391,7 @@ macro(add_swift_executable name)
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")  
 endmacro(add_swift_executable)
 
-set(MODULES_SDK "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9M.sdk" CACHE PATH
+set(MODULES_SDK "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk" CACHE PATH
   "Path to the modules-enabled SDK to use")
 if(EXISTS "${MODULES_SDK}/System/Library/Frameworks/module.map")
   set(HAVE_MODULES_SDK YES)

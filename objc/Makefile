@@ -11,7 +11,7 @@
 ##===----------------------------------------------------------------------===##
 
 # skip this if $(SWIFT_SDK) isn't installed.
-SWIFT_SDK := /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9M.sdk
+SWIFT_SDK := /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk
 ifeq ($(shell test -d $(SWIFT_SDK) && echo OK), OK)
 
 SWIFT_LEVEL := ..
