@@ -23,10 +23,10 @@ using namespace Lowering;
 #include "llvm/Support/raw_ostream.h"
 
 namespace {
-  class CleanupClosure : public Cleanup {
+  class CleanupClosureConstant : public Cleanup {
     Value closure;
   public:
-    CleanupClosure(Value closure) : closure(closure) {}
+    CleanupClosureConstant(Value closure) : closure(closure) {}
     void emit(SILGenFunction &gen) override {
       gen.B.createRelease(SILLocation(), closure);
     }
@@ -43,7 +43,7 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
     Value closure = emitClosureForCapturingExpr(fd, SILConstant(fd),
                                                 fd->getBody())
       .forward(*this);
-    Cleanups.pushCleanup<CleanupClosure>(closure);
+    Cleanups.pushCleanup<CleanupClosureConstant>(closure);
     LocalConstants[SILConstant(fd)] = closure;
   }
 }
@@ -100,7 +100,8 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     // FIXME: Use escape analysis info to generate "alloc_var"/"dealloc_var"
     // stack allocations instead of "alloc_box"/"release" for values that don't
     // escape and thus don't need boxes.
-    auto allocBox = Gen.B.createAllocBox(vd, vd->getType());
+    TypeInfo const &ti = Gen.getTypeInfo(vd->getType());
+    auto allocBox = Gen.B.createAllocBox(vd, ti.getLoweredType());
     auto box = Value(allocBox, 0);
     auto addr = Value(allocBox, 1);
 
@@ -113,8 +114,19 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     // definitive assignment, then we can consider removing it.
     // FIXME: Indirect returns (such as for address-only types) could be
     // emplaced directly into the storage for the variable.
-    auto initVal = Init ? Init : Gen.B.createZeroValue(vd, vd->getType());
-    Gen.B.createStore(vd, initVal, addr);
+    if (ti.isAddressOnly()) {
+      if (Init) {
+        Gen.B.createCopyAddr(vd, Init, addr,
+                             /*isTake=*/ false,
+                             /*isInitialize=*/ true);
+      } else {
+        Gen.B.createZeroAddr(vd, addr);
+      }
+    } else {
+      auto initVal = Init ? Init : Gen.B.createZeroValue(vd,
+                                                         ti.getLoweredType());
+      Gen.B.createStore(vd, initVal, addr);
+    }
 
     Gen.Cleanups.pushCleanup<CleanupVar>(allocBox);
   }
@@ -136,8 +148,11 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     unsigned FieldNo = 0;
     Value TupleInit = Init;
     for (auto &elt : P->getFields()) {
+      TypeInfo const &eltTI = Gen.getTypeInfo(elt.getPattern()->getType());
+      assert(eltTI.isLoadable() &&
+             "init from address-only tuple not yet implemented");
       Init = Gen.B.createExtract(SILLocation(), TupleInit, FieldNo++,
-                                 elt.getPattern()->getType());
+                                 eltTI.getLoweredType());
       visit(elt.getPattern());
     }
   }
@@ -176,7 +191,8 @@ struct ArgumentCreatorVisitor :
   ArgumentCreatorVisitor(SILGenFunction &gen, Function &f) : gen(gen), f(f) {}
 
   Value makeArgument(Type ty, BasicBlock *parent) {
-    return new (f.getModule()) BBArgument(ty, parent);
+    TypeInfo const &ti = gen.getTypeInfo(ty);
+    return new (f.getModule()) BBArgument(ti.getLoweredType(), parent);
   }
     
   // Paren & Typed patterns are noops, just look through them.
@@ -197,7 +213,10 @@ struct ArgumentCreatorVisitor :
       Elements.push_back(visit(elt.getPattern()));
 
     SILBuilder B(f.begin(), f);
-    return B.createTuple(SILLocation(), P->getType(), Elements);
+    TypeInfo const &PTI = gen.getTypeInfo(P->getType());
+    assert(PTI.isLoadable() &&
+           "address-only argument tuple not yet implemented");
+    return B.createTuple(SILLocation(), PTI.getLoweredType(), Elements);
   }
 
   Value visitAnyPattern(AnyPattern *P) {
@@ -234,8 +253,8 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
   case CaptureKind::LValue: {
     // LValues are captured as two arguments: a retained ObjectPointer that owns
     // the captured value, and the address of the value itself.
-    Type ty = capture->getTypeOfReference();
-    Value box = new (gen.SGM.M) BBArgument(c.TheObjectPointerType,
+    SILType ty = gen.getLoweredType(capture->getTypeOfReference());
+    Value box = new (gen.SGM.M) BBArgument(SILType::getObjectPointerType(c),
                                            gen.F.begin());
     Value addr = new (gen.SGM.M) BBArgument(ty,
                                             gen.F.begin());
@@ -246,34 +265,38 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
   case CaptureKind::Byref: {
     // Byref captures are non-escaping, so it's sufficient to capture only the
     // address.
-    Type ty = capture->getTypeOfReference();
+    SILType ty = gen.getLoweredType(capture->getTypeOfReference());
     Value addr = new (gen.SGM.M) BBArgument(ty, gen.F.begin());
     gen.VarLocs[capture] = {Value(), addr};
     break;
   }
   case CaptureKind::Constant: {
     // Constants are captured by value.
-    Type ty = capture->getType();
-    assert(!ty->is<LValueType>() && "capturing byref by value?!");
-    Value value = new (gen.SGM.M) BBArgument(ty, gen.F.begin());
+    assert(!capture->getType()->is<LValueType>() &&
+           "capturing byref by value?!");
+    TypeInfo const &ti = gen.getTypeInfo(capture->getType());
+    Value value = new (gen.SGM.M) BBArgument(ti.getLoweredType(),
+                                             gen.F.begin());
     gen.LocalConstants[SILConstant(capture)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     break;
   }
   case CaptureKind::GetterSetter: {
     // Capture the setter and getter closures by value.
-    Type setTy = FunctionType::get(capture->getType(),
-                                   TupleType::getEmpty(c), c);
-    Value value = new (gen.SGM.M) BBArgument(setTy, gen.F.begin());
+    Type setTy = gen.SGM.Types.getPropertyType(SILConstant::Setter,
+                                               capture->getType());
+    SILType lSetTy = gen.getLoweredType(setTy);
+    Value value = new (gen.SGM.M) BBArgument(lSetTy, gen.F.begin());
     gen.LocalConstants[SILConstant(capture, SILConstant::Setter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     /* FALLTHROUGH */
   }
   case CaptureKind::Getter: {
     // Capture the getter closure by value.
-    Type getTy = FunctionType::get(TupleType::getEmpty(c),
-                                   capture->getType(), c);
-    Value value = new (gen.SGM.M) BBArgument(getTy, gen.F.begin());
+    Type getTy = gen.SGM.Types.getPropertyType(SILConstant::Getter,
+                                               capture->getType());
+    SILType lGetTy = gen.getLoweredType(getTy);
+    Value value = new (gen.SGM.M) BBArgument(lGetTy, gen.F.begin());
     gen.LocalConstants[SILConstant(capture, SILConstant::Getter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     break;
@@ -305,7 +328,9 @@ static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc,
                                                                 Value),
                                    ReferenceTypeElement const &elt) {
   for (FragileElement comp : elt.path) {
-    v = gen.B.createExtract(loc, v, comp.index, comp.type);
+    TypeInfo const &ti = gen.getTypeInfo(comp.type);
+    assert(ti.isLoadable() && "fragile element is address-only?!");
+    v = gen.B.createExtract(loc, v, comp.index, ti.getLoweredType());
   }
   (gen.B.*createRR)(loc, v);
 }

@@ -218,6 +218,9 @@ public:
     if (CI->isInitializationOfDest())
       OS << " [initialization]";
   }
+  void visitZeroAddrInst(ZeroAddrInst *ZI) {
+    OS << "zero_addr " << getID(ZI->getDest());
+  }
   void visitSpecializeInst(SpecializeInst *SI) {
     OS << "specialize " << getID(SI->getOperand()) << ", $"
        << SI->getType().getString() << "  ; ";
@@ -290,7 +293,7 @@ public:
     AEI->getConcreteType()->print(OS);
   }
   void visitMetatypeInst(MetatypeInst *MI) {
-    OS << "metatype $" << MI->getMetaType().getString();
+    OS << "metatype $" << MI->getType().getString();
   }
   
   void visitRetainInst(RetainInst *RI) {

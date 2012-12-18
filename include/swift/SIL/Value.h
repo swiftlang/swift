@@ -17,8 +17,7 @@
 #ifndef SWIFT_SIL_VALUE_H
 #define SWIFT_SIL_VALUE_H
 
-#include "swift/SIL/SILBase.h"
-#include "swift/AST/Type.h"
+#include "swift/SIL/SILModule.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 
@@ -36,20 +35,20 @@ namespace swift {
   /// represents a runtime computed value.  Things like Instruction derive from
   /// this.
   class ValueBase : public SILAllocated<ValueBase> {
-    PointerUnion<Type, SILTypeList *> Types;
+    PointerUnion<SILTypeList*, SILType> Types;
     const ValueKind Kind;
   protected:
     ValueBase(ValueKind Kind, SILTypeList *TypeList = 0)
       : Types(TypeList), Kind(Kind) {}
-    ValueBase(ValueKind Kind, Type Ty)
+    ValueBase(ValueKind Kind, SILType Ty)
       : Types(Ty), Kind(Kind) {}
   public:
 
     ValueKind getKind() const { return Kind; }
 
-    ArrayRef<Type> getTypes() const;
+    ArrayRef<SILType> getTypes() const;
 
-    Type getType(unsigned i) const { return getTypes()[i]; }
+    SILType getType(unsigned i) const { return getTypes()[i]; }
 
     /// Pretty-print the Instruction.
     void dump() const;
@@ -72,7 +71,7 @@ namespace swift {
     ValueBase *operator->() const { return getDef(); }
     unsigned getResultNumber() const { return ValueAndResultNumber.getInt(); }
 
-    Type getType() const {
+    SILType getType() const {
       return getDef()->getType(getResultNumber());
     }
 

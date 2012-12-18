@@ -43,25 +43,26 @@ namespace {
   };
   
   class FragileElementComponent : public PhysicalPathComponent {
-    FragileElement element;
-    Type type;
+    unsigned elementIndex;
+    SILType type;
   public:
-    FragileElementComponent(FragileElement element,
-                            Type type) : element(element), type(type) {}
+    FragileElementComponent(unsigned elementIndex,
+                            SILType type)
+      : elementIndex(elementIndex), type(type) {}
     
     Value offset(SILGenFunction &gen, SILLocation loc,
                  Value base) const override {
       assert(base && "invalid value for element base");
-      Type baseType = base.getType();
+      SILType baseType = base.getType();
       if (base.getType()->is<LValueType>()) {
         assert(!base.getType()->getRValueType()->hasReferenceSemantics() &&
                "can't get element from address of ref type");
-        return gen.B.createElementAddr(loc, base, element.index, type);
+        return gen.B.createElementAddr(loc, base, elementIndex, type);
       } else if (baseType->hasReferenceSemantics()) {
-        return gen.B.createRefElementAddr(loc, base, element.index, type);
+        return gen.B.createRefElementAddr(loc, base, elementIndex, type);
       } else
-        llvm_unreachable("base for element component must have ref type "
-                         "or be an address");
+        llvm_unreachable("base for element component must be reference type "
+                         "or an address");
     }
   };
 
@@ -80,16 +81,6 @@ namespace {
     }
   };
   
-  class RequalifyComponent : public PhysicalPathComponent {
-    Type type;
-  public:
-    RequalifyComponent(Type type) : type(type) {}
-    Value offset(SILGenFunction &gen, SILLocation loc,
-                 Value base) const override {
-      return gen.B.createImplicitConvert(loc, base, type);
-    }
-  };
-
   class GetterSetterComponent : public LogicalPathComponent {
     Value getter;
     Value setter;
@@ -231,8 +222,8 @@ LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
                                      e->getBase()->getType()->getRValueType());
   
   if (ti.hasFragileElement(decl->getName())) {
-    lv.add<FragileElementComponent>(ti.getFragileElement(decl->getName()),
-                                    e->getType());
+    lv.add<FragileElementComponent>(ti.getFragileElement(decl->getName()).index,
+                                    gen.getLoweredLoadableType(e->getType()));
   } else {
     ManagedValue get = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
                                        /*subscriptExpr=*/nullptr,
@@ -289,9 +280,11 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
   LValue lv = visitRec(e->getBase());
   // FIXME: address-only tuples
-  lv.add<FragileElementComponent>(FragileElement{e->getType()->getRValueType(),
-                                                 e->getFieldNumber()},
-                                  e->getType());
+  TypeInfo const &ti = gen.getTypeInfo(e->getType());
+  assert(ti.isLoadable() &&
+         "address-only tuples not yet implemented");
+  lv.add<FragileElementComponent>(e->getFieldNumber(),
+                                  ti.getLoweredType());
   return ::std::move(lv);
 }
 
@@ -306,7 +299,5 @@ LValue SILGenLValue::visitParenExpr(ParenExpr *e) {
 LValue SILGenLValue::visitRequalifyExpr(RequalifyExpr *e) {
   assert(e->getType()->is<LValueType>() &&
          "non-lvalue requalify in lvalue expression");
-  LValue lv = visitRec(e->getSubExpr());
-  lv.add<RequalifyComponent>(e->getType());
-  return ::std::move(lv);
+  return visitRec(e->getSubExpr());
 }

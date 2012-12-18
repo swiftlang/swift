@@ -17,16 +17,20 @@
 #ifndef SWIFT_SIL_SILMODULE_H
 #define SWIFT_SIL_SILMODULE_H
 
+#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/SIL/SILBase.h"
 #include "swift/SIL/SILConstant.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
   class TranslationUnit;
   class ASTContext;
   class FuncDecl;
+  class Function;
   
   namespace Lowering {
     class SILGenModule;
@@ -46,6 +50,24 @@ public:
   
   /// Get a SILType from a type that has already been lowered.
   static SILType getPreLoweredType(TypeBase *t) { return SILType(t); }
+  static SILType getPreLoweredType(Type t) { return SILType(t); }
+  
+  /// Get the address type for referencing this type, or the type itself if it
+  /// is already an address type.
+  SILType getAddressType(ASTContext &C) const;
+  
+  //
+  // Accessors for types used in SIL instructions:
+  //
+  
+  /// Get the empty tuple type as a SILType.
+  static SILType getEmptyTupleType(ASTContext &C);
+  /// Get the ObjectPointer type as a SILType.
+  static SILType getObjectPointerType(ASTContext &C);
+  /// Get the RawPointer type as a SILType.
+  static SILType getRawPointerType(ASTContext &C);
+  /// Get a builtin Int* type as a SILType.
+  static SILType getBuiltinIntegerType(unsigned bitWidth, ASTContext &C);
 };
 
 /// SILModule - A SIL translation unit. The module object owns all of the SIL
@@ -131,5 +153,19 @@ public:
 };
 
 } // end swift namespace
+
+namespace llvm {
+
+template<>
+class PointerLikeTypeTraits<swift::SILType> :
+  public PointerLikeTypeTraits<swift::Type>
+{
+public:
+  static inline swift::SILType getFromVoidPointer(void *P) {
+    return swift::SILType::getPreLoweredType((swift::TypeBase*)P);
+  }
+};
+
+} // end llvm namespace
 
 #endif

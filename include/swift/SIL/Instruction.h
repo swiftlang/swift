@@ -29,7 +29,7 @@
 namespace swift {
 
 class ValueDecl;
-class Type;
+class SILType;
 class Function;
 class BasicBlock;
 class CharacterLiteralExpr;
@@ -59,7 +59,7 @@ class Instruction : public ValueBase, public llvm::ilist_node<Instruction> {
   void operator delete(void *Ptr, size_t) = delete;
 
 protected:
-  Instruction(ValueKind Kind, SILLocation Loc, Type Ty)
+  Instruction(ValueKind Kind, SILLocation Loc, SILType Ty)
     : ValueBase(Kind, Ty), ParentBB(0), Loc(Loc) {}
   Instruction(ValueKind Kind, SILLocation Loc, SILTypeList *TypeList = 0)
     : ValueBase(Kind, TypeList), ParentBB(0), Loc(Loc) {}
@@ -116,11 +116,11 @@ class AllocInst : public Instruction {
   AllocKind allocKind;
 
 protected:
-  AllocInst(ValueKind Kind, SILLocation Loc, Type Ty, AllocKind allocKind)
+  AllocInst(ValueKind Kind, SILLocation Loc, SILType Ty, AllocKind allocKind)
     : Instruction(Kind, Loc, Ty), allocKind(allocKind) {}
 public:
   /// getType() is ok since this is known to only have one type.
-  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   AllocKind getAllocKind() const { return allocKind; }
   
@@ -134,8 +134,8 @@ public:
 /// temporary. The memory is provided uninitialized.
 class AllocVarInst : public AllocInst {
 public:
-  AllocVarInst(VarDecl *VD);
-  AllocVarInst(SILLocation loc, AllocKind allocKind, Type elementType);
+  AllocVarInst(SILLocation loc, AllocKind allocKind, SILType elementType,
+               Function &F);
 
   /// getDecl - Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.
@@ -157,11 +157,10 @@ public:
 /// returned is an lvalue to the element.
 ///
 class AllocBoxInst : public Instruction {
-  Type ElementType;
 public:
-  AllocBoxInst(SILLocation Loc, Type ElementType, SILBase &B);
+  AllocBoxInst(SILLocation Loc, SILType ElementType, Function &F);
 
-  Type getElementType() const { return ElementType; }
+  Type getElementType() const;
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::AllocBoxInst;
@@ -176,14 +175,13 @@ public:
 /// lvalue to the first array element.
 ///
 class AllocArrayInst : public Instruction {
-  Type ElementType;
   Value NumElements;
 public:
 
-  AllocArrayInst(SILLocation Loc, Type ElementType, Value NumElements,
-                 SILBase &B);
+  AllocArrayInst(SILLocation Loc, SILType ElementType, Value NumElements,
+                 Function &F);
 
-  Type getElementType() const { return ElementType; }
+  Type getElementType() const;
   Value getNumElements() const { return NumElements; }
 
   static bool classof(Value V) {
@@ -205,7 +203,7 @@ protected:
   /// Construct an ApplyInst from a given call expression and the provided
   /// arguments.
   FunctionInst(ValueKind kind,
-               SILLocation Loc, Type Ty, Value Callee, ArrayRef<Value> Args);
+               SILLocation Loc, SILType Ty, Value Callee, ArrayRef<Value> Args);
 
   template<typename DERIVED>
   static DERIVED *create(SILLocation Loc, Value Callee,
@@ -225,7 +223,7 @@ public:
   }
 
   /// getType() is ok since this is known to only have one type.
-  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() >= ValueKind::First_FunctionInst &&
@@ -262,13 +260,13 @@ public:
   /// \param Loc  The location of the reference.
   /// \param C    The constant being referenced.
   /// \param F    The type of the constant. Must be a function type.
-  ConstantRefInst(SILLocation Loc, SILConstant C, Type Ty);
+  ConstantRefInst(SILLocation Loc, SILConstant C, SILType Ty);
 
   /// getConstant - Return the referenced constant.
   SILConstant getConstant() const;
 
   /// getType() is ok since this is known to only have one type.
-  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ConstantRefInst;
@@ -279,10 +277,10 @@ public:
 /// explicitly initialized.
 class ZeroValueInst : public Instruction {
 public:
-  ZeroValueInst(SILLocation Loc, Type Ty);
+  ZeroValueInst(SILLocation Loc, SILType Ty);
 
   /// getType() is ok since this is known to only have one type.
-  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ZeroValueInst;
@@ -302,7 +300,7 @@ public:
   APInt getValue() const;
 
   /// getType() is ok since this is known to only have one type.
-  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::IntegerLiteralInst;
@@ -321,7 +319,7 @@ public:
   APFloat getValue() const;
 
   /// getType() is ok since this is known to only have one type.
-  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::FloatLiteralInst;
@@ -340,7 +338,7 @@ public:
   StringRef getValue() const;
 
   /// getType() is ok since this is known to only have one type.
-  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::StringLiteralInst;
@@ -364,7 +362,7 @@ public:
   Value getLValue() const { return LValue; }
 
   /// getType() is ok since this is known to only have one type.
-  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::LoadInst;
@@ -386,13 +384,31 @@ public:
     return V->getKind() == ValueKind::StoreInst;
   }
 };
+
+/// ZeroAddrInst - Represents a zeroing of a buffer in memory. This is similar
+/// to:
+///   %1 = zero_value $T
+///   store %1 to %dest
+/// but zero_addr must be used for address-only types.
+class ZeroAddrInst : public Instruction {
+  /// Dest - the address of the buffer to be zeroed.
+  Value Dest;
   
+public:
+  ZeroAddrInst(SILLocation Loc, Value Dest);
+  
+  Value getDest() const { return Dest; }
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ZeroAddrInst;
+  }
+};
+
 /// CopyAddrInst - Represents a copy from one memory location to another. This
 /// is similar to:
 ///   %1 = load %src
 ///   store %1 -> %dest
-/// but a copy instruction can be used with types that cannot be loaded, such as
-/// resilient value types.
+/// but a copy instruction must be used for address-only types.
 class CopyAddrInst : public Instruction {
   /// Src - The lvalue being loaded from.
   Value Src;
@@ -441,12 +457,12 @@ class SpecializeInst : public Instruction {
 
   SpecializeInst(SILLocation Loc, Value Operand,
                  ArrayRef<Substitution> Substitutions,
-                 Type DestTy);
+                 SILType DestTy);
 
 public:
   static SpecializeInst *create(SILLocation Loc, Value Operand,
                                 ArrayRef<Substitution> Substitutions,
-                                Type DestTy,
+                                SILType DestTy,
                                 Function &F);
 
   Value getOperand() const { return Operand; }
@@ -456,7 +472,7 @@ public:
   }
   
   /// getType() is ok since this is known to only have one type.
-  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::SpecializeInst;
@@ -468,12 +484,12 @@ public:
 class ConversionInst : public Instruction {
   Value Operand;
 public:
-  ConversionInst(ValueKind Kind, SILLocation Loc, Value Operand, Type Ty);
+  ConversionInst(ValueKind Kind, SILLocation Loc, Value Operand, SILType Ty);
   
   Value getOperand() const { return Operand; }
   
   /// getType() is ok since this is known to only have one type.
-  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
   
   static bool classof(Value V) {
     return V->getKind() >= ValueKind::First_ConversionInst &&
@@ -485,7 +501,7 @@ public:
 /// will codegen.
 class ImplicitConvertInst : public ConversionInst {
 public:
-  ImplicitConvertInst(SILLocation Loc, Value Operand, Type Ty);
+  ImplicitConvertInst(SILLocation Loc, Value Operand, SILType Ty);
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ImplicitConvertInst;
@@ -495,7 +511,7 @@ public:
 /// CoerceInst - Convert a value to a type with an explicit T(x) cast.
 class CoerceInst : public ConversionInst {
 public:
-  CoerceInst(SILLocation Loc, Value Operand, Type ty);
+  CoerceInst(SILLocation Loc, Value Operand, SILType ty);
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::CoerceInst;
@@ -505,7 +521,7 @@ public:
 /// DowncastInst - Perform a checked conversion of a value to a subclass type.
 class DowncastInst : public ConversionInst {
 public:
-  DowncastInst(SILLocation Loc, Value Operand, Type ty);
+  DowncastInst(SILLocation Loc, Value Operand, SILType ty);
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::DowncastInst;
@@ -516,7 +532,7 @@ public:
 /// class constraint, returns a reference to the base class instance.
 class ArchetypeToSuperInst : public ConversionInst {
 public:
-  ArchetypeToSuperInst(SILLocation Loc, Value Archetype, Type BaseTy);
+  ArchetypeToSuperInst(SILLocation Loc, Value Archetype, SILType BaseTy);
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ArchetypeToSuperInst;
@@ -532,8 +548,8 @@ class TupleInst : public Instruction {
 
   /// Private constructor.  Because of the storage requirements of
   /// TupleInst, object creation goes through 'create()'.
-  TupleInst(SILLocation Loc, Type Ty, ArrayRef<Value> Elements);
-  static TupleInst *createImpl(SILLocation Loc, Type Ty,
+  TupleInst(SILLocation Loc, SILType Ty, ArrayRef<Value> Elements);
+  static TupleInst *createImpl(SILLocation Loc, SILType Ty,
                                ArrayRef<Value> Elements, Function &F);
 
 public:
@@ -548,13 +564,13 @@ public:
   }
 
   /// Construct a TupleInst.
-  static TupleInst *create(SILLocation Loc, Type Ty, ArrayRef<Value> Elements,
+  static TupleInst *create(SILLocation Loc, SILType Ty, ArrayRef<Value> Elements,
                            Function &F) {
     return createImpl(SILLocation(), Ty, Elements, F);
   }
 
   /// getType() is ok since this is known to only have one type.
-  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::TupleInst;
@@ -562,23 +578,15 @@ public:
 };
 
 /// MetatypeInst - Represents the production of an instance of a given metatype.
-///
-/// FIXME: base!
 class MetatypeInst : public Instruction {
 public:
 
-  /// Constructs a TypeOfInst.
-  ///
-  /// \param Expr A backpointer to the original MetatypeExpr.
-  ///
-  MetatypeInst(Expr *E);
+  /// Constructs a MetatypeInst
+  MetatypeInst(SILLocation Loc, SILType Metatype);
 
-  Expr *getExpr() const;
-
-  /// getMetaType - Return the type of the metatype that this instruction
-  /// returns.
-  Type getMetaType() const;
-
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  
   static bool classof(Value V) {
     return V->getKind() == ValueKind::MetatypeInst;
   }
@@ -592,7 +600,7 @@ class ExtractInst : public Instruction {
   unsigned FieldNo;
 public:
   ExtractInst(SILLocation Loc, Value Operand, unsigned FieldNo,
-              Type ResultTy);
+              SILType ResultTy);
   
   Value getOperand() const { return Operand; }
   unsigned getFieldNo() const { return FieldNo; }
@@ -609,7 +617,7 @@ class ElementAddrInst : public Instruction {
   unsigned FieldNo;
 public:
   ElementAddrInst(SILLocation Loc, Value Operand, unsigned FieldNo,
-                  Type ResultTy);
+                  SILType ResultTy);
   
   Value getOperand() const { return Operand; }
   unsigned getFieldNo() const { return FieldNo; }
@@ -626,7 +634,7 @@ class RefElementAddrInst : public Instruction {
   unsigned FieldNo;
 public:
   RefElementAddrInst(SILLocation Loc, Value Operand, unsigned FieldNo,
-                     Type ResultTy);
+                     SILType ResultTy);
   
   Value getOperand() const { return Operand; }
   unsigned getFieldNo() const { return FieldNo; }
@@ -644,7 +652,7 @@ class WitnessTableMethodInst : public Instruction {
 public:
   WitnessTableMethodInst(ValueKind Kind,
                          SILLocation Loc, Value Operand, SILConstant Member,
-                         Type thisTy, Type methodTy, Function &F);
+                         SILType thisTy, SILType methodTy, Function &F);
   
   Value getOperand() const { return Operand; }
   SILConstant getMember() const { return Member; }
@@ -660,7 +668,7 @@ public:
 class ArchetypeMethodInst : public WitnessTableMethodInst {
 public:
   ArchetypeMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
-                      Type methodTy, Function &F);
+                      SILType methodTy, Function &F);
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ArchetypeMethodInst;
@@ -675,7 +683,7 @@ public:
 class ExistentialMethodInst : public WitnessTableMethodInst {
 public:
   ExistentialMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
-                        Type methodTy, Function &F);
+                        SILType methodTy, Function &F);
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ExistentialMethodInst;
@@ -704,7 +712,7 @@ class AllocExistentialInst : public Instruction {
   Value Existential;
 public:
   AllocExistentialInst(SILLocation Loc,
-                       Value Existential, Type ConcreteType);
+                       Value Existential, SILType ConcreteType, Function &F);
   
   Value getExistential() const { return Existential; }
   Type getConcreteType() const;
@@ -789,7 +797,7 @@ public:
   unsigned getIndex() const { return Index; }
 
   /// getType() is ok since this is known to only have one type.
-  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::IndexAddrInst;
@@ -801,12 +809,12 @@ public:
 class IntegerValueInst : public Instruction {
   uint64_t Val;
 public:
-  IntegerValueInst(uint64_t Val, Type Ty);
+  IntegerValueInst(uint64_t Val, SILType Ty);
 
   uint64_t getValue() const { return Val; }
 
   /// getType() is ok since this is known to only have one type.
-  Type getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::IntegerValueInst;
@@ -821,7 +829,8 @@ public:
 /// This class defines a "terminating instruction" for a BasicBlock.
 class TermInst : public Instruction {
 protected:
-  TermInst(ValueKind K, SILLocation Loc, Type Ty) : Instruction(K, Loc, Ty) {}
+  TermInst(ValueKind K, SILLocation Loc, SILType Ty)
+    : Instruction(K, Loc, Ty) {}
   TermInst(ValueKind K, SILLocation Loc) : Instruction(K, Loc) {}
 public:
 

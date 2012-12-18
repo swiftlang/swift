@@ -68,6 +68,7 @@ ABSTRACT_VALUE(Instruction, Value)
 
   INST(LoadInst, Instruction)
   INST(StoreInst, Instruction)
+  INST(ZeroAddrInst, Instruction)
   INST(CopyAddrInst, Instruction)
   INST(SpecializeInst, Instruction)
   INST(TupleInst, Instruction)

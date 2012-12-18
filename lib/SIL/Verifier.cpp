@@ -62,7 +62,7 @@ public:
     // If there is a single argument to the apply, it might be a scalar or the
     // whole tuple being presented all at once.
     if (AI->getArguments().size() != 1 ||
-        !AI->getArguments()[0].getType()->isEqual(FT->getInput())) {
+        AI->getArguments()[0].getType() != FT->getInput()) {
       // Otherwise, we must have a decomposed tuple.  Verify the arguments match
       // up.
       const TupleType *TT = FT->getInput()->castTo<TupleType>();
@@ -113,6 +113,16 @@ public:
            "Store operand type and dest type mismatch");
   }
   
+  void visitZeroAddrInst(ZeroAddrInst *ZI) {
+    assert(ZI->getDest().getType()->is<LValueType>() &&
+           "Dest address should be lvalue");
+  }
+  
+  void visitZeroValueInst(ZeroValueInst *ZVI) {
+    assert(!ZVI->getType()->is<LValueType>() &&
+           "zero_value cannot create an address");
+  }
+  
   void visitSpecializeInst(SpecializeInst *SI) {
     assert(SI->getType()->is<FunctionType>() &&
            "Specialize dest should be a function type");
@@ -157,7 +167,7 @@ public:
   
   void visitExtractInst(ExtractInst *EI) {
 #ifndef NDEBUG
-    Type operandTy = EI->getOperand().getType();
+    SILType operandTy = EI->getOperand().getType();
     assert(!operandTy->is<LValueType>() &&
            "cannot extract from address");
     assert(!operandTy->hasReferenceSemantics() &&
@@ -169,7 +179,7 @@ public:
 
   void visitElementAddrInst(ElementAddrInst *EI) {
 #ifndef NDEBUG
-    Type operandTy = EI->getOperand().getType();
+    SILType operandTy = EI->getOperand().getType();
     assert(operandTy->is<LValueType>() &&
            "must derive element_addr from address");
     assert(!operandTy->hasReferenceSemantics() &&
@@ -181,7 +191,7 @@ public:
   
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
 #ifndef NDEBUG
-    Type operandTy = EI->getOperand().getType();
+    SILType operandTy = EI->getOperand().getType();
     assert(operandTy->hasReferenceSemantics() &&
            "must derive ref_element_addr from reference type");
     assert(EI->getType(0)->is<LValueType>() &&
@@ -194,7 +204,7 @@ public:
     FunctionType *methodType = AMI->getType(0)->getAs<FunctionType>();
     assert(methodType &&
            "result method must be of a concrete function type");
-    Type operandType = AMI->getOperand().getType();
+    SILType operandType = AMI->getOperand().getType();
     assert(methodType->getInput()->isEqual(operandType) &&
            "result must be a method of the operand");
     assert(methodType->getResult()->is<FunctionType>() &&
@@ -215,7 +225,7 @@ public:
     FunctionType *methodType = EMI->getType(0)->getAs<FunctionType>();
     assert(methodType &&
            "result method must be of a concrete function type");
-    Type operandType = EMI->getOperand().getType();
+    SILType operandType = EMI->getOperand().getType();
     assert(methodType->getInput()->isEqual(
                             operandType->getASTContext().TheRawPointerType) &&
            "result must be a method of the operand");

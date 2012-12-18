@@ -82,17 +82,12 @@ void Instruction::eraseFromParent() {
 // Instruction Subclasses
 //===----------------------------------------------------------------------===//
 
-AllocVarInst::AllocVarInst(VarDecl *VD)
-  : AllocInst(ValueKind::AllocVarInst, VD, VD->getTypeOfReference(),
-              AllocKind::Heap) {
-}
-
 AllocVarInst::AllocVarInst(SILLocation loc, AllocKind allocKind,
-                           Type elementType)
+                           SILType elementType,
+                           Function &F)
   // FIXME: LValue qualifiers being wrong can break the verifier
   : AllocInst(ValueKind::AllocVarInst, loc,
-              LValueType::get(elementType, LValueType::Qual::DefaultForType,
-                              elementType->getASTContext()),
+              elementType.getAddressType(F.getContext()),
               allocKind) {
 }
 
@@ -113,31 +108,37 @@ Type AllocVarInst::getElementType() const {
 }
 
 // Allocations always return two results: Builtin.ObjectPointer & LValue[EltTy]
-static SILTypeList *getAllocType(Type EltTy, SILBase &B) {
+static SILTypeList *getAllocType(SILType EltTy, Function &F) {
   ASTContext &Ctx = EltTy->getASTContext();
 
-  Type ResTys[] = {
-    Ctx.TheObjectPointerType,
-    LValueType::get(EltTy, LValueType::Qual::DefaultForType, Ctx)
+  SILType ResTys[] = {
+    SILType::getObjectPointerType(Ctx),
+    EltTy.getAddressType(F.getContext())
   };
 
-  return B.getSILTypeList(ResTys);
+  return F.getModule().getSILTypeList(ResTys);
 }
 
-AllocBoxInst::AllocBoxInst(SILLocation Loc, Type ElementType, SILBase &B)
-  : Instruction(ValueKind::AllocBoxInst, Loc, getAllocType(ElementType, B)),
-    ElementType(ElementType) {
+AllocBoxInst::AllocBoxInst(SILLocation Loc, SILType ElementType, Function &F)
+  : Instruction(ValueKind::AllocBoxInst, Loc, getAllocType(ElementType, F)) {
 }
 
+Type AllocBoxInst::getElementType() const {
+  return getType(1)->getRValueType();
+}
 
-AllocArrayInst::AllocArrayInst(SILLocation Loc, Type ElementType,
-                               Value NumElements, SILBase &B)
-  : Instruction(ValueKind::AllocArrayInst, Loc, getAllocType(ElementType, B)),
-    ElementType(ElementType), NumElements(NumElements) {
+AllocArrayInst::AllocArrayInst(SILLocation Loc, SILType ElementType,
+                               Value NumElements, Function &F)
+  : Instruction(ValueKind::AllocArrayInst, Loc, getAllocType(ElementType, F)),
+    NumElements(NumElements) {
+}
+
+Type AllocArrayInst::getElementType() const {
+  return getType(1)->getRValueType();
 }
 
 FunctionInst::FunctionInst(ValueKind kind,
-                           SILLocation Loc, Type Ty, Value Callee,
+                           SILLocation Loc, SILType Ty, Value Callee,
                            ArrayRef<Value> Args)
   : Instruction(kind, Loc, Ty), Callee(Callee),
     NumArgs(Args.size()) {
@@ -154,7 +155,8 @@ DERIVED *FunctionInst::create(SILLocation Loc, Value Callee,
 
 ApplyInst::ApplyInst(SILLocation Loc, Value Callee, ArrayRef<Value> Args)
   : FunctionInst(ValueKind::ApplyInst, Loc,
-                 Callee.getType()->castTo<FunctionType>()->getResult(),
+                 SILType::getPreLoweredType(
+                   Callee.getType()->castTo<FunctionType>()->getResult()),
                  Callee, Args) {
   
 }
@@ -178,7 +180,7 @@ ClosureInst *ClosureInst::create(SILLocation Loc, Value Callee,
   return FunctionInst::create<ClosureInst>(Loc, Callee, Args, F);
 }
 
-ConstantRefInst::ConstantRefInst(SILLocation Loc, SILConstant C, Type Ty)
+ConstantRefInst::ConstantRefInst(SILLocation Loc, SILConstant C, SILType Ty)
   : Instruction(ValueKind::ConstantRefInst, Loc, Ty),
     Constant(C) {
 }
@@ -187,16 +189,18 @@ SILConstant ConstantRefInst::getConstant() const {
   return Constant;
 }
 
-ZeroValueInst::ZeroValueInst(SILLocation Loc, Type Ty)
+ZeroValueInst::ZeroValueInst(SILLocation Loc, SILType Ty)
   : Instruction(ValueKind::ZeroValueInst, Loc, Ty) {
 }
 
 IntegerLiteralInst::IntegerLiteralInst(IntegerLiteralExpr *E)
-  : Instruction(ValueKind::IntegerLiteralInst, E, E->getType()) {
+  : Instruction(ValueKind::IntegerLiteralInst, E,
+                SILType::getPreLoweredType(E->getType()->getCanonicalType())) {
 }
 
 IntegerLiteralInst::IntegerLiteralInst(CharacterLiteralExpr *E)
-  : Instruction(ValueKind::IntegerLiteralInst, E, E->getType()) {
+  : Instruction(ValueKind::IntegerLiteralInst, E,
+                SILType::getPreLoweredType(E->getType()->getCanonicalType())) {
 }
 
 Expr *IntegerLiteralInst::getExpr() const {
@@ -216,7 +220,8 @@ APInt IntegerLiteralInst::getValue() const {
 }
 
 FloatLiteralInst::FloatLiteralInst(FloatLiteralExpr *E)
-  : Instruction(ValueKind::FloatLiteralInst, E, E->getType()) {
+  : Instruction(ValueKind::FloatLiteralInst, E,
+                SILType::getPreLoweredType(E->getType()->getCanonicalType())) {
 }
 
 FloatLiteralExpr *FloatLiteralInst::getExpr() const {
@@ -228,7 +233,8 @@ APFloat FloatLiteralInst::getValue() const {
 }
 
 StringLiteralInst::StringLiteralInst(StringLiteralExpr *E)
-  : Instruction(ValueKind::StringLiteralInst, E, E->getType()) {
+  : Instruction(ValueKind::StringLiteralInst, E,
+                SILType::getPreLoweredType(E->getType()->getCanonicalType())) {
 }
 
 StringLiteralExpr *StringLiteralInst::getExpr() const {
@@ -241,7 +247,8 @@ StringRef StringLiteralInst::getValue() const {
 
 
 LoadInst::LoadInst(SILLocation Loc, Value LValue)
-  : Instruction(ValueKind::LoadInst, Loc, LValue.getType()->getRValueType()),
+  : Instruction(ValueKind::LoadInst, Loc,
+                SILType::getPreLoweredType(LValue.getType()->getRValueType())),
     LValue(LValue) {
 }
 
@@ -258,9 +265,13 @@ CopyAddrInst::CopyAddrInst(SILLocation Loc, Value SrcLValue, Value DestLValue,
     IsTakeOfSrc(IsTakeOfSrc), IsInitializationOfDest(IsInitializationOfDest) {
 }
 
+ZeroAddrInst::ZeroAddrInst(SILLocation Loc, Value Dest)
+  : Instruction(ValueKind::ZeroAddrInst, Loc), Dest(Dest) {
+}
+
 SpecializeInst *SpecializeInst::create(SILLocation Loc, Value Operand,
                                        ArrayRef<Substitution> Substitutions,
-                                       Type DestTy, Function &F) {
+                                       SILType DestTy, Function &F) {
  void *Buffer = F.allocate(
            sizeof(SpecializeInst) + Substitutions.size() * sizeof(Substitution),
            llvm::AlignOf<SpecializeInst>::Alignment);
@@ -269,7 +280,7 @@ SpecializeInst *SpecializeInst::create(SILLocation Loc, Value Operand,
 
 SpecializeInst::SpecializeInst(SILLocation Loc, Value Operand,
                                ArrayRef<Substitution> Substitutions,
-                               Type DestTy)
+                               SILType DestTy)
   : Instruction(ValueKind::SpecializeInst, Loc, DestTy), Operand(Operand),
     NumSubstitutions(Substitutions.size())
 {
@@ -278,67 +289,57 @@ SpecializeInst::SpecializeInst(SILLocation Loc, Value Operand,
 }
 
 ConversionInst::ConversionInst(ValueKind Kind,
-                               SILLocation Loc, Value Operand, Type Ty)
+                               SILLocation Loc, Value Operand, SILType Ty)
   : Instruction(Kind, Loc, Ty), Operand(Operand) {
 }
 
 ImplicitConvertInst::ImplicitConvertInst(SILLocation Loc, Value Operand,
-                                         Type Ty)
+                                         SILType Ty)
   : ConversionInst(ValueKind::ImplicitConvertInst, Loc, Operand, Ty) {
 }
 
-CoerceInst::CoerceInst(SILLocation Loc, Value Operand, Type Ty)
+CoerceInst::CoerceInst(SILLocation Loc, Value Operand, SILType Ty)
   : ConversionInst(ValueKind::CoerceInst, Loc, Operand, Ty) {
 }
 
-DowncastInst::DowncastInst(SILLocation Loc, Value Operand, Type Ty)
+DowncastInst::DowncastInst(SILLocation Loc, Value Operand, SILType Ty)
   : ConversionInst(ValueKind::DowncastInst, Loc, Operand, Ty) {
 }
 
 ArchetypeToSuperInst::ArchetypeToSuperInst(SILLocation Loc,
-                                           Value Operand, Type Ty)
+                                           Value Operand, SILType Ty)
   : ConversionInst(ValueKind::ArchetypeToSuperInst, Loc, Operand, Ty) {
 }
 
-TupleInst *TupleInst::createImpl(SILLocation Loc, Type Ty,
+TupleInst *TupleInst::createImpl(SILLocation Loc, SILType Ty,
                                  ArrayRef<Value> Elements, Function &F) {
   void *Buffer = F.allocate(sizeof(TupleInst) + Elements.size() * sizeof(Value),
                             llvm::AlignOf<TupleInst>::Alignment);
   return ::new(Buffer) TupleInst(Loc, Ty, Elements);
 }
 
-TupleInst::TupleInst(SILLocation Loc, Type Ty, ArrayRef<Value> Elems)
+TupleInst::TupleInst(SILLocation Loc, SILType Ty, ArrayRef<Value> Elems)
   : Instruction(ValueKind::TupleInst, Loc, Ty), NumArgs(Elems.size()) {
   memcpy(getElementsStorage(), Elems.data(), Elems.size() * sizeof(Value));
 }
 
-MetatypeInst::MetatypeInst(Expr *E)
-  : Instruction(ValueKind::MetatypeInst, E, E->getType()) {}
-
-Expr *MetatypeInst::getExpr() const {
-  return getLocExpr<Expr>();
-}
-
-/// getMetaType - Return the type of the metatype that this instruction
-/// returns.
-Type MetatypeInst::getMetaType() const {
-  return getExpr()->getType();
-}
+MetatypeInst::MetatypeInst(SILLocation Loc, SILType Metatype)
+  : Instruction(ValueKind::MetatypeInst, Loc, Metatype) {}
 
 ExtractInst::ExtractInst(SILLocation Loc, Value Operand,
-                         unsigned FieldNo, Type ResultTy)
+                         unsigned FieldNo, SILType ResultTy)
   : Instruction(ValueKind::ExtractInst, Loc, ResultTy),
     Operand(Operand), FieldNo(FieldNo) {
 }
 
 ElementAddrInst::ElementAddrInst(SILLocation Loc, Value Operand,
-                                 unsigned FieldNo, Type ResultTy)
+                                 unsigned FieldNo, SILType ResultTy)
   : Instruction(ValueKind::ElementAddrInst, Loc, ResultTy),
     Operand(Operand), FieldNo(FieldNo) {
 }
 
 RefElementAddrInst::RefElementAddrInst(SILLocation Loc, Value Operand,
-                                       unsigned FieldNo, Type ResultTy)
+                                       unsigned FieldNo, SILType ResultTy)
   : Instruction(ValueKind::RefElementAddrInst, Loc, ResultTy),
     Operand(Operand), FieldNo(FieldNo) {
 }
@@ -346,16 +347,17 @@ RefElementAddrInst::RefElementAddrInst(SILLocation Loc, Value Operand,
 WitnessTableMethodInst::WitnessTableMethodInst(ValueKind Kind,
                                                SILLocation Loc, Value Operand,
                                                SILConstant Member,
-                                               Type ThisTy, Type MethodTy,
+                                               SILType ThisTy, SILType MethodTy,
                                                Function &F)
   : Instruction(Kind, Loc,
-                FunctionType::get(ThisTy, MethodTy, F.getContext())),
+                SILType::getPreLoweredType(
+                  FunctionType::get(ThisTy, MethodTy, F.getContext()))),
     Operand(Operand), Member(Member) {
 }
 
 ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, Value Operand,
                                          SILConstant Member,
-                                         Type MethodTy,
+                                         SILType MethodTy,
                                          Function &F)
   : WitnessTableMethodInst(ValueKind::ArchetypeMethodInst,
                            Loc, Operand, Member,
@@ -364,26 +366,26 @@ ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, Value Operand,
 
 ExistentialMethodInst::ExistentialMethodInst(SILLocation Loc, Value Operand,
                                              SILConstant Member,
-                                             Type MethodTy,
+                                             SILType MethodTy,
                                              Function &F)
   : WitnessTableMethodInst(ValueKind::ExistentialMethodInst,
                            Loc, Operand, Member,
-                           F.getContext().TheRawPointerType, MethodTy, F) {
+                           SILType::getRawPointerType(F.getContext()),
+                           MethodTy, F) {
 }
 
 ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc, Value Operand,
                                                Function &F)
   : Instruction(ValueKind::ProjectExistentialInst, Loc,
-                F.getContext().TheRawPointerType),
+                SILType::getRawPointerType(F.getContext())),
     Operand(Operand) {
 }
 
 AllocExistentialInst::AllocExistentialInst(SILLocation Loc, Value Existential,
-                                           Type ConcreteType)
+                                           SILType ConcreteType,
+                                           Function &F)
   : Instruction(ValueKind::AllocExistentialInst, Loc,
-                LValueType::get(ConcreteType,
-                                LValueType::Qual::DefaultForType,
-                                ConcreteType->getASTContext())),
+                ConcreteType.getAddressType(F.getContext())),
     Existential(Existential) {
   
 }
@@ -420,7 +422,7 @@ IndexAddrInst::IndexAddrInst(SILLocation Loc, Value Operand, unsigned Index)
     Operand(Operand), Index(Index) {
 }
 
-IntegerValueInst::IntegerValueInst(uint64_t Val, Type Ty)
+IntegerValueInst::IntegerValueInst(uint64_t Val, SILType Ty)
   : Instruction(ValueKind::IntegerValueInst, SILLocation(), Ty), Val(Val) {}
 
 
@@ -442,7 +444,7 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
 
 UnreachableInst::UnreachableInst(Function &F)
   : TermInst(ValueKind::UnreachableInst, SILLocation(),
-             F.getContext().TheEmptyTupleType) {
+             SILType::getEmptyTupleType(F.getContext())) {
 }
 
 ReturnInst::ReturnInst(SILLocation Loc, Value ReturnValue)
@@ -452,7 +454,7 @@ ReturnInst::ReturnInst(SILLocation Loc, Value ReturnValue)
 
 BranchInst::BranchInst(BasicBlock *DestBB, Function &F)
   : TermInst(ValueKind::BranchInst, SILLocation(),
-             F.getContext().TheEmptyTupleType),
+             SILType::getEmptyTupleType(F.getContext())),
     DestBB(this, DestBB) {
 }
 

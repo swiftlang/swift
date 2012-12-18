@@ -103,7 +103,7 @@ public:
     return Module.allocate(Size, Align);
   }
   
-  SILTypeList *getSILTypeList(llvm::ArrayRef<Type> Types) const {
+  SILTypeList *getSILTypeList(llvm::ArrayRef<SILType> Types) const {
     return Module.getSILTypeList(Types);
   }
 

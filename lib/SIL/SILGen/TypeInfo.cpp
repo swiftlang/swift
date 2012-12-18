@@ -42,7 +42,7 @@ class LoadableTypeInfoVisitor : public TypeVisitor<LoadableTypeInfoVisitor,
 public:
   LoadableTypeInfoVisitor(TypeInfo &theInfo) : theInfo(theInfo) {}
   
-  void pushPath() { currentElement.path.push_back({Type(), 0}); }
+  void pushPath() { currentElement.path.push_back({SILType(), 0}); }
   void popPath() { currentElement.path.pop_back(); }
   void setPathType(Type t) { currentElement.path.back().type = t; }
   void advancePath() { ++currentElement.path.back().index; }
@@ -313,6 +313,12 @@ public:
     return SILType(lowered);
   }
   
+  SILType visitLValueType(LValueType *lt) {
+    // Lower to an address type without any qualifiers.
+    SILType objectOrAddress = visit(lt->getObjectType()->getCanonicalType());
+    return objectOrAddress.getAddressType(Types.Context);
+  }
+
   SILType visitType(TypeBase *t) {
     TypeInfo const &ti = Types.getTypeInfo(t);
     if (ti.isAddressOnly())
@@ -321,6 +327,7 @@ public:
                                      Types.Context));
     return SILType(t);
   }
+  
 };
 
 SILType TypeConverter::lowerType(CanType ty) {

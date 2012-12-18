@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/Function.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILConstant.h"
 #include "swift/AST/ASTContext.h"
@@ -63,4 +64,34 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc) {
   
   loc = baseLoc;
   id = 0;
+}
+
+SILType SILType::getObjectPointerType(ASTContext &C) {
+  return SILType(C.TheObjectPointerType);
+}
+
+SILType SILType::getRawPointerType(ASTContext &C) {
+  return SILType(C.TheRawPointerType);
+}
+
+SILType SILType::getEmptyTupleType(ASTContext &C) {
+  return SILType(TupleType::getEmpty(C));
+}
+
+SILType SILType::getBuiltinIntegerType(unsigned bitWidth, ASTContext &C) {
+  return SILType(BuiltinIntegerType::get(bitWidth, C));
+}
+
+SILType SILType::getAddressType(ASTContext &C) const {
+  if ((*this)->is<LValueType>())
+    return *this;
+  else
+    return SILType(LValueType::get(*this, LValueType::Qual::DefaultForType, C));
+}
+
+TupleInst *SILBuilder::createEmptyTuple(SILLocation Loc) {
+  return createTuple(Loc,
+                     SILType::getPreLoweredType(
+                       TupleType::getEmpty(F.getContext())),
+                     ArrayRef<Value>());
 }

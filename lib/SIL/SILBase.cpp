@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/Value.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -23,7 +24,7 @@ namespace swift {
 class SILTypeList : public llvm::FoldingSetNode {
 public:
   unsigned NumTypes;
-  Type Types[1];  // Actually variable sized.
+  SILType Types[1];  // Actually variable sized.
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
     for (unsigned i = 0, e = NumTypes; i != e; ++i)
@@ -32,15 +33,15 @@ public:
 };
 }
 
-ArrayRef<Type> ValueBase::getTypes() const {
+ArrayRef<SILType> ValueBase::getTypes() const {
   // No results.
   if (Types.isNull())
-    return ArrayRef<Type>();
+    return ArrayRef<SILType>();
   // Arbitrary list of results.
   if (auto TypeList = Types.dyn_cast<SILTypeList*>())
-    return ArrayRef<Type>(TypeList->Types, TypeList->NumTypes);
+    return ArrayRef<SILType>(TypeList->Types, TypeList->NumTypes);
   // Single result.
-  return Types.get<Type>();
+  return Types.get<SILType>();
 }
 
 /// SILTypeListUniquingType - This is the type of the folding set maintained by
@@ -58,7 +59,7 @@ SILBase::~SILBase() {
 
 /// getSILTypeList - Get a uniqued pointer to a SIL type list.  This can only
 /// be used by Value.
-SILTypeList *SILBase::getSILTypeList(ArrayRef<Type> Types) const {
+SILTypeList *SILBase::getSILTypeList(ArrayRef<SILType> Types) const {
   assert(Types.size() > 1 && "Shouldn't use type list for 0 or 1 types");
   auto UniqueMap = (SILTypeListUniquingType*)TypeListUniquing;
 
@@ -73,7 +74,7 @@ SILTypeList *SILBase::getSILTypeList(ArrayRef<Type> Types) const {
 
   // Otherwise, allocate a new one.
   void *NewListP = BPA.Allocate(sizeof(SILTypeList)+
-                                sizeof(Type)*(Types.size()-1),
+                                sizeof(SILType)*(Types.size()-1),
                                 llvm::AlignOf<SILTypeList>::Alignment);
   SILTypeList *NewList = new (NewListP) SILTypeList();
   NewList->NumTypes = Types.size();

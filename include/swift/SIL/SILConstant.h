@@ -29,7 +29,6 @@ namespace llvm {
 namespace swift {
   class ValueDecl;
   class CapturingExpr;
-  class Type;
 
 /// SILConstant - A key for referencing an entity that can be the subject of a
 /// SIL ConstantRefInst or the name of a SIL Function body. This can currently

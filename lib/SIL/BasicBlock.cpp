@@ -23,7 +23,7 @@ using namespace swift;
 // BBArgument Implementation
 //===----------------------------------------------------------------------===//
 
-BBArgument::BBArgument(Type Ty, BasicBlock *ParentBB)
+BBArgument::BBArgument(SILType Ty, BasicBlock *ParentBB)
   : ValueBase(ValueKind::BBArgument, Ty), ParentBB(ParentBB) {
   ParentBB->addArgument(this);
 }

@@ -195,6 +195,12 @@ public:
   SILBuilder &getBuilder() { return B; }
     
   TypeInfo const &getTypeInfo(Type t) { return SGM.Types.getTypeInfo(t); }
+  SILType getLoweredType(Type t) { return getTypeInfo(t).getLoweredType(); }
+  SILType getLoweredLoadableType(Type t) {
+    TypeInfo const &ti = getTypeInfo(t);
+    assert(ti.isLoadable() && "unexpected address-only type");
+    return ti.getLoweredType();
+  }
   
   //===--------------------------------------------------------------------===//
   // Control flow

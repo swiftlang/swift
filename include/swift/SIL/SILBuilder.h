@@ -103,24 +103,18 @@ public:
   // Instruction Creation Methods
   //===--------------------------------------------------------------------===//
 
-  AllocVarInst *createAllocVar(VarDecl *VD) {
-    return insert(new AllocVarInst(VD));
-  }
-
   AllocVarInst *createAllocVar(SILLocation Loc, AllocKind allocKind,
-                               Type elementType) {
-    return insert(new AllocVarInst(Loc, allocKind, elementType));
+                               SILType elementType) {
+    return insert(new AllocVarInst(Loc, allocKind, elementType, F));
   }
 
-  AllocBoxInst *createAllocBox(SILLocation Loc, Type ElementType) {
-    return insert(new AllocBoxInst(Loc, ElementType,
-                                   F.getModule()));
+  AllocBoxInst *createAllocBox(SILLocation Loc, SILType ElementType) {
+    return insert(new AllocBoxInst(Loc, ElementType, F));
   }
 
-  AllocArrayInst *createAllocArray(Expr *E, Type ElementType,
+  AllocArrayInst *createAllocArray(Expr *E, SILType ElementType,
                                    Value NumElements) {
-    return insert(new AllocArrayInst(E, ElementType, NumElements,
-                                     F.getModule()));
+    return insert(new AllocArrayInst(E, ElementType, NumElements, F));
   }
 
   ApplyInst *createApply(SILLocation Loc, Value Fn, ArrayRef<Value> Args) {
@@ -131,11 +125,11 @@ public:
     return insert(ClosureInst::create(Loc, Fn, Args, F));
   }
 
-  ConstantRefInst *createConstantRef(SILLocation loc, SILConstant c, Type ty) {
+  ConstantRefInst *createConstantRef(SILLocation loc, SILConstant c, SILType ty) {
     return insert(new ConstantRefInst(loc, c, ty));
   }
 
-  ZeroValueInst *createZeroValue(SILLocation Loc, Type Ty) {
+  ZeroValueInst *createZeroValue(SILLocation Loc, SILType Ty) {
     return insert(new ZeroValueInst(Loc, Ty));
   }
 
@@ -160,6 +154,11 @@ public:
     return insert(new StoreInst(Loc, Src, DestLValue));
   }
 
+  ZeroAddrInst *createZeroAddr(SILLocation Loc,
+                               Value DestLValue) {
+    return insert(new ZeroAddrInst(Loc, DestLValue));
+  }
+
   CopyAddrInst *createCopyAddr(SILLocation Loc,
                                Value SrcLValue, Value DestLValue,
                                bool isTake = false,
@@ -170,38 +169,38 @@ public:
   
   SpecializeInst *createSpecialize(SILLocation Loc, Value Operand,
                                    ArrayRef<Substitution> Substitutions,
-                                   Type DestTy) {
+                                   SILType DestTy) {
     return insert(SpecializeInst::create(Loc, Operand, Substitutions, DestTy,
                                          F));
   }
 
 
   ImplicitConvertInst *createImplicitConvert(SILLocation Loc, Value Op,
-                                             Type Ty) {
+                                             SILType Ty) {
     return insert(new ImplicitConvertInst(Loc, Op, Ty));
   }
 
-  CoerceInst *createCoerce(SILLocation Loc, Value Op, Type Ty) {
+  CoerceInst *createCoerce(SILLocation Loc, Value Op, SILType Ty) {
     return insert(new CoerceInst(Loc, Op, Ty));
   }
   
-  DowncastInst *createDowncast(SILLocation Loc, Value Op, Type Ty) {
+  DowncastInst *createDowncast(SILLocation Loc, Value Op, SILType Ty) {
     return insert(new DowncastInst(Loc, Op, Ty));
   }
   
   ArchetypeToSuperInst *createArchetypeToSuper(SILLocation Loc,
-                                               Value Archetype, Type BaseTy) {
+                                               Value Archetype, SILType BaseTy) {
     return insert(new ArchetypeToSuperInst(Loc, Archetype, BaseTy));
   }
   
-  TupleInst *createTuple(SILLocation Loc, Type Ty, ArrayRef<Value> Elements) {
+  TupleInst *createTuple(SILLocation Loc, SILType Ty, ArrayRef<Value> Elements) {
     return insert(TupleInst::create(Loc, Ty, Elements, F));
   }
   
   TupleInst *createEmptyTuple(SILLocation Loc);
 
   Value createExtract(SILLocation Loc, Value Operand, unsigned FieldNo,
-                           Type ResultTy) {
+                           SILType ResultTy) {
     // Fold extract(tuple(a,b,c), 1) -> b.
     if (TupleInst *TI = dyn_cast<TupleInst>(Operand))
       return TI->getElements()[FieldNo];
@@ -210,17 +209,17 @@ public:
   }
 
   Value createElementAddr(SILLocation Loc, Value Operand, unsigned FieldNo,
-                          Type ResultTy) {
+                          SILType ResultTy) {
     return insert(new ElementAddrInst(Loc, Operand, FieldNo, ResultTy));
   }
   
   Value createRefElementAddr(SILLocation Loc, Value Operand, unsigned FieldNo,
-                          Type ResultTy) {
+                          SILType ResultTy) {
     return insert(new RefElementAddrInst(Loc, Operand, FieldNo, ResultTy));
   }
   
   ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc, Value Operand,
-                                             SILConstant Member, Type MethodTy)
+                                             SILConstant Member, SILType MethodTy)
   {
     return insert(new ArchetypeMethodInst(Loc, Operand, Member, MethodTy, F));
   }
@@ -228,7 +227,7 @@ public:
   ExistentialMethodInst *createExistentialMethod(SILLocation Loc,
                                                  Value Operand,
                                                  SILConstant Member,
-                                                 Type MethodTy) {
+                                                 SILType MethodTy) {
     return insert(new ExistentialMethodInst(Loc, Operand, Member, MethodTy, F));
   }
   
@@ -239,12 +238,12 @@ public:
   
   AllocExistentialInst *createAllocExistential(SILLocation Loc,
                                                Value Existential,
-                                               Type ConcreteType) {
-    return insert(new AllocExistentialInst(Loc, Existential, ConcreteType));
+                                               SILType ConcreteType) {
+    return insert(new AllocExistentialInst(Loc, Existential, ConcreteType, F));
   }
   
-  MetatypeInst *createMetatype(Expr *Expr) {
-    return insert(new MetatypeInst(Expr));
+  MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype) {
+    return insert(new MetatypeInst(Loc, Metatype));
   }
   
   void createRetain(SILLocation Loc, Value Operand) {
@@ -273,7 +272,7 @@ public:
     return insert(new IndexAddrInst(E, Operand, Index));
   }
 
-  IntegerValueInst *createIntegerValueInst(uint64_t Val, Type Ty) {
+  IntegerValueInst *createIntegerValueInst(uint64_t Val, SILType Ty) {
     return insert(new IntegerValueInst(Val, Ty));
   }
 

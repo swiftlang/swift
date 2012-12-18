@@ -23,6 +23,8 @@
 #include "SILGen.h"
 
 namespace swift {
+  class Value;
+  
 namespace Lowering {
 
 /// ManagedValue - represents a SIL rvalue. It constists of a Value and an

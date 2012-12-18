@@ -110,9 +110,11 @@ static void emitAssignStmtRecursive(AssignStmt *S, Value Src, Expr *Dest,
   if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
     unsigned EltNo = 0;
     for (Expr *DestElem : TE->getElements()) {
+      SILType elemType = Gen.getLoweredType(
+                                          DestElem->getType()->getRValueType());
       Value SrcVal = Gen.B.createExtract(SILLocation(), Src,
                                          EltNo++,
-                                         DestElem->getType()->getRValueType());
+                                         elemType);
       emitAssignStmtRecursive(S, SrcVal, DestElem, Gen);
     }
     return;
@@ -379,13 +381,15 @@ static void assignPhysicalAddress(SILGenFunction &gen,
                                   SILLocation loc,
                                   Value src,
                                   Value addr) {
-  Type srcTy = src.getType();
+  SILType srcTy = src.getType();
   
   if (srcTy->is<LValueType>()) {
     // src is an address-only type; copy using the copy_addr instruction.
     assert(gen.getTypeInfo(srcTy->getRValueType()).isAddressOnly() &&
            "source of copy may only be an address if type is address-only");
-    llvm_unreachable("assignment to address-only unimplemented");
+    gen.B.createCopyAddr(loc, src, addr,
+                         /*isTake=*/ false,
+                         /*isInitialize=*/ false);
   } else {
     // src is a loadable type; release the old value if necessary and store
     // the new.

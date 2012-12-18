@@ -24,7 +24,7 @@
 
 namespace swift {
 class SILTypeList;
-class Type;
+class SILType;
 class SILBase {
   /// Allocator that manages the memory of all the pieces of the SILModule.
   mutable llvm::BumpPtrAllocator BPA;
@@ -40,7 +40,7 @@ public:
     return BPA.Allocate(Size, Align);
   }
   /// getSILTypeList - Get a uniqued pointer to a SIL type list.
-  SILTypeList *getSILTypeList(llvm::ArrayRef<Type> Types) const;
+  SILTypeList *getSILTypeList(llvm::ArrayRef<SILType> Types) const;
 };
 
 template <typename DERIVED>

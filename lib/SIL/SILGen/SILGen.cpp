@@ -50,11 +50,6 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F, ClosureExpr *CE)
   emitProlog(CE, CE->getParamPatterns());
 }
 
-TupleInst *SILBuilder::createEmptyTuple(SILLocation Loc) {
-  return createTuple(Loc, TupleType::getEmpty(F.getContext()),
-                     ArrayRef<Value>());
-}
-
 /// SILGenFunction destructor - called after the entire function's AST has been
 /// visited.  This handles "falling off the end of the function" logic.
 SILGenFunction::~SILGenFunction() {
