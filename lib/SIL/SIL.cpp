@@ -23,8 +23,11 @@ using namespace swift;
 Function::~Function() {
 }
 
-static Type toplevelFunctionType(ASTContext &C) {
-  return FunctionType::get(TupleType::getEmpty(C), TupleType::getEmpty(C), C);
+static SILType toplevelFunctionType(ASTContext &C) {
+  auto t = FunctionType::get(TupleType::getEmpty(C),
+                             TupleType::getEmpty(C),
+                             C);
+  return SILType::getPreLoweredType(t);
 }
 
 SILModule::SILModule(ASTContext &Context, bool hasTopLevel) :

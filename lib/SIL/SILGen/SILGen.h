@@ -60,7 +60,7 @@ public:
   void operator=(SILGenModule const &) = delete;
   
   /// Returns the type of a constant reference.
-  Type getConstantType(SILConstant constant);
+  SILType getConstantType(SILConstant constant);
 
   //===--------------------------------------------------------------------===//
   // Visitors for top-level forms

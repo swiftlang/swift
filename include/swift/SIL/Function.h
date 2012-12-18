@@ -48,14 +48,14 @@ private:
 
   /// The lowered type of the function. This will differ from the type of the
   /// original function if the function consumes or returns address-only values.
-  Type LoweredType;
+  SILType LoweredType;
   
   /// The collection of all BasicBlocks in the Function.
   BlockListType BlockList;
 
   // Intentionally marked private so that we need to use
   // 'SILModule::constructSIL()' to generate a Function.
-  Function(SILModule &Module, Type LoweredType)
+  Function(SILModule &Module, SILType LoweredType)
     : Module(Module), LoweredType(LoweredType) {}
   
 public:
@@ -63,7 +63,7 @@ public:
 
   SILModule &getModule() const { return Module; }
   ASTContext &getContext() const { return Module.Context; }
-  Type getLoweredType() const { return LoweredType; }
+  SILType getLoweredType() const { return LoweredType; }
 
   //===--------------------------------------------------------------------===//
   // Block List Access

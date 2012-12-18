@@ -88,7 +88,7 @@ SILGenModule::~SILGenModule() {
   delete TopLevelSGF;
 }
 
-Type SILGenModule::getConstantType(SILConstant constant) {
+SILType SILGenModule::getConstantType(SILConstant constant) {
   return Types.getConstantType(constant);
 }
 

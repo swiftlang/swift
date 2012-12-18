@@ -18,6 +18,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILConstant.h"
+#include "swift/SIL/SILModule.h"
 
 namespace swift {
 namespace Lowering {
@@ -56,6 +57,9 @@ class LLVM_LIBRARY_VISIBILITY TypeInfo {
   /// non-struct types.
   llvm::DenseMap<Identifier, FragileElement> fragileElements;
   
+  /// loweredType - The SIL type of values with this Swift type.
+  SILType loweredType;
+  
   bool addressOnly : 1;
 
 public:
@@ -92,6 +96,33 @@ public:
     return fragileElements.count(name);
   }
   
+  /// getLoweredType - Get the type used to represent values of the Swift type
+  /// in SIL.
+  ///
+  /// - For address-only types, this is the address type pointing to the Swift
+  ///   type. For example, Swift::
+  ///
+  ///     struct [API] AddressOnly {}
+  ///
+  ///   lowers to SIL `*AddressOnly`.
+  /// - For function types, the argument types are lowered, and if the return
+  ///   type is address-only, it is rewritten as an address parameter, and the
+  ///   lowered return value is the empty tuple. Function types are lowered
+  ///   recursively. For example, these function types::
+  ///
+  ///     struct [API] AddressOnly {}
+  ///     struct Fragile {}
+  ///
+  ///     (a:AddressOnly, b:Fragile) -> Fragile
+  ///     (a:Fragile, b:(c:AddressOnly) -> Fragile) -> AddressOnly
+  ///
+  ///   lower to:
+  ///
+  ///     (a:*AddressOnly, b:Fragile) -> Fragile
+  ///     (a:Fragile, b:(c:*AddressOnly) -> Fragile, _:*AddressOnly) -> ()
+  ///
+  SILType getLoweredType() const { return loweredType; }
+  
   /// getFragileElement - For a loadable struct type, returns the index and type
   /// of the element named by the given identifier. The named element must exist
   /// in the type and be a physical member.
@@ -105,27 +136,28 @@ public:
 
 /// TypeConverter - helper class for creating and managing TypeInfos.
 class LLVM_LIBRARY_VISIBILITY TypeConverter {
-  ASTContext &Context;
-  
   llvm::DenseMap<TypeBase *, TypeInfo> types;
-  llvm::DenseMap<SILConstant, Type> constantTypes;
+  llvm::DenseMap<SILConstant, SILType> constantTypes;
   
   TypeInfo const &makeTypeInfo(CanType t);
   void makeFragileElements(TypeInfo &theInfo, CanType t);
   void makeFragileElementsForDecl(TypeInfo &theInfo, NominalTypeDecl *decl);
+  SILType lowerType(CanType ty);
 
   Type makeConstantType(SILConstant constant);
   
 public:
+  ASTContext &Context;
+
   TypeConverter(SILGenModule &sgm);
 
   /// Returns the SIL TypeInfo for a type.
   TypeInfo const &getTypeInfo(Type t);
   
   /// Returns the SIL type of a constant reference.
-  Type getConstantType(SILConstant constant);
+  SILType getConstantType(SILConstant constant);
   
-    /// Returns the type of the "this" parameter to methods of a type.
+  /// Returns the type of the "this" parameter to methods of a type.
   Type getMethodThisType(Type thisType) const;
   /// Returns the type of a property accessor, () -> T for a getter,
   /// or (value:T) -> () for a setter.

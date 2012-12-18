@@ -30,7 +30,23 @@ namespace swift {
   
   namespace Lowering {
     class SILGenModule;
+    class TypeLowerer;
   }
+  
+/// SILType - A type that has been desugared and lowered to SIL.
+class SILType : public CanType {
+private:
+  /// SILTypes should only be created by TypeConverter.
+  explicit SILType(Type t) : CanType(t) {}
+  explicit SILType(TypeBase *t) : CanType(t) {}
+  
+  friend class Lowering::TypeLowerer;
+public:
+  SILType() = default;
+  
+  /// Get a SILType from a type that has already been lowered.
+  static SILType getPreLoweredType(TypeBase *t) { return SILType(t); }
+};
 
 /// SILModule - A SIL translation unit. The module object owns all of the SIL
 /// Function and other top-level objects generated when a translation unit is

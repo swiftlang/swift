@@ -14,14 +14,29 @@
 #include "TypeInfo.h"
 #include "TypeVisitor.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Types.h"
 
 namespace swift {
 namespace Lowering {
 
+static bool isAddressOnly(Type t) {
+  // Archetypes and existentials are always address-only.
+  // FIXME: Class archetypes and existentials will one day be representable as
+  // reference types.
+  // FIXME: resilient structs
+  return t->is<ArchetypeType>() || t->isExistentialType();
+}
+
+namespace {
+  enum Loadable_t { IsAddressOnly, IsLoadable };
+}
+  
 /// LoadableTypeInfoVisitor - Recursively descend into fragile struct and
 /// tuple types and visit their element types, storing information about the
 /// reference type members in the TypeInfo for the type.
-class LoadableTypeInfoVisitor : public TypeVisitor<LoadableTypeInfoVisitor> {
+class LoadableTypeInfoVisitor : public TypeVisitor<LoadableTypeInfoVisitor,
+                                                   Loadable_t>
+{
   TypeInfo &theInfo;
   ReferenceTypeElement currentElement;
 public:
@@ -32,13 +47,17 @@ public:
   void setPathType(Type t) { currentElement.path.back().type = t; }
   void advancePath() { ++currentElement.path.back().index; }
   
-  void visitType(TypeBase *t) {
+  Loadable_t visitType(TypeBase *t) {
     if (t->hasReferenceSemantics()) {
       theInfo.referenceTypeElements.push_back(currentElement);
+      return IsLoadable;
     }
+    if (isAddressOnly(t))
+      return IsAddressOnly;
+    return IsLoadable;
   }
   
-  void visitNominalType(NominalType *t) {
+  Loadable_t visitNominalType(NominalType *t) {
     if (StructDecl *sd = dyn_cast<StructDecl>(t->getDecl())) {
       // FIXME: if this struct has a resilient attribute, mark the TypeInfo
       // as addressOnly and bail.
@@ -49,23 +68,29 @@ public:
           if (!vd->isProperty()) {
             CanType ct = vd->getType()->getCanonicalType();
             setPathType(ct);
-            visit(ct);
+            if (visit(ct) == IsAddressOnly) {
+              return IsAddressOnly;
+            }
             advancePath();
           }
       popPath();
+      return IsLoadable;
     } else
-      this->visitType(t);
+      return this->visitType(t);
   }
   
-  void visitTupleType(TupleType *t) {
+  Loadable_t visitTupleType(TupleType *t) {
     pushPath();
     for (TupleTypeElt const &elt : t->getFields()) {
       CanType ct = elt.getType()->getCanonicalType();
       setPathType(ct);
-      visit(ct);
+      if (visit(ct) == IsAddressOnly) {
+        return IsAddressOnly;
+      }
       advancePath();
     }
     popPath();
+    return IsLoadable;
   }
 };
   
@@ -99,16 +124,26 @@ TypeInfo const &TypeConverter::makeTypeInfo(CanType t) {
   TypeInfo &theInfo = types[t.getPointer()];
   
   if (t->hasReferenceSemantics()) {
+    // Reference types are always loadable, and need only to retain/release
+    // themselves.
     theInfo.addressOnly = false;
     theInfo.referenceTypeElements.push_back(ReferenceTypeElement());
+  } else if (isAddressOnly(t)) {
+    theInfo.addressOnly = true;
   } else {
     // walk aggregate types to determine address-only-ness and find reference
     // type elements.
-    theInfo.addressOnly = false;
-    LoadableTypeInfoVisitor(theInfo).visit(t);
+    theInfo.addressOnly =
+      LoadableTypeInfoVisitor(theInfo).visit(t) == IsAddressOnly;
+    if (theInfo.addressOnly)
+      theInfo.referenceTypeElements.clear();
   }
   // If this is a struct or class type, find its fragile elements.
-  makeFragileElements(theInfo, t);
+  if (!theInfo.addressOnly)
+    makeFragileElements(theInfo, t);
+  
+  // Generate the lowered type.
+  theInfo.loweredType = lowerType(t);
   
   return theInfo;
 }
@@ -122,12 +157,13 @@ TypeInfo const &TypeConverter::getTypeInfo(Type t) {
     return existing->second;
 }
   
-Type TypeConverter::getConstantType(SILConstant constant) {
+SILType TypeConverter::getConstantType(SILConstant constant) {
   auto found = constantTypes.find(constant);
   if (found == constantTypes.end()) {
-    Type ty = makeConstantType(constant);
-    constantTypes[constant] = ty;
-    return ty;
+    Type swiftTy = makeConstantType(constant);
+    SILType loweredTy = getTypeInfo(swiftTy).getLoweredType();
+    constantTypes[constant] = loweredTy;
+    return loweredTy;
   } else
     return found->second;
 }
@@ -220,6 +256,76 @@ Type TypeConverter::makeConstantType(SILConstant c) {
   llvm_unreachable("unexpected constant loc");
 }
 
+class TypeLowerer : public TypeVisitor<TypeLowerer, SILType> {
+  TypeConverter &Types;
+public:
+  TypeLowerer(TypeConverter &Types) : Types(Types) {}
   
+  void lowerFunctionSignature(Type input, Type result,
+                              SILType &loweredInput, SILType &loweredResult) {
+    TypeInfo const &resultTypeInfo = Types.getTypeInfo(result);
+    llvm::SmallVector<TupleTypeElt, 4> loweredArguments;
+    loweredResult = visit(result->getCanonicalType());
+    
+    if (TupleType *argsTuple = input->getAs<TupleType>()) {
+      for (auto &arg : argsTuple->getFields()) {
+        loweredArguments.push_back(
+                       TupleTypeElt(visit(arg.getType()->getCanonicalType()),
+                                    arg.getName(),
+                                    arg.getInit(),
+                                    arg.getVarargBaseTy()));
+      }
+    } else {
+      loweredInput = visit(input->getCanonicalType());
+      // Special case if the input type is not a tuple and the output type is
+      // loadable--all we needed to do was lower the types.
+      if (resultTypeInfo.isLoadable()) {
+        return;
+      }
+      
+      loweredArguments.push_back(TupleTypeElt(loweredInput, Identifier()));
+    }
+    if (resultTypeInfo.isAddressOnly()) {
+      loweredArguments.push_back(TupleTypeElt(loweredResult, Identifier()));
+      loweredResult = SILType(TupleType::getEmpty(Types.Context));
+    }
+    loweredInput = SILType(TupleType::get(loweredArguments, Types.Context)
+                             ->getCanonicalType());
+  }
+  
+  SILType visitFunctionType(FunctionType *ft) {
+    SILType loweredInput, loweredResult;
+    lowerFunctionSignature(ft->getInput(), ft->getResult(),
+                           loweredInput, loweredResult);
+    auto lowered = FunctionType::get(loweredInput, loweredResult,
+                                     ft->isAutoClosure(),
+                                     Types.Context);
+    return SILType(lowered);
+  }
+  
+  SILType visitPolymorphicFunctionType(PolymorphicFunctionType *pft) {
+    SILType loweredInput, loweredResult;
+    lowerFunctionSignature(pft->getInput(), pft->getResult(),
+                           loweredInput, loweredResult);
+    auto lowered = PolymorphicFunctionType::get(loweredInput, loweredResult,
+                                                &pft->getGenericParams(),
+                                                Types.Context);
+    return SILType(lowered);
+  }
+  
+  SILType visitType(TypeBase *t) {
+    TypeInfo const &ti = Types.getTypeInfo(t);
+    if (ti.isAddressOnly())
+      return SILType(LValueType::get(t,
+                                     LValueType::Qual::DefaultForType,
+                                     Types.Context));
+    return SILType(t);
+  }
+};
+
+SILType TypeConverter::lowerType(CanType ty) {
+  return TypeLowerer(*this).visit(ty);
+}
+
 } // namespace Lowering
 } // namespace swift
