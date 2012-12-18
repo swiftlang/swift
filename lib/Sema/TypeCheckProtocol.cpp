@@ -158,6 +158,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         case MemberLookupResult::MemberFunction:
         case MemberLookupResult::ExistentialMember:
         case MemberLookupResult::ArchetypeMember:
+        case MemberLookupResult::GenericParameter:
           // These results cannot satisfy type requirements.
           break;
         }
@@ -366,6 +367,9 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
             Viable.push_back(Candidate.D);
           break;
         }
+        case MemberLookupResult::GenericParameter:
+            // Generic parameters are never viable.
+          break;
         }
       }
       

@@ -222,6 +222,7 @@ getGenericParam(ASTContext &Context) {
                                   SourceLoc(), TypeLoc::withoutLoc(Archetype),
                                   Context.TheBuiltinModule,
                                   MutableArrayRef<TypeLoc>());
+  GenericTyDecl->setGenericParameter();
   Type GenericTy = GenericTyDecl->getAliasType();
   GenericParam Param = GenericTyDecl;
   auto ParamList = GenericParamList::create(Context, SourceLoc(), Param,

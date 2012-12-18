@@ -106,11 +106,24 @@ class Decl {
   enum { NumFuncDeclBits = NumValueDeclBits + 1 };
   static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
 
+  enum { NumTypeDeclBits = NumValueDeclBits };
+
+  class TypeAliasDeclBitFields {
+    friend class TypeAliasDecl;
+    unsigned : NumTypeDeclBits;
+
+    /// \brief Whether this type alias is a generic parameter.
+    unsigned GenericParameter : 1;
+  };
+  enum { NumTypeAliasDeclBits = NumTypeDeclBits + 1 };
+  static_assert(NumTypeAliasDeclBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     DeclBitfields DeclBits;
     ValueDeclBitfields ValueDeclBits;
     FuncDeclBitFields FuncDeclBits;
+    TypeAliasDeclBitFields TypeAliasDeclBits;
   };
 
 private:
@@ -822,6 +835,14 @@ public:
 
   /// getAliasType - Return the sugared version of this decl as a Type.
   NameAliasType *getAliasType() const { return AliasTy; }
+
+  /// \brief Determine whether this type alias is a generic parameter.
+  bool isGenericParameter() const { return TypeAliasDeclBits.GenericParameter; }
+
+  /// \brief Set whether this type alias is a generic parameter.
+  void setGenericParameter(bool GP = true) {
+    TypeAliasDeclBits.GenericParameter = GP;
+  }
   
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::TypeAlias;

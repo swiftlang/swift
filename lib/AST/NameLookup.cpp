@@ -208,6 +208,7 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
 
       case MemberLookupResult::MemberProperty:
       case MemberLookupResult::MemberFunction:
+      case MemberLookupResult::GenericParameter:
         break;
           
       case MemberLookupResult::MetaArchetypeMember:
@@ -225,8 +226,12 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
     lookupMembers(BaseTy, M, ExtensionMethods);
 
     for (ValueDecl *VD : ExtensionMethods) {
-      if (TypeDecl *TAD = dyn_cast<TypeDecl>(VD)) {
-        Results.push_back(Result::getMetatypeMember(TAD));
+      if (TypeDecl *TD = dyn_cast<TypeDecl>(VD)) {
+        auto TAD = dyn_cast<TypeAliasDecl>(TD);
+        if (TAD && TAD->isGenericParameter())
+          Results.push_back(Result::getGenericParameter(TAD));
+        else
+          Results.push_back(Result::getMetatypeMember(TD));
         continue;
       }
       if (FuncDecl *FD = dyn_cast<FuncDecl>(VD)) {
@@ -615,6 +620,10 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
           Results.push_back(Result::getMetaArchetypeMember(
                               isa<FuncDecl>(Result.D)? BaseDecl : MetaBaseDecl,
                               Result.D));
+          break;
+        case MemberLookupResult::GenericParameter:
+          // All generic parameters are 'local'.
+          Results.push_back(Result::getLocalDecl(Result.D));
           break;
         }
       }

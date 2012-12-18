@@ -28,6 +28,7 @@ namespace swift {
   class Expr;
   class ValueDecl;
   class Type;
+  class TypeAliasDecl;
   class TypeDecl;
   class Module;
   class TupleType;
@@ -64,7 +65,10 @@ struct MemberLookupResult {
     /// the metatype A of an archetype (A'). May also occur for "a.x" when "x"
     /// is not an instance member, e.g., it is a type or a static function.
     /// In either case, the base is evaluated and ignored.
-    MetaArchetypeMember
+    MetaArchetypeMember,
+
+    /// \brief Lookup has found a generic parameter.
+    GenericParameter
   } Kind;
   
   static MemberLookupResult getMemberProperty(ValueDecl *D) {
@@ -102,6 +106,13 @@ struct MemberLookupResult {
     MemberLookupResult R;
     R.D = D;
     R.Kind = MetaArchetypeMember;
+    return R;
+  }
+
+  static MemberLookupResult getGenericParameter(TypeAliasDecl *D) {
+    MemberLookupResult R;
+    R.D = reinterpret_cast<ValueDecl *>(D);
+    R.Kind = GenericParameter;
     return R;
   }
 };

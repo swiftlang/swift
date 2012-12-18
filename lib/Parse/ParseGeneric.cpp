@@ -72,6 +72,7 @@ GenericParamList *Parser::parseGenericParameters() {
       = new (Context) TypeAliasDecl(NameLoc, Name, NameLoc, TypeLoc(),
                                     CurDeclContext,
                                     Context.AllocateCopy(Inherited));
+    Param->setGenericParameter();
     GenericParams.push_back(Param);
 
     // Add this parameter to the scope.

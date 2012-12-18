@@ -385,6 +385,8 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
   ASTContext &Ctx = getASTContext();
   AliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
   setType(MetaTypeType::get(AliasTy, Ctx));
+
+  TypeAliasDeclBits.GenericParameter = false;
 }
 
 SourceRange TypeAliasDecl::getSourceRange() const {

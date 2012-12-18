@@ -933,6 +933,7 @@ CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
     case MemberLookupResult::MetaArchetypeMember:
     case MemberLookupResult::ExistentialMember:  // FIXME: Should work?
     case MemberLookupResult::ArchetypeMember:    // FIXME: Should work?
+    case MemberLookupResult::GenericParameter:
       continue;
     
     case MemberLookupResult::MemberFunction:
