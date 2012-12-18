@@ -115,10 +115,10 @@ private:
   /// \brief NSObject, imported into Swift.
   Type NSObjectTy;
 
-public:
   ///\ brief The Swift standard library module.
   Module *swiftModule = nullptr;
 
+public:
   /// \brief The first Clang module we loaded.
   ///
   /// FIXME: This horrible hack is used because we don't have a nice way to
@@ -171,20 +171,39 @@ public:
   /// be converted.
   DeclContext *importDeclContext(clang::DeclContext *dc);
 
+  /// \brief Retrieve the 'swift' module.
+  ///
+  /// \returns The 'swift' module, or null if the module has not been imported.
+  Module *getSwiftModule();
+
+  /// \brief Retrieve the named module.
+  ///
+  /// \param The name of the module.
+  ///
+  /// \returns The named module, or null if the module has not been imported.
+  Module *getNamedModule(StringRef name);
+
   /// \brief Retrieve the named Swift type, e.g., Int32.
   ///
+  /// \param module The name of the module in which the type should occur.
+  ///
+  /// \param name The name of the type to find.
+  ///
   /// \returns The named type, or null if the type could not be found.
-  Type getNamedSwiftType(StringRef name);
+  Type getNamedSwiftType(Module *module, StringRef name);
 
   /// \brief Retrieve a specialization of the the named Swift type, e.g.,
   /// CPointer<T>.
   ///
-  /// \param name The name of the generic type to look up.
+  /// \param module The name of the module in which the type should occur.
+  ///
+  /// \param name The name of the type to find.
   ///
   /// \param args The arguments to use in the specialization.
   ///
   /// \returns The named type, or null if the type could not be found.
-  Type getNamedSwiftTypeSpecialization(StringRef name, ArrayRef<Type> args);
+  Type getNamedSwiftTypeSpecialization(Module *module, StringRef name,
+                                       ArrayRef<Type> args);
 
   /// \brief Retrieve the NSObject type.
   Type getNSObjectType();

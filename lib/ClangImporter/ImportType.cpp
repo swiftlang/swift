@@ -50,66 +50,67 @@ namespace {
     Type VisitBuiltinType(const clang::BuiltinType *type) {
       switch (type->getKind()) {
       case clang::BuiltinType::Void:
-        return Impl.getNamedSwiftType("CVoid");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CVoid");
 
       case clang::BuiltinType::Bool:
-        return Impl.getNamedSwiftType("CBool");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CBool");
 
       case clang::BuiltinType::Char_U:
       case clang::BuiltinType::Char_S:
-        return Impl.getNamedSwiftType("CChar");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CChar");
 
       case clang::BuiltinType::UChar:
-        return Impl.getNamedSwiftType("CUnsignedChar");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CUnsignedChar");
 
       case clang::BuiltinType::UShort:
-        return Impl.getNamedSwiftType("CUnsignedShort");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CUnsignedShort");
 
       case clang::BuiltinType::UInt:
-        return Impl.getNamedSwiftType("CUnsignedInt");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CUnsignedInt");
 
       case clang::BuiltinType::ULong:
-        return Impl.getNamedSwiftType("CUnsignedLong");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CUnsignedLong");
 
       case clang::BuiltinType::ULongLong:
-        return Impl.getNamedSwiftType("CUnsignedLongLong");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(),
+                                      "CUnsignedLongLong");
 
       case clang::BuiltinType::UInt128:
-        return Impl.getNamedSwiftType("CUnsignedInt128");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CUnsignedInt128");
 
       case clang::BuiltinType::WChar_S:
       case clang::BuiltinType::WChar_U:
-        return Impl.getNamedSwiftType("CWideChar");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CWideChar");
 
       case clang::BuiltinType::Char16:
-        return Impl.getNamedSwiftType("CChar16");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CChar16");
 
       case clang::BuiltinType::Char32:
-        return Impl.getNamedSwiftType("CChar32");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CChar32");
 
       case clang::BuiltinType::SChar:
-        return Impl.getNamedSwiftType("CSignedChar");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CSignedChar");
 
       case clang::BuiltinType::Short:
-        return Impl.getNamedSwiftType("CShort");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CShort");
 
       case clang::BuiltinType::Int:
-        return Impl.getNamedSwiftType("CInt");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CInt");
 
       case clang::BuiltinType::Long:
-        return Impl.getNamedSwiftType("CLong");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CLong");
 
       case clang::BuiltinType::LongLong:
-        return Impl.getNamedSwiftType("CLongLong");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CLongLong");
 
       case clang::BuiltinType::Int128:
-        return Impl.getNamedSwiftType("CInt128");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CInt128");
 
       case clang::BuiltinType::Float:
-        return Impl.getNamedSwiftType("CFloat");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CFloat");
 
       case clang::BuiltinType::Double:
-        return Impl.getNamedSwiftType("CDouble");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CDouble");
 
       // Types that cannot be mapped into Swift, and probably won't ever be.
       case clang::BuiltinType::Dependent:
@@ -161,14 +162,15 @@ namespace {
       clang::ASTContext &clangContext = Impl.getClangASTContext();
       if (clangContext.hasSameType(type->getPointeeType(),
                                    clangContext.CharTy.withConst())) {
-        return Impl.getNamedSwiftType("CString");
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CString");
       }
                                                 
       // All other C pointers map to CPointer<T>.
       auto pointeeType = Impl.importType(type->getPointeeType());
       if (!pointeeType)
         return Type();
-      return Impl.getNamedSwiftTypeSpecialization("CPointer", pointeeType);
+      return Impl.getNamedSwiftTypeSpecialization(Impl.getSwiftModule(),
+                                                  "CPointer", pointeeType);
     }
 
     Type VisitBlockPointerType(const clang::BlockPointerType *type) {
@@ -479,23 +481,33 @@ Type ClangImporter::Implementation::importFunctionType(
   return FunctionType::get(paramsTy, swiftResultTy, SwiftContext);
 }
 
+Module *ClangImporter::Implementation::getSwiftModule() {
+  if (swiftModule)
+    return swiftModule;
 
-Type ClangImporter::Implementation::getNamedSwiftType(StringRef name) {
-  if (!swiftModule) {
-    for (auto module : SwiftContext.LoadedModules) {
-      if (module.second->Name.str() == "swift") {
-        swiftModule = module.second;
-        break;
-      }
-    }
+  auto known = SwiftContext.LoadedModules.find("swift");
+  if (known == SwiftContext.LoadedModules.end())
+    return nullptr;
 
-    // The 'swift' module hasn't been loaded. There's nothing we can do.
-    if (!swiftModule)
-      return Type();
-  }
+  swiftModule = known->second;
+  return swiftModule;
+}
+
+Module *ClangImporter::Implementation::getNamedModule(StringRef name) {
+  auto known = SwiftContext.LoadedModules.find(name);
+  if (known == SwiftContext.LoadedModules.end())
+    return nullptr;
+
+  return known->second;
+}
+
+Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
+                                                      StringRef name) {
+  if (!module)
+    return Type();
 
   // Look for the type.
-  UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), swiftModule);
+  UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), module);
   if (auto type = lookup.getSingleTypeResult()) {
     return type->getDeclaredType();
   }
@@ -505,19 +517,10 @@ Type ClangImporter::Implementation::getNamedSwiftType(StringRef name) {
 
 Type
 ClangImporter::Implementation::
-getNamedSwiftTypeSpecialization(StringRef name, ArrayRef<Type> args) {
-  if (!swiftModule) {
-    for (auto module : SwiftContext.LoadedModules) {
-      if (module.second->Name.str() == "swift") {
-        swiftModule = module.second;
-        break;
-      }
-    }
-
-    // The 'swift' module hasn't been loaded. There's nothing we can do.
-    if (!swiftModule)
-      return Type();
-  }
+getNamedSwiftTypeSpecialization(Module *module, StringRef name,
+                                ArrayRef<Type> args) {
+  if (!module)
+    return Type();
 
   UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), swiftModule);
   if (TypeDecl *typeDecl = lookup.getSingleTypeResult()) {
