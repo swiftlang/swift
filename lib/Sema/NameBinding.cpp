@@ -188,8 +188,8 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
                                              /*IsMainModule*/false,
                                              /*IsReplModule*/false);
 
-  parseIntoTranslationUnit(ImportedTU, BufferID);
   Context.LoadedModules[ModuleID.first.str()] = ImportedTU;
+  parseIntoTranslationUnit(ImportedTU, BufferID);
 
   // We have to do name binding on it to ensure that types are fully resolved.
   // This should eventually be eliminated by having actual fully resolved binary

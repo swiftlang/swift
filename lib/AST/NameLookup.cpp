@@ -704,11 +704,20 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     }
   }
 
-  for (const auto &ImpEntry : TU.getImportedModules())
-    if (ImpEntry.second->Name == Name) {
-      Results.push_back(Result::getModuleName(ImpEntry.second));
-      break;
-    }
+  // If we've found something, we're done.
+  if (!Results.empty())
+    return;
+
+  // Look for a module with the given name.
+  if (Name == M.Name) {
+    Results.push_back(Result::getModuleName(&M));
+  } else {
+    for (const auto &ImpEntry : TU.getImportedModules())
+      if (ImpEntry.second->Name == Name) {
+        Results.push_back(Result::getModuleName(ImpEntry.second));
+        break;
+      }
+  }
 }
 
 

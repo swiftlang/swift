@@ -65,7 +65,8 @@ swift::buildSingleTranslationUnit(ASTContext &Context, unsigned BufferID,
   TranslationUnit *TU = new (Context) TranslationUnit(ID, Comp, Context,
                                                       IsMainModule,
                                                       /*IsReplModule=*/false);
-
+  Context.LoadedModules[ID.str()] = TU;
+  
   unsigned BufferOffset = 0;
   unsigned CurTUElem = 0;
   do {
