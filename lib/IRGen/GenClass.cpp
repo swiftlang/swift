@@ -292,7 +292,7 @@ static llvm::Value *emitGEPToOffset(IRGenFunction &IGF,
                                     const llvm::Twine &name = "") {
   auto addr = IGF.Builder.CreateBitCast(base, IGF.IGM.Int8PtrTy);
   addr = IGF.Builder.CreateInBoundsGEP(addr, offset);
-  return IGF.Builder.CreateBitCast(addr, type, name);
+  return IGF.Builder.CreateBitCast(addr, type->getPointerTo(), name);
 }
 
 /// Emit a field l-value by applying the given offset to the given base.
