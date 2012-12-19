@@ -144,10 +144,18 @@ void SILGenFunction::visitAssignStmt(AssignStmt *S) {
 
 void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
   Value ArgV;
-  if (S->hasResult()) {
+  if (IndirectReturnAddress) {
+    // Indirect return of an address-only value.
+    FullExpr scope(Cleanups);
+    visit(S->getResult()).forwardInto(*this, S, IndirectReturnAddress,
+                                      /*isInitialize=*/ true);
+    ArgV = B.createEmptyTuple(S);
+  } else if (S->hasResult()) {
+    // Value return.
     FullExpr scope(Cleanups);
     ArgV = visit(S->getResult()).forward(*this);
   } else {
+    // Void return.
     ArgV = B.createEmptyTuple(S);
   }
   Cleanups.emitReturnAndCleanups(S, ArgV);

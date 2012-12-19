@@ -203,6 +203,12 @@ ManagedValue SILGenFunction::visitStringLiteralExpr(StringLiteralExpr *E) {
 
 ManagedValue SILGenFunction::visitLoadExpr(LoadExpr *E) {
   ManagedValue SubV = visit(E->getSubExpr());
+  TypeInfo const &ti = getTypeInfo(E->getType());
+  if (ti.isAddressOnly()) {
+    // We can't load address-only types. Just pass on the address.
+    return ManagedValue(SubV.getUnmanagedValue(),
+                        /*isAddressOnlyValue=*/ true);
+  }
   Value loadedV = B.createLoad(E, SubV.getUnmanagedValue());
   emitRetainRValue(E, loadedV);
   return emitManagedRValueWithCleanup(loadedV);
@@ -231,7 +237,12 @@ namespace {
   };
 
   static Materialize emitMaterialize(SILGenFunction &gen,
-                                      SILLocation loc, Value v) {
+                                     SILLocation loc, Value v) {
+    // Address-only values are always materialized.
+    // FIXME: handle address-only values here and in Materialize::consume
+    if (v.getType()->is<LValueType>())
+      llvm_unreachable("address-only materialize not yet implemented");
+    
     Value tmpMem = gen.B.createAllocVar(loc, AllocKind::Stack, v.getType());
     gen.Cleanups.pushCleanup<CleanupMaterializeAllocation>(tmpMem);
     gen.B.createStore(loc, v, tmpMem);

@@ -566,7 +566,7 @@ public:
   /// Construct a TupleInst.
   static TupleInst *create(SILLocation Loc, SILType Ty, ArrayRef<Value> Elements,
                            Function &F) {
-    return createImpl(SILLocation(), Ty, Elements, F);
+    return createImpl(Loc, Ty, Elements, F);
   }
 
   /// getType() is ok since this is known to only have one type.

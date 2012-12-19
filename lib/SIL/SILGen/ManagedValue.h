@@ -34,15 +34,24 @@ namespace Lowering {
 /// must be used instead, which also handles writeback through logical
 /// properties.
 class ManagedValue {
+  /// The value (or address of an address-only value) being managed.
   Value value;
+  /// A handle to the cleanup that destroys this value, or
+  /// CleanupsDepth::invalid if the value has no cleanup.
   CleanupsDepth cleanup;
+  /// True if this ManagedValue represents an address-only value.
+  bool isAddressOnlyValue : 1;
 
 public:
   ManagedValue() = default;
-  explicit ManagedValue(Value value)
-    : value(value), cleanup(CleanupsDepth::invalid()) {}
-  ManagedValue(Value value, CleanupsDepth cleanup)
-    : value(value), cleanup(cleanup) {}
+  explicit ManagedValue(Value value, bool isAddressOnlyValue = false)
+    : value(value), cleanup(CleanupsDepth::invalid()),
+      isAddressOnlyValue(isAddressOnlyValue)
+    {}
+  ManagedValue(Value value, CleanupsDepth cleanup,
+               bool isAddressOnlyValue = false)
+    : value(value), cleanup(cleanup), isAddressOnlyValue(isAddressOnlyValue)
+    {}
 
   Value getUnmanagedValue() const {
     assert(!hasCleanup());
@@ -54,11 +63,35 @@ public:
   CleanupsDepth getCleanup() const { return cleanup; }
 
   /// Forward this value, deactivating the cleanup and returning the
-  /// underlying value.
+  /// underlying value. Not valid for address-only values.
   Value forward(SILGenFunction &gen) {
+    assert(!isAddressOnlyValue &&
+           "must forward an address-only value using forwardInto");
     if (hasCleanup())
       gen.Cleanups.setCleanupState(getCleanup(), CleanupState::Dead);
     return getValue();
+  }
+  
+  /// Forward this value into memory by storing it to the given address.
+  /// Currently only implemented for address-only values.
+  ///
+  /// \param gen - The SILGenFunction.
+  /// \param loc - the AST location to associate with emitted instructions.
+  /// \param address - the address to store to.
+  /// \param isInitialize - True if the address references uninitialized memory.
+  ///                       False if the address currently contains a valid
+  ///                       value.
+  void forwardInto(SILGenFunction &gen, SILLocation loc,
+                   Value address, bool isInitialize) {
+    assert(isAddressOnlyValue &&
+           "must forward loadable value using forward");
+    // If we own a cleanup for this value, we can "take" the value and disable
+    // the cleanup.
+    bool canTake = hasCleanup();
+    if (canTake) {
+      gen.Cleanups.setCleanupState(getCleanup(), CleanupState::Dead);
+    }
+    gen.B.createCopyAddr(loc, value, address, canTake, isInitialize);
   }
 
   /// Split this value into its underlying value and, if present, its cleanup.

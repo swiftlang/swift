@@ -149,8 +149,7 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     Value TupleInit = Init;
     for (auto &elt : P->getFields()) {
       TypeInfo const &eltTI = Gen.getTypeInfo(elt.getPattern()->getType());
-      assert(eltTI.isLoadable() &&
-             "init from address-only tuple not yet implemented");
+      // FIXME address-only tuple
       Init = Gen.B.createExtract(SILLocation(), TupleInit, FieldNo++,
                                  eltTI.getLoweredType());
       visit(elt.getPattern());
@@ -213,10 +212,13 @@ struct ArgumentCreatorVisitor :
       Elements.push_back(visit(elt.getPattern()));
 
     SILBuilder B(f.begin(), f);
-    TypeInfo const &PTI = gen.getTypeInfo(P->getType());
-    assert(PTI.isLoadable() &&
-           "address-only argument tuple not yet implemented");
-    return B.createTuple(SILLocation(), PTI.getLoweredType(), Elements);
+    
+    // FIXME bypass SIL type lowering and make a loadable tuple even if that's
+    // nonsense until we figure out what to do with address-only tuples that
+    // doesn't make argument passing horrendous
+    SILType loweredType = SILType::getPreLoweredType(
+                            P->getType()->getCanonicalType());
+    return B.createTuple(SILLocation(), loweredType, Elements);
   }
 
   Value visitAnyPattern(AnyPattern *P) {
@@ -308,7 +310,7 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
 
 void SILGenFunction::emitProlog(CapturingExpr *ce,
                                 ArrayRef<Pattern*> paramPatterns) {
-  // Emit the capture variables.
+  // Emit the capture argument variables.
   for (auto capture : ce->getCaptures()) {
     makeCaptureBBArguments(*this, capture);
   }
@@ -319,6 +321,14 @@ void SILGenFunction::emitProlog(CapturingExpr *ce,
     Value ArgInit = ArgumentCreatorVisitor(*this, F).visit(paramPattern);
     // Use the value to initialize a (mutable) variable allocation.
     InitPatternWithExpr(*this, ArgInit).visit(paramPattern);
+  }
+  
+  // If the return type is address-only, emit the indirect return argument.
+  Type resultType = ce->getType()->castTo<AnyFunctionType>()->getResult();
+  TypeInfo const &returnTI = getTypeInfo(resultType);
+  if (returnTI.isAddressOnly()) {
+    IndirectReturnAddress = new (SGM.M) BBArgument(returnTI.getLoweredType(),
+                                                   F.begin());
   }
 }
 

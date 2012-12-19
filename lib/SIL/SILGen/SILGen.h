@@ -144,6 +144,11 @@ public:
   /// B - The SILBuilder used to construct the Function.  It is what maintains
   /// the notion of the current block being emitted into.
   SILBuilder B;
+    
+  /// IndirectReturnAddress - For a function with an indirect return, holds a
+  /// value representing the address to initialize with the return value. Null
+  /// for a function that returns by value.
+  Value IndirectReturnAddress;
   
   std::vector<JumpDest> BreakDestStack;
   std::vector<JumpDest> ContinueDestStack;
