@@ -130,8 +130,7 @@ namespace llvm {
     }
   };
 
-  
-  // An Type is "pointer like".
+  // A Type is "pointer like".
   template<typename T> class PointerLikeTypeTraits;
   template<>
   class PointerLikeTypeTraits<swift::Type> {
