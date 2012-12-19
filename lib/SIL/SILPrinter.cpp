@@ -422,6 +422,8 @@ void SILModule::print(llvm::raw_ostream &OS) const {
   for (std::pair<SILConstant, Function*> vf : *this) {
     OS << "func_decl ";
     vf.first.print(OS);
+    OS << " : $";
+    vf.second->getLoweredType()->print(OS);
     OS << '\n';
     vf.second->print(OS);
     OS << "\n";
