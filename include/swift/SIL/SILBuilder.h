@@ -117,8 +117,9 @@ public:
     return insert(new AllocArrayInst(E, ElementType, NumElements, F));
   }
 
-  ApplyInst *createApply(SILLocation Loc, Value Fn, ArrayRef<Value> Args) {
-    return insert(ApplyInst::create(Loc, Fn, Args, F));
+  ApplyInst *createApply(SILLocation Loc, Value Fn,
+                         SILType Result, ArrayRef<Value> Args) {
+    return insert(ApplyInst::create(Loc, Fn, Result, Args, F));
   }
 
   ClosureInst *createClosure(SILLocation Loc, Value Fn, ArrayRef<Value> Args) {

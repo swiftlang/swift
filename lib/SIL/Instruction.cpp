@@ -85,9 +85,8 @@ void Instruction::eraseFromParent() {
 AllocVarInst::AllocVarInst(SILLocation loc, AllocKind allocKind,
                            SILType elementType,
                            Function &F)
-  // FIXME: LValue qualifiers being wrong can break the verifier
   : AllocInst(ValueKind::AllocVarInst, loc,
-              elementType.getAddressType(F.getContext()),
+              elementType.getAddressType(),
               allocKind) {
 }
 
@@ -104,16 +103,16 @@ VarDecl *AllocVarInst::getDecl() const {
 /// getElementType - Get the type of the allocated memory (as opposed to the
 /// type of the instruction itself, which will be an address type).
 Type AllocVarInst::getElementType() const {
-  return getType()->castTo<LValueType>()->getObjectType();
+  return getType().getSwiftRValueType();
 }
 
 // Allocations always return two results: Builtin.ObjectPointer & LValue[EltTy]
 static SILTypeList *getAllocType(SILType EltTy, Function &F) {
-  ASTContext &Ctx = EltTy->getASTContext();
+  ASTContext &Ctx = EltTy.getASTContext();
 
   SILType ResTys[] = {
     SILType::getObjectPointerType(Ctx),
-    EltTy.getAddressType(F.getContext())
+    EltTy.getAddressType()
   };
 
   return F.getModule().getSILTypeList(ResTys);
@@ -124,7 +123,7 @@ AllocBoxInst::AllocBoxInst(SILLocation Loc, SILType ElementType, Function &F)
 }
 
 Type AllocBoxInst::getElementType() const {
-  return getType(1)->getRValueType();
+  return getType(1).getSwiftRValueType();
 }
 
 AllocArrayInst::AllocArrayInst(SILLocation Loc, SILType ElementType,
@@ -134,7 +133,7 @@ AllocArrayInst::AllocArrayInst(SILLocation Loc, SILType ElementType,
 }
 
 Type AllocArrayInst::getElementType() const {
-  return getType(1)->getRValueType();
+  return getType(1).getSwiftRValueType();
 }
 
 FunctionInst::FunctionInst(ValueKind kind,
@@ -145,25 +144,26 @@ FunctionInst::FunctionInst(ValueKind kind,
   memcpy(getArgsStorage(), Args.data(), Args.size() * sizeof(Value));
 }
 
-template<typename DERIVED>
-DERIVED *FunctionInst::create(SILLocation Loc, Value Callee,
-                              ArrayRef<Value> Args, Function &F) {
+template<typename DERIVED, typename...T>
+DERIVED *FunctionInst::create(Function &F, ArrayRef<Value> Args,
+                              T &&...ConstructorArgs) {
   void *Buffer = F.allocate(sizeof(DERIVED) + Args.size() * sizeof(Value),
                             llvm::AlignOf<DERIVED>::Alignment);
-  return ::new(Buffer) DERIVED(Loc, Callee, Args);
+  return ::new(Buffer) DERIVED(::std::forward<T>(ConstructorArgs)...);
 }
 
-ApplyInst::ApplyInst(SILLocation Loc, Value Callee, ArrayRef<Value> Args)
-  : FunctionInst(ValueKind::ApplyInst, Loc,
-                 SILType::getPreLoweredType(
-                   Callee.getType()->castTo<FunctionType>()->getResult()),
+ApplyInst::ApplyInst(SILLocation Loc, Value Callee,
+                     SILType Result, ArrayRef<Value> Args)
+  : FunctionInst(ValueKind::ApplyInst, Loc, Result,
                  Callee, Args) {
   
 }
 
 ApplyInst *ApplyInst::create(SILLocation Loc, Value Callee,
-                             ArrayRef<Value> Args, Function &F) {
-  return FunctionInst::create<ApplyInst>(Loc, Callee, Args, F);
+                             SILType Result, ArrayRef<Value> Args,
+                             Function &F) {
+  return FunctionInst::create<ApplyInst>(F, Args,
+                                         Loc, Callee, Result, Args);
 }
 
 ClosureInst::ClosureInst(SILLocation Loc, Value Callee, ArrayRef<Value> Args)
@@ -177,7 +177,8 @@ ClosureInst::ClosureInst(SILLocation Loc, Value Callee, ArrayRef<Value> Args)
 
 ClosureInst *ClosureInst::create(SILLocation Loc, Value Callee,
                                  ArrayRef<Value> Args, Function &F) {
-  return FunctionInst::create<ClosureInst>(Loc, Callee, Args, F);
+  return FunctionInst::create<ClosureInst>(F, Args,
+                                           Loc, Callee, Args);
 }
 
 ConstantRefInst::ConstantRefInst(SILLocation Loc, SILConstant C, SILType Ty)
@@ -195,12 +196,16 @@ ZeroValueInst::ZeroValueInst(SILLocation Loc, SILType Ty)
 
 IntegerLiteralInst::IntegerLiteralInst(IntegerLiteralExpr *E)
   : Instruction(ValueKind::IntegerLiteralInst, E,
-                SILType::getPreLoweredType(E->getType()->getCanonicalType())) {
+                // Builtin integer types are always valid SIL types.
+                SILType::getPreLoweredType(E->getType()->getCanonicalType(),
+                                       /*address=*/false, /*loadable=*/true)) {
 }
 
 IntegerLiteralInst::IntegerLiteralInst(CharacterLiteralExpr *E)
   : Instruction(ValueKind::IntegerLiteralInst, E,
-                SILType::getPreLoweredType(E->getType()->getCanonicalType())) {
+                // Builtin integer types are always valid SIL types.
+                SILType::getPreLoweredType(E->getType()->getCanonicalType(),
+                                       /*address=*/false, /*loadable=*/true)) {
 }
 
 Expr *IntegerLiteralInst::getExpr() const {
@@ -221,7 +226,9 @@ APInt IntegerLiteralInst::getValue() const {
 
 FloatLiteralInst::FloatLiteralInst(FloatLiteralExpr *E)
   : Instruction(ValueKind::FloatLiteralInst, E,
-                SILType::getPreLoweredType(E->getType()->getCanonicalType())) {
+                // Builtin floating-point types are always valid SIL types.
+                SILType::getPreLoweredType(E->getType()->getCanonicalType(),
+                                       /*address=*/false, /*loadable=*/true)) {
 }
 
 FloatLiteralExpr *FloatLiteralInst::getExpr() const {
@@ -234,7 +241,9 @@ APFloat FloatLiteralInst::getValue() const {
 
 StringLiteralInst::StringLiteralInst(StringLiteralExpr *E)
   : Instruction(ValueKind::StringLiteralInst, E,
-                SILType::getPreLoweredType(E->getType()->getCanonicalType())) {
+                // The string literal tuple type is always a valid SIL type.
+                SILType::getPreLoweredType(E->getType()->getCanonicalType(),
+                                       /*address=*/false, /*loadable=*/true)) {
 }
 
 StringLiteralExpr *StringLiteralInst::getExpr() const {
@@ -247,8 +256,7 @@ StringRef StringLiteralInst::getValue() const {
 
 
 LoadInst::LoadInst(SILLocation Loc, Value LValue)
-  : Instruction(ValueKind::LoadInst, Loc,
-                SILType::getPreLoweredType(LValue.getType()->getRValueType())),
+  : Instruction(ValueKind::LoadInst, Loc, LValue.getType().getObjectType()),
     LValue(LValue) {
 }
 
@@ -350,8 +358,13 @@ WitnessTableMethodInst::WitnessTableMethodInst(ValueKind Kind,
                                                SILType ThisTy, SILType MethodTy,
                                                Function &F)
   : Instruction(Kind, Loc,
+                // The method type should always be an address-to-function type,
+                // which doesn't need additional lowering.
                 SILType::getPreLoweredType(
-                  FunctionType::get(ThisTy, MethodTy, F.getContext()))),
+                  FunctionType::get(ThisTy.getSwiftType(),
+                                    MethodTy.getSwiftType(),
+                                    F.getContext()),
+                  /*address=*/false, /*loadable=*/true)),
     Operand(Operand), Member(Member) {
 }
 
@@ -385,13 +398,13 @@ AllocExistentialInst::AllocExistentialInst(SILLocation Loc, Value Existential,
                                            SILType ConcreteType,
                                            Function &F)
   : Instruction(ValueKind::AllocExistentialInst, Loc,
-                ConcreteType.getAddressType(F.getContext())),
+                ConcreteType.getAddressType()),
     Existential(Existential) {
   
 }
 
 Type AllocExistentialInst::getConcreteType() const {
-  return getType(0)->castTo<LValueType>()->getObjectType();
+  return getType(0).getSwiftRValueType();
 }
 
 RetainInst::RetainInst(SILLocation Loc, Value Operand)

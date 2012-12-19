@@ -329,6 +329,7 @@ public:
   void emitApplyArguments(Expr *argsExpr,
                           llvm::SmallVectorImpl<Value> &args,
                           llvm::SmallVectorImpl<Writeback> &writebacks);
+  ManagedValue emitApply(SILLocation Loc, Value Fn, ArrayRef<Value> Args);
   ManagedValue emitArrayInjectionCall(Value ObjectPtr,
                                       Value BasePtr,
                                       Value Length,

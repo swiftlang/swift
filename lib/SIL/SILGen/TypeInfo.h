@@ -60,10 +60,8 @@ class LLVM_LIBRARY_VISIBILITY TypeInfo {
   /// loweredType - The SIL type of values with this Swift type.
   SILType loweredType;
   
-  bool addressOnly : 1;
-
 public:
-  TypeInfo() : addressOnly(false) {}
+  TypeInfo() = default;
 
   TypeInfo(TypeInfo const &) = delete;
   void operator=(TypeInfo const &) = delete;
@@ -74,11 +72,11 @@ public:
   /// is address-only if it is a resilient value type, or if it is a fragile
   /// value type with a resilient member. In either case, the full layout of
   /// values of the type is unavailable to the compiler.
-  bool isAddressOnly() const { return addressOnly; }
+  bool isAddressOnly() const { return loweredType.isAddressOnly(); }
   /// isLoadable - Returns true if the type is loadable, in other words, its
   /// full layout is available to the compiler. This is the inverse of
   /// isAddressOnly.
-  bool isLoadable() const { return !addressOnly; }
+  bool isLoadable() const { return loweredType.isLoadable(); }
   
   /// isTrivial - Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
@@ -142,7 +140,7 @@ class LLVM_LIBRARY_VISIBILITY TypeConverter {
   TypeInfo const &makeTypeInfo(CanType t);
   void makeFragileElements(TypeInfo &theInfo, CanType t);
   void makeFragileElementsForDecl(TypeInfo &theInfo, NominalTypeDecl *decl);
-  SILType lowerType(CanType ty);
+  SILType lowerType(CanType ty, bool addressOnly);
 
   Type makeConstantType(SILConstant constant);
   

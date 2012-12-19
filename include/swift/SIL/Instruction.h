@@ -205,9 +205,9 @@ protected:
   FunctionInst(ValueKind kind,
                SILLocation Loc, SILType Ty, Value Callee, ArrayRef<Value> Args);
 
-  template<typename DERIVED>
-  static DERIVED *create(SILLocation Loc, Value Callee,
-                         ArrayRef<Value> Args, Function &F);
+  template<typename DERIVED, typename...T>
+  static DERIVED *create(Function &F, ArrayRef<Value> Args,
+                         T &&...ConstructorArgs);
 
 public:
   Value getCallee() { return Callee; }
@@ -234,10 +234,13 @@ public:
 /// ApplyInst - Represents the full application of a function value.
 class ApplyInst : public FunctionInst {
   friend class FunctionInst;
-  ApplyInst(SILLocation Loc, Value Callee, ArrayRef<Value> Args);
+  ApplyInst(SILLocation Loc, Value Callee, SILType ReturnType,
+            ArrayRef<Value> Args);
 public:
   static ApplyInst *create(SILLocation Loc, Value Callee,
-                           ArrayRef<Value> Args, Function &F);
+                           SILType ReturnType,
+                           ArrayRef<Value> Args,
+                           Function &F);
 };
 
 /// ClosureInst - Represents the creation of a closure object by partial

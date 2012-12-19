@@ -57,7 +57,7 @@ Condition SILGenFunction::emitCondition(Stmt *TheStmt, Expr *E,
     FullExpr Scope(Cleanups);
     V = visit(E).forward(*this);
   }
-  assert(V.getType()->castTo<BuiltinIntegerType>()->getBitWidth() == 1);
+  assert(V.getType().castTo<BuiltinIntegerType>()->getBitWidth() == 1);
   
   BasicBlock *ContBB = new BasicBlock(&F, "condition.cont");
   BasicBlock *TrueBB = new BasicBlock(&F, "if.true");
@@ -375,12 +375,12 @@ ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
                             ShouldPreserveValues::PreserveValues)
         .address;
     }
-    assert((addr.getType()->is<LValueType>() ||
-            addr.getType()->hasReferenceSemantics()) &&
+    assert((addr.getType().isAddress() ||
+            addr.getType().hasReferenceSemantics()) &&
            "resolving lvalue component did not give an address "
            "or reference type");
   }
-  assert(addr.getType()->is<LValueType>() &&
+  assert(addr.getType().isAddress() &&
          "resolving lvalue did not give an address");
   return ManagedValue(addr);
 }
@@ -391,19 +391,17 @@ static void assignPhysicalAddress(SILGenFunction &gen,
                                   Value addr) {
   SILType srcTy = src.getType();
   
-  if (srcTy->is<LValueType>()) {
+  if (srcTy.isAddressOnly()) {
     // src is an address-only type; copy using the copy_addr instruction.
-    assert(gen.getTypeInfo(srcTy->getRValueType()).isAddressOnly() &&
-           "source of copy may only be an address if type is address-only");
     gen.B.createCopyAddr(loc, src, addr,
                          /*isTake=*/ false,
                          /*isInitialize=*/ false);
   } else {
     // src is a loadable type; release the old value if necessary and store
     // the new.
-    TypeInfo const &ti = gen.getTypeInfo(srcTy);
-    assert(ti.isLoadable() &&
-           "copy of address-only type must take address for source argument");
+    assert(!srcTy.isAddress() &&
+           "can't assign loadable type from address");
+    TypeInfo const &ti = gen.getTypeInfo(srcTy.getSwiftRValueType());
     
     Value old;
     
@@ -443,12 +441,12 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
       Materialize newDest = lcomponent
         .loadAndMaterialize(*this, loc, destAddr,
                             ShouldPreserveValues::PreserveValues);
-      if (!newDest.address.getType()->getRValueType()->hasReferenceSemantics())
+      if (!newDest.address.getType().hasReferenceSemantics())
         writebacks.push_back({destAddr, newDest, &lcomponent});
       destAddr = newDest.address;
     }
     
-    if (destAddr.getType()->hasReferenceSemantics())
+    if (destAddr.getType().hasReferenceSemantics())
       writebacks.clear();
   }
   

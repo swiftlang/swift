@@ -46,7 +46,7 @@ raw_ostream &operator<<(raw_ostream &OS, ID i) {
   return OS;
 }
 
-void SILConstant::print(llvm::raw_ostream &OS) const {
+void SILConstant::print(raw_ostream &OS) const {
   if (hasDecl()) {
     OS << getDecl()->getName();
   } else {
@@ -68,6 +68,28 @@ void SILConstant::print(llvm::raw_ostream &OS) const {
 void SILConstant::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
+}
+
+void SILType::print(raw_ostream &OS) const {
+  if (isAddress()) {
+    OS << "*";
+  }
+  getSwiftRValueType()->print(OS);
+}
+
+void SILType::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+raw_ostream &operator<<(raw_ostream &OS, SILType t) {
+  t.print(OS);
+  return OS;
+}
+
+raw_ostream &operator<<(raw_ostream &OS, SILConstant t) {
+  t.print(OS);
+  return OS;
 }
 
 namespace {
@@ -94,7 +116,7 @@ public:
       OS << '(';
       for (auto I = BB->bbarg_begin(), E = BB->bbarg_end(); I != E; ++I) {
         if (I != BB->bbarg_begin()) OS << ", ";
-        OS << getID(*I) << " : " << (*I)->getType().getString();
+        OS << getID(*I) << " : " << (*I)->getType();
       }
       OS << ')';
     }
@@ -183,22 +205,22 @@ public:
   }
 
   void visitConstantRefInst(ConstantRefInst *DRI) {
-    OS << "constant_ref $" << DRI->getType(0).getString() << ", @";
+    OS << "constant_ref $" << DRI->getType(0) << ", @";
     DRI->getConstant().print(OS);
   }
 
   void visitZeroValueInst(ZeroValueInst *ZVI) {
-    OS << "zero_value $" << ZVI->getType().getString();
+    OS << "zero_value $" << ZVI->getType();
   }
 
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     const auto &lit = ILI->getValue();
-    OS << "integer_literal $" << ILI->getType().getString() << ", " << lit;
+    OS << "integer_literal $" << ILI->getType() << ", " << lit;
   }
   void visitFloatLiteralInst(FloatLiteralInst *FLI) {
     SmallVector<char, 12> Buffer;
     FLI->getValue().toString(Buffer);
-    OS << "float_literal $" << FLI->getType().getString() << ", "
+    OS << "float_literal $" << FLI->getType() << ", "
        << StringRef(Buffer.data(), Buffer.size());
   }
   void visitStringLiteralInst(StringLiteralInst *SLI) {
@@ -223,7 +245,7 @@ public:
   }
   void visitSpecializeInst(SpecializeInst *SI) {
     OS << "specialize " << getID(SI->getOperand()) << ", $"
-       << SI->getType().getString() << "  ; ";
+       << SI->getType() << "  ; ";
     bool first = true;
     for (Substitution const &s : SI->getSubstitutions()) {
       if (!first)
@@ -237,7 +259,7 @@ public:
   
   void printConversionInst(ConversionInst *CI, llvm::StringRef name) {
     OS << name << " " << getID(CI->getOperand()) << ", $"
-      << CI->getType().getString();
+      << CI->getType();
   }
   
   void visitImplicitConvertInst(ImplicitConvertInst *CI) {
@@ -293,7 +315,7 @@ public:
     AEI->getConcreteType()->print(OS);
   }
   void visitMetatypeInst(MetatypeInst *MI) {
-    OS << "metatype $" << MI->getType().getString();
+    OS << "metatype $" << MI->getType();
   }
   
   void visitRetainInst(RetainInst *RI) {
@@ -317,7 +339,7 @@ public:
 
   void visitIntegerValueInst(IntegerValueInst *IVI) {
     OS << "integer_value " << IVI->getValue() << ", $"
-       << IVI->getType().getString();
+       << IVI->getType();
   }
 
   void visitUnreachableInst(UnreachableInst *UI) {
@@ -422,9 +444,7 @@ void SILModule::print(llvm::raw_ostream &OS) const {
   for (std::pair<SILConstant, Function*> vf : *this) {
     OS << "func_decl ";
     vf.first.print(OS);
-    OS << " : $";
-    vf.second->getLoweredType()->print(OS);
-    OS << '\n';
+    OS << " : $" << vf.second->getLoweredType() << '\n';
     vf.second->print(OS);
     OS << "\n";
   }

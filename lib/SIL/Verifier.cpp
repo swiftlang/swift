@@ -45,7 +45,7 @@ public:
   }
 
   void visitAllocInst(AllocInst *AI) {
-    assert(AI->getType()->is<LValueType>() &&"Allocation should return lvalue");
+    assert(AI->getType().isAddress() &&"Allocation should return address");
   }
 
   void visitAllocVarInst(AllocVarInst *AI) {
@@ -53,16 +53,17 @@ public:
   }
 
   void visitApplyInst(ApplyInst *AI) {
-    assert(AI->getCallee().getType()->is<FunctionType>() &&
+    /* FIXME This logic needs to be reworked to deal with type lowering.
+    assert(AI->getCallee().getType().is<FunctionType>() &&
            "Callee of ApplyInst should have function type");
-    FunctionType *FT = AI->getCallee().getType()->castTo<FunctionType>();
-    assert(AI->getType()->isEqual(FT->getResult()) &&
+    FunctionType *FT = AI->getCallee().getType().castTo<FunctionType>();
+    assert(AI->getType().getSwiftType()->isEqual(FT->getResult()) &&
            "ApplyInst result type mismatch");
 
     // If there is a single argument to the apply, it might be a scalar or the
     // whole tuple being presented all at once.
     if (AI->getArguments().size() != 1 ||
-        AI->getArguments()[0].getType() != FT->getInput()) {
+        AI->getArguments()[0].getType().getSwiftType() != FT->getInput()) {
       // Otherwise, we must have a decomposed tuple.  Verify the arguments match
       // up.
       const TupleType *TT = FT->getInput()->castTo<TupleType>();
@@ -70,109 +71,108 @@ public:
       assert(AI->getArguments().size() == TT->getFields().size() &&
              "ApplyInst contains unexpected argument count for function");
       for (unsigned i = 0, e = AI->getArguments().size(); i != e; ++i)
-        assert(AI->getArguments()[i].getType()
+        assert(AI->getArguments()[i].getType().getSwiftType()
                  ->isEqual(TT->getFields()[i].getType()) &&
                "ApplyInst argument type mismatch");
     }
+     */
   }
 
   void visitConstantRefInst(ConstantRefInst *CRI) {
-    assert(CRI->getType()->is<AnyFunctionType>() &&
+    assert(CRI->getType().is<AnyFunctionType>() &&
            "constant_ref should have a function result");
   }
 
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
-    assert(ILI->getType()->is<BuiltinIntegerType>() &&
+    assert(ILI->getType().is<BuiltinIntegerType>() &&
            "invalid integer literal type");
   }
   void visitLoadInst(LoadInst *LI) {
-    assert(!LI->getType()->is<LValueType>() && "Load should produce rvalue");
-    assert(LI->getLValue().getType()->is<LValueType>() &&
+    assert(!LI->getType().isAddress() && "Load should produce rvalue");
+    assert(LI->getLValue().getType().isAddress() &&
            "Load op should be lvalue");
-    assert(LI->getLValue().getType()->getRValueType()->isEqual(LI->getType()) &&
+    assert(LI->getLValue().getType().getObjectType() == LI->getType() &&
            "Load operand type and result type mismatch");
   }
 
   void visitStoreInst(StoreInst *SI) {
-    assert(!SI->getSrc().getType()->is<LValueType>() &&
+    assert(!SI->getSrc().getType().isAddress() &&
            "Src value should be rvalue");
-    assert(SI->getDest().getType()->is<LValueType>() &&
+    assert(SI->getDest().getType().isAddress() &&
            "Dest address should be lvalue");
-    assert(SI->getDest().getType()->getRValueType()->
-              isEqual(SI->getSrc().getType()) &&
+    assert(SI->getDest().getType().getObjectType() == SI->getSrc().getType() &&
            "Store operand type and dest type mismatch");
   }
 
   void visitCopyAddrInst(CopyAddrInst *SI) {
-    assert(SI->getSrc().getType()->is<LValueType>() &&
+    assert(SI->getSrc().getType().isAddress() &&
            "Src value should be lvalue");
-    assert(SI->getDest().getType()->is<LValueType>() &&
+    assert(SI->getDest().getType().isAddress() &&
            "Dest address should be lvalue");
-    assert(SI->getDest().getType()->getRValueType()->
-           isEqual(SI->getSrc().getType()->getRValueType()) &&
+    assert(SI->getDest().getType() == SI->getSrc().getType() &&
            "Store operand type and dest type mismatch");
   }
   
   void visitZeroAddrInst(ZeroAddrInst *ZI) {
-    assert(ZI->getDest().getType()->is<LValueType>() &&
+    assert(ZI->getDest().getType().isAddress() &&
            "Dest address should be lvalue");
   }
   
   void visitZeroValueInst(ZeroValueInst *ZVI) {
-    assert(!ZVI->getType()->is<LValueType>() &&
+    assert(!ZVI->getType().isAddress() &&
            "zero_value cannot create an address");
   }
   
   void visitSpecializeInst(SpecializeInst *SI) {
-    assert(SI->getType()->is<FunctionType>() &&
+    assert(SI->getType().is<FunctionType>() &&
            "Specialize dest should be a function type");
-    assert(SI->getOperand().getType()->is<PolymorphicFunctionType>() &&
+    assert(SI->getOperand().getType().is<PolymorphicFunctionType>() &&
            "Specialize source should be a polymorphic function type");
   }
 
   void visitTupleInst(TupleInst *TI) {
-    assert(TI->getType()->is<TupleType>() && "TupleInst should return a tuple");
-    TupleType *ResTy = TI->getType()->castTo<TupleType>(); (void)ResTy;
+    assert(TI->getType().is<TupleType>() && "TupleInst should return a tuple");
+    TupleType *ResTy = TI->getType().castTo<TupleType>(); (void)ResTy;
 
     assert(TI->getElements().size() == ResTy->getFields().size() &&
            "Tuple field count mismatch!");
   }
   void visitMetatypeInst(MetatypeInst *MI) {
-    assert(MI->getType(0)->is<MetaTypeType>() &&
+    assert(MI->getType(0).is<MetaTypeType>() &&
            "Metatype instruction must be of metatype type");
   }
   
   void visitRetainInst(RetainInst *RI) {
-    assert(!RI->getOperand().getType()->is<LValueType>() &&
+    assert(!RI->getOperand().getType().isAddress() &&
            "Operand of retain must not be lvalue");
   }
   void visitReleaseInst(ReleaseInst *RI) {
-    assert(!RI->getOperand().getType()->is<LValueType>() &&
+    assert(!RI->getOperand().getType().isAddress() &&
            "Operand of release must not be lvalue");
   }
   void visitDeallocVarInst(DeallocVarInst *DI) {
-    assert(DI->getOperand().getType()->is<LValueType>() &&
+    assert(DI->getOperand().getType().isAddress() &&
            "Operand of dealloc must be lvalue");
   }
   void visitDestroyAddrInst(DestroyAddrInst *DI) {
-    assert(DI->getOperand().getType()->is<LValueType>() &&
+    assert(DI->getOperand().getType().isAddress() &&
            "Operand of destroy must be lvalue");
   }
 
   void visitIndexAddrInst(IndexAddrInst *IAI) {
-    assert(IAI->getType()->is<LValueType>() &&
-           IAI->getType()->isEqual(IAI->getOperand().getType()) &&
+    assert(IAI->getType().isAddress() &&
+           IAI->getType() == IAI->getOperand().getType() &&
            "invalid IndexAddrInst");
   }
   
   void visitExtractInst(ExtractInst *EI) {
 #ifndef NDEBUG
     SILType operandTy = EI->getOperand().getType();
-    assert(!operandTy->is<LValueType>() &&
+    assert(!operandTy.isAddress() &&
            "cannot extract from address");
-    assert(!operandTy->hasReferenceSemantics() &&
+    assert(!operandTy.hasReferenceSemantics() &&
            "cannot extract from reference type");
-    assert(!EI->getType(0)->is<LValueType>() &&
+    assert(!EI->getType(0).isAddress() &&
            "result of extract cannot be address");
 #endif
   }
@@ -180,11 +180,11 @@ public:
   void visitElementAddrInst(ElementAddrInst *EI) {
 #ifndef NDEBUG
     SILType operandTy = EI->getOperand().getType();
-    assert(operandTy->is<LValueType>() &&
+    assert(operandTy.isAddress() &&
            "must derive element_addr from address");
-    assert(!operandTy->hasReferenceSemantics() &&
+    assert(!operandTy.hasReferenceSemantics() &&
            "cannot derive element_addr from reference type");
-    assert(EI->getType(0)->is<LValueType>() &&
+    assert(EI->getType(0).isAddress() &&
            "result of element_addr must be lvalue");
 #endif
   }
@@ -192,27 +192,27 @@ public:
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
 #ifndef NDEBUG
     SILType operandTy = EI->getOperand().getType();
-    assert(operandTy->hasReferenceSemantics() &&
+    assert(operandTy.hasReferenceSemantics() &&
            "must derive ref_element_addr from reference type");
-    assert(EI->getType(0)->is<LValueType>() &&
+    assert(EI->getType(0).isAddress() &&
            "result of element_addr must be lvalue");
 #endif
   }
   
   void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
 #ifndef NDEBUG
-    FunctionType *methodType = AMI->getType(0)->getAs<FunctionType>();
+    FunctionType *methodType = AMI->getType(0).getAs<FunctionType>();
     assert(methodType &&
            "result method must be of a concrete function type");
     SILType operandType = AMI->getOperand().getType();
-    assert(methodType->getInput()->isEqual(operandType) &&
+    assert(methodType->getInput()->isEqual(operandType.getSwiftType()) &&
            "result must be a method of the operand");
     assert(methodType->getResult()->is<FunctionType>() &&
            "result must be a method");
-    if (LValueType *lvt = operandType->getAs<LValueType>()) {
+    if (LValueType *lvt = operandType.getAs<LValueType>()) {
       assert(lvt->getObjectType()->is<ArchetypeType>() &&
              "archetype_method must apply to an archetype address");
-    } else if (MetaTypeType *mt = operandType->getAs<MetaTypeType>()) {
+    } else if (MetaTypeType *mt = operandType.getAs<MetaTypeType>()) {
       assert(mt->getInstanceType()->is<ArchetypeType>() &&
              "archetype_method must apply to an archetype metatype");
     } else
@@ -222,58 +222,59 @@ public:
   
   void visitExistentialMethodInst(ExistentialMethodInst *EMI) {
 #ifndef NDEBUG
-    FunctionType *methodType = EMI->getType(0)->getAs<FunctionType>();
+    FunctionType *methodType = EMI->getType(0).getAs<FunctionType>();
     assert(methodType &&
            "result method must be of a concrete function type");
     SILType operandType = EMI->getOperand().getType();
     assert(methodType->getInput()->isEqual(
-                            operandType->getASTContext().TheRawPointerType) &&
+                            operandType.getASTContext().TheRawPointerType) &&
            "result must be a method of the operand");
     assert(methodType->getResult()->is<FunctionType>() &&
            "result must be a method");
-    LValueType *operandLVT = operandType->getAs<LValueType>();
-    assert(operandLVT &&
+    assert(operandType.isAddress() &&
            "existential_method must apply to an existential address");
-    assert(operandLVT->getObjectType()->isExistentialType() &&
+    assert(operandType.isExistentialType() &&
            "existential_method must apply to an existential address");    
 #endif
   }
   
   void visitProjectExistentialInst(ProjectExistentialInst *PEI) {
 #ifndef NDEBUG
-    LValueType *operandLVT = PEI->getOperand().getType()->getAs<LValueType>();
-    assert(operandLVT && "project_existential must be applied to address");
-    assert(operandLVT->getObjectType()->isExistentialType() &&
+    SILType operandType = PEI->getOperand().getType();
+    assert(operandType.isAddress() && "project_existential must be applied to address");
+    assert(operandType.isExistentialType() &&
            "project_existential must be applied to address of existential");
 #endif
   }
   
   void visitAllocExistentialInst(AllocExistentialInst *AEI) {
 #ifndef NDEBUG
-    LValueType *exLVT = AEI->getExistential().getType()->getAs<LValueType>();
-    assert(exLVT && "alloc_existential must be applied to an address");
-    assert(exLVT->getObjectType()->isExistentialType() &&
+    SILType exType = AEI->getExistential().getType();
+    assert(exType.isAddress() &&
+           "alloc_existential must be applied to an address");
+    assert(exType.isExistentialType() &&
            "alloc_existential must be applied to address of existential");
 #endif
   }
   
   void visitArchetypeToSuperInst(ArchetypeToSuperInst *ASI) {
     // FIXME: archetypes should be address-only
-    assert(ASI->getOperand().getType()->is<ArchetypeType>() &&
+    assert(ASI->getOperand().getType().is<ArchetypeType>() &&
            "archetype_to_super operand must be archetype");
-    assert(ASI->getType()->hasReferenceSemantics() &&
+    assert(ASI->getType().hasReferenceSemantics() &&
            "archetype_to_super must convert to a reference type");
   }
   
   void visitDowncastInst(DowncastInst *DI) {
-    assert(DI->getOperand().getType()->hasReferenceSemantics() &&
+    assert(DI->getOperand().getType().hasReferenceSemantics() &&
            "downcast operand must be a reference type");
-    assert(DI->getType()->hasReferenceSemantics() &&
+    assert(DI->getType().hasReferenceSemantics() &&
            "downcast must convert to a reference type");
   }
   
   void visitIntegerValueInst(IntegerValueInst *IVI) {
-    assert(IVI->getType()->is<BuiltinIntegerType>());
+    assert(IVI->getType().is<BuiltinIntegerType>() &&
+           "invalid integer value type");
   }
 
   void visitReturnInst(ReturnInst *RI) {

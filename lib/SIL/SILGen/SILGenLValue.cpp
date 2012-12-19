@@ -31,7 +31,7 @@ namespace {
     Value address;
   public:
     AddressComponent(Value address) : address(address) {
-      assert(address.getType()->is<LValueType>() &&
+      assert(address.getType().isAddress() &&
              "var component value must be an address");
     }
     
@@ -54,11 +54,11 @@ namespace {
                  Value base) const override {
       assert(base && "invalid value for element base");
       SILType baseType = base.getType();
-      if (base.getType()->is<LValueType>()) {
-        assert(!base.getType()->getRValueType()->hasReferenceSemantics() &&
+      if (base.getType().isAddress()) {
+        assert(!base.getType().hasReferenceSemantics() &&
                "can't get element from address of ref type");
         return gen.B.createElementAddr(loc, base, elementIndex, type);
-      } else if (baseType->hasReferenceSemantics()) {
+      } else if (baseType.hasReferenceSemantics()) {
         return gen.B.createRefElementAddr(loc, base, elementIndex, type);
       } else
         llvm_unreachable("base for element component must be reference type "
@@ -70,7 +70,7 @@ namespace {
     Value value;
   public:
     RefComponent(ManagedValue value) : value(value.getValue()) {
-      assert(value.getValue().getType()->hasReferenceSemantics() &&
+      assert(value.getType().hasReferenceSemantics() &&
              "ref component must be of reference type");
     }
     
@@ -95,26 +95,22 @@ namespace {
     
     ManagedValue partialApplyAccessor(SILGenFunction &gen, SILLocation loc,
                                       Value accessor, Value base) const {
-      assert((!base || base.getType()->is<LValueType>() ||
-              base.getType()->hasReferenceSemantics()) &&
+      assert((!base || (base.getType().isAddress() ^
+              base.getType().hasReferenceSemantics())) &&
              "base of getter/setter component must be invalid, lvalue, or "
              "of reference type");
       gen.B.createRetain(loc, accessor);
-      if (base && base.getType()->hasReferenceSemantics())
+      if (base && base.getType().hasReferenceSemantics())
         gen.B.createRetain(loc, base);
       // Apply the base "this" argument, if any.
       ManagedValue appliedThis = base
-        ? gen.emitManagedRValueWithCleanup(gen.B.createApply(loc,
-                                                             accessor, base))
+        ? gen.emitApply(loc, accessor, base)
         : ManagedValue(accessor);
       // Apply the subscript argument, if any.
       if (subscriptExpr) {
         llvm::SmallVector<Value, 2> args;
         getSubscriptArguments(gen, args);
-        Value appliedSubscript = gen.B.createApply(loc,
-                                                   appliedThis.forward(gen),
-                                                   args);
-        return gen.emitManagedRValueWithCleanup(appliedSubscript);
+        return gen.emitApply(loc, appliedThis.forward(gen), args);
       } else
         return appliedThis;
     }
@@ -140,7 +136,7 @@ namespace {
                      ShouldPreserveValues preserve) const override {
       ManagedValue appliedSetter = partialApplyAccessor(gen, loc,
                                                         setter, base);
-      gen.B.createApply(loc, appliedSetter.forward(gen), rvalue);
+      gen.emitApply(loc, appliedSetter.forward(gen), rvalue);
     }
     
     Materialize loadAndMaterialize(SILGenFunction &gen, SILLocation loc,
@@ -190,7 +186,7 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
 
   // If it's a physical value, push its address.
   Value address = gen.emitReferenceToDecl(e, decl).getUnmanagedValue();
-  assert(address.getType()->is<LValueType>() &&
+  assert(address.getType().isAddress() &&
          "physical lvalue decl ref must evaluate to an address");
   lv.add<AddressComponent>(address);
   return ::std::move(lv);

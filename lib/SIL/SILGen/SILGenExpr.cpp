@@ -35,8 +35,8 @@ namespace {
 }
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(Value v) {
-  if (v.getType()->is<LValueType>() ||
-      getTypeInfo(v.getType()).isTrivial()) {
+  if (v.getType().isAddress() ||
+      getTypeInfo(v.getType().getSwiftType()).isTrivial()) {
     return ManagedValue(v);
   } else {
     Cleanups.pushCleanup<CleanupRValue>(v);
@@ -94,6 +94,17 @@ void SILGenFunction::emitApplyArguments(Expr *argsExpr,
   }
 }
 
+ManagedValue SILGenFunction::emitApply(SILLocation Loc,
+                                       Value Fn, ArrayRef<Value> Args) {
+  FunctionType *fty = Fn.getType().getAs<FunctionType>();
+  TypeInfo const &resultTI = getTypeInfo(fty->getResult());
+  // FIXME: handle address-only return
+  assert(!resultTI.isAddressOnly() &&
+         "address-only returns not yet implemented");
+  Value result = B.createApply(Loc, Fn, resultTI.getLoweredType(), Args);
+  return emitManagedRValueWithCleanup(result);
+}
+
 ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   // FIXME: This assumes that all Swift arguments and returns lower one-to-one
   // to SIL arguments and returns, which won't hold up in the face of
@@ -104,7 +115,7 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   
   emitApplyArguments(E->getArg(), ArgsV, writebacks);
   
-  ManagedValue r = emitManagedRValueWithCleanup(B.createApply(E, FnV, ArgsV));
+  ManagedValue r = emitApply(E, FnV, ArgsV);
   
   for (auto &wb : writebacks) {
     Value newValue = B.createLoad(E, wb.tempAddress);
@@ -171,8 +182,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
     // If this is a global variable, invoke its accessor function to get its
     // address.
     Value accessor = emitGlobalConstantRef(loc, SILConstant(decl));
-    Value address = B.createApply(loc, accessor, {});
-    return ManagedValue(address);
+    return emitApply(loc, accessor, {});
   }
   
   // If the referenced decl isn't a VarDecl, it should be a constant of some
@@ -244,7 +254,7 @@ namespace {
                          /*isAddressOnlyValue=*/ true};
     }
     
-    assert(!v.getType()->is<LValueType>() &&
+    assert(!v.getType().isAddress() &&
            "can't materialize a reference");
     
     Value tmpMem = gen.B.createAllocVar(loc, AllocKind::Stack, v.getType());
@@ -252,7 +262,7 @@ namespace {
     gen.B.createStore(loc, v.forward(gen), tmpMem);
     
     CleanupsDepth valueCleanup = CleanupsDepth::invalid();
-    if (!gen.getTypeInfo(v.getType()).isTrivial()) {
+    if (!gen.getTypeInfo(v.getType().getSwiftType()).isTrivial()) {
       gen.Cleanups.pushCleanup<CleanupMaterializeValue>(tmpMem);
       valueCleanup = gen.getCleanupsDepth();
     }
@@ -330,9 +340,9 @@ ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E) {
   Cleanups.pushCleanup<CleanupMaterializeAllocation>(existential);
   // Allocate its internal value.
   Value valueAddr = B.createAllocExistential(E, existential,
-                                             concrete.getValue().getType());
+                                             concrete.getType());
   // Initialize the internal value.
-  assert(!concrete.getValue().getType()->is<LValueType>() &&
+  assert(!concrete.getType().isAddressOnly() &&
          "erasure of address-only type not yet implemented");
   B.createStore(E, concrete.forward(*this), valueAddr);
   
@@ -395,13 +405,13 @@ static ManagedValue emitExtractLoadableElement(SILGenFunction &gen,
   if (e->getType()->is<LValueType>()) {
     // Get the element address relative to the aggregate's address.
     Value address;
-    if (base.getValue().getType()->hasReferenceSemantics()) {
+    if (base.getType().hasReferenceSemantics()) {
       address = gen.B.createRefElementAddr(e,
                                      base.getValue(),
                                      elt,
                                      gen.getLoweredType(e->getType()));
     } else {
-      assert(base.getValue().getType()->is<LValueType>() &&
+      assert(base.getType().isAddress() &&
              "base of lvalue member ref must be ref type or address");
       address = gen.B.createElementAddr(e,
                                       base.getUnmanagedValue(),
@@ -449,12 +459,11 @@ ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
                                                           SILConstant::Getter),
                                               substitutions);
     // Apply the "this" parameter.
-    Value getterDel = gen.B.createApply(e,
-                                        getter.forward(gen),
-                                        base.forward(gen));
+    ManagedValue getterDel = gen.emitApply(e,
+                                           getter.forward(gen),
+                                           base.forward(gen));
     // Apply the getter.
-    Materialize propTemp = gen.emitGetProperty(e,
-                                  gen.emitManagedRValueWithCleanup(getterDel));
+    Materialize propTemp = gen.emitGetProperty(e, getterDel);
     return ManagedValue(propTemp.address);
   }  
 }
@@ -472,7 +481,7 @@ ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
   ManagedValue method(emitGlobalConstantRef(expr, constant));
   // If there are substitutions, specialize the generic getter.
   if (!substitutions.empty()) {
-    assert(method.getValue().getType()->is<PolymorphicFunctionType>() &&
+    assert(method.getType().is<PolymorphicFunctionType>() &&
            "generic getter is not of a poly function type");
     TypeConverter &tc = SGM.Types;
     Type propType;
@@ -491,7 +500,7 @@ ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
                             B.createSpecialize(expr, method.getUnmanagedValue(),
                                                substitutions, lPropType));
   }
-  assert(method.getValue().getType()->is<FunctionType>() &&
+  assert(method.getType().is<FunctionType>() &&
          "getter is not of a concrete function type");
   return method;
 }
@@ -518,8 +527,8 @@ ManagedValue SILGenFunction::visitGenericMemberRefExpr(GenericMemberRefExpr *E)
 ManagedValue SILGenFunction::visitArchetypeMemberRefExpr(
                                                     ArchetypeMemberRefExpr *E) {
   Value archetype = visit(E->getBase()).getUnmanagedValue();
-  assert((archetype.getType()->is<LValueType>() ||
-          archetype.getType()->is<MetaTypeType>()) &&
+  assert((archetype.getType().isAddress() ||
+          archetype.getType().is<MetaTypeType>()) &&
          "archetype must be an address or metatype");
   if (isa<FuncDecl>(E->getDecl())) {
     // This is a method reference. Extract the method implementation from the
@@ -527,8 +536,7 @@ ManagedValue SILGenFunction::visitArchetypeMemberRefExpr(
     Value method = B.createArchetypeMethod(E, archetype,
                                          SILConstant(E->getDecl()),
                                          getLoweredLoadableType(E->getType()));
-    Value delegate = B.createApply(E, method, archetype);
-    return emitManagedRValueWithCleanup(delegate);
+    return emitApply(E, method, archetype);
   } else {
     llvm_unreachable("archetype properties not yet implemented");
   }
@@ -537,8 +545,8 @@ ManagedValue SILGenFunction::visitArchetypeMemberRefExpr(
 ManagedValue SILGenFunction::visitExistentialMemberRefExpr(
                                                  ExistentialMemberRefExpr *E) {
   Value existential = visit(E->getBase()).getUnmanagedValue();
-  assert(existential.getType()->is<LValueType>() &&
-         "archetype must be an address or metatype");
+  assert(existential.getType().isAddress() &&
+         "existential must be an address");
   if (isa<FuncDecl>(E->getDecl())) {
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
@@ -546,8 +554,7 @@ ManagedValue SILGenFunction::visitExistentialMemberRefExpr(
                                          SILConstant(E->getDecl()),
                                          getLoweredLoadableType(E->getType()));
     Value projection = B.createProjectExistential(E, existential);
-    Value delegate = B.createApply(E, method, projection);
-    return emitManagedRValueWithCleanup(delegate);
+    return emitApply(E, method, projection);
   } else {
     llvm_unreachable("existential properties not yet implemented");
   }
@@ -588,14 +595,14 @@ ManagedValue emitAnySubscriptExpr(SILGenFunction &gen,
                                           substitutions);
   
   // Apply the "this" parameter.
-  Value getterDelegate = gen.B.createApply(e,
+  ManagedValue getterDelegate = gen.emitApply(e,
                                            getterMethod.forward(gen),
                                            base.forward(gen));
   // Apply the index parameter.
-  Value getter = gen.B.createApply(e, getterDelegate, indexArgs);
+  ManagedValue getter = gen.emitApply(e, getterDelegate.forward(gen),
+                                      indexArgs);
   // Apply the getter.
-  Materialize propTemp = gen.emitGetProperty(e,
-                                      gen.emitManagedRValueWithCleanup(getter));
+  Materialize propTemp = gen.emitGetProperty(e, getter);
   return ManagedValue(propTemp.address);
 }
 
@@ -624,15 +631,14 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(Value ObjectPtr,
                                             Value Length,
                                             Expr *ArrayInjectionFunction) {
   // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
-  if (!BasePtr.getType()->isEqual(F.getContext().TheRawPointerType))
+  if (BasePtr.getType() != SILType::getRawPointerType(F.getContext()))
     BasePtr = B.createImplicitConvert(SILLocation(),
                               BasePtr,
                               SILType::getRawPointerType(F.getContext()));
 
   Value InjectionFn = visit(ArrayInjectionFunction).forward(*this);
   Value InjectionArgs[] = { BasePtr, ObjectPtr, Length };
-  return emitManagedRValueWithCleanup(B.createApply(SILLocation(),
-                                                   InjectionFn, InjectionArgs));
+  return emitApply(SILLocation(), InjectionFn, InjectionArgs);
 }
 
 
@@ -714,7 +720,7 @@ ManagedValue SILGenFunction::visitTupleShuffleExpr(TupleShuffleExpr *E) {
   Value Op = visit(E->getSubExpr()).getValue();
   SmallVector<Value, 8> InElts;
   unsigned EltNo = 0;
-  for (auto &InField : Op.getType()->castTo<TupleType>()->getFields()) {
+  for (auto &InField : Op.getType().castTo<TupleType>()->getFields()) {
     // FIXME address-only tuples
     Value elt = B.createExtract(SILLocation(), Op, EltNo++,
                                 getLoweredLoadableType(InField.getType()));
@@ -842,8 +848,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
 Materialize SILGenFunction::emitGetProperty(SILLocation loc,
                                             ManagedValue getter) {
   // Call the getter and then materialize the return value as an lvalue.
-  ManagedValue result = emitManagedRValueWithCleanup(
-                                 B.createApply(loc, getter.forward(*this), {}));
+  ManagedValue result = emitApply(loc, getter.forward(*this), {});
   return emitMaterialize(*this, loc, result);
 }
 

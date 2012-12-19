@@ -350,28 +350,21 @@ static void rrLoadableValue(SILGenFunction &gen, SILLocation loc, Value v,
 }
 
 void SILGenFunction::emitRetainRValue(SILLocation loc, Value v) {
-  if (v.getType()->is<LValueType>()) {
-    // v is an address-only type.
-    // FIXME: should allocate, copy_addr, and return a temporary
-    llvm_unreachable("FIXME: address-only types not implemented yet");
-  } else {
-    // v is a loadable type; retain it if necessary.
-    rrLoadableValue(*this, loc, v, &SILBuilder::createRetain,
-                    getTypeInfo(v.getType()).getReferenceTypeElements());
-  }
+  assert(!v.getType().isAddress() &&
+         "emitRetainRValue cannot retain an address");
+
+  TypeInfo const &ti = getTypeInfo(v.getType().getSwiftRValueType());
+  rrLoadableValue(*this, loc, v, &SILBuilder::createRetain,
+                  ti.getReferenceTypeElements());
 }
 
 void SILGenFunction::emitReleaseRValue(SILLocation loc, Value v) {
-  if (v.getType()->is<LValueType>()) {
-    // v is an address-only type; destroy it indirectly with destroy_addr.
-    assert(getTypeInfo(v.getType()).isAddressOnly() &&
-           "released address is not of an address-only type");
-    B.createDestroyAddr(loc, v);
-  } else {
-    // v is a loadable type; release it if necessary.
-    rrLoadableValue(*this, loc, v, &SILBuilder::createRelease,
-                    getTypeInfo(v.getType()).getReferenceTypeElements());
-  }
+  assert(!v.getType().isAddress() &&
+         "emitReleaseRValue cannot release an address");
+
+  TypeInfo const &ti = getTypeInfo(v.getType().getSwiftRValueType());
+  rrLoadableValue(*this, loc, v, &SILBuilder::createRelease,
+                  ti.getReferenceTypeElements());
 }
 
 void SILGenModule::visitNominalTypeDecl(NominalTypeDecl *ntd) {

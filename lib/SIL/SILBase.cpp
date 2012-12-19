@@ -28,7 +28,7 @@ public:
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
     for (unsigned i = 0, e = NumTypes; i != e; ++i)
-      ID.AddPointer(Types[i].getPointer());
+      ID.AddPointer(Types[i].getOpaqueValue());
   }
 };
 }
@@ -65,7 +65,7 @@ SILTypeList *SILBase::getSILTypeList(ArrayRef<SILType> Types) const {
 
   llvm::FoldingSetNodeID ID;
   for (auto T : Types)
-    ID.AddPointer(T.getPointer());
+    ID.AddPointer(T.getOpaqueValue());
 
   // If we already have this type list, just return it.
   void *InsertPoint = 0;

@@ -28,7 +28,9 @@ static SILType toplevelFunctionType(ASTContext &C) {
   auto t = FunctionType::get(TupleType::getEmpty(C),
                              TupleType::getEmpty(C),
                              C);
-  return SILType::getPreLoweredType(t);
+  return SILType::getPreLoweredType(t,
+                                    /*isAddress=*/false,
+                                    /*isLoadable=*/true);
 }
 
 SILModule::SILModule(ASTContext &Context, bool hasTopLevel) :
@@ -67,31 +69,31 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc) {
 }
 
 SILType SILType::getObjectPointerType(ASTContext &C) {
-  return SILType(C.TheObjectPointerType);
+  return SILType(CanType(C.TheObjectPointerType),
+                 /*isAddress=*/false,
+                 /*isLoadable=*/true);
 }
 
 SILType SILType::getRawPointerType(ASTContext &C) {
-  return SILType(C.TheRawPointerType);
+  return SILType(CanType(C.TheRawPointerType),
+                 /*isAddress=*/false,
+                 /*isLoadable=*/true);
 }
 
 SILType SILType::getEmptyTupleType(ASTContext &C) {
-  return SILType(TupleType::getEmpty(C));
+  return SILType(CanType(TupleType::getEmpty(C)),
+                 /*isAddress=*/false,
+                 /*isLoadable=*/true);
 }
 
 SILType SILType::getBuiltinIntegerType(unsigned bitWidth, ASTContext &C) {
-  return SILType(BuiltinIntegerType::get(bitWidth, C));
-}
-
-SILType SILType::getAddressType(ASTContext &C) const {
-  if ((*this)->is<LValueType>())
-    return *this;
-  else
-    return SILType(LValueType::get(*this, LValueType::Qual::DefaultForType, C));
+  return SILType(CanType(BuiltinIntegerType::get(bitWidth, C)),
+                 /*isAddress=*/false,
+                 /*isLoadable=*/true);
 }
 
 TupleInst *SILBuilder::createEmptyTuple(SILLocation Loc) {
   return createTuple(Loc,
-                     SILType::getPreLoweredType(
-                       TupleType::getEmpty(F.getContext())),
+                     SILType::getEmptyTupleType(F.getContext()),
                      ArrayRef<Value>());
 }
