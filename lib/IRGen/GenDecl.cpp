@@ -163,12 +163,8 @@ void IRGenFunction::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) 
         llvm_unreachable("external definition not type-checked");
 
       case ExternalDefinition::TypeChecked:
+        // FIXME: We should emit this definition only if it's actually needed.
         emitExternalDefinition(def.getDecl());
-        def.setStage(ExternalDefinition::IRGenerated);
-        break;
-
-      case ExternalDefinition::IRGenerated:
-        // Already generated IR.
         break;
       }
     }
@@ -182,13 +178,6 @@ static bool isLocalLinkageDecl(Decl *D) {
       return true;
     DC = DC->getParent();
   }
-
-  // Constructors, subscripts, and properties synthesized in the mapping to
-  // Clang modules are local.
-  if (isa<ClangModule>(DC) &&
-      (isa<ConstructorDecl>(D) || isa<SubscriptDecl>(D) ||
-       (isa<VarDecl>(D) && cast<VarDecl>(D)->isProperty())))
-    return true;
 
   return false;
 }
@@ -324,6 +313,23 @@ bool LinkEntity::isLocalLinkage() const {
   llvm_unreachable("bad link entity kind");
 }
 
+bool LinkEntity::isClangThunk() const {
+  if (!isDeclKind(getKind()))
+    return false;
+
+  ValueDecl *D = static_cast<ValueDecl *>(Pointer);
+  DeclContext *DC = D->getDeclContext();
+  while (!DC->isModuleContext()) {
+    DC = DC->getParent();
+  }
+
+  // Constructors, subscripts, and properties synthesized in the mapping to
+  // Clang modules are local.
+  return isa<ClangModule>(DC) &&
+    (isa<ConstructorDecl>(D) || isa<SubscriptDecl>(D) ||
+     (isa<VarDecl>(D) && cast<VarDecl>(D)->isProperty()));
+}
+
 LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
   LinkInfo result;
 
@@ -338,6 +344,10 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
     return result;
   } else if (entity.isValueWitness()) {
     // The linkage for a value witness is linkonce_odr.
+    result.Linkage = llvm::GlobalValue::LinkOnceODRLinkage;
+    result.Visibility = llvm::GlobalValue::HiddenVisibility;
+  } else if (entity.isClangThunk()) {
+    // Clang thunks are linkonce_odr and hidden.
     result.Linkage = llvm::GlobalValue::LinkOnceODRLinkage;
     result.Visibility = llvm::GlobalValue::HiddenVisibility;
   } else {

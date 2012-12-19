@@ -256,8 +256,6 @@ public:
     NameBound,
     /// \brief The definition has been type-checked.
     TypeChecked,
-    /// \brief IR for the definition has been generated.
-    IRGenerated
   };
 
 private:

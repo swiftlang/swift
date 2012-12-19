@@ -752,7 +752,6 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
       for (auto &def : clangModule->getExternalDefinitions()) {
         switch (def.getStage()) {
-        case ExternalDefinition::IRGenerated:
         case ExternalDefinition::TypeChecked:
           continue;
 
