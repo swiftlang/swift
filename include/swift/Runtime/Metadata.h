@@ -699,6 +699,18 @@ swift_getMetatypeMetadata(const Metadata *instanceType);
 extern "C" const void *
 swift_dynamicCast(const void *object, const ClassMetadata *targetType);
 
+/// \brief Unconditional, checked dynamic cast.
+///
+/// Aborts if the object isn't of the target type.
+///
+/// \param object The object to cast.
+/// \param targetType The type to which we are casting.
+///
+/// \returns the object.
+extern "C" const void *
+swift_dynamicCastUnconditional(const void *object,
+                               const ClassMetadata *targetType);
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_METADATA_H */

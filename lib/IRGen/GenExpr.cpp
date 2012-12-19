@@ -324,13 +324,31 @@ namespace {
     void visitDowncastExpr(DowncastExpr *E) {
       IGF.emitIgnored(E->getLHS());
 
-      // FIXME: These casts are unchecked, which is almost certainly not what
-      // we want in the long run.
+      // Emit the value we're casting from.
       Explosion subResult(ExplosionKind::Maximal);
       IGF.emitRValue(E->getRHS(), subResult);
       ManagedValue val = subResult.claimNext();
+      llvm::Value *object = val.getValue();
+      if (object->getType() != IGF.IGM.Int8PtrTy)
+        object = IGF.Builder.CreateBitCast(object, IGF.IGM.Int8PtrTy);
+
+      // Emit a reference to the metadata.
+      llvm::Value *metadataRef
+        = IGF.IGM.getAddrOfTypeMetadata(E->getType()->getCanonicalType(),
+                                        false, false);
+      if (metadataRef->getType() != IGF.IGM.Int8PtrTy)
+        metadataRef = IGF.Builder.CreateBitCast(metadataRef, IGF.IGM.Int8PtrTy);
+
+      // Call the (unconditional) dynamic cast.
+      auto call
+        = IGF.Builder.CreateCall2(IGF.IGM.getDynamicCastUnconditionalFn(),
+                                  object, metadataRef);
+      // FIXME: Eventually, we may want to throw.
+      call->setDoesNotThrow();
+
+      // Cast the result of the dynamic cast to the requested static type.
       llvm::Type *subTy = IGF.getFragileTypeInfo(E->getType()).StorageType;
-      llvm::Value *castVal = IGF.Builder.CreateBitCast(val.getValue(), subTy);
+      llvm::Value *castVal = IGF.Builder.CreateBitCast(call, subTy);
       Out.add({castVal, val.getCleanup()});
     }
 

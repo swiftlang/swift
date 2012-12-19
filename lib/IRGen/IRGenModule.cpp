@@ -248,6 +248,29 @@ llvm::Constant *IRGenModule::getSlowRawDeallocFn() {
   return SlowRawDeallocFn;
 }
 
+llvm::Constant *IRGenModule::getDynamicCastFn() {
+  if (DynamicCastFn) return DynamicCastFn;
+
+  // void *swift_dynamicCast(void*, void*);
+  llvm::Type *types[] = { Int8PtrTy, Int8PtrTy };
+  llvm::FunctionType *fnType = llvm::FunctionType::get(Int8PtrTy, types, false);
+  DynamicCastFn
+    = createReadonlyRuntimeFunction(*this, "swift_dynamicCast", fnType);
+  return DynamicCastFn;
+}
+
+llvm::Constant *IRGenModule::getDynamicCastUnconditionalFn() {
+  if (DynamicCastUnconditionalFn) return DynamicCastUnconditionalFn;
+
+  // void *swift_dynamicCastUnconditional(void*, void*);
+  llvm::Type *types[] = { Int8PtrTy, Int8PtrTy };
+  llvm::FunctionType *fnType = llvm::FunctionType::get(Int8PtrTy, types, false);
+  DynamicCastUnconditionalFn
+    = createReadonlyRuntimeFunction(*this, "swift_dynamicCastUnconditional",
+                                    fnType);
+  return DynamicCastUnconditionalFn;
+}
+
 llvm::Constant *IRGenModule::getRetainNoResultFn() {
   if (RetainNoResultFn) return RetainNoResultFn;
 
