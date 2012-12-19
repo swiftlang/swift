@@ -75,7 +75,11 @@ enum class ResilienceScope {
 
   /// Program scope means the decision has to be consistent across all
   /// components.
-  Program
+  Program,
+
+  /// Universal scope means that the decision has to be consistent
+  /// across all possible clients who could see this declaration.
+  Universal
 };
 
 /// ExplosionKind - A policy for choosing what types should be

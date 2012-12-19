@@ -49,6 +49,16 @@ protected:
   /// The most-derived class.
   ClassDecl *const TargetClass;
 
+  /// Is the object layout globally resilient at this point?
+  bool IsObjectResilient = false;
+
+  /// Is the object layout generically dependent at this point?
+  /// Implies IsObjectResilient.
+  bool IsObjectGenericallyArranged = false;
+
+  /// Is the metadata layout globally resilient at this point?
+  bool IsMetadataResilient = false;
+
   ClassMetadataLayout(IRGenModule &IGM, ClassDecl *target)
     : super(IGM), TargetClass(target) {}
 
@@ -89,9 +99,35 @@ private:
       addGenericClassFields(theClass, *generics);
     }
 
+    // If there exists a potential context from which the class is
+    // resilient, subsequent fields will require indirect offsets.
+    if (IGM.isResilient(theClass, ResilienceScope::Universal)) {
+      IsObjectResilient = true;
+      IsMetadataResilient = true;
+      if (theClass->getGenericParamsOfContext())
+        IsObjectGenericallyArranged = true;
+    }
+
+    // Add offset fields if *any* of the fields are generically
+    // arranged.  Essentially, we don't want the metadata layout to
+    // depend on order of allocation.  In theory, if we only have one
+    // generically-sized field, that field itself doesn't need an
+    // offset --- but that's really tricky to guarantee.
+    for (auto member : theClass->getMembers()) {
+      if (auto field = dyn_cast<VarDecl>(member))
+        if (!field->isProperty())
+          updateForFieldSize(field);
+    }
+
     // Add entries for the methods.  TODO: methods from extensions
     for (auto member : theClass->getMembers()) {
-      // Ignore non-methods.
+      // Add entries for fields that are not currently declared as
+      // properties.
+      if (auto field = dyn_cast<VarDecl>(member))
+        if (!field->isProperty())
+          addFieldEntries(field);
+
+      // Add entries for methods.
       if (auto fn = dyn_cast<FuncDecl>(member))
         addMethodEntries(fn);
     }
@@ -105,6 +141,31 @@ private:
   void addGenericClassFields(ClassDecl *theClass,
                              const GenericParamList &generics) {
     this->addGenericFields(generics, theClass);
+  }
+
+  void addFieldEntries(VarDecl *field) {
+    if (IsObjectGenericallyArranged)
+      asImpl().addFieldOffset(field);
+  }
+
+  void updateForFieldSize(VarDecl *field) {
+    assert(!field->isProperty());
+
+    // Update the class layout based on abstract, globally-known
+    // characteristics of the type.
+    switch (IGM.classifyTypeSize(field->getType()->getCanonicalType(),
+                                 ResilienceScope::Universal)) {
+    case ObjectSize::Fixed:
+      return;
+    case ObjectSize::Resilient:
+      IsObjectResilient = true;
+      return;
+    case ObjectSize::Dependent:
+      IsObjectResilient = true;
+      IsObjectGenericallyArranged = true;
+      return;
+    }
+    llvm_unreachable("invalid type size classification");
   }
 
   void addMethodEntries(FuncDecl *fn) {
@@ -158,6 +219,7 @@ public:
   void addClassCacheData() { NextIndex += 2; }
   void addClassDataPointer() { NextIndex++; }
   void addMethod(FunctionRef fn) { NextIndex++; }
+  void addFieldOffset(VarDecl *var) { NextIndex++; }
   void addGenericArgument(ArchetypeType *argument, ClassDecl *forClass) {
     NextIndex++;
   }

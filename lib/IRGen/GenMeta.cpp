@@ -784,6 +784,12 @@ namespace {
       Fields.push_back(data);
     }
 
+    void addFieldOffset(VarDecl *var) {
+      // FIXME: use a fixed offset if we have one, or set up so that
+      // we fill this out at runtime.
+      Fields.push_back(llvm::ConstantInt::get(IGM.IntPtrTy, 0));
+    }
+
     void addMethod(FunctionRef fn) {
       // If this function is associated with the target class, go
       // ahead and emit the witness offset variable.
