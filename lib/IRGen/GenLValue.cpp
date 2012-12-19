@@ -433,7 +433,7 @@ void swift::irgen::emitRequalify(IRGenFunction &IGF, RequalifyExpr *E,
 /// Must accesses to the given variable be performed as a
 /// logical access?
 static bool isVarAccessLogical(IRGenFunction &IGF, VarDecl *var) {
-  return var->isProperty() || IGF.IGM.isResilient(var);
+  return var->isProperty() || IGF.IGM.isResilient(var, ResilienceScope::Local);
 }
 
 void GetterSetter::storeRValue(IRGenFunction &IGF, Expr *rvalue, Address base,

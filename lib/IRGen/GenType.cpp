@@ -30,6 +30,7 @@
 #include "Linking.h"
 #include "ProtocolInfo.h"
 #include "ScalarTypeInfo.h"
+#include "TypeVisitor.h"
 
 using namespace swift;
 using namespace irgen;
@@ -508,4 +509,48 @@ bool IRGenModule::isPOD(CanType type, ResilienceScope scope) {
     return true;
   }
   return getFragileTypeInfo(type).isPOD(scope);
+}
+
+
+namespace {
+  struct ClassifyTypeSize : irgen::TypeVisitor<ClassifyTypeSize, ObjectSize> {
+    IRGenModule &IGM;
+    ResilienceScope Scope;
+    ClassifyTypeSize(IRGenModule &IGM, ResilienceScope scope)
+      : IGM(IGM), Scope(scope) {}
+
+#define ALWAYS(KIND, RESULT) \
+    ObjectSize visit##KIND##Type(KIND##Type *t) { return ObjectSize::RESULT; }
+
+    ALWAYS(Builtin, Fixed)
+    ALWAYS(AnyFunction, Fixed)
+    ALWAYS(Class, Fixed)
+    ALWAYS(BoundGenericClass, Fixed)
+    ALWAYS(Archetype, Dependent)
+    ALWAYS(Protocol, Dependent)
+    ALWAYS(ProtocolComposition, Dependent)
+    ALWAYS(LValue, Dependent)
+#undef ALWAYS
+
+    ObjectSize visitTupleType(TupleType *tuple) {
+      ObjectSize result = ObjectSize::Fixed;
+      for (auto &field : tuple->getFields()) {
+        result = std::max(result, visit(CanType(field.getType())));
+      }
+      return result;
+    }
+
+    ObjectSize visitArrayType(ArrayType *array) {
+      return visit(CanType(array->getBaseType()));
+    }
+
+    ObjectSize visitType(TypeBase *type) {
+      // FIXME: resilience!
+      return ObjectSize::Fixed;
+    }
+  };
+}
+
+ObjectSize IRGenModule::classifyTypeSize(CanType type, ResilienceScope scope) {
+  return ClassifyTypeSize(*this, scope).visit(type);
 }

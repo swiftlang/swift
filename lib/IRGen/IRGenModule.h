@@ -161,8 +161,9 @@ public:
   llvm::PointerType *requiresIndirectResult(CanType T, ExplosionKind kind);
   bool hasTrivialMetatype(CanType type);
   bool isPOD(CanType type, ResilienceScope scope);
+  ObjectSize classifyTypeSize(CanType type, ResilienceScope scope);
 
-  bool isResilient(Decl *decl) { return false; }
+  bool isResilient(Decl *decl, ResilienceScope scope);
 
 private:
   TypeConverter &Types;

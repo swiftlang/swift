@@ -1347,6 +1347,38 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
   llvm_unreachable("bad decl kind!");
 }
 
+namespace {
+  /// A class for finding a protocol witness table for a type argument
+  /// in a class metadata object.
+  class FindClassFieldOffset :
+      public MetadataSearcher<ClassMetadataScanner<FindClassFieldOffset>> {
+    typedef MetadataSearcher super;
+
+    VarDecl *TargetField;
+  public:
+    FindClassFieldOffset(IRGenModule &IGM, ClassDecl *theClass,
+                         VarDecl *targetField)
+      : super(IGM, theClass), TargetField(targetField) {}
+
+    void addFieldOffset(VarDecl *field) {
+      if (field == TargetField)
+        setTargetIndex();
+      NextIndex++;
+    }
+  };
+}
+
+/// Given a reference to class metadata of the given type,
+/// derive a reference to a protocol witness table for the nth
+/// argument metadata.  The type must have generic arguments.
+llvm::Value *irgen::emitClassFieldOffset(IRGenFunction &IGF,
+                                         ClassDecl *theClass,
+                                         VarDecl *field,
+                                         llvm::Value *metadata) {
+  int index = FindClassFieldOffset(IGF.IGM, theClass, field).getTargetIndex();
+  return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
+}
+
 /// Given a pointer to a heap object (i.e. definitely not a tagged
 /// pointer), load its heap metadata pointer.
 static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,

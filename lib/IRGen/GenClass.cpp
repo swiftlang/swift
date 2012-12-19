@@ -54,7 +54,40 @@ static bool hasSwiftRefcount(ClassDecl *theClass) {
   return hasSwiftRefcount(baseClass);
 }
 
+/// Different policies for accessing a physical field.
+enum class FieldAccess : uint8_t {
+  /// Instance variable offsets are constant.
+  ConstantDirect,
+
+  /// Instance variable offsets must be loaded from "direct offset"
+  /// global variables.
+  NonConstantDirect,
+
+  /// Instance variable offsets are kept in fields in metadata, but
+  /// the offsets of those fields within the metadata are constant.
+  ConstantIndirect,
+
+  /// Instance variable offsets are kept in fields in metadata, and
+  /// the offsets of those fields within the metadata must be loaded
+  /// from "indirect offset" global variables.
+  NonConstantIndirect
+};
+
 namespace {
+  class FieldEntry {
+    llvm::PointerIntPair<VarDecl*, 2> VarAndAccess;
+  public:
+    FieldEntry(VarDecl *var, FieldAccess access)
+      : VarAndAccess(var, unsigned(access)) {}
+
+    VarDecl *getVar() const {
+      return VarAndAccess.getPointer();
+    }
+    FieldAccess getAccess() const {
+      return FieldAccess(VarAndAccess.getInt());
+    }
+  };
+
   /// Layout information for class types.
   class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
     ClassDecl *TheClass;
@@ -119,6 +152,112 @@ namespace {
       return getLayout(IGM).getElements();
     }
   };
+
+  /// A class for computing properties of the instance-variable layout
+  /// of a class.  TODO: cache the results!
+  class LayoutClass {
+    IRGenModule &IGM;
+
+    SmallVector<FieldEntry, 8> Fields;
+
+    bool IsMetadataResilient = false;
+    bool IsObjectResilient = false;
+    bool IsObjectGenericallyArranged = false;
+
+    ResilienceScope Resilience;
+
+  public:
+    LayoutClass(IRGenModule &IGM, ResilienceScope resilience,
+                ClassDecl *theClass, CanType type)
+        : IGM(IGM), Resilience(resilience) {
+      layout(theClass, type);
+    }
+
+    const FieldEntry &getFieldEntry(VarDecl *field) const {
+      for (auto &entry : Fields)
+        if (entry.getVar() == field)
+          return entry;
+      llvm_unreachable("no entry for field!");
+    }
+
+  private:
+    void layout(ClassDecl *theClass, CanType type) {
+      // TODO: use the full type information to potentially make
+      // generic layouts concrete.
+
+      // First, collect information about the base class.
+      if (theClass->hasBaseClass()) {
+        CanType baseType = theClass->getBaseClass()->getCanonicalType();
+        auto baseClass = type->getClassOrBoundGenericClass();
+        assert(baseClass);
+        layout(baseClass, baseType);
+      }
+
+      // If the class is resilient, then it may have fields we can't
+      // see, and all subsequent fields are *at least* resilient ---
+      // and if the class is generic, then it may have
+      // dependently-sized fields, and we'll be in the worst case.
+      bool isClassResilient = IGM.isResilient(theClass, Resilience);
+      if (isClassResilient) {
+        IsMetadataResilient = true;
+        IsObjectResilient = true;
+        if (theClass->getGenericParamsOfContext() != nullptr) {
+          IsObjectGenericallyArranged = true;
+        }
+      }
+
+      // Okay, make entries for all the physical fields we know about.
+      for (auto member : theClass->getMembers()) {
+        auto var = dyn_cast<VarDecl>(member);
+        if (!var) continue;
+
+        // Skip properties that we have to access logically.
+        assert(isClassResilient || !IGM.isResilient(var, Resilience));
+        if (var->isProperty())
+          continue;
+
+        Fields.push_back(FieldEntry(var, getCurFieldAccess()));
+
+        // Adjust based on the type of this field.
+        // FIXME: this algorithm is assuming that fields are laid out
+        // in declaration order.
+        adjustAccessAfterField(var);
+      }
+    }
+
+    FieldAccess getCurFieldAccess() const {
+      if (IsObjectGenericallyArranged) {
+        if (IsMetadataResilient) {
+          return FieldAccess::NonConstantIndirect;
+        } else {
+          return FieldAccess::ConstantIndirect;
+        }
+      } else {
+        if (IsObjectResilient) {
+          return FieldAccess::NonConstantDirect;
+        } else {
+          return FieldAccess::ConstantDirect;
+        }
+      }
+    }
+
+    void adjustAccessAfterField(VarDecl *var) {
+      if (var->isProperty()) return;
+
+      CanType type = var->getType()->getCanonicalType();
+      switch (IGM.classifyTypeSize(type, ResilienceScope::Local)) {
+      case ObjectSize::Fixed:
+        return;
+      case ObjectSize::Resilient:
+        IsObjectResilient = true;
+        return;
+      case ObjectSize::Dependent:
+        IsObjectResilient = IsObjectGenericallyArranged = true;
+        return;
+      }
+      llvm_unreachable("bad ObjectSize value");
+    }
+  };
 }  // end anonymous namespace.
 
 static unsigned getNumFieldsInBases(ClassDecl *derived, unsigned count = 0) {
@@ -144,23 +283,81 @@ static unsigned getFieldIndex(ClassDecl *base, VarDecl *target) {
   llvm_unreachable("didn't find field in type!");
 }
 
+/// Cast the base to i8*, apply the given inbounds offset, and cast to
+/// a pointer to the given type.
+static llvm::Value *emitGEPToOffset(IRGenFunction &IGF,
+                                    llvm::Value *base,
+                                    llvm::Value *offset,
+                                    llvm::Type *type,
+                                    const llvm::Twine &name = "") {
+  auto addr = IGF.Builder.CreateBitCast(base, IGF.IGM.Int8PtrTy);
+  addr = IGF.Builder.CreateInBoundsGEP(addr, offset);
+  return IGF.Builder.CreateBitCast(addr, type, name);
+}
+
+/// Emit a field l-value by applying the given offset to the given base.
+static LValue emitLValueAtOffset(IRGenFunction &IGF,
+                                 llvm::Value *base, llvm::Value *offset,
+                                 VarDecl *field) {
+  auto &fieldTI = IGF.getFragileTypeInfo(field->getType());
+  auto addr = emitGEPToOffset(IGF, base, offset, fieldTI.getStorageType(),
+                              base->getName() + "." + field->getName().str());
+  Address fieldAddr(addr, fieldTI.StorageAlignment);
+  return IGF.emitAddressLValue(OwnedAddress(fieldAddr, base));
+}
+
 static LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
-                                            Expr *base,
-                                            ClassDecl *classDecl,
-                                            const ClassTypeInfo &classTI,
+                                            Expr *baseE,
+                                            ClassDecl *baseClass,
+                                            const ClassTypeInfo &baseClassTI,
                                             VarDecl *field) {
   Explosion explosion(ExplosionKind::Maximal);
   // FIXME: Can we avoid the retain/release here in some cases?
-  IGF.emitRValue(base, explosion);
+  IGF.emitRValue(baseE, explosion);
   ManagedValue baseVal = explosion.claimNext();
+  llvm::Value *base = baseVal.getValue();
 
-  // FIXME: This field index computation is an ugly hack.
-  unsigned fieldIndex = getFieldIndex(classDecl, field);
+  auto baseType = baseE->getType()->getCanonicalType();
+  LayoutClass layout(IGF.IGM, ResilienceScope::Local, baseClass, baseType);
+  
+  auto &entry = layout.getFieldEntry(field);
+  switch (entry.getAccess()) {
+  case FieldAccess::ConstantDirect: {
+    // FIXME: This field index computation is an ugly hack.
+    unsigned fieldIndex = getFieldIndex(baseClass, field);
 
-  Address baseAddr(baseVal.getValue(), classTI.getHeapAlignment(IGF.IGM));
-  auto &element = classTI.getElements(IGF.IGM)[fieldIndex];
-  Address memberAddr = element.project(IGF, baseAddr);
-  return IGF.emitAddressLValue(OwnedAddress(memberAddr, baseVal.getValue()));
+    Address baseAddr(base, baseClassTI.getHeapAlignment(IGF.IGM));
+    auto &element = baseClassTI.getElements(IGF.IGM)[fieldIndex];
+    Address memberAddr = element.project(IGF, baseAddr);
+    return IGF.emitAddressLValue(OwnedAddress(memberAddr, base));
+  }
+
+  case FieldAccess::NonConstantDirect: {
+    Address offsetA = IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ false);
+    auto offset = IGF.Builder.CreateLoad(offsetA, "offset");
+    return emitLValueAtOffset(IGF, base, offset, field);
+  }
+
+  case FieldAccess::ConstantIndirect: {
+    auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
+    auto offset = emitClassFieldOffset(IGF, baseClass, field, metadata);
+    return emitLValueAtOffset(IGF, base, offset, field);
+  }
+
+  case FieldAccess::NonConstantIndirect: {
+    auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
+    Address indirectOffsetA =
+      IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ true);
+    auto indirectOffset =
+      IGF.Builder.CreateLoad(indirectOffsetA, "indirect-offset");
+    auto offsetA =
+      emitGEPToOffset(IGF, metadata, indirectOffset, IGF.IGM.SizeTy);
+    auto offset =
+      IGF.Builder.CreateLoad(Address(offsetA, IGF.IGM.getPointerAlignment()));
+    return emitLValueAtOffset(IGF, base, offset, field);
+  }
+  }
+  llvm_unreachable("bad field-access strategy");
 }
 
 LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
@@ -174,10 +371,9 @@ LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
 
 LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
                                             GenericMemberRefExpr *E) {
-  auto baseType = E->getBase()->getType()->castTo<BoundGenericType>();
+  auto baseType = E->getBase()->getType()->castTo<BoundGenericClassType>();
   auto &baseTI = IGF.getFragileTypeInfo(baseType).as<ClassTypeInfo>();
-  return ::emitPhysicalClassMemberLValue(IGF, E->getBase(),
-                                         cast<ClassDecl>(baseType->getDecl()),
+  return ::emitPhysicalClassMemberLValue(IGF, E->getBase(), baseType->getDecl(),
                                          baseTI, cast<VarDecl>(E->getDecl()));
 }
 

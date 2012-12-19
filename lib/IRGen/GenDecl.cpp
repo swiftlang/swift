@@ -1177,3 +1177,13 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(llvm::StringRef data) {
   entry = address;
   return address;
 }
+
+/// Is the given declaration resilient?
+bool IRGenModule::isResilient(Decl *theDecl, ResilienceScope scope) {
+  // Classes defined by Clang are resilient.
+  if (auto theClass = dyn_cast<ClassDecl>(theDecl)) {
+    return theClass->hasClangDecl();
+  }
+
+  return false;
+}

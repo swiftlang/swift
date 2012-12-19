@@ -363,11 +363,11 @@ struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
   bool visitProtocolDecl(ProtocolDecl *decl) { return false; }
   bool visitClassDecl(ClassDecl *decl) { return false; }
   bool visitStructDecl(StructDecl *decl) {
-    if (IGM.isResilient(decl)) return true;
+    if (IGM.isResilient(decl, ResilienceScope::Local)) return true;
     return visitMembers(decl->getMembers());
   }
   bool visitOneOfDecl(OneOfDecl *decl) {
-    if (IGM.isResilient(decl)) return true;
+    if (IGM.isResilient(decl, ResilienceScope::Local)) return true;
     return visitMembers(decl->getMembers());
   }
   bool visitVarDecl(VarDecl *var) {
