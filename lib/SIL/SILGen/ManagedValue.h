@@ -40,17 +40,17 @@ class ManagedValue {
   /// CleanupsDepth::invalid if the value has no cleanup.
   CleanupsDepth cleanup;
   /// True if this ManagedValue represents an address-only value.
-  bool isAddressOnlyValue : 1;
+  bool addressOnlyValue : 1;
 
 public:
   ManagedValue() = default;
-  explicit ManagedValue(Value value, bool isAddressOnlyValue = false)
+  explicit ManagedValue(Value value, bool addressOnlyValue = false)
     : value(value), cleanup(CleanupsDepth::invalid()),
-      isAddressOnlyValue(isAddressOnlyValue)
+      addressOnlyValue(addressOnlyValue)
     {}
   ManagedValue(Value value, CleanupsDepth cleanup,
                bool isAddressOnlyValue = false)
-    : value(value), cleanup(cleanup), isAddressOnlyValue(isAddressOnlyValue)
+    : value(value), cleanup(cleanup), addressOnlyValue(isAddressOnlyValue)
     {}
 
   Value getUnmanagedValue() const {
@@ -58,6 +58,10 @@ public:
     return getValue();
   }
   Value getValue() const { return value; }
+  
+  SILType getType() const { return value.getType(); }
+  
+  bool isAddressOnlyValue() const { return addressOnlyValue; }
 
   bool hasCleanup() const { return cleanup.isValid(); }
   CleanupsDepth getCleanup() const { return cleanup; }
@@ -65,7 +69,7 @@ public:
   /// Forward this value, deactivating the cleanup and returning the
   /// underlying value. Not valid for address-only values.
   Value forward(SILGenFunction &gen) {
-    assert(!isAddressOnlyValue &&
+    assert(!addressOnlyValue &&
            "must forward an address-only value using forwardInto");
     if (hasCleanup())
       gen.Cleanups.setCleanupState(getCleanup(), CleanupState::Dead);
@@ -83,7 +87,7 @@ public:
   ///                       value.
   void forwardInto(SILGenFunction &gen, SILLocation loc,
                    Value address, bool isInitialize) {
-    assert(isAddressOnlyValue &&
+    assert(addressOnlyValue &&
            "must forward loadable value using forward");
     // If we own a cleanup for this value, we can "take" the value and disable
     // the cleanup.

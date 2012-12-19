@@ -237,15 +237,19 @@ namespace {
   };
 
   static Materialize emitMaterialize(SILGenFunction &gen,
-                                     SILLocation loc, Value v) {
-    // Address-only values are always materialized.
-    // FIXME: handle address-only values here and in Materialize::consume
-    if (v.getType()->is<LValueType>())
-      llvm_unreachable("address-only materialize not yet implemented");
+                                     SILLocation loc, ManagedValue v) {
+    // Address-only values are already materialized.
+    if (v.isAddressOnlyValue()) {
+      return Materialize{v.getValue(), v.getCleanup(),
+                         /*isAddressOnlyValue=*/ true};
+    }
+    
+    assert(!v.getType()->is<LValueType>() &&
+           "can't materialize a reference");
     
     Value tmpMem = gen.B.createAllocVar(loc, AllocKind::Stack, v.getType());
     gen.Cleanups.pushCleanup<CleanupMaterializeAllocation>(tmpMem);
-    gen.B.createStore(loc, v, tmpMem);
+    gen.B.createStore(loc, v.forward(gen), tmpMem);
     
     CleanupsDepth valueCleanup = CleanupsDepth::invalid();
     if (!gen.getTypeInfo(v.getType()).isTrivial()) {
@@ -253,11 +257,14 @@ namespace {
       valueCleanup = gen.getCleanupsDepth();
     }
     
-    return Materialize{tmpMem, valueCleanup};
+    return Materialize{tmpMem, valueCleanup,
+                       /*isAddressOnlyValue=*/ false};
   }
 }
 
 ManagedValue Materialize::consume(SILGenFunction &gen, SILLocation loc) {
+  assert(!isAddressOnlyValue &&
+         "address-only value must be consumed with consumeInto");
   if (valueCleanup.isValid())
     gen.Cleanups.setCleanupState(valueCleanup, CleanupState::Dead);
   return gen.emitManagedRValueWithCleanup(gen.B.createLoad(loc, address));
@@ -266,7 +273,7 @@ ManagedValue Materialize::consume(SILGenFunction &gen, SILLocation loc) {
 ManagedValue SILGenFunction::visitMaterializeExpr(MaterializeExpr *E) {
   // Evaluate the value, then use it to initialize a new temporary and return
   // the temp's address.
-  Value V = visit(E->getSubExpr()).forward(*this);
+  ManagedValue V = visit(E->getSubExpr());
   return ManagedValue(emitMaterialize(*this, E, V).address);
 }
 
@@ -833,9 +840,10 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
 }
 
 Materialize SILGenFunction::emitGetProperty(SILLocation loc,
-                                             ManagedValue getter) {
+                                            ManagedValue getter) {
   // Call the getter and then materialize the return value as an lvalue.
-  Value result = B.createApply(loc, getter.forward(*this), {});
+  ManagedValue result = emitManagedRValueWithCleanup(
+                                 B.createApply(loc, getter.forward(*this), {}));
   return emitMaterialize(*this, loc, result);
 }
 
