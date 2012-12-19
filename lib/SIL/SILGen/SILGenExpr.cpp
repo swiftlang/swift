@@ -32,7 +32,39 @@ namespace {
       gen.emitReleaseRValue(SILLocation(), rv);
     }
   };
-}
+  
+  class CleanupMaterializeAllocation : public Cleanup {
+    Value alloc;
+  public:
+    CleanupMaterializeAllocation(Value alloc) : alloc(alloc) {}
+    
+    void emit(SILGenFunction &gen) override {
+      gen.B.createDeallocVar(SILLocation(), AllocKind::Stack, alloc);
+    }
+  };
+  
+  class CleanupMaterializeValue : public Cleanup {
+    Value address;
+  public:
+    CleanupMaterializeValue(Value address) : address(address) {}
+    
+    void emit(SILGenFunction &gen) override {
+      Value tmpValue = gen.B.createLoad(SILLocation(), address);
+      gen.emitReleaseRValue(SILLocation(), tmpValue);
+    }
+  };
+  
+  class CleanupMaterializeAddressOnlyValue : public Cleanup {
+    Value address;
+  public:
+    CleanupMaterializeAddressOnlyValue(Value address) : address(address) {}
+    
+    void emit(SILGenFunction &gen) override {
+      gen.B.createDestroyAddr(SILLocation(), address);
+    }
+  };
+
+  } // end anonymous namespace
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(Value v) {
   if (v.getType().isAddress() ||
@@ -54,6 +86,8 @@ namespace {
 static Value emitApplyArgument(SILGenFunction &gen, Expr *arg,
                                 llvm::SmallVectorImpl<Writeback> &writebacks) {
   if (arg->getType()->is<LValueType>()) {
+    // Construct a logical lvalue for the byref argument, materialize the
+    // lvalue, and arrange for it to be written back after the call.
     LValue lv = SILGenLValue(gen).visit(arg);
     Value addr = gen.emitMaterializedLoadFromLValue(arg, lv)
       .getUnmanagedValue();
@@ -62,7 +96,15 @@ static Value emitApplyArgument(SILGenFunction &gen, Expr *arg,
     }
     return addr;
   } else {
-    return gen.visit(arg).forward(gen);
+    ManagedValue argV = gen.visit(arg);
+    if (argV.isAddressOnlyValue()) {
+      // Address-only arguments are passed by address. The callee does not take
+      // ownership.
+      return argV.getValue();
+    } else {
+      // Loadable arguments are passed by value, and the callee takes ownership.
+      return argV.forward(gen);
+    }
   }
 }
   
@@ -98,11 +140,25 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                        Value Fn, ArrayRef<Value> Args) {
   FunctionType *fty = Fn.getType().getAs<FunctionType>();
   TypeInfo const &resultTI = getTypeInfo(fty->getResult());
-  // FIXME: handle address-only return
-  assert(!resultTI.isAddressOnly() &&
-         "address-only returns not yet implemented");
-  Value result = B.createApply(Loc, Fn, resultTI.getLoweredType(), Args);
-  return emitManagedRValueWithCleanup(result);
+  if (resultTI.isAddressOnly()) {
+    // Allocate a temporary to house the indirect return, and pass it to the
+    // function as an implicit argument.
+    // FIXME: If Args is a prepackaged tuple argument, we need to explode it.
+    SmallVector<Value, 4> argsWithReturn(Args.begin(), Args.end());
+    Value buffer = B.createAllocVar(Loc, AllocKind::Stack,
+                                    resultTI.getLoweredType());
+    Cleanups.pushCleanup<CleanupMaterializeAllocation>(buffer);
+    argsWithReturn.push_back(buffer);
+    B.createApply(Loc, Fn, SILType::getEmptyTupleType(F.getContext()),
+                  argsWithReturn);
+    Cleanups.pushCleanup<CleanupMaterializeAddressOnlyValue>(buffer);
+    return ManagedValue(buffer, getCleanupsDepth(),
+                        /*isAddressOnlyValue=*/true);
+  } else {
+    // Receive the result by value.
+    Value result = B.createApply(Loc, Fn, resultTI.getLoweredType(), Args);
+    return emitManagedRValueWithCleanup(result);
+  }
 }
 
 ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
@@ -225,27 +281,6 @@ ManagedValue SILGenFunction::visitLoadExpr(LoadExpr *E) {
 }
 
 namespace {
-  class CleanupMaterializeAllocation : public Cleanup {
-    Value alloc;
-  public:
-    CleanupMaterializeAllocation(Value alloc) : alloc(alloc) {}
-    
-    void emit(SILGenFunction &gen) override {
-      gen.B.createDeallocVar(SILLocation(), AllocKind::Stack, alloc);
-    }
-  };
-  
-  class CleanupMaterializeValue : public Cleanup {
-    Value address;
-  public:
-    CleanupMaterializeValue(Value address) : address(address) {}
-    
-    void emit(SILGenFunction &gen) override {
-      Value tmpValue = gen.B.createLoad(SILLocation(), address);
-      gen.emitReleaseRValue(SILLocation(), tmpValue);      
-    }
-  };
-
   static Materialize emitMaterialize(SILGenFunction &gen,
                                      SILLocation loc, ManagedValue v) {
     // Address-only values are already materialized.
