@@ -287,9 +287,12 @@ namespace {
       Out.add({castVal, val.getCleanup()});
     }
     void visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E) {
-      // Load the 
+      // Emit the expression with archetype type as an rvalue.
       Explosion subResult(ExplosionKind::Maximal);
       IGF.emitRValue(E->getSubExpr(), subResult);
+
+      // The data associated with the archetype is simply a pointer; grab it
+      // and cast it to the superclass type.
       ManagedValue val = subResult.claimNext();
       const TypeInfo &baseTypeInfo = IGF.getFragileTypeInfo(E->getType());
       llvm::Type *baseTy = baseTypeInfo.StorageType;
@@ -332,9 +335,13 @@ namespace {
     }
 
     void visitSuperToArchetypeExpr(SuperToArchetypeExpr *E) {
+      // FIXME: We should check whether the dynamic type of the RHS is
+      // actually the same as the archetype. Right now, this is an
+      // unchecked cast.
       IGF.emitIgnored(E->getLHS());
-      IGF.unimplemented(E->getLoc(), "super-to-archetype casts");
-      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
+      IGF.emitRValueAsUnsubstituted(E->getRHS(),
+                                    E->getType()->getCanonicalType(),
+                                    { }, Out);
     }
 
     void visitNewArrayExpr(NewArrayExpr *E) {
