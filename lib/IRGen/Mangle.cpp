@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
@@ -109,6 +110,8 @@ namespace {
     void mangleProtocolName(ProtocolDecl *protocol);
     void mangleIdentifier(Identifier ident);
     void mangleGetterOrSetterContext(FuncDecl *fn);
+    void bindGenericParameters(const GenericParamList *genericParams,
+                               bool mangleParameters);
     void manglePolymorphicType(const GenericParamList *genericParams, Type T,
                                ExplosionKind explosion, unsigned uncurryLevel,
                                bool mangleAsFunction);
@@ -264,36 +267,51 @@ void Mangler::mangleGetterOrSetterContext(FuncDecl *func) {
   }
 }
 
-void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
-                                    Type T, ExplosionKind explosion,
-                                    unsigned uncurryLevel,
-                                    bool mangleAsFunction) {
+/// Bind the generic parameters from the given list and its parents.
+///
+/// \param mangle if true, also emit the mangling for a 'generics'
+void Mangler::bindGenericParameters(const GenericParamList *genericParams,
+                                    bool mangle = false) {
+  assert(genericParams);
   SmallVector<const GenericParamList *, 2> paramLists;
-  for (; genericParams; genericParams = genericParams->getOuterParameters())
+  do {
     paramLists.push_back(genericParams);
+  } while ((genericParams = genericParams->getOuterParameters()));
 
-  // FIXME: Prefix?
-  llvm::SaveAndRestore<unsigned> oldArchetypesDepth(ArchetypesDepth);
   for (auto gp = paramLists.rbegin(), gpEnd = paramLists.rend(); gp != gpEnd;
        ++gp) {
     ArchetypesDepth++;
     unsigned index = 0;
-    // FIXME: Only mangle the archetypes and protocol requirements that
-    // matter, rather than everything.
+
     for (auto archetype : (*gp)->getAllArchetypes()) {
       // Remember the current depth and level.
       ArchetypeInfo info;
       info.Depth = ArchetypesDepth;
       info.Index = index++;
+      assert(!Archetypes.count(archetype));
       Archetypes.insert(std::make_pair(archetype, info));
+
+      if (!mangle) continue;
 
       // Mangle this type parameter.
       //   <generic-parameter> ::= <protocol-list> _
+      // FIXME: Only mangle the archetypes and protocol requirements
+      // that matter, rather than everything.
       mangleProtocolList(archetype->getConformsTo());
       Buffer << '_';
     }
   }
-  Buffer << '_';
+
+  if (mangle) Buffer << '_';  
+}
+
+void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
+                                    Type T, ExplosionKind explosion,
+                                    unsigned uncurryLevel,
+                                    bool mangleAsFunction) {
+  // FIXME: Prefix?
+  llvm::SaveAndRestore<unsigned> oldArchetypesDepth(ArchetypesDepth);
+  bindGenericParameters(genericParams, /*mangle*/ true);
 
   if (mangleAsFunction)
     mangleFunctionType(T->castTo<AnyFunctionType>(), explosion, uncurryLevel);
@@ -321,16 +339,64 @@ void Mangler::mangleDeclName(ValueDecl *decl, IncludeType includeType) {
 
 void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
                              unsigned uncurryLevel) {
-  if (isa<SubscriptDecl>(decl)) {
+  // The return value here is a pair of (1) whether we need to mangle
+  // the type and (2) whether we need to specifically bind parameters
+  // from the context.
+  typedef std::pair<bool, bool> result_t;
+  struct ClassifyDecl : swift::DeclVisitor<ClassifyDecl, result_t> {
+    /// TypeDecls don't need their types mangled in.
+    result_t visitTypeDecl(TypeDecl *D) {
+      return { false, false };
+    }
+
+    /// Function-like declarations do, but they should have
+    /// polymorphic type and therefore don't need specific binding.
+    result_t visitFuncDecl(FuncDecl *D) {
+      return { true, false };
+    }
+    result_t visitConstructorDecl(ConstructorDecl *D) {
+      return { true, false };
+    }
+    result_t visitDestructorDecl(DestructorDecl *D) {
+      return { true, false };
+    }
+
+    /// All other values need to have contextual archetypes bound.
+    result_t visitVarDecl(VarDecl *D) {
+      return { true, true };
+    }
+    result_t visitSubscriptDecl(SubscriptDecl *D) {
+      return { true, true };
+    }
+    result_t visitOneOfElementDecl(OneOfElementDecl *D) {
+      return { true, D->hasArgumentType() };
+    }
+
+    /// Make sure we have a case for every ValueDecl.
+    result_t visitValueDecl(ValueDecl *D) = delete;
+
+    /// Everything else should be unreachable here.
+    result_t visitDecl(Decl *D) {
+      llvm_unreachable("not a ValueDecl");
+    }
+  };
+
+  auto result = ClassifyDecl().visit(decl);
+  assert(result.first || !result.second);
+
+  // Bind the contextual archetypes if requested.
+  llvm::SaveAndRestore<unsigned> oldArchetypesDepth(ArchetypesDepth);
+  if (result.second) {
     auto genericParams = decl->getDeclContext()->getGenericParamsOfContext();
     if (genericParams) {
-      manglePolymorphicType(genericParams, decl->getType(), explosion,
-                            uncurryLevel, /*mangleAsFunction=*/false);
-      return;
+      bindGenericParameters(genericParams);
     }
   }
-  if (!isa<TypeDecl>(decl))
+
+  // Mangle the type if requested.
+  if (result.first) {
     mangleType(decl->getType(), explosion, uncurryLevel);
+  }
 }
 
 /// Mangle a type into the buffer.
