@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "llvm/DerivedTypes.h"
@@ -526,6 +527,8 @@ void IRGenModule::emitClassConstructor(ConstructorDecl *D) {
 
 /// emitClassDecl - Emit all the declarations associated with this class type.
 void IRGenModule::emitClassDecl(ClassDecl *D) {
+  PrettyStackTraceDecl prettyStackTrace("emitting class metadata for", D);
+
   auto &classTI = Types.getFragileTypeInfo(D).as<ClassTypeInfo>();
   auto &layout = classTI.getLayout(*this);
 
@@ -784,8 +787,39 @@ namespace {
     ///   uint32_t size;
     /// };
     llvm::Constant *buildIvar(VarDecl *ivar) {
-      // FIXME
-      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+      // FIXME: this is not always the right thing to do!
+      auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*direct*/ true);
+      auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
+      offsetVar->setConstant(false);
+      offsetVar->setInitializer(llvm::ConstantInt::get(IGM.IntPtrTy, 0));
+
+      // TODO: clang puts this in __TEXT,__objc_methname,cstring_literals
+      auto name = IGM.getAddrOfGlobalString(ivar->getName().str());
+
+      // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
+      auto typeEncode = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+
+      auto &ivarTI = IGM.getFragileTypeInfo(ivar->getType());
+      auto size = ivarTI.getStaticSize(IGM);
+      auto alignment = ivarTI.getStaticAlignment(IGM);
+      assert((size != nullptr) == (alignment != nullptr));
+      if (size != nullptr) {
+        if (IGM.SizeTy != IGM.Int32Ty) {
+          size = llvm::ConstantExpr::getTrunc(size, IGM.Int32Ty);
+          alignment = llvm::ConstantExpr::getTrunc(alignment, IGM.Int32Ty);
+        }
+      } else {
+        size = alignment = llvm::ConstantInt::get(IGM.Int32Ty, 0);
+      }
+
+      llvm::Constant *fields[] = {
+        offsetVar,
+        name,
+        typeEncode,
+        size,
+        alignment
+      };
+      return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
     }
 
     /// struct ivar_list_t {
