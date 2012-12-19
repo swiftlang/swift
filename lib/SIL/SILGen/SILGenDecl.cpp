@@ -213,11 +213,8 @@ struct ArgumentCreatorVisitor :
 
     SILBuilder B(f.begin(), f);
     
-    // FIXME bypass SIL type lowering and make a loadable tuple even if that's
-    // nonsense until we figure out what to do with address-only tuples that
-    // doesn't make argument passing horrendous
-    SILType loweredType = SILType::getPreLoweredType(
-                            P->getType()->getCanonicalType());
+    // FIXME address-only tuples
+    SILType loweredType = gen.getLoweredType(P->getType()->getCanonicalType());
     return B.createTuple(SILLocation(), loweredType, Elements);
   }
 
