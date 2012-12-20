@@ -345,9 +345,20 @@ ManagedValue SILGenFunction::visitMetatypeConversionExpr(
 
 ManagedValue SILGenFunction::visitArchetypeToSuperExpr(
                                                swift::ArchetypeToSuperExpr *E) {
+  ManagedValue archetype = visit(E->getSubExpr());
   Value base = B.createArchetypeToSuper(E,
-                                        visit(E->getSubExpr()).forward(*this),
+                                        archetype.getValue(),
                                         getLoweredLoadableType(E->getType()));
+  if (archetype.hasCleanup()) {
+    // If an archetype has a base class, then it must have been of some
+    // reference type, so releasing the resulting class-type value is equivalent
+    // to destroying the archetype. We can thus "take" the archetype and disable
+    // its destructor cleanup if it was a temporary.
+    Cleanups.setCleanupState(archetype.getCleanup(), CleanupState::Dead);
+  } else {
+    // The archetype isn't a temporary, so we need our own retain.
+    emitRetainRValue(E, base);
+  }
   return emitManagedRValueWithCleanup(base);
 }
 
@@ -366,9 +377,6 @@ ManagedValue SILGenFunction::visitFunctionConversionExpr(
 }
 
 ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E) {
-  // FIXME: Existentials are address-only. The load and value cleanup in here
-  // are bogus.
-
   ManagedValue concrete = visit(E->getSubExpr());
   // Allocate the existential.
   Value existential = B.createAllocVar(E, AllocKind::Stack,
@@ -378,13 +386,17 @@ ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E) {
   Value valueAddr = B.createAllocExistential(E, existential,
                                              concrete.getType());
   // Initialize the internal value.
-  assert(!concrete.getType().isAddressOnly() &&
-         "erasure of address-only type not yet implemented");
-  B.createStore(E, concrete.forward(*this), valueAddr);
+  if (concrete.getType().isAddressOnly()) {
+    concrete.forwardInto(*this, E, valueAddr,
+                         /*isInitialize=*/true);
+  } else {
+    B.createStore(E, concrete.forward(*this), valueAddr);
+  }
   
-  // FIXME Since we don't support address-only types yet, "load" the existential
-  // as a hack.
-  return emitManagedRValueWithCleanup(B.createLoad(E, existential));
+  Cleanups.pushCleanup<CleanupMaterializeAddressOnlyValue>(existential);
+  
+  return ManagedValue(existential, getCleanupsDepth(),
+                      /*isAddressOnlyValue=*/true);
 }
 
 ManagedValue SILGenFunction::visitCoerceExpr(CoerceExpr *E) {

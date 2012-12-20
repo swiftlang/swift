@@ -301,7 +301,8 @@ public:
   }
   
   void visitArchetypeToSuperInst(ArchetypeToSuperInst *ASI) {
-    // FIXME: archetypes should be address-only
+    assert(ASI->getOperand().getType().isAddressOnly() &&
+           "archetype_to_super operand must be an address");
     assert(ASI->getOperand().getType().is<ArchetypeType>() &&
            "archetype_to_super operand must be archetype");
     assert(ASI->getType().hasReferenceSemantics() &&
