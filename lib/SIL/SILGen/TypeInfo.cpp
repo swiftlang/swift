@@ -129,9 +129,14 @@ void TypeConverter::makeFragileElements(TypeInfo &theInfo, CanType t) {
   
 TypeInfo const &TypeConverter::makeTypeInfo(CanType t) {
   TypeInfo &theInfo = types[t.getPointer()];
+  bool address = false;
   bool addressOnly = false;
   
-  if (t->hasReferenceSemantics()) {
+  if (LValueType *lvt = t->getAs<LValueType>()) {
+    t = lvt->getObjectType()->getCanonicalType();
+    address = true;
+    addressOnly = getTypeInfo(t).isAddressOnly();
+  } else if (t->hasReferenceSemantics()) {
     // Reference types are always loadable, and need only to retain/release
     // themselves.
     addressOnly = false;
@@ -150,7 +155,9 @@ TypeInfo const &TypeConverter::makeTypeInfo(CanType t) {
   makeFragileElements(theInfo, t);
   
   // Generate the lowered type.
-  theInfo.loweredType = lowerType(t, addressOnly);
+  theInfo.loweredType = SILType(t,
+                                /*address=*/address || addressOnly,
+                                /*loadable=*/!addressOnly);
   
   return theInfo;
 }
@@ -262,16 +269,6 @@ Type TypeConverter::makeConstantType(SILConstant c) {
   }
   llvm_unreachable("unexpected constant loc");
 }
-
-SILType TypeConverter::lowerType(CanType ty, bool addressOnly) {
-  bool address = addressOnly;
-  if (LValueType *lvt = ty->getAs<LValueType>()) {
-    ty = lvt->getObjectType()->getCanonicalType();
-    address = true;
-  }
   
-  return SILType(ty, /*address=*/address, /*loadable=*/!addressOnly);
-}
-
 } // namespace Lowering
 } // namespace swift

@@ -140,7 +140,6 @@ class LLVM_LIBRARY_VISIBILITY TypeConverter {
   TypeInfo const &makeTypeInfo(CanType t);
   void makeFragileElements(TypeInfo &theInfo, CanType t);
   void makeFragileElementsForDecl(TypeInfo &theInfo, NominalTypeDecl *decl);
-  SILType lowerType(CanType ty, bool addressOnly);
 
   Type makeConstantType(SILConstant constant);
   
