@@ -341,7 +341,7 @@ namespace {
 
       // Call the (unconditional) dynamic cast.
       auto call
-        = IGF.Builder.CreateCall2(IGF.IGM.getDynamicCastUnconditionalFn(),
+        = IGF.Builder.CreateCall2(IGF.IGM.getDynamicCastClassUnconditionalFn(),
                                   object, metadataRef);
       // FIXME: Eventually, we may want to throw.
       call->setDoesNotThrow();

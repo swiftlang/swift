@@ -204,8 +204,8 @@ public:
   llvm::Constant *getSlowAllocFn();
   llvm::Constant *getSlowRawDeallocFn();
 
-  llvm::Constant *getDynamicCastFn();
-  llvm::Constant *getDynamicCastUnconditionalFn();
+  llvm::Constant *getDynamicCastClassFn();
+  llvm::Constant *getDynamicCastClassUnconditionalFn();
 
   llvm::Constant *getObjCRetainFn();
   llvm::Constant *getObjCRetainAutoreleasedReturnValueFn();
@@ -234,8 +234,8 @@ private:
   llvm::Constant *RawDeallocFn;
   llvm::Constant *SlowAllocFn;
   llvm::Constant *SlowRawDeallocFn;
-  llvm::Constant *DynamicCastFn = nullptr;
-  llvm::Constant *DynamicCastUnconditionalFn = nullptr;
+  llvm::Constant *DynamicCastClassFn = nullptr;
+  llvm::Constant *DynamicCastClassUnconditionalFn = nullptr;
   llvm::Constant *GetFunctionMetadataFn = nullptr;
   llvm::Constant *GetGenericMetadataFn = nullptr;
   llvm::Constant *GetMetatypeMetadataFn = nullptr;

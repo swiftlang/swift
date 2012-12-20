@@ -193,7 +193,7 @@ instantiateGenericMetadata(GenericMetadata *pattern,
 
 /// The primary entrypoint.
 const void *
-swift::swift_dynamicCast(const void *object, const ClassMetadata *targetType) {
+swift::swift_dynamicCastClass(const void *object, const ClassMetadata *targetType) {
   const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
   do {
     if (isa == targetType) {
@@ -206,7 +206,7 @@ swift::swift_dynamicCast(const void *object, const ClassMetadata *targetType) {
 
 /// The primary entrypoint.
 const void *
-swift::swift_dynamicCastUnconditional(const void *object,
+swift::swift_dynamicCastClassUnconditional(const void *object,
                                       const ClassMetadata *targetType) {
   const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
   do {

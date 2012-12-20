@@ -248,27 +248,27 @@ llvm::Constant *IRGenModule::getSlowRawDeallocFn() {
   return SlowRawDeallocFn;
 }
 
-llvm::Constant *IRGenModule::getDynamicCastFn() {
-  if (DynamicCastFn) return DynamicCastFn;
+llvm::Constant *IRGenModule::getDynamicCastClassFn() {
+  if (DynamicCastClassFn) return DynamicCastClassFn;
 
-  // void *swift_dynamicCast(void*, void*);
+  // void *swift_dynamicCastClass(void*, void*);
   llvm::Type *types[] = { Int8PtrTy, Int8PtrTy };
   llvm::FunctionType *fnType = llvm::FunctionType::get(Int8PtrTy, types, false);
-  DynamicCastFn
-    = createReadonlyRuntimeFunction(*this, "swift_dynamicCast", fnType);
-  return DynamicCastFn;
+  DynamicCastClassFn
+    = createReadonlyRuntimeFunction(*this, "swift_dynamicCastClass", fnType);
+  return DynamicCastClassFn;
 }
 
-llvm::Constant *IRGenModule::getDynamicCastUnconditionalFn() {
-  if (DynamicCastUnconditionalFn) return DynamicCastUnconditionalFn;
+llvm::Constant *IRGenModule::getDynamicCastClassUnconditionalFn() {
+  if (DynamicCastClassUnconditionalFn) return DynamicCastClassUnconditionalFn;
 
-  // void *swift_dynamicCastUnconditional(void*, void*);
+  // void *swift_dynamicCastClassUnconditional(void*, void*);
   llvm::Type *types[] = { Int8PtrTy, Int8PtrTy };
   llvm::FunctionType *fnType = llvm::FunctionType::get(Int8PtrTy, types, false);
-  DynamicCastUnconditionalFn
-    = createReadonlyRuntimeFunction(*this, "swift_dynamicCastUnconditional",
+  DynamicCastClassUnconditionalFn
+    = createReadonlyRuntimeFunction(*this, "swift_dynamicCastClassUnconditional",
                                     fnType);
-  return DynamicCastUnconditionalFn;
+  return DynamicCastClassUnconditionalFn;
 }
 
 llvm::Constant *IRGenModule::getRetainNoResultFn() {

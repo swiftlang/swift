@@ -695,21 +695,28 @@ swift_getTupleTypeMetadata(size_t numElements,
 extern "C" const MetatypeMetadata *
 swift_getMetatypeMetadata(const Metadata *instanceType);
 
-/// \brief Simple proof of concept dynamic_cast API
+/// \brief Checked dynamic cast to a class type.
+///
+/// \param object The object to cast.
+/// \param targetType The type to which we are casting, which is known to be
+/// a class type.
+///
+/// \returns the object if the cast succeeds, or null otherwise.
 extern "C" const void *
-swift_dynamicCast(const void *object, const ClassMetadata *targetType);
+swift_dynamicCastClass(const void *object, const ClassMetadata *targetType);
 
-/// \brief Unconditional, checked dynamic cast.
+/// \brief Unconditional, checked dynamic cast to a class type.
 ///
 /// Aborts if the object isn't of the target type.
 ///
 /// \param object The object to cast.
-/// \param targetType The type to which we are casting.
+/// \param targetType The type to which we are casting, which is known to be
+/// a class type.
 ///
 /// \returns the object.
 extern "C" const void *
-swift_dynamicCastUnconditional(const void *object,
-                               const ClassMetadata *targetType);
+swift_dynamicCastClassUnconditional(const void *object,
+                                    const ClassMetadata *targetType);
 
 } // end namespace swift
 
