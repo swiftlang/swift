@@ -130,28 +130,12 @@ public:
   /// Perform a store operation with a value produced by the given
   /// expression.
   virtual void storeRValue(SILGenFunction &gen, SILLocation loc,
-                           Value rvalue, Value base,
-                           ShouldPreserveValues preserve) const = 0;
-
-  /*TODO
-  /// Perform a store operation with a value held in memory.
-  virtual void storeMaterialized(SILGenFunction &gen, SILLocation loc,
-                                 Value temp, Value base,
-                                 ShouldPreserveValues preserve) const = 0;
-
-  /// Perform a load operation from this path into memory
-  /// at a given address.
-  virtual void loadMaterialized(SILGenFunction &gen, SILLocation loc,
-                                Value base, Value temp,
-                                ShouldPreserveValues preserve) const = 0;
-   */
+                           ManagedValue rvalue, Value base) const = 0;
 
   /// Perform a load operation from this path into temporary
   /// memory.
   virtual Materialize loadAndMaterialize(SILGenFunction &gen, SILLocation loc,
-                                         Value base,
-                                         ShouldPreserveValues preserve)
-                                         const = 0;
+                                         Value base) const = 0;
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {

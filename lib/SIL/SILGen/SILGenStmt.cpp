@@ -78,8 +78,6 @@ Condition SILGenFunction::emitCondition(Stmt *TheStmt, Expr *E,
   return Condition(TrueBB, FalseBB, ContBB);
 }
 
-
-
 void SILGenFunction::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
   Scope BraceScope(Cleanups);
@@ -101,21 +99,23 @@ void SILGenFunction::visitBraceStmt(BraceStmt *S) {
   }
 }
 
-
 /// emitAssignStmtRecursive - Used to destructure (potentially) recursive
 /// assignments into tuple expressions down to their scalar stores.
-static void emitAssignStmtRecursive(AssignStmt *S, Value Src, Expr *Dest,
+static void emitAssignStmtRecursive(AssignStmt *S, ManagedValue Src, Expr *Dest,
                                     SILGenFunction &Gen) {
   // If the destination is a tuple, recursively destructure.
   if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
+    Value SrcV = Src.forward(Gen);
     unsigned EltNo = 0;
     for (Expr *DestElem : TE->getElements()) {
       SILType elemType = Gen.getLoweredType(
                                           DestElem->getType()->getRValueType());
-      Value SrcVal = Gen.B.createExtract(SILLocation(), Src,
+      Value SrcVal = Gen.B.createExtract(SILLocation(), SrcV,
                                          EltNo++,
                                          elemType);
-      emitAssignStmtRecursive(S, SrcVal, DestElem, Gen);
+      emitAssignStmtRecursive(S,
+                              Gen.emitManagedRValueWithCleanup(SrcVal),
+                              DestElem, Gen);
     }
     return;
   }
@@ -127,19 +127,11 @@ static void emitAssignStmtRecursive(AssignStmt *S, Value Src, Expr *Dest,
 
 
 void SILGenFunction::visitAssignStmt(AssignStmt *S) {
-  Value SrcV;
-  {
-    FullExpr rhsScope(Cleanups);
-    // FIXME: don't forward components of SrcV until they're consumed by a
-    // store.
-    SrcV = visit(S->getSrc()).forward(*this);
-  }
-  
-  {
-    FullExpr lhsScope(Cleanups);
-    // Handle tuple destinations by destructuring them if present.
-    return emitAssignStmtRecursive(S, SrcV, S->getDest(), *this);
-  }
+  FullExpr scope(Cleanups);
+  ManagedValue SrcV = visit(S->getSrc());
+
+  // Handle tuple destinations by destructuring them if present.
+  return emitAssignStmtRecursive(S, SrcV, S->getDest(), *this);
 }
 
 void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
@@ -371,8 +363,7 @@ ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
       addr = component.asPhysical().offset(*this, loc, addr);
     } else {
       addr = component.asLogical()
-        .loadAndMaterialize(*this, loc, addr,
-                            ShouldPreserveValues::PreserveValues)
+        .loadAndMaterialize(*this, loc, addr)
         .address;
     }
     assert((addr.getType().isAddress() ||
@@ -387,15 +378,12 @@ ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
 
 static void assignPhysicalAddress(SILGenFunction &gen,
                                   SILLocation loc,
-                                  Value src,
+                                  ManagedValue src,
                                   Value addr) {
   SILType srcTy = src.getType();
   
   if (srcTy.isAddressOnly()) {
-    // src is an address-only type; copy using the copy_addr instruction.
-    gen.B.createCopyAddr(loc, src, addr,
-                         /*isTake=*/ false,
-                         /*isInitialize=*/ false);
+    src.forwardInto(gen, loc, addr, /*isInitialize=*/false);
   } else {
     // src is a loadable type; release the old value if necessary and store
     // the new.
@@ -409,14 +397,14 @@ static void assignPhysicalAddress(SILGenFunction &gen,
       old = gen.B.createLoad(loc, addr);
     }
     
-    gen.B.createStore(loc, src, addr);
+    gen.B.createStore(loc, src.forward(gen), addr);
     if (old)
       gen.emitReleaseRValue(loc, old);
   }
 }
 
 void SILGenFunction::emitAssignToLValue(SILLocation loc,
-                                        Value src, LValue const &dest) {
+                                        ManagedValue src, LValue const &dest) {
   struct StoreWriteback {
     Value base;
     Materialize member;
@@ -439,8 +427,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
     } else {
       LogicalPathComponent const &lcomponent = component->asLogical();
       Materialize newDest = lcomponent
-        .loadAndMaterialize(*this, loc, destAddr,
-                            ShouldPreserveValues::PreserveValues);
+        .loadAndMaterialize(*this, loc, destAddr);
       if (!newDest.address.getType().hasReferenceSemantics())
         writebacks.push_back({destAddr, newDest, &lcomponent});
       destAddr = newDest.address;
@@ -456,17 +443,16 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
     assignPhysicalAddress(*this, loc, src, finalDestAddr);
   } else {
     component->asLogical().storeRValue(*this, loc,
-                                       src, destAddr,
-                                       ShouldPreserveValues::ConsumeValues);
+                                       src, destAddr);
   }
   
   // Write back through value-type logical properties.
   for (auto wb = writebacks.rbegin(), wend = writebacks.rend();
        wb != wend; ++wb) {
+    // FIXME: address-only writeback
     ManagedValue wbValue = wb->member.consume(*this, loc);
     wb->component->storeRValue(*this, loc,
-                               wbValue.forward(*this), wb->base,
-                               ShouldPreserveValues::ConsumeValues);
+                               wbValue, wb->base);
   }
 }
 

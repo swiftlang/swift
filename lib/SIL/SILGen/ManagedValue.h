@@ -85,6 +85,9 @@ public:
   /// \param isInitialize - True if the address references uninitialized memory.
   ///                       False if the address currently contains a valid
   ///                       value.
+  ///
+  /// FIXME: Ideally we would initialize directly into destinations and not need
+  /// this method.
   void forwardInto(SILGenFunction &gen, SILLocation loc,
                    Value address, bool isInitialize) {
     assert(addressOnlyValue &&

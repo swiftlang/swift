@@ -132,17 +132,18 @@ namespace {
     }
     
     void storeRValue(SILGenFunction &gen, SILLocation loc,
-                     Value rvalue, Value base,
-                     ShouldPreserveValues preserve) const override {
+                     ManagedValue rvalue, Value base) const override {
       ManagedValue appliedSetter = partialApplyAccessor(gen, loc,
                                                         setter, base);
-      gen.emitApply(loc, appliedSetter.forward(gen), rvalue);
+      // Address-only arguments are not callee-consumed; loadable arguments are.
+      Value arg = rvalue.isAddressOnlyValue()
+        ? rvalue.getValue()
+        : rvalue.forward(gen);
+      gen.emitApply(loc, appliedSetter.forward(gen), arg);
     }
     
     Materialize loadAndMaterialize(SILGenFunction &gen, SILLocation loc,
-                                   Value base,
-                                   ShouldPreserveValues preserve)
-                                   const override
+                                   Value base) const override
     {
       // FIXME: ignores base and preserve
       ManagedValue appliedGetter = partialApplyAccessor(gen, loc,

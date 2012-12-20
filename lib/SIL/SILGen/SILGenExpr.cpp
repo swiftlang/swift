@@ -162,9 +162,6 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
 }
 
 ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
-  // FIXME: This assumes that all Swift arguments and returns lower one-to-one
-  // to SIL arguments and returns, which won't hold up in the face of
-  // address-only types.
   Value FnV = visit(E->getFn()).forward(*this);
   llvm::SmallVector<Value, 10> ArgsV;
   llvm::SmallVector<Writeback, 2> writebacks;
@@ -172,10 +169,14 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E) {
   emitApplyArguments(E->getArg(), ArgsV, writebacks);
   
   ManagedValue r = emitApply(E, FnV, ArgsV);
-  
+
+  // FIXME: writebacks need to be applied later, perhaps at full expr scope
+  // exit, in order for method writeback to do the right thing, because
+  // foo.bar.bas() could really be bas(get_bar(&foo)), and modifications by
+  // bas() ought to show up in foo's bar.
   for (auto &wb : writebacks) {
     Value newValue = B.createLoad(E, wb.tempAddress);
-    emitAssignToLValue(E, newValue, wb.lvalue);
+    emitAssignToLValue(E, emitManagedRValueWithCleanup(newValue), wb.lvalue);
   }
   
   return r;
