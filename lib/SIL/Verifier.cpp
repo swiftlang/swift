@@ -121,18 +121,18 @@ public:
            "invalid integer literal type");
   }
   void visitLoadInst(LoadInst *LI) {
-    assert(!LI->getType().isAddress() && "Load should produce rvalue");
+    assert(!LI->getType().isAddress() && "Can't load an address");
     assert(LI->getLValue().getType().isAddress() &&
-           "Load op should be lvalue");
+           "Load operand must be an address");
     assert(LI->getLValue().getType().getObjectType() == LI->getType() &&
            "Load operand type and result type mismatch");
   }
 
   void visitStoreInst(StoreInst *SI) {
     assert(!SI->getSrc().getType().isAddress() &&
-           "Src value should be rvalue");
+           "Can't store from an address source");
     assert(SI->getDest().getType().isAddress() &&
-           "Dest address should be lvalue");
+           "Must store to an address dest");
     assert(SI->getDest().getType().getObjectType() == SI->getSrc().getType() &&
            "Store operand type and dest type mismatch");
   }
@@ -287,6 +287,16 @@ public:
            "alloc_existential must be applied to an address");
     assert(exType.isExistentialType() &&
            "alloc_existential must be applied to address of existential");
+#endif
+  }
+  
+  void visitDeallocExistentialInst(DeallocExistentialInst *DEI) {
+#ifndef NDEBUG
+    SILType exType = DEI->getExistential().getType();
+    assert(exType.isAddress() &&
+           "dealloc_existential must be applied to an address");
+    assert(exType.isExistentialType() &&
+           "dealloc_existential must be applied to address of existential");
 #endif
   }
   

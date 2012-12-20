@@ -407,6 +407,12 @@ Type AllocExistentialInst::getConcreteType() const {
   return getType(0).getSwiftRValueType();
 }
 
+DeallocExistentialInst::DeallocExistentialInst(SILLocation Loc,
+                                               Value Existential)
+  : Instruction(ValueKind::DeallocExistentialInst, Loc,
+            SILType::getEmptyTupleType(Existential.getType().getASTContext())) {
+}
+
 RetainInst::RetainInst(SILLocation Loc, Value Operand)
   : Instruction(ValueKind::RetainInst, Loc, Operand.getType()),
     Operand(Operand) {

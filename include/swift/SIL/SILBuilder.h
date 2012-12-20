@@ -220,7 +220,8 @@ public:
   }
   
   ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc, Value Operand,
-                                             SILConstant Member, SILType MethodTy)
+                                             SILConstant Member,
+                                             SILType MethodTy)
   {
     return insert(new ArchetypeMethodInst(Loc, Operand, Member, MethodTy, F));
   }
@@ -241,6 +242,11 @@ public:
                                                Value Existential,
                                                SILType ConcreteType) {
     return insert(new AllocExistentialInst(Loc, Existential, ConcreteType, F));
+  }
+  
+  DeallocExistentialInst *createDeallocExistential(SILLocation Loc,
+                                                   Value Existential) {
+    return insert(new DeallocExistentialInst(Loc, Existential));
   }
   
   MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype) {

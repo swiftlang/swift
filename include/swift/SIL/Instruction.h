@@ -733,6 +733,20 @@ public:
     return V->getKind() == ValueKind::RetainInst;
   }
 };
+  
+/// DeallocExistentialInst - Given an address of an existential that has been
+/// partially initialized with an AllocExistentialInst but whose value buffer
+/// has not been initialized, deinitializes the existential and deallocates
+/// the value buffer. This should only be used for partially-initialized
+/// existentials; a fully-initialized existential can be destroyed with
+/// DestroyAddrInst and deallocated with DeallocVarInst.
+class DeallocExistentialInst : public Instruction {
+  Value Existential;
+public:
+  DeallocExistentialInst(SILLocation Loc, Value Existential);
+  
+  Value getExistential() const { return Existential; }
+};
 
 /// ReleaseInst - Decrease the retain count of a value, and dealloc the value
 /// if its retain count is zero.

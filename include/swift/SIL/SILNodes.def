@@ -84,6 +84,7 @@ ABSTRACT_VALUE(Instruction, Value)
     
   INST(ProjectExistentialInst, Instruction)
   INST(AllocExistentialInst, Instruction)
+  INST(DeallocExistentialInst, Instruction)
 
   INST(RetainInst, Instruction)
   INST(ReleaseInst, Instruction)

@@ -314,6 +314,9 @@ public:
     OS << "alloc_existential " << getID(AEI->getExistential()) << ", $";
     AEI->getConcreteType()->print(OS);
   }
+  void visitDeallocExistentialInst(DeallocExistentialInst *DEI) {
+    OS << "dealloc_existential " << getID(DEI->getExistential());
+  }
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype $" << MI->getType();
   }

@@ -21,7 +21,8 @@ class Expr;
 class Stmt;
 
 /// SILLocation - This is a pointer to the AST node that a SIL instruction was
-/// derived from.
+/// derived from. This may be null if AST information is unavailable or
+/// stripped.
 ///
 /// FIXME: This should eventually include inlining history, generics
 /// instantiation info, etc (when we get to it).
