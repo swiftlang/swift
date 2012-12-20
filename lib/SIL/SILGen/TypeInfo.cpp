@@ -230,9 +230,12 @@ Type TypeConverter::getMethodTypeInContext(Type /*nullable*/ contextType,
 }
 
 /// Get the type of a global variable accessor function, () -> [byref] T.
-static Type getGlobalAccessorType(Type varAddressType, ASTContext &C) {
+static Type getGlobalAccessorType(Type varType, ASTContext &C) {
   return FunctionType::get(TupleType::getEmpty(C),
-                           varAddressType, C);
+                           LValueType::get(varType,
+                                           LValueType::Qual::DefaultForType,
+                                           C),
+                           C);
 }
 
 Type TypeConverter::makeConstantType(SILConstant c) {
@@ -258,7 +261,7 @@ Type TypeConverter::makeConstantType(SILConstant c) {
       // () -> [byref] T
       if (VarDecl *var = dyn_cast<VarDecl>(vd)) {
         assert(!var->isProperty() && "constant ref to non-physical global var");
-        return getGlobalAccessorType(var->getTypeOfReference(), Context);
+        return getGlobalAccessorType(var->getType(), Context);
       }
       
       // Otherwise, return the Swift-level type.
