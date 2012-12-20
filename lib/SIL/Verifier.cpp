@@ -63,15 +63,15 @@ public:
   void visitApplyInst(ApplyInst *AI) {
     FunctionType *FT = AI->getCallee().getType().getAs<FunctionType>();
     assert(FT && "Callee of ApplyInst must have concrete function type");
+    ASTContext &C = FT->getASTContext();
+    bool implicitReturn = false;
     
-    if (AI->getType().isAddressOnly()) {
+    if (AI->getType() == SILType::getEmptyTupleType(C) &&
+        !FT->getResult()->isEqual(C.TheEmptyTupleType)) {
       // Address-only returns are passed as an implicit extra argument.
       // The result of the instruction should be the empty tuple.
-      assert(AI->getType() == SILType::getEmptyTupleType(FT->getASTContext()) &&
-             "Address-only return type must be passed as indirect argument");
+      implicitReturn = true;
     } else {
-      FT->getResult()->dump();
-      AI->getType().dump();
       assert(FT->getResult()->isEqual(AI->getType().getSwiftType()) &&
              "Return type does not match function type");
       
@@ -89,20 +89,20 @@ public:
     // Check that the arguments match the decomposed tuple.
     const TupleType *TT = FT->getInput()->castTo<TupleType>();
     (void)TT;
-    for (unsigned i = 0, e = AI->getArguments().size(); i != e; ++i)
+    for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i)
       assert(argumentTypeMatches(AI->getArguments()[i].getType(),
                                  TT->getFields()[i].getType()) &&
              "ApplyInst argument type mismatch");
     
-    if (AI->getType().isAddressOnly()) {
+    if (implicitReturn) {
       // Check that the indirect return argument exists and is of the right
       // type.
       assert(AI->getArguments().size() == TT->getFields().size() + 1 &&
              "ApplyInst doesn't have enough arguments for function "
              "and indirect return");
       SILType indirectReturn = AI->getArguments().back().getType();
-      assert(indirectReturn.isAddress() &&
-             "indirect return argument must be address");
+      assert(indirectReturn.isAddressOnly() &&
+             "indirect return argument is not address-only");
       assert(indirectReturn.getSwiftRValueType()->isEqual(FT->getResult()) &&
              "indirect return argument does not match function return type");
     } else {
