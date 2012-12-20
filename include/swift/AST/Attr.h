@@ -144,7 +144,6 @@ public:
   bool Conversion = false;
   bool ObjC = false;
   bool Postfix = false;
-  bool AllocatesThis = false;
   bool IBOutlet = false;
   bool IBAction = false;
   
@@ -162,15 +161,13 @@ public:
   bool isConversion() const { return Conversion; }
   bool isPostfix() const { return Postfix; }
   bool isObjC() const { return ObjC; }
-  bool isAllocatesThis() const { return AllocatesThis; }
   bool isIBOutlet() const { return IBOutlet; }
   bool isIBAction() const { return IBAction; }
 
   bool empty() const {
     return !isInfix() && !getResilienceData().isValid() && !isByref() &&
            !isAutoClosure() && !isAssignment() && !isConversion() &&
-           !isPostfix() && !isObjC() && !isAllocatesThis() && !isIBOutlet() &&
-           !isIBAction();
+           !isPostfix() && !isObjC() && !isIBOutlet() && !isIBAction();
   }
 };
   

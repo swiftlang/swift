@@ -287,15 +287,6 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;
   }
 
-  case AttrName::allocates_this: {
-    if (Attributes.isAllocatesThis())
-      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
-
-    consumeToken(tok::identifier);
-    Attributes.AllocatesThis = true;
-    return false;
-  }
-
   /// FIXME: This is a temporary hack until we can import C modules.
   case AttrName::asmname: {
     SourceLoc TokLoc = Tok.getLoc();

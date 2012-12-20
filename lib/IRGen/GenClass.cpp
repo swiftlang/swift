@@ -487,12 +487,13 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
 
   // Emit the "this" variable
   Initialization I;
-  I.registerObject(IGF, I.getObjectForDecl(thisDecl),
+  auto object = I.getObjectForDecl(thisDecl);
+  I.registerObject(IGF, object,
                    thisDecl->hasFixedLifetime() ? NotOnHeap : OnHeap,
                    classTI);
   Address addr = I.emitVariable(IGF, thisDecl, classTI);
 
-  if (!CD->getAttrs().isAllocatesThis()) {
+  if (!CD->getAllocThisExpr()) {
     FullExpr scope(IGF);
     // Allocate the class.
     // FIXME: Long-term, we clearly need a specialized runtime entry point.
@@ -511,11 +512,8 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
 
     I.markInitialized(IGF, I.getObjectForDecl(thisDecl));
   } else {
-    // FIXME: Sema or SIL should identify where 'this' gets assigned, so we
-    // can do the initialization at that point, rather than zero'ing now
-    // and assigning later.
-    auto ptrType = layout.getType()->getPointerTo();
-    IGF.Builder.CreateStore(llvm::ConstantPointerNull::get(ptrType), addr);
+    // Use the allocation expression described in the AST to initialize 'this'.
+    I.emitInit(IGF, object, addr, CD->getAllocThisExpr(), classTI);
   }
   
   IGF.emitConstructorBody(CD);

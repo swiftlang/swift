@@ -606,6 +606,12 @@ namespace {
           
         return nullptr;
 
+      case clang::OMF_init:
+        // An init instance method can be a constructor.
+        if (objcMethod->isInstanceMethod())
+          return importConstructor(decl, objcMethod);
+        return nullptr;
+
       case clang::OMF_new:
       case clang::OMF_alloc:
       case clang::OMF_autorelease:
@@ -619,12 +625,6 @@ namespace {
       case clang::OMF_retainCount:
       case clang::OMF_self:
         // None of these methods have special consideration.
-        return nullptr;
-
-      case clang::OMF_init:
-        // An init instance method can be a constructor.
-        if (objcMethod->isInstanceMethod())
-          return importConstructor(decl, objcMethod);
         return nullptr;
       }
     }
@@ -677,6 +677,7 @@ namespace {
       case clang::OMF_retain:
       case clang::OMF_retainCount:
       case clang::OMF_self:
+        case clang::OMF_new:
         llvm_unreachable("Caller did not filter non-constructor methods");
 
       case clang::OMF_init: {
@@ -703,10 +704,6 @@ namespace {
           return nullptr;
         break;
       }
-
-      case clang::OMF_new:
-        assert(objcMethod->isClassMethod() && "Caller did not filter inputs");
-        break;
       }
 
       // FIXME: Hack.
@@ -763,20 +760,18 @@ namespace {
                                                             thisVar,
                                                             /*GenericParams=*/0,
                                                             dc);
-      result->getMutableAttrs().AllocatesThis = true;
       result->setType(type);
       thisVar->setDeclContext(result);
       setVarDeclContexts(argPatterns, result);
       setVarDeclContexts(bodyPatterns, result);
 
-      // Create the body of the constructor, which will call the appropriate
-      // underlying method (and 'alloc', if needed).
-      // FIXME: Use the 'this' of metaclass type rather than a metatype
-      // expression.
-      Expr* initExpr = new (Impl.SwiftContext) MetatypeExpr(nullptr, loc,
-                                                            thisMetaTy);
+      // Create the call to alloc that allocates 'this'.
+      {
+        // FIXME: Use the 'this' of metaclass type rather than a metatype
+        // expression.
+        Expr* initExpr = new (Impl.SwiftContext) MetatypeExpr(nullptr, loc,
+                                                              thisMetaTy);
 
-      if (objcMethod->getMethodFamily() == clang::OMF_init) {
         // For an 'init' method, we need to call alloc first.
         Expr *allocRef
           = new (Impl.SwiftContext) DeclRefExpr(alloc, loc,
@@ -793,8 +788,16 @@ namespace {
         auto toTypeRef = new (Impl.SwiftContext) MetatypeExpr(nullptr, loc,
                                                               thisMetaTy);
         initExpr = new (Impl.SwiftContext) CallExpr(toTypeRef, initExpr);
-      }
 
+        result->setAllocThisExpr(initExpr);
+      }
+      
+      // Create the body of the constructor, which will call the
+      // corresponding init method.
+      Expr *initExpr
+        = new (Impl.SwiftContext) DeclRefExpr(thisVar, loc,
+                                              thisVar->getTypeOfReference());
+      
       // Form a reference to the actual method.
       auto func = cast<FuncDecl>(decl);
       auto funcRef

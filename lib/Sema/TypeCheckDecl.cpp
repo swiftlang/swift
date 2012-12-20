@@ -888,10 +888,4 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "auto_closure");
     VD->getMutableAttrs().AutoClosure = false;
   }
-  
-  if (Attrs.isAllocatesThis() && !isa<ConstructorDecl>(VD)) {
-    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute,
-                "allocates_this");
-    VD->getMutableAttrs().AllocatesThis = false;
-  }
 }

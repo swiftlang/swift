@@ -1368,6 +1368,10 @@ class ConstructorDecl : public ValueDecl, public DeclContext {
   VarDecl *ImplicitThisDecl;
   GenericParamList *GenericParams;
 
+  /// \brief When non-null, the expression that should be used to
+  /// allocate 'this'.
+  Expr *AllocThis = nullptr;
+
 public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
                   Pattern *Arguments, VarDecl *ImplicitThisDecl,
@@ -1401,6 +1405,17 @@ public:
 
   GenericParamList *getGenericParams() const { return GenericParams; }
   bool isGeneric() const { return GenericParams != nullptr; }
+
+  /// \brief Retrieve the expression that should be evaluated to allocate
+  /// 'this', or null if 'this' should be allocated via the normal path.
+  ///
+  /// There is no way to describe this expression in the Swift language.
+  /// However, the \c ClangImporter synthesizes this-allocation expressions
+  /// for "constructors" of Objective-C classes (which call 'alloc').
+  Expr *getAllocThisExpr() const { return AllocThis; }
+
+  /// \brief Set the expression used to allocate this.
+  void setAllocThisExpr(Expr *expr) { AllocThis = expr; }
 
   /// Given that this is an Objective-C method declaration, produce
   /// its selector in the given buffer (as UTF-8).

@@ -156,10 +156,6 @@ void PrintAST::printAttributes(const DeclAttributes &attrs) {
     comma();
     OS << "objc";
   }
-  if (attrs.isAllocatesThis()) {
-    comma();
-    OS << "allocates_this";
-  }
   if (attrs.isIBOutlet()) {
     comma();
     OS << "iboutlet";

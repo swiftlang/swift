@@ -1119,6 +1119,12 @@ namespace {
 
     void visitConstructorDecl(ConstructorDecl *CD) {
       printCommon(CD, "constructor_decl", FuncColor);
+      if (CD->getAllocThisExpr()) {
+        OS << "\n";
+        OS.indent(Indent+2);
+        OS << "this = ";
+        CD->getAllocThisExpr()->print(OS, 0);
+      }
       if (CD->getBody()) {
         OS << '\n';
         printRec(CD->getBody());

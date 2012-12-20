@@ -516,6 +516,11 @@ void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
 }
 
 void TypeChecker::typeCheckConstructorBody(ConstructorDecl *CD) {
+  if (auto allocThis = CD->getAllocThisExpr()) {
+    if (!typeCheckExpression(allocThis))
+      CD->setAllocThisExpr(allocThis);
+  }
+
   Stmt *Body = CD->getBody();
   if (Body)
     StmtChecker(*this, CD).typeCheckStmt(Body);
