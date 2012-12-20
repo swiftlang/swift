@@ -51,31 +51,64 @@ public:
   void visitAllocVarInst(AllocVarInst *AI) {
     visitAllocInst(AI);
   }
+  
+  bool argumentTypeMatches(SILType argValueType, Type declaredArgType) {
+    if (argValueType.isAddressOnly()) {
+      return argValueType.getSwiftRValueType()->isEqual(declaredArgType);
+    } else {
+      return argValueType.getSwiftType()->isEqual(declaredArgType);
+    }
+  }
 
   void visitApplyInst(ApplyInst *AI) {
-    /* FIXME This logic needs to be reworked to deal with type lowering.
-    assert(AI->getCallee().getType().is<FunctionType>() &&
-           "Callee of ApplyInst should have function type");
-    FunctionType *FT = AI->getCallee().getType().castTo<FunctionType>();
-    assert(AI->getType().getSwiftType()->isEqual(FT->getResult()) &&
-           "ApplyInst result type mismatch");
-
-    // If there is a single argument to the apply, it might be a scalar or the
-    // whole tuple being presented all at once.
-    if (AI->getArguments().size() != 1 ||
-        AI->getArguments()[0].getType().getSwiftType() != FT->getInput()) {
-      // Otherwise, we must have a decomposed tuple.  Verify the arguments match
-      // up.
-      const TupleType *TT = FT->getInput()->castTo<TupleType>();
-      (void)TT;
-      assert(AI->getArguments().size() == TT->getFields().size() &&
-             "ApplyInst contains unexpected argument count for function");
-      for (unsigned i = 0, e = AI->getArguments().size(); i != e; ++i)
-        assert(AI->getArguments()[i].getType().getSwiftType()
-                 ->isEqual(TT->getFields()[i].getType()) &&
-               "ApplyInst argument type mismatch");
+    FunctionType *FT = AI->getCallee().getType().getAs<FunctionType>();
+    assert(FT && "Callee of ApplyInst must have concrete function type");
+    
+    if (AI->getType().isAddressOnly()) {
+      // Address-only returns are passed as an implicit extra argument.
+      // The result of the instruction should be the empty tuple.
+      assert(AI->getType() == SILType::getEmptyTupleType(FT->getASTContext()) &&
+             "Address-only return type must be passed as indirect argument");
+    } else {
+      FT->getResult()->dump();
+      AI->getType().dump();
+      assert(FT->getResult()->isEqual(AI->getType().getSwiftType()) &&
+             "Return type does not match function type");
+      
+      // If there is a single argument to the apply, it could either be a scalar
+      // or the whole argument tuple being presented all at once.
+      if (AI->getArguments().size() == 1 &&
+          argumentTypeMatches(AI->getArguments()[0].getType(),
+                              FT->getInput())) {
+        // The single argument type matches the function argument type, so the
+        // arguments are OK.
+        return;
+      }
     }
-     */
+    
+    // Check that the arguments match the decomposed tuple.
+    const TupleType *TT = FT->getInput()->castTo<TupleType>();
+    (void)TT;
+    for (unsigned i = 0, e = AI->getArguments().size(); i != e; ++i)
+      assert(argumentTypeMatches(AI->getArguments()[i].getType(),
+                                 TT->getFields()[i].getType()) &&
+             "ApplyInst argument type mismatch");
+    
+    if (AI->getType().isAddressOnly()) {
+      // Check that the indirect return argument exists and is of the right
+      // type.
+      assert(AI->getArguments().size() == TT->getFields().size() + 1 &&
+             "ApplyInst doesn't have enough arguments for function "
+             "and indirect return");
+      SILType indirectReturn = AI->getArguments().back().getType();
+      assert(indirectReturn.isAddress() &&
+             "indirect return argument must be address");
+      assert(indirectReturn.getSwiftRValueType()->isEqual(FT->getResult()) &&
+             "indirect return argument does not match function return type");
+    } else {
+      assert(AI->getArguments().size() == TT->getFields().size() &&
+             "ApplyInst doesn't have enough arguments for function");
+    }
   }
 
   void visitConstantRefInst(ConstantRefInst *CRI) {
