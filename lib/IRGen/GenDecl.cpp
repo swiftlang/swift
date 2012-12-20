@@ -28,6 +28,7 @@
 #include "CallingConvention.h"
 #include "Explosion.h"
 #include "FormalType.h"
+#include "GenMeta.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Linking.h"
@@ -719,13 +720,22 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   llvm::Type *defaultVarTy;
   llvm::Type *defaultVarPtrTy;
   unsigned adjustmentIndex;
-
+  ClassDecl *ObjCClass = nullptr;
+  
   // Patterns use the pattern type and no adjustment.
   if (isPattern) {
     defaultVarTy = TypeMetadataPatternStructTy;
     defaultVarPtrTy = TypeMetadataPatternPtrTy;
     adjustmentIndex = 0;
 
+  // Objective-C classes use the generic metadata type and need no adjustment.
+  } else if (isa<ClassType>(concreteType) &&
+             !hasKnownSwiftMetadata(*this,
+                                    cast<ClassType>(concreteType)->getDecl())) {
+    defaultVarTy = TypeMetadataStructTy;
+    defaultVarPtrTy = TypeMetadataPtrTy;
+    adjustmentIndex = 0;
+    ObjCClass = cast<ClassType>(concreteType)->getDecl();
   // Class direct metadata use the heap type and require a two-word
   // adjustment (due to the heap-metadata header).
   } else if (isa<ClassType>(concreteType) ||
@@ -750,8 +760,10 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     adjustmentIndex = 0;
   }
 
-  LinkEntity entity =
-    LinkEntity::forTypeMetadata(concreteType, isIndirect, isPattern);
+  LinkEntity entity
+    = ObjCClass? LinkEntity::forObjCClass(ObjCClass)
+               : LinkEntity::forTypeMetadata(concreteType, isIndirect,
+                                             isPattern);
 
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                     storageType, defaultVarTy,

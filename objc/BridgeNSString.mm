@@ -42,10 +42,6 @@ swift_StringToNSString(SwiftString *string);
 NSDate *
 swift_createDate(void);
 
-// FIXME: Egregious hack. This ends up being the Swift metadata for
-// NSString, which is clearly bogus.
-unsigned _TMdC8NSString = 0;
-
 }; // extern "C"
 
 struct SwiftString {

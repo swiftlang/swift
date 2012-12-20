@@ -200,7 +200,7 @@ swift::swift_dynamicCast(const void *object, const ClassMetadata *targetType) {
       return object;
     }
     isa = isa->SuperClass;
-  } while (targetType);
+  } while (isa);
   return NULL;
 }
 
@@ -214,7 +214,7 @@ swift::swift_dynamicCastUnconditional(const void *object,
       return object;
     }
     isa = isa->SuperClass;
-  } while (targetType);
+  } while (isa);
   abort();
 }
 
