@@ -1,7 +1,9 @@
 @import objc;
 
+typedef unsigned long NSUInteger;
+
 @interface NSArray : NSObject
-- (id)objectAtIndexedSubscript:(unsigned)idx;
+- (id)objectAtIndexedSubscript:(NSUInteger)idx;
 @end
 
 @interface Hive
