@@ -334,6 +334,11 @@ public:
                                  ArrayRef<Substitution> subs,
                                  Explosion &explosion);
 
+  /// \brief Convert the given expression to the given destination archetype,
+  /// using a runtime-checked cast.
+  void emitSupertoArchetypeConversion(Expr *E, CanType destType,
+                                      Explosion &explosion);
+
   llvm::Value *emitAsPrimitiveScalar(Expr *E);
 
   void emitLoad(const LValue &lvalue, const TypeInfo &type,

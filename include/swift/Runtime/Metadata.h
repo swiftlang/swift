@@ -718,6 +718,31 @@ extern "C" const void *
 swift_dynamicCastClassUnconditional(const void *object,
                                     const ClassMetadata *targetType);
 
+/// \brief Checked dynamic cast to the given type.
+///
+/// \param object The object to cast.
+///
+/// \param targetType The type to which we are casting, which may be either a
+/// class type or a wrapped Objective-C class type.
+///
+/// \returns the object, or null if it doesn't have the given target type.
+extern "C" const void *
+swift_dynamicCast(const void *object, const Metadata *targetType);
+
+/// \brief Unconditional checked dynamic cast to the given type.
+///
+/// Aborts if the object isn't of the target type.
+///
+/// \param object The object to cast.
+///
+/// \param targetType The type to which we are casting, which may be either a
+/// class type or a wrapped Objective-C class type.
+///
+/// \returns the object.
+extern "C" const void *
+swift_dynamicCastUnconditional(const void *object,
+                               const Metadata *targetType);
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_METADATA_H */

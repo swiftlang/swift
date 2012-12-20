@@ -859,3 +859,51 @@ void IRGenFunction::emitRValueAsUnsubstituted(Expr *E, CanType expectedType,
 
   emitAsUnsubstituted(*this, E, expectedType, subs, out);
 }
+
+void IRGenFunction::emitSupertoArchetypeConversion(Expr *E, CanType destType,
+                                                   Explosion &explosion) {
+  assert(destType->is<ArchetypeType>() && "expected archetype type");
+  auto &actualTI = getFragileTypeInfo(E->getType());
+
+  // Set up the temporary.
+  Initialization init;
+  auto object = init.getObjectForTemporary();
+  auto cleanup = init.registerObject(*this, object, NotOnHeap, actualTI);
+  auto addr = init.emitLocalAllocation(*this, object, NotOnHeap, actualTI,
+                                       "substitution.temp").getAddress();
+
+  // Emit the expression.
+  Explosion subResult(ExplosionKind::Maximal);
+  emitRValue(E, subResult);
+  ManagedValue val = subResult.claimNext();
+  auto superObject = val.getValue();
+  if (superObject->getType() != IGM.Int8PtrTy)
+    superObject = Builder.CreateBitCast(superObject, IGM.Int8PtrTy);
+
+  // Retrieve the metadata
+  auto metadataRef = emitTypeMetadataRef(*this, destType);
+  if (metadataRef->getType() != IGM.Int8PtrTy)
+    metadataRef = Builder.CreateBitCast(metadataRef, IGM.Int8PtrTy);
+
+  {
+    // Call the (unconditional) dynamic cast.
+    auto call
+      = Builder.CreateCall2(IGM.getDynamicCastUnconditionalFn(),
+                            superObject, metadataRef);
+    // FIXME: Eventually, we may want to throw.
+    call->setDoesNotThrow();
+    superObject = Builder.CreateBitCast(call, IGM.OpaquePtrTy);
+  }
+  
+  // Initialize the object with the result of the call.
+  Explosion initExplosion(ExplosionKind::Maximal);
+  initExplosion.addUnmanaged(superObject);
+  actualTI.initialize(*this, initExplosion,
+                      Builder.CreateBitCast(addr,
+                                            IGM.OpaquePtrTy->getPointerTo()));
+  init.markInitialized(*this, object);
+
+  // Add the object to the output explosion.
+  addr = Builder.CreateBitCast(addr, IGM.OpaquePtrTy, "temp.cast");
+  explosion.add(ManagedValue(addr.getAddress(), cleanup));
+}

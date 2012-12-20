@@ -218,6 +218,67 @@ swift::swift_dynamicCastClassUnconditional(const void *object,
   abort();
 }
 
+const void *
+swift::swift_dynamicCast(const void *object, const Metadata *targetType) {
+  const ClassMetadata *targetClassType;
+  switch (targetType->Kind) {
+  case MetadataKind::Class:
+    targetClassType = static_cast<const ClassMetadata *>(targetType);
+    break;
+
+  case MetadataKind::ObjCClassWrapper:
+    targetClassType
+    = static_cast<const ObjCClassWrapperMetadata *>(targetType)->Class;
+    break;
+
+  case MetadataKind::Existential:
+  case MetadataKind::Function:
+  case MetadataKind::HeapArray:
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::Metatype:
+  case MetadataKind::Oneof:
+  case MetadataKind::Opaque:
+  case MetadataKind::PolyFunction:
+  case MetadataKind::Struct:
+  case MetadataKind::Tuple:
+    // FIXME: unreachable
+    abort();
+  }
+
+  return swift_dynamicCastClass(object, targetClassType);
+}
+
+const void *
+swift::swift_dynamicCastUnconditional(const void *object,
+                                      const Metadata *targetType) {
+  const ClassMetadata *targetClassType;
+  switch (targetType->Kind) {
+  case MetadataKind::Class:
+    targetClassType = static_cast<const ClassMetadata *>(targetType);
+    break;
+
+  case MetadataKind::ObjCClassWrapper:
+    targetClassType
+      = static_cast<const ObjCClassWrapperMetadata *>(targetType)->Class;
+    break;
+
+  case MetadataKind::Existential:
+  case MetadataKind::Function:
+  case MetadataKind::HeapArray:
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::Metatype:
+  case MetadataKind::Oneof:
+  case MetadataKind::Opaque:
+  case MetadataKind::PolyFunction:
+  case MetadataKind::Struct:
+  case MetadataKind::Tuple:
+    // FIXME: unreachable
+    abort();
+  }
+
+  return swift_dynamicCastClassUnconditional(object, targetClassType);
+}
+
 /// The primary entrypoint.
 const Metadata *
 swift::swift_getGenericMetadata(GenericMetadata *pattern,

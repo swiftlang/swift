@@ -357,9 +357,9 @@ namespace {
       // actually the same as the archetype. Right now, this is an
       // unchecked cast.
       IGF.emitIgnored(E->getLHS());
-      IGF.emitRValueAsUnsubstituted(E->getRHS(),
-                                    E->getType()->getCanonicalType(),
-                                    { }, Out);
+      IGF.emitSupertoArchetypeConversion(E->getRHS(),
+                                         E->getType()->getCanonicalType(),
+                                         Out);
     }
 
     void visitNewArrayExpr(NewArrayExpr *E) {
