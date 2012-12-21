@@ -393,6 +393,8 @@ void swift::REPL(ASTContext &Context) {
                      "named declarations\n"
                      "  :dump_source - dump the user input (ignoring"
                          " lines with errors)\n"
+                     "  :print_decl <name> - print the AST representation of the"
+                     "named declarations\n"
                      "API documentation etc. will be here eventually.\n");
       } else if (L.peekNextToken().getText() == "quit" ||
                  L.peekNextToken().getText() == "exit") {
@@ -401,13 +403,19 @@ void swift::REPL(ASTContext &Context) {
         DumpModule.dump();
       } else if (L.peekNextToken().getText() == "dump_ast") {
         TU->dump();
-      } else if (L.peekNextToken().getText() == "dump_decl") {
+      } else if (L.peekNextToken().getText() == "dump_decl" ||
+                 L.peekNextToken().getText() == "print_decl") {
+        bool doPrint = (L.peekNextToken().getText() == "print_decl");
         L.lex(Tok);
         L.lex(Tok);
         UnqualifiedLookup lookup(Context.getIdentifier(Tok.getText()), TU);
         for (auto result : lookup.Results) {
           if (result.hasValueDecl()) {
-            result.getValueDecl()->dump();
+            if (doPrint) {
+              result.getValueDecl()->print(llvm::outs());
+              llvm::outs() << '\n';
+            } else
+              result.getValueDecl()->dump();
 
             if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
               // FIXME: Hack!
@@ -436,8 +444,13 @@ void swift::REPL(ASTContext &Context) {
                 }
               }
 
-              for (auto ext : extensions)
-                ext->dump();
+              for (auto ext : extensions) {
+                if (doPrint) {
+                  ext->print(llvm::outs());
+                  llvm::outs() << '\n';
+                } else
+                  ext->dump();
+              }
             }
           }
         }
