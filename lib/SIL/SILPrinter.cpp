@@ -332,6 +332,9 @@ public:
     printAllocKind(DI->getAllocKind());
     OS << getID(DI->getOperand());
   }
+  void visitDeallocRefInst(DeallocRefInst *DI) {
+    OS << "dealloc_ref " << getID(DI->getOperand());
+  }
   void visitDestroyAddrInst(DestroyAddrInst *DI) {
     OS << "destroy_addr " << getID(DI->getOperand());
   }

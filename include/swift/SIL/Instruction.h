@@ -776,6 +776,21 @@ public:
     return V->getKind() == ValueKind::DeallocVarInst;
   }
 };
+  
+/// DeallocRefInst - Deallocate memory allocated for a box or reference type
+/// instance. This does not destroy the referenced instance; it must either be
+/// uninitialized or have been manually destroyed.
+class DeallocRefInst : public Instruction {
+  Value Operand;
+public:
+  DeallocRefInst(SILLocation Loc, Value Operand);
+  
+  Value getOperand() const { return Operand; }
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::DeallocRefInst;
+  }
+};
 
 /// DestroyAddrInst - Destroy the value at a memory location and deallocate the
 /// memory. This is similar to:

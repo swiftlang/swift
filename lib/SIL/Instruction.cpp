@@ -428,6 +428,11 @@ DeallocVarInst::DeallocVarInst(SILLocation loc, AllocKind allocKind,
     Operand(operand) {
 }
 
+DeallocRefInst::DeallocRefInst(SILLocation loc, Value operand)
+  : Instruction(ValueKind::DeallocRefInst, loc),
+    Operand(operand) {
+}
+
 DestroyAddrInst::DestroyAddrInst(SILLocation Loc, Value Operand)
   : Instruction(ValueKind::DestroyAddrInst, Loc), Operand(Operand) {
 }

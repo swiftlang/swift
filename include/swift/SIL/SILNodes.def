@@ -89,6 +89,7 @@ ABSTRACT_VALUE(Instruction, Value)
   INST(RetainInst, Instruction)
   INST(ReleaseInst, Instruction)
   INST(DeallocVarInst, Instruction)
+  INST(DeallocRefInst, Instruction)
   INST(DestroyAddrInst, Instruction)
   
   ABSTRACT_VALUE(ConversionInst, Instruction)

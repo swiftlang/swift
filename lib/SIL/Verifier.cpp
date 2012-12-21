@@ -177,19 +177,29 @@ public:
   
   void visitRetainInst(RetainInst *RI) {
     assert(!RI->getOperand().getType().isAddress() &&
-           "Operand of retain must not be lvalue");
+           "Operand of retain must not be address");
+    assert(RI->getOperand().getType().hasReferenceSemantics() &&
+           "Operand of dealloc_ref must be reference type");
   }
   void visitReleaseInst(ReleaseInst *RI) {
     assert(!RI->getOperand().getType().isAddress() &&
-           "Operand of release must not be lvalue");
+           "Operand of release must not be address");
+    assert(RI->getOperand().getType().hasReferenceSemantics() &&
+           "Operand of dealloc_ref must be reference type");
   }
   void visitDeallocVarInst(DeallocVarInst *DI) {
     assert(DI->getOperand().getType().isAddress() &&
-           "Operand of dealloc must be lvalue");
+           "Operand of dealloc_var must be address");
+  }
+  void visitDeallocRefInst(DeallocRefInst *DI) {
+    assert(!DI->getOperand().getType().isAddress() &&
+           "Operand of dealloc_ref must not be address");
+    assert(DI->getOperand().getType().hasReferenceSemantics() &&
+           "Operand of dealloc_ref must be reference type");
   }
   void visitDestroyAddrInst(DestroyAddrInst *DI) {
-    assert(DI->getOperand().getType().isAddress() &&
-           "Operand of destroy must be lvalue");
+    assert(DI->getOperand().getType().isAddressOnly() &&
+           "Operand of destroy_addr must be address-only");
   }
 
   void visitIndexAddrInst(IndexAddrInst *IAI) {

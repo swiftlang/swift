@@ -267,6 +267,9 @@ public:
                                    Value operand) {
     return insert(new DeallocVarInst(loc, allocKind, operand));
   }
+  DeallocRefInst *createDeallocRef(SILLocation loc, Value operand) {
+    return insert(new DeallocRefInst(loc, operand));
+  }
   DestroyAddrInst *createDestroyAddr(SILLocation Loc, Value Operand) {
     return insert(new DestroyAddrInst(Loc, Operand));
   }
