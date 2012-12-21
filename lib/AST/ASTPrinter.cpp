@@ -17,7 +17,9 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/PrintOptions.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -25,7 +27,7 @@ using namespace swift;
 
 namespace {
   /// \brief AST pretty-printer.
-  class PrintAST : public DeclVisitor<PrintAST> {
+  class PrintAST : public ASTVisitor<PrintAST> {
     raw_ostream &OS;
     const PrintOptions &Options;
     llvm::SmallVectorImpl<std::pair<Decl *, uint64_t>> *DeclOffsets;
@@ -71,6 +73,9 @@ namespace {
 #define DECL_RANGE(Name,Start,End)
 #include "swift/AST/DeclNodes.def"
 
+#define STMT(Name, Parent) void visit##Name##Stmt(Name##Stmt *stmt);
+#include "swift/AST/StmtNodes.def"
+    
   public:
     PrintAST(raw_ostream &os, const PrintOptions &options,
              llvm::SmallVectorImpl<std::pair<Decl *, uint64_t>> *declOffsets)
@@ -318,7 +323,11 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
 }
 
 void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
-  // FIXME: Implement once we can pretty-print statements and expressions
+  if (auto stmt = decl->getBody().dyn_cast<Stmt *>()) {
+    visit(stmt);
+  } else {
+    // FIXME: print expression
+  }
 }
 
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
@@ -467,7 +476,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     return;
   }
 
-  // FIXME: Print function body
+  OS << " ";
+  visit(decl->getBody()->getBody());
 }
 
 void PrintAST::visitOneOfElementDecl(OneOfElementDecl *decl) {
@@ -523,7 +533,8 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
     return;
   }
 
-  // FIXME: Print constructor body
+  OS << " ";
+  visit(decl->getBody());
 }
 
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
@@ -536,7 +547,125 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
     return;
   }
 
-  // FIXME: Print destructor body
+  OS << " ";
+  visit(decl->getBody());
+}
+
+void PrintAST::visitSemiStmt(SemiStmt *stmt) {
+  indent();
+  OS << ";";
+}
+
+void PrintAST::visitAssignStmt(AssignStmt *stmt) {
+  indent();
+  // FIXME: lhs
+  OS << " = ";
+  // FIXME: rhs
+}
+
+void PrintAST::visitBraceStmt(BraceStmt *stmt) {
+  indent();
+  OS << "{";
+  {
+    IndentRAII indentMore(*this);
+    for (auto element : stmt->getElements()) {
+      OS << "\n";
+      if (auto decl = element.dyn_cast<Decl*>()) {
+        visit(decl);
+      } else if (auto stmt = element.dyn_cast<Stmt*>()) {
+        visit(stmt);
+      } else {
+        // FIXME: print expression
+        // visit(element.get<Expr*>());
+      }
+    }
+  }
+  OS << "\n";
+  indent();
+  OS << "}";
+}
+
+void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
+  indent();
+  OS << "return";
+  if (stmt->hasResult()) {
+    OS << " ";
+    // FIXME: print expression, w/o initial indentation.
+  }
+}
+
+void PrintAST::visitIfStmt(IfStmt *stmt) {
+  indent();
+  OS << "if ";
+  // FIXME: print condition
+  OS << " ";
+  visit(stmt->getThenStmt());
+  if (auto elseStmt = stmt->getElseStmt()) {
+    OS << " else ";
+    visit(elseStmt);
+  }
+}
+
+void PrintAST::visitWhileStmt(WhileStmt *stmt) {
+  indent();
+  OS << "while ";
+  // FIXME: print condition
+  OS << " ";
+  visit(stmt->getBody());
+}
+
+void PrintAST::visitDoWhileStmt(DoWhileStmt *stmt) {
+  indent();
+  OS << "do ";
+  visit(stmt->getBody());
+  OS << " while ";
+  // FIXME: print condition
+}
+
+void PrintAST::visitForStmt(ForStmt *stmt) {
+  indent();
+  OS << "for(";
+  if (!stmt->getInitializer().isNull()) {
+    if (auto assign = stmt->getInitializer().dyn_cast<AssignStmt *>())
+      visit(assign);
+    else {
+      // FIXME: print expr
+    }
+  }
+  OS << "; ";
+  if (stmt->getCond().isNonNull()) {
+    // FIXME: print cond
+  }
+  OS << "; ";
+  if (!stmt->getIncrement().isNull()) {
+    if (auto assign = stmt->getIncrement().dyn_cast<AssignStmt *>())
+      visit(assign);
+    else {
+      // FIXME: print expr
+    }
+  }
+  OS << ") ";
+  visit(stmt->getBody());
+}
+
+void PrintAST::visitForEachStmt(ForEachStmt *stmt) {
+  indent();
+  OS << "for ";
+  printPattern(stmt->getPattern());
+  OS << " in ";
+  // FIXME: print container
+  OS << " ";
+  visit(stmt->getBody());
+}
+
+void PrintAST::visitBreakStmt(BreakStmt *stmt) {
+  indent();
+  OS << "break";
+}
+
+void PrintAST::visitContinueStmt(ContinueStmt *stmt) {
+  indent();
+  OS << "continue";
 }
 
 void Decl::print(raw_ostream &os) const {
