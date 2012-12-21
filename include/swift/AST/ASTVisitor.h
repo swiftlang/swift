@@ -31,28 +31,31 @@ template<typename ImplClass,
          typename ExprRetTy = void,
          typename StmtRetTy = void,
          typename DeclRetTy = void,
-         typename PatternRetTy = void> 
+         typename PatternRetTy = void,
+         typename... Args>
 class ASTVisitor {
 public:
 
-  DeclRetTy visit(Decl *D) {
+  DeclRetTy visit(Decl *D, Args... AA) {
     switch (D->getKind()) {
 #define DECL(CLASS, PARENT) \
     case DeclKind::CLASS: \
       return static_cast<ImplClass*>(this) \
-        ->visit##CLASS##Decl(static_cast<CLASS##Decl*>(D));
+        ->visit##CLASS##Decl(static_cast<CLASS##Decl*>(D), \
+                             ::std::forward<Args>(AA)...);
 #include "swift/AST/DeclNodes.def"
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
   
-  ExprRetTy visit(Expr *E) {
+  ExprRetTy visit(Expr *E, Args... AA) {
     switch (E->getKind()) {
 
 #define EXPR(CLASS, PARENT) \
     case ExprKind::CLASS: \
       return static_cast<ImplClass*>(this) \
-        ->visit##CLASS##Expr(static_cast<CLASS##Expr*>(E));
+        ->visit##CLASS##Expr(static_cast<CLASS##Expr*>(E), \
+                             ::std::forward<Args>(AA)...);
 #include "swift/AST/ExprNodes.def"
 
     }
@@ -65,13 +68,14 @@ public:
   // a template, it will only instantiate cases that are used and thus we still
   // require full coverage of the AST nodes by the visitor.
 #define ABSTRACT_EXPR(CLASS, PARENT)                                \
-  ExprRetTy visit##CLASS##Expr(CLASS##Expr *E) {                    \
-     return static_cast<ImplClass*>(this)->visit##PARENT(E);  \
+  ExprRetTy visit##CLASS##Expr(CLASS##Expr *E, Args... AA) {  \
+     return static_cast<ImplClass*>(this)->visit##PARENT(E, \
+                                                ::std::forward<Args>(AA)...);  \
   }
 #define EXPR(CLASS, PARENT) ABSTRACT_EXPR(CLASS, PARENT)
 #include "swift/AST/ExprNodes.def"
 
-  StmtRetTy visit(Stmt *S) {
+  StmtRetTy visit(Stmt *S, Args... AA) {
     switch (S->getKind()) {
 
 #define STMT(CLASS, PARENT) \
@@ -84,7 +88,7 @@ public:
     llvm_unreachable("Not reachable, all cases handled");
   }
 
-  DeclRetTy visitDecl(Decl *D) { return DeclRetTy(); }
+  DeclRetTy visitDecl(Decl *D, Args... AA) { return DeclRetTy(); }
 
 #define DECL(CLASS, PARENT) \
   DeclRetTy visit##CLASS##Decl(CLASS##Decl *D) {\
@@ -93,12 +97,13 @@ public:
 #define ABSTRACT_DECL(CLASS, PARENT) DECL(CLASS, PARENT)
 #include "swift/AST/DeclNodes.def"
 
-  PatternRetTy visit(Pattern *P) {
+  PatternRetTy visit(Pattern *P, Args... AA) {
     switch (P->getKind()) {
 #define PATTERN(CLASS, PARENT) \
     case PatternKind::CLASS: \
       return static_cast<ImplClass*>(this) \
-        ->visit##CLASS##Pattern(static_cast<CLASS##Pattern*>(P));
+        ->visit##CLASS##Pattern(static_cast<CLASS##Pattern*>(P), \
+                                ::std::forward<Args>(AA)...);
 #include "swift/AST/PatternNodes.def"
     }
     llvm_unreachable("Not reachable, all cases handled");
@@ -106,17 +111,21 @@ public:
 };
   
   
-template<typename ImplClass, typename ExprRetTy = void>
-using ExprVisitor = ASTVisitor<ImplClass, ExprRetTy>;
+template<typename ImplClass, typename ExprRetTy = void, typename... Args>
+using ExprVisitor = ASTVisitor<ImplClass, ExprRetTy, void, void, void,
+                               Args...>;
 
-template<typename ImplClass, typename StmtRetTy = void>
-using StmtVisitor = ASTVisitor<ImplClass, void, StmtRetTy>;
+template<typename ImplClass, typename StmtRetTy = void, typename... Args>
+using StmtVisitor = ASTVisitor<ImplClass, void, StmtRetTy, void, void,
+                               Args...>;
 
-template<typename ImplClass, typename DeclRetTy = void>
-using DeclVisitor = ASTVisitor<ImplClass, void, void, DeclRetTy>;
+template<typename ImplClass, typename DeclRetTy = void, typename... Args>
+using DeclVisitor = ASTVisitor<ImplClass, void, void, DeclRetTy, void,
+                               Args...>;
 
-template<typename ImplClass, typename PatternRetTy = void>
-using PatternVisitor = ASTVisitor<ImplClass, void, void, void, PatternRetTy>;
+template<typename ImplClass, typename PatternRetTy = void, typename... Args>
+using PatternVisitor = ASTVisitor<ImplClass, void, void, void, PatternRetTy,
+                                  Args...>;
 
 } // end namespace swift
   
