@@ -195,7 +195,7 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
 
 LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
   LValue lv;
-  Value materialized = gen.visitMaterializeExpr(e).getUnmanagedValue();
+  Value materialized = gen.visit(e).getUnmanagedValue();
   lv.add<AddressComponent>(materialized);
   return ::std::move(lv);
 }

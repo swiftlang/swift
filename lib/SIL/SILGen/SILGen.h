@@ -134,9 +134,44 @@ struct Materialize {
   ManagedValue consume(SILGenFunction &gen, SILLocation loc);
 };
   
+/// SGFContext - Internal context information for the SILGenFunction visitor.
+struct SGFContext {
+  /// The Initialization, if any, the current expr should emit its result into.
+  Initialization /*nullable*/ *emitInto;
+  /// True if the current expr is a direct child of a LoadExpr. Used to avoid
+  /// materializing a temporary that's only immediately going to be loaded.
+  bool isChildOfLoadExpr : 1;
+  /// True if the result of the current expression will be used as a function
+  /// argument tuple. This affects the lowering of the tuple type; a tuple
+  /// containing an address-only value of type T should lower to a
+  /// tuple-of-address value, e.g. (*T, Int), whereas a normal tuple value
+  /// should lower to an address-only in-memory tuple, e.g. *(T, Int).
+  bool isArgumentTuple : 1;
+  
+  SGFContext()
+    : emitInto(nullptr),
+      isChildOfLoadExpr(false),
+      isArgumentTuple(false)
+  {}
+  
+  SGFContext(Initialization *emitInto,
+             bool isChildOfLoadExpr,
+             bool isArgumentTuple)
+    : emitInto(emitInto),
+      isChildOfLoadExpr(isChildOfLoadExpr),
+      isArgumentTuple(isArgumentTuple)
+  {}
+};
+  
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
-  : public ASTVisitor<SILGenFunction, ManagedValue, void> {
+  : public ASTVisitor<SILGenFunction,
+                      /*ExprRetTy=*/ ManagedValue,
+                      /*StmtRetTy=*/ void,
+                      /*DeclRetTy=*/ void,
+                      /*PatternRetTy=*/ void,
+                      /*Args...=*/ SGFContext>
+{
 public:
   /// The SILGenModule this function belongs to.
   SILGenModule &SGM;
@@ -255,31 +290,40 @@ public:
   /// - For address-only types, the value at the address is destroyed using
   ///   a destroy_addr instruction.
   void emitReleaseRValue(SILLocation loc, Value v);
-    
+                        
+  //===--------------------------------------------------------------------===//
+  // Public entry points
+  //===--------------------------------------------------------------------===//
+  using ASTVisitorType::visit;
+  
+  ManagedValue visit(Expr *E);
+  void visit(Stmt *S) { visit(S, SGFContext()); }
+  void visit(Decl *D) { visit(D, SGFContext()); }
+  
   //===--------------------------------------------------------------------===//
   // Statements
   //===--------------------------------------------------------------------===//
   
-  void visitBraceStmt(BraceStmt *S);
-  void visitSemiStmt(SemiStmt *S) {}
+  void visitBraceStmt(BraceStmt *S, SGFContext C);
+  void visitSemiStmt(SemiStmt *S, SGFContext C) {}
   
-  void visitAssignStmt(AssignStmt *S);
+  void visitAssignStmt(AssignStmt *S, SGFContext C);
 
-  void visitReturnStmt(ReturnStmt *S);
+  void visitReturnStmt(ReturnStmt *S, SGFContext C);
   
-  void visitIfStmt(IfStmt *S);
+  void visitIfStmt(IfStmt *S, SGFContext C);
   
-  void visitWhileStmt(WhileStmt *S);
+  void visitWhileStmt(WhileStmt *S, SGFContext C);
   
-  void visitDoWhileStmt(DoWhileStmt *S);
+  void visitDoWhileStmt(DoWhileStmt *S, SGFContext C);
   
-  void visitForStmt(ForStmt *S);
+  void visitForStmt(ForStmt *S, SGFContext C);
   
-  void visitForEachStmt(ForEachStmt *S);
+  void visitForEachStmt(ForEachStmt *S, SGFContext C);
   
-  void visitBreakStmt(BreakStmt *S);
+  void visitBreakStmt(BreakStmt *S, SGFContext C);
   
-  void visitContinueStmt(ContinueStmt *S);
+  void visitContinueStmt(ContinueStmt *S, SGFContext C);
   
   //===--------------------------------------------------------------------===//
   // Expressions
@@ -293,47 +337,53 @@ public:
   void emitExprInto(Expr *E, Initialization *I);
     
   /// Unreachable default case for unimplemented expr nodes.
-  ManagedValue visitExpr(Expr *E);
+  ManagedValue visitExpr(Expr *E, SGFContext C);
   
-  ManagedValue visitApplyExpr(ApplyExpr *E);
-  ManagedValue visitDeclRefExpr(DeclRefExpr *E);
-  ManagedValue visitIntegerLiteralExpr(IntegerLiteralExpr *E);
-  ManagedValue visitFloatLiteralExpr(FloatLiteralExpr *E);
-  ManagedValue visitCharacterLiteralExpr(CharacterLiteralExpr *E);
-  ManagedValue visitStringLiteralExpr(StringLiteralExpr *E);
-  ManagedValue visitLoadExpr(LoadExpr *E);
-  ManagedValue visitMaterializeExpr(MaterializeExpr *E);
-  ManagedValue visitDerivedToBaseExpr(DerivedToBaseExpr *E);
-  ManagedValue visitMetatypeConversionExpr(MetatypeConversionExpr *E);
-  ManagedValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E);
-  ManagedValue visitRequalifyExpr(RequalifyExpr *E);
-  ManagedValue visitFunctionConversionExpr(FunctionConversionExpr *E);
-  ManagedValue visitErasureExpr(ErasureExpr *E);
-  ManagedValue visitCoerceExpr(CoerceExpr *E);
-  ManagedValue visitDowncastExpr(DowncastExpr *E);
-  ManagedValue visitParenExpr(ParenExpr *E);
-  ManagedValue visitTupleExpr(TupleExpr *E);
-  ManagedValue visitScalarToTupleExpr(ScalarToTupleExpr *E);
-  ManagedValue visitGetMetatypeExpr(GetMetatypeExpr *E);
-  ManagedValue visitSpecializeExpr(SpecializeExpr *E);
-  ManagedValue visitAddressOfExpr(AddressOfExpr *E);
-  ManagedValue visitMemberRefExpr(MemberRefExpr *E);
-  ManagedValue visitGenericMemberRefExpr(GenericMemberRefExpr *E);
-  ManagedValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E);
-  ManagedValue visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E);
-  ManagedValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E);
-  ManagedValue visitModuleExpr(ModuleExpr *E);
-  ManagedValue visitTupleElementExpr(TupleElementExpr *E);
-  ManagedValue visitSubscriptExpr(SubscriptExpr *E);
-  ManagedValue visitGenericSubscriptExpr(GenericSubscriptExpr *E);
-  ManagedValue visitTupleShuffleExpr(TupleShuffleExpr *E);
-  ManagedValue visitNewArrayExpr(NewArrayExpr *E);
-  ManagedValue visitMetatypeExpr(MetatypeExpr *E);
-  ManagedValue visitFuncExpr(FuncExpr *E);
-  ManagedValue visitClosureExpr(ClosureExpr *E);
+  ManagedValue visitApplyExpr(ApplyExpr *E, SGFContext C);
+  ManagedValue visitDeclRefExpr(DeclRefExpr *E, SGFContext C);
+  ManagedValue visitIntegerLiteralExpr(IntegerLiteralExpr *E, SGFContext C);
+  ManagedValue visitFloatLiteralExpr(FloatLiteralExpr *E, SGFContext C);
+  ManagedValue visitCharacterLiteralExpr(CharacterLiteralExpr *E, SGFContext C);
+  ManagedValue visitStringLiteralExpr(StringLiteralExpr *E, SGFContext C);
+  ManagedValue visitLoadExpr(LoadExpr *E, SGFContext C);
+  ManagedValue visitMaterializeExpr(MaterializeExpr *E, SGFContext C);
+  ManagedValue visitDerivedToBaseExpr(DerivedToBaseExpr *E, SGFContext C);
+  ManagedValue visitMetatypeConversionExpr(MetatypeConversionExpr *E,
+                                           SGFContext C);
+  ManagedValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
+  ManagedValue visitRequalifyExpr(RequalifyExpr *E, SGFContext C);
+  ManagedValue visitFunctionConversionExpr(FunctionConversionExpr *E,
+                                           SGFContext C);
+  ManagedValue visitErasureExpr(ErasureExpr *E, SGFContext C);
+  ManagedValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
+  ManagedValue visitDowncastExpr(DowncastExpr *E, SGFContext C);
+  ManagedValue visitParenExpr(ParenExpr *E, SGFContext C);
+  ManagedValue visitTupleExpr(TupleExpr *E, SGFContext C);
+  ManagedValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);
+  ManagedValue visitGetMetatypeExpr(GetMetatypeExpr *E, SGFContext C);
+  ManagedValue visitSpecializeExpr(SpecializeExpr *E, SGFContext C);
+  ManagedValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C);
+  ManagedValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
+  ManagedValue visitGenericMemberRefExpr(GenericMemberRefExpr *E, SGFContext C);
+  ManagedValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
+                                           SGFContext C);
+  ManagedValue visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E,
+                                             SGFContext C);
+  ManagedValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E,
+                                             SGFContext C);
+  ManagedValue visitModuleExpr(ModuleExpr *E, SGFContext C);
+  ManagedValue visitTupleElementExpr(TupleElementExpr *E, SGFContext C);
+  ManagedValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
+  ManagedValue visitGenericSubscriptExpr(GenericSubscriptExpr *E, SGFContext C);
+  ManagedValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
+  ManagedValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
+  ManagedValue visitMetatypeExpr(MetatypeExpr *E, SGFContext C);
+  ManagedValue visitFuncExpr(FuncExpr *E, SGFContext C);
+  ManagedValue visitClosureExpr(ClosureExpr *E, SGFContext C);
   ManagedValue visitInterpolatedStringLiteralExpr(
-                                              InterpolatedStringLiteralExpr *E);
-    
+                                              InterpolatedStringLiteralExpr *E,
+                                              SGFContext C);
+  
   void emitApplyArguments(Expr *argsExpr,
                           llvm::SmallVectorImpl<Value> &args,
                           llvm::SmallVectorImpl<Writeback> &writebacks);
@@ -384,20 +434,20 @@ public:
   // Declarations
   //===--------------------------------------------------------------------===//
   
-  void visitDecl(Decl *D) {
+  void visitDecl(Decl *D, SGFContext C) {
     D->dump();
     llvm_unreachable("Not yet implemented");
   }
 
-  void visitNominalTypeDecl(NominalTypeDecl *D);
-  void visitFuncDecl(FuncDecl *D);
-  void visitPatternBindingDecl(PatternBindingDecl *D);
+  void visitNominalTypeDecl(NominalTypeDecl *D, SGFContext C);
+  void visitFuncDecl(FuncDecl *D, SGFContext C);
+  void visitPatternBindingDecl(PatternBindingDecl *D, SGFContext C);
     
-  void visitTypeAliasDecl(TypeAliasDecl *D) {
+  void visitTypeAliasDecl(TypeAliasDecl *D, SGFContext C) {
     // No lowering support needed.
   }
     
-  void visitVarDecl(VarDecl *D) {
+  void visitVarDecl(VarDecl *D, SGFContext C) {
     // We handle these in pattern binding.
   }
 

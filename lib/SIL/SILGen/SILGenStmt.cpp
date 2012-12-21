@@ -80,7 +80,7 @@ Condition SILGenFunction::emitCondition(Stmt *TheStmt, Expr *E,
   return Condition(TrueBB, FalseBB, ContBB);
 }
 
-void SILGenFunction::visitBraceStmt(BraceStmt *S) {
+void SILGenFunction::visitBraceStmt(BraceStmt *S, SGFContext C) {
   // Enter a new scope.
   Scope BraceScope(Cleanups);
   
@@ -128,7 +128,7 @@ static void emitAssignStmtRecursive(AssignStmt *S, ManagedValue Src, Expr *Dest,
 }
 
 
-void SILGenFunction::visitAssignStmt(AssignStmt *S) {
+void SILGenFunction::visitAssignStmt(AssignStmt *S, SGFContext C) {
   FullExpr scope(Cleanups);
   ManagedValue SrcV = visit(S->getSrc());
 
@@ -150,7 +150,7 @@ public:
 
 } // end anonymous namespace
 
-void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
+void SILGenFunction::visitReturnStmt(ReturnStmt *S, SGFContext C) {
   Value ArgV;
   if (IndirectReturnAddress) {
     // Indirect return of an address-only value.
@@ -170,7 +170,7 @@ void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
   Cleanups.emitReturnAndCleanups(S, ArgV);
 }
 
-void SILGenFunction::visitIfStmt(IfStmt *S) {
+void SILGenFunction::visitIfStmt(IfStmt *S, SGFContext C) {
   Condition Cond = emitCondition(S, S->getCond(), S->getElseStmt() != nullptr);
   
   if (Cond.hasTrue()) {
@@ -189,7 +189,7 @@ void SILGenFunction::visitIfStmt(IfStmt *S) {
   Cond.complete(B);
 }
 
-void SILGenFunction::visitWhileStmt(WhileStmt *S) {
+void SILGenFunction::visitWhileStmt(WhileStmt *S, SGFContext C) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (F.getModule()) BasicBlock(&F, "while");
   B.emitBlock(LoopBB);
@@ -220,7 +220,7 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S) {
   ContinueDestStack.pop_back();
 }
 
-void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
+void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S, SGFContext C) {
   // Create a new basic block and jump into it.
   BasicBlock *LoopBB = new (F.getModule()) BasicBlock(&F, "dowhile");
   B.emitBlock(LoopBB);
@@ -252,7 +252,7 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
   ContinueDestStack.pop_back();
 }
 
-void SILGenFunction::visitForStmt(ForStmt *S) {
+void SILGenFunction::visitForStmt(ForStmt *S, SGFContext C) {
   // Enter a new scope.
   Scope ForScope(Cleanups);
   
@@ -316,10 +316,10 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
   ContinueDestStack.pop_back();
 }
 
-void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
+void SILGenFunction::visitForEachStmt(ForEachStmt *S, SGFContext C) {
   // Emit the 'range' variable that we'll be using for iteration.
   Scope OuterForScope(Cleanups);
-  visitPatternBindingDecl(S->getRange());
+  visitPatternBindingDecl(S->getRange(), SGFContext());
   
   // If we ever reach an unreachable point, stop emitting statements.
   // This will need revision if we ever add goto.
@@ -344,7 +344,7 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
     // at the end of each loop iteration.
     {
       Scope InnerForScope(Cleanups);
-      visitPatternBindingDecl(S->getElementInit());
+      visitPatternBindingDecl(S->getElementInit(), SGFContext());
       visit(S->getBody());
     }
     
@@ -362,11 +362,11 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   ContinueDestStack.pop_back();
 }
 
-void SILGenFunction::visitBreakStmt(BreakStmt *S) {
+void SILGenFunction::visitBreakStmt(BreakStmt *S, SGFContext C) {
   Cleanups.emitBranchAndCleanups(BreakDestStack.back());
 }
 
-void SILGenFunction::visitContinueStmt(ContinueStmt *S) {
+void SILGenFunction::visitContinueStmt(ContinueStmt *S, SGFContext C) {
   Cleanups.emitBranchAndCleanups(ContinueDestStack.back());
 }
 

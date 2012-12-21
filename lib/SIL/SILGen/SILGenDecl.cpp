@@ -38,7 +38,7 @@ namespace {
   };
 }
 
-void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
+void SILGenFunction::visitFuncDecl(FuncDecl *fd, SGFContext C) {
   // Generate the local function body.
   SGM.emitFunction(fd, fd->getBody());
   
@@ -249,7 +249,8 @@ struct InitializationForPattern
 } // end anonymous namespace
 
 
-void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
+void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D,
+                                             SGFContext C) {
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
   llvm::OwningPtr<Initialization> initialization(
@@ -525,7 +526,7 @@ void SILGenModule::visitNominalTypeDecl(NominalTypeDecl *ntd) {
   SILGenType(*this).visit(ntd);
 }
 
-void SILGenFunction::visitNominalTypeDecl(NominalTypeDecl *ntd) {
+void SILGenFunction::visitNominalTypeDecl(NominalTypeDecl *ntd, SGFContext C) {
   SILGenType(SGM).visit(ntd);
 }
 
