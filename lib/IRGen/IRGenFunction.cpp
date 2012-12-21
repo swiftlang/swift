@@ -86,8 +86,8 @@ static AllocToken getAllocToken(IRGenModule &IGM, uint64_t size) {
 
 static llvm::AttributeSet getAllocAttrs(llvm::LLVMContext &ctx) {
   llvm::AttributeWithIndex attrValues[] = {
-    llvm::AttributeWithIndex::get(ctx, 0, llvm::Attributes::NoAlias),
-    llvm::AttributeWithIndex::get(ctx, ~0, llvm::Attributes::NoUnwind)
+    llvm::AttributeWithIndex::get(ctx, 0, llvm::Attribute::NoAlias),
+    llvm::AttributeWithIndex::get(ctx, ~0, llvm::Attribute::NoUnwind)
   };
   return llvm::AttributeSet::get(ctx, attrValues);
 }
