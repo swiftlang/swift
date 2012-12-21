@@ -35,6 +35,7 @@ template<typename ImplClass,
          typename... Args>
 class ASTVisitor {
 public:
+  typedef ASTVisitor ASTVisitorType;
 
   DeclRetTy visit(Decl *D, Args... AA) {
     switch (D->getKind()) {
@@ -81,7 +82,8 @@ public:
 #define STMT(CLASS, PARENT) \
     case StmtKind::CLASS: \
       return static_cast<ImplClass*>(this) \
-        ->visit##CLASS##Stmt(static_cast<CLASS##Stmt*>(S));
+        ->visit##CLASS##Stmt(static_cast<CLASS##Stmt*>(S), \
+                             ::std::forward<Args>(AA)...);
 #include "swift/AST/StmtNodes.def"
 
     }
@@ -91,8 +93,9 @@ public:
   DeclRetTy visitDecl(Decl *D, Args... AA) { return DeclRetTy(); }
 
 #define DECL(CLASS, PARENT) \
-  DeclRetTy visit##CLASS##Decl(CLASS##Decl *D) {\
-    return static_cast<ImplClass*>(this)->visit##PARENT(D);\
+  DeclRetTy visit##CLASS##Decl(CLASS##Decl *D, Args... AA) {\
+    return static_cast<ImplClass*>(this)->visit##PARENT(D, \
+                                                 ::std::forward<Args>(AA)...); \
   }
 #define ABSTRACT_DECL(CLASS, PARENT) DECL(CLASS, PARENT)
 #include "swift/AST/DeclNodes.def"
