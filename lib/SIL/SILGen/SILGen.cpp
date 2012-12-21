@@ -24,10 +24,7 @@ using namespace Lowering;
 // IRGenFunction::emitEpilogue to handle all cases where a default void return
 // is needed
 static bool isVoidableType(Type type) {
-  if (TupleType *tt = type->getAs<TupleType>()) {
-    return tt->getFields().empty();
-  } else
-    return false;
+  return type->isEqual(type->getASTContext().TheEmptyTupleType);
 }
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F,

@@ -31,6 +31,7 @@ namespace Lowering {
   class ManagedValue;
   class TypeConverter;
   class SILGenFunction;
+  class Initialization;
   struct Writeback;
 
 /// SILGenModule - an ASTVisitor for generating SIL from top-level declarations
@@ -284,6 +285,13 @@ public:
   // Expressions
   //===--------------------------------------------------------------------===//
   
+  /// Generate SIL for the given expression, storing the final result into the
+  /// specified Initialization buffer(s). This avoids an allocation and copy if
+  /// the result would be allocated into temporary memory normally.*
+  ///
+  /// *FIXME: does not actually avoid copy yet!
+  void emitExprInto(Expr *E, Initialization *I);
+    
   /// Unreachable default case for unimplemented expr nodes.
   ManagedValue visitExpr(Expr *E);
   

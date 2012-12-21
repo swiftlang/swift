@@ -11,16 +11,21 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "Initialization.h"
 #include "ManagedValue.h"
 #include "Scope.h"
 #include "TypeInfo.h"
+#include "llvm/ADT/OwningPtr.h"
 #include "swift/SIL/BBArgument.h"
+#include "swift/SIL/SILType.h"
 #include "swift/AST/AST.h"
 #include <iterator>
 using namespace swift;
 using namespace Lowering;
 
 #include "llvm/Support/raw_ostream.h"
+
+void Initialization::_anchor() {}
 
 namespace {
   class CleanupClosureConstant : public Cleanup {
@@ -50,58 +55,196 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
 
 namespace {
 
-class CleanupVar : public Cleanup {
+/// An Initialization of a tuple pattern, such as "var (a,b)".
+class TupleInitialization : public Initialization {
+public:
+  /// The sub-Initializations aggregated by this tuple initialization.
+  /// The TupleInitialization object takes ownership of Initializations pushed
+  /// here.
+  SmallVector<Initialization*, 4>  subInitializations;
+
+  TupleInitialization() {}
+  
+  ~TupleInitialization() override {
+    for (auto sub : subInitializations) {
+      delete sub;
+    }
+  }
+  
+  Value getAddressOrNull() override {
+    if (subInitializations.size() == 1)
+      return subInitializations[0]->getAddressOrNull();
+    else
+      return Value();
+  }
+  
+  ArrayRef<Initialization*> getSubInitializations() override {
+    return subInitializations;
+  }
+  
+  void zeroInitialize(SILGenFunction &gen) override {
+    for (auto sub : subInitializations)
+      sub->zeroInitialize(gen);
+  }
+};
+
+/// Cleanup for a boxed variable. Before the box contents are initialized, only
+/// the allocation can be cleaned up using dealloc_ref. After initialization the
+/// box and contained value are both governed by its retain count, so it
+/// cleans up by a release.
+class CleanupBox : public Cleanup {
   AllocBoxInst *box;
 public:
-  CleanupVar(AllocBoxInst *box) : box(box) {}
+  CleanupBox(AllocBoxInst *box)
+    : box(box) {}
+  
   void emit(SILGenFunction &gen) override {
-    gen.B.createRelease(SILLocation(), Value(box, 0));
+    // FIXME: provide a way to mark the cleanup initialized.
+    //if (initialized)
+      gen.B.createRelease(SILLocation(), Value(box, 0));
+    //else
+    //  gen.B.createDeallocRef(SILLocation(), Value(box, 0));
+  }
+};
+
+/// Abstract base class for single-buffer initializations
+class SingleInitializationBase : public Initialization {
+public:
+  ArrayRef<Initialization*> getSubInitializations() override {
+    return {};
+  }
+  
+  void zeroInitialize(SILGenFunction &gen) override {
+    Value address = getAddress();
+    if (address.getType().isAddressOnly())
+      gen.B.createZeroAddr(SILLocation(), address);
+    else {
+      Value zero = gen.B.createZeroValue(SILLocation(),
+                                         address.getType().getObjectType());
+      gen.B.createStore(SILLocation(), zero, address);
+    }
+    finishInitialization(gen);
+  }
+};
+
+/// An initialization of a box allocated by alloc_box.
+class BoxInitialization : public SingleInitializationBase {
+  /// The box being initialized.
+  AllocBoxInst *box;
+  /// The cleanup for the allocated but uninitialized box. Once
+  /// this box has been initialized, it can be replaced by a 'release'
+  /// cleanup.
+  CleanupsDepth cleanup;
+  
+  bool didFinish;
+public:
+  /// Sets up an initialization for the allocated box. This pushes a
+  /// CleanupUninitializedBox cleanup that will be replaced when
+  /// initialization is completed.
+  BoxInitialization(AllocBoxInst *box, SILGenFunction &gen)
+    : box(box),
+      didFinish(false)
+  {
+    gen.Cleanups.pushCleanup<CleanupBox>(box);
+    cleanup = gen.getCleanupsDepth();
+  }
+  
+  ~BoxInitialization() override {
+    assert(didFinish && "did not call BoxInit::finishInitialization!");
+  }
+  
+  Value getAddressOrNull() override {
+    return Value(box, 1);
+  }
+  
+  void finishInitialization(SILGenFunction &gen) override {
+    assert(!didFinish && "called BoxInit::finishInitialization twice!");
+    // FIXME: mark the cleanup "initialized" somehow.
+    // cleanup.markInitialized();
+    didFinish = true;
   }
 };
   
-/// InitPatternWithExpr - A visitor for traversing a pattern and generating SIL
-/// code to allocate the declared variables and generate initialization
-/// sequences for their values.  If an initial value is specified by the "Init"
-/// expression, then it is used to initialize the corresponding decls.  If not,
-/// the decls are default initialized.  This does not occur within the
-/// initializer's full-expression;  that should be pushed at the appropriate
-/// moment.
-struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
+/// An initialization for a byref argument.
+class ByrefArgumentInitialization : public Initialization {
+  /// The VarDecl for the byref symbol.
+  VarDecl *vd;
+public:
+  ByrefArgumentInitialization(VarDecl *vd) : vd(vd) {}
+  
+  Value getAddressOrNull() override {
+    llvm_unreachable("byref argument does not have an address to store to");
+  }
+  ArrayRef<Initialization*> getSubInitializations() override { return {}; }
+
+  void bindAddress(Value address, SILGenFunction &gen) override {
+    // Use the input address as the var's address.
+    assert(address.getType().isAddress() &&
+           "binding a non-address to a byref argument?!");
+    gen.VarLocs[vd] = {Value(), address};
+  }
+
+  void zeroInitialize(SILGenFunction &gen) override {}
+};
+
+/// A "null" initialization that indicates that any value being initialized into
+/// this initialization should be discarded. This represents AnyPatterns
+/// (that is, 'var (_)') that bind to values without storing them.
+class BlackHoleInitialization : public Initialization {
+public:
+  BlackHoleInitialization() {}
+  
+  Value getAddressOrNull() override { return Value(); }
+  ArrayRef<Initialization*> getSubInitializations() override {
+    return {};
+  }
+  
+  void zeroInitialize(SILGenFunction &gen) override {}
+};
+
+/// InitializationForPattern - A visitor for traversing a pattern, generating
+/// SIL code to allocate the declared variables, and generating an
+/// Initialization representing the needed initializations. 
+struct InitializationForPattern
+  : public PatternVisitor<InitializationForPattern, Initialization *>
+{
   SILGenFunction &Gen;
-  Value Init;
-  InitPatternWithExpr(SILGenFunction &Gen, Value Init) : Gen(Gen), Init(Init) {}
+  InitializationForPattern(SILGenFunction &Gen) : Gen(Gen) {}
   
   // Paren & Typed patterns are noops, just look through them.
-  void visitParenPattern(ParenPattern *P) { visit(P->getSubPattern()); }
-  void visitTypedPattern(TypedPattern *P) { visit(P->getSubPattern()); }
+  Initialization *visitParenPattern(ParenPattern *P) {
+    return visit(P->getSubPattern());
+  }
+  Initialization *visitTypedPattern(TypedPattern *P) {
+    return visit(P->getSubPattern());
+  }
   
-  // AnyPatterns (i.e, _) don't require any further codegen beyond emitting the
-  // initializer.
-  void visitAnyPattern(AnyPattern *P) {}
+  // AnyPatterns (i.e, _) don't require any storage. Any value bound here will
+  // just be dropped.
+  Initialization *visitAnyPattern(AnyPattern *P) {
+    return new BlackHoleInitialization();
+  }
   
   // Bind to a named pattern by creating a memory location and initializing it
   // with the initial value.
-  void visitNamedPattern(NamedPattern *P) {
+  Initialization *visitNamedPattern(NamedPattern *P) {
     VarDecl *vd = P->getDecl();
     
     // If this is a property, we don't need to do anything here. We'll generate
     // the getter and setter when we see their FuncDecls.
     if (vd->isProperty())
-      return;
+      return new BlackHoleInitialization();
 
-    // If this is a [byref] argument, just use the argument lvalue as our
+    // If this is a [byref] argument, bind the argument lvalue as our
     // address.
-    // FIXME: capturing byrefs?
-    if (vd->getType()->is<LValueType>()) {
-      Gen.VarLocs[vd] = {Value(), Init};
-      return;
-    }
+    if (vd->getType()->is<LValueType>())
+      return new ByrefArgumentInitialization(vd);
 
     // FIXME: Use escape analysis info to generate "alloc_var"/"dealloc_var"
     // stack allocations instead of "alloc_box"/"release" for values that don't
     // escape and thus don't need boxes.
-    TypeInfo const &ti = Gen.getTypeInfo(vd->getType());
-    auto allocBox = Gen.B.createAllocBox(vd, ti.getLoweredType());
+    SILType lType = Gen.getLoweredType(vd->getType());
+    AllocBoxInst *allocBox = Gen.B.createAllocBox(vd, lType);
     auto box = Value(allocBox, 0);
     auto addr = Value(allocBox, 1);
 
@@ -109,121 +252,150 @@ struct InitPatternWithExpr : public PatternVisitor<InitPatternWithExpr> {
     /// decl to.
     Gen.VarLocs[vd] = {box, addr};
 
-    // FIXME: "Default zero initialization" is a dubious concept.  When we get
-    // something like typestate or another concept that allows us to model
-    // definitive assignment, then we can consider removing it.
-    // FIXME: Indirect returns (such as for address-only types) could be
-    // emplaced directly into the storage for the variable.
-    if (ti.isAddressOnly()) {
-      if (Init) {
-        Gen.B.createCopyAddr(vd, Init, addr,
-                             /*isTake=*/ false,
-                             /*isInitialize=*/ true);
-      } else {
-        Gen.B.createZeroAddr(vd, addr);
-      }
-    } else {
-      auto initVal = Init ? Init : Gen.B.createZeroValue(vd,
-                                                         ti.getLoweredType());
-      Gen.B.createStore(vd, initVal, addr);
-    }
-
-    Gen.Cleanups.pushCleanup<CleanupVar>(allocBox);
+    /// Create a BoxInitialization for the uninitialized box.
+    return new BoxInitialization(allocBox, Gen);
   }
   
-  // Bind to a tuple pattern by first trying to see if we can emit
-  // the initializers independently.
-  void visitTuplePattern(TuplePattern *P) {
-    // If we have no initializer, just emit the subpatterns using
-    // the missing initializer.
-    if (Init == nullptr) {
-      for (auto &elt : P->getFields())
-        visit(elt.getPattern());
-      return;
-    }
-
-    // Otherwise, iterate through the fields of the tuple that we're
-    // initializing and extract the interesting bits of Init out for each tuple
-    // element.
-    unsigned FieldNo = 0;
-    Value TupleInit = Init;
-    for (auto &elt : P->getFields()) {
-      TypeInfo const &eltTI = Gen.getTypeInfo(elt.getPattern()->getType());
-      // FIXME address-only tuple
-      Init = Gen.B.createExtract(SILLocation(), TupleInit, FieldNo++,
-                                 eltTI.getLoweredType());
-      visit(elt.getPattern());
-    }
+  // Bind a tuple pattern by aggregating the component variables into a
+  // TupleInitialization.
+  Initialization *visitTuplePattern(TuplePattern *P) {
+    TupleInitialization *init = new TupleInitialization();
+    for (auto &elt : P->getFields())
+      init->subInitializations.push_back(visit(elt.getPattern()));
+    return init;
   }
 };
+
 } // end anonymous namespace
 
 
 void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
-  // FIXME: Implement cleanups in a way that stands up to unwinding and handles
-  // cleanup of partial initializations.
+  // Allocate the variables and build up an Initialization over their
+  // allocated storage.
+  llvm::OwningPtr<Initialization> initialization(
+    InitializationForPattern(*this).visit(D->getPattern()));
   
-  // Actually emit the code to allocate space for each declared variable, and
-  // then initialize them.
-
-  // If an initial value was specified by the decl, use it to produce the
-  // initial values, otherwise use a "zero" placeholder value as the
-  // initializer.
-  Value initializer = nullptr;
+  // If an initial value expression was specified by the decl, emit it into
+  // the initialization. Otherwise, use "zero" placeholder initialization.
   if (D->getInit()) {
     FullExpr Scope(Cleanups);
-    initializer = visit(D->getInit()).forward(*this);
+    emitExprInto(D->getInit(), initialization.get());
+  } else {
+    initialization->zeroInitialize(*this);
   }
-  InitPatternWithExpr(*this, initializer).visit(D->getPattern());
 }
-
 
 namespace {
 
-/// ArgumentCreatorVisitor - A visitor for traversing a pattern and creating
-/// BBArguments for each pattern variable.  This is used to create function
-/// arguments and to set up cleanups to release the arguments on function exit.
-struct ArgumentCreatorVisitor :
-  public PatternVisitor<ArgumentCreatorVisitor, Value> {
+/// ArgumentInitVisitor - A visitor for traversing a pattern, creating
+/// BBArguments, and initializing the local value for each pattern variable
+/// in a function argument list.
+struct ArgumentInitVisitor :
+  public PatternVisitor<ArgumentInitVisitor, /*RetTy=*/ Value,
+                        /*Args...=*/ Initialization*>
+{
   SILGenFunction &gen;
   Function &f;
-  ArgumentCreatorVisitor(SILGenFunction &gen, Function &f) : gen(gen), f(f) {}
+  SILBuilder initB;
+  ArgumentInitVisitor(SILGenFunction &gen, Function &f)
+    : gen(gen), f(f), initB(f.begin(), f) {}
 
   Value makeArgument(Type ty, BasicBlock *parent) {
-    TypeInfo const &ti = gen.getTypeInfo(ty);
-    return new (f.getModule()) BBArgument(ti.getLoweredType(), parent);
+    return new (f.getModule()) BBArgument(gen.getLoweredType(ty), parent);
+  }
+  
+  void storeArgumentInto(Type ty, Value arg, SILLocation loc, Initialization *I)
+  {
+    if (I) {
+      if (ty->is<LValueType>()) {
+        I->bindAddress(arg, gen);
+      } else if (arg.getType().isAddressOnly()) {
+        initB.createCopyAddr(loc, arg, I->getAddress(),
+                             /*isTake=*/false,
+                             /*isInitialize=*/true);
+      } else {
+        initB.createStore(loc, arg, I->getAddress());
+      }
+      I->finishInitialization(gen);
+    }
+  }
+
+  /// Create a BBArgument and store its value into the given Initialization,
+  /// if not null.
+  Value makeArgumentInto(Type ty, BasicBlock *parent,
+                        SILLocation loc, Initialization *I) {
+    Value arg = makeArgument(ty, parent);
+    storeArgumentInto(ty, arg, loc, I);
+    return arg;
   }
     
   // Paren & Typed patterns are noops, just look through them.
-  Value visitParenPattern(ParenPattern *P) {return visit(P->getSubPattern());}
-  Value visitTypedPattern(TypedPattern *P) {
+  Value visitParenPattern(ParenPattern *P, Initialization *I) {
+    return visit(P->getSubPattern(), I);
+  }
+  Value visitTypedPattern(TypedPattern *P, Initialization *I) {
     // FIXME: work around a bug in visiting the "this" argument of methods
-    if (isa<NamedPattern>(P->getSubPattern()))
-      return makeArgument(P->getType(), f.begin());
+    if (NamedPattern *np = dyn_cast<NamedPattern>(P->getSubPattern()))
+      return makeArgumentInto(P->getType(), f.begin(),
+                              np->getDecl(), I);
     else
-      return visit(P->getSubPattern());
+      return visit(P->getSubPattern(), I);
   }
 
-  // Bind to a tuple pattern by first trying to see if we can emit
-  // the initializers independently.
-  Value visitTuplePattern(TuplePattern *P) {
+  Value visitTuplePattern(TuplePattern *P, Initialization *I) {
+    // If the tuple is empty, so should be our initialization. Just pass an
+    // empty tuple upwards.
+    if (P->getFields().empty()) {
+      assert(I->getSubInitializations().empty() &&
+             (!I->hasAddress() ||
+              I->getAddress().getType().getSwiftRValueType() == P->getType()) &&
+             "empty tuple pattern with non-empty-tuple initializer?!");
+      return initB.createTuple(SILLocation(), gen.getLoweredType(P->getType()),
+                               {});
+    }
+    
+    // First see if we can emit the initializers independently by destructuring
+    // a TupleInitialization.
+    ArrayRef<Initialization *> subInits = {};
+    if (I)
+      subInits = I->getSubInitializations();
+    if (!subInits.empty()) {
+      assert(P->getFields().size() == subInits.size() &&
+             "TupleInitialization size does not match tuple pattern size!");
+      for (size_t i = 0; i < P->getFields().size(); ++i)
+        visit(P->getFields()[i].getPattern(), subInits[i]);
+      return Value();
+    }
+    
+    // Otherwise, build a tuple of the subarguments and store it to the
+    // FIXME: Doesn't work for address-only tuples. We should implement an
+    // Initialization::breakIntoTupleInitialization method and use that to
+    // initialize a tuple in memory piecewise.
+    
     SmallVector<Value, 4> Elements;
     for (auto &elt : P->getFields())
-      Elements.push_back(visit(elt.getPattern()));
-
-    SILBuilder B(f.begin(), f);
+      Elements.push_back(visit(elt.getPattern(), nullptr));
     
-    // FIXME address-only tuples
     SILType loweredType = gen.getLoweredType(P->getType()->getCanonicalType());
-    return B.createTuple(SILLocation(), loweredType, Elements);
+    assert(loweredType.isLoadable() && "address-only tuples not yet supported");
+    Value tup = initB.createTuple(SILLocation(), loweredType, Elements);
+    storeArgumentInto(P->getType(), tup, SILLocation(), I);
+    return tup;
   }
 
-  Value visitAnyPattern(AnyPattern *P) {
-    return makeArgument(P->getType(), f.begin());
+  Value visitAnyPattern(AnyPattern *P, Initialization *I) {
+    // A value bound to _ is unused and can be immediately released.
+    assert(!I->hasAddress() && I->getSubInitializations().empty() &&
+           "any pattern should match a black-hole Initialization");
+    Value arg = makeArgument(P->getType(), f.begin());
+    if (arg.getType().isLoadable())
+      gen.emitReleaseRValue(SILLocation(), arg);
+    return arg;
   }
 
-  Value visitNamedPattern(NamedPattern *P) {
-    return makeArgument(P->getType(), f.begin());
+  Value visitNamedPattern(NamedPattern *P, Initialization *I) {
+    return makeArgumentInto(P->getType(), f.begin(),
+                            P->getDecl(), I);
   }
 };
 
@@ -314,10 +486,12 @@ void SILGenFunction::emitProlog(CapturingExpr *ce,
   
   // Emit the argument variables.
   for (auto &paramPattern : paramPatterns) {
-    // Add the BBArguments and collect them as a Value.
-    Value ArgInit = ArgumentCreatorVisitor(*this, F).visit(paramPattern);
-    // Use the value to initialize a (mutable) variable allocation.
-    InitPatternWithExpr(*this, ArgInit).visit(paramPattern);
+    // Allocate the local mutable argument storage and set up an Initialization.
+    llvm::OwningPtr<Initialization> argInit(
+      InitializationForPattern(*this).visit(paramPattern));
+    
+    // Add the BBArguments and use them to initialize the local argument values.
+    ArgumentInitVisitor(*this, F).visit(paramPattern, argInit.get());
   }
   
   // If the return type is address-only, emit the indirect return argument.

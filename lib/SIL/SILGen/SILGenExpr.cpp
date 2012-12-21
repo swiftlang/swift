@@ -14,6 +14,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "Initialization.h"
 #include "LValue.h"
 #include "ManagedValue.h"
 #include "TypeInfo.h"
@@ -73,6 +74,22 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(Value v) {
   } else {
     Cleanups.pushCleanup<CleanupRValue>(v);
     return ManagedValue(v, getCleanupsDepth());
+  }
+}
+
+void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
+  // FIXME: tuple initializations
+  assert(I->getSubInitializations().empty() &&
+         "expr initialization into tuple not yet implemented");
+  // FIXME: actually emit into the initialization
+  ManagedValue result = visit(E);
+  if (I->hasAddress()) {
+    if (result.getType().isAddressOnly())
+      result.forwardInto(*this, E, I->getAddress(), /*isInitialize=*/true);
+    else {
+      B.createStore(E, result.forward(*this), I->getAddress());
+    }
+    I->finishInitialization(*this);
   }
 }
 
