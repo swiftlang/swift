@@ -19,7 +19,7 @@ using namespace swift;
 namespace swift {
 
 /// SILTypeList - The uniqued backing store for the Value type list.  This
-/// is only expose out of Value as an ArrayRef of types, so it should never be
+/// is only exposed out of Value as an ArrayRef of types, so it should never be
 /// used outside of libSIL.
 class SILTypeList : public llvm::FoldingSetNode {
 public:
