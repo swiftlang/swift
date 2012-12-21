@@ -488,7 +488,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   OS << "subscript ";
   printAttributes(decl->getAttrs());
   printPattern(decl->getIndices());
-  OS << " : ";
+  OS << " -> ";
   decl->getElementType()->print(OS);
   OS << " {";
   {
