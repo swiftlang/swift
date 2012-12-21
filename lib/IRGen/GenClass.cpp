@@ -731,8 +731,8 @@ namespace {
     /// This method does not return a value of a predictable type.
     llvm::Constant *buildMethodList(ArrayRef<FuncDecl*> methods,
                                     StringRef name) {
-      return buildOptionalList<FuncDecl*>(methods, 3 * IGM.getPointerSize(), name,
-                                          &ClassDataBuilder::buildMethod);
+      return buildOptionalList(methods, 3 * IGM.getPointerSize(), name,
+                               &ClassDataBuilder::buildMethod);
     }
 
     /*** Protocols *********************************************************/
@@ -750,8 +750,8 @@ namespace {
     ///
     /// This method does not return a value of a predictable type.
     llvm::Constant *buildProtocolList() {
-      return buildOptionalList<ProtocolDecl*>(Protocols, Size(0), "_PROTOCOLS_",
-                                              &ClassDataBuilder::buildProtocolRef);
+      return buildOptionalList(Protocols, Size(0), "_PROTOCOLS_",
+                               &ClassDataBuilder::buildProtocolRef);
     }
 
     /*** Ivars *************************************************************/
@@ -829,8 +829,8 @@ namespace {
     /// This method does not return a value of a predictable type.
     llvm::Constant *buildIvarList() {
       Size eltSize = 3 * IGM.getPointerSize() + Size(8);
-      return buildOptionalList<VarDecl*>(Ivars, eltSize, "_IVARS_",
-                                         &ClassDataBuilder::buildIvar);
+      return buildOptionalList(Ivars, eltSize, "_IVARS_",
+                               &ClassDataBuilder::buildIvar);
     }
 
     /*** Properties ********************************************************/
@@ -858,11 +858,15 @@ namespace {
     /// This method does not return a value of a predictable type.
     llvm::Constant *buildPropertyList() {
       Size eltSize = 2 * IGM.getPointerSize();
-      return buildOptionalList<VarDecl*>(Properties, eltSize, "_PROPERTIES_",
-                                         &ClassDataBuilder::buildProperty);
+      return buildOptionalList(Properties, eltSize, "_PROPERTIES_",
+                               &ClassDataBuilder::buildProperty);
     }
 
     /*** General ***********************************************************/
+
+    /// A hack to turn ArrayRef<T> into a non-deduced context,
+    /// allowing template argument deduction to behave sensibly.
+    template <class T> struct NDArrayRef { typedef ArrayRef<T> type; };
 
     /// Build a list structure from the given array of objects.
     /// If the array is empty, use null.  The assumption is that every
@@ -871,7 +875,7 @@ namespace {
     /// \param optionalEltSize - if non-zero, a size which needs
     ///   to be placed in the list header
     template <class T>
-    llvm::Constant *buildOptionalList(ArrayRef<T> objects,
+    llvm::Constant *buildOptionalList(typename NDArrayRef<T>::type objects,
                                       Size optionalEltSize,
                                       StringRef nameBase,
                           llvm::Constant *(ClassDataBuilder::*build)(T)) {
