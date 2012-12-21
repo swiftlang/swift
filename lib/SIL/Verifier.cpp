@@ -54,7 +54,8 @@ public:
   
   bool argumentTypeMatches(SILType argValueType, Type declaredArgType) {
     if (argValueType.isAddressOnly()) {
-      return argValueType.getSwiftRValueType()->isEqual(declaredArgType);
+      return argValueType.getSwiftRValueType()->isEqual(
+                                              declaredArgType->getRValueType());
     } else {
       return argValueType.getSwiftType()->isEqual(declaredArgType);
     }
@@ -252,8 +253,8 @@ public:
            "result must be a method of the operand");
     assert(methodType->getResult()->is<FunctionType>() &&
            "result must be a method");
-    if (LValueType *lvt = operandType.getAs<LValueType>()) {
-      assert(lvt->getObjectType()->is<ArchetypeType>() &&
+    if (operandType.isAddress()) {
+      assert(operandType.is<ArchetypeType>() &&
              "archetype_method must apply to an archetype address");
     } else if (MetaTypeType *mt = operandType.getAs<MetaTypeType>()) {
       assert(mt->getInstanceType()->is<ArchetypeType>() &&
