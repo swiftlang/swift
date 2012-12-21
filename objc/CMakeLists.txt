@@ -27,18 +27,12 @@ else()
   set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib")
 endif()
 
-add_custom_command(
-  OUTPUT "${SWIFTLIB_DIR}/swift/objc.swift"
+add_custom_target(swiftFoundationSources ALL
   COMMAND mkdir -p "${SWIFTLIB_DIR}/swift"
   COMMAND cp objc.swift "${SWIFTLIB_DIR}/swift/objc.swift"
-  DEPENDS objc.swift
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-add_custom_command(
-  OUTPUT "${SWIFTLIB_DIR}/swift/Foundation.swift"
-  COMMAND mkdir -p "${SWIFTLIB_DIR}/swift"
   COMMAND cp Foundation.swift "${SWIFTLIB_DIR}/swift/Foundation.swift"
-  DEPENDS Foundation.swift
+  DEPENDS objc.swift Foundation.swift
+  COMMENT "Installing swiftFoundation sources"
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Link against Foundation
