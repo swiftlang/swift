@@ -13,9 +13,11 @@
 #include "SILGen.h"
 #include "Scope.h"
 #include "Condition.h"
+#include "Initialization.h"
 #include "LValue.h"
 #include "ManagedValue.h"
 #include "swift/AST/AST.h"
+#include "llvm/ADT/OwningPtr.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -134,13 +136,28 @@ void SILGenFunction::visitAssignStmt(AssignStmt *S) {
   return emitAssignStmtRecursive(S, SrcV, S->getDest(), *this);
 }
 
+namespace {
+
+/// IndirectReturnInitialization - represents initializing an indirect return
+/// value.
+class IndirectReturnInitialization : public SingleInitializationBase {
+  Value address;
+public:
+  IndirectReturnInitialization(Value address) : address(address) {}
+  
+  Value getAddressOrNull() override { return address; }
+};
+
+} // end anonymous namespace
+
 void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
   Value ArgV;
   if (IndirectReturnAddress) {
     // Indirect return of an address-only value.
     FullExpr scope(Cleanups);
-    visit(S->getResult()).forwardInto(*this, S, IndirectReturnAddress,
-                                      /*isInitialize=*/ true);
+    llvm::OwningPtr<Initialization> returnInit(
+                       new IndirectReturnInitialization(IndirectReturnAddress));
+    emitExprInto(S->getResult(), returnInit.get());
     ArgV = B.createEmptyTuple(S);
   } else if (S->hasResult()) {
     // Value return.

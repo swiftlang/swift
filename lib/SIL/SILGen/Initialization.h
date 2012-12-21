@@ -25,7 +25,8 @@ namespace swift {
 namespace Lowering {
   class SILGenFunction;
 
-/// An initialization represents an uninitialized buffer or a tuple of
+/// Initialization - Abstract base class for initialization buffers. An
+/// initialization represents an uninitialized buffer or a tuple of
 /// uninitialized buffers that must be initialized with the result of an
 /// expression, such as in a var declaration or return statement. An
 /// initialization may also have partial cleanups that should be disabled and
@@ -56,7 +57,7 @@ public:
 
   /// Returns the address of the single contiguous buffer represented by this
   /// initialization. Once the address has been stored to,
-  /// finishInitialization should be called.
+  /// finishInitialization must be called.
   Value getAddress() {
     Value address = getAddressOrNull();
     assert(address && "initialization does not represent a single buffer");
@@ -65,7 +66,8 @@ public:
 
   /// If this initialization represents an aggregation of sub-initializations,
   /// return the sub-initializations. Once all the sub-initializations have been
-  /// initialized,
+  /// initialized and finalized with finishInitialization, finishInitialization
+  /// must then be called on this aggregate initialization.
   virtual ArrayRef<Initialization*> getSubInitializations() = 0;
   
   /// Perform post-initialization bookkeeping for this initialization.
@@ -78,7 +80,28 @@ public:
 private:
   virtual void _anchor();
 };
+
+/// Abstract base class for single-buffer initializations.
+class SingleInitializationBase : public Initialization {
+public:
+  ArrayRef<Initialization*> getSubInitializations() override {
+    return {};
+  }
   
+  void zeroInitialize(SILGenFunction &gen) override {
+    Value address = getAddress();
+    if (address.getType().isAddressOnly())
+      gen.B.createZeroAddr(SILLocation(), address);
+    else {
+      Value zero = gen.B.createZeroValue(SILLocation(),
+                                         address.getType().getObjectType());
+      gen.B.createStore(SILLocation(), zero, address);
+    }
+    finishInitialization(gen);
+  }
+};
+
+
 } // end namespace Lowering
 } // end namespace swift
 
