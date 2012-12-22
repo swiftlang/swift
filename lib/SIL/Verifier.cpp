@@ -62,6 +62,7 @@ public:
   }
 
   void visitApplyInst(ApplyInst *AI) {
+    AI->dump();
     FunctionType *FT = AI->getCallee().getType().getAs<FunctionType>();
     assert(FT && "Callee of ApplyInst must have concrete function type");
     ASTContext &C = FT->getASTContext();
@@ -72,6 +73,17 @@ public:
       // Address-only returns are passed as an implicit extra argument.
       // The result of the instruction should be the empty tuple.
       implicitReturn = true;
+      
+      // We could have a single nontuple argument and an implicit return.
+      if (AI->getArguments().size() == 2 &&
+          argumentTypeMatches(AI->getArguments()[0].getType(),
+                              FT->getInput()) &&
+          AI->getArguments()[1].getType().getSwiftRValueType()
+            ->isEqual(FT->getResult())) {
+        // We match the single argument type and the implicit return, so the
+        // arguments are OK.
+        return;
+      }
     } else {
       assert(FT->getResult()->isEqual(AI->getType().getSwiftType()) &&
              "Return type does not match function type");
@@ -88,7 +100,11 @@ public:
     }
     
     // Check that the arguments match the decomposed tuple.
-    const TupleType *TT = FT->getInput()->castTo<TupleType>();
+    
+    const TupleType *TT = FT->getInput()->getAs<TupleType>();
+    assert(TT &&
+           "argument type does not match single-argument function type "
+           "and is not tuple");
     (void)TT;
     for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i)
       assert(argumentTypeMatches(AI->getArguments()[i].getType(),
