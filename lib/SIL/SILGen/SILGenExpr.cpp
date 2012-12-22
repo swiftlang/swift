@@ -627,6 +627,17 @@ ManagedValue SILGenFunction::visitMemberRefExpr(MemberRefExpr *E,
 ManagedValue SILGenFunction::visitGenericMemberRefExpr(GenericMemberRefExpr *E,
                                                        SGFContext C)
 {
+  if (E->getBase()->getType()->is<MetaTypeType>()) {
+    assert(E->getType()->is<MetaTypeType>() &&
+           "generic_member_ref of metatype should give metatype");
+    // If the base and member are metatypes, emit an associated_metatype inst
+    // to extract the associated type from the type metadata.
+    Value baseMetatype = visit(E->getBase()).getUnmanagedValue();
+    return ManagedValue(B.createAssociatedMetatype(E,
+                             baseMetatype,
+                             getLoweredLoadableType(E->getType())));
+
+  }
   return emitAnyMemberRefExpr(*this, E, E->getSubstitutions());
 }
 

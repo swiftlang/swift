@@ -282,11 +282,13 @@ struct ArgumentInitVisitor :
     : gen(gen), f(f), initB(f.begin(), f) {}
 
   Value makeArgument(Type ty, BasicBlock *parent) {
+    assert(ty && "no type?!");
     return new (f.getModule()) BBArgument(gen.getLoweredType(ty), parent);
   }
   
   void storeArgumentInto(Type ty, Value arg, SILLocation loc, Initialization *I)
   {
+    assert(ty && "no type?!");
     if (I) {
       if (ty->is<LValueType>()) {
         I->bindAddress(arg, gen);
@@ -305,6 +307,7 @@ struct ArgumentInitVisitor :
   /// if not null.
   Value makeArgumentInto(Type ty, BasicBlock *parent,
                         SILLocation loc, Initialization *I) {
+    assert(ty && "no type?!");
     Value arg = makeArgument(ty, parent);
     storeArgumentInto(ty, arg, loc, I);
     return arg;
@@ -315,6 +318,8 @@ struct ArgumentInitVisitor :
     return visit(P->getSubPattern(), I);
   }
   Value visitTypedPattern(TypedPattern *P, Initialization *I) {
+    P->dump();
+    P->getType()->dump();
     // FIXME: work around a bug in visiting the "this" argument of methods
     if (NamedPattern *np = dyn_cast<NamedPattern>(P->getSubPattern()))
       return makeArgumentInto(P->getType(), f.begin(),
