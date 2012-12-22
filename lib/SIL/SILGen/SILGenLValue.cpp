@@ -218,8 +218,8 @@ LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
   TypeInfo const &ti = gen.getTypeInfo(
                                      e->getBase()->getType()->getRValueType());
   
-  if (ti.hasFragileElement(decl->getName())) {
-    lv.add<FragileElementComponent>(ti.getFragileElement(decl->getName()).index,
+  if (ti.hasFragileElement(decl)) {
+    lv.add<FragileElementComponent>(ti.getFragileElement(decl).index,
                                     gen.getLoweredType(e->getType()));
   } else {
     ManagedValue get = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),

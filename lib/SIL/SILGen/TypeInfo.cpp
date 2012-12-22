@@ -104,14 +104,22 @@ TypeConverter::TypeConverter(SILGenModule &sgm)
   : Context(sgm.M.getContext()) {
 }
 
+TypeConverter::~TypeConverter() {
+  // The bump pointer allocator destructor will deallocate but not destroy all
+  // our TypeInfos.
+  for (auto &ti : types) {
+    ti.second->~TypeInfo();
+  }
+}
+  
 void TypeConverter::makeFragileElementsForDecl(TypeInfo &theInfo,
                                                NominalTypeDecl *decl) {
   unsigned elementIndex = 0;
   for (Decl *d : decl->getMembers()) {
     if (VarDecl *vd = dyn_cast<VarDecl>(d)) {
       if (!vd->isProperty()) {
-        theInfo.fragileElements[vd->getName()] = {vd->getType(),
-          elementIndex};
+        theInfo.fragileElements[vd] = {vd->getType(),
+                                       elementIndex};
         ++elementIndex;
       }
     }
@@ -128,7 +136,9 @@ void TypeConverter::makeFragileElements(TypeInfo &theInfo, CanType t) {
 }
   
 TypeInfo const &TypeConverter::makeTypeInfo(CanType t) {
-  TypeInfo &theInfo = types[t.getPointer()];
+  void *infoBuffer = TypeInfoBPA.Allocate<TypeInfo>();
+  TypeInfo *theInfo = ::new (infoBuffer) TypeInfo();
+  types[t.getPointer()] = theInfo;
   bool address = false;
   bool addressOnly = false;
   
@@ -140,26 +150,25 @@ TypeInfo const &TypeConverter::makeTypeInfo(CanType t) {
     // Reference types are always loadable, and need only to retain/release
     // themselves.
     addressOnly = false;
-    theInfo.referenceTypeElements.push_back(ReferenceTypeElement());
+    theInfo->referenceTypeElements.push_back(ReferenceTypeElement());
   } else if (isAddressOnly(t)) {
     addressOnly = true;
   } else {
     // walk aggregate types to determine address-only-ness and find reference
     // type elements.
     addressOnly =
-      LoadableTypeInfoVisitor(theInfo).visit(t) == IsAddressOnly;
+      LoadableTypeInfoVisitor(*theInfo).visit(t) == IsAddressOnly;
     if (addressOnly)
-      theInfo.referenceTypeElements.clear();
+      theInfo->referenceTypeElements.clear();
   }
   // If this is a struct or class type, find its fragile elements.
-  makeFragileElements(theInfo, t);
+  makeFragileElements(*theInfo, t);
   
   // Generate the lowered type.
-  theInfo.loweredType = SILType(t,
-                                /*address=*/address || addressOnly,
-                                /*loadable=*/!addressOnly);
-  
-  return theInfo;
+  theInfo->loweredType = SILType(t,
+                                 /*address=*/address || addressOnly,
+                                 /*loadable=*/!addressOnly);
+  return *theInfo;
 }
   
 TypeInfo const &TypeConverter::getTypeInfo(Type t) {
@@ -168,7 +177,7 @@ TypeInfo const &TypeConverter::getTypeInfo(Type t) {
   if (existing == types.end()) {
     return makeTypeInfo(ct);
   } else
-    return existing->second;
+    return *existing->second;
 }
   
 SILType TypeConverter::getConstantType(SILConstant constant) {

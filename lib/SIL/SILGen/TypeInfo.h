@@ -21,6 +21,7 @@
 #include "swift/SIL/SILModule.h"
 
 namespace swift {
+  class ValueDecl;
 namespace Lowering {
   class SILGenFunction;
   class SILGenModule;
@@ -55,7 +56,7 @@ class LLVM_LIBRARY_VISIBILITY TypeInfo {
   /// fragileElements - For a loadable struct type, this contains mappings from
   /// member identifiers to SIL element indexes. Empty for address-only or
   /// non-struct types.
-  llvm::DenseMap<Identifier, FragileElement> fragileElements;
+  llvm::DenseMap<ValueDecl*, FragileElement> fragileElements;
   
   /// loweredType - The SIL type of values with this Swift type.
   SILType loweredType;
@@ -90,41 +91,18 @@ public:
   
   /// hasFragileElement - Returns true if this TypeInfo represents a loadable
   /// struct type and it has a physical member with the given name.
-  bool hasFragileElement(Identifier name) const {
+  bool hasFragileElement(ValueDecl *name) const {
     return fragileElements.count(name);
   }
   
   /// getLoweredType - Get the type used to represent values of the Swift type
   /// in SIL.
-  ///
-  /// - For address-only types, this is the address type pointing to the Swift
-  ///   type. For example, Swift::
-  ///
-  ///     struct [API] AddressOnly {}
-  ///
-  ///   lowers to SIL `*AddressOnly`.
-  /// - For function types, the argument types are lowered, and if the return
-  ///   type is address-only, it is rewritten as an address parameter, and the
-  ///   lowered return value is the empty tuple. Function types are lowered
-  ///   recursively. For example, these function types::
-  ///
-  ///     struct [API] AddressOnly {}
-  ///     struct Fragile {}
-  ///
-  ///     (a:AddressOnly, b:Fragile) -> Fragile
-  ///     (a:Fragile, b:(c:AddressOnly) -> Fragile) -> AddressOnly
-  ///
-  ///   lower to:
-  ///
-  ///     (a:*AddressOnly, b:Fragile) -> Fragile
-  ///     (a:Fragile, b:(c:*AddressOnly) -> Fragile, _:*AddressOnly) -> ()
-  ///
   SILType getLoweredType() const { return loweredType; }
   
   /// getFragileElement - For a loadable struct type, returns the index and type
   /// of the element named by the given identifier. The named element must exist
   /// in the type and be a physical member.
-  FragileElement getFragileElement(Identifier name) const {
+  FragileElement getFragileElement(ValueDecl *name) const {
     auto found = fragileElements.find(name);
     assert(found != fragileElements.end() &&
            "element name does not exist in type, or type isn't loadable");
@@ -134,7 +112,8 @@ public:
 
 /// TypeConverter - helper class for creating and managing TypeInfos.
 class LLVM_LIBRARY_VISIBILITY TypeConverter {
-  llvm::DenseMap<TypeBase *, TypeInfo> types;
+  llvm::BumpPtrAllocator TypeInfoBPA;
+  llvm::DenseMap<TypeBase *, TypeInfo *> types;
   llvm::DenseMap<SILConstant, SILType> constantTypes;
   
   TypeInfo const &makeTypeInfo(CanType t);
@@ -147,6 +126,9 @@ public:
   ASTContext &Context;
 
   TypeConverter(SILGenModule &sgm);
+  ~TypeConverter();
+  TypeConverter(TypeConverter const &) = delete;
+  TypeConverter &operator=(TypeConverter const &) = delete;
 
   /// Returns the SIL TypeInfo for a type.
   TypeInfo const &getTypeInfo(Type t);

@@ -552,9 +552,9 @@ ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
   TypeInfo const &ti = gen.getTypeInfo(e->getBase()->getType()
                                        ->getRValueType());
   
-  if (ti.hasFragileElement(e->getDecl()->getName())) {
+  if (ti.hasFragileElement(e->getDecl())) {
     // We can get to the element directly with element_addr.
-    FragileElement element = ti.getFragileElement(e->getDecl()->getName());
+    FragileElement element = ti.getFragileElement(e->getDecl());
     return emitExtractLoadableElement(gen, e, gen.visit(e->getBase()),
                                       element.index);
   } else {
