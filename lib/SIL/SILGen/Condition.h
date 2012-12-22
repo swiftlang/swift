@@ -57,7 +57,7 @@ public:
   void enterFalse(SILBuilder &B);
   
   /// exitFalse - End the emission of the true block.  This must be called after
-  /// exitFalse but before anything else on this Condition.
+  /// enterFalse but before anything else on this Condition.
   void exitFalse(SILBuilder &B);
   
   /// complete - Complete this conditional execution.  This should be called
