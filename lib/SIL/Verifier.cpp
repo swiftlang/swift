@@ -189,7 +189,13 @@ public:
   }
   void visitMetatypeInst(MetatypeInst *MI) {
     assert(MI->getType(0).is<MetaTypeType>() &&
-           "Metatype instruction must be of metatype type");
+           "metatype instruction must be of metatype type");
+  }
+  void visitAssociatedMetatypeInst(AssociatedMetatypeInst *MI) {
+    assert(MI->getType(0).is<MetaTypeType>() &&
+           "associated_metatype instruction must be of metatype type");
+    assert(MI->getSourceMetatype().getType().is<MetaTypeType>() &&
+           "associated_metatype operand must be of metatype type");
   }
   
   void visitRetainInst(RetainInst *RI) {

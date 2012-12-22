@@ -252,6 +252,12 @@ public:
   MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype) {
     return insert(new MetatypeInst(Loc, Metatype));
   }
+
+  AssociatedMetatypeInst *createAssociatedMetatype(SILLocation Loc,
+                                                   Value MetatypeSrc,
+                                                   SILType MetatypeDest) {
+    return insert(new AssociatedMetatypeInst(Loc, MetatypeSrc, MetatypeDest));
+  }
   
   void createRetain(SILLocation Loc, Value Operand) {
     // Retaining a constant_ref is a no-op.

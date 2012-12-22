@@ -320,6 +320,10 @@ public:
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype $" << MI->getType();
   }
+  void visitAssociatedMetatypeInst(AssociatedMetatypeInst *MI) {
+    OS << "associated_metatype " << getID(MI->getSourceMetatype())
+       << ", $" << MI->getType();
+  }
   
   void visitRetainInst(RetainInst *RI) {
     OS << "retain " << getID(RI->getOperand());

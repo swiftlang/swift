@@ -334,6 +334,12 @@ TupleInst::TupleInst(SILLocation Loc, SILType Ty, ArrayRef<Value> Elems)
 MetatypeInst::MetatypeInst(SILLocation Loc, SILType Metatype)
   : Instruction(ValueKind::MetatypeInst, Loc, Metatype) {}
 
+AssociatedMetatypeInst::AssociatedMetatypeInst(SILLocation Loc,
+                                               Value MetatypeSrc,
+                                               SILType MetatypeDest)
+  : Instruction(ValueKind::AssociatedMetatypeInst, Loc, MetatypeDest),
+    SourceMetatype(MetatypeSrc) {}
+
 ExtractInst::ExtractInst(SILLocation Loc, Value Operand,
                          unsigned FieldNo, SILType ResultTy)
   : Instruction(ValueKind::ExtractInst, Loc, ResultTy),

@@ -595,6 +595,24 @@ public:
   }
 };
 
+/// AssociatedMetatypeInst - Extract the metatype of an associated type from a
+/// metatype.
+class AssociatedMetatypeInst : public Instruction {
+private:
+  Value SourceMetatype;
+public:
+  AssociatedMetatypeInst(SILLocation Loc,
+                         Value MetatypeSrc, SILType MetatypeDest);
+  
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  
+  Value getSourceMetatype() const { return SourceMetatype; }
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::AssociatedMetatypeInst;
+  }
+};
 
 /// ExtractInst - Extract a numbered element out of a value of tuple or fragile
 /// struct type.
