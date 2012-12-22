@@ -250,6 +250,7 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
       if (!member->shouldPrintInContext())
         continue;
 
+      indent();
       visit(member);
       if (needComma && member != members.back())
         OS << ",";
@@ -285,7 +286,6 @@ void PrintAST::printInherited(ArrayRef<TypeLoc> inherited) {
 }
 
 void PrintAST::visitImportDecl(ImportDecl *decl) {
-  indent();
   OS << "import ";
   recordDeclLoc(decl);
   bool first = true;
@@ -302,7 +302,6 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
 }
 
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
-  indent();
   OS << "extension ";
   recordDeclLoc(decl);
   decl->getExtendedType().print(OS);
@@ -313,7 +312,6 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
 }
 
 void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
-  indent();
   recordDeclLoc(decl);
   OS << "var ";
   printPattern(decl->getPattern());
@@ -331,7 +329,6 @@ void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
 }
 
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
-  indent();
   OS << "typealias ";
   printAttributes(decl->getAttrs());
   recordDeclLoc(decl);
@@ -344,7 +341,6 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 }
 
 void PrintAST::visitOneOfDecl(OneOfDecl *decl) {
-  indent();
   OS << "oneof ";
   printAttributes(decl->getAttrs());
   recordDeclLoc(decl);
@@ -356,7 +352,6 @@ void PrintAST::visitOneOfDecl(OneOfDecl *decl) {
 }
 
 void PrintAST::visitStructDecl(StructDecl *decl) {
-  indent();
   OS << "struct ";
   printAttributes(decl->getAttrs());
   recordDeclLoc(decl);
@@ -368,7 +363,6 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
 }
 
 void PrintAST::visitClassDecl(ClassDecl *decl) {
-  indent();
   OS << "class ";
   printAttributes(decl->getAttrs());
   recordDeclLoc(decl);
@@ -380,7 +374,6 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
 }
 
 void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
-  indent();
   OS << "protocol ";
   printAttributes(decl->getAttrs());
   recordDeclLoc(decl);
@@ -392,7 +385,6 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
-  indent();
   OS << "var ";
   printAttributes(decl->getAttrs());
   recordDeclLoc(decl);
@@ -407,11 +399,13 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
       IndentRAII indentMore(*this);
       if (auto getter = decl->getGetter()) {
         OS << "\n";
+        indent();
         visit(getter);
         OS << "\n";
       }
       if (auto setter = decl->getSetter()) {
         OS << "\n";
+        indent();
         visit(setter);
         OS << "\n";
       }
@@ -422,7 +416,6 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
 }
 
 void PrintAST::visitFuncDecl(FuncDecl *decl) {
-  indent();
   if (decl->isGetterOrSetter()) {
     // FIXME: Attributes
     recordDeclLoc(decl);
@@ -481,7 +474,6 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 }
 
 void PrintAST::visitOneOfElementDecl(OneOfElementDecl *decl) {
-  indent();
   // FIXME: Attributes?
   recordDeclLoc(decl);
   OS << decl->getName();
@@ -493,7 +485,6 @@ void PrintAST::visitOneOfElementDecl(OneOfElementDecl *decl) {
 }
 
 void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
-  indent();
   recordDeclLoc(decl);
   OS << "subscript ";
   printAttributes(decl->getAttrs());
@@ -505,11 +496,13 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     IndentRAII indentMore(*this);
     if (auto getter = decl->getGetter()) {
       OS << "\n";
+      indent();
       visit(getter);
       OS << "\n";
     }
     if (auto setter = decl->getSetter()) {
       OS << "\n";
+      indent();
       visit(setter);
       OS << "\n";
     }
@@ -519,7 +512,6 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
 }
 
 void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
-  indent();
   recordDeclLoc(decl);
   OS << "constructor";
   if (decl->isGeneric()) {
@@ -538,7 +530,6 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 }
 
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
-  indent();
   recordDeclLoc(decl);
   OS << "destructor ";
   printAttributes(decl->getAttrs());
@@ -552,24 +543,22 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
 }
 
 void PrintAST::visitSemiStmt(SemiStmt *stmt) {
-  indent();
   OS << ";";
 }
 
 void PrintAST::visitAssignStmt(AssignStmt *stmt) {
-  indent();
   // FIXME: lhs
   OS << " = ";
   // FIXME: rhs
 }
 
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
-  indent();
   OS << "{";
   {
     IndentRAII indentMore(*this);
     for (auto element : stmt->getElements()) {
       OS << "\n";
+      indent();
       if (auto decl = element.dyn_cast<Decl*>()) {
         visit(decl);
       } else if (auto stmt = element.dyn_cast<Stmt*>()) {
@@ -586,16 +575,14 @@ void PrintAST::visitBraceStmt(BraceStmt *stmt) {
 }
 
 void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
-  indent();
   OS << "return";
   if (stmt->hasResult()) {
     OS << " ";
-    // FIXME: print expression, w/o initial indentation.
+    // FIXME: print expression.
   }
 }
 
 void PrintAST::visitIfStmt(IfStmt *stmt) {
-  indent();
   OS << "if ";
   // FIXME: print condition
   OS << " ";
@@ -607,7 +594,6 @@ void PrintAST::visitIfStmt(IfStmt *stmt) {
 }
 
 void PrintAST::visitWhileStmt(WhileStmt *stmt) {
-  indent();
   OS << "while ";
   // FIXME: print condition
   OS << " ";
@@ -615,7 +601,6 @@ void PrintAST::visitWhileStmt(WhileStmt *stmt) {
 }
 
 void PrintAST::visitDoWhileStmt(DoWhileStmt *stmt) {
-  indent();
   OS << "do ";
   visit(stmt->getBody());
   OS << " while ";
@@ -623,7 +608,6 @@ void PrintAST::visitDoWhileStmt(DoWhileStmt *stmt) {
 }
 
 void PrintAST::visitForStmt(ForStmt *stmt) {
-  indent();
   OS << "for(";
   if (!stmt->getInitializer().isNull()) {
     if (auto assign = stmt->getInitializer().dyn_cast<AssignStmt *>())
@@ -649,7 +633,6 @@ void PrintAST::visitForStmt(ForStmt *stmt) {
 }
 
 void PrintAST::visitForEachStmt(ForEachStmt *stmt) {
-  indent();
   OS << "for ";
   printPattern(stmt->getPattern());
   OS << " in ";
@@ -659,12 +642,10 @@ void PrintAST::visitForEachStmt(ForEachStmt *stmt) {
 }
 
 void PrintAST::visitBreakStmt(BreakStmt *stmt) {
-  indent();
   OS << "break";
 }
 
 void PrintAST::visitContinueStmt(ContinueStmt *stmt) {
-  indent();
   OS << "continue";
 }
 
