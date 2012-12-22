@@ -77,20 +77,52 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(Value v) {
   }
 }
 
-void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
-  // FIXME: tuple initializations
-  assert(I->getSubInitializations().empty() &&
-         "expr initialization into tuple not yet implemented");
-  // FIXME: actually emit into the initialization
-  ManagedValue result = visit(E);
+static void initializeWithResult(SILGenFunction &gen,
+                                 SILLocation loc,
+                                 Initialization *I,
+                                 ManagedValue result) {
   if (I->hasAddress()) {
     if (result.getType().isAddressOnly())
-      result.forwardInto(*this, E, I->getAddress(), /*isInitialize=*/true);
+      result.forwardInto(gen, loc, I->getAddress(), /*isInitialize=*/true);
     else {
-      B.createStore(E, result.forward(*this), I->getAddress());
+      gen.B.createStore(loc, result.forward(gen), I->getAddress());
     }
-    I->finishInitialization(*this);
+    I->finishInitialization(gen);
+    return;
   }
+  
+  // Destructure the tuple result into the subinitializations.
+  // FIXME: address-only tuples
+  // FIXME: visitTupleExpr and friends could destructure their subexpressions
+  // directly into the subinitializations.
+  ArrayRef<Initialization*> subInits = I->getSubInitializations();
+  if (subInits.empty()) {
+    // The initialization is a black hole or an empty tuple, in either case
+    // we can do nothing and drop the result on the floor.
+    return;
+  }
+  
+  Value resultV = result.forward(gen);
+  TupleType *tty = resultV.getType().getAs<TupleType>();
+  
+  assert(tty && "tuple initialization for non-tuple result?!");
+  assert(tty->getFields().size() == subInits.size() &&
+         "tuple initialization size does not match tuple size?!");
+  for (size_t i = 0; i < subInits.size(); ++i) {
+    SILType eltTy = gen.getLoweredLoadableType(tty->getFields()[i].getType());
+    ManagedValue elt = ManagedValue(gen.B.createExtract(loc, resultV, i,
+                                                        eltTy));
+    initializeWithResult(gen, loc, subInits[i], elt);
+  }
+  I->finishInitialization(gen);
+}
+
+void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
+  // FIXME: actually emit into the initialization. The initialization should
+  // be passed down in the context argument to visit, and it should be the
+  // visit*Expr method's responsibility to store to it if possible.
+  ManagedValue result = visit(E);
+  initializeWithResult(*this, E, I, result);
 }
 
 ManagedValue SILGenFunction::visit(swift::Expr *E) {
