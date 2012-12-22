@@ -62,7 +62,6 @@ public:
   }
 
   void visitApplyInst(ApplyInst *AI) {
-    AI->dump();
     FunctionType *FT = AI->getCallee().getType().getAs<FunctionType>();
     assert(FT && "Callee of ApplyInst must have concrete function type");
     ASTContext &C = FT->getASTContext();

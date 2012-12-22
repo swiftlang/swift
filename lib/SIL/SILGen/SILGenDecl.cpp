@@ -318,8 +318,6 @@ struct ArgumentInitVisitor :
     return visit(P->getSubPattern(), I);
   }
   Value visitTypedPattern(TypedPattern *P, Initialization *I) {
-    P->dump();
-    P->getType()->dump();
     // FIXME: work around a bug in visiting the "this" argument of methods
     if (NamedPattern *np = dyn_cast<NamedPattern>(P->getSubPattern()))
       return makeArgumentInto(P->getType(), f.begin(),
