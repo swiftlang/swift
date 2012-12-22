@@ -224,7 +224,8 @@ public:
 
   /// emitProlog - Generates prolog code to allocate and clean up mutable
   /// storage for closure captures and local arguments.
-  void emitProlog(CapturingExpr *ce, ArrayRef<Pattern*> paramPatterns);
+  void emitProlog(CapturingExpr *ce, ArrayRef<Pattern*> paramPatterns,
+                  Type resultType);
   /// emitClosureBody - Generates code for a ClosureExpr body. This is akin
   /// to visiting the body as if wrapped in a ReturnStmt.
   void emitClosureBody(Expr *body);

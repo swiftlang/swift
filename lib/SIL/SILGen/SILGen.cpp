@@ -38,13 +38,14 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE)
   : SILGenFunction(SGM, F,
           /*hasVoidReturn=*/isVoidableType(FE->getResultType(F.getContext()))) {
 
-  emitProlog(FE, FE->getBodyParamPatterns());
+  emitProlog(FE, FE->getBodyParamPatterns(), FE->getResultType(F.getContext()));
 }
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F, ClosureExpr *CE)
   : SILGenFunction(SGM, F, /*hasVoidReturn=*/false) {
 
-  emitProlog(CE, CE->getParamPatterns());
+  emitProlog(CE, CE->getParamPatterns(),
+             CE->getType()->castTo<FunctionType>()->getResult());
 }
 
 /// SILGenFunction destructor - called after the entire function's AST has been

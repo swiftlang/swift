@@ -459,7 +459,8 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
 } // end anonymous namespace
 
 void SILGenFunction::emitProlog(CapturingExpr *ce,
-                                ArrayRef<Pattern*> paramPatterns) {
+                                ArrayRef<Pattern*> paramPatterns,
+                                Type resultType) {
   // Emit the capture argument variables.
   for (auto capture : ce->getCaptures()) {
     makeCaptureBBArguments(*this, capture);
@@ -476,7 +477,6 @@ void SILGenFunction::emitProlog(CapturingExpr *ce,
   }
   
   // If the return type is address-only, emit the indirect return argument.
-  Type resultType = ce->getType()->castTo<AnyFunctionType>()->getResult();
   TypeInfo const &returnTI = getTypeInfo(resultType);
   if (returnTI.isAddressOnly()) {
     IndirectReturnAddress = new (SGM.M) BBArgument(returnTI.getLoweredType(),
