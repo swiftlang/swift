@@ -317,7 +317,7 @@ static void setHelperAttributesForAggResult(llvm::CallInst *call,
     attrs.push_back(llvm::AttributeWithIndex::get(call->getContext(),
                                                   1,llvm::Attribute::NoAlias));
   } else {
-    const static llvm::Attribute::AttrVal resultAttrs[] = {
+    const static llvm::Attribute::AttrKind resultAttrs[] = {
       llvm::Attribute::NoAlias,
       llvm::Attribute::StructRet
     };

@@ -162,7 +162,7 @@ llvm::CallingConv::ID irgen::expandAbstractCC(IRGenModule &IGM,
                           SmallVectorImpl<llvm::AttributeWithIndex> &attrs) {
   // If we have an indirect result, add the appropriate attributes.
   if (hasIndirectResult) {
-    llvm::Attribute::AttrVal tmp[] = {
+    llvm::Attribute::AttrKind tmp[] = {
       llvm::Attribute::StructRet,
       llvm::Attribute::NoAlias
     };
