@@ -113,7 +113,7 @@ be considered as strongly as the arguments and return value of the function.  We
 consider it a breaking change (and therefore, unacceptable) for API that was
 previously guaranteed to never return an error to start returning error codes.
 
-It's worth noting that (other than its syntax) Objective-C achieves these goals
+It's worth noting that Objective-C achieves these goals
 with NSError.  NSError "results" are explicitly part of the signature of a
 method, and one cannot be added or removed without changing the selector (a
 breaking change).  Clients who don't care about error handling can (and often
@@ -122,6 +122,38 @@ do) completely ignore the NSError result of a method call.
 
 Swift Error Handling Model
 --------------------------
+
+Swift categorizes error conditions into two classifications: exceptions and
+unrecoverable runtime errors.  Either condition can be raised by arbitrary code,
+but the two are implemented in different ways and have different ramifications
+for propagation and handling of the condition.
+
+Swift Runtime Errors
+````````````````````
+
+Runtime errors are conditions like deferencing a null pointer, accessing an
+array out of bounds, and explicitly declared exceptions (e.g. out of memory
+conditions, at least in some cases).  Because they can occur anywhere, they are
+not explicitly declared as part of API - any function is assumed to be capable
+of raising a runtime error.
+
+are considered to be "uncatchable" failures that terminate the
+current thread/actor, and are
+
+Runtime errors can occur anywhere in the application
+
+assertion failure, typestate violation.
+
+
+
+ (e.g. 
+
+
+
+
+Swift Exceptions
+````````````````
+
 
 TODO
 
