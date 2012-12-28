@@ -662,7 +662,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
 
 
 /// lexCharacterLiteral:
-///   character_literal ::= '([^"\\\n\r]|character_escape)'
+///   character_literal ::= '([^'\\\n\r]|character_escape)'
 void Lexer::lexCharacterLiteral() {
   const char *TokStart = CurPtr-1;
   assert(*TokStart == '\'' && "Unexpected start");
