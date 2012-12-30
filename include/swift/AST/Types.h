@@ -538,7 +538,9 @@ class TupleTypeElt {
 
 public:
   TupleTypeElt() = default;
-  TupleTypeElt(Type ty, Identifier name, ExprHandle *init = nullptr,
+  TupleTypeElt(Type ty,
+               Identifier name = Identifier(),
+               ExprHandle *init = nullptr,
                Type VarargBaseTy = Type())
     : Name(name), Ty(ty), Init(init), VarargBaseTy(VarargBaseTy) { }
 
