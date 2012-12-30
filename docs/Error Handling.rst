@@ -1,7 +1,7 @@
-.. MemoryAndErrorHandlingModel:
+.. ErrorHandlingModel:
 
-Swift Memory and Error Handling Notes
-=====================================
+Swift Error Handling Model
+==========================
 
 The goal of this writeup is to capture ideas around error handling in APIs and
 the tradeoffs involved that influenced this design.
