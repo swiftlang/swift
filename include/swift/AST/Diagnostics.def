@@ -842,6 +842,8 @@ ERROR(field_number_too_large,sema_tce,none,
       "field number is too large for tuple", ())
 ERROR(no_valid_dot_expression,sema_tce,none,
       "base type %0 has no valid '.' expression for this field", (Type))
+ERROR(no_member_of_tuple,sema_tce,none,
+      "tuple type %0 has no member named %1", (Type, Identifier))
 ERROR(no_member_of_module,sema_tce,none,
       "module %0 has no member named %1", (Identifier, Identifier))
 ERROR(no_member_of_metatype,sema_tce,none,

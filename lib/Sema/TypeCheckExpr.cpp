@@ -1376,7 +1376,7 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
     }
     if (FieldNo == -1) {
       // FIXME: This diagnostic is a bit painful.
-      diagnose(E->getDotLoc(), diag::no_valid_dot_expression, BaseTy)
+      diagnose(E->getDotLoc(), diag::no_member_of_tuple, TT, MemberName)
         << Base->getSourceRange() << SourceRange(E->getNameLoc());
       return 0;
     }
@@ -1395,22 +1395,19 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   if (!Lookup.isSuccess()) {
     if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
       diagnose(E->getDotLoc(), diag::no_member_of_module, MT->getModule()->Name,
-               MemberName)
-        << Base->getSourceRange()
+               MemberName) << Base->getSourceRange()
         << SourceRange(E->getNameLoc(), E->getNameLoc());
-      return 0;
-    }
-    if (MetaTypeType *MTT = BaseTy->getAs<MetaTypeType>()) {
+    } else if (MetaTypeType *MTT = BaseTy->getAs<MetaTypeType>()) {
       diagnose(E->getDotLoc(), diag::no_member_of_metatype,
                MTT->getInstanceType(), MemberName) << Base->getSourceRange()
       << SourceRange(E->getNameLoc(), E->getNameLoc());
-      return 0;
-    }
-    
-    // FIXME: This diagnostic is ridiculously painful.
-    diagnose(E->getDotLoc(), diag::no_valid_dot_expression, BaseTy)
+    } else {
+      // FIXME: This diagnostic is ridiculously painful.
+      diagnose(E->getDotLoc(), diag::no_valid_dot_expression, BaseTy)
       << Base->getSourceRange() << SourceRange(E->getNameLoc(),E->getNameLoc());
+    }
     return 0;
+      
   }
 
   bool IsMetatypeBase = Base->getType()->is<MetaTypeType>();
