@@ -1410,11 +1410,15 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
       
   }
 
-  bool IsMetatypeBase = Base->getType()->is<MetaTypeType>();
+  bool IsMetatypeBase = BaseTy->is<MetaTypeType>();
   if (IsMetatypeBase && Lookup.Results.size() == 1) {
     MemberLookupResult R = Lookup.Results[0];
+    // If we're looking in a metatype and find a use of a field of the type,
+    // diagnose it.
     if (R.Kind == MemberLookupResult::MemberProperty) {
-      diagnose(E->getNameLoc(), diag::no_valid_dot_expression, Base->getType());
+      diagnose(E->getNameLoc(), diag::no_member_of_metatype,
+               BaseTy->castTo<MetaTypeType>()->getInstanceType(), MemberName)
+        << SourceRange(E->getNameLoc(), E->getNameLoc());
       return 0;
     }
   }
