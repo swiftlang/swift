@@ -1249,8 +1249,8 @@ static llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O) {
     .Case("monotonic", Monotonic)
     .Case("acquire", Acquire)
     .Case("release", Release)
-    .Case("acq_rel", AcquireRelease)
-    .Case("seq_cst", SequentiallyConsistent);
+    .Case("acqrel", AcquireRelease)
+    .Case("seqcst", SequentiallyConsistent);
 }
 
 
@@ -1479,6 +1479,26 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     }
     return;
   }
+  
+  if (BuiltinName.startswith("fence_")) {
+    BuiltinName = BuiltinName.drop_front(strlen("fence_"));
+    // Decode the ordering argument, which is required.
+    auto underscore = BuiltinName.find('_');
+    auto ordering = decodeLLVMAtomicOrdering(BuiltinName.substr(0, underscore));
+    BuiltinName = BuiltinName.substr(underscore);
+    
+    // Accept singlethread if present.
+    bool isSingleThread = BuiltinName.startswith("_singlethread");
+    if (isSingleThread)
+      BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
+    assert(BuiltinName.empty() && "Mismatch with sema");
+    
+    IGF.Builder.CreateFence(ordering,
+                      isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+    emission.setVoidResult();
+    return;
+  }
+
   
   if (BuiltinName.startswith("cmpxchg_")) {
     BuiltinName = BuiltinName.drop_front(strlen("cmpxchg_"));

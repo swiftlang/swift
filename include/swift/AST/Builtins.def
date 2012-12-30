@@ -148,9 +148,12 @@ BUILTIN_MISC_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)
 /// Bridging to/from a raw pointer does not imply a retain.
 BUILTIN_MISC_OPERATION(BridgeFromRawPointer, "bridgeFromRawPointer", Special)
 
+/// Fence has type () -> ().
+BUILTIN_MISC_OPERATION(Fence, "fence", None)
 
 /// CmpXChg has type (Builtin.RawPointer, T, T) -> T.
 BUILTIN_MISC_OPERATION(CmpXChg, "cmpxchg", Special)
+
 
 #undef BUILTIN_MISC_OPERATION
 

@@ -330,6 +330,14 @@ static ValueDecl *getDeallocOperation(ASTContext &Context, Identifier id) {
                                 Context.TheBuiltinModule);
 }
 
+static ValueDecl *getFenceOperation(ASTContext &Context, Identifier id) {
+  Type tt = TupleType::getEmpty(Context);
+  Type fnTy = FunctionType::get(tt, tt, Context);
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), id, SourceLoc(),
+                                nullptr, fnTy, /*init*/ nullptr,
+                                Context.TheBuiltinModule);
+}
+
 static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier id,
                                       Type type) {
   TupleTypeElt argElts[] = {
@@ -506,10 +514,15 @@ static Type getSwiftFunctionTypeForIntrinsic(unsigned iid,
   return FunctionType::get(Arg, ResultTy, Context);
 }
 
+static bool isValidFenceOrdering(StringRef Ordering) {
+  return Ordering == "acquire" || Ordering == "release" ||
+         Ordering == "acqrel" || Ordering == "seqcst";
+}
+
 static bool isValidAtomicOrdering(StringRef Ordering) {
   return Ordering == "unordered" || Ordering == "monotonic" ||
          Ordering == "acquire" || Ordering == "release" ||
-         Ordering == "acq_rel" || Ordering == "seq_cst";
+         Ordering == "acqrel" || Ordering == "seqcst";
 }
 
 ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
@@ -523,16 +536,39 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
       return getBuiltinFunction(Context, Id, FnTy);
   }
   
+  
+  // If this starts with fence, we have special suffixes to handle.
+  if (OperationName.startswith("fence_")) {
+    OperationName = OperationName.drop_front(strlen("fence_"));
+    
+    // Verify we have a single integer, floating point, or pointer type.
+    if (!Types.empty()) return nullptr;
+    
+    // Get and validate the ordering argument, which is required.
+    auto Underscore = OperationName.find('_');
+    if (!isValidFenceOrdering(OperationName.substr(0, Underscore)))
+      return nullptr;
+    OperationName = OperationName.substr(Underscore);
+    
+    // Accept singlethread if present.
+    if (OperationName.startswith("_singlethread"))
+      OperationName = OperationName.drop_front(strlen("_singlethread"));
+    // Nothing else is allowed in the name.
+    if (!OperationName.empty())
+      return nullptr;
+    return getFenceOperation(Context, Id);
+  }
+  
   // If this starts with cmpxchg, we have special suffixes to handle.
   if (OperationName.startswith("cmpxchg_")) {
+    OperationName = OperationName.drop_front(strlen("cmpxchg_"));
+    
     // Verify we have a single integer, floating point, or pointer type.
     if (Types.size() != 1) return nullptr;
     Type T = Types[0];
     if (!T->is<BuiltinIntegerType>() && !T->is<BuiltinRawPointerType>() &&
         !T->is<BuiltinFloatType>())
       return nullptr;
-
-    OperationName = OperationName.drop_front(strlen("cmpxchg_"));
 
     // Get and validate the ordering argument, which is required.
     auto Underscore = OperationName.find('_');
@@ -567,7 +603,9 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
       return nullptr;
 
   switch (BV) {
-  case BuiltinValueKind::CmpXChg: assert(0 && "Handled above");
+  case BuiltinValueKind::Fence:
+  case BuiltinValueKind::CmpXChg:
+    assert(0 && "Handled above");
   case BuiltinValueKind::None: return nullptr;
 
   case BuiltinValueKind::Gep:
