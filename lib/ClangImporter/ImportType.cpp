@@ -241,7 +241,7 @@ namespace {
         // FIXME: If we were walking TypeLocs, we could actually get parameter
         // names. The probably doesn't matter outside of a FuncDecl, which
         // we'll have to special-case, but it's an interesting bit of data loss.
-        params.push_back(TupleTypeElt(swiftParamTy, Identifier()));
+        params.push_back(swiftParamTy);
       }
 
       // Form the parameter tuple.

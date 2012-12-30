@@ -1302,19 +1302,19 @@ Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
   if (!injectionFn) return nullptr;
 
   // The input is a tuple type:
-  TupleTypeElt argTypes[3];
+  TupleTypeElt argTypes[3] = {
+    // The first element is Builtin.RawPointer.
+    // FIXME: this should probably be either UnsafePointer<T> or the
+    // first two arguments should be combined into a byref(heap).
+    Context.TheRawPointerType,
 
-  // The first element is Builtin.RawPointer.
-  // FIXME: this should probably be either UnsafePointer<T> or the
-  // first two arguments should be combined into a byref(heap).
-  argTypes[0] = TupleTypeElt(Context.TheRawPointerType, Identifier());
+    // The second element is the owner pointer, Builtin.ObjectPointer.
+    Context.TheObjectPointerType,
 
-  // The second element is the owner pointer, Builtin.ObjectPointer.
-  argTypes[1] = TupleTypeElt(Context.TheObjectPointerType, Identifier());
-
-  // The third element is the bound type.  Maybe this should be a
-  // target-specific size_t type?
-  argTypes[2] = TupleTypeElt(lenTy, Identifier());
+    // The third element is the bound type.  Maybe this should be a
+    // target-specific size_t type?
+    lenTy
+  };
 
   Type input = TupleType::get(argTypes, Context);
 

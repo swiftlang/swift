@@ -538,11 +538,13 @@ class TupleTypeElt {
 
 public:
   TupleTypeElt() = default;
-  TupleTypeElt(Type ty,
-               Identifier name = Identifier(),
-               ExprHandle *init = nullptr,
-               Type VarargBaseTy = Type())
+  /*implicit*/ TupleTypeElt(Type ty,
+                            Identifier name = Identifier(),
+                            ExprHandle *init = nullptr,
+                            Type VarargBaseTy = Type())
     : Name(name), Ty(ty), Init(init), VarargBaseTy(VarargBaseTy) { }
+  /*implicit*/ TupleTypeElt(TypeBase *Ty)
+    : Name(Identifier()), Ty(Ty), Init(nullptr),VarargBaseTy(Type()) { }
 
   bool hasName() const { return !Name.empty(); }
   Identifier getName() const { return Name; }

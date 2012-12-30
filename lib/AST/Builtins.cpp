@@ -100,10 +100,7 @@ static FuncDecl *getBuiltinFunction(ASTContext &Context, Identifier Id, Type T){
 static ValueDecl *getGepOperation(ASTContext &Context, Identifier Id,
                                   Type ArgType) {
   // This is always "(i8*, IntTy) -> i8*"
-  TupleTypeElt ArgElts[] = {
-    TupleTypeElt(Context.TheRawPointerType, Identifier()),
-    TupleTypeElt(ArgType, Identifier())
-  };
+  TupleTypeElt ArgElts[] = { Context.TheRawPointerType, ArgType };
   Type Arg = TupleType::get(ArgElts, Context);
   Type FnTy = FunctionType::get(Arg, Context.TheRawPointerType, Context);
   return getBuiltinFunction(Context, Id, FnTy);
@@ -112,10 +109,7 @@ static ValueDecl *getGepOperation(ASTContext &Context, Identifier Id,
 /// Build a binary operation declaration.
 static ValueDecl *getBinaryOperation(ASTContext &Context, Identifier Id,
                                      Type ArgType) {
-  TupleTypeElt ArgElts[] = {
-    TupleTypeElt(ArgType, Identifier()),
-    TupleTypeElt(ArgType, Identifier())
-  };
+  TupleTypeElt ArgElts[] = { ArgType, ArgType };
   Type Arg = TupleType::get(ArgElts, Context);
   Type FnTy = FunctionType::get(Arg, ArgType, Context);
   return getBuiltinFunction(Context, Id, FnTy);
@@ -124,10 +118,7 @@ static ValueDecl *getBinaryOperation(ASTContext &Context, Identifier Id,
 /// Build a binary predicate declaration.
 static ValueDecl *getBinaryPredicate(ASTContext &Context, Identifier Id,
                                      Type ArgType) {
-  TupleTypeElt ArgElts[] = {
-    TupleTypeElt(ArgType, Identifier()),
-    TupleTypeElt(ArgType, Identifier())
-  };
+  TupleTypeElt ArgElts[] = { ArgType, ArgType };
   Type Arg = TupleType::get(ArgElts, Context);
   Type FnTy = FunctionType::get(Arg, BuiltinIntegerType::get(1, Context),
                                 Context);
@@ -237,9 +228,7 @@ static ValueDecl *getLoadOperation(ASTContext &Context, Identifier Id) {
   GenericParamList *ParamList;
   std::tie(GenericTy, ParamList) = getGenericParam(Context);
 
-  TupleTypeElt ArgElts[] = {
-    TupleTypeElt(Context.TheRawPointerType, Identifier())
-  };
+  TupleTypeElt ArgElts[] = { Context.TheRawPointerType };
   Type Arg = TupleType::get(ArgElts, Context);
   Type FnTy = PolymorphicFunctionType::get(Arg, GenericTy, ParamList, Context);
   return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, SourceLoc(),
@@ -252,10 +241,7 @@ static ValueDecl *getStoreOperation(ASTContext &Context, Identifier Id) {
   GenericParamList *ParamList;
   std::tie(GenericTy, ParamList) = getGenericParam(Context);
 
-  TupleTypeElt ArgElts[] = {
-    TupleTypeElt(GenericTy, Identifier()),
-    TupleTypeElt(Context.TheRawPointerType, Identifier())
-  };
+  TupleTypeElt ArgElts[] = { GenericTy, Context.TheRawPointerType };
   Type Arg = TupleType::get(ArgElts, Context);
   Type FnTy = PolymorphicFunctionType::get(Arg, TupleType::getEmpty(Context),
                                            ParamList, Context);
@@ -270,8 +256,7 @@ static ValueDecl *getDestroyOperation(ASTContext &Context, Identifier id) {
   std::tie(genericTy, paramList) = getGenericParam(Context);
 
   TupleTypeElt argElts[] = {
-    TupleTypeElt(MetaTypeType::get(genericTy, Context), Identifier()),
-    TupleTypeElt(Context.TheRawPointerType, Identifier())
+    MetaTypeType::get(genericTy, Context), Context.TheRawPointerType
   };
   Type argTy = TupleType::get(argElts, Context);
   Type fnTy = PolymorphicFunctionType::get(argTy, TupleType::getEmpty(Context),
@@ -291,9 +276,7 @@ static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context, Identifier Id){
   GenericParamList *ParamList;
   std::tie(GenericTy, ParamList) = getGenericParam(Context);
 
-  TupleTypeElt ArgElts[] = {
-    TupleTypeElt(MetaTypeType::get(GenericTy, Context), Identifier()),
-  };
+  TupleTypeElt ArgElts[] = { MetaTypeType::get(GenericTy, Context) };
   Type Arg = TupleType::get(ArgElts, Context);
   Type FnTy = PolymorphicFunctionType::get(Arg,
                                            getPointerSizeType(Context),
@@ -305,10 +288,7 @@ static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context, Identifier Id){
 
 static ValueDecl *getAllocOperation(ASTContext &Context, Identifier id) {
   Type ptrSizeTy = getPointerSizeType(Context);
-  TupleTypeElt argElts[] = {
-    TupleTypeElt(ptrSizeTy, Identifier()),
-    TupleTypeElt(ptrSizeTy, Identifier())
-  };
+  TupleTypeElt argElts[] = { ptrSizeTy, ptrSizeTy };
   Type argTy = TupleType::get(argElts, Context);
   Type fnTy = FunctionType::get(argTy, Context.TheRawPointerType, Context);
 
@@ -319,8 +299,7 @@ static ValueDecl *getAllocOperation(ASTContext &Context, Identifier id) {
 
 static ValueDecl *getDeallocOperation(ASTContext &Context, Identifier id) {
   TupleTypeElt argElts[] = {
-    TupleTypeElt(Context.TheRawPointerType, Identifier()),
-    TupleTypeElt(getPointerSizeType(Context), Identifier())
+    Context.TheRawPointerType, getPointerSizeType(Context)
   };
   Type argTy = TupleType::get(argElts, Context);
   Type fnTy = FunctionType::get(argTy, TupleType::getEmpty(Context), Context);
@@ -340,9 +319,7 @@ static ValueDecl *getFenceOperation(ASTContext &Context, Identifier id) {
 
 static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier id,
                                       Type type) {
-  TupleTypeElt argElts[] = {
-    Context.TheRawPointerType, type, type
-  };
+  TupleTypeElt argElts[] = { Context.TheRawPointerType, type, type };
   Type argTy = TupleType::get(argElts, Context);
   Type fnTy = FunctionType::get(argTy, type, Context);
   
@@ -353,9 +330,7 @@ static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier id,
 
 static ValueDecl *getAtomicRMWOperation(ASTContext &Context, Identifier id,
                                         Type type) {
-  TupleTypeElt argElts[] = {
-    Context.TheRawPointerType, type
-  };
+  TupleTypeElt argElts[] = { Context.TheRawPointerType, type };
   Type argTy = TupleType::get(argElts, Context);
   Type fnTy = FunctionType::get(argTy, type, Context);
   
@@ -387,7 +362,7 @@ static ValueDecl *getObjectPointerCast(ASTContext &Context, Identifier Id,
     Ret = GenericTy;
   }
 
-  TupleTypeElt ArgElts[] = { TupleTypeElt(Arg, Identifier()) };
+  TupleTypeElt ArgElts[] = { Arg };
   Arg = TupleType::get(ArgElts, Context);
 
   Type FnTy = PolymorphicFunctionType::get(Arg, Ret, ParamList, Context);
@@ -494,7 +469,7 @@ static Type DecodeIntrinsicType(ArrayRef<llvm::Intrinsic::IITDescriptor> &Table,
       Type T = DecodeIntrinsicType(Table, Tys, Context);
       if (!T) return Type();
       
-      Elts.push_back(TupleTypeElt(T, Identifier()));
+      Elts.push_back(T);
     }
     return TupleType::get(Elts, Context);
   }
@@ -520,7 +495,7 @@ static Type getSwiftFunctionTypeForIntrinsic(unsigned iid,
   while (!TableRef.empty()) {
     Type ArgTy = DecodeIntrinsicType(TableRef, TypeArgs, Context);
     if (!ArgTy) return Type();
-    ArgTys.push_back(TupleTypeElt(ArgTy, Identifier()));
+    ArgTys.push_back(ArgTy);
   }
   
   Type Arg = TupleType::get(ArgTys, Context);

@@ -2395,7 +2395,7 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       tupleTypeElts.reserve(n);
       for (unsigned i = 0; i != n; ++i) {
         auto tv = CS.createTypeVariable(expr);
-        tupleTypeElts.push_back(TupleTypeElt(tv, Identifier()));
+        tupleTypeElts.push_back(tv);
         varDecls[i]->setType(tv);
       }
       ASTContext &Context = CS.getASTContext();

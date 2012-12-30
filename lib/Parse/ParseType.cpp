@@ -375,7 +375,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, TypeLoc &Result) {
       if ((HadError = parseTypeAnnotation(type)))
         break;
 
-      Elements.push_back(TupleTypeElt(type.getType(), Identifier(), nullptr));
+      Elements.push_back(type.getType());
     } while (consumeIf(tok::comma));
     
     if (HadError) {
