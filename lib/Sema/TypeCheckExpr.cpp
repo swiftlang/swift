@@ -1393,7 +1393,15 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   MemberLookup Lookup(BaseTy, MemberName, TU);
   
   if (!Lookup.isSuccess()) {
-    // FIXME: This diagnostic is a bit painful.
+    if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
+      diagnose(E->getDotLoc(), diag::no_member_of_module, MT->getModule()->Name,
+               MemberName)
+        << Base->getSourceRange()
+        << SourceRange(E->getNameLoc(), E->getNameLoc());
+      return 0;
+    }
+    
+    // FIXME: This diagnostic is ridiculously painful.
     diagnose(E->getDotLoc(), diag::no_valid_dot_expression, BaseTy)
       << Base->getSourceRange() << SourceRange(E->getNameLoc(),E->getNameLoc());
     return 0;
