@@ -1529,6 +1529,54 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     emission.setScalarUnmanagedSubstResult(result);
     return;
   }
+  
+  if (BuiltinName.startswith("atomicrmw_")) {
+    using namespace llvm;
+    BuiltinName = BuiltinName.drop_front(strlen("atomicrmw_"));
+    auto underscore = BuiltinName.find('_');
+    StringRef SubOp = BuiltinName.substr(0, underscore);
+    
+    auto SubOpcode = StringSwitch<AtomicRMWInst::BinOp>(SubOp)
+      .Case("xchg", AtomicRMWInst::Xchg)
+      .Case("add",  AtomicRMWInst::Add)
+      .Case("sub",  AtomicRMWInst::Sub)
+      .Case("and",  AtomicRMWInst::And)
+      .Case("nand", AtomicRMWInst::Nand)
+      .Case("or",   AtomicRMWInst::Or)
+      .Case("xor",  AtomicRMWInst::Xor)
+      .Case("max",  AtomicRMWInst::Max)
+      .Case("min",  AtomicRMWInst::Min)
+      .Case("umax", AtomicRMWInst::UMax)
+      .Case("umin", AtomicRMWInst::UMin);
+    BuiltinName = BuiltinName.drop_front(underscore+1);
+    
+    // Decode the ordering argument, which is required.
+    underscore = BuiltinName.find('_');
+    auto ordering = decodeLLVMAtomicOrdering(BuiltinName.substr(0, underscore));
+    BuiltinName = BuiltinName.substr(underscore);
+    
+    // Accept volatile and singlethread if present.
+    bool isVolatile = BuiltinName.startswith("_volatile");
+    if (isVolatile) BuiltinName = BuiltinName.drop_front(strlen("_volatile"));
+    
+    bool isSingleThread = BuiltinName.startswith("_singlethread");
+    if (isSingleThread)
+      BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
+    assert(BuiltinName.empty() && "Mismatch with sema");
+    
+    auto pointer = args.claimUnmanagedNext();
+    auto val = args.claimUnmanagedNext();
+    
+    pointer = IGF.Builder.CreateBitCast(pointer,
+                                  llvm::PointerType::getUnqual(val->getType()));
+    auto result = IGF.Builder.CreateAtomicRMW(SubOpcode, pointer, val,
+                                              ordering,
+                      isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+    result->setVolatile(isVolatile);
+    emission.setScalarUnmanagedSubstResult(result);
+    return;
+  }
+
 
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }

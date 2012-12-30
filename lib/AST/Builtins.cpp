@@ -351,6 +351,19 @@ static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier id,
                                 Context.TheBuiltinModule);
 }
 
+static ValueDecl *getAtomicRMWOperation(ASTContext &Context, Identifier id,
+                                        Type type) {
+  TupleTypeElt argElts[] = {
+    Context.TheRawPointerType, type
+  };
+  Type argTy = TupleType::get(argElts, Context);
+  Type fnTy = FunctionType::get(argTy, type, Context);
+  
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), id, SourceLoc(),
+                                nullptr, fnTy, /*init*/ nullptr,
+                                Context.TheBuiltinModule);
+}
+
 static ValueDecl *getObjectPointerCast(ASTContext &Context, Identifier Id,
                                        BuiltinValueKind BV) {
   Type GenericTy;
@@ -587,6 +600,40 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
     return getCmpXChgOperation(Context, Id, T);
   }
   
+  // If this starts with atomicrmw, we have special suffixes to handle.
+  if (OperationName.startswith("atomicrmw_")) {
+    OperationName = OperationName.drop_front(strlen("atomicrmw_"));
+    
+    // Verify we have a single integer, floating point, or pointer type.
+    if (Types.size() != 1 || !Types[0]->is<BuiltinIntegerType>())
+      return nullptr;
+    
+    // Get and validate the suboperation name, which is required.
+    auto Underscore = OperationName.find('_');
+    if (Underscore == StringRef::npos) return nullptr;
+    StringRef SubOp = OperationName.substr(0, Underscore);
+    if (SubOp != "xchg" && SubOp != "add" && SubOp != "sub" && SubOp != "and" &&
+        SubOp != "nand" && SubOp != "or" && SubOp != "xor" && SubOp != "max" &&
+        SubOp != "min" && SubOp != "umax" && SubOp != "umin")
+      return nullptr;
+    OperationName = OperationName.drop_front(Underscore+1);
+    
+    // Get and validate the ordering argument, which is required.
+    Underscore = OperationName.find('_');
+    if (!isValidAtomicOrdering(OperationName.substr(0, Underscore)))
+      return nullptr;
+    OperationName = OperationName.substr(Underscore);
+    
+    // Accept volatile and singlethread if present.
+    if (OperationName.startswith("_volatile"))
+      OperationName = OperationName.drop_front(strlen("_volatile"));
+    if (OperationName.startswith("_singlethread"))
+      OperationName = OperationName.drop_front(strlen("_singlethread"));
+    // Nothing else is allowed in the name.
+    if (!OperationName.empty())
+      return nullptr;
+    return getAtomicRMWOperation(Context, Id, Types[0]);
+  }
   
   BuiltinValueKind BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name) \
@@ -605,6 +652,7 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   switch (BV) {
   case BuiltinValueKind::Fence:
   case BuiltinValueKind::CmpXChg:
+  case BuiltinValueKind::AtomicRMW:
     assert(0 && "Handled above");
   case BuiltinValueKind::None: return nullptr;
 

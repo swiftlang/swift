@@ -154,6 +154,8 @@ BUILTIN_MISC_OPERATION(Fence, "fence", None)
 /// CmpXChg has type (Builtin.RawPointer, T, T) -> T.
 BUILTIN_MISC_OPERATION(CmpXChg, "cmpxchg", Special)
 
+/// AtomicRMW has type (Builtin.RawPointer, T) -> T.
+BUILTIN_MISC_OPERATION(AtomicRMW, "atomicrmw", Integer)
 
 #undef BUILTIN_MISC_OPERATION
 
