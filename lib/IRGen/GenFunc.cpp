@@ -62,6 +62,7 @@
 #include "llvm/Intrinsics.h"
 #include "llvm/Module.h"
 #include "llvm/Support/CallSite.h"
+#include "llvm/ADT/StringSwitch.h"
 
 #include "ASTVisitor.h"
 #include "CallingConvention.h"
@@ -1240,6 +1241,19 @@ static void emitCompareBuiltin(IRGenFunction &IGF, FuncDecl *fn,
   emission.setScalarUnmanagedSubstResult(v);
 }
 
+/// decodeLLVMAtomicOrdering - turn a string like "release" into the LLVM enum.
+static llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O) {
+  using namespace llvm;
+  return StringSwitch<AtomicOrdering>(O)
+    .Case("unordered", Unordered)
+    .Case("monotonic", Monotonic)
+    .Case("acquire", Acquire)
+    .Case("release", Release)
+    .Case("acq_rel", AcquireRelease)
+    .Case("seq_cst", SequentiallyConsistent);
+}
+
+
 /// emitBuiltinCall - Emit a call to a builtin function.
 static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
                             SpecializedCallEmission &emission) {
@@ -1463,6 +1477,36 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
       value = IGF.Builder.CreateBitCast(value, valueTI.StorageType);
       IGF.emitRetain(value, emission.getSubstExplosion());
     }
+    return;
+  }
+  
+  if (BuiltinName.startswith("cmpxchg_")) {
+    BuiltinName = BuiltinName.drop_front(strlen("cmpxchg_"));
+    // Decode the ordering argument, which is required.
+    auto underscore = BuiltinName.find('_');
+    auto ordering = decodeLLVMAtomicOrdering(BuiltinName.substr(0, underscore));
+    BuiltinName = BuiltinName.substr(underscore);
+    
+    // Accept volatile and singlethread if present.
+    bool isVolatile = BuiltinName.startswith("_volatile");
+    if (isVolatile) BuiltinName = BuiltinName.drop_front(strlen("_volatile"));
+    
+    bool isSingleThread = BuiltinName.startswith("_singlethread");
+    if (isSingleThread)
+      BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
+    assert(BuiltinName.empty() && "Mismatch with sema");
+
+    auto pointer = args.claimUnmanagedNext();
+    auto cmp = args.claimUnmanagedNext();
+    auto newval = args.claimUnmanagedNext();
+    
+    pointer = IGF.Builder.CreateBitCast(pointer,
+                                  llvm::PointerType::getUnqual(cmp->getType()));
+    auto result = IGF.Builder.CreateAtomicCmpXchg(pointer, cmp, newval,
+                                                  ordering,
+                      isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+    result->setVolatile(isVolatile);
+    emission.setScalarUnmanagedSubstResult(result);
     return;
   }
 

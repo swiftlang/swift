@@ -286,7 +286,7 @@ static Type getPointerSizeType(ASTContext &Context) {
   return BuiltinIntegerType::get(64, Context);
 }
 
-static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context, Identifier Id) {
+static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context, Identifier Id){
   Type GenericTy;
   GenericParamList *ParamList;
   std::tie(GenericTy, ParamList) = getGenericParam(Context);
@@ -325,6 +325,19 @@ static ValueDecl *getDeallocOperation(ASTContext &Context, Identifier id) {
   Type argTy = TupleType::get(argElts, Context);
   Type fnTy = FunctionType::get(argTy, TupleType::getEmpty(Context), Context);
 
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), id, SourceLoc(),
+                                nullptr, fnTy, /*init*/ nullptr,
+                                Context.TheBuiltinModule);
+}
+
+static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier id,
+                                      Type type) {
+  TupleTypeElt argElts[] = {
+    Context.TheRawPointerType, type, type
+  };
+  Type argTy = TupleType::get(argElts, Context);
+  Type fnTy = FunctionType::get(argTy, type, Context);
+  
   return new (Context) FuncDecl(SourceLoc(), SourceLoc(), id, SourceLoc(),
                                 nullptr, fnTy, /*init*/ nullptr,
                                 Context.TheBuiltinModule);
@@ -493,6 +506,11 @@ static Type getSwiftFunctionTypeForIntrinsic(unsigned iid,
   return FunctionType::get(Arg, ResultTy, Context);
 }
 
+static bool isValidAtomicOrdering(StringRef Ordering) {
+  return Ordering == "unordered" || Ordering == "monotonic" ||
+         Ordering == "acquire" || Ordering == "release" ||
+         Ordering == "acq_rel" || Ordering == "seq_cst";
+}
 
 ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   SmallVector<Type, 4> Types;
@@ -504,7 +522,35 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
     if (Type FnTy = getSwiftFunctionTypeForIntrinsic(ID, Types, Context))
       return getBuiltinFunction(Context, Id, FnTy);
   }
+  
+  // If this starts with cmpxchg, we have special suffixes to handle.
+  if (OperationName.startswith("cmpxchg_")) {
+    // Verify we have a single integer, floating point, or pointer type.
+    if (Types.size() != 1) return nullptr;
+    Type T = Types[0];
+    if (!T->is<BuiltinIntegerType>() && !T->is<BuiltinRawPointerType>() &&
+        !T->is<BuiltinFloatType>())
+      return nullptr;
+
+    OperationName = OperationName.drop_front(strlen("cmpxchg_"));
+
+    // Get and validate the ordering argument, which is required.
+    auto Underscore = OperationName.find('_');
+    if (!isValidAtomicOrdering(OperationName.substr(0, Underscore)))
+      return nullptr;
+    OperationName = OperationName.substr(Underscore);
     
+    // Accept volatile and singlethread if present.
+    if (OperationName.startswith("_volatile"))
+      OperationName = OperationName.drop_front(strlen("_volatile"));
+    if (OperationName.startswith("_singlethread"))
+      OperationName = OperationName.drop_front(strlen("_singlethread"));
+    // Nothing else is allowed in the name.
+    if (!OperationName.empty())
+      return nullptr;
+    return getCmpXChgOperation(Context, Id, T);
+  }
+  
   
   BuiltinValueKind BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name) \
@@ -521,6 +567,7 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
       return nullptr;
 
   switch (BV) {
+  case BuiltinValueKind::CmpXChg: assert(0 && "Handled above");
   case BuiltinValueKind::None: return nullptr;
 
   case BuiltinValueKind::Gep:
