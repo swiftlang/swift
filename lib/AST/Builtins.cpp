@@ -405,16 +405,16 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
 }
 
 /// getLLVMIntrinsicID - Given an LLVM IR intrinsic name with argument types
-/// remove (e.g. like "bswap") return the LLVM IR IntrinsicID for the intrinsic
+/// removed (e.g. like "bswap") return the LLVM IR IntrinsicID for the intrinsic
 /// or 0 if the intrinsic name doesn't match anything.
 unsigned swift::getLLVMIntrinsicID(StringRef InName, bool hasArgTypes) {
   using namespace llvm;
 
-  // FIXME: Hack so we don't treat "trunc" as "llvm.trunc"; we should consider
-  // renaming the swift intrinsic so it doesn't conflict.
-  if (InName == "trunc")
+  // Swift intrinsic names start with int_.
+  if (!InName.startswith("int_"))
     return llvm::Intrinsic::not_intrinsic;
-
+  InName = InName.drop_front(strlen("int_"));
+  
   // Prepend "llvm." and change _ to . in name.
   SmallString<128> NameS;
   NameS.append("llvm.");
