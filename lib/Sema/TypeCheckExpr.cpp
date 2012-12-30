@@ -1400,6 +1400,12 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
         << SourceRange(E->getNameLoc(), E->getNameLoc());
       return 0;
     }
+    if (MetaTypeType *MTT = BaseTy->getAs<MetaTypeType>()) {
+      diagnose(E->getDotLoc(), diag::no_member_of_metatype,
+               MTT->getInstanceType(), MemberName) << Base->getSourceRange()
+      << SourceRange(E->getNameLoc(), E->getNameLoc());
+      return 0;
+    }
     
     // FIXME: This diagnostic is ridiculously painful.
     diagnose(E->getDotLoc(), diag::no_valid_dot_expression, BaseTy)

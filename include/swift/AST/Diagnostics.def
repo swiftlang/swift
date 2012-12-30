@@ -844,6 +844,8 @@ ERROR(no_valid_dot_expression,sema_tce,none,
       "base type %0 has no valid '.' expression for this field", (Type))
 ERROR(no_member_of_module,sema_tce,none,
       "module %0 has no member named %1", (Identifier, Identifier))
+ERROR(no_member_of_metatype,sema_tce,none,
+      "metatype %0 has no member named %1", (Type, Identifier))
 ERROR(member_ref_metatype_variable,sema_tce,none,
       "reference to member variable %0 requires base object of type %1",
       (Identifier, Type))
