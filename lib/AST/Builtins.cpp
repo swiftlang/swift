@@ -369,19 +369,12 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 // There's deliberately no BUILTIN clause here so that we'll blow up
 // if new builtin categories are added there and not here.
 #define BUILTIN_CAST_OPERATION(id, name) OverloadedBuiltinKind::Special,
-#define BUILTIN_GEP_OPERATION(id, name, overload) overload,
-#define BUILTIN_BINARY_OPERATION(id, name, overload) overload,
-#define BUILTIN_BINARY_PREDICATE(id, name, overload) overload,
-#define BUILTIN_LOAD(id, name) OverloadedBuiltinKind::Special,
-#define BUILTIN_ASSIGN(id, name) OverloadedBuiltinKind::Special,
-#define BUILTIN_INIT(id, name) OverloadedBuiltinKind::Special,
-#define BUILTIN_DESTROY(id, name) OverloadedBuiltinKind::Special,
-#define BUILTIN_SIZEOF(id, name) OverloadedBuiltinKind::Special,
-#define BUILTIN_STRIDEOF(id, name) OverloadedBuiltinKind::Special,
-#define BUILTIN_ALIGNOF(id, name) OverloadedBuiltinKind::Special,
-#define BUILTIN_ALLOCRAW(id, name) OverloadedBuiltinKind::Special,
-#define BUILTIN_DEALLOCRAW(id, name) OverloadedBuiltinKind::Special,
-#define BUILTIN_CASTOBJECTPOINTER(id, name) OverloadedBuiltinKind::Special,
+#define BUILTIN_BINARY_OPERATION(id, name, overload) \
+   OverloadedBuiltinKind::overload,
+#define BUILTIN_BINARY_PREDICATE(id, name, overload) \
+   OverloadedBuiltinKind::overload,
+#define BUILTIN_MISC_OPERATION(id, name, overload) \
+   OverloadedBuiltinKind::overload,
 #include "swift/AST/Builtins.def"
 };
 
@@ -530,9 +523,7 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   switch (BV) {
   case BuiltinValueKind::None: return nullptr;
 
-#define BUILTIN(id, name)
-#define BUILTIN_GEP_OPERATION(id, name, overload)  case BuiltinValueKind::id:
-#include "swift/AST/Builtins.def"
+  case BuiltinValueKind::Gep:
     if (Types.size() != 1) return nullptr;
     return getGepOperation(Context, Id, Types[0]);
 
