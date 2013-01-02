@@ -1333,6 +1333,26 @@ namespace {
     }
 
   public:
+    // Import the given Objective-C protocol list and return a context-allocated
+    // ArrayRef that can be passed to the declaration.
+    MutableArrayRef<TypeLoc>
+    importObjCProtocols(const clang::ObjCProtocolList &clangProtocols) {
+      if (clangProtocols.empty())
+        return { };
+
+      SmallVector<TypeLoc, 4> protocols;
+      for (auto cp = clangProtocols.begin(), cpEnd = clangProtocols.end();
+           cp != cpEnd; ++cp) {
+        auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp));
+        if (!proto)
+          continue;
+
+        protocols.push_back(TypeLoc::withoutLoc(proto->getDeclaredType()));
+      }
+
+      return Impl.SwiftContext.AllocateCopy(protocols);
+    }
+
     Decl *VisitObjCCategoryDecl(clang::ObjCCategoryDecl *decl) {
       // Objective-C categories and extensions map to Swift extensions.
 
@@ -1353,7 +1373,8 @@ namespace {
       auto result
         = new (Impl.SwiftContext)
             ExtensionDecl(loc, TypeLoc(objcClass->getDeclaredType(), loc),
-                          { }, dc);
+                          importObjCProtocols(decl->getReferencedProtocols()),
+                          dc);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
       // Import each of the members.
@@ -1398,7 +1419,82 @@ namespace {
       return result;
     }
 
-    // FIXME: ObjCProtocolDecl
+    Decl *VisitObjCProtocolDecl(clang::ObjCProtocolDecl *decl) {
+      // FIXME: Figure out how to deal with incomplete protocols, since that
+      // notion doesn't exist in Swift.
+      decl = decl->getDefinition();
+      if (!decl)
+        return nullptr;
+
+      // Append "Proto" to protocol names.
+      auto name = Impl.importName(decl->getDeclName(), "Proto");
+      if (name.empty())
+        return nullptr;
+
+      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      if (!dc)
+        return nullptr;
+
+      // Create the protocol declaration and record it.
+      auto result = new (Impl.SwiftContext)
+                      ProtocolDecl(dc,
+                                   Impl.importSourceLoc(decl->getLocStart()),
+                                   Impl.importSourceLoc(decl->getLocation()),
+                                   name,
+                                   { });
+      Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+
+      // Import protocols this protocol conforms to.
+      result->setInherited(importObjCProtocols(decl->getReferencedProtocols()));
+
+      // Note that this is an Objective-C protocol.
+      result->getMutableAttrs().ObjC = true;
+
+      // Import each of the members.
+      SmallVector<Decl *, 4> members;
+      for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
+           m != mEnd; ++m) {
+        auto nd = dyn_cast<clang::NamedDecl>(*m);
+        if (!nd)
+          continue;
+
+        // FIXME: Failure to import a non-optional requirement from a protocol
+        // seems like a serious problem, because we can't actually prove
+        // conformance to the protocol. Somehow mark this as an incomplete
+        // protocol, or drop it entirely (?).
+        auto member = Impl.importDecl(nd);
+        if (!member)
+          continue;
+
+        // If this member is a method that is a getter or setter for a property
+        // that was imported, don't add it to the list of members so it won't
+        // be found by name lookup. This eliminates the ambiguity between
+        // property names and getter names (by choosing to only have a
+        // variable).
+        if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
+          if (auto property = objcMethod->findPropertyDecl())
+            if (Impl.importDecl(
+                                const_cast<clang::ObjCPropertyDecl *>(property)))
+              continue;
+
+          // If there is a special declaration associated with this member,
+          // add it now.
+          if (auto special = importSpecialMethod(member)) {
+            members.push_back(special);
+          }
+        }
+
+        members.push_back(member);
+      }
+
+      // FIXME: Source range isn't accurate.
+      result->setMembers(Impl.SwiftContext.AllocateCopy(members),
+                         Impl.importSourceRange(clang::SourceRange(
+                                                  decl->getLocation(),
+                                                  decl->getLocEnd())));
+
+      return result;
+    }
 
     Decl *VisitObjCInterfaceDecl(clang::ObjCInterfaceDecl *decl) {
       // FIXME: Figure out how to deal with incomplete types, since that
@@ -1414,11 +1510,6 @@ namespace {
       auto dc = Impl.importDeclContext(decl->getDeclContext());
       if (!dc)
         return nullptr;
-
-      // FIXME: Import the protocols that this class conforms to. There's
-      // a minor, annoying problem here because those protocols might mention
-      // this class before we've had a chance to build it (due to forward
-      // declarations). The same issue occurs with the superclass...
 
       // Create the class declaration and record it.
       auto result = new (Impl.SwiftContext)
@@ -1438,6 +1529,9 @@ namespace {
                         Impl.importSourceRange(decl->getSuperClassLoc()));
         result->setBaseClassLoc(superTy);
       }
+
+      // Import protocols this class conforms to.
+      result->setInherited(importObjCProtocols(decl->getReferencedProtocols()));
 
       // Note that this is an Objective-C class.
       result->getMutableAttrs().ObjC = true;

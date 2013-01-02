@@ -297,14 +297,21 @@ ClangImporter::Implementation::importName(Identifier name) {
 }
 
 Identifier
-ClangImporter::Implementation::importName(clang::DeclarationName name) {
+ClangImporter::Implementation::importName(clang::DeclarationName name,
+                                          StringRef suffix) {
   // FIXME: At some point, we'll be able to import operators as well.
   if (!name || name.getNameKind() != clang::DeclarationName::Identifier)
     return Identifier();
 
-  // Make the identifier over.
+  // Get the Swift identifier.
   // FIXME: Check for Swift keywords, and filter those out.
-  return SwiftContext.getIdentifier(name.getAsIdentifierInfo()->getName());
+  if (suffix.empty())
+    return SwiftContext.getIdentifier(name.getAsIdentifierInfo()->getName());
+
+  llvm::SmallString<64> nameBuf;
+  nameBuf += name.getAsIdentifierInfo()->getName();
+  nameBuf += suffix;
+  return SwiftContext.getIdentifier(nameBuf);
 }
 
 
@@ -316,6 +323,20 @@ void ClangImporter::lookupValue(Module *module,
                                 SmallVectorImpl<ValueDecl*> &results) {
   auto &sema = Impl.Instance->getSema();
 
+  // If the name ends with 'Proto', strip off the 'Proto' and look for an
+  // Objective-C protocol.
+  // FIXME: Revisit this notion. We could append 'Proto' only when there is both
+  // a class and a protocol with the same name, as with NSObject. However,
+  // doing so requires our input modules to be "sane", in the sense that
+  // one cannot introduce a class X in one module and a protocol X in a another
+  // module that does *not* depend on 
+  auto lookupNameKind = clang::Sema::LookupOrdinaryName;
+  if (name.str().endswith("Proto")) {
+    name = Impl.SwiftContext.getIdentifier(
+             name.str().substr(0, name.str().size() - 5));
+    lookupNameKind = clang::Sema::LookupObjCProtocolName;
+  }
+
   // Map the name. If we can't represent the Swift name in Clang, bail out now.
   auto clangName = Impl.importName(name);
   if (!clangName)
@@ -324,8 +345,9 @@ void ClangImporter::lookupValue(Module *module,
   // Perform name lookup into the global scope.
   // FIXME: Map source locations over.
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
-                                   clang::Sema::LookupOrdinaryName);
-  if (!sema.LookupName(lookupResult, /*Scope=*/0)) {
+                                   lookupNameKind);
+  if (!sema.LookupName(lookupResult, /*Scope=*/0) &&
+      lookupNameKind == clang::Sema::LookupOrdinaryName) {
     // If we didn't find an ordinary name, fall back to a tag name.
     lookupResult.clear(clang::Sema::LookupTagName);
     if (!sema.LookupName(lookupResult, /*Scope=*/0))

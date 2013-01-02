@@ -19,9 +19,19 @@
 @property int overriddenProp;
 @end
 
-@interface B : A
+@protocol B
+- (int)method:(int)arg withFloat:(float)f;
+@end
+
+@protocol Cat1
+- cat1Method;
+@end
+
+@interface B : A <B>
 - (int)method:(int)arg withFloat:(float)f;
 + (int)classMethod:(int)arg withInt:(int)i;
+- (id<B>)getAsProto;
+- (id<B, Cat1>)getAsProtoWithCat;
 
 @property (readonly) int readCounter;
 
@@ -34,8 +44,9 @@
 - initWithInt:(int)i andDouble:(double)d;
 @end
 
-@interface A(Cat1)
+@interface A(Cat1) <Cat1>
 - method:(int)i onCat1:(double)d;
+- cat1Method;
 @end
 
 @interface A()

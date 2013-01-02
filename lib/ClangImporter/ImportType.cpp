@@ -330,6 +330,22 @@ namespace {
     }
 
     Type VisitObjCObjectType(const clang::ObjCObjectType *type) {
+      // If this is id<P> , turn this into a protocol type.
+      // FIXME: What about Class<P>?
+      if (type->isObjCQualifiedId()) {
+        SmallVector<Type, 4> protocols;
+        for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
+             cp != cpEnd; ++cp) {
+          auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp));
+          if (!proto)
+            return Type();
+
+          protocols.push_back(proto->getDeclaredType());
+        }
+
+        return ProtocolCompositionType::get(Impl.SwiftContext, protocols);
+      }
+
       // FIXME: Swift cannot express qualified object pointer types, e.g.,
       // NSObject<Proto>, so we drop the <Proto> part.
       return Visit(type->getBaseType().getTypePtr());
@@ -350,6 +366,22 @@ namespace {
         // FIXME: Swift cannot express qualified object pointer types, e.g.,
         // NSObject<Proto>, so we drop the <Proto> part.
         return VisitObjCInterfaceType(interface);
+      }
+
+      // If this is id<P>, turn this into a protocol type.
+      // FIXME: What about Class<P>?
+      if (type->isObjCQualifiedIdType()) {
+        SmallVector<Type, 4> protocols;
+        for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
+             cp != cpEnd; ++cp) {
+          auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp));
+          if (!proto)
+            return Type();
+
+          protocols.push_back(proto->getDeclaredType());
+        }
+
+        return ProtocolCompositionType::get(Impl.SwiftContext, protocols);
       }
 
       // FIXME: We fake 'id' and 'Class' by using NSObject. We need a proper

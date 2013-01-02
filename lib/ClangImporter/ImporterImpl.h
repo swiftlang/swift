@@ -148,7 +148,12 @@ public:
   clang::DeclarationName importName(Identifier name);
   
   /// \brief Import the given Clang name into Swift.
-  Identifier importName(clang::DeclarationName name);
+  ///
+  /// \param name The Clang name to map into Swift.
+  ///
+  /// \param suffix The suffix to append to the Clang name to produce the
+  /// Swift name.
+  Identifier importName(clang::DeclarationName name, StringRef suffix = "");
 
   /// \brief Import the given Swift source location into Clang.
   clang::SourceLocation importSourceLoc(SourceLoc loc);
