@@ -1,3 +1,4 @@
+import objc
 import Foundation // Clang module
 
 func [asmname="swift_StringToNSString"]
@@ -5,6 +6,10 @@ convertStringToNSString(string : [byref] String) -> NSString
 
 func [asmname="swift_NSStringToString"]
 convertNSStringToString(nsstring : NSString, string : [byref] String)
+
+//===----------------------------------------------------------------------===//
+// Strings
+//===----------------------------------------------------------------------===//
 
 extension String {
   /// \brief Convert from a Swift String to an Objective-C NSString
@@ -30,5 +35,22 @@ extension NSString {
   /// \brief Print NSStrings in the repl.
   func replPrint() {
     print(String(this))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Typed Collections
+//===----------------------------------------------------------------------===//
+struct NSTypedArray<T : NSObject> {
+  var array : NSArray
+
+  constructor(array : NSArray) { this.array = array }
+
+  func [conversion] __conversion() -> NSArray { return array }
+
+  subscript (idx : NSUInteger) -> T {
+    get {
+      return T(array[idx])
+    }
   }
 }
