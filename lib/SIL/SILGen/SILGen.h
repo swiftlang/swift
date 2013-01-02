@@ -358,6 +358,7 @@ public:
   ManagedValue visitErasureExpr(ErasureExpr *E, SGFContext C);
   ManagedValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
   ManagedValue visitDowncastExpr(DowncastExpr *E, SGFContext C);
+  ManagedValue visitSuperToArchetypeExpr(SuperToArchetypeExpr *E, SGFContext C);
   ManagedValue visitParenExpr(ParenExpr *E, SGFContext C);
   ManagedValue visitTupleExpr(TupleExpr *E, SGFContext C);
   ManagedValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);

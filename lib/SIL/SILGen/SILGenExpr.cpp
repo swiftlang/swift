@@ -476,6 +476,22 @@ ManagedValue SILGenFunction::visitDowncastExpr(DowncastExpr *E, SGFContext C) {
                                        getLoweredLoadableType(E->getType())));
 }
 
+ManagedValue SILGenFunction::visitSuperToArchetypeExpr(SuperToArchetypeExpr *E,
+                                                       SGFContext C) {
+  visit(E->getLHS());
+  ManagedValue base = visit(E->getRHS());
+  // Allocate an archetype to hold the downcast value.
+  Value archetype = B.createAllocVar(E, AllocKind::Stack,
+                                     getLoweredType(E->getType()));
+  Cleanups.pushCleanup<CleanupMaterializeAllocation>(archetype);
+  // Initialize it with a SuperToArchetypeInst.
+  B.createSuperToArchetype(E, base.forward(*this), archetype);
+  Cleanups.pushCleanup<CleanupMaterializeAddressOnlyValue>(archetype);
+  
+  return ManagedValue(archetype, getCleanupsDepth(),
+                      /*isAddressOnlyValue=*/true);
+}
+
 ManagedValue SILGenFunction::visitParenExpr(ParenExpr *E, SGFContext C) {
   return visit(E->getSubExpr());
 }
