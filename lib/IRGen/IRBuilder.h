@@ -18,7 +18,7 @@
 #define SWIFT_IRGEN_IRBUILDER_H
 
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/IRBuilder.h"
+#include "llvm/IR/IRBuilder.h"
 #include "swift/Basic/LLVM.h"
 #include "Address.h"
 #include "IRGen.h"

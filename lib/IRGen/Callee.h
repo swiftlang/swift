@@ -18,7 +18,7 @@
 #ifndef SWIFT_IRGEN_CALLEE_H
 #define SWIFT_IRGEN_CALLEE_H
 
-#include "llvm/DerivedTypes.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "CallingConvention.h"
 #include "Explosion.h"
 #include "IRGen.h"

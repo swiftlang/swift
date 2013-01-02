@@ -17,7 +17,7 @@
 
 #include "GenLValue.h"
 
-#include "llvm/Function.h"
+#include "llvm/IR/Function.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"

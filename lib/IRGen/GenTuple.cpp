@@ -26,7 +26,7 @@
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/Optional.h"
-#include "llvm/DerivedTypes.h"
+#include "llvm/IR/DerivedTypes.h"
 
 #include "ASTVisitor.h"
 #include "GenArray.h"

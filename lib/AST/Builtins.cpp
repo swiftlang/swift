@@ -18,7 +18,7 @@
 #include "swift/AST/AST.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Intrinsics.h"
+#include "llvm/IR/Intrinsics.h"
 #include <tuple>
 using namespace swift;
 

@@ -23,7 +23,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
-#include "llvm/Function.h"
+#include "llvm/IR/Function.h"
 
 using namespace swift;
 using namespace irgen;

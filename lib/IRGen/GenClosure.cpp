@@ -21,8 +21,8 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
-#include "llvm/DerivedTypes.h"
-#include "llvm/Function.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
 
 #include "IRGenFunction.h"
 #include "IRGenModule.h"

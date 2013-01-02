@@ -20,8 +20,8 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Optional.h"
-#include "llvm/DerivedTypes.h"
-#include "llvm/Function.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
 
 #include "ASTVisitor.h"
 #include "GenArray.h"

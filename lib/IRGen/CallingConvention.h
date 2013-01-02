@@ -18,7 +18,7 @@
 #ifndef SWIFT_IRGEN_CALLINGCONVENTION_H
 #define SWIFT_IRGEN_CALLINGCONVENTION_H
 
-#include "llvm/CallingConv.h"
+#include "llvm/IR/CallingConv.h"
 
 namespace llvm {
   struct AttributeWithIndex;

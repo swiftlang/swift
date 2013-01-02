@@ -23,8 +23,8 @@
 #include "swift/AST/Decl.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/CallingConv.h"
-#include "llvm/GlobalValue.h"
+#include "llvm/IR/CallingConv.h"
+#include "llvm/IR/GlobalValue.h"
 #include "FunctionRef.h"
 #include "IRGen.h"
 

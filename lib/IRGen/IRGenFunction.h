@@ -21,7 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/CallingConv.h"
+#include "llvm/IR/CallingConv.h"
 #include "IRBuilder.h"
 #include "JumpDest.h"
 

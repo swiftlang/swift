@@ -29,8 +29,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/Basic/Optional.h"
-#include "llvm/DerivedTypes.h"
-#include "llvm/Function.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
 
 #include "FixedTypeInfo.h"
 #include "GenProto.h"

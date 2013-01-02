@@ -17,7 +17,7 @@
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CallSite.h"
-#include "llvm/Function.h"
+#include "llvm/IR/Function.h"
 #include "Cleanup.h"
 #include "Condition.h"
 #include "IRGenFunction.h"

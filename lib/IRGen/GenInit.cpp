@@ -18,7 +18,7 @@
 
 #include "swift/Basic/Optional.h"
 #include "swift/AST/Pattern.h"
-#include "llvm/GlobalVariable.h"
+#include "llvm/IR/GlobalVariable.h"
 
 #include "ASTVisitor.h"
 #include "Cleanup.h"

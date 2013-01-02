@@ -16,7 +16,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
-#include "llvm/DerivedTypes.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"

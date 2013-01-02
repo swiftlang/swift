@@ -18,7 +18,7 @@
 #ifndef SWIFT_IRGEN_HEAPTYPEINFO_H
 #define SWIFT_IRGEN_HEAPTYPEINFO_H
 
-#include "llvm/DerivedTypes.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "FixedTypeInfo.h"
 #include "ScalarTypeInfo.h"
 
