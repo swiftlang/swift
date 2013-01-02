@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/Instruction.h"
+#include "swift/SIL/SILVisitor.h"
 #include "swift/AST/AST.h"
 #include "swift/SIL/Function.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -76,6 +77,18 @@ void Instruction::removeFromParent() {
 ///
 void Instruction::eraseFromParent() {
   getParent()->getInsts().erase(this);
+}
+
+namespace {
+  class InstructionDestroyer : public SILVisitor<InstructionDestroyer> {
+  public:
+#define VALUE(CLASS, PARENT) void visit##CLASS(CLASS *I) { I->~CLASS(); }
+#include "swift/SIL/SILNodes.def"
+  };
+} // end anonymous namespace
+
+void Instruction::destroy(Instruction *I) {
+  InstructionDestroyer().visit(I);
 }
 
 //===----------------------------------------------------------------------===//

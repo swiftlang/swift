@@ -24,7 +24,7 @@ void SILSuccessor::operator=(BasicBlock *BB) {
   // predecessor list.
   if (SuccessorBlock) {
     *Prev = Next;
-    Next->Prev = Prev;
+    if (Next) Next->Prev = Prev;
   }
   
   // If we have a successor, add ourself to its prev list.

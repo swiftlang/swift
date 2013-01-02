@@ -83,10 +83,7 @@ void Condition::exitFalse(SILBuilder &B) {
     // we don't either, regardless of whether the current location
     // is reachable.  Just keep inserting / being unreachable
     // right where we are.
-  }
-  /* FIXME: This doesn't work because SILSuccessor destructors never fire. See
-   * below.
-  else if (!B.hasValidInsertionPoint()) {
+  } else if (!B.hasValidInsertionPoint()) {
     // If the true case did need the continuation block, but the false
     // case doesn't, just merge the continuation block back into its
     // single predecessor and move the IP there.
@@ -104,16 +101,11 @@ void Condition::exitFalse(SILBuilder &B) {
     auto *Br = cast<BranchInst>(ContPred->getTerminator());
     B.setInsertionPoint(Br->getParent());
 
-    // FIXME: Instruction::eraseFromParent doesn't actually invoke the
-    // Instruction's destructor, so the SILSuccessor destructor for the branch
-    // doesn't fire and update the predecessor list, so this assertion bogusly
-    // fires.
     Br->eraseFromParent();
-    assert(ContBB->pred_empty() &&"Zapping the branch should make ContBB dead");
-    
+    assert(ContBB->pred_empty() &&
+           "Zapping the branch should make ContBB dead");
+  } else {
     // Otherwise, branch to the continuation block and start inserting there.
-  } */
-  else {
     B.createBranch(ContBB);
   }
 }

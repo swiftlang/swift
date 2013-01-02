@@ -104,6 +104,11 @@ public:
     return V->getKind() >= ValueKind::First_Instruction &&
            V->getKind() <= ValueKind::Last_Instruction;
   }
+  
+  /// Invoke an Instruction's destructor. This dispatches to the appropriate
+  /// leaf class destructor for the type of the instruction. This does not
+  /// deallocate the instruction.
+  static void destroy(Instruction *I);
 };
 
 enum class AllocKind : uint8_t {
@@ -993,7 +998,7 @@ public:
     return V->getKind() == ValueKind::CondBranchInst;
   }
 };
-
+  
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//
@@ -1001,7 +1006,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 namespace llvm {
-
+  
 template <>
 struct ilist_traits<::swift::Instruction> :
   public ilist_default_traits<::swift::Instruction> {
@@ -1021,7 +1026,9 @@ public:
   Instruction *provideInitialHead() const { return createSentinel(); }
   Instruction *ensureHead(Instruction*) const { return createSentinel(); }
   static void noteHead(Instruction*, Instruction*) {}
-  static void deleteNode(Instruction *V) {}
+  static void deleteNode(Instruction *V) {
+    Instruction::destroy(V);
+  }
 
   void addNodeToList(Instruction *I);
   void removeNodeFromList(Instruction *I);
