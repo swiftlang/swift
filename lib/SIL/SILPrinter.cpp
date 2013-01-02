@@ -274,6 +274,11 @@ public:
   void visitArchetypeToSuperInst(ArchetypeToSuperInst *CI) {
     printConversionInst(CI, "archetype_to_super");
   }
+
+  void visitSuperToArchetypeInst(SuperToArchetypeInst *I) {
+    OS << "super_to_archetype " << getID(I->getSrcBase()) << " to "
+       << getID(I->getDestArchetypeAddress());
+  }
   
   void visitTupleInst(TupleInst *TI) {
     OS << "tuple (";

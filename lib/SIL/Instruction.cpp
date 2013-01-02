@@ -332,6 +332,13 @@ ArchetypeToSuperInst::ArchetypeToSuperInst(SILLocation Loc,
   : ConversionInst(ValueKind::ArchetypeToSuperInst, Loc, Operand, Ty) {
 }
 
+SuperToArchetypeInst::SuperToArchetypeInst(SILLocation Loc,
+                                           Value SrcBase,
+                                           Value DestArchetypeAddress)
+  : Instruction(ValueKind::SuperToArchetypeInst, Loc),
+    SrcBase(SrcBase), DestArchetypeAddress(DestArchetypeAddress) {
+}
+
 TupleInst *TupleInst::createImpl(SILLocation Loc, SILType Ty,
                                  ArrayRef<Value> Elements, Function &F) {
   void *Buffer = F.allocate(sizeof(TupleInst) + Elements.size() * sizeof(Value),

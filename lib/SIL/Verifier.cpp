@@ -341,6 +341,13 @@ public:
            "archetype_to_super must convert to a reference type");
   }
   
+  void visitSuperToArchetypeInst(SuperToArchetypeInst *SAI) {
+    assert(SAI->getSrcBase().getType().hasReferenceSemantics() &&
+           "super_to_archetype source must be a reference type");
+    assert(SAI->getDestArchetypeAddress().getType().is<ArchetypeType>() &&
+           "super_to_archetype dest must be an archetype address");
+  }
+  
   void visitDowncastInst(DowncastInst *DI) {
     assert(DI->getOperand().getType().hasReferenceSemantics() &&
            "downcast operand must be a reference type");

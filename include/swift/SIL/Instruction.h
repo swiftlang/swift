@@ -547,6 +547,23 @@ public:
   }
 };
 
+/// SuperToArchetypeInst - Given a value of a class type, initializes an
+/// archetype with a base class constraint to contain a reference to the value.
+class SuperToArchetypeInst : public Instruction {
+  Value SrcBase, DestArchetypeAddress;
+public:
+  SuperToArchetypeInst(SILLocation Loc,
+                       Value SrcBase,
+                       Value DestArchetypeAddress);
+  
+  Value getSrcBase() const { return SrcBase; }
+  Value getDestArchetypeAddress() const { return DestArchetypeAddress; }
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::SuperToArchetypeInst;
+  }
+};
+  
 /// TupleInst - Represents a constructed tuple.
 class TupleInst : public Instruction {
   Value *getElementsStorage() {

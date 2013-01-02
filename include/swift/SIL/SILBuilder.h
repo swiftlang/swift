@@ -194,6 +194,12 @@ public:
     return insert(new ArchetypeToSuperInst(Loc, Archetype, BaseTy));
   }
   
+  SuperToArchetypeInst *createSuperToArchetype(SILLocation Loc,
+                                               Value SrcBase,
+                                               Value DestArchetypeAddr) {
+    return insert(new SuperToArchetypeInst(Loc, SrcBase, DestArchetypeAddr));
+  }
+  
   TupleInst *createTuple(SILLocation Loc, SILType Ty, ArrayRef<Value> Elements) {
     return insert(TupleInst::create(Loc, Ty, Elements, F));
   }
