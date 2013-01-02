@@ -26,6 +26,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/TypeVisitor.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 
 using namespace swift;
@@ -418,6 +419,7 @@ Type ClangImporter::Implementation::importFunctionType(
   SmallVector<TuplePatternElt, 4> argPatternElts;
   SmallVector<TuplePatternElt, 4> bodyPatternElts;
   unsigned index = 0;
+  llvm::SmallPtrSet<Identifier, 8> usedIdentifiers;
   for (auto param : params) {
     auto paramTy = param->getType();
     if (paramTy->isVoidType()) {
@@ -449,6 +451,30 @@ Type ClangImporter::Implementation::importFunctionType(
       // For parameters after the first, or all parameters in a constructor,
       // the name comes from the selector.
       name = importName(selector.getIdentifierInfoForSlot(index));
+    }
+
+    if (!name.empty()) {
+      // If we've already seen this name, increment the number at the end.
+      if (!usedIdentifiers.insert(name)) {
+        // Figure out the next value to use.
+        auto nameStr = name.str();
+        auto numStartIdx = nameStr.size();
+        while (numStartIdx > 1 && isdigit(nameStr[numStartIdx-1])) {
+          --numStartIdx;
+        }
+        unsigned nextValue = 2;
+        if (numStartIdx < nameStr.size()) {
+          nameStr.getAsInteger(10, nextValue);
+        }
+
+        StringRef baseNameStr = nameStr.substr(0, numStartIdx);
+        llvm::SmallString<32> nameBuf;
+        do {
+          nameBuf = baseNameStr;
+          nameBuf += llvm::utostr(nextValue++);
+          name = SwiftContext.getIdentifier(nameBuf);
+        } while (!usedIdentifiers.insert(name));
+      }
     }
 
     // Compute the pattern to put into the body.

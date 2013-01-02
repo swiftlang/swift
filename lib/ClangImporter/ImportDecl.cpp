@@ -528,8 +528,7 @@ namespace {
       // Add the 'this' parameter to the function type.
       type = FunctionType::get(thisTy, type, Impl.SwiftContext);
 
-      // FIXME: Related result type? Not so important when we get constructors
-      // working.
+      // FIXME: Related result type?
 
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
@@ -683,7 +682,6 @@ namespace {
       case clang::OMF_init: {
         // Make sure we have a usable 'alloc' method. Otherwise, we can't
         // build this constructor anyway.
-        // FIXME: Can we do this for protocol methods as well? Do we want to?
         auto interface = objcMethod->getClassInterface();
         if (!interface)
           return nullptr;

@@ -32,7 +32,7 @@
 + (int)classMethod:(int)arg withInt:(int)i;
 - (id<B>)getAsProto;
 - (id<B, Cat1>)getAsProtoWithCat;
-
+- performAdd:(int)x withValue:(int)y withValue:(int)z withValue2:(int)w;
 @property (readonly) int readCounter;
 
 @property int informalMadeFormal;
