@@ -117,6 +117,7 @@ public:
              "ApplyInst doesn't have enough arguments for function "
              "and indirect return");
       SILType indirectReturn = AI->getArguments().back().getType();
+      (void)indirectReturn;
       assert(indirectReturn.isAddressOnly() &&
              "indirect return argument is not address-only");
       assert(indirectReturn.getSwiftRValueType()->isEqual(FT->getResult()) &&
