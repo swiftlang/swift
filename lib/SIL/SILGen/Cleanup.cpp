@@ -107,9 +107,9 @@ void CleanupManager::emitReturnAndCleanups(SILLocation loc, Value returnValue) {
   for (auto &cleanup : Stack)
     if (cleanup.isActive())
       cleanup.emit(Gen);
-  if (Gen.destructorCleanupBB) {
-    assert(Gen.hasVoidReturn && "destructor with non-void return?!");
-    B.createBranch(Gen.destructorCleanupBB);
+  if (Gen.epilogBB) {
+    assert(Gen.hasVoidReturn && "ctor or dtor with non-void return?!");
+    B.createBranch(Gen.epilogBB);
   } else {
     B.createReturn(loc, returnValue);
   }

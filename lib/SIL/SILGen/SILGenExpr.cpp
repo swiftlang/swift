@@ -1025,16 +1025,22 @@ void SILGenFunction::emitClosureBody(Expr *body) {
 }
 
 void SILGenFunction::emitDestructorBody(swift::DestructorDecl *dd) {
-  // Emit the destructor body normally.
+  // Create a basic block to jump to for the implicit destruction behavior
+  // of releasing the elements and calling the base class destructor.
+  // We won't actually emit the block until we finish with the destructor body.
+  epilogBB = new (SGM.M) BasicBlock(&F, "destructor");
+  
+  // Emit the destructor body.
   visit(dd->getBody());
+  
   // Returning from the destructor body jumps to the cleanup block.
   if (B.hasValidInsertionPoint())
     Cleanups.emitReturnAndCleanups(dd, Value());
   
   // Emit the cleanup block.
-  assert(destructorCleanupBB &&
-         "did not create cleanup block for destructor?!");
-  B.emitBlock(destructorCleanupBB);
+  assert(epilogBB &&
+         "did not create epilog block for destructor?!");
+  B.emitBlock(epilogBB);
   
   assert(!F.begin()->bbarg_empty() && "destructor has no this argument?!");
   Value thisValue = *F.begin()->bbarg_begin();
@@ -1068,6 +1074,91 @@ void SILGenFunction::emitDestructorBody(swift::DestructorDecl *dd) {
   B.createDeallocRef(dd, thisValue);
   
   B.createReturn(dd, B.createEmptyTuple(dd));
+}
+
+namespace {
+  class CleanupMaterializeThisValue : public Cleanup {
+    ConstructorDecl *ctor;
+    Value thisLV;
+    Value &thisValue;
+  public:
+    CleanupMaterializeThisValue(ConstructorDecl *ctor,
+                                Value thisLV, Value &thisValue)
+      : ctor(ctor), thisLV(thisLV), thisValue(thisValue) {}
+    
+    void emit(SILGenFunction &gen) override {
+      thisValue = gen.B.createLoad(ctor, thisLV);
+      gen.B.createDeallocVar(ctor, AllocKind::Stack, thisLV);
+    }
+  };
+}
+
+void SILGenFunction::emitConstructorBody(ConstructorDecl *ctor) {
+  //
+  // Create the 'this' value.
+  //
+  VarDecl *thisDecl = ctor->getImplicitThisDecl();
+  SILType thisTy = getLoweredType(thisDecl->getType());
+  Value thisLV, thisValue;
+  assert((!ctor->getAllocThisExpr() || thisTy.hasReferenceSemantics())
+         && "alloc_this expr for value type?!");
+  if (thisTy.hasReferenceSemantics()) {
+    if (ctor->getAllocThisExpr()) {
+      FullExpr allocThisScope(Cleanups);
+      // If the constructor has an alloc-this expr, emit it to get "this".
+      thisValue = visit(ctor->getAllocThisExpr()).forward(*this);
+      assert(thisValue.getType() == thisTy &&
+             "alloc-this expr type did not match this type?!");
+    } else {
+      // Otherwise, emit an alloc_ref instruction.
+      // FIXME: should have a cleanup in case of exception
+      thisValue = B.createAllocRef(ctor, AllocKind::Heap, thisTy);
+    }
+    
+    // Materialize an lvalue for 'this'.
+    thisLV = B.createAllocVar(ctor, AllocKind::Stack, thisTy);
+    Cleanups.pushCleanup<CleanupMaterializeAllocation>(thisLV);
+    B.createRetain(ctor, thisValue);
+    B.createStore(ctor, thisValue, thisLV);
+    Cleanups.pushCleanup<CleanupMaterializeValue>(thisLV);
+  } else if (thisTy.isAddressOnly()) {
+    // If 'this' is of an address-only value type, then we can construct the
+    // indirect return argument directly.
+    assert(IndirectReturnAddress &&
+           "address-only constructor without indirect return?!");
+    thisLV = IndirectReturnAddress;
+  } else {
+    // Materialize a temporary for the loadable value type.
+    thisLV = B.createAllocVar(ctor, AllocKind::Stack,
+                                 thisTy);
+    Cleanups.pushCleanup<CleanupMaterializeThisValue>(ctor, thisLV, thisValue);
+  }
+  VarLocs[thisDecl] = {Value(), thisLV};
+  
+  // Create a basic block to jump to for the implicit 'this' return.
+  // We won't emit this until after we've emitted the body.
+  epilogBB = new (SGM.M) BasicBlock(&F, "constructor");
+
+  //
+  // Emit the constructor body.
+  // FIXME: call base class constructor  
+  //
+  visit(ctor->getBody());
+  // Returning from the body takes us to the epilog block.
+  if (B.hasValidInsertionPoint())
+    Cleanups.emitReturnAndCleanups(ctor, Value());
+
+  //
+  // Return 'this'.
+  //
+  B.emitBlock(epilogBB);
+  if (thisTy.isAddressOnly()) {
+    // We already initialized the return value in-place.
+    B.createReturn(ctor, B.createEmptyTuple(ctor));
+  } else {
+    assert(thisValue && "thisValue not initialized?!");
+    B.createReturn(ctor, thisValue);
+  }
 }
 
 ManagedValue SILGenFunction::visitInterpolatedStringLiteralExpr(

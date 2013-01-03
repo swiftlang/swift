@@ -13,6 +13,7 @@
 #include "SILGen.h"
 #include "llvm/ADT/Optional.h"
 #include "swift/AST/AST.h"
+#include "swift/SIL/BBArgument.h"
 using namespace swift;
 using namespace Lowering;
 
@@ -32,7 +33,7 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F,
   : SGM(SGM), F(F), B(new (F.getModule()) BasicBlock(&F), F),
     Cleanups(*this),
     hasVoidReturn(hasVoidReturn),
-    destructorCleanupBB(nullptr) {
+    epilogBB(nullptr) {
 }
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE)
@@ -55,6 +56,20 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F,
   emitDestructorProlog(DD);
 }
 
+SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F,
+                               ConstructorDecl *CD)
+  // Although a constructor implicitly returns 'this', from the body's
+  // perspective it looks like a void function, hence the hasVoidReturn flag.
+  : SILGenFunction(SGM, F, /*hasVoidReturn=*/true)
+{
+  // In addition to the declared arguments, the constructor implicitly takes
+  // the metatype as its first argument, like a static function.
+  Type metatype = CD->getType()->castTo<AnyFunctionType>()->getInput();
+  new (F.getModule()) BBArgument(getLoweredType(metatype), F.begin());
+                                
+  emitProlog(CD->getArguments(), CD->getImplicitThisDecl()->getType());
+}
+
 /// SILGenFunction destructor - called after the entire function's AST has been
 /// visited.  This handles "falling off the end of the function" logic.
 SILGenFunction::~SILGenFunction() {
@@ -66,6 +81,7 @@ SILGenFunction::~SILGenFunction() {
   // If we have an unterminated block, it is either an implicit return of an
   // empty tuple, or a dynamically unreachable location.
   if (hasVoidReturn) {
+    assert(!epilogBB && "epilog bb not terminated?!");
     Value emptyTuple = B.createEmptyTuple(SILLocation());
     Cleanups.emitReturnAndCleanups(SILLocation(), emptyTuple);
   } else {
@@ -126,6 +142,20 @@ Function *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   SILConstant constant(decl);
   Function *f = preEmitFunction(constant, fe);
   SILGenFunction(*this, *f, fe).visit(fe->getBody());
+  postEmitFunction(constant, f);
+  
+  return f;
+}
+
+Function *SILGenModule::emitConstructor(ConstructorDecl *decl) {
+  // Ignore prototypes.
+  // FIXME: generate default constructor, which appears in the AST as a
+  // prototype
+  if (decl->getBody() == nullptr) return nullptr;
+  
+  SILConstant constant(decl);
+  Function *f = preEmitFunction(constant, decl);
+  SILGenFunction(*this, *f, decl).emitConstructorBody(decl);
   postEmitFunction(constant, f);
   
   return f;

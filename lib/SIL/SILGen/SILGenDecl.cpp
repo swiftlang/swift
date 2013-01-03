@@ -468,12 +468,17 @@ void SILGenFunction::emitProlog(CapturingExpr *ce,
   for (auto capture : ce->getCaptures()) {
     makeCaptureBBArguments(*this, capture);
   }
-  
+
+  emitProlog(paramPatterns, resultType);
+}
+
+void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
+                                Type resultType) {
   // Emit the argument variables.
   for (auto &paramPattern : paramPatterns) {
     // Allocate the local mutable argument storage and set up an Initialization.
     llvm::OwningPtr<Initialization> argInit(
-      InitializationForPattern(*this).visit(paramPattern));
+                                            InitializationForPattern(*this).visit(paramPattern));
     
     // Add the BBArguments and use them to initialize the local argument values.
     ArgumentInitVisitor(*this, F).visit(paramPattern, argInit.get());
@@ -484,7 +489,7 @@ void SILGenFunction::emitProlog(CapturingExpr *ce,
   if (returnTI.isAddressOnly()) {
     IndirectReturnAddress = new (SGM.M) BBArgument(returnTI.getLoweredType(),
                                                    F.begin());
-  }
+  }  
 }
 
 namespace {
@@ -492,11 +497,9 @@ namespace {
     Value thisAddr;
   public:
     CleanupDestructorThis(Value thisAddr) : thisAddr(thisAddr) {
-      llvm::errs() << "make cleanup\n";
     }
     
     void emit(SILGenFunction &gen) override {
-      llvm::errs() << "emit cleanup\n";
       gen.B.createDeallocVar(SILLocation(), AllocKind::Stack, thisAddr);
     }
   };
@@ -520,12 +523,7 @@ void SILGenFunction::emitDestructorProlog(DestructorDecl *DD) {
   Value thisAddr = B.createAllocVar(DD, AllocKind::Stack, thisType);
   Cleanups.pushCleanup<CleanupDestructorThis>(thisAddr);
   B.createStore(DD, thisValue, thisAddr);
-  VarLocs[thisDecl] = {Value(), thisAddr};
-  
-  // Create a basic block to jump to for the implicit destruction behavior
-  // of releasing the elements and calling the base class destructor.
-  // We won't actually emit the block until we finish with the destructor body.
-  destructorCleanupBB = new (SGM.M) BasicBlock(&F, "destructor");
+  VarLocs[thisDecl] = {Value(), thisAddr};  
 }
 
 static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc,
@@ -585,4 +583,8 @@ void SILGenType::visitFuncDecl(FuncDecl *fd) {
 
 void SILGenType::visitDestructorDecl(DestructorDecl *dd) {
   SGM.emitDestructor(dd);
+}
+
+void SILGenType::visitConstructorDecl(ConstructorDecl *cd) {
+  SGM.emitConstructor(cd);
 }

@@ -80,6 +80,9 @@ public:
   /// emitClosure - Generates code for the given ClosureExpr and adds the
   /// Function to the current SILModule under the name SILConstant(ce).
   Function *emitClosure(ClosureExpr *ce);
+  /// emitConstructor - Generates code for the given ConstructorDecl and adds
+  /// the Function to the current SILModule under the name SILConstant(decl).
+  Function *emitConstructor(ConstructorDecl *decl);
   /// emitDestructor - Generates code for the given DestructorDecl and adds
   /// the Function to the current SILModule under the name SILConstant(dd).
   /// FIXME: implicit destructors
@@ -105,12 +108,12 @@ public:
   //===--------------------------------------------------------------------===//
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitFuncDecl(FuncDecl *fd);
+  void visitConstructorDecl(ConstructorDecl *cd);
   // FIXME: implicit destructors
   void visitDestructorDecl(DestructorDecl *dd);
-  // FIXME: constructor, other special members
+  // FIXME: other special members?
   
-  
-  // no-ops. We don't deal with the layout of types.
+  // no-ops. We don't deal with the layout of types here.
   void visitPatternBindingDecl(PatternBindingDecl *) {}
   void visitVarDecl(VarDecl *) {}
 };
@@ -229,31 +232,44 @@ public:
   /// function is valid.
   bool hasVoidReturn;
   
-  /// In a destructor context, the basic block for the implicit destruction
-  /// behavior. This is where 'return'ing from or reaching the end of the
-  /// destructor will jump to. Null in non-destructor contexts.
-  BasicBlock *destructorCleanupBB;
+  /// In a constructor or destructor context, returning from the body doesn't
+  /// return from the current SIL function but instead branches to an epilog
+  /// block that executes implicit behavior. epilogBB points to the epilog
+  /// block that 'return' jumps to in those contexts, or 'null' if returning
+  /// can return normally from the function.
+  BasicBlock *epilogBB;
 
 public:
   SILGenFunction(SILGenModule &SGM, Function &F, bool hasVoidReturn);
   SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE);
   SILGenFunction(SILGenModule &SGM, Function &F, ClosureExpr *CE);
   SILGenFunction(SILGenModule &SGM, Function &F, DestructorDecl *DD);
+  SILGenFunction(SILGenModule &SGM, Function &F, ConstructorDecl *CD);
   ~SILGenFunction();
 
   /// emitProlog - Generates prolog code to allocate and clean up mutable
   /// storage for closure captures and local arguments.
   void emitProlog(CapturingExpr *ce, ArrayRef<Pattern*> paramPatterns,
                   Type resultType);
+  void emitProlog(ArrayRef<Pattern*> paramPatterns,
+                  Type resultType);
   /// emitDestructorProlog - Generates prolog code for a destructor. Unlike
   /// a normal function, the destructor does not consume its
   /// 'this' argument at +1 retain count.
   void emitDestructorProlog(DestructorDecl *DD);
+  
   /// emitClosureBody - Generates code for a ClosureExpr body. This is akin
   /// to visiting the body as if wrapped in a ReturnStmt.
   void emitClosureBody(Expr *body);
-  /// emitDestructorBody - Generates code for a DestructorDecl body.
+  /// emitDestructorBody - Generates code for a DestructorDecl body. This
+  /// implicitly releases the elements of the class and calls the base
+  /// class d
   void emitDestructorBody(DestructorDecl *dd);
+  /// emitConstructorBody - Generates code for a ConstructorDecl body. This
+  /// implicitly allocates the new 'this' value, invokes the base
+  /// constructor if any, and returns the 'this' value.
+  /// FIXME: allocating and non-allocating entry points
+  void emitConstructorBody(ConstructorDecl *ctor);
 
   /// Return a stable reference to the current cleanup.
   CleanupsDepth getCleanupsDepth() const {
