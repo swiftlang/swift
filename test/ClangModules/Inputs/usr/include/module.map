@@ -1,7 +1,7 @@
 module cfuncs { header "cfuncs.h" }
 module ctypes { header "ctypes.h" }
 module cvars { header "cvars.h" }
-module objc { header "objc.h" }
+module ObjC { header "objc.h" }
 module Foundation { header "Foundation.h" }
 module objc_ext { header "objc_ext.h" }
 

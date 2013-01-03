@@ -1,8 +1,8 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift -constraint-checker -parse -parse-as-library -verify -module-cache-path=%t/clang-module-cache -sdk=%S/Inputs %s
-// RUN: ls -lR %t/clang-module-cache | grep objc.pcm
+// RUN: ls -lR %t/clang-module-cache | grep ObjC.pcm
 
-import objc // Clang module
+import ObjC // Clang module
 
 struct ObjCBool {
   var value : UInt8

@@ -90,7 +90,7 @@ namespace {
           name.str() == "BOOL" &&
           clangContext.hasSameType(decl->getUnderlyingType(),
                                    clangContext.ObjCBuiltinBoolTy)) {
-        type = Impl.getNamedSwiftType(Impl.getNamedModule("objc"), "ObjCBool");
+        type = Impl.getNamedSwiftType(Impl.getNamedModule("ObjC"), "ObjCBool");
       } else {
         type = Impl.importType(decl->getUnderlyingType());
       }

@@ -1,4 +1,4 @@
-import objc
+import ObjC
 
 //===----------------------------------------------------------------------===//
 // Objective-C Primitive Types

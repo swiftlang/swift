@@ -12,7 +12,7 @@ function(install_swift_module items)
   endforeach()
 endfunction()
 
-install_swift_module(objc.swift)
+install_swift_module(ObjC.swift)
 
 add_subdirectory(Foundation)
 add_subdirectory(ScriptingBridge)
