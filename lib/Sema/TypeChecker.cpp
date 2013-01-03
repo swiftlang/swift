@@ -745,12 +745,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
     // Type-check any externally-sourced definition.
     // FIXME: This is O(N^2), because we're not tracking new definitions.
-    for (auto imported : TC.TU.getImportedModules()) {
-      auto clangModule = dyn_cast<ClangModule>(imported.second);
-      if (!clangModule)
-        continue;
-
-      for (auto &def : clangModule->getExternalDefinitions()) {
+    for (auto imported : TC.Context.LoadedClangModules) {
+      for (auto &def : imported->getExternalDefinitions()) {
         switch (def.getStage()) {
         case ExternalDefinition::TypeChecked:
           continue;

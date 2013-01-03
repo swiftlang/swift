@@ -40,6 +40,7 @@ namespace clang {
 namespace swift {
   class ASTContext;
   class BoundGenericType;
+  class ClangModule;
   class Decl;
   class SourceLoc;
   class Type;
@@ -155,6 +156,10 @@ public:
 
   /// LoadedModules - The set of modules we have loaded.
   llvm::StringMap<Module*> LoadedModules;
+
+  /// \brief The set of Clang modules we have loaded.
+  /// FIXME: Just a silly hack for IRGen.
+  llvm::SmallVector<ClangModule *, 4> LoadedClangModules;
 
   /// TheBuiltinModule - The builtin module.
   Module * const TheBuiltinModule;

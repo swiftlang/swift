@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
@@ -149,16 +150,12 @@ void IRGenFunction::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) 
     emitGlobalDecl(TU->Decls[i]);
   }
 
-  // For any Clang modules imported by this translation unit, emit external
-  // definitions.
-  // FIXME: This can be O(N^2), since we can see the same Clang module in
-  // different modules.
-  for (auto mod : TU->getImportedModules()) {
-    auto clangMod = dyn_cast<ClangModule>(mod.second);
-    if (!clangMod)
-      continue;
-    
-    for (auto &def : clangMod->getExternalDefinitions()) {
+  // For any Clang modules imported by this translation unit, directly
+  // or indirectly, emit external definitions.  
+  // FIXME: This can be O(N^2), since we can see the same Clang module
+  // in different modules.
+  for (auto mod : TU->getASTContext().LoadedClangModules) {
+    for (auto &def : mod->getExternalDefinitions()) {
       switch (def.getStage()) {
       case ExternalDefinition::NameBound:
         llvm_unreachable("external definition not type-checked");
