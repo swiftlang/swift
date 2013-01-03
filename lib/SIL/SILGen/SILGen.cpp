@@ -31,13 +31,14 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F,
                                bool hasVoidReturn)
   : SGM(SGM), F(F), B(new (F.getModule()) BasicBlock(&F), F),
     Cleanups(*this),
-    hasVoidReturn(hasVoidReturn) {
+    hasVoidReturn(hasVoidReturn),
+    destructorCleanupBB(nullptr) {
 }
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE)
   : SILGenFunction(SGM, F,
-          /*hasVoidReturn=*/isVoidableType(FE->getResultType(F.getContext()))) {
-
+          /*hasVoidReturn=*/isVoidableType(FE->getResultType(F.getContext())))
+{
   emitProlog(FE, FE->getBodyParamPatterns(), FE->getResultType(F.getContext()));
 }
 
@@ -46,6 +47,12 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F, ClosureExpr *CE)
 
   emitProlog(CE, CE->getParamPatterns(),
              CE->getType()->castTo<FunctionType>()->getResult());
+}
+
+SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F,
+                               DestructorDecl *DD)
+  : SILGenFunction(SGM, F, /*hasVoidReturn=*/true) {
+  emitDestructorProlog(DD);
 }
 
 /// SILGenFunction destructor - called after the entire function's AST has been
@@ -89,49 +96,55 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) {
   emitFunction(fd, fd->getBody());
 }
 
+template<typename T>
+Function *SILGenModule::preEmitFunction(SILConstant constant,
+                                        T *astNode) {
+  assert(!M.hasFunction(constant) &&
+         "already generated function for constant!");
+  
+  if (Verbose) {
+    constant.dump();
+    astNode->dump();
+  }
+
+  return new (M) Function(M, getConstantType(constant));
+}
+
+void SILGenModule::postEmitFunction(SILConstant constant,
+                                    Function *F) {
+  if (Verbose) {
+    F->dump();
+  }
+  F->verify();
+  M.functions[constant] = F;
+}
+
 Function *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   // Ignore prototypes.
   if (fe->getBody() == nullptr) return nullptr;
   
   SILConstant constant(decl);
-  assert(!M.hasFunction(constant) &&
-         "already generated function for decl!");
-
-  if (Verbose) {
-    constant.dump();
-    fe->dump();
-  }
-  
-  Function *f = new (M) Function(M, getConstantType(constant));
+  Function *f = preEmitFunction(constant, fe);
   SILGenFunction(*this, *f, fe).visit(fe->getBody());
-  
-  if (Verbose) {
-    f->dump();
-  }
-  f->verify();
-  M.functions[constant] = f;
+  postEmitFunction(constant, f);
   
   return f;
 }
 
 Function *SILGenModule::emitClosure(ClosureExpr *ce) {
   SILConstant constant(ce);
-  assert(!M.hasFunction(constant) &&
-         "already generated function for closure!");
-  
-  if (Verbose) {
-    constant.dump();
-    ce->dump();
-  }
-  
-  Function *f = new (M) Function(M, getConstantType(constant));
+  Function *f = preEmitFunction(constant, ce);
   SILGenFunction(*this, *f, ce).emitClosureBody(ce->getBody());
+  postEmitFunction(constant, f);
+  
+  return f;
+}
 
-  if (Verbose) {
-    f->dump();
-  }
-  f->verify();
-  M.functions[constant] = f;
+Function *SILGenModule::emitDestructor(DestructorDecl *dd) {
+  SILConstant constant(dd);
+  Function *f = preEmitFunction(constant, dd);
+  SILGenFunction(*this, *f, dd).emitDestructorBody(dd);
+  postEmitFunction(constant, f);
   
   return f;
 }

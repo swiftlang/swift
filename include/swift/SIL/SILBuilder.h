@@ -73,7 +73,7 @@ public:
     setInsertionPoint(BB, BB->end());
   }
 
-  /// emitBlock - Each basic block is individually new'd, then them emitted with
+  /// emitBlock - Each basic block is individually new'd then emitted with
   /// this function.  Since each block is implicitly added to the Function's list of
   /// blocks when created, the construction order is not particularly useful.
   ///

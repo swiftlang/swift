@@ -80,6 +80,14 @@ public:
   /// emitClosure - Generates code for the given ClosureExpr and adds the
   /// Function to the current SILModule under the name SILConstant(ce).
   Function *emitClosure(ClosureExpr *ce);
+  /// emitDestructor - Generates code for the given DestructorDecl and adds
+  /// the Function to the current SILModule under the name SILConstant(dd).
+  /// FIXME: implicit destructors
+  Function *emitDestructor(DestructorDecl *dd);
+  
+  template<typename T>
+  Function *preEmitFunction(SILConstant constant, T *astNode);
+  void postEmitFunction(SILConstant constant, Function *F);
 };
   
 /// SILGenType - an ASTVisitor for generating SIL from method declarations
@@ -97,7 +105,10 @@ public:
   //===--------------------------------------------------------------------===//
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitFuncDecl(FuncDecl *fd);
-  // FIXME: constructor, destructor, other special members
+  // FIXME: implicit destructors
+  void visitDestructorDecl(DestructorDecl *dd);
+  // FIXME: constructor, other special members
+  
   
   // no-ops. We don't deal with the layout of types.
   void visitPatternBindingDecl(PatternBindingDecl *) {}
@@ -213,22 +224,36 @@ public:
   /// emitted. This map is then queried to produce the value for a DeclRefExpr
   /// to a local constant.
   llvm::DenseMap<SILConstant, Value> LocalConstants;
-    
+  
+  /// True if 'return' without an operand or falling off the end of the current
+  /// function is valid.
   bool hasVoidReturn;
+  
+  /// In a destructor context, the basic block for the implicit destruction
+  /// behavior. This is where 'return'ing from or reaching the end of the
+  /// destructor will jump to. Null in non-destructor contexts.
+  BasicBlock *destructorCleanupBB;
 
 public:
   SILGenFunction(SILGenModule &SGM, Function &F, bool hasVoidReturn);
   SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE);
   SILGenFunction(SILGenModule &SGM, Function &F, ClosureExpr *CE);
+  SILGenFunction(SILGenModule &SGM, Function &F, DestructorDecl *DD);
   ~SILGenFunction();
 
   /// emitProlog - Generates prolog code to allocate and clean up mutable
   /// storage for closure captures and local arguments.
   void emitProlog(CapturingExpr *ce, ArrayRef<Pattern*> paramPatterns,
                   Type resultType);
+  /// emitDestructorProlog - Generates prolog code for a destructor. Unlike
+  /// a normal function, the destructor does not consume its
+  /// 'this' argument at +1 retain count.
+  void emitDestructorProlog(DestructorDecl *DD);
   /// emitClosureBody - Generates code for a ClosureExpr body. This is akin
   /// to visiting the body as if wrapped in a ReturnStmt.
   void emitClosureBody(Expr *body);
+  /// emitDestructorBody - Generates code for a DestructorDecl body.
+  void emitDestructorBody(DestructorDecl *dd);
 
   /// Return a stable reference to the current cleanup.
   CleanupsDepth getCleanupsDepth() const {

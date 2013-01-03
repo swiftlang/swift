@@ -81,10 +81,12 @@ public:
   
   /// isTrivial - Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
-  bool isTrivial() const { return referenceTypeElements.empty(); }
+  bool isTrivial() const {
+    return loweredType.isLoadable() && referenceTypeElements.empty();
+  }
   
   /// getReferenceTypeElements - For a nontrivial loadable value type, returns
-  /// an array of ReferenceTypeElements addressing the reference type elements
+  /// an array of ReferenceTypeElements addressing the reference type elements.
   llvm::ArrayRef<ReferenceTypeElement> getReferenceTypeElements() const {
     return referenceTypeElements;
   }

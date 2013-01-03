@@ -14,6 +14,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/BBArgument.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "ManagedValue.h"
@@ -1012,6 +1013,8 @@ ManagedValue SILGenFunction::visitClosureExpr(ClosureExpr *e, SGFContext C) {
 
 void SILGenFunction::emitClosureBody(Expr *body) {
   // Closure expressions implicitly return the result of their body expression.
+  // FIXME: address-only return from closure. refactor common code from
+  // visitReturnStmt
   Value result;
   {
     FullExpr scope(Cleanups);
@@ -1019,6 +1022,52 @@ void SILGenFunction::emitClosureBody(Expr *body) {
   }
   if (B.hasValidInsertionPoint())
     Cleanups.emitReturnAndCleanups(body, result);
+}
+
+void SILGenFunction::emitDestructorBody(swift::DestructorDecl *dd) {
+  // Emit the destructor body normally.
+  visit(dd->getBody());
+  // Returning from the destructor body jumps to the cleanup block.
+  if (B.hasValidInsertionPoint())
+    Cleanups.emitReturnAndCleanups(dd, Value());
+  
+  // Emit the cleanup block.
+  assert(destructorCleanupBB &&
+         "did not create cleanup block for destructor?!");
+  B.emitBlock(destructorCleanupBB);
+  
+  assert(!F.begin()->bbarg_empty() && "destructor has no this argument?!");
+  Value thisValue = *F.begin()->bbarg_begin();
+  
+  // Release our members.
+  // FIXME: generic params
+  // FIXME: Can a destructor always consider its fields fragile like this?
+  ClassDecl *cd = cast<ClassDecl>(dd->getParent());
+  unsigned fieldNo = 0;
+  for (Decl *member : cd->getMembers()) {
+    if (VarDecl *vd = dyn_cast<VarDecl>(member)) {
+      if (vd->isProperty())
+        continue;
+      TypeInfo const &ti = getTypeInfo(vd->getType());
+      if (!ti.isTrivial()) {
+        Value addr = B.createRefElementAddr(dd, thisValue, fieldNo,
+                                            ti.getLoweredType().getAddressType());
+        if (ti.isAddressOnly()) {
+          B.createDestroyAddr(dd, addr);
+        } else {
+          Value field = B.createLoad(dd, addr);
+          emitReleaseRValue(dd, field);
+        }
+      }
+      ++fieldNo;
+    }
+  }
+  
+  // FIXME: If we have a base class, invoke its destructor.
+  // Otherwise, deallocate the instance.
+  B.createDeallocRef(dd, thisValue);
+  
+  B.createReturn(dd, B.createEmptyTuple(dd));
 }
 
 ManagedValue SILGenFunction::visitInterpolatedStringLiteralExpr(

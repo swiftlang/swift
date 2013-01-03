@@ -487,6 +487,47 @@ void SILGenFunction::emitProlog(CapturingExpr *ce,
   }
 }
 
+namespace {
+  class CleanupDestructorThis : public Cleanup {
+    Value thisAddr;
+  public:
+    CleanupDestructorThis(Value thisAddr) : thisAddr(thisAddr) {
+      llvm::errs() << "make cleanup\n";
+    }
+    
+    void emit(SILGenFunction &gen) override {
+      llvm::errs() << "emit cleanup\n";
+      gen.B.createDeallocVar(SILLocation(), AllocKind::Stack, thisAddr);
+    }
+  };
+} // end anonymous namespace
+
+void SILGenFunction::emitDestructorProlog(DestructorDecl *DD) {
+  // Emit the implicit 'this' argument.
+  VarDecl *thisDecl = DD->getImplicitThisDecl();
+  assert(thisDecl->getType()->hasReferenceSemantics() &&
+         "destructor on a value type?!");
+  SILType thisType = getLoweredLoadableType(thisDecl->getType());
+  
+  Value thisValue = new (SGM.M) BBArgument(thisType, F.begin());
+  
+  // FIXME: Bump the retain count so that destruction doesn't fire
+  // recursively while passing 'this' around.
+  B.createRetain(DD, thisValue);
+  
+  // Materialize an lvalue for 'this'. It doesn't need a full box because
+  // 'this' shouldn't be capturable out of a destructor scope.
+  Value thisAddr = B.createAllocVar(DD, AllocKind::Stack, thisType);
+  Cleanups.pushCleanup<CleanupDestructorThis>(thisAddr);
+  B.createStore(DD, thisValue, thisAddr);
+  VarLocs[thisDecl] = {Value(), thisAddr};
+  
+  // Create a basic block to jump to for the implicit destruction behavior
+  // of releasing the elements and calling the base class destructor.
+  // We won't actually emit the block until we finish with the destructor body.
+  destructorCleanupBB = new (SGM.M) BasicBlock(&F, "destructor");
+}
+
 static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc,
                                    Value v,
                                    void (SILBuilder::*createRR)(SILLocation,
@@ -540,4 +581,8 @@ void SILGenType::visitNominalTypeDecl(NominalTypeDecl *ntd) {
 
 void SILGenType::visitFuncDecl(FuncDecl *fd) {
   SGM.emitFunction(fd, fd->getBody());
+}
+
+void SILGenType::visitDestructorDecl(DestructorDecl *dd) {
+  SGM.emitDestructor(dd);
 }
