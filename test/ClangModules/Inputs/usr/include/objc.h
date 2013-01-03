@@ -2,6 +2,7 @@
 + alloc;
 - init;
 + new;
+- performSelector:(SEL)selector withObject:(id)obj;
 @end
 
 @interface A : NSObject
@@ -88,3 +89,5 @@ typedef signed char BOOL;
 @interface A(BoolStuff)
 - setEnabled:(BOOL)enabled;
 @end
+
+typedef struct objc_selector    *SEL;

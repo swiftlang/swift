@@ -684,7 +684,9 @@ TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
     return std::pair<FuncDecl*, Type>();
   }
   FuncDecl *Method = cast<FuncDecl>(LookupResult.D);
-  
+  if (Method->getType()->is<ErrorType>())
+    return std::pair<FuncDecl *, Type>();
+
   // Check that the type of the 'convertFrom*Literal' method makes
   // sense.  We want a type of "S -> DestTy" where S is the expected type.
   AnyFunctionType *FT = Method->getType()->castTo<AnyFunctionType>();

@@ -129,8 +129,8 @@ namespace {
       case clang::BuiltinType::NullPtr:
         return Type();
 
-      // FIXME: Objective-C types that need a mapping, but I haven't figured
-      // out yet.
+      // Objective-C types that aren't mapped directly; rather, pointers to
+      // these types will be mapped.
       case clang::BuiltinType::ObjCClass:
       case clang::BuiltinType::ObjCId:
       case clang::BuiltinType::ObjCSel:
@@ -165,7 +165,13 @@ namespace {
                                    clangContext.CharTy.withConst())) {
         return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CString");
       }
-                                                
+
+      // "builtin-SEL *" maps to Swift's ObjCSel.
+      if (type->getPointeeType()->isSpecificBuiltinType(
+                                                 clang::BuiltinType::ObjCSel)) {
+        return Impl.getNamedSwiftType(Impl.getNamedModule("ObjC"), "ObjCSel");
+      }
+
       // All other C pointers map to CPointer<T>.
       auto pointeeType = Impl.importType(type->getPointeeType());
       if (!pointeeType)
