@@ -12,6 +12,16 @@ function(install_swift_module items)
   endforeach()
 endfunction()
 
+# Build the swiftObjC dylib.
+set(SHARED_LIBRARY ON)
+add_swift_library(swiftObjC
+  ObjC.swift
+  DEPENDS swift_stdlib)
+
+# Link against the system dylib.
+target_link_libraries(swiftObjC
+  "-lobjc")
+
 install_swift_module(ObjC.swift)
 
 add_subdirectory(Foundation)

@@ -2,7 +2,7 @@ set(SHARED_LIBRARY ON)
 add_swift_library(swiftFoundation
   Foundation.swift
   BridgeNSString.mm
-  DEPENDS swift_stdlib)
+  DEPENDS swift_stdlib swiftObjC)
 
 if(SWIFT_OPTIMIZED)
   if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
