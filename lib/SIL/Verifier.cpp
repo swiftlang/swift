@@ -44,12 +44,13 @@ public:
     ((SILVisitor<SILVerifier>*)this)->visit(I);
   }
 
-  void visitAllocInst(AllocInst *AI) {
-    assert(AI->getType().isAddress() &&"Allocation should return address");
-  }
-
   void visitAllocVarInst(AllocVarInst *AI) {
-    visitAllocInst(AI);
+    assert(AI->getType().isAddress() && "alloc_var must return address");
+  }
+  
+  void visitAllocRefInst(AllocRefInst *AI) {
+    assert(AI->getType().hasReferenceSemantics() && !AI->getType().isAddress()
+           && "alloc_ref must return reference type value");
   }
   
   bool argumentTypeMatches(SILType argValueType, Type declaredArgType) {

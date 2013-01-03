@@ -113,6 +113,15 @@ VarDecl *AllocVarInst::getDecl() const {
   }
 }
 
+AllocRefInst::AllocRefInst(SILLocation loc, AllocKind allocKind,
+                           SILType elementType,
+                           Function &F)
+: AllocInst(ValueKind::AllocRefInst, loc,
+            elementType,
+            allocKind) {
+}
+
+
 /// getElementType - Get the type of the allocated memory (as opposed to the
 /// type of the instruction itself, which will be an address type).
 Type AllocVarInst::getElementType() const {

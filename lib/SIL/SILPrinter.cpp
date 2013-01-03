@@ -172,6 +172,12 @@ public:
       OS << "  ; var " << vd->getName();
   }
 
+  void visitAllocRefInst(AllocRefInst *ARI) {
+    OS << "alloc_ref ";
+    printAllocKind(ARI->getAllocKind());
+    OS << "$" << ARI->getType().getSwiftType().getString();
+  }
+  
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     OS << "alloc_box $" << ABI->getElementType().getString();
   }

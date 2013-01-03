@@ -154,6 +154,19 @@ public:
     return V->getKind() == ValueKind::AllocVarInst;
   }
 };
+  
+/// AllocRefInst - This represents the primitive allocation of an instance
+/// of a reference type. Aside from the reference count, the instance is
+/// returned uninitialized.
+class AllocRefInst : public AllocInst {
+public:
+  AllocRefInst(SILLocation loc, AllocKind allocKind, SILType type,
+               Function &F);
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::AllocRefInst;
+  }
+};
 
 /// AllocBoxInst - This represents the allocation of a heap box for a Swift
 /// value of some type, and whose element memory is left uninitialized.  This

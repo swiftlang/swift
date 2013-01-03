@@ -108,6 +108,11 @@ public:
     return insert(new AllocVarInst(Loc, allocKind, elementType, F));
   }
 
+  AllocRefInst *createAllocRef(SILLocation Loc, AllocKind allocKind,
+                               SILType elementType) {
+    return insert(new AllocRefInst(Loc, allocKind, elementType, F));
+  }
+  
   AllocBoxInst *createAllocBox(SILLocation Loc, SILType ElementType) {
     return insert(new AllocBoxInst(Loc, ElementType, F));
   }
