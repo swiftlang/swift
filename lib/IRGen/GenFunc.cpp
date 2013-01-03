@@ -2086,7 +2086,7 @@ static bool emitKnownCall(IRGenFunction &IGF, ValueDecl *fn,
       return false;
     StringRef name = decl->getName().str();
     if (!name.startswith("Int") && !name.startswith("UInt") &&
-        name != "Float" && name != "Double")
+        !name.startswith("Float"))
       return false;
 
     Expr *args[2];
@@ -2120,7 +2120,7 @@ static bool emitKnownCall(IRGenFunction &IGF, ValueDecl *fn,
     if (!decl || !isInSwiftModule(decl))
       return false;
     StringRef name = decl->getName().str();
-    if (name != "Float" && name != "Double")
+    if (!name.startswith("Float"))
       return false;
 
     Expr *args[2];

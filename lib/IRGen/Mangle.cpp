@@ -674,10 +674,10 @@ bool Mangler::tryMangleStandardSubstitution(NominalTypeDecl *decl) {
   } else if (name == "Char") {
     Buffer << "Sc";
     return true;
-  } else if (name == "Double") {
+  } else if (name == "Float64") {
     Buffer << "Sd";
     return true;
-  } else if (name == "Float") {
+  } else if (name == "Float32") {
     Buffer << "Sf";
     return true;
   } else if (name == "String") {
