@@ -505,25 +505,32 @@ namespace {
   };
 } // end anonymous namespace
 
-void SILGenFunction::emitDestructorProlog(DestructorDecl *DD) {
+void SILGenFunction::emitDestructorProlog(ClassDecl *CD,
+                                          DestructorDecl *DD) {
   // Emit the implicit 'this' argument.
-  VarDecl *thisDecl = DD->getImplicitThisDecl();
-  assert(thisDecl->getType()->hasReferenceSemantics() &&
-         "destructor on a value type?!");
-  SILType thisType = getLoweredLoadableType(thisDecl->getType());
+  VarDecl *thisDecl = DD ? DD->getImplicitThisDecl() : nullptr;
+  assert((!thisDecl || thisDecl->getType()->hasReferenceSemantics()) &&
+         "destructor's implicit this is a value type?!");
+  
+  SILType thisType = getLoweredLoadableType(CD->getDeclaredTypeInContext());
+  assert((!thisDecl || getLoweredLoadableType(thisDecl->getType()) == thisType)
+         && "decl type doesn't match destructor's implicit this type");
   
   Value thisValue = new (SGM.M) BBArgument(thisType, F.begin());
   
-  // FIXME: Bump the retain count so that destruction doesn't fire
-  // recursively while passing 'this' around.
-  B.createRetain(DD, thisValue);
+  if (DD) {
+    // FIXME: Bump the retain count so that destruction doesn't fire
+    // recursively while passing 'this' around in the destructor body.
+    B.createRetain(DD, thisValue);
   
-  // Materialize an lvalue for 'this'. It doesn't need a full box because
-  // 'this' shouldn't be capturable out of a destructor scope.
-  Value thisAddr = B.createAllocVar(DD, AllocKind::Stack, thisType);
-  Cleanups.pushCleanup<CleanupDestructorThis>(thisAddr);
-  B.createStore(DD, thisValue, thisAddr);
-  VarLocs[thisDecl] = {Value(), thisAddr};  
+    // Materialize an lvalue for 'this' in the body's scope. It doesn't need a
+    // full box because 'this' shouldn't be capturable out of a destructor
+    // scope.
+    Value thisAddr = B.createAllocVar(DD, AllocKind::Stack, thisType);
+    Cleanups.pushCleanup<CleanupDestructorThis>(thisAddr);
+    B.createStore(DD, thisValue, thisAddr);
+    VarLocs[thisDecl] = {Value(), thisAddr};
+  }
 }
 
 static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc,
@@ -565,16 +572,20 @@ void SILGenFunction::emitReleaseRValue(SILLocation loc, Value v) {
 }
 
 void SILGenModule::visitNominalTypeDecl(NominalTypeDecl *ntd) {
-  SILGenType(*this).visit(ntd);
+  SILGenType(*this, ntd).emitType();
 }
 
 void SILGenFunction::visitNominalTypeDecl(NominalTypeDecl *ntd, SGFContext C) {
-  SILGenType(SGM).visit(ntd);
+  SILGenType(SGM, ntd).emitType();
+}
+
+void SILGenType::emitType() {
+  for (Decl *member : theType->getMembers())
+    visit(member);
 }
 
 void SILGenType::visitNominalTypeDecl(NominalTypeDecl *ntd) {
-  for (Decl *member : ntd->getMembers())
-    visit(member);
+  SILGenType(SGM, ntd).emitType();
 }
 
 void SILGenType::visitFuncDecl(FuncDecl *fd) {
@@ -582,9 +593,12 @@ void SILGenType::visitFuncDecl(FuncDecl *fd) {
 }
 
 void SILGenType::visitDestructorDecl(DestructorDecl *dd) {
-  SGM.emitDestructor(dd);
+  // Save the destructor decl so we can use it to generate the destructor later.
+  assert(!explicitDestructor && "more than one destructor decl in type?!");
+  explicitDestructor = dd;
 }
 
 void SILGenType::visitConstructorDecl(ConstructorDecl *cd) {
   SGM.emitConstructor(cd);
 }
+

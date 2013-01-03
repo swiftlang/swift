@@ -141,11 +141,14 @@ public:
   /// Returns the type of the "this" parameter to methods of a type.
   Type getMethodThisType(Type thisType) const;
   /// Returns the type of a property accessor, () -> T for a getter,
-  /// or (value:T) -> () for a setter.
-  Type getPropertyType(unsigned id, Type propType) const;
+  /// or (value:T) -> () for a setter. 'kind' must be one of the Kind constants
+  /// from SILConstant, SILConstant::Getter or SILConstant::Setter.
+  Type getPropertyType(unsigned kind, Type propType) const;
   /// Returns the type of a subscript property accessor, Index -> () -> T
   /// for a getter, or Index -> (value:T) -> () for a setter.
-  Type getSubscriptPropertyType(unsigned id,
+  /// 'kind' must be one of the Kind constants
+  /// from SILConstant, SILConstant::Getter or SILConstant::Setter.
+  Type getSubscriptPropertyType(unsigned kind,
                                 Type indexType,
                                 Type elementType) const;
 
@@ -154,7 +157,8 @@ public:
   ///   <T,U,...> This -> M for an unbound generic This,
   ///   or the type M of the function itself if the context type is null.
   Type getMethodTypeInContext(Type /*nullable*/ contextType,
-                              Type methodType) const;
+                              Type methodType,
+                              GenericParamList *genericParams = nullptr) const;
   
 };
 

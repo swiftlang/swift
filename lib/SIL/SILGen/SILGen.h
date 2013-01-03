@@ -62,6 +62,11 @@ public:
   
   /// Returns the type of a constant reference.
   SILType getConstantType(SILConstant constant);
+  
+  /// Get the lowered type for a Swift type.
+  SILType getLoweredType(Type t) {
+    return Types.getTypeInfo(t).getLoweredType();
+  }
 
   //===--------------------------------------------------------------------===//
   // Visitors for top-level forms
@@ -83,10 +88,12 @@ public:
   /// emitConstructor - Generates code for the given ConstructorDecl and adds
   /// the Function to the current SILModule under the name SILConstant(decl).
   Function *emitConstructor(ConstructorDecl *decl);
-  /// emitDestructor - Generates code for the given DestructorDecl and adds
-  /// the Function to the current SILModule under the name SILConstant(dd).
-  /// FIXME: implicit destructors
-  Function *emitDestructor(DestructorDecl *dd);
+  /// emitDestructor - Generates code for the given class's destructor and adds
+  /// the Function to the current SILModule under the name
+  /// SILConstant(cd, Destructor). If a DestructorDecl is provided, it will be
+  /// used, otherwise only the implicit destruction behavior will be emitted.
+  Function *emitDestructor(ClassDecl *cd,
+                           DestructorDecl /*nullable*/ *dd);
   
   template<typename T>
   Function *preEmitFunction(SILConstant constant, T *astNode);
@@ -98,24 +105,29 @@ public:
 class LLVM_LIBRARY_VISIBILITY SILGenType : public ASTVisitor<SILGenType> {
 public:
   SILGenModule &SGM;
+  NominalTypeDecl *theType;
+  DestructorDecl *explicitDestructor;
   
 public:
-  SILGenType(SILGenModule &SGM);
+  SILGenType(SILGenModule &SGM, NominalTypeDecl *theType);
   ~SILGenType();
 
+  /// Emit SIL functions for all the members of the type.
+  void emitType();
+  
   //===--------------------------------------------------------------------===//
   // Visitors for subdeclarations
   //===--------------------------------------------------------------------===//
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitFuncDecl(FuncDecl *fd);
   void visitConstructorDecl(ConstructorDecl *cd);
-  // FIXME: implicit destructors
   void visitDestructorDecl(DestructorDecl *dd);
   // FIXME: other special members?
   
   // no-ops. We don't deal with the layout of types here.
   void visitPatternBindingDecl(PatternBindingDecl *) {}
   void visitVarDecl(VarDecl *) {}
+  
 };
 
 /// CaptureKind - Closure capture modes.
@@ -243,8 +255,9 @@ public:
   SILGenFunction(SILGenModule &SGM, Function &F, bool hasVoidReturn);
   SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE);
   SILGenFunction(SILGenModule &SGM, Function &F, ClosureExpr *CE);
-  SILGenFunction(SILGenModule &SGM, Function &F, DestructorDecl *DD);
   SILGenFunction(SILGenModule &SGM, Function &F, ConstructorDecl *CD);
+  SILGenFunction(SILGenModule &SGM, Function &F,
+                 ClassDecl *CD, DestructorDecl *DD);
   ~SILGenFunction();
 
   /// emitProlog - Generates prolog code to allocate and clean up mutable
@@ -254,17 +267,18 @@ public:
   void emitProlog(ArrayRef<Pattern*> paramPatterns,
                   Type resultType);
   /// emitDestructorProlog - Generates prolog code for a destructor. Unlike
-  /// a normal function, the destructor does not consume its
-  /// 'this' argument at +1 retain count.
-  void emitDestructorProlog(DestructorDecl *DD);
+  /// a normal function, the destructor deallocates its argument completely.
+  void emitDestructorProlog(ClassDecl *CD,
+                            DestructorDecl *DD);
   
   /// emitClosureBody - Generates code for a ClosureExpr body. This is akin
   /// to visiting the body as if wrapped in a ReturnStmt.
   void emitClosureBody(Expr *body);
-  /// emitDestructorBody - Generates code for a DestructorDecl body. This
-  /// implicitly releases the elements of the class and calls the base
-  /// class d
-  void emitDestructorBody(DestructorDecl *dd);
+  /// emitDestructorBody - Generates code for a class. This emits the
+  /// body code from the DestructorDecl (if any),
+  /// implicitly releases the elements of the class, and calls the base
+  /// class destructor or deallocates the instance if this is a root class.
+  void emitDestructorBody(ClassDecl *cd, DestructorDecl *dd);
   /// emitConstructorBody - Generates code for a ConstructorDecl body. This
   /// implicitly allocates the new 'this' value, invokes the base
   /// constructor if any, and returns the 'this' value.

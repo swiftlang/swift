@@ -617,11 +617,11 @@ ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
     TypeConverter &tc = SGM.Types;
     Type propType;
     if (subscriptExpr) {
-      propType = tc.getSubscriptPropertyType(constant.id,
+      propType = tc.getSubscriptPropertyType(constant.getKind(),
                                             subscriptExpr->getType(),
                                             expr->getType()->getRValueType());
     } else {
-      propType = tc.getPropertyType(constant.id,
+      propType = tc.getPropertyType(constant.getKind(),
                                    expr->getType()->getRValueType());
     }
     propType = tc.getMethodTypeInContext(baseExpr->getType()->getRValueType(),
@@ -1024,22 +1024,22 @@ void SILGenFunction::emitClosureBody(Expr *body) {
     Cleanups.emitReturnAndCleanups(body, result);
 }
 
-void SILGenFunction::emitDestructorBody(swift::DestructorDecl *dd) {
+void SILGenFunction::emitDestructorBody(ClassDecl *cd,
+                                        DestructorDecl *dd) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the base class destructor.
   // We won't actually emit the block until we finish with the destructor body.
   epilogBB = new (SGM.M) BasicBlock(&F, "destructor");
   
-  // Emit the destructor body.
-  visit(dd->getBody());
+  // Emit the destructor body, if any.
+  if (dd)
+    visit(dd->getBody());
   
   // Returning from the destructor body jumps to the cleanup block.
   if (B.hasValidInsertionPoint())
     Cleanups.emitReturnAndCleanups(dd, Value());
   
   // Emit the cleanup block.
-  assert(epilogBB &&
-         "did not create epilog block for destructor?!");
   B.emitBlock(epilogBB);
   
   assert(!F.begin()->bbarg_empty() && "destructor has no this argument?!");
@@ -1048,7 +1048,6 @@ void SILGenFunction::emitDestructorBody(swift::DestructorDecl *dd) {
   // Release our members.
   // FIXME: generic params
   // FIXME: Can a destructor always consider its fields fragile like this?
-  ClassDecl *cd = cast<ClassDecl>(dd->getParent());
   unsigned fieldNo = 0;
   for (Decl *member : cd->getMembers()) {
     if (VarDecl *vd = dyn_cast<VarDecl>(member)) {
@@ -1057,7 +1056,7 @@ void SILGenFunction::emitDestructorBody(swift::DestructorDecl *dd) {
       TypeInfo const &ti = getTypeInfo(vd->getType());
       if (!ti.isTrivial()) {
         Value addr = B.createRefElementAddr(dd, thisValue, fieldNo,
-                                            ti.getLoweredType().getAddressType());
+                                          ti.getLoweredType().getAddressType());
         if (ti.isAddressOnly()) {
           B.createDestroyAddr(dd, addr);
         } else {
@@ -1069,9 +1068,24 @@ void SILGenFunction::emitDestructorBody(swift::DestructorDecl *dd) {
     }
   }
   
-  // FIXME: If we have a base class, invoke its destructor.
-  // Otherwise, deallocate the instance.
-  B.createDeallocRef(dd, thisValue);
+  // If we have a base class, invoke its destructor.
+  if (Type baseTy = cd->getBaseClass()) {
+    // FIXME: generic base class
+    ClassType *baseClassTy = baseTy->castTo<ClassType>();
+    SILConstant dtorConstant = SILConstant(baseClassTy->getDecl(),
+                                   SILConstant::Destructor);
+    Value dtorValue = B.createConstantRef(dd, dtorConstant,
+                                         SGM.getConstantType(dtorConstant));
+    Value baseThis = B.createImplicitConvert(dd,
+                                             thisValue,
+                                             getLoweredLoadableType(baseTy));
+    B.createApply(dd, dtorValue,
+                  SILType::getEmptyTupleType(SGM.M.getContext()),
+                  baseThis);
+  } else {
+    // Otherwise, deallocate the instance ourselves.
+    B.createDeallocRef(dd, thisValue);
+  }
   
   B.createReturn(dd, B.createEmptyTuple(dd));
 }
@@ -1131,6 +1145,8 @@ void SILGenFunction::emitConstructorBody(ConstructorDecl *ctor) {
     // Materialize a temporary for the loadable value type.
     thisLV = B.createAllocVar(ctor, AllocKind::Stack,
                                  thisTy);
+    // Set up a cleanup to load the final value at the end of the constructor
+    // body.
     Cleanups.pushCleanup<CleanupMaterializeThisValue>(ctor, thisLV, thisValue);
   }
   VarLocs[thisDecl] = {Value(), thisLV};

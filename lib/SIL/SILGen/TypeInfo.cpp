@@ -193,11 +193,11 @@ SILType TypeConverter::getConstantType(SILConstant constant) {
 
 /// Get the type of a property accessor, () -> T for a getter or (value:T) -> ()
 /// for a setter.
-Type TypeConverter::getPropertyType(unsigned id, Type valueType) const {
-  if (id & SILConstant::Getter) {
+Type TypeConverter::getPropertyType(unsigned kind, Type valueType) const {
+  if (kind == SILConstant::Getter) {
     return FunctionType::get(TupleType::getEmpty(Context), valueType, Context);
   }
-  if (id & SILConstant::Setter) {
+  if (kind == SILConstant::Setter) {
     TupleTypeElt valueParam(valueType, Context.getIdentifier("value"));
     return FunctionType::get(TupleType::get(valueParam, Context),
                              TupleType::getEmpty(Context),
@@ -207,10 +207,10 @@ Type TypeConverter::getPropertyType(unsigned id, Type valueType) const {
 }
 
 /// Get the type of a subscript accessor, Index -> PropertyAccessor.
-Type TypeConverter::getSubscriptPropertyType(unsigned id,
-                                     Type indexType,
-                                     Type elementType) const {
-  Type propertyType = getPropertyType(id, elementType);
+Type TypeConverter::getSubscriptPropertyType(unsigned kind,
+                                             Type indexType,
+                                             Type elementType) const {
+  Type propertyType = getPropertyType(kind, elementType);
   return FunctionType::get(indexType, propertyType, Context);
 }
 
@@ -224,14 +224,15 @@ Type TypeConverter::getMethodThisType(Type thisType) const {
 }
 
 Type TypeConverter::getMethodTypeInContext(Type /*nullable*/ contextType,
-                                       Type methodType) const {
+                                       Type methodType,
+                                       GenericParamList *genericParams) const {
   if (!contextType)
     return methodType;
   Type thisType = getMethodThisType(contextType);
   
-  if (UnboundGenericType *ugt = contextType->getAs<UnboundGenericType>()) {
+  if (genericParams) {
     return PolymorphicFunctionType::get(thisType, methodType,
-                                        ugt->getDecl()->getGenericParams(),
+                                        genericParams,
                                         Context);
   }
 
@@ -247,23 +248,53 @@ static Type getGlobalAccessorType(Type varType, ASTContext &C) {
                            C);
 }
 
+/// Get the type of a destructor function, This -> ().
+static Type getDestructorType(ClassDecl *cd, ASTContext &C) {
+  Type classType = cd->getDeclaredTypeInContext();
+
+  Type voidType = TupleType::getEmpty(C);
+  if (cd->getGenericParams()) {
+    return PolymorphicFunctionType::get(classType,
+                                        voidType,
+                                        cd->getGenericParams(),
+                                        C);
+  } else {
+    return FunctionType::get(classType,
+                             voidType,
+                             C);
+  }
+}
+
 Type TypeConverter::makeConstantType(SILConstant c) {
   // TODO: mangle function types for address-only indirect arguments and returns
   if (ValueDecl *vd = c.loc.dyn_cast<ValueDecl*>()) {
     Type /*nullable*/ contextType =
       vd->getDeclContext()->getDeclaredTypeOfContext();
+    GenericParamList *genericParams = nullptr;
+    if (contextType) {
+      if (UnboundGenericType *ugt = contextType->getAs<UnboundGenericType>()) {
+        // Bind the generic parameters.
+        // FIXME: see computeThisType()
+        genericParams = ugt->getDecl()->getGenericParams();
+        contextType = vd->getDeclContext()->getDeclaredTypeInContext();
+      }
+    }
     if (SubscriptDecl *sd = dyn_cast<SubscriptDecl>(vd)) {
       // If this is a subscript accessor, derive the accessor type.
-      Type subscriptType = getSubscriptPropertyType(c.id,
+      Type subscriptType = getSubscriptPropertyType(c.getKind(),
                                                     sd->getIndices()->getType(),
                                                     sd->getElementType());
-      return getMethodTypeInContext(contextType, subscriptType);
+      return getMethodTypeInContext(contextType, subscriptType, genericParams);
     } else {
-      Type propertyType;
+      // If this is a destructor, derive the destructor type.
+      if (c.getKind() == SILConstant::Destructor) {
+        return getDestructorType(cast<ClassDecl>(vd), Context);
+      }
+      
       // If this is a property accessor, derive the property type.
-      if (c.id & (SILConstant::Getter | SILConstant::Setter)) {
-        Type propertyType = getPropertyType(c.id, vd->getType());
-        return getMethodTypeInContext(contextType, propertyType);
+      if (c.isProperty()) {
+        Type propertyType = getPropertyType(c.getKind(), vd->getType());
+        return getMethodTypeInContext(contextType, propertyType, genericParams);
       }
 
       // If it's a global var, derive the initializer/accessor function type
@@ -277,6 +308,8 @@ Type TypeConverter::makeConstantType(SILConstant c) {
       return vd->getTypeOfReference();
     }
   } else if (CapturingExpr *e = c.loc.dyn_cast<CapturingExpr*>()) {
+    assert(c.getKind() == 0 &&
+           "closure constant should not be getter, setter, or dtor");
     return e->getType();
   }
   llvm_unreachable("unexpected constant loc");

@@ -43,10 +43,14 @@ struct SILConstant {
   unsigned id;
   
   enum : unsigned {
-    /// Getter - this id references the getter for the associated decl.
-    Getter = 1U << 31U,
-    /// Setter - this id references the setter for the associated decl.
-    Setter = 1U << 30U,
+    KindMask = 0xFU << 28U,
+    /// Getter - this id references the getter for the VarDecl in loc.
+    Getter = 1U << 28U,
+    /// Setter - this id references the setter for the VarDecl in loc.
+    Setter = 2U << 28U,
+    /// Destructor = this id references the destructor for the ClassDecl in
+    /// loc.
+    Destructor = 3U << 28U,
   };
   
   SILConstant() : loc(), id(0) {}
@@ -60,6 +64,9 @@ struct SILConstant {
   
   ValueDecl *getDecl() const { return loc.get<ValueDecl*>(); }
   CapturingExpr *getExpr() const { return loc.get<CapturingExpr*>(); }
+    
+  unsigned getKind() const { return id & KindMask; }
+  bool isProperty() const { return getKind() == Getter || getKind() == Setter; }
   
   bool operator==(SILConstant rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue() && id == rhs.id;

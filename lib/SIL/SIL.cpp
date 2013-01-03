@@ -62,6 +62,14 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc) {
         return;
       }
     }
+    // Likewise for destructors--we need to be able to reference implicit
+    // destructors for class decls without explicit destructor decls.
+    else if (DestructorDecl *dd = dyn_cast<DestructorDecl>(vd)) {
+      ClassDecl *cd = cast<ClassDecl>(dd->getParent());
+      loc = cd;
+      id = Destructor;
+      return;
+    }
   }
   
   loc = baseLoc;

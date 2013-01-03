@@ -51,9 +51,9 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F, ClosureExpr *CE)
 }
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F,
-                               DestructorDecl *DD)
+                               ClassDecl *CD, DestructorDecl *DD)
   : SILGenFunction(SGM, F, /*hasVoidReturn=*/true) {
-  emitDestructorProlog(DD);
+  emitDestructorProlog(CD, DD);
 }
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F,
@@ -119,8 +119,11 @@ Function *SILGenModule::preEmitFunction(SILConstant constant,
          "already generated function for constant!");
   
   if (Verbose) {
-    constant.dump();
-    astNode->dump();
+    constant.print(llvm::errs());
+    llvm::errs() << " : $";
+    getConstantType(constant).dump();
+    if (astNode)
+      astNode->dump();
   }
 
   return new (M) Function(M, getConstantType(constant));
@@ -170,10 +173,12 @@ Function *SILGenModule::emitClosure(ClosureExpr *ce) {
   return f;
 }
 
-Function *SILGenModule::emitDestructor(DestructorDecl *dd) {
-  SILConstant constant(dd);
+Function *SILGenModule::emitDestructor(ClassDecl *cd,
+                                       DestructorDecl /*nullable*/ *dd) {
+  SILConstant constant(cd, SILConstant::Destructor);
+  
   Function *f = preEmitFunction(constant, dd);
-  SILGenFunction(*this, *f, dd).emitDestructorBody(dd);
+  SILGenFunction(*this, *f, cd, dd).emitDestructorBody(cd, dd);
   postEmitFunction(constant, f);
   
   return f;
@@ -210,5 +215,14 @@ SILModule *SILModule::constructSIL(TranslationUnit *tu, bool verbose) {
 // SILGenType Class implementation
 //===--------------------------------------------------------------------===//
 
-SILGenType::SILGenType(SILGenModule &SGM) : SGM(SGM) {}
-SILGenType::~SILGenType() {}
+SILGenType::SILGenType(SILGenModule &SGM, NominalTypeDecl *theType)
+  : SGM(SGM), theType(theType), explicitDestructor(nullptr) {}
+
+SILGenType::~SILGenType() {
+  // Emit the destructor for a class type.
+  if (ClassDecl *theClass = dyn_cast<ClassDecl>(theType)) {
+    SGM.emitDestructor(theClass, explicitDestructor);
+  } else {
+    assert(!explicitDestructor && "destructor in non-class type?!");
+  }
+}

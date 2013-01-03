@@ -53,13 +53,14 @@ void SILConstant::print(raw_ostream &OS) const {
     OS << "<anonymous function>";
   }
   // TODO: bikeshed a SIL syntax for decl ids
-  if (id & SILConstant::Getter) {
+  if (getKind() == SILConstant::Getter) {
     OS << ".getter";
-  }
-  if (id & SILConstant::Setter) {
+  } else if (getKind() == SILConstant::Setter) {
     OS << ".setter";
+  } else if (getKind() == SILConstant::Destructor) {
+    OS << ".destructor";
   }
-  unsigned number = id & ~(SILConstant::Getter | SILConstant::Setter);
+  unsigned number = id & ~(SILConstant::KindMask);
   if (number != 0) {
     OS << "." << number;
   }
