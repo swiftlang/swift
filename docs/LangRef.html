@@ -177,7 +177,7 @@
      different token streams and are therefore different in the grammar.</p>
   
   <!-- ===================================================================== -->
-  <h3>Whitespace and Comments</h3>
+  <h3 id="whitespace">Whitespace and Comments</h3>
   <!-- ===================================================================== -->
   
   <div class="commentary">
@@ -376,13 +376,16 @@
   <div>
   <div class="commentary">
     FIXME: We need to support unicode identifiers.
-    
+
     <br><br><b>[1]</b> The '=' token is explicitly handled in the grammar elsewhere,
     and in general users cannot provide custom definitions for the '=' operator.
     This distinctly differs from C++, which allows '=' to be overloaded.
-    
+
     <br><br><b>[2]</b> The '->' token is <a href="#reserved_punctuation">reserved punctuation</a>,
       and cannot be used as an operator identifier.
+
+    <br><br><b>[3]</b> The '//', '/*', and '*/' tokens are <a href="#whitespace">reserved for comments</a>,
+      and cannot be used as operator identifiers.
   </div>
 
   <pre class="grammar">
@@ -393,6 +396,7 @@
 
       Note: excludes '=', see <b>[1]</b>
             excludes '->', see <b>[2]</b>
+            excludes '//', '/*', and '*/', see <b>[3]</b>
             '..' is an operator, not two '.'s.
 
     operator-binary ::= operator
