@@ -2628,28 +2628,10 @@ ill-formed if the type does not conform to the protocol.</p>
     stmt-for-each ::= 'for' <a href="#pattern">pattern</a> 'in' <a href="#expr">expr</a> <a href="#stmt-brace">stmt-brace</a>
   </pre>
   
-  <p>Enumerator-based 'for' statements provide iteration over the values in a
- container. The <tt>expr</tt> is the container, and shall have a
- method <tt>getElements()</tt> that, when called, returns the range
- over which the loop will iterate.</p>
-
-  <p>The range must, at a minimum, have two methods:
-  <div class="commentary">
-    The methods used here constitute an informal protocol. In the
-  future, we intend to express this via a formal protocol.
- </div>
-<dl>
-  <dt><tt>isEmpty() -> Bool</tt></dt>
-  <dd>Determines whether the range is empty, meaning that the loop
-    should terminate.</dd>
-  </dl>
-
-  <dt><tt>next() -> T</tt></dt>
-  <dd>Retrieves the first element in the range then advances to the
-    next element in the range, reducing the length of the range by
-    one. The type <tt>T</tt> can be any materializable type, and will
-    be used to initialize the variables in the <tt>pattern</tt>.</dd>
- </dl></p>
+  <p>Enumerator-based 'for' statements provide enumeration over the values in a
+ container. The <tt>expr</tt> is either a container or an enumerator; and
+ respectively, it either conforms to the formal Enumeration or formal Enumerator
+ protocol.
 
   <p>Note that each iteration of the loop declares a distinct variable for each
      variable in the pattern.  For example, in a loop like "for i in 0..10",
