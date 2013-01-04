@@ -101,6 +101,10 @@ public:
   /// cleanup stack.
   void emitReturnAndCleanups(SILLocation loc, Value returnValue);
   
+  /// emitCleanupsForReturn - Emit all the cleanups necessary before a return
+  /// branch (but not the branch itself).
+  void emitCleanupsForReturn(SILLocation loc);
+  
   /// pushCleanup - Push a new cleanup.
   template<class T, class... A>
   T &pushCleanupInState(CleanupState state,

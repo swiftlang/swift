@@ -101,12 +101,18 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest) {
   B.createBranch(Dest.getBlock());
 }
 
-void CleanupManager::emitReturnAndCleanups(SILLocation loc, Value returnValue) {
-  SILBuilder &B = Gen.getBuilder();
-  assert(B.hasValidInsertionPoint() && "Inserting return in invalid spot");
+void CleanupManager::emitCleanupsForReturn(SILLocation loc) {
   for (auto &cleanup : Stack)
     if (cleanup.isActive())
       cleanup.emit(Gen);
+}
+
+void CleanupManager::emitReturnAndCleanups(SILLocation loc, Value returnValue) {
+  SILBuilder &B = Gen.getBuilder();
+  assert(B.hasValidInsertionPoint() && "Inserting return in invalid spot");
+
+  emitCleanupsForReturn(loc);
+  
   if (Gen.epilogBB) {
     assert(Gen.hasVoidReturn && "ctor or dtor with non-void return?!");
     B.createBranch(Gen.epilogBB);

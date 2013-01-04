@@ -1056,6 +1056,30 @@ void SILGenFunction::emitClosure(ClosureExpr *ce) {
     Cleanups.emitReturnAndCleanups(ce->getBody(), result);
 }
 
+bool SILGenFunction::emitEpilogBB(SILLocation loc) {
+  assert(epilogBB && "no epilog bb to emit?!");
+  
+  // If the epilog was not branched to at all, just unwind like a "return"
+  // and emit the epilog into the current BB.
+  if (epilogBB->pred_empty()) {
+    epilogBB->eraseFromParent();
+
+    // If the current bb is terminated then the epilog is just unreachable.
+    if (!B.hasValidInsertionPoint())
+      return false;
+    
+    Cleanups.emitCleanupsForReturn(loc);
+  } else {
+    // If the body didn't explicitly return, we need to branch out of it as if
+    // returning. emitReturnAndCleanups will do that.
+    if (B.hasValidInsertionPoint())
+      Cleanups.emitReturnAndCleanups(loc, Value());
+    // Emit the epilog into the epilog bb.
+    B.emitBlock(epilogBB);
+  }
+  return true;
+}
+
 void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   emitDestructorProlog(cd, dd);
 
@@ -1068,12 +1092,8 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   if (dd)
     visit(dd->getBody());
   
-  // Returning from the destructor body jumps to the cleanup block.
-  if (B.hasValidInsertionPoint())
-    Cleanups.emitReturnAndCleanups(dd, Value());
-  
-  // Emit the cleanup block.
-  B.emitBlock(epilogBB);
+  if (!emitEpilogBB(dd))
+    return;
   
   assert(!F.begin()->bbarg_empty() && "destructor has no this argument?!");
   Value thisValue = *F.begin()->bbarg_begin();
@@ -1188,14 +1208,13 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // FIXME: call base class constructor  
   //
   visit(ctor->getBody());
-  // Returning from the body takes us to the epilog block.
-  if (B.hasValidInsertionPoint())
-    Cleanups.emitReturnAndCleanups(ctor, Value());
+  
+  //
+  // Return 'this' in the epilog.
+  //
+  if (!emitEpilogBB(ctor))
+    return;
 
-  //
-  // Return 'this'.
-  //
-  B.emitBlock(epilogBB);
   if (thisTy.isAddressOnly()) {
     // We already initialized the return value in-place.
     B.createReturn(ctor, B.createEmptyTuple(ctor));

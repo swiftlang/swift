@@ -254,18 +254,26 @@ public:
 public:
   SILGenFunction(SILGenModule &SGM, Function &F, bool hasVoidReturn);
   ~SILGenFunction();
-
-  /// emitProlog - Generates prolog code to allocate and clean up mutable
-  /// storage for closure captures and local arguments.
-  void emitProlog(CapturingExpr *ce, ArrayRef<Pattern*> paramPatterns,
-                  Type resultType);
-  void emitProlog(ArrayRef<Pattern*> paramPatterns,
-                  Type resultType);
   
-  /// emitDestructorProlog - Generates prolog code for a destructor. Unlike
-  /// a normal function, the destructor deallocates its argument completely.
-  void emitDestructorProlog(ClassDecl *CD,
-                            DestructorDecl *DD);
+  /// Return a stable reference to the current cleanup.
+  CleanupsDepth getCleanupsDepth() const {
+    return Cleanups.getCleanupsDepth();
+  }
+  
+  Function &getFunction() { return F; }
+  SILBuilder &getBuilder() { return B; }
+  
+  TypeInfo const &getTypeInfo(Type t) { return SGM.Types.getTypeInfo(t); }
+  SILType getLoweredType(Type t) { return getTypeInfo(t).getLoweredType(); }
+  SILType getLoweredLoadableType(Type t) {
+    TypeInfo const &ti = getTypeInfo(t);
+    assert(ti.isLoadable() && "unexpected address-only type");
+    return ti.getLoweredType();
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Entry points for codegen
+  //===--------------------------------------------------------------------===//
   
   /// emitFunction - Generates code for a FuncExpr.
   void emitFunction(FuncExpr *fe);
@@ -290,22 +298,6 @@ public:
   /// as parameters and executes the constructor body to initialize 'this'.
   void emitClassConstructorInitializer(ConstructorDecl *ctor);
 
-  /// Return a stable reference to the current cleanup.
-  CleanupsDepth getCleanupsDepth() const {
-    return Cleanups.getCleanupsDepth();
-  }
-  
-  Function &getFunction() { return F; }
-  SILBuilder &getBuilder() { return B; }
-    
-  TypeInfo const &getTypeInfo(Type t) { return SGM.Types.getTypeInfo(t); }
-  SILType getLoweredType(Type t) { return getTypeInfo(t).getLoweredType(); }
-  SILType getLoweredLoadableType(Type t) {
-    TypeInfo const &ti = getTypeInfo(t);
-    assert(ti.isLoadable() && "unexpected address-only type");
-    return ti.getLoweredType();
-  }
-  
   //===--------------------------------------------------------------------===//
   // Control flow
   //===--------------------------------------------------------------------===//
@@ -327,9 +319,26 @@ public:
   /// through any cleanups we might need to run.
   void emitBranch(JumpDest D);
   
+  /// emitEpilogBB - Branch to and emit the epilog basic block. This will fuse
+  /// the epilog to the current basic block if the epilog bb has no predecessor.
+  /// Returns true if the epilog is reachable, false if it is unreachable.
+  bool emitEpilogBB(SILLocation loc);
+  
   //===--------------------------------------------------------------------===//
   // Memory management
   //===--------------------------------------------------------------------===//
+  
+  /// emitProlog - Generates prolog code to allocate and clean up mutable
+  /// storage for closure captures and local arguments.
+  void emitProlog(CapturingExpr *ce, ArrayRef<Pattern*> paramPatterns,
+                  Type resultType);
+  void emitProlog(ArrayRef<Pattern*> paramPatterns,
+                  Type resultType);
+  
+  /// emitDestructorProlog - Generates prolog code for a destructor. Unlike
+  /// a normal function, the destructor deallocates its argument completely.
+  void emitDestructorProlog(ClassDecl *CD,
+                            DestructorDecl *DD);
   
   /// emitRetainRValue - Emits the instructions necessary to increase the
   /// retain count of a temporary, in order to use it as part of another
@@ -353,8 +362,9 @@ public:
   void emitReleaseRValue(SILLocation loc, Value v);
                         
   //===--------------------------------------------------------------------===//
-  // Public entry points
+  // Recursive entry points
   //===--------------------------------------------------------------------===//
+
   using ASTVisitorType::visit;
   
   ManagedValue visit(Expr *E);
