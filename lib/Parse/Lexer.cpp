@@ -600,6 +600,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
     return 0;
       
   // Simple single-character escapes.
+  case '0': ++CurPtr; return '\0';
   case 't': ++CurPtr; return '\t';
   case 'n': ++CurPtr; return '\n';
   case 'r': ++CurPtr; return '\r';

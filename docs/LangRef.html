@@ -319,7 +319,7 @@
   
   <pre class="grammar">
     character_literal ::= '[^'\\\n\r]|character_escape'
-    character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]'
+    character_escape  ::= [\]0 [\][\] | [\]t | [\]n | [\]r | [\]" | [\]'
     character_escape  ::= [\]x hex hex  
     character_escape  ::= [\]u hex hex hex hex  
     character_escape  ::= [\]U hex hex hex hex hex hex hex hex
