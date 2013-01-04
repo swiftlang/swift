@@ -426,7 +426,7 @@ unsigned swift::getLLVMIntrinsicID(StringRef InName, bool hasArgTypes) {
   const char *Name = NameS.c_str();
   unsigned Len = NameS.size();
 #define GET_FUNCTION_RECOGNIZER
-#include "llvm/Intrinsics.gen"
+#include "llvm/IR/Intrinsics.gen"
 #undef GET_FUNCTION_RECOGNIZER
   return llvm::Intrinsic::not_intrinsic;
 }
