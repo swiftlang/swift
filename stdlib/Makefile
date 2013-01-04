@@ -20,7 +20,8 @@ SWIFT_SOURCES := Policy.swift Bool.swift FixedPoint.swift Float32.swift \
 		 Float64.swift \
 		 Object.swift CTypes.swift Misc.swift Enumeration.swift \
 		 UnsafePointer.swift \
-		 Slice.swift String.swift Dictionary.swift Vector.swift \
+		 Slice.swift StringByte.swift String.swift Char.swift \
+		 Dictionary.swift Vector.swift \
 		 Algorithm.swift \
 		 Demangle.swift InputStream.swift OutputStream.swift \
 		 CString.swift \
