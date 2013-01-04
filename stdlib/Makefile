@@ -30,6 +30,12 @@ ifeq ($(DISABLE_ASSERTIONS),1)
 else
   SWIFT_SOURCES += AssertDebug.swift
 endif
+ifeq ($(ARCH),x86_64)
+  SWIFT_SOURCES += Float80.swift
+endif
+ifeq ($(ARCH),x86)
+  SWIFT_SOURCES += Float80.swift
+endif
 SOURCES := swift.swift
 NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
