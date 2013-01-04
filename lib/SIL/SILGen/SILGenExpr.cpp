@@ -636,6 +636,30 @@ ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
   return method;
 }
 
+ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
+                                           Value thisValue,
+                                           SILConstant methodConstant) {
+  SILType methodType = SGM.getConstantType(methodConstant);
+  Value methodValue = B.createConstantRef(loc,
+                                          methodConstant,
+                                          methodType);
+  /// If the 'this' type is a bound generic, specialize the method ref with
+  /// its substitutions
+  if (BoundGenericType *bgt = thisValue.getType().getAs<BoundGenericType>()) {
+    PolymorphicFunctionType *methodFT =
+      methodType.castTo<PolymorphicFunctionType>();
+    Type specializedType = FunctionType::get(thisValue.getType().getSwiftType(),
+                                             methodFT->getResult(),
+                                             F.getContext());
+    methodValue = B.createSpecialize(loc, methodValue,
+                                     bgt->getSubstitutions(),
+                                     getLoweredLoadableType(specializedType));
+    return emitManagedRValueWithCleanup(methodValue);
+  }
+  
+  return ManagedValue(methodValue);
+}
+
 ManagedValue SILGenFunction::visitMemberRefExpr(MemberRefExpr *E,
                                                 SGFContext C) {
   return emitAnyMemberRefExpr(*this, E, {});
@@ -1011,21 +1035,30 @@ ManagedValue SILGenFunction::visitClosureExpr(ClosureExpr *e, SGFContext C) {
   return emitClosureForCapturingExpr(e, SILConstant(e), e);
 }
 
-void SILGenFunction::emitClosureBody(Expr *body) {
+void SILGenFunction::emitFunction(FuncExpr *fe) {
+  emitProlog(fe, fe->getBodyParamPatterns(), fe->getResultType(F.getContext()));
+  visit(fe->getBody());
+}
+
+void SILGenFunction::emitClosure(ClosureExpr *ce) {
+  emitProlog(ce, ce->getParamPatterns(),
+             ce->getType()->castTo<FunctionType>()->getResult());
+
   // Closure expressions implicitly return the result of their body expression.
   // FIXME: address-only return from closure. refactor common code from
   // visitReturnStmt
   Value result;
   {
     FullExpr scope(Cleanups);
-    result = visit(body).forward(*this);
+    result = visit(ce->getBody()).forward(*this);
   }
   if (B.hasValidInsertionPoint())
-    Cleanups.emitReturnAndCleanups(body, result);
+    Cleanups.emitReturnAndCleanups(ce->getBody(), result);
 }
 
-void SILGenFunction::emitDestructorBody(ClassDecl *cd,
-                                        DestructorDecl *dd) {
+void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
+  emitDestructorProlog(cd, dd);
+
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the base class destructor.
   // We won't actually emit the block until we finish with the destructor body.
@@ -1107,35 +1140,30 @@ namespace {
   };
 }
 
-void SILGenFunction::emitConstructorBody(ConstructorDecl *ctor) {
+
+static void emitConstructorMetatypeArg(SILGenFunction &gen,
+                                       ConstructorDecl *ctor) {
+  // In addition to the declared arguments, the constructor implicitly takes
+  // the metatype as its first argument, like a static function.
+  Type metatype = ctor->getType()->castTo<AnyFunctionType>()->getInput();
+  new (gen.F.getModule()) BBArgument(gen.getLoweredType(metatype),
+                                     gen.F.begin());
+}
+
+void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
+  // Emit the prolog.
+  emitConstructorMetatypeArg(*this, ctor);
+  emitProlog(ctor->getArguments(), ctor->getImplicitThisDecl()->getType());
+  
   //
   // Create the 'this' value.
   //
   VarDecl *thisDecl = ctor->getImplicitThisDecl();
   SILType thisTy = getLoweredType(thisDecl->getType());
   Value thisLV, thisValue;
-  assert((!ctor->getAllocThisExpr() || thisTy.hasReferenceSemantics())
-         && "alloc_this expr for value type?!");
-  if (thisTy.hasReferenceSemantics()) {
-    if (ctor->getAllocThisExpr()) {
-      FullExpr allocThisScope(Cleanups);
-      // If the constructor has an alloc-this expr, emit it to get "this".
-      thisValue = visit(ctor->getAllocThisExpr()).forward(*this);
-      assert(thisValue.getType() == thisTy &&
-             "alloc-this expr type did not match this type?!");
-    } else {
-      // Otherwise, emit an alloc_ref instruction.
-      // FIXME: should have a cleanup in case of exception
-      thisValue = B.createAllocRef(ctor, AllocKind::Heap, thisTy);
-    }
-    
-    // Materialize an lvalue for 'this'.
-    thisLV = B.createAllocVar(ctor, AllocKind::Stack, thisTy);
-    Cleanups.pushCleanup<CleanupMaterializeAllocation>(thisLV);
-    B.createRetain(ctor, thisValue);
-    B.createStore(ctor, thisValue, thisLV);
-    Cleanups.pushCleanup<CleanupMaterializeValue>(thisLV);
-  } else if (thisTy.isAddressOnly()) {
+  assert(!ctor->getAllocThisExpr() && "alloc_this expr for value type?!");
+  assert(!thisTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
+  if (thisTy.isAddressOnly()) {
     // If 'this' is of an address-only value type, then we can construct the
     // indirect return argument directly.
     assert(IndirectReturnAddress &&
@@ -1176,6 +1204,112 @@ void SILGenFunction::emitConstructorBody(ConstructorDecl *ctor) {
     B.createReturn(ctor, thisValue);
   }
 }
+
+namespace {
+  // Unlike the ArgumentInitVisitor, this visitor generates arguments but leaves
+  // them collected into a tuple instead of storing them to lvalues, so that the
+  // argument set can just be forwarded to another function.
+  class ArgumentForwardVisitor
+    : public PatternVisitor<ArgumentForwardVisitor, Value>
+  {
+    SILGenFunction &gen;
+  public:
+    ArgumentForwardVisitor(SILGenFunction &gen) : gen(gen) {}
+    
+    Value makeArgument(Type ty) {
+      assert(ty && "no type?!");
+      return new (gen.F.getModule()) BBArgument(gen.getLoweredType(ty),
+                                                gen.F.begin());
+    }
+
+    Value visitParenPattern(ParenPattern *P) {
+      return visit(P->getSubPattern());
+    }
+    
+    Value visitTypedPattern(TypedPattern *P) {
+      return visit(P->getSubPattern());
+    }
+    
+    Value visitTuplePattern(TuplePattern *P) {
+      SmallVector<Value, 4> elements;
+      for (auto &elt : P->getFields())
+        elements.push_back(visit(elt.getPattern()));
+      return gen.B.createTuple(SILLocation(),
+                               gen.getLoweredType(P->getType()),
+                               elements);
+    }
+    
+    Value visitAnyPattern(AnyPattern *P) {
+      return makeArgument(P->getType());
+    }
+    
+    Value visitNamedPattern(NamedPattern *P) {
+      return makeArgument(P->getType());
+    }
+  };
+} // end anonymous namespace
+
+void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
+  // Emit the prolog. Since we're just going to forward our args directly
+  // to the initializer, keep them tupled up instead of allocating local
+  // variables for all of them.
+  emitConstructorMetatypeArg(*this, ctor);
+  Value args = ArgumentForwardVisitor(*this).visit(ctor->getArguments());
+  
+  // Allocate the "this" value.
+  VarDecl *thisDecl = ctor->getImplicitThisDecl();
+  SILType thisTy = getLoweredType(thisDecl->getType());
+  assert(thisTy.hasReferenceSemantics() &&
+         "can't emit a value type ctor here");
+  Value thisValue;
+  if (ctor->getAllocThisExpr()) {
+    FullExpr allocThisScope(Cleanups);
+    // If the constructor has an alloc-this expr, emit it to get "this".
+    thisValue = visit(ctor->getAllocThisExpr()).forward(*this);
+    assert(thisValue.getType() == thisTy &&
+           "alloc-this expr type did not match this type?!");
+  } else {
+    // Otherwise, just emit an alloc_ref instruction for the default allocation
+    // path.
+    // FIXME: should have a cleanup in case of exception
+    thisValue = B.createAllocRef(ctor, AllocKind::Heap, thisTy);
+  }
+
+  // Call the initializer.
+  SILConstant initConstant = SILConstant(ctor, SILConstant::Initializer);
+  ManagedValue initVal = emitMethodRef(ctor, thisValue, initConstant);
+  SILType initDelType = getLoweredLoadableType(
+                     initVal.getType().castTo<AnyFunctionType>()->getResult());
+  B.createRetain(ctor, thisValue);
+  Value initDel = B.createApply(ctor, initVal.forward(*this),
+                                initDelType, thisValue);
+  B.createApply(ctor, initDel, SILType::getEmptyTupleType(F.getContext()),
+                args);
+  
+  // Return 'this'.
+  B.createReturn(ctor, thisValue);
+}
+
+void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
+  // Emit the 'this' argument and make an lvalue for it.
+  VarDecl *thisDecl = ctor->getImplicitThisDecl();
+  SILType thisTy = getLoweredType(thisDecl->getType());
+  assert(thisTy.hasReferenceSemantics() &&
+         "can't emit a value type ctor here");
+  Value thisValue = new (SGM.M) BBArgument(thisTy, F.begin());
+  Value thisLV = B.createAllocVar(ctor, AllocKind::Stack, thisTy);
+  Cleanups.pushCleanup<CleanupMaterializeAllocation>(thisLV);
+  B.createStore(ctor, thisValue, thisLV);
+  Cleanups.pushCleanup<CleanupMaterializeValue>(thisLV);
+  VarLocs[thisDecl] = {Value(), thisLV};
+  
+  // Emit the prolog for the other arguments.
+  emitProlog(ctor->getArguments(), TupleType::getEmpty(F.getContext()));
+  
+  // Emit the constructor body.
+  visit(ctor->getBody());
+}
+
 
 ManagedValue SILGenFunction::visitInterpolatedStringLiteralExpr(
                                               InterpolatedStringLiteralExpr *E,

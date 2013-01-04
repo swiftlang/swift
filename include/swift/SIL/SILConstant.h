@@ -44,13 +44,16 @@ struct SILConstant {
   
   enum : unsigned {
     KindMask = 0xFU << 28U,
-    /// Getter - this id references the getter for the VarDecl in loc.
+    /// Getter - this constant references the getter for the VarDecl in loc.
     Getter = 1U << 28U,
-    /// Setter - this id references the setter for the VarDecl in loc.
+    /// Setter - this constant references the setter for the VarDecl in loc.
     Setter = 2U << 28U,
-    /// Destructor = this id references the destructor for the ClassDecl in
-    /// loc.
+    /// Destructor = this constant references the destructor for the ClassDecl
+    /// in loc.
     Destructor = 3U << 28U,
+    /// Initializer - this constant references the initializer entry point for
+    /// the ConstructorDecl in loc.
+    Initializer = 4U << 28U
   };
   
   SILConstant() : loc(), id(0) {}

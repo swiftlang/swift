@@ -265,6 +265,32 @@ static Type getDestructorType(ClassDecl *cd, ASTContext &C) {
   }
 }
 
+// Get the type of a constructor's initializer, This -> ConstructorArgs -> ().
+static Type getInitializerType(TypeConverter &tc,
+                               ConstructorDecl *cd,
+                               ASTContext &C) {
+  AnyFunctionType *ctorType = cd->getType()->castTo<AnyFunctionType>();
+  // The constructor's main entry point type is
+  // This.metatype -> ConstructorArgs -> This. Rearrange it to get the
+  // initializer type we want.
+  Type voidType = TupleType::getEmpty(C);
+  Type argsType = ctorType->getResult()->castTo<FunctionType>()->getInput();
+  Type retType = ctorType->getResult()->castTo<FunctionType>()->getResult();
+  
+  Type methodType = FunctionType::get(argsType, voidType, C);
+  Type thisType = tc.getMethodThisType(retType);
+  
+  if (PolymorphicFunctionType *pCtorType =
+        ctorType->getAs<PolymorphicFunctionType>()) {
+    return PolymorphicFunctionType::get(thisType,
+                                        methodType,
+                                        &pCtorType->getGenericParams(),
+                                        C);
+  } else {
+    return FunctionType::get(thisType, methodType, C);
+  }
+}
+
 Type TypeConverter::makeConstantType(SILConstant c) {
   // TODO: mangle function types for address-only indirect arguments and returns
   if (ValueDecl *vd = c.loc.dyn_cast<ValueDecl*>()) {
@@ -289,6 +315,11 @@ Type TypeConverter::makeConstantType(SILConstant c) {
       // If this is a destructor, derive the destructor type.
       if (c.getKind() == SILConstant::Destructor) {
         return getDestructorType(cast<ClassDecl>(vd), Context);
+      }
+      
+      // If this is a constructor initializer, derive the initializer type.
+      if (c.getKind() == SILConstant::Initializer) {
+        return getInitializerType(*this, cast<ConstructorDecl>(vd), Context);
       }
       
       // If this is a property accessor, derive the property type.

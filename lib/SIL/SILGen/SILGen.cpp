@@ -36,40 +36,6 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F,
     epilogBB(nullptr) {
 }
 
-SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE)
-  : SILGenFunction(SGM, F,
-          /*hasVoidReturn=*/isVoidableType(FE->getResultType(F.getContext())))
-{
-  emitProlog(FE, FE->getBodyParamPatterns(), FE->getResultType(F.getContext()));
-}
-
-SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F, ClosureExpr *CE)
-  : SILGenFunction(SGM, F, /*hasVoidReturn=*/false) {
-
-  emitProlog(CE, CE->getParamPatterns(),
-             CE->getType()->castTo<FunctionType>()->getResult());
-}
-
-SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F,
-                               ClassDecl *CD, DestructorDecl *DD)
-  : SILGenFunction(SGM, F, /*hasVoidReturn=*/true) {
-  emitDestructorProlog(CD, DD);
-}
-
-SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F,
-                               ConstructorDecl *CD)
-  // Although a constructor implicitly returns 'this', from the body's
-  // perspective it looks like a void function, hence the hasVoidReturn flag.
-  : SILGenFunction(SGM, F, /*hasVoidReturn=*/true)
-{
-  // In addition to the declared arguments, the constructor implicitly takes
-  // the metatype as its first argument, like a static function.
-  Type metatype = CD->getType()->castTo<AnyFunctionType>()->getInput();
-  new (F.getModule()) BBArgument(getLoweredType(metatype), F.begin());
-                                
-  emitProlog(CD->getArguments(), CD->getImplicitThisDecl()->getType());
-}
-
 /// SILGenFunction destructor - called after the entire function's AST has been
 /// visited.  This handles "falling off the end of the function" logic.
 SILGenFunction::~SILGenFunction() {
@@ -144,7 +110,8 @@ Function *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   
   SILConstant constant(decl);
   Function *f = preEmitFunction(constant, fe);
-  SILGenFunction(*this, *f, fe).visit(fe->getBody());
+  bool hasVoidReturn = isVoidableType(fe->getResultType(f->getContext()));
+  SILGenFunction(*this, *f, hasVoidReturn).emitFunction(fe);
   postEmitFunction(constant, f);
   
   return f;
@@ -155,11 +122,28 @@ Function *SILGenModule::emitConstructor(ConstructorDecl *decl) {
   // FIXME: generate default constructor, which appears in the AST as a
   // prototype
   if (decl->getBody() == nullptr) return nullptr;
-  
+
   SILConstant constant(decl);
   Function *f = preEmitFunction(constant, decl);
-  SILGenFunction(*this, *f, decl).emitConstructorBody(decl);
-  postEmitFunction(constant, f);
+  
+  if (decl->getImplicitThisDecl()->getType()->hasReferenceSemantics()) {
+    // Class constructors have separate entry points for allocation and
+    // initialization.
+    SILGenFunction(*this, *f, /*hasVoidReturn=*/true)
+      .emitClassConstructorAllocator(decl);
+    postEmitFunction(constant, f);
+    
+    SILConstant initConstant(decl, SILConstant::Initializer);
+    Function *initF = preEmitFunction(initConstant, decl);
+    SILGenFunction(*this, *initF, /*hasVoidReturn=*/true)
+      .emitClassConstructorInitializer(decl);
+    postEmitFunction(initConstant, initF);
+  } else {
+    // Struct constructors do everything in a single function.
+    SILGenFunction(*this, *f, /*hasVoidReturn=*/true)
+      .emitValueConstructor(decl);
+    postEmitFunction(constant, f);
+  }
   
   return f;
 }
@@ -167,7 +151,7 @@ Function *SILGenModule::emitConstructor(ConstructorDecl *decl) {
 Function *SILGenModule::emitClosure(ClosureExpr *ce) {
   SILConstant constant(ce);
   Function *f = preEmitFunction(constant, ce);
-  SILGenFunction(*this, *f, ce).emitClosureBody(ce->getBody());
+  SILGenFunction(*this, *f, /*hasVoidReturn=*/false).emitClosure(ce);
   postEmitFunction(constant, f);
   
   return f;
@@ -178,7 +162,7 @@ Function *SILGenModule::emitDestructor(ClassDecl *cd,
   SILConstant constant(cd, SILConstant::Destructor);
   
   Function *f = preEmitFunction(constant, dd);
-  SILGenFunction(*this, *f, cd, dd).emitDestructorBody(cd, dd);
+  SILGenFunction(*this, *f, /*hasVoidReturn=*/true).emitDestructor(cd, dd);
   postEmitFunction(constant, f);
   
   return f;

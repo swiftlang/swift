@@ -253,11 +253,6 @@ public:
 
 public:
   SILGenFunction(SILGenModule &SGM, Function &F, bool hasVoidReturn);
-  SILGenFunction(SILGenModule &SGM, Function &F, FuncExpr *FE);
-  SILGenFunction(SILGenModule &SGM, Function &F, ClosureExpr *CE);
-  SILGenFunction(SILGenModule &SGM, Function &F, ConstructorDecl *CD);
-  SILGenFunction(SILGenModule &SGM, Function &F,
-                 ClassDecl *CD, DestructorDecl *DD);
   ~SILGenFunction();
 
   /// emitProlog - Generates prolog code to allocate and clean up mutable
@@ -266,24 +261,34 @@ public:
                   Type resultType);
   void emitProlog(ArrayRef<Pattern*> paramPatterns,
                   Type resultType);
+  
   /// emitDestructorProlog - Generates prolog code for a destructor. Unlike
   /// a normal function, the destructor deallocates its argument completely.
   void emitDestructorProlog(ClassDecl *CD,
                             DestructorDecl *DD);
   
-  /// emitClosureBody - Generates code for a ClosureExpr body. This is akin
+  /// emitFunction - Generates code for a FuncExpr.
+  void emitFunction(FuncExpr *fe);
+  /// emitClosure - Generates code for a ClosureExpr. This is akin
   /// to visiting the body as if wrapped in a ReturnStmt.
-  void emitClosureBody(Expr *body);
-  /// emitDestructorBody - Generates code for a class. This emits the
+  void emitClosure(ClosureExpr *ce);
+  /// emitDestructor - Generates code for a class destructor. This emits the
   /// body code from the DestructorDecl (if any),
   /// implicitly releases the elements of the class, and calls the base
   /// class destructor or deallocates the instance if this is a root class.
-  void emitDestructorBody(ClassDecl *cd, DestructorDecl *dd);
-  /// emitConstructorBody - Generates code for a ConstructorDecl body. This
-  /// implicitly allocates the new 'this' value, invokes the base
-  /// constructor if any, and returns the 'this' value.
-  /// FIXME: allocating and non-allocating entry points
-  void emitConstructorBody(ConstructorDecl *ctor);
+  void emitDestructor(ClassDecl *cd, DestructorDecl *dd);
+  /// emitValueConstructor - Generates code for a struct constructor.
+  /// This allocates the new 'this' value, emits the
+  /// body code, then returns the final initialized 'this'.
+  void emitValueConstructor(ConstructorDecl *ctor);
+  /// emitClassConstructorAllocator - Generates code for a class constructor's
+  /// allocating entry point. This allocates the new 'this' value, passes it to
+  /// the initializer entry point, then returns the initialized 'this'.
+  void emitClassConstructorAllocator(ConstructorDecl *ctor);
+  /// emitClassConstructorInitializer - Generates code for a class constructor's
+  /// initializing entry point. This takes 'this' and the constructor arguments
+  /// as parameters and executes the constructor body to initialize 'this'.
+  void emitClassConstructorInitializer(ConstructorDecl *ctor);
 
   /// Return a stable reference to the current cleanup.
   CleanupsDepth getCleanupsDepth() const {
@@ -486,6 +491,9 @@ public:
                                             Expr /*nullable*/ *subscriptExpr,
                                             SILConstant constant,
                                             ArrayRef<Substitution> substs);
+  ManagedValue emitMethodRef(SILLocation loc,
+                             Value thisValue,
+                             SILConstant methodConstant);
 
   //===--------------------------------------------------------------------===//
   // Declarations

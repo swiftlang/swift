@@ -478,7 +478,7 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
   for (auto &paramPattern : paramPatterns) {
     // Allocate the local mutable argument storage and set up an Initialization.
     llvm::OwningPtr<Initialization> argInit(
-                                            InitializationForPattern(*this).visit(paramPattern));
+                          InitializationForPattern(*this).visit(paramPattern));
     
     // Add the BBArguments and use them to initialize the local argument values.
     ArgumentInitVisitor(*this, F).visit(paramPattern, argInit.get());
