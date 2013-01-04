@@ -412,6 +412,9 @@ void Lexer::lexOperatorIdentifier() {
     switch ((TokStart[0] << 8) | TokStart[1]) {
     case ('-' << 8) | '>': // ->
       return formToken(tok::arrow, TokStart);
+    case ('*' << 8) | '/': // */
+      diagnose(TokStart, diag::lex_unexpected_block_comment_end);
+      return formToken(tok::unknown, TokStart);
     }
   }
   
