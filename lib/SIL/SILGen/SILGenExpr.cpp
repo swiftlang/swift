@@ -1123,16 +1123,14 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   
   // If we have a base class, invoke its destructor.
   if (Type baseTy = cd->getBaseClass()) {
-    // FIXME: generic base class
-    ClassType *baseClassTy = baseTy->castTo<ClassType>();
-    SILConstant dtorConstant = SILConstant(baseClassTy->getDecl(),
-                                   SILConstant::Destructor);
-    Value dtorValue = B.createConstantRef(dd, dtorConstant,
-                                         SGM.getConstantType(dtorConstant));
+    SILConstant dtorConstant =
+      SILConstant(baseTy->getClassOrBoundGenericClass(),
+                  SILConstant::Destructor);
     Value baseThis = B.createImplicitConvert(dd,
                                              thisValue,
                                              getLoweredLoadableType(baseTy));
-    B.createApply(dd, dtorValue,
+    ManagedValue dtorValue = emitMethodRef(dd, baseThis, dtorConstant);
+    B.createApply(dd, dtorValue.forward(*this),
                   SILType::getEmptyTupleType(SGM.M.getContext()),
                   baseThis);
   } else {
