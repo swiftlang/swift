@@ -86,6 +86,15 @@ namespace irgen {
 
     /// The minimum uncurrying level at which the function can be called.
     unsigned getMinUncurryLevel() const { return MinUncurryLevel; }
+
+    /// Produce the known limits on the abstract callee for the given
+    /// function.
+    static AbstractCallee forDirectFunction(IRGenFunction &IGF,
+                                            ValueDecl *func);
+
+    /// Like forDirectFunction, but for a known-global function.
+    static AbstractCallee forDirectGlobalFunction(IRGenModule &IGM,
+                                                  ValueDecl *func);
   };
 
   class OwnershipConventions {

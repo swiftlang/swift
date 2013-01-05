@@ -576,32 +576,44 @@ AbstractCC irgen::getAbstractCC(ValueDecl *fn) {
   return AbstractCC::Freestanding;
 }
 
-/// Construct the best known limits on how we can call the given function.
-static AbstractCallee getAbstractDirectCallee(IRGenFunction &IGF,
-                                              ValueDecl *val) {
-  bool isLocal = val->getDeclContext()->isLocalContext();
-
-  // FIXME: be more aggressive about all this.
-  ExplosionKind level;
-  if (isLocal) {
-    level = ExplosionKind::Maximal;
-  } else {
-    level = ExplosionKind::Minimal;
-  }
-
+static AbstractCallee getAbstractDirectCallee(ValueDecl *val,
+                                              ExplosionKind level,
+                                              ExtraData extraData) {
   unsigned minUncurry = 0;
   if (val->getDeclContext()->isTypeContext())
     minUncurry = 1;
   unsigned maxUncurry = getNaturalUncurryLevel(val);
   
+  AbstractCC convention = getAbstractCC(val);
+
+  return AbstractCallee(convention, level, minUncurry, maxUncurry, extraData);
+}
+
+/// Construct the best known limits on how we can call the given function.
+AbstractCallee AbstractCallee::forDirectFunction(IRGenFunction &IGF,
+                                                 ValueDecl *val) {
+  bool isLocal = val->getDeclContext()->isLocalContext();
+  if (!isLocal) return forDirectGlobalFunction(IGF.IGM, val);
+
   auto extraData = ExtraData::None;
   if (FuncDecl *fn = dyn_cast<FuncDecl>(val)) {
     if (isLocal && !isa<llvm::ConstantPointerNull>(IGF.getLocalFuncData(fn)))
       extraData = ExtraData::Retainable;
   }
-  AbstractCC convention = getAbstractCC(val);
 
-  return AbstractCallee(convention, level, minUncurry, maxUncurry, extraData);
+  return getAbstractDirectCallee(val, ExplosionKind::Maximal, extraData);
+}
+
+/// Construct the best known limits on how we can call the given
+/// global function.
+AbstractCallee AbstractCallee::forDirectGlobalFunction(IRGenModule &IGM,
+                                                       ValueDecl *val) {
+  assert(!val->getDeclContext()->isLocalContext());
+
+  // FIXME: be more aggressive about this.
+  ExplosionKind level = ExplosionKind::Minimal;
+
+  return getAbstractDirectCallee(val, level, ExtraData::None);
 }
 
 /// Return this function pointer, bitcasted to an i8*.
@@ -651,7 +663,7 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
                                ExplosionKind bestExplosion,
                                unsigned bestUncurry) {
   if (bestUncurry != 0 || bestExplosion != ExplosionKind::Minimal) {
-    AbstractCallee absCallee = getAbstractDirectCallee(IGF, val);
+    auto absCallee = AbstractCallee::forDirectFunction(IGF, val);
     bestUncurry = std::min(bestUncurry, absCallee.getMaxUncurryLevel());
     bestExplosion = absCallee.getBestExplosionLevel();
   }
@@ -912,7 +924,7 @@ namespace {
         return AbstractCallee::forIndirect();
 
       case Kind::Direct:
-        return getAbstractDirectCallee(IGF, getDirectFunction());
+        return AbstractCallee::forDirectFunction(IGF, getDirectFunction());
 
       case Kind::Virtual:
         return getAbstractVirtualCallee(IGF, getVirtualFunction());

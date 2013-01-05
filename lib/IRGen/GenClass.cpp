@@ -31,6 +31,7 @@
 #include "Explosion.h"
 #include "GenFunc.h"
 #include "GenMeta.h"
+#include "GenObjC.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
@@ -53,6 +54,17 @@ static bool hasSwiftRefcount(ClassDecl *theClass) {
   auto baseClass = theClass->getBaseClass()->getClassOrBoundGenericClass();
   assert(baseClass && "base type of class not a class?");
   return hasSwiftRefcount(baseClass);
+}
+
+/// Emit a retain of a class pointer, using the best known retain
+/// semantics for the value.
+llvm::Value *IRGenFunction::emitBestRetainCall(llvm::Value *value,
+                                               ClassDecl *theClass) {
+  if (hasSwiftRefcount(theClass)) {
+    emitRetainCall(value);
+    return value;
+  }
+  return emitObjCRetainCall(value);
 }
 
 /// Different policies for accessing a physical field.
@@ -693,8 +705,8 @@ namespace {
   public:
     /// Methods need to be collected into the appropriate methods list.
     void visitFuncDecl(FuncDecl *method) {
-      if (!requiresObjCMethodEntry(method)) return;
-      llvm::Constant *entry = buildMethod(method);
+      if (!requiresObjCMethodDescriptor(method)) return;
+      llvm::Constant *entry = emitObjCMethodDescriptor(IGM, method);
       if (!method->isStatic()) {
         InstanceMethods.push_back(entry);
       } else {
@@ -703,21 +715,11 @@ namespace {
     }
 
   private:
-    bool requiresObjCMethodEntry(FuncDecl *method) {
+    bool requiresObjCMethodDescriptor(FuncDecl *method) {
       if (method->getAttrs().ObjC) return true;
       if (auto override = method->getOverriddenDecl())
-        return requiresObjCMethodEntry(override);
+        return requiresObjCMethodDescriptor(override);
       return false;
-    }
-
-    /// struct method_t {
-    ///   SEL name;
-    ///   const char *types;
-    ///   IMP imp;
-    /// };
-    llvm::Constant *buildMethod(FuncDecl *method) {
-      // FIXME
-      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     }
 
     llvm::Constant *buildInstanceMethodList()  {

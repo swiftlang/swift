@@ -37,7 +37,7 @@ namespace swift {
   class AssignStmt;
   class BraceStmt;
   class BreakStmt;
-  class ClassType;
+  class ClassDecl;
   class ConstructorDecl;
   class ContinueStmt;
   class Decl;
@@ -288,6 +288,7 @@ public:
   void emitInitializeRetained(llvm::Value *value, Address addr);
   void emitRetain(llvm::Value *value, Explosion &explosion);
   void emitRetainCall(llvm::Value *value);
+  llvm::Value *emitBestRetainCall(llvm::Value *value, ClassDecl *theClass);
   void emitRelease(llvm::Value *value);
   ManagedValue enterReleaseCleanup(llvm::Value *value);
   void emitObjCRetain(llvm::Value *value, Explosion &explosion);

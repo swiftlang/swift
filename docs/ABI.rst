@@ -17,6 +17,7 @@ All Swift-mangled names begin with this prefix.
   global ::= 'Wo' entity                     // witness table offset
   global ::= 'Wv' directness entity          // field offset
   global ::= local-marker? entity            // some identifiable thing
+  global ::= 'To' global                     // swift-as-ObjC thunk
   entity ::= context 'D'                     // destructor
   entity ::= context 'C' type                // constructor
   entity ::= declaration 'g'                 // getter
@@ -27,7 +28,7 @@ All Swift-mangled names begin with this prefix.
 
 Entity manglings all start with a nominal-type-kind ([COV]), an
 identifier ([0-9o]), or a substitution ([S]).  Global manglings start
-with any of those or [MWw].
+with any of those or [MTWw].
 
   directness ::= 'd'                         // direct
   directness ::= 'i'                         // indirect
