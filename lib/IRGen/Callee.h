@@ -18,6 +18,7 @@
 #ifndef SWIFT_IRGEN_CALLEE_H
 #define SWIFT_IRGEN_CALLEE_H
 
+#include <type_traits>
 #include "llvm/IR/DerivedTypes.h"
 #include "CallingConvention.h"
 #include "Explosion.h"
@@ -102,6 +103,32 @@ namespace irgen {
     ///   order
     virtual void getConsumedArgs(IRGenModule &IGM, const Callee &callee,
                            llvm::SmallVectorImpl<unsigned> &set) const = 0;
+
+
+    /// A buffer for allocating an OwnershipConventions object into.
+    class Buffer {
+      void *Storage[4];
+
+    public:
+      /// Set a new object into this buffer.  The caller is responsible
+      /// for ensuring that an object isn't already allocated here.
+      template <class T, class... Args> T &set(Args &&...args) {
+        static_assert(sizeof(T) <= sizeof(Storage),
+                      "conventions type overruns buffer size");
+        static_assert(alignof(T) <= alignof(void*),
+                      "conventions type requires extra alignment");
+        static_assert(std::is_trivially_destructible<T>::value,
+                      "conventions type has non-trivial destructor");
+        return *new (&Storage) T(std::forward<Args>(args)...);
+      }
+
+      /// Return a pointer to the object allocated in this buffer.
+      /// The caller is responsible for ensuring that an object has
+      /// actually been so allocated.
+      const OwnershipConventions &get() const {
+        return reinterpret_cast<const OwnershipConventions &>(Storage);
+      }
+    };
   };
 
   class Callee {
@@ -137,7 +164,7 @@ namespace irgen {
     ArrayRef<Substitution> Substitutions;
 
     /// A buffer for storing an OwnershipConventions implementation.
-    void *OwnershipConventionsBuffer[4];
+    OwnershipConventions::Buffer OwnershipConventionsBuffer;
 
   public:
     Callee() = default;
@@ -237,15 +264,10 @@ namespace irgen {
 
     /// Construct an OwnershipConventions in this callee.
     template <class T, class... Args>
-    void setOwnershipConventions(Args &&...args) {
+    T &setOwnershipConventions(Args &&...args) {
       assert(!HasOwnershipConventions);
-      static_assert(sizeof(T) <= sizeof(OwnershipConventionsBuffer),
-                    "conventions type overruns buffer size");
-      static_assert(alignof(T) <= alignof(void*),
-                    "conventions type requires extra alignment");
       HasOwnershipConventions = true;
-      new (static_cast<void*>(&OwnershipConventionsBuffer))
-             T(std::forward<Args>(args)...);
+      return OwnershipConventionsBuffer.set<T>(std::forward<Args>(args)...);
     }
 
     bool hasOwnershipConventions() const {
@@ -253,8 +275,8 @@ namespace irgen {
     }
 
     const OwnershipConventions &getOwnershipConventions() const {
-      auto &buffer = OwnershipConventionsBuffer;
-      return reinterpret_cast<const OwnershipConventions &>(buffer);
+      assert(HasOwnershipConventions);
+      return OwnershipConventionsBuffer.get();
     }
   };
 
