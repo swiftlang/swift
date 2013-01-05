@@ -610,13 +610,14 @@ namespace {
     ClassDecl *TheClass;
     bool HasNonTrivialDestructor = false;
     bool HasNonTrivialConstructor = false;
-    SmallVector<VarDecl*, 8> Ivars;
-    SmallVector<FuncDecl*, 16> InstanceMethods;
-    SmallVector<FuncDecl*, 16> ClassMethods;
-    SmallVector<ProtocolDecl*, 4> Protocols;
-    SmallVector<VarDecl*, 8> Properties;
+    SmallVector<llvm::Constant*, 8> Ivars;
+    SmallVector<llvm::Constant*, 16> InstanceMethods;
+    SmallVector<llvm::Constant*, 16> ClassMethods;
+    SmallVector<llvm::Constant*, 4> Protocols;
+    SmallVector<llvm::Constant*, 8> Properties;
   public:
-    ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass)
+    ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
+                     const LayoutClass &layout)
       : IGM(IGM), TheClass(theClass) {}
 
     llvm::Constant *emit() {
@@ -692,21 +693,22 @@ namespace {
   public:
     /// Methods need to be collected into the appropriate methods list.
     void visitFuncDecl(FuncDecl *method) {
+      if (!requiresObjCMethodEntry(method)) return;
+      llvm::Constant *entry = buildMethod(method);
       if (!method->isStatic()) {
-        visitInstanceMethod(method);
+        InstanceMethods.push_back(entry);
       } else {
-        visitClassMethod(method);
+        ClassMethods.push_back(entry);
       }
     }
 
   private:
-    void visitInstanceMethod(FuncDecl *method) {
-      InstanceMethods.push_back(method);
+    bool requiresObjCMethodEntry(FuncDecl *method) {
+      if (method->getAttrs().ObjC) return true;
+      if (auto override = method->getOverriddenDecl())
+        return requiresObjCMethodEntry(override);
+      return false;
     }
-
-    void visitClassMethod(FuncDecl *method) {
-      ClassMethods.push_back(method);
-    }    
 
     /// struct method_t {
     ///   SEL name;
@@ -729,10 +731,9 @@ namespace {
     /// };
     ///
     /// This method does not return a value of a predictable type.
-    llvm::Constant *buildMethodList(ArrayRef<FuncDecl*> methods,
+    llvm::Constant *buildMethodList(ArrayRef<llvm::Constant*> methods,
                                     StringRef name) {
-      return buildOptionalList(methods, 3 * IGM.getPointerSize(), name,
-                               &ClassDataBuilder::buildMethod);
+      return buildOptionalList(methods, 3 * IGM.getPointerSize(), name);
     }
 
     /*** Protocols *********************************************************/
@@ -750,8 +751,7 @@ namespace {
     ///
     /// This method does not return a value of a predictable type.
     llvm::Constant *buildProtocolList() {
-      return buildOptionalList(Protocols, Size(0), "_PROTOCOLS_",
-                               &ClassDataBuilder::buildProtocolRef);
+      return buildOptionalList(Protocols, Size(0), "_PROTOCOLS_");
     }
 
     /*** Ivars *************************************************************/
@@ -770,7 +770,7 @@ namespace {
     /// Ivars need to be collected in the ivars list, and they also
     /// affect flags.
     void visitIvar(VarDecl *var) {
-      Ivars.push_back(var);
+      Ivars.push_back(buildIvar(var));
       if (!IGM.isPOD(var->getType()->getCanonicalType(),
                      ResilienceScope::Local)) {
         HasNonTrivialDestructor = true;
@@ -829,15 +829,14 @@ namespace {
     /// This method does not return a value of a predictable type.
     llvm::Constant *buildIvarList() {
       Size eltSize = 3 * IGM.getPointerSize() + Size(8);
-      return buildOptionalList(Ivars, eltSize, "_IVARS_",
-                               &ClassDataBuilder::buildIvar);
+      return buildOptionalList(Ivars, eltSize, "_IVARS_");
     }
 
     /*** Properties ********************************************************/
 
     /// Properties need to be collected in the properties list.
     void visitProperty(VarDecl *var) {
-      Properties.push_back(var);
+      Properties.push_back(buildProperty(var));
     }
 
     /// struct property_t {
@@ -858,15 +857,10 @@ namespace {
     /// This method does not return a value of a predictable type.
     llvm::Constant *buildPropertyList() {
       Size eltSize = 2 * IGM.getPointerSize();
-      return buildOptionalList(Properties, eltSize, "_PROPERTIES_",
-                               &ClassDataBuilder::buildProperty);
+      return buildOptionalList(Properties, eltSize, "_PROPERTIES_");
     }
 
     /*** General ***********************************************************/
-
-    /// A hack to turn ArrayRef<T> into a non-deduced context,
-    /// allowing template argument deduction to behave sensibly.
-    template <class T> struct NDArrayRef { typedef ArrayRef<T> type; };
 
     /// Build a list structure from the given array of objects.
     /// If the array is empty, use null.  The assumption is that every
@@ -874,11 +868,9 @@ namespace {
     ///
     /// \param optionalEltSize - if non-zero, a size which needs
     ///   to be placed in the list header
-    template <class T>
-    llvm::Constant *buildOptionalList(typename NDArrayRef<T>::type objects,
+    llvm::Constant *buildOptionalList(ArrayRef<llvm::Constant*> objects,
                                       Size optionalEltSize,
-                                      StringRef nameBase,
-                          llvm::Constant *(ClassDataBuilder::*build)(T)) {
+                                      StringRef nameBase) {
       if (objects.empty())
         return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
@@ -895,15 +887,9 @@ namespace {
         fields.push_back(llvm::ConstantInt::get(IGM.IntPtrTy, objects.size()));
       }
 
-      SmallVector<llvm::Constant*, 8> objectInits;
-      objectInits.reserve(objects.size());
-      for (auto &object : objects) {
-        objectInits.push_back((this->*build)(object));
-      }
-
       auto arrayTy =
-        llvm::ArrayType::get(objectInits[0]->getType(), objectInits.size());
-      fields.push_back(llvm::ConstantArray::get(arrayTy, objectInits));
+        llvm::ArrayType::get(objects[0]->getType(), objects.size());
+      fields.push_back(llvm::ConstantArray::get(arrayTy, objects));
 
       return buildGlobalVariable(fields, nameBase);
     }
@@ -952,8 +938,10 @@ namespace {
 
 /// Emit the private data (RO-data) associated with a class.
 llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
-                                            ClassDecl *forClass) {
-  return ClassDataBuilder(IGM, forClass).emit();
+                                            ClassDecl *cls) {
+  CanType type = cls->getDeclaredTypeInContext()->getCanonicalType();
+  LayoutClass layout(IGM, ResilienceScope::Universal, cls, type);
+  return ClassDataBuilder(IGM, cls, layout).emit();
 }
 
 const TypeInfo *TypeConverter::convertClassType(ClassDecl *D) {
