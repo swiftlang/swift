@@ -57,25 +57,36 @@ public:
     return IsLoadable;
   }
   
-  Loadable_t visitNominalType(NominalType *t) {
-    if (StructDecl *sd = dyn_cast<StructDecl>(t->getDecl())) {
-      // FIXME: if this struct has a resilient attribute, mark the TypeInfo
-      // as addressOnly and bail.
-      
-      pushPath();
-      for (Decl *d : sd->getMembers())
-        if (VarDecl *vd = dyn_cast<VarDecl>(d))
-          if (!vd->isProperty()) {
-            CanType ct = vd->getType()->getCanonicalType();
-            setPathType(ct);
-            if (visit(ct) == IsAddressOnly) {
-              return IsAddressOnly;
-            }
-            advancePath();
+  Loadable_t walkStructDecl(StructDecl *sd) {
+    // FIXME: if this struct has a resilient attribute, mark the TypeInfo
+    // as addressOnly and bail without checking fields.
+    
+    pushPath();
+    for (Decl *d : sd->getMembers())
+      if (VarDecl *vd = dyn_cast<VarDecl>(d))
+        if (!vd->isProperty()) {
+          CanType ct = vd->getType()->getCanonicalType();
+          setPathType(ct);
+          if (visit(ct) == IsAddressOnly) {
+            return IsAddressOnly;
           }
-      popPath();
-      return IsLoadable;
-    } else
+          advancePath();
+        }
+    popPath();
+    return IsLoadable;
+  }
+  
+  Loadable_t visitBoundGenericType(BoundGenericType *gt) {
+    if (StructDecl *sd = dyn_cast<StructDecl>(gt->getDecl()))
+      return walkStructDecl(sd);
+    else
+      return this->visitType(gt);
+  }
+  
+  Loadable_t visitNominalType(NominalType *t) {
+    if (StructDecl *sd = dyn_cast<StructDecl>(t->getDecl()))
+      return walkStructDecl(sd);
+    else
       return this->visitType(t);
   }
   
