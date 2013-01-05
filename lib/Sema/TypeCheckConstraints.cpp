@@ -1987,6 +1987,25 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                              TC.Context);
   } else
     type = getTypeOfValueDeclReference(baseTy, value, TC.Context);
+
+  // For a member of an archetype, substitute the base type for the 'This'
+  // type.
+  if (baseObjTy->is<ArchetypeType>()) {
+    if (auto ownerProtoTy = ownerTy->getAs<ProtocolType>()) {
+      auto thisArchetype = ownerProtoTy->getDecl()->getThis()->getDeclaredType()
+                             ->castTo<ArchetypeType>();
+      type = TC.transformType(type,
+               [&](Type type) -> Type {
+                 if (auto archetype = type->getAs<ArchetypeType>()) {
+                   if (archetype == thisArchetype)
+                     return baseObjTy;
+                 }
+
+                 return type;
+             });
+    }
+  }
+
   type = openType(type, { }, replacements);
 
   // Skip the 'this' argument if it's already been bound by the base.
