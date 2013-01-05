@@ -166,14 +166,16 @@ types but are needed for some operations:
 * The *address of T* ``$*T``, a pointer to memory containing a
   value of any reference or value type ``$T``.  This can be an internal pointer
   into a data structure. Addresses of loadable types can be loaded and stored
-  to access values of those types. Addresses of address-only types can only be
-  used with the ``copy_addr``, ``destroy_addr``, and ``dealloc_var``
-  instructions or as arguments to functions. Addresses cannot be retained or
-  released.
-* The *box* ``$SIL.Box`` is a generic reference to a reference-counted block
-  of memory. This can be either an instance of a reference type or
-  reference-counted storage for a value type. The contents of a box are not
-  accessible through the ``SIL.Box`` type; boxes can only be retained, released,
+  to access values of those types.
+  Addresses of address-only types can only be used with instructions that
+  manipulate their operands indirectly by address, such as ``copy_addr``,
+  ``destroy_addr``, and ``dealloc_var``, or as arguments to functions.
+  Addresses cannot be retained or released.
+* The primitive ``$Builtin.ObjectPointer`` type is used to represent the
+  *box*, a typeless reference to a reference-counted block
+  of memory. A box can be either an instance of a reference type or a
+  reference-counted storage area for a value type. The contents of a box are not
+  accessible through the object pointer; boxes can only be retained, released,
   or passed around as opaque operands. Operations that allocate retainable
   memory generally return both a box and a typed address pointing
   into the box.
@@ -249,6 +251,23 @@ to prevent uninitialized access
 Creates a "zero" value of type ``T``. This value represents the uninitialized
 state of a variable, so it may not be a semantically valid value of type ``T``.
 
+zero_addr
+`````````
+::
+
+  zero_addr %0
+  ; %0 must be the address of an address-only type
+
+FIXME: this is a stopgap that will be eliminated when we have dataflow passes
+to prevent uninitialized access
+
+Zero-initializes the memory referenced by ``%0``. This is similar to::
+
+  %1 = zero_value $T
+  store %1 to %0
+
+but ``zero_addr`` must be used if ``$T`` is an address-only type.
+
 integer_literal
 ```````````````
 ::
@@ -321,7 +340,6 @@ alloc_ref
   %1 = alloc_ref {heap|stack} $T
   ; $T must be a reference type
   ; %1 has type $T
-  ; TODO: not implemented
 
 Allocates an object of reference type ``T``. The object will be initialized
 with retain count 1; its state will be otherwise uninitialized. The object
@@ -391,7 +409,6 @@ dealloc_ref
 
   dealloc_ref {heap|stack} %0
   ; %0 must be of a box or reference type
-  ; TODO: not implemented
 
 Deallocates a box or reference type instance. The box must have a
 retain count of one, and the ``heap`` or ``stack`` attribute must match the
@@ -582,7 +599,6 @@ ref_element_addr
   ; %0 must be of a reference type $T
   ; %1 will be of type $*U where U is the type of the 123rd
   ;   element of T
-  ; TODO: not implemented
 
 Given a value of a reference type, creates a value representing the address
 of an element within the referenced instance.
@@ -625,6 +641,8 @@ downcast
   ; %1 will be of type T
 
 Performs a checked downcast conversion of ``%0`` to subclass ``T``.
+
+FIXME: if it fails...
 
 coerce
 ``````
@@ -671,10 +689,25 @@ archetype_to_super
 
   %1 = archetype_to_super %0, $T
   ; %0 must be an address of an archetype $*U with base class constraint U : B
-  ; $T must be the base constraint type B or a supertype of B
+  ; $T must be the base constraint type B or a superclass of B
   ; %1 will be of the base type $T
 
 Performs an upcast operation on the archetype value referenced by ``%0``.
+
+super_to_archetype
+``````````````````
+::
+
+  super_to_archetype %0 to %1
+  ; %0 must be of a reference type $T
+  ; %1 must be the address of an archetype $*U with base class constraint U : B
+  ;   where B is T or a subclass of T
+
+Performs a checked downcast operation on the class instance referenced by
+``%0``, initializing the archetype referenced by ``%1`` with a reference to
+the class instance if the check succeeds.
+
+FIXME: if it fails...
 
 archetype_method
 ````````````````
@@ -692,6 +725,17 @@ Obtains a reference to function implementing ``@method`` for the archetype
 referenced by ``%0``. Self and associated types in the signature of ``@method``
 are bound relative to the type referenced by ``%0`` in the resulting function
 value.
+
+associated_metatype
+```````````````````
+::
+
+  %1 = associated_metatype %0, $U
+  ; %0 must be a metatype value of type $T.metatype
+  ; $U must be an associated type of $T
+
+Obtains the metatype object for the associated type ``$U`` of the type with
+metatype ``%0``.
 
 Existential types
 ~~~~~~~~~~~~~~~~~
@@ -721,6 +765,21 @@ lowers to something like this::
   %e = alloc_var $SomeProtocol                      ; allocate the existential
   %e_instance = alloc_protocol $SomeInstance, %e    ; allocate its value
   store %1 to %e_instance                           ; initialize value
+
+dealloc_existential
+```````````````````
+::
+  
+  dealloc_existential %0
+  ; %0 must be of a $*P type for existential type P
+
+Undoes the internal allocation (if any) performed by ``alloc_existential``.
+This does not clean up any value contained in the existential, so the
+existential buffer must be uninitialized.
+``dealloc_existential`` is only necessary for existentials that have been
+partially initialized by ``alloc_existential`` but haven't had their value
+initialized. A fully initialized existential can be destroyed with
+``destroy_addr`` like a normal address-only value.
 
 existential_method
 ``````````````````
