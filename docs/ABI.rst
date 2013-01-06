@@ -96,8 +96,8 @@ and so the structure is quite simple.
   known-module ::= 'Ss'                      // swift
   known-nominal-type ::= 'Sb'                // swift.Bool
   known-nominal-type ::= 'Sc'                // swift.Char
-  known-nominal-type ::= 'Sd'                // swift.Double
-  known-nominal-type ::= 'Sf'                // swift.Float
+  known-nominal-type ::= 'Sd'                // swift.Float64
+  known-nominal-type ::= 'Sf'                // swift.Float32
   known-nominal-type ::= 'Si'                // swift.Int64
   known-nominal-type ::= 'SS'                // swift.String
   known-nominal-type ::= 'Su'                // swift.UInt64
