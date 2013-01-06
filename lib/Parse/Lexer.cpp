@@ -37,7 +37,12 @@ static bool EncodeToUTF8(unsigned CharValue,
   assert(CharValue >= 0x80 && "Single-byte encoding should be already handled");
   // Number of bits in the value, ignoring leading zeros.
   unsigned NumBits = 32-llvm::CountLeadingZeros_32(CharValue);
-  
+  unsigned LowHalf = CharValue & 0xFFFF;
+
+  // Reserved values in each plane
+  if (LowHalf == 0xFFFE || LowHalf == 0xFFFF)
+    return true;
+
   // Handle the leading byte, based on the number of bits in the value.
   unsigned NumTrailingBytes;
   if (NumBits <= 5+6) {
@@ -48,9 +53,12 @@ static bool EncodeToUTF8(unsigned CharValue,
     // Encoding is 0x1110aaaa 10bbbbbb 10cccccc
     Result.push_back(char(0xE0 | (CharValue >> (6+6))));
     NumTrailingBytes = 2;
-    
+
     // UTF-16 surrogate pair values are not valid code points.
     if (CharValue >= 0xD800 && CharValue <= 0xDFFF)
+      return true;
+    // U+FDD0...U+FDEF are also reserved
+    if (CharValue >= 0xFDD0 && CharValue <= 0xFDEF)
       return true;
   } else if (NumBits <= 3+6+6+6) {
     // Encoding is 0x11110aaa 10bbbbbb 10cccccc 10dddddd
