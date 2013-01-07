@@ -408,8 +408,17 @@ void Lexer::formOperatorToken(const char *TokStart) {
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
 
-  while (Identifier::isOperatorChar(*CurPtr) && *CurPtr != '.')
+  while (Identifier::isOperatorChar(*CurPtr) && *CurPtr != '.') {
+    if (CurPtr[-1] == '/' && (CurPtr[0] == '/' || CurPtr[0] == '*')) {
+      --CurPtr;
+      break;
+    }
+    if (CurPtr[-1] == '*' && CurPtr[0] == '/' && TokStart != (CurPtr-1)) {
+      --CurPtr;
+      break;
+    }
     ++CurPtr;
+  }
   
   // Match various reserved words.
   if (CurPtr-TokStart == 1) {
