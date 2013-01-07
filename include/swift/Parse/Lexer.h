@@ -141,6 +141,7 @@ private:
   void lexCharacterLiteral();
   void lexStringLiteral();
   bool isPrecededBySpace();
+  bool isStartOfDotFloatLiteral();
 };
   
   

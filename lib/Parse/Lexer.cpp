@@ -198,6 +198,25 @@ bool Lexer::isPrecededBySpace() {
   return (isspace(LastChar) || LastChar == '\0');
 }
 
+bool Lexer::isStartOfDotFloatLiteral() {
+  if (isPrecededBySpace())
+    return true;
+
+  char LastChar = *(CurPtr - 2);
+  if (Identifier::isOperatorChar(LastChar))
+    return true;
+
+  switch (LastChar) {
+  case '(':
+  case '[':
+  case '{':
+  case ';':
+  case ',':
+    return true;
+  }
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // Lexer Subroutines
 //===----------------------------------------------------------------------===//
@@ -972,7 +991,7 @@ Restart:
   case ']': return formToken(tok::r_square, TokStart);
 
   case '.':
-    if (isdigit(CurPtr[0]))   // .42
+    if (isdigit(CurPtr[0]) && isStartOfDotFloatLiteral()) // .42
       return lexNumber();
 
     if (CurPtr[0] == '.') {
