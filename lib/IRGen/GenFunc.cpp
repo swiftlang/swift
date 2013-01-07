@@ -1531,13 +1531,23 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     auto pointer = args.claimUnmanagedNext();
     auto cmp = args.claimUnmanagedNext();
     auto newval = args.claimUnmanagedNext();
-    
+
+    llvm::Type *origTy = cmp->getType();
+    if (origTy->isPointerTy()) {
+      cmp = IGF.Builder.CreatePtrToInt(cmp, IGF.IGM.IntPtrTy);
+      newval = IGF.Builder.CreatePtrToInt(newval, IGF.IGM.IntPtrTy);
+    }
+
     pointer = IGF.Builder.CreateBitCast(pointer,
                                   llvm::PointerType::getUnqual(cmp->getType()));
-    auto result = IGF.Builder.CreateAtomicCmpXchg(pointer, cmp, newval,
-                                                  ordering,
+    llvm::Value *result = IGF.Builder.CreateAtomicCmpXchg(pointer, cmp, newval,
+                                                          ordering,
                       isSingleThread ? llvm::SingleThread : llvm::CrossThread);
-    result->setVolatile(isVolatile);
+    cast<llvm::AtomicCmpXchgInst>(result)->setVolatile(isVolatile);
+
+    if (origTy->isPointerTy())
+      result = IGF.Builder.CreateIntToPtr(result, origTy);
+
     emission.setScalarUnmanagedSubstResult(result);
     return;
   }
@@ -1578,13 +1588,22 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     
     auto pointer = args.claimUnmanagedNext();
     auto val = args.claimUnmanagedNext();
-    
+
+    // Handle atomic ops on pointers by casting to intptr_t.
+    llvm::Type *origTy = val->getType();
+    if (origTy->isPointerTy())
+      val = IGF.Builder.CreatePtrToInt(val, IGF.IGM.IntPtrTy);
+
     pointer = IGF.Builder.CreateBitCast(pointer,
                                   llvm::PointerType::getUnqual(val->getType()));
-    auto result = IGF.Builder.CreateAtomicRMW(SubOpcode, pointer, val,
-                                              ordering,
+    Value *result = IGF.Builder.CreateAtomicRMW(SubOpcode, pointer, val,
+                                                ordering,
                       isSingleThread ? llvm::SingleThread : llvm::CrossThread);
-    result->setVolatile(isVolatile);
+    cast<AtomicRMWInst>(result)->setVolatile(isVolatile);
+
+    if (origTy->isPointerTy())
+      result = IGF.Builder.CreateIntToPtr(result, origTy);
+
     emission.setScalarUnmanagedSubstResult(result);
     return;
   }

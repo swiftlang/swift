@@ -580,7 +580,9 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
     OperationName = OperationName.drop_front(strlen("atomicrmw_"));
     
     // Verify we have a single integer, floating point, or pointer type.
-    if (Types.size() != 1 || !Types[0]->is<BuiltinIntegerType>())
+    if (Types.size() != 1) return nullptr;
+    Type Ty = Types[0];
+    if (!Ty->is<BuiltinIntegerType>() && !Ty->is<BuiltinRawPointerType>())
       return nullptr;
     
     // Get and validate the suboperation name, which is required.
@@ -607,7 +609,7 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
     // Nothing else is allowed in the name.
     if (!OperationName.empty())
       return nullptr;
-    return getAtomicRMWOperation(Context, Id, Types[0]);
+    return getAtomicRMWOperation(Context, Id, Ty);
   }
   
   BuiltinValueKind BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
