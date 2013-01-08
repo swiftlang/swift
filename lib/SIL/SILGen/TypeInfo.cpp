@@ -124,8 +124,15 @@ TypeConverter::~TypeConverter() {
 }
   
 void TypeConverter::makeFragileElementsForDecl(TypeInfo &theInfo,
+                                               unsigned &elementIndex,
                                                NominalTypeDecl *decl) {
-  unsigned elementIndex = 0;
+  if (ClassDecl *cd = dyn_cast<ClassDecl>(decl)) {
+    if (cd->hasBaseClass()) {
+      makeFragileElementsForDecl(theInfo, elementIndex,
+                             cd->getBaseClass()->getClassOrBoundGenericClass());
+    }
+  }
+  
   for (Decl *d : decl->getMembers()) {
     if (VarDecl *vd = dyn_cast<VarDecl>(d)) {
       if (!vd->isProperty()) {
@@ -139,10 +146,11 @@ void TypeConverter::makeFragileElementsForDecl(TypeInfo &theInfo,
 
 void TypeConverter::makeFragileElements(TypeInfo &theInfo, CanType t) {
   // FIXME: check resilient attribute
+  unsigned elementIndex = 0;
   if (NominalType *nt = t->getAs<NominalType>()) {
-    makeFragileElementsForDecl(theInfo, nt->getDecl());
+    makeFragileElementsForDecl(theInfo, elementIndex, nt->getDecl());
   } else if (BoundGenericType *bgt = t->getAs<BoundGenericType>()) {
-    makeFragileElementsForDecl(theInfo, bgt->getDecl());
+    makeFragileElementsForDecl(theInfo, elementIndex, bgt->getDecl());
   }
 }
   

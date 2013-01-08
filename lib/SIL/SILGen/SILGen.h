@@ -336,9 +336,10 @@ public:
                   Type resultType);
   
   /// emitDestructorProlog - Generates prolog code for a destructor. Unlike
-  /// a normal function, the destructor deallocates its argument completely.
-  void emitDestructorProlog(ClassDecl *CD,
-                            DestructorDecl *DD);
+  /// a normal function, the destructor does not consume a reference to its
+  /// argument. Returns the 'this' argument Value.
+  Value emitDestructorProlog(ClassDecl *CD,
+                             DestructorDecl *DD);
   
   /// emitRetainRValue - Emits the instructions necessary to increase the
   /// retain count of a temporary, in order to use it as part of another

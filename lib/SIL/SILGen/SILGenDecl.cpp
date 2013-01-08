@@ -505,7 +505,7 @@ namespace {
   };
 } // end anonymous namespace
 
-void SILGenFunction::emitDestructorProlog(ClassDecl *CD,
+Value SILGenFunction::emitDestructorProlog(ClassDecl *CD,
                                           DestructorDecl *DD) {
   // Emit the implicit 'this' argument.
   VarDecl *thisDecl = DD ? DD->getImplicitThisDecl() : nullptr;
@@ -531,6 +531,7 @@ void SILGenFunction::emitDestructorProlog(ClassDecl *CD,
     B.createStore(DD, thisValue, thisAddr);
     VarLocs[thisDecl] = {Value(), thisAddr};
   }
+  return thisValue;
 }
 
 static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc,

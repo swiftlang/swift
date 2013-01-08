@@ -1081,7 +1081,7 @@ bool SILGenFunction::emitEpilogBB(SILLocation loc) {
 }
 
 void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
-  emitDestructorProlog(cd, dd);
+  Value thisValue = emitDestructorProlog(cd, dd);
 
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the base class destructor.
@@ -1095,17 +1095,16 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   if (!emitEpilogBB(dd))
     return;
   
-  assert(!F.begin()->bbarg_empty() && "destructor has no this argument?!");
-  Value thisValue = *F.begin()->bbarg_begin();
-  
   // Release our members.
   // FIXME: generic params
   // FIXME: Can a destructor always consider its fields fragile like this?
-  unsigned fieldNo = 0;
+  TypeInfo const &thisTI = getTypeInfo(thisValue.getType().getSwiftType());
   for (Decl *member : cd->getMembers()) {
     if (VarDecl *vd = dyn_cast<VarDecl>(member)) {
       if (vd->isProperty())
         continue;
+      assert(thisTI.hasFragileElement(vd));
+      unsigned fieldNo = thisTI.getFragileElement(vd).index;
       TypeInfo const &ti = getTypeInfo(vd->getType());
       if (!ti.isTrivial()) {
         Value addr = B.createRefElementAddr(dd, thisValue, fieldNo,
