@@ -447,17 +447,8 @@ void Lexer::lexOperatorIdentifier() {
     }
   }
 
-  while (Identifier::isOperatorChar(*CurPtr) && *CurPtr != '.') {
-    if (CurPtr[-1] == '/' && (CurPtr[0] == '/' || CurPtr[0] == '*')) {
-      --CurPtr;
-      break;
-    }
-    if (CurPtr[-1] == '*' && CurPtr[0] == '/' && TokStart != (CurPtr-1)) {
-      --CurPtr;
-      break;
-    }
+  while (Identifier::isOperatorChar(*CurPtr) && *CurPtr != '.')
     ++CurPtr;
-  }
   
   // Match various reserved words.
   if (CurPtr-TokStart == 1) {
@@ -470,6 +461,26 @@ void Lexer::lexOperatorIdentifier() {
       return formToken(tok::arrow, TokStart);
     case ('*' << 8) | '/': // */
       diagnose(TokStart, diag::lex_unexpected_block_comment_end);
+      return formToken(tok::unknown, TokStart);
+    }
+  } else {
+    // If there is a "//" in the middle of an identifier token, it starts
+    // a single-line comment.
+    auto Pos = StringRef(TokStart, CurPtr-TokStart).find("//");
+    if (Pos != StringRef::npos)
+      CurPtr = TokStart+Pos;
+
+    // If there is a "/*" in the middle of an identifier token, it starts
+    // a multi-line comment.
+    Pos = StringRef(TokStart, CurPtr-TokStart).find("/*");
+    if (Pos != StringRef::npos)
+      CurPtr = TokStart+Pos;
+
+    // Verify there is no "*/" in the middle of the identifier token, we reject
+    // it as potentially ending a block comment.
+    Pos = StringRef(TokStart, CurPtr-TokStart).find("*/");
+    if (Pos != StringRef::npos) {
+      diagnose(TokStart+Pos, diag::lex_unexpected_block_comment_end);
       return formToken(tok::unknown, TokStart);
     }
   }
