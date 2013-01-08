@@ -81,12 +81,12 @@ ABSTRACT_VALUE(Instruction, Value)
   
   ABSTRACT_VALUE(WitnessTableMethodInst, Instruction)
     INST(ArchetypeMethodInst, WitnessTableMethodInst)
-    INST(ExistentialMethodInst, WitnessTableMethodInst)
-    VALUE_RANGE(WitnessTableMethodInst, ArchetypeMethodInst, ExistentialMethodInst)
+    INST(ProtocolMethodInst, WitnessTableMethodInst)
+    VALUE_RANGE(WitnessTableMethodInst, ArchetypeMethodInst, ProtocolMethodInst)
     
   INST(ProjectExistentialInst, Instruction)
-  INST(AllocExistentialInst, Instruction)
-  INST(DeallocExistentialInst, Instruction)
+  INST(InitExistentialInst, Instruction)
+  INST(DeinitExistentialInst, Instruction)
 
   INST(RetainInst, Instruction)
   INST(ReleaseInst, Instruction)

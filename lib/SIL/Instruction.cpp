@@ -412,11 +412,11 @@ ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, Value Operand,
                            Operand.getType(), MethodTy, F) {
 }
 
-ExistentialMethodInst::ExistentialMethodInst(SILLocation Loc, Value Operand,
+ProtocolMethodInst::ProtocolMethodInst(SILLocation Loc, Value Operand,
                                              SILConstant Member,
                                              SILType MethodTy,
                                              Function &F)
-  : WitnessTableMethodInst(ValueKind::ExistentialMethodInst,
+  : WitnessTableMethodInst(ValueKind::ProtocolMethodInst,
                            Loc, Operand, Member,
                            SILType::getRawPointerType(F.getContext()),
                            MethodTy, F) {
@@ -429,22 +429,22 @@ ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc, Value Operand,
     Operand(Operand) {
 }
 
-AllocExistentialInst::AllocExistentialInst(SILLocation Loc, Value Existential,
+InitExistentialInst::InitExistentialInst(SILLocation Loc, Value Existential,
                                            SILType ConcreteType,
                                            Function &F)
-  : Instruction(ValueKind::AllocExistentialInst, Loc,
+  : Instruction(ValueKind::InitExistentialInst, Loc,
                 ConcreteType.getAddressType()),
     Existential(Existential) {
   
 }
 
-Type AllocExistentialInst::getConcreteType() const {
+Type InitExistentialInst::getConcreteType() const {
   return getType(0).getSwiftRValueType();
 }
 
-DeallocExistentialInst::DeallocExistentialInst(SILLocation Loc,
+DeinitExistentialInst::DeinitExistentialInst(SILLocation Loc,
                                                Value Existential)
-  : Instruction(ValueKind::DeallocExistentialInst, Loc,
+  : Instruction(ValueKind::DeinitExistentialInst, Loc,
             SILType::getEmptyTupleType(Existential.getType().getASTContext())) {
 }
 

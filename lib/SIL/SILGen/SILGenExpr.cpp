@@ -447,7 +447,7 @@ ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
                                        getLoweredType(E->getType()));
   Cleanups.pushCleanup<CleanupMaterializeAllocation>(existential);
   // Allocate its internal value.
-  Value valueAddr = B.createAllocExistential(E, existential,
+  Value valueAddr = B.createInitExistential(E, existential,
                                              concrete.getType());
   // Initialize the internal value.
   if (concrete.getType().isAddressOnly()) {
@@ -710,7 +710,7 @@ ManagedValue SILGenFunction::visitExistentialMemberRefExpr(
   if (isa<FuncDecl>(E->getDecl())) {
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
-    Value method = B.createExistentialMethod(E, existential,
+    Value method = B.createProtocolMethod(E, existential,
                                          SILConstant(E->getDecl()),
                                          getLoweredLoadableType(E->getType()));
     Value projection = B.createProjectExistential(E, existential);

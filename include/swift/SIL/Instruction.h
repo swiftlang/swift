@@ -731,18 +731,18 @@ public:
   }
 };
   
-/// ExistentialMethodInst - Given the address of an existential and a method
+/// ProtocolMethodInst - Given the address of an existential and a method
 /// constant, extracts the implementation of that method for the existential.
 /// The result will be of the type RawPointer -> F for a method of function type
 /// F. The RawPointer "this" argument can be derived from the same existential
 /// using a ProjectExistentialInst.
-class ExistentialMethodInst : public WitnessTableMethodInst {
+class ProtocolMethodInst : public WitnessTableMethodInst {
 public:
-  ExistentialMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
+  ProtocolMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
                         SILType methodTy, Function &F);
 
   static bool classof(Value V) {
-    return V->getKind() == ValueKind::ExistentialMethodInst;
+    return V->getKind() == ValueKind::ProtocolMethodInst;
   }
 };
   
@@ -760,14 +760,14 @@ public:
   }
 };
   
-/// AllocExistentialInst - Given an address to an uninitialized buffer of
+/// InitExistentialInst - Given an address to an uninitialized buffer of
 /// an existential type, initializes the existential to contain a value of
 /// a given concrete type, and returns the address of an uninitialized buffer
 /// of the concrete type that then must be initialized.
-class AllocExistentialInst : public Instruction {
+class InitExistentialInst : public Instruction {
   Value Existential;
 public:
-  AllocExistentialInst(SILLocation Loc,
+  InitExistentialInst(SILLocation Loc,
                        Value Existential, SILType ConcreteType, Function &F);
   
   Value getExistential() const { return Existential; }
@@ -787,16 +787,16 @@ public:
   }
 };
   
-/// DeallocExistentialInst - Given an address of an existential that has been
-/// partially initialized with an AllocExistentialInst but whose value buffer
+/// DeinitExistentialInst - Given an address of an existential that has been
+/// partially initialized with an InitExistentialInst but whose value buffer
 /// has not been initialized, deinitializes the existential and deallocates
 /// the value buffer. This should only be used for partially-initialized
 /// existentials; a fully-initialized existential can be destroyed with
 /// DestroyAddrInst and deallocated with DeallocVarInst.
-class DeallocExistentialInst : public Instruction {
+class DeinitExistentialInst : public Instruction {
   Value Existential;
 public:
-  DeallocExistentialInst(SILLocation Loc, Value Existential);
+  DeinitExistentialInst(SILLocation Loc, Value Existential);
   
   Value getExistential() const { return Existential; }
 };

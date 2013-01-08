@@ -287,7 +287,7 @@ public:
 #endif
   }
   
-  void visitExistentialMethodInst(ExistentialMethodInst *EMI) {
+  void visitProtocolMethodInst(ProtocolMethodInst *EMI) {
 #ifndef NDEBUG
     FunctionType *methodType = EMI->getType(0).getAs<FunctionType>();
     assert(methodType &&
@@ -299,9 +299,9 @@ public:
     assert(methodType->getResult()->is<FunctionType>() &&
            "result must be a method");
     assert(operandType.isAddress() &&
-           "existential_method must apply to an existential address");
+           "protocol_method must apply to an existential address");
     assert(operandType.isExistentialType() &&
-           "existential_method must apply to an existential address");    
+           "protocol_method must apply to an existential address");    
 #endif
   }
   
@@ -314,23 +314,23 @@ public:
 #endif
   }
   
-  void visitAllocExistentialInst(AllocExistentialInst *AEI) {
+  void visitInitExistentialInst(InitExistentialInst *AEI) {
 #ifndef NDEBUG
     SILType exType = AEI->getExistential().getType();
     assert(exType.isAddress() &&
-           "alloc_existential must be applied to an address");
+           "init_existential must be applied to an address");
     assert(exType.isExistentialType() &&
-           "alloc_existential must be applied to address of existential");
+           "init_existential must be applied to address of existential");
 #endif
   }
   
-  void visitDeallocExistentialInst(DeallocExistentialInst *DEI) {
+  void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
 #ifndef NDEBUG
     SILType exType = DEI->getExistential().getType();
     assert(exType.isAddress() &&
-           "dealloc_existential must be applied to an address");
+           "deinit_existential must be applied to an address");
     assert(exType.isExistentialType() &&
-           "dealloc_existential must be applied to address of existential");
+           "deinit_existential must be applied to address of existential");
 #endif
   }
   

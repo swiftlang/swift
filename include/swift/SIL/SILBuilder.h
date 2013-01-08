@@ -237,11 +237,11 @@ public:
     return insert(new ArchetypeMethodInst(Loc, Operand, Member, MethodTy, F));
   }
   
-  ExistentialMethodInst *createExistentialMethod(SILLocation Loc,
+  ProtocolMethodInst *createProtocolMethod(SILLocation Loc,
                                                  Value Operand,
                                                  SILConstant Member,
                                                  SILType MethodTy) {
-    return insert(new ExistentialMethodInst(Loc, Operand, Member, MethodTy, F));
+    return insert(new ProtocolMethodInst(Loc, Operand, Member, MethodTy, F));
   }
   
   ProjectExistentialInst *createProjectExistential(SILLocation Loc,
@@ -249,15 +249,15 @@ public:
     return insert(new ProjectExistentialInst(Loc, Operand, F));
   }
   
-  AllocExistentialInst *createAllocExistential(SILLocation Loc,
+  InitExistentialInst *createInitExistential(SILLocation Loc,
                                                Value Existential,
                                                SILType ConcreteType) {
-    return insert(new AllocExistentialInst(Loc, Existential, ConcreteType, F));
+    return insert(new InitExistentialInst(Loc, Existential, ConcreteType, F));
   }
   
-  DeallocExistentialInst *createDeallocExistential(SILLocation Loc,
+  DeinitExistentialInst *createDeinitExistential(SILLocation Loc,
                                                    Value Existential) {
-    return insert(new DeallocExistentialInst(Loc, Existential));
+    return insert(new DeinitExistentialInst(Loc, Existential));
   }
   
   MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype) {

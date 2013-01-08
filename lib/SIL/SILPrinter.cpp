@@ -322,19 +322,19 @@ public:
     OS << "archetype_method " << getID(AMI->getOperand()) << ", @";
     AMI->getMember().print(OS);
   }
-  void visitExistentialMethodInst(ExistentialMethodInst *AMI) {
-    OS << "existential_method " << getID(AMI->getOperand()) << ", @";
+  void visitProtocolMethodInst(ProtocolMethodInst *AMI) {
+    OS << "protocol_method " << getID(AMI->getOperand()) << ", @";
     AMI->getMember().print(OS);
   }
   void visitProjectExistentialInst(ProjectExistentialInst *PI) {
     OS << "project_existential " << getID(PI->getOperand());
   }
-  void visitAllocExistentialInst(AllocExistentialInst *AEI) {
-    OS << "alloc_existential " << getID(AEI->getExistential()) << ", $";
+  void visitInitExistentialInst(InitExistentialInst *AEI) {
+    OS << "init_existential " << getID(AEI->getExistential()) << ", $";
     AEI->getConcreteType()->print(OS);
   }
-  void visitDeallocExistentialInst(DeallocExistentialInst *DEI) {
-    OS << "dealloc_existential " << getID(DEI->getExistential());
+  void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
+    OS << "deinit_existential " << getID(DEI->getExistential());
   }
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype $" << MI->getType();
