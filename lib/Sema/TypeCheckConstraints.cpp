@@ -2757,7 +2757,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   unsigned subFlags = flags | TMF_GenerateConstraints;
 
   // Equality and subtyping have fairly strict requirements on tuple matching,
-  // requiring
+  // requiring element names to either match up or be disjoint.
   if (kind < TypeMatchKind::Conversion) {
     if (tuple1->getFields().size() != tuple2->getFields().size())
       return SolutionKind::Error;
@@ -2829,7 +2829,17 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       continue;
 
     // Find the corresponding named element.
-    int matched = tuple1->getNamedElementId(elt2.getName());
+    int matched = -1;
+    {
+      int index = 0;
+      for (auto field : tuple1->getFields()) {
+        if (field.getName() == elt2.getName() && !consumed[index]) {
+          matched = index;
+          break;
+        }
+        ++index;
+      }
+    }
     if (matched == -1)
       continue;
 

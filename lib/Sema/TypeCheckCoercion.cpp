@@ -1388,7 +1388,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
 
       int InputElement = -1;
       for (unsigned j = 0; j != NumExprElements; ++j)
-        if (IdentList[j] == DestElt.getName()) {
+        if (IdentList[j] == DestElt.getName() && !UsedElements[j]) {
           InputElement = j;
           break;
         }
