@@ -737,88 +737,123 @@ associated_metatype
 Obtains the metatype object for the associated type ``$U`` of the type with
 metatype ``%0``.
 
-Existential types
-~~~~~~~~~~~~~~~~~
+Protocol and protocol composition types
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-alloc_existential
-`````````````````
-::
+From SIL's perspective, protocol and protocol composition types consist of 
+an *existential container*, which gets allocated when
+``alloc_var`` or ``alloc_box`` is applied to a protocol or protocol composition
+type. An existential container is a generic container for
+a value of unknown runtime type, referred to as an "existential type" in
+type theory. The existential container consists of a reference to the *witness
+table(s)* for the protocol(s) referred to by the protocol type and a reference
+to the underlying *concrete value*, which may be either stored in-line inside
+the existential container for small values or allocated separately into a
+buffer owned and managed by the existential reference for larger values.
 
-  %1 = alloc_existential $T, %0
-  ; %0 must be of a $*P type for existential type P
-  ; $T must be a type that fulfills protocol(s) P
-  ; %1 will be of type $*T
+Existential containers are always address-only. The value semantics of
+the existential reference propagate to the contained concrete value. Applying
+``copy_addr`` to an existential reference copies both the reference and the
+contained instance, deallocating or reallocating any associated buffers as
+necessary, and applying ``destroy_addr`` to an existential reference
+both destroys and deallocates the contained instance.
 
-Prepares the uninitialized existential buffer pointed to by ``%0`` to
-contain a value of type ``$T``. ``%0`` must point to uninitialized storage
-for the existential type ``$P``. The result of the instruction is the address
-of the storage for the value; this storage is uninitialized and must be
-initialized by a ``store`` or ``copy_addr`` to ``%1``. Creating a
-existential value from a value type::
+An existential container's witness tables and reference to the concrete value
+are initialized by applying the ``init_existential`` instruction to an
+uninitialized existential container, which takes a concrete type parameter.
+The result of ``init_existential`` is a typed address that can then be
+stored to in order to fully initialize the existential. For example, creating a
+protocol value from a value type in Swift::
 
   var e:SomeProtocol = SomeInstance()
 
-lowers to something like this::
+compiles to this SIL::
 
   %SomeInstance = constant_ref @SomeInstance
   %1 = apply %SomeInstance()
-  %e = alloc_var $SomeProtocol                      ; allocate the existential
-  %e_instance = alloc_protocol $SomeInstance, %e    ; allocate its value
-  store %1 to %e_instance                           ; initialize value
+  ; allocate the existential container for a SomeProtocol
+  %e = alloc_var $SomeProtocol
+  ; initialize the existential container to contain a SomeInstance
+  %e_instance = init_existential $SomeInstance, %e
+  ; store a SomeInstance inside the existential container
+  store %1 to %e_instance
 
-dealloc_existential
-```````````````````
+init_existential
+````````````````
 ::
-  
-  dealloc_existential %0
-  ; %0 must be of a $*P type for existential type P
 
-Undoes the internal allocation (if any) performed by ``alloc_existential``.
-This does not clean up any value contained in the existential, so the
-existential buffer must be uninitialized.
-``dealloc_existential`` is only necessary for existentials that have been
-partially initialized by ``alloc_existential`` but haven't had their value
-initialized. A fully initialized existential can be destroyed with
-``destroy_addr`` like a normal address-only value.
+  %1 = init_existential $T, %0
+  ; %0 must be of a $*P type for protocol or protocol composition type P
+  ; $T must be a type that fulfills protocol(s) P
+  ; %1 will be of type $*T
 
-existential_method
+Prepares the uninitialized existential container pointed to by ``%0`` to
+contain a value of type ``$T``. ``%0`` must point to uninitialized storage
+for an existential container. The result of the instruction is the address
+of the concrete value inside the container; this storage is uninitialized and
+must be initialized by a ``store`` or ``copy_addr`` to ``%1``. If the concrete
+value must be deallocated without be initialized (for instance, if its
+constructor fails), ``deinit_existential`` can do so. Once the concrete value
+is initialized, the entire existential container can be destroyed with
+``destroy_addr``.
+
+deinit_existential
 ``````````````````
 ::
 
-  %1 = existential_method %0, @method
-  ; %0 must be of a $*P type for existential type P
+  deinit_existential %0
+  ; %0 must be of a $*P type for protocol or protocol composition type P
+
+Undoes the internal allocation (if any) performed by
+``init_existential``.  This does not destroy the value referenced by
+the existential container, which must be uninitialized.
+``deinit_existential`` is only necessary for existential
+containers that have been partially initialized by ``init_existential``
+but haven't had their value initialized. A fully initialized existential can
+be destroyed with ``destroy_addr`` like a normal address-only value.
+
+protocol_method
+```````````````
+::
+
+  %1 = protocol_method %0, @method
+  ; %0 must be of a $*P type for protocol or protocol composition type P
   ; @method must be a reference to a method of (one of the) protocol(s) P
   ; %1 will be of type $Builtin.RawPointer -> T -> U
   ;   for method type T -> U
 
-Obtains a reference to the function implementing ``@method`` for the existential
+Obtains a reference to the function implementing protocol method ``@method``
+for the concrete value referenced by the existential container
 referenced by ``%0``. The resulting function value will take a pointer
-to the ``this`` value as a ``RawPointer``; this value can be projected from
-the existential with a ``project_existential`` instruction.
+to the ``this`` value as a ``RawPointer``. The ``this`` pointer value can
+be derived from the existential container with a ``project_existential``
+instruction.
 
 project_existential
 ```````````````````
 ::
 
   %1 = project_existential %0
-  ; %0 must be of a $*P type for existential type P
+  ; %0 must be of a $*P type for protocol or protocol composition type P
   ; %1 will be of type $Builtin.RawPointer
 
-Obtains a ``RawPointer`` pointing to the value inside the existential value
-referenced by ``%0``. This raw pointer can be passed to existential methods
-obtained by ``existential_method``. A method call on an existential::
+Obtains a ``RawPointer`` pointing to the concrete value referenced by the
+existential container referenced by ``%0``. This raw pointer can be passed to
+protocol methods obtained by ``protocol_method``. A method call on a
+protocol-type value in Swift::
 
   protocol Foo {
     func bar(x:Int)
   }
 
   var foo:Foo
+  // ... initialize foo
   foo.bar(123)
 
-would lower to something like this::
+compiles to this SIL::
 
   ; ... initialize %foo
-  %bar = existential_method %foo, @Foo.bar
+  %bar = protocol_method %foo, @Foo.bar
   %foo_p = project_existential %foo
   %one_two_three = integer_literal $Builtin.Int64, 123
   %_ = apply %bar(%foo_p, %one_two_three)
@@ -1205,7 +1240,6 @@ TODO: more examples
 ~~~~~~~~~~~~~~~~~~~
 
 * generics
-* existentials
 * resilient-inside-fragile type
 
 TODO design questions
