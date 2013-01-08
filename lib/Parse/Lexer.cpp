@@ -427,6 +427,26 @@ void Lexer::formOperatorToken(const char *TokStart) {
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
 
+  // We only allow '.' in a series
+  if (*TokStart == '.') {
+    while (*CurPtr == '.')
+      ++CurPtr;
+
+    switch (CurPtr-TokStart) {
+    case 1:
+      if (isdigit(CurPtr[0]) && isStartOfDotFloatLiteral()) // .42
+        return lexNumber();
+      return formToken(tok::period, TokStart);
+    case 2:
+      return formOperatorToken(TokStart);
+    case 3:
+      return formToken(tok::ellipsis, TokStart);
+    default:
+      diagnose(TokStart, diag::lex_unexpected_long_period_series);
+      return formToken(tok::unknown, TokStart);
+    }
+  }
+
   while (Identifier::isOperatorChar(*CurPtr) && *CurPtr != '.') {
     if (CurPtr[-1] == '/' && (CurPtr[0] == '/' || CurPtr[0] == '*')) {
       --CurPtr;
@@ -990,52 +1010,23 @@ Restart:
                      TokStart);
   case ']': return formToken(tok::r_square, TokStart);
 
-  case '.':
-    if (isdigit(CurPtr[0]) && isStartOfDotFloatLiteral()) // .42
-      return lexNumber();
-
-    if (CurPtr[0] == '.') {
-      ++CurPtr;
-      if (CurPtr[0] == '.') {
-        ++CurPtr;
-        return formToken(tok::ellipsis, TokStart);
-      }
-      return formOperatorToken(TokStart);
-    }
-
-    return formToken(tok::period, TokStart);
-
   case ',': return formToken(tok::comma,    TokStart);
   case ';': return formToken(tok::semi,     TokStart);
   case ':': return formToken(tok::colon,    TokStart);
       
-  // Punctuator identifier characters.
+  // Operator characters.
   case '/':
     if (CurPtr[0] == '/') {  // "//"
       skipSlashSlashComment();
       goto Restart;
     }
-      
     if (CurPtr[0] == '*') { // "/*"
       skipSlashStarComment();
       goto Restart;
     }
-      
-    // '/' starts an operator identifier.
-    return lexOperatorIdentifier();
-
-  case '=':
-  case '-':
-  case '+':
-  case '*': 
-  case '%':
-  case '<':
-  case '>':
-  case '!':
-  case '&':
-  case '|':
-  case '^':
-  case '~':
+    // FALL THROUGH
+  case '=': case '-': case '+': case '*': case '%': case '<': case '>':
+  case '!': case '&': case '|': case '^': case '~': case '.':
     return lexOperatorIdentifier();
 
   case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
