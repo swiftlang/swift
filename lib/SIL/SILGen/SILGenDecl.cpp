@@ -14,7 +14,7 @@
 #include "Initialization.h"
 #include "ManagedValue.h"
 #include "Scope.h"
-#include "TypeInfo.h"
+#include "TypeLoweringInfo.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "swift/SIL/BBArgument.h"
 #include "swift/SIL/SILType.h"
@@ -429,7 +429,7 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
     // Constants are captured by value.
     assert(!capture->getType()->is<LValueType>() &&
            "capturing byref by value?!");
-    TypeInfo const &ti = gen.getTypeInfo(capture->getType());
+    TypeLoweringInfo const &ti = gen.getTypeLoweringInfo(capture->getType());
     Value value = new (gen.SGM.M) BBArgument(ti.getLoweredType(),
                                              gen.F.begin());
     gen.LocalConstants[SILConstant(capture)] = value;
@@ -485,7 +485,7 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
   }
   
   // If the return type is address-only, emit the indirect return argument.
-  TypeInfo const &returnTI = getTypeInfo(resultType);
+  TypeLoweringInfo const &returnTI = getTypeLoweringInfo(resultType);
   if (returnTI.isAddressOnly()) {
     IndirectReturnAddress = new (SGM.M) BBArgument(returnTI.getLoweredType(),
                                                    F.begin());
@@ -538,9 +538,9 @@ static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc,
                                    Value v,
                                    void (SILBuilder::*createRR)(SILLocation,
                                                                 Value),
-                                   ReferenceTypeElement const &elt) {
-  for (FragileElement comp : elt.path) {
-    TypeInfo const &ti = gen.getTypeInfo(comp.type);
+                                   ReferenceTypePath const &elt) {
+  for (auto &comp : elt.path) {
+    TypeLoweringInfo const &ti = gen.getTypeLoweringInfo(comp.type);
     assert(ti.isLoadable() && "fragile element is address-only?!");
     v = gen.B.createExtract(loc, v, comp.index, ti.getLoweredType());
   }
@@ -549,7 +549,7 @@ static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc,
 
 static void rrLoadableValue(SILGenFunction &gen, SILLocation loc, Value v,
                             void (SILBuilder::*createRR)(SILLocation, Value),
-                            ArrayRef<ReferenceTypeElement> elts) {
+                            ArrayRef<ReferenceTypePath> elts) {
   for (auto &elt : elts)
     rrLoadableValueElement(gen, loc, v, createRR, elt);
 }
@@ -558,7 +558,7 @@ void SILGenFunction::emitRetainRValue(SILLocation loc, Value v) {
   assert(!v.getType().isAddress() &&
          "emitRetainRValue cannot retain an address");
 
-  TypeInfo const &ti = getTypeInfo(v.getType().getSwiftRValueType());
+  TypeLoweringInfo const &ti = getTypeLoweringInfo(v.getType().getSwiftRValueType());
   rrLoadableValue(*this, loc, v, &SILBuilder::createRetain,
                   ti.getReferenceTypeElements());
 }
@@ -567,7 +567,7 @@ void SILGenFunction::emitReleaseRValue(SILLocation loc, Value v) {
   assert(!v.getType().isAddress() &&
          "emitReleaseRValue cannot release an address");
 
-  TypeInfo const &ti = getTypeInfo(v.getType().getSwiftRValueType());
+  TypeLoweringInfo const &ti = getTypeLoweringInfo(v.getType().getSwiftRValueType());
   rrLoadableValue(*this, loc, v, &SILBuilder::createRelease,
                   ti.getReferenceTypeElements());
 }

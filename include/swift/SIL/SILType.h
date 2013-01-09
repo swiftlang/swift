@@ -24,6 +24,9 @@
 
 namespace swift {
   class ASTContext;
+  class SILTypeInfo;
+  class SILFunctionTypeInfo;
+  class SILCompoundTypeInfo;
   
 namespace Lowering {
   class TypeConverter;
@@ -190,7 +193,7 @@ public:
 
 namespace llvm {
 
-
+// Allow SILType to be treated as a pointer-like type.
 template<>
 class PointerLikeTypeTraits<swift::SILType> {
 public:
@@ -204,7 +207,27 @@ public:
   
   enum { NumLowBitsAvailable = 1 };
 };
-  
+
+// Allow SILType to be used as a DenseMap key.
+template<>
+class DenseMapInfo<swift::SILType> {
+  using SILType = swift::SILType;
+  using PointerMapInfo = DenseMapInfo<void*>;
+public:
+  static SILType getEmptyKey() {
+    return SILType::getFromOpaqueValue(PointerMapInfo::getEmptyKey());
+  }
+  static SILType getTombstoneKey() {
+    return SILType::getFromOpaqueValue(PointerMapInfo::getTombstoneKey());
+  }
+  static unsigned getHashValue(SILType t) {
+    return PointerMapInfo::getHashValue(t.getOpaqueValue());
+  }
+  static bool isEqual(SILType LHS, SILType RHS) {
+    return LHS == RHS;
+  }
+};
+
 } // end llvm namespace
 
 

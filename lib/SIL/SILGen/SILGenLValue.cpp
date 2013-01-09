@@ -16,7 +16,7 @@
 #include "swift/AST/Types.h"
 #include "LValue.h"
 #include "ManagedValue.h"
-#include "TypeInfo.h"
+#include "TypeLoweringInfo.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -215,24 +215,28 @@ LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
                             ArrayRef<Substitution> substitutions) {
   LValue lv = sgl.visitRec(e->getBase());
   ValueDecl *decl = e->getDecl();
-  TypeInfo const &ti = gen.getTypeInfo(
-                                     e->getBase()->getType()->getRValueType());
+  SILType baseTy = gen.getLoweredType(e->getBase()->getType()->getRValueType());
+
+  // If this is a physical field, access with a fragile element reference.
+  if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
+    if (!var->isProperty()) {
+      SILCompoundTypeInfo *cti = gen.SGM.M.getCompoundTypeInfo(baseTy);
+      lv.add<FragileElementComponent>(cti->getIndexOfMemberDecl(var),
+                                      gen.getLoweredType(e->getType()));
+      return ::std::move(lv);
+    }
+  }
   
-  if (ti.hasFragileElement(decl)) {
-    lv.add<FragileElementComponent>(ti.getFragileElement(decl).index,
-                                    gen.getLoweredType(e->getType()));
-  } else {
-    ManagedValue get = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
+  // Otherwise, use the property accessors.
+  ManagedValue get = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
                                        /*subscriptExpr=*/nullptr,
                                        SILConstant(decl, SILConstant::Getter),
                                        substitutions);
-    ManagedValue set = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
+  ManagedValue set = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
                                        /*subscriptExpr=*/nullptr,
                                        SILConstant(decl, SILConstant::Setter),
                                        substitutions);
-    lv.add<GetterSetterComponent>(get.getValue(), set.getValue());
-  }
-  
+  lv.add<GetterSetterComponent>(get.getValue(), set.getValue());
   return ::std::move(lv);
 }
   
@@ -277,7 +281,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
   LValue lv = visitRec(e->getBase());
   // FIXME: address-only tuples
-  TypeInfo const &ti = gen.getTypeInfo(e->getType());
+  TypeLoweringInfo const &ti = gen.getTypeLoweringInfo(e->getType());
   assert(ti.isLoadable() &&
          "address-only tuples not yet implemented");
   lv.add<FragileElementComponent>(e->getFieldNumber(),

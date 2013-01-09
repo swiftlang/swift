@@ -15,7 +15,7 @@
 
 #include "Cleanup.h"
 #include "Scope.h"
-#include "TypeInfo.h"
+#include "TypeLoweringInfo.h"
 #include "swift/SIL/Function.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBuilder.h"
@@ -41,7 +41,7 @@ public:
   /// The Module being constructed.
   SILModule &M;
   
-  /// Types - This creates and manages TypeInfo objects containing extra
+  /// Types - This creates and manages TypeLoweringInfo objects containing extra
   /// information about types needed for SIL generation.
   TypeConverter Types;
   
@@ -65,7 +65,7 @@ public:
   
   /// Get the lowered type for a Swift type.
   SILType getLoweredType(Type t) {
-    return Types.getTypeInfo(t).getLoweredType();
+    return Types.getTypeLoweringInfo(t).getLoweredType();
   }
 
   //===--------------------------------------------------------------------===//
@@ -263,10 +263,10 @@ public:
   Function &getFunction() { return F; }
   SILBuilder &getBuilder() { return B; }
   
-  TypeInfo const &getTypeInfo(Type t) { return SGM.Types.getTypeInfo(t); }
-  SILType getLoweredType(Type t) { return getTypeInfo(t).getLoweredType(); }
+  TypeLoweringInfo const &getTypeLoweringInfo(Type t) { return SGM.Types.getTypeLoweringInfo(t); }
+  SILType getLoweredType(Type t) { return getTypeLoweringInfo(t).getLoweredType(); }
   SILType getLoweredLoadableType(Type t) {
-    TypeInfo const &ti = getTypeInfo(t);
+    TypeLoweringInfo const &ti = getTypeLoweringInfo(t);
     assert(ti.isLoadable() && "unexpected address-only type");
     return ti.getLoweredType();
   }

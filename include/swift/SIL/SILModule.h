@@ -20,6 +20,7 @@
 #include "swift/SIL/SILBase.h"
 #include "swift/SIL/SILConstant.h"
 #include "swift/SIL/SILType.h"
+#include "swift/SIL/SILTypeInfo.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -33,7 +34,7 @@ namespace swift {
   
   namespace Lowering {
     class SILGenModule;
-    class TypeLowerer;
+    class TypeConverter;
   }
   
 /// SILModule - A SIL translation unit. The module object owns all of the SIL
@@ -44,6 +45,7 @@ private:
   friend class BasicBlock;
   friend class Function;
   friend class Lowering::SILGenModule;
+  friend class Lowering::TypeConverter;
 
   /// Context - This is the context that uniques the types used by this
   /// Function.
@@ -51,6 +53,9 @@ private:
   
   /// The collection of all codegenned Functions in the module.
   llvm::MapVector<SILConstant, Function*> functions;
+
+  /// SILTypeInfos for SILTypes used in the module.
+  llvm::DenseMap<SILType, SILTypeInfo*> typeInfos;
   
   /// The top-level Function for the module.
   Function *toplevel;
@@ -99,6 +104,33 @@ public:
   /// Returns a pointer to the Function generated from the given declaration.
   Function *getFunction(ValueDecl *decl) const {
     return getFunction(SILConstant(decl));
+  }
+  
+  /// Returns a pointer to the SILTypeInfo for the given SILType, or null if
+  /// there is no type info for the type.
+  SILTypeInfo *getTypeInfo(SILType ty) const {
+    auto found = typeInfos.find(ty);
+    if (found != typeInfos.end())
+      return found->second;
+    else
+      return nullptr;
+  }
+  
+  /// Returns a pointer to the SILFunctionTypeInfo for the given SILType,
+  /// which must be a function type.
+  SILFunctionTypeInfo *getFunctionTypeInfo(SILType ty) const {
+    assert(ty.is<AnyFunctionType>() && "not a function type?!");
+    return cast<SILFunctionTypeInfo>(getTypeInfo(ty));
+  }
+  
+  /// Returns a pointer to the SILCompoundTypeInfo for the given SILType,
+  /// which must be of a tuple, struct, or class type.
+  SILCompoundTypeInfo *getCompoundTypeInfo(SILType ty) const {
+    assert((ty.is<NominalType>()
+              || ty.is<BoundGenericType>()
+              || ty.is<TupleType>())
+           && "not a tuple, struct, or class type?!");
+    return cast<SILCompoundTypeInfo>(getTypeInfo(ty));
   }
   
   typedef llvm::MapVector<SILConstant, Function*>::const_iterator iterator;

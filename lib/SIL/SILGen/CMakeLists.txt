@@ -6,6 +6,6 @@ add_swift_library(swiftSILGen
   SILGenExpr.cpp
   SILGenLValue.cpp
   SILGenStmt.cpp
-  TypeInfo.cpp
+  TypeLoweringInfo.cpp
   DEPENDS swiftSIL)
 

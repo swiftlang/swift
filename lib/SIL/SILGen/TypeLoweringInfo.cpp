@@ -1,4 +1,4 @@
-//===--- TypeInfo.cpp - Type information relevant to SILGen -----*- C++ -*-===//
+//===--- TypeLoweringInfo.cpp - Type information for SILGen -----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
-#include "TypeInfo.h"
+#include "TypeLoweringInfo.h"
 #include "TypeVisitor.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
@@ -31,16 +31,16 @@ namespace {
   enum Loadable_t { IsAddressOnly, IsLoadable };
 }
   
-/// LoadableTypeInfoVisitor - Recursively descend into fragile struct and
+/// LoadableTypeLoweringInfoVisitor - Recursively descend into fragile struct and
 /// tuple types and visit their element types, storing information about the
-/// reference type members in the TypeInfo for the type.
-class LoadableTypeInfoVisitor : public TypeVisitor<LoadableTypeInfoVisitor,
+/// reference type members in the TypeLoweringInfo for the type.
+class LoadableTypeLoweringInfoVisitor : public TypeVisitor<LoadableTypeLoweringInfoVisitor,
                                                    Loadable_t>
 {
-  TypeInfo &theInfo;
-  ReferenceTypeElement currentElement;
+  TypeLoweringInfo &theInfo;
+  ReferenceTypePath currentElement;
 public:
-  LoadableTypeInfoVisitor(TypeInfo &theInfo) : theInfo(theInfo) {}
+  LoadableTypeLoweringInfoVisitor(TypeLoweringInfo &theInfo) : theInfo(theInfo) {}
   
   void pushPath() { currentElement.path.push_back({Type(), 0}); }
   void popPath() { currentElement.path.pop_back(); }
@@ -58,7 +58,7 @@ public:
   }
   
   Loadable_t walkStructDecl(StructDecl *sd) {
-    // FIXME: if this struct has a resilient attribute, mark the TypeInfo
+    // FIXME: if this struct has a resilient attribute, mark the TypeLoweringInfo
     // as addressOnly and bail without checking fields.
     
     pushPath();
@@ -112,51 +112,75 @@ public:
 };
   
 TypeConverter::TypeConverter(SILGenModule &sgm)
-  : Context(sgm.M.getContext()) {
+  : SGM(sgm), Context(sgm.M.getContext()) {
 }
 
 TypeConverter::~TypeConverter() {
   // The bump pointer allocator destructor will deallocate but not destroy all
-  // our TypeInfos.
+  // our TypeLoweringInfos.
   for (auto &ti : types) {
-    ti.second->~TypeInfo();
+    ti.second->~TypeLoweringInfo();
   }
 }
   
-void TypeConverter::makeFragileElementsForDecl(TypeInfo &theInfo,
-                                               unsigned &elementIndex,
-                                               NominalTypeDecl *decl) {
+void TypeConverter::makeLayoutForDecl(
+                        SmallVectorImpl<SILCompoundTypeInfo::Element> &elements,
+                        NominalTypeDecl *decl) {
   if (ClassDecl *cd = dyn_cast<ClassDecl>(decl)) {
     if (cd->hasBaseClass()) {
-      makeFragileElementsForDecl(theInfo, elementIndex,
-                             cd->getBaseClass()->getClassOrBoundGenericClass());
+      makeLayoutForDecl(elements,
+                        cd->getBaseClass()->getClassOrBoundGenericClass());
     }
   }
   
   for (Decl *d : decl->getMembers()) {
     if (VarDecl *vd = dyn_cast<VarDecl>(d)) {
       if (!vd->isProperty()) {
-        theInfo.fragileElements[vd] = {vd->getType(),
-                                       elementIndex};
-        ++elementIndex;
+        // FIXME: specialize type of generic fields
+        elements.push_back({getLoweredType(vd->getType()), vd});
       }
     }
   }
 }
 
-void TypeConverter::makeFragileElements(TypeInfo &theInfo, CanType t) {
-  // FIXME: check resilient attribute
-  unsigned elementIndex = 0;
-  if (NominalType *nt = t->getAs<NominalType>()) {
-    makeFragileElementsForDecl(theInfo, elementIndex, nt->getDecl());
-  } else if (BoundGenericType *bgt = t->getAs<BoundGenericType>()) {
-    makeFragileElementsForDecl(theInfo, elementIndex, bgt->getDecl());
+SILTypeInfo *TypeConverter::makeSILTypeInfo(TypeLoweringInfo &theInfo) {
+  //
+  // Make a SILCompoundTypeInfo for struct or class types.
+  SILType ty = theInfo.loweredType;
+  NominalTypeDecl *ntd = nullptr;
+  if (NominalType *nt = ty.getAs<NominalType>()) {
+    ntd = nt->getDecl();
+  } else if (BoundGenericType *bgt = ty.getAs<BoundGenericType>()) {
+    ntd = bgt->getDecl();
   }
+
+  if (ntd) {
+    SmallVector<SILCompoundTypeInfo::Element, 4> compoundElements;
+    // FIXME: record resilient attribute
+    makeLayoutForDecl(compoundElements, ntd);
+    return SILCompoundTypeInfo::create(compoundElements, SGM.M);
+  }
+  
+  //
+  // Make a SILCompoundTypeInfo for tuple types.
+  if (TupleType *tt = ty.getAs<TupleType>()) {
+    SmallVector<SILCompoundTypeInfo::Element, 4> compoundElements;
+    for (auto &elt : tt->getFields()) {
+      compoundElements.push_back({getLoweredType(elt.getType()), nullptr});
+    }
+  }
+  
+  //
+  // FIXME: functions
+  
+  //
+  // Other types don't need any additional SILTypeInfo.
+  return nullptr;
 }
   
-TypeInfo const &TypeConverter::makeTypeInfo(CanType t) {
-  void *infoBuffer = TypeInfoBPA.Allocate<TypeInfo>();
-  TypeInfo *theInfo = ::new (infoBuffer) TypeInfo();
+TypeLoweringInfo const &TypeConverter::makeTypeLoweringInfo(CanType t) {
+  void *infoBuffer = TypeLoweringInfoBPA.Allocate<TypeLoweringInfo>();
+  TypeLoweringInfo *theInfo = ::new (infoBuffer) TypeLoweringInfo();
   types[t.getPointer()] = theInfo;
   bool address = false;
   bool addressOnly = false;
@@ -164,37 +188,41 @@ TypeInfo const &TypeConverter::makeTypeInfo(CanType t) {
   if (LValueType *lvt = t->getAs<LValueType>()) {
     t = lvt->getObjectType()->getCanonicalType();
     address = true;
-    addressOnly = getTypeInfo(t).isAddressOnly();
+    addressOnly = getTypeLoweringInfo(t).isAddressOnly();
   } else if (t->hasReferenceSemantics()) {
     // Reference types are always loadable, and need only to retain/release
     // themselves.
     addressOnly = false;
-    theInfo->referenceTypeElements.push_back(ReferenceTypeElement());
+    theInfo->referenceTypeElements.push_back(ReferenceTypePath());
   } else if (isAddressOnly(t)) {
     addressOnly = true;
   } else {
     // walk aggregate types to determine address-only-ness and find reference
     // type elements.
     addressOnly =
-      LoadableTypeInfoVisitor(*theInfo).visit(t) == IsAddressOnly;
+      LoadableTypeLoweringInfoVisitor(*theInfo).visit(t) == IsAddressOnly;
     if (addressOnly)
       theInfo->referenceTypeElements.clear();
   }
-  // If this is a struct or class type, find its fragile elements.
-  makeFragileElements(*theInfo, t);
-  
+
   // Generate the lowered type.
   theInfo->loweredType = SILType(t,
                                  /*address=*/address || addressOnly,
                                  /*loadable=*/!addressOnly);
+  
+  // Generate the SILTypeInfo for the lowered type.
+  if (SILTypeInfo *sti = makeSILTypeInfo(*theInfo)) {
+    SGM.M.typeInfos[theInfo->loweredType] = sti;
+  }
+  
   return *theInfo;
 }
   
-TypeInfo const &TypeConverter::getTypeInfo(Type t) {
+TypeLoweringInfo const &TypeConverter::getTypeLoweringInfo(Type t) {
   CanType ct = t->getCanonicalType();
   auto existing = types.find(ct.getPointer());
   if (existing == types.end()) {
-    return makeTypeInfo(ct);
+    return makeTypeLoweringInfo(ct);
   } else
     return *existing->second;
 }
@@ -203,7 +231,7 @@ SILType TypeConverter::getConstantType(SILConstant constant) {
   auto found = constantTypes.find(constant);
   if (found == constantTypes.end()) {
     Type swiftTy = makeConstantType(constant);
-    SILType loweredTy = getTypeInfo(swiftTy).getLoweredType();
+    SILType loweredTy = getTypeLoweringInfo(swiftTy).getLoweredType();
     constantTypes[constant] = loweredTy;
     return loweredTy;
   } else

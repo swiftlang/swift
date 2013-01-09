@@ -406,7 +406,7 @@ static void assignPhysicalAddress(SILGenFunction &gen,
     // the new.
     assert(!srcTy.isAddress() &&
            "can't assign loadable type from address");
-    TypeInfo const &ti = gen.getTypeInfo(srcTy.getSwiftRValueType());
+    TypeLoweringInfo const &ti = gen.getTypeLoweringInfo(srcTy.getSwiftRValueType());
     
     Value old;
     

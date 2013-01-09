@@ -18,7 +18,7 @@
 #include "Initialization.h"
 #include "LValue.h"
 #include "ManagedValue.h"
-#include "TypeInfo.h"
+#include "TypeLoweringInfo.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -70,7 +70,7 @@ namespace {
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(Value v) {
   if (v.getType().isAddress() ||
-      getTypeInfo(v.getType().getSwiftType()).isTrivial()) {
+      getTypeLoweringInfo(v.getType().getSwiftType()).isTrivial()) {
     return ManagedValue(v);
   } else {
     Cleanups.pushCleanup<CleanupRValue>(v);
@@ -193,7 +193,7 @@ void SILGenFunction::emitApplyArguments(Expr *argsExpr,
 ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                        Value Fn, ArrayRef<Value> Args) {
   FunctionType *fty = Fn.getType().getAs<FunctionType>();
-  TypeInfo const &resultTI = getTypeInfo(fty->getResult());
+  TypeLoweringInfo const &resultTI = getTypeLoweringInfo(fty->getResult());
   if (resultTI.isAddressOnly()) {
     // Allocate a temporary to house the indirect return, and pass it to the
     // function as an implicit argument.
@@ -328,7 +328,7 @@ ManagedValue SILGenFunction::visitStringLiteralExpr(StringLiteralExpr *E,
 
 ManagedValue SILGenFunction::visitLoadExpr(LoadExpr *E, SGFContext C) {
   ManagedValue SubV = visit(E->getSubExpr());
-  TypeInfo const &ti = getTypeInfo(E->getType());
+  TypeLoweringInfo const &ti = getTypeLoweringInfo(E->getType());
   if (ti.isAddressOnly()) {
     // We can't load address-only types. Just pass on the address.
     return ManagedValue(SubV.getUnmanagedValue(),
@@ -356,7 +356,7 @@ namespace {
     gen.B.createStore(loc, v.forward(gen), tmpMem);
     
     CleanupsDepth valueCleanup = CleanupsDepth::invalid();
-    if (!gen.getTypeInfo(v.getType().getSwiftType()).isTrivial()) {
+    if (!gen.getTypeLoweringInfo(v.getType().getSwiftType()).isTrivial()) {
       gen.Cleanups.pushCleanup<CleanupMaterializeValue>(tmpMem);
       valueCleanup = gen.getCleanupsDepth();
     }
@@ -566,37 +566,41 @@ template<typename ANY_MEMBER_REF_EXPR>
 ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
                                   ANY_MEMBER_REF_EXPR *e,
                                   ArrayRef<Substitution> substitutions) {
-  TypeInfo const &ti = gen.getTypeInfo(e->getBase()->getType()
-                                       ->getRValueType());
+  SILType ty = gen.getLoweredType(e->getBase()->getType()->getRValueType());
   
-  if (ti.hasFragileElement(e->getDecl())) {
-    // We can get to the element directly with element_addr.
-    FragileElement element = ti.getFragileElement(e->getDecl());
-    return emitExtractLoadableElement(gen, e, gen.visit(e->getBase()),
-                                      element.index);
-  } else {
-    Type baseTy = e->getBase()->getType();
-    (void)baseTy;
-    // We have to load the element indirectly through a property.
-    assert((baseTy->is<LValueType>() || baseTy->hasReferenceSemantics()) &&
-           "member ref of a non-lvalue?!");
-    ManagedValue base = gen.visit(e->getBase());
-    // Get the getter function, which will have type This -> () -> T.
-    // The type will be a polymorphic function if the This type is generic.
-    ManagedValue getter = gen.emitSpecializedPropertyConstantRef(e,
-                                              e->getBase(),
-                                              /*subscriptExpr=*/nullptr,
-                                              SILConstant(e->getDecl(),
-                                                          SILConstant::Getter),
-                                              substitutions);
-    // Apply the "this" parameter.
-    ManagedValue getterDel = gen.emitApply(e,
-                                           getter.forward(gen),
-                                           base.forward(gen));
-    // Apply the getter.
-    Materialize propTemp = gen.emitGetProperty(e, getterDel);
-    return ManagedValue(propTemp.address);
-  }  
+  // If this is a physical field, derive its address directly.
+  if (VarDecl *var = dyn_cast<VarDecl>(e->getDecl())) {
+    if (!var->isProperty()) {
+      SILCompoundTypeInfo *cti = gen.SGM.M.getCompoundTypeInfo(ty);
+      // We can get to the element directly with element_addr.
+      size_t index = cti->getIndexOfMemberDecl(var);
+      return emitExtractLoadableElement(gen, e, gen.visit(e->getBase()),
+                                        index);
+    }
+  }
+
+  // Otherwise, call the getter.
+  Type baseTy = e->getBase()->getType();
+  (void)baseTy;
+  // We have to load the element indirectly through a property.
+  assert((baseTy->is<LValueType>() || baseTy->hasReferenceSemantics()) &&
+         "member ref of a non-lvalue?!");
+  ManagedValue base = gen.visit(e->getBase());
+  // Get the getter function, which will have type This -> () -> T.
+  // The type will be a polymorphic function if the This type is generic.
+  ManagedValue getter = gen.emitSpecializedPropertyConstantRef(e,
+                                            e->getBase(),
+                                            /*subscriptExpr=*/nullptr,
+                                            SILConstant(e->getDecl(),
+                                                        SILConstant::Getter),
+                                            substitutions);
+  // Apply the "this" parameter.
+  ManagedValue getterDel = gen.emitApply(e,
+                                         getter.forward(gen),
+                                         base.forward(gen));
+  // Apply the getter.
+  Materialize propTemp = gen.emitGetProperty(e, getterDel);
+  return ManagedValue(propTemp.address);
 }
 
 } // end anonymous namespace
@@ -1098,14 +1102,13 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   // Release our members.
   // FIXME: generic params
   // FIXME: Can a destructor always consider its fields fragile like this?
-  TypeInfo const &thisTI = getTypeInfo(thisValue.getType().getSwiftType());
+  SILCompoundTypeInfo *thisTI = SGM.M.getCompoundTypeInfo(thisValue.getType());
   for (Decl *member : cd->getMembers()) {
     if (VarDecl *vd = dyn_cast<VarDecl>(member)) {
       if (vd->isProperty())
         continue;
-      assert(thisTI.hasFragileElement(vd));
-      unsigned fieldNo = thisTI.getFragileElement(vd).index;
-      TypeInfo const &ti = getTypeInfo(vd->getType());
+      unsigned fieldNo = thisTI->getIndexOfMemberDecl(vd);
+      TypeLoweringInfo const &ti = getTypeLoweringInfo(vd->getType());
       if (!ti.isTrivial()) {
         Value addr = B.createRefElementAddr(dd, thisValue, fieldNo,
                                           ti.getLoweredType().getAddressType());
