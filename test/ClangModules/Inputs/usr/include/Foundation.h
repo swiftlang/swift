@@ -6,6 +6,10 @@ typedef unsigned long NSUInteger;
 - (id)objectAtIndexedSubscript:(NSUInteger)idx;
 @end
 
+@interface NSString : NSObject
+@end
+
+
 @interface Hive
 @property __attribute__((iboutletcollection(B))) NSArray *bees;
 @end

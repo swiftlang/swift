@@ -1597,6 +1597,8 @@ namespace {
       StringRefPair typedCollection
         = llvm::StringSwitch<StringRefPair>(classTy->getDecl()->getName().str())
             .Case("NSArray", StringRefPair("Foundation", "NSTypedArray"))
+            .Case("SBElementArray",
+                  StringRefPair("Foundation", "SBTypedElementArray"))
             .Default(StringRefPair(StringRef(), StringRef()));
       if (typedCollection.first.empty()) {
         return collectionTy;
