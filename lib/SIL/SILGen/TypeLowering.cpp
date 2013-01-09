@@ -184,15 +184,6 @@ SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft)
     resultType = SILType::getEmptyTupleType(Context);
   }
   
-  ft->dump();
-  llvm::errs() << "---\n";
-  for (auto t : inputTypes) {
-    t.dump();
-  }
-  llvm::errs() << "->\n";
-  resultType.dump();
-  llvm::errs() << "---\n";  
-  
   return SILFunctionTypeInfo::create(inputTypes,
                                      resultType,
                                      hasIndirectReturn,
