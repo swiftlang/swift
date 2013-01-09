@@ -749,34 +749,37 @@ type theory. The existential container consists of a reference to the *witness
 table(s)* for the protocol(s) referred to by the protocol type and a reference
 to the underlying *concrete value*, which may be either stored in-line inside
 the existential container for small values or allocated separately into a
-buffer owned and managed by the existential reference for larger values.
+buffer owned and managed by the existential container for larger values.
 
 Existential containers are always address-only. The value semantics of
-the existential reference propagate to the contained concrete value. Applying
-``copy_addr`` to an existential reference copies both the reference and the
-contained instance, deallocating or reallocating any associated buffers as
-necessary, and applying ``destroy_addr`` to an existential reference
-both destroys and deallocates the contained instance.
+the existential container propagate to the contained concrete value. Applying
+``copy_addr`` to an existential container copies the
+contained concrete value, deallocating or reallocating the destination's
+owned buffer if necessary. Applying ``destroy_addr`` to an existential
+container destroys the concrete value and deallocates any buffers owned by
+the existential container.
 
-An existential container's witness tables and reference to the concrete value
-are initialized by applying the ``init_existential`` instruction to an
-uninitialized existential container, which takes a concrete type parameter.
-The result of ``init_existential`` is a typed address that can then be
-stored to in order to fully initialize the existential. For example, creating a
-protocol value from a value type in Swift::
+An existential container's witness tables and concrete value buffer
+are prepared by applying the ``init_existential`` instruction to an
+uninitialized existential container. ``init_existential`` takes a
+concrete type parameter and returns an address of the given type that can then
+be stored to in order to fully initialize the existential container.
+For example, creating a protocol value from a value type in Swift::
 
-  var e:SomeProtocol = SomeInstance()
+  protocol SomeProtocol
+  struct SomeInstance : SomeProtocol
+
+  var x:SomeInstance
+  var p:SomeProtocol = x
 
 compiles to this SIL::
 
-  %SomeInstance = constant_ref @SomeInstance
-  %1 = apply %SomeInstance()
   ; allocate the existential container for a SomeProtocol
-  %e = alloc_var $SomeProtocol
+  %p = alloc_var $SomeProtocol
   ; initialize the existential container to contain a SomeInstance
-  %e_instance = init_existential $SomeInstance, %e
-  ; store a SomeInstance inside the existential container
-  store %1 to %e_instance
+  %p_instance = init_existential $SomeInstance, %p
+  ; store the SomeInstance inside the existential container
+  store %x to %p_instance
 
 init_existential
 ````````````````
