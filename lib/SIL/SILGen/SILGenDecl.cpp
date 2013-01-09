@@ -14,7 +14,7 @@
 #include "Initialization.h"
 #include "ManagedValue.h"
 #include "Scope.h"
-#include "TypeLoweringInfo.h"
+#include "TypeLowering.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "swift/SIL/BBArgument.h"
 #include "swift/SIL/SILType.h"

@@ -15,7 +15,7 @@
 
 #include "Cleanup.h"
 #include "Scope.h"
-#include "TypeLoweringInfo.h"
+#include "TypeLowering.h"
 #include "swift/SIL/Function.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBuilder.h"

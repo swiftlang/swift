@@ -1,4 +1,4 @@
-//===--- TypeLoweringInfo.h - Type information for SILGen -------*- C++ -*-===//
+//===--- TypeLowering.h - Type information for SILGen -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

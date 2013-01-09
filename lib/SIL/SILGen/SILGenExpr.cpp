@@ -18,7 +18,7 @@
 #include "Initialization.h"
 #include "LValue.h"
 #include "ManagedValue.h"
-#include "TypeLoweringInfo.h"
+#include "TypeLowering.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
