@@ -142,6 +142,62 @@ void TypeConverter::makeLayoutForDecl(
     }
   }
 }
+  
+namespace {
+  /// Recursively destructure tuple-type arguments into SIL argument types.
+  class LoweredFunctionInputTypeVisitor
+    : public TypeVisitor<LoweredFunctionInputTypeVisitor>
+  {
+    TypeConverter &tc;
+    SmallVectorImpl<SILType> &inputTypes;
+  public:
+    LoweredFunctionInputTypeVisitor(TypeConverter &tc,
+                                    SmallVectorImpl<SILType> &inputTypes)
+      : tc(tc), inputTypes(inputTypes) {}
+    
+    void visitType(TypeBase *t) {
+      inputTypes.push_back(tc.getLoweredType(t));
+    }
+    
+    void visitTupleType(TupleType *tt) {
+      for (auto &field : tt->getFields()) {
+        visit(field.getType()->getCanonicalType());
+      }
+    }
+  };
+} // end anonymous namespace
+  
+SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft)
+{
+  SmallVector<SILType, 8> inputTypes;
+  
+  // Destructure the input tuple type.
+  LoweredFunctionInputTypeVisitor(*this, inputTypes)
+    .visit(ft->getInput()->getCanonicalType());
+  
+  // If the result type lowers to an address-only type, add it as an indirect
+  // return argument.
+  SILType resultType = getLoweredType(ft->getResult());
+  bool hasIndirectReturn = resultType.isAddressOnly();
+  if (hasIndirectReturn) {
+    inputTypes.push_back(resultType);
+    resultType = SILType::getEmptyTupleType(Context);
+  }
+  
+  ft->dump();
+  llvm::errs() << "---\n";
+  for (auto t : inputTypes) {
+    t.dump();
+  }
+  llvm::errs() << "->\n";
+  resultType.dump();
+  llvm::errs() << "---\n";  
+  
+  return SILFunctionTypeInfo::create(inputTypes,
+                                     resultType,
+                                     hasIndirectReturn,
+                                     SGM.M);
+}
 
 SILTypeInfo *TypeConverter::makeSILTypeInfo(TypeLoweringInfo &theInfo) {
   //
@@ -168,10 +224,14 @@ SILTypeInfo *TypeConverter::makeSILTypeInfo(TypeLoweringInfo &theInfo) {
     for (auto &elt : tt->getFields()) {
       compoundElements.push_back({getLoweredType(elt.getType()), nullptr});
     }
+    return SILCompoundTypeInfo::create(compoundElements, SGM.M);
   }
   
   //
-  // FIXME: functions
+  // Make a SILFunctionTypeInfo for
+  if (AnyFunctionType *ft = ty.getAs<AnyFunctionType>()) {
+    return makeInfoForFunctionType(ft);
+  }
   
   //
   // Other types don't need any additional SILTypeInfo.

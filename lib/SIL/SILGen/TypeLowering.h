@@ -101,6 +101,7 @@ class LLVM_LIBRARY_VISIBILITY TypeConverter {
   SILTypeInfo *makeSILTypeInfo(TypeLoweringInfo &theInfo);
   void makeLayoutForDecl(SmallVectorImpl<SILCompoundTypeInfo::Element> &theInfo,
                          NominalTypeDecl *decl);
+  SILFunctionTypeInfo *makeInfoForFunctionType(AnyFunctionType *ft);
 
   Type makeConstantType(SILConstant constant);
   
