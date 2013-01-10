@@ -47,11 +47,14 @@ public:
   ///
   /// \param moduleCachePath The module cache path.
   ///
+  /// \param searchPaths Additional paths to search for user modules.
+  ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static ClangImporter *create(ASTContext &ctx, StringRef sdkroot,
                                StringRef targetTriple,
-                               StringRef moduleCachePath);
+                               StringRef moduleCachePath,
+                               ArrayRef<std::string> searchPaths = {});
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;

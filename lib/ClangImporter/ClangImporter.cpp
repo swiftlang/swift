@@ -79,7 +79,8 @@ ClangImporter::~ClangImporter() {
 
 ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
                                      StringRef targetTriple,
-                                     StringRef moduleCachePath) {
+                                     StringRef moduleCachePath,
+                                     ArrayRef<std::string> searchPaths) {
   std::unique_ptr<ClangImporter> importer(new ClangImporter(ctx));
 
   // Create a Clang diagnostics engine.
@@ -99,6 +100,11 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
     "-isysroot", sdkroot.str(), "-triple", targetTriple.str(),
     "swift.m"
   };
+
+  for (auto path : searchPaths) {
+    invocationArgStrs.push_back("-I");
+    invocationArgStrs.push_back(path);
+  }
 
   // Set the module cache path.
   if (moduleCachePath.empty()) {
