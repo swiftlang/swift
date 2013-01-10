@@ -14,6 +14,7 @@
 #include "llvm/ADT/Optional.h"
 #include "swift/AST/AST.h"
 #include "swift/SIL/BBArgument.h"
+#include "llvm/Support/Debug.h"
 using namespace swift;
 using namespace Lowering;
 
@@ -59,8 +60,8 @@ SILGenFunction::~SILGenFunction() {
 // SILGenModule Class implementation
 //===--------------------------------------------------------------------===//
 
-SILGenModule::SILGenModule(SILModule &M, bool verbose)
-  : M(M), Types(*this), TopLevelSGF(nullptr), Verbose(verbose) {
+SILGenModule::SILGenModule(SILModule &M)
+  : M(M), Types(*this), TopLevelSGF(nullptr) {
   if (M.toplevel)
     TopLevelSGF = new SILGenFunction(*this, *M.toplevel,
                                      /*hasVoidReturn=*/true);
@@ -84,22 +85,24 @@ Function *SILGenModule::preEmitFunction(SILConstant constant,
   assert(!M.hasFunction(constant) &&
          "already generated function for constant!");
   
-  if (Verbose) {
-    constant.print(llvm::errs());
-    llvm::errs() << " : $";
-    getConstantType(constant).dump();
-    if (astNode)
-      astNode->dump();
-  }
-
+  DEBUG(llvm::dbgs() << "lowering ";
+        constant.print(llvm::dbgs());
+        llvm::dbgs() << " : $";
+        getConstantType(constant).print(llvm::dbgs());
+        llvm::dbgs() << '\n';
+        if (astNode) {
+          astNode->print(llvm::dbgs());
+          llvm::dbgs() << '\n';
+        });
+  
   return new (M) Function(M, getConstantType(constant));
 }
 
 void SILGenModule::postEmitFunction(SILConstant constant,
                                     Function *F) {
-  if (Verbose) {
-    F->dump();
-  }
+
+  DEBUG(llvm::dbgs() << "lowered sil:\n";
+        F->print(llvm::dbgs()));
   F->verify();
   M.functions[constant] = F;
 }
@@ -177,7 +180,7 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 //===--------------------------------------------------------------------===//
 
 
-SILModule *SILModule::constructSIL(TranslationUnit *tu, bool verbose) {
+SILModule *SILModule::constructSIL(TranslationUnit *tu) {
   bool hasTopLevel = true;
   switch (tu->Kind) {
   case TranslationUnit::Library:
@@ -189,7 +192,7 @@ SILModule *SILModule::constructSIL(TranslationUnit *tu, bool verbose) {
     break;
   }
   SILModule *m = new SILModule(tu->getASTContext(), hasTopLevel);
-  SILGenModule sgm(*m, verbose);
+  SILGenModule sgm(*m);
   for (Decl *D : tu->Decls)
     sgm.visit(D);
   return m;

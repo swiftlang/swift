@@ -69,7 +69,7 @@ public:
 
   /// Construct a SIL module from a translation unit.  It is the caller's
   /// responsibility to 'delete' this object.
-  static SILModule *constructSIL(TranslationUnit *tu, bool verbose);
+  static SILModule *constructSIL(TranslationUnit *tu);
 
   ASTContext &getContext() const { return Context; }
   
