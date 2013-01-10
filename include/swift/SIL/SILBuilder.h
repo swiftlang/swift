@@ -117,9 +117,9 @@ public:
     return insert(new AllocBoxInst(Loc, ElementType, F));
   }
 
-  AllocArrayInst *createAllocArray(Expr *E, SILType ElementType,
+  AllocArrayInst *createAllocArray(SILLocation Loc, SILType ElementType,
                                    Value NumElements) {
-    return insert(new AllocArrayInst(E, ElementType, NumElements, F));
+    return insert(new AllocArrayInst(Loc, ElementType, NumElements, F));
   }
 
   ApplyInst *createApply(SILLocation Loc, Value Fn,
@@ -295,8 +295,9 @@ public:
   // SIL-only instructions that don't have an AST analog
   //===--------------------------------------------------------------------===//
 
-  IndexAddrInst *createIndexAddr(Expr *E, Value Operand, unsigned Index) {
-    return insert(new IndexAddrInst(E, Operand, Index));
+  IndexAddrInst *createIndexAddr(SILLocation loc, Value Operand,
+                                 unsigned Index) {
+    return insert(new IndexAddrInst(loc, Operand, Index));
   }
 
   IntegerValueInst *createIntegerValueInst(uint64_t Val, SILType Ty) {
