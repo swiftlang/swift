@@ -1014,10 +1014,19 @@ public:
 /// tuple type.  The expression's type is known to be a tuple type and the
 /// subexpression is known to have a tuple type as well.
 class TupleShuffleExpr : public ImplicitConversionExpr {
+public:
+  enum : int {
+    /// The element mapping value indicating that a field of the destination
+    /// tuple should be default-initialized.
+    DefaultInitialize = -1,
+    /// The element mapping value signaling the first variadic field.
+    FirstVariadic = -2
+  };
+private:
   /// This contains an entry for each element in the Expr type.  Each element
   /// specifies which index from the SubExpr that the destination element gets.
-  /// If the element value is -1, then the destination value gets the default
-  /// initializer for that tuple element value.
+  /// If the element value is DefaultInitialize, then the destination value
+  /// gets the default initializer for that tuple element value.
   ArrayRef<int> ElementMapping;
 
   /// If we're doing a varargs shuffle, this is the function to build the
