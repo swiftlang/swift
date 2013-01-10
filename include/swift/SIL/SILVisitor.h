@@ -28,7 +28,6 @@ namespace swift {
 template<typename ImplClass, typename ValueRetTy = void>
 class SILVisitor {
 public:
-
   ValueRetTy visitValue(ValueBase *V) {
     // Base class, used if some class of value isn't handled.
   }
@@ -60,20 +59,25 @@ ValueRetTy visit##CLASS(CLASS *I) {                         \
 }
 #include "swift/SIL/SILNodes.def"
 
-  void visitBB(BasicBlock *BB) {
+  void visitBasicBlock(BasicBlock *BB) {
+    for (auto argI = BB->bbarg_begin(), argEnd = BB->bbarg_end();
+         argI != argEnd;
+         ++argI)
+      visit(*argI);
+      
     for (auto &I : *BB)
       visit(&I);
   }
-  void visitBB(BasicBlock &BB) {
-    visitBB(&BB);
+  void visitBasicBlock(BasicBlock &BB) {
+    this->ImplClass::visitBasicBlock(&BB);
   }
 
   void visitFunction(Function *F) {
     for (auto &BB : *F)
-      visitBB(BB);
+      this->ImplClass::visitBasicBlock(&BB);
   }
   void visitFunction(Function &F) {
-    visitBB(&F);
+    this->ImplClass::visitFunction(&F);
   }
 };
 
