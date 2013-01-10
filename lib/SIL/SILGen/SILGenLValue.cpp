@@ -88,9 +88,7 @@ namespace {
     
     void getSubscriptArguments(SILGenFunction &gen,
                                llvm::SmallVectorImpl<Value> &args) const {
-      llvm::SmallVector<Writeback, 2> writebacks;
-      gen.emitApplyArguments(subscriptExpr, args, writebacks);
-      assert(writebacks.empty() && "subscript shouldn't have byref args");
+      gen.emitApplyArguments(subscriptExpr, args);
     }
     
     ManagedValue partialApplyAccessor(SILGenFunction &gen, SILLocation loc,
@@ -135,11 +133,9 @@ namespace {
                      ManagedValue rvalue, Value base) const override {
       ManagedValue appliedSetter = partialApplyAccessor(gen, loc,
                                                         setter, base);
-      // Address-only arguments are not callee-consumed; loadable arguments are.
-      Value arg = rvalue.isAddressOnlyValue()
-        ? rvalue.getValue()
-        : rvalue.forward(gen);
-      gen.emitApply(loc, appliedSetter.forward(gen), arg);
+      SmallVector<Value, 2> setterArgs;
+      gen.emitApplyArgumentValue(loc, rvalue, setterArgs);
+      gen.emitApply(loc, appliedSetter.forward(gen), setterArgs);
     }
     
     Materialize loadAndMaterialize(SILGenFunction &gen, SILLocation loc,

@@ -283,6 +283,16 @@ struct ArgumentInitVisitor :
 
   Value makeArgument(Type ty, BasicBlock *parent) {
     assert(ty && "no type?!");
+    // Destructure tuple arguments.
+    if (TupleType *tupleTy = ty->getAs<TupleType>()) {
+      SmallVector<Value, 4> tupleArgs;
+      for (auto &field : tupleTy->getFields()) {
+        tupleArgs.push_back(makeArgument(field.getType(), parent));
+      }
+      // FIXME: address-only tuples
+      return initB.createTuple(SILLocation(), gen.getLoweredType(ty),
+                               tupleArgs);
+    }
     return new (f.getModule()) BBArgument(gen.getLoweredType(ty), parent);
   }
   
@@ -352,6 +362,7 @@ struct ArgumentInitVisitor :
     }
     
     // Otherwise, build a tuple of the subarguments and store it to the
+    // destination.
     // FIXME: Doesn't work for address-only tuples. We should implement an
     // Initialization::breakIntoTupleInitialization method and use that to
     // initialize a tuple in memory piecewise.

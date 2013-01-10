@@ -15,14 +15,17 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "llvm/Support/Debug.h"
+
 using namespace swift;
 
 namespace {
 /// SILVerifier class - This class implements the SIL verifier, which walks over
 /// SIL, checking and enforcing its invariants.
 class SILVerifier : public SILVisitor<SILVerifier> {
+  Function const &F;
 public:
-  SILVerifier() {}
+  SILVerifier(Function const &F) : F(F) {}
   
   void visit(Instruction *I) {
     
@@ -53,80 +56,50 @@ public:
            && "alloc_ref must return reference type value");
   }
   
-  bool argumentTypeMatches(SILType argValueType, Type declaredArgType) {
-    if (argValueType.isAddressOnly()) {
-      return argValueType.getSwiftRValueType()->isEqual(
-                                              declaredArgType->getRValueType());
-    } else {
-      return argValueType.getSwiftType()->isEqual(declaredArgType);
-    }
-  }
-
   void visitApplyInst(ApplyInst *AI) {
-    FunctionType *FT = AI->getCallee().getType().getAs<FunctionType>();
-    assert(FT && "Callee of ApplyInst must have concrete function type");
-    ASTContext &C = FT->getASTContext();
-    bool implicitReturn = false;
     
-    if (AI->getType() == SILType::getEmptyTupleType(C) &&
-        !FT->getResult()->isEqual(C.TheEmptyTupleType)) {
-      // Address-only returns are passed as an implicit extra argument.
-      // The result of the instruction should be the empty tuple.
-      implicitReturn = true;
-      
-      // We could have a single nontuple argument and an implicit return.
-      if (AI->getArguments().size() == 2 &&
-          argumentTypeMatches(AI->getArguments()[0].getType(),
-                              FT->getInput()) &&
-          AI->getArguments()[1].getType().getSwiftRValueType()
-            ->isEqual(FT->getResult())) {
-        // We match the single argument type and the implicit return, so the
-        // arguments are OK.
-        return;
-      }
-    } else {
-      assert(FT->getResult()->isEqual(AI->getType().getSwiftType()) &&
-             "Return type does not match function type");
-      
-      // If there is a single argument to the apply, it could either be a scalar
-      // or the whole argument tuple being presented all at once.
-      if (AI->getArguments().size() == 1 &&
-          argumentTypeMatches(AI->getArguments()[0].getType(),
-                              FT->getInput())) {
-        // The single argument type matches the function argument type, so the
-        // arguments are OK.
-        return;
-      }
+    DEBUG(llvm::dbgs() << "verifying";
+          AI->print(llvm::dbgs()));
+    SILType calleeTy = AI->getCallee().getType();
+    DEBUG(llvm::dbgs() << "callee type: ";
+          AI->getCallee().getType().print(llvm::dbgs());
+          llvm::dbgs() << '\n');
+    assert(!calleeTy.isAddress() && "callee of apply cannot be an address");
+    assert(calleeTy.is<FunctionType>() &&
+           "callee of apply must have concrete function type");
+    SILFunctionTypeInfo *ti = F.getModule().getFunctionTypeInfo(calleeTy);
+    
+    DEBUG(llvm::dbgs() << "function input types:\n";
+          for (SILType t : ti->getInputTypes()) {
+            llvm::dbgs() << "  ";
+            t.print(llvm::dbgs());
+            llvm::dbgs() << '\n';
+          });
+    DEBUG(llvm::dbgs() << "function result type ";
+          ti->getResultType().print(llvm::dbgs());
+          llvm::dbgs() << '\n');
+
+    DEBUG(llvm::dbgs() << "argument types:\n";
+          for (Value arg : AI->getArguments()) {
+            llvm::dbgs() << "  ";
+            arg.getType().print(llvm::dbgs());
+            llvm::dbgs() << '\n';
+          });
+    
+    // Check that the arguments and result match.
+    assert(AI->getArguments().size() == ti->getInputTypes().size() &&
+           "apply doesn't have right number of arguments for function");
+    for (size_t i = 0, size = AI->getArguments().size(); i < size; ++i) {
+      DEBUG(llvm::dbgs() << "  argument type ";
+            AI->getArguments()[i].getType().print(llvm::dbgs());
+            llvm::dbgs() << " for input type ";
+            ti->getInputTypes()[i].print(llvm::dbgs());
+            llvm::dbgs() << '\n');
+      assert(AI->getArguments()[i].getType() == ti->getInputTypes()[i] &&
+             "input types to apply don't match function input types");
     }
-    
-    // Check that the arguments match the decomposed tuple.
-    
-    const TupleType *TT = FT->getInput()->getAs<TupleType>();
-    assert(TT &&
-           "argument type does not match single-argument function type "
-           "and is not tuple");
-    (void)TT;
-    for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i)
-      assert(argumentTypeMatches(AI->getArguments()[i].getType(),
-                                 TT->getFields()[i].getType()) &&
-             "ApplyInst argument type mismatch");
-    
-    if (implicitReturn) {
-      // Check that the indirect return argument exists and is of the right
-      // type.
-      assert(AI->getArguments().size() == TT->getFields().size() + 1 &&
-             "ApplyInst doesn't have enough arguments for function "
-             "and indirect return");
-      SILType indirectReturn = AI->getArguments().back().getType();
-      (void)indirectReturn;
-      assert(indirectReturn.isAddressOnly() &&
-             "indirect return argument is not address-only");
-      assert(indirectReturn.getSwiftRValueType()->isEqual(FT->getResult()) &&
-             "indirect return argument does not match function return type");
-    } else {
-      assert(AI->getArguments().size() == TT->getFields().size() &&
-             "ApplyInst doesn't have enough arguments for function");
-    }
+    assert(AI->getType() == ti->getResultType() &&
+           "type of apply instruction doesn't match function result type");
   }
 
   void visitConstantRefInst(ConstantRefInst *CRI) {
@@ -268,10 +241,18 @@ public:
   
   void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
 #ifndef NDEBUG
+    DEBUG(llvm::dbgs() << "verifying";
+          AMI->print(llvm::dbgs()));
     FunctionType *methodType = AMI->getType(0).getAs<FunctionType>();
+    DEBUG(llvm::dbgs() << "method type ";
+          methodType->print(llvm::dbgs());
+          llvm::dbgs() << "\n");
     assert(methodType &&
            "result method must be of a concrete function type");
     SILType operandType = AMI->getOperand().getType();
+    DEBUG(llvm::dbgs() << "operand type ";
+          operandType.print(llvm::dbgs());
+          llvm::dbgs() << "\n");
     assert(methodType->getInput()->isEqual(operandType.getSwiftType()) &&
            "result must be a method of the operand");
     assert(methodType->getResult()->is<FunctionType>() &&
@@ -295,7 +276,7 @@ public:
     SILType operandType = EMI->getOperand().getType();
     assert(methodType->getInput()->isEqual(
                             operandType.getASTContext().TheRawPointerType) &&
-           "result must be a method of the operand");
+           "result must be a method of raw pointer");
     assert(methodType->getResult()->is<FunctionType>() &&
            "result must be a method");
     assert(operandType.isAddress() &&
@@ -363,7 +344,22 @@ public:
   }
 
   void visitReturnInst(ReturnInst *RI) {
+    DEBUG(RI->print(llvm::dbgs()));
     assert(RI->getReturnValue() && "Return of null value is invalid");
+    
+    // FIXME: when curry entry points are typed properly, verify return type
+    // here.
+    /*
+    SILFunctionTypeInfo *ti =
+      F.getModule().getFunctionTypeInfo(F.getLoweredType());
+    DEBUG(llvm::dbgs() << "  operand type ";
+          RI->getReturnValue().getType().print(llvm::dbgs());
+          llvm::dbgs() << " for return type ";
+          ti->getResultType().print(llvm::dbgs());
+          llvm::dbgs() << '\n');
+    assert(RI->getReturnValue().getType() == ti->getResultType() &&
+           "return value type does not match return type of function");
+     */
   }
   
   void visitBranchInst(BranchInst *BI) {
@@ -373,6 +369,10 @@ public:
     assert(CBI->getCondition() &&
            "Condition of conditional branch can't be missing");
   }
+  
+  void verify() {
+    visitFunction(const_cast<Function*>(&F));
+  }
 };
 } // end anonymous namespace
 
@@ -380,5 +380,5 @@ public:
 /// verify - Run the IR verifier to make sure that the Function follows
 /// invariants.
 void Function::verify() const {
-  SILVerifier().visitFunction(const_cast<Function*>(this));
+  SILVerifier(*this).verify();
 }

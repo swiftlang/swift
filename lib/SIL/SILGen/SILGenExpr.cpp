@@ -137,67 +137,74 @@ ManagedValue SILGenFunction::visitExpr(Expr *E, SGFContext C) {
 
 namespace {
 
-static Value emitApplyArgument(SILGenFunction &gen, Expr *arg,
-                                llvm::SmallVectorImpl<Writeback> &writebacks) {
-  if (arg->getType()->is<LValueType>()) {
-    // Construct a logical lvalue for the byref argument, materialize the
-    // lvalue, and arrange for it to be written back after the call.
-    LValue lv = SILGenLValue(gen).visit(arg);
-    Value addr = gen.emitMaterializedLoadFromLValue(arg, lv)
-      .getUnmanagedValue();
-    if (!lv.isPhysical()) {
-      writebacks.push_back({::std::move(lv), addr});
-    }
-    return addr;
-  } else {
-    ManagedValue argV = gen.visit(arg);
-    if (argV.isAddressOnlyValue()) {
-      // Address-only arguments are passed by address. The callee does not take
-      // ownership.
-      return argV.getValue();
-    } else {
-      // Loadable arguments are passed by value, and the callee takes ownership.
-      return argV.forward(gen);
-    }
+static void emitDestructureArgumentTuple(SILGenFunction &gen,
+                                         SILLocation loc,
+                                         Value argValue,
+                                         SmallVectorImpl<Value> &argsV) {
+  TupleType *ty = argValue.getType().castTo<TupleType>();
+  
+  // FIXME: address-only tuple
+  // FIXME: varargs
+  for (size_t i = 0, size = ty->getFields().size(); i < size; ++i) {
+    Value elt = gen.B.createExtract(loc, argValue, i,
+                      gen.getLoweredLoadableType(ty->getFields()[i].getType()));
+    if (ty->getFields()[i].getType()->is<TupleType>())
+      emitDestructureArgumentTuple(gen, loc, elt, argsV);
+    else
+      argsV.push_back(elt);
   }
 }
+
+static void emitApplyArgument(SILGenFunction &gen,
+                              Expr *arg,
+                              llvm::SmallVectorImpl<Value> &argsV) {
+  // FIXME: byref arguments need to generate LValues with writebacks.
   
-static bool isSingleElementTupleType(Type t) {
-  TupleType *tt = t->getAs<TupleType>();
-  return tt && tt->getFields().size() == 1;
+  // Visit the subexpression with an argument vector context so that tupling
+  // expressions will destructure into the argument list.
+  ManagedValue argValue = gen.visit(arg, SGFContext(argsV));
+  
+  // If visiting the subexpression returned a null value, then it emitted its
+  // elements into the argument vector.
+  if (!argValue.getValue())
+    return;
+  
+  gen.emitApplyArgumentValue(arg, argValue, argsV);
 }
   
 } // end anonymous namespace
 
-void SILGenFunction::emitApplyArguments(Expr *argsExpr,
-                               llvm::SmallVectorImpl<Value> &ArgsV,
-                               llvm::SmallVectorImpl<Writeback> &writebacks) {
-  if (ParenExpr *pe = dyn_cast<ParenExpr>(argsExpr))
-    argsExpr = pe->getSubExpr();
-  
-  // Special case Arg being a TupleExpr or single-element ScalarToTupleExpr to
-  // inline the arguments and not create a tuple instruction.
-  if (TupleExpr *te = dyn_cast<TupleExpr>(argsExpr)) {
-    for (auto arg : te->getElements())
-      ArgsV.push_back(emitApplyArgument(*this, arg, writebacks));
-  } else if (isa<ScalarToTupleExpr>(argsExpr) &&
-             isSingleElementTupleType(argsExpr->getType())) {
-    ArgsV.push_back(emitApplyArgument(*this,
-                            dyn_cast<ScalarToTupleExpr>(argsExpr)->getSubExpr(),
-                            writebacks));
-  } else {
-    ArgsV.push_back(emitApplyArgument(*this, argsExpr, writebacks));
+void SILGenFunction::emitApplyArgumentValue(SILLocation loc,
+                                            ManagedValue argValue,
+                                            llvm::SmallVectorImpl<Value> &argsV)
+{
+  // If the result of the subexpression is a tuple value, destructure it.
+  if (!argValue.isLValue() && argValue.getType().is<TupleType>()) {
+    emitDestructureArgumentTuple(*this, loc,
+                                 argValue.forward(*this), argsV);
+    return;
   }
+  
+  // Otherwise, the value is a single argument.
+  argsV.push_back(argValue.forwardArgument(*this));
+}
+
+void SILGenFunction::emitApplyArguments(Expr *argsExpr,
+                                        llvm::SmallVectorImpl<Value> &ArgsV) {
+  // Skim off any ParenExprs.
+  while (ParenExpr *pe = dyn_cast<ParenExpr>(argsExpr))
+    argsExpr = pe->getSubExpr();
+
+  emitApplyArgument(*this, argsExpr, ArgsV);
 }
 
 ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                        Value Fn, ArrayRef<Value> Args) {
-  FunctionType *fty = Fn.getType().getAs<FunctionType>();
+  FunctionType *fty = Fn.getType().castTo<FunctionType>();
   TypeLoweringInfo const &resultTI = getTypeLoweringInfo(fty->getResult());
   if (resultTI.isAddressOnly()) {
     // Allocate a temporary to house the indirect return, and pass it to the
     // function as an implicit argument.
-    // FIXME: If Args is a prepackaged tuple argument, we need to explode it.
     SmallVector<Value, 4> argsWithReturn(Args.begin(), Args.end());
     Value buffer = B.createAllocVar(Loc, AllocKind::Stack,
                                     resultTI.getLoweredType());
@@ -218,21 +225,11 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
 ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E, SGFContext C) {
   Value FnV = visit(E->getFn()).forward(*this);
   llvm::SmallVector<Value, 10> ArgsV;
-  llvm::SmallVector<Writeback, 2> writebacks;
   
-  emitApplyArguments(E->getArg(), ArgsV, writebacks);
+  emitApplyArguments(E->getArg(), ArgsV);
   
   ManagedValue r = emitApply(E, FnV, ArgsV);
 
-  // FIXME: writebacks need to be applied later, perhaps at full expr scope
-  // exit, in order for method writeback to do the right thing, because
-  // foo.bar.bas() could really be bas(get_bar(&foo)), and modifications by
-  // bas() ought to show up in foo's bar.
-  for (auto &wb : writebacks) {
-    Value newValue = B.createLoad(E, wb.tempAddress);
-    emitAssignToLValue(E, emitManagedRValueWithCleanup(newValue), wb.lvalue);
-  }
-  
   return r;
 }
 
@@ -494,17 +491,36 @@ ManagedValue SILGenFunction::visitSuperToArchetypeExpr(SuperToArchetypeExpr *E,
 }
 
 ManagedValue SILGenFunction::visitParenExpr(ParenExpr *E, SGFContext C) {
-  return visit(E->getSubExpr());
+  return visit(E->getSubExpr(), C);
 }
 
-ManagedValue SILGenFunction::visitTupleExpr(TupleExpr *E, SGFContext C) {
-  llvm::SmallVector<Value, 10> ArgsV;
-  for (auto &I : E->getElements())
-    ArgsV.push_back(visit(I).forward(*this));
+ManagedValue SILGenFunction::emitTuple(Expr *E,
+                                       ArrayRef<Expr *> Elements,
+                                       SGFContext C) {
+  if (SmallVectorImpl<Value> *argsV = C.getArgumentVector()) {
+    // If we're in a function argument context, destructure our subexpressions
+    // directly onto the function call's argument vector.
+    for (auto &elt : Elements) {
+      emitApplyArgument(*this, elt, *argsV);
+    }
+    return ManagedValue();
+  }
+  
+  // FIXME: variadics
+  
+  // Otherwise, create a tuple value.
+  // FIXME: address-only tuples
+  llvm::SmallVector<Value, 10> tupleV;
+  for (auto &elt : Elements)
+    tupleV.push_back(visit(elt).forward(*this));
   // FIXME: address-only tuple
   return emitManagedRValueWithCleanup(B.createTuple(E,
                                           getLoweredLoadableType(E->getType()),
-                                          ArgsV));
+                                          tupleV));
+}
+
+ManagedValue SILGenFunction::visitTupleExpr(TupleExpr *E, SGFContext C) {
+  return emitTuple(E, E->getElements(), C);
 }
 
 ManagedValue SILGenFunction::visitGetMetatypeExpr(GetMetatypeExpr *E,
@@ -525,7 +541,7 @@ ManagedValue SILGenFunction::visitSpecializeExpr(SpecializeExpr *E,
 
 ManagedValue SILGenFunction::visitAddressOfExpr(AddressOfExpr *E,
                                                 SGFContext C) {
-  return visit(E->getSubExpr());
+  return visit(E->getSubExpr(), C);
 }
 
 namespace {
@@ -696,9 +712,12 @@ ManagedValue SILGenFunction::visitArchetypeMemberRefExpr(
   if (isa<FuncDecl>(E->getDecl())) {
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
+    Type methodType = FunctionType::get(archetype.getType().getSwiftType(),
+                                        E->getType(),
+                                        F.getContext());
     Value method = B.createArchetypeMethod(E, archetype,
                                          SILConstant(E->getDecl()),
-                                         getLoweredLoadableType(E->getType()));
+                                         getLoweredLoadableType(methodType));
     return emitApply(E, method, archetype);
   } else {
     llvm_unreachable("archetype properties not yet implemented");
@@ -714,9 +733,12 @@ ManagedValue SILGenFunction::visitExistentialMemberRefExpr(
   if (isa<FuncDecl>(E->getDecl())) {
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
+    Type methodType = FunctionType::get(F.getContext().TheRawPointerType,
+                                        E->getType(),
+                                        F.getContext());
     Value method = B.createProtocolMethod(E, existential,
                                          SILConstant(E->getDecl()),
-                                         getLoweredLoadableType(E->getType()));
+                                         getLoweredLoadableType(methodType));
     Value projection = B.createProjectExistential(E, existential);
     return emitApply(E, method, projection);
   } else {
@@ -748,10 +770,8 @@ ManagedValue emitAnySubscriptExpr(SILGenFunction &gen,
   SubscriptDecl *sd = e->getDecl();
   ManagedValue base = gen.visit(e->getBase());
   llvm::SmallVector<Value, 2> indexArgs;
-  llvm::SmallVector<Writeback, 2> writebacks;
   
-  gen.emitApplyArguments(e->getIndex(), indexArgs, writebacks);
-  assert(writebacks.empty() && "subscript should not have byref args");
+  gen.emitApplyArguments(e->getIndex(), indexArgs);
   
   // Get the getter function, which will have type This -> Index -> () -> T.
   ManagedValue getterMethod = gen.emitSpecializedPropertyConstantRef(
@@ -809,6 +829,45 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(Value ObjectPtr,
   return emitApply(SILLocation(), InjectionFn, InjectionArgs);
 }
 
+ManagedValue SILGenFunction::emitTupleShuffleOfExprs(Expr *E,
+                                             ArrayRef<Expr *> InExprs,
+                                             ArrayRef<int> ElementMapping,
+                                             Expr *VarargsInjectionFunction,
+                                             SGFContext C) {
+  // Collect the shuffled subexprs.
+  SmallVector<Expr *, 8> ResultElements;
+  
+  // Loop over each result element to compute it.
+  ArrayRef<TupleTypeElt> outerFields =
+  E->getType()->castTo<TupleType>()->getFields();
+  
+  auto shuffleIndexIterator = ElementMapping.begin();
+  for (const TupleTypeElt &outerField : outerFields) {
+    int shuffleIndex = *shuffleIndexIterator++;
+    
+    // If the shuffle index is DefaultInitialize, we're supposed to use the
+    // default value.
+    if (shuffleIndex == TupleShuffleExpr::DefaultInitialize) {
+      assert(outerField.hasInit() && "no default initializer for field!");
+      ResultElements.push_back(outerField.getInit()->getExpr());
+      continue;
+    }
+    
+    // If the shuffle index is FirstVariadic, it is the beginning of the list of
+    // varargs inputs.  Save this case for last.
+    if (shuffleIndex != TupleShuffleExpr::FirstVariadic) {
+      // Map from a different tuple element.
+      ResultElements.push_back(InExprs[shuffleIndex]);
+      continue;
+    }
+    
+    // FIXME handle variadics
+    llvm_unreachable("variadic arguments not implemented");
+  }
+  
+  return emitTuple(E, ResultElements, C);
+}
+
 
 ManagedValue SILGenFunction::emitTupleShuffle(Expr *E,
                                       ArrayRef<Value> InOps,
@@ -825,17 +884,18 @@ ManagedValue SILGenFunction::emitTupleShuffle(Expr *E,
   for (const TupleTypeElt &outerField : outerFields) {
     int shuffleIndex = *shuffleIndexIterator++;
 
-    // If the shuffle index is -1, we're supposed to use the default value.
-    if (shuffleIndex == -1) {
+    // If the shuffle index is DefaultInitialize, we're supposed to use the
+    // default value.
+    if (shuffleIndex == TupleShuffleExpr::DefaultInitialize) {
       assert(outerField.hasInit() && "no default initializer for field!");
       ResultElements.push_back(visit(outerField.getInit()->getExpr())
                                  .forward(*this));
       continue;
     }
 
-    // If the shuffle index is -2, it is the beginning of the list of
+    // If the shuffle index is FirstVariadic, it is the beginning of the list of
     // varargs inputs.  Save this case for last.
-    if (shuffleIndex != -2) {
+    if (shuffleIndex != TupleShuffleExpr::FirstVariadic) {
       // Map from a different tuple element.
       ResultElements.push_back(InOps[shuffleIndex]);
       continue;
@@ -884,8 +944,21 @@ ManagedValue SILGenFunction::emitTupleShuffle(Expr *E,
 
 ManagedValue SILGenFunction::visitTupleShuffleExpr(TupleShuffleExpr *E,
                                                    SGFContext C) {
-  // TupleShuffle expands out to extracts+inserts.  Start by emitting the base
-  // expression that we'll shuffle.
+  // If our subexpr is a literal TupleExpr, then shuffle the literal exprs
+  // directly.
+  Expr *subExpr = E->getSubExpr();
+  while (ParenExpr *pe = dyn_cast<ParenExpr>(subExpr)) {
+    subExpr = pe->getSubExpr();
+  }
+  if (TupleExpr *tupleE = dyn_cast<TupleExpr>(subExpr)) {
+    return emitTupleShuffleOfExprs(E, tupleE->getElements(),
+                                   E->getElementMapping(),
+                                   E->getVarargsInjectionFunctionOrNull(),
+                                   C);
+  }
+  
+  // Otherwise, TupleShuffle expands out to extracts+inserts. Start by emitting
+  // and exploding the base expression that we'll shuffle.
   Value Op = visit(E->getSubExpr()).getValue();
   SmallVector<Value, 8> InElts;
   unsigned EltNo = 0;
@@ -903,29 +976,28 @@ ManagedValue SILGenFunction::visitTupleShuffleExpr(TupleShuffleExpr *E,
 
 ManagedValue SILGenFunction::visitScalarToTupleExpr(ScalarToTupleExpr *E,
                                                     SGFContext C) {
-  // Emit the argument and turn it into a trivial tuple.
-  Value Arg = visit(E->getSubExpr()).getValue();
-
-  // If we don't have exactly the same tuple, perform a shuffle to create
-  // default arguments etc.
-  SmallVector<int, 8> ShuffleMask;
-
+  // Collect the expressions to construct the new elements.
+  SmallVector<Expr *, 8> ResultElements;
+  
+  // Perform a shuffle to create a tuple around the scalar along with any
+  // default values or varargs.
   auto outerFields = E->getType()->castTo<TupleType>()->getFields();
   for (unsigned i = 0, e = outerFields.size(); i != e; ++i) {
-    // If we get to the last argument and it is a varargs list, make sure to
-    // mark it with a "-2" entry.
+    // FIXME: Handle the variadic argument.
     if (outerFields[i].isVararg())
-      ShuffleMask.push_back(-2);
-
-    // If we have a field with a default value, emit that value.  Otherwise, use
-    // the tuple we have as input.
-    if (i == E->getScalarField())
-      ShuffleMask.push_back(0);
-    else if (!outerFields[i].isVararg())
-      ShuffleMask.push_back(-1);
+      llvm_unreachable("variadic fields not yet implemented");
+    // Emit the subexpression into the scalar field indicated by the AST node.
+    else if (i == E->getScalarField())
+      ResultElements.push_back(E->getSubExpr());
+    // Fill in the other fields with their default initializers.
+    else {
+      assert(outerFields[i].hasInit() &&
+             "no default initializer in scalar-to-tuple tuple?!");
+      ResultElements.push_back(outerFields[i].getInit()->getExpr());
+    }
   }
 
-  return emitTupleShuffle(E, Arg, ShuffleMask,E->getVarargsInjectionFunction());
+  return emitTuple(E, ResultElements, C);
 }
 
 ManagedValue SILGenFunction::visitNewArrayExpr(NewArrayExpr *E, SGFContext C) {
@@ -1226,54 +1298,60 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
 namespace {
   // Unlike the ArgumentInitVisitor, this visitor generates arguments but leaves
-  // them collected into a tuple instead of storing them to lvalues, so that the
-  // argument set can just be forwarded to another function.
+  // them destructured instead of storing them to lvalues so that the
+  // argument set can be easily forwarded to another function.
   class ArgumentForwardVisitor
-    : public PatternVisitor<ArgumentForwardVisitor, Value>
+    : public PatternVisitor<ArgumentForwardVisitor>
   {
     SILGenFunction &gen;
+    SmallVectorImpl<Value> &args;
   public:
-    ArgumentForwardVisitor(SILGenFunction &gen) : gen(gen) {}
+    ArgumentForwardVisitor(SILGenFunction &gen,
+                           SmallVectorImpl<Value> &args)
+      : gen(gen), args(args) {}
     
-    Value makeArgument(Type ty) {
+    void makeArgument(Type ty) {
       assert(ty && "no type?!");
-      return new (gen.F.getModule()) BBArgument(gen.getLoweredType(ty),
-                                                gen.F.begin());
+      // Destructure tuple arguments.
+      if (TupleType *tupleTy = ty->getAs<TupleType>()) {
+        for (auto &field : tupleTy->getFields())
+          makeArgument(field.getType());
+      } else {
+        Value arg = new (gen.F.getModule()) BBArgument(gen.getLoweredType(ty),
+                                                       gen.F.begin());
+        args.push_back(arg);
+      }
     }
 
-    Value visitParenPattern(ParenPattern *P) {
-      return visit(P->getSubPattern());
+    void visitParenPattern(ParenPattern *P) {
+      visit(P->getSubPattern());
     }
     
-    Value visitTypedPattern(TypedPattern *P) {
-      return visit(P->getSubPattern());
+    void visitTypedPattern(TypedPattern *P) {
+      visit(P->getSubPattern());
     }
     
-    Value visitTuplePattern(TuplePattern *P) {
-      SmallVector<Value, 4> elements;
+    void visitTuplePattern(TuplePattern *P) {
       for (auto &elt : P->getFields())
-        elements.push_back(visit(elt.getPattern()));
-      return gen.B.createTuple(SILLocation(),
-                               gen.getLoweredType(P->getType()),
-                               elements);
+        visit(elt.getPattern());
     }
     
-    Value visitAnyPattern(AnyPattern *P) {
-      return makeArgument(P->getType());
+    void visitAnyPattern(AnyPattern *P) {
+      makeArgument(P->getType());
     }
     
-    Value visitNamedPattern(NamedPattern *P) {
-      return makeArgument(P->getType());
+    void visitNamedPattern(NamedPattern *P) {
+      makeArgument(P->getType());
     }
   };
 } // end anonymous namespace
 
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Emit the prolog. Since we're just going to forward our args directly
-  // to the initializer, keep them tupled up instead of allocating local
-  // variables for all of them.
+  // to the initializer, don't allocate local variables for them.
   emitConstructorMetatypeArg(*this, ctor);
-  Value args = ArgumentForwardVisitor(*this).visit(ctor->getArguments());
+  SmallVector<Value, 8> args;
+  ArgumentForwardVisitor(*this, args).visit(ctor->getArguments());
   
   // Allocate the "this" value.
   VarDecl *thisDecl = ctor->getImplicitThisDecl();

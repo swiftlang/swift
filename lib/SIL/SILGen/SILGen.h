@@ -21,6 +21,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
   class BasicBlock;
@@ -158,31 +159,55 @@ struct Materialize {
   
 /// SGFContext - Internal context information for the SILGenFunction visitor.
 struct SGFContext {
-  /// The Initialization, if any, the current expr should emit its result into.
-  Initialization /*nullable*/ *emitInto;
-  /// True if the current expr is a direct child of a LoadExpr. Used to avoid
-  /// materializing a temporary that's only immediately going to be loaded.
-  bool isChildOfLoadExpr : 1;
-  /// True if the result of the current expression will be used as a function
-  /// argument tuple. This affects the lowering of the tuple type; a tuple
-  /// containing an address-only value of type T should lower to a
-  /// tuple-of-address value, e.g. (*T, Int), whereas a normal tuple value
-  /// should lower to an address-only in-memory tuple, e.g. *(T, Int).
-  bool isArgumentTuple : 1;
+private:
+  using EmitIntoOrArgumentVectorPointer =
+    PointerUnion<Initialization*, SmallVectorImpl<Value>*>;
   
-  SGFContext()
-    : emitInto(nullptr),
-      isChildOfLoadExpr(false),
-      isArgumentTuple(false)
+  using State =
+    llvm::PointerIntPair<EmitIntoOrArgumentVectorPointer, 1, bool>;
+  
+  State state;
+public:
+  SGFContext() = default;
+  
+  /// Creates an emitInto context that will store the result of the visited expr
+  /// into the given Initialization.
+  SGFContext(Initialization *emitInto)
+    : state(EmitIntoOrArgumentVectorPointer(emitInto), false)
   {}
   
-  SGFContext(Initialization *emitInto,
-             bool isChildOfLoadExpr,
-             bool isArgumentTuple)
-    : emitInto(emitInto),
-      isChildOfLoadExpr(isChildOfLoadExpr),
-      isArgumentTuple(isArgumentTuple)
+  /// Creates an argument tuple context that will recursively append tuple
+  /// elements to the given argument vector.
+  SGFContext(SmallVectorImpl<Value> &argumentVector)
+    : state(EmitIntoOrArgumentVectorPointer(&argumentVector), false)
   {}
+  
+  /// Creates a load expr context, in which a temporary lvalue that would
+  /// normally be materialized can be left as an rvalue to avoid a useless
+  /// immediately-consumed allocation.
+  SGFContext(bool isChildOfLoadExpr)
+    : state(EmitIntoOrArgumentVectorPointer(), isChildOfLoadExpr)
+  {}
+
+  /// Returns a pointer to the Initialization that the current expression should
+  /// store its result to, or null if the expression should allocate temporary
+  /// storage for its result.
+  Initialization *getEmitInto() const {
+    return state.getPointer().dyn_cast<Initialization*>();
+  }
+  
+  /// Returns a pointer to the argument vector the current tuple expression
+  /// should destructure its result elements into, or null if the expression
+  /// should return a tuple value.
+  SmallVectorImpl<Value> *getArgumentVector() const {
+    return state.getPointer().dyn_cast<SmallVectorImpl<Value>*>();
+  }
+  
+  /// Returns true if the current expression is a child of a LoadExpr, and
+  /// should thus avoid emitting a temporary materialization if possible.
+  bool isChildOfLoadExpr() const {
+    return state.getInt();
+  }
 };
   
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
@@ -452,19 +477,30 @@ public:
   ManagedValue visitInterpolatedStringLiteralExpr(
                                               InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
-  
+
+  void emitApplyArgumentValue(SILLocation loc,
+                              ManagedValue argValue,
+                              llvm::SmallVectorImpl<Value> &argsV);
   void emitApplyArguments(Expr *argsExpr,
-                          llvm::SmallVectorImpl<Value> &args,
-                          llvm::SmallVectorImpl<Writeback> &writebacks);
+                          llvm::SmallVectorImpl<Value> &args);
+
   ManagedValue emitApply(SILLocation Loc, Value Fn, ArrayRef<Value> Args);
   ManagedValue emitArrayInjectionCall(Value ObjectPtr,
                                       Value BasePtr,
                                       Value Length,
                                       Expr *ArrayInjectionFunction);
+  ManagedValue emitTupleShuffleOfExprs(Expr *E,
+                                       ArrayRef<Expr *> InExprs,
+                                       ArrayRef<int> ElementMapping,
+                                       Expr *VarargsInjectionFunction,
+                                       SGFContext C);
   ManagedValue emitTupleShuffle(Expr *E,
-                                ArrayRef<Value> InOps,
+                                ArrayRef<Value> InElts,
                                 ArrayRef<int> ElementMapping,
                                 Expr *VarargsInjectionFunction);
+  ManagedValue emitTuple(Expr *E,
+                         ArrayRef<Expr *> Elements,
+                         SGFContext C);
 
   /// Returns a reference to a constant in global context. For local func decls
   /// this returns the function constant with unapplied closure context.

@@ -76,6 +76,15 @@ public:
     return getValue();
   }
   
+  /// Forward this value if it's loadable, or just provide the address if it's
+  /// address-only, per the argument passing convention.
+  Value forwardArgument(SILGenFunction &gen) {
+    if (getType().isAddress())
+      return getValue();
+    else
+      return forward(gen);
+  }
+  
   /// Forward this value into memory by storing it to the given address.
   /// Currently only implemented for address-only values.
   ///
@@ -105,6 +114,11 @@ public:
   Value split(llvm::SmallVectorImpl<CleanupsDepth> &cleanups) {
     if (hasCleanup()) cleanups.push_back(getCleanup());
     return getValue();
+  }
+  
+  /// Returns true if this value corresponds to an lvalue in Swift.
+  bool isLValue() const {
+    return getType().isAddress() && !isAddressOnlyValue();
   }
 };
 
