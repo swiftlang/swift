@@ -390,36 +390,28 @@ RefElementAddrInst::RefElementAddrInst(SILLocation Loc, Value Operand,
 WitnessTableMethodInst::WitnessTableMethodInst(ValueKind Kind,
                                                SILLocation Loc, Value Operand,
                                                SILConstant Member,
-                                               SILType ThisTy, SILType MethodTy,
+                                               SILType Ty,
                                                Function &F)
-  : Instruction(Kind, Loc,
-                // The method type should always be an address-to-function type,
-                // which doesn't need additional lowering.
-                SILType::getPreLoweredType(
-                  FunctionType::get(ThisTy.getSwiftType(),
-                                    MethodTy.getSwiftType(),
-                                    F.getContext()),
-                  /*address=*/false, /*loadable=*/true)),
+  : Instruction(Kind, Loc, Ty),
     Operand(Operand), Member(Member) {
 }
 
 ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, Value Operand,
                                          SILConstant Member,
-                                         SILType MethodTy,
+                                         SILType Ty,
                                          Function &F)
   : WitnessTableMethodInst(ValueKind::ArchetypeMethodInst,
                            Loc, Operand, Member,
-                           Operand.getType(), MethodTy, F) {
+                           Ty, F) {
 }
 
 ProtocolMethodInst::ProtocolMethodInst(SILLocation Loc, Value Operand,
                                              SILConstant Member,
-                                             SILType MethodTy,
+                                             SILType Ty,
                                              Function &F)
   : WitnessTableMethodInst(ValueKind::ProtocolMethodInst,
                            Loc, Operand, Member,
-                           SILType::getRawPointerType(F.getContext()),
-                           MethodTy, F) {
+                           Ty, F) {
 }
 
 ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc, Value Operand,

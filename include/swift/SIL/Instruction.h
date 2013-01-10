@@ -708,7 +708,7 @@ class WitnessTableMethodInst : public Instruction {
 public:
   WitnessTableMethodInst(ValueKind Kind,
                          SILLocation Loc, Value Operand, SILConstant Member,
-                         SILType thisTy, SILType methodTy, Function &F);
+                         SILType Ty, Function &F);
   
   Value getOperand() const { return Operand; }
   SILConstant getMember() const { return Member; }
@@ -724,7 +724,7 @@ public:
 class ArchetypeMethodInst : public WitnessTableMethodInst {
 public:
   ArchetypeMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
-                      SILType methodTy, Function &F);
+                      SILType Ty, Function &F);
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ArchetypeMethodInst;
@@ -739,7 +739,7 @@ public:
 class ProtocolMethodInst : public WitnessTableMethodInst {
 public:
   ProtocolMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
-                        SILType methodTy, Function &F);
+                     SILType Ty, Function &F);
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ProtocolMethodInst;
