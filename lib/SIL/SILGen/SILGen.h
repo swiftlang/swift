@@ -500,6 +500,9 @@ public:
                                 Expr *VarargsInjectionFunction);
   ManagedValue emitTuple(Expr *E,
                          ArrayRef<Expr *> Elements,
+                         Type VarargsBaseTy,
+                         ArrayRef<Value> VariadicElements,
+                         Expr *VarargsInjectionFunction,
                          SGFContext C);
 
   /// Returns a reference to a constant in global context. For local func decls

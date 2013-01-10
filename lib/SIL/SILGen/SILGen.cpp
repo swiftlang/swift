@@ -69,6 +69,8 @@ SILGenModule::SILGenModule(SILModule &M)
 
 SILGenModule::~SILGenModule() {
   delete TopLevelSGF;
+  if (M.toplevel)
+    M.toplevel->verify();
 }
 
 SILType SILGenModule::getConstantType(SILConstant constant) {

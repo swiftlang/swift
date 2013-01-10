@@ -494,25 +494,65 @@ ManagedValue SILGenFunction::visitParenExpr(ParenExpr *E, SGFContext C) {
   return visit(E->getSubExpr(), C);
 }
 
+static ManagedValue emitVarargs(SILGenFunction &gen,
+                                SILLocation loc,
+                                Type baseTy,
+                                ArrayRef<Value> elements,
+                                Expr *VarargsInjectionFn) {
+  Value numEltsVal = gen.B.createIntegerValueInst(elements.size(),
+                      SILType::getBuiltinIntegerType(64, gen.F.getContext()));
+  AllocArrayInst *allocArray = gen.B.createAllocArray(loc,
+                                                  gen.getLoweredType(baseTy),
+                                                  numEltsVal);
+  
+  Value objectPtr(allocArray, 0);
+  Value basePtr(allocArray, 1);
+
+  for (size_t i = 0, size = elements.size(); i < size; ++i) {
+    Value eltPtr = i == 0
+      ? basePtr
+      : gen.B.createIndexAddr(loc, basePtr, i);
+    gen.B.createStore(loc, elements[i], eltPtr);
+  }
+
+  return gen.emitArrayInjectionCall(objectPtr, basePtr,
+                                    numEltsVal, VarargsInjectionFn);
+}
+
 ManagedValue SILGenFunction::emitTuple(Expr *E,
                                        ArrayRef<Expr *> Elements,
-                                       SGFContext C) {
+                                       Type VarargsBaseTy,
+                                       ArrayRef<Value> VariadicElements,
+                                       Expr *VarargsInjectionFunction,
+                                       SGFContext C) {  
   if (SmallVectorImpl<Value> *argsV = C.getArgumentVector()) {
     // If we're in a function argument context, destructure our subexpressions
     // directly onto the function call's argument vector.
     for (auto &elt : Elements) {
       emitApplyArgument(*this, elt, *argsV);
     }
+    
+    if (VarargsBaseTy)
+      argsV->push_back(emitVarargs(*this, E,
+                                   VarargsBaseTy,
+                                   VariadicElements, VarargsInjectionFunction)
+                         .forward(*this));
+    
     return ManagedValue();
   }
   
-  // FIXME: variadics
-  
   // Otherwise, create a tuple value.
   // FIXME: address-only tuples
-  llvm::SmallVector<Value, 10> tupleV;
+  llvm::SmallVector<Value, 8> tupleV;
   for (auto &elt : Elements)
     tupleV.push_back(visit(elt).forward(*this));
+
+  if (VarargsBaseTy)
+    tupleV.push_back(emitVarargs(*this, E,
+                                 VarargsBaseTy,
+                                 VariadicElements, VarargsInjectionFunction)
+                       .forward(*this));
+  
   // FIXME: address-only tuple
   return emitManagedRValueWithCleanup(B.createTuple(E,
                                           getLoweredLoadableType(E->getType()),
@@ -520,7 +560,9 @@ ManagedValue SILGenFunction::emitTuple(Expr *E,
 }
 
 ManagedValue SILGenFunction::visitTupleExpr(TupleExpr *E, SGFContext C) {
-  return emitTuple(E, E->getElements(), C);
+  return emitTuple(E, E->getElements(),
+                   Type(), /*VariadicElements=*/ {}, /*InjectionFn=*/ nullptr,
+                   C);
 }
 
 ManagedValue SILGenFunction::visitGetMetatypeExpr(GetMetatypeExpr *E,
@@ -836,6 +878,8 @@ ManagedValue SILGenFunction::emitTupleShuffleOfExprs(Expr *E,
                                              SGFContext C) {
   // Collect the shuffled subexprs.
   SmallVector<Expr *, 8> ResultElements;
+  SmallVector<Value, 4> variadicValues;
+  Type variadicBaseTy;
   
   // Loop over each result element to compute it.
   ArrayRef<TupleTypeElt> outerFields =
@@ -861,13 +905,32 @@ ManagedValue SILGenFunction::emitTupleShuffleOfExprs(Expr *E,
       continue;
     }
     
-    // FIXME handle variadics
-    llvm_unreachable("variadic arguments not implemented");
+    assert(outerField.isVararg() && "Cannot initialize nonvariadic element");
+    
+    // Okay, we have a varargs tuple element.  All the remaining elements feed
+    // into the varargs portion of this, which is then constructed into a Slice
+    // through an informal protocol captured by the InjectionFn in the
+    // TupleShuffleExpr.
+    assert(VarargsInjectionFunction &&
+           "no injection function for varargs tuple?!");
+    auto shuffleIndexIteratorEnd = ElementMapping.end();
+    
+    while (shuffleIndexIterator != shuffleIndexIteratorEnd) {
+      unsigned sourceField = *shuffleIndexIterator++;
+      // Variadic values are never destructured so we greedily evaluate our
+      // subexpressions here. There's nothing to gain from passing the exprs
+      // down further.
+      variadicValues.push_back(visit(InExprs[sourceField]).forward(*this));
+    }
+
+    variadicBaseTy = outerField.getVarargBaseTy();
+    break;
   }
   
-  return emitTuple(E, ResultElements, C);
+  return emitTuple(E, ResultElements,
+                   variadicBaseTy, variadicValues, VarargsInjectionFunction,
+                   C);
 }
-
 
 ManagedValue SILGenFunction::emitTupleShuffle(Expr *E,
                                       ArrayRef<Value> InOps,
@@ -907,32 +970,21 @@ ManagedValue SILGenFunction::emitTupleShuffle(Expr *E,
     // into the varargs portion of this, which is then constructed into a Slice
     // through an informal protocol captured by the InjectionFn in the
     // TupleShuffleExpr.
+    assert(VarargsInjectionFunction &&
+           "no injection function for varargs tuple?!");
     auto shuffleIndexIteratorEnd = ElementMapping.end();
-    unsigned NumArrayElts = shuffleIndexIteratorEnd - shuffleIndexIterator;
-    Value NumEltsVal = B.createIntegerValueInst(NumArrayElts,
-                            SILType::getBuiltinIntegerType(64, F.getContext()));
-    AllocArrayInst *AllocArray =
-      B.createAllocArray(E,
-                         getLoweredType(outerField.getVarargBaseTy()),
-                         NumEltsVal);
-
-    Value ObjectPtr(AllocArray, 0);
-    Value BasePtr(AllocArray, 1);
-
-    unsigned CurElem = 0;
+    SmallVector<Value, 4> variadicValues;
+    
     while (shuffleIndexIterator != shuffleIndexIteratorEnd) {
-      unsigned SourceField = *shuffleIndexIterator++;
-      
-      Value EltLoc = BasePtr;
-      if (CurElem) EltLoc = B.createIndexAddr(E, EltLoc, CurElem);
-
-      B.createStore(E, InOps[SourceField], EltLoc);
-      ++CurElem;
+      unsigned sourceField = *shuffleIndexIterator++;
+      variadicValues.push_back(InOps[sourceField]);
     }
-
-    ResultElements.push_back(emitArrayInjectionCall(ObjectPtr, BasePtr,
-                                        NumEltsVal, VarargsInjectionFunction)
-                               .forward(*this));
+    
+    ResultElements.push_back(emitVarargs(*this,
+                                         E, outerField.getVarargBaseTy(),
+                                         variadicValues,
+                                         VarargsInjectionFunction)
+                              .forward(*this));
     break;
   }
 
@@ -977,27 +1029,42 @@ ManagedValue SILGenFunction::visitTupleShuffleExpr(TupleShuffleExpr *E,
 ManagedValue SILGenFunction::visitScalarToTupleExpr(ScalarToTupleExpr *E,
                                                     SGFContext C) {
   // Collect the expressions to construct the new elements.
-  SmallVector<Expr *, 8> ResultElements;
+  SmallVector<Expr *, 2> ResultElements;
+  SmallVector<Value, 2> VariadicElements;
+  Type VariadicBaseTy;
   
   // Perform a shuffle to create a tuple around the scalar along with any
   // default values or varargs.
   auto outerFields = E->getType()->castTo<TupleType>()->getFields();
+  bool didEmitScalarField = false;
   for (unsigned i = 0, e = outerFields.size(); i != e; ++i) {
-    // FIXME: Handle the variadic argument.
-    if (outerFields[i].isVararg())
-      llvm_unreachable("variadic fields not yet implemented");
+    // Handle the variadic argument. If we didn't emit the scalar field yet,
+    // it goes into the variadic array; otherwise, the variadic array is empty.
+    if (outerFields[i].isVararg()) {
+      assert(i == e - 1 && "vararg isn't last?!");
+      if (!didEmitScalarField)
+        VariadicElements.push_back(visit(E->getSubExpr()).forward(*this));
+      VariadicBaseTy = outerFields[i].getVarargBaseTy();
+      break;
+    }
+
     // Emit the subexpression into the scalar field indicated by the AST node.
-    else if (i == E->getScalarField())
+    else if (i == E->getScalarField()) {
       ResultElements.push_back(E->getSubExpr());
+      didEmitScalarField = true;
+    }
     // Fill in the other fields with their default initializers.
     else {
       assert(outerFields[i].hasInit() &&
-             "no default initializer in scalar-to-tuple tuple?!");
+             "no default initializer in non-scalar field of scalar-to-tuple?!");
       ResultElements.push_back(outerFields[i].getInit()->getExpr());
     }
   }
 
-  return emitTuple(E, ResultElements, C);
+  return emitTuple(E, ResultElements,
+                   VariadicBaseTy, VariadicElements,
+                   E->getVarargsInjectionFunction(),
+                   C);
 }
 
 ManagedValue SILGenFunction::visitNewArrayExpr(NewArrayExpr *E, SGFContext C) {
