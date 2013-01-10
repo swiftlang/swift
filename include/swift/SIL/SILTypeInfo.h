@@ -41,6 +41,9 @@ public:
 
   SILTypeInfo(SILTypeInfoKind kind) : kind(kind) {}
   
+  SILTypeInfo(const SILTypeInfo &) = delete;
+  SILTypeInfo &operator=(const SILTypeInfo &) = delete;
+  
   static bool classof(SILTypeInfo const *ti) {
     assert(ti->kind >= SILTypeInfoKind::SILTypeInfo_First
            && ti->kind <= SILTypeInfoKind::SILTypeInfo_Last
@@ -66,7 +69,9 @@ class SILFunctionTypeInfo : public SILTypeInfo {
                   SILType resultType,
                   bool hasIndirectReturn)
     : SILTypeInfo(SILTypeInfoKind::SILFunctionTypeInfo),
-      resultTypeAndIndirectReturn(resultType, hasIndirectReturn) {}
+      resultTypeAndIndirectReturn(resultType, hasIndirectReturn),
+      inputTypeCount(inputTypeCount)
+  {}
 
 public:
   static SILFunctionTypeInfo *create(ArrayRef<SILType> inputTypes,
