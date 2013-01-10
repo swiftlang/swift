@@ -1,1 +1,2 @@
 module ExternIntX { header "x.h" }
+module Swarm { header "Swarm.h" }

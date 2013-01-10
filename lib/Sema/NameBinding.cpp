@@ -53,8 +53,14 @@ namespace {
 
     NameBinder(TranslationUnit *TU)
     : TU(TU), Context(TU->Ctx), ImportedBuiltinModule(false) {
-      for (auto M : TU->getImportedModules())
-        Context.LoadedModules[M.second->Name.str()] = M.second;
+      for (auto M : TU->getImportedModules()) {
+        Module *&ref = Context.LoadedModules[M.second->Name.str()];
+        if (ref)
+          assert(ref == M.second ||
+                 isa<TranslationUnit>(ref) && isa<ClangModule>(M.second));
+        else
+          ref = M.second;
+      }
     }
     ~NameBinder() {
     }

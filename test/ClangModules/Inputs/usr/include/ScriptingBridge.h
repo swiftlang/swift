@@ -8,5 +8,5 @@
 @end
 
 @interface SBHive
-@property __attribute__((iboutletcollection(B))) SBElementArray *bees;
+@property (readonly) __attribute__((iboutletcollection(B))) SBElementArray *bees;
 @end
