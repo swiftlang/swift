@@ -1504,12 +1504,12 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     
     if (SrcField == -2) {
       // Use the default element for the tuple.
-      NewElements.push_back(-1);
+      NewElements.push_back(TupleShuffleExpr::DefaultInitialize);
       continue;
     }
 
     if (SrcField == -3) {
-      NewElements.push_back(-2);
+      NewElements.push_back(TupleShuffleExpr::FirstVariadic);
       break;
     }
 
