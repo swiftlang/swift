@@ -1620,8 +1620,8 @@ namespace {
 
       // FIXME: For now, don't import properties in protocols, because IRGen
       // can't handle the thunks we generate.
-//      if (isa<clang::ObjCProtocolDecl>(decl->getDeclContext()))
-//        return nullptr;
+      if (isa<clang::ObjCProtocolDecl>(decl->getDeclContext()))
+        return nullptr;
 
       auto dc = Impl.importDeclContext(decl->getDeclContext());
       if (!dc)
