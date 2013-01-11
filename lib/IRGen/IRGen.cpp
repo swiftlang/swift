@@ -65,7 +65,10 @@ static void addSwiftExpandPass(const PassManagerBuilder &Builder,
 }
 
 void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
-                                TranslationUnit *TU, unsigned StartElem) {
+                                TranslationUnit *TU,
+                                SILModule *SILMod,
+                                unsigned StartElem) {
+  assert(!SILMod && "SIL irgen not yet implemented");
   assert(!TU->Ctx.hadError());
 
   std::unique_ptr<LLVMContext> Context;

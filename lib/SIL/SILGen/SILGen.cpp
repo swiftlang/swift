@@ -14,6 +14,7 @@
 #include "llvm/ADT/Optional.h"
 #include "swift/AST/AST.h"
 #include "swift/SIL/BBArgument.h"
+#include "swift/Subsystems.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 using namespace Lowering;
@@ -198,6 +199,10 @@ SILModule *SILModule::constructSIL(TranslationUnit *tu) {
   for (Decl *D : tu->Decls)
     sgm.visit(D);
   return m;
+}
+
+SILModule *swift::performSILGeneration(TranslationUnit *tu) {
+  return SILModule::constructSIL(tu);
 }
 
 //===--------------------------------------------------------------------===//

@@ -26,6 +26,7 @@ namespace swift {
   class TranslationUnit;
   class ASTContext;
   class Component;
+  class SILModule;
 
   namespace irgen {
     class Options;
@@ -61,13 +62,21 @@ namespace swift {
   /// analysis in the main module.
   void performCaptureAnalysis(TranslationUnit *TU, unsigned StartElem = 0);
 
+  /// Turn the given translation unit into SIL IR. The returned SILModule must
+  /// be deleted by the caller.
+  SILModule *performSILGeneration(TranslationUnit *TU);
+  
   /// Turn the given translation unit into either LLVM IR or native code.
   ///
-  /// \param StartElem indicates where to start for incremental IRGen in the
-  /// main module.
+  /// \param SILMod  A SIL module to translate to LLVM IR. If null, IRGen works
+  ///   directly from the AST.
+  /// \param StartElem  Indicates where to start for incremental IRGen in the
+  ///   main module.
   void performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
-                           TranslationUnit *TU, unsigned StartElem = 0);
-
+                           TranslationUnit *TU,
+                           SILModule *SILMod = nullptr,
+                           unsigned StartElem = 0);
+  
   // Optimization passes.
   llvm::FunctionPass *createSwiftARCOptPass();
   llvm::FunctionPass *createSwiftARCExpandPass();

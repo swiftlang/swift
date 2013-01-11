@@ -538,7 +538,8 @@ void swift::REPL(ASTContext &Context) {
     // IRGen the current line(s).
     llvm::Module LineModule("REPLLine", LLVMContext);
     performCaptureAnalysis(TU, CurIRGenElem);
-    performIRGeneration(Options, &LineModule, TU, CurIRGenElem);
+    performIRGeneration(Options, &LineModule, TU, /*sil=*/nullptr,
+                        CurIRGenElem);
     CurIRGenElem = CurTUElem;
 
     if (Context.hadError())
