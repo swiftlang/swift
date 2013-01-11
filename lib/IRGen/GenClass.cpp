@@ -65,10 +65,8 @@ static bool hasSwiftRefcount(ClassDecl *theClass) {
     assert(theClass && "base type of class not a class?");
   }
 
-  // FIXME: remove this check and update the tests.  Exporting
-  // something as ObjC doesn't change how we should ref-count it.
-  if (theClass->getAttrs().isObjC()) return false;
-
+  // If the root class is implemented in swift, then we have a swift
+  // refcount.
   return hasSwiftImplementation(theClass);
 }
 
