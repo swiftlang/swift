@@ -14,6 +14,9 @@ able to use the following build settings:
     fine for applications with no main.swift, but will need to be turned off
     for CLI tools. You will then want to add -parse-as-library for each
     non-script file you are compiling.
+  SWIFT_INCLUDE_PATHS - A list of paths to other directories containing Swift
+    or Clang modules.
+  SWIFT_OTHER_FLAGS - Any other flags to pass to the Swift compiler.
 
 * install.sh has a few options:
   Pass --symlink to use a symbolic link to the repo's copy of Swift.xcplugin.
