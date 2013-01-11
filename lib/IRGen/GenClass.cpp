@@ -684,6 +684,7 @@ namespace {
     IRGenModule &IGM;
     ClassDecl *TheClass;
     const LayoutClass &Layout;
+    const StructLayout &FieldLayout;
 
     bool HasNonTrivialDestructor = false;
     bool HasNonTrivialConstructor = false;
@@ -693,10 +694,13 @@ namespace {
     SmallVector<llvm::Constant*, 4> Protocols;
     SmallVector<llvm::Constant*, 8> Properties;
     llvm::Constant *Name = nullptr;
+    unsigned NextFieldIndex = 0;
   public:
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                     const LayoutClass &layout)
-        : IGM(IGM), TheClass(theClass), Layout(layout) {
+                     const LayoutClass &layout,
+                     const StructLayout &fieldLayout)
+        : IGM(IGM), TheClass(theClass), Layout(layout),
+          FieldLayout(fieldLayout) {
       visitMembers(TheClass);
     }
 
@@ -741,17 +745,31 @@ namespace {
 
       //   uint32_t instanceStart;
       //   uint32_t instanceSize;
-      // These are generally filled in by the runtime.
-      // TODO: it's an optimization to have them have the right values
-      // at launch-time.
-      auto zero32 = llvm::ConstantInt::get(IGM.Int32Ty, 0);
-      fields.push_back(zero32);
-      fields.push_back(zero32);
+      // The runtime requires that the ivar offsets be initialized to
+      // a valid layout of the ivars of this class, bounded by these
+      // two values.  If the instanceSize of the base class equals the
+      // stored instanceStart of the derived class, the ivar offsets
+      // will not be changed.
+      Size instanceStart = Size(0);
+      Size instanceSize = Size(0);
+      if (!forMeta) {
+        instanceSize = FieldLayout.getSize();
+        if (FieldLayout.getElements().empty()) {
+          instanceStart = instanceSize;
+        } else {
+          // FIXME: assumes layout is always sequential!
+          instanceStart = FieldLayout.getElements()[0].ByteOffset;
+        }
+      }
+      fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty,
+                                              instanceStart.getValue()));
+      fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty,
+                                              instanceSize.getValue()));
 
       //   uint32_t reserved;  // only when building for 64bit targets
       if (IGM.getPointerAlignment().getValue() > 4) {
         assert(IGM.getPointerAlignment().getValue() == 8);
-        fields.push_back(zero32);
+        fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, 0));
       }
 
       //   const uint8_t *ivarLayout;
@@ -907,10 +925,13 @@ namespace {
     /// };
     llvm::Constant *buildIvar(VarDecl *ivar) {
       // FIXME: this is not always the right thing to do!
+      auto &elt = FieldLayout.getElements()[NextFieldIndex++];
       auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*direct*/ true);
       auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
       offsetVar->setConstant(false);
-      offsetVar->setInitializer(llvm::ConstantInt::get(IGM.IntPtrTy, 0));
+      auto offsetVal =
+        llvm::ConstantInt::get(IGM.IntPtrTy, elt.ByteOffset.getValue());
+      offsetVar->setInitializer(offsetVal);
 
       // TODO: clang puts this in __TEXT,__objc_methname,cstring_literals
       auto name = IGM.getAddrOfGlobalString(ivar->getName().str());
@@ -1062,8 +1083,10 @@ llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
                                             ClassDecl *cls) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
   CanType type = cls->getDeclaredTypeInContext()->getCanonicalType();
+  auto &classTI = IGM.getFragileTypeInfo(type).as<ClassTypeInfo>();
+  auto &fieldLayout = classTI.getLayout(IGM);
   LayoutClass layout(IGM, ResilienceScope::Universal, cls, type);
-  ClassDataBuilder builder(IGM, cls, layout);
+  ClassDataBuilder builder(IGM, cls, layout, fieldLayout);
 
   // First, build the metaclass object.
   builder.buildMetaclassStub();

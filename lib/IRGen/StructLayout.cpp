@@ -146,7 +146,11 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
     addedStorage = true;
 
     // FIXME: handle resilient/dependently-sized types
-    // TODO: consider using different layout requirements.
+
+    // TODO: consider using different layout rules.
+    // If the rules are changed so that fields aren't necessarily laid
+    // out sequentially, the computation of InstanceStart in the
+    // RO-data will need to be fixed.
 
     // The struct alignment is the max of the alignment of the fields.
     CurAlignment = std::max(CurAlignment, eltTI.StorageAlignment);
