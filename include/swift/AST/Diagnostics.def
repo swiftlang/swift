@@ -736,6 +736,8 @@ ERROR(invalid_decl_attribute,sema_tcd,none,
       "attribute '%0' cannot be applied to declaration", (StringRef))
 
 // Extensions
+ERROR(expected_lbrace_extension,type_parsing,none,
+      "expected '{' in extension", ())
 ERROR(non_nominal_extension,sema_tcd,none,
       "%select{non-nominal type|protocol}0 %1 cannot be extended", (bool, Type))
 

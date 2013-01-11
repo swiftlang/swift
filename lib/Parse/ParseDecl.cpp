@@ -564,7 +564,7 @@ Decl *Parser::parseDeclExtension() {
   if (Tok.is(tok::colon))
     parseInheritance(Inherited);
 
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension))
     return nullptr;
   
   ExtensionDecl *ED
