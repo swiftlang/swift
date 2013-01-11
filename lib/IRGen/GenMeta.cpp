@@ -718,8 +718,20 @@ namespace {
     }
 
   public:
+    /// The 'metadata flags' field in a class is actually a pointer to
+    /// the metaclass object for the class.
+    ///
+    /// NONAPPLE: This is only really required for ObjC interop; maybe
+    /// suppress this for classes that don't need to be exposed to
+    /// ObjC, e.g. for non-Apple platforms?
     void addMetadataFlags() {
-      Fields.push_back(getMetadataKind(this->IGM, MetadataKind::Class));
+      static_assert(unsigned(MetadataKind::Class) == 0,
+                    "class metadata kind is non-zero?");
+
+      // Get the metaclass pointer as an intptr_t.
+      auto metaclass = IGM.getAddrOfMetaclassObject(TargetClass);
+      auto flags = llvm::ConstantExpr::getPtrToInt(metaclass, IGM.IntPtrTy);
+      Fields.push_back(flags);
     }
 
     /// The runtime provides a value witness table for Builtin.ObjectPointer.
@@ -731,11 +743,6 @@ namespace {
 
     void addDestructorFunction() {
       Fields.push_back(IGM.getAddrOfDestructor(TargetClass));
-    }
-
-    void addNominalTypeDescriptor() {
-      // FIXME!
-      Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
     }
 
     void addParentMetadataRef(ClassDecl *forClass) {
@@ -761,6 +768,7 @@ namespace {
             = tryEmitConstantHeapMetadataRef(IGM, type)) {
         Fields.push_back(metadata);
       } else {
+        // FIXME: remember to compute this at runtime
         Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
       }
     }

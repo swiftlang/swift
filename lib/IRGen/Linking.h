@@ -94,11 +94,14 @@ class LinkEntity {
     /// A field offset.  The pointer is a VarDecl*.
     FieldOffset,
 
-    /// An Objective-C class reference.
+    /// An Objective-C class reference.  The pointer is a ClassDecl*.
     ObjCClass,
 
-    /// An Objective-C metaclass reference.
+    /// An Objective-C metaclass reference.  The pointer is a ClassDecl*.
     ObjCMetaclass,
+
+    /// A swift metaclass-stub reference.  The pointer is a ClassDecl*.
+    SwiftMetaclassStub,
 
     /// Some other kind of declaration.
     /// The pointer is a Decl*.
@@ -116,7 +119,7 @@ class LinkEntity {
 
     /// The metadata or metadata template for a class.
     /// The pointer is a canonical TypeBase*.
-    TypeMetadata
+    TypeMetadata,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -210,6 +213,13 @@ public:
   static LinkEntity forObjCMetaclass(ClassDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ObjCMetaclass, decl, ExplosionKind::Minimal, 0);
+    return entity;
+  }
+
+  static LinkEntity forSwiftMetaclassStub(ClassDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::SwiftMetaclassStub,
+                      decl, ExplosionKind::Minimal, 0);
     return entity;
   }
 

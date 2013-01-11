@@ -123,6 +123,8 @@ public:
   llvm::PointerType *FullTypeMetadataPtrTy;/// %swift.full_type*
   llvm::PointerType *ObjCPtrTy;        /// %objc_object*
   llvm::PointerType *OpaquePtrTy;      /// %swift.opaque*
+  llvm::StructType *ObjCClassStructTy; /// %objc_class
+  llvm::PointerType *ObjCClassPtrTy;   /// %objc_class*
   llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
 
   Size getPointerSize() const { return PtrSize; }
@@ -226,6 +228,7 @@ public:
   llvm::Constant *getGetMetatypeMetadataFn();
   llvm::Constant *getGetTupleMetadataFn();
   llvm::Constant *getGetObjCClassMetadataFn();
+  ClassDecl *getSwiftRootClass();
 
 private:
   llvm::Function *MemCpyFn;
@@ -255,6 +258,7 @@ private:
   llvm::Constant *ObjCMsgSendFn = nullptr;
   llvm::Constant *ObjCMsgSendStretFn = nullptr;
   llvm::Constant *ObjCSelRegisterNameFn = nullptr;
+  ClassDecl *SwiftRootClass = nullptr;
 
 //--- Generic ---------------------------------------------------------------
 public:
@@ -307,6 +311,8 @@ public:
                                         llvm::Type *definitionType = nullptr);
   llvm::Constant *getAddrOfObjCClass(ClassDecl *D);
   llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D);
+  llvm::Constant *getAddrOfSwiftMetaclassStub(ClassDecl *D);
+  llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D);
 };
 
 } // end namespace irgen

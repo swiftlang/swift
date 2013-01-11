@@ -18,8 +18,10 @@
 
 #include "swift/ABI/Class.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeMemberVisitor.h"
@@ -47,13 +49,27 @@
 using namespace swift;
 using namespace irgen;
 
+/// Is the given class known to have a swift implementation?
+static bool hasSwiftImplementation(ClassDecl *theClass) {
+  // For now, assume that anything imported from Objective-C does not
+  // have a swift implementation.  In the future, there may be some sort
+  // of clang attribute to mark something with a swift implementation.
+  return !theClass->hasClangDecl();
+}
+
 /// Does the given class have a Swift refcount?
 static bool hasSwiftRefcount(ClassDecl *theClass) {
+  // Scan to the root class.
+  while (theClass->hasBaseClass()) {
+    theClass = theClass->getBaseClass()->getClassOrBoundGenericClass();
+    assert(theClass && "base type of class not a class?");
+  }
+
+  // FIXME: remove this check and update the tests.  Exporting
+  // something as ObjC doesn't change how we should ref-count it.
   if (theClass->getAttrs().isObjC()) return false;
-  if (!theClass->hasBaseClass()) return true;
-  auto baseClass = theClass->getBaseClass()->getClassOrBoundGenericClass();
-  assert(baseClass && "base type of class not a class?");
-  return hasSwiftRefcount(baseClass);
+
+  return hasSwiftImplementation(theClass);
 }
 
 /// Emit a retain of a class pointer, using the best known retain
@@ -171,6 +187,7 @@ namespace {
   class LayoutClass {
     IRGenModule &IGM;
 
+    ClassDecl *Root;
     SmallVector<FieldEntry, 8> Fields;
 
     bool IsMetadataResilient = false;
@@ -184,6 +201,22 @@ namespace {
                 ClassDecl *theClass, CanType type)
         : IGM(IGM), Resilience(resilience) {
       layout(theClass, type);
+    }
+
+    /// The root class for purposes of metaclass objects.
+    ClassDecl *getRootClassForMetaclass() const {
+      // If the formal root class is imported from Objective-C, then
+      // we should use that.  For a class that's really implemented in
+      // Objective-C, this is obviously right.  For a class that's
+      // really implemented in Swift, but that we're importing via an
+      // Objective-C interface, this would be wrong --- except such a
+      // class can never be a formal root class, because a Swift class
+      // without a formal superclass will actually be parented by
+      // SwiftObject (or maybe eventually something else like it),
+      // which will be visible in the Objective-C type system.
+      if (Root->hasClangDecl()) return Root;
+
+      return IGM.getSwiftRootClass();
     }
 
     const FieldEntry &getFieldEntry(VarDecl *field) const {
@@ -204,6 +237,8 @@ namespace {
         auto baseClass = type->getClassOrBoundGenericClass();
         assert(baseClass);
         layout(baseClass, baseType);
+      } else {
+        Root = theClass;
       }
 
       // If the class is resilient, then it may have fields we can't
@@ -616,10 +651,19 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
 }
 
 namespace {
+  enum ForMetaClass_t : bool {
+    ForClass = false,
+    ForMetaClass = true
+  };
+
   /// A class for building class data.
+  ///
+  /// In Objective-C terms, this is the class_ro_t.
   class ClassDataBuilder : public ClassMemberVisitor<ClassDataBuilder> {
     IRGenModule &IGM;
     ClassDecl *TheClass;
+    const LayoutClass &Layout;
+
     bool HasNonTrivialDestructor = false;
     bool HasNonTrivialConstructor = false;
     SmallVector<llvm::Constant*, 8> Ivars;
@@ -627,18 +671,52 @@ namespace {
     SmallVector<llvm::Constant*, 16> ClassMethods;
     SmallVector<llvm::Constant*, 4> Protocols;
     SmallVector<llvm::Constant*, 8> Properties;
+    llvm::Constant *Name = nullptr;
   public:
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                      const LayoutClass &layout)
-      : IGM(IGM), TheClass(theClass) {}
-
-    llvm::Constant *emit() {
+        : IGM(IGM), TheClass(theClass), Layout(layout) {
       visitMembers(TheClass);
+    }
 
+    /// Build the metaclass stub object.
+    void buildMetaclassStub() {
+      // The isa is the metaclass pointer for the root class.
+      auto rootClass = Layout.getRootClassForMetaclass();
+      auto rootPtr = IGM.getAddrOfMetaclassObject(rootClass);
+
+      // The superclass of the metaclass is the metaclass of the
+      // superclass.  Note that for metaclass stubs, we can always
+      // ignore parent contexts and generic arguments.
+      //
+      // If this class has no formal superclass, then its actual
+      // superclass is SwiftObject, i.e. the root class.
+      llvm::Constant *superPtr;
+      if (TheClass->hasBaseClass()) {
+        auto base = TheClass->getBaseClass()->getClassOrBoundGenericClass();
+        superPtr = IGM.getAddrOfMetaclassObject(base);
+      } else {
+        superPtr = rootPtr;
+      }
+
+      auto dataPtr = emitROData(ForMetaClass);
+      dataPtr = llvm::ConstantExpr::getPtrToInt(dataPtr, IGM.IntPtrTy);
+
+      llvm::Constant *fields[] = {
+        rootPtr, superPtr, null(), null(), dataPtr
+      };
+      auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy,
+                                            makeArrayRef(fields));
+      auto metaclass =
+        cast<llvm::GlobalVariable>(IGM.getAddrOfMetaclassObject(TheClass));
+      metaclass->setInitializer(init);
+    }
+
+    llvm::Constant *emitROData(ForMetaClass_t forMeta) {
       SmallVector<llvm::Constant*, 11> fields;
       // struct _class_ro_t {
       //   uint32_t flags;
-      fields.push_back(buildFlags());
+      fields.push_back(buildFlags(forMeta));
 
       //   uint32_t instanceStart;
       //   uint32_t instanceSize;
@@ -657,36 +735,47 @@ namespace {
 
       //   const uint8_t *ivarLayout;
       // GC/ARC layout.  TODO.
-      fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+      fields.push_back(null());
 
       //   const char *name;
+      // It is correct to use the same name for both class and metaclass.
       fields.push_back(buildName());
 
       //   const method_list_t *baseMethods;
-      fields.push_back(buildInstanceMethodList());
+      fields.push_back(forMeta ? buildClassMethodList()
+                               : buildInstanceMethodList());
 
       //   const protocol_list_t *baseProtocols;
+      // Apparently, this list is the same in the class and the metaclass.
       fields.push_back(buildProtocolList());
 
       //   const ivar_list_t *ivars;
-      fields.push_back(buildIvarList());
+      fields.push_back(forMeta ? null() : buildIvarList());
 
       //   const uint8_t *weakIvarLayout;
       // More GC/ARC layout.  TODO.
-      fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+      fields.push_back(null());
 
       //   const property_list_t *baseProperties;
-      fields.push_back(buildPropertyList());
+      fields.push_back(forMeta ? null() : buildPropertyList());
 
       // };
 
-      return buildGlobalVariable(fields, "_DATA_");
+      auto dataSuffix = forMeta ? "_METACLASS_DATA_" : "_DATA_";
+      return buildGlobalVariable(fields, dataSuffix);
     }
 
   private:
-    llvm::Constant *buildFlags() {
+    llvm::Constant *buildFlags(ForMetaClass_t forMeta) {
       ClassFlags flags = ClassFlags::CompiledByARC;
-      if (HasNonTrivialDestructor || HasNonTrivialConstructor) {
+
+      // Mark metaclasses as appropriate.
+      if (forMeta) {
+        flags |= ClassFlags::Meta;
+
+      // Non-metaclasses need us to record things whether primitive
+      // construction/destructor is trivial.
+      } else if (HasNonTrivialDestructor || HasNonTrivialConstructor) {
         flags |= ClassFlags::HasCXXStructors;
         if (!HasNonTrivialConstructor)
           flags |= ClassFlags::HasCXXDestructorOnly;
@@ -697,7 +786,12 @@ namespace {
     }
 
     llvm::Constant *buildName() {
-      return IGM.getAddrOfGlobalString(TheClass->getName().str());
+      if (Name) return Name;
+      return (Name = IGM.getAddrOfGlobalString(TheClass->getName().str()));
+    }
+
+    llvm::Constant *null() {
+      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     }
 
     /*** Methods ***********************************************************/
@@ -720,6 +814,10 @@ namespace {
       if (auto override = method->getOverriddenDecl())
         return requiresObjCMethodDescriptor(override);
       return false;
+    }
+
+    llvm::Constant *buildClassMethodList()  {
+      return buildMethodList(ClassMethods, "_CLASS_METHODS_");
     }
 
     llvm::Constant *buildInstanceMethodList()  {
@@ -943,7 +1041,13 @@ llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
                                             ClassDecl *cls) {
   CanType type = cls->getDeclaredTypeInContext()->getCanonicalType();
   LayoutClass layout(IGM, ResilienceScope::Universal, cls, type);
-  return ClassDataBuilder(IGM, cls, layout).emit();
+  ClassDataBuilder builder(IGM, cls, layout);
+
+  // First, build the metaclass object.
+  builder.buildMetaclassStub();
+
+  // Then build the class RO-data.
+  return builder.emitROData(ForClass);
 }
 
 const TypeInfo *TypeConverter::convertClassType(ClassDecl *D) {
@@ -951,4 +1055,19 @@ const TypeInfo *TypeConverter::convertClassType(ClassDecl *D) {
   llvm::PointerType *irType = ST->getPointerTo();
   return new ClassTypeInfo(irType, IGM.getPointerSize(),
                            IGM.getPointerAlignment(), D);
+}
+
+/// Lazily declare the Swift root-class, SwiftObject.
+ClassDecl *IRGenModule::getSwiftRootClass() {
+  if (SwiftRootClass) return SwiftRootClass;
+
+  auto name = Context.getIdentifier("SwiftObject");
+
+  // Make a really fake-looking class.
+  SwiftRootClass = new (Context) ClassDecl(SourceLoc(), name, SourceLoc(),
+                                           MutableArrayRef<TypeLoc>(),
+                                           /*generics*/ nullptr,
+                                           Context.TheBuiltinModule);
+  SwiftRootClass->getMutableAttrs().ObjC = true;
+  return SwiftRootClass;
 }

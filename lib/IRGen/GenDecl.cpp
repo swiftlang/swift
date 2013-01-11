@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
@@ -306,6 +307,7 @@ bool LinkEntity::isLocalLinkage() const {
   case Kind::Other:
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
+  case Kind::SwiftMetaclassStub:
   case Kind::FieldOffset:
     return isLocalLinkageDecl(getDecl());
   }
@@ -694,15 +696,35 @@ llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass) {
   return addr;
 }
 
-/// Fetch a global reference to the given Objective-C metaclass.  The
-/// result is always a TypeMetadataPtrTy, but it may not be compatible
-/// with IR-generation.
+/// Fetch a global reference to the given Objective-C metaclass.
+/// The result is always a GlobalVariable of ObjCClassPtrTy.
 llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass) {
   LinkEntity entity = LinkEntity::forObjCMetaclass(theClass);
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
-                                    TypeMetadataStructTy, TypeMetadataStructTy,
-                                    TypeMetadataPtrTy);
+                                    ObjCClassStructTy, ObjCClassStructTy,
+                                    ObjCClassPtrTy);
   return addr;
+}
+
+/// Fetch the declaration of the metaclass stub for the given class type.
+/// The result is always a GlobalVariable of ObjCClassPtrTy.
+llvm::Constant *IRGenModule::getAddrOfSwiftMetaclassStub(ClassDecl *theClass) {
+  LinkEntity entity = LinkEntity::forSwiftMetaclassStub(theClass);
+  auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
+                                    ObjCClassStructTy, ObjCClassStructTy,
+                                    ObjCClassPtrTy);
+  return addr;
+}
+
+/// Fetch the declaration of a metaclass object.  This performs either
+/// getAddrOfSwiftMetaclassStub or getAddrOfObjCMetaclass, depending
+/// on whether the class is published as an ObjC class.
+llvm::Constant *IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl) {
+  if (decl->getAttrs().ObjC || decl->hasClangDecl()) {
+    return getAddrOfObjCMetaclass(decl);
+  } else {
+    return getAddrOfSwiftMetaclassStub(decl);
+  }
 }
 
 /// Fetch the declaration of the metadata (or metadata template) for a

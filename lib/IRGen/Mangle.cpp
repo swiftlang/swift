@@ -812,6 +812,13 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     return;
   }
 
+  //   global ::= 'Mm' type                       // class metaclass
+  case Kind::SwiftMetaclassStub:
+    buffer << "Mm";
+    mangler.mangleNominalType(cast<ClassDecl>(getDecl()),
+                              ExplosionKind::Minimal);
+    return;
+
   //   global ::= 'Wo' entity
   case Kind::WitnessTableOffset:
     buffer << "Wo";

@@ -135,6 +135,17 @@ IRGenModule::IRGenModule(ASTContext &Context,
   ObjCPtrTy = llvm::StructType::create(getLLVMContext(), "objc_object")
                 ->getPointerTo(defaultAS);
 
+  ObjCClassStructTy = llvm::StructType::create(LLVMContext, "objc_class");
+  ObjCClassPtrTy = ObjCClassStructTy->getPointerTo(defaultAS);
+  llvm::Type *objcClassElts[] = {
+    ObjCClassPtrTy,
+    ObjCClassPtrTy,
+    Int8PtrTy,
+    Int8PtrTy,
+    IntPtrTy
+  };
+  ObjCClassStructTy->setBody(objcClassElts);
+
   // TODO: use "tinycc" on platforms that support it
   RuntimeCC = llvm::CallingConv::C;
 }

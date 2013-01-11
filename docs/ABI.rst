@@ -3,6 +3,14 @@
 The Swift ABI
 =============
 
+Hard Constraints on Resilience
+------------------------------
+
+The root of a class hierarchy must remain stable, at pain of
+invalidating the metaclass hierarchy.  Note a Swift class without an
+explicit base class is implicitly rooted in the SwiftObject
+Objective-C class.
+
 Mangling
 --------
 
@@ -12,6 +20,7 @@ All Swift-mangled names begin with this prefix.
 
   global ::= 'M' directness type             // type metadata
   global ::= 'MP' directness type            // type metadata pattern
+  global ::= 'Mm' type                       // class metaclass
   global ::= 'w' value-witness-kind type     // value witness
   global ::= 'WV' type                       // value witness table
   global ::= 'Wo' entity                     // witness table offset

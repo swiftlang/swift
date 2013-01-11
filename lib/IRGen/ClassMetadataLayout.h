@@ -213,7 +213,6 @@ public:
   void addMetadataFlags() { NextIndex++; }
   void addValueWitnessTable() { NextIndex++; }
   void addDestructorFunction() { NextIndex++; }
-  void addNominalTypeDescriptor() { NextIndex++; }
   void addParentMetadataRef(ClassDecl *forClass) { NextIndex++; }
   void addSuperClass() { NextIndex++; }
   void addClassCacheData() { NextIndex += 2; }
