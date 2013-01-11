@@ -214,10 +214,15 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
 
 /// Is the given class known to have Swift-compatible metadata?
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass) {
-  // For now, the fact that a declaration was imported from ObjC is
-  // enough to conclusively force us into a slower path.  Eventually
-  // we might have an attribute here or something based on the
-  // deployment target.
+  // For now, the fact that a declaration was not implemented in Swift
+  // is enough to conclusively force us into a slower path.
+  // Eventually we might have an attribute here or something based on
+  // the deployment target.
+  return hasKnownSwiftImplementation(IGM, theClass);
+}
+
+/// Is the given class known to have an implementation in Swift?
+bool irgen::hasKnownSwiftImplementation(IRGenModule &IGM, ClassDecl *theClass) {
   return !theClass->hasClangDecl();
 }
 

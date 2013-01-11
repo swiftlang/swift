@@ -49,16 +49,8 @@
 using namespace swift;
 using namespace irgen;
 
-/// Is the given class known to have a swift implementation?
-static bool hasSwiftImplementation(ClassDecl *theClass) {
-  // For now, assume that anything imported from Objective-C does not
-  // have a swift implementation.  In the future, there may be some sort
-  // of clang attribute to mark something with a swift implementation.
-  return !theClass->hasClangDecl();
-}
-
 /// Does the given class have a Swift refcount?
-static bool hasSwiftRefcount(ClassDecl *theClass) {
+static bool hasSwiftRefcount(IRGenModule &IGM, ClassDecl *theClass) {
   // Scan to the root class.
   while (theClass->hasBaseClass()) {
     theClass = theClass->getBaseClass()->getClassOrBoundGenericClass();
@@ -67,14 +59,14 @@ static bool hasSwiftRefcount(ClassDecl *theClass) {
 
   // If the root class is implemented in swift, then we have a swift
   // refcount.
-  return hasSwiftImplementation(theClass);
+  return hasKnownSwiftImplementation(IGM, theClass);
 }
 
 /// Emit a retain of a class pointer, using the best known retain
 /// semantics for the value.
 llvm::Value *IRGenFunction::emitBestRetainCall(llvm::Value *value,
                                                ClassDecl *theClass) {
-  if (hasSwiftRefcount(theClass)) {
+  if (hasSwiftRefcount(IGM, theClass)) {
     emitRetainCall(value);
     return value;
   }
@@ -122,15 +114,13 @@ namespace {
 
     /// Can we use swift reference-counting, or do we have to use
     /// objc_retain/release?
-    bool HasSwiftRefcount;
+    const bool HasSwiftRefcount;
 
   public:
     ClassTypeInfo(llvm::PointerType *irType, Size size, Alignment align,
-                  ClassDecl *D)
-      : HeapTypeInfo(irType, size, align), TheClass(D), Layout(nullptr) {
-
-      HasSwiftRefcount = ::hasSwiftRefcount(D);
-    }
+                  ClassDecl *D, bool hasSwiftRefcount)
+      : HeapTypeInfo(irType, size, align), TheClass(D), Layout(nullptr),
+        HasSwiftRefcount(hasSwiftRefcount) {}
 
     bool hasSwiftRefcount() const {
       return HasSwiftRefcount;
@@ -1051,8 +1041,10 @@ llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
 const TypeInfo *TypeConverter::convertClassType(ClassDecl *D) {
   llvm::StructType *ST = IGM.createNominalType(D);
   llvm::PointerType *irType = ST->getPointerTo();
+  bool hasSwiftRefcount = ::hasSwiftRefcount(IGM, D);
   return new ClassTypeInfo(irType, IGM.getPointerSize(),
-                           IGM.getPointerAlignment(), D);
+                           IGM.getPointerAlignment(),
+                           D, hasSwiftRefcount);
 }
 
 /// Lazily declare the Swift root-class, SwiftObject.
