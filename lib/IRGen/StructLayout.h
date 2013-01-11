@@ -58,6 +58,9 @@ enum class LayoutKind {
 
 /// An element layout is the layout for a single element of a type.
 struct ElementLayout {
+  /// A constant value used to record that there is no structure index.
+  enum : unsigned { NoStructIndex = unsigned(-1) };
+
   /// The offset in bytes from the start of the struct.
   Size ByteOffset;
 
@@ -102,6 +105,50 @@ public:
   bool hasStaticLayout() const { return true; }
   llvm::Value *emitSize(IRGenFunction &IGF) const;
   llvm::Value *emitAlign(IRGenFunction &IGF) const;
+};
+
+/// A class for building a structure layout.
+class StructLayoutBuilder {
+  IRGenModule &IGM;
+  llvm::SmallVector<llvm::Type*, 8> StructFields;
+  Size CurSize = Size(0);
+  Alignment CurAlignment = Alignment(1);
+  bool IsKnownLayout = true;
+public:
+  StructLayoutBuilder(IRGenModule &IGM) : IGM(IGM) {}
+
+  /// Add a swift heap header to the layout.  This must be the first
+  /// call to the layout.
+  void addHeapHeader();
+
+  /// Add a number of fields to the layout.  The field layouts need
+  /// only have the TypeInfo set; the rest will be filled out.
+  ///
+  /// Returns true if the fields may have increased the storage
+  /// requirements of the layout.
+  bool addFields(llvm::MutableArrayRef<ElementLayout> fields,
+                 LayoutStrategy strategy);
+
+  /// Return whether the layout is known to be empty.
+  bool empty() const { return IsKnownLayout && CurSize == Size(0); }
+
+  /// Return the current set of fields.
+  llvm::ArrayRef<llvm::Type*> getStructFields() const { return StructFields; }
+
+  /// Return whether the structure has a known layout.
+  bool hasKnownLayout() const { return IsKnownLayout; }
+
+  /// Return the size of the structure built so far.
+  Size getSize() const { return CurSize; }
+
+  /// Return the alignment of the structure built so far.
+  Alignment getAlignment() const { return CurAlignment; }
+
+  /// Build the current elements as a new anonymous struct type.
+  llvm::StructType *getAsAnonStruct() const;
+
+  /// Build the current elements as a new anonymous struct type.
+  void setAsBodyOfStruct(llvm::StructType *type) const;
 };
 
 Size getHeapHeaderSize(IRGenModule &IGM);

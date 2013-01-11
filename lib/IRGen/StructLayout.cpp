@@ -26,16 +26,6 @@
 using namespace swift;
 using namespace irgen;
 
-/// Given a layout strategy, find the resilience scope at which we
-/// must operate.
-static ResilienceScope getResilienceScopeForStrategy(LayoutStrategy strategy) {
-  switch (strategy) {
-  case LayoutStrategy::Optimal: return ResilienceScope::Local;
-  case LayoutStrategy::Universal: return ResilienceScope::Program;
-  }
-  llvm_unreachable("bad layout strategy!");
-}
-
 /// Does this layout kind require a heap header?
 static bool requiresHeapHeader(LayoutKind kind) {
   switch (kind) {
@@ -63,85 +53,41 @@ void irgen::addHeapHeaderToLayout(IRGenModule &IGM,
 /// Perform structure layout on the given types.
 StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
                            LayoutStrategy strategy,
-                           llvm::ArrayRef<const TypeInfo *> types,
-                           llvm::StructType *typeToFill) {
+                           ArrayRef<const TypeInfo *> types,
+                           llvm::StructType *typeToFill)
+    : Elements(types.size()) {
+
+  // Fill in the Elements array.
+  for (unsigned i = 0, e = types.size(); i != e; ++i)
+    Elements[i].Type = types[i];
+
   assert(typeToFill == nullptr || typeToFill->isOpaque());
 
-  // For now, we actually only have one algorithm, and it's not
-  // exactly optimal.
-
-  Size storageSize(0);
-  Alignment storageAlign(1);
-  llvm::SmallVector<llvm::Type*, 8> storageTypes;
+  StructLayoutBuilder builder(IGM);
 
   // Add the heap header if necessary.
   if (requiresHeapHeader(layoutKind)) {
-    storageSize += IGM.getPointerSize() * 2;
-    storageAlign = IGM.getPointerAlignment();
-    storageTypes.push_back(IGM.RefCountedStructTy);
+    builder.addHeapHeader();
   }
-  
-  ResilienceScope resilience = getResilienceScopeForStrategy(strategy);
 
-  bool isEmpty = true;
-  for (const TypeInfo *type : types) {
-    // Skip types known to be empty.
-    if (type->isEmpty(resilience)) {
-      ElementLayout element = { Size(0), (unsigned) -1, type };
-      Elements.push_back(element);
-      continue;
-    }
-
-    // The struct is no longer empty.
-    isEmpty = false;
-
-    // The struct alignment is the max of the alignment of the fields.
-    storageAlign = std::max(storageAlign, type->StorageAlignment);
-
-    // If the current tuple size isn't a multiple of the field's
-    // required alignment, we need padding.
-    if (Size offsetFromAlignment = storageSize % type->StorageAlignment) {
-      unsigned paddingRequired
-        = type->StorageAlignment.getValue() - offsetFromAlignment.getValue();
-
-      // We don't actually need to uglify the IR unless the natural
-      // alignment of the IR type for the field isn't good enough.
-      Alignment fieldIRAlignment(
-          IGM.DataLayout.getABITypeAlignment(type->StorageType));
-      assert(fieldIRAlignment <= type->StorageAlignment);
-      if (fieldIRAlignment != type->StorageAlignment) {
-        storageTypes.push_back(llvm::ArrayType::get(IGM.Int8Ty,
-                                                    paddingRequired));
-      }
-
-      // Regardless, the storage size goes up.
-      storageSize += Size(paddingRequired);
-    }
-
-    ElementLayout element =
-      { storageSize, (unsigned) storageTypes.size(), type };
-    Elements.push_back(element);
-
-    storageTypes.push_back(type->getStorageType());
-    storageSize += type->StorageSize;
-  }
+  bool nonEmpty = builder.addFields(Elements, strategy);
 
   // Special-case: there's nothing to store.
   // In this case, produce an opaque type;  this tends to cause lovely
   // assertions.
-  if (isEmpty) {
-    assert(!storageTypes.empty() == requiresHeapHeader(layoutKind));
+  if (!nonEmpty) {
+    assert(!builder.empty() == requiresHeapHeader(layoutKind));
     Align = Alignment(1);
     TotalSize = Size(0);
     Ty = (typeToFill ? typeToFill : IGM.OpaquePtrTy->getElementType());
   } else {
-    Align = storageAlign;
-    TotalSize = storageSize;
+    Align = builder.getAlignment();
+    TotalSize = builder.getSize();
     if (typeToFill) {
-      typeToFill->setBody(storageTypes);
+      builder.setAsBodyOfStruct(typeToFill);
       Ty = typeToFill;
     } else {
-      Ty = llvm::StructType::get(IGM.getLLVMContext(), storageTypes);
+      Ty = builder.getAsAnonStruct();
     }
   }
   assert(typeToFill == nullptr || Ty == typeToFill);
@@ -161,4 +107,80 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
                                const llvm::Twine &suffix) const {
   return IGF.Builder.CreateStructGEP(baseAddr, StructIndex, ByteOffset,
                                      baseAddr.getAddress()->getName() + suffix);
+}
+
+void StructLayoutBuilder::addHeapHeader() {
+  assert(StructFields.empty() && "adding heap header at a non-zero offset");
+  CurSize = getHeapHeaderSize(IGM);
+  CurAlignment = IGM.getPointerAlignment();
+  StructFields.push_back(IGM.RefCountedStructTy);
+}
+
+bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
+                                    LayoutStrategy strategy) {
+  // Track whether we've added any storage to our layout.
+  bool addedStorage = false;
+
+  // Loop through the elements.  The only valid field in each element
+  // is Type; StructIndex and ByteOffset need to be laid out.
+  for (auto &elt : elts) {
+    auto &eltTI = *elt.Type;
+
+    // If the element type is empty, it adds nothing.
+    if (eltTI.isEmpty(ResilienceScope::Local)) {
+      elt.StructIndex = ElementLayout::NoStructIndex;
+      elt.ByteOffset = Size(-1);
+      continue;
+    }
+
+    // Anything else we do at least potentially adds storage requirements.
+    addedStorage = true;
+
+    // FIXME: handle resilient/dependently-sized types
+    // TODO: consider using different layout requirements.
+
+    // The struct alignment is the max of the alignment of the fields.
+    CurAlignment = std::max(CurAlignment, eltTI.StorageAlignment);
+
+    // If the current tuple size isn't a multiple of the field's
+    // required alignment, we need to pad out.
+    if (Size offsetFromAlignment = CurSize % eltTI.StorageAlignment) {
+      unsigned paddingRequired
+        = eltTI.StorageAlignment.getValue() - offsetFromAlignment.getValue();
+      assert(paddingRequired != 0);
+
+      // We don't actually need to uglify the IR unless the natural
+      // alignment of the IR type for the field isn't good enough.
+      Alignment fieldIRAlignment(
+          IGM.DataLayout.getABITypeAlignment(eltTI.StorageType));
+      assert(fieldIRAlignment <= eltTI.StorageAlignment);
+      if (fieldIRAlignment != eltTI.StorageAlignment) {
+        auto paddingTy = llvm::ArrayType::get(IGM.Int8Ty, paddingRequired);
+        StructFields.push_back(paddingTy);
+      }
+
+      // Regardless, the storage size goes up.
+      CurSize += Size(paddingRequired);
+    }
+
+    // Set the element's offset and field-index.
+    elt.ByteOffset = CurSize;
+    elt.StructIndex = StructFields.size();
+
+    StructFields.push_back(eltTI.getStorageType());
+    CurSize += eltTI.StorageSize;
+  }
+
+  return addedStorage;
+}
+
+/// Produce the current fields as an anonymous structure.
+llvm::StructType *StructLayoutBuilder::getAsAnonStruct() const {
+  return llvm::StructType::get(IGM.getLLVMContext(), StructFields);
+}
+
+/// Set the current fields as the body of the given struct type.
+void StructLayoutBuilder::setAsBodyOfStruct(llvm::StructType *type) const {
+  assert(type->isOpaque());
+  type->setBody(StructFields);
 }
