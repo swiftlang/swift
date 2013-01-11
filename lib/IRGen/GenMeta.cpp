@@ -759,9 +759,12 @@ namespace {
     }
 
     void addSuperClass() {
-      // If this is a root class, just put 'null' here.
+      // If this is a root class, use SwiftObject as our formal parent.
       if (!TargetClass->hasBaseClass()) {
-        Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+        // We have to do getAddrOfObjCClass ourselves here because
+        // getSwiftRootClass needs to be ObjC-mangled but isn't
+        // actually imported from a clang module.
+        Fields.push_back(IGM.getAddrOfObjCClass(IGM.getSwiftRootClass()));
         return;
       }
 
