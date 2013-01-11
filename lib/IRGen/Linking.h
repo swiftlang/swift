@@ -97,6 +97,9 @@ class LinkEntity {
     /// An Objective-C class reference.
     ObjCClass,
 
+    /// An Objective-C metaclass reference.
+    ObjCMetaclass,
+
     /// Some other kind of declaration.
     /// The pointer is a Decl*.
     Other,
@@ -201,6 +204,12 @@ public:
   static LinkEntity forObjCClass(ClassDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ObjCClass, decl, ExplosionKind::Minimal, 0);
+    return entity;
+  }
+
+  static LinkEntity forObjCMetaclass(ClassDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ObjCMetaclass, decl, ExplosionKind::Minimal, 0);
     return entity;
   }
 

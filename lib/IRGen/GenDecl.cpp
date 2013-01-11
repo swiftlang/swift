@@ -305,6 +305,7 @@ bool LinkEntity::isLocalLinkage() const {
   case Kind::Setter:
   case Kind::Other:
   case Kind::ObjCClass:
+  case Kind::ObjCMetaclass:
   case Kind::FieldOffset:
     return isLocalLinkageDecl(getDecl());
   }
@@ -687,6 +688,17 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
 /// with IR-generation.
 llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass) {
   LinkEntity entity = LinkEntity::forObjCClass(theClass);
+  auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
+                                    TypeMetadataStructTy, TypeMetadataStructTy,
+                                    TypeMetadataPtrTy);
+  return addr;
+}
+
+/// Fetch a global reference to the given Objective-C metaclass.  The
+/// result is always a TypeMetadataPtrTy, but it may not be compatible
+/// with IR-generation.
+llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass) {
+  LinkEntity entity = LinkEntity::forObjCMetaclass(theClass);
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                     TypeMetadataStructTy, TypeMetadataStructTy,
                                     TypeMetadataPtrTy);

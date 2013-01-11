@@ -762,6 +762,9 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   if (getKind() == Kind::ObjCClass) {
     buffer << "OBJC_CLASS_$_" << getDecl()->getName().str();
     return;
+  } else if (getKind() == Kind::ObjCMetaclass) {
+    buffer << "OBJC_METACLASS_$_" << getDecl()->getName().str();
+    return;
   }
 
   // Otherwise, everything gets the common prefix.
@@ -857,6 +860,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   //   These aren't swift entities and are special-cased above.
   case Kind::ObjCClass:
+  case Kind::ObjCMetaclass:
     llvm_unreachable("not a swift entity");
   }
   llvm_unreachable("bad entity kind!");

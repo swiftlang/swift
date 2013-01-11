@@ -306,6 +306,7 @@ public:
                                         bool isIndirect, bool isPattern,
                                         llvm::Type *definitionType = nullptr);
   llvm::Constant *getAddrOfObjCClass(ClassDecl *D);
+  llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D);
 };
 
 } // end namespace irgen
