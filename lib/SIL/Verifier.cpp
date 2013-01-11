@@ -68,6 +68,7 @@ public:
     assert(calleeTy.is<FunctionType>() &&
            "callee of apply must have concrete function type");
     SILFunctionTypeInfo *ti = F.getModule().getFunctionTypeInfo(calleeTy);
+    (void)ti;
     
     DEBUG(llvm::dbgs() << "function input types:\n";
           for (SILType t : ti->getInputTypes()) {
