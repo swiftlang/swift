@@ -1027,6 +1027,7 @@ namespace {
 /// Emit the private data (RO-data) associated with a class.
 llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
                                             ClassDecl *cls) {
+  assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
   CanType type = cls->getDeclaredTypeInContext()->getCanonicalType();
   LayoutClass layout(IGM, ResilienceScope::Universal, cls, type);
   ClassDataBuilder builder(IGM, cls, layout);

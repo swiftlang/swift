@@ -70,10 +70,15 @@ public:
     // Metadata header.
     super::layout();
 
-    // ClassMetadata header.  This is ObjC-compatible.
+    // ClassMetadata header.  In ObjCInterop mode, this must be
+    // layout-compatible with an Objective-C class.  The superclass
+    // pointer is useful regardless of mode, but the rest of the data
+    // isn't necessary.
     asImpl().addSuperClass();
-    asImpl().addClassCacheData();
-    asImpl().addClassDataPointer();
+    if (IGM.ObjCInterop) {
+      asImpl().addClassCacheData();
+      asImpl().addClassDataPointer();
+    }
 
     // Class members.
     addClassMembers(TargetClass);

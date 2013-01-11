@@ -689,6 +689,7 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
 /// result is always a TypeMetadataPtrTy, but it may not be compatible
 /// with IR-generation.
 llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass) {
+  assert(ObjCInterop && "getting address of ObjC class in no-interop mode");
   LinkEntity entity = LinkEntity::forObjCClass(theClass);
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                     TypeMetadataStructTy, TypeMetadataStructTy,
@@ -699,6 +700,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass) {
 /// Fetch a global reference to the given Objective-C metaclass.
 /// The result is always a GlobalVariable of ObjCClassPtrTy.
 llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass) {
+  assert(ObjCInterop && "getting address of ObjC metaclass in no-interop mode");
   LinkEntity entity = LinkEntity::forObjCMetaclass(theClass);
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                     ObjCClassStructTy, ObjCClassStructTy,
@@ -709,6 +711,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass) {
 /// Fetch the declaration of the metaclass stub for the given class type.
 /// The result is always a GlobalVariable of ObjCClassPtrTy.
 llvm::Constant *IRGenModule::getAddrOfSwiftMetaclassStub(ClassDecl *theClass) {
+  assert(ObjCInterop && "getting address of metaclass stub in no-interop mode");
   LinkEntity entity = LinkEntity::forSwiftMetaclassStub(theClass);
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                     ObjCClassStructTy, ObjCClassStructTy,

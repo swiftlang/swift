@@ -88,6 +88,9 @@ public:
   llvm::LLVMContext &LLVMContext;
   const llvm::DataLayout &DataLayout;
 
+  /// Does the current target require Objective-C interoperation?
+  static const bool ObjCInterop = true;
+
   llvm::Type *VoidTy;                  /// void (usually {})
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
