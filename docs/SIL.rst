@@ -959,9 +959,11 @@ Calling convention
 ------------------
 
 Calling a function with trivial value types as inputs and outputs simply passes
-everything by value. This Swift function::
+the arguments by value. This Swift function::
 
   func foo(x:Int, y:Float) -> Char
+
+  foo(x, y)
 
 gets called in SIL as::
 
@@ -975,6 +977,8 @@ type components retained and released the same way. This Swift function::
   class A {}
 
   func bar(x:A) -> (Int, A)
+
+  bar(x)
 
 gets called in SIL as::
 
@@ -995,14 +999,47 @@ callee must initialize this buffer before returning. This Swift function::
 
   func bas(x:A, y:Int) -> A
 
+  bas(x, y)
+
 gets called in SIL as::
 
-  %bas = constant_ref $(*A, Int, *A) -> ()
-  %z = alloc_var stack $A
+  %bas = constant_ref $(*A, Int, *A) -> (), @bas
+  %tmp = alloc_var stack $A
   apply %bas(%x, %y, %z)
   ; ... use %z ...
-  destroy_addr %z
-  dealloc_var stack %z
+  destroy_addr %tmp
+  dealloc_var stack %tmp
+
+Tuple arguments are destructured recursively, regardless of the
+address-only-ness of the tuple type. The destructured fields are passed
+individually according to the above convention. This Swift function::
+
+  struct [API] A {}
+
+  func zim(x:Int, y:A, (z:Int, w:(A, Int)))
+
+  zim(x, y, (z, w))
+
+gets called in SIL as::
+
+  %zim = constant_ref $(Int, *A, Int, *A, Int) -> (), @bas
+  %w.0 = extract %w, 0
+  %w.1 = extract %w, 1
+  apply %zim(%x, %y, %z, %w.0, %w.1)
+
+Variadic arguments and tuple elements are packaged into an array and passed as
+a single array argument. This Swift function::
+
+  func zang(x:Int, (y:Int, z:Int...), v:Int, w:Int...)
+
+  zang(x, (y, z0, z1), v, w0, w1, w2)
+
+gets called in SIL as::
+
+  %zang = constant_ref $(Int, Int, Int[], Int, Int[]) -> (), @zang
+  %zs = <<make array from %z1, %z2>>
+  %ws = <<make array from %w0, %w1, %w2>>
+  apply %zang(%x, %y, %zs, %v, %ws)
 
 Examples
 --------
