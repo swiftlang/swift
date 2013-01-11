@@ -32,7 +32,6 @@
 #include "ClassMetadataLayout.h"
 #include "FixedTypeInfo.h"
 #include "GenClass.h"
-#include "GenHeap.h"
 #include "GenPoly.h"
 #include "GenProto.h"
 #include "IRGenModule.h"
@@ -680,13 +679,13 @@ namespace {
     using super::IGM;
     using super::TargetClass;
     SmallVector<llvm::Constant *, 8> Fields;
-    const HeapLayout &Layout;    
+    const StructLayout &Layout;    
 
     /// A mapping from functions to their final overriders.
     llvm::DenseMap<FuncDecl*,FuncDecl*> FinalOverriders;
 
     ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
-                             const HeapLayout &layout)
+                             const StructLayout &layout)
       : super(IGM, theClass), Layout(layout) {
 
       computeFinalOverriders();
@@ -854,7 +853,7 @@ namespace {
     public ClassMetadataBuilderBase<ClassMetadataBuilder> {
   public:
     ClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                         const HeapLayout &layout)
+                         const StructLayout &layout)
       : ClassMetadataBuilderBase(IGM, theClass, layout) {}
 
     llvm::Constant *getInit() {
@@ -875,7 +874,7 @@ namespace {
 
   public:
     GenericClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                                const HeapLayout &layout,
+                                const StructLayout &layout,
                                 const GenericParamList &classGenerics)
       : super(IGM, classGenerics, theClass, layout) {}
   };
@@ -883,7 +882,7 @@ namespace {
 
 /// Emit the type metadata or metadata template for a class.
 void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
-                              const HeapLayout &layout) {
+                              const StructLayout &layout) {
   // TODO: classes nested within generic types
   llvm::Constant *init;
   bool isPattern;

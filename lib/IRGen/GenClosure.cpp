@@ -125,8 +125,7 @@ static ManagedValue emitClosureData(IRGenFunction &IGF, CapturingExpr *E,
     data = IGF.emitAlloc(layout, "closure-data.alloc");
   }
     
-  Address object =
-    layout.emitCastOfAlloc(IGF, data.getValue(), "closure-data");
+  Address object = layout.emitCastTo(IGF, data.getValue(), "closure-data");
 
   // Emit stores and loads for objects actually captured.
   for (unsigned i = 0, e = info.Captures.size(); i != e; ++i) {
@@ -218,8 +217,7 @@ static void emitLocalFunctionBody(IRGenFunction &definingIGF,
 
   // Map all the non-trivial captures.
   if (info.requiresData()) {
-    Address data = layout->emitCastOfAlloc(IGF, IGF.ContextPtr, 
-                                           "closure-data");
+    Address data = layout->emitCastTo(IGF, IGF.ContextPtr, "closure-data");
 
     // Emit stores and loads for objects actually captured.
     for (unsigned i = 0, e = info.Captures.size(); i != e; ++i) {

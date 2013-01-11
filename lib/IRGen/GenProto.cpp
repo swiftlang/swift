@@ -1005,7 +1005,7 @@ namespace {
                                                          name + ".alloc");
 
         // Cast and GEP down to the element.
-        Address rawAddr = layout.emitCastOfAlloc(IGF, allocation);
+        Address rawAddr = layout.emitCastTo(IGF, allocation);
         rawAddr = elt.project(IGF, rawAddr, name);
 
         // Push a cleanup to dealloc the allocation.

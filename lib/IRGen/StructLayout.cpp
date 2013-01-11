@@ -103,6 +103,15 @@ llvm::Value *StructLayout::emitAlign(IRGenFunction &IGF) const {
   return llvm::ConstantInt::get(IGF.IGM.SizeTy, getAlignment().getValue());
 }
 
+/// Bitcast an arbitrary pointer to be a pointer to this type.
+Address StructLayout::emitCastTo(IRGenFunction &IGF,
+                                 llvm::Value *ptr,
+                                 const llvm::Twine &name) const {
+  llvm::Value *addr =
+    IGF.Builder.CreateBitCast(ptr, getType()->getPointerTo(), name);
+  return Address(addr, getAlignment());
+}
+
 Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
                                const llvm::Twine &suffix) const {
   return IGF.Builder.CreateStructGEP(baseAddr, StructIndex, ByteOffset,

@@ -74,42 +74,11 @@ struct ElementLayout {
                   const llvm::Twine &suffix = "") const;
 };
 
-/// A struct layout is the result of laying out a complete structure.
-class StructLayout {
-  Alignment Align;
-  Size TotalSize;
-  llvm::Type *Ty;
-  llvm::SmallVector<ElementLayout, 8> Elements;
-
-public:
-  /// Create a structure layout.
-  ///
-  /// \param strategy - how much leeway the algorithm has to rearrange
-  ///   and combine the storage of fields
-  /// \param kind - the kind of layout to perform, including whether the
-  ///   layout must include the reference-counting header
-  /// \param typeToFill - if present, must be an opaque type whose body
-  ///   will be filled with this layout
-  StructLayout(IRGenModule &IGM, LayoutKind kind, LayoutStrategy strategy,
-               llvm::ArrayRef<const TypeInfo *> fields,
-               llvm::StructType *typeToFill = 0);
-
-  /// Return the element layouts.  This is parallel to the fields
-  /// passed in the constructor.
-  llvm::ArrayRef<ElementLayout> getElements() const { return Elements; }
-  llvm::Type *getType() const { return Ty; }
-  Size getSize() const { return TotalSize; }
-  Alignment getAlignment() const { return Align; }
-  bool empty() const { return TotalSize.isZero(); }
-
-  bool hasStaticLayout() const { return true; }
-  llvm::Value *emitSize(IRGenFunction &IGF) const;
-  llvm::Value *emitAlign(IRGenFunction &IGF) const;
-};
-
 /// A class for building a structure layout.
 class StructLayoutBuilder {
+protected:
   IRGenModule &IGM;
+private:
   llvm::SmallVector<llvm::Type*, 8> StructFields;
   Size CurSize = Size(0);
   Alignment CurAlignment = Alignment(1);
@@ -149,6 +118,50 @@ public:
 
   /// Build the current elements as a new anonymous struct type.
   void setAsBodyOfStruct(llvm::StructType *type) const;
+};
+
+/// A struct layout is the result of laying out a complete structure.
+class StructLayout {
+  Alignment Align;
+  Size TotalSize;
+  llvm::Type *Ty;
+  llvm::SmallVector<ElementLayout, 8> Elements;
+
+public:
+  /// Create a structure layout.
+  ///
+  /// \param strategy - how much leeway the algorithm has to rearrange
+  ///   and combine the storage of fields
+  /// \param kind - the kind of layout to perform, including whether the
+  ///   layout must include the reference-counting header
+  /// \param typeToFill - if present, must be an opaque type whose body
+  ///   will be filled with this layout
+  StructLayout(IRGenModule &IGM, LayoutKind kind, LayoutStrategy strategy,
+               llvm::ArrayRef<const TypeInfo *> fields,
+               llvm::StructType *typeToFill = 0);
+
+  /// Create a structure layout from a builder.
+  StructLayout(const StructLayoutBuilder &builder,
+               llvm::Type *type,
+               llvm::ArrayRef<ElementLayout> elements)
+    : Align(builder.getAlignment()), TotalSize(builder.getSize()),
+      Ty(type), Elements(elements.begin(), elements.end()) {}
+
+  /// Return the element layouts.  This is parallel to the fields
+  /// passed in the constructor.
+  llvm::ArrayRef<ElementLayout> getElements() const { return Elements; }
+  llvm::Type *getType() const { return Ty; }
+  Size getSize() const { return TotalSize; }
+  Alignment getAlignment() const { return Align; }
+  bool empty() const { return TotalSize.isZero(); }
+
+  bool hasStaticLayout() const { return true; }
+  llvm::Value *emitSize(IRGenFunction &IGF) const;
+  llvm::Value *emitAlign(IRGenFunction &IGF) const;
+
+  /// Bitcast the given pointer to this type.
+  Address emitCastTo(IRGenFunction &IGF, llvm::Value *ptr,
+                     const llvm::Twine &name = "") const;
 };
 
 Size getHeapHeaderSize(IRGenModule &IGM);

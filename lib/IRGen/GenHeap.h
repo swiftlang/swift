@@ -45,11 +45,6 @@ public:
   /// As a convenience, build a metadata object with internal linkage
   /// consisting solely of the standard heap metadata.
   llvm::Constant *getPrivateMetadata(IRGenModule &IGM) const;
-
-  /// Given that an object has been allocated, cast the result to the
-  /// appropriate type.
-  Address emitCastOfAlloc(IRGenFunction &IGF, llvm::Value *alloc,
-                          const llvm::Twine &name = "") const;
 };
 
 /// The heap-layout of an array.

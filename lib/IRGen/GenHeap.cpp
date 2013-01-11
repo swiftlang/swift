@@ -74,7 +74,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
   IRGenFunction IGF(IGM, CanType(), llvm::ArrayRef<Pattern*>(),
                     ExplosionKind::Minimal, 0, fn, Prologue::Bare);
 
-  Address structAddr = layout.emitCastOfAlloc(IGF, fn->arg_begin());
+  Address structAddr = layout.emitCastTo(IGF, fn->arg_begin());
 
   for (auto &field : layout.getElements()) {
     if (field.Type->isPOD(ResilienceScope::Local))
@@ -502,16 +502,6 @@ ManagedValue IRGenFunction::emitAlloc(const HeapLayout &layout,
                                       const llvm::Twine &name) {
   llvm::Value *alloc = emitUnmanagedAlloc(layout, name);
   return enterReleaseCleanup(alloc);
-}
-
-/// Given that an object has been allocated, cast the result to the
-/// appropriate type.
-Address HeapLayout::emitCastOfAlloc(IRGenFunction &IGF,
-                                    llvm::Value *alloc,
-                                    const llvm::Twine &name) const {
-  llvm::Value *addr =
-    IGF.Builder.CreateBitCast(alloc, getType()->getPointerTo(), name);
-  return Address(addr, getAlignment());
 }
 
 namespace {

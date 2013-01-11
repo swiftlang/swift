@@ -110,7 +110,7 @@ namespace {
   /// Layout information for class types.
   class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
     ClassDecl *TheClass;
-    mutable HeapLayout *Layout;
+    mutable StructLayout *Layout;
 
     /// Can we use swift reference-counting, or do we have to use
     /// objc_retain/release?
@@ -132,40 +132,12 @@ namespace {
 
     ClassDecl *getClass() const { return TheClass; }
 
-    static void addFieldsFromClass(IRGenModule &IGM,
-                                   ClassDecl *theClass,
-                              SmallVectorImpl<const TypeInfo*> &fieldTypes) {
-      // Recursively add members from the base.  This really only
-      // works under an assumption that the class is a base
-      if (theClass->hasBaseClass()) {
-        auto baseClass =
-          theClass->getBaseClass()->getClassOrBoundGenericClass();
-        addFieldsFromClass(IGM, baseClass, fieldTypes);
-      }
-      for (Decl *member : theClass->getMembers())
-        if (VarDecl *var = dyn_cast<VarDecl>(member))
-          if (!var->isProperty())
-            fieldTypes.push_back(&IGM.getFragileTypeInfo(var->getType()));
-    }
+    const StructLayout &getLayout(IRGenModule &IGM) const;
 
-    const HeapLayout &getLayout(IRGenModule &IGM) const {
-      if (Layout)
-        return *Layout;
-
-      // Collect all the fields from the type.
-      SmallVector<const TypeInfo*, 8> fieldTypes;
-      addFieldsFromClass(IGM, getClass(), fieldTypes);
-
-      llvm::PointerType *Ptr = cast<llvm::PointerType>(getStorageType());
-      llvm::StructType *STy = cast<llvm::StructType>(Ptr->getElementType());
-
-      Layout = new HeapLayout(IGM, LayoutStrategy::Optimal, fieldTypes, STy);
-      return *Layout;
-    }
     Alignment getHeapAlignment(IRGenModule &IGM) const {
       return getLayout(IGM).getAlignment();
     }
-    llvm::ArrayRef<ElementLayout> getElements(IRGenModule &IGM) const {
+    ArrayRef<ElementLayout> getElements(IRGenModule &IGM) const {
       return getLayout(IGM).getElements();
     }
   };
@@ -296,20 +268,11 @@ namespace {
   };
 }  // end anonymous namespace.
 
-static unsigned getNumFieldsInBases(ClassDecl *derived, unsigned count = 0) {
-  if (!derived->hasBaseClass()) return count;
-  auto base = derived->getBaseClass()->getClassOrBoundGenericClass();
-  for (Decl *member : base->getMembers()) {
-    if (auto var = dyn_cast<VarDecl>(member))
-      if (!var->isProperty())
-        ++count;
-  }
-  return getNumFieldsInBases(base, count);
-}
-
+/// Return the index of the given field within the class.
 static unsigned getFieldIndex(ClassDecl *base, VarDecl *target) {
-  // FIXME: This is an ugly hack.
-  unsigned index = getNumFieldsInBases(base);
+  // FIXME: This is algorithmically terrible.
+
+  unsigned index = 0;
   for (Decl *member : base->getMembers()) {
     if (member == target) return index;
     if (auto var = dyn_cast<VarDecl>(member))
@@ -317,6 +280,76 @@ static unsigned getFieldIndex(ClassDecl *base, VarDecl *target) {
         ++index;
   }
   llvm_unreachable("didn't find field in type!");
+}
+
+namespace {
+  class ClassLayoutBuilder : public StructLayoutBuilder {
+    SmallVector<ElementLayout, 8> LastElements;
+  public:
+    ClassLayoutBuilder(IRGenModule &IGM, ClassDecl *theClass)
+      : StructLayoutBuilder(IGM) {
+
+      // Start by adding a heap header.
+      addHeapHeader();
+
+      // Next, add the fields for the given class.
+      addFieldsForClass(theClass);
+    }
+
+    /// Return the element layouts for the most-derived class.
+    ArrayRef<ElementLayout> getLastElements() const {
+      return LastElements;
+    }
+
+  private:
+    void addFieldsForClass(ClassDecl *theClass) {
+      if (theClass->hasBaseClass()) {
+        // TODO: apply substitutions when computing base-class layouts!
+        auto baseClass = theClass->getBaseClass()->getClassOrBoundGenericClass();
+        assert(baseClass);
+
+        // Recurse.
+        addFieldsForClass(baseClass);
+
+        // Forget about the fields from the base class.
+        LastElements.clear();
+      }
+
+      // Collect fields from this class and add them to the layout as a chunk.
+      addDirectFieldsFromClass(theClass);
+    }
+
+    void addDirectFieldsFromClass(ClassDecl *theClass) {
+      assert(LastElements.empty());
+      for (Decl *member : theClass->getMembers()) {
+        VarDecl *var = dyn_cast<VarDecl>(member);
+        if (!var || var->isProperty()) continue;
+
+        LastElements.push_back(ElementLayout());
+        LastElements.back().Type = &IGM.getFragileTypeInfo(var->getType());
+      }
+
+      // Add those fields to the builder.
+      addFields(LastElements, LayoutStrategy::Universal);
+    }
+  };
+}
+
+const StructLayout &ClassTypeInfo::getLayout(IRGenModule &IGM) const {
+  // Return the cached layout if available.
+  if (Layout) return *Layout;
+
+  // Add the heap header.
+  ClassLayoutBuilder builder(IGM, getClass());
+
+  // Set the body of the class type.
+  auto classPtrTy = cast<llvm::PointerType>(getStorageType());
+  auto classTy = cast<llvm::StructType>(classPtrTy->getElementType());
+  builder.setAsBodyOfStruct(classTy);
+
+  // Record the layout.
+  Layout = new StructLayout(builder, classTy, builder.getLastElements());
+  return *Layout;
 }
 
 /// Cast the base to i8*, apply the given inbounds offset, and cast to
@@ -426,7 +459,7 @@ namespace {
       // FIXME: This implementation will be wrong once we get dynamic
       // class layout.
       auto &layout = info.getLayout(IGF.IGM);
-      Address baseAddr = layout.emitCastOfAlloc(IGF, ThisValue);
+      Address baseAddr = layout.emitCastTo(IGF, ThisValue);
 
       // Destroy all the instance variables of the class.
       for (auto &field : layout.getElements()) {

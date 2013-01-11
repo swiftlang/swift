@@ -36,7 +36,6 @@ namespace irgen {
   class Callee;
   class Explosion;
   enum class ExplosionKind : unsigned;
-  class HeapLayout;
   class IRGenFunction;
   class IRGenModule;
   class StructLayout;
@@ -69,7 +68,7 @@ namespace irgen {
 
   /// Emit the metadata associated with the given class declaration.
   void emitClassMetadata(IRGenModule &IGM, ClassDecl *theClass,
-                         const HeapLayout &layout);
+                         const StructLayout &layout);
 
   /// Emit the metadata associated with the given struct declaration.
   void emitStructMetadata(IRGenModule &IGM, StructDecl *theStruct);

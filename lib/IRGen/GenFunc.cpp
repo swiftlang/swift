@@ -3170,7 +3170,7 @@ namespace {
         // do a lot of setup beforehand.
         data = IGF.emitUnmanagedAlloc(layout, "data");
 
-        Address dataAddr = layout.emitCastOfAlloc(IGF, data);
+        Address dataAddr = layout.emitCastTo(IGF, data);
 
         // Perform the store.
         for (auto &fieldLayout : layout.getElements()) {
@@ -3216,7 +3216,7 @@ namespace {
       // parameters.
       if (!layout.empty()) {
         llvm::Value *rawData = params.takeLast().getUnmanagedValue();
-        Address data = layout.emitCastOfAlloc(IGF, rawData);
+        Address data = layout.emitCastTo(IGF, rawData);
 
         // Perform the loads.
         for (auto &fieldLayout : layout.getElements()) {
