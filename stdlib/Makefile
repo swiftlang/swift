@@ -16,8 +16,14 @@ include $(SWIFT_LEVEL)/../../Makefile.config
 LIBRARYNAME := swift_stdlib
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
-SWIFT_SOURCES := Policy.swift Bool.swift FixedPoint.swift Float32.swift \
-		 Float64.swift \
+SWIFT_SOURCES := Policy.swift Bool.swift
+ifeq ($(ARCH),x86_64)
+  SWIFT_SOURCES += Word64.swift
+endif
+ifeq ($(ARCH),x86)
+  SWIFT_SOURCES += Word32.swift
+endif
+SWIFT_SOURCES += FixedPoint.swift Float32.swift Float64.swift \
 		 Object.swift CTypes.swift Misc.swift Enumeration.swift \
 		 UnsafePointer.swift \
 		 Slice.swift StringByte.swift String.swift Char.swift \
