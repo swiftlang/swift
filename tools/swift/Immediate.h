@@ -20,7 +20,8 @@
 namespace swift {
   class ASTContext;
   class TranslationUnit;
+  class SILModule;
 
-  void RunImmediately(TranslationUnit *TU);
+  void RunImmediately(TranslationUnit *TU, SILModule *SILMod = nullptr);
   void REPL(ASTContext &Context);
 }

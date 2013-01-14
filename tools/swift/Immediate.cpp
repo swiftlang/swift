@@ -137,7 +137,7 @@ static bool IRGenImportedModules(TranslationUnit *TU,
   return false;
 }
 
-void swift::RunImmediately(TranslationUnit *TU) {
+void swift::RunImmediately(TranslationUnit *TU, SILModule *SILMod) {
   ASTContext &Context = TU->Ctx;
   irgen::Options Options;
   Options.OutputFilename = "";
@@ -150,7 +150,7 @@ void swift::RunImmediately(TranslationUnit *TU) {
   llvm::LLVMContext LLVMContext;
   llvm::Module Module(TU->Name.str(), LLVMContext);
   performCaptureAnalysis(TU);
-  performIRGeneration(Options, &Module, TU);
+  performIRGeneration(Options, &Module, TU, SILMod);
 
   if (Context.hadError())
     return;
