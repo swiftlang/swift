@@ -23,6 +23,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/SILModule.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
@@ -33,6 +34,7 @@
 #include "GenMeta.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "IRGenSIL.h"
 #include "Linking.h"
 #include "LValue.h"
 #include "TypeInfo.h"
@@ -92,9 +94,13 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                                 tunit->Name.str() + ".init", &Module);
   }
 
-  IRGenFunction(*this, unitToUnit, params, ExplosionKind::Minimal,
-                /*uncurry*/ 0, fn)
-    .emitGlobalTopLevel(tunit, StartElem);
+  if (SILMod)
+    IRGenSILFunction(*this, unitToUnit, params, fn)
+      .emitGlobalTopLevel(tunit, SILMod);
+  else
+    IRGenFunction(*this, unitToUnit, params, ExplosionKind::Minimal,
+                  /*uncurry*/ 0, fn)
+      .emitGlobalTopLevel(tunit, StartElem);
 
   if (tunit->Kind == TranslationUnit::Main ||
       tunit->Kind == TranslationUnit::Repl) {
@@ -150,7 +156,7 @@ void IRGenFunction::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) 
     assert(Builder.hasValidIP());
     emitGlobalDecl(TU->Decls[i]);
   }
-
+  
   // For any Clang modules imported by this translation unit, directly
   // or indirectly, emit external definitions.  
   // FIXME: This can be O(N^2), since we can see the same Clang module
@@ -467,6 +473,11 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     return IGM.emitGlobalFunction(cast<FuncDecl>(D));
 
   case DeclKind::TopLevelCode: {
+    // If we have a SIL module, all the top-level code will be lowered
+    // separately.
+    if (IGM.SILMod)
+      return;
+    
     auto Body = cast<TopLevelCodeDecl>(D)->getBody();
     if (Body.is<Expr*>())
       return emitIgnored(Body.get<Expr*>());

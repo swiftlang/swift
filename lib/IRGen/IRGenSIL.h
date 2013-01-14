@@ -23,6 +23,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/CallingConv.h"
+#include "CallEmission.h"
 #include "IRBuilder.h"
 #include "IRGenFunction.h"
 #include "JumpDest.h"
@@ -118,6 +119,12 @@ public:
   
   /// Generate IR for the given SIL Function.
   void emitSILFunction(swift::Function *f);
+  
+  /// Generate code from the global toplevel. This will emit all the
+  /// declarations in the given translation unit along with the toplevel
+  /// of the given SILModule.
+  void emitGlobalTopLevel(TranslationUnit *TU,
+                          SILModule *SILMod);
   
   /// Create a new Explosion corresponding to the given SIL value.
   Explosion &newLoweredExplosion(swift::Value v) {

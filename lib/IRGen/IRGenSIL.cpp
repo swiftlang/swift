@@ -58,6 +58,16 @@ void IRGenSILFunction::emitSILFunction(swift::Function *f) {
   visitBasicBlock(entry);
 }
 
+void IRGenSILFunction::emitGlobalTopLevel(TranslationUnit *TU,
+                                          SILModule *SILMod) {
+  // Emit the toplevel function.
+  if (SILMod->hasTopLevelFunction())
+    emitSILFunction(SILMod->getTopLevelFunction());
+  
+  // FIXME: should support nonzero StartElems for interactive contexts.
+  IRGenFunction::emitGlobalTopLevel(TU, 0);
+}
+
 void IRGenSILFunction::visitBasicBlock(swift::BasicBlock *BB) {
   // Emit the LLVM basic block.
   // FIXME: Use the SIL basic block's name.
