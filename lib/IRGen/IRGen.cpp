@@ -68,7 +68,6 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
                                 TranslationUnit *TU,
                                 SILModule *SILMod,
                                 unsigned StartElem) {
-  assert(!SILMod && "SIL irgen not yet implemented");
   assert(!TU->Ctx.hadError());
 
   std::unique_ptr<LLVMContext> Context;
@@ -119,7 +118,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   Module->setDataLayout(DataLayout->getStringRepresentation());
 
   // Emit the translation unit.
-  IRGenModule IRM(TU->Ctx, Opts, *Module, *DataLayout);
+  IRGenModule IRM(TU->Ctx, Opts, *Module, *DataLayout, SILMod);
   IRM.emitTranslationUnit(TU, StartElem);
 
   // Bail out if there are any errors.

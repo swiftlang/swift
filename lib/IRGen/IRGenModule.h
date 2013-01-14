@@ -55,6 +55,7 @@ namespace swift {
   class OneOfDecl;
   class ProtocolCompositionType;
   class ProtocolDecl;
+  class SILModule;
   class SourceLoc;
   class StructDecl;
   class TranslationUnit;
@@ -87,6 +88,7 @@ public:
   llvm::Module &Module;
   llvm::LLVMContext &LLVMContext;
   const llvm::DataLayout &DataLayout;
+  SILModule *SILMod;
 
   /// Does the current target require Objective-C interoperation?
   static const bool ObjCInterop = true;
@@ -266,7 +268,8 @@ private:
 //--- Generic ---------------------------------------------------------------
 public:
   IRGenModule(ASTContext &Context, Options &Opts, llvm::Module &Module,
-              const llvm::DataLayout &DataLayout);
+              const llvm::DataLayout &DataLayout,
+              SILModule *SILMod);
   ~IRGenModule();
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }

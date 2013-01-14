@@ -22,6 +22,7 @@ add_swift_library(swiftIRGen
   IRGen.cpp
   IRGenFunction.cpp
   IRGenModule.cpp
+  IRGenSIL.cpp
   Mangle.cpp
   OptimizeARC.cpp
   StructLayout.cpp

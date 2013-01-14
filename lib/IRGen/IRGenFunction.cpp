@@ -35,12 +35,15 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM, CanType t, ArrayRef<Pattern*> p,
     CurExplosionLevel(explosionLevel), CurUncurryLevel(uncurryLevel),
     CurPrologue(prologue), ContextPtr(nullptr),
     UnreachableBB(nullptr), JumpDestSlot(nullptr),
-    InnermostScope(Cleanups.stable_end()) {
-  emitPrologue();
+    InnermostScope(Cleanups.stable_end())
+{
+  if (CurPrologue != Prologue::None)
+    emitPrologue();
 }
 
 IRGenFunction::~IRGenFunction() {
-  emitEpilogue();
+  if (CurPrologue != Prologue::None)
+    emitEpilogue();
 }
 
 /// Call the llvm.memcpy intrinsic.  The arguments need not already

@@ -36,11 +36,13 @@ using namespace swift;
 using namespace irgen;
 
 IRGenModule::IRGenModule(ASTContext &Context,
-			 Options &Opts, llvm::Module &Module,
-                         const llvm::DataLayout &DataLayout)
+                         Options &Opts, llvm::Module &Module,
+                         const llvm::DataLayout &DataLayout,
+                         SILModule *SILMod)
   : Context(Context), Opts(Opts),
     Module(Module), LLVMContext(Module.getContext()),
-    DataLayout(DataLayout), Types(*new TypeConverter(*this)) {
+    DataLayout(DataLayout), SILMod(SILMod),
+    Types(*new TypeConverter(*this)) {
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());

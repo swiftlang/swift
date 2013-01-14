@@ -89,6 +89,9 @@ enum class LocalTypeData : unsigned {
 /// Prologue - A value indicating controlling the kind of prologue/epilogue
 /// code to emit.
 enum class Prologue : unsigned char {
+  /// No prologue whatever.
+  None,
+
   /// The standard prologue/epilogue is useful for emitting normal
   /// function bodies consisting of statements and expressions.  It implies:
   ///   - everything from Prologue::Bare, plus

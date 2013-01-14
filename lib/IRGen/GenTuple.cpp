@@ -492,3 +492,16 @@ void swift::irgen::emitTuplePatternInitFromAddress(IRGenFunction &IGF,
   // and copy directly.
   InitPatternFromAddress(IGF, I, addr).visitTuplePattern(P, tupleTI);
 }
+
+/// Emit a string literal, either as a C string pointer or as a (pointer, size)
+/// tuple.
+
+void swift::irgen::emitStringLiteral(IRGenFunction &IGF,
+                                     StringRef string,
+                                     bool includeSize,
+                                     Explosion &out) {
+  auto ptr = IGF.IGM.getAddrOfGlobalString(string);
+  out.addUnmanaged(ptr);
+  if (includeSize)
+    out.addUnmanaged(IGF.Builder.getInt64(string.size()));
+}

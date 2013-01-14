@@ -59,6 +59,12 @@ namespace irgen {
                                        Address address, TuplePattern *P,
                                        const TypeInfo &type);
 
+  /// Emit a string literal rvalue.
+  void emitStringLiteral(IRGenFunction &IGF,
+                         llvm::StringRef string,
+                         bool includeSize,
+                         Explosion &out);
+  
 } // end namespace irgen
 } // end namespace swift
 

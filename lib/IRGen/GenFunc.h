@@ -22,6 +22,7 @@
 
 namespace swift {
   class ApplyExpr;
+  class ApplyInst;
   class FuncDecl;
   template <class T> class Optional;
   class Substitution;
@@ -51,6 +52,10 @@ namespace irgen {
   void emitApplyExprToMemory(IRGenFunction &IGF, ApplyExpr *apply,
                              Address addr, const TypeInfo &type);
 
+  /// Return the natural level at which to uncurry this function.  This
+  /// is the number of additional parameter clauses that are uncurried
+  /// in the function body.
+  unsigned getDeclNaturalUncurryLevel(ValueDecl *val);
 } // end namespace irgen
 } // end namespace swift
 

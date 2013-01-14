@@ -57,6 +57,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Optional.h"
+#include "swift/SIL/SILModule.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Intrinsics.h"
@@ -78,6 +79,7 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "IRGenSIL.h"
 #include "LValue.h"
 #include "Condition.h"
 #include "FixedTypeInfo.h"
@@ -126,7 +128,7 @@ static unsigned getNumCurries(AnyFunctionType *type) {
 /// Return the natural level at which to uncurry this function.  This
 /// is the number of additional parameter clauses that are uncurried
 /// in the function body.
-static unsigned getNaturalUncurryLevel(ValueDecl *val) {
+unsigned irgen::getDeclNaturalUncurryLevel(ValueDecl *val) {
   if (FuncDecl *func = dyn_cast<FuncDecl>(val)) {
     return func->getBody()->getNaturalArgumentCount() - 1;
   }
@@ -582,7 +584,7 @@ static AbstractCallee getAbstractDirectCallee(ValueDecl *val,
   unsigned minUncurry = 0;
   if (val->getDeclContext()->isTypeContext())
     minUncurry = 1;
-  unsigned maxUncurry = getNaturalUncurryLevel(val);
+  unsigned maxUncurry = getDeclNaturalUncurryLevel(val);
   
   AbstractCC convention = getAbstractCC(val);
 
@@ -1554,6 +1556,7 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   
   if (BuiltinName.startswith("atomicrmw_")) {
     using namespace llvm;
+    
     BuiltinName = BuiltinName.drop_front(strlen("atomicrmw_"));
     auto underscore = BuiltinName.find('_');
     StringRef SubOp = BuiltinName.substr(0, underscore);
@@ -1596,8 +1599,8 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
 
     pointer = IGF.Builder.CreateBitCast(pointer,
                                   llvm::PointerType::getUnqual(val->getType()));
-    Value *result = IGF.Builder.CreateAtomicRMW(SubOpcode, pointer, val,
-                                                ordering,
+    llvm::Value *result = IGF.Builder.CreateAtomicRMW(SubOpcode, pointer, val,
+                                                      ordering,
                       isSingleThread ? llvm::SingleThread : llvm::CrossThread);
     cast<AtomicRMWInst>(result)->setVolatile(isVolatile);
 
@@ -2817,6 +2820,8 @@ static void emitParameterClauses(IRGenFunction &IGF,
 
 /// Emit the prologue for the function.
 void IRGenFunction::emitPrologue() {
+  assert(CurPrologue != Prologue::None && "no prologue asked?!");
+  
   // Set up the IRBuilder.
   llvm::BasicBlock *EntryBB = createBasicBlock("entry");
   assert(CurFn->getBasicBlockList().empty() && "prologue already emitted?");
@@ -2904,6 +2909,8 @@ static void eraseAllocaIfOnlyStoredTo(llvm::AllocaInst *alloca) {
 
 /// Emit the epilogue for the function.
 void IRGenFunction::emitEpilogue() {
+  assert(CurPrologue != Prologue::None && "no prologue asked?!");
+
   // Leave the cleanups created for the parameters if we've got a full
   // prologue.
   if (CurPrologue != Prologue::Bare)
@@ -3261,7 +3268,7 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
 
   // FIXME: variant currying levels!
   // FIXME: also emit entrypoints with maximal explosion when all types are known!
-  unsigned naturalUncurryLevel = getNaturalUncurryLevel(func);
+  unsigned naturalUncurryLevel = getDeclNaturalUncurryLevel(func);
   assert(startingUncurryLevel <= naturalUncurryLevel);
 
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
@@ -3294,11 +3301,22 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
   }
 
   // Finally, emit the uncurried entrypoint.
-  PrettyStackTraceDecl stackTrace("emitting IR for", func);
-  IRGenFunction(IGM, funcExpr->getType()->getCanonicalType(),
-                funcExpr->getBodyParamPatterns(), explosionLevel,
-                naturalUncurryLevel, entrypoint)
-    .emitFunctionTopLevel(funcExpr->getBody());
+  if (IGM.SILMod) {
+    // If we have a SIL function, use it.
+    PrettyStackTraceDecl stackTrace("emitting IR from SIL for", func);
+    Function *silFunction = IGM.SILMod->getFunction(SILConstant(func));
+    IRGenSILFunction(IGM,
+                     funcExpr->getType()->getCanonicalType(),
+                     funcExpr->getBodyParamPatterns(),
+                     entrypoint)
+      .emitSILFunction(silFunction);
+  } else {
+    PrettyStackTraceDecl stackTrace("emitting IR for", func);
+    IRGenFunction(IGM, funcExpr->getType()->getCanonicalType(),
+                  funcExpr->getBodyParamPatterns(), explosionLevel,
+                  naturalUncurryLevel, entrypoint)
+      .emitFunctionTopLevel(funcExpr->getBody());
+  }
 }
 
 /// Emit the definition for the given instance method.

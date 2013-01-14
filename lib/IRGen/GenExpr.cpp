@@ -72,13 +72,13 @@ static llvm::Value *emitCharacterLiteralExpr(IRGenFunction &IGF,
 static void emitStringLiteralExpr(IRGenFunction &IGF,
                                   StringLiteralExpr *E, 
                                   Explosion &out) {
-  auto ptr = IGF.IGM.getAddrOfGlobalString(E->getValue());
-  out.addUnmanaged(ptr);
-
-  if (!E->getType()->is<BuiltinRawPointerType>()) {
+  // Type of the expression should be either a lone RawPointer or a
+  // (RawPointer, Int64) tuple.
+  bool includeSize = !E->getType()->is<BuiltinRawPointerType>();
+  if (includeSize)
     assert(E->getType()->is<TupleType>());
-    out.addUnmanaged(IGF.Builder.getInt64(E->getValue().size()));
-  }
+
+  emitStringLiteral(IGF, E->getValue(), includeSize, out);
 }
 
 static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
