@@ -53,7 +53,7 @@ public:
   }
   
   /// Returns true if this initialization represents a single contiguous buffer.
-  bool hasAddress() { return getAddressOrNull(); }
+  bool hasAddress() { return getAddressOrNull().isValid(); }
 
   /// Returns the address of the single contiguous buffer represented by this
   /// initialization. Once the address has been stored to,

@@ -80,9 +80,15 @@ namespace swift {
       return ValueAndResultNumber == RHS.ValueAndResultNumber;
     }
     bool operator!=(Value RHS) const { return !(*this == RHS); }
+    // Ordering (for std::map).
+    bool operator<(Value RHS) const {
+      return ValueAndResultNumber.getOpaqueValue() <
+      RHS.ValueAndResultNumber.getOpaqueValue();
+    }
 
-    // Boolean conversion for null checks.
-    operator bool() const { return getDef() != nullptr; }
+    // Check validity.
+    bool isValid() const { return getDef() != nullptr; }
+    explicit operator bool() const { return getDef() != nullptr; }
   };
 } // end namespace swift
 
