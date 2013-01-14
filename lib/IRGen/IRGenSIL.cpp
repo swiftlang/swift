@@ -52,6 +52,7 @@ void IRGenSILFunction::emitSILFunction(swift::Function *f) {
   
   // FIXME Map the SIL arguments to LLVM arguments.
   size_t bbarg_size = entry->bbarg_end() - entry->bbarg_begin();
+  (void)bbarg_size;
   assert(bbarg_size == 0 && "arguments not yet supported");
   
   // Emit the function body.
