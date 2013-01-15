@@ -124,7 +124,7 @@ print_double(char* Buffer, double X) {
   return i;
 }
 
-extern "C" bool _TSb13getLogicValuefRSbFT_Bi1(bool* b) {
+extern "C" bool _TSb13getLogicValuefRSbFT_Bi1_(bool* b) {
   return *b;
 }
 
