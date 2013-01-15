@@ -13,10 +13,13 @@ Objective-C class.
 
 Mangling
 --------
+::
 
   mangled-name ::= '_T' global
 
 All Swift-mangled names begin with this prefix.
+
+::
 
   global ::= 'M' directness type             // type metadata
   global ::= 'MP' directness type            // type metadata pattern
@@ -39,6 +42,8 @@ Entity manglings all start with a nominal-type-kind ([COV]), an
 identifier ([0-9o]), or a substitution ([S]).  Global manglings start
 with any of those or [MTWw].
 
+::
+
   directness ::= 'd'                         // direct
   directness ::= 'i'                         // indirect
 
@@ -56,6 +61,8 @@ resilient structure.  When the layout of the object may depend on
 generic arguments, these offsets must be kept in metadata.  Indirect
 field offsets are therefore required when accessing fields in generic
 types where the metadata itself has unknown layout.)
+
+::
 
   context ::= module
   context ::= function
@@ -93,6 +100,8 @@ types where the metadata itself has unknown layout.)
 <type> never begins or ends with a number.
 <type> never begins with an underscore.
 
+::
+
   generics ::= generic-parameter+
   generic-parameter ::= protocol-list '_'
   protocol-list ::= protocol*
@@ -101,6 +110,8 @@ types where the metadata itself has unknown layout.)
 
 <protocol-list> is unambiguous because protocols are always top-level,
 and so the structure is quite simple.
+
+::
 
   known-module ::= 'Ss'                      // swift
   known-nominal-type ::= 'Sb'                // swift.Bool
@@ -114,6 +125,8 @@ and so the structure is quite simple.
 <known-module> and <known-nominal-type> are built-in substitutions for
 certain common entities.  Like any other substitution, they all start
 with 'S'.
+
+::
 
   value-witness-kind ::= 'al'                // allocateBuffer
   value-witness-kind ::= 'ac'                // assignWithCopy
@@ -130,6 +143,8 @@ with 'S'.
 
 <value-witness-kind> differentiates the kinds of function value
 witnesses for a type.
+
+::
 
   identifier ::= natural identifier-start-char identifier-char*
   identifier ::= 'op' natural operator-char+
@@ -153,6 +168,8 @@ characters follow.  Operator characters are mapped into ASCII as
 given.  Non-ASCII identifier characters are... translated into ASCII
 somehow?  In neither case can an identifier start with a digit, so
 there's no ambiguity with the run-length.
+
+::
 
   index ::= '_'                              // 0
   index ::= natural '_'                      // N+1
