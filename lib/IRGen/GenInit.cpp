@@ -130,6 +130,8 @@ void Initialization::markAllocated(IRGenFunction &IGF,
                                    InitializedObject object,
                                    OwnedAddress address,
                                    CleanupsDepth dealloc) {
+  assert(Records.find(object.Opaque) != Records.end() &&
+         "object was not registered with initialization");
   ValueRecord &record = Records.find(object.Opaque)->second;
   record.DeallocCleanup = dealloc;
 

@@ -31,6 +31,13 @@ namespace irgen {
   class Initialization;
   class LValue;
 
+  /// Project a tuple element rvalue from an already-exploded tuple rvalue.
+  void projectTupleElementFromExplosion(IRGenFunction &IGF,
+                                        CanType tupleType,
+                                        Explosion &tuple,
+                                        unsigned fieldNo,
+                                        Explosion &out);
+  
   /// Emit an element projection as an r-value.
   void emitTupleElement(IRGenFunction &IGF, TupleElementExpr *E,
                         Explosion &explosion);

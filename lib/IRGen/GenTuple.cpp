@@ -143,6 +143,25 @@ namespace {
   };
 }
 
+void swift::irgen::projectTupleElementFromExplosion(IRGenFunction &IGF,
+                                                    CanType tupleType,
+                                                    Explosion &tuple,
+                                                    unsigned fieldNo,
+                                                    Explosion &out) {
+  const TupleTypeInfo &tupleTI = getAsTupleTypeInfo(IGF, tupleType);
+  const TupleFieldInfo &field = tupleTI.getFields()[fieldNo];
+  // If the field requires no storage, there's nothing to do.
+  if (field.isEmpty()) {
+    return IGF.emitFakeExplosion(field.getTypeInfo(), out);
+  }
+
+  // Otherwise, project from the base.
+  auto fieldRange = field.getProjectionRange(out.getKind());
+  ArrayRef<ManagedValue> element = tuple.getRange(fieldRange.first,
+                                                  fieldRange.second);
+  out.add(element);
+}
+
 void swift::irgen::emitTupleElement(IRGenFunction &IGF, TupleElementExpr *E,
                                     Explosion &explosion) {
   // If we're doing an l-value projection, this is straightforward.

@@ -2819,9 +2819,7 @@ static void emitParameterClauses(IRGenFunction &IGF,
 }
 
 /// Emit the prologue for the function.
-void IRGenFunction::emitPrologue() {
-  assert(CurPrologue != Prologue::None && "no prologue asked?!");
-  
+void IRGenFunction::emitPrologue() {  
   // Set up the IRBuilder.
   llvm::BasicBlock *EntryBB = createBasicBlock("entry");
   assert(CurFn->getBasicBlockList().empty() && "prologue already emitted?");
@@ -2909,8 +2907,6 @@ static void eraseAllocaIfOnlyStoredTo(llvm::AllocaInst *alloca) {
 
 /// Emit the epilogue for the function.
 void IRGenFunction::emitEpilogue() {
-  assert(CurPrologue != Prologue::None && "no prologue asked?!");
-
   // Leave the cleanups created for the parameters if we've got a full
   // prologue.
   if (CurPrologue != Prologue::Bare)

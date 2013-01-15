@@ -89,6 +89,11 @@ namespace swift {
     // Check validity.
     bool isValid() const { return getDef() != nullptr; }
     explicit operator bool() const { return getDef() != nullptr; }
+    
+    // Use as a pointer-like type.
+    void *getOpaqueValue() const {
+      return ValueAndResultNumber.getOpaqueValue();
+    }
   };
 } // end namespace swift
 

@@ -37,13 +37,13 @@ struct PartialCall {
   unsigned remainingCurryLevels;
 };
   
-/// Represents a SIL value lowered to IR, either as an Explosion of (unmanaged)
-/// LLVM Values, or as a CallEmission in progress. (The CallEmission case is
-/// a kludge to deal with the impedance mismatch between irgen's current
-/// handling of CallEmissions as complete expressions vs. SIL's CFG-like
-/// representation.)
+/// Represents a SIL value lowered to IR, in one of these forms:
+/// - an Address, corresponding to a SIL address value;
+/// - an Explosion of (unmanaged) Values, corresponding to a SIL "register"; or
+/// - a CallEmission for a partially-applied curried function or method.
 struct LoweredValue {
   enum class Kind {
+    Address,
     Explosion,
     PartialCall
   };
@@ -52,11 +52,16 @@ struct LoweredValue {
   
 private:
   union {
+    Address address;
     Explosion explosion;
     PartialCall partialCall;
   };
 
 public:
+  LoweredValue(Address const &address)
+    : kind(Kind::Address), address(address)
+  {}
+  
   LoweredValue(Explosion &&explosion)
     : kind(Kind::Explosion), explosion(std::move(explosion))
   {}
@@ -66,15 +71,24 @@ public:
   {}
   
   LoweredValue(LoweredValue &&lv)
-    : kind(lv.kind) {
+    : kind(lv.kind)
+  {
     switch (kind) {
+    case Kind::Address:
+      ::new (&address) Address(std::move(lv.address));
+      break;
     case Kind::Explosion:
-      new (&explosion) Explosion(std::move(lv.explosion));
+      ::new (&explosion) Explosion(std::move(lv.explosion));
       break;
     case Kind::PartialCall:
-      new (&partialCall) PartialCall(std::move(lv.partialCall));
+      ::new (&partialCall) PartialCall(std::move(lv.partialCall));
       break;
     }
+  }
+           
+  Address getAddress() {
+    assert(kind == Kind::Address && "not an address");
+    return address;
   }
   
   Explosion &getExplosion() {
@@ -89,9 +103,13 @@ public:
   
   ~LoweredValue() {
     switch (kind) {
+    case Kind::Address:
+      address.~Address();
+      break;
     case Kind::Explosion:
       // Work around Explosion's "empty" sanity check by discarding all the
-      // managed values.
+      // managed values (which should never actually be managed when generated
+      // from SIL).
       explosion.claimAll();
       explosion.~Explosion();
       break;
@@ -101,6 +119,15 @@ public:
     }
   }
 };
+  
+/// Represents a lowered SIL basic block. This keeps track^W^Wwill keep track
+/// of SIL branch arguments so that they can be lowered to LLVM phi nodes.
+struct LoweredBB {
+  llvm::BasicBlock *bb;
+  
+  LoweredBB() = default;
+  explicit LoweredBB(llvm::BasicBlock *bb) : bb(bb) {}
+};
 
 /// Visits a SIL Function and generates LLVM IR.
 class IRGenSILFunction :
@@ -109,6 +136,8 @@ class IRGenSILFunction :
   // FIXME: using std::map because DenseMap doesn't handle non-copyable value
   // types.
   ::std::map<swift::Value, LoweredValue> loweredValues;
+  
+  llvm::MapVector<swift::BasicBlock *, LoweredBB> loweredBBs;
   
 public:
   IRGenSILFunction(IRGenModule &IGM,
@@ -126,8 +155,16 @@ public:
   void emitGlobalTopLevel(TranslationUnit *TU,
                           SILModule *SILMod);
   
+  /// Create a new Address corresponding to the given SIL address value.
+  void newLoweredAddress(swift::Value v, Address const &address) {
+    assert(v.getType().isAddress() && "address for non-address value?!");
+    auto inserted = loweredValues.emplace(v, address);
+    assert(inserted.second && "already had lowered value for sil value?!");
+  }
+  
   /// Create a new Explosion corresponding to the given SIL value.
   Explosion &newLoweredExplosion(swift::Value v) {
+    assert(!v.getType().isAddress() && "explosion for address value?!");
     auto inserted = loweredValues.emplace(v, LoweredValue{
       Explosion(ExplosionKind::Minimal)
     });
@@ -156,17 +193,26 @@ public:
   /// Get the Explosion corresponding to the given SIL value, which must
   /// previously exist.
   LoweredValue &getLoweredValue(swift::Value v) {
-    auto foundExplosion = loweredValues.find(v);
-    assert(foundExplosion != loweredValues.end() &&
+    auto foundValue = loweredValues.find(v);
+    assert(foundValue != loweredValues.end() &&
            "no lowered explosion for sil value!");
-    return foundExplosion->second;
+    return foundValue->second;
   }
   
+  Address getLoweredAddress(swift::Value v) {
+    return getLoweredValue(v).getAddress();
+  }
   Explosion &getLoweredExplosion(swift::Value v) {
     return getLoweredValue(v).getExplosion();
   }
   PartialCall &getLoweredPartialCall(swift::Value v) {
     return getLoweredValue(v).getPartialCall();
+  }
+  
+  LoweredBB &getLoweredBB(swift::BasicBlock *bb) {
+    auto foundBB = loweredBBs.find(bb);
+    assert(foundBB != loweredBBs.end() && "no llvm bb for sil bb?!");
+    return foundBB->second;
   }
   
   //===--------------------------------------------------------------------===//
@@ -180,19 +226,34 @@ public:
     llvm_unreachable("irgen for SIL instruction not yet implemented");
   }
   
-  /* A minimal set of instructions to implement to make hello world work. */
-  void visitTupleInst(TupleInst *i);
-  void visitConstantRefInst(ConstantRefInst *i);
-  void visitMetatypeInst(MetatypeInst *i);
+  void visitAllocVarInst(AllocVarInst *i);
+  void visitAllocBoxInst(AllocBoxInst *i);
+
   void visitApplyInst(ApplyInst *i);
+
+  void visitConstantRefInst(ConstantRefInst *i);
+
+  void visitIntegerLiteralInst(IntegerLiteralInst *i);
   void visitStringLiteralInst(StringLiteralInst *i);
+
+  void visitLoadInst(LoadInst *i);
+  void visitStoreInst(StoreInst *i);
+  void visitTupleInst(TupleInst *i);
+  void visitMetatypeInst(MetatypeInst *i);
   void visitExtractInst(ExtractInst *i);
+
+  void visitDeallocVarInst(DeallocVarInst *i);
+  void visitReleaseInst(ReleaseInst *i);
+  
+  void visitUnreachableInst(UnreachableInst *i);
   void visitReturnInst(ReturnInst *i);
+  void visitBranchInst(BranchInst *i);
+  void visitCondBranchInst(CondBranchInst *i);
   
   //===--------------------------------------------------------------------===//
   // Helpers
   //===--------------------------------------------------------------------===//
-  void emitCall(LoweredValue &lv, Explosion &out);
+  void emitApplyArgument(Explosion &args, LoweredValue &newArg);
 };
 
 } // end namespace irgen

@@ -36,6 +36,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "IRGenFunction.h"
+#include "swift/SIL/Value.h"
 
 namespace swift {
   class ValueDecl;
@@ -79,6 +80,11 @@ public:
   /// Create an object reference for the given local declaration.
   InitializedObject getObjectForDecl(ValueDecl *value) {
     return InitializedObject(value);
+  }
+  
+  /// Create an object reference for the given SIL value.
+  InitializedObject getObjectForValue(swift::Value v) {
+    return InitializedObject(v.getOpaqueValue());
   }
 
   /// Create an object reference for the given temporary.
