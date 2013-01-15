@@ -1,20 +1,3 @@
-//===----------------------------------------------------------------------===//
-// Enumeration
-//===----------------------------------------------------------------------===//
-
-/// \brief Describes iteration over a sequences of elements that can be
-/// performed once.
-protocol Enumerator {
-  typealias Element
-  func isEmpty() -> Bool
-  func next() -> Element
-}
-
-protocol Enumerable {
-  typealias EnumeratorType : Enumerator
-  func getEnumeratorType() -> EnumeratorType
-}
-
 // FIXME: make generic
 // BLOCKED: <rdar://problem/12780068> Crash while trying to make iteration generic
 struct IntEnumeratorType : Enumerator, Enumerable {

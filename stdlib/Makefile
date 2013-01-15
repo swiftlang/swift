@@ -24,7 +24,7 @@ ifeq ($(ARCH),x86)
   SWIFT_SOURCES += Word32.swift
 endif
 SWIFT_SOURCES += FixedPoint.swift Float32.swift Float64.swift \
-		 Object.swift CTypes.swift Misc.swift Enumeration.swift \
+		 Object.swift CTypes.swift Misc.swift Range.swift \
 		 UnsafePointer.swift \
 		 Slice.swift StringByte.swift String.swift Char.swift \
 		 Dictionary.swift Vector.swift \
