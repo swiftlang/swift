@@ -267,8 +267,8 @@ public:
                           bool NeedDefinition,
                           SmallVectorImpl<Decl *> &Decls);
 
-  ConstructorDecl *parseDeclConstructor();
-  DestructorDecl *parseDeclDestructor();
+  ConstructorDecl *parseDeclConstructor(bool HasContainerType);
+  DestructorDecl *parseDeclDestructor(bool HasContainerType);
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

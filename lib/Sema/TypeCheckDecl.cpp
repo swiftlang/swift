@@ -261,9 +261,8 @@ public:
     if (IsSecondPass)
       return;
 
-    // The getter and setter functions will be type-checked separately.
-    if (!SD->getDeclContext()->isTypeContext())
-      TC.diagnose(SD->getStartLoc(), diag::subscript_not_member);
+    assert(SD->getDeclContext()->isTypeContext()
+           && "Decl parsing must prevent subscripts outside of types!");
 
     bool isInvalid = TC.validateType(SD->getElementTypeLoc(), IsFirstPass);
     isInvalid |= TC.typeCheckPattern(SD->getIndices(), IsFirstPass,
@@ -557,8 +556,8 @@ public:
     if (IsSecondPass)
       return;
 
-    if (!CD->getDeclContext()->isTypeContext())
-      TC.diagnose(CD->getStartLoc(), diag::constructor_not_member);
+    assert(CD->getDeclContext()->isTypeContext()
+           && "Decl parsing must prevent constructors outside of types!");
 
     GenericParamList *outerGenericParams = nullptr;
     Type ThisTy = CD->computeThisType(&outerGenericParams);
@@ -600,8 +599,8 @@ public:
     if (IsSecondPass)
       return;
 
-    if (!isa<ClassDecl>(DD->getDeclContext()))
-      TC.diagnose(DD->getStartLoc(), diag::destructor_not_member);
+    assert(DD->getDeclContext()->isTypeContext()
+           && "Decl parsing must prevent destructors outside of types!");
 
     GenericParamList *outerGenericParams = nullptr;
     Type ThisTy = DD->computeThisType(&outerGenericParams);

@@ -408,10 +408,10 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     HadParseError = parseDeclClass(Entries);
     break;
   case tok::kw_constructor:
-    Entries.push_back(parseDeclConstructor());
+    Entries.push_back(parseDeclConstructor(Flags & PD_HasContainerType));
     break;
   case tok::kw_destructor:
-    Entries.push_back(parseDeclDestructor());
+    Entries.push_back(parseDeclDestructor(Flags & PD_HasContainerType));
     break;
   case tok::kw_protocol:
     Entries.push_back(parseDeclProtocol());
@@ -897,7 +897,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 ///
 ///   decl-var:
 ///      'var' attribute-list identifier : type-annotation { get-set }
-void Parser::parseDeclVarGetSet(Pattern &pattern, bool hasContainerType) {
+void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
   assert(!GetIdent.empty() && "No 'get' identifier?");
   assert(!SetIdent.empty() && "No 'set' identifier?");
   bool Invalid = false;
@@ -934,7 +934,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool hasContainerType) {
   FuncDecl *Get = 0;
   FuncDecl *Set = 0;
   SourceLoc LastValidLoc = LBLoc;
-  if (parseGetSet(hasContainerType, /*Indices=*/0, Ty, Get, Set, LastValidLoc))
+  if (parseGetSet(HasContainerType, /*Indices=*/0, Ty, Get, Set, LastValidLoc))
     Invalid = true;
   
   // Parse the final '}'.
@@ -968,7 +968,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool hasContainerType) {
 ///   decl-var:
 ///      'var' attribute-list pattern initializer? (',' pattern initializer? )*
 ///      'var' attribute-list identifier : type-annotation { get-set }
-bool Parser::parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls){
+bool Parser::parseDeclVar(bool HasContainerType, SmallVectorImpl<Decl*> &Decls){
   SourceLoc VarLoc = consumeToken(tok::kw_var);
   
   DeclAttributes Attributes;
@@ -992,7 +992,7 @@ bool Parser::parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls){
         SetIdent = Context.getIdentifier("set");
       }
       if (Name == GetIdent || Name == SetIdent) {
-        parseDeclVarGetSet(*pattern.get(), hasContainerType);
+        parseDeclVarGetSet(*pattern.get(), HasContainerType);
         HasGetSet = true;
       }
     }
@@ -1068,13 +1068,13 @@ Pattern *Parser::buildImplicitThisParameter() {
 /// NOTE: The caller of this method must ensure that the token sequence is
 /// either 'func' or 'static' 'func'.
 ///
-FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
+FuncDecl *Parser::parseDeclFunc(bool HasContainerType) {
   SourceLoc StaticLoc;
   if (Tok.is(tok::kw_static)) {
     StaticLoc = consumeToken(tok::kw_static);
 
     // Reject 'static' functions at global scope.
-    if (!hasContainerType) {
+    if (!HasContainerType) {
       diagnose(Tok, diag::static_func_decl_global_scope);
       StaticLoc = SourceLoc();
     }
@@ -1110,7 +1110,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   // named 'this'.  This turns "(int)->int" on FooTy into "(this :
   // [byref] FooTy)->((int)->int)".  Note that we can't actually compute the
   // type here until Sema.
-  if (hasContainerType) {
+  if (HasContainerType) {
     Pattern *thisPattern = buildImplicitThisParameter();
     ArgParams.push_back(thisPattern);
     BodyParams.push_back(thisPattern);
@@ -1583,6 +1583,12 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   bool Invalid = false;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
   
+  // Reject 'subscript' functions outside of type decls
+  if (!HasContainerType) {
+    diagnose(Tok, diag::subscript_decl_wrong_scope);
+    Invalid = true;
+  }
+
   // attribute-list
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
@@ -1646,15 +1652,13 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
     RBLoc = LastValidLoc;
   }
 
-  if (Set && !Get) {
+  if (!Get) {
     if (!Invalid)
-      diagnose(Set->getLoc(), diag::set_without_get_subscript);
-    
-    Set = nullptr;
+      diagnose(SubscriptLoc, diag::subscript_without_get);
     Invalid = true;
   }
   
-  if (!Invalid && (Set || Get)) {
+  if (!Invalid) {
     // FIXME: We should build the declarations even if they are invalid.
 
     // Build an AST for the subscript declaration.
@@ -1676,7 +1680,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
       Get->setDeclContext(CurDeclContext);
       Get->makeGetter(Subscript);
       Decls.push_back(Get);
-    }    
+    }
   }
   return Invalid;
 }
@@ -1714,9 +1718,15 @@ static void AddConstructorArgumentsToScope(Pattern *pat, ConstructorDecl *CD,
 }
 
 
-ConstructorDecl *Parser::parseDeclConstructor() {
+ConstructorDecl *Parser::parseDeclConstructor(bool HasContainerType) {
   SourceLoc ConstructorLoc = consumeToken(tok::kw_constructor);
   
+  // Reject 'constructor' functions outside of types
+  if (!HasContainerType) {
+    diagnose(Tok, diag::constructor_decl_wrong_scope);
+    return nullptr;
+  }
+
   // attribute-list
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
@@ -1770,9 +1780,15 @@ ConstructorDecl *Parser::parseDeclConstructor() {
 }
 
 
-DestructorDecl *Parser::parseDeclDestructor() {
+DestructorDecl *Parser::parseDeclDestructor(bool HasContainerType) {
   SourceLoc DestructorLoc = consumeToken(tok::kw_destructor);
   
+  // Reject 'destructor' functions outside of types
+  if (!HasContainerType) {
+    diagnose(Tok, diag::destructor_decl_wrong_scope);
+    return nullptr;
+  }
+
   // attribute-list
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
