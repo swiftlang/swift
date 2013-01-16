@@ -182,8 +182,12 @@ public:
   }
   
   PartialCall &moveLoweredPartialCall(swift::Value v,
-                                      PartialCall &&parent) {
-    auto inserted = loweredValues.insert({v, LoweredValue{std::move(parent)}});
+                                      swift::Value parent) {
+    // Move to a temporary first because inserting into the DenseMap will
+    // invalidate the reference to the parent PartialCall.
+    PartialCall tmpParent = std::move(getLoweredPartialCall(parent));
+    auto inserted = loweredValues.insert({v,
+                                          LoweredValue{std::move(tmpParent)}});
     assert(inserted.second && "already had lowered value for sil value?!");
     return inserted.first->second.getPartialCall();
   }
@@ -239,6 +243,7 @@ public:
   void visitTupleInst(TupleInst *i);
   void visitMetatypeInst(MetatypeInst *i);
   void visitExtractInst(ExtractInst *i);
+  void visitElementAddrInst(ElementAddrInst *i);
 
   void visitDeallocVarInst(DeallocVarInst *i);
   void visitRetainInst(RetainInst *i);

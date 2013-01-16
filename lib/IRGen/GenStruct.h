@@ -20,10 +20,17 @@
 namespace swift {
   class GenericMemberRefExpr;
   class MemberRefExpr;
+  class CanType;
 
 namespace irgen {
   class LValue;
   class IRGenFunction;
+  class OwnedAddress;
+  
+  OwnedAddress projectPhysicalStructMemberAddress(IRGenFunction &IGF,
+                                                  OwnedAddress base,
+                                                  CanType baseType,
+                                                  unsigned fieldIndex);
 
   LValue emitPhysicalStructMemberLValue(IRGenFunction &IGF, MemberRefExpr *E);
   LValue emitPhysicalStructMemberLValue(IRGenFunction &IGF,

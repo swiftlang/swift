@@ -155,6 +155,17 @@ static unsigned getFieldIndex(StructDecl *baseStruct, VarDecl *target) {
   llvm_unreachable("didn't find field in type!");
 }
 
+OwnedAddress irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
+                                                       OwnedAddress base,
+                                                       CanType baseType,
+                                                       unsigned fieldIndex) {
+  assert(baseType->is<StructType>() && "not a struct type");
+  auto &baseTI = IGF.getFragileTypeInfo(baseType).as<StructTypeInfo>();
+  auto &fieldI = baseTI.getFields()[fieldIndex];
+  Address project = fieldI.projectAddress(IGF, base);
+  return OwnedAddress(project, base.getOwner());
+}
+
 static LValue emitPhysicalStructMemberLValue(IRGenFunction &IGF,
                                              Expr *base,
                                              StructDecl *baseStruct,

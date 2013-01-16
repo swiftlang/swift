@@ -28,6 +28,7 @@
 #include "GenFunc.h"
 #include "GenInit.h"
 #include "GenMeta.h"
+#include "GenStruct.h"
 #include "GenTuple.h"
 #include "IRGenModule.h"
 #include "IRGenSIL.h"
@@ -119,24 +120,78 @@ void IRGenSILFunction::visitBasicBlock(swift::BasicBlock *BB) {
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
 }
 
-void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
-  // Find the entry point corresponding to the SILConstant.
-  // FIXME: currently only does uncurried FuncDecls
-  SILConstant constant = i->getConstant();
-  assert(constant.id == 0 &&
-         "constant_ref alternate entry points not yet handled");
-  ValueDecl *vd = constant.loc.dyn_cast<ValueDecl*>();
-  FuncDecl *fd = cast<FuncDecl>(vd);
-  
-  unsigned naturalCurryLevel = getDeclNaturalUncurryLevel(fd);
-  
-  FunctionRef fnRef(fd, ExplosionKind::Minimal, naturalCurryLevel);
-  llvm::Value *fnptr = IGM.getAddrOfFunction(fnRef, ExtraData::None);
+/// Find the entry point, natural curry level, and calling convention for a
+/// SILConstant.
+static void getAddrOfSILConstant(IRGenSILFunction &IGF,
+                                 SILConstant constant,
+                                 llvm::Value* &fnptr,
+                                 unsigned &naturalCurryLevel,
+                                 AbstractCC &cc)
+{
+  // FIXME: currently only does ValueDecls. Needs to handle closures.
 
-  AbstractCC cc = fd->isInstanceMember()
-    ? AbstractCC::Method
-    : AbstractCC::Freestanding;
-  
+  ValueDecl *vd = constant.loc.get<ValueDecl*>();
+
+  switch (vd->getKind()) {
+  case DeclKind::Func: {
+    assert(constant.id == 0 && "alternate entry point for func?!");
+    // Get the function pointer at the natural uncurry level.
+    naturalCurryLevel = getDeclNaturalUncurryLevel(vd);
+    FunctionRef fnRef(cast<FuncDecl>(vd),
+                      ExplosionKind::Minimal,
+                      naturalCurryLevel);
+    
+    fnptr = IGF.IGM.getAddrOfFunction(fnRef, ExtraData::None);
+    // FIXME: c calling convention
+    cc = vd->isInstanceMember() ? AbstractCC::Method : AbstractCC::Freestanding;
+    break;
+  }
+  case DeclKind::Constructor: {
+    assert(constant.id == 0 && "constant initializer not yet implemented");
+    naturalCurryLevel = getDeclNaturalUncurryLevel(vd);
+    fnptr = IGF.IGM.getAddrOfConstructor(cast<ConstructorDecl>(vd),
+                                         ExplosionKind::Minimal);
+    cc = AbstractCC::Freestanding;
+    break;
+  }
+  case DeclKind::Class: {
+    assert(constant.id == SILConstant::Destructor &&
+           "non-destructor reference to ClassDecl?!");
+    fnptr = IGF.IGM.getAddrOfDestructor(cast<ClassDecl>(vd));
+    cc = AbstractCC::Method;
+    break;
+  }
+  case DeclKind::Var: {
+    if (constant.getKind() == SILConstant::Getter) {
+      fnptr = IGF.IGM.getAddrOfGetter(vd, ExplosionKind::Minimal);
+      
+    } else if (constant.getKind() == SILConstant::Setter) {
+      fnptr = IGF.IGM.getAddrOfSetter(vd, ExplosionKind::Minimal);
+    } else {
+      // FIXME: physical global variable accessor.
+      constant.dump();
+      llvm_unreachable("unimplemented constant_ref to var");
+    }
+    cc = vd->isInstanceMember()
+      ? AbstractCC::Method
+      : AbstractCC::Freestanding;
+    // FIXME: a more canonical place to ask for this?
+    naturalCurryLevel = vd->isInstanceMember() ? 1 : 0;
+    break;
+  }
+  default:
+    constant.dump();
+    llvm_unreachable("codegen for constant_ref not yet implemented");
+  }
+}
+
+void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
+  llvm::Value *fnptr;
+  unsigned naturalCurryLevel;
+  AbstractCC cc;
+  getAddrOfSILConstant(*this, i->getConstant(),
+                       fnptr, naturalCurryLevel, cc);
+
   // Prepare a CallEmission for this function.
   // FIXME generic call specialization
   CanType origType = i->getType().getSwiftType();
@@ -162,6 +217,8 @@ void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
 }
 
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
+  i->dump();
+  
   Value v(i, 0);
   
   // FIXME: This assumes that a curried application always reaches the "natural"
@@ -178,10 +235,13 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   
   if (--parent.remainingCurryLevels == 0) {
     // If this brought the call to its natural curry level, emit the call.
-    parent.emission.emitToExplosion(newLoweredExplosion(v));
+    Explosion &result = newLoweredExplosion(v);
+    // NB: 'newLoweredExplosion' invalidates the 'parent' reference by inserting
+    // into the loweredValues DenseMap.
+    getLoweredPartialCall(i->getCallee()).emission.emitToExplosion(result);
   } else {
     // If not, pass the partial emission forward.
-    moveLoweredPartialCall(v, std::move(parent));
+    moveLoweredPartialCall(v, i->getCallee());
   }
 }
 
@@ -261,6 +321,19 @@ void IRGenSILFunction::visitExtractInst(swift::ExtractInst *i) {
                                    operand,
                                    i->getFieldNo(),
                                    lowered);
+}
+
+void IRGenSILFunction::visitElementAddrInst(swift::ElementAddrInst *i) {
+  Address base = getLoweredAddress(i->getOperand());
+  CanType baseType = i->getOperand().getType().getSwiftRValueType();
+  // FIXME: handle element_addr from tuples.
+
+  Address field = projectPhysicalStructMemberAddress(*this,
+                                                     OwnedAddress(base, nullptr),
+                                                     baseType,
+                                                     i->getFieldNo())
+    .getAddress();
+  newLoweredAddress(Value(i,0), field);
 }
 
 void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
