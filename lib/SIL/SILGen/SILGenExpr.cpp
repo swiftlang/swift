@@ -1311,8 +1311,8 @@ static void emitConstructorMetatypeArg(SILGenFunction &gen,
 
 void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Emit the prolog.
-  emitConstructorMetatypeArg(*this, ctor);
   emitProlog(ctor->getArguments(), ctor->getImplicitThisDecl()->getType());
+  emitConstructorMetatypeArg(*this, ctor);
   
   //
   // Create the 'this' value.
@@ -1416,9 +1416,9 @@ namespace {
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Emit the prolog. Since we're just going to forward our args directly
   // to the initializer, don't allocate local variables for them.
-  emitConstructorMetatypeArg(*this, ctor);
   SmallVector<Value, 8> args;
   ArgumentForwardVisitor(*this, args).visit(ctor->getArguments());
+  emitConstructorMetatypeArg(*this, ctor);
   
   // Allocate the "this" value.
   VarDecl *thisDecl = ctor->getImplicitThisDecl();
@@ -1455,6 +1455,9 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 }
 
 void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
+  // Emit the prolog for the non-this arguments.
+  emitProlog(ctor->getArguments(), TupleType::getEmpty(F.getContext()));
+  
   // Emit the 'this' argument and make an lvalue for it.
   VarDecl *thisDecl = ctor->getImplicitThisDecl();
   SILType thisTy = getLoweredType(thisDecl->getType());
@@ -1466,9 +1469,6 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   B.createStore(ctor, thisValue, thisLV);
   Cleanups.pushCleanup<CleanupMaterializeValue>(thisLV);
   VarLocs[thisDecl] = {Value(), thisLV};
-  
-  // Emit the prolog for the other arguments.
-  emitProlog(ctor->getArguments(), TupleType::getEmpty(F.getContext()));
   
   // Emit the constructor body.
   visit(ctor->getBody());

@@ -869,14 +869,15 @@ closure
 ::
 
   %C = closure %0(%1, %2, ...)
-  ; %0 must be of a concrete function type $(A1, A2, ...) -> R
-  ; %1, %2, etc. must be of the types of the first N arguments to %0
-  ; %C will be of the function type of %0 with the first N arguments removed
+  ; %0 must be of a concrete function type $(..., A1, A2, ..., AN) -> R
+  ; %1, %2, etc. must be of the types A1...AN of the last N arguments to %0
+  ; %C will be of the function type of %0 with the last N arguments removed
 
-Allocates a closure by partially applying the function ``%0`` in its first
-N arguments. The closure will be a allocated as a box with retain count 1
-containing the values ``%1``, ``%2``, etc. The closed-over values will not be
-retained; that must be done separately if necessary.
+Allocates a closure by partially applying the function ``%0`` to its last
+N arguments. The closure context will be allocated with retain
+count 1 containing the values ``%1``, ``%2``, etc. The closed-over values
+will not be retained; that must be done separately if necessary. Retaining
+or releasing the closure object will retain or release its context.
 
 apply
 `````
