@@ -79,6 +79,10 @@ namespace {
       // FIXME
     }
 
+    void transfer(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      // FIXME
+    }
+    
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       // FIXME
     }

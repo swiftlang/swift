@@ -123,6 +123,10 @@ public:
     // Force the cleanup here?
   }
 
+  void transfer(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
+    in.transferInto(out, 1);
+  }
+  
   void manage(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
     Address obj(in.claimUnmanagedNext(), this->StorageAlignment);
     if (asDerived().Derived::isPOD(ResilienceScope::Local)) {

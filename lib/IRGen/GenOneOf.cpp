@@ -124,6 +124,10 @@ namespace {
       // FIXME
     }
 
+    void transfer(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      // FIXME
+    }
+    
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       // FIXME
     }
@@ -210,6 +214,10 @@ namespace {
       if (Singleton) Singleton->copy(IGF, src, dest);
     }
 
+    void transfer(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      if (Singleton) Singleton->transfer(IGF, src, dest);
+    }
+    
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       if (Singleton) Singleton->manage(IGF, src, dest);
     }

@@ -154,6 +154,10 @@ public:
     asDerived().enterScalarCleanup(IGF, value, out);
   }
 
+  void transfer(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
+    in.transferInto(out, 1);
+  }
+  
   void manage(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
     llvm::Value *value = in.claimUnmanagedNext();
     asDerived().enterScalarCleanup(IGF, value, out);

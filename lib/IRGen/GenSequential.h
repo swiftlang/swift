@@ -221,6 +221,11 @@ public:
       field.getTypeInfo().copy(IGF, src, dest);
   }
 
+  void transfer(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+    for (auto &field : getFields())
+      field.getTypeInfo().transfer(IGF, src, dest);
+  }
+  
   void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
     for (auto &field : getFields())
       field.getTypeInfo().manage(IGF, src, dest);

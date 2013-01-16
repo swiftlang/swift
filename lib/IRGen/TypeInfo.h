@@ -195,6 +195,12 @@ public:
   /// l-value operations.
   virtual void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
                     Explosion &targetExplosion) const = 0;
+  
+  /// Copy a value into a new explosion and transfer management to the
+  /// destination explosion. This operation may also shift explosion
+  /// levels.
+  virtual void transfer(IRGenFunction &IGF, Explosion &sourceExplosion,
+                        Explosion &targetExplosion) const = 0;
 
   /// Enter management of an unmanaged exploded value by adding
   /// cleanups where appropriate.
