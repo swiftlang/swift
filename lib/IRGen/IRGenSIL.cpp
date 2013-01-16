@@ -67,9 +67,27 @@ void IRGenSILFunction::emitSILFunction(swift::Function *f) {
   }
 
   auto entry = loweredBBs.begin();
-  // FIXME Map the entry point arguments to LLVM arguments.
-  size_t bbarg_size = entry->first->bbarg_end() - entry->first->bbarg_begin();
-  assert(bbarg_size == 0 && "arguments not yet supported");
+
+  // Map the LLVM arguments to arguments on the entry point BB.
+  Explosion params = collectParameters();
+  
+  for (auto argi = entry->first->bbarg_begin(),
+            argend = entry->first->bbarg_end();
+       argi != argend;
+       ++argi) {
+    BBArgument *arg = *argi;
+    Value argv(arg, 0);
+    TypeInfo const &argType = IGM.getFragileTypeInfo(
+                                           arg->getType().getSwiftRValueType());
+    if (arg->getType().isAddress()) {
+      newLoweredAddress(argv, Address(params.claimUnmanagedNext(),
+                                      argType.StorageAlignment));
+    } else {
+      Explosion &explosion = newLoweredExplosion(argv);
+      argType.transfer(*this, params, explosion);
+    }
+  }
+  assert(params.empty() && "did not map all llvm params to SIL params?!");
   
   // Emit the function body.
   for (swift::BasicBlock &bb : *f)
@@ -93,8 +111,6 @@ void IRGenSILFunction::visitBasicBlock(swift::BasicBlock *BB) {
 
   // FIXME: emit a phi node to bind the bb arguments from all the predecessor
   // branches.
-  assert(BB->bbarg_begin() == BB->bbarg_end() &&
-         "arguments not yet supported");
   
   // Generate the body.
   for (auto &I : *BB)
@@ -200,11 +216,13 @@ void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
 }
 
 void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
-  assert(i->getReturnValue().getType() ==
-         SILType::getEmptyTupleType(i->getReturnValue().getType().getASTContext())
-         && "value returns not yet implemented");
-  // FIXME: actually return a value.
-  Builder.CreateRet(nullptr);
+  Explosion &result = getLoweredExplosion(i->getReturnValue());
+  // emitScalarReturn eats all the results out of the explosion, which we don't
+  // want to happen in case the SIL value gets reused, so make a temporary
+  // explosion it can chew on.
+  Explosion consumedResult(result.getKind());
+  consumedResult.add(result.getAll());
+  emitScalarReturn(consumedResult);
 }
 
 void IRGenSILFunction::visitBranchInst(swift::BranchInst *i) {
