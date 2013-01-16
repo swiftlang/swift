@@ -399,6 +399,22 @@ namespace {
       doLoad(IGF, address, e);
     }
 
+    static void doLoadUnmanaged(IRGenFunction &IGF, Address address,
+                                Explosion &e) {
+      // Load the function.
+      Address fnAddr = projectFunction(IGF, address);
+      e.addUnmanaged(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
+      
+      // Load the data.
+      Address dataAddr = projectData(IGF, address);
+      e.addUnmanaged(IGF.Builder.CreateLoad(dataAddr));
+    }
+    
+    void loadUnmanaged(IRGenFunction &IGF, Address address,
+                       Explosion &e) const {
+      doLoadUnmanaged(IGF, address, e);
+    }
+    
     static void doLoadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) {
       // Load the function.
       Address fnAddr = projectFunction(IGF, addr);

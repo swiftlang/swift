@@ -74,6 +74,21 @@ public:
     out.add(ManagedValue(dest.getAddress(), cleanup));
   }
 
+  void loadUnmanaged(IRGenFunction &IGF, Address src, Explosion &out) const {
+    // Create a temporary.
+    Initialization init;
+    auto temp = init.getObjectForTemporary();
+    Address dest = asDerived().Derived::allocate(IGF, init, temp, NotOnHeap,
+                                                 "temporary.forLoad");
+    
+    // Initialize it with a copy of the source.
+    asDerived().Derived::initializeWithCopy(IGF, dest, src);
+    init.markInitialized(IGF, temp);
+    
+    // Enter a cleanup for the temporary.
+    out.addUnmanaged(dest.getAddress());
+  }
+  
   void loadAsTake(IRGenFunction &IGF, Address src, Explosion &out) const {
     // Create a temporary and memcpy into it, then enter a cleanup
     // to destroy that.

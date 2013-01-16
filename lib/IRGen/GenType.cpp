@@ -121,6 +121,7 @@ namespace {
     unsigned getExplosionSize(ExplosionKind kind) const { return 0; }
     void getSchema(ExplosionSchema &schema) const {}
     void load(IRGenFunction &IGF, Address addr, Explosion &e) const {}
+    void loadUnmanaged(IRGenFunction &IGF, Address addr, Explosion &e) const {}
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {}
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {}
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {}

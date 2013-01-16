@@ -122,6 +122,12 @@ public:
     asDerived().enterScalarCleanup(IGF, value, out);
   }
 
+  void loadUnmanaged(IRGenFunction &IGF, Address addr, Explosion &out) const {
+    addr = asDerived().projectScalar(IGF, addr);
+    llvm::Value *value = IGF.Builder.CreateLoad(addr);
+    out.addUnmanaged(value);
+  }
+  
   void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &out) const {
     addr = asDerived().projectScalar(IGF, addr);
     llvm::Value *value = IGF.Builder.CreateLoad(addr);

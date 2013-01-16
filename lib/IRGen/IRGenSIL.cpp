@@ -25,6 +25,7 @@
 
 #include "CallEmission.h"
 #include "Explosion.h"
+#include "GenClass.h"
 #include "GenFunc.h"
 #include "GenInit.h"
 #include "GenMeta.h"
@@ -217,8 +218,6 @@ void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
 }
 
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
-  i->dump();
-  
   Value v(i, 0);
   
   // FIXME: This assumes that a curried application always reaches the "natural"
@@ -336,11 +335,24 @@ void IRGenSILFunction::visitElementAddrInst(swift::ElementAddrInst *i) {
   newLoweredAddress(Value(i,0), field);
 }
 
+void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
+  Explosion &base = getLoweredExplosion(i->getOperand());
+  ArrayRef<ManagedValue> value = base.getRange(0, 1);
+  
+  CanType baseTy = i->getOperand().getType().getSwiftType();
+  Address field = projectPhysicalClassMemberAddress(*this,
+                                                    value[0].getUnmanagedValue(),
+                                                    baseTy,
+                                                    i->getField())
+    .getAddress();
+  newLoweredAddress(Value(i,0), field);
+}
+
 void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
   Explosion &lowered = newLoweredExplosion(Value(i, 0));
   Address source = getLoweredAddress(i->getLValue());
   const TypeInfo &type = getFragileTypeInfo(i->getType().getSwiftRValueType());
-  type.load(*this, source, lowered);
+  type.loadUnmanaged(*this, source, lowered);
 }
 
 void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
@@ -352,6 +364,8 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
 }
 
 void IRGenSILFunction::visitRetainInst(swift::RetainInst *i) {
+  i->dump();
+  i->getOperand()->dump();
   // FIXME: emit retain appropriate to the type (swift, objc, ...).
   Explosion &lowered = getLoweredExplosion(i->getOperand());
   ArrayRef<ManagedValue> value = lowered.getRange(0, 1);

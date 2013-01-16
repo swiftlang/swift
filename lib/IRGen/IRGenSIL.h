@@ -244,6 +244,7 @@ public:
   void visitMetatypeInst(MetatypeInst *i);
   void visitExtractInst(ExtractInst *i);
   void visitElementAddrInst(ElementAddrInst *i);
+  void visitRefElementAddrInst(RefElementAddrInst *i);
 
   void visitDeallocVarInst(DeallocVarInst *i);
   void visitRetainInst(RetainInst *i);

@@ -51,6 +51,11 @@ namespace {
       // FIXME
     }
 
+    void loadUnmanaged(IRGenFunction &IGF, Address addr,
+                       Explosion &explosion) const {
+      // FIXME
+    }
+    
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
       // FIXME
     }

@@ -19,18 +19,27 @@
 
 namespace llvm {
   class Constant;
+  class Value;
 }
 
 namespace swift {
   class ClassDecl;
   class GenericMemberRefExpr;
   class MemberRefExpr;
+  class CanType;
+  class VarDecl;
 
 namespace irgen {
   class HeapLayout;
   class IRGenFunction;
   class IRGenModule;
   class LValue;
+  class OwnedAddress;
+
+  OwnedAddress projectPhysicalClassMemberAddress(IRGenFunction &IGF,
+                                                 llvm::Value *base,
+                                                 CanType baseType,
+                                                 VarDecl *field);
 
   LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF, MemberRefExpr *E);
   LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,

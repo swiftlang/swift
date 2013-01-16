@@ -376,6 +376,54 @@ static LValue emitLValueAtOffset(IRGenFunction &IGF,
 }
 
 static LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
+                                            llvm::Value *base,
+                                            CanType baseType,
+                                            ClassDecl *baseClass,
+                                            const ClassTypeInfo &baseClassTI,
+                                            VarDecl *field) {
+  LayoutClass layout(IGF.IGM, ResilienceScope::Local, baseClass, baseType);
+  
+  auto &entry = layout.getFieldEntry(field);
+  switch (entry.getAccess()) {
+    case FieldAccess::ConstantDirect: {
+      // FIXME: This field index computation is an ugly hack.
+      unsigned fieldIndex = getFieldIndex(baseClass, field);
+      
+      Address baseAddr(base, baseClassTI.getHeapAlignment(IGF.IGM));
+      auto &element = baseClassTI.getElements(IGF.IGM)[fieldIndex];
+      Address memberAddr = element.project(IGF, baseAddr);
+      return IGF.emitAddressLValue(OwnedAddress(memberAddr, base));
+    }
+      
+    case FieldAccess::NonConstantDirect: {
+      Address offsetA = IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ false);
+      auto offset = IGF.Builder.CreateLoad(offsetA, "offset");
+      return emitLValueAtOffset(IGF, base, offset, field);
+    }
+      
+    case FieldAccess::ConstantIndirect: {
+      auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
+      auto offset = emitClassFieldOffset(IGF, baseClass, field, metadata);
+      return emitLValueAtOffset(IGF, base, offset, field);
+    }
+      
+    case FieldAccess::NonConstantIndirect: {
+      auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
+      Address indirectOffsetA =
+      IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ true);
+      auto indirectOffset =
+      IGF.Builder.CreateLoad(indirectOffsetA, "indirect-offset");
+      auto offsetA =
+      emitGEPToOffset(IGF, metadata, indirectOffset, IGF.IGM.SizeTy);
+      auto offset =
+      IGF.Builder.CreateLoad(Address(offsetA, IGF.IGM.getPointerAlignment()));
+      return emitLValueAtOffset(IGF, base, offset, field);
+    }
+  }
+  llvm_unreachable("bad field-access strategy");
+}
+
+static LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
                                             Expr *baseE,
                                             ClassDecl *baseClass,
                                             const ClassTypeInfo &baseClassTI,
@@ -385,48 +433,23 @@ static LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
   IGF.emitRValue(baseE, explosion);
   ManagedValue baseVal = explosion.claimNext();
   llvm::Value *base = baseVal.getValue();
-
   auto baseType = baseE->getType()->getCanonicalType();
-  LayoutClass layout(IGF.IGM, ResilienceScope::Local, baseClass, baseType);
-  
-  auto &entry = layout.getFieldEntry(field);
-  switch (entry.getAccess()) {
-  case FieldAccess::ConstantDirect: {
-    // FIXME: This field index computation is an ugly hack.
-    unsigned fieldIndex = getFieldIndex(baseClass, field);
+  return ::emitPhysicalClassMemberLValue(IGF, base, baseType,
+                                         baseClass, baseClassTI, field);
+}
 
-    Address baseAddr(base, baseClassTI.getHeapAlignment(IGF.IGM));
-    auto &element = baseClassTI.getElements(IGF.IGM)[fieldIndex];
-    Address memberAddr = element.project(IGF, baseAddr);
-    return IGF.emitAddressLValue(OwnedAddress(memberAddr, base));
-  }
-
-  case FieldAccess::NonConstantDirect: {
-    Address offsetA = IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ false);
-    auto offset = IGF.Builder.CreateLoad(offsetA, "offset");
-    return emitLValueAtOffset(IGF, base, offset, field);
-  }
-
-  case FieldAccess::ConstantIndirect: {
-    auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
-    auto offset = emitClassFieldOffset(IGF, baseClass, field, metadata);
-    return emitLValueAtOffset(IGF, base, offset, field);
-  }
-
-  case FieldAccess::NonConstantIndirect: {
-    auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
-    Address indirectOffsetA =
-      IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ true);
-    auto indirectOffset =
-      IGF.Builder.CreateLoad(indirectOffsetA, "indirect-offset");
-    auto offsetA =
-      emitGEPToOffset(IGF, metadata, indirectOffset, IGF.IGM.SizeTy);
-    auto offset =
-      IGF.Builder.CreateLoad(Address(offsetA, IGF.IGM.getPointerAlignment()));
-    return emitLValueAtOffset(IGF, base, offset, field);
-  }
-  }
-  llvm_unreachable("bad field-access strategy");
+OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
+                                                      llvm::Value *base,
+                                                      CanType baseType,
+                                                      VarDecl *field) {
+  auto &baseTI = IGF.getFragileTypeInfo(baseType).as<ClassTypeInfo>();
+  LValue lv = ::emitPhysicalClassMemberLValue(IGF,
+                                      base,
+                                      baseType,
+                                      baseType->getClassOrBoundGenericClass(),
+                                      baseTI,
+                                      field);
+  return IGF.emitAddressForPhysicalLValue(lv);
 }
 
 LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
