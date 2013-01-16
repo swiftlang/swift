@@ -480,7 +480,6 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
         diagnose(Pattern->getStartLoc(), diag::disallowed_init)
           << Pattern->getInit()->getSourceRange();
     }
-    // FIXME: Diagnose top-level subscript
   }
   
   return HadParseError;
