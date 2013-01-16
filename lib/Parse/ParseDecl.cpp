@@ -372,7 +372,6 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
 ///     decl-import
 ///
 bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
-  unsigned EntryStart = Entries.size();
   bool HadParseError = false;
   switch (Tok.getKind()) {
   default:
@@ -387,41 +386,41 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     consumeToken(tok::semi);
     break;
   case tok::kw_import:
-    Entries.push_back(parseDeclImport());
+    Entries.push_back(parseDeclImport(Flags));
     break;
   case tok::kw_extension:
-    Entries.push_back(parseDeclExtension());
+    Entries.push_back(parseDeclExtension(Flags));
     break;
   case tok::kw_var:
-    HadParseError = parseDeclVar(Flags & PD_HasContainerType, Entries);
+    HadParseError = parseDeclVar(Flags, Entries);
     break;
   case tok::kw_typealias:
     Entries.push_back(parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef)));
     break;
   case tok::kw_oneof:
-    HadParseError = parseDeclOneOf(Entries);
+    HadParseError = parseDeclOneOf(Flags, Entries);
     break;
   case tok::kw_struct:
-    HadParseError = parseDeclStruct(Entries);
+    HadParseError = parseDeclStruct(Flags, Entries);
     break;
   case tok::kw_class:
-    HadParseError = parseDeclClass(Entries);
+    HadParseError = parseDeclClass(Flags, Entries);
     break;
   case tok::kw_constructor:
     Entries.push_back(parseDeclConstructor(Flags & PD_HasContainerType));
     break;
   case tok::kw_destructor:
-    Entries.push_back(parseDeclDestructor(Flags & PD_HasContainerType));
+    Entries.push_back(parseDeclDestructor(Flags));
     break;
   case tok::kw_protocol:
-    Entries.push_back(parseDeclProtocol());
+    Entries.push_back(parseDeclProtocol(Flags));
     break;
   case tok::kw_static:
     if (peekToken().isNot(tok::kw_func))
       goto ParseError;
     // FALL THROUGH.
   case tok::kw_func:
-    Entries.push_back(parseDeclFunc(Flags & PD_HasContainerType));
+    Entries.push_back(parseDeclFunc(Flags));
     break;
   case tok::kw_subscript:
     HadParseError = parseDeclSubscript(Flags & PD_HasContainerType,
@@ -448,40 +447,6 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     HadParseError = true;
   }
 
-  // Validate the new entries.
-  for (unsigned i = EntryStart, e = Entries.size(); i != e; ++i) {
-    Decl *D = Entries[i];
-
-    // FIXME: Mark decls erroneous.
-    // FIXME: Specialize diagnostics based on our context.
-    if ((isa<ImportDecl>(D) || isa<ExtensionDecl>(D) || isa<ProtocolDecl>(D)) &&
-        !(Flags & PD_AllowTopLevel))
-      diagnose(D->getStartLoc(), diag::decl_inner_scope);
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-      if (auto Var = dyn_cast<VarDecl>(VD)) {
-        if ((Flags & PD_DisallowVar) && !Var->isProperty())
-          diagnose(D->getStartLoc(), diag::disallowed_var_decl);
-        else if ((Flags & PD_DisallowProperty) && Var->isProperty())
-          diagnose(D->getStartLoc(), diag::disallowed_property_decl);
-      }
-      
-      if (auto Func = dyn_cast<FuncDecl>(VD)) {
-        if ((Flags & PD_DisallowFuncDef) && Func->getBody()->getBody() &&
-            !Func->isGetterOrSetter())
-          diagnose(Func->getBody()->getLoc(), diag::disallowed_func_def);
-      }
-      
-      if (auto Type = dyn_cast<NominalTypeDecl>(VD)) {
-        if (Flags & PD_DisallowNominalTypes)
-          diagnose(Type->getStartLoc(), diag::disallowed_type);
-      }
-    } else if (auto Pattern = dyn_cast<PatternBindingDecl>(D)) {
-      if ((Flags & PD_DisallowInit) && Pattern->getInit())
-        diagnose(Pattern->getStartLoc(), diag::disallowed_init)
-          << Pattern->getInit()->getSourceRange();
-    }
-  }
-  
   return HadParseError;
 }
 
@@ -492,7 +457,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
 ///   decl-import:
 ///      'import' attribute-list any-identifier ('.' any-identifier)*
 ///
-Decl *Parser::parseDeclImport() {
+Decl *Parser::parseDeclImport(unsigned Flags) {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
   
   DeclAttributes Attributes;
@@ -514,6 +479,11 @@ Decl *Parser::parseDeclImport() {
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::import_attributes);
   
+  if (!(Flags & PD_AllowTopLevel)) {
+    diagnose(ImportLoc, diag::decl_inner_scope);
+    return 0;
+  }
+
   return ImportDecl::create(Context, CurDeclContext, ImportLoc, ImportPath);
 }
 
@@ -550,7 +520,7 @@ bool Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
 ///   extension:
 ///    'extension' type-identifier inheritance? '{' decl* '}'
 ///
-Decl *Parser::parseDeclExtension() {
+Decl *Parser::parseDeclExtension(unsigned Flags) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
   TypeLoc Loc;
@@ -565,7 +535,7 @@ Decl *Parser::parseDeclExtension() {
 
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension))
     return nullptr;
-  
+
   ExtensionDecl *ED
     = new (Context) ExtensionDecl(ExtensionLoc, Loc,
                                   Context.AllocateCopy(Inherited),
@@ -584,6 +554,11 @@ Decl *Parser::parseDeclExtension() {
                      LBLoc, diag::opening_brace);
 
   ED->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
+
+  if (!(Flags & PD_AllowTopLevel)) {
+    diagnose(ExtensionLoc, diag::decl_inner_scope);
+    return nullptr;
+  }
 
   return ED;
 }
@@ -967,7 +942,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
 ///   decl-var:
 ///      'var' attribute-list pattern initializer? (',' pattern initializer? )*
 ///      'var' attribute-list identifier : type-annotation { get-set }
-bool Parser::parseDeclVar(bool HasContainerType, SmallVectorImpl<Decl*> &Decls){
+bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
   SourceLoc VarLoc = consumeToken(tok::kw_var);
   
   DeclAttributes Attributes;
@@ -991,7 +966,7 @@ bool Parser::parseDeclVar(bool HasContainerType, SmallVectorImpl<Decl*> &Decls){
         SetIdent = Context.getIdentifier("set");
       }
       if (Name == GetIdent || Name == SetIdent) {
-        parseDeclVarGetSet(*pattern.get(), HasContainerType);
+        parseDeclVarGetSet(*pattern.get(), Flags & PD_HasContainerType);
         HasGetSet = true;
       }
     }
@@ -1001,7 +976,8 @@ bool Parser::parseDeclVar(bool HasContainerType, SmallVectorImpl<Decl*> &Decls){
   do {
     Type Ty;
     NullablePtr<Expr> Init;
-    if (consumeIf(tok::equal)) {
+    if (Tok.is(tok::equal)) {
+      SourceLoc EqualLoc = consumeToken(tok::equal);
       Init = parseExpr(diag::expected_initializer_expr);
       if (Init.isNull())
         return true;
@@ -1010,6 +986,10 @@ bool Parser::parseDeclVar(bool HasContainerType, SmallVectorImpl<Decl*> &Decls){
         diagnose(pattern.get()->getLoc(), diag::getset_init)
           << Init.get()->getSourceRange();
         Init = nullptr;
+      }
+      if (Flags & PD_DisallowInit) {
+        diagnose(EqualLoc, diag::disallowed_init);
+        return true;
       }
     }
 
@@ -1044,6 +1024,16 @@ bool Parser::parseDeclVar(bool HasContainerType, SmallVectorImpl<Decl*> &Decls){
     if (pattern.isNull()) return true;
   } while (1);
 
+  if (HasGetSet) {
+    if (Flags & PD_DisallowProperty) {
+      diagnose(VarLoc, diag::disallowed_property_decl);
+      return true;
+    }
+  } else if (Flags & PD_DisallowVar) {
+    diagnose(VarLoc, diag::disallowed_var_decl);
+    return true;
+  }
+
   return false;
 }
 
@@ -1067,7 +1057,8 @@ Pattern *Parser::buildImplicitThisParameter() {
 /// NOTE: The caller of this method must ensure that the token sequence is
 /// either 'func' or 'static' 'func'.
 ///
-FuncDecl *Parser::parseDeclFunc(bool HasContainerType) {
+FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
+  bool HasContainerType = Flags & PD_HasContainerType;
   SourceLoc StaticLoc;
   if (Tok.is(tok::kw_static)) {
     StaticLoc = consumeToken(tok::kw_static);
@@ -1150,6 +1141,10 @@ FuncDecl *Parser::parseDeclFunc(bool HasContainerType) {
       } else {
         FE->setBody(Body.get());
       }
+      if (Flags & PD_DisallowFuncDef) {
+        diagnose(Body.get()->getLBraceLoc(), diag::disallowed_func_def);
+        return 0;
+      }
     }
   }
 
@@ -1179,7 +1174,7 @@ FuncDecl *Parser::parseDeclFunc(bool HasContainerType) {
 ///      identifier
 ///      identifier ':' type-annotation
 ///      
-bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
+bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SourceLoc OneOfLoc = consumeToken(tok::kw_oneof);
 
   DeclAttributes Attributes;
@@ -1302,6 +1297,11 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
                          LBLoc, diag::opening_brace))
     return true;
 
+  if (Flags & PD_DisallowNominalTypes) {
+    diagnose(OneOfLoc, diag::disallowed_type);
+    return true;
+  }
+
   return false;
 }
 
@@ -1314,7 +1314,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
 ///   decl-struct-body:
 ///      decl*
 ///
-bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
+bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SourceLoc StructLoc = consumeToken(tok::kw_struct);
   
   DeclAttributes Attributes;
@@ -1387,6 +1387,11 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
                          LBLoc, diag::opening_brace))
     return true;
 
+  if (Flags & PD_DisallowNominalTypes) {
+    diagnose(StructLoc, diag::disallowed_type);
+    return true;
+  }
+
   return false;
 }
 
@@ -1399,7 +1404,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
 ///   decl-class-body:
 ///      decl*
 ///
-bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
+bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SourceLoc ClassLoc = consumeToken(tok::kw_class);
   
   DeclAttributes Attributes;
@@ -1447,7 +1452,7 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
     ContextChange CC(*this, CD);
     Scope ClassBodyScope(this, /*AllowLookup=*/false);
     while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-      if (parseDecl(MemberDecls, PD_HasContainerType))
+      if (parseDecl(MemberDecls, PD_HasContainerType|PD_AllowDestructor))
         skipUntilDeclRBrace();
     }
   }
@@ -1480,6 +1485,11 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
                          LBLoc, diag::opening_brace))
     return true;
 
+  if (Flags & PD_DisallowNominalTypes) {
+    diagnose(ClassLoc, diag::disallowed_type);
+    return true;
+  }
+
   return false;
 }
 
@@ -1497,7 +1507,7 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
 ///      decl-var-simple
 ///      decl-typealias
 ///
-Decl *Parser::parseDeclProtocol() {
+Decl *Parser::parseDeclProtocol(unsigned Flags) {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
   
   DeclAttributes Attributes;
@@ -1512,7 +1522,7 @@ Decl *Parser::parseDeclProtocol() {
   SmallVector<TypeLoc, 4> InheritedProtocols;
   if (Tok.is(tok::colon))
     parseInheritance(InheritedProtocols);
-  
+
   ProtocolDecl *Proto
     = new (Context) ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc,
                                  ProtocolName,
@@ -1557,7 +1567,7 @@ Decl *Parser::parseDeclProtocol() {
       consumeToken();
     else if (!HadError) {
       diagnose(Tok.getLoc(), diag::expected_rbrace_protocol);
-      diagnose(LBraceLoc, diag::opening_brace);      
+      diagnose(LBraceLoc, diag::opening_brace);
     }
     
     // Install the protocol elements.
@@ -1565,6 +1575,14 @@ Decl *Parser::parseDeclProtocol() {
                       SourceRange(LBraceLoc, RBraceLoc));
   }
   
+  if (Flags & PD_DisallowNominalTypes) {
+    diagnose(ProtocolLoc, diag::disallowed_type);
+    return nullptr;
+  } else if (!(Flags & PD_AllowTopLevel)) {
+    diagnose(ProtocolLoc, diag::decl_inner_scope);
+    return nullptr;
+  }
+
   return Proto;
 }
 
@@ -1779,12 +1797,12 @@ ConstructorDecl *Parser::parseDeclConstructor(bool HasContainerType) {
 }
 
 
-DestructorDecl *Parser::parseDeclDestructor(bool HasContainerType) {
+DestructorDecl *Parser::parseDeclDestructor(unsigned Flags) {
   SourceLoc DestructorLoc = consumeToken(tok::kw_destructor);
   
-  // Reject 'destructor' functions outside of types
-  if (!HasContainerType) {
-    diagnose(Tok, diag::destructor_decl_wrong_scope);
+  // Reject 'destructor' functions outside of classes
+  if (!(Flags & PD_AllowDestructor)) {
+    diagnose(Tok, diag::destructor_decl_outside_class);
     return nullptr;
   }
 

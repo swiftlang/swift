@@ -231,7 +231,8 @@ public:
     PD_DisallowNominalTypes = 1 << 5,
     PD_DisallowFuncDef      = 1 << 6,
     PD_DisallowInit         = 1 << 7,
-    PD_DisallowTypeAliasDef = 1 << 8
+    PD_DisallowTypeAliasDef = 1 << 8,
+    PD_AllowDestructor      = 1 << 9
   };
   
   TypeAliasDecl *parseDeclTypeAlias(bool WantDefinition);
@@ -247,28 +248,28 @@ public:
   void parseAttributeListPresent(DeclAttributes &Attributes);
   bool parseAttribute(DeclAttributes &Attributes);
   
-  Decl *parseDeclImport();
+  Decl *parseDeclImport(unsigned Flags);
   bool parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
-  Decl *parseDeclExtension();
-  bool parseDeclOneOf(SmallVectorImpl<Decl*> &Decls);
+  Decl *parseDeclExtension(unsigned Flags);
+  bool parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
 
-  bool parseDeclStruct(SmallVectorImpl<Decl*> &Decls);
-  bool parseDeclClass(SmallVectorImpl<Decl*> &Decls);
-  bool parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls);
+  bool parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
+  bool parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
+  bool parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseGetSet(bool HasContainerType, Pattern *Indices, Type ElementTy, 
                    FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc);
   void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);
   
   Pattern *buildImplicitThisParameter();
-  FuncDecl *parseDeclFunc(bool hasContainerType = false);
-  Decl *parseDeclProtocol();
+  FuncDecl *parseDeclFunc(unsigned Flags);
+  Decl *parseDeclProtocol(unsigned Flags);
   
   bool parseDeclSubscript(bool HasContainerType,
                           bool NeedDefinition,
                           SmallVectorImpl<Decl *> &Decls);
 
   ConstructorDecl *parseDeclConstructor(bool HasContainerType);
-  DestructorDecl *parseDeclDestructor(bool HasContainerType);
+  DestructorDecl *parseDeclDestructor(unsigned Flags);
 
   //===--------------------------------------------------------------------===//
   // Type Parsing
