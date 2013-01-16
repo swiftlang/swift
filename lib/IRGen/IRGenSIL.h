@@ -243,6 +243,7 @@ public:
   void visitExtractInst(ExtractInst *i);
 
   void visitDeallocVarInst(DeallocVarInst *i);
+  void visitRetainInst(RetainInst *i);
   void visitReleaseInst(ReleaseInst *i);
   
   void visitUnreachableInst(UnreachableInst *i);

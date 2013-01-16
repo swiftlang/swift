@@ -278,6 +278,13 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   type.initialize(*this, source, dest);
 }
 
+void IRGenSILFunction::visitRetainInst(swift::RetainInst *i) {
+  // FIXME: emit retain appropriate to the type (swift, objc, ...).
+  Explosion &lowered = getLoweredExplosion(i->getOperand());
+  ArrayRef<ManagedValue> value = lowered.getRange(0, 1);
+  emitRetainCall(value[0].getUnmanagedValue());
+}
+
 void IRGenSILFunction::visitReleaseInst(swift::ReleaseInst *i) {
   // FIXME: emit release appropriate to the type (swift, objc, ...).
   Explosion &lowered = getLoweredExplosion(i->getOperand());
