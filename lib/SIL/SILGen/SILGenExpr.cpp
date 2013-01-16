@@ -591,22 +591,17 @@ namespace {
 static ManagedValue emitExtractLoadableElement(SILGenFunction &gen,
                                                Expr *e, ManagedValue base,
                                                unsigned elt) {
+  assert(!base.getType().hasReferenceSemantics() &&
+         "can't extract from reference types here");
   if (e->getType()->is<LValueType>()) {
     // Get the element address relative to the aggregate's address.
     Value address;
-    if (base.getType().hasReferenceSemantics()) {
-      address = gen.B.createRefElementAddr(e,
-                                     base.getValue(),
-                                     elt,
-                                     gen.getLoweredType(e->getType()));
-    } else {
-      assert(base.getType().isAddress() &&
-             "base of lvalue member ref must be ref type or address");
-      address = gen.B.createElementAddr(e,
-                                      base.getUnmanagedValue(),
-                                      elt,
-                                      gen.getLoweredType(e->getType()));
-    }
+    assert(base.getType().isAddress() &&
+           "base of lvalue member ref must be ref type or address");
+    address = gen.B.createElementAddr(e,
+                                    base.getUnmanagedValue(),
+                                    elt,
+                                    gen.getLoweredType(e->getType()));
     return ManagedValue(address);
   } else {
     // Extract the element from the original aggregate value.
@@ -620,6 +615,15 @@ static ManagedValue emitExtractLoadableElement(SILGenFunction &gen,
   }
 }
   
+static ManagedValue emitExtractFromClass(SILGenFunction &gen,
+                                         Expr *e, ManagedValue base,
+                                         VarDecl *field) {
+  return ManagedValue(gen.B.createRefElementAddr(e,
+                                             base.getValue(),
+                                             field,
+                                             gen.getLoweredType(e->getType())));
+}
+
 template<typename ANY_MEMBER_REF_EXPR>
 ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
                                   ANY_MEMBER_REF_EXPR *e,
@@ -630,10 +634,13 @@ ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
   if (VarDecl *var = dyn_cast<VarDecl>(e->getDecl())) {
     if (!var->isProperty()) {
       SILCompoundTypeInfo *cti = gen.SGM.M.getCompoundTypeInfo(ty);
-      // We can get to the element directly with element_addr.
+      // We can get to the element directly with element_addr or
+      // ref_element_addr.
+      ManagedValue base = gen.visit(e->getBase());
+      if (ty.hasReferenceSemantics())
+        return emitExtractFromClass(gen, e, base, var);
       size_t index = cti->getIndexOfMemberDecl(var);
-      return emitExtractLoadableElement(gen, e, gen.visit(e->getBase()),
-                                        index);
+      return emitExtractLoadableElement(gen, e, base, index);
     }
   }
 
@@ -1241,15 +1248,13 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   // Release our members.
   // FIXME: generic params
   // FIXME: Can a destructor always consider its fields fragile like this?
-  SILCompoundTypeInfo *thisTI = SGM.M.getCompoundTypeInfo(thisValue.getType());
   for (Decl *member : cd->getMembers()) {
     if (VarDecl *vd = dyn_cast<VarDecl>(member)) {
       if (vd->isProperty())
         continue;
-      unsigned fieldNo = thisTI->getIndexOfMemberDecl(vd);
       TypeLoweringInfo const &ti = getTypeLoweringInfo(vd->getType());
       if (!ti.isTrivial()) {
-        Value addr = B.createRefElementAddr(dd, thisValue, fieldNo,
+        Value addr = B.createRefElementAddr(dd, thisValue, vd,
                                           ti.getLoweredType().getAddressType());
         if (ti.isAddressOnly()) {
           B.createDestroyAddr(dd, addr);
@@ -1258,7 +1263,6 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
           emitReleaseRValue(dd, field);
         }
       }
-      ++fieldNo;
     }
   }
   

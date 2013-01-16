@@ -683,17 +683,17 @@ public:
   }
 };
 
-/// RefElementAddrInst - Derive the address of a numbered element in a reference
+/// RefElementAddrInst - Derive the address of a named element in a reference
 /// type instance.
 class RefElementAddrInst : public Instruction {
   Value Operand;
-  unsigned FieldNo;
+  VarDecl *Field;
 public:
-  RefElementAddrInst(SILLocation Loc, Value Operand, unsigned FieldNo,
+  RefElementAddrInst(SILLocation Loc, Value Operand, VarDecl *Field,
                      SILType ResultTy);
   
   Value getOperand() const { return Operand; }
-  unsigned getFieldNo() const { return FieldNo; }
+  VarDecl *getField() const { return Field; }
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::RefElementAddrInst;

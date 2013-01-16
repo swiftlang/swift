@@ -233,10 +233,12 @@ public:
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
 #ifndef NDEBUG
     SILType operandTy = EI->getOperand().getType();
+    assert(!operandTy.isAddress() &&
+           "must derive ref_element_addr from non-address");
     assert(operandTy.hasReferenceSemantics() &&
            "must derive ref_element_addr from reference type");
     assert(EI->getType(0).isAddress() &&
-           "result of element_addr must be lvalue");
+           "result of ref_element_addr must be lvalue");
 #endif
   }
   

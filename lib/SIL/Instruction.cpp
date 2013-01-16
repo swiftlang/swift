@@ -382,9 +382,9 @@ ElementAddrInst::ElementAddrInst(SILLocation Loc, Value Operand,
 }
 
 RefElementAddrInst::RefElementAddrInst(SILLocation Loc, Value Operand,
-                                       unsigned FieldNo, SILType ResultTy)
+                                       VarDecl *Field, SILType ResultTy)
   : Instruction(ValueKind::RefElementAddrInst, Loc, ResultTy),
-    Operand(Operand), FieldNo(FieldNo) {
+    Operand(Operand), Field(Field) {
 }
 
 WitnessTableMethodInst::WitnessTableMethodInst(ValueKind Kind,

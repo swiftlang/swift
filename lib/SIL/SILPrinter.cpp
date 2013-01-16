@@ -315,8 +315,8 @@ public:
        << EI->getFieldNo();
   }
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
-    OS << "ref_element_addr " << getID(EI->getOperand()) << ", "
-       << EI->getFieldNo();
+    OS << "ref_element_addr " << getID(EI->getOperand()) << ", @"
+       << EI->getField()->getName().get();
   }
   void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
     OS << "archetype_method " << getID(AMI->getOperand()) << ", @";

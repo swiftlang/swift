@@ -42,27 +42,41 @@ namespace {
     }
   };
   
+  class RefElementComponent : public PhysicalPathComponent {
+    VarDecl *field;
+    SILType type;
+  public:
+    RefElementComponent(VarDecl *field, SILType type)
+      : field(field), type(type) {}
+    
+    Value offset(SILGenFunction &gen, SILLocation loc, Value base)
+      const override
+    {
+      assert(!base.getType().isAddress() &&
+             "base for ref element component can't be an address");
+      assert(base.getType().hasReferenceSemantics() &&
+             "base for ref element component must be a reference type");
+      return gen.B.createRefElementAddr(loc, base, field, type);
+    }
+  };
+  
   class FragileElementComponent : public PhysicalPathComponent {
     unsigned elementIndex;
     SILType type;
   public:
-    FragileElementComponent(unsigned elementIndex,
-                            SILType type)
+    FragileElementComponent(unsigned elementIndex, SILType type)
       : elementIndex(elementIndex), type(type) {}
     
     Value offset(SILGenFunction &gen, SILLocation loc,
                  Value base) const override {
       assert(base && "invalid value for element base");
       SILType baseType = base.getType();
-      if (base.getType().isAddress()) {
-        assert(!base.getType().hasReferenceSemantics() &&
-               "can't get element from address of ref type");
-        return gen.B.createElementAddr(loc, base, elementIndex, type);
-      } else if (baseType.hasReferenceSemantics()) {
-        return gen.B.createRefElementAddr(loc, base, elementIndex, type);
-      } else
-        llvm_unreachable("base for element component must be reference type "
-                         "or an address");
+      (void)baseType;
+      assert(baseType.isAddress() &&
+             "base for element component must be an address");
+      assert(!baseType.hasReferenceSemantics() &&
+             "can't get element from address of ref type");
+      return gen.B.createElementAddr(loc, base, elementIndex, type);
     }
   };
 
@@ -216,9 +230,14 @@ LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
   // If this is a physical field, access with a fragile element reference.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     if (!var->isProperty()) {
-      SILCompoundTypeInfo *cti = gen.SGM.M.getCompoundTypeInfo(baseTy);
-      lv.add<FragileElementComponent>(cti->getIndexOfMemberDecl(var),
-                                      gen.getLoweredType(e->getType()));
+      if (baseTy.hasReferenceSemantics()) {
+        lv.add<RefElementComponent>(var,
+                                    gen.getLoweredType(e->getType()));
+      } else {
+        SILCompoundTypeInfo *cti = gen.SGM.M.getCompoundTypeInfo(baseTy);
+        lv.add<FragileElementComponent>(cti->getIndexOfMemberDecl(var),
+                                        gen.getLoweredType(e->getType()));
+      }
       return ::std::move(lv);
     }
   }

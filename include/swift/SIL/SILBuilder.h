@@ -225,9 +225,9 @@ public:
     return insert(new ElementAddrInst(Loc, Operand, FieldNo, ResultTy));
   }
   
-  Value createRefElementAddr(SILLocation Loc, Value Operand, unsigned FieldNo,
+  Value createRefElementAddr(SILLocation Loc, Value Operand, VarDecl *Field,
                           SILType ResultTy) {
-    return insert(new RefElementAddrInst(Loc, Operand, FieldNo, ResultTy));
+    return insert(new RefElementAddrInst(Loc, Operand, Field, ResultTy));
   }
   
   ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc, Value Operand,
