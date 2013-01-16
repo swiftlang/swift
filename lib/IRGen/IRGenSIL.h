@@ -133,9 +133,7 @@ struct LoweredBB {
 class IRGenSILFunction :
   public IRGenFunction, public SILVisitor<IRGenSILFunction>
 {
-  // FIXME: using std::map because DenseMap doesn't handle non-copyable value
-  // types.
-  ::std::map<swift::Value, LoweredValue> loweredValues;
+  llvm::DenseMap<swift::Value, LoweredValue> loweredValues;
   
   llvm::MapVector<swift::BasicBlock *, LoweredBB> loweredBBs;
   
@@ -158,16 +156,16 @@ public:
   /// Create a new Address corresponding to the given SIL address value.
   void newLoweredAddress(swift::Value v, Address const &address) {
     assert(v.getType().isAddress() && "address for non-address value?!");
-    auto inserted = loweredValues.emplace(v, address);
+    auto inserted = loweredValues.insert({v, address});
     assert(inserted.second && "already had lowered value for sil value?!");
   }
   
   /// Create a new Explosion corresponding to the given SIL value.
   Explosion &newLoweredExplosion(swift::Value v) {
     assert(!v.getType().isAddress() && "explosion for address value?!");
-    auto inserted = loweredValues.emplace(v, LoweredValue{
+    auto inserted = loweredValues.insert({v, LoweredValue{
       Explosion(ExplosionKind::Minimal)
-    });
+    }});
     assert(inserted.second && "already had lowered value for sil value?!");
     return inserted.first->second.getExplosion();
   }
@@ -176,16 +174,16 @@ public:
   PartialCall &newLoweredPartialCall(swift::Value v,
                                      unsigned naturalCurryLevel,
                                      CallEmission &&emission) {
-    auto inserted = loweredValues.emplace(v, LoweredValue{
+    auto inserted = loweredValues.insert({v, LoweredValue{
       PartialCall{std::move(emission), naturalCurryLevel+1}
-    });
+    }});
     assert(inserted.second && "already had lowered value for sil value?!");
     return inserted.first->second.getPartialCall();
   }
   
   PartialCall &moveLoweredPartialCall(swift::Value v,
                                       PartialCall &&parent) {
-    auto inserted = loweredValues.emplace(v, LoweredValue{std::move(parent)});
+    auto inserted = loweredValues.insert({v, LoweredValue{std::move(parent)}});
     assert(inserted.second && "already had lowered value for sil value?!");
     return inserted.first->second.getPartialCall();
   }
