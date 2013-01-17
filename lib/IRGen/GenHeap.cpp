@@ -445,11 +445,12 @@ llvm::Value *ArrayHeapLayout::getBeginPointer(IRGenFunction &IGF,
                                  ElementTI.getStorageType()->getPointerTo());
 }
 
-ManagedValue ArrayHeapLayout::emitAlloc(IRGenFunction &IGF,
-                                        llvm::Value *length,
-                                        Address &begin,
-                                        Expr *init,
-                                        const llvm::Twine &name) const {
+llvm::Value *ArrayHeapLayout::emitUnmanagedAlloc(IRGenFunction &IGF,
+                                                 llvm::Value *length,
+                                                 Address &begin,
+                                                 Expr *init,
+                                                 const llvm::Twine &name) const
+{
   llvm::Constant *metadata = getPrivateMetadata(IGF.IGM);
   llvm::Value *size = getAllocationSize(IGF, length, true, true);
   llvm::Value *align = getSize(IGF, Size(Align.getValue()));
@@ -486,6 +487,15 @@ ManagedValue ArrayHeapLayout::emitAlloc(IRGenFunction &IGF,
     llvm_unreachable("unimplemented: array alloc with nontrivial initializer");
   }
 
+  return alloc;
+}
+
+ManagedValue ArrayHeapLayout::emitAlloc(IRGenFunction &IGF,
+                                        llvm::Value *length,
+                                        Address &begin,
+                                        Expr *init,
+                                        const llvm::Twine &name) const {
+  llvm::Value *alloc = emitUnmanagedAlloc(IGF, length, begin, init, name);
   return IGF.enterReleaseCleanup(alloc);
 }
 

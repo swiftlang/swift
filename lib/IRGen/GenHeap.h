@@ -76,7 +76,14 @@ public:
   /// Derive a pointer to the first element of the given allocation.
   llvm::Value *getBeginPointer(IRGenFunction &IGF, llvm::Value *alloc) const;
 
-  /// Allocate the array.
+  /// Allocate the array without a cleanup.
+  llvm::Value *emitUnmanagedAlloc(IRGenFunction &IGF,
+                                  llvm::Value *length,
+                                  Address &beginPtr,
+                                  Expr *init,
+                                  const llvm::Twine &name) const;
+
+  /// Allocate the array with a release cleanup.
   ManagedValue emitAlloc(IRGenFunction &IGF, llvm::Value *length,
                          Address &beginPtr,
                          Expr *init, const llvm::Twine &name) const;

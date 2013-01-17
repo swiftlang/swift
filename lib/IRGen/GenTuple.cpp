@@ -206,6 +206,19 @@ void swift::irgen::emitTupleElement(IRGenFunction &IGF, TupleElementExpr *E,
   tupleExplosion.ignoreAndDestroy(IGF, tupleExplosion.size());
 }
 
+OwnedAddress swift::irgen::projectTupleElementAddress(IRGenFunction &IGF,
+                                                      OwnedAddress base,
+                                                      CanType tupleType,
+                                                      unsigned fieldNo) {
+  const TupleTypeInfo &tupleTI = getAsTupleTypeInfo(IGF, tupleType);
+  const TupleFieldInfo &field = tupleTI.getFields()[fieldNo];
+  if (field.isEmpty())
+    return {Address(), nullptr};
+  Address fieldAddr = field.projectAddress(IGF,
+                                           base.getAddress());
+  return {fieldAddr, base.getOwner()};
+}
+
 /// Try to emit a tuple-element reference expression as an address.
 Optional<Address>
 swift::irgen::tryEmitTupleElementAsAddress(IRGenFunction &IGF,

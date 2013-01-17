@@ -221,6 +221,31 @@ static void emitGetMetatype(IRGenFunction &IGF, Expr *base, Explosion &out) {
   emitMetaTypeRef(IGF, type, out);
 }
 
+/// Emit a checked unconditional downcast.
+llvm::Value *IRGenFunction::emitUnconditionalDowncast(llvm::Value *from,
+                                                      CanType toType) {
+  // Emit the value we're casting from.
+  if (from->getType() != IGM.Int8PtrTy)
+    from = Builder.CreateBitCast(from, IGM.Int8PtrTy);
+  
+  // Emit a reference to the metadata.
+  llvm::Value *metadataRef
+    = IGM.getAddrOfTypeMetadata(toType, false, false);
+  if (metadataRef->getType() != IGM.Int8PtrTy)
+    metadataRef = Builder.CreateBitCast(metadataRef, IGM.Int8PtrTy);
+  
+  // Call the (unconditional) dynamic cast.
+  auto call
+    = Builder.CreateCall2(IGM.getDynamicCastClassUnconditionalFn(),
+                              from, metadataRef);
+  // FIXME: Eventually, we may want to throw.
+  call->setDoesNotThrow();
+  
+  llvm::Type *subTy = getFragileTypeInfo(toType).StorageType;
+  return Builder.CreateBitCast(call, subTy);
+  
+}
+
 namespace {
   /// A visitor for emitting a value into an explosion.  We call this
   /// r-value emission, but do note that it's valid to emit an
@@ -320,7 +345,7 @@ namespace {
       IGF.emitIgnored(E->getLHS());
       IGF.emitRValue(E->getRHS(), Out);
     }
-
+    
     void visitDowncastExpr(DowncastExpr *E) {
       IGF.emitIgnored(E->getLHS());
 
@@ -329,26 +354,9 @@ namespace {
       IGF.emitRValue(E->getRHS(), subResult);
       ManagedValue val = subResult.claimNext();
       llvm::Value *object = val.getValue();
-      if (object->getType() != IGF.IGM.Int8PtrTy)
-        object = IGF.Builder.CreateBitCast(object, IGF.IGM.Int8PtrTy);
-
-      // Emit a reference to the metadata.
-      llvm::Value *metadataRef
-        = IGF.IGM.getAddrOfTypeMetadata(E->getType()->getCanonicalType(),
-                                        false, false);
-      if (metadataRef->getType() != IGF.IGM.Int8PtrTy)
-        metadataRef = IGF.Builder.CreateBitCast(metadataRef, IGF.IGM.Int8PtrTy);
-
-      // Call the (unconditional) dynamic cast.
-      auto call
-        = IGF.Builder.CreateCall2(IGF.IGM.getDynamicCastClassUnconditionalFn(),
-                                  object, metadataRef);
-      // FIXME: Eventually, we may want to throw.
-      call->setDoesNotThrow();
-
-      // Cast the result of the dynamic cast to the requested static type.
-      llvm::Type *subTy = IGF.getFragileTypeInfo(E->getType()).StorageType;
-      llvm::Value *castVal = IGF.Builder.CreateBitCast(call, subTy);
+      llvm::Value *castVal = IGF.emitUnconditionalDowncast(
+                                             object,
+                                             E->getType()->getCanonicalType());
       Out.add({castVal, val.getCleanup()});
     }
 

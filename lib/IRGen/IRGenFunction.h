@@ -340,6 +340,11 @@ public:
   void emitSupertoArchetypeConversion(Expr *E, CanType destType,
                                       Explosion &explosion);
 
+  /// \brief Convert the given value to the given destination type, using a
+  /// runtime-checked cast.
+  llvm::Value *emitUnconditionalDowncast(llvm::Value *from,
+                                         CanType toType);
+
   llvm::Value *emitAsPrimitiveScalar(Expr *E);
 
   void emitLoad(const LValue &lvalue, const TypeInfo &type,

@@ -230,6 +230,7 @@ public:
   
   void visitAllocVarInst(AllocVarInst *i);
   void visitAllocBoxInst(AllocBoxInst *i);
+  void visitAllocArrayInst(AllocArrayInst *i);
 
   void visitApplyInst(ApplyInst *i);
 
@@ -249,6 +250,13 @@ public:
   void visitDeallocVarInst(DeallocVarInst *i);
   void visitRetainInst(RetainInst *i);
   void visitReleaseInst(ReleaseInst *i);
+
+  void visitImplicitConvertInst(ImplicitConvertInst *i);
+  void visitCoerceInst(CoerceInst *i);
+  void visitDowncastInst(DowncastInst *i);
+
+  void visitIndexAddrInst(IndexAddrInst *i);
+  void visitIntegerValueInst(IntegerValueInst *i);
   
   void visitUnreachableInst(UnreachableInst *i);
   void visitReturnInst(ReturnInst *i);

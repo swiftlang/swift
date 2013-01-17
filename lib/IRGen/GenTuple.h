@@ -18,6 +18,7 @@
 #define SWIFT_IRGEN_GENTUPLE_H
 
 namespace swift {
+  class CanType;
   class TupleElementExpr;
   class TupleExpr;
   class TuplePattern;
@@ -30,6 +31,13 @@ namespace irgen {
   class IRGenFunction;
   class Initialization;
   class LValue;
+  class OwnedAddress;
+
+  /// Project the address of a tuple element.
+  OwnedAddress projectTupleElementAddress(IRGenFunction &IGF,
+                                          OwnedAddress base,
+                                          CanType tupleType,
+                                          unsigned fieldNo);
 
   /// Project a tuple element rvalue from an already-exploded tuple rvalue.
   void projectTupleElementFromExplosion(IRGenFunction &IGF,
