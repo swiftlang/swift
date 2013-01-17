@@ -445,7 +445,8 @@ ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   Cleanups.pushCleanup<CleanupMaterializeAllocation>(existential);
   // Allocate its internal value.
   Value valueAddr = B.createInitExistential(E, existential,
-                                             concrete.getType());
+                                            concrete.getType(),
+                                            E->getConformances());
   // Initialize the internal value.
   if (concrete.getType().isAddressOnly()) {
     concrete.forwardInto(*this, E, valueAddr,

@@ -250,13 +250,18 @@ public:
   }
   
   InitExistentialInst *createInitExistential(SILLocation Loc,
-                                               Value Existential,
-                                               SILType ConcreteType) {
-    return insert(new InitExistentialInst(Loc, Existential, ConcreteType, F));
+                                 Value Existential,
+                                 SILType ConcreteType,
+                                 ArrayRef<ProtocolConformance*> Conformances) {
+    return insert(new InitExistentialInst(Loc,
+                                          Existential,
+                                          ConcreteType,
+                                          Conformances,
+                                          F));
   }
   
   DeinitExistentialInst *createDeinitExistential(SILLocation Loc,
-                                                   Value Existential) {
+                                                 Value Existential) {
     return insert(new DeinitExistentialInst(Loc, Existential));
   }
   

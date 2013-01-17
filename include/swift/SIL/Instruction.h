@@ -766,11 +766,18 @@ public:
 /// of the concrete type that then must be initialized.
 class InitExistentialInst : public Instruction {
   Value Existential;
+  ArrayRef<ProtocolConformance*> Conformances;
 public:
   InitExistentialInst(SILLocation Loc,
-                       Value Existential, SILType ConcreteType, Function &F);
+                      Value Existential,
+                      SILType ConcreteType,
+                      ArrayRef<ProtocolConformance*> Conformances,
+                      Function &F);
   
   Value getExistential() const { return Existential; }
+  ArrayRef<ProtocolConformance*> getConformances() const {
+    return Conformances;
+  }
   Type getConcreteType() const;
 };
   

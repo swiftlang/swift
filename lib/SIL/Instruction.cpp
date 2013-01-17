@@ -421,13 +421,15 @@ ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc, Value Operand,
     Operand(Operand) {
 }
 
-InitExistentialInst::InitExistentialInst(SILLocation Loc, Value Existential,
-                                           SILType ConcreteType,
-                                           Function &F)
+InitExistentialInst::InitExistentialInst(SILLocation Loc,
+                                   Value Existential,
+                                   SILType ConcreteType,
+                                   ArrayRef<ProtocolConformance*> Conformances,
+                                   Function &F)
   : Instruction(ValueKind::InitExistentialInst, Loc,
                 ConcreteType.getAddressType()),
-    Existential(Existential) {
-  
+    Existential(Existential),
+    Conformances(Conformances) {
 }
 
 Type InitExistentialInst::getConcreteType() const {
