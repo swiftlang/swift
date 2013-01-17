@@ -14,15 +14,15 @@ endfunction()
 
 # Build the swiftObjC dylib.
 set(SHARED_LIBRARY ON)
-add_swift_library(swiftObjC
-  ObjC.swift
+add_swift_library(swiftObjectiveC
+  ObjectiveC.swift
   DEPENDS swift_stdlib)
 
 # Link against the system dylib.
-target_link_libraries(swiftObjC
+target_link_libraries(swiftObjectiveC
   "-lobjc")
 
-install_swift_module(ObjC.swift)
+install_swift_module(ObjectiveC.swift)
 
 add_subdirectory(Foundation)
 add_subdirectory(ScriptingBridge)

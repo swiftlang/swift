@@ -169,7 +169,7 @@ namespace {
       // "builtin-SEL *" maps to Swift's ObjCSel.
       if (type->getPointeeType()->isSpecificBuiltinType(
                                                  clang::BuiltinType::ObjCSel)) {
-        return Impl.getNamedSwiftType(Impl.getNamedModule("ObjC"), "ObjCSel");
+        return Impl.getNamedSwiftType(Impl.getNamedModule("ObjectiveC"), "ObjCSel");
       }
 
       // All other C pointers map to CPointer<T>.

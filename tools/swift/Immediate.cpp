@@ -127,7 +127,7 @@ static bool IRGenImportedModules(TranslationUnit *TU,
     StringRef sharedLibName
       = llvm::StringSwitch<StringRef>(SubTU->Name.str())
           .Case("Foundation", "libswiftFoundation.dylib")
-          .Case("ObjC", "libswiftObjC.dylib")
+          .Case("ObjectiveC", "libswiftObjectiveC.dylib")
           .Default("");
     if (!sharedLibName.empty()) {
       loadRuntimeLib(sharedLibName);
