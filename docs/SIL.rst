@@ -595,8 +595,9 @@ ref_element_addr
 ````````````````
 ::
 
-  %1 = ref_element_addr %0, 123
+  %1 = ref_element_addr %0, @T.x
   ; %0 must be of a reference type $T
+  ; @T.x must be an instance field of $T
   ; %1 will be of type $*U where U is the type of the 123rd
   ;   element of T
 
