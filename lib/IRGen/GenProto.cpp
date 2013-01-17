@@ -3207,6 +3207,120 @@ void irgen::expandPolymorphicSignature(IRGenModule &IGM,
   ExpandPolymorphicSignature(IGM, polyFn).expand(out);
 }
 
+static void emitProtocolWitnessTables(IRGenFunction &IGF,
+                                  Address dest,
+                                  ExistentialTypeInfo const &destTI,
+                                  CanType srcType,
+                                  ArrayRef<ProtocolConformance*> conformances,
+                                  llvm::Value* &metadata,
+                                  FixedPacking &packing,
+                                  llvm::Value* &wtable) {
+  const TypeInfo &srcTI = IGF.getFragileTypeInfo(srcType);
+  ExistentialLayout destLayout = destTI.getLayout();
+  ArrayRef<ProtocolEntry> destEntries = destTI.getProtocols();
+
+  // First, write out the metadata.
+  metadata = emitTypeMetadataRef(IGF, srcType);
+  IGF.Builder.CreateStore(metadata, destLayout.projectMetadataRef(IGF, dest));
+  
+  // Compute basic layout information about the type.  If we have a
+  // concrete type, we need to know how it packs into a fixed-size
+  // buffer.  If we don't, we need an value-witness table.
+  if (isa<ArchetypeType>(srcType)) { // FIXME: tuples of archetypes?
+    packing = (FixedPacking) -1;
+    wtable = srcTI.as<ArchetypeTypeInfo>().getValueWitnessTable(IGF);
+  } else {
+    packing = computePacking(IGF.IGM, srcTI);
+    wtable = nullptr;
+  }
+  
+  // Next, write the protocol witness tables.
+  for (unsigned i = 0, e = destTI.getProtocols().size(); i != e; ++i) {
+    ProtocolDecl *proto = destEntries[i].getProtocol();
+    auto &protoI = destEntries[i].getInfo();
+    
+    llvm::Value *ptable;
+    
+    // If the source type is an archetype, look at what's bound.
+    if (isa<ArchetypeType>(srcType)) {
+      auto &archTI = srcTI.as<ArchetypeTypeInfo>();
+      ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
+      ptable = archTI.getWitnessTable(IGF, path.getOriginIndex());
+      ptable = path.apply(IGF, ptable);
+      
+      // All other source types should be concrete enough that we have
+      // conformance information for them.
+    } else {
+      auto astConformance = conformances[i];
+      assert(astConformance);
+      
+      // Compute the conformance information.
+      const ConformanceInfo &conformance =
+      protoI.getConformance(IGF.IGM, srcType, srcTI, proto, *astConformance);
+      ptable = conformance.getTable(IGF);
+    }
+    
+    // Now store the protocol witness table into the destination.
+    Address ptableSlot = destLayout.projectWitnessTable(IGF, dest, i);
+    IGF.Builder.CreateStore(ptable, ptableSlot);
+  }
+
+}
+
+/// Emit an existential container initialization operation for a concrete type.
+/// Returns the address of the uninitialized buffer for the concrete value.
+Address irgen::emitExistentialContainerInit(IRGenFunction &IGF,
+                                  Address dest,
+                                  CanType destType,
+                                  CanType srcType,
+                                  ArrayRef<ProtocolConformance*> conformances) {
+  auto &destTI = IGF.getFragileTypeInfo(destType).as<ExistentialTypeInfo>();
+  const TypeInfo &srcTI = IGF.getFragileTypeInfo(srcType);
+  ExistentialLayout destLayout = destTI.getLayout();
+  ArrayRef<ProtocolEntry> destEntries = destTI.getProtocols();
+  assert(destEntries.size() == conformances.size());
+  
+  assert(!srcType->isExistentialType() &&
+         "SIL existential-to-existential erasure not yet supported");
+  
+  // First, write out the metadata and witness tables.
+  
+  llvm::Value *metadata = nullptr;
+  FixedPacking packing = (FixedPacking) -1;
+  llvm::Value *wtable = nullptr;
+  emitProtocolWitnessTables(IGF,
+                            dest,
+                            destTI,
+                            srcType,
+                            conformances,
+                            metadata,
+                            packing,
+                            wtable);
+  
+  // Finally, evaluate into the buffer.
+  
+  // Project down to the destination fixed-size buffer.
+  Address buffer = destLayout.projectExistentialBuffer(IGF, dest);
+
+  // If the type is provably empty, we're done.
+  if (srcTI.isEmpty(ResilienceScope::Local)) {
+    assert(packing == FixedPacking::OffsetZero);
+    return buffer;
+  }
+  
+  // Otherwise, allocate if necessary.
+  
+  if (wtable) {
+    // If we're using a witness-table to do this, we need to emit a
+    // value-witness call to allocate the fixed-size buffer.
+    return Address(emitAllocateBufferCall(IGF, wtable, metadata, buffer),
+                   Alignment(1));
+  } else {
+    // Otherwise, allocate using what we know statically about the type.
+    return emitAllocateBuffer(IGF, buffer, packing, srcTI);
+  }
+}
+
 /// Emit an erasure expression as an initializer for the given memory.
 void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
                               Address dest, const TypeInfo &rawTI) {
@@ -3284,52 +3398,20 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
   // We're converting from a concrete type to an existential type.
   const TypeInfo &srcTI = IGF.getFragileTypeInfo(srcType);
 
-  // First, write out the metadata.
-  llvm::Value *metadata = emitTypeMetadataRef(IGF, srcType);
-  IGF.Builder.CreateStore(metadata, destLayout.projectMetadataRef(IGF, dest));
-
-  // Compute basic layout information about the type.  If we have a
-  // concrete type, we need to know how it packs into a fixed-size
-  // buffer.  If we don't, we need an value-witness table.
+  // First, write out the metadata and witness tables.
+  
+  llvm::Value *metadata = nullptr;
   FixedPacking packing = (FixedPacking) -1;
   llvm::Value *wtable = nullptr;
-  if (isa<ArchetypeType>(srcType)) { // FIXME: tuples of archetypes?
-    wtable = srcTI.as<ArchetypeTypeInfo>().getValueWitnessTable(IGF);
-  } else {
-    packing = computePacking(IGF.IGM, srcTI);
-  }
+  emitProtocolWitnessTables(IGF,
+                            dest,
+                            destTI,
+                            srcType,
+                            E->getConformances(),
+                            metadata,
+                            packing,
+                            wtable);
 
-  // Next, write the protocol witness tables.
-  for (unsigned i = 0, e = destEntries.size(); i != e; ++i) {
-    ProtocolDecl *proto = destEntries[i].getProtocol();
-    auto &protoI = destEntries[i].getInfo();
-
-    llvm::Value *ptable;
-
-    // If the source type is an archetype, look at what's bound.
-    if (isa<ArchetypeType>(srcType)) {
-      auto &archTI = srcTI.as<ArchetypeTypeInfo>();
-      ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
-      ptable = archTI.getWitnessTable(IGF, path.getOriginIndex());
-      ptable = path.apply(IGF, ptable);
-
-    // All other source types should be concrete enough that we have
-    // conformance information for them.
-    } else {
-      auto astConformance = E->getConformances()[i];
-      assert(astConformance);
-
-      // Compute the conformance information.
-      const ConformanceInfo &conformance =
-        protoI.getConformance(IGF.IGM, srcType, srcTI, proto, *astConformance);
-      ptable = conformance.getTable(IGF);
-    }
-
-    // Now store the protocol witness table into the destination.
-    Address ptableSlot = destLayout.projectWitnessTable(IGF, dest, i);
-    IGF.Builder.CreateStore(ptable, ptableSlot);
-  }
-  
   // Finally, evaluate into the buffer.
 
   // If the type is provably empty, just emit the operand as ignored.
@@ -3477,6 +3559,8 @@ static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
 
   return emission;
 }
+
+
 
 /// Emit an existential member reference as a callee.
 CallEmission
@@ -3641,5 +3725,16 @@ LValue irgen::emitArchetypeSubscriptLValue(IRGenFunction &IGF,
                                            ArchetypeSubscriptExpr *E) {
   IGF.unimplemented(E->getLoc(), "l-value subscript into archetype");
   return IGF.emitFakeLValue(E->getType());
+}
+
+/// Emit a projection from an existential container to its concrete value
+/// buffer.
+Address irgen::emitExistentialProjection(IRGenFunction &IGF,
+                                         Address base,
+                                         CanType baseTy) {
+  assert(baseTy->isExistentialType());
+  auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<ExistentialTypeInfo>();
+  auto existLayout = baseTI.getLayout();
+  return existLayout.projectExistentialBuffer(IGF, base);
 }
 

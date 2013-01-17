@@ -163,7 +163,7 @@ public:
                       Address addr) const = 0;
 
   /// Copy a value out of an object and into another, destroying the
-  /// old value.
+  /// old value in the destination.
   virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
                               Address src) const = 0;
 

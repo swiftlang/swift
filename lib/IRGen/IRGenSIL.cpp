@@ -30,6 +30,7 @@
 #include "GenHeap.h"
 #include "GenInit.h"
 #include "GenMeta.h"
+#include "GenProto.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
 #include "IRGenModule.h"
@@ -468,8 +469,6 @@ void IRGenSILFunction::visitAllocArrayInst(swift::AllocArrayInst *i) {
 }
 
 void IRGenSILFunction::visitImplicitConvertInst(swift::ImplicitConvertInst *i) {
-  i->dump();
-  i->getOperand()->dump();
   Explosion &to = newLoweredExplosion(Value(i, 0));
   LoweredValue &from = getLoweredValue(i->getOperand());
   switch (from.kind) {
@@ -523,4 +522,59 @@ void IRGenSILFunction::visitIndexAddrInst(swift::IndexAddrInst *i) {
 void IRGenSILFunction::visitIntegerValueInst(swift::IntegerValueInst *i) {
   llvm::Value *constant = Builder.getInt64(i->getValue());
   newLoweredExplosion(Value(i, 0)).addUnmanaged(constant);
+}
+
+void IRGenSILFunction::visitInitExistentialInst(swift::InitExistentialInst *i) {
+  Address container = getLoweredAddress(i->getExistential());
+  CanType destType = i->getExistential().getType().getSwiftRValueType();
+  CanType srcType = i->getConcreteType()->getCanonicalType();
+  Address buffer = emitExistentialContainerInit(*this,
+                                                container,
+                                                destType, srcType,
+                                                i->getConformances());
+  newLoweredAddress(Value(i,0), buffer);
+}
+
+void IRGenSILFunction::visitProjectExistentialInst(
+                                             swift::ProjectExistentialInst *i) {
+  CanType baseTy = i->getOperand().getType().getSwiftRValueType();
+  Address base = getLoweredAddress(i->getOperand());
+  newLoweredAddress(Value(i,0), emitExistentialProjection(*this,
+                                                          base,
+                                                          baseTy));
+}
+
+void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
+  CanType addrTy = i->getSrc().getType().getSwiftRValueType();
+  Address src = getLoweredAddress(i->getSrc());
+  Address dest = getLoweredAddress(i->getDest());
+  TypeInfo const &addrTI = getFragileTypeInfo(addrTy);
+
+  unsigned takeAndOrInitialize =
+    (i->isTakeOfSrc() << 1U) | i->isInitializationOfDest();
+  static const unsigned COPY = 0, TAKE = 2, ASSIGN = 0, INITIALIZE = 1;
+  
+  switch (takeAndOrInitialize) {
+  case ASSIGN | COPY:
+    addrTI.assignWithCopy(*this, dest, src);
+    break;
+  case INITIALIZE | COPY:
+    addrTI.initializeWithCopy(*this, dest, src);
+    break;
+  case ASSIGN | TAKE:
+    addrTI.assignWithTake(*this, dest, src);
+    break;
+  case INITIALIZE | TAKE:
+    addrTI.initializeWithTake(*this, dest, src);
+    break;
+  default:
+    llvm_unreachable("unexpected take/initialize attribute combination?!");
+  }
+}
+
+void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
+  CanType addrTy = i->getOperand().getType().getSwiftRValueType();
+  Address base = getLoweredAddress(i->getOperand());
+  TypeInfo const &addrTI = getFragileTypeInfo(addrTy);
+  addrTI.destroy(*this, base);
 }

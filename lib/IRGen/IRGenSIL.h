@@ -247,9 +247,17 @@ public:
   void visitElementAddrInst(ElementAddrInst *i);
   void visitRefElementAddrInst(RefElementAddrInst *i);
 
-  void visitDeallocVarInst(DeallocVarInst *i);
+  //void visitProtocolMethodInst(ProtocolMethodInst *i);
+  
+  void visitProjectExistentialInst(ProjectExistentialInst *i);
+  void visitInitExistentialInst(InitExistentialInst *i);
+
   void visitRetainInst(RetainInst *i);
   void visitReleaseInst(ReleaseInst *i);
+  void visitDeallocVarInst(DeallocVarInst *i);
+
+  void visitCopyAddrInst(CopyAddrInst *i);
+  void visitDestroyAddrInst(DestroyAddrInst *i);
 
   void visitImplicitConvertInst(ImplicitConvertInst *i);
   void visitCoerceInst(CoerceInst *i);

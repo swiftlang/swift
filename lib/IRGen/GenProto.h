@@ -31,6 +31,7 @@ namespace swift {
   class ExistentialSubscriptExpr;
   class FuncDecl;
   class PolymorphicFunctionType;
+  class ProtocolConformance;
 
 namespace irgen {
   class AbstractCallee;
@@ -46,6 +47,20 @@ namespace irgen {
 
   /// Emit an erasure expression into an explosion.
   void emitErasure(IRGenFunction &IGF, ErasureExpr *E, Explosion &out);
+
+  /// Emit the metadata and witness table initialization for an allocated
+  /// existential container.
+  Address emitExistentialContainerInit(IRGenFunction &IGF,
+                                   Address dest,
+                                   CanType destType,
+                                   CanType srcType,
+                                   ArrayRef<ProtocolConformance*> conformances);
+
+  /// Emit a projection from an existential container address to the address
+  /// of its concrete value buffer.
+  Address emitExistentialProjection(IRGenFunction &IGF,
+                                    Address base,
+                                    CanType baseTy);
 
   /// Emit an erasure expression as an initializer of memory.
   void emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
