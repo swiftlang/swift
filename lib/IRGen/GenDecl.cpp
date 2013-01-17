@@ -131,7 +131,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                                   "llvm.global_ctors");
   }
   
-  emitLLVMUsed();
+  emitGlobalLists();
 
   // Objective-C image information.
   // Generate module-level named metadata to convey this information to the
@@ -149,6 +149,67 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   Module.addModuleFlag(llvm::Module::Override,
                        "Objective-C Garbage Collection", (uint32_t)0);
   // FIXME: Simulator flag.
+}
+
+/// Add the given global value to @llvm.used.
+void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
+  assert(!global->isDeclaration() &&
+         "Only globals with definition can force usage.");
+  LLVMUsed.push_back(global);
+}
+
+/// Add the given global value to the Objective-C class list.
+void IRGenModule::addObjCClass(llvm::Constant *classPtr) {
+  ObjCClasses.push_back(classPtr);
+}
+
+/// Emit a global list, i.e. a global constant array holding all of a
+/// list of values.  Generally these lists are for various LLVM
+/// metadata or runtime purposes.
+static void emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
+                           StringRef name, StringRef section,
+                           llvm::GlobalValue::LinkageTypes linkage) {
+  // Do nothing if the list is empty.
+  if (handles.empty()) return;
+
+  // For global lists that actually get linked (as opposed to notional
+  // ones like @llvm.used), it's important to set an explicit alignment
+  // so that the linker doesn't accidentally put padding in the list.
+  Alignment alignment = IGM.getPointerAlignment();
+  auto eltTy = IGM.Int8PtrTy;
+
+  // We have an array of value handles, but we need an array of constants.
+  SmallVector<llvm::Constant*, 8> elts;
+  elts.reserve(handles.size());
+  for (auto &handle : handles) {
+    auto elt = cast<llvm::Constant>(&*handle);
+    elt = llvm::ConstantExpr::getBitCast(elt, eltTy);
+    elts.push_back(elt);
+  }
+
+  auto varTy = llvm::ArrayType::get(eltTy, elts.size());
+  auto init = llvm::ConstantArray::get(varTy, elts);
+  auto var = new llvm::GlobalVariable(IGM.Module, varTy, false, linkage,
+                                      init, name);
+  var->setSection(section);
+  var->setAlignment(alignment.getValue());
+
+  // Mark the variable as used if doesn't have external linkage.
+  // (Note that we'd specifically like to not put @llvm.used in itself.)
+  if (llvm::GlobalValue::isLocalLinkage(linkage))
+    IGM.addUsedGlobal(var);
+}
+
+void IRGenModule::emitGlobalLists() {
+  // Objective-C class references go in a variable with a meaningless
+  // name but a magic section.
+  emitGlobalList(*this, ObjCClasses, "objc_classes",
+                 "__DATA, __objc_classlist, regular, no_dead_strip",
+                 llvm::GlobalValue::InternalLinkage);
+
+  // @llvm.used
+  emitGlobalList(*this, LLVMUsed, "llvm.used", "llvm.metadata",
+                 llvm::GlobalValue::AppendingLinkage);
 }
 
 void IRGenFunction::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) {

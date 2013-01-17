@@ -261,39 +261,6 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
   return global;
 }
 
-void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
-  assert(!global->isDeclaration() &&
-         "Only globals with definition can force usage.");
-  LLVMUsed.push_back(global);
-}
-
-void IRGenModule::emitLLVMUsed() {
-  // Don't create llvm.used if there is no need.
-  if (LLVMUsed.empty())
-    return;
-
-  // Convert LLVMUsed to what ConstantArray needs.
-  SmallVector<llvm::Constant*, 8> UsedArray;
-  UsedArray.resize(LLVMUsed.size());
-  for (unsigned i = 0, e = LLVMUsed.size(); i != e; ++i) {
-    UsedArray[i] =
-    llvm::ConstantExpr::getBitCast(cast<llvm::Constant>(&*LLVMUsed[i]),
-                                   Int8PtrTy);
-  }
-
-  if (UsedArray.empty())
-    return;
-  llvm::ArrayType *ATy = llvm::ArrayType::get(Int8PtrTy, UsedArray.size());
-
-  llvm::GlobalVariable *GV =
-  new llvm::GlobalVariable(Module, ATy, false,
-                           llvm::GlobalValue::AppendingLinkage,
-                           llvm::ConstantArray::get(ATy, UsedArray),
-                           "llvm.used");
-
-  GV->setSection("llvm.metadata");
-}
-
 /// Determine the natural limits on how we can call the given method
 /// using Objective-C method dispatch.
 AbstractCallee irgen::getAbstractObjCMethodCallee(IRGenFunction &IGF,

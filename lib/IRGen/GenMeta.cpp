@@ -906,9 +906,23 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                      IGM.getAddrOfTypeMetadata(declaredType,
                                                isIndirect, isPattern,
                                                init->getType()));
-
-  var->setConstant(!isPattern);
   var->setInitializer(init);
+
+  // TODO: the metadata global can actually be constant in a very
+  // special case: it's not a pattern, ObjC interoperation isn't
+  // required, there are no class fields, and there is nothing that
+  // needs to be runtime-adjusted.
+  var->setConstant(false);
+
+  // Add non-generic classes to the ObjC class list.
+  if (IGM.ObjCInterop && !isPattern && !isIndirect) {
+    // We can't just use 'var' here because it's unadjusted.  Instead
+    // of re-implementing the adjustment logic, just pull the metadata
+    // pointer again.
+    auto metadata =
+      IGM.getAddrOfTypeMetadata(declaredType, isIndirect, isPattern);
+    IGM.addObjCClass(metadata);
+  }
 }
 
 namespace {

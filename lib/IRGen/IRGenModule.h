@@ -182,7 +182,7 @@ public:
   llvm::Constant *getAddrOfObjCSelectorRef(llvm::StringRef selector);
   llvm::Constant *getAddrOfObjCMethodName(llvm::StringRef methodName);
   void addUsedGlobal(llvm::GlobalValue *global);
-  void emitLLVMUsed();
+  void addObjCClass(llvm::Constant *addr);
 
 private:
   llvm::DenseMap<LinkEntity, llvm::GlobalVariable*> GlobalVars;
@@ -197,7 +197,11 @@ private:
   /// out.
   llvm::SmallVector<llvm::WeakVH, 4> LLVMUsed;
 
+  /// ObjCClasses - List of Objective-C classes, bitcast to i8*.
+  llvm::SmallVector<llvm::WeakVH, 4> ObjCClasses;
+
   void mangleGlobalInitializer(raw_ostream &buffer, TranslationUnit *D);
+  void emitGlobalLists();
 
 //--- Runtime ---------------------------------------------------------------
 public:
