@@ -400,9 +400,10 @@ ClangImporter::lookupExtensions(Module *module, Type type) {
   auto extensions = cache.Extensions;
   if (extensions)
     extensions->clear();
-  for (auto category = objcClass->getCategoryList(); category;
-       category = category->getNextClassCategory()) {
-    if (auto imported = cast_or_null<ExtensionDecl>(Impl.importDecl(category))){
+  for (auto I = objcClass->visible_categories_begin(),
+            E = objcClass->visible_categories_end();
+       I != E; ++I) {
+    if (auto imported = cast_or_null<ExtensionDecl>(Impl.importDecl(*I))){
       if (!extensions) {
         extensions = new SmallVector<ExtensionDecl *, 4>;
 
