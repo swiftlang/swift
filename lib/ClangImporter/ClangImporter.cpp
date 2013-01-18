@@ -106,6 +106,10 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
     invocationArgStrs.push_back(path);
   }
 
+  // FIXME: Hack around poor module search heuristics.
+  invocationArgStrs.push_back("-iwithsysroot");
+  invocationArgStrs.push_back("/usr/include/objc");
+
   // Set the module cache path.
   if (moduleCachePath.empty()) {
     llvm::SmallString<128> DefaultModuleCache;
