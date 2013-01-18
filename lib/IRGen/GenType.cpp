@@ -411,7 +411,8 @@ llvm::StructType *IRGenModule::createNominalType(TypeDecl *decl) {
     typeName = decl->getName().str();
     typeName.append(".local");
   } else {
-    LinkEntity::forNonFunction(decl).mangle(typeName);
+    auto type = decl->getDeclaredType()->getCanonicalType();
+    LinkEntity::forTypeMangling(type).mangle(typeName);
   }
   return llvm::StructType::create(getLLVMContext(), typeName.str());
 }
