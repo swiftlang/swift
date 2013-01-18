@@ -134,6 +134,8 @@ ASTContext::ASTContext(LangOptions &langOpts, llvm::SourceMgr &sourcemgr,
                          BuiltinObjCPointerType(*this)),
     TheRawPointerType(new (*this, AllocationArena::Permanent)
                         BuiltinRawPointerType(*this)),
+    TheOpaquePointerType(new (*this, AllocationArena::Permanent)
+                         BuiltinOpaquePointerType(*this)),
     TheUnstructuredUnresolvedType(new (*this, AllocationArena::Permanent)
                                     UnstructuredUnresolvedType(*this)),
     TheIEEE32Type(new (*this, AllocationArena::Permanent)

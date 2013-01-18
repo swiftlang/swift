@@ -278,8 +278,8 @@ public:
            "result method must be of a concrete function type");
     SILType operandType = EMI->getOperand().getType();
     assert(methodType->getInput()->isEqual(
-                            operandType.getASTContext().TheRawPointerType) &&
-           "result must be a method of raw pointer");
+                            operandType.getASTContext().TheOpaquePointerType) &&
+           "result must be a method of opaque pointer");
     assert(methodType->getResult()->is<FunctionType>() &&
            "result must be a method");
     assert(operandType.isAddress() &&

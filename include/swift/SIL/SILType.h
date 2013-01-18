@@ -177,6 +177,8 @@ public:
   static SILType getObjectPointerType(ASTContext &C);
   /// Get the RawPointer type as a SILType.
   static SILType getRawPointerType(ASTContext &C);
+  /// Get the OpaquePointer type as a SILType.
+  static SILType getOpaquePointerType(ASTContext &C);
   /// Get a builtin integer type as a SILType.
   static SILType getBuiltinIntegerType(unsigned bitWidth, ASTContext &C);
   

@@ -25,6 +25,8 @@ using namespace swift;
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   if (Name == "RawPointer")
     return Context.TheRawPointerType;
+  if (Name == "OpaquePointer")
+    return Context.TheOpaquePointerType;
   if (Name == "ObjectPointer")
     return Context.TheObjectPointerType;
   if (Name == "ObjCPointer")

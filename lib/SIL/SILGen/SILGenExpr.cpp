@@ -783,7 +783,7 @@ ManagedValue SILGenFunction::visitExistentialMemberRefExpr(
   if (isa<FuncDecl>(E->getDecl())) {
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
-    Type methodType = FunctionType::get(F.getContext().TheRawPointerType,
+    Type methodType = FunctionType::get(F.getContext().TheOpaquePointerType,
                                         E->getType(),
                                         F.getContext());
     Value method = B.createProtocolMethod(E, existential,

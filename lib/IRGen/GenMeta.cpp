@@ -266,6 +266,7 @@ namespace {
     TREAT_AS_OPAQUE(BuiltinInteger)
     TREAT_AS_OPAQUE(BuiltinFloat)
     TREAT_AS_OPAQUE(BuiltinRawPointer)
+    TREAT_AS_OPAQUE(BuiltinOpaquePointer)
 #undef TREAT_AS_OPAQUE
 
     llvm::Value *emitDirectMetadataRef(CanType type) {

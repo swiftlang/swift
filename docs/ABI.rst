@@ -78,6 +78,7 @@ types where the metadata itself has unknown layout.)
   type ::= 'BO'                              // Builtin.ObjCPointer
   type ::= 'Bo'                              // Builtin.ObjectPointer
   type ::= 'Bp'                              // Builtin.RawPointer
+  type ::= 'Bu'                              // Builtin.OpaquePointer
   type ::= nominal-type
   type ::= 'F' type type                     // function type
   type ::= 'f' type type                     // uncurried function type

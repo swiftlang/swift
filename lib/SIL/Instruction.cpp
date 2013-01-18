@@ -417,7 +417,7 @@ ProtocolMethodInst::ProtocolMethodInst(SILLocation Loc, Value Operand,
 ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc, Value Operand,
                                                Function &F)
   : Instruction(ValueKind::ProjectExistentialInst, Loc,
-                SILType::getRawPointerType(F.getContext())),
+                SILType::getOpaquePointerType(F.getContext())),
     Operand(Operand) {
 }
 

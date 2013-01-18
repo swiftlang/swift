@@ -278,6 +278,9 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
   case TypeKind::BuiltinRawPointer:
     return createPrimitive(IGM.Int8PtrTy, IGM.getPointerSize(),
                            IGM.getPointerAlignment());
+  case TypeKind::BuiltinOpaquePointer:
+    return createPrimitive(IGM.OpaquePtrTy, IGM.getPointerSize(),
+                           IGM.getPointerAlignment());
   case TypeKind::BuiltinObjectPointer:
     return convertBuiltinObjectPointer();
   case TypeKind::BuiltinObjCPointer:

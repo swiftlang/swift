@@ -141,6 +141,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::UnstructuredUnresolved:

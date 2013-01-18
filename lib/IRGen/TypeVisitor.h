@@ -97,6 +97,7 @@ public:
     case TypeKind::BuiltinInteger:
     case TypeKind::BuiltinObjectPointer:
     case TypeKind::BuiltinObjCPointer:
+    case TypeKind::BuiltinOpaquePointer:
     case TypeKind::BuiltinRawPointer:
     case TypeKind::Class:
     case TypeKind::Module:

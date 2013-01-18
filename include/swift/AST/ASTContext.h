@@ -256,6 +256,7 @@ public:
   const Type TheObjectPointerType; /// Builtin.ObjectPointer
   const Type TheObjCPointerType; /// Builtin.ObjCPointer
   const Type TheRawPointerType;  /// Builtin.RawPointer
+  const Type TheOpaquePointerType;  /// Builtin.OpaquePointer
   
   /// TheUnstructuredUnresolvedType - Unresolved on context.  This is given to an 
   /// anonymous closure argument (e.g. $4) and to UnresolvedMemberExprs 

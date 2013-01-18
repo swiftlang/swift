@@ -84,6 +84,7 @@ bool TypeBase::hasReferenceSemantics() {
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::UnstructuredUnresolved:
   case TypeKind::Tuple:
@@ -192,6 +193,7 @@ bool TypeBase::isSpecialized() {
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinOpaquePointer:
   case TypeKind::DeducibleGenericParam:
   case TypeKind::Module:
   case TypeKind::Protocol:
@@ -216,6 +218,7 @@ static void gatherTypeVariables(
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::UnstructuredUnresolved:
@@ -334,6 +337,7 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
   switch (getKind()) {
   case TypeKind::Error: 
   case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinInteger:
@@ -1095,6 +1099,10 @@ void TypeBase::print(raw_ostream &OS) const {
 
 void BuiltinRawPointerType::print(raw_ostream &OS) const {
   OS << "Builtin.RawPointer";
+}
+
+void BuiltinOpaquePointerType::print(raw_ostream &OS) const {
+  OS << "Builtin.OpaquePointer";
 }
 
 void BuiltinObjectPointerType::print(raw_ostream &OS) const {

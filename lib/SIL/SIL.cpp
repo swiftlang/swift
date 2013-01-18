@@ -88,6 +88,12 @@ SILType SILType::getRawPointerType(ASTContext &C) {
                  /*isLoadable=*/true);
 }
 
+SILType SILType::getOpaquePointerType(ASTContext &C) {
+  return SILType(CanType(C.TheOpaquePointerType),
+                 /*isAddress=*/false,
+                 /*isLoadable=*/true);
+}
+
 SILType SILType::getEmptyTupleType(ASTContext &C) {
   return SILType(CanType(TupleType::getEmpty(C)),
                  /*isAddress=*/false,
