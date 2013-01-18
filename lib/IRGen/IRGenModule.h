@@ -323,6 +323,9 @@ public:
   llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D);
   llvm::Constant *getAddrOfSwiftMetaclassStub(ClassDecl *D);
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D);
+
+  llvm::StringRef mangleType(CanType type,
+                             llvm::SmallVectorImpl<char> &buffer);
 };
 
 } // end namespace irgen

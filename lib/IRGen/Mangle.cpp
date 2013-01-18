@@ -207,12 +207,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
   case DeclContextKind::ExtensionDecl: {
     // Mangle the extension as the originally-extended type.
     Type type = cast<ExtensionDecl>(ctx)->getExtendedType();
-    if (NominalType *nom = type->getAs<NominalType>()) {
-      mangleNominalType(nom->getDecl(), ExplosionKind::Minimal);
-      return;
-    }
-    mangleNominalType(type->castTo<UnboundGenericType>()->getDecl(),
-                      ExplosionKind::Minimal);
+    mangleType(type->getCanonicalType(), ExplosionKind::Minimal, 0);
     return;
   }
 
@@ -436,7 +431,6 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     llvm_unreachable("mangling error type");
   case TypeKind::UnstructuredUnresolved:
   case TypeKind::DeducibleGenericParam:
-  case TypeKind::UnboundGeneric:
     llvm_unreachable("mangling unresolved type");
   case TypeKind::TypeVariable:
     llvm_unreachable("mangling type variable");
@@ -514,6 +508,13 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
 
   case TypeKind::Class:
     return mangleNominalType(cast<ClassType>(base)->getDecl(), explosion);
+
+  case TypeKind::UnboundGeneric:
+    // We normally reject unbound types in IR-generation, but there
+    // are several occasions in which we'd like to mangle them in the
+    // abstract.
+    mangleNominalType(cast<UnboundGenericType>(base)->getDecl(), explosion);
+    return;
 
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericOneOf:
@@ -764,6 +765,11 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
     return;
 
+  // Abstract type manglings just follow <type>.
+  case Kind::TypeMangling:
+    mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
+    return;
+
   //   global ::= 'M' directness type             // type metadata
   //   global ::= 'MP' directness type            // type metadata pattern
   case Kind::TypeMetadata: {
@@ -771,20 +777,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     bool isPattern = isMetadataPattern();
     if (isPattern) buffer << 'P';
     mangler.mangleDirectness(isMetadataIndirect());
-    if (!isPattern) {
-      mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
-      return;
-    }
-
-    // Patterns necessarily belong to generic nominal types or to
-    // nominal member types thereof.
-    NominalTypeDecl *theDecl;
-    if (auto unbound = dyn_cast<UnboundGenericType>(getType())) {
-      theDecl = unbound->getDecl();
-    } else {
-      theDecl = cast<NominalType>(getType())->getDecl();
-    }
-    mangler.mangleNominalType(theDecl, ExplosionKind::Minimal);
+    mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
     return;
   }
 

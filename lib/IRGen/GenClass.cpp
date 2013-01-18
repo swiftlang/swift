@@ -849,7 +849,20 @@ namespace {
 
     llvm::Constant *buildName() {
       if (Name) return Name;
-      return (Name = IGM.getAddrOfGlobalString(TheClass->getName().str()));
+
+      // If the class is being exported as an Objective-C class, we
+      // should export it under its formal name.
+      if (TheClass->getAttrs().ObjC) {
+        Name = IGM.getAddrOfGlobalString(TheClass->getName().str());
+        return Name;
+      }
+
+      // Otherwise, we need to mangle the type.
+      auto type = TheClass->getDeclaredType()->getCanonicalType();
+
+      SmallVector<char, 128> buffer;
+      Name = IGM.getAddrOfGlobalString(IGM.mangleType(type, buffer));
+      return Name;
     }
 
     llvm::Constant *null() {

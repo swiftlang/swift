@@ -366,6 +366,7 @@ bool LinkEntity::isLocalLinkage() const {
   case Kind::ValueWitness:
   case Kind::ValueWitnessTable:
   case Kind::TypeMetadata:
+  case Kind::TypeMangling:
     return isLocalLinkageType(getType());
 
   case Kind::WitnessTableOffset:
@@ -1305,6 +1306,13 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(llvm::StringRef data) {
   // Cache and return.
   entry = address;
   return address;
+}
+
+/// Mangle the name of a type.
+StringRef IRGenModule::mangleType(CanType type, SmallVectorImpl<char> &buffer) {
+  llvm::raw_svector_ostream nameStream(buffer);
+  LinkEntity::forTypeMangling(type).mangle(nameStream);
+  return nameStream.str();
 }
 
 /// Is the given declaration resilient?

@@ -120,6 +120,10 @@ class LinkEntity {
     /// The metadata or metadata template for a class.
     /// The pointer is a canonical TypeBase*.
     TypeMetadata,
+
+    /// A type which is being mangled just for its string.
+    /// The pointer is a canonical TypeBase*.
+    TypeMangling,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -151,6 +155,12 @@ class LinkEntity {
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
          | LINKENTITY_SET_FIELD(ExplosionLevel, unsigned(explosionKind))
          | LINKENTITY_SET_FIELD(UncurryLevel, uncurryLevel);
+  }
+
+  void setForType(Kind kind, CanType type) {
+    assert(isTypeKind(kind));
+    Pointer = type.getPointer();
+    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
   }
 
   static Kind getKindForFunction(FunctionRef::Kind fn) {
@@ -241,10 +251,15 @@ public:
     return entity;
   }
 
-  static LinkEntity forValueWitnessTable(CanType concreteType) {
+  static LinkEntity forValueWitnessTable(CanType type) {
     LinkEntity entity;
-    entity.Pointer = concreteType.getPointer();
-    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::ValueWitnessTable));
+    entity.setForType(Kind::ValueWitnessTable, type);
+    return entity;
+  }
+
+  static LinkEntity forTypeMangling(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::TypeMangling, type);
     return entity;
   }
 
