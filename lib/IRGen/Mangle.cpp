@@ -745,57 +745,29 @@ void Mangler::mangleDirectness(bool isIndirect) {
 }
 
 void LinkEntity::mangle(raw_ostream &buffer) const {
-  if (getKind() == Kind::Function) {
-    // As a special case, functions can have external asm names.
-    if (!getDecl()->getAttrs().AsmName.empty()) {
-      buffer << getDecl()->getAttrs().AsmName;
-      return;
-    }
-
-    // As another special case, Clang C functions don't get mangled at all.
-    // FIXME: When we can import C++, use Clang's mangler.
-    if (auto clangDecl = getDecl()->getClangDecl()) {
-      if (auto clangFunc = dyn_cast<clang::FunctionDecl>(clangDecl)) {
-        buffer << clangFunc->getName();
-        return;
-      }
-    }
-  }
-
-  // Objective-C class references also have a custom mangling.
-  if (getKind() == Kind::ObjCClass) {
-    buffer << "OBJC_CLASS_$_" << getDecl()->getName().str();
-    return;
-  } else if (getKind() == Kind::ObjCMetaclass) {
-    buffer << "OBJC_METACLASS_$_" << getDecl()->getName().str();
-    return;
-  }
-
-  // Otherwise, everything gets the common prefix.
+  // Almost everything below gets the common prefix:
   //   mangled-name ::= '_T' global
-  buffer << "_T";
 
   Mangler mangler(buffer);
-
   switch (getKind()) {
 
   //   global ::= 'w' value-witness-kind type     // value witness
   case Kind::ValueWitness:
-    buffer << 'w';
+    buffer << "_Tw";
     buffer << mangleValueWitness(getValueWitness());
     mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
     return;
 
   //   global ::= 'WV' type                       // value witness
   case Kind::ValueWitnessTable:
-    buffer << "WV";
+    buffer << "_TWV";
     mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
     return;
 
   //   global ::= 'M' directness type             // type metadata
   //   global ::= 'MP' directness type            // type metadata pattern
   case Kind::TypeMetadata: {
-    buffer << 'M';
+    buffer << "_TM";
     bool isPattern = isMetadataPattern();
     if (isPattern) buffer << 'P';
     mangler.mangleDirectness(isMetadataIndirect());
@@ -818,20 +790,20 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   //   global ::= 'Mm' type                       // class metaclass
   case Kind::SwiftMetaclassStub:
-    buffer << "Mm";
+    buffer << "_TMm";
     mangler.mangleNominalType(cast<ClassDecl>(getDecl()),
                               ExplosionKind::Minimal);
     return;
 
   //   global ::= 'Wo' entity
   case Kind::WitnessTableOffset:
-    buffer << "Wo";
+    buffer << "_TWo";
     mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
     return;
 
   //   global ::= 'Wv' directness entity
   case Kind::FieldOffset:
-    buffer << "Wv";
+    buffer << "_TWv";
     mangler.mangleDirectness(isOffsetIndirect());
     mangler.mangleEntity(getDecl(), ExplosionKind::Minimal, 0);
     return;
@@ -841,6 +813,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   //   entity ::= context 'D'                     // destructor
   case Kind::Destructor:
+    buffer << "_T";
     if (isLocalLinkage()) buffer << 'L';
     mangler.mangleDeclContext(cast<ClassDecl>(getDecl()));
     buffer << 'D';
@@ -848,15 +821,33 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   //   entity ::= declaration                     // other declaration
   //   entity ::= context 'C' type                // constructor
-  // The latter case is essentially as if 'C' were the name of the function.
+  // The latter case is treated as if 'C' were the name of the function.
   case Kind::Function:
+    // As a special case, functions can have external asm names.
+    if (!getDecl()->getAttrs().AsmName.empty()) {
+      buffer << getDecl()->getAttrs().AsmName;
+      return;
+    }
+
+    // As another special case, Clang functions don't get mangled at all.
+    // FIXME: When we can import C++, use Clang's mangler.
+    if (auto clangDecl = getDecl()->getClangDecl()) {
+      if (auto clangFunc = dyn_cast<clang::FunctionDecl>(clangDecl)) {
+        buffer << clangFunc->getName();
+        return;
+      }
+    }
+    // Otherwise, fallthrough into the 'other decl' case.
+
   case Kind::Other:
+    buffer << "_T";
     if (isLocalLinkage()) buffer << 'L';
     mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
     return;
 
   //   entity ::= declaration 'g'                 // getter
   case Kind::Getter:
+    buffer << "_T";
     if (isLocalLinkage()) buffer << 'L';
     mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
     buffer << 'g';
@@ -864,15 +855,21 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   //   entity ::= declaration 's'                 // setter
   case Kind::Setter:
+    buffer << "_T";
     if (isLocalLinkage()) buffer << 'L';
     mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
     buffer << 's';
     return;
 
-  //   These aren't swift entities and are special-cased above.
+  // An Objective-C class reference;  not a swift mangling.
   case Kind::ObjCClass:
+    buffer << "OBJC_CLASS_$_" << getDecl()->getName().str();
+    return;
+
+  // An Objective-C metaclass reference;  not a swift mangling.
   case Kind::ObjCMetaclass:
-    llvm_unreachable("not a swift entity");
+    buffer << "OBJC_METACLASS_$_" << getDecl()->getName().str();
+    return;
   }
   llvm_unreachable("bad entity kind!");
 }
