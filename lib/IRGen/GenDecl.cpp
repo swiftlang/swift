@@ -26,7 +26,6 @@
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Support/raw_ostream.h"
 
 #include "CallingConvention.h"
 #include "Explosion.h"
@@ -403,8 +402,7 @@ bool LinkEntity::isClangThunk() const {
 LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
   LinkInfo result;
 
-  llvm::raw_svector_ostream nameStream(result.Name);
-  entity.mangle(nameStream);
+  entity.mangle(result.Name);
 
   if (entity.isLocalLinkage()) {
     // If an entity isn't visible outside this translation unit,
@@ -1310,9 +1308,8 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(llvm::StringRef data) {
 
 /// Mangle the name of a type.
 StringRef IRGenModule::mangleType(CanType type, SmallVectorImpl<char> &buffer) {
-  llvm::raw_svector_ostream nameStream(buffer);
-  LinkEntity::forTypeMangling(type).mangle(nameStream);
-  return nameStream.str();
+  LinkEntity::forTypeMangling(type).mangle(buffer);
+  return StringRef(buffer.data(), buffer.size());
 }
 
 /// Is the given declaration resilient?

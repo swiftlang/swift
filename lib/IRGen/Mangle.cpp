@@ -745,6 +745,13 @@ void Mangler::mangleDirectness(bool isIndirect) {
   Buffer << (isIndirect ? 'i': 'd');
 }
 
+/// Mangle this entity into the given buffer.
+void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {
+  llvm::raw_svector_ostream stream(buffer);
+  mangle(stream);
+}
+
+/// Mangle this entity into the given stream.
 void LinkEntity::mangle(raw_ostream &buffer) const {
   // Almost everything below gets the common prefix:
   //   mangled-name ::= '_T' global

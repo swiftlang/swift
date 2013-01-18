@@ -18,7 +18,6 @@
 #include "swift/AST/Types.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"
 
 #include "FixedTypeInfo.h"
@@ -406,14 +405,13 @@ const TypeInfo *TypeConverter::convertMetaTypeType(MetaTypeType *T) {
 }
 
 /// createNominalType - Create a new nominal type.
-llvm::StructType *IRGenModule::createNominalType(TypeDecl *type) {
+llvm::StructType *IRGenModule::createNominalType(TypeDecl *decl) {
   llvm::SmallString<32> typeName;
-  if (type->getDeclContext()->isLocalContext()) {
-    typeName = type->getName().str();
+  if (decl->getDeclContext()->isLocalContext()) {
+    typeName = decl->getName().str();
     typeName.append(".local");
   } else {
-    llvm::raw_svector_ostream nameStream(typeName);
-    LinkEntity::forNonFunction(type).mangle(nameStream);
+    LinkEntity::forNonFunction(decl).mangle(typeName);
   }
   return llvm::StructType::create(getLLVMContext(), typeName.str());
 }
@@ -426,18 +424,16 @@ llvm::StructType *IRGenModule::createNominalType(TypeDecl *type) {
 llvm::StructType *
 IRGenModule::createNominalType(ProtocolCompositionType *type) {
   llvm::SmallString<32> typeName;
-  llvm::raw_svector_ostream nameStream(typeName);
 
   SmallVector<ProtocolDecl *, 4> protocols;
   type->isExistentialType(protocols);
 
-  nameStream << "protocol<";
+  typeName.append("protocol<");
   for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-    if (i) nameStream << ',';
-    LinkEntity::forNonFunction(protocols[i]).mangle(nameStream);
+    if (i) typeName.push_back(',');
+    LinkEntity::forNonFunction(protocols[i]).mangle(typeName);
   }
-  nameStream << '>';
-  nameStream.flush();
+  typeName.push_back('>');
   return llvm::StructType::create(getLLVMContext(), typeName.str());
 }
 
