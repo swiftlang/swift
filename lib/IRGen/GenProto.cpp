@@ -246,6 +246,14 @@ namespace {
       return IGF.Builder.CreateLoad(projectWitnessTable(IGF, addr, which),
                                     "witness-table");
     }
+    
+    llvm::Value *loadValueWitnessTable(IRGenFunction &IGF, Address addr,
+                                       llvm::Value *metadata) {
+      if (getNumTables() > 0)
+        return loadWitnessTable(IGF, addr, 0);
+      else
+        return emitValueWitnessTableRefForMetadata(IGF, metadata);
+    }
 
     /// Given the address of an existential object, drill down to the
     /// metadata field.
@@ -488,12 +496,7 @@ static void emitDestroyExistential(IRGenFunction &IGF, Address addr,
   // We need a value witness table.  Use one from the existential if
   // possible because (1) it should be in cache and (2) the address
   // won't be dependent on the metadata load.
-  llvm::Value *wtable;
-  if (layout.getNumTables()) {
-    wtable = layout.loadWitnessTable(IGF, addr, 0);
-  } else {
-    wtable = emitValueWitnessTableRefForMetadata(IGF, metadata);
-  }
+  llvm::Value *wtable = layout.loadValueWitnessTable(IGF, addr, metadata);
 
   Address object = layout.projectExistentialBuffer(IGF, addr);
   emitDestroyBufferCall(IGF, wtable, metadata, object);
@@ -3512,14 +3515,13 @@ LValue irgen::emitExistentialSubscriptLValue(IRGenFunction &IGF,
 ///
 /// \param fn - the protocol member being called
 /// \param witness - the actual function address being called
-/// \param wtable - the witness table from which the witness was loaded
-/// \param thisObject - the object (if applicable) to call the method on
+/// \param metadata - the metatype data for the concrete type
+///   to which the function will be applied
 static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
                                               CanType substResultType,
                                               ArrayRef<Substitution> subs,
                                               llvm::Value *witness,
-                                              llvm::Value *metadata,
-                                              Address thisObject) {
+                                              llvm::Value *metadata) {
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   unsigned uncurryLevel = 1;
 
@@ -3536,7 +3538,28 @@ static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
                              witness, ManagedValue(metadata),
                              explosionLevel, uncurryLevel);
 
-  CallEmission emission(IGF, callee);
+  return CallEmission(IGF, callee);
+}
+
+/// Emit a callee for a protocol method.
+///
+/// \param fn - the protocol member being called
+/// \param witness - the actual function address being called
+/// \param metadata - the metatype data for the concrete type of thisObject
+///   (or the type itself for a static method)
+/// \param thisObject - the object (if applicable) to call the method on
+static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
+                                              CanType substResultType,
+                                              ArrayRef<Substitution> subs,
+                                              llvm::Value *witness,
+                                              llvm::Value *metadata,
+                                              Address thisObject) {
+  CallEmission emission = prepareProtocolMethodCall(IGF,
+                                                    fn,
+                                                    substResultType,
+                                                    subs,
+                                                    witness,
+                                                    metadata);
 
   // If this isn't a static method, add the temporary address as a
   // callee argument.  This argument is bitcast to the type of the
@@ -3560,7 +3583,42 @@ static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
   return emission;
 }
 
+/// Emit an existential member reference as a callee.
+CallEmission
+irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
+                                       Address existAddr,
+                                       CanType baseTy,
+                                       SILConstant member,
+                                       CanType substResultType,
+                                       ArrayRef<Substitution> subs) {
+  // The protocol we're calling on.
+  // TODO: support protocol compositions here.
+  assert(baseTy->isExistentialType());
+  auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<ExistentialTypeInfo>();
+  
+  // The function we're going to call.
+  // FIXME: Support getters and setters (and curried entry points?)
+  assert(member.id == 0 && "getters, setters, and curries not yet supported");
+  ValueDecl *vd = member.getDecl();
+  FuncDecl *fn = cast<FuncDecl>(vd);
+  ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
 
+  // Load the witness table.
+  llvm::Value *wtable = baseTI.findWitnessTable(IGF, existAddr, fnProto);
+  
+  // Load the metadata.
+  auto existLayout = baseTI.getLayout();  
+  llvm::Value *metadata = existLayout.loadMetadataRef(IGF, existAddr);
+
+  // Find the actual witness.
+  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(fnProto);
+  auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
+  llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
+  
+  // Emit the callee.
+  return prepareProtocolMethodCall(IGF, fn, substResultType, subs,
+                                   witness, metadata);
+}
 
 /// Emit an existential member reference as a callee.
 CallEmission
@@ -3734,7 +3792,11 @@ Address irgen::emitExistentialProjection(IRGenFunction &IGF,
                                          CanType baseTy) {
   assert(baseTy->isExistentialType());
   auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<ExistentialTypeInfo>();
-  auto existLayout = baseTI.getLayout();
-  return existLayout.projectExistentialBuffer(IGF, base);
-}
+  auto layout = baseTI.getLayout();
 
+  llvm::Value *metadata = layout.loadMetadataRef(IGF, base);
+  llvm::Value *wtable = layout.loadValueWitnessTable(IGF, base, metadata);
+  Address buffer = layout.projectExistentialBuffer(IGF, base);
+  llvm::Value *object = emitProjectBufferCall(IGF, wtable, metadata, buffer);
+  return Address(object, Alignment(1));
+}

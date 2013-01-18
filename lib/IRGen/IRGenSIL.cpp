@@ -539,9 +539,26 @@ void IRGenSILFunction::visitProjectExistentialInst(
                                              swift::ProjectExistentialInst *i) {
   CanType baseTy = i->getOperand().getType().getSwiftRValueType();
   Address base = getLoweredAddress(i->getOperand());
-  newLoweredAddress(Value(i,0), emitExistentialProjection(*this,
-                                                          base,
-                                                          baseTy));
+  Address object = emitExistentialProjection(*this, base, baseTy);
+  Explosion &lowered = newLoweredExplosion(Value(i,0));
+  lowered.addUnmanaged(object.getAddress());
+}
+
+void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
+  Address base = getLoweredAddress(i->getOperand());
+  CanType baseTy = i->getOperand().getType().getSwiftRValueType();
+  CanType resultTy = getResultType(i->getType(0).getSwiftType(),
+                                   /*uncurryLevel=*/1);
+  SILConstant member = i->getMember();
+  // FIXME: get substitution list from outer function
+  CallEmission call = prepareExistentialMemberRefCall(*this,
+                                                      base,
+                                                      baseTy,
+                                                      member,
+                                                      resultTy,
+                                                      /*subs=*/ {});
+  newLoweredPartialCall(Value(i,0), /*naturalCurryLevel=*/1,
+                        std::move(call));
 }
 
 void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {

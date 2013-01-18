@@ -32,6 +32,7 @@ namespace swift {
   class FuncDecl;
   class PolymorphicFunctionType;
   class ProtocolConformance;
+  struct SILConstant;
 
 namespace irgen {
   class AbstractCallee;
@@ -89,6 +90,14 @@ namespace irgen {
   /// Emit an archetype subscript reference as an l-value.
   LValue emitArchetypeSubscriptLValue(IRGenFunction &IGF,
                                       ArchetypeSubscriptExpr *E);
+
+  /// Emit an existential member reference as a callee.
+  CallEmission prepareExistentialMemberRefCall(IRGenFunction &IGF,
+                                         Address existAddr,
+                                         CanType baseTy,
+                                         SILConstant member,
+                                         CanType substResultType,
+                                         ArrayRef<Substitution> subs);
 
   /// Emit an existential member reference as a callee.
   CallEmission prepareExistentialMemberRefCall(IRGenFunction &IGF,

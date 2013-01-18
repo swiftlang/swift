@@ -247,7 +247,7 @@ public:
   void visitElementAddrInst(ElementAddrInst *i);
   void visitRefElementAddrInst(RefElementAddrInst *i);
 
-  //void visitProtocolMethodInst(ProtocolMethodInst *i);
+  void visitProtocolMethodInst(ProtocolMethodInst *i);
   
   void visitProjectExistentialInst(ProjectExistentialInst *i);
   void visitInitExistentialInst(InitExistentialInst *i);
