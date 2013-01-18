@@ -229,39 +229,51 @@ public:
   }
   
   void visitAllocVarInst(AllocVarInst *i);
+  //void visitAllocRefInst(AllocRefInst *i);
   void visitAllocBoxInst(AllocBoxInst *i);
   void visitAllocArrayInst(AllocArrayInst *i);
 
   void visitApplyInst(ApplyInst *i);
+  //void visitClosureInst(ClosureInst *i);
+  //void visitSpecializeInst(SpecializeInst *i);
 
   void visitConstantRefInst(ConstantRefInst *i);
 
+  void visitZeroValueInst(ZeroValueInst *i);
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
+  void visitFloatLiteralInst(FloatLiteralInst *i);
   void visitStringLiteralInst(StringLiteralInst *i);
 
   void visitLoadInst(LoadInst *i);
   void visitStoreInst(StoreInst *i);
   void visitTupleInst(TupleInst *i);
   void visitMetatypeInst(MetatypeInst *i);
+  //void visitAssociatedMetatypeInst(AssociatedMetatypeInst *i);
   void visitExtractInst(ExtractInst *i);
   void visitElementAddrInst(ElementAddrInst *i);
   void visitRefElementAddrInst(RefElementAddrInst *i);
 
+  //void visitArchetypeMethodInst(ArchetypeMethodInst *i);
   void visitProtocolMethodInst(ProtocolMethodInst *i);
   
   void visitProjectExistentialInst(ProjectExistentialInst *i);
   void visitInitExistentialInst(InitExistentialInst *i);
+  //void visitDeinitExistentialInst(DeinitExistentialInst *i);
 
   void visitRetainInst(RetainInst *i);
   void visitReleaseInst(ReleaseInst *i);
   void visitDeallocVarInst(DeallocVarInst *i);
+  //void visitDeallocRefInst(DeallocRefInst *i);
 
+  void visitZeroAddrInst(ZeroAddrInst *i);
   void visitCopyAddrInst(CopyAddrInst *i);
   void visitDestroyAddrInst(DestroyAddrInst *i);
 
   void visitImplicitConvertInst(ImplicitConvertInst *i);
   void visitCoerceInst(CoerceInst *i);
   void visitDowncastInst(DowncastInst *i);
+  //void visitArchetypeToSuperInst(ArchetypeToSuperInst *i);
+  //void visitSuperToArchetypeInst(SuperToArchetypeInst *i);
 
   void visitIndexAddrInst(IndexAddrInst *i);
   void visitIntegerValueInst(IntegerValueInst *i);

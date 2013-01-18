@@ -261,9 +261,35 @@ void IRGenSILFunction::emitApplyArgument(Explosion &args,
   }
 }
 
+void IRGenSILFunction::visitZeroValueInst(swift::ZeroValueInst *i) {
+  const TypeInfo &ti = getFragileTypeInfo(i->getType().getSwiftType());
+  Explosion &lowered = newLoweredExplosion(Value(i, 0));
+
+  // No work is necessary if the type is empty or the address is global.
+  if (ti.isEmpty(ResilienceScope::Local))
+    return;
+  
+  ExplosionSchema schema(lowered.getKind());
+  ti.getSchema(schema);
+  
+  // FIXME: irgen's emitZeroInit puts a heuristic limit on the schema size
+  // for which a zero explosion will be created (vs doing a memset to
+  // initialize the stored variable). Should we do the same?
+  assert(!schema.containsAggregate() && "aggregate in zero_value schema");
+  for (auto elt : schema) {
+    lowered.addUnmanaged(llvm::Constant::getNullValue(elt.getScalarType()));
+  }
+}
+
 void IRGenSILFunction::visitIntegerLiteralInst(swift::IntegerLiteralInst *i) {
   llvm::Value *constant = llvm::ConstantInt::get(IGM.LLVMContext,
                                                  i->getValue());
+  newLoweredExplosion(Value(i, 0)).addUnmanaged(constant);
+}
+
+void IRGenSILFunction::visitFloatLiteralInst(swift::FloatLiteralInst *i) {
+  llvm::Value *constant = llvm::ConstantFP::get(IGM.LLVMContext,
+                                                i->getValue());
   newLoweredExplosion(Value(i, 0)).addUnmanaged(constant);
 }
 
@@ -559,6 +585,18 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
                                                       /*subs=*/ {});
   newLoweredPartialCall(Value(i,0), /*naturalCurryLevel=*/1,
                         std::move(call));
+}
+
+void IRGenSILFunction::visitZeroAddrInst(swift::ZeroAddrInst *i) {
+  CanType ty = i->getDest().getType().getSwiftRValueType();
+  TypeInfo const &ti = getFragileTypeInfo(ty);
+  Address dest = getLoweredAddress(i->getDest());
+  Builder.CreateMemSet(Builder.CreateBitCast(dest.getAddress(),
+                                             IGM.Int8PtrTy),
+                       Builder.getInt8(0),
+                       Builder.getInt64(ti.StorageSize.getValue()),
+                       dest.getAlignment().getValue(),
+                       /*isVolatile=*/ false);
 }
 
 void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
