@@ -1,5 +1,5 @@
 @import Foundation;
-@import ObjC;
+@import ObjectiveC;
 
 @class NSString;
 

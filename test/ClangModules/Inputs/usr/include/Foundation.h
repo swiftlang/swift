@@ -1,4 +1,4 @@
-@import ObjC;
+@import ObjectiveC;
 
 typedef unsigned long NSUInteger;
 

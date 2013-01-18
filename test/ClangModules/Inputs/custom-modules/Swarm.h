@@ -1,4 +1,4 @@
-@import ObjC;
+@import ObjectiveC;
 @import Foundation;
 
 @interface Swarm
