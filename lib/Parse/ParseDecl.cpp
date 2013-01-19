@@ -940,40 +940,43 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
   
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
-
-  NullablePtr<Pattern> pattern = parsePattern();
-  if (pattern.isNull()) return true;
-
-  // If we syntactically match the second decl-var production, with a
-  // var-get-set clause, parse the var-get-set clause.
+  SmallVector<PatternBindingDecl*, 4> PBDs;
   bool HasGetSet = false;
-  if (Tok.is(tok::l_brace)) {
-    // Check whether the next token is 'get' or 'set'.
-    const Token &NextTok = peekToken();
-    if (NextTok.is(tok::identifier)) {
-      Identifier Name = Context.getIdentifier(NextTok.getText());
-      
-      // Get the identifiers for both 'get' and 'set'.
-      if (GetIdent.empty()) {
-        GetIdent = Context.getIdentifier("get");
-        SetIdent = Context.getIdentifier("set");
-      }
-      if (Name == GetIdent || Name == SetIdent) {
-        parseDeclVarGetSet(*pattern.get(), Flags & PD_HasContainerType);
-        HasGetSet = true;
+  bool Invalid = false;
+
+  do {
+    NullablePtr<Pattern> pattern = parsePattern();
+    if (pattern.isNull()) return true;
+
+    // If we syntactically match the second decl-var production, with a
+    // var-get-set clause, parse the var-get-set clause.
+    if (Tok.is(tok::l_brace)) {
+      // Check whether the next token is 'get' or 'set'.
+      const Token &NextTok = peekToken();
+      if (NextTok.is(tok::identifier)) {
+        Identifier Name = Context.getIdentifier(NextTok.getText());
+
+        // Get the identifiers for both 'get' and 'set'.
+        if (GetIdent.empty()) {
+          GetIdent = Context.getIdentifier("get");
+          SetIdent = Context.getIdentifier("set");
+        }
+        if (Name == GetIdent || Name == SetIdent) {
+          parseDeclVarGetSet(*pattern.get(),Flags & PD_HasContainerType);
+          HasGetSet = true;
+        }
       }
     }
-  }
 
-  SmallVector<PatternBindingDecl*, 4> PBDs;
-  do {
     Type Ty;
     NullablePtr<Expr> Init;
     if (Tok.is(tok::equal)) {
       SourceLoc EqualLoc = consumeToken(tok::equal);
       Init = parseExpr(diag::expected_initializer_expr);
-      if (Init.isNull())
-        return true;
+      if (Init.isNull()) {
+        Invalid = true;
+        break;
+      }
     
       if (HasGetSet) {
         diagnose(pattern.get()->getLoc(), diag::getset_init)
@@ -982,7 +985,7 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
       }
       if (Flags & PD_DisallowInit) {
         diagnose(EqualLoc, diag::disallowed_init);
-        return true;
+        Invalid = true;
       }
     }
 
@@ -1001,6 +1004,11 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
           Pattern *PrevPat = PrevPBD->getPattern();
           if (!isa<NamedPattern>(PrevPat) || PrevPBD->hasInit())
             break;
+          if (HasGetSet) {
+            // FIXME -- offer a fixit to explicitly specify the type
+            diagnose(PrevPat->getLoc(), diag::getset_cannot_be_implied);
+            Invalid = true;
+          }
 
           TypedPattern *NewTP = new (Context) TypedPattern(PrevPat,
                                                            TP->getTypeLoc());
@@ -1009,13 +1017,7 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
       }
     }
     PBDs.push_back(PBD);
-
-    if (!consumeIf(tok::comma))
-      break;
-
-    pattern = parsePattern();
-    if (pattern.isNull()) return true;
-  } while (1);
+  } while (consumeIf(tok::comma));
 
   if (HasGetSet) {
     if (Flags & PD_DisallowProperty) {
@@ -1027,7 +1029,7 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
     return true;
   }
 
-  return false;
+  return Invalid;
 }
 
 /// addImplicitThisParameter - Add an implicit 'this' parameter to the given

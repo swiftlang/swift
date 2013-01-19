@@ -190,6 +190,8 @@ ERROR(var_set_without_get,decl_parsing,none,
       "variable with a setter must also have a getter", ())
 ERROR(getset_init,decl_parsing,none,
       "variable with getter/setter cannot have an initializer", ())
+ERROR(getset_cannot_be_implied,decl_parsing,none,
+      "variable with implied type cannot have implied getter/setter", ())
 
 // Import
 ERROR(decl_expected_module_name,decl_parsing,none,
