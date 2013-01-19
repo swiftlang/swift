@@ -856,7 +856,7 @@ llvm::Constant *irgen::emitObjCMethodDescriptor(IRGenModule &IGM,
   Selector selector(method);
   
   /// The first element is the selector.
-  auto selectorRef = IGM.getAddrOfObjCSelectorRef(selector.str());
+  auto selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
 
   /// The second element is the type @encoding.  Leave this null for now.
   auto atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
