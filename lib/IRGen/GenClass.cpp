@@ -751,7 +751,11 @@ namespace {
       dataPtr = llvm::ConstantExpr::getPtrToInt(dataPtr, IGM.IntPtrTy);
 
       llvm::Constant *fields[] = {
-        rootPtr, superPtr, null(), null(), dataPtr
+        rootPtr,
+        superPtr,
+        IGM.getObjCEmptyCachePtr(),
+        IGM.getObjCEmptyVTablePtr(),
+        dataPtr
       };
       auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy,
                                             makeArrayRef(fields));

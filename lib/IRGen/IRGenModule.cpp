@@ -142,8 +142,8 @@ IRGenModule::IRGenModule(ASTContext &Context,
   llvm::Type *objcClassElts[] = {
     ObjCClassPtrTy,
     ObjCClassPtrTy,
-    Int8PtrTy,
-    Int8PtrTy,
+    OpaquePtrTy,
+    OpaquePtrTy,
     IntPtrTy
   };
   ObjCClassStructTy->setBody(objcClassElts);
@@ -438,6 +438,24 @@ llvm::Constant *IRGenModule::getGetObjectTypeFn() {
   GetObjectTypeFn =
     createReadnoneRuntimeFunction(*this, "swift_getObjectType", fnType);
   return GetObjectTypeFn;
+}
+
+llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
+  if (ObjCEmptyCachePtr) return ObjCEmptyCachePtr;
+
+  // struct objc_cache _objc_empty_cache;
+  ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache",
+                                               OpaquePtrTy->getElementType());
+  return ObjCEmptyCachePtr;
+}
+
+llvm::Constant *IRGenModule::getObjCEmptyVTablePtr() {
+  if (ObjCEmptyVTablePtr) return ObjCEmptyVTablePtr;
+
+  // IMP _objc_empty_vtable;
+  ObjCEmptyVTablePtr = Module.getOrInsertGlobal("_objc_empty_vtable",
+                                                OpaquePtrTy->getElementType());
+  return ObjCEmptyVTablePtr;
 }
 
 void IRGenModule::unimplemented(SourceLoc loc, StringRef message) {

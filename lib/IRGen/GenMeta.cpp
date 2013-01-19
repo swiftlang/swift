@@ -788,10 +788,10 @@ namespace {
     }
 
     void addClassCacheData() {
-      // This is two words and always zero-initialized.
-      auto null = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-      Fields.push_back(null);
-      Fields.push_back(null);
+      // We initially fill in these fields with addresses taken from
+      // the ObjC runtime.
+      Fields.push_back(IGM.getObjCEmptyCachePtr());
+      Fields.push_back(IGM.getObjCEmptyVTablePtr());
     }
 
     void addClassDataPointer() {

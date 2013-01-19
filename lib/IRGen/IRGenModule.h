@@ -237,6 +237,8 @@ public:
   llvm::Constant *getGetMetatypeMetadataFn();
   llvm::Constant *getGetTupleMetadataFn();
   llvm::Constant *getGetObjCClassMetadataFn();
+  llvm::Constant *getObjCEmptyCachePtr();
+  llvm::Constant *getObjCEmptyVTablePtr();
   ClassDecl *getSwiftRootClass();
 
 private:
@@ -267,6 +269,8 @@ private:
   llvm::Constant *ObjCMsgSendFn = nullptr;
   llvm::Constant *ObjCMsgSendStretFn = nullptr;
   llvm::Constant *ObjCSelRegisterNameFn = nullptr;
+  llvm::Constant *ObjCEmptyCachePtr = nullptr;
+  llvm::Constant *ObjCEmptyVTablePtr = nullptr;
   ClassDecl *SwiftRootClass = nullptr;
 
 //--- Generic ---------------------------------------------------------------
