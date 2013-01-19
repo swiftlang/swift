@@ -336,11 +336,10 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
     return;
   }
   
-  bool HadError = parseAttribute(Attributes);
-  while (Tok.is(tok::comma)) {
-    consumeToken(tok::comma);
+  bool HadError = false;
+  do {
     HadError |= parseAttribute(Attributes);
-  }
+  } while (consumeIf(tok::comma));
 
   Attributes.RSquareLoc = Tok.getLoc();
   if (consumeIf(tok::r_square))
@@ -504,13 +503,7 @@ bool Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
     Inherited.push_back(Loc);
     
     // Check for a ',', which indicates that there are more protocols coming.
-    if (Tok.is(tok::comma)) {
-      consumeToken();
-      continue;
-    }
-    
-    break;
-  } while (true);
+  } while (consumeIf(tok::comma));
   
   return false;
 }

@@ -40,7 +40,7 @@ GenericParamList *Parser::parseGenericParameters() {
   // FIXME: Allow a bare 'requires' clause with no generic parameters?
   SmallVector<GenericParam, 4> GenericParams;
   bool Invalid = false;
-  while (true) {
+  do {
     // Parse the name of the parameter.
     Identifier Name;
     SourceLoc NameLoc = Tok.getLoc();
@@ -79,13 +79,7 @@ GenericParamList *Parser::parseGenericParameters() {
     ScopeInfo.addToScope(Param);
 
     // Parse the comma, if the list continues.
-    if (Tok.is(tok::comma)) {
-      consumeToken();
-      continue;
-    }
-
-    break;
-  }
+  } while (consumeIf(tok::comma));
 
   // Parse the optional requires-clause.
   SourceLoc RequiresLoc;
@@ -150,7 +144,7 @@ bool Parser::parseRequiresClause(SourceLoc &RequiresLoc,
   // Parse the 'requires'.
   RequiresLoc = consumeToken(tok::kw_requires);
   bool Invalid = false;
-  while (true) {
+  do {
     // Parse the leading type-identifier.
     // FIXME: Dropping TypeLocs left and right.
     TypeLoc FirstType;
@@ -179,17 +173,8 @@ bool Parser::parseRequiresClause(SourceLoc &RequiresLoc,
       Requirements.push_back(Requirement::getConformance(FirstType,
                                                          ColonLoc,
                                                          Protocol));
-
-      // If there's a comma, keep parsing the list.
-      if (Tok.is(tok::comma)) {
-        consumeToken();
-        continue;
-      }
-
-      break;
-    }
-
-    if ((Tok.isAnyOperator() && Tok.getText() == "==") || Tok.is(tok::equal)) {
+    } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
+               Tok.is(tok::equal)) {
       // A same-type-requirement
       if (Tok.is(tok::equal)) {
         // FIXME: Fix-It here!
@@ -208,19 +193,13 @@ bool Parser::parseRequiresClause(SourceLoc &RequiresLoc,
       Requirements.push_back(Requirement::getSameType(FirstType,
                                                       EqualLoc,
                                                       SecondType));
-
-      // If there's a comma, keep parsing the list.
-      if (Tok.is(tok::comma)) {
-        consumeToken();
-        continue;
-      }
-
+    } else {
+      diagnose(Tok, diag::expected_requirement_delim);
+      Invalid = true;
       break;
     }
-
-    diagnose(Tok, diag::expected_requirement_delim);
-    break;
-  }
+    // If there's a comma, keep parsing the list.
+  } while (consumeIf(tok::comma));
 
   return Invalid;
 }

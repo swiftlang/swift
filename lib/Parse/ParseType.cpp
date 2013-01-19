@@ -174,7 +174,7 @@ bool Parser::parseGenericArguments(ArrayRef<TypeLoc> &Args) {
 
   SmallVector<TypeLoc, 4> GenericArgs;
   
-  while (true) {
+  do {
     TypeLoc Result;
     if (parseType(Result, diag::expected_type)) {
       // Skip until we hit the '>'.
@@ -185,15 +185,8 @@ bool Parser::parseGenericArguments(ArrayRef<TypeLoc> &Args) {
     }
 
     GenericArgs.push_back(Result);
-
     // Parse the comma, if the list continues.
-    if (Tok.is(tok::comma)) {
-      consumeToken();
-      continue;
-    }
-
-    break;
-  }
+  } while (consumeIf(tok::comma));
 
   if (!startsWithGreater(Tok)) {
     diagnose(Tok.getLoc(), diag::expected_rangle_generic_arg_list);
@@ -298,14 +291,7 @@ bool Parser::parseTypeComposition(TypeLoc &Result) {
     }
     
     Protocols.push_back(Protocol);
-    
-    if (Tok.is(tok::comma)) {
-      consumeToken();
-      continue;
-    }
-    
-    break;
-  } while (true);
+  } while (consumeIf(tok::comma));
   
   // Check for the terminating '>'.
   SourceLoc EndLoc = Tok.getLoc();
