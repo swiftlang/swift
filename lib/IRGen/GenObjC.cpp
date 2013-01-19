@@ -218,7 +218,8 @@ llvm::Constant *IRGenModule::getAddrOfObjCMethodName(StringRef selector) {
   auto init = llvm::ConstantDataArray::getString(LLVMContext, selector);
   auto global = new llvm::GlobalVariable(Module, init->getType(), true,
                                          llvm::GlobalValue::InternalLinkage,
-                                         init, "\01L_OBJC_METH_VAR_NAME_");
+                                         init,
+                             llvm::Twine("selector_data(") + selector + ")");
   global->setSection("__TEXT,__objc_methname,cstring_literals");
   global->setAlignment(1);
 
