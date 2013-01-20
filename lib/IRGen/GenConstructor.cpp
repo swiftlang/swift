@@ -29,7 +29,9 @@ using namespace swift;
 using namespace irgen;
 
 void IRGenModule::emitConstructor(ConstructorDecl *CD) {
-  llvm::Function *fn = getAddrOfConstructor(CD, ExplosionKind::Minimal);
+  // FIXME: kind of constructor?
+  llvm::Function *fn = getAddrOfConstructor(CD, ConstructorKind::Allocating,
+                                            ExplosionKind::Minimal);
 
   auto thisDecl = CD->getImplicitThisDecl();
   Pattern *pats[] = {

@@ -30,8 +30,10 @@ All Swift-mangled names begin with this prefix.
   global ::= 'Wv' directness entity          // field offset
   global ::= local-marker? entity            // some identifiable thing
   global ::= 'To' global                     // swift-as-ObjC thunk
-  entity ::= context 'D'                     // destructor
-  entity ::= context 'C' type                // constructor
+  entity ::= context 'D'                     // deallocating destructor
+  entity ::= context 'd'                     // non-deallocating destructor
+  entity ::= context 'C' type                // allocating constructor
+  entity ::= context 'c' type                // non-allocating constructor
   entity ::= declaration 'g'                 // getter
   entity ::= declaration 's'                 // setter
   entity ::= declaration                     // other declaration

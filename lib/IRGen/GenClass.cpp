@@ -495,12 +495,13 @@ namespace {
   };
 }
 
-/// Emit the destructor for a class.
+/// Emit the destructors for a class.
 ///
 /// \param DD - the optional explicit destructor declaration
 static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
                                 DestructorDecl *DD) {
-  llvm::Function *fn = IGM.getAddrOfDestructor(CD);
+  // FIXME: emit the destroying destructor first.
+  llvm::Function *fn = IGM.getAddrOfDestructor(CD, DestructorKind::Deallocating);
 
   IRGenFunction IGF(IGM, CanType(), nullptr,
                     ExplosionKind::Minimal, 0, fn, Prologue::Bare);
@@ -562,7 +563,9 @@ static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
 }
 
 static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
-  llvm::Function *fn = IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
+  // FIXME: emit separate allocating and initializing constructors.
+  llvm::Function *fn = IGM.getAddrOfConstructor(CD, ConstructorKind::Allocating,
+                                                ExplosionKind::Minimal);
   auto thisDecl = CD->getImplicitThisDecl();
   CanType thisType = thisDecl->getType()->getCanonicalType();
   auto &classTI = IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();

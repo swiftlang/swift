@@ -117,6 +117,26 @@ enum class ObjectSize : uint8_t {
   Dependent
 };
 
+/// Destructor variants.
+enum class DestructorKind : uint8_t {
+  /// A deallocating destructor destroys the object and deallocates
+  /// the memory associated with it.
+  Deallocating,
+
+  /// A destroying destructor destroys the object but does not
+  /// deallocate the memory associated with it.
+  Destroying
+};
+
+/// Constructor variants.
+enum class ConstructorKind : uint8_t {
+  /// An allocating constructor allocates an object and initializes it.
+  Allocating,
+
+  /// An initializing constructor just initializes an existing object.
+  Initializing
+};
+
 /// getResultType - Drill through N levels of function type to get to
 /// a formal result type.
 CanType getResultType(CanType fnType, unsigned uncurryLevel);

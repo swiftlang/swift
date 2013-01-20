@@ -59,6 +59,12 @@ class LinkEntity {
     ExplosionLevelShift = 8, ExplosionLevelMask = 0xFF00,
     UncurryLevelShift = 16, UncurryLevelMask = 0xFF0000,
 
+    // This field appears in the Destructor kind.
+    DtorKindShift = 24, DtorKindMask = 0x01000000,
+
+    // This field appears in the Constructor kind.
+    CtorKindShift = 24, CtorKindMask = 0x01000000,
+
     // This field appears in the ValueWitness kind.
     ValueWitnessShift = 8, ValueWitnessMask = 0xFF00,
 
@@ -81,6 +87,10 @@ class LinkEntity {
     /// The setter for an entity.
     /// The pointer is a VarDecl* or SubscriptDecl*.
     Setter,
+
+    /// A constructor for a class.
+    /// The pointer is a ConstructorDecl*.
+    Constructor,
 
     /// The destructor for a class.
     /// The pointer is a ClassDecl*.
@@ -208,9 +218,18 @@ public:
     return entity;
   }
 
-  static LinkEntity forDestructor(ClassDecl *decl) {
+  static LinkEntity forConstructor(CodeRef fn, ConstructorKind kind) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::Constructor, fn.getDecl(),
+                      fn.getExplosionLevel(), fn.getUncurryLevel());
+    entity.Data |= LINKENTITY_SET_FIELD(CtorKind, unsigned(kind));
+    return entity;
+  }
+
+  static LinkEntity forDestructor(ClassDecl *decl, DestructorKind kind) {
     LinkEntity entity;
     entity.setForDecl(Kind::Destructor, decl, ExplosionKind::Minimal, 0);
+    entity.Data |= LINKENTITY_SET_FIELD(DtorKind, unsigned(kind));
     return entity;
   }
 
@@ -278,6 +297,16 @@ public:
   }
   unsigned getUncurryLevel() const {
     return LINKENTITY_GET_FIELD(Data, UncurryLevel);
+  }
+
+  DestructorKind getDestructorKind() const {
+    assert(getKind() == Kind::Destructor);
+    return DestructorKind(LINKENTITY_GET_FIELD(Data, DtorKind));
+  }
+
+  ConstructorKind getConstructorKind() const {
+    assert(getKind() == Kind::Constructor);
+    return ConstructorKind(LINKENTITY_GET_FIELD(Data, CtorKind));
   }
 
   bool isValueWitness() const { return getKind() == Kind::ValueWitness; }

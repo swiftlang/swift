@@ -253,7 +253,9 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
     case DeclKind::Constructor: {
       auto ctor = cast<ConstructorDecl>(member);
       if (!ctor->getBody()) {
-        llvm::Function *fn = getAddrOfConstructor(ctor, ExplosionKind::Minimal);
+        llvm::Function *fn =
+          getAddrOfConstructor(ctor, ConstructorKind::Allocating,
+                               ExplosionKind::Minimal);
         emitValueConstructor(*this, fn, ctor);
       } else {
         emitConstructor(ctor);

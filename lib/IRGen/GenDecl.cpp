@@ -357,10 +357,6 @@ static bool isLocalLinkageType(CanType type) {
 
 bool LinkEntity::isLocalLinkage() const {
   switch (getKind()) {
-  // Destructors always have internal linkage.
-  case Kind::Destructor:
-    return true;
-
   // Value witnesses depend on the linkage of their type.
   case Kind::ValueWitness:
   case Kind::ValueWitnessTable:
@@ -369,6 +365,8 @@ bool LinkEntity::isLocalLinkage() const {
     return isLocalLinkageType(getType());
 
   case Kind::WitnessTableOffset:
+  case Kind::Constructor:
+  case Kind::Destructor:
   case Kind::Function:
   case Kind::Getter:
   case Kind::Setter:
@@ -679,21 +677,24 @@ llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
 
 /// Fetch the declaration of the given known function.
 llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
-                                                  ExplosionKind kind) {
+                                                  ConstructorKind ctorKind,
+                                                  ExplosionKind explodeLevel) {
   unsigned uncurryLevel = 1;
-  LinkEntity entity =
-    LinkEntity::forFunction(CodeRef::forConstructor(cons, kind, uncurryLevel));
+  auto codeRef = CodeRef::forConstructor(cons, explodeLevel, uncurryLevel);
+  LinkEntity entity = LinkEntity::forConstructor(codeRef, ctorKind);
 
   // Check whether we've cached this.
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
+  auto extraData = (ctorKind == ConstructorKind::Allocating ? ExtraData::None
+                                                      : ExtraData::Retainable);
   CanType formalType = cons->getType()->getCanonicalType();
   llvm::FunctionType *fnType =
-    getFunctionType(formalType, kind, uncurryLevel, ExtraData::None);
+    getFunctionType(formalType, explodeLevel, uncurryLevel, extraData);
 
   bool indirectResult =
-    hasIndirectResult(*this, formalType, kind, uncurryLevel);
+    hasIndirectResult(*this, formalType, explodeLevel, uncurryLevel);
 
   SmallVector<llvm::AttributeWithIndex, 4> attrs;
   auto cc = expandAbstractCC(*this, AbstractCC::Method, indirectResult,
@@ -888,12 +889,15 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 }
 
 /// Fetch the declaration of the given known function.
-llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd) {
-  LinkEntity entity = LinkEntity::forDestructor(cd);
+llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
+                                                 DestructorKind kind) {
+  LinkEntity entity = LinkEntity::forDestructor(cd, kind);
 
   // Check whether we've cached this.
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
+
+  // FIXME: deallocating and destroying destructors have different signatures
 
   SmallVector<llvm::AttributeWithIndex, 4> attrs;
   auto cc = expandAbstractCC(*this, AbstractCC::Method, false, attrs);

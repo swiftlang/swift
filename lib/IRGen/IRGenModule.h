@@ -318,8 +318,10 @@ public:
                                         ValueWitness index);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
                                              llvm::Type *definitionType = nullptr);
-  llvm::Function *getAddrOfConstructor(ConstructorDecl *D, ExplosionKind kind);
-  llvm::Function *getAddrOfDestructor(ClassDecl *D);
+  llvm::Function *getAddrOfConstructor(ConstructorDecl *D,
+                                       ConstructorKind kind,
+                                       ExplosionKind explosionLevel);
+  llvm::Function *getAddrOfDestructor(ClassDecl *D, DestructorKind kind);
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,
                                         bool isIndirect, bool isPattern,
                                         llvm::Type *definitionType = nullptr);

@@ -747,7 +747,8 @@ namespace {
     }
 
     void addDestructorFunction() {
-      Fields.push_back(IGM.getAddrOfDestructor(TargetClass));
+      Fields.push_back(IGM.getAddrOfDestructor(TargetClass,
+                                               DestructorKind::Deallocating));
     }
 
     void addParentMetadataRef(ClassDecl *forClass) {

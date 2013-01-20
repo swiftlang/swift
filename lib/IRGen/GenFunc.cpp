@@ -699,7 +699,8 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
                                   bestExplosion, bestUncurry,
                                   ExtraData::None));
     } else {
-      fnPtr = IGF.IGM.getAddrOfConstructor(ctor, bestExplosion);
+      fnPtr = IGF.IGM.getAddrOfConstructor(ctor, ConstructorKind::Allocating,
+                                           bestExplosion);
     }
     return Callee::forFreestandingFunction(ctor->getType()->getCanonicalType(),
                                            substResultType, subs, fnPtr,

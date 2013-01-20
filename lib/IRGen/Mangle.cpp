@@ -336,12 +336,7 @@ void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
 void Mangler::mangleDeclName(ValueDecl *decl, IncludeType includeType) {
   // decl ::= context identifier
   mangleContextOf(decl);
-
-  if (isa<ConstructorDecl>(decl)) {
-    Buffer << 'C';
-  } else {
-    mangleIdentifier(decl->getName());
-  }
+  mangleIdentifier(decl->getName());
 
   if (includeType == IncludeType::No) return;
 
@@ -733,6 +728,14 @@ void Mangler::mangleEntity(ValueDecl *decl, ExplosionKind explosion,
   mangleDeclType(decl, explosion, uncurryLevel);
 }
 
+static char mangleConstructorKind(ConstructorKind kind) {
+  switch (kind) {
+  case ConstructorKind::Allocating: return 'C';
+  case ConstructorKind::Initializing: return 'c';
+  }
+  llvm_unreachable("bad constructor kind");
+}
+
 static StringRef mangleValueWitness(ValueWitness witness) {
   // The ones with at least one capital are the composite ops, and the
   // capitals correspond roughly to the positions of buffers (as
@@ -830,17 +833,35 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   // For all the following, this rule was imposed above:
   //   global ::= local-marker? entity            // some identifiable thing
 
-  //   entity ::= context 'D'                     // destructor
+  //   entity ::= context 'D'                     // deallocating destructor
+  //   entity ::= context 'd'                     // non-deallocating destructor
   case Kind::Destructor:
     buffer << "_T";
     if (isLocalLinkage()) buffer << 'L';
     mangler.mangleDeclContext(cast<ClassDecl>(getDecl()));
-    buffer << 'D';
+    switch (getDestructorKind()) {
+    case DestructorKind::Deallocating:
+      buffer << 'D';
+      return;
+    case DestructorKind::Destroying:
+      buffer << 'd';
+      return;
+    }
+    llvm_unreachable("bad destructor kind");
+
+  //   entity ::= context 'C' type                // allocating constructor
+  //   entity ::= context 'c' type                // non-allocating constructor
+  case Kind::Constructor: {
+    buffer << "_T";
+    if (isLocalLinkage()) buffer << 'L';
+    auto ctor = cast<ConstructorDecl>(getDecl());
+    mangler.mangleContextOf(ctor);
+    buffer << mangleConstructorKind(getConstructorKind());
+    mangler.mangleDeclType(ctor, getExplosionKind(), getUncurryLevel());
     return;
+  }
 
   //   entity ::= declaration                     // other declaration
-  //   entity ::= context 'C' type                // constructor
-  // The latter case is treated as if 'C' were the name of the function.
   case Kind::Function:
     // As a special case, functions can have external asm names.
     if (!getDecl()->getAttrs().AsmName.empty()) {
