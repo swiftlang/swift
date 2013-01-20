@@ -137,10 +137,6 @@ public:
     asDerived().Derived::load(IGF, src, out);
     // Force the cleanup here?
   }
-
-  void transfer(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
-    in.transferInto(out, 1);
-  }
   
   void manage(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
     Address obj(in.claimUnmanagedNext(), this->StorageAlignment);
@@ -149,6 +145,14 @@ public:
     } else {
       IGF.enterDestroyCleanup(obj, *this, out);
     }
+  }
+  
+  void retain(IRGenFunction &IGF, Explosion &e) const {
+    llvm_unreachable("not retainable");
+  }
+
+  void release(IRGenFunction &IGF, Explosion &e) const {
+    llvm_unreachable("not releasable");
   }
 };
 

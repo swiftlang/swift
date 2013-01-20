@@ -128,14 +128,18 @@ namespace {
       // FIXME
     }
 
-    void transfer(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      // FIXME
-    }
-    
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       // FIXME
     }
 
+    void retain(IRGenFunction &IGF, Explosion &e) const {
+      // FIXME
+    }
+    
+    void release(IRGenFunction &IGF, Explosion &e) const {
+      // FIXME
+    }
+    
     void destroy(IRGenFunction &IGF, Address addr) const {
       // FIXME
     }
@@ -223,14 +227,18 @@ namespace {
       if (Singleton) Singleton->copy(IGF, src, dest);
     }
 
-    void transfer(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      if (Singleton) Singleton->transfer(IGF, src, dest);
-    }
-    
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       if (Singleton) Singleton->manage(IGF, src, dest);
     }
 
+    void retain(IRGenFunction &IGF, Explosion &e) const {
+      if (Singleton) Singleton->retain(IGF, e);
+    }
+    
+    void release(IRGenFunction &IGF, Explosion &e) const {
+      if (Singleton) Singleton->release(IGF, e);
+    }
+    
     void destroy(IRGenFunction &IGF, Address addr) const {
       if (Singleton && !isPOD(ResilienceScope::Local))
         Singleton->destroy(IGF, getSingletonAddress(IGF, addr));

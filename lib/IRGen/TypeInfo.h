@@ -200,12 +200,6 @@ public:
   virtual void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
                     Explosion &targetExplosion) const = 0;
   
-  /// Copy a value into a new explosion and transfer management to the
-  /// destination explosion. This operation may also shift explosion
-  /// levels.
-  virtual void transfer(IRGenFunction &IGF, Explosion &sourceExplosion,
-                        Explosion &targetExplosion) const = 0;
-
   /// Enter management of an unmanaged exploded value by adding
   /// cleanups where appropriate.
   virtual void manage(IRGenFunction &IGF, Explosion &sourceExplosion,
@@ -213,6 +207,12 @@ public:
 
   /// Destroy an object of this type in memory.
   virtual void destroy(IRGenFunction &IGF, Address address) const = 0;
+  
+  /// Retains a value. Does not affect cleanups.
+  virtual void retain(IRGenFunction &IGF, Explosion &explosion) const = 0;
+  
+  /// Releases a value. Does not affect cleanups.
+  virtual void release(IRGenFunction &IGF, Explosion &explosion) const = 0;
 
   /// Should optimizations be enabled which rely on the representation
   /// for this type being a single retainable object pointer?

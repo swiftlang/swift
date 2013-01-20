@@ -84,14 +84,18 @@ namespace {
       // FIXME
     }
 
-    void transfer(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      // FIXME
-    }
-    
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       // FIXME
     }
 
+    void retain(IRGenFunction &IGF, Explosion &e) const {
+      // FIXME
+    }
+    
+    void release(IRGenFunction &IGF, Explosion &e) const {
+      // FIXME
+    }
+    
     void destroy(IRGenFunction &IGF, Address addr) const {
       // FIXME
     }

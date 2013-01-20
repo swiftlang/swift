@@ -372,10 +372,14 @@ namespace {
       IGF.emitRetain(src.claimNext().getValue(), dest);
     }
 
-    void transfer(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      src.transferInto(dest, 2);
+    void retain(IRGenFunction &IGF, Explosion &e) const {
+      IGF.emitRetainCall(e.getRange(1, 2)[0].getValue());
     }
-    
+      
+    void release(IRGenFunction &IGF, Explosion &e) const {
+      IGF.emitRelease(e.getRange(1, 2)[0].getValue());
+    }
+      
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 1);
       dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));

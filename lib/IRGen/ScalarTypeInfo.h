@@ -160,15 +160,21 @@ public:
     asDerived().enterScalarCleanup(IGF, value, out);
   }
 
-  void transfer(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
-    in.transferInto(out, 1);
-  }
-  
   void manage(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
     llvm::Value *value = in.claimUnmanagedNext();
     asDerived().enterScalarCleanup(IGF, value, out);
   }
+  
+  void retain(IRGenFunction &IGF, Explosion &e) const {
+    llvm::Value *value = e.getRange(0, 1)[0].getValue();
+    asDerived().emitScalarRetain(IGF, value);
+  }
 
+  void release(IRGenFunction &IGF, Explosion &e) const {
+    llvm::Value *value = e.getRange(0, 1)[0].getValue();
+    asDerived().emitScalarRelease(IGF, value);
+  }
+  
   void destroy(IRGenFunction &IGF, Address addr) const {
     if (!Derived::IsScalarPOD) {
       addr = asDerived().projectScalar(IGF, addr);
