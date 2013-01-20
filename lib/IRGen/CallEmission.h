@@ -106,6 +106,8 @@ public:
   void emitToMemory(Address addr, const TypeInfo &substResultTI);
   void emitToExplosion(Explosion &out);
   void emitVoid();
+  
+  void invalidate();
 };
 
 /// Emit an expression as a callee.

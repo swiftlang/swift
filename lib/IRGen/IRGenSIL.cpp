@@ -88,7 +88,7 @@ void IRGenSILFunction::emitSILFunction(swift::Function *f) {
                                       argType.StorageAlignment));
     } else {
       Explosion &explosion = newLoweredExplosion(argv);
-      argType.transfer(*this, params, explosion);
+      argType.reexplode(*this, params, explosion);
     }
   }
   assert(params.empty() && "did not map all llvm params to SIL params?!");
@@ -107,6 +107,34 @@ void IRGenSILFunction::emitGlobalTopLevel(TranslationUnit *TU,
   // FIXME: should support nonzero StartElems for interactive contexts.
   IRGenFunction::emitGlobalTopLevel(TU, 0);
 }
+
+PartialCall IRGenSILFunction::getLoweredPartialCall(swift::Value v) {
+  LoweredValue &lowered = getLoweredValue(v);
+  switch (lowered.kind) {
+  case LoweredValue::Kind::PartialCall:
+    return std::move(lowered.getPartialCall());
+  case LoweredValue::Kind::Explosion: {
+    // Create a CallEmission from the function and its context.
+    Explosion &e = lowered.getExplosion();
+    ManagedValue fnPtr = e.getRange(0, 1)[0];
+    ManagedValue data = e.getRange(1, 2)[0];
+    CanType fnTy = v.getType().getSwiftType();
+    Callee callee = Callee::forKnownFunction(AbstractCC::Freestanding,
+                                             fnTy,
+                                             getResultType(fnTy, 0),
+                                             {},
+                                             fnPtr.getUnmanagedValue(),
+                                             data,
+                                             // FIXME how to know explosion kind?
+                                             e.getKind(),
+                                             0);
+    return PartialCall{CallEmission(*this, callee), 1};
+  }
+  case LoweredValue::Kind::Address:
+    llvm_unreachable("function lowered as address?!");
+  }
+}
+
 
 void IRGenSILFunction::visitBasicBlock(swift::BasicBlock *BB) {
   // Insert into the lowered basic block.
@@ -231,7 +259,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   // conditions aren't supported for many decls in IRGen anyway though.
   
   // Pile our arguments onto the CallEmission.
-  PartialCall &parent = getLoweredPartialCall(i->getCallee());
+  PartialCall parent = getLoweredPartialCall(i->getCallee());
   Explosion args(ExplosionKind::Minimal);
   for (Value arg : i->getArguments()) {
     emitApplyArgument(args, getLoweredValue(arg));
@@ -241,13 +269,41 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   if (--parent.remainingCurryLevels == 0) {
     // If this brought the call to its natural curry level, emit the call.
     Explosion &result = newLoweredExplosion(v);
-    // NB: 'newLoweredExplosion' invalidates the 'parent' reference by inserting
-    // into the loweredValues DenseMap.
-    getLoweredPartialCall(i->getCallee()).emission.emitToExplosion(result);
+    parent.emission.emitToExplosion(result);
   } else {
     // If not, pass the partial emission forward.
-    moveLoweredPartialCall(v, i->getCallee());
+    moveLoweredPartialCall(v, std::move(parent));
   }
+}
+
+void IRGenSILFunction::visitClosureInst(swift::ClosureInst *i) {
+  Value v(i, 0);
+
+  // FIXME: This only works for unapplied "thin" function values.
+  // FIXME: Really need to move CallEmission to the silgen level to get rid
+  // of this crap!
+  
+  // Get the function pointer from the parent CallEmission, which should be
+  // unapplied.
+  PartialCall parent = getLoweredPartialCall(i->getCallee());
+  llvm::Function *fnPtr = cast<llvm::Function>
+    (parent.emission.getCallee().getFunctionPointer());
+  parent.emission.invalidate();
+  
+  // Collect the context arguments.
+  Explosion args(ExplosionKind::Minimal);
+  SmallVector<const TypeInfo *, 8> argTypes;
+  for (Value arg : i->getArguments()) {
+    emitApplyArgument(args, getLoweredValue(arg));
+    argTypes.push_back(&getFragileTypeInfo(arg.getType().getSwiftType()));
+  }
+  
+  // Create the thunk and function value.
+  Explosion &function = newLoweredExplosion(v);
+  CanType closureTy = i->getType().getSwiftType();
+  emitFunctionPartialApplication(*this, fnPtr, args, argTypes,
+                                 closureTy,
+                                 function);
 }
 
 void IRGenSILFunction::emitApplyArgument(Explosion &args,
@@ -402,17 +458,17 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
 }
 
 void IRGenSILFunction::visitRetainInst(swift::RetainInst *i) {
-  // FIXME: emit retain appropriate to the type (swift, objc, ...).
   Explosion &lowered = getLoweredExplosion(i->getOperand());
-  ArrayRef<ManagedValue> value = lowered.getRange(0, 1);
-  emitRetainCall(value[0].getUnmanagedValue());
+  TypeInfo const &ti = getFragileTypeInfo(
+                                      i->getOperand().getType().getSwiftType());
+  ti.retain(*this, lowered);
 }
 
 void IRGenSILFunction::visitReleaseInst(swift::ReleaseInst *i) {
-  // FIXME: emit release appropriate to the type (swift, objc, ...).
   Explosion &lowered = getLoweredExplosion(i->getOperand());
-  ArrayRef<ManagedValue> value = lowered.getRange(0, 1);
-  emitRelease(value[0].getUnmanagedValue());
+  TypeInfo const &ti = getFragileTypeInfo(
+                                      i->getOperand().getType().getSwiftType());
+  ti.release(*this, lowered);
 }
 
 void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {

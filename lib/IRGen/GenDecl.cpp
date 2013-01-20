@@ -628,9 +628,23 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
-  llvm::FunctionType *fnType =
-    getFunctionType(fn.getDecl()->getType()->getCanonicalType(),
-                    fn.getExplosionLevel(), fn.getUncurryLevel(), extraData);
+  llvm::FunctionType *fnType;
+  // A bit of a hack here. SIL represents closure functions with their context
+  // expanded out and uses a partial application function to construct the
+  // context. IRGen previously set up local functions to expect their extraData
+  // prepackaged.
+  SILConstant silConstant = SILConstant(fn.getDecl());
+  if (SILMod && SILMod->hasFunction(silConstant)) {
+    swift::Function *silFn = SILMod->getFunction(silConstant);
+    fnType = getFunctionType(silFn->getLoweredType().getSwiftType(),
+                             fn.getExplosionLevel(),
+                             fn.getUncurryLevel(),
+                             ExtraData::None);
+  } else {
+    fnType = getFunctionType(fn.getDecl()->getType()->getCanonicalType(),
+                             fn.getExplosionLevel(), fn.getUncurryLevel(),
+                             extraData);
+  }
 
   AbstractCC convention = getAbstractCC(fn.getDecl());
   bool indirectResult =

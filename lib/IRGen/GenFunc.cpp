@@ -2056,15 +2056,19 @@ CallEmission::CallEmission(CallEmission &&other)
     LastArgWritten(other.LastArgWritten),
     EmittedCall(other.EmittedCall) {
   // Prevent other's destructor from asserting.
-  other.LastArgWritten = 0;
-  other.RemainingArgsForCallee = 0;
-  other.EmittedCall = true;
+  other.invalidate();
 }
 
 CallEmission::~CallEmission() {
   assert(LastArgWritten == 0);
   assert(RemainingArgsForCallee == 0);
   assert(EmittedCall);
+}
+
+void CallEmission::invalidate() {
+  LastArgWritten = 0;
+  RemainingArgsForCallee = 0;
+  EmittedCall = true;
 }
 
 static bool isInSwiftModule(Decl *D) {
@@ -3364,3 +3368,99 @@ void IRGenModule::emitGlobalFunction(FuncDecl *func) {
 void IRGenFunction::emitFunctionTopLevel(BraceStmt *S) {
   emitBraceStmt(S);
 }
+
+/// Emit the forwarding stub function for a partial application.
+static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
+                                       llvm::Function *fnPtr,
+                                       ExplosionKind explosionLevel,
+                                       CanType outType,
+                                       HeapLayout const &layout) {
+  llvm::FunctionType *fwdTy = IGM.getFunctionType(outType,
+                                                  explosionLevel,
+                                                  /*curryLevel=*/ 0,
+                                                  ExtraData::Retainable);
+  // FIXME: Give the thunk a real name.
+  // FIXME: Maybe cache the thunk by function and closure types? Could there
+  // be multiple same-type closures off the same 
+  llvm::Function *fwd =
+    llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
+                           "closureinst", &IGM.Module);
+
+  IRGenFunction subIGF(IGM, outType, {}, explosionLevel, /*curryLevel=*/ 0,
+                       fwd, Prologue::Bare);
+  
+  Explosion params = subIGF.collectParameters();
+  
+  // If there's a data pointer required, grab it (it's always the
+  // last parameter) and load out the extra, previously-curried
+  // parameters.
+  if (!layout.empty()) {
+    llvm::Value *rawData = params.takeLast().getUnmanagedValue();
+    Address data = layout.emitCastTo(subIGF, rawData);
+    
+    // Perform the loads.
+    for (auto &fieldLayout : layout.getElements()) {
+      Address fieldAddr = fieldLayout.project(subIGF, data);
+      fieldLayout.Type->load(subIGF, fieldAddr, params);
+    }
+    
+    // Kill the allocated data pointer immediately.  The safety of
+    // this assumes that neither this release nor any of the loads
+    // can throw.
+    subIGF.emitRelease(rawData);
+  }
+  
+  llvm::SmallVector<llvm::Value*, 8> args;
+  params.forward(subIGF, params.size(), args);
+
+  llvm::CallSite callSite = subIGF.emitInvoke(fnPtr->getCallingConv(),
+                                              fnPtr,
+                                              args,
+                                              fnPtr->getAttributes());
+  llvm::CallInst *call = cast<llvm::CallInst>(callSite.getInstruction());
+  call->setTailCall();
+  
+  if (call->getType()->isVoidTy())
+    subIGF.Builder.CreateRetVoid();
+  else
+    subIGF.Builder.CreateRet(call);
+  
+  return fwd;
+}
+
+/// Emit a partial application thunk for a function pointer applied to a partial
+/// set of argument values.
+void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
+                                           llvm::Function *fnPtr,
+                                           Explosion &args,
+                                           ArrayRef<const TypeInfo *> argTypes,
+                                           CanType outType,
+                                           Explosion &out) {
+  // Store the context arguments on the heap.
+  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, argTypes);
+  llvm::Value *data;
+  if (layout.empty()) {
+    data = IGF.IGM.RefCountedNull;
+  } else {
+    // Allocate a new object.
+    data = IGF.emitUnmanagedAlloc(layout, "closure");
+    Address dataAddr = layout.emitCastTo(IGF, data);
+    
+    // Perform the store.
+    for (auto &fieldLayout : layout.getElements()) {
+      Address fieldAddr = fieldLayout.project(IGF, dataAddr);
+      fieldLayout.Type->initialize(IGF, args, fieldAddr);
+    }
+  }
+  assert(args.empty() && "unused args in partial application?!");
+  
+  // Create the forwarding stub.
+  llvm::Function *forwarder = emitPartialApplicationForwarder(IGF.IGM,
+                                                              fnPtr,
+                                                              args.getKind(),
+                                                              outType,
+                                                              layout);
+  out.addUnmanaged(forwarder);
+  out.addUnmanaged(data);
+}
+

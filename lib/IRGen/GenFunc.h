@@ -56,6 +56,15 @@ namespace irgen {
   /// is the number of additional parameter clauses that are uncurried
   /// in the function body.
   unsigned getDeclNaturalUncurryLevel(ValueDecl *val);
+  
+  /// Emit a partial application thunk for a function pointer applied to a
+  /// partial set of argument values.
+  void emitFunctionPartialApplication(IRGenFunction &IGF,
+                                      llvm::Function *fnPtr,
+                                      Explosion &args,
+                                      ArrayRef<const TypeInfo *> argTypes,
+                                      CanType outType,
+                                      Explosion &out);
 } // end namespace irgen
 } // end namespace swift
 

@@ -181,15 +181,10 @@ public:
     return inserted.first->second.getPartialCall();
   }
   
-  PartialCall &moveLoweredPartialCall(swift::Value v,
-                                      swift::Value parent) {
-    // Move to a temporary first because inserting into the DenseMap will
-    // invalidate the reference to the parent PartialCall.
-    PartialCall tmpParent = std::move(getLoweredPartialCall(parent));
-    auto inserted = loweredValues.insert({v,
-                                          LoweredValue{std::move(tmpParent)}});
+  void moveLoweredPartialCall(swift::Value v, PartialCall parent) {
+    auto inserted = loweredValues.insert({v, LoweredValue{std::move(parent)}});
+    (void)inserted;
     assert(inserted.second && "already had lowered value for sil value?!");
-    return inserted.first->second.getPartialCall();
   }
   
   /// Get the Explosion corresponding to the given SIL value, which must
@@ -207,9 +202,7 @@ public:
   Explosion &getLoweredExplosion(swift::Value v) {
     return getLoweredValue(v).getExplosion();
   }
-  PartialCall &getLoweredPartialCall(swift::Value v) {
-    return getLoweredValue(v).getPartialCall();
-  }
+  PartialCall getLoweredPartialCall(swift::Value v);
   
   LoweredBB &getLoweredBB(swift::BasicBlock *bb) {
     auto foundBB = loweredBBs.find(bb);
@@ -234,7 +227,7 @@ public:
   void visitAllocArrayInst(AllocArrayInst *i);
 
   void visitApplyInst(ApplyInst *i);
-  //void visitClosureInst(ClosureInst *i);
+  void visitClosureInst(ClosureInst *i);
   //void visitSpecializeInst(SpecializeInst *i);
 
   void visitConstantRefInst(ConstantRefInst *i);

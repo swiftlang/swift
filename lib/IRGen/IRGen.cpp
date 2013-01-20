@@ -28,6 +28,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -120,6 +121,9 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   // Emit the translation unit.
   IRGenModule IRM(TU->Ctx, Opts, *Module, *DataLayout, SILMod);
   IRM.emitTranslationUnit(TU, StartElem);
+  
+  DEBUG(llvm::dbgs() << "module before passes:\n";
+        IRM.Module.dump());
 
   // Bail out if there are any errors.
   if (TU->Ctx.hadError()) return;
