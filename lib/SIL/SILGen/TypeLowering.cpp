@@ -389,8 +389,77 @@ static Type getInitializerType(TypeConverter &tc,
   }
 }
 
+static Type getFunctionTypeWithCaptures(TypeConverter &types,
+                                        AnyFunctionType *funcType,
+                                        ArrayRef<ValueDecl*> captures) {
+  if (captures.empty())
+    return funcType;
+  
+  Type baseInput = funcType->getInput();
+  SmallVector<TupleTypeElt, 8> inputFields;
+  if (TupleType *tt = baseInput->getAs<TupleType>()) {
+    inputFields.insert(inputFields.end(),
+                       tt->getFields().begin(), tt->getFields().end());
+  } else {
+    inputFields.push_back(TupleTypeElt(baseInput));
+  }
+
+  for (ValueDecl *capture : captures) {
+    switch (SILGenFunction::getDeclCaptureKind(capture)) {
+    case CaptureKind::Constant:
+      // Constants are captured by value.
+      assert(!capture->getTypeOfReference()->is<LValueType>() &&
+             "constant capture is an lvalue?!");
+      inputFields.push_back(TupleTypeElt(capture->getType()));
+      break;
+    case CaptureKind::Byref:
+      // Capture the address.
+      assert(capture->getTypeOfReference()->is<LValueType>() &&
+             "byref capture not an lvalue?!");
+      inputFields.push_back(TupleTypeElt(capture->getTypeOfReference()));
+      break;
+    case CaptureKind::GetterSetter: {
+      // Capture the setter and getter closures.
+      Type setterTy = types.getPropertyType(SILConstant::Setter,
+                                            capture->getType());
+      inputFields.push_back(TupleTypeElt(setterTy));
+      /* FALLTHROUGH */
+    }
+    case CaptureKind::Getter: {
+      // Capture the getter closure.
+      Type getterTy = types.getPropertyType(SILConstant::Getter,
+                                            capture->getType());
+      inputFields.push_back(TupleTypeElt(getterTy));
+      break;
+    }
+    case CaptureKind::LValue:
+      // Capture the owning ObjectPointer and the address of the value.
+      assert(capture->getTypeOfReference()->is<LValueType>() &&
+             "lvalue capture not an lvalue?!");
+      inputFields.push_back(types.Context.TheObjectPointerType);
+      LValueType *lvType = LValueType::get(capture->getType(),
+                                           LValueType::Qual::DefaultForType,
+                                           types.Context);
+      inputFields.push_back(TupleTypeElt(lvType));
+      break;
+    }
+  }
+  
+  Type capturedInputs = TupleType::get(inputFields, types.Context);
+  
+  if (auto *polyType = funcType->getAs<PolymorphicFunctionType>()) {
+    return PolymorphicFunctionType::get(capturedInputs,
+                                        polyType->getResult(),
+                                        &polyType->getGenericParams(),
+                                        types.Context);
+  } else {
+    return FunctionType::get(capturedInputs,
+                             funcType->getResult(),
+                             types.Context);
+  }
+}
+
 Type TypeConverter::makeConstantType(SILConstant c) {
-  // TODO: mangle function types for address-only indirect arguments and returns
   if (ValueDecl *vd = c.loc.dyn_cast<ValueDecl*>()) {
     Type /*nullable*/ contextType =
       vd->getDeclContext()->getDeclaredTypeOfContext();
@@ -423,7 +492,23 @@ Type TypeConverter::makeConstantType(SILConstant c) {
       // If this is a property accessor, derive the property type.
       if (c.isProperty()) {
         Type propertyType = getPropertyType(c.getKind(), vd->getType());
-        return getMethodTypeInContext(contextType, propertyType, genericParams);
+        Type propertyMethodType = getMethodTypeInContext(contextType,
+                                                         propertyType,
+                                                         genericParams);
+        
+        // If this is a local variable, its property methods may be closures.
+        if (VarDecl *var = dyn_cast<VarDecl>(vd)) {
+          if (var->isProperty()) {
+            FuncDecl *property = c.getKind() == SILConstant::Getter
+              ? var->getGetter()
+              : var->getSetter();
+            auto *propTy = propertyMethodType->castTo<AnyFunctionType>();
+            return getFunctionTypeWithCaptures(*this,
+                                           propTy,
+                                           property->getBody()->getCaptures());
+          }
+        }
+        return propertyMethodType;
       }
 
       // If it's a global var, derive the initializer/accessor function type
@@ -433,13 +518,22 @@ Type TypeConverter::makeConstantType(SILConstant c) {
         return getGlobalAccessorType(var->getType(), Context);
       }
       
+      // If it's a function, mangle the function type with its capture
+      // arguments.
+      if (FuncDecl *func = dyn_cast<FuncDecl>(vd)) {
+        auto *funcTy = func->getTypeOfReference()->castTo<AnyFunctionType>();
+        return getFunctionTypeWithCaptures(*this, funcTy,
+                                           func->getBody()->getCaptures());
+      }
+      
       // Otherwise, return the Swift-level type.
       return vd->getTypeOfReference();
     }
   } else if (CapturingExpr *e = c.loc.dyn_cast<CapturingExpr*>()) {
     assert(c.getKind() == 0 &&
            "closure constant should not be getter, setter, or dtor");
-    return e->getType();
+    auto *funcTy = e->getType()->castTo<AnyFunctionType>();
+    return getFunctionTypeWithCaptures(*this, funcTy, e->getCaptures());
   }
   llvm_unreachable("unexpected constant loc");
 }

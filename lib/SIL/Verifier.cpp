@@ -56,8 +56,7 @@ public:
            && "alloc_ref must return reference type value");
   }
   
-  void visitApplyInst(ApplyInst *AI) {
-    
+  void visitApplyInst(ApplyInst *AI) {    
     DEBUG(llvm::dbgs() << "verifying";
           AI->print(llvm::dbgs()));
     SILType calleeTy = AI->getCallee().getType();
@@ -101,6 +100,46 @@ public:
     }
     assert(AI->getType() == ti->getResultType() &&
            "type of apply instruction doesn't match function result type");
+  }
+  
+  void visitClosureInst(ClosureInst *CI) {
+    SILType calleeTy = CI->getCallee().getType();
+    assert(!calleeTy.isAddress() && "callee of closure cannot be an address");
+    assert(calleeTy.is<FunctionType>() &&
+           "callee of closure must have concrete function type");
+    SILType appliedTy = CI->getType();
+    assert(!appliedTy.isAddress() && "result of closure cannot be an address");
+    assert(appliedTy.is<FunctionType>() &&
+           "result of closure must have concrete function type");
+    
+    SILFunctionTypeInfo *calleeTI = F.getModule().getFunctionTypeInfo(calleeTy);
+    SILFunctionTypeInfo *appliedTI
+      = F.getModule().getFunctionTypeInfo(appliedTy);
+    (void)calleeTI; (void)appliedTI;
+
+    // Check that the partially applied arguments match.
+    size_t allArgsCount = calleeTI->getInputTypes().size();
+    size_t appliedArgsCount = CI->getArguments().size();
+    size_t unappliedArgsCount = appliedTI->getInputTypes().size();
+    assert(allArgsCount >= unappliedArgsCount &&
+           "result type of closure has more arguments than callee");
+    assert(allArgsCount >= appliedArgsCount &&
+           "closure applies more arguments than callee has");
+    assert(unappliedArgsCount + appliedArgsCount == allArgsCount &&
+           "result type of closure does not have right amount of unapplied args");
+    for (size_t i = 0; i < unappliedArgsCount; ++i) {
+      assert(appliedTI->getInputTypes()[i] == calleeTI->getInputTypes()[i] &&
+             "result type's input types do not match callee's");
+    }
+    for (size_t i = 0; i < appliedArgsCount; ++i) {
+      assert(CI->getArguments()[i].getType() ==
+               calleeTI->getInputTypes()[i + unappliedArgsCount] &&
+             "closure argument types do not match callee's");
+    }
+    
+    // Check that the result types match.
+    assert(calleeTI->getResultType() == appliedTI->getResultType() &&
+           "result type of closure does not match result type of callee");
   }
 
   void visitConstantRefInst(ConstantRefInst *CRI) {

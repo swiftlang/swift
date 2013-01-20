@@ -1101,6 +1101,28 @@ ManagedValue SILGenFunction::visitMetatypeExpr(MetatypeExpr *E, SGFContext C) {
                                        getLoweredLoadableType(E->getType())));
 }
 
+static SILType getClosureType(SILGenModule &sgm,
+                              SILType calleeType, ArrayRef<Value> Args) {
+  // Partially apply the last N arguments of the function type.
+  FunctionType *funcTy = calleeType.castTo<FunctionType>();
+  Type inputs = funcTy->getInput();
+  ArrayRef<TupleTypeElt> inputFields;
+  if (TupleType *tupleInputs = inputs->getAs<TupleType>()) {
+    inputFields = tupleInputs->getFields();
+  } else {
+    inputFields = TupleTypeElt(inputs);
+  }
+  assert(inputFields.size() >= Args.size()
+         && "not enough inputs for closure application!");
+  ArrayRef<TupleTypeElt> appliedInputFields
+    = inputFields.slice(0, inputFields.size() - Args.size());
+  Type appliedInputs = TupleType::get(appliedInputFields,
+                                      calleeType.getASTContext());
+  return sgm.getLoweredType(FunctionType::get(appliedInputs,
+                                              funcTy->getResult(),
+                                              calleeType.getASTContext()));
+}
+
 ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
                                                          SILConstant constant,
                                                          CapturingExpr *body) {
@@ -1155,8 +1177,13 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
     }
     
     Value functionRef = emitGlobalConstantRef(loc, constant);
+    SILType closureTy = getClosureType(SGM,
+                                       functionRef.getType(),
+                                       capturedArgs);
     return emitManagedRValueWithCleanup(B.createClosure(loc,
-                                                    functionRef, capturedArgs));
+                                                        functionRef,
+                                                        capturedArgs,
+                                                        closureTy));
   } else {
     return ManagedValue(emitGlobalConstantRef(loc, constant));
   }

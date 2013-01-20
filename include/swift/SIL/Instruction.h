@@ -265,10 +265,13 @@ public:
 /// application of a function value.
 class ClosureInst : public FunctionInst {
   friend class FunctionInst;
-  ClosureInst(SILLocation Loc, Value Callee, ArrayRef<Value> Args);
+  ClosureInst(SILLocation Loc, Value Callee, ArrayRef<Value> Args,
+              SILType ClosureType);
 public:
   static ClosureInst *create(SILLocation Loc, Value Callee,
-                             ArrayRef<Value> Args, Function &F);
+                             ArrayRef<Value> Args,
+                             SILType ClosureType,
+                             Function &F);
 };
 
 /// ConstantRefInst - Represents a reference to a *constant* declaration,
