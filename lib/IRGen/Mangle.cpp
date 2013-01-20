@@ -27,6 +27,7 @@
 #include "llvm/Support/ErrorHandling.h"
 
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclObjC.h"
 
 #include "IRGen.h"
 #include "IRGenModule.h"
@@ -92,6 +93,7 @@ namespace {
 
   public:
     Mangler(raw_ostream &buffer) : Buffer(buffer) {}
+    void mangleContextOf(ValueDecl *decl);
     void mangleDeclContext(DeclContext *ctx);
     void mangleDeclName(ValueDecl *decl, IncludeType includeType);
     void mangleDeclType(ValueDecl *decl, ExplosionKind kind,
@@ -162,6 +164,23 @@ bool Mangler::tryMangleSubstitution(void *ptr) {
 
 void Mangler::addSubstitution(void *ptr) {
   Substitutions.insert(std::make_pair(ptr, Substitutions.size()));
+}
+
+/// Mangle the context of the given declaration as a <context.
+/// This is the top-level entrypoint for mangling <context>.
+void Mangler::mangleContextOf(ValueDecl *decl) {
+  auto clangDecl = decl->getClangDecl();
+
+  // Classes published as Objective-C classes have a special context mangling.
+  //   known-context ::= 'So'
+  if (isa<ClassDecl>(decl) && (clangDecl || decl->getAttrs().isObjC())) {
+    assert(!clangDecl || isa<clang::ObjCInterfaceDecl>(clangDecl));
+    Buffer << "So";
+    return;
+  }
+
+  // Otherwise, just mangle the decl's DC.
+  mangleDeclContext(decl->getDeclContext());
 }
 
 void Mangler::mangleDeclContext(DeclContext *ctx) {
@@ -316,7 +335,7 @@ void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
 
 void Mangler::mangleDeclName(ValueDecl *decl, IncludeType includeType) {
   // decl ::= context identifier
-  mangleDeclContext(decl->getDeclContext());
+  mangleContextOf(decl);
 
   if (isa<ConstructorDecl>(decl)) {
     Buffer << 'C';

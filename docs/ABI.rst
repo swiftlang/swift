@@ -69,7 +69,7 @@ types where the metadata itself has unknown layout.)
   context ::= nominal-type
   module ::= substitution                    // other substitution
   module ::= identifier                      // module name
-  module ::= standard-module                 // abbreviation
+  module ::= known-module                    // abbreviation
   function ::= entity
 
   type ::= 'A' natural type                  // fixed-size array
@@ -114,6 +114,7 @@ and so the structure is quite simple.
 
 ::
 
+  known-module ::= 'So'                      // Objective-C
   known-module ::= 'Ss'                      // swift
   known-nominal-type ::= 'Sb'                // swift.Bool
   known-nominal-type ::= 'Sc'                // swift.Char
@@ -126,6 +127,9 @@ and so the structure is quite simple.
 <known-module> and <known-nominal-type> are built-in substitutions for
 certain common entities.  Like any other substitution, they all start
 with 'S'.
+
+The Objective-C module is used as the context for mangling Objective-C
+classes as <type>s.
 
 ::
 
