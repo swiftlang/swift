@@ -135,13 +135,19 @@ bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
 ///   stmt-assign:
 ///     expr '=' expr
 void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
-                                bool IsTopLevel) {
+                                bool IsTopLevel, bool IsGetSet) {
   // This forms a lexical scope.
   Scope BraceScope(this, !IsTopLevel);
     
   SmallVector<Decl*, 8> TmpDecls;
   
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
+    if (IsGetSet) {
+      Identifier Id = Context.getIdentifier(Tok.getText());
+      if (Id == GetIdent || Id == SetIdent)
+        break;
+    }
+
     bool NeedParseErrorRecovery = false;
     TopLevelCodeDecl *TLCD = 0;
     llvm::OwningPtr<ContextChange> CC;

@@ -646,10 +646,10 @@ void Parser::addVarsToScope(Pattern *Pat,
 ///      set var-get
 ///
 ///   get:
-///     'get' stmt-brace
+///     'get:' stmt-brace-item*
 ///
 ///   set:
-///     'set' set-name? stmt-brace
+///     'set' set-name? ':' stmt-brace-item*
 ///
 ///   set-name:
 ///     '(' identifier ')'
@@ -665,13 +665,14 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
   Get = 0;
   Set = 0;
   
-  while (true) {
-    if (!Tok.is(tok::identifier))
+  while (Tok.isNot(tok::r_brace)) {
+    if (Tok.is(tok::eof)) {
+      Invalid = true;
       break;
-    
+    }
     Identifier Id = Context.getIdentifier(Tok.getText());
     
-    if (Id == GetIdent) {
+    if (Id == GetIdent || Id != SetIdent) {
       //   get         ::= 'get' stmt-brace
       
       // Have we already parsed a get clause?
@@ -683,17 +684,17 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
         Get = 0;
       }
       
-      SourceLoc GetLoc = consumeToken();
-      
-      // It's easy to imagine someone writing redundant parentheses here;
-      // diagnose this directly.
-      if (Tok.isAnyLParen() && peekToken().is(tok::r_paren)) {
-        SourceLoc StartLoc = consumeToken();
-        SourceLoc EndLoc = consumeToken();
-        diagnose(StartLoc, diag::empty_parens_getsetname, false)
-          << SourceRange(StartLoc, EndLoc);
+      SourceLoc GetLoc = Tok.getLoc(), ColonLoc = Tok.getLoc();
+      if (Id == GetIdent) {
+        GetLoc = consumeToken();
+        if (Tok.isNot(tok::colon)) {
+          diagnose(Tok.getLoc(), diag::expected_colon_get);
+          Invalid = true;
+          break;
+        }
+        ColonLoc = consumeToken(tok::colon);
       }
-      
+
       // Set up a function declaration for the getter and parse its body.
       
       // Create the parameter list(s) for the getter.
@@ -723,8 +724,12 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       
       // Establish the new context.
       ContextChange CC(*this, GetFn);
-      
-      NullablePtr<BraceStmt> Body = parseStmtBrace(diag::expected_lbrace_get);
+
+      SmallVector<ExprStmtOrDecl, 16> Entries;
+      parseBraceItemList(Entries, false /*NotTopLevel*/, true /*IsGetSet*/);
+      NullablePtr<BraceStmt> Body = BraceStmt::create(Context, ColonLoc,
+                                                      Entries, Tok.getLoc());
+
       if (Body.isNull()) {
         GetLoc = SourceLoc();
         skipUntilDeclRBrace();
@@ -742,14 +747,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       GetFn->setDecl(Get);
       continue;
     }
-    
-    if (Id != SetIdent) {
-      diagnose(Tok.getLoc(), diag::expected_getset);
-      skipUntilDeclRBrace();
-      Invalid = true;
-      break;
-    }
-    
+
     //   var-set         ::= 'set' var-set-name? stmt-brace
     
     // Have we already parsed a var-set clause?
@@ -781,9 +779,6 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                                StartLoc, diag::opening_paren))
           EndLoc = SetNameLoc;
         SetNameParens = SourceRange(StartLoc, EndLoc);
-      } else if (Tok.is(tok::r_paren)) {
-        diagnose(StartLoc, diag::empty_parens_getsetname, true)
-        << SourceRange(StartLoc, consumeToken());
       } else {
         diagnose(Tok.getLoc(), diag::expected_setname);
         skipUntil(tok::r_paren, tok::l_brace);
@@ -791,7 +786,13 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
           consumeToken();
       }
     }
-    
+    if (Tok.isNot(tok::colon)) {
+      diagnose(Tok.getLoc(), diag::expected_colon_set);
+      Invalid = true;
+      break;
+    }
+    SourceLoc ColonLoc = consumeToken(tok::colon);
+
     // Set up a function declaration for the setter and parse its body.
     
     // Create the parameter list(s) for the setter.
@@ -836,7 +837,11 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     ContextChange CC(*this, SetFn);
     
     // Parse the body.
-    NullablePtr<BraceStmt> Body = parseStmtBrace(diag::expected_lbrace_set);
+    SmallVector<ExprStmtOrDecl, 16> Entries;
+    parseBraceItemList(Entries, false /*NotTopLevel*/, true /*IsGetSet*/);
+    NullablePtr<BraceStmt> Body = BraceStmt::create(Context, ColonLoc,
+                                                    Entries, Tok.getLoc());
+
     if (Body.isNull()) {
       skipUntilDeclRBrace();
       Invalid = true;
@@ -947,21 +952,13 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
     if (Tok.is(tok::l_brace)) {
-      // Check whether the next token is 'get' or 'set'.
-      const Token &NextTok = peekToken();
-      if (NextTok.is(tok::identifier)) {
-        Identifier Name = Context.getIdentifier(NextTok.getText());
-
-        // Get the identifiers for both 'get' and 'set'.
-        if (GetIdent.empty()) {
-          GetIdent = Context.getIdentifier("get");
-          SetIdent = Context.getIdentifier("set");
-        }
-        if (Name == GetIdent || Name == SetIdent) {
-          parseDeclVarGetSet(*pattern.get(),Flags & PD_HasContainerType);
-          HasGetSet = true;
-        }
+      // Get the identifiers for both 'get' and 'set'.
+      if (GetIdent.empty()) {
+        GetIdent = Context.getIdentifier("get");
+        SetIdent = Context.getIdentifier("set");
       }
+      parseDeclVarGetSet(*pattern.get(), Flags & PD_HasContainerType);
+      HasGetSet = true;
     }
 
     Type Ty;

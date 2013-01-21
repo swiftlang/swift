@@ -550,6 +550,9 @@
   
   <pre id="value-specifier" class="grammar">
     decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#pattern">pattern</a> initializer?  (',' pattern initializer?)*
+
+    decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> <a href="#stmt-brace">stmt-brace</a>
+
     decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> '{' get-set '}'
   
    initializer     ::= '=' <a href="#expr">expr</a>
@@ -557,9 +560,9 @@
     <a name="get-set"></a>get-set         ::= get set?
     get-set         ::= set get
 
-    get             ::= 'get' <a href="#stmt-brace">stmt-brace</a>
+    get             ::= 'get:' <a href="#stmt-brace">stmt-brace-item*</a>
 
-    set             ::= 'set' set-name? <a href="#stmt-brace">stmt-brace</a>
+    set             ::= 'set' set-name? ':' <a href="#stmt-brace">stmt-brace-item*</a>
 
     set-name        ::= '(' <a href="#identifier">identifier</a> ')'
 </pre>
@@ -618,22 +621,19 @@ an lvalue unless it has a <code>var-get</code> clause but not
     <i>// Variable getter/setter</i>
     var _x : Int = 0
     var x_modify_count : Int = 0
-    var x : Int {
-      get { return _x }
-      set {
-        x_modify_count = x_modify_count + 1
-        _x = value
-      }
+    var x1 : Int {
+      return _x
+    }
+    var x2 : Int {
+    get:
+      return _x
+    set:
+      x_modify_count = x_modify_count + 1
+      _x = value
     }
   </pre>
 
-  <p>Note that both 'get' and 'set' are context-sensitive keywords,
-which means that at both global and local scope, there is a syntactic
-ambiguity between a variable with a <code>var-get-set</code> clause
-and a variable followed by a <code><a
- href="#stmt-brace">stmt-brace</a></code>. This ambiguity is resolved
-in favor of a variable with a <code>var-get-set</code> clause if the
-token following the opening '{' is either 'set' or 'get'.</p>
+  <p>Note that both 'get' and 'set' are context-sensitive keywords.</p>
     
   <!-- ===================================================================== -->
   <h3 id="decl-func">func Declarations</h3>

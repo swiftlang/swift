@@ -214,7 +214,7 @@ public:
   bool parseValueSpecifier(TypeLoc &Loc, NullablePtr<Expr> &Init);
 
   void parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Decls,
-                          bool IsTopLevel);
+                          bool IsTopLevel, bool IsGetSet = false);
 
   //===--------------------------------------------------------------------===//
   // Decl Parsing
