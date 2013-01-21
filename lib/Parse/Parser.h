@@ -241,11 +241,12 @@ public:
   /// \c Attributes to each one.
   void addVarsToScope(Pattern *Pat, SmallVectorImpl<Decl*> &Decls,
                       DeclAttributes &Attributes);
-  void parseAttributeList(DeclAttributes &Attributes) {
+  bool parseAttributeList(DeclAttributes &Attributes) {
     if (Tok.isAnyLSquare())
-      parseAttributeListPresent(Attributes);
+      return parseAttributeListPresent(Attributes);
+    return false;
   }
-  void parseAttributeListPresent(DeclAttributes &Attributes);
+  bool parseAttributeListPresent(DeclAttributes &Attributes);
   bool parseAttribute(DeclAttributes &Attributes);
   
   Decl *parseDeclImport(unsigned Flags);

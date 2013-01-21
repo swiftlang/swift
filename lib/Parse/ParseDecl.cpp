@@ -326,14 +326,14 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
 ///     /*empty*/
 ///     '[' ']'
 ///     '[' attribute (',' attribute)* ']'
-void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
+bool Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
   assert(Tok.isAnyLSquare());
   Attributes.LSquareLoc = consumeToken();
   
   // If this is an empty attribute list, consume it and return.
   if (Tok.is(tok::r_square)) {
     Attributes.RSquareLoc = consumeToken(tok::r_square);
-    return;
+    return false;
   }
   
   bool HadError = false;
@@ -341,18 +341,14 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
     HadError |= parseAttribute(Attributes);
   } while (consumeIf(tok::comma));
 
-  Attributes.RSquareLoc = Tok.getLoc();
-  if (consumeIf(tok::r_square))
-    return;
-  
-  // Otherwise, there was an error parsing the attribute list.  If we already
-  // reported an error, skip to a ], otherwise report the error.
-  if (!HadError)
-    parseMatchingToken(tok::r_square, Attributes.RSquareLoc,
-                       diag::expected_in_attribute_list, 
-                       Attributes.LSquareLoc, diag::opening_bracket);
-  skipUntil(tok::r_square);
-  consumeIf(tok::r_square);
+  if (parseMatchingToken(tok::r_square, Attributes.RSquareLoc,
+                         diag::expected_in_attribute_list,
+                         Attributes.LSquareLoc, diag::opening_bracket)) {
+    skipUntil(tok::r_square);
+    consumeIf(tok::r_square);
+    return true;
+  }
+  return HadError;
 }
 
 /// parseDecl - Parse a single syntactic declaration and return a list of decl
