@@ -667,6 +667,10 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       // FIXME: Will need an implementation here for resilience
       continue;
     case DeclKind::Func: {
+      // Methods should be lowered through SIL.
+      if (SILMod)
+        continue;
+      
       FuncDecl *func = cast<FuncDecl>(member);
       if (func->isStatic()) {
         // Eventually this won't always be the right thing.

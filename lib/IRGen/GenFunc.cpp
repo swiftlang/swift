@@ -3281,6 +3281,51 @@ namespace {
   };
 }
 
+/// Emit a range of curried entry points for a function declaration.
+/// Returns the address of the ending curry level.
+static llvm::Function *emitFunctionCurriedEntrypoints(IRGenModule &IGM,
+                                                  FuncDecl *func,
+                                                  ExtraData extraData,
+                                                  ExplosionKind explosionLevel,
+                                                  unsigned startingUncurryLevel,
+                                                  unsigned naturalUncurryLevel)
+{
+  assert(startingUncurryLevel <= naturalUncurryLevel &&
+         "can't start emitting entrypoints past the natural curry level");
+  
+  FuncExpr *funcExpr = func->getBody();
+  assert(funcExpr->getBody() && "can't emit entrypoints for a bodyless func");
+
+  // Get the address of the first entrypoint we're going to emit.
+  llvm::Function *entrypoint;
+  if (Decl *var = func->getGetterDecl()) {
+    entrypoint = IGM.getAddrOfGetter(cast<ValueDecl>(var), explosionLevel);
+  } else if (Decl *var = func->getSetterDecl()) {
+    entrypoint = IGM.getAddrOfSetter(cast<ValueDecl>(var), explosionLevel);
+  } else {
+    auto fnRef = FunctionRef(func, explosionLevel, startingUncurryLevel);
+    entrypoint = IGM.getAddrOfFunction(fnRef, extraData);
+  }
+  
+  CurriedData curriedData(IGM, funcExpr, explosionLevel,
+                          startingUncurryLevel, naturalUncurryLevel);
+  
+  // Emit the curried entrypoints.  At the end of each iteration,
+  // 'entrypoint' will point to the next entrypoint in the currying sequence.
+  for (unsigned uncurryLevel = startingUncurryLevel;
+       uncurryLevel != naturalUncurryLevel; ++uncurryLevel) {
+    llvm::Function *nextEntrypoint =
+    IGM.getAddrOfFunction(FunctionRef(func, explosionLevel, uncurryLevel + 1),
+                          extraData);
+    
+    curriedData.emitCurriedEntrypoint(entrypoint, nextEntrypoint);
+    
+    entrypoint = nextEntrypoint;
+  }
+
+  return entrypoint;
+}
+
 /// Emit a function declaration, starting at the given uncurry level.
 static void emitFunction(IRGenModule &IGM, FuncDecl *func,
                          unsigned startingUncurryLevel) {
@@ -3294,54 +3339,44 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
   // FIXME: variant currying levels!
   // FIXME: also emit entrypoints with maximal explosion when all types are known!
   unsigned naturalUncurryLevel = getDeclNaturalUncurryLevel(func);
-  assert(startingUncurryLevel <= naturalUncurryLevel);
 
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
 
-  // Get the address of the first entrypoint we're going to emit.
-  llvm::Function *entrypoint;
-  if (Decl *var = func->getGetterDecl()) {
-    entrypoint = IGM.getAddrOfGetter(cast<ValueDecl>(var), explosionLevel);
-  } else if (Decl *var = func->getSetterDecl()) {
-    entrypoint = IGM.getAddrOfSetter(cast<ValueDecl>(var), explosionLevel);
-  } else {
-    auto fnRef = FunctionRef(func, explosionLevel, startingUncurryLevel);
-    entrypoint = IGM.getAddrOfFunction(fnRef, extraData);
-  }
-
-  CurriedData curriedData(IGM, funcExpr, explosionLevel,
-                          startingUncurryLevel, naturalUncurryLevel);
-
-  // Emit the curried entrypoints.  At the end of each iteration,
-  // fnAddr will point to the next entrypoint in the currying sequence.
-  for (unsigned uncurryLevel = startingUncurryLevel;
-         uncurryLevel != naturalUncurryLevel; ++uncurryLevel) {
-    llvm::Function *nextEntrypoint =
-      IGM.getAddrOfFunction(FunctionRef(func, explosionLevel, uncurryLevel + 1),
-                            extraData);
-
-    curriedData.emitCurriedEntrypoint(entrypoint, nextEntrypoint);
-
-    entrypoint = nextEntrypoint;
-  }
+  // Emit the curried entry points.
+  llvm::Function *entrypoint
+    = emitFunctionCurriedEntrypoints(IGM, func, extraData, explosionLevel,
+                                     startingUncurryLevel, naturalUncurryLevel);
 
   // Finally, emit the uncurried entrypoint.
-  if (IGM.SILMod) {
-    // If we have a SIL function, use it.
-    PrettyStackTraceDecl stackTrace("emitting IR from SIL for", func);
-    Function *silFunction = IGM.SILMod->getFunction(SILConstant(func));
-    IRGenSILFunction(IGM,
-                     funcExpr->getType()->getCanonicalType(),
-                     funcExpr->getBodyParamPatterns(),
-                     entrypoint)
-      .emitSILFunction(silFunction);
-  } else {
-    PrettyStackTraceDecl stackTrace("emitting IR for", func);
-    IRGenFunction(IGM, funcExpr->getType()->getCanonicalType(),
-                  funcExpr->getBodyParamPatterns(), explosionLevel,
-                  naturalUncurryLevel, entrypoint)
-      .emitFunctionTopLevel(funcExpr->getBody());
-  }
+  PrettyStackTraceDecl stackTrace("emitting IR for", func);
+  IRGenFunction(IGM, funcExpr->getType()->getCanonicalType(),
+                funcExpr->getBodyParamPatterns(), explosionLevel,
+                naturalUncurryLevel, entrypoint)
+    .emitFunctionTopLevel(funcExpr->getBody());
+}
+
+/// Emit a SIL function.
+static void emitSILFunction(IRGenModule &IGM, FuncDecl *func,
+                            swift::Function *f)
+{
+  ExtraData extraData = ExtraData::None;
+  ExplosionKind explosionLevel = ExplosionKind::Minimal;
+
+  // FIXME: curry levels should be handled entirely in SIL.
+  unsigned startingUncurryLevel = func->isInstanceMember() ? 1 : 0;
+  unsigned naturalUncurryLevel = getDeclNaturalUncurryLevel(func);
+  llvm::Function *entrypoint
+    = emitFunctionCurriedEntrypoints(IGM, func, extraData, explosionLevel,
+                                     startingUncurryLevel, naturalUncurryLevel);
+  
+  PrettyStackTraceDecl stackTrace("emitting IR from SIL for", func);
+  Function *silFunction = IGM.SILMod->getFunction(SILConstant(func));
+  IRGenSILFunction igs(IGM,
+                       f->getLoweredType().getSwiftType(),
+                       nullptr,
+                       entrypoint);
+  igs.emitSILFunction(silFunction);
+  igs.emitLocalDecls(func->getBody()->getBody());
 }
 
 /// Emit the definition for the given instance method.
@@ -3362,6 +3397,19 @@ void IRGenModule::emitStaticMethod(FuncDecl *func) {
 /// Emit the definition for the given global function.
 void IRGenModule::emitGlobalFunction(FuncDecl *func) {
   emitFunction(*this, func, 0);
+}
+
+/// Emit the definition for the given SIL constant.
+void IRGenModule::emitSILConstant(SILConstant c,
+                                  swift::Function *f) {
+  // FIXME: support non-FuncDecl SIL constants. for now just skip over them
+  // and hope old irgen catches them.
+  if (c.id != 0) return;
+  ValueDecl *vd = c.loc.dyn_cast<ValueDecl*>();
+  FuncDecl *fd = dyn_cast_or_null<FuncDecl>(vd);
+  if (!fd) return;
+  
+  emitSILFunction(*this, fd, f);
 }
 
 /// Emit the code for the top-level of a function.

@@ -146,12 +146,16 @@ public:
   
   /// Generate IR for the given SIL Function.
   void emitSILFunction(swift::Function *f);
-  
+
   /// Generate code from the global toplevel. This will emit all the
   /// declarations in the given translation unit along with the toplevel
   /// of the given SILModule.
   void emitGlobalTopLevel(TranslationUnit *TU,
                           SILModule *SILMod);
+  
+  /// Generate local decls in the given function body. This skips VarDecls and
+  /// other locals that are consumed by SIL.
+  void emitLocalDecls(BraceStmt *body);
   
   /// Create a new Address corresponding to the given SIL address value.
   void newLoweredAddress(swift::Value v, Address const &address) {

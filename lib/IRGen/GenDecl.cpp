@@ -93,13 +93,20 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                                 tunit->Name.str() + ".init", &Module);
   }
 
-  if (SILMod)
+  if (SILMod) {
     IRGenSILFunction(*this, unitToUnit, params, fn)
       .emitGlobalTopLevel(tunit, SILMod);
-  else
+    
+    for (auto &cf : *SILMod) {
+      SILConstant c = cf.first;
+      swift::Function *f = cf.second;
+      emitSILConstant(c, f);
+    }
+  } else {
     IRGenFunction(*this, unitToUnit, params, ExplosionKind::Minimal,
                   /*uncurry*/ 0, fn)
       .emitGlobalTopLevel(tunit, StartElem);
+  }
 
   if (tunit->Kind == TranslationUnit::Main ||
       tunit->Kind == TranslationUnit::Repl) {
@@ -529,6 +536,10 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::Func:
+    // If we have a SIL module, the function will be lowered separately.
+    if (IGM.SILMod)
+      return;
+      
     return IGM.emitGlobalFunction(cast<FuncDecl>(D));
 
   case DeclKind::TopLevelCode: {
@@ -565,6 +576,10 @@ void IRGenFunction::emitExternalDefinition(Decl *D) {
       llvm_unreachable("Not a valid external definition for IRgen");
 
     case DeclKind::Func:
+      // Emit methods through SIL if possible.
+      if (IGM.SILMod)
+        return;
+      
       // The only functions available are getters and setters.
       assert(cast<FuncDecl>(D)->isGetterOrSetter() &&
              "Not a synthesized getter/setter");
@@ -1189,6 +1204,10 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
         continue;
       llvm_unreachable("decl not allowed in extension!");
     case DeclKind::Func: {
+      // Methods are emitted through SIL.
+      if (SILMod)
+        continue;
+
       FuncDecl *func = cast<FuncDecl>(member);
       if (func->isStatic()) {
         // Eventually this won't always be the right thing.

@@ -22,6 +22,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Stmt.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -96,6 +97,45 @@ void IRGenSILFunction::emitSILFunction(swift::Function *f) {
   // Emit the function body.
   for (swift::BasicBlock &bb : *f)
     visitBasicBlock(&bb);
+}
+
+void IRGenSILFunction::emitLocalDecls(BraceStmt *body) {
+  Decl *decl;
+  for (auto element : body->getElements()) {
+    decl = element.dyn_cast<Decl*>();
+    if (!decl)
+      break;
+    switch (decl->getKind()) {
+    case DeclKind::Import:
+    case DeclKind::Subscript:
+    case DeclKind::TopLevelCode:
+    case DeclKind::Protocol:
+    case DeclKind::Extension:
+    case DeclKind::OneOfElement:
+    case DeclKind::Constructor:
+    case DeclKind::Destructor:
+      llvm_unreachable("declaration cannot appear in local scope");
+
+    case DeclKind::TypeAlias:
+      // no IR generation support required.
+      return;
+
+    case DeclKind::PatternBinding:
+    case DeclKind::Var:
+    case DeclKind::Func:
+      // These get lowered by SIL.
+      return;
+
+    case DeclKind::OneOf:
+      return IGM.emitOneOfDecl(cast<OneOfDecl>(decl));
+      
+    case DeclKind::Struct:
+      return IGM.emitStructDecl(cast<StructDecl>(decl));
+      
+    case DeclKind::Class:
+      return IGM.emitClassDecl(cast<ClassDecl>(decl));
+    }
+  }
 }
 
 void IRGenSILFunction::emitGlobalTopLevel(TranslationUnit *TU,

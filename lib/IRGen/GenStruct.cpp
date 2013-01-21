@@ -241,6 +241,10 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
       // FIXME: Will need an implementation here for resilience
       continue;
     case DeclKind::Func: {
+      // Methods are emitted through SIL if possible.
+      if (SILMod)
+        continue;
+      
       FuncDecl *func = cast<FuncDecl>(member);
       if (func->isStatic()) {
         // Eventually this won't always be the right thing.

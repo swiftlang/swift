@@ -51,10 +51,12 @@ namespace swift {
   class DestructorDecl;
   class ExtensionDecl;
   class FuncDecl;
+  class Function;
   class OneOfElementDecl;
   class OneOfDecl;
   class ProtocolCompositionType;
   class ProtocolDecl;
+  struct SILConstant;
   class SILModule;
   class SourceLoc;
   class StructDecl;
@@ -294,6 +296,8 @@ public:
   void emitInstanceMethod(FuncDecl *D);
   void emitConstructor(ConstructorDecl *D);
   void emitClassConstructor(ConstructorDecl *D);
+  
+  void emitSILConstant(SILConstant c, swift::Function *f);
 
   llvm::FunctionType *getFunctionType(CanType fnType, ExplosionKind kind,
                                       unsigned uncurryLevel,
