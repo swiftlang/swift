@@ -218,11 +218,12 @@ static void getAddrOfSILConstant(IRGenSILFunction &IGF,
     break;
   }
   case DeclKind::Constructor: {
-    // FIXME: distinguish between constructor variants in SIL
-    assert(constant.id == 0 && "constant initializer not yet implemented");
+    ConstructorKind kind = constant.getKind() == SILConstant::Initializer
+      ? ConstructorKind::Initializing
+      : ConstructorKind::Allocating;
     naturalCurryLevel = getDeclNaturalUncurryLevel(vd);
     fnptr = IGF.IGM.getAddrOfConstructor(cast<ConstructorDecl>(vd),
-                                         ConstructorKind::Allocating,
+                                         kind,
                                          ExplosionKind::Minimal);
     cc = AbstractCC::Freestanding;
     break;
