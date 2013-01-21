@@ -1125,16 +1125,20 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
     NullablePtr<Stmt> Body;
     
     // Check to see if we have a "{" to start a brace statement.
-    if (Tok.is(tok::l_brace)) {
-      NullablePtr<BraceStmt> Body = parseStmtBrace(diag::invalid_diagnostic);
+    if (Flags & PD_DisallowFuncDef) {
+      if (Tok.is(tok::l_brace)) {
+        diagnose(Tok.getLoc(), diag::disallowed_func_def);
+        consumeToken();
+        skipUntil(tok::r_brace);
+        consumeToken();
+        return 0;
+      }
+    } else if (Attributes.AsmName.empty() || Tok.is(tok::l_brace)) {
+      NullablePtr<BraceStmt> Body=parseStmtBrace(diag::func_decl_without_brace);
       if (Body.isNull()) {
         // FIXME: Should do some sort of error recovery here?
       } else {
         FE->setBody(Body.get());
-      }
-      if (Flags & PD_DisallowFuncDef) {
-        diagnose(Body.get()->getLBraceLoc(), diag::disallowed_func_def);
-        return 0;
       }
     }
   }

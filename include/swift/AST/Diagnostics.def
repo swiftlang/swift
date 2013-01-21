@@ -210,6 +210,8 @@ ERROR(associated_type_def,decl_parsing,none,
       "typealias %0 in protocol cannot have a definition", (Identifier))
 
 // Func
+ERROR(func_decl_without_brace,decl_parsing,none,
+      "expected '{' in body of func declaration", ())
 ERROR(func_decl_without_paren,decl_parsing,none,
       "expected '(' in argument list of func declaration", ())
 ERROR(static_func_decl_global_scope,decl_parsing,none,
