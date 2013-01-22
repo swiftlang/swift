@@ -1306,9 +1306,6 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     B.createApply(dd, dtorValue.forward(*this),
                   SILType::getEmptyTupleType(SGM.M.getContext()),
                   baseThis);
-  } else {
-    // Otherwise, deallocate the instance ourselves.
-    B.createDeallocRef(dd, thisValue);
   }
   
   B.createReturn(dd, B.createEmptyTuple(dd));
