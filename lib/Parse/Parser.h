@@ -294,7 +294,7 @@ public:
                               SmallVectorImpl<Pattern*> &bodyPatterns,
                               TypeLoc &retLoc);
   NullablePtr<Pattern> parsePattern();
-  NullablePtr<Pattern> parsePatternTuple();
+  NullablePtr<Pattern> parsePatternTuple(bool AllowInitExpr);
   NullablePtr<Pattern> parsePatternIdentifier();
   NullablePtr<Pattern> parsePatternAtom();
 

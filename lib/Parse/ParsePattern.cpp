@@ -36,7 +36,8 @@ static bool parseCurriedFunctionArguments(Parser *parser,
   // parseFunctionArguments parsed the first argument pattern.
   // Parse additional curried argument clauses as long as we can.
   while (parser->Tok.isAnyLParen()) {
-    NullablePtr<Pattern> pattern = parser->parsePatternTuple();
+    NullablePtr<Pattern> pattern = parser->parsePatternTuple(
+                                                 /*AllowInitExpr=*/true);
     if (pattern.isNull())
       return true;
     else {
@@ -197,7 +198,7 @@ static bool parseSelectorFunctionArguments(Parser *parser,
 bool Parser::parseFunctionArguments(SmallVectorImpl<Pattern*> &argPatterns,
                                     SmallVectorImpl<Pattern*> &bodyPatterns) {
   // Parse the first function argument clause.
-  NullablePtr<Pattern> pattern = parsePatternTuple();
+  NullablePtr<Pattern> pattern = parsePatternTuple(/*AllowInitExpr=*/true);
   if (pattern.isNull())
     return true;
   else {
@@ -288,7 +289,7 @@ NullablePtr<Pattern> Parser::parsePatternAtom() {
   switch (Tok.getKind()) {
   case tok::l_paren:
   case tok::l_paren_space:
-    return parsePatternTuple();
+    return parsePatternTuple(/*AllowInitExpr*/false);
 
   case tok::identifier:
     return parsePatternIdentifier();
@@ -308,7 +309,7 @@ NullablePtr<Pattern> Parser::parsePatternAtom() {
 ///   pattern-tuple-element:
 ///     pattern ('=' expr)?
 
-NullablePtr<Pattern> Parser::parsePatternTuple() {
+NullablePtr<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
   assert(Tok.isAnyLParen());
 
   // We're looking at the left parenthesis; consume it.
@@ -317,6 +318,7 @@ NullablePtr<Pattern> Parser::parsePatternTuple() {
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
   bool hadEllipsis = false;
+  bool Invalid = false;
   if (Tok.isNot(tok::r_paren)) {
     do {
       NullablePtr<Pattern> pattern = parsePattern();
@@ -325,7 +327,12 @@ NullablePtr<Pattern> Parser::parsePatternTuple() {
       if (pattern.isNull()) {
         skipUntil(tok::r_paren);
         return nullptr;
-      } else if (consumeIf(tok::equal)) {
+      } else if (Tok.is(tok::equal)) {
+        SourceLoc EqualLoc = consumeToken();
+        if (!AllowInitExpr) {
+          diagnose(EqualLoc, diag::non_func_decl_pattern_init);
+          Invalid = true;
+        }
         NullablePtr<Expr> initR = parseExpr(diag::expected_initializer_expr);
         if (initR.isNull()) {
           skipUntil(tok::r_paren);
@@ -371,6 +378,9 @@ NullablePtr<Pattern> Parser::parsePatternTuple() {
 
   // Consume the right parenthesis.
   SourceLoc rp = consumeToken(tok::r_paren);
+
+  if (Invalid)
+    return nullptr;
 
   // A pattern which wraps a single anonymous pattern is not a tuple.
   if (elts.size() == 1 &&

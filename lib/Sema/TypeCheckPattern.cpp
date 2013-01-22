@@ -182,11 +182,8 @@ bool TypeChecker::coerceToType(Pattern *P, Type type, bool isFirstPass) {
     for (unsigned i = 0, e = TP->getNumFields(); i != e; ++i) {
       TuplePatternElt &elt = TP->getFields()[i];
       Pattern *pattern = elt.getPattern();
-      if (elt.getInit()) {
-        diagnose(pattern->getLoc(), diag::coerced_tuple_pattern_has_init)
-          << pattern->getSourceRange();
-        hadError = true;
-      }
+      assert(!elt.getInit() &&
+             "parsing must prevent tuple init outside of function signatures!");
 
       Type CoercionType;
       if (hadError)

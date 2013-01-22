@@ -1606,7 +1606,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
     return true;
   }
   
-  NullablePtr<Pattern> Indices = parsePatternTuple();
+  NullablePtr<Pattern> Indices = parsePatternTuple(/*AllowInitExpr=*/false);
   if (Indices.isNull())
     return true;
   
@@ -1748,7 +1748,7 @@ ConstructorDecl *Parser::parseDeclConstructor(bool HasContainerType) {
     return nullptr;
   }
   
-  NullablePtr<Pattern> Arguments = parsePatternTuple();
+  NullablePtr<Pattern> Arguments = parsePatternTuple(/*AllowInitExpr=*/true);
   if (Arguments.isNull())
     return nullptr;
 
