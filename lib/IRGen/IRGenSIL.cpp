@@ -44,9 +44,11 @@ using namespace irgen;
 
 IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                                    CanType t,
-                                   ArrayRef<Pattern*> p,
+                                   ExplosionKind explosionLevel,
                                    llvm::Function *fn)
-  : IRGenFunction(IGM, t, p, ExplosionKind::Minimal, 0, fn, Prologue::Bare)
+  : IRGenFunction(IGM, t,
+                  /*paramPatterns=*/ nullptr,
+                  explosionLevel, 0, fn, Prologue::Bare)
 {
 }
 
@@ -193,11 +195,11 @@ void IRGenSILFunction::visitBasicBlock(swift::BasicBlock *BB) {
 
 /// Find the entry point, natural curry level, and calling convention for a
 /// SILConstant.
-static void getAddrOfSILConstant(IRGenSILFunction &IGF,
-                                 SILConstant constant,
-                                 llvm::Value* &fnptr,
-                                 unsigned &naturalCurryLevel,
-                                 AbstractCC &cc)
+void IRGenModule::getAddrOfSILConstant(SILConstant constant,
+                                       llvm::Function* &fnptr,
+                                       unsigned &naturalCurryLevel,
+                                       AbstractCC &cc,
+                                       BraceStmt* &body)
 {
   // FIXME: currently only does ValueDecls. Needs to handle closures.
 
@@ -205,44 +207,53 @@ static void getAddrOfSILConstant(IRGenSILFunction &IGF,
 
   switch (vd->getKind()) {
   case DeclKind::Func: {
+    FuncDecl *fd = cast<FuncDecl>(vd);
     assert(constant.id == 0 && "alternate entry point for func?!");
     // Get the function pointer at the natural uncurry level.
     naturalCurryLevel = getDeclNaturalUncurryLevel(vd);
-    FunctionRef fnRef(cast<FuncDecl>(vd),
+    FunctionRef fnRef(fd,
                       ExplosionKind::Minimal,
                       naturalCurryLevel);
     
-    fnptr = IGF.IGM.getAddrOfFunction(fnRef, ExtraData::None);
+    fnptr = getAddrOfFunction(fnRef, ExtraData::None);
     // FIXME: c calling convention
     cc = vd->isInstanceMember() ? AbstractCC::Method : AbstractCC::Freestanding;
+    body = fd->getBody()->getBody();
     break;
   }
   case DeclKind::Constructor: {
+    ConstructorDecl *cd = cast<ConstructorDecl>(vd);
     ConstructorKind kind = constant.getKind() == SILConstant::Initializer
       ? ConstructorKind::Initializing
       : ConstructorKind::Allocating;
     naturalCurryLevel = getDeclNaturalUncurryLevel(vd);
-    fnptr = IGF.IGM.getAddrOfConstructor(cast<ConstructorDecl>(vd),
-                                         kind,
-                                         ExplosionKind::Minimal);
+    fnptr = getAddrOfConstructor(cd,
+                                 kind,
+                                 ExplosionKind::Minimal);
     cc = AbstractCC::Freestanding;
+    body = cd->getBody();
     break;
   }
   case DeclKind::Class: {
     // FIXME: distinguish between destructor variants in SIL
     assert(constant.id == SILConstant::Destructor &&
            "non-destructor reference to ClassDecl?!");
-    fnptr = IGF.IGM.getAddrOfDestructor(cast<ClassDecl>(vd),
-                                        DestructorKind::Deallocating);
+    fnptr = getAddrOfDestructor(cast<ClassDecl>(vd),
+                                DestructorKind::Deallocating);
     cc = AbstractCC::Method;
+    // FIXME: get destructor body from destructor decl
+    body = nullptr;
     break;
   }
   case DeclKind::Var: {
+    VarDecl *var = cast<VarDecl>(vd);
+    FuncDecl *propFunc;
     if (constant.getKind() == SILConstant::Getter) {
-      fnptr = IGF.IGM.getAddrOfGetter(vd, ExplosionKind::Minimal);
-      
+      fnptr = getAddrOfGetter(vd, ExplosionKind::Minimal);
+      propFunc = var->getGetter();
     } else if (constant.getKind() == SILConstant::Setter) {
-      fnptr = IGF.IGM.getAddrOfSetter(vd, ExplosionKind::Minimal);
+      fnptr = getAddrOfSetter(vd, ExplosionKind::Minimal);
+      propFunc = var->getSetter();
     } else {
       // FIXME: physical global variable accessor.
       constant.dump();
@@ -253,6 +264,7 @@ static void getAddrOfSILConstant(IRGenSILFunction &IGF,
       : AbstractCC::Freestanding;
     // FIXME: a more canonical place to ask for this?
     naturalCurryLevel = vd->isInstanceMember() ? 1 : 0;
+    body = propFunc ? propFunc->getBody()->getBody() : nullptr;
     break;
   }
   default:
@@ -262,11 +274,12 @@ static void getAddrOfSILConstant(IRGenSILFunction &IGF,
 }
 
 void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
-  llvm::Value *fnptr;
+  llvm::Function *fnptr;
   unsigned naturalCurryLevel;
   AbstractCC cc;
-  getAddrOfSILConstant(*this, i->getConstant(),
-                       fnptr, naturalCurryLevel, cc);
+  BraceStmt *body;
+  IGM.getAddrOfSILConstant(i->getConstant(),
+                           fnptr, naturalCurryLevel, cc, body);
 
   // Prepare a CallEmission for this function.
   // FIXME generic call specialization

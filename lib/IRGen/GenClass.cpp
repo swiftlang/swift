@@ -687,12 +687,23 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       continue;
     }
     case DeclKind::Constructor: {
-      ::emitClassConstructor(*this, cast<ConstructorDecl>(member));
+      // Constructors are lowered through SIL.
+      // FIXME: SIL doesn't build the implicit constructor for structs yet.
+      ConstructorDecl *cd = cast<ConstructorDecl>(member);
+      if (SILMod && cd->getBody())
+        continue;
+      
+      ::emitClassConstructor(*this, cd);
       continue;
     }
     case DeclKind::Destructor: {
       assert(!emittedDtor && "two destructors in class?");
       emittedDtor = true;
+
+      // Destructors are lowered through SIL.
+      if (SILMod)
+        continue;
+
       emitClassDestructor(*this, D, cast<DestructorDecl>(member));
       continue;
     }
@@ -701,7 +712,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   }
 
   // Emit a defaulted class destructor if we didn't see one explicitly.
-  if (!emittedDtor)
+  if (!SILMod && !emittedDtor)
     emitClassDestructor(*this, D, nullptr);
 }
 

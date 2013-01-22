@@ -18,6 +18,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/APFloat.h"
@@ -483,4 +484,31 @@ void SILModule::print(llvm::raw_ostream &OS) const {
     toplevel->print(OS);
     OS << "\n";
   }
+}
+
+//===----------------------------------------------------------------------===//
+// Printing for PrettyStackTrace
+//===----------------------------------------------------------------------===//
+
+void PrettyStackTraceSILConstant::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << ' ';
+  ASTContext *Ctx;
+  SourceLoc sloc;
+  if (ValueDecl *decl = C.loc.dyn_cast<ValueDecl*>()) {
+    if (decl->getName().get())
+      out << '\'' << decl->getName() << '\'';
+    else
+      out << "'anonname=" << (const void*)decl << '\'';
+    Ctx = &decl->getASTContext();
+    sloc = decl->getStartLoc();
+  }
+  else if (CapturingExpr *expr = C.loc.dyn_cast<CapturingExpr*>()) {
+    out << "anonymous function";
+    Ctx = &expr->getASTContext();
+    sloc = expr->getStartLoc();
+  } else
+    llvm_unreachable("impossible sil constant");
+
+  out << " at ";
+  printSourceLoc(out, sloc, *Ctx);
 }

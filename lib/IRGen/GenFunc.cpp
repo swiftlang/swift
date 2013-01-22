@@ -3282,7 +3282,7 @@ namespace {
 }
 
 /// Emit a range of curried entry points for a function declaration.
-/// Returns the address of the ending curry level.
+/// Returns the address of the natural curry level entrypoint.
 static llvm::Function *emitFunctionCurriedEntrypoints(IRGenModule &IGM,
                                                   FuncDecl *func,
                                                   ExtraData extraData,
@@ -3356,27 +3356,25 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
 }
 
 /// Emit a SIL function.
-static void emitSILFunction(IRGenModule &IGM, FuncDecl *func,
-                            swift::Function *f)
+static void emitSILFunction(IRGenModule &IGM,
+                            SILConstant c,
+                            swift::Function *f,
+                            llvm::Function *entrypoint,
+                            BraceStmt *body = nullptr)
 {
-  ExtraData extraData = ExtraData::None;
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
-
-  // FIXME: curry levels should be handled entirely in SIL.
-  unsigned startingUncurryLevel = func->isInstanceMember() ? 1 : 0;
-  unsigned naturalUncurryLevel = getDeclNaturalUncurryLevel(func);
-  llvm::Function *entrypoint
-    = emitFunctionCurriedEntrypoints(IGM, func, extraData, explosionLevel,
-                                     startingUncurryLevel, naturalUncurryLevel);
   
-  PrettyStackTraceDecl stackTrace("emitting IR from SIL for", func);
-  Function *silFunction = IGM.SILMod->getFunction(SILConstant(func));
+  // Emit the code for the function.
+  PrettyStackTraceSILConstant stackTrace("emitting IR from SIL for", c);
   IRGenSILFunction igs(IGM,
                        f->getLoweredType().getSwiftType(),
-                       nullptr,
+                       explosionLevel,
                        entrypoint);
-  igs.emitSILFunction(silFunction);
-  igs.emitLocalDecls(func->getBody()->getBody());
+  igs.emitSILFunction(f);
+  
+  // Walk the function body to look for local types or other decls.
+  if (body)
+    igs.emitLocalDecls(body);
 }
 
 /// Emit the definition for the given instance method.
@@ -3402,14 +3400,13 @@ void IRGenModule::emitGlobalFunction(FuncDecl *func) {
 /// Emit the definition for the given SIL constant.
 void IRGenModule::emitSILConstant(SILConstant c,
                                   swift::Function *f) {
-  // FIXME: support non-FuncDecl SIL constants. for now just skip over them
-  // and hope old irgen catches them.
-  if (c.id != 0) return;
-  ValueDecl *vd = c.loc.dyn_cast<ValueDecl*>();
-  FuncDecl *fd = dyn_cast_or_null<FuncDecl>(vd);
-  if (!fd) return;
-  
-  emitSILFunction(*this, fd, f);
+  llvm::Function *entrypoint;
+  unsigned naturalCurryLevel;
+  AbstractCC cc;
+  BraceStmt *body;
+  getAddrOfSILConstant(c,
+                       entrypoint, naturalCurryLevel, cc, body);
+  emitSILFunction(*this, c, f, entrypoint, body);
 }
 
 /// Emit the code for the top-level of a function.

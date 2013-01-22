@@ -21,6 +21,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/PrettyStackTrace.h"
 
 namespace llvm {
   class raw_ostream;
@@ -29,6 +30,7 @@ namespace llvm {
 namespace swift {
   class ValueDecl;
   class CapturingExpr;
+  class ASTContext;
 
 /// SILConstant - A key for referencing an entity that can be the subject of a
 /// SIL ConstantRefInst or the name of a SIL Function body. This can currently
@@ -82,6 +84,17 @@ struct SILConstant {
   void dump() const;
 };
 
+/// PrettyStackTraceSILConstant - Observe that we are processing a specific
+/// SIL constant.
+class PrettyStackTraceSILConstant : public llvm::PrettyStackTraceEntry {
+  SILConstant C;
+  const char *Action;
+public:
+  PrettyStackTraceSILConstant(const char *Action, SILConstant C)
+    : C(C), Action(Action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+  
 } // end swift namespace
 
 namespace llvm {

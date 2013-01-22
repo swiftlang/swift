@@ -560,6 +560,9 @@ void IRGenModule::emitOneOfDecl(OneOfDecl *oneof) {
       continue;
     }
     case DeclKind::Constructor: {
+      if (SILMod)
+        continue;
+      
       emitConstructor(cast<ConstructorDecl>(member));
       continue;
     }

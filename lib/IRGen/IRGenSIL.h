@@ -35,6 +35,18 @@ namespace irgen {
 struct PartialCall {
   CallEmission emission;
   unsigned remainingCurryLevels;
+  
+  PartialCall() = default;
+  PartialCall(PartialCall const &) = default;
+  PartialCall(PartialCall &&) = default;
+  PartialCall &operator=(PartialCall const &) = default;
+  PartialCall &operator=(PartialCall &&) = default;
+  
+  ~PartialCall() {
+    // It's ok in SIL to reference a function without applying it, so suppress
+    // ~CallEmission's "RemainingArgsForCallee == 0" sanity check.
+    emission.invalidate();
+  }
 };
   
 /// Represents a SIL value lowered to IR, in one of these forms:
@@ -140,7 +152,7 @@ class IRGenSILFunction :
 public:
   IRGenSILFunction(IRGenModule &IGM,
                    CanType t,
-                   ArrayRef<Pattern*> p,
+                   ExplosionKind explosionLevel,
                    llvm::Function *fn);
   ~IRGenSILFunction();
   

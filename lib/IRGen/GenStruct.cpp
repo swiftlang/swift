@@ -262,6 +262,11 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
                                ExplosionKind::Minimal);
         emitValueConstructor(*this, fn, ctor);
       } else {
+        // Constructors get emitted through SIL.
+        // FIXME: SIL does not generate the implicit constructor.
+        if (SILMod)
+          continue;
+        
         emitConstructor(ctor);
       }
       continue;

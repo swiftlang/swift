@@ -94,7 +94,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   }
 
   if (SILMod) {
-    IRGenSILFunction(*this, unitToUnit, params, fn)
+    IRGenSILFunction(*this, unitToUnit, ExplosionKind::Minimal, fn)
       .emitGlobalTopLevel(tunit, SILMod);
     
     for (auto &cf : *SILMod) {
@@ -587,6 +587,9 @@ void IRGenFunction::emitExternalDefinition(Decl *D) {
       break;
 
     case DeclKind::Constructor:
+      if (IGM.SILMod)
+        return;
+      
       if (D->getDeclContext()->getDeclaredTypeOfContext()
             ->getClassOrBoundGenericClass()) {
         IGM.emitClassConstructor(cast<ConstructorDecl>(D));
@@ -1218,6 +1221,9 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
       continue;
     }
     case DeclKind::Constructor: {
+      if (SILMod)
+        continue;
+
       emitConstructor(cast<ConstructorDecl>(member));
       continue;
     }

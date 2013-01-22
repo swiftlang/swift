@@ -68,6 +68,7 @@ namespace swift {
   class VarDecl;
 
 namespace irgen {
+  enum class AbstractCC : unsigned char;
   class Address;
   class CodeRef;
   enum class ExplosionKind : unsigned;
@@ -333,6 +334,11 @@ public:
   llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D);
   llvm::Constant *getAddrOfSwiftMetaclassStub(ClassDecl *D);
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D);
+  void getAddrOfSILConstant(SILConstant constant,
+                            llvm::Function* &fnptr,
+                            unsigned &naturalCurryLevel,
+                            AbstractCC &cc,
+                            BraceStmt* &body);
 
   llvm::StringRef mangleType(CanType type,
                              llvm::SmallVectorImpl<char> &buffer);
