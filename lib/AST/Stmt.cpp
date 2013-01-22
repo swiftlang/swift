@@ -129,10 +129,6 @@ public:
   void printRec(Decl *D) { D->dump(Indent+2); }
   void printRec(Expr *E) { E->print(OS, Indent+2); }
 
-  void visitSemiStmt(SemiStmt *S) {
-    OS.indent(Indent) << "(semi_stmt)";
-  }
-
   void visitAssignStmt(AssignStmt *S) {
     OS.indent(Indent) << "(assign_stmt\n";
     printRec(S->getDest());

@@ -398,7 +398,6 @@ public:
   //===--------------------------------------------------------------------===//
   
   void visitBraceStmt(BraceStmt *S, SGFContext C);
-  void visitSemiStmt(SemiStmt *S, SGFContext C) {}
   
   void visitAssignStmt(AssignStmt *S, SGFContext C);
 

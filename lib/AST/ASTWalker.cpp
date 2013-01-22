@@ -346,10 +346,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;
   }
 
-  Stmt *visitSemiStmt(SemiStmt *SS) {
-    return SS;
-  }
-
   Stmt *visitBreakStmt(BreakStmt *BS) {
     return BS;
   }

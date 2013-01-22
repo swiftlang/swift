@@ -93,10 +93,6 @@ public:
   // Visit Methods.
   //===--------------------------------------------------------------------===//
 
-  Stmt *visitSemiStmt(SemiStmt *S) {
-    return S;
-  }
-
   Stmt *visitAssignStmt(AssignStmt *S) {
     Expr *Dest = S->getDest();
     Expr *Src = S->getSrc();

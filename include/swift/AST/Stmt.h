@@ -56,6 +56,7 @@ public:
   SourceLoc getEndLoc() const { return getSourceRange().End; }
   
   SourceRange getSourceRange() const;
+  SourceLoc TrailingSemiLoc;
   
   /// walk - This recursively walks the AST rooted at this statement.
   Stmt *walk(ASTWalker &walker);
@@ -77,20 +78,6 @@ public:
   void operator delete(void *Data) throw() = delete;
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
 
-};
-
-/// SemiStmt - A semicolon, the noop statement: ";"
-class SemiStmt : public Stmt {
-  SourceLoc Loc;
-  
-public:
-  SemiStmt(SourceLoc Loc) : Stmt(StmtKind::Semi), Loc(Loc) {}
-
-  SourceLoc getLoc() const { return Loc; }
-  
-  SourceRange getSourceRange() const { return Loc; }
-
-  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Semi; }
 };
 
 /// AssignStmt - A value assignment, like "x = y".

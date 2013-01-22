@@ -542,10 +542,6 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   visit(decl->getBody());
 }
 
-void PrintAST::visitSemiStmt(SemiStmt *stmt) {
-  OS << ";";
-}
-
 void PrintAST::visitAssignStmt(AssignStmt *stmt) {
   // FIXME: lhs
   OS << " = ";

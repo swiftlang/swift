@@ -160,6 +160,8 @@ public:
   SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
 
+  SourceLoc TrailingSemiLoc;
+
   void dump() const;
   void dump(unsigned Indent) const;
 

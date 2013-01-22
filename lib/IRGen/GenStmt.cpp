@@ -34,10 +34,6 @@ using namespace irgen;
 
 void IRGenFunction::emitStmt(Stmt *S) {
   switch (S->getKind()) {
-  case StmtKind::Semi:
-    // Nothing to do.
-    return;
-
   case StmtKind::Assign:
     return emitAssignStmt(cast<AssignStmt>(S));
 

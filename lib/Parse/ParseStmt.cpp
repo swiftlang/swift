@@ -30,7 +30,6 @@ using namespace swift;
 bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
   switch (Tok.getKind()) {
   default: return false;
-  case tok::semi:
   case tok::l_brace:
   case tok::kw_return:
   case tok::kw_if:
@@ -107,7 +106,11 @@ bool Parser::parseExprOrStmtAssign(ExprStmtOrDecl &Result) {
 }
 
 bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
-  if (isStartOfStmtOtherThanAssignment(Tok)) {
+  if (Tok.is(tok::semi)) {
+    diagnose(Tok.getLoc(), diag::illegal_semi_stmt);
+    consumeToken();
+    return true;
+  } else if (isStartOfStmtOtherThanAssignment(Tok)) {
     NullablePtr<Stmt> Res = parseStmtOtherThanAssignment();
     if (Res.isNull())
       return true;
@@ -151,6 +154,7 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     bool NeedParseErrorRecovery = false;
     TopLevelCodeDecl *TLCD = 0;
     llvm::OwningPtr<ContextChange> CC;
+    ExprStmtOrDecl Result;
 
     // Parse the decl, stmt, or expression.
     if (isStartOfDecl(Tok, peekToken())) {
@@ -166,7 +170,6 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
       ContextChange CC(*this, TLCD);
 
-      ExprStmtOrDecl Result;
       if (parseExprOrStmt(Result)) {
         NeedParseErrorRecovery = true;
       } else {
@@ -177,11 +180,17 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         Entries.push_back(TLCD);
       }
     } else {
-      ExprStmtOrDecl Result;
       if (parseExprOrStmt(Result))
         NeedParseErrorRecovery = true;
       else
         Entries.push_back(Result);
+    }
+    if (!NeedParseErrorRecovery && Tok.is(tok::semi)) {
+      if (Result.is<Expr*>()) {
+        Result.get<Expr*>()->TrailingSemiLoc = consumeToken(tok::semi);
+      } else {
+        Result.get<Stmt*>()->TrailingSemiLoc = consumeToken(tok::semi);
+      }
     }
 
     // If we had a parse error, skip to the start of the next stmt or decl.  It
@@ -220,7 +229,6 @@ NullablePtr<Stmt> Parser::parseStmtOtherThanAssignment() {
   default:
     diagnose(Tok, diag::expected_stmt);
     return 0;
-  case tok::semi:      return new (Context) SemiStmt(consumeToken(tok::semi));
   case tok::l_brace:
     return parseStmtBrace(diag::invalid_diagnostic).getPtrOrNull();
   case tok::kw_return: return parseStmtReturn();
