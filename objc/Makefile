@@ -18,11 +18,11 @@ SWIFT_LEVEL := ..
 DIRS := Foundation
 include $(SWIFT_LEVEL)/Makefile
 
-LIBRARYNAME := swiftObjC
+LIBRARYNAME := swiftObjectiveC
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
-SWIFT_SOURCES := ObjC.swift
-SOURCES := ObjC.swift
+SWIFT_SOURCES := ObjectiveC.swift
+SOURCES := ObjectiveC.swift
 NO_BUILD_ARCHIVE := 1
 
 SWIFT_OPTFLAG := -O3
@@ -38,11 +38,11 @@ $(HeaderDir)/ObjC.swift: $(PATH_TO_SWIFT_SOURCES) $(HeaderDir)/.dir
 	$(Verb) cat $(PATH_TO_SWIFT_SOURCES) > $@
 
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
-$(ObjDir)/ObjC.o: $(HeaderDir)/ObjC.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
+$(ObjDir)/ObjC.o: $(HeaderDir)/ObjectiveC.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
 	$(Verb) $(SWIFT_COMPILER) -c $(SWIFT_SDKFLAG) $< -o $@ -parse-as-library -constraint-checker $(SWIFT_OPTFLAG)
 
-all-local:: $(HeaderDir)/ObjC.swift
+all-local:: $(HeaderDir)/ObjectiveC.swift
 
 else
 
