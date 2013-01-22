@@ -98,6 +98,9 @@ public:
       assert(AI->getArguments()[i].getType() == ti->getInputTypes()[i] &&
              "input types to apply don't match function input types");
     }
+    DEBUG(llvm::dbgs() << "result type ";
+          AI->getType().print(llvm::dbgs());
+          llvm::dbgs() << '\n');
     assert(AI->getType() == ti->getResultType() &&
            "type of apply instruction doesn't match function result type");
   }

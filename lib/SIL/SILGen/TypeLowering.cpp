@@ -363,7 +363,7 @@ static Type getDestructorType(ClassDecl *cd, ASTContext &C) {
   }
 }
 
-// Get the type of a constructor's initializer, This -> ConstructorArgs -> ().
+// Get the type of a constructor's initializer, This -> ConstructorArgs -> This.
 static Type getInitializerType(TypeConverter &tc,
                                ConstructorDecl *cd,
                                ASTContext &C) {
@@ -371,11 +371,10 @@ static Type getInitializerType(TypeConverter &tc,
   // The constructor's main entry point type is
   // This.metatype -> ConstructorArgs -> This. Rearrange it to get the
   // initializer type we want.
-  Type voidType = TupleType::getEmpty(C);
   Type argsType = ctorType->getResult()->castTo<FunctionType>()->getInput();
   Type retType = ctorType->getResult()->castTo<FunctionType>()->getResult();
   
-  Type methodType = FunctionType::get(argsType, voidType, C);
+  Type methodType = FunctionType::get(argsType, retType, C);
   Type thisType = tc.getMethodThisType(retType);
   
   if (PolymorphicFunctionType *pCtorType =

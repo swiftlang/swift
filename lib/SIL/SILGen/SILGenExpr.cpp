@@ -1371,15 +1371,10 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // We won't emit this until after we've emitted the body.
   epilogBB = new (SGM.M) BasicBlock(&F, "constructor");
 
-  //
   // Emit the constructor body.
-  // FIXME: call base class constructor  
-  //
   visit(ctor->getBody());
   
-  //
   // Return 'this' in the epilog.
-  //
   if (!emitEpilogBB(ctor))
     return;
 
@@ -1473,14 +1468,12 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   ManagedValue initVal = emitMethodRef(ctor, thisValue, initConstant);
   SILType initDelType = getLoweredLoadableType(
                      initVal.getType().castTo<AnyFunctionType>()->getResult());
-  B.createRetain(ctor, thisValue);
   Value initDel = B.createApply(ctor, initVal.forward(*this),
                                 initDelType, thisValue);
-  B.createApply(ctor, initDel, SILType::getEmptyTupleType(F.getContext()),
-                args);
+  Value initedThisValue = B.createApply(ctor, initDel, thisTy, args);
   
-  // Return 'this'.
-  B.createReturn(ctor, thisValue);
+  // Return the initialized 'this'.
+  B.createReturn(ctor, initedThisValue);
 }
 
 void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
@@ -1495,12 +1488,23 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   Value thisValue = new (SGM.M) BBArgument(thisTy, F.begin());
   Value thisLV = B.createAllocVar(ctor, AllocKind::Stack, thisTy);
   Cleanups.pushCleanup<CleanupMaterializeAllocation>(thisLV);
+  B.createRetain(ctor, thisValue);
   B.createStore(ctor, thisValue, thisLV);
   Cleanups.pushCleanup<CleanupMaterializeValue>(thisLV);
   VarLocs[thisDecl] = {Value(), thisLV};
   
+  // Create a basic block to jump to for the implicit 'this' return.
+  // We won't emit the block until after we've emitted the body.
+  epilogBB = new (SGM.M) BasicBlock(&F, "constructor");
+  
   // Emit the constructor body.
   visit(ctor->getBody());
+  
+  // Return 'this' in the epilog.
+  if (!emitEpilogBB(ctor))
+    return;
+  
+  B.createReturn(ctor, thisValue);
 }
 
 
