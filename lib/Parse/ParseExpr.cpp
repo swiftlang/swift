@@ -146,8 +146,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
   SmallVector<NewArrayExpr::Bound, 4> bounds;
   while (Tok.is(tok::l_square)) {
     SourceRange brackets;
-    brackets.Start = Tok.getLoc();
-    consumeToken(tok::l_square);
+    brackets.Start = consumeToken(tok::l_square);
 
     // If the bound is missing, that's okay unless this is the first bound.
     if (Tok.is(tok::r_square)) {
@@ -156,8 +155,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
         hadInvalid = true;
       }
 
-      brackets.End = Tok.getLoc();
-      consumeToken(tok::r_square);
+      brackets.End = consumeToken(tok::r_square);
       bounds.push_back(NewArrayExpr::Bound(nullptr, brackets));
       continue;
     }
@@ -172,8 +170,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
       hadInvalid = true;
     }
 
-    brackets.End = Tok.getLoc();
-    consumeToken(tok::r_square);
+    brackets.End = consumeToken(tok::r_square);
 
     bounds.push_back(NewArrayExpr::Bound(boundValue.get(), brackets));
   }
