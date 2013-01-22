@@ -205,6 +205,8 @@ ERROR(associated_type_def,decl_parsing,none,
       "typealias %0 in protocol cannot have a definition", (Identifier))
 
 // Func
+ERROR(func_decl_nonglobal_operator,decl_parsing,none,
+      "operators are only allowed at global scope", ())
 ERROR(func_decl_without_brace,decl_parsing,none,
       "expected '{' in body of func declaration", ())
 ERROR(func_decl_without_paren,decl_parsing,none,

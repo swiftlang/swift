@@ -1059,6 +1059,11 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
 
   Identifier Name;
   SourceLoc NameLoc = Tok.getLoc();
+  if (!(Flags & PD_AllowTopLevel) && !(Flags & PD_DisallowFuncDef) &&
+      Tok.isAnyOperator()) {
+    diagnose(Tok, diag::func_decl_nonglobal_operator);
+    return 0;
+  }
   if (parseAnyIdentifier(Name, diag::expected_identifier_in_decl, "func"))
     return 0;
 
