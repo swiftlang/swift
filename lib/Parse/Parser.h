@@ -293,10 +293,10 @@ public:
   bool parseFunctionSignature(SmallVectorImpl<Pattern*> &argPatterns,
                               SmallVectorImpl<Pattern*> &bodyPatterns,
                               TypeLoc &retLoc);
-  NullablePtr<Pattern> parsePattern();
-  NullablePtr<Pattern> parsePatternTuple(bool AllowInitExpr);
+  NullablePtr<Pattern> parsePattern(bool &CForLoopHack);
+  NullablePtr<Pattern> parsePatternTuple(bool &CForLoopHack,bool AllowInitExpr);
+  NullablePtr<Pattern> parsePatternAtom(bool &CForLoopHack);
   NullablePtr<Pattern> parsePatternIdentifier();
-  NullablePtr<Pattern> parsePatternAtom();
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
@@ -335,7 +335,8 @@ public:
   NullablePtr<Stmt> parseStmtWhile();
   NullablePtr<Stmt> parseStmtDoWhile();
   NullablePtr<Stmt> parseStmtFor();
-  NullablePtr<Stmt> parseStmtForCStyle(SourceLoc ForLoc);
+  NullablePtr<Stmt> parseStmtForCStyle(SourceLoc ForLoc, SourceLoc LPLoc,
+                                       bool CForLoopHack);
   NullablePtr<Stmt> parseStmtForEach(SourceLoc ForLoc);
 
   //===--------------------------------------------------------------------===//
