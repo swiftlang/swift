@@ -47,6 +47,9 @@ namespace irgen {
 
   llvm::Constant *emitClassPrivateData(IRGenModule &IGM, ClassDecl *theClass);
 
+  /// Emit an allocation of a class.
+  llvm::Value *emitClassAllocation(IRGenFunction &IGF, CanType thisType);
+
 } // end namespace irgen
 } // end namespace swift
 

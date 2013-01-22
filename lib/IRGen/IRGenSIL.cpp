@@ -543,6 +543,11 @@ void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
   newLoweredAddress(v, addr.getAddress());
 }
 
+void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
+  llvm::Value *alloced = emitClassAllocation(*this, i->getType().getSwiftType());
+  newLoweredExplosion(Value(i,0)).addUnmanaged(alloced);
+}
+
 void IRGenSILFunction::visitDeallocVarInst(swift::DeallocVarInst *i) {
   switch (i->getAllocKind()) {
   case AllocKind::Heap:

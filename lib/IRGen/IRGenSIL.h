@@ -226,7 +226,7 @@ public:
   }
   
   void visitAllocVarInst(AllocVarInst *i);
-  //void visitAllocRefInst(AllocRefInst *i);
+  void visitAllocRefInst(AllocRefInst *i);
   void visitAllocBoxInst(AllocBoxInst *i);
   void visitAllocArrayInst(AllocArrayInst *i);
 

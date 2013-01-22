@@ -562,6 +562,22 @@ static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
   }
 }
 
+/// Emit an allocation of a class.
+llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, CanType thisType) {
+  // FIXME: Long-term, we clearly need a specialized runtime entry point.
+  auto &classTI = IGF.IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();
+  auto &layout = classTI.getLayout(IGF.IGM);
+
+  llvm::Value *metadata = emitClassHeapMetadataRef(IGF, thisType);
+  
+  llvm::Value *size = layout.emitSize(IGF);
+  llvm::Value *align = layout.emitAlign(IGF);
+  llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, align,
+                                             "reference.new");
+  llvm::Type *destType = layout.getType()->getPointerTo();
+  return IGF.Builder.CreateBitCast(val, destType);
+}
+
 static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   // FIXME: emit separate allocating and initializing constructors.
   llvm::Function *fn = IGM.getAddrOfConstructor(CD, ConstructorKind::Allocating,
@@ -569,7 +585,6 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   auto thisDecl = CD->getImplicitThisDecl();
   CanType thisType = thisDecl->getType()->getCanonicalType();
   auto &classTI = IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();
-  auto &layout = classTI.getLayout(IGM);
 
   Pattern* pats[] = {
     new (IGM.Context) AnyPattern(SourceLoc()),
@@ -590,17 +605,8 @@ static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
   if (!CD->getAllocThisExpr()) {
     FullExpr scope(IGF);
     // Allocate the class.
-    // FIXME: Long-term, we clearly need a specialized runtime entry point.
-
-    llvm::Value *metadata = emitClassHeapMetadataRef(IGF, thisType);
-
-    llvm::Value *size = layout.emitSize(IGF);
-    llvm::Value *align = layout.emitAlign(IGF);
-    llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, align,
-                                               "reference.new");
-    llvm::Type *destType = layout.getType()->getPointerTo();
-    llvm::Value *castVal = IGF.Builder.CreateBitCast(val, destType);
-    IGF.Builder.CreateStore(castVal, addr);
+    llvm::Value *val = emitClassAllocation(IGF, thisType);
+    IGF.Builder.CreateStore(val, addr);
 
     scope.pop();
 
