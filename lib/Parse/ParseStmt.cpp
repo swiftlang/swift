@@ -372,8 +372,13 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
   // though, we can distinguish between the two with two-token lookahead.
 
   // If we have a leading (, this is a pattern in a foreach loop.
-  if (Tok.isAnyLParen())
+  if (Tok.isAnyLParen()) {
+    if (peekToken().is(tok::kw_var) || peekToken().is(tok::semi)) {
+      return parseStmtForCStyle(ForLoc);
+    }
+    // Assume foreach loop.
     return parseStmtForEach(ForLoc);
+  }
   
   // If we have a leading identifier followed by a ':' or 'in', then this is a
   // pattern, so it is foreach. 
@@ -393,7 +398,9 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
 ///     expr-or-stmt-assign
 NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   SourceLoc Semi1Loc, Semi2Loc;
-  
+  SourceLoc LPLoc, RPLoc;
+  bool LPLocConsumed = false;
+
   ExprStmtOrDecl First;
   SmallVector<Decl*, 2> FirstDecls;
   NullablePtr<Expr> Second;
@@ -403,21 +410,34 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   // Introduce a new scope to contain any var decls in the init value.
   Scope ForScope(this, /*AllowLookup=*/true);
   
+  if (Tok.isAnyLParen()) {
+    LPLoc = consumeToken();
+    LPLocConsumed = true;
+  }
   // Parse the first part, either a var, expr, or stmt-assign.
   if (Tok.is(tok::kw_var)) {
     if (parseDeclVar(false, FirstDecls)) return 0;
   } else if ((Tok.isNot(tok::semi) && parseExprOrStmtAssign(First)))
     return 0;
-  
+
   // Parse the rest of the statement.
-  if (parseToken(tok::semi, Semi1Loc, diag::expected_semi_for_stmt) ||
-      (Tok.isNot(tok::semi) && Tok.isNot(tok::l_brace) &&
+  if (parseToken(tok::semi, Semi1Loc, diag::expected_semi_for_stmt))
+    return 0;
+
+  if ((Tok.isNot(tok::semi) && Tok.isNot(tok::l_brace) &&
         (Second = parseExpr(diag::expected_cond_for_stmt)).isNull()) ||
       parseToken(tok::semi, Semi2Loc, diag::expected_semi_for_stmt) ||
-      (Tok.isNot(tok::l_brace) && parseExprOrStmtAssign(Third)) ||
-      (Body = parseStmtBrace(diag::expected_lbrace_after_for)).isNull())
+      (Tok.isNot(tok::l_brace) && parseExprOrStmtAssign(Third)))
     return 0;
-  
+
+  if (LPLocConsumed && parseMatchingToken(tok::r_paren, RPLoc,
+                                          diag::expected_rparen_for_stmt,
+                                          LPLoc, diag::opening_paren))
+    return 0;
+
+  if ((Body = parseStmtBrace(diag::expected_lbrace_after_for)).isNull())
+    return 0;
+
   PointerUnion<Expr*, AssignStmt*> Initializer, Increment;
   if (First.isNull())
     ;
