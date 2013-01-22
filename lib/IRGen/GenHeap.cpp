@@ -68,7 +68,8 @@ HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
 static llvm::Function *createDtorFn(IRGenModule &IGM,
                                     const HeapLayout &layout) {
   llvm::Function *fn =
-    llvm::Function::Create(IGM.DtorTy, llvm::Function::InternalLinkage,
+    llvm::Function::Create(IGM.DeallocatingDtorTy,
+                           llvm::Function::InternalLinkage,
                            "objectdestroy", &IGM.Module);
 
   IRGenFunction IGF(IGM, CanType(), llvm::ArrayRef<Pattern*>(),
@@ -93,7 +94,8 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
 /// TODO: give this some reasonable name and possibly linkage.
 llvm::Constant *HeapLayout::createSizeFn(IRGenModule &IGM) const {
   llvm::Function *fn =
-    llvm::Function::Create(IGM.DtorTy, llvm::Function::InternalLinkage,
+    llvm::Function::Create(IGM.DeallocatingDtorTy,
+                           llvm::Function::InternalLinkage,
                            "objectsize", &IGM.Module);
 
   IRGenFunction IGF(IGM, CanType(), llvm::ArrayRef<Pattern*>(),
@@ -253,7 +255,8 @@ createArrayDtorFn(IRGenModule &IGM,
                   const ArrayHeapLayout &layout,
                   const NecessaryBindings &bindings) {
   llvm::Function *fn =
-    llvm::Function::Create(IGM.DtorTy, llvm::Function::InternalLinkage,
+    llvm::Function::Create(IGM.DeallocatingDtorTy,
+                           llvm::Function::InternalLinkage,
                            "arraydestroy", &IGM.Module);
 
   IRGenFunction IGF(IGM, CanType(), llvm::ArrayRef<Pattern*>(),

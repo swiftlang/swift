@@ -707,6 +707,27 @@ llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
   return entry;
 }
 
+/// Turn a constructor type T.metatype -> (...) -> T into an initializing
+/// constructor type T -> (...) -> T.
+CanType getInitializingConstructorType(CanType allocatingType) {
+  assert(allocatingType->hasReferenceSemantics() &&
+         "value types don't have initializing constructors");
+  FunctionType *argsTy = allocatingType->castTo<AnyFunctionType>()->getResult()
+    ->castTo<FunctionType>();
+  Type thisTy = argsTy->getResult();
+  if (PolymorphicFunctionType *polyTy =
+        allocatingType->getAs<PolymorphicFunctionType>()) {
+    return PolymorphicFunctionType::get(thisTy, argsTy,
+                                        &polyTy->getGenericParams(),
+                                        thisTy->getASTContext())
+      ->getCanonicalType();
+  } else {
+    return FunctionType::get(thisTy, argsTy,
+                             thisTy->getASTContext())
+      ->getCanonicalType();
+  }
+}
+
 /// Fetch the declaration of the given known function.
 llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
                                                   ConstructorKind ctorKind,
@@ -719,11 +740,14 @@ llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
-  auto extraData = (ctorKind == ConstructorKind::Allocating ? ExtraData::None
-                                                      : ExtraData::Retainable);
   CanType formalType = cons->getType()->getCanonicalType();
+  // Derive the initializing constructor type from the constructor type if
+  // necessary.
+  if (ctorKind == ConstructorKind::Initializing)
+    formalType = getInitializingConstructorType(formalType);
+  
   llvm::FunctionType *fnType =
-    getFunctionType(formalType, explodeLevel, uncurryLevel, extraData);
+    getFunctionType(formalType, explodeLevel, uncurryLevel, ExtraData::None);
 
   bool indirectResult =
     hasIndirectResult(*this, formalType, explodeLevel, uncurryLevel);
@@ -935,7 +959,11 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
   auto cc = expandAbstractCC(*this, AbstractCC::Method, false, attrs);
 
   LinkInfo link = LinkInfo::get(*this, entity);
-  entry = link.createFunction(*this, DtorTy, cc, attrs);
+  llvm::FunctionType *dtorTy = kind == DestructorKind::Deallocating
+    ? DeallocatingDtorTy
+    : DestroyingDtorTy;
+  
+  entry = link.createFunction(*this, dtorTy, cc, attrs);
   return entry;
 }
 

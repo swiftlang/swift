@@ -120,7 +120,8 @@ public:
   llvm::PointerType *RefCountedPtrTy;  /// %swift.refcounted*
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
-  llvm::FunctionType *DtorTy;          /// size_t (%swift.refcounted*)
+  llvm::FunctionType *DeallocatingDtorTy; /// size_t (%swift.refcounted*)
+  llvm::FunctionType *DestroyingDtorTy; /// void (%swift.refcounted*)
   llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
   llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
   llvm::StructType *FullHeapMetadataStructTy; /// %swift.full_heapmetadata = type { ... }
