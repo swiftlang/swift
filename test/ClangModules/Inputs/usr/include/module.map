@@ -2,6 +2,5 @@ module cfuncs { header "cfuncs.h" }
 module ctypes { header "ctypes.h" }
 module cvars { header "cvars.h" }
 module Foundation { header "Foundation.h" }
-module ScriptingBridge { header "ScriptingBridge.h" }
 module objc_ext { header "objc_ext.h" }
 

@@ -15,7 +15,7 @@ SWIFT_SDK := /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platfor
 ifeq ($(shell test -d $(SWIFT_SDK) && echo OK), OK)
 
 SWIFT_LEVEL := ..
-PARALLEL_DIRS := Foundation ScriptingBridge
+DIRS := Foundation
 include $(SWIFT_LEVEL)/Makefile
 
 LIBRARYNAME := swiftObjC
