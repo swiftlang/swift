@@ -63,6 +63,7 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/CallSite.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/ADT/StringSwitch.h"
 
 #include "ASTVisitor.h"
@@ -70,6 +71,7 @@
 #include "CallEmission.h"
 #include "Explosion.h"
 #include "FunctionRef.h"
+#include "GenClass.h"
 #include "GenHeap.h"
 #include "GenInit.h"
 #include "GenMeta.h"
@@ -3366,15 +3368,30 @@ static void emitSILFunction(IRGenModule &IGM,
   
   // Emit the code for the function.
   PrettyStackTraceSILConstant stackTrace("emitting IR from SIL for", c);
+  
+  DEBUG(llvm::dbgs() << "emitting SIL function: ";
+        c.print(llvm::dbgs());
+        llvm::dbgs() << '\n';
+        f->print(llvm::dbgs()));
+  
   IRGenSILFunction igs(IGM,
                        f->getLoweredType().getSwiftType(),
                        explosionLevel,
                        entrypoint);
-  igs.emitSILFunction(f);
+  igs.emitSILFunction(c, f);
   
   // Walk the function body to look for local types or other decls.
   if (body)
     igs.emitLocalDecls(body);
+  
+  // If the function was a destroying destructor, emit the corresponding
+  // deallocating destructor.
+  if (c.isDestructor()) {
+    ClassDecl *cd = cast<ClassDecl>(c.getDecl());
+    llvm::Function *deallocator
+      = IGM.getAddrOfDestructor(cd, DestructorKind::Deallocating);
+    emitDeallocatingDestructor(IGM, cd, deallocator, entrypoint);
+  }
 }
 
 /// Emit the definition for the given instance method.

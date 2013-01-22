@@ -145,11 +145,13 @@ struct LoweredBB {
 class IRGenSILFunction :
   public IRGenFunction, public SILVisitor<IRGenSILFunction>
 {
+public:
   llvm::DenseMap<swift::Value, LoweredValue> loweredValues;
-  
   llvm::MapVector<swift::BasicBlock *, LoweredBB> loweredBBs;
   
-public:
+  SILConstant CurConstant;
+  swift::Function *CurSILFn;
+  
   IRGenSILFunction(IRGenModule &IGM,
                    CanType t,
                    ExplosionKind explosionLevel,
@@ -157,7 +159,7 @@ public:
   ~IRGenSILFunction();
   
   /// Generate IR for the given SIL Function.
-  void emitSILFunction(swift::Function *f);
+  void emitSILFunction(SILConstant c, swift::Function *f);
 
   /// Generate code from the global toplevel. This will emit all the
   /// declarations in the given translation unit along with the toplevel

@@ -31,6 +31,7 @@ namespace swift {
   class ValueDecl;
   class CapturingExpr;
   class ASTContext;
+  class ClassDecl;
 
 /// SILConstant - A key for referencing an entity that can be the subject of a
 /// SIL ConstantRefInst or the name of a SIL Function body. This can currently
@@ -72,6 +73,9 @@ struct SILConstant {
     
   unsigned getKind() const { return id & KindMask; }
   bool isProperty() const { return getKind() == Getter || getKind() == Setter; }
+  bool isDestructor() const {
+    return getKind() == Destructor;
+  }
   
   bool operator==(SILConstant rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue() && id == rhs.id;

@@ -20,6 +20,7 @@
 namespace llvm {
   class Constant;
   class Value;
+  class Function;
 }
 
 namespace swift {
@@ -50,6 +51,12 @@ namespace irgen {
   /// Emit an allocation of a class.
   llvm::Value *emitClassAllocation(IRGenFunction &IGF, CanType thisType);
 
+  /// Emit the deallocating destructor for a class in terms of its destroying
+  /// destructor.
+  void emitDeallocatingDestructor(IRGenModule &IGM,
+                                  ClassDecl *theClass,
+                                  llvm::Function *deallocator,
+                                  llvm::Function *destroyer);
 } // end namespace irgen
 } // end namespace swift
 

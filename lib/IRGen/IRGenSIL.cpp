@@ -20,6 +20,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SourceMgr.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
@@ -48,7 +49,8 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                                    llvm::Function *fn)
   : IRGenFunction(IGM, t,
                   /*paramPatterns=*/ nullptr,
-                  explosionLevel, 0, fn, Prologue::Bare)
+                  explosionLevel, 0, fn, Prologue::Bare),
+    CurSILFn(nullptr)
 {
 }
 
@@ -56,11 +58,12 @@ IRGenSILFunction::~IRGenSILFunction() {
   DEBUG(CurFn->print(llvm::dbgs()));
 }
 
-void IRGenSILFunction::emitSILFunction(swift::Function *f) {
-  DEBUG(llvm::dbgs() << "emitting SIL function: ";
-        f->print(llvm::dbgs()));
-
+void IRGenSILFunction::emitSILFunction(SILConstant c,
+                                       swift::Function *f) {
   assert(!f->empty() && "function has no basic blocks?!");
+  
+  CurConstant = c;
+  CurSILFn = f;
 
   // Map the entry bbs.
   loweredBBs[f->begin()] = LoweredBB(CurFn->begin());
@@ -91,7 +94,17 @@ void IRGenSILFunction::emitSILFunction(swift::Function *f) {
                                       argType.StorageAlignment));
     } else {
       Explosion &explosion = newLoweredExplosion(argv);
-      argType.reexplode(*this, params, explosion);
+
+      // The argument for a destructor comes in as a %swift.refcounted*. Cast
+      // to the correct local type.
+      if (c.isDestructor()) {
+        TypeInfo const &thisTI
+          = getFragileTypeInfo(arg->getType().getSwiftType());
+        llvm::Value *arg = params.claimUnmanagedNext();
+        arg = Builder.CreateBitCast(arg, thisTI.getStorageType());
+        explosion.addUnmanaged(arg);
+      } else
+        argType.reexplode(*this, params, explosion);
     }
   }
   assert(params.empty() && "did not map all llvm params to SIL params?!");
@@ -144,7 +157,8 @@ void IRGenSILFunction::emitGlobalTopLevel(TranslationUnit *TU,
                                           SILModule *SILMod) {
   // Emit the toplevel function.
   if (SILMod->hasTopLevelFunction())
-    emitSILFunction(SILMod->getTopLevelFunction());
+    emitSILFunction(SILConstant(),
+                    SILMod->getTopLevelFunction());
   
   // FIXME: should support nonzero StartElems for interactive contexts.
   IRGenFunction::emitGlobalTopLevel(TU, 0);
@@ -239,7 +253,7 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
     assert(constant.id == SILConstant::Destructor &&
            "non-destructor reference to ClassDecl?!");
     fnptr = getAddrOfDestructor(cast<ClassDecl>(vd),
-                                DestructorKind::Deallocating);
+                                DestructorKind::Destroying);
     cc = AbstractCC::Method;
     // FIXME: get destructor body from destructor decl
     body = nullptr;
@@ -418,6 +432,7 @@ void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
 
 void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
   Explosion &result = getLoweredExplosion(i->getReturnValue());
+
   // emitScalarReturn eats all the results out of the explosion, which we don't
   // want to happen in case the SIL value gets reused, so make a temporary
   // explosion it can chew on.
@@ -508,7 +523,12 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   Address dest = getLoweredAddress(i->getDest());
   const TypeInfo &type = getFragileTypeInfo(
                               i->getSrc().getType().getSwiftRValueType());
-  type.initialize(*this, source, dest);
+
+  // TypeInfo::initialize clears values out of the explosion, so fake up a copy
+  // for it to chew up.
+  Explosion sourceCopy(source.getKind());
+  sourceCopy.add(source.getAll());
+  type.initialize(*this, sourceCopy, dest);
 }
 
 void IRGenSILFunction::visitRetainInst(swift::RetainInst *i) {

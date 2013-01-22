@@ -562,6 +562,35 @@ static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
   }
 }
 
+/// Emit the deallocating destructor for a class in terms of its destroying
+/// destructor.
+void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
+                                       ClassDecl *theClass,
+                                       llvm::Function *deallocator,
+                                       llvm::Function *destroyer) {
+  // FIXME: We need to move some pieces around:
+  // - swift_release should restore the retain count to one before calling the
+  //   destroying destructor
+  // - the destroying destructor should return the object pointer back so the
+  //   pointer doesn't need to be preserved across the call and it doesn't need
+  //   to be r/r-ed
+  // - the deallocating destructor should perform the deallocation instead of
+  //   swift_release
+
+  IRGenFunction IGF(IGM, CanType(), nullptr,
+                    ExplosionKind::Minimal, 0, deallocator, Prologue::Bare);
+
+  Type thisType = theClass->getDeclaredTypeInContext();
+  const ClassTypeInfo &info =
+    IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();
+  
+  llvm::Value *arg = deallocator->getArgumentList().begin();
+  IGF.Builder.CreateCall(destroyer, arg);
+  
+  llvm::Value *size = info.getLayout(IGM).emitSize(IGF);
+  IGF.Builder.CreateRet(size);
+}
+
 /// Emit an allocation of a class.
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, CanType thisType) {
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
