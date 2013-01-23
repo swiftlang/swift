@@ -187,34 +187,40 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
   NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
 }
 
-bool Lexer::isPrecededBySpace() {
+bool Lexer::isStartOfLiteral() {
   // For these purposes, the start of the file is considered to be
   // preceeded by infinite whitespace.
   if (CurPtr - 1 == BufferStart)
     return true;
 
-  // Otherwise, our list of whitespace characters is pretty short.
   char LastChar = *(CurPtr - 2);
-  return (isspace(LastChar) || LastChar == '\0');
-}
-
-bool Lexer::isStartOfDotFloatLiteral() {
-  if (isPrecededBySpace())
+  if (isspace(LastChar) || LastChar == '\0')
     return true;
 
-  char LastChar = *(CurPtr - 2);
-  if (Identifier::isOperatorChar(LastChar))
-    return true;
-
-  switch (LastChar) {
-  case '(':
-  case '[':
-  case '{':
-  case ';':
-  case ',':
+  // If we are not preceded by white space, and if '(', '[', and '.' are
+  // preceded by identifiers, literals, or "closing" tokens (i.e. ')', ']', and
+  // '}'), then '(', '[', and '.' represent function calls, subscripting, and
+  // field access respectively. The rest are literals.
+  //
+  // For example:
+  // f(.42,[1,2,3,4])[42].bar();.42.print();[1,2,3,4].print();(1,2).$0.print()
+  // return { 42 }()
+  //
+  // Note: "NextToken" is actually the soon to be previous token.
+  switch (NextToken.getKind()) {
+  case tok::identifier:
+  case tok::dollarident:
+  case tok::integer_literal:
+  case tok::floating_literal:
+  case tok::string_literal:
+  case tok::character_literal:
+  case tok::r_paren:
+  case tok::r_square:
+  case tok::r_brace:
+    return false;
+  default:
     return true;
   }
-  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -434,7 +440,7 @@ void Lexer::lexOperatorIdentifier() {
 
     switch (CurPtr-TokStart) {
     case 1:
-      if (isdigit(CurPtr[0]) && isStartOfDotFloatLiteral()) // .42
+      if (isdigit(CurPtr[0]) && isStartOfLiteral()) // .42
         return lexNumber();
       return formToken(tok::period, TokStart);
     case 2:
@@ -1005,7 +1011,7 @@ Restart:
     return formToken(tok::eof, TokStart);
 
   case '(':
-    return formToken(isPrecededBySpace() ? tok::l_paren_space : tok::l_paren,
+    return formToken(isStartOfLiteral() ? tok::l_paren : tok::l_paren_call,
                      TokStart);
   case ')': 
     // When lexing an interpolated string literal, the buffer will terminate
@@ -1017,7 +1023,7 @@ Restart:
   case '{': return formToken(tok::l_brace,  TokStart);
   case '}': return formToken(tok::r_brace,  TokStart);
   case '[':
-    return formToken(isPrecededBySpace() ? tok::l_square_space : tok::l_square,
+    return formToken(isStartOfLiteral()? tok::l_square: tok::l_square_subscript,
                      TokStart);
   case ']': return formToken(tok::r_square, TokStart);
 

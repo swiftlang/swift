@@ -50,7 +50,7 @@ static bool isFuncExpr(const Token &Tok1, const Token &Tok2) {
   // "func identifier" and "func [attribute]" is a func declaration,
   // otherwise we have a func expression.
   return Tok2.isNot(tok::identifier) && Tok2.isNotAnyOperator() &&
-         Tok2.isNotAnyLSquare();
+         Tok2.isNot(tok::l_square);
 }
 
 /// isStartOfDecl - Return true if this is the start of a decl or decl-import.
@@ -373,7 +373,7 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
   // though, we can distinguish between the two with two-token lookahead and a
   // gross hack between this statement parser and the pattern parser.
 
-  if (Tok.isAnyLParen()) {
+  if (Tok.is(tok::l_paren)) {
     if (peekToken().is(tok::kw_var) || peekToken().is(tok::semi)) {
       return parseStmtForCStyle(ForLoc, LPLoc, false);
     }
@@ -411,7 +411,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc, SourceLoc LPLoc,
   // Introduce a new scope to contain any var decls in the init value.
   Scope ForScope(this, /*AllowLookup=*/true);
   
-  if (!LPLocConsumed && Tok.isAnyLParen()) {
+  if (!LPLocConsumed && Tok.is(tok::l_paren)) {
     LPLoc = consumeToken();
     LPLocConsumed = true;
   }
@@ -474,7 +474,7 @@ NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   // CForLoopHack is true and the pattern smells like a for loop
   // initialization list. This saves us from arbitrary token lookahead
   // but at the cost of parsePattern() consuming the left paren.
-  if (Tok.isAnyLParen()) {
+  if (Tok.is(tok::l_paren)) {
     LPLoc = Tok.getLoc();
     CForLoopHack = true;
   }

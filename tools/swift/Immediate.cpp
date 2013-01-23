@@ -487,8 +487,8 @@ void swift::REPL(ASTContext &Context) {
     }
     do {
       if (Tok.is(tok::l_brace) || Tok.is(tok::l_paren) ||
-          Tok.is(tok::l_paren_space) || Tok.is(tok::l_square) ||
-          Tok.is(tok::l_square_space))
+          Tok.is(tok::l_paren_call) || Tok.is(tok::l_square) ||
+          Tok.is(tok::l_square_subscript))
         ++BraceCount;
       else if ((Tok.is(tok::r_brace) || Tok.is(tok::r_paren) ||
                 Tok.is(tok::r_square)) && BraceCount > 0)

@@ -70,12 +70,12 @@ enum class tok {
 #undef KEYWORD
   
 #define PUNCTUATOR(X, Y) X,
-  PUNCTUATOR(l_paren_space, "(")
+  PUNCTUATOR(l_paren_call, "(")
   PUNCTUATOR(l_paren,     "(")
   PUNCTUATOR(r_paren,     ")")
   PUNCTUATOR(l_brace,     "{")
   PUNCTUATOR(r_brace,     "}")
-  PUNCTUATOR(l_square_space, "[")
+  PUNCTUATOR(l_square_subscript, "[")
   PUNCTUATOR(l_square,    "[")
   PUNCTUATOR(r_square,    "]")
 
@@ -126,15 +126,9 @@ public:
   }
   
   bool isAnyLParen() const {
-    return Kind == tok::l_paren || Kind == tok::l_paren_space;
+    return Kind == tok::l_paren || Kind == tok::l_paren_call;
   }
-  bool isNotAnyLParen() const { return !isAnyLParen(); }
 
-  bool isAnyLSquare() const {
-    return Kind == tok::l_square || Kind == tok::l_square_space;
-  }
-  bool isNotAnyLSquare() const { return !isAnyLSquare(); }
-  
   /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.
   SourceLoc getLoc() const {

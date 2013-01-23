@@ -140,8 +140,7 @@ private:
                         bool StopAtDoubleQuote, bool EmitDiagnostics);
   void lexCharacterLiteral();
   void lexStringLiteral();
-  bool isPrecededBySpace();
-  bool isStartOfDotFloatLiteral();
+  bool isStartOfLiteral();
 };
   
   

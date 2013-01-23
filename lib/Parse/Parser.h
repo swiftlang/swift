@@ -242,7 +242,7 @@ public:
   void addVarsToScope(Pattern *Pat, SmallVectorImpl<Decl*> &Decls,
                       DeclAttributes &Attributes);
   bool parseAttributeList(DeclAttributes &Attributes) {
-    if (Tok.isAnyLSquare())
+    if (Tok.is(tok::l_square))
       return parseAttributeListPresent(Attributes);
     return false;
   }

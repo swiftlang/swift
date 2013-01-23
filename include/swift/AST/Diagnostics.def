@@ -421,6 +421,9 @@ ERROR(expected_foreach_lbrace,stmt_parsing,none,
 // Expression parsing diagnostics
 //------------------------------------------------------------------------------
 
+ERROR(unsupported_container_literal,expr_parsing,none,
+      "container literals are not yet supported", ())
+
 ERROR(expected_expr,expr_parsing,none,
       "expected expression", ())
 

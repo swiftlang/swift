@@ -292,7 +292,6 @@ NullablePtr<Pattern> Parser::parsePatternIdentifier() {
 NullablePtr<Pattern> Parser::parsePatternAtom(bool &CForLoopHack) {
   switch (Tok.getKind()) {
   case tok::l_paren:
-  case tok::l_paren_space:
     return parsePatternTuple(CForLoopHack, /*AllowInitExpr*/false);
 
   case tok::identifier:

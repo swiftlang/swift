@@ -113,8 +113,7 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
     if (parseTypeComposition(Result))
       return true;
     break;
-  case tok::l_paren:
-  case tok::l_paren_space: {
+  case tok::l_paren: {
     isTupleType = true;
     SourceLoc LPLoc = consumeToken(), RPLoc;
     if (parseTypeTupleBody(LPLoc, Result) ||
@@ -161,7 +160,9 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
   }
 
   // If there is a square bracket without a space, we have an array.
-  if (Tok.is(tok::l_square))
+  // FIXME TODO -- Generics makes x<y>[] look like a comparison to array literal
+  if (Tok.is(tok::l_square_subscript) ||
+      (Tok.is(tok::l_square) && peekToken().is(tok::r_square)))
     return parseTypeArray(Result);
   
   return false;
@@ -412,7 +413,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, TypeLoc &Result) {
 
 
 /// parseTypeArray - Parse the type-array production, given that we
-/// are looking at the initial l_square.  Note that this index
+/// are looking at the initial l_square_subscript.  Note that this index
 /// clause is actually the outermost (first-indexed) clause.
 ///
 ///   type-array:
@@ -421,15 +422,15 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, TypeLoc &Result) {
 ///     type-array '[' expr ']'
 ///
 bool Parser::parseTypeArray(TypeLoc &result) {
-  SourceLoc lsquareLoc = Tok.getLoc();
-  consumeToken(tok::l_square);
+  assert(Tok.is(tok::l_square_subscript) || Tok.is(tok::l_square));
+  SourceLoc lsquareLoc = consumeToken();
 
   // Handle the [] production, meaning an array slice.
   if (Tok.is(tok::r_square)) {
     SourceLoc rsquareLoc = consumeToken(tok::r_square);
 
     // If we're starting another square-bracket clause, recurse.
-    if (Tok.is(tok::l_square) && parseTypeArray(result))
+    if (Tok.is(tok::l_square_subscript) && parseTypeArray(result))
       return true;
 
     // Just build a normal array slice type.
@@ -449,7 +450,7 @@ bool Parser::parseTypeArray(TypeLoc &result) {
     return true;
 
   // If we're starting another square-bracket clause, recurse.
-  if (Tok.is(tok::l_square) && parseTypeArray(result))
+  if (Tok.is(tok::l_square_subscript) && parseTypeArray(result))
     return true;
   
   // FIXME: We don't supported fixed-length arrays yet.
