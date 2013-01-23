@@ -399,6 +399,12 @@ else()
   message(STATUS "warning: modules-enabled SDK is not available")
 endif()
 
+# On OS X 10.9, the magic "Swift bit" is not supported yet.
+# Note that this is using Darwin version numbers.
+if(NOT ${CMAKE_SYSTEM_VERSION} VERSION_LESS "13")
+  add_definitions(-DSWIFT_DISABLE_SWIFT_BIT_ON_CLASS_DATA)
+endif()
+
 # We'll need this once we have generated headers
 include_directories(BEFORE
   ${CMAKE_CURRENT_BINARY_DIR}/include
