@@ -198,7 +198,8 @@ bool Lexer::isStartOfLiteral() {
     return true;
 
   // If we are not preceded by white space, and if '(', '[', and '.' are
-  // preceded by identifiers, literals, or "closing" tokens (i.e. ')', ']', and
+  // preceded by identifiers, keywords, literals, or "closing" tokens
+  // (i.e. ')', ']', and
   // '}'), then '(', '[', and '.' represent function calls, subscripting, and
   // field access respectively. The rest are literals.
   //
@@ -208,6 +209,8 @@ bool Lexer::isStartOfLiteral() {
   //
   // Note: "NextToken" is actually the soon to be previous token.
   switch (NextToken.getKind()) {
+#define KEYWORD(kw) case tok::kw_##kw:
+#include "swift/Parse/Tokens.def"
   case tok::identifier:
   case tok::dollarident:
   case tok::integer_literal:
@@ -376,6 +379,7 @@ void Lexer::lexIdentifier() {
 
     // Expressions
     .Case("new", tok::kw_new)
+    .Case("super", tok::kw_super)
 
     .Default(tok::identifier);
   

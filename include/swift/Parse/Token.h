@@ -37,57 +37,8 @@ enum class tok {
   character_literal,
   
 #define KEYWORD(X) kw_ ## X,
-  // Decl and type keywords.
-  KEYWORD(class)
-  KEYWORD(constructor)
-  KEYWORD(destructor)
-  KEYWORD(extension)
-  KEYWORD(func)
-  KEYWORD(import)
-  KEYWORD(oneof)
-  KEYWORD(metatype)
-  KEYWORD(protocol)
-  KEYWORD(requires)
-  KEYWORD(struct)
-  KEYWORD(typealias)
-  KEYWORD(var)
-  KEYWORD(static)
-  KEYWORD(subscript)
-  
-  // Statements
-  KEYWORD(if)
-  KEYWORD(in)
-  KEYWORD(do)
-  KEYWORD(else)
-  KEYWORD(for)
-  KEYWORD(while)
-  KEYWORD(return)
-  KEYWORD(break)
-  KEYWORD(continue)
-
-  // Expressions
-  KEYWORD(new)
-#undef KEYWORD
-  
 #define PUNCTUATOR(X, Y) X,
-  PUNCTUATOR(l_paren_call, "(")
-  PUNCTUATOR(l_paren,     "(")
-  PUNCTUATOR(r_paren,     ")")
-  PUNCTUATOR(l_brace,     "{")
-  PUNCTUATOR(r_brace,     "}")
-  PUNCTUATOR(l_square_subscript, "[")
-  PUNCTUATOR(l_square,    "[")
-  PUNCTUATOR(r_square,    "]")
-
-  PUNCTUATOR(period,      ".")
-  PUNCTUATOR(comma,       ",")
-  PUNCTUATOR(colon,       ":")
-  PUNCTUATOR(semi,        ";")
-  PUNCTUATOR(equal,       "=")
-  PUNCTUATOR(ellipsis,    "...")
-  
-  PUNCTUATOR(arrow,       "->")
-#undef PUNCTUATOR
+#include "swift/Parse/Tokens.def"
   
   NUM_TOKENS
 };

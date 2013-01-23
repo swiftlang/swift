@@ -282,6 +282,12 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     break;
   }
 
+  case tok::l_paren_call:
+    // If the first token in an expr looks like a call paren, treat it as a
+    // literal paren. This happens in cases like 'if(x)' or 'while(x)' where
+    // an expr immediately follows a statement keyword.
+    Tok.setKind(tok::l_paren);
+    [[clang::fallthrough]];
   case tok::l_paren:
     Result = parseExprParen();
     break;
@@ -618,7 +624,7 @@ NullablePtr<Expr> Parser::parseExprFunc() {
       SourceLoc());
     ArgParams.push_back(unitPattern);
     BodyParams.push_back(unitPattern);
-  } else if (Tok.isNot(tok::l_paren)) {
+  } else if (!Tok.isAnyLParen()) {
     diagnose(Tok, diag::func_decl_without_paren);
     return 0;
   } else if (parseFunctionSignature(ArgParams, BodyParams, RetTy)) {

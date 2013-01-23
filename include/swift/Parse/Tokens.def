@@ -1,0 +1,85 @@
+//===--- Tokens.def - Swift Tokenizer Metaprogramming -----------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming lexer tokens.
+//
+//===----------------------------------------------------------------------===//
+
+/// KEYWORD(kw)
+///   Expands for every Swift keyword, such as 'if', 'else', etc.
+#ifndef KEYWORD
+#define KEYWORD(kw)
+#endif
+
+/// PUNCTUATOR(name, str)
+///   Expands for every Swift punctuator.
+///   \param name  The symbolic name of the punctuator, such as 'l_paren' or
+///                'arrow'.
+///   \param str   A string literal containing the spelling of the punctuator,
+///                such as '"("' or '"->"'.
+#ifndef PUNCTUATOR
+#define PUNCTUATOR(name, str)
+#endif
+
+// Decl and type keywords.
+KEYWORD(class)
+KEYWORD(constructor)
+KEYWORD(destructor)
+KEYWORD(extension)
+KEYWORD(func)
+KEYWORD(import)
+KEYWORD(oneof)
+KEYWORD(metatype)
+KEYWORD(protocol)
+KEYWORD(requires)
+KEYWORD(struct)
+KEYWORD(typealias)
+KEYWORD(var)
+KEYWORD(static)
+KEYWORD(subscript)
+
+// Statement keywords.
+KEYWORD(if)
+KEYWORD(in)
+KEYWORD(do)
+KEYWORD(else)
+KEYWORD(for)
+KEYWORD(while)
+KEYWORD(return)
+KEYWORD(break)
+KEYWORD(continue)
+
+// Expression keywords.
+KEYWORD(new)
+KEYWORD(super)
+
+// Punctuators.
+PUNCTUATOR(l_paren_call, "(")
+PUNCTUATOR(l_paren,     "(")
+PUNCTUATOR(r_paren,     ")")
+PUNCTUATOR(l_brace,     "{")
+PUNCTUATOR(r_brace,     "}")
+PUNCTUATOR(l_square_subscript, "[")
+PUNCTUATOR(l_square,    "[")
+PUNCTUATOR(r_square,    "]")
+
+PUNCTUATOR(period,      ".")
+PUNCTUATOR(comma,       ",")
+PUNCTUATOR(colon,       ":")
+PUNCTUATOR(semi,        ";")
+PUNCTUATOR(equal,       "=")
+PUNCTUATOR(ellipsis,    "...")
+
+PUNCTUATOR(arrow,       "->")
+
+#undef KEYWORD
+#undef PUNCTUATOR
