@@ -216,10 +216,10 @@ llvm::Constant *IRGenModule::getAddrOfObjCMethodName(StringRef selector) {
 
   // If not, create it.  This implicitly adds a trailing null.
   auto init = llvm::ConstantDataArray::getString(LLVMContext, selector);
-  auto label = llvm::Twine("\01L_selector_data(") + selector + ")";
   auto global = new llvm::GlobalVariable(Module, init->getType(), true,
                                          llvm::GlobalValue::InternalLinkage,
-                                         init, label);
+                                         init,
+                          llvm::Twine("\01L_selector_data(") + selector + ")");
   global->setSection("__TEXT,__objc_methname,cstring_literals");
   global->setAlignment(1);
 
@@ -245,10 +245,10 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
   // method name.  Note that the label here is unimportant, so we
   // choose something descriptive to make the IR readable.
   auto init = getAddrOfObjCMethodName(selector);
-  auto label = llvm::Twine("\01L_selector(") + selector + ")";
   auto global = new llvm::GlobalVariable(Module, init->getType(), false,
                                          llvm::GlobalValue::InternalLinkage,
-                                         init, label);
+                                         init,
+                                llvm::Twine("\01L_selector(") + selector + ")");
   global->setAlignment(getPointerAlignment().getValue());
 
   // This section name is magical for the Darwin static and dynamic linkers.
