@@ -830,6 +830,10 @@ public:
     return E;
   }
     
+  Expr *visitSuperMemberRefExpr(SuperMemberRefExpr *E) {
+    llvm_unreachable("super member ref not implemented");
+  }
+    
   Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
     if (E->getDecl()->getType()->is<ErrorType>())
       return nullptr;
@@ -987,6 +991,11 @@ public:
   Expr *visitSubscriptExpr(SubscriptExpr *E) {
     return TC.semaSubscriptExpr(E);
   }
+
+  Expr *visitSuperSubscriptExpr(SuperSubscriptExpr *E) {
+    llvm_unreachable("super member ref not implemented");
+  }
+
   Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
     return TC.semaSubscriptExpr(E);
   }
@@ -1002,8 +1011,16 @@ public:
     return E;
   }
     
+  Expr *visitOverloadedSuperSubscriptExpr(OverloadedSuperSubscriptExpr *E) {
+    llvm_unreachable("not implemented");
+  }
+    
   Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     return TC.semaUnresolvedDotExpr(E);
+  }
+    
+  Expr *visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *E) {
+    llvm_unreachable("not implemented");
   }
   
   Expr *visitTupleElementExpr(TupleElementExpr *E) {

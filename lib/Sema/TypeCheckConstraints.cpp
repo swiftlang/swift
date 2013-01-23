@@ -2181,7 +2181,16 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       CS.addOverloadSet(OverloadSet::getNew(CS, tv, expr, choices));
       return tv;
     }
+    
+    Type visitOverloadedSuperMemberRefExpr(OverloadedSuperMemberRefExpr *e) {
+      llvm_unreachable("not implemented");
+    }
 
+    Type visitOverloadedSuperConstructorRefExpr(
+                                         OverloadedSuperConstructorRefExpr *e) {
+      llvm_unreachable("not implemented");
+    }
+    
     Type visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
       // This is an error case, where we're trying to use type inference
       // to help us determine which declaration the user meant to refer to.
@@ -2194,6 +2203,10 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       OverloadChoice choice(expr->getBase()->getType(), expr->getDecl());
       CS.addOverloadSet(OverloadSet::getNew(CS, tv, expr, { &choice, 1 }));
       return tv;
+    }
+    
+    Type visitSuperMemberRefExpr(SuperMemberRefExpr *expr) {
+      llvm_unreachable("not implemented");
     }
 
     Type visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
@@ -2246,6 +2259,10 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       auto tv = CS.createTypeVariable(expr);
       CS.addValueMemberConstraint(baseTy, expr->getName(), tv, expr);
       return tv;
+    }
+    
+    Type visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *expr) {
+      llvm_unreachable("not implemented");
     }
 
     Type visitSequenceExpr(SequenceExpr *expr) {
@@ -2307,8 +2324,16 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return outputTv;
     }
 
+    Type visitSuperSubscriptExpr(SuperSubscriptExpr *expr) {
+      llvm_unreachable("not implemented");
+    }
+    
     Type visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *expr) {
       llvm_unreachable("Already type-checked");
+    }
+    
+    Type visitOverloadedSuperSubscriptExpr(OverloadedSuperSubscriptExpr *expr) {
+      llvm_unreachable("not implemented");
     }
 
     Type visitExistentialSubscriptExpr(ExistentialSubscriptExpr *expr) {
@@ -5112,7 +5137,16 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
                             selected.first.getDecl(), expr->getMemberLoc(),
                             selected.second);
     }
+    
+    Expr *visitOverloadedSuperMemberRefExpr(OverloadedSuperMemberRefExpr *e) {
+      llvm_unreachable("not implemented");
+    }
 
+    Expr *visitOverloadedSuperConstructorRefExpr(
+                                         OverloadedSuperConstructorRefExpr *e) {
+      llvm_unreachable("not implemented");
+    }
+    
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
       // FIXME: We should have generated an overload set from this, in which
       // case we can emit a typo-correction error here but recover well.
@@ -5122,6 +5156,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     Expr *visitMemberRefExpr(MemberRefExpr *expr) {
       // FIXME: Falls back to the old type checker.
       return CS.getTypeChecker().recheckTypes(expr);
+    }
+    
+    Expr *visitSuperMemberRefExpr(SuperMemberRefExpr *expr) {
+      llvm_unreachable("not implemented");
     }
 
     Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
@@ -5203,6 +5241,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
         llvm_unreachable("Nonsensical overload choice");
       }
     }
+    
+    Expr *visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *expr) {
+      llvm_unreachable("not implemented");
+    }
 
     Expr *visitSequenceExpr(SequenceExpr *expr) {
       llvm_unreachable("Expression wasn't parsed?");
@@ -5265,9 +5307,17 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       expr->setDecl(subscript);
       return tc.semaSubscriptExpr(expr);
     }
+    
+    Expr *visitSuperSubscriptExpr(SuperSubscriptExpr *expr) {
+      llvm_unreachable("super subscript not implemented");
+    }
 
     Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *expr) {
       llvm_unreachable("Already type-checked");
+    }
+    
+    Expr *visitOverloadedSuperSubscriptExpr(OverloadedSuperSubscriptExpr *expr) {
+      llvm_unreachable("not implemented");
     }
 
     Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *expr) {

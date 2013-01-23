@@ -73,8 +73,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
 
     return nullptr;
   }
+  Expr *visitOverloadedSuperMemberRefExpr(OverloadedSuperMemberRefExpr *E) {
+    return E;
+  }
+  Expr *visitOverloadedSuperConstructorRefExpr(
+                                         OverloadedSuperConstructorRefExpr *E) {
+    return E;
+  }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
+  Expr *visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *E) {
+    return E;
+  }
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
   
   Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
@@ -93,6 +103,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
       return E;
     }
     return nullptr;
+  }
+  
+  Expr *visitSuperMemberRefExpr(SuperMemberRefExpr *E) {
+    return E;
   }
   
   Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
@@ -149,6 +163,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     
     return E;
   }
+  Expr *visitSuperSubscriptExpr(SuperSubscriptExpr *E) {
+    if (Expr *Index = doIt(E->getIndex()))
+      E->setIndex(Index);
+    else
+      return nullptr;
+    
+    return E;
+  }
   Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
     if (Expr *Base = doIt(E->getBase()))
       E->setBase(Base);
@@ -189,6 +211,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;
   }
   Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) { return E; }
+  Expr *visitOverloadedSuperSubscriptExpr(OverloadedSuperSubscriptExpr *E) {
+    return E;
+  }
   Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     if (!E->getBase())
       return E;

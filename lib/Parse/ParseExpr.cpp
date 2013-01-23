@@ -67,12 +67,13 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
 ///   expr-unary:
 ///     expr-postfix
 ///     expr-new
+///     expr-super
 ///     operator-prefix expr-unary
 NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
   // If the next token is the keyword 'new', this must be expr-new.
   if (Tok.is(tok::kw_new))
     return parseExprNew();
-
+  
   // For recovery purposes, accept an oper_binary here.
   if (Tok.is(tok::oper_binary)) {
     diagnose(Tok.getLoc(), diag::expected_prefix_operator);
@@ -197,6 +198,65 @@ NullablePtr<Expr> Parser::parseExprNew() {
   return NewArrayExpr::create(Context, newLoc, elementTy, bounds);
 }
 
+/// parseExprSuper
+///
+///   expr-super:
+///     expr-super-member
+///     expr-super-constructor
+///     expr-super-subscript
+///   expr-super-member:
+///     'super' '.' identifier
+///   expr-super-constructor:
+///     'super' '.' 'constructor'
+///   expr-super-subscript:
+///     'super' '[' expr ']'
+NullablePtr<Expr> Parser::parseExprSuper() {
+  SourceLoc superLoc = consumeToken(tok::kw_super);
+
+  if (Tok.is(tok::period)) {
+    // 'super.' must be a member or constructor ref.
+    SourceLoc dotLoc = consumeToken(tok::period);
+    
+    if (Tok.is(tok::kw_constructor)) {
+      // super.constructor
+      SourceLoc ctorLoc = consumeToken(tok::kw_constructor);
+      return new (Context) SuperConstructorRefCallExpr(superLoc,
+                                                       dotLoc,
+                                                       ctorLoc,
+                                                       nullptr,
+                                                       nullptr);
+    } else {
+      // super.foo
+      SourceLoc nameLoc = Tok.getLoc();
+      Identifier name;
+      if (parseIdentifier(name, diag::expected_identifier_after_super_dot_expr))
+        return nullptr;
+      return new (Context) UnresolvedSuperMemberExpr(nullptr,
+                                                     superLoc,
+                                                     dotLoc,
+                                                     name,
+                                                     nameLoc);
+    }
+  } else if (Tok.is(tok::l_square_subscript)) {
+    // super[expr]
+    SourceLoc lBraceLoc = consumeToken(tok::l_square_subscript);
+    NullablePtr<Expr> idx = parseExpr(diag::expected_expr_subscript_value);
+    SourceLoc rBraceLoc;
+    if (idx.isNull() ||
+        parseMatchingToken(tok::r_square, rBraceLoc,
+                           diag::expected_bracket_array_subscript,
+                           lBraceLoc, diag::opening_bracket))
+      return 0;
+    
+    return new (Context) SuperSubscriptExpr(nullptr,
+                                            superLoc,
+                                            lBraceLoc, idx.get(), rBraceLoc);
+  } else {
+    diagnose(superLoc, diag::expected_dot_or_subscript_after_super);
+    return nullptr;
+  }
+}
+
 /// parseExprPostfix
 ///
 ///   expr-literal:
@@ -213,6 +273,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
 ///     expr-delayed-identifier
 ///     expr-paren
 ///     expr-func
+///     expr-super
 ///
 ///   expr-delayed-identifier:
 ///     ':' identifier
@@ -279,6 +340,11 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     
     // Handle .foo by just making an AST node.
     Result = new (Context) UnresolvedMemberExpr(DotLoc, NameLoc, Name);
+    break;
+  }
+      
+  case tok::kw_super: {      // super.foo or super[foo]
+    Result = parseExprSuper();
     break;
   }
 

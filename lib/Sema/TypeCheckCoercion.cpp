@@ -249,6 +249,9 @@ public:
 
     return failed(E); // FIXME: Is this reachable?
   }
+  CoercedResult visitSuperMemberRefExpr(SuperMemberRefExpr *E) {
+    llvm_unreachable("super member ref not implemented");
+  }
   CoercedResult visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
     return failed(E); // FIXME: Is this reachable?
   }
@@ -277,6 +280,9 @@ public:
       return CoercionResult::Unknowable;
 
     return failed(E);
+  }
+  CoercedResult visitSuperSubscriptExpr(SuperSubscriptExpr *E) {
+    llvm_unreachable("super subscript not implemented");
   }
   CoercedResult visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
     return failed(E); // FIXME: Is this reachable?
@@ -345,6 +351,11 @@ public:
     E->setType(ErrorType::get(TC.Context));
     return nullptr;
 
+  }
+  
+  CoercedResult visitOverloadedSuperSubscriptExpr(
+                                              OverloadedSuperSubscriptExpr *E) {
+    llvm_unreachable("not implemented");
   }
 
   CoercedResult visitOverloadedExpr(OverloadedExpr Ovl) {
@@ -485,6 +496,9 @@ public:
     // (e.g., if it has literals of unresolved type), or it could always be
     // ill-formed.
     return CoercionResult::Unknowable;
+  }
+  CoercedResult visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *E) {
+    llvm_unreachable("not implemented");
   }
 
   CoercedResult visitTupleElementExpr(TupleElementExpr *E) {

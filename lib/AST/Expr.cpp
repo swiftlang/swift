@@ -131,6 +131,14 @@ MemberRefExpr::MemberRefExpr(Expr *Base, SourceLoc DotLoc, VarDecl *Value,
   : Expr(ExprKind::MemberRef), Base(Base),
     Value(Value), DotLoc(DotLoc), NameLoc(NameLoc) { }
 
+SuperMemberRefExpr::SuperMemberRefExpr(VarDecl *This,
+                                       SourceLoc SuperLoc, SourceLoc DotLoc,
+                                       VarDecl *Value, SourceLoc NameLoc)
+: Expr(ExprKind::SuperMemberRef), This(This), Value(Value),
+  SuperLoc(SuperLoc), DotLoc(DotLoc), NameLoc(NameLoc)
+{
+}
+
 ExistentialMemberRefExpr::ExistentialMemberRefExpr(Expr *Base, SourceLoc DotLoc,
                                                    ValueDecl *Value,
                                                    SourceLoc NameLoc)
@@ -237,6 +245,17 @@ SubscriptExpr::SubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
   assert((!D ||
           !D->getDeclContext()->getDeclaredTypeOfContext()->isExistentialType())
          && "use ExistentialSubscriptExpr for existential type subscript");
+}
+
+SuperSubscriptExpr::SuperSubscriptExpr(VarDecl *This,
+                                       SourceLoc SuperLoc,
+                                       SourceLoc LBracketLoc, Expr *Index,
+                                       SourceLoc RBracketLoc,
+                                       SubscriptDecl *D)
+  : Expr(ExprKind::SuperSubscript, D ? D->getElementType() : Type()),
+    D(D), SuperLoc(SuperLoc), Brackets(LBracketLoc, RBracketLoc), This(This),
+    Index(Index)
+{
 }
 
 ExistentialSubscriptExpr::
@@ -494,7 +513,7 @@ public:
       << " decl=" << E->getDecl()->getName() << ')';
   }
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) {
-    printCommon(E, "overloadeddeclref_expr")
+    printCommon(E, "overloaded_decl_ref_expr")
       << " name=" << E->getDecls()[0]->getName().str()
       << " #decls=" << E->getDecls().size();
     for (ValueDecl *D : E->getDecls()) {
@@ -505,10 +524,32 @@ public:
     OS << ')';
   }
   void visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *E) {
-    printCommon(E, "overloadedmemberref_expr")
+    printCommon(E, "overloaded_member_ref_expr")
       << " name=" << E->getDecls()[0]->getName().str()
       << " #decls=" << E->getDecls().size() << "\n";
     printRec(E->getBase());
+    for (ValueDecl *D : E->getDecls()) {
+      OS << '\n';
+      OS.indent(Indent);
+      OS << "  type=" << D->getTypeOfReference().getString();
+    }
+    OS << ')';
+  }
+  void visitOverloadedSuperMemberRefExpr(OverloadedSuperMemberRefExpr *E) {
+    printCommon(E, "overloaded_super_member_ref_expr")
+      << " name=" << E->getDecls()[0]->getName().str()
+      << " #decls=" << E->getDecls().size() << "\n";
+    for (ValueDecl *D : E->getDecls()) {
+      OS << '\n';
+      OS.indent(Indent);
+      OS << "  type=" << D->getTypeOfReference().getString();
+    }
+    OS << ')';
+  }
+  void visitOverloadedSuperConstructorRefExpr(
+                                        OverloadedSuperConstructorRefExpr *E) {
+    printCommon(E, "overloaded_super_member_ref_expr")
+    << " #decls=" << E->getDecls().size() << "\n";
     for (ValueDecl *D : E->getDecls()) {
       OS << '\n';
       OS.indent(Indent);
@@ -525,6 +566,10 @@ public:
       << " decl=" << E->getDecl()->getName() << '\n';
     printRec(E->getBase());
     OS << ')';
+  }
+  void visitSuperMemberRefExpr(SuperMemberRefExpr *E) {
+    printCommon(E, "super_member_ref_expr")
+      << " decl=" << E->getDecl()->getName() << ';';
   }
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
     printCommon(E, "existential_member_ref_expr")
@@ -549,6 +594,10 @@ public:
     printCommon(E, "unresolved_member_expr")
       << " name='" << E->getName() << "')";
   }
+  void visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *E) {
+    printCommon(E, "unresolved_super_member_expr")
+    << " name='" << E->getName() << "')";
+  }
   void visitParenExpr(ParenExpr *E) {
     printCommon(E, "paren_expr") << '\n';
     printRec(E->getSubExpr());
@@ -569,6 +618,12 @@ public:
     printCommon(E, "subscript_expr");
     OS << '\n';
     printRec(E->getBase());
+    OS << '\n';
+    printRec(E->getIndex());
+    OS << ')';
+  }
+  void visitSuperSubscriptExpr(SuperSubscriptExpr *E) {
+    printCommon(E, "super_subscript_expr");
     OS << '\n';
     printRec(E->getIndex());
     OS << ')';
@@ -602,6 +657,12 @@ public:
     printCommon(E, "overloaded_subscript_expr");
     OS << '\n';
     printRec(E->getBase());
+    OS << '\n';
+    printRec(E->getIndex());
+    OS << ')';
+  }
+  void visitOverloadedSuperSubscriptExpr(OverloadedSuperSubscriptExpr *E) {
+    printCommon(E, "overloaded_super_subscript_expr");
     OS << '\n';
     printRec(E->getIndex());
     OS << ')';
@@ -793,11 +854,17 @@ public:
   void visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
     printApplyExpr(E, "dot_syntax_call_expr");
   }
+  void visitSuperCallExpr(SuperCallExpr *E) {
+    printApplyExpr(E, "super_call_expr");
+  }
   void visitNewReferenceExpr(NewReferenceExpr *E) {
     printApplyExpr(E, "new_reference_expr");
   }
   void visitConstructorRefCallExpr(ConstructorRefCallExpr *E) {
     printApplyExpr(E, "constructor_ref_call_expr");
+  }
+  void visitSuperConstructorRefCallExpr(SuperConstructorRefCallExpr *E) {
+    printApplyExpr(E, "super_constructor_ref_call_expr");
   }
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
     printCommon(E, "dot_syntax_base_ignored") << '\n';

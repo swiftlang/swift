@@ -367,6 +367,84 @@ public:
   }
 };
   
+/// OverloadedSuperMemberRefExpr - A reference to an overloaded name that is a
+/// member of the superclass, that will eventually be
+/// resolved to some kind of super-member or super-call expression.
+class OverloadedSuperMemberRefExpr : public OverloadSetRefExpr {
+  ValueDecl *This;
+  SourceLoc SuperLoc;
+  SourceLoc DotLoc;
+  SourceLoc MemberLoc;
+  
+public:
+  OverloadedSuperMemberRefExpr(ValueDecl *This,
+                               SourceLoc SuperLoc,
+                               SourceLoc DotLoc,
+                               ArrayRef<ValueDecl *> Decls, SourceLoc MemberLoc,
+                               Type Ty)
+    : OverloadSetRefExpr(ExprKind::OverloadedSuperMemberRef, Decls, Ty),
+      This(This), SuperLoc(SuperLoc), DotLoc(DotLoc), MemberLoc(MemberLoc) { }
+
+  SourceLoc getDotLoc() const { return DotLoc; }
+  SourceLoc getMemberLoc() const { return MemberLoc; }
+  ValueDecl *getThis() const { return This; }
+  void setThis(ValueDecl *D) { This = D; }
+  
+  SourceLoc getLoc() const { return MemberLoc; }
+  SourceLoc getStartLoc() const {
+    return SuperLoc;
+  }
+  SourceLoc getEndLoc() const { return MemberLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(SuperLoc, MemberLoc);
+  }
+
+  static bool classof(const Expr *E) {
+  return E->getKind() == ExprKind::OverloadedSuperMemberRef;
+  }
+};
+
+/// OverloadedSuperConstructorRefExpr - A reference to an overloaded set of
+/// superclass constructors.
+class OverloadedSuperConstructorRefExpr : public OverloadSetRefExpr {
+  ValueDecl *This;
+  SourceLoc SuperLoc;
+  SourceLoc DotLoc;
+  SourceLoc ConstructorLoc;
+  
+public:
+  OverloadedSuperConstructorRefExpr(ValueDecl *This,
+                                    SourceLoc SuperLoc,
+                                    SourceLoc DotLoc,
+                                    ArrayRef<ValueDecl *> Decls,
+                                    SourceLoc ConstructorLoc,
+                                    Type Ty)
+    : OverloadSetRefExpr(ExprKind::OverloadedSuperConstructorRef, Decls, Ty),
+      This(This),
+      SuperLoc(SuperLoc),
+      DotLoc(DotLoc),
+      ConstructorLoc(ConstructorLoc) { }
+
+  SourceLoc getDotLoc() const { return DotLoc; }
+  SourceLoc getConstructorLoc() const { return ConstructorLoc; }
+  ValueDecl *getThis() const { return This; }
+  void setThis(ValueDecl *D) { This = D; }
+  
+  SourceLoc getLoc() const { return ConstructorLoc; }
+  SourceLoc getStartLoc() const {
+    return SuperLoc;
+  }
+  SourceLoc getEndLoc() const { return ConstructorLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(SuperLoc, ConstructorLoc);
+  }
+
+  static bool classof(const Expr *E) {
+  return E->getKind() == ExprKind::OverloadedSuperConstructorRef;
+  }
+};
+  
+
 /// UnresolvedDeclRefExpr - This represents use of an undeclared identifier,
 /// which may ultimately be a use of something that hasn't been defined yet, it
 /// may be a use of something that got imported (which will be resolved during
@@ -426,7 +504,42 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::MemberRef;
   }
-};  
+};
+  
+/// SuperMemberRefExpr - This represents 'super.b' where we are referring to a
+/// property or member variable of the superclass of a type.
+///
+/// Note that methods found by 'dot' syntax are expressed as SuperCallExpr
+/// nodes, because 'super.f' is an application of 'this' to the superclass's
+/// method 'f'.
+class SuperMemberRefExpr : public Expr {
+  VarDecl *This;
+  VarDecl *Value;
+  SourceLoc SuperLoc;
+  SourceLoc DotLoc;
+  SourceLoc NameLoc;
+  
+public:
+  SuperMemberRefExpr(VarDecl *This,
+                     SourceLoc SuperLoc, SourceLoc DotLoc, VarDecl *Value,
+                     SourceLoc NameLoc);
+  VarDecl *getThis() const { return This; }
+  VarDecl *getDecl() const { return Value; }
+  SourceLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getDotLoc() const { return DotLoc; }
+  
+  void setThis(VarDecl *D) { This = D; }
+  
+  SourceLoc getLoc() const { return NameLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(SuperLoc, NameLoc);
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::SuperMemberRef;
+  }
+};
+
 
 /// ExistentialMemberRefExpr - This represents 'a.b' where we are referring to
 /// a member of an existential type (e.g., a protocol member).
@@ -727,6 +840,54 @@ public:
     return E->getKind() == ExprKind::Subscript;
   }
 };
+  
+/// SuperSubscriptExpr - Subscripting expressions that delegate to the
+/// superclass subscript accessors, super[i].
+class SuperSubscriptExpr : public Expr {
+  SubscriptDecl *D;
+  SourceLoc SuperLoc;
+  SourceRange Brackets;
+  VarDecl *This;
+  Expr *Index;
+  
+public:
+  SuperSubscriptExpr(VarDecl *This,
+                     SourceLoc SuperLoc,
+                     SourceLoc LBracketLoc, Expr *Index,
+                     SourceLoc RBracketLoc, SubscriptDecl *D = 0);
+  
+  /// getThis - Retrieve the 'this' decl to use as the base of the application.
+  VarDecl *getThis() const { return This; }
+  void setThis(VarDecl *D) { This = D; }
+  
+  /// getIndex - Retrieve the index of the subscript expression, i.e., the
+  /// "offset" into the base value.
+  Expr *getIndex() const { return Index; }
+  void setIndex(Expr *E) { Index = E; }
+  
+  /// hasDecl - Determine whether subscript operation has a known underlying
+  /// subscript declaration or not.
+  bool hasDecl() const { return D != 0; }
+  
+  /// getDecl - Retrieve the subscript declaration that this subscripting
+  /// operation refers to. Only valid when \c hasDecl() is true.
+  SubscriptDecl *getDecl() const {
+    assert(hasDecl() && "No subscript declaration known!");
+    return D;
+  }
+  void setDecl(SubscriptDecl *D) { this->D = D; }
+  
+  SourceLoc getLBracketLoc() const { return Brackets.Start; }
+  SourceLoc getRBracketLoc() const { return Brackets.End; }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(SuperLoc, Brackets.End);
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::SuperSubscript;
+  }
+};
 
 /// ExistentialSubscriptExpr - Subscripting expressions like a[i] that refer to
 /// an element within a container, where the container has existential type.
@@ -862,7 +1023,7 @@ public:
 
 
 /// OverloadedSubscriptExpr - Subscripting expressions like a[i] that refer to
-/// an element within a container, for which overload resolution has found
+/// an element within a container for which overload resolution has found
 /// multiple potential subscript declarations that may apply.
 ///
 /// Instances of OverloadedSubscriptExpr are mapped down to SubscriptExpr
@@ -908,6 +1069,59 @@ public:
     return E->getKind() == ExprKind::OverloadedSubscript;
   }
 };
+  
+/// OverloadedSuperSubscriptExpr - Subscripting expressions like super[i] that
+/// refer to the superclass subscript accessors for which overload resolution
+/// has found multiple potential subscript declarations that may apply.
+///
+/// Instances of OverloadedSubscriptExpr are mapped down to SubscriptExpr
+/// instances by type-checking.
+class OverloadedSuperSubscriptExpr : public Expr {
+  SourceLoc SuperLoc;
+  SourceRange Brackets;
+  ArrayRef<ValueDecl *> Decls;
+  ValueDecl *This;
+  Expr *Index;
+  
+  OverloadedSuperSubscriptExpr(ValueDecl *This, ArrayRef<ValueDecl *> Decls,
+                               SourceLoc SuperLoc,
+                               SourceLoc LBracketLoc, Expr *Index,
+                               SourceLoc RBracketLoc, Type Ty)
+    : Expr(ExprKind::OverloadedSuperSubscript, Ty),
+      SuperLoc(SuperLoc),
+      Brackets(LBracketLoc, RBracketLoc), Decls(Decls), This(This),
+      Index(Index) { }
+  
+public:
+  ValueDecl *getThis() const { return This; }
+  Expr *getIndex() const { return Index; }
+  
+  ArrayRef<ValueDecl *> getDecls() const { return Decls; }
+  
+  SourceLoc getLBracketLoc() const { return Brackets.Start; }
+  SourceLoc getRBracketLoc() const { return Brackets.End; }
+  
+  SourceLoc getLoc() const { return getLBracketLoc(); }
+  SourceLoc getStartLoc() const { return SuperLoc; }
+  SourceLoc getEndLoc() const { return getRBracketLoc(); }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(SuperLoc, getRBracketLoc());
+  }
+  
+  /// createWithCopy - Create and return a new OverloadedSubscriptExpr or a
+  /// new SubscriptExpr (if the list of decls has a single entry) from the
+  /// specified (non-empty) list of decls and with the given base/index.
+  static Expr *createWithCopy(ValueDecl *This, ArrayRef<ValueDecl*> Decls,
+                              SourceLoc SuperLoc,
+                              SourceLoc LBracketLoc, Expr *Index,
+                              SourceLoc RBracketLoc);
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::OverloadedSuperSubscript;
+  }
+};
+  
 
 /// UnresolvedDotExpr - A field access (foo.bar) on an expression with
 /// unresolved type.
@@ -939,6 +1153,41 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnresolvedDot;
+  }
+};
+
+/// UnresolvedSuperMemberExpr - A superclass field access (super.bar) on an
+/// expression with unresolved type.
+class UnresolvedSuperMemberExpr : public Expr {
+  ValueDecl *This;
+  SourceLoc SuperLoc;
+  SourceLoc DotLoc;
+  SourceLoc NameLoc;
+  Identifier Name;
+public:
+  UnresolvedSuperMemberExpr(ValueDecl *This,
+                            SourceLoc superloc,
+                            SourceLoc dotloc, Identifier name,
+                            SourceLoc nameloc)
+  : Expr(ExprKind::UnresolvedSuperMember), This(This),
+    SuperLoc(superloc), DotLoc(dotloc),
+    NameLoc(nameloc), Name(name) {}
+  
+  SourceLoc getLoc() const { return NameLoc; }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(SuperLoc, NameLoc);
+  }
+  
+  SourceLoc getDotLoc() const { return DotLoc; }
+  ValueDecl *getThis() const { return This; }
+  void setThis(ValueDecl *e) { This = e; }
+
+  Identifier getName() const { return Name; }
+  SourceLoc getNameLoc() const { return NameLoc; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnresolvedSuperMember;
   }
 };
 
@@ -1876,6 +2125,39 @@ public:
   }
 };
 
+/// SuperCallExpr - Refer to a method of the superclass, e.g., 'super.x()'.  'x'
+/// is modeled as a DeclRefExpr or OverloadSetRefExpr on the method.
+class SuperCallExpr : public ThisApplyExpr {
+  SourceLoc SuperLoc;
+  SourceLoc DotLoc;
+  
+public:
+  SuperCallExpr(Expr *FnExpr,
+                SourceLoc SuperLoc,
+                SourceLoc DotLoc, Expr *BaseExpr,
+                Type Ty = Type())
+    : ThisApplyExpr(ExprKind::SuperCall, FnExpr, BaseExpr, Ty),
+      SuperLoc(SuperLoc),
+      DotLoc(DotLoc) {
+  }
+
+  SourceLoc getDotLoc() const { return DotLoc; }
+  SourceLoc getLoc() const {
+    return DotLoc.isValid() ? getArg()->getStartLoc() : getFn()->getStartLoc();
+  }
+  SourceLoc getEndLoc() const {
+    return getFn()->getEndLoc();
+  }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(SuperLoc, getEndLoc());
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::SuperCall;
+  }
+};
+
 /// ConstructorRefCallExpr - Refer to a constructor for a type P.  The
 /// actual reference to function which returns the constructor is modeled
 /// as a DeclRefExpr.
@@ -1896,6 +2178,34 @@ public:
   }
 };
   
+/// SuperConstructorRefCallExpr - Refer to a superclass constructor, e.g.,
+/// 'super.constructor()'.  The actual reference to function which returns the
+/// constructor is modeled as a DeclRefExpr.
+class SuperConstructorRefCallExpr : public ThisApplyExpr {
+  SourceLoc SuperLoc;
+  SourceLoc DotLoc;
+  SourceLoc ConstructorLoc;
+  
+public:
+  SuperConstructorRefCallExpr(SourceLoc SuperLoc,
+                              SourceLoc DotLoc,
+                              SourceLoc ConstructorLoc,
+                              Expr *FnExpr, Expr *BaseExpr, Type Ty = Type())
+    : ThisApplyExpr(ExprKind::SuperConstructorRefCall, FnExpr, BaseExpr, Ty),
+      SuperLoc(SuperLoc), DotLoc(DotLoc), ConstructorLoc(ConstructorLoc) {}
+  
+  SourceLoc getLoc() const {
+    return ConstructorLoc;
+  }
+  SourceRange getSourceRange() const {
+    return SourceRange(SuperLoc, ConstructorLoc);
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::SuperConstructorRefCall;
+  }
+};
+
 /// DotSyntaxBaseIgnoredExpr - When a.b resolves to something that does not need
 /// the actual value of the base (e.g. when applied to a metatype, module, or
 /// the base of a 'static' function) this expression node is created.  The

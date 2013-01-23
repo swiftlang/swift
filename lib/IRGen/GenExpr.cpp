@@ -281,6 +281,10 @@ namespace {
       IGF.emitLValueAsScalar(emitSubscriptLValue(IGF, E),
                              isOnHeap(E->getType()), Out);
     }
+    
+    void visitSuperSubscriptExpr(SuperSubscriptExpr *E) {
+      llvm_unreachable("super subscript not implemented");
+    }
 
     void visitTupleShuffleExpr(TupleShuffleExpr *E) {
       emitTupleShuffle(IGF, E, Out);
@@ -414,6 +418,10 @@ namespace {
     void visitMemberRefExpr(MemberRefExpr *E) {
       IGF.emitLValueAsScalar(emitMemberRefLValue(IGF, E),
                              isOnHeap(E->getType()), Out);
+    }
+    
+    void visitSuperMemberRefExpr(SuperMemberRefExpr *E) {
+      llvm_unreachable("super member ref not implemented");
     }
 
     bool isLValueMember(ValueDecl *D) {
@@ -578,10 +586,18 @@ namespace {
       return emitMemberRefLValue(IGF, E);
     }
     
+    LValue visitSuperMemberRefExpr(SuperMemberRefExpr *E) {
+      llvm_unreachable("super member ref not implemented");
+    }
+    
     LValue visitSubscriptExpr(SubscriptExpr *E) {
       return emitSubscriptLValue(IGF, E);
     }
 
+    LValue visitSuperSubscriptExpr(SuperSubscriptExpr *E) {
+      llvm_unreachable("super subscript not implemented");
+    }
+    
 #define FOR_MEMBER_KIND(KIND)                                              \
     LValue visit##KIND##MemberRefExpr(KIND##MemberRefExpr *E) {            \
       return emit##KIND##MemberRefLValue(IGF, E);                          \
@@ -693,6 +709,10 @@ namespace {
       return tryEmitMemberRefAsAddress(IGF, E);
     }
 
+    Optional<Address> visitSuperMemberRefExpr(SuperMemberRefExpr *E) {
+      llvm_unreachable("super member ref not implemented");
+    }
+
     // These expressions aren't naturally already in memory.
     NON_LOCATEABLE(TupleExpr)
     NON_LOCATEABLE(IntegerLiteralExpr)
@@ -724,6 +744,7 @@ namespace {
 
     // FIXME: We may want to specialize IR generation for array subscripts.
     NON_LOCATEABLE(SubscriptExpr)
+    NON_LOCATEABLE(SuperSubscriptExpr)
     NON_LOCATEABLE(ExistentialSubscriptExpr)
     NON_LOCATEABLE(ArchetypeSubscriptExpr)
     NON_LOCATEABLE(GenericSubscriptExpr)
