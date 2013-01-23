@@ -348,12 +348,6 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     break;
   }
 
-  case tok::l_paren_call:
-    // If the first token in an expr looks like a call paren, treat it as a
-    // literal paren. This happens in cases like 'if(x)' or 'while(x)' where
-    // an expr immediately follows a statement keyword.
-    Tok.setKind(tok::l_paren);
-    [[clang::fallthrough]];
   case tok::l_paren:
     Result = parseExprParen();
     break;

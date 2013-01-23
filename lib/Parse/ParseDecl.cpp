@@ -1616,7 +1616,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   parseAttributeList(Attributes);
   
   // pattern-tuple
-  if (!Tok.isAnyLParen()) {
+  if (Tok.isNot(tok::l_paren)) {
     diagnose(Tok.getLoc(), diag::expected_lparen_subscript);
     return true;
   }
@@ -1760,6 +1760,9 @@ ConstructorDecl *Parser::parseDeclConstructor(bool HasContainerType) {
   GenericParamList *GenericParams = maybeParseGenericParams();
 
   // pattern-tuple
+  // Constructor is an identifier-like keyword so that 'super.constructor()'
+  // can be parsed as a call. The opening paren in a constructor decl might
+  // be lexed as an l_paren or an l_paren_call.
   if (!Tok.isAnyLParen()) {
     diagnose(Tok.getLoc(), diag::expected_lparen_constructor);
     return nullptr;
