@@ -724,8 +724,6 @@ ERROR(invalid_postfix_input,sema_tcd,none,
       "only unary operators can be declared 'postfix'", ())
 ERROR(assignment_without_byref,sema_tcd,none,
       "assignment operator must have an initial [byref] argument", ())
-ERROR(assignment_nonvoid,sema_tcd,none,
-      "assignment operator must return 'Void' (not %0)", (Type))
 ERROR(conversion_not_instance_method,sema_tcd,none,
       "conversion function %0 is not an instance method",
       (Identifier))

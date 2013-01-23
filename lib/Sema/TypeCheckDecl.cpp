@@ -781,9 +781,6 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       if (!ParamType->is<LValueType>()) {
         TC.diagnose(VD->getStartLoc(), diag::assignment_without_byref);
         VD->getMutableAttrs().Assignment = false;
-      } else if (!FT->getResult()->isEqual(TupleType::getEmpty(TC.Context))) {
-        TC.diagnose(VD->getStartLoc(), diag::assignment_nonvoid,
-                    FT->getResult());
       }
     }
   }
