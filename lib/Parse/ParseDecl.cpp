@@ -241,12 +241,21 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;    
   }
 
+  case AttrName::prefix: {
+    if (Attributes.isPrefix())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+
+    consumeToken(tok::identifier);
+    Attributes.ExplicitPrefix = true;
+    return false;
+  }
+
   case AttrName::postfix: {
     if (Attributes.isPostfix())
       diagnose(Tok, diag::duplicate_attribute, Tok.getText());
 
     consumeToken(tok::identifier);
-    Attributes.Postfix = true;
+    Attributes.ExplicitPostfix = true;
     return false;
   }
 

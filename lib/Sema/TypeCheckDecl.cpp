@@ -749,7 +749,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     // Only operator functions can be postfix.
     if (!isOperator) {
       TC.diagnose(VD->getStartLoc(), diag::postfix_not_an_operator);
-      VD->getMutableAttrs().Postfix = false;
+      VD->getMutableAttrs().ExplicitPostfix = false;
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
@@ -757,7 +757,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     // Only unary operators can be postfix.
     if (NumArguments != 1) {
       TC.diagnose(VD->getStartLoc(), diag::invalid_postfix_input);
-      VD->getMutableAttrs().Postfix = false;
+      VD->getMutableAttrs().ExplicitPostfix = false;
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
