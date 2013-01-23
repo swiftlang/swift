@@ -799,11 +799,16 @@ namespace {
       // Derive the RO-data.
       llvm::Constant *data = emitClassPrivateData(IGM, TargetClass);
 
-      // We always set the low bit.  Eventually the high bits will be
-      // a pointer of some sort.
+      // FIXME: This is not supported on alpha OS builds yet.
+#ifdef MAC_OS_X_VERSION_MAX_ALLOWED
+#if MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_8
+      // We always set the low bit to indicate this is a Swift class.
       data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
       data = llvm::ConstantExpr::getAdd(data,
                                     llvm::ConstantInt::get(IGM.IntPtrTy, 1));
+#endif
+#endif
+
       Fields.push_back(data);
     }
 
