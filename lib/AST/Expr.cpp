@@ -440,6 +440,10 @@ ExplicitCastExpr::ExplicitCastExpr(ExprKind kind, Expr *lhs, Expr *rhs)
 {
 }
 
+ConstructorDecl *SuperConstructorRefCallExpr::getConstructor() const {
+  return cast<ConstructorDecl>(cast<DeclRefExpr>(getFn())->getDecl());
+}
+
 //===----------------------------------------------------------------------===//
 // Printing for Expr and all subclasses.
 //===----------------------------------------------------------------------===//

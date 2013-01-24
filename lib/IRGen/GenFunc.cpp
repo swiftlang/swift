@@ -756,6 +756,34 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
                                   bestExplosion, bestUncurry);
 }
 
+/// Emit a reference to a superclass initializing constructor, using the best
+/// parameters possible up to given limits.
+static Callee emitSuperConstructorCallee(IRGenFunction &IGF,
+                                         ConstructorDecl *ctor,
+                                         CanType substResultType,
+                                         ArrayRef<Substitution> subs,
+                                         ExplosionKind bestExplosion,
+                                         unsigned bestUncurry) {
+  llvm::Constant *fnPtr;
+  if (bestUncurry != 1) {
+    IGF.unimplemented(ctor->getLoc(),
+                      "uncurried reference to super.constructor");
+    fnPtr = llvm::UndefValue::get(
+                  IGF.IGM.getFunctionType(ctor->getType()->getCanonicalType(),
+                                          bestExplosion, bestUncurry,
+                                          ExtraData::None));
+
+  } else {
+    fnPtr = IGF.IGM.getAddrOfConstructor(ctor,
+                                         ConstructorKind::Initializing,
+                                         bestExplosion);
+  }
+  return Callee::forFreestandingFunction(ctor->getType()->getCanonicalType(),
+                                         substResultType, subs, fnPtr,
+                                         bestExplosion, bestUncurry);
+}
+
+
 namespace {
   /// A single call site, with argument expression and the type of
   /// function being applied.
@@ -807,6 +835,9 @@ namespace {
 
       /// A direct call to a known function.
       Direct,
+      
+      /// A direct call to a superclass's constructor.
+      DirectSuperConstructor,
 
       /// A virtual call to a class member.  The first argument is a
       /// pointer to a class instance or metatype.
@@ -836,6 +867,9 @@ namespace {
       struct {
         ValueDecl *Fn;
       } Direct;
+      struct {
+        ConstructorDecl *Ctor;
+      } DirectSuperConstructor;
       struct {
         FuncDecl *Fn;
       } Virtual;
@@ -869,6 +903,13 @@ namespace {
       CalleeSource result;
       result.TheKind = Kind::Direct;
       result.Direct.Fn = fn;
+      return result;
+    }
+    
+    static CalleeSource forDirectSuperConstructor(ConstructorDecl *ctor) {
+      CalleeSource result;
+      result.TheKind = Kind::DirectSuperConstructor;
+      result.DirectSuperConstructor.Ctor = ctor;
       return result;
     }
 
@@ -909,6 +950,11 @@ namespace {
     ValueDecl *getDirectFunction() const {
       assert(isDirect());
       return Direct.Fn;
+    }
+    
+    ConstructorDecl *getDirectSuperConstructor() const {
+      assert(getKind() == Kind::DirectSuperConstructor);
+      return DirectSuperConstructor.Ctor;
     }
 
     Expr *getSideEffects() const {
@@ -954,6 +1000,10 @@ namespace {
 
       case Kind::Direct:
         return AbstractCallee::forDirectFunction(IGF, getDirectFunction());
+          
+      case Kind::DirectSuperConstructor:
+        return AbstractCallee::forDirectFunction(IGF,
+                                                 getDirectSuperConstructor());
 
       case Kind::Virtual:
         return getAbstractVirtualCallee(IGF, getVirtualFunction());
@@ -1676,6 +1726,14 @@ CallEmission CalleeSource::prepareRootCall(IRGenFunction &IGF,
                                               getSubstitutions(),
                                               maxExplosion, bestUncurry));
 
+  case Kind::DirectSuperConstructor: {
+    Callee callee = emitSuperConstructorCallee(IGF, getDirectSuperConstructor(),
+                                               SubstResultType,
+                                               getSubstitutions(),
+                                               maxExplosion, bestUncurry);
+    return CallEmission(IGF, callee);
+  }
+      
   case Kind::ObjCMessage: {
     // Find the 'self' expression and pass it separately.
     Expr *self = CallSites[0].getArg();
@@ -1753,6 +1811,15 @@ namespace {
   /// which can, hopefully, be called more efficiently.
   struct FunctionDecomposer :
       irgen::ExprVisitor<FunctionDecomposer, CalleeSource> {
+        
+    CalleeSource visitSuperConstructorRefCallExpr(
+                                              SuperConstructorRefCallExpr *E) {
+      CalleeSource source =
+        CalleeSource::forDirectSuperConstructor(E->getConstructor());
+      source.addCallSite(CallSite(E));
+      return source;
+    }
+      
     CalleeSource visitDeclRefExpr(DeclRefExpr *E) {
       if (FuncDecl *fn = dyn_cast<FuncDecl>(E->getDecl())) {
         // FIXME: The test we really want is to ask if this function ONLY has an

@@ -1402,7 +1402,8 @@ Expr *TypeChecker::semaSuperConstructorRefCallExpr(
     assert(theCtor->getInitializerType() && "ctor not type checked");
     // Since we're inside a constructor and have already allocated the instance,
     // we reference the superclass initializing constructor, not the normal
-    // allocating constructor.
+    // allocating constructor, so this DeclRef uses the constructor's
+    // InitializerType.
     e->setFn(new (Context) DeclRefExpr(theCtor, e->getLoc(),
                                        theCtor->getInitializerType()));
     // Type-check the call.

@@ -2201,6 +2201,17 @@ public:
     return SourceRange(SuperLoc, ConstructorLoc);
   }
   
+  // A super constructor call should always have an argument of 'this' and a fn
+  // of a constructor decl.
+  
+  /// Get the 'this' declaration to which the constructor is applied.
+  ValueDecl *getThis() const {
+    return cast<ValueDecl>(cast<DeclRefExpr>(getArg())->getDecl());
+  }
+  
+  /// Get the constructor declaration being applied.
+  ConstructorDecl *getConstructor() const;
+  
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::SuperConstructorRefCall;
   }
