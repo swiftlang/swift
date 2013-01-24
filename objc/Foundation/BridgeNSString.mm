@@ -177,3 +177,7 @@ const Metadata *swift::swift_getObjectType(id object) {
 
   return swift_getObjCClassMetadata(classAsMetadata);
 }
+
+extern "C" bool swift_comparePointers(id x, id y) {
+  return x == y;
+}
