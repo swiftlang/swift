@@ -695,7 +695,7 @@ NullablePtr<Expr> Parser::parseExprFunc() {
       SourceLoc());
     ArgParams.push_back(unitPattern);
     BodyParams.push_back(unitPattern);
-  } else if (!Tok.isAnyLParen()) {
+  } else if (!Tok.is(tok::l_paren)) {
     diagnose(Tok, diag::func_decl_without_paren);
     return 0;
   } else if (parseFunctionSignature(ArgParams, BodyParams, RetTy)) {
