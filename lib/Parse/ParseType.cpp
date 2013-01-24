@@ -105,6 +105,7 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
   SourceLoc StartLoc = Tok.getLoc();
   bool isTupleType = false;
   switch (Tok.getKind()) {
+  case tok::kw_This:
   case tok::identifier:
     if (parseTypeIdentifier(Result))
       return true;
@@ -213,7 +214,7 @@ bool Parser::parseGenericArguments(ArrayRef<TypeLoc> &Args) {
 ///
 bool Parser::parseTypeIdentifier(TypeLoc &Result) {
   SourceLoc StartLoc = Tok.getLoc();
-  if (Tok.isNot(tok::identifier)) {
+  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_This)) {
     diagnose(Tok.getLoc(), diag::expected_identifier_for_type);
     return true;
   }

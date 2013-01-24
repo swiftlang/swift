@@ -331,6 +331,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
   case tok::string_literal:  // "foo"
     Result = parseExprStringLiteral();
     break;
+  case tok::kw_this:     // this
   case tok::identifier:  // foo
     Result = parseExprIdentifier();
     break;
@@ -515,10 +516,10 @@ Expr *Parser::parseExprStringLiteral() {
 ///   expr-identifier:
 ///     identifier
 Expr *Parser::parseExprIdentifier() {
-  assert(Tok.is(tok::identifier));
+  assert(Tok.is(tok::identifier) || Tok.is(tok::kw_this));
   SourceLoc Loc = Tok.getLoc();
   Identifier Name = Context.getIdentifier(Tok.getText());
-  consumeToken(tok::identifier);
+  consumeToken();
   return actOnIdentifierExpr(Name, Loc);
 }
 

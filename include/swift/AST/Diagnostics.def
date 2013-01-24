@@ -344,6 +344,8 @@ ERROR(expected_rangle_protocol,type_parsing,none,
 
 ERROR(expected_pattern,pattern_parsing,none,
       "expected pattern", ())
+ERROR(expected_pattern_is_keyword,pattern_parsing,none,
+      "expected pattern is a keyword", ())
 ERROR(expected_rparen_tuple_pattern_list,pattern_parsing,non,
       "expected ')' at end of tuple pattern", ())
 ERROR(untyped_pattern_ellipsis,pattern_parsing,none,

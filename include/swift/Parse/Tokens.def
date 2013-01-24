@@ -70,6 +70,8 @@ KEYWORD(continue)
 // Expression keywords.
 KEYWORD(new)
 IDENTIFIER_KEYWORD(super)
+IDENTIFIER_KEYWORD(this)
+IDENTIFIER_KEYWORD(This)
 
 // Punctuators.
 PUNCTUATOR(l_paren_call, "(")

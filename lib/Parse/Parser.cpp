@@ -200,14 +200,17 @@ void Parser::skipUntilDeclStmtRBrace() {
 /// present and return its name in Result.  Otherwise, emit an error and
 /// return true.
 bool Parser::parseIdentifier(Identifier &Result, const Diagnostic &D) {
-  if (Tok.is(tok::identifier)) {
+  switch (Tok.getKind()) {
+#define IDENTIFIER_KEYWORD(kw) case tok::kw_##kw:
+#include "swift/Parse/Tokens.def"
+  case tok::identifier:
     Result = Context.getIdentifier(Tok.getText());
-    consumeToken(tok::identifier);
+    consumeToken();
     return false;
+  default:
+    Diags.diagnose(Tok.getLoc(), D);
+    return true;
   }
-  
-  Diags.diagnose(Tok.getLoc(), D);
-  return true;
 }
 
 /// parseAnyIdentifier - Consume an identifier or operator if present and return

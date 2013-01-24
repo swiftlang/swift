@@ -298,6 +298,13 @@ NullablePtr<Pattern> Parser::parsePatternAtom(bool &CForLoopHack) {
     CForLoopHack = false;
     return parsePatternIdentifier();
 
+#define IDENTIFIER_KEYWORD(kw) case tok::kw_##kw:
+#include "swift/Parse/Tokens.def"
+    CForLoopHack = false;
+    diagnose(Tok, diag::expected_pattern_is_keyword);
+    consumeToken();
+    return nullptr;
+
   default:
     CForLoopHack = false;
     diagnose(Tok, diag::expected_pattern);

@@ -380,6 +380,8 @@ void Lexer::lexIdentifier() {
     // Expressions
     .Case("new", tok::kw_new)
     .Case("super", tok::kw_super)
+    .Case("this", tok::kw_this)
+    .Case("This", tok::kw_This)
 
     .Default(tok::identifier);
   
