@@ -1188,6 +1188,30 @@ if vec[3] {
     var a = X(10)
   </pre>
 
+  <p>If a class is derived from a base class, it must explicitly invoke a
+  base class constructor using the <tt>super.constructor</tt> syntax.
+  <tt>super.constructor</tt> may only be used in a derived class constructor;
+  it is not valid in a struct, oneof, or root class constructor. Additionally,
+  <tt>super.constructor</tt> may only be referenced exactly once per derived
+  constructor. An example:</p>
+
+  <pre class="example">
+    class View {
+      var bounds : Rect
+      constructor(bounds:Rect) {
+        this.bounds = bounds
+      }
+    }
+
+    class Button : View {
+      var onClick : () -&gt; ()
+      constructor(bounds:Rect, onClick:() -&gt; ()) {
+        super.constructor(bounds)
+        this.onClick = onClick
+      }
+    }
+  </pre>
+
   <!-- ===================================================================== -->
   <h3 id="decl-destructor">destructor Declarations</h3>
   <!-- ===================================================================== -->
@@ -1199,7 +1223,8 @@ if vec[3] {
   <p>'destructor' declares a destructor for a class.  This function is called
      when there are no longer any references to a class object, just before it
      is destroyed.  Note that destructors can only be declared for classes,
-     and cannot be declared in extensions.</p>
+     and cannot be declared in extensions. Derived class destructors implicitly
+     invoke their base class destructors after executing.</p>
 
   <p>FIXME: We haven't really decided the precise rules here, but it's probably
      a fatal error to either throw an exception or stash a reference to 'this'
@@ -1736,7 +1761,7 @@ protocol C : A, B { }
 </pre>
 
   <!-- _____________________________________________________________________ -->
-  <h3 id="inheritance">Type Inheritance</h4>
+  <h3 id="inheritance">Type Inheritance</h3>
   <pre class="grammar">
     inheritance ::= ':' <a href="#type-identifier">type-identifier</a> (',' <a href="#type-identifier">type-identifier</a>)*
   </pre>
@@ -1906,6 +1931,7 @@ ill-formed if the type does not conform to the protocol.</p>
     
     expr-primary ::= <a href="#expr-literal">expr-literal</a>
     expr-primary ::= <a href="#expr-identifier">expr-identifier</a>
+    expr-primary ::= <a href="#expr-super">expr-super</a>
     expr-primary ::= <a href="#expr-explicit-closure">expr-explicit-closure</a>
     expr-primary ::= <a href="#expr-anon-closure-arg">expr-anon-closure-arg</a>
     expr-primary ::= <a href="#expr-paren">expr-paren</a>
@@ -2042,6 +2068,39 @@ ill-formed if the type does not conform to the protocol.</p>
      href="#decl-var">var</a> and the syntactic sugar forms like <a 
      href="decl-func">func</a> declarations.</p>
 
+  <!-- ===================================================================== -->
+  <h3 id="expr-super">Super</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    expr-super ::= expr-super-method
+    expr-super ::= expr-super-subscript
+    expr-super ::= expr-super-constructor
+
+    expr-super-method ::= 'super' '.' <a href="#expr-identifier">expr-identifier</a>
+    expr-super-subscript ::= 'super' '[' <a href="#expr">expr</a> ']'
+    expr-super-constructor ::= 'super' '.' 'constructor'
+  </pre>
+
+  <p>The keyword <tt>super</tt> is used to refer to superclass members from
+  a derived class method. This can be used to access members of a base class
+  overridden by the derived class. The following forms are allowed:
+
+  <ul>
+  <li>A base class property or method can be accessed with the form
+    <tt>super.name</tt>.</li>
+  <li>A base class subscript accessor can be accessed with the form
+    <tt>super[index]</tt>.</li>
+  <li>Within a constructor, a base class constructor can be accessed with the
+    form <tt>super.constructor</tt>.</li>
+  </ul>
+
+  <p><tt>super</tt> expressions are invalid outside of a derived class method.
+  <tt>super.constructor</tt> is invalid outside of a derived class constructor.
+  <tt>super.constructor</tt> furthermore may only be referenced once per derived
+  constructor.
+  </p>
+  
   <!-- ===================================================================== -->
   <h3 id="expr-explicit-closure">Explicit Closure Expression</h3>
   <!-- ===================================================================== -->
