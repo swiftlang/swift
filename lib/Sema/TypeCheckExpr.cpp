@@ -834,6 +834,10 @@ public:
     llvm_unreachable("super member ref not implemented");
   }
     
+  Expr *visitSuperConstructorRefCallExpr(SuperConstructorRefCallExpr *E) {
+    return TC.semaSuperConstructorRefCallExpr(E);
+  }
+    
   Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
     if (E->getDecl()->getType()->is<ErrorType>())
       return nullptr;
@@ -1350,6 +1354,64 @@ static Type makeSimilarLValue(Type objectType, Type lvalueType,
   return LValueType::get(objectType, qs, Context);
 }
 
+Expr *TypeChecker::semaSuperConstructorRefCallExpr(
+                                               SuperConstructorRefCallExpr *e) {
+  // If we already diagnosed an error, don't complain again.
+  if (e->getType() && e->getType()->is<ErrorType>())
+    return nullptr;
+
+  // If we already resolved the constructor function, analyze as a typical
+  // ApplyExpr.
+  if (e->getFn()) {
+    return semaApplyExpr(e);
+  }
+  
+  // If this is a valid super constructor call, the base should be a reference
+  // to a 'this' decl.
+  Expr *base = e->getArg();
+  if (!base || base->getType()->is<ErrorType>())
+    return nullptr;
+  ValueDecl *thisDecl = cast<DeclRefExpr>(base)->getDecl();
+  
+  // Get the superclass context, which will be the parent of the constructor
+  // context.
+  DeclContext *typeContext = thisDecl->getDeclContext()->getParent();
+  assert(typeContext && "constructor without parent context?!");
+  ClassDecl *classDecl = dyn_cast<ClassDecl>(typeContext);
+  if (!classDecl) {
+    diagnose(e->getLoc(), diag::super_constructor_not_in_class_constructor);
+    e->setType(ErrorType::get(Context));
+    return e;
+  }
+  // The class must have a base class.
+  if (!classDecl->hasBaseClass()) {
+    diagnose(e->getLoc(), diag::super_constructor_with_no_base_class);
+    e->setType(ErrorType::get(Context));
+    return e;
+  }
+  
+  Type superTy = classDecl->getBaseClass();
+  
+  // Look for constructors in the superclass.
+  ConstructorLookup lookup(superTy, TU);
+  assert(lookup.isSuccess() && "class with no constructor?!");
+  
+  // If there's only one, use it.
+  if (lookup.Results.size() == 1) {
+    ConstructorDecl *theCtor = cast<ConstructorDecl>(lookup.Results[0]);
+    assert(theCtor->getInitializerType() && "ctor not type checked");
+    // Since we're inside a constructor and have already allocated the instance,
+    // we reference the superclass initializing constructor, not the normal
+    // allocating constructor.
+    e->setFn(new (Context) DeclRefExpr(theCtor, e->getLoc(),
+                                       theCtor->getInitializerType()));
+    // Type-check the call.
+    return semaApplyExpr(e);
+  } else {
+    // Otherwise, build an overloaded reference.
+    llvm_unreachable("todo: overloaded super ctors");
+  }
+}
 
 Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // If we already diagnosed this as an error, don't complain again.
@@ -1366,7 +1428,7 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   }
   
   if (BaseTy->is<ErrorType>())
-    return 0;  // Squelch an erroneous subexpression.
+    return nullptr;  // Squelch an erroneous subexpression.
 
   // If the base expression is not an lvalue, make everything inside it
   // materializable.

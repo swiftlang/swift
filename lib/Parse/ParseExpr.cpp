@@ -212,7 +212,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
 ///     'super' '[' expr ']'
 NullablePtr<Expr> Parser::parseExprSuper() {
   SourceLoc superLoc = consumeToken(tok::kw_super);
-
+  
   if (Tok.is(tok::period)) {
     // 'super.' must be a member or constructor ref.
     SourceLoc dotLoc = consumeToken(tok::period);
@@ -220,11 +220,22 @@ NullablePtr<Expr> Parser::parseExprSuper() {
     if (Tok.is(tok::kw_constructor)) {
       // super.constructor
       SourceLoc ctorLoc = consumeToken(tok::kw_constructor);
+      
+      // The function expr will be resolved by sema. The base however should be
+      // 'this', which we get from the constructor context.
+      Expr *thisExpr = nullptr;
+      ConstructorDecl *ctor = dyn_cast<ConstructorDecl>(CurDeclContext);
+      if (ctor) {
+        thisExpr = new (Context) DeclRefExpr(ctor->getImplicitThisDecl(),
+                                             SourceLoc());
+      } else
+        diagnose(ctorLoc, diag::super_constructor_not_in_constructor);
+      
       return new (Context) SuperConstructorRefCallExpr(superLoc,
                                                        dotLoc,
                                                        ctorLoc,
-                                                       nullptr,
-                                                       nullptr);
+                                                       /*fnExpr=*/ nullptr,
+                                                       /*baseExpr=*/ thisExpr);
     } else {
       // super.foo
       SourceLoc nameLoc = Tok.getLoc();

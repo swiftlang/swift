@@ -1369,6 +1369,9 @@ class ConstructorDecl : public ValueDecl, public DeclContext {
   BraceStmt *Body;
   VarDecl *ImplicitThisDecl;
   GenericParamList *GenericParams;
+  
+  /// The type of the initializing constructor.
+  Type InitializerType = Type();
 
   /// \brief When non-null, the expression that should be used to
   /// allocate 'this'.
@@ -1429,6 +1432,10 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::ConstructorDecl;
   }
+  
+  /// Get the type of the initializing constructor.
+  Type getInitializerType() const { return InitializerType; }
+  void setInitializerType(Type t) { InitializerType = t; }
 };
 
 /// DestructorDecl - Declares a destructor for a type.  For example:

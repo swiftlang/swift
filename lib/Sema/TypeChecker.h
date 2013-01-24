@@ -364,6 +364,8 @@ public:
   Expr *semaSubscriptExpr(GenericSubscriptExpr *SE);
   Expr *semaApplyExpr(ApplyExpr *E);
   Expr *semaUnresolvedDotExpr(UnresolvedDotExpr *E);
+  Expr *semaSuperConstructorRefCallExpr(SuperConstructorRefCallExpr *E);
+
   void typeCheckIgnoredExpr(Expr *E);
   void typeCheckFunctionBody(FuncExpr *FE);
   void typeCheckConstructorBody(ConstructorDecl *CD);

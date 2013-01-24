@@ -574,6 +574,8 @@ public:
       CD->setType(ErrorType::get(TC.Context));
     } else {
       Type FnTy;
+      Type AllocFnTy;
+      Type InitFnTy;
       if (GenericParamList *innerGenericParams = CD->getGenericParams()) {
         innerGenericParams->setOuterParameters(outerGenericParams);
         FnTy = PolymorphicFunctionType::get(CD->getArguments()->getType(),
@@ -584,12 +586,16 @@ public:
                                  ThisTy, TC.Context);
       Type ThisMetaTy = MetaTypeType::get(ThisTy, TC.Context);
       if (outerGenericParams) {
-        FnTy = PolymorphicFunctionType::get(ThisMetaTy, FnTy, 
-                                            outerGenericParams, TC.Context);
+        AllocFnTy = PolymorphicFunctionType::get(ThisMetaTy, FnTy,
+                                                outerGenericParams, TC.Context);
+        InitFnTy = PolymorphicFunctionType::get(ThisTy, FnTy,
+                                                outerGenericParams, TC.Context);
       } else {
-        FnTy = FunctionType::get(ThisMetaTy, FnTy, TC.Context);
+        AllocFnTy = FunctionType::get(ThisMetaTy, FnTy, TC.Context);
+        InitFnTy = FunctionType::get(ThisTy, FnTy, TC.Context);
       }
-      CD->setType(FnTy);
+      CD->setType(AllocFnTy);
+      CD->setInitializerType(InitFnTy);
     }
 
     validateAttributes(CD);
