@@ -384,7 +384,10 @@
     <br><br><b>[2]</b> The '->' token is <a href="#reserved_punctuation">reserved punctuation</a>,
       and cannot be used as an operator identifier.
 
-    <br><br><b>[3]</b> The '//', '/*', and '*/' tokens are <a href="#whitespace">reserved for comments</a>,
+    <br><br><b>[3]</b> The unary '&' token is <a href="#reserved_punctuation">reserved punctuation</a>,
+      and cannot be used as an operator identifier.
+
+    <br><br><b>[4]</b> The '//', '/*', and '*/' tokens are <a href="#whitespace">reserved for comments</a>,
       and cannot be used as operator identifiers.
   </div>
 
@@ -396,7 +399,8 @@
 
       Note: excludes '=', see <b>[1]</b>
             excludes '->', see <b>[2]</b>
-            excludes '//', '/*', and '*/', see <b>[3]</b>
+            excludes unary '&', see <b>[3]</b>
+            excludes '//', '/*', and '*/', see <b>[4]</b>
             '..' is an operator, not two '.'s.
 
     operator-binary ::= operator
