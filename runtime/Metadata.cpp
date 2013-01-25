@@ -194,6 +194,10 @@ instantiateGenericMetadata(GenericMetadata *pattern,
 /// The primary entrypoint.
 const void *
 swift::swift_dynamicCastClass(const void *object, const ClassMetadata *targetType) {
+  // FIXME -- we really need a dedicated ObjC story for 'nil'
+  if (object == NULL) {
+    return NULL;
+  }
   const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
   do {
     if (isa == targetType) {
