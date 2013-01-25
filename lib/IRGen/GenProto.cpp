@@ -2669,6 +2669,10 @@ namespace {
       /// The polymorphic arguments are derived from a source class
       /// pointer.
       ClassPointer,
+      
+      /// The polymorphic arguments are derived from a class metadata
+      /// pointer.
+      ClassMetadata,
 
       /// The polymorphic arguments are passed from generic type
       /// metadata for the origin type.
@@ -2713,6 +2717,17 @@ namespace {
         } else if (auto boundTy = dyn_cast<BoundGenericType>(objTy)) {
           source = SourceKind::GenericLValueMetadata;
           considerBoundGenericType(boundTy, 0);
+        }
+      } else if (auto metatypeTy = dyn_cast<MetaTypeType>(argTy)) {
+        CanType objTy = CanType(metatypeTy->getInstanceType());
+        if (auto nomTy = dyn_cast<ClassType>(objTy)) {
+          source = SourceKind::ClassMetadata;
+          considerNominalType(nomTy, 0);
+        } else if (auto boundTy = dyn_cast<BoundGenericType>(objTy)) {
+          if (isa<ClassDecl>(boundTy->getDecl())) {
+            source = SourceKind::ClassMetadata;
+            considerBoundGenericType(boundTy, 0);
+          }
         }
       }
 
@@ -2831,6 +2846,9 @@ namespace {
       case SourceKind::None:
         return nullptr;
 
+      case SourceKind::ClassMetadata:
+        return in.getLastClaimed();
+          
       case SourceKind::ClassPointer:
         return emitHeapMetadataRefForHeapObject(IGF, in.getLastClaimed(),
                                                 getArgType(),
@@ -3085,6 +3103,7 @@ namespace {
       switch (getSourceKind()) {
       case SourceKind::None: return;
       case SourceKind::ClassPointer: return;
+      case SourceKind::ClassMetadata: return;
       case SourceKind::GenericLValueMetadata: {
         CanType argTy = stripLabel(substInputType);
         CanType objTy = CanType(cast<LValueType>(argTy)->getObjectType());
@@ -3195,6 +3214,7 @@ namespace {
       switch (getSourceKind()) {
       case SourceKind::None: return;
       case SourceKind::ClassPointer: return; // already accounted for
+      case SourceKind::ClassMetadata: return; // already accounted for
       case SourceKind::GenericLValueMetadata:
         return out.push_back(IGM.TypeMetadataPtrTy);
       }
