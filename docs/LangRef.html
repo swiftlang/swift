@@ -1978,13 +1978,6 @@ ill-formed if the type does not conform to the protocol.</p>
     Should this use the expr-identifier production to allow qualified
     identifiers?  This would allow "foo swift.+ bar".  Is ADL or something
     like it enough?<br><br>
-    
-    The ++/-- restriction is an unfortunate hack.  It happens because ++ and --
-    are typically used for their side effect, not their result value.  With the
-    current setup and no other solution, things like:
-    "<tt>var x = foo() ++y</tt>" get parsed as a single var declaration that
-    uses a binary ++ operator.  Disallowing them is an unsatisfying but
-    effective solution to this.  We should revisit this in the future.
   </div>
   
   <pre class="grammar">
