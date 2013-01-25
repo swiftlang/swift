@@ -745,8 +745,9 @@ namespace {
       type = FunctionType::get(type->castTo<FunctionType>()->getInput(),
                                thisTy, Impl.SwiftContext);
 
-      // Add the 'this' parameter to the function type.
-      type = FunctionType::get(thisMetaTy, type, Impl.SwiftContext);
+      // Add the 'this' parameter to the function types.
+      Type allocType = FunctionType::get(thisMetaTy, type, Impl.SwiftContext);
+      Type initType = FunctionType::get(thisTy, type, Impl.SwiftContext);
 
       VarDecl *thisVar = new (Impl.SwiftContext) VarDecl(SourceLoc(),
                                                           thisName, thisTy, dc);
@@ -758,7 +759,8 @@ namespace {
                                                             thisVar,
                                                             /*GenericParams=*/0,
                                                             dc);
-      result->setType(type);
+      result->setType(allocType);
+      result->setInitializerType(initType);
       thisVar->setDeclContext(result);
       setVarDeclContexts(argPatterns, result);
       setVarDeclContexts(bodyPatterns, result);
