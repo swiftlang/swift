@@ -779,7 +779,6 @@ static Callee emitSuperConstructorCallee(IRGenFunction &IGF,
                                           ExtraData::None));
 
   } else {
-    llvm::errs() << "bum\n";
     fnPtr = IGF.IGM.getAddrOfConstructor(ctor,
                                          ConstructorKind::Initializing,
                                          bestExplosion);
