@@ -1026,7 +1026,13 @@ Restart:
       return formToken(tok::eof, TokStart);
     
     return formToken(tok::r_paren,  TokStart);
-  case '{': return formToken(tok::l_brace,  TokStart);
+  case '{':
+    if (isStartOfLiteral()) {
+      return formToken(tok::l_brace, TokStart);
+    } else {
+      diagnose(CurPtr-1, diag::lex_reserved_non_literal_char);
+      return formToken(tok::unknown, TokStart);
+    }
   case '}': return formToken(tok::r_brace,  TokStart);
   case '[':
     return formToken(isStartOfLiteral()? tok::l_square: tok::l_square_subscript,
@@ -1070,9 +1076,19 @@ Restart:
   case '5': case '6': case '7': case '8': case '9':
     return lexNumber();
   case '\'':
-    return lexCharacterLiteral();
+    if (isStartOfLiteral()) {
+      return lexCharacterLiteral();
+    } else {
+      diagnose(CurPtr-1, diag::lex_reserved_non_literal_char);
+      return formToken(tok::unknown, TokStart);
+    }
   case '"':
-    return lexStringLiteral();
+    if (isStartOfLiteral()) {
+      return lexStringLiteral();
+    } else {
+      diagnose(CurPtr-1, diag::lex_reserved_non_literal_char);
+      return formToken(tok::unknown, TokStart);
+    }
   }
 }
 

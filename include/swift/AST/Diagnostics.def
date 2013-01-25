@@ -75,6 +75,8 @@ WARNING(lex_nul_character,lexing,none,
 
 ERROR(lex_invalid_utf8_character,lexing,none,
       "invalid utf8-encoded character found in source file", ())
+ERROR(lex_reserved_non_literal_char,lexing,none,
+        "non-literal use this character is reserved", ())
 
 ERROR(lex_unterminated_block_comment,lexing,none,
       "unterminated '/*' comment", ())
