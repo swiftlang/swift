@@ -314,6 +314,13 @@
     "4. km".  This regex is same as the Java floating point literal regex,
     except that we do not allow "4." and do not allow a trailing suffix that
     specifies a precision.
+
+    <br><br><b>FIXME:</b>
+    Should we allow float literals without a digit in front of the dot?
+    Our public SDKs show that normal float literals outnumber "dot floats"
+    933.5 to 1. And if we do not allow dot float literals, then '.' can behave
+    like a normal operator character, unlike today where we limit '.' as an
+    operator to a series of '.' characters.
   </div>
   
   <pre class="grammar">
