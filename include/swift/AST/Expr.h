@@ -407,28 +407,29 @@ public:
 /// OverloadedSuperConstructorRefExpr - A reference to an overloaded set of
 /// superclass constructors.
 class OverloadedSuperConstructorRefExpr : public OverloadSetRefExpr {
-  ValueDecl *This;
+  Expr *Base;
   SourceLoc SuperLoc;
   SourceLoc DotLoc;
   SourceLoc ConstructorLoc;
   
 public:
-  OverloadedSuperConstructorRefExpr(ValueDecl *This,
+  OverloadedSuperConstructorRefExpr(Expr *Base,
                                     SourceLoc SuperLoc,
                                     SourceLoc DotLoc,
                                     ArrayRef<ValueDecl *> Decls,
                                     SourceLoc ConstructorLoc,
                                     Type Ty)
     : OverloadSetRefExpr(ExprKind::OverloadedSuperConstructorRef, Decls, Ty),
-      This(This),
+      Base(Base),
       SuperLoc(SuperLoc),
       DotLoc(DotLoc),
       ConstructorLoc(ConstructorLoc) { }
 
+  SourceLoc getSuperLoc() const { return SuperLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
   SourceLoc getConstructorLoc() const { return ConstructorLoc; }
-  ValueDecl *getThis() const { return This; }
-  void setThis(ValueDecl *D) { This = D; }
+  Expr *getBase() const { return Base; }
+  void setBase(Expr *E) { Base = E; }
   
   SourceLoc getLoc() const { return ConstructorLoc; }
   SourceLoc getStartLoc() const {
@@ -442,6 +443,14 @@ public:
   static bool classof(const Expr *E) {
   return E->getKind() == ExprKind::OverloadedSuperConstructorRef;
   }
+  
+  /// Create an OverloadedSuperConstructorRef or SuperConstructorRef for the
+  /// given list of decls with the given base.
+  static Expr *createWithCopy(Expr *Base,
+                              SourceLoc SuperLoc,
+                              SourceLoc DotLoc,
+                              ArrayRef<ValueDecl *> Ctors,
+                              SourceLoc ConstructorLoc);
 };
   
 
@@ -2194,6 +2203,12 @@ public:
     : ThisApplyExpr(ExprKind::SuperConstructorRefCall, FnExpr, BaseExpr, Ty),
       SuperLoc(SuperLoc), DotLoc(DotLoc), ConstructorLoc(ConstructorLoc) {}
   
+  SourceLoc getSuperLoc() const {
+    return SuperLoc;
+  }
+  SourceLoc getDotLoc() const {
+    return DotLoc;
+  }
   SourceLoc getLoc() const {
     return ConstructorLoc;
   }

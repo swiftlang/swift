@@ -188,9 +188,11 @@ bool GenericMemberRefExpr::isBaseIgnored() const {
 Type OverloadSetRefExpr::getBaseType() const {
   if (isa<OverloadedDeclRefExpr>(this))
     return Type();
-  if (const OverloadedMemberRefExpr *DRE
-        = dyn_cast<OverloadedMemberRefExpr>(this)) {
+  if (auto *DRE = dyn_cast<OverloadedMemberRefExpr>(this)) {
     return DRE->getBase()->getType()->getRValueType();
+  }
+  if (auto *SCRE = dyn_cast<OverloadedSuperConstructorRefExpr>(this)) {
+    return SCRE->getBase()->getType()->getRValueType();
   }
   
   llvm_unreachable("Unhandled overloaded set reference expression");
@@ -283,6 +285,35 @@ GenericSubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
     D(D), Brackets(LBracketLoc, RBracketLoc), Base(Base), Index(Index) {
   assert(Base->getType()->getRValueType()->is<BoundGenericType>() &&
          "use SubscriptExpr for non-generic type subscript");
+}
+
+Expr *OverloadedSuperConstructorRefExpr::createWithCopy(Expr *Base,
+                                                  SourceLoc SuperLoc,
+                                                  SourceLoc DotLoc,
+                                                  ArrayRef<ValueDecl *> Ctors,
+                                                  SourceLoc ConstructorLoc) {
+  assert(!Ctors.empty() &&
+         "can't create empty overloaded super.constructor ref");
+  ASTContext &C = Ctors[0]->getASTContext();
+  if (Ctors.size() == 1) {
+    ConstructorDecl *candidateCtor = cast<ConstructorDecl>(Ctors[0]);
+    auto *ctorRef = new (C) DeclRefExpr(candidateCtor,
+                                        ConstructorLoc,
+                                        candidateCtor->getInitializerType());
+    
+    return new (C) SuperConstructorRefCallExpr(SuperLoc,
+                                               DotLoc,
+                                               ConstructorLoc,
+                                               ctorRef,
+                                               Base);
+  } else {
+    return new (C) OverloadedSuperConstructorRefExpr(Base,
+                                           SuperLoc,
+                                           DotLoc,
+                                           C.AllocateCopy(Ctors),
+                                           ConstructorLoc,
+                                           UnstructuredUnresolvedType::get(C));    
+  }
 }
 
 Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,

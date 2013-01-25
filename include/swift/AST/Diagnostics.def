@@ -889,7 +889,7 @@ ERROR(closure_not_function_type,sema_tce,none,
       "closure inferred to have non-function type %0", (Type))
 
 ERROR(super_constructor_not_in_class_constructor,sema_tce,none,
-      "'super.constructor' can only be called in a class constructor", ())
+      "'super.constructor' cannot be called in a constructor for a non-class type", ())
 ERROR(super_constructor_with_no_base_class,sema_tce,none,
       "'super.constructor' cannot be called in a root class constructor", ())
 

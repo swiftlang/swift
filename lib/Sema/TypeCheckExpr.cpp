@@ -1410,7 +1410,14 @@ Expr *TypeChecker::semaSuperConstructorRefCallExpr(
     return semaApplyExpr(e);
   } else {
     // Otherwise, build an overloaded reference.
-    llvm_unreachable("todo: overloaded super ctors");
+    auto resultsCopy = Context.AllocateCopy(lookup.Results);
+    auto unresolvedTy = UnstructuredUnresolvedType::get(Context);
+    return new (Context) OverloadedSuperConstructorRefExpr(e->getArg(),
+                                                           e->getSuperLoc(),
+                                                           e->getDotLoc(),
+                                                           resultsCopy,
+                                                           e->getLoc(),
+                                                           unresolvedTy);
   }
 }
 
