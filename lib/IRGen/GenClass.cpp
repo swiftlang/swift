@@ -29,6 +29,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/Support/CallSite.h"
 
 #include "Explosion.h"
 #include "GenFunc.h"
@@ -607,49 +608,98 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, CanType thisType) {
   return IGF.Builder.CreateBitCast(val, destType);
 }
 
-static void emitClassConstructor(IRGenModule &IGM, ConstructorDecl *CD) {
-  // FIXME: emit separate allocating and initializing constructors.
-  llvm::Function *fn = IGM.getAddrOfConstructor(CD, ConstructorKind::Allocating,
-                                                ExplosionKind::Minimal);
+static void emitClassAllocatingConstructor(IRGenModule &IGM,
+                                           ConstructorDecl *CD,
+                                           llvm::Function *allocFn,
+                                           llvm::Function *initFn) {
   auto thisDecl = CD->getImplicitThisDecl();
   CanType thisType = thisDecl->getType()->getCanonicalType();
-  auto &classTI = IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();
-
+  CanType thisMetaType = MetaTypeType::get(thisDecl->getType(), IGM.Context)
+    ->getCanonicalType();
+  
   Pattern* pats[] = {
     new (IGM.Context) AnyPattern(SourceLoc()),
     CD->getArguments()
   };
-  pats[0]->setType(MetaTypeType::get(thisDecl->getType(), IGM.Context));
+  pats[0]->setType(thisMetaType);
+  
   IRGenFunction IGF(IGM, CD->getType()->getCanonicalType(), pats,
-                    ExplosionKind::Minimal, 1, fn, Prologue::Standard);
+                    ExplosionKind::Minimal, 1, allocFn, Prologue::Bare);
+  
+  // Gather our arguments.
+  Explosion args = IGF.collectParameters();
+  
+  // Pick out the metatype we received and use it as the local type data for
+  // the 'this' type.
+  ManagedValue metadata = args.takeLast();
+  IGF.setUnscopedLocalTypeData(thisType,
+                               LocalTypeData::Metatype,
+                               metadata.getValue());
 
-  // Emit the "this" variable
-  Initialization I;
-  auto object = I.getObjectForDecl(thisDecl);
-  I.registerObject(IGF, object,
-                   thisDecl->hasFixedLifetime() ? NotOnHeap : OnHeap,
-                   classTI);
-  Address addr = I.emitVariable(IGF, thisDecl, classTI);
+  // We'll forward the rest of the arguments to the initializer.
+  SmallVector<llvm::Value*, 8> argValues;
+  for (ManagedValue arg : args.claimAll()) {
+    argValues.push_back(arg.getValue());
+  }
 
+  // Allocate the "this" value.
+  llvm::Value *thisValue;
   if (!CD->getAllocThisExpr()) {
-    FullExpr scope(IGF);
-    // Allocate the class.
-    llvm::Value *val = emitClassAllocation(IGF, thisType);
-    IGF.Builder.CreateStore(val, addr);
-
-    scope.pop();
-
-    I.markInitialized(IGF, I.getObjectForDecl(thisDecl));
+    thisValue = emitClassAllocation(IGF, thisType);
   } else {
     // Use the allocation expression described in the AST to initialize 'this'.
-    I.emitInit(IGF, object, addr, CD->getAllocThisExpr(), classTI);
+    Explosion allocedThis(ExplosionKind::Minimal);
+    IGF.emitRValue(CD->getAllocThisExpr(), allocedThis);
+    thisValue = allocedThis.claimNext().getValue();
   }
+  
+  // Pass 'this' on to the initializer.
+  argValues.push_back(thisValue);
+  
+  // Emit a tail call to the initializing constructor.
+  llvm::CallSite callSite = IGF.emitInvoke(initFn->getCallingConv(),
+                                           initFn, argValues,
+                                           initFn->getAttributes());
+  llvm::CallInst *call = cast<llvm::CallInst>(callSite.getInstruction());
+  call->setTailCall();
+  IGF.Builder.CreateRet(call);
+}
+
+static void emitClassInitializingConstructor(IRGenModule &IGM,
+                                             ConstructorDecl *CD,
+                                             llvm::Function *initFn) {
+  auto thisDecl = CD->getImplicitThisDecl();
+  CanType thisType = thisDecl->getType()->getCanonicalType();
+  
+  // The initializing constructor looks like a function with param patterns
+  // (this:T)(args...) -> T.
+  Pattern *pats[] = {
+    new (IGM.Context) NamedPattern(thisDecl),
+    CD->getArguments()
+  };
+  pats[0]->setType(thisType);
+
+  // Emit the constructor body, if any.
+  IRGenFunction IGF(IGM, CD->getInitializerType()->getCanonicalType(), pats,
+                    ExplosionKind::Minimal, 1, initFn, Prologue::Standard);
   
   IGF.emitConstructorBody(CD);
 }
 
-void IRGenModule::emitClassConstructor(ConstructorDecl *D) {
-  return ::emitClassConstructor(*this, D);
+static void emitClassConstructors(IRGenModule &IGM, ConstructorDecl *CD) {
+  llvm::Function *allocFn = IGM.getAddrOfConstructor(CD,
+                                                    ConstructorKind::Allocating,
+                                                    ExplosionKind::Minimal);
+  llvm::Function *initFn = IGM.getAddrOfConstructor(CD,
+                                                  ConstructorKind::Initializing,
+                                                  ExplosionKind::Minimal);
+
+  emitClassAllocatingConstructor(IGM, CD, allocFn, initFn);
+  emitClassInitializingConstructor(IGM, CD, initFn);
+}
+
+void IRGenModule::emitClassConstructors(ConstructorDecl *D) {
+  return ::emitClassConstructors(*this, D);
 }
 
 /// emitClassDecl - Emit all the declarations associated with this class type.
@@ -722,7 +772,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       if (SILMod && cd->getBody())
         continue;
       
-      ::emitClassConstructor(*this, cd);
+      ::emitClassConstructors(*this, cd);
       continue;
     }
     case DeclKind::Destructor: {

@@ -592,7 +592,7 @@ void IRGenFunction::emitExternalDefinition(Decl *D) {
       
       if (D->getDeclContext()->getDeclaredTypeOfContext()
             ->getClassOrBoundGenericClass()) {
-        IGM.emitClassConstructor(cast<ConstructorDecl>(D));
+        IGM.emitClassConstructors(cast<ConstructorDecl>(D));
       } else {
         IGM.emitConstructor(cast<ConstructorDecl>(D));
       }
@@ -707,27 +707,6 @@ llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
   return entry;
 }
 
-/// Turn a constructor type T.metatype -> (...) -> T into an initializing
-/// constructor type T -> (...) -> T.
-CanType getInitializingConstructorType(CanType allocatingType) {
-  assert(allocatingType->hasReferenceSemantics() &&
-         "value types don't have initializing constructors");
-  FunctionType *argsTy = allocatingType->castTo<AnyFunctionType>()->getResult()
-    ->castTo<FunctionType>();
-  Type thisTy = argsTy->getResult();
-  if (PolymorphicFunctionType *polyTy =
-        allocatingType->getAs<PolymorphicFunctionType>()) {
-    return PolymorphicFunctionType::get(thisTy, argsTy,
-                                        &polyTy->getGenericParams(),
-                                        thisTy->getASTContext())
-      ->getCanonicalType();
-  } else {
-    return FunctionType::get(thisTy, argsTy,
-                             thisTy->getASTContext())
-      ->getCanonicalType();
-  }
-}
-
 /// Fetch the declaration of the given known function.
 llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
                                                   ConstructorKind ctorKind,
@@ -740,11 +719,11 @@ llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
-  CanType formalType = cons->getType()->getCanonicalType();
-  // Derive the initializing constructor type from the constructor type if
-  // necessary.
+  CanType formalType;
   if (ctorKind == ConstructorKind::Initializing)
-    formalType = getInitializingConstructorType(formalType);
+    formalType = cons->getInitializerType()->getCanonicalType();
+  else
+    formalType = cons->getType()->getCanonicalType();
   
   llvm::FunctionType *fnType =
     getFunctionType(formalType, explodeLevel, uncurryLevel, ExtraData::None);

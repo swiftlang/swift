@@ -297,7 +297,7 @@ public:
   void emitStaticMethod(FuncDecl *D);
   void emitInstanceMethod(FuncDecl *D);
   void emitConstructor(ConstructorDecl *D);
-  void emitClassConstructor(ConstructorDecl *D);
+  void emitClassConstructors(ConstructorDecl *D);
   
   void emitSILConstant(SILConstant c, swift::Function *f);
 

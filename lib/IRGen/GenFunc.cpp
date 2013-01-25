@@ -764,6 +764,11 @@ static Callee emitSuperConstructorCallee(IRGenFunction &IGF,
                                          ArrayRef<Substitution> subs,
                                          ExplosionKind bestExplosion,
                                          unsigned bestUncurry) {
+  if (bestExplosion != ExplosionKind::Minimal) {
+    auto absCallee = AbstractCallee::forDirectFunction(IGF, ctor);
+    bestExplosion = absCallee.getBestExplosionLevel();
+  }
+
   llvm::Constant *fnPtr;
   if (bestUncurry != 1) {
     IGF.unimplemented(ctor->getLoc(),
@@ -774,6 +779,7 @@ static Callee emitSuperConstructorCallee(IRGenFunction &IGF,
                                           ExtraData::None));
 
   } else {
+    llvm::errs() << "bum\n";
     fnPtr = IGF.IGM.getAddrOfConstructor(ctor,
                                          ConstructorKind::Initializing,
                                          bestExplosion);
@@ -2900,7 +2906,7 @@ static void emitParameterClause(IRGenFunction &IGF, AnyFunctionType *fnType,
 /// Emit all the parameter clauses of the given function type.  This
 /// is basically making sure that we have mappings for all the
 /// VarDecls bound by the pattern.
-static void emitParameterClauses(IRGenFunction &IGF,
+void irgen::emitParameterClauses(IRGenFunction &IGF,
                                  Type type,
                                  llvm::ArrayRef<Pattern*> paramClauses,
                                  Explosion &args) {

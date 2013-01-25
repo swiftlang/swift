@@ -65,6 +65,14 @@ namespace irgen {
                                       ArrayRef<const TypeInfo *> argTypes,
                                       CanType outType,
                                       Explosion &out);
+  
+  /// Emit all the parameter clauses of the given function type.  This
+  /// is basically making sure that we have mappings for all the
+  /// VarDecls bound by the pattern.
+  void emitParameterClauses(IRGenFunction &IGF,
+                            Type type,
+                            llvm::ArrayRef<Pattern*> paramClauses,
+                            Explosion &args);
 } // end namespace irgen
 } // end namespace swift
 
