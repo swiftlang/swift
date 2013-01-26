@@ -188,25 +188,6 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
 }
 
 bool Lexer::isStartOfLiteral() {
-  // For these purposes, the start of the file is considered to be
-  // preceeded by infinite whitespace.
-  if (CurPtr - 1 == BufferStart)
-    return true;
-
-  char LastChar = *(CurPtr - 2);
-  if (isspace(LastChar) || LastChar == '\0')
-    return true;
-
-  // If we are not preceded by white space, and if '(', '[', and '.' are
-  // preceded by identifiers, certain keywords, literals, or "closing" tokens
-  // (i.e. ')', ']', and
-  // '}'), then '(', '[', and '.' represent function calls, subscripting, and
-  // field access respectively. The rest are literals.
-  //
-  // For example:
-  // f(.42,[1,2,3,4])[42].bar();.42.print();[1,2,3,4].print();(1,2).$0.print()
-  // return { 42 }()
-  //
   // Note: "NextToken" is actually the soon to be previous token.
   switch (NextToken.getKind()) {
 #define IDENTIFIER_KEYWORD(kw) case tok::kw_##kw:
@@ -219,8 +200,12 @@ bool Lexer::isStartOfLiteral() {
   case tok::character_literal:
   case tok::r_paren:
   case tok::r_square:
-  case tok::r_brace:
-    return false;
+  case tok::r_brace: {
+    // If there is whitespace between the above tokens and this one,
+    // then the current token is a literal.
+    char LastChar = *(CurPtr - 2);
+    return isspace(LastChar) || LastChar == '\0';
+  }
   default:
     return true;
   }
