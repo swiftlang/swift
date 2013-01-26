@@ -64,6 +64,8 @@ struct SILConstant {
     : loc(loc), id(id) {}
   
   SILConstant(Loc loc);
+    
+  bool isNull() const { return loc.isNull(); }
   
   bool hasDecl() const { return loc.is<ValueDecl*>(); }
   bool hasExpr() const { return loc.is<CapturingExpr*>(); }

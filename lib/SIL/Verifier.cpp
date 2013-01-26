@@ -375,6 +375,13 @@ public:
     assert(SAI->getDestArchetypeAddress().getType().is<ArchetypeType>() &&
            "super_to_archetype dest must be an archetype address");
   }
+
+  void visitUpcastInst(UpcastInst *UI) {
+    assert(UI->getOperand().getType().hasReferenceSemantics() &&
+           "upcast operand must be a reference type");
+    assert(UI->getType().hasReferenceSemantics() &&
+           "upcast must convert to a reference type");
+  }
   
   void visitDowncastInst(DowncastInst *DI) {
     assert(DI->getOperand().getType().hasReferenceSemantics() &&

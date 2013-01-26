@@ -542,7 +542,18 @@ public:
   }
 };
 
-/// DowncastInst - Perform a checked conversion of a value to a subclass type.
+/// UpcastInst - Perform a conversion of a class instance to a supertype.
+class UpcastInst : public ConversionInst {
+public:
+  UpcastInst(SILLocation Loc, Value Operand, SILType ty);
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::UpcastInst;
+  }
+};
+
+/// DowncastInst - Perform a checked conversion of a class instance to a
+/// subclass type.
 class DowncastInst : public ConversionInst {
 public:
   DowncastInst(SILLocation Loc, Value Operand, SILType ty);

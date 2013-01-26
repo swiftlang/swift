@@ -390,7 +390,11 @@ static ManagedValue emitImplicitConvert(SILGenFunction &gen,
 
 ManagedValue SILGenFunction::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
                                                     SGFContext C) {
-  return emitImplicitConvert(*this, E);
+  ManagedValue original = visit(E->getSubExpr());
+  Value converted = B.createUpcast(E,
+                                   original.getValue(),
+                                   getLoweredType(E->getType()));
+  return ManagedValue(converted, original.getCleanup());
 }
 
 ManagedValue SILGenFunction::visitMetatypeConversionExpr(
@@ -1299,9 +1303,9 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     SILConstant dtorConstant =
       SILConstant(baseTy->getClassOrBoundGenericClass(),
                   SILConstant::Destructor);
-    Value baseThis = B.createImplicitConvert(dd,
-                                             thisValue,
-                                             getLoweredLoadableType(baseTy));
+    Value baseThis = B.createUpcast(dd,
+                                    thisValue,
+                                    getLoweredLoadableType(baseTy));
     ManagedValue dtorValue = emitMethodRef(dd, baseThis, dtorConstant);
     B.createApply(dd, dtorValue.forward(*this),
                   SILType::getEmptyTupleType(SGM.M.getContext()),

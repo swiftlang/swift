@@ -336,6 +336,10 @@ CoerceInst::CoerceInst(SILLocation Loc, Value Operand, SILType Ty)
   : ConversionInst(ValueKind::CoerceInst, Loc, Operand, Ty) {
 }
 
+UpcastInst::UpcastInst(SILLocation Loc, Value Operand, SILType Ty)
+  : ConversionInst(ValueKind::UpcastInst, Loc, Operand, Ty) {
+}
+
 DowncastInst::DowncastInst(SILLocation Loc, Value Operand, SILType Ty)
   : ConversionInst(ValueKind::DowncastInst, Loc, Operand, Ty) {
 }

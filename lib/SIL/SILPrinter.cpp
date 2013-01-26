@@ -48,6 +48,11 @@ raw_ostream &operator<<(raw_ostream &OS, ID i) {
 }
 
 void SILConstant::print(raw_ostream &OS) const {
+  if (isNull()) {
+    OS << "<null sil constant>";
+    return;
+  }
+  
   if (hasDecl()) {
     OS << getDecl()->getName();
   } else {
@@ -282,6 +287,9 @@ public:
   }
   void visitCoerceInst(CoerceInst *CI) {
     printConversionInst(CI, "coerce");
+  }
+  void visitUpcastInst(UpcastInst *CI) {
+    printConversionInst(CI, "upcast");
   }
   void visitDowncastInst(DowncastInst *CI) {
     printConversionInst(CI, "downcast");

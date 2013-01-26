@@ -191,6 +191,10 @@ public:
     return insert(new CoerceInst(Loc, Op, Ty));
   }
   
+  UpcastInst *createUpcast(SILLocation Loc, Value Op, SILType Ty) {
+    return insert(new UpcastInst(Loc, Op, Ty));
+  }
+  
   DowncastInst *createDowncast(SILLocation Loc, Value Op, SILType Ty) {
     return insert(new DowncastInst(Loc, Op, Ty));
   }
