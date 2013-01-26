@@ -34,7 +34,8 @@ namespace irgen {
 
 struct PartialCall {
   CallEmission emission;
-  unsigned remainingCurryLevels;
+  unsigned remainingCurryLevels : 31;
+  bool isDestructor : 1;
   
   PartialCall() = default;
   PartialCall(PartialCall const &) = default;
@@ -190,10 +191,15 @@ public:
   
   /// Create a new PartialCall corresponding to the given SIL value.
   PartialCall &newLoweredPartialCall(swift::Value v,
+                                     SILConstant c,
                                      unsigned naturalCurryLevel,
                                      CallEmission &&emission) {
     auto inserted = loweredValues.insert({v, LoweredValue{
-      PartialCall{std::move(emission), naturalCurryLevel+1}
+      PartialCall{
+        std::move(emission),
+        naturalCurryLevel+1,
+        /*isDestructor=*/ c.isDestructor()
+      }
     }});
     assert(inserted.second && "already had lowered value for sil value?!");
     return inserted.first->second.getPartialCall();
@@ -294,11 +300,6 @@ public:
   void visitReturnInst(ReturnInst *i);
   void visitBranchInst(BranchInst *i);
   void visitCondBranchInst(CondBranchInst *i);
-  
-  //===--------------------------------------------------------------------===//
-  // Helpers
-  //===--------------------------------------------------------------------===//
-  void emitApplyArgument(Explosion &args, LoweredValue &newArg);
 };
 
 } // end namespace irgen

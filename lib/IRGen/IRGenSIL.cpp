@@ -24,6 +24,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
+#include "swift/SIL/SILConstant.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -189,7 +190,7 @@ PartialCall IRGenSILFunction::getLoweredPartialCall(swift::Value v) {
                                              // FIXME how to know explosion kind?
                                              e.getKind(),
                                              0);
-    return PartialCall{CallEmission(*this, callee), 1};
+    return PartialCall{CallEmission(*this, callee), 1, false};
   }
   case LoweredValue::Kind::Address:
     llvm_unreachable("function lowered as address?!");
@@ -257,6 +258,7 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
     // FIXME: distinguish between destructor variants in SIL
     assert(constant.id == SILConstant::Destructor &&
            "non-destructor reference to ClassDecl?!");
+    naturalCurryLevel = 0;
     fnptr = getAddrOfDestructor(cast<ClassDecl>(vd),
                                 DestructorKind::Destroying);
     cc = AbstractCC::Method;
@@ -315,6 +317,7 @@ void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
                                ExplosionKind::Minimal,
                                naturalCurryLevel);
   newLoweredPartialCall(Value(i, 0),
+                        i->getConstant(),
                         naturalCurryLevel,
                         CallEmission(*this, callee));
 }
@@ -335,6 +338,34 @@ static void scrubCleanups(IRGenFunction &IGF, Explosion &in, Explosion &out) {
     out.addUnmanaged(v);
 }
 
+static void emitApplyArgument(IRGenSILFunction &IGF,
+                              PartialCall const &call,
+                              Explosion &args,
+                              LoweredValue &newArg) {
+  switch (newArg.kind) {
+    case LoweredValue::Kind::Explosion:
+      if (call.isDestructor) {
+        // Destructors surface to SIL as T -> () but have LLVM signature
+        // void (%swift.refcounted*).
+        assert(newArg.getExplosion().size() == 1 &&
+               "destructible thing should explode to one argument");
+        llvm::Value *v = newArg.getExplosion().getAll()[0].getUnmanagedValue();
+        args.addUnmanaged(IGF.Builder.CreateBitCast(v,
+                                                    IGF.IGM.RefCountedPtrTy));
+        break;
+      }
+      
+      args.add(newArg.getExplosion().getAll());
+      break;
+    case LoweredValue::Kind::Address:
+      args.addUnmanaged(newArg.getAddress().getAddress());
+      break;
+    case LoweredValue::Kind::PartialCall:
+      llvm_unreachable("partial call lowering not implemented");
+      break;
+  }
+}
+
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   Value v(i, 0);
   
@@ -346,7 +377,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   PartialCall parent = getLoweredPartialCall(i->getCallee());
   Explosion args(ExplosionKind::Minimal);
   for (Value arg : i->getArguments()) {
-    emitApplyArgument(args, getLoweredValue(arg));
+    emitApplyArgument(*this, parent, args, getLoweredValue(arg));
   }
   parent.emission.addArg(args);
   
@@ -380,7 +411,7 @@ void IRGenSILFunction::visitClosureInst(swift::ClosureInst *i) {
   Explosion args(ExplosionKind::Minimal);
   SmallVector<const TypeInfo *, 8> argTypes;
   for (Value arg : i->getArguments()) {
-    emitApplyArgument(args, getLoweredValue(arg));
+    emitApplyArgument(*this, parent, args, getLoweredValue(arg));
     argTypes.push_back(&getFragileTypeInfo(arg.getType().getSwiftType()));
   }
   
@@ -390,21 +421,6 @@ void IRGenSILFunction::visitClosureInst(swift::ClosureInst *i) {
   emitFunctionPartialApplication(*this, fnPtr, args, argTypes,
                                  closureTy,
                                  function);
-}
-
-void IRGenSILFunction::emitApplyArgument(Explosion &args,
-                                         LoweredValue &newArg) {
-  switch (newArg.kind) {
-  case LoweredValue::Kind::Explosion:
-    args.add(newArg.getExplosion().getAll());
-    break;
-  case LoweredValue::Kind::Address:
-    args.addUnmanaged(newArg.getAddress().getAddress());
-    break;
-  case LoweredValue::Kind::PartialCall:
-    llvm_unreachable("partial call lowering not implemented");
-    break;
-  }
 }
 
 void IRGenSILFunction::visitZeroValueInst(swift::ZeroValueInst *i) {
@@ -750,7 +766,9 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
                                                       member,
                                                       resultTy,
                                                       /*subs=*/ {});
-  newLoweredPartialCall(Value(i,0), /*naturalCurryLevel=*/1,
+  newLoweredPartialCall(Value(i,0),
+                        SILConstant(),
+                        /*naturalCurryLevel=*/1,
                         std::move(call));
 }
 
