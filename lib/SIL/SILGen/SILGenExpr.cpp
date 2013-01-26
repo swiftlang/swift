@@ -379,15 +379,6 @@ ManagedValue SILGenFunction::visitMaterializeExpr(MaterializeExpr *E,
   return ManagedValue(emitMaterialize(*this, E, V).address);
 }
 
-static ManagedValue emitImplicitConvert(SILGenFunction &gen,
-                                        ImplicitConversionExpr *e) {
-  ManagedValue original = gen.visit(e->getSubExpr());
-  Value converted = gen.B.createImplicitConvert(e,
-                                        original.getValue(),
-                                        gen.getLoweredType(e->getType()));
-  return ManagedValue(converted, original.getCleanup());
-}
-
 ManagedValue SILGenFunction::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
                                                     SGFContext C) {
   ManagedValue original = visit(E->getSubExpr());
@@ -423,6 +414,15 @@ ManagedValue SILGenFunction::visitArchetypeToSuperExpr(
     emitRetainRValue(E, base);
   }
   return emitManagedRValueWithCleanup(base);
+}
+
+static ManagedValue emitImplicitConvert(SILGenFunction &gen,
+                                        ImplicitConversionExpr *e) {
+  ManagedValue original = gen.visit(e->getSubExpr());
+  Value converted = gen.B.createImplicitConvert(e,
+                                                original.getValue(),
+                                                gen.getLoweredType(e->getType()));
+  return ManagedValue(converted, original.getCleanup());
 }
 
 ManagedValue SILGenFunction::visitRequalifyExpr(RequalifyExpr *E,
@@ -475,8 +475,10 @@ ManagedValue SILGenFunction::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
 ManagedValue SILGenFunction::visitDowncastExpr(DowncastExpr *E, SGFContext C) {
   // FIXME: do something with lhs value?
   visit(E->getLHS());
-  return ManagedValue(B.createDowncast(E, visit(E->getRHS()).getValue(),
-                                       getLoweredLoadableType(E->getType())));
+  ManagedValue original = visit(E->getRHS());
+  Value converted = B.createDowncast(E, original.getValue(),
+                                     getLoweredLoadableType(E->getType()));
+  return ManagedValue(converted, original.getCleanup());
 }
 
 ManagedValue SILGenFunction::visitSuperToArchetypeExpr(SuperToArchetypeExpr *E,
