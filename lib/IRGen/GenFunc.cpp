@@ -3441,11 +3441,6 @@ static void emitSILFunction(IRGenModule &IGM,
   // Emit the code for the function.
   PrettyStackTraceSILConstant stackTrace("emitting IR from SIL for", c);
   
-  DEBUG(llvm::dbgs() << "emitting SIL function: ";
-        c.print(llvm::dbgs());
-        llvm::dbgs() << '\n';
-        f->print(llvm::dbgs()));
-  
   IRGenSILFunction igs(IGM,
                        f->getLoweredType().getSwiftType(),
                        explosionLevel,

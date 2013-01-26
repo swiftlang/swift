@@ -60,6 +60,11 @@ IRGenSILFunction::~IRGenSILFunction() {
 
 void IRGenSILFunction::emitSILFunction(SILConstant c,
                                        swift::Function *f) {
+  DEBUG(llvm::dbgs() << "emitting SIL function: ";
+        c.print(llvm::dbgs());
+        llvm::dbgs() << '\n';
+        f->print(llvm::dbgs()));
+  
   assert(!f->empty() && "function has no basic blocks?!");
   
   CurConstant = c;
@@ -664,6 +669,16 @@ void IRGenSILFunction::visitCoerceInst(swift::CoerceInst *i) {
   Explosion &from = getLoweredExplosion(i->getOperand());
   // FIXME: could change explosion level here?
   to.add(from.getAll());
+}
+
+void IRGenSILFunction::visitUpcastInst(swift::UpcastInst *i) {
+  Explosion &to = newLoweredExplosion(Value(i, 0));
+  Explosion &from = getLoweredExplosion(i->getOperand());
+  assert(from.size() == 1 && "class should explode to single value");
+  const TypeInfo &toTI = getFragileTypeInfo(i->getType().getSwiftType());
+  llvm::Value *fromValue = from.getRange(0, 1)[0].getUnmanagedValue();
+  to.addUnmanaged(Builder.CreateBitCast(fromValue,
+                                        toTI.getStorageType()));
 }
 
 void IRGenSILFunction::visitDowncastInst(swift::DowncastInst *i) {

@@ -282,6 +282,7 @@ public:
 
   void visitImplicitConvertInst(ImplicitConvertInst *i);
   void visitCoerceInst(CoerceInst *i);
+  void visitUpcastInst(UpcastInst *i);
   void visitDowncastInst(DowncastInst *i);
   //void visitArchetypeToSuperInst(ArchetypeToSuperInst *i);
   //void visitSuperToArchetypeInst(SuperToArchetypeInst *i);
