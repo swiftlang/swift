@@ -228,9 +228,20 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E, SGFContext C) {
   
   emitApplyArguments(E->getArg(), ArgsV);
   
-  ManagedValue r = emitApply(E, FnV, ArgsV);
+  return emitApply(E, FnV, ArgsV);
+}
 
-  return r;
+ManagedValue SILGenFunction::visitSuperConstructorRefCallExpr(
+                                                SuperConstructorRefCallExpr *E,
+                                                SGFContext C) {
+  // A SuperConstructorRefCall really references the initializing constructor,
+  // not the main allocating constructor entry point.
+  ConstructorDecl *ctor = E->getConstructor();
+  Value initializer = emitGlobalConstantRef(E->getFn(),
+                                  SILConstant(ctor, SILConstant::Initializer));
+  llvm::SmallVector<Value, 10> ArgsV;
+  emitApplyArguments(E->getArg(), ArgsV);
+  return emitApply(E, initializer, ArgsV);
 }
 
 Value SILGenFunction::emitGlobalConstantRef(SILLocation loc,
