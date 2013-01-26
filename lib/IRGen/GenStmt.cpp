@@ -215,11 +215,16 @@ void IRGenFunction::emitDoWhileStmt(DoWhileStmt *S) {
   
   // Set the destinations for 'break' and 'continue'
   llvm::BasicBlock *endBB = createBasicBlock("dowhile.end");
+  llvm::BasicBlock *condBB = createBasicBlock("dowhile.cond");
   BreakDestStack.emplace_back(endBB, getCleanupsDepth());
-  ContinueDestStack.emplace_back(loopBB, getCleanupsDepth());
+  ContinueDestStack.emplace_back(condBB, getCleanupsDepth());
 
   // Emit the body, which is always evaluated the first time around.
   emitStmt(S->getBody());
+
+  // Let's not differ from C99 6.8.5.2: "The evaluation of the controlling
+  // expression takes place after each execution of the loop body."
+  emitOrDeleteBlock(*this, condBB);
 
   if (Builder.hasValidIP()) {
 
