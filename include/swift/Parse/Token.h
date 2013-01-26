@@ -75,7 +75,11 @@ public:
   bool isNotAnyOperator() const {
     return !isAnyOperator();
   }
-  
+
+  bool isContextualKeyword(StringRef ContextKW) const {
+    return is(tok::identifier) && Text == ContextKW;
+  }
+
   bool isAnyLParen() const {
     return Kind == tok::l_paren || Kind == tok::l_paren_call;
   }

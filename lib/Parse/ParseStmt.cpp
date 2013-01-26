@@ -146,8 +146,7 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
   
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
     if (IsGetSet) {
-      Identifier Id = Context.getIdentifier(Tok.getText());
-      if (Id == GetIdent || Id == SetIdent)
+      if (Tok.isContextualKeyword("get") || Tok.isContextualKeyword("set"))
         break;
     }
 
@@ -382,9 +381,9 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
   }
   
   // If we have a leading identifier followed by a ':' or 'in', then this is a
-  // pattern, so it is foreach. 
-  if (Tok.is(tok::identifier) && 
-      (peekToken().is(tok::colon) || peekToken().is(tok::kw_in)))
+  // pattern, so it is foreach.
+  if (Tok.is(tok::identifier) &&
+      (peekToken().is(tok::colon) || peekToken().isContextualKeyword("in")))
     return parseStmtForEach(ForLoc);
 
   // Otherwise, this is some sort of c-style for loop.
@@ -486,8 +485,7 @@ NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
     return parseStmtForCStyle(ForLoc, LPLoc, CForLoopHack);
   }
 
-  // 'in'
-  if (!Tok.is(tok::kw_in)) {
+  if (!Tok.isContextualKeyword("in")) {
     if (Pattern.isNonNull())
       diagnose(Tok.getLoc(), diag::expected_foreach_in);
     return nullptr;

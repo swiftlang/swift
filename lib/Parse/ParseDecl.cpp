@@ -660,11 +660,6 @@ void Parser::addVarsToScope(Pattern *Pat,
 bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                          Type ElementTy, FuncDecl *&Get, FuncDecl *&Set,
                          SourceLoc &LastValidLoc) {
-  if (GetIdent.empty()) {
-    GetIdent = Context.getIdentifier("get");
-    SetIdent = Context.getIdentifier("set");
-  }
-
   bool Invalid = false;
   Get = 0;
   Set = 0;
@@ -674,9 +669,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Invalid = true;
       break;
     }
-    Identifier Id = Context.getIdentifier(Tok.getText());
-    
-    if (Id == GetIdent || Id != SetIdent) {
+    if (Tok.isContextualKeyword("get") || !Tok.isContextualKeyword("set")) {
       //   get         ::= 'get' stmt-brace
       
       // Have we already parsed a get clause?
@@ -689,7 +682,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       }
       
       SourceLoc GetLoc = Tok.getLoc(), ColonLoc = Tok.getLoc();
-      if (Id == GetIdent) {
+      if (Tok.isContextualKeyword("get")) {
         GetLoc = consumeToken();
         if (Tok.isNot(tok::colon)) {
           diagnose(Tok.getLoc(), diag::expected_colon_get);
@@ -870,8 +863,6 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 ///   decl-var:
 ///      'var' attribute-list identifier : type-annotation { get-set }
 void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
-  assert(!GetIdent.empty() && "No 'get' identifier?");
-  assert(!SetIdent.empty() && "No 'set' identifier?");
   bool Invalid = false;
     
   // The grammar syntactically requires a simple identifier for the variable
@@ -957,11 +948,6 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
     if (Tok.is(tok::l_brace)) {
-      // Get the identifiers for both 'get' and 'set'.
-      if (GetIdent.empty()) {
-        GetIdent = Context.getIdentifier("get");
-        SetIdent = Context.getIdentifier("set");
-      }
       parseDeclVarGetSet(*pattern.get(), Flags & PD_HasContainerType);
       HasGetSet = true;
     }

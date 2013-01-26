@@ -42,10 +42,7 @@ namespace swift {
 class Parser {
   Parser(const Parser&) = delete;
   void operator=(const Parser&) = delete;
-  
-  Identifier GetIdent;
-  Identifier SetIdent;
-  
+
 public:
   llvm::SourceMgr &SourceMgr;
   DiagnosticEngine &Diags;
