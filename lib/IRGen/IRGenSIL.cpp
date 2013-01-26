@@ -324,6 +324,17 @@ void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
                   newLoweredExplosion(Value(i, 0)));
 }
 
+/// This is a hack to kill off cleanups emitted by some IRGen infrastructure.
+/// SIL code should always have memory management within it explicitly lowered.
+static void scrubCleanups(IRGenFunction &IGF, Explosion &in, Explosion &out) {
+  SmallVector<llvm::Value*, 4> scrubbed;
+  while (!in.empty()) {
+    scrubbed.push_back(in.claimNext().forward(IGF));
+  }
+  for (auto v : scrubbed)
+    out.addUnmanaged(v);
+}
+
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   Value v(i, 0);
   
@@ -342,7 +353,9 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   if (--parent.remainingCurryLevels == 0) {
     // If this brought the call to its natural curry level, emit the call.
     Explosion &result = newLoweredExplosion(v);
-    parent.emission.emitToExplosion(result);
+    Explosion tmp(result.getKind());
+    parent.emission.emitToExplosion(tmp);
+    scrubCleanups(*this, tmp, result);
   } else {
     // If not, pass the partial emission forward.
     moveLoweredPartialCall(v, std::move(parent));
