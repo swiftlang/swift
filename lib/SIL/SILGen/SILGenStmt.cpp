@@ -227,12 +227,17 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S, SGFContext C) {
   
   // Set the destinations for 'break' and 'continue'
   BasicBlock *EndBB = new (F.getModule()) BasicBlock(&F, "dowhile.end");
+  BasicBlock *CondBB = new (F.getModule()) BasicBlock(&F, "dowhile.cond");
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
-  ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth());
+  ContinueDestStack.emplace_back(CondBB, getCleanupsDepth());
   
   // Emit the body, which is always evaluated the first time around.
   visit(S->getBody());
-  
+
+  // Let's not differ from C99 6.8.5.2: "The evaluation of the controlling
+  // expression takes place after each execution of the loop body."
+  emitOrDeleteBlock(B, CondBB);
+
   if (B.hasValidInsertionPoint()) {
     // Evaluate the condition with the false edge leading directly
     // to the continuation block.
