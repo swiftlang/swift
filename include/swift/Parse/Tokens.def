@@ -90,6 +90,7 @@ PUNCTUATOR(semi,        ";")
 PUNCTUATOR(equal,       "=")
 PUNCTUATOR(ellipsis,    "...")
 
+PUNCTUATOR(make_ref,    "&")
 PUNCTUATOR(arrow,       "->")
 
 #undef KEYWORD

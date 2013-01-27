@@ -676,10 +676,8 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       return;
     }
 
-    // The unary operator '&' cannot be overloaded.  In an expression,
-    // the parser never interprets this as a normal unary operator
-    // anyway.
-    if (NumArguments == 1 && VD->getName().str() == "&") {
+    // The unary prefix operator '&' is reserved and cannot be overloaded.
+    if (NumArguments == 1 && VD->getName().str() == "&" && !Attrs.isPostfix()) {
       TC.diagnose(VD->getStartLoc(), diag::custom_operator_addressof);
       return;
     }

@@ -241,6 +241,7 @@
     punctuation ::= '='
     punctuation ::= '-&gt;'
     punctuation ::= '...'
+    punctuation ::= '&amp;' // unary prefix operator
   </pre>
 
   <p>These are all reserved punctuation that are lexed into tokens.  Most other
@@ -399,10 +400,10 @@
     and in general users cannot provide custom definitions for the '=' operator.
     This distinctly differs from C++, which allows '=' to be overloaded.
 
-    <br><br><b>[2]</b> The '->' token is <a href="#reserved_punctuation">reserved punctuation</a>,
+    <br><br><b>[2]</b> The '-&gt;' token is <a href="#reserved_punctuation">reserved punctuation</a>,
       and cannot be used as an operator identifier.
 
-    <br><br><b>[3]</b> The unary '&' token is <a href="#reserved_punctuation">reserved punctuation</a>,
+    <br><br><b>[3]</b> The unary prefix '&amp;' token is <a href="#reserved_punctuation">reserved punctuation</a>,
       and cannot be used as an operator identifier.
 
     <br><br><b>[4]</b> The '//', '/*', and '*/' tokens are <a href="#whitespace">reserved for comments</a>,

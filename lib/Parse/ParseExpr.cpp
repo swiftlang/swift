@@ -80,20 +80,18 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
     Tok.setKind(tok::oper_prefix);
   }
 
+  if (Tok.is(tok::make_ref)) {
+    SourceLoc Loc = consumeToken(tok::make_ref);
+
+    if (Expr *SubExpr = parseExprUnary(Message).getPtrOrNull())
+      return new (Context) AddressOfExpr(Loc, SubExpr, Type());
+    return 0;
+  }
+
   // If the next token is not an operator, just parse this as expr-postfix.
   if (Tok.isNot(tok::oper_prefix))
     return parseExprPostfix(Message);
 
-  // '&' is a very special case.
-  if (Tok.getText() == "&") {
-    SourceLoc loc = Tok.getLoc();
-    consumeToken(tok::oper_prefix);
-
-    if (Expr *SubExpr = parseExprUnary(Message).getPtrOrNull())
-      return new (Context) AddressOfExpr(loc, SubExpr, Type());
-    return 0;
-  }
-  
   // Parse the operator.
   Expr *Operator = parseExprOperator();
 

@@ -327,30 +327,31 @@ bool Lexer::isIdentifier(llvm::StringRef string) {
 void Lexer::lexIdentifier() {
   const char *TokStart = CurPtr-1;
   assert(isValidStartOfIdentifier(*TokStart) && "Unexpected start");
-  
+
   // Lex [a-zA-Z_$0-9]*
   while (isValidContinuationOfIdentifier(*CurPtr))
     ++CurPtr;
-  
+
   tok Kind =
   llvm::StringSwitch<tok>(StringRef(TokStart, CurPtr-TokStart))
-    // decl and type keywords
+    // Declarations
     .Case("class", tok::kw_class)
     .Case("constructor", tok::kw_constructor)
     .Case("destructor", tok::kw_destructor)
     .Case("extension", tok::kw_extension)
     .Case("func", tok::kw_func)
     .Case("import", tok::kw_import)
-    .Case("metatype", tok::kw_metatype)
     .Case("oneof", tok::kw_oneof)
-    .Case("protocol", tok::kw_protocol)
-    .Case("requires", tok::kw_requires)
     .Case("struct", tok::kw_struct)
     .Case("typealias", tok::kw_typealias)
     .Case("var", tok::kw_var)
-    .Case("static", tok::kw_static)
+    .Case("static", tok::kw_static) // inside-out attribute that implies a decl
     .Case("subscript", tok::kw_subscript)
-  
+
+    // Type Keywords
+    .Case("protocol", tok::kw_protocol)
+    .Case("requires", tok::kw_requires)
+
     // Statements
     .Case("if", tok::kw_if)
     .Case("else", tok::kw_else)
@@ -363,12 +364,15 @@ void Lexer::lexIdentifier() {
 
     // Expressions
     .Case("new", tok::kw_new)
+
+    // Reserved Identifiers
+    .Case("metatype", tok::kw_metatype)
     .Case("super", tok::kw_super)
     .Case("this", tok::kw_this)
     .Case("This", tok::kw_This)
 
     .Default(tok::identifier);
-  
+
   return formToken(Kind, TokStart);
 }
 
@@ -403,22 +407,6 @@ static bool isRightBound(const char *tokEnd) {
   }
 }
 
-/// formOperatorToken - Form some kind of operator token.
-void Lexer::formOperatorToken(const char *TokStart) {
-  // Decide between the binary, prefix, and postfix cases.
-  bool leftBound = isLeftBound(TokStart, BufferStart);
-  bool rightBound = isRightBound(CurPtr);
-
-  // It's binary if either both sides are bound or both sides are not bound.
-  if (leftBound == rightBound) {
-    formToken(tok::oper_binary, TokStart);
-
-  // Otherwise, it's postfix if left-bound and prefix if right-bound.
-  } else {
-    formToken(leftBound ? tok::oper_postfix : tok::oper_prefix, TokStart);
-  }
-}
-
 /// lexOperatorIdentifier - Match identifiers formed out of punctuation.
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
@@ -428,32 +416,42 @@ void Lexer::lexOperatorIdentifier() {
     while (*CurPtr == '.')
       ++CurPtr;
 
-    switch (CurPtr-TokStart) {
-    case 1:
-      if (isStartOfLiteral()) {
-        if (isdigit(CurPtr[0])) // .42
-          return lexNumber();
-        if (isValidStartOfIdentifier(*CurPtr))
-          return formToken(tok::unresolved_member, TokStart);
-      }
-      return formToken(tok::period, TokStart);
-    case 2:
-      return formOperatorToken(TokStart);
-    case 3:
-      return formToken(tok::ellipsis, TokStart);
-    default:
+    if (CurPtr-TokStart > 3) {
       diagnose(TokStart, diag::lex_unexpected_long_period_series);
       return formToken(tok::unknown, TokStart);
     }
+  } else {
+    while (Identifier::isOperatorChar(*CurPtr) && *CurPtr != '.')
+      ++CurPtr;
   }
 
-  while (Identifier::isOperatorChar(*CurPtr) && *CurPtr != '.')
-    ++CurPtr;
-  
+  // Decide between the binary, prefix, and postfix cases.
+  // It's binary if either both sides are bound or both sides are not bound.
+  // Otherwise, it's postfix if left-bound and prefix if right-bound.
+  bool leftBound = isLeftBound(TokStart, BufferStart);
+  bool rightBound = isRightBound(CurPtr);
+
   // Match various reserved words.
   if (CurPtr-TokStart == 1) {
     switch (TokStart[0]) {
-    case '=': return formToken(tok::equal, TokStart);
+    case '=':
+      return formToken(tok::equal, TokStart);
+    case '&':
+      if (leftBound == rightBound || leftBound)
+        break;
+      return formToken(tok::make_ref, TokStart);
+    case '.':
+      // Parsing the '.' in ".5" in "3.14*.5" breaks the rules we have for
+      // operators. It becomes a false-positive binary operator given our
+      // simple left bound versus right bound rule.
+      if (isdigit(CurPtr[0]) && isStartOfLiteral())
+        return lexNumber();
+      if (leftBound == rightBound)
+        return formToken(tok::period, TokStart);
+      if (rightBound)
+        return formToken(tok::unresolved_member, TokStart);
+      diagnose(TokStart, diag::lex_unary_postfix_dot_is_reserved);
+      return formToken(tok::unknown, TokStart);
     }
   } else if (CurPtr-TokStart == 2) {
     switch ((TokStart[0] << 8) | TokStart[1]) {
@@ -464,6 +462,12 @@ void Lexer::lexOperatorIdentifier() {
       return formToken(tok::unknown, TokStart);
     }
   } else {
+    if (CurPtr-TokStart == 3) {
+      switch ((TokStart[0] << 16) | (TokStart[1] << 8) | TokStart[0]) {
+      case ('.' << 16) | ('.' << 8) | '.':
+        return formToken(tok::ellipsis, TokStart);
+      }
+    }
     // If there is a "//" in the middle of an identifier token, it starts
     // a single-line comment.
     auto Pos = StringRef(TokStart, CurPtr-TokStart).find("//");
@@ -484,8 +488,11 @@ void Lexer::lexOperatorIdentifier() {
       return formToken(tok::unknown, TokStart);
     }
   }
-  
-  formOperatorToken(TokStart);
+
+  if (leftBound == rightBound)
+    return formToken(tok::oper_binary, TokStart);
+
+  return formToken(leftBound ? tok::oper_postfix : tok::oper_prefix, TokStart);
 }
 
 /// lexDollarIdent - Match $[0-9a-zA-Z_$]*

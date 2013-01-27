@@ -114,6 +114,8 @@ ERROR(lex_expected_digit_in_int_literal,lexing,none,
        "expected a digit after integer literal prefix", ())
 ERROR(lex_unexpected_block_comment_end,lexing,none,
       "unexpected end of block comment", ())
+ERROR(lex_unary_postfix_dot_is_reserved,lexing,none,
+      "postfix '.' is reserved", ())
 ERROR(lex_unexpected_long_period_series,lexing,none,
       "unexpected long series of '.'", ())
 
