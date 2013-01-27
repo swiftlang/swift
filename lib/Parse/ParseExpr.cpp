@@ -343,8 +343,8 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     Result = parseExprExplicitClosure();
     break;
 
-  case tok::period: {     // .foo
-    SourceLoc DotLoc = consumeToken(tok::period);
+  case tok::unresolved_member: {     // .foo
+    SourceLoc DotLoc = consumeToken(tok::unresolved_member);
     Identifier Name;
     SourceLoc NameLoc = Tok.getLoc();
     if (parseIdentifier(Name, diag::expected_identifier_after_dot_expr))

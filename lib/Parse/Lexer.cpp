@@ -430,8 +430,12 @@ void Lexer::lexOperatorIdentifier() {
 
     switch (CurPtr-TokStart) {
     case 1:
-      if (isdigit(CurPtr[0]) && isStartOfLiteral()) // .42
-        return lexNumber();
+      if (isStartOfLiteral()) {
+        if (isdigit(CurPtr[0])) // .42
+          return lexNumber();
+        if (isValidStartOfIdentifier(*CurPtr))
+          return formToken(tok::unresolved_member, TokStart);
+      }
       return formToken(tok::period, TokStart);
     case 2:
       return formOperatorToken(TokStart);
