@@ -275,6 +275,7 @@ public:
   
   void visitProjectExistentialInst(ProjectExistentialInst *i);
   void visitInitExistentialInst(InitExistentialInst *i);
+  void visitUpcastExistentialInst(UpcastExistentialInst *i);
   //void visitDeinitExistentialInst(DeinitExistentialInst *i);
 
   void visitRetainInst(RetainInst *i);

@@ -57,6 +57,16 @@ namespace irgen {
                                    CanType srcType,
                                    ArrayRef<ProtocolConformance*> conformances);
 
+  /// Initialize an existential container using the value and metadata from
+  /// an existing, more specific existential container.
+  void emitExistentialContainerUpcast(IRGenFunction &IGF,
+                                  Address dest,
+                                  CanType destType,
+                                  Address src,
+                                  CanType srcType,
+                                  bool isTakeOfSrc,
+                                  ArrayRef<ProtocolConformance*> conformances);
+  
   /// Emit a projection from an existential container address to the address
   /// of its concrete value buffer.
   Address emitExistentialProjection(IRGenFunction &IGF,

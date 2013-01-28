@@ -3290,6 +3290,71 @@ static void emitProtocolWitnessTables(IRGenFunction &IGF,
 
 }
 
+/// Emit an existential container initialization by copying the value and
+/// witness tables from an existential container of a more specific type.
+void irgen::emitExistentialContainerUpcast(IRGenFunction &IGF,
+                                 Address dest,
+                                 CanType destType,
+                                 Address src,
+                                 CanType srcType,
+                                 bool isTakeOfSrc,
+                                 ArrayRef<ProtocolConformance*> conformances) {
+  auto &destTI = IGF.getFragileTypeInfo(destType).as<ExistentialTypeInfo>();
+  auto &srcTI = IGF.getFragileTypeInfo(srcType).as<ExistentialTypeInfo>();
+
+  auto destLayout = destTI.getLayout();
+  auto srcLayout = srcTI.getLayout();
+  
+  ArrayRef<ProtocolEntry> destEntries = destTI.getProtocols();
+  assert(destEntries.size() == conformances.size());
+
+  // Take the data out of the other buffer.
+  // UpcastExistential never implies a transformation of the *value*,
+  // just of the *witnesses*.
+  Address destBuffer = destLayout.projectExistentialBuffer(IGF, dest);
+  Address srcBuffer = srcLayout.projectExistentialBuffer(IGF, src);
+  llvm::Value *srcMetadata = srcLayout.loadMetadataRef(IGF, src);
+  if (isTakeOfSrc) {
+    // If we can take the source, we can just memcpy the buffer.
+    IGF.emitMemCpy(destBuffer, srcBuffer, getFixedBufferSize(IGF.IGM));
+  } else {
+    // Otherwise, we have to do a copy-initialization of the buffer.
+    llvm::Value *srcWtable = srcLayout.loadValueWitnessTable(IGF, src,
+                                                             srcMetadata);
+    emitInitializeBufferWithCopyOfBufferCall(IGF,
+                                             srcWtable, srcMetadata,
+                                             destBuffer, srcBuffer);
+  }
+  
+  // Copy the metadata as well.
+  Address destMetadataRef = destLayout.projectMetadataRef(IGF, dest);
+  IGF.Builder.CreateStore(srcMetadata, destMetadataRef);
+  
+  // Okay, the buffer on dest has been meaningfully filled in.
+  // Fill in the witnesses.
+  
+  // If we're erasing *all* protocols, we're done.
+  if (destEntries.empty())
+    return;
+  
+  // Okay, so we're erasing to a non-trivial set of protocols.
+  
+  // First, find all the destination tables.  We can't write these
+  // into dest immediately because later fetches of protocols might
+  // give us trouble.
+  SmallVector<llvm::Value*, 4> destTables;
+  for (auto &entry : destTI.getProtocols()) {
+    auto table = srcTI.findWitnessTable(IGF, src, entry.getProtocol());
+    destTables.push_back(table);
+  }
+  
+  // Now write those into the destination.
+  for (unsigned i = 0, e = destTables.size(); i != e; ++i) {
+    Address destSlot = destLayout.projectWitnessTable(IGF, dest, i);
+    IGF.Builder.CreateStore(destTables[i], destSlot);
+  }
+}
+
 /// Emit an existential container initialization operation for a concrete type.
 /// Returns the address of the uninitialized buffer for the concrete value.
 Address irgen::emitExistentialContainerInit(IRGenFunction &IGF,

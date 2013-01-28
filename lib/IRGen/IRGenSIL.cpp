@@ -744,6 +744,17 @@ void IRGenSILFunction::visitInitExistentialInst(swift::InitExistentialInst *i) {
   newLoweredAddress(Value(i,0), buffer);
 }
 
+void IRGenSILFunction::visitUpcastExistentialInst(
+                                              swift::UpcastExistentialInst *i) {
+  Address src = getLoweredAddress(i->getSrcExistential());
+  Address dest = getLoweredAddress(i->getDestExistential());
+  CanType srcType = i->getSrcExistential().getType().getSwiftRValueType();
+  CanType destType = i->getDestExistential().getType().getSwiftRValueType();
+  emitExistentialContainerUpcast(*this, dest, destType, src, srcType,
+                                 i->isTakeOfSrc(),
+                                 i->getConformances());
+}
+
 void IRGenSILFunction::visitProjectExistentialInst(
                                              swift::ProjectExistentialInst *i) {
   CanType baseTy = i->getOperand().getType().getSwiftRValueType();
