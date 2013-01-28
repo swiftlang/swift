@@ -435,25 +435,24 @@ public:
 /// but a copy instruction must be used for address-only types.
 class CopyAddrInst : public Instruction {
   /// Src - The lvalue being loaded from.
-  Value Src;
-  /// Dest - The lvalue being stored to.
-  Value Dest;
-  
   /// IsTakeOfSrc - True if ownership will be taken from the value at the source
   /// memory location.
-  bool IsTakeOfSrc : 1;
+  llvm::PointerIntPair<Value, 1, bool> SrcAndIsTake;
+  /// Dest - The lvalue being stored to.
   /// IsInitializationOfDest - True if this is the initialization of the
   /// uninitialized destination memory location.
-  bool IsInitializationOfDest : 1;
+  llvm::PointerIntPair<Value, 1, bool> DestAndIsInitialization;
   
 public:
   CopyAddrInst(SILLocation Loc, Value Src, Value Dest,
                bool IsTakeOfSrc, bool IsInitializationOfDest);
   
-  Value getSrc() const { return Src; }
-  Value getDest() const { return Dest; }
-  bool isTakeOfSrc() const { return IsTakeOfSrc; }
-  bool isInitializationOfDest() const { return IsInitializationOfDest; }
+  Value getSrc() const { return SrcAndIsTake.getPointer(); }
+  Value getDest() const { return DestAndIsInitialization.getPointer(); }
+  bool isTakeOfSrc() const { return SrcAndIsTake.getInt(); }
+  bool isInitializationOfDest() const {
+    return DestAndIsInitialization.getInt();
+  }
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::CopyAddrInst;
@@ -775,9 +774,9 @@ public:
 };
   
 /// InitExistentialInst - Given an address to an uninitialized buffer of
-/// an existential type, initializes the existential to contain a value of
-/// a given concrete type, and returns the address of an uninitialized buffer
-/// of the concrete type that then must be initialized.
+/// a protocol type, initializes its existential container to contain a concrete
+/// value of the given type, and returns the address of the uninitialized
+/// concrete value inside the existential container.
 class InitExistentialInst : public Instruction {
   Value Existential;
   ArrayRef<ProtocolConformance*> Conformances;
@@ -785,14 +784,53 @@ public:
   InitExistentialInst(SILLocation Loc,
                       Value Existential,
                       SILType ConcreteType,
-                      ArrayRef<ProtocolConformance*> Conformances,
-                      Function &F);
+                      ArrayRef<ProtocolConformance*> Conformances);
   
   Value getExistential() const { return Existential; }
   ArrayRef<ProtocolConformance*> getConformances() const {
     return Conformances;
   }
   Type getConcreteType() const;
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::InitExistentialInst;
+  }
+};
+
+/// UpcastExistentialInst - Copies the concrete value from an existential
+/// container of a protocol type to another uninitialized existential container
+/// for a supertype of the original protocol type. The destination can be
+/// of a base protocol type or of a protocol composition that is a superset
+/// of the original type (or a protocol composition of base protocols).
+class UpcastExistentialInst : public Instruction {
+  llvm::PointerIntPair<Value, 1, bool> SrcExistentialAndIsTake;
+  Value DestExistential;
+  ArrayRef<ProtocolConformance*> Conformances;
+public:
+  UpcastExistentialInst(SILLocation Loc,
+                        Value SrcExistential,
+                        Value DestExistential,
+                        bool isTakeOfSrc,
+                        ArrayRef<ProtocolConformance*> Conformances);
+  
+  Value getSrcExistential() const {
+    return SrcExistentialAndIsTake.getPointer();
+  }
+  Value getDestExistential() const { return DestExistential; }
+
+  /// True if the destination can take ownership of the concrete value from the
+  /// source.
+  bool isTakeOfSrc() const {
+    return SrcExistentialAndIsTake.getInt();
+  }
+  
+  ArrayRef<ProtocolConformance*> getConformances() const {
+    return Conformances;
+  }
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::UpcastExistentialInst;
+  }
 };
   
 /// RetainInst - Increase the retain count of a value.

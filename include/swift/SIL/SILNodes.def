@@ -86,6 +86,7 @@ ABSTRACT_VALUE(Instruction, Value)
     
   INST(ProjectExistentialInst, Instruction)
   INST(InitExistentialInst, Instruction)
+  INST(UpcastExistentialInst, Instruction)
   INST(DeinitExistentialInst, Instruction)
 
   INST(RetainInst, Instruction)

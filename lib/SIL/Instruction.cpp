@@ -295,8 +295,10 @@ StoreInst::StoreInst(SILLocation Loc, Value Src, Value Dest)
 
 CopyAddrInst::CopyAddrInst(SILLocation Loc, Value SrcLValue, Value DestLValue,
                            bool IsTakeOfSrc, bool IsInitializationOfDest)
-  : Instruction(ValueKind::CopyAddrInst, Loc), Src(SrcLValue), Dest(DestLValue),
-    IsTakeOfSrc(IsTakeOfSrc), IsInitializationOfDest(IsInitializationOfDest) {
+  : Instruction(ValueKind::CopyAddrInst, Loc),
+    SrcAndIsTake(SrcLValue, IsTakeOfSrc),
+    DestAndIsInitialization(DestLValue, IsInitializationOfDest)
+{
 }
 
 ZeroAddrInst::ZeroAddrInst(SILLocation Loc, Value Dest)
@@ -432,8 +434,7 @@ ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc, Value Operand,
 InitExistentialInst::InitExistentialInst(SILLocation Loc,
                                    Value Existential,
                                    SILType ConcreteType,
-                                   ArrayRef<ProtocolConformance*> Conformances,
-                                   Function &F)
+                                   ArrayRef<ProtocolConformance*> Conformances)
   : Instruction(ValueKind::InitExistentialInst, Loc,
                 ConcreteType.getAddressType()),
     Existential(Existential),
@@ -442,6 +443,18 @@ InitExistentialInst::InitExistentialInst(SILLocation Loc,
 
 Type InitExistentialInst::getConcreteType() const {
   return getType(0).getSwiftRValueType();
+}
+
+UpcastExistentialInst::UpcastExistentialInst(SILLocation Loc,
+                                 Value SrcExistential,
+                                 Value DestExistential,
+                                 bool isTakeOfSrc,
+                                 ArrayRef<ProtocolConformance*> Conformances)
+  : Instruction(ValueKind::UpcastExistentialInst, Loc),
+    SrcExistentialAndIsTake(SrcExistential, isTakeOfSrc),
+    DestExistential(DestExistential),
+    Conformances(Conformances)
+{
 }
 
 DeinitExistentialInst::DeinitExistentialInst(SILLocation Loc,

@@ -261,8 +261,19 @@ public:
     return insert(new InitExistentialInst(Loc,
                                           Existential,
                                           ConcreteType,
-                                          Conformances,
-                                          F));
+                                          Conformances));
+  }
+  
+  UpcastExistentialInst *createUpcastExistential(SILLocation Loc,
+                                 Value SrcExistential,
+                                 Value DestExistential,
+                                 bool isTakeOfSrc,
+                                 ArrayRef<ProtocolConformance*> Conformances) {
+    return insert(new UpcastExistentialInst(Loc,
+                                            SrcExistential,
+                                            DestExistential,
+                                            isTakeOfSrc,
+                                            Conformances));
   }
   
   DeinitExistentialInst *createDeinitExistential(SILLocation Loc,

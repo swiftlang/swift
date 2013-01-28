@@ -342,6 +342,13 @@ public:
     OS << "init_existential " << getID(AEI->getExistential()) << ", $";
     AEI->getConcreteType()->print(OS);
   }
+  void visitUpcastExistentialInst(UpcastExistentialInst *UEI) {
+    OS << "upcast_existential ";
+    if (UEI->isTakeOfSrc())
+      OS << "[take] ";
+    OS << getID(UEI->getSrcExistential())
+       << " to " << getID(UEI->getDestExistential());
+  }
   void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
     OS << "deinit_existential " << getID(DEI->getExistential());
   }

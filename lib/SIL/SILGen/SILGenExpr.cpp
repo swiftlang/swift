@@ -458,16 +458,30 @@ ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   Value existential = B.createAllocVar(E, AllocKind::Stack,
                                        getLoweredType(E->getType()));
   Cleanups.pushCleanup<CleanupMaterializeAllocation>(existential);
-  // Allocate its internal value.
-  Value valueAddr = B.createInitExistential(E, existential,
-                                            concrete.getType(),
-                                            E->getConformances());
-  // Initialize the internal value.
-  if (concrete.getType().isAddressOnly()) {
-    concrete.forwardInto(*this, E, valueAddr,
-                         /*isInitialize=*/true);
+
+  if (concrete.getType().isExistentialType()) {
+    // If the source value is already of a protocol type, we can use
+    // upcast_existential to steal its already-initialized witness tables and
+    // concrete value.
+
+    B.createUpcastExistential(E, concrete.getValue(), existential,
+                              /*isTake=*/concrete.hasCleanup(),
+                              E->getConformances());
   } else {
-    B.createStore(E, concrete.forward(*this), valueAddr);
+    // Otherwise, we need to initialize a new existential container from
+    // scratch.
+    
+    // Allocate the concrete value inside the container.
+    Value valueAddr = B.createInitExistential(E, existential,
+                                              concrete.getType(),
+                                              E->getConformances());
+    // Initialize the concrete value.
+    if (concrete.getType().isAddressOnly()) {
+      concrete.forwardInto(*this, E, valueAddr,
+                           /*isInitialize=*/true);
+    } else {
+      B.createStore(E, concrete.forward(*this), valueAddr);
+    }
   }
   
   Cleanups.pushCleanup<CleanupMaterializeAddressOnlyValue>(existential);

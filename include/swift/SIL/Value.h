@@ -59,6 +59,12 @@ namespace swift {
   /// it is a pair of the ValueBase and the result number being referenced.
   class Value {
     llvm::PointerIntPair<ValueBase*, 1> ValueAndResultNumber;
+    
+    Value(void *p) {
+      ValueAndResultNumber =
+        decltype(ValueAndResultNumber)::getFromOpaqueValue(p);
+    }
+    
   public:
     Value(const ValueBase *V = 0, unsigned ResultNumber = 0)
       : ValueAndResultNumber((ValueBase*)V, ResultNumber) {
@@ -94,6 +100,9 @@ namespace swift {
     void *getOpaqueValue() const {
       return ValueAndResultNumber.getOpaqueValue();
     }
+    static Value getFromOpaqueValue(void *p) {
+      return Value(p);
+    }
   };
 } // end namespace swift
 
@@ -123,6 +132,20 @@ namespace llvm {
     static bool isEqual(swift::Value LHS, swift::Value RHS) {
       return LHS == RHS;
     }
+  };
+  
+  // Value is a PointerLikeType.
+  template<> class PointerLikeTypeTraits<::swift::Value> {
+    using Value = ::swift::Value;
+  public:
+    static void *getAsVoidPointer(Value v) {
+      return v.getOpaqueValue();
+    }
+    static Value getFromVoidPointer(void *p) {
+      return Value::getFromOpaqueValue(p);
+    }
+    
+    enum { NumLowBitsAvailable = 1 };
   };
 }  // end namespace llvm
 

@@ -19,6 +19,10 @@
 
 using namespace swift;
 
+// The verifier is basically all assertions, so don't compile it with NDEBUG to
+// prevent release builds from triggering spurious unused variable warnings.
+#ifndef NDEBUG
+
 namespace {
 /// SILVerifier class - This class implements the SIL verifier, which walks over
 /// SIL, checking and enforcing its invariants.
@@ -30,7 +34,6 @@ public:
   void visit(Instruction *I) {
     
     const BasicBlock *BB = I->getParent();
-    (void)BB;
     // Check that non-terminators look ok.
     if (!isa<TermInst>(I)) {
       assert(!BB->empty() &&
@@ -67,7 +70,6 @@ public:
     assert(calleeTy.is<FunctionType>() &&
            "callee of apply must have concrete function type");
     SILFunctionTypeInfo *ti = F.getModule().getFunctionTypeInfo(calleeTy);
-    (void)ti;
     
     DEBUG(llvm::dbgs() << "function input types:\n";
           for (SILType t : ti->getInputTypes()) {
@@ -118,7 +120,6 @@ public:
     SILFunctionTypeInfo *calleeTI = F.getModule().getFunctionTypeInfo(calleeTy);
     SILFunctionTypeInfo *appliedTI
       = F.getModule().getFunctionTypeInfo(appliedTy);
-    (void)calleeTI; (void)appliedTI;
 
     // Check that the partially applied arguments match.
     size_t allArgsCount = calleeTI->getInputTypes().size();
@@ -199,7 +200,7 @@ public:
 
   void visitTupleInst(TupleInst *TI) {
     assert(TI->getType().is<TupleType>() && "TupleInst should return a tuple");
-    TupleType *ResTy = TI->getType().castTo<TupleType>(); (void)ResTy;
+    TupleType *ResTy = TI->getType().castTo<TupleType>();
 
     assert(TI->getElements().size() == ResTy->getFields().size() &&
            "Tuple field count mismatch!");
@@ -249,7 +250,6 @@ public:
   }
   
   void visitExtractInst(ExtractInst *EI) {
-#ifndef NDEBUG
     SILType operandTy = EI->getOperand().getType();
     assert(!operandTy.isAddress() &&
            "cannot extract from address");
@@ -257,11 +257,9 @@ public:
            "cannot extract from reference type");
     assert(!EI->getType(0).isAddress() &&
            "result of extract cannot be address");
-#endif
   }
 
   void visitElementAddrInst(ElementAddrInst *EI) {
-#ifndef NDEBUG
     SILType operandTy = EI->getOperand().getType();
     assert(operandTy.isAddress() &&
            "must derive element_addr from address");
@@ -269,11 +267,9 @@ public:
            "cannot derive element_addr from reference type");
     assert(EI->getType(0).isAddress() &&
            "result of element_addr must be lvalue");
-#endif
   }
   
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
-#ifndef NDEBUG
     SILType operandTy = EI->getOperand().getType();
     assert(!operandTy.isAddress() &&
            "must derive ref_element_addr from non-address");
@@ -281,11 +277,9 @@ public:
            "must derive ref_element_addr from reference type");
     assert(EI->getType(0).isAddress() &&
            "result of ref_element_addr must be lvalue");
-#endif
   }
   
   void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
-#ifndef NDEBUG
     DEBUG(llvm::dbgs() << "verifying";
           AMI->print(llvm::dbgs()));
     FunctionType *methodType = AMI->getType(0).getAs<FunctionType>();
@@ -310,11 +304,9 @@ public:
              "archetype_method must apply to an archetype metatype");
     } else
       llvm_unreachable("method must apply to an address or metatype");
-#endif
   }
   
   void visitProtocolMethodInst(ProtocolMethodInst *EMI) {
-#ifndef NDEBUG
     FunctionType *methodType = EMI->getType(0).getAs<FunctionType>();
     assert(methodType &&
            "result method must be of a concrete function type");
@@ -328,36 +320,45 @@ public:
            "protocol_method must apply to an existential address");
     assert(operandType.isExistentialType() &&
            "protocol_method must apply to an existential address");    
-#endif
   }
   
   void visitProjectExistentialInst(ProjectExistentialInst *PEI) {
-#ifndef NDEBUG
     SILType operandType = PEI->getOperand().getType();
     assert(operandType.isAddress() && "project_existential must be applied to address");
     assert(operandType.isExistentialType() &&
            "project_existential must be applied to address of existential");
-#endif
   }
   
   void visitInitExistentialInst(InitExistentialInst *AEI) {
-#ifndef NDEBUG
     SILType exType = AEI->getExistential().getType();
     assert(exType.isAddress() &&
            "init_existential must be applied to an address");
     assert(exType.isExistentialType() &&
            "init_existential must be applied to address of existential");
-#endif
+    assert(!AEI->getConcreteType()->isExistentialType() &&
+           "init_existential cannot put an existential container inside "
+           "an existential container");
+  }
+  
+  void visitUpcastExistentialInst(UpcastExistentialInst *UEI) {
+    SILType srcType = UEI->getSrcExistential().getType();
+    SILType destType = UEI->getDestExistential().getType();
+    assert(srcType.isAddress() &&
+           "upcast_existential source must be an address");
+    assert(srcType.isExistentialType() &&
+           "upcast_existential source must be address of existential");
+    assert(destType.isAddress() &&
+           "upcast_existential dest must be an address");
+    assert(destType.isExistentialType() &&
+           "upcast_existential dest must be address of existential");
   }
   
   void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
-#ifndef NDEBUG
     SILType exType = DEI->getExistential().getType();
     assert(exType.isAddress() &&
            "deinit_existential must be applied to an address");
     assert(exType.isExistentialType() &&
            "deinit_existential must be applied to address of existential");
-#endif
   }
   
   void visitArchetypeToSuperInst(ArchetypeToSuperInst *ASI) {
@@ -428,9 +429,12 @@ public:
 };
 } // end anonymous namespace
 
+#endif //NDEBUG
 
 /// verify - Run the IR verifier to make sure that the Function follows
 /// invariants.
 void Function::verify() const {
+#ifndef NDEBUG
   SILVerifier(*this).verify();
+#endif
 }
