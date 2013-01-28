@@ -53,8 +53,9 @@ Cons:
   declaration syntax:
   ::
     var  x : Int { return 42 }
-    func y : () -> Int { return 42 }
-    func z(T : Equatable) : (a : T, b : T) -> Bool { return a == b }
+    func y : Int { return 42 }
+    func z : (arg : Int) -> Int { return arg }
+    func g(T : Equatable) : (a : T, b : T) -> Bool { return a == b }
 - Potentially confusing. For example: ``f(Int)()`` -- is ``f`` a generic
   function or a higher-order function?
 - Difficult with tuple types. (DaveZ: why?)
