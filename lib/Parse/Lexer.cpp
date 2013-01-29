@@ -1012,8 +1012,8 @@ Restart:
     return formToken(tok::eof, TokStart);
 
   case '(':
-    return formToken(isStartOfLiteral() ? tok::l_paren : tok::l_paren_call,
-                     TokStart);
+    return formToken(isStartOfLiteral() ?
+                     tok::l_paren_starting : tok::l_paren_following, TokStart);
   case ')': 
     // When lexing an interpolated string literal, the buffer will terminate
     // with a ')'.
@@ -1030,8 +1030,8 @@ Restart:
     }
   case '}': return formToken(tok::r_brace,  TokStart);
   case '[':
-    return formToken(isStartOfLiteral()? tok::l_square: tok::l_square_subscript,
-                     TokStart);
+    return formToken(isStartOfLiteral() ?
+                     tok::l_square_starting: tok::l_square_following, TokStart);
   case ']': return formToken(tok::r_square, TokStart);
 
   case ',': return formToken(tok::comma,    TokStart);

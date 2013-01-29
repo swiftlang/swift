@@ -216,23 +216,27 @@
   </div>
 
   <pre class="grammar">
-    lparen-spaced    ::= '('      // preceded by space
-    lparen-unspaced  ::= '('      // not preceded by space
-    lparen-any       ::= lparen-spaced
-    lparen-any       ::= lparen-unspaced
+    lparen-following  ::= '('  // immediately (no white space) preceded by an
+                               // identifier, or an identfier-like keyword, or
+                               // a literal, or ')', or ']', or '}'
+    lparen-starting   ::= '('  // any '(' that is not lparen-following
+    lparen-any        ::= lparen-following
+    lparen-any        ::= lparen-starting
 
-    lsquare-spaced   ::= '['      // preceded by space
-    lsquare-unspaced ::= '['      // not preceded by space
-    lsquare-any      ::= lsquare-spaced
-    lsquare-any      ::= lsquare-unspaced
+    lsquare-following ::= '['  // immediately (no white space) preceded by an
+                               // identifier, or an identfier-like keyword, or
+                               // a literal, or ')', or ']', or '}'
+    lsquare-starting  ::= '['  // any '[' that is not lsquare-following
+    lsquare-any       ::= lsquare-following
+    lsquare-any       ::= lsquare-starting
 
-    punctuation ::= lparen-spaced
-    punctuation ::= lparen-unspaced
+    punctuation ::= lparen-following
+    punctuation ::= lparen-starting
     punctuation ::= ')'
     punctuation ::= '{'
     punctuation ::= '}'
-    punctuation ::= lsquare-spaced
-    punctuation ::= lsquare-unspaced
+    punctuation ::= lsquare-following
+    punctuation ::= lsquare-starting
     punctuation ::= ']'
     punctuation ::= '.'
     punctuation ::= ','
@@ -1256,8 +1260,8 @@ if vec[3] {
 
   <pre class="grammar">
     attribute-list ::= /*empty*/
-    attribute-list ::= lsquare-any ']'
-    attribute-list ::= lsquare-any attribute (',' attribute)* ']'
+    attribute-list ::= lsquare-starting ']'
+    attribute-list ::= lsquare-starting attribute (',' attribute)* ']'
     
     attribute      ::= attribute-infix
     attribute      ::= attribute-resilience
@@ -1630,12 +1634,7 @@ if vec[3] {
   <!-- ===================================================================== -->
 
   <div class="commentary">
-    Array types are currently a hack, and only partially implemented in the
-    compiler.  Arrays don't make sense to fully define until we have generics,
-    because array syntax should just be sugar for a standard library type.
-    "Int[4]" should just be sugar for array&lt;Int, 4&gt; or whatever.
-
-    <br/><br/>Note that array types are parsed inside-out, with the first
+    Note that array types are parsed inside-out, with the first
     bounds clause being the outermost one.  This little oddity is required
     for the bounds of nested arrays to correspond in sequence to subscript
     indexes.  That is, given an array "x : Int[5][7][11][13]" and a
@@ -1647,8 +1646,8 @@ if vec[3] {
   
   <pre class="grammar">
     type-array ::= <a href="#type">type-simple</a>
-    type-array ::= <a href="#type">type-array</a> lsquare-unspaced ']'
-    type-array ::= <a href="#type">type-array</a> lsquare-unspaced <a href="#expr">expr</a> ']'
+    type-array ::= <a href="#type">type-array</a> lsquare-following ']'
+    type-array ::= <a href="#type">type-array</a> lsquare-following <a href="#expr">expr</a> ']'
   </pre>
   
   <p>Array types include a base type and an optional size.  Array types indicate
@@ -2229,7 +2228,7 @@ ill-formed if the type does not conform to the protocol.</p>
   </p>
 
   <p>Note that some enclosing productions restrict the <tt>lparen-any</tt> to a
-  <tt>lparen-unspaced</tt>.</p>
+  <tt>lparen-following</tt>.</p>
 
   <p>Some examples:</p>
   
@@ -2360,7 +2359,7 @@ ill-formed if the type does not conform to the protocol.</p>
   </div>
 
   <pre class="grammar">
-    expr-subscript ::= <a href="#expr">expr-postfix</a> lsquare-unspaced <a href="#expr">expr</a> ']'
+    expr-subscript ::= <a href="#expr">expr-postfix</a> lsquare-following <a href="#expr">expr</a> ']'
   </pre>
 
  <p>A subscript expression invokes a <a
@@ -2380,7 +2379,7 @@ ill-formed if the type does not conform to the protocol.</p>
     It's not really clear what the behavior of multiple bounds should be.
 
     <br/><br/>We should probably allow an initializer, which would
-    have to start with an lparen-unspaced; the semantics would be to
+    have to start with an lparen-following; the semantics would be to
     evaluate that constructor for each element constructed.
   </div>
 
@@ -2389,7 +2388,7 @@ ill-formed if the type does not conform to the protocol.</p>
 
     expr-new-bounds ::= expr-new-bound
     expr-new-bounds ::= expr-new-bounds expr-new-bound
-    expr-new-bound  ::= lsquare-unspaced <a href="#expr">expr?</a> ']'
+    expr-new-bound  ::= lsquare-following <a href="#expr">expr?</a> ']'
   </pre>
     
   <p>Allocates and initializes a new array of objects with value
@@ -2407,7 +2406,7 @@ ill-formed if the type does not conform to the protocol.</p>
   </pre>
 
   <p>The leading <tt>'('</tt> of the <tt>expr-paren</tt> must be
-  a <tt>lparen-unspaced</tt>.  This greatly reduces the likelihood of
+  a <tt>lparen-following</tt>.  This greatly reduces the likelihood of
   confusion from semicolon elision, without requiring feedback from
   the typechecker or more aggressive whitespace sensitivity.</p>
 

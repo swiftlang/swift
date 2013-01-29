@@ -141,8 +141,8 @@ SourceLoc Parser::consumeStartingGreater() {
 
 void Parser::skipSingle() {
   switch (Tok.getKind()) {
-  case tok::l_paren:
-  case tok::l_paren_call:
+  case tok::l_paren_starting:
+  case tok::l_paren_following:
     consumeToken();
     skipUntil(tok::r_paren);
     consumeIf(tok::r_paren);
@@ -152,8 +152,8 @@ void Parser::skipSingle() {
     skipUntil(tok::r_brace);
     consumeIf(tok::r_brace);
     break;
-  case tok::l_square_subscript:
-  case tok::l_square:
+  case tok::l_square_following:
+  case tok::l_square_starting:
     consumeToken();
     skipUntil(tok::r_square);
     consumeIf(tok::r_square);

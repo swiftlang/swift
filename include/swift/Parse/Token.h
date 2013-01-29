@@ -81,7 +81,7 @@ public:
   }
 
   bool isAnyLParen() const {
-    return Kind == tok::l_paren || Kind == tok::l_paren_call;
+    return Kind == tok::l_paren_starting || Kind == tok::l_paren_following;
   }
 
   /// getLoc - Return a source location identifier for the specified

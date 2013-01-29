@@ -143,9 +143,9 @@ NullablePtr<Expr> Parser::parseExprNew() {
 
   bool hadInvalid = false;
   SmallVector<NewArrayExpr::Bound, 4> bounds;
-  while (Tok.is(tok::l_square_subscript)) {
+  while (Tok.is(tok::l_square_following)) {
     SourceRange brackets;
-    brackets.Start = consumeToken(tok::l_square_subscript);
+    brackets.Start = consumeToken(tok::l_square_following);
 
     // If the bound is missing, that's okay unless this is the first bound.
     if (Tok.is(tok::r_square)) {
@@ -178,7 +178,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
 
   if (bounds.empty()) {
     NullablePtr<Expr> Init;
-    if (Tok.is(tok::l_paren_call)) {
+    if (Tok.is(tok::l_paren_following)) {
       Init = parseExprParen();
       if (Init.isNull())
         return nullptr;
@@ -188,7 +188,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
   }
 
   // TODO: we allow a tuple-expr here as an initializer?
-  if (Tok.is(tok::l_paren_call)) {
+  if (Tok.is(tok::l_paren_following)) {
     diagnose(newLoc, diag::array_new_init_unsupported);
     return nullptr;
   }
@@ -246,9 +246,9 @@ NullablePtr<Expr> Parser::parseExprSuper() {
                                                      name,
                                                      nameLoc);
     }
-  } else if (Tok.is(tok::l_square_subscript)) {
+  } else if (Tok.is(tok::l_square_following)) {
     // super[expr]
-    SourceLoc lBraceLoc = consumeToken(tok::l_square_subscript);
+    SourceLoc lBraceLoc = consumeToken(tok::l_square_following);
     NullablePtr<Expr> idx = parseExpr(diag::expected_expr_subscript_value);
     SourceLoc rBraceLoc;
     if (idx.isNull() ||
@@ -358,11 +358,11 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     break;
   }
 
-  case tok::l_paren:
+  case tok::l_paren_starting:
     Result = parseExprParen();
     break;
 
-  case tok::l_square: {
+  case tok::l_square_starting: {
     SourceRange SB;
     SB.Start = consumeToken();
     skipUntil(tok::r_square);
@@ -418,8 +418,8 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     }
     
     // Check for a () suffix, which indicates a call.
-    // Note that this cannot be a l_paren.
-    if (Tok.is(tok::l_paren_call)) {
+    // Note that this cannot be a l_paren_starting.
+    if (Tok.is(tok::l_paren_following)) {
       NullablePtr<Expr> Arg = parseExprParen();
       if (Arg.isNull())
         return 0;
@@ -428,8 +428,8 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     }
     
     // Check for a [expr] suffix.
-    // Note that this cannot be a l_square.
-    if (Tok.is(tok::l_square_subscript)) {
+    // Note that this cannot be a l_square_starting.
+    if (Tok.is(tok::l_square_following)) {
       SourceLoc LLoc = consumeToken();
       NullablePtr<Expr> Idx = parseExpr(diag::expected_expr_subscript_value);
       SourceLoc RLoc;
@@ -490,7 +490,7 @@ Expr *Parser::parseExprStringLiteral() {
       // Prime the new lexer with a '(' as the first token.
       assert(Segment.Data.data()[-1] == '(' &&
              "Didn't get an lparen before interpolated expression");
-      Tok.setToken(tok::l_paren, StringRef(Segment.Data.data()-1, 1));
+      Tok.setToken(tok::l_paren_starting, StringRef(Segment.Data.data()-1, 1));
       
       NullablePtr<Expr> E = parseExprParen();
       if (E.isNonNull()) {
@@ -694,7 +694,7 @@ NullablePtr<Expr> Parser::parseExprFunc() {
       SourceLoc());
     ArgParams.push_back(unitPattern);
     BodyParams.push_back(unitPattern);
-  } else if (!Tok.is(tok::l_paren)) {
+  } else if (!Tok.is(tok::l_paren_starting)) {
     diagnose(Tok, diag::func_decl_without_paren);
     return 0;
   } else if (parseFunctionSignature(ArgParams, BodyParams, RetTy)) {
