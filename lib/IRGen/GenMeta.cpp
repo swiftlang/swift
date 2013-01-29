@@ -1632,6 +1632,8 @@ static FuncDecl *findOverriddenFunction(IRGenModule &IGM,
 
   FuncDecl *cur = method;
   while ((cur = cur->getOverriddenDecl())) {
+    if (!hasKnownVTableEntry(IGM, cur))
+      break;
     if (isCompatibleOverride(IGM, method, cur, explosionLevel,
                              uncurryLevel))
       method = cur;
