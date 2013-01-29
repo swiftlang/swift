@@ -225,6 +225,12 @@ bool irgen::hasKnownSwiftImplementation(IRGenModule &IGM, ClassDecl *theClass) {
   return !theClass->hasClangDecl();
 }
 
+/// Is the given method known to be callable by vtable lookup?
+bool irgen::hasKnownVTableEntry(IRGenModule &IGM, FuncDecl *theMethod) {
+  return hasKnownSwiftImplementation(IGM,
+                                 cast<ClassDecl>(theMethod->getDeclContext()));
+}
+
 /// Emit a string encoding the labels in the given tuple type.
 static llvm::Constant *getTupleLabelsString(IRGenModule &IGM,
                                             TupleType *type) {
@@ -1073,6 +1079,11 @@ bool irgen::doesMethodRequireOverrideEntry(IRGenModule &IGM, FuncDecl *fn,
   FuncDecl *overridden = fn->getOverriddenDecl();
   do {
     assert(overridden);
+    
+    // ObjC methods never get vtable entries, so overrides always need a new
+    // entry.
+    if (!hasKnownVTableEntry(IGM, overridden))
+      return true;
 
     // If we ever find something we compatibly override, we're done.
     if (isCompatibleOverride(IGM, fn, overridden,

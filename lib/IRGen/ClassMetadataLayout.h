@@ -174,11 +174,15 @@ private:
   }
 
   void addMethodEntries(FuncDecl *fn) {
+    // If the method does not have a vtable entry, don't add any.
+    if (!hasKnownVTableEntry(IGM, fn))
+      return;
+    
     // TODO: consider emitting at different explosion levels and
     // uncurryings.
     auto explosionLevel = ExplosionKind::Minimal;
     unsigned uncurryLevel = 1; // whether static or not
-
+    
     maybeAddMethod(fn, explosionLevel, uncurryLevel);
   }
 

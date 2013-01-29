@@ -45,6 +45,9 @@ namespace irgen {
 
   /// Is the given class known to have an implementation in Swift?
   bool hasKnownSwiftImplementation(IRGenModule &IGM, ClassDecl *theClass);
+  
+  /// Is the given method known to be callable by vtable dispatch?
+  bool hasKnownVTableEntry(IRGenModule &IGM, FuncDecl *theMethod);
 
   /// Emit a declaration reference to a metatype object.
   void emitMetaTypeRef(IRGenFunction &IGF, CanType type, Explosion &explosion);
