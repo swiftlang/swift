@@ -334,7 +334,7 @@ void Lexer::lexIdentifier() {
 
   tok Kind =
   llvm::StringSwitch<tok>(StringRef(TokStart, CurPtr-TokStart))
-    // Declarations
+    // Declarations and Type Keywords
     .Case("class", tok::kw_class)
     .Case("constructor", tok::kw_constructor)
     .Case("destructor", tok::kw_destructor)
@@ -342,15 +342,13 @@ void Lexer::lexIdentifier() {
     .Case("func", tok::kw_func)
     .Case("import", tok::kw_import)
     .Case("oneof", tok::kw_oneof)
+    .Case("protocol", tok::kw_protocol)
+    .Case("requires", tok::kw_requires)
     .Case("struct", tok::kw_struct)
     .Case("typealias", tok::kw_typealias)
     .Case("var", tok::kw_var)
     .Case("static", tok::kw_static) // inside-out attribute that implies a decl
     .Case("subscript", tok::kw_subscript)
-
-    // Type Keywords
-    .Case("protocol", tok::kw_protocol)
-    .Case("requires", tok::kw_requires)
 
     // Statements
     .Case("if", tok::kw_if)
