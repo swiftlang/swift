@@ -1854,8 +1854,8 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
 
   TypeChecker &TC = CC.TC;
   
-  // If the destination is a AutoClosing FunctionType, we have special rules.
-  if (FunctionType *FT = DestTy->getAs<FunctionType>())
+  if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
+    // If the destination is a AutoClosing FunctionType, we have special rules.
     if (FT->isAutoClosure()) {
       // We require the expression to be an ImplicitClosureExpr that produces
       // DestTy.
@@ -1891,6 +1891,28 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
 
       return coerced(ICE, Flags);
     }
+    
+    // FIXME: If the destination is an [objc_block] function type, insert a
+    // BridgeToBlockExpr.
+    if (FT->isBlock()) {
+      FunctionType *NonBlockTy = FunctionType::get(FT->getInput(),
+                                                   FT->getResult(),
+                                                   TC.Context);
+      
+      if (CoercedResult CoercedE = coerceToType(E, NonBlockTy, CC,
+                                                Flags & ~CF_NotPropagated)) {
+        if (!(Flags & CF_Apply))
+          return DestTy;
+        
+        E = CoercedE.getExpr();
+      } else {
+        return CoercedE;
+      }
+      
+      BridgeToBlockExpr *BBE = new (TC.Context) BridgeToBlockExpr(E, FT);
+      return coerced(BBE, Flags);
+    }
+  }
 
   // If we have an exact match, we're done.
   if (E->getType()->isEqual(DestTy))

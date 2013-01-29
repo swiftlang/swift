@@ -1846,7 +1846,9 @@ static Type adjustLValueForReference(Type type, bool isAssignment,
       }
 
       return FunctionType::get(inputTy, funcTy->getResult(),
-                               funcTy->isAutoClosure(), context);
+                               funcTy->isAutoClosure(),
+                               funcTy->isBlock(),
+                               context);
     }
   }
 

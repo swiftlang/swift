@@ -467,6 +467,10 @@ namespace {
     void visitModuleExpr(ModuleExpr *E) {
       // Nothing to do: modules have no runtime representation.
     }
+    
+    void visitBridgeToBlockExpr(BridgeToBlockExpr *E) {
+      llvm_unreachable("bridge to block not implemented");
+    }
   };
 }
 
@@ -562,6 +566,7 @@ namespace {
     NOT_LVALUE_EXPR(Downcast)
     NOT_LVALUE_EXPR(SuperToArchetype)
     NOT_LVALUE_EXPR(Module)
+    NOT_LVALUE_EXPR(BridgeToBlock)
 #undef NOT_LVALUE_EXPR
 
     LValue visitTupleElementExpr(TupleElementExpr *E) {
@@ -741,6 +746,7 @@ namespace {
     NON_LOCATEABLE(ExistentialMemberRefExpr)
     NON_LOCATEABLE(ArchetypeMemberRefExpr)
     NON_LOCATEABLE(GenericMemberRefExpr)
+    NON_LOCATEABLE(BridgeToBlockExpr)
 
     // FIXME: We may want to specialize IR generation for array subscripts.
     NON_LOCATEABLE(SubscriptExpr)
