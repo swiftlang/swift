@@ -1067,7 +1067,7 @@ namespace {
     llvm::Constant *buildIvar(VarDecl *ivar) {
       // FIXME: this is not always the right thing to do!
       auto &elt = FieldLayout.getElements()[NextFieldIndex++];
-      auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*direct*/ true);
+      auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ false);
       auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
       offsetVar->setConstant(false);
       auto offsetVal =
