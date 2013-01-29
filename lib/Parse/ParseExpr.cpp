@@ -67,7 +67,6 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
 ///   expr-unary:
 ///     expr-postfix
 ///     expr-new
-///     expr-super
 ///     operator-prefix expr-unary
 NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
   // If the next token is the keyword 'new', this must be expr-new.
