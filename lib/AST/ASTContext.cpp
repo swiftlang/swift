@@ -592,23 +592,32 @@ ModuleType *ModuleType::get(Module *M) {
   return Entry = new (C, AllocationArena::Permanent) ModuleType(M, C);
 }
 
+static char getFuncAttrKey(bool isAutoClosure, bool isBlock) {
+  return isAutoClosure | (isBlock << 1);
+}
+
 /// FunctionType::get - Return a uniqued function type with the specified
 /// input and result.
-FunctionType *FunctionType::get(Type Input, Type Result, bool isAutoClosure,
+FunctionType *FunctionType::get(Type Input, Type Result,
+                                bool isAutoClosure, bool isBlock,
                                 ASTContext &C) {
   bool hasTypeVariable = Input->hasTypeVariable() || Result->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
+  char attrKey = getFuncAttrKey(isAutoClosure, isBlock);
 
   FunctionType *&Entry
-    = C.Impl.getArena(arena).FunctionTypes[{Input, {Result, isAutoClosure} }];
+    = C.Impl.getArena(arena).FunctionTypes[{Input, {Result, attrKey} }];
   if (Entry) return Entry;
 
-  return Entry = new (C, arena) FunctionType(Input, Result, isAutoClosure,
-                                      hasTypeVariable);
+  return Entry = new (C, arena) FunctionType(Input, Result,
+                                             isAutoClosure,
+                                             isBlock,
+                                             hasTypeVariable);
 }
 
 // If the input and result types are canonical, then so is the result.
-FunctionType::FunctionType(Type input, Type output, bool isAutoClosure,
+FunctionType::FunctionType(Type input, Type output,
+                           bool isAutoClosure, bool isBlock,
                            bool hasTypeVariable)
   : AnyFunctionType(TypeKind::Function,
              (input->isCanonical() && output->isCanonical()) ?
@@ -616,7 +625,9 @@ FunctionType::FunctionType(Type input, Type output, bool isAutoClosure,
              input, output,
              (input->isUnresolvedType() || output->isUnresolvedType()),
              hasTypeVariable),
-    AutoClosure(isAutoClosure) { }
+    AutoClosure(isAutoClosure),
+    Block(isBlock)
+{ }
 
 
 /// FunctionType::get - Return a uniqued function type with the specified

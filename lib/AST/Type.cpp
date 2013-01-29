@@ -1218,8 +1218,12 @@ void TupleType::print(raw_ostream &OS) const {
 }
 
 void FunctionType::print(raw_ostream &OS) const {
-  if (isAutoClosure())
-    OS << "[auto_closure]";
+  if (isAutoClosure() && isBlock())
+    OS << "[auto_closure, objc_block] ";
+  else if (isAutoClosure())
+    OS << "[auto_closure] ";
+  else if (isBlock())
+    OS << "[objc_block] ";
   OS << getInput() << " -> " << getResult();
 }
 

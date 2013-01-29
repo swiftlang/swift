@@ -1065,16 +1065,26 @@ public:
 /// close over the value.  For example:
 ///   var x : [auto_closure] () -> int = 4
 class FunctionType : public AnyFunctionType {
-  bool AutoClosure;
+  bool AutoClosure : 1;
+  
+  /// True if this type represents an ObjC-compatible block value. This is a
+  /// temporary hack to make simple demo-quality block interop easy.
+  bool Block : 1;
 public:
   /// 'Constructor' Factory Function
   static FunctionType *get(Type Input, Type Result, ASTContext &C) {
-    return get(Input, Result, false, C);
+    return get(Input, Result, false, false, C);
   }
   static FunctionType *get(Type Input, Type Result, bool isAutoClosure,
+                           ASTContext &C) {
+    return get(Input, Result, isAutoClosure, false, C);
+  }
+  static FunctionType *get(Type Input, Type Result,
+                           bool isAutoClosure, bool isBlock,
                            ASTContext &C);
 
   bool isAutoClosure() const { return AutoClosure; }
+  bool isBlock() const { return Block; }
   
   void print(raw_ostream &OS) const;
   
@@ -1084,10 +1094,12 @@ public:
   }
   
 private:
-  FunctionType(Type Input, Type Result, bool isAutoClosure,
+  FunctionType(Type Input, Type Result,
+               bool isAutoClosure,
+               bool isBlock,
                bool HasTypeVariable);
 };
-
+  
 /// PolymorphicFunctionType - A polymorphic function type.
 ///
 /// If the AutoClosure bit is set to true, then the input type is known to be ()
