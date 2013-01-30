@@ -410,7 +410,10 @@ namespace {
 
 Type ClangImporter::Implementation::importType(clang::QualType type) {
   SwiftTypeConverter converter(*this);
-  return converter.Visit(type.getTypePtr());
+  Type converted = converter.Visit(type.getTypePtr());
+  if (converted)
+    firstClangModule->addType(converted);
+  return converted;
 }
 
 Type ClangImporter::Implementation::importFunctionType(

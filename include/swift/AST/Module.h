@@ -19,8 +19,10 @@
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Type.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseSet.h"
 
 namespace clang {
   class Module;
@@ -283,6 +285,10 @@ class ClangModule : public Module {
   ///
   /// FIXME: Make sure this gets freed.
   std::vector<ExternalDefinition> ExternalDefs;
+  
+  /// \brief The list of types that were synthesized while importing from the
+  /// Clang module.
+  llvm::DenseSet<Type> Types;
 
 public:
   ClangModule(ASTContext &ctx, Component *comp, clang::Module *clangModule);
@@ -294,6 +300,11 @@ public:
   void addExternalDefinition(Decl *def) {
     ExternalDefs.push_back(def);
   }
+  
+  /// \brief Add the given type to this module.
+  void addType(Type t) {
+    Types.insert(t);
+  }
 
   /// \brief Retrieve the list of definitions that were synthesized while
   /// importing from the Clang module.
@@ -304,7 +315,7 @@ public:
   MutableArrayRef<ExternalDefinition> getExternalDefinitions() {
     return ExternalDefs;
   }
-
+  
   /// \brief Retrieve the list of definitions that were synthesized while
   /// importing from the Clang module.
   ///
@@ -315,6 +326,12 @@ public:
     return ExternalDefs;
   }
 
+  /// \brief Retrieve the list of types that were synthesized while importing
+  /// from the Clang module.
+  llvm::DenseSet<Type> const &getTypes() const {
+    return Types;
+  }
+  
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::ClangModule;
   }

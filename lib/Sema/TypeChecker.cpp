@@ -743,7 +743,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       TC.typeCheckFunctionBody(FE);
     }
 
-    // Type-check any externally-sourced definition.
+    // Type-check any externally-sourced definitions and types.
     // FIXME: This is O(N^2), because we're not tracking new definitions.
     for (auto imported : TC.Context.LoadedClangModules) {
       for (auto &def : imported->getExternalDefinitions()) {
@@ -774,6 +774,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
         llvm_unreachable("Unknown externally-sourced definition");
       }
+      for (Type t : imported->getTypes())
+        TC.validateTypeSimple(t);
     }
   } while (currentFuncExpr < prePass.FuncExprs.size());
   
