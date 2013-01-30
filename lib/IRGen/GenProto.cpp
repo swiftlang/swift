@@ -2817,7 +2817,7 @@ namespace {
     void addFulfillment(ArchetypeType *arg, ProtocolDecl *proto,
                         unsigned depth, unsigned index) {
       // Only add a fulfillment if it's not enough information otherwise.
-      auto key = FulfillmentKey(arg, nullptr);
+      auto key = FulfillmentKey(arg, proto);
       if (!Fulfillments.count(key))
         Fulfillments.insert(std::make_pair(key, Fulfillment(depth, index)));
     }
