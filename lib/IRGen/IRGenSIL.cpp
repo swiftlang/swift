@@ -687,9 +687,6 @@ void IRGenSILFunction::visitImplicitConvertInst(swift::ImplicitConvertInst *i) {
     
     case LoweredValue::Kind::PartialCall:
       llvm_unreachable("forcing partial call not yet supported");
-      
-    default:
-      break;
   }
 }
 
