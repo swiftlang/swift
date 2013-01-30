@@ -166,14 +166,15 @@ static llvm::CallingConv::ID getFreestandingConvention(IRGenModule &IGM) {
 llvm::CallingConv::ID irgen::expandAbstractCC(IRGenModule &IGM,
                                               AbstractCC convention,
                                               bool hasIndirectResult,
-                          SmallVectorImpl<llvm::AttributeWithIndex> &attrs) {
+                                              llvm::AttributeSet &attrs) {
   // If we have an indirect result, add the appropriate attributes.
   if (hasIndirectResult) {
-    llvm::Attribute::AttrKind tmp[] = {
+    static const llvm::Attribute::AttrKind attrKinds[] = {
       llvm::Attribute::StructRet,
       llvm::Attribute::NoAlias
     };
-    attrs.push_back(llvm::AttributeWithIndex::get(IGM.LLVMContext, 1, tmp));
+    auto resultAttrs = llvm::AttributeSet::get(IGM.LLVMContext, 1, attrKinds);
+    attrs = attrs.addAttributes(IGM.LLVMContext, 1, resultAttrs);
   }
 
   switch (convention) {
@@ -1983,7 +1984,7 @@ llvm::CallSite CallEmission::emitCallSite(bool hasIndirectResult) {
   Cleanups.clear();
 
   // Determine the calling convention.
-  llvm::SmallVector<llvm::AttributeWithIndex, 4> attrs;
+  llvm::AttributeSet attrs;
   auto cc = expandAbstractCC(IGF.IGM, getCallee().getConvention(),
                              hasIndirectResult, attrs);
 
@@ -3638,7 +3639,7 @@ llvm::Function *IRGenModule::getAddrOfBridgeToBlockConverter(CanType blockType)
                                                        /*isVarArg=*/ false);
   
   
-  SmallVector<llvm::AttributeWithIndex, 4> attrs;
+  llvm::AttributeSet attrs;
   auto cc = expandAbstractCC(*this, AbstractCC::C,
                              /*indirectResult=*/false,
                              attrs);

@@ -29,7 +29,7 @@
 #include "IRGen.h"
 
 namespace llvm {
-  struct AttributeWithIndex;
+  class AttributeSet;
   class Value;
 }
 
@@ -371,7 +371,7 @@ public:
   llvm::Function *createFunction(IRGenModule &IGM,
                                  llvm::FunctionType *fnType,
                                  llvm::CallingConv::ID cc,
-                                 ArrayRef<llvm::AttributeWithIndex> attrs);
+                                 const llvm::AttributeSet &attrs);
 
 
   llvm::GlobalVariable *createVariable(IRGenModule &IGM,

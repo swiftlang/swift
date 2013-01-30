@@ -43,11 +43,11 @@ using namespace irgen;
 
 static bool isTrivialGlobalInit(llvm::Function *fn) {
   // Must be exactly one basic block.
-  if (next(fn->begin()) != fn->end()) return false;
+  if (std::next(fn->begin()) != fn->end()) return false;
 
   // Basic block must have exactly one instruction.
   llvm::BasicBlock *entry = &fn->getEntryBlock();
-  if (next(entry->begin()) != entry->end()) return false;
+  if (std::next(entry->begin()) != entry->end()) return false;
 
   // That instruction is necessarily a 'ret' instruction.
   assert(isa<llvm::ReturnInst>(entry->front()));
@@ -444,7 +444,7 @@ static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
 llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
                                          llvm::FunctionType *fnType,
                                          llvm::CallingConv::ID cc,
-                                ArrayRef<llvm::AttributeWithIndex> attrs) {
+                                         const llvm::AttributeSet &attrs) {
   llvm::GlobalValue *existing = IGM.Module.getNamedGlobal(getName());
   if (existing) {
     if (isa<llvm::Function>(existing) &&
@@ -463,8 +463,8 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
     = llvm::Function::Create(fnType, getLinkage(), getName(), &IGM.Module);
   fn->setVisibility(getVisibility());
   fn->setCallingConv(cc);
-  if (!attrs.empty())
-    fn->setAttributes(llvm::AttributeSet::get(fnType->getContext(), attrs));
+  if (!attrs.isEmpty())
+    fn->setAttributes(attrs);
   return fn;
 }
 
@@ -673,7 +673,7 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
     hasIndirectResult(*this, fn.getDecl()->getType()->getCanonicalType(),
                       fn.getExplosionLevel(), fn.getUncurryLevel());
 
-  SmallVector<llvm::AttributeWithIndex, 4> attrs;
+  llvm::AttributeSet attrs;
   auto cc = expandAbstractCC(*this, convention, indirectResult, attrs);
 
   LinkInfo link = LinkInfo::get(*this, entity);
@@ -700,7 +700,7 @@ llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
   bool indirectResult =
     hasIndirectResult(*this, formalType, explosionLevel, uncurryLevel);
 
-  SmallVector<llvm::AttributeWithIndex, 1> attrs;
+  llvm::AttributeSet attrs;
   auto cc = expandAbstractCC(*this, AbstractCC::Freestanding,
                              indirectResult, attrs);
 
@@ -735,9 +735,8 @@ llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
   bool indirectResult =
     hasIndirectResult(*this, formalType, explodeLevel, uncurryLevel);
 
-  SmallVector<llvm::AttributeWithIndex, 4> attrs;
-  auto cc = expandAbstractCC(*this, AbstractCC::Method, indirectResult,
-                             attrs);
+  llvm::AttributeSet attrs;
+  auto cc = expandAbstractCC(*this, AbstractCC::Method, indirectResult, attrs);
 
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, cc, attrs);
@@ -938,7 +937,7 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
 
   // FIXME: deallocating and destroying destructors have different signatures
 
-  SmallVector<llvm::AttributeWithIndex, 4> attrs;
+  llvm::AttributeSet attrs;
   auto cc = expandAbstractCC(*this, AbstractCC::Method, false, attrs);
 
   LinkInfo link = LinkInfo::get(*this, entity);
@@ -965,8 +964,7 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(CanType concreteType,
       cast<llvm::PointerType>(getValueWitnessTy(index))
         ->getElementType());
   LinkInfo link = LinkInfo::get(*this, entity);
-  entry = link.createFunction(*this, fnType, RuntimeCC,
-                              ArrayRef<llvm::AttributeWithIndex>());
+  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
   return entry;
 }
 
@@ -1069,7 +1067,7 @@ llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
     getFunctionType(formal.getType(), explosionLevel,
                     formal.getNaturalUncurryLevel(), ExtraData::None);
 
-  SmallVector<llvm::AttributeWithIndex, 4> attrs;
+  llvm::AttributeSet attrs;
   auto convention = expandAbstractCC(*this, formal.getCC(), false, attrs);
 
   LinkInfo link = LinkInfo::get(*this, entity);
@@ -1116,7 +1114,7 @@ llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
     getFunctionType(formal.getType(), explosionLevel,
                     formal.getNaturalUncurryLevel(), ExtraData::None);
 
-  SmallVector<llvm::AttributeWithIndex, 4> attrs;
+  llvm::AttributeSet attrs;
   auto convention = expandAbstractCC(*this, formal.getCC(), false, attrs);
 
   LinkInfo link = LinkInfo::get(*this, entity);

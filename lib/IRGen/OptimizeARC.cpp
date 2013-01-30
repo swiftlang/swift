@@ -115,8 +115,8 @@ static Constant *getRetain(Function &F, Type *ObjectPtrTy, Constant *&Cache) {
   if (Cache) return Cache;
   
   auto AttrList = AttributeSet::get(F.getContext(),
-                                   AttributeWithIndex::get(F.getContext(), ~0U,
-                                                         Attribute::NoUnwind));
+                                    AttributeSet::FunctionIndex,
+                                    Attribute::NoUnwind);
 
   Module *M = F.getParent();
   return Cache = M->getOrInsertFunction("swift_retain", AttrList,
@@ -131,11 +131,10 @@ static Constant *getRetainNoResult(Function &F, Type *ObjectPtrTy,
                                    Constant *&Cache) {
   if (Cache) return Cache;
  
-  AttributeWithIndex Attrs[] = {
-    AttributeWithIndex::get(F.getContext(), 1, Attribute::NoCapture),
-    AttributeWithIndex::get(F.getContext(), ~0U, Attribute::NoUnwind)
-  };
-  auto AttrList = AttributeSet::get(F.getContext(), Attrs);
+  auto AttrList = AttributeSet::get(F.getContext(), 1, Attribute::NoCapture);
+  AttrList = AttrList.addAttribute(F.getContext(),
+                                   AttributeSet::FunctionIndex,
+                                   Attribute::NoUnwind);
   Module *M = F.getParent();
   return Cache = M->getOrInsertFunction("swift_retain_noresult", AttrList,
                                         Type::getVoidTy(F.getContext()),
@@ -150,10 +149,9 @@ static Constant *getRetainAndReturnThree(Function &F, Type *ObjectPtrTy,
                                          Constant *&Cache) {
   if (Cache) return Cache;
   
-  AttributeWithIndex Attrs[] = {
-    AttributeWithIndex::get(F.getContext(), ~0U, Attribute::NoUnwind)
-  };
-  auto AttrList = AttributeSet::get(F.getContext(), Attrs);
+  auto AttrList = AttributeSet::get(F.getContext(),
+                                    AttributeSet::FunctionIndex,
+                                    Attribute::NoUnwind);
   Module *M = F.getParent();
   
   Type *Int64Ty = Type::getInt64Ty(F.getContext());

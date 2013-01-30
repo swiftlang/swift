@@ -86,11 +86,13 @@ static AllocToken getAllocToken(IRGenModule &IGM, uint64_t size) {
 }
 
 static llvm::AttributeSet getAllocAttrs(llvm::LLVMContext &ctx) {
-  llvm::AttributeWithIndex attrValues[] = {
-    llvm::AttributeWithIndex::get(ctx, 0, llvm::Attribute::NoAlias),
-    llvm::AttributeWithIndex::get(ctx, ~0, llvm::Attribute::NoUnwind)
-  };
-  return llvm::AttributeSet::get(ctx, attrValues);
+  auto attrs = llvm::AttributeSet::get(ctx,
+                                       llvm::AttributeSet::ReturnIndex,
+                                       llvm::Attribute::NoAlias);
+  attrs = attrs.addAttribute(ctx,
+                             llvm::AttributeSet::FunctionIndex,
+                             llvm::Attribute::NoUnwind);
+  return attrs;
 }
 
 static llvm::Value *emitAllocatingCall(IRGenFunction &IGF,

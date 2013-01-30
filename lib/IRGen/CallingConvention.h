@@ -21,7 +21,7 @@
 #include "llvm/IR/CallingConv.h"
 
 namespace llvm {
-  struct AttributeWithIndex;
+  class AttributeSet;
   class Value;
 }
 
@@ -49,7 +49,7 @@ AbstractCC getAbstractCC(ValueDecl *fn);
 /// and a set of attributes.
 llvm::CallingConv::ID expandAbstractCC(IRGenModule &IGM, AbstractCC convention,
                                        bool hasAggResult,
-                       llvm::SmallVectorImpl<llvm::AttributeWithIndex> &attrs);
+                                       llvm::AttributeSet &attrs);
 
 } // end namespace irgen
 } // end namespace swift
