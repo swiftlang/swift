@@ -31,6 +31,7 @@
 
 #include "IRGen.h"
 #include "IRGenModule.h"
+#include "GenFunc.h"
 #include "Linking.h"
 #include "ValueWitness.h"
 
@@ -712,7 +713,11 @@ void Mangler::mangleFunctionType(AnyFunctionType *fn,
                                  unsigned uncurryLevel) {
   // type ::= 'F' type type (curried)
   // type ::= 'f' type type (uncurried)
-  Buffer << (uncurryLevel > 0 ? 'f' : 'F');
+  // type ::= 'b' type type (objc block)
+  if (isBlockFunctionType(fn))
+    Buffer << 'b';
+  else
+    Buffer << (uncurryLevel > 0 ? 'f' : 'F');
   mangleType(fn->getInput(), explosion, 0);
   mangleType(fn->getResult(), explosion,
              (uncurryLevel > 0 ? uncurryLevel - 1 : 0));
@@ -828,6 +833,12 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     buffer << "_TWv";
     mangler.mangleDirectness(isOffsetIndirect());
     mangler.mangleEntity(getDecl(), ExplosionKind::Minimal, 0);
+    return;
+  
+  //   global ::= 'Tb' type
+  case Kind::BridgeToBlockConverter:
+    buffer << "_TTb";
+    mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
     return;
 
   // For all the following, this rule was imposed above:

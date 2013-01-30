@@ -678,7 +678,9 @@ CanType TypeBase::getCanonicalType() {
     FunctionType *FT = cast<FunctionType>(this);
     Type In = FT->getInput()->getCanonicalType();
     Type Out = FT->getResult()->getCanonicalType();
-    Result = FunctionType::get(In, Out, FT->isAutoClosure(),
+    Result = FunctionType::get(In, Out,
+                               FT->isAutoClosure(),
+                               FT->isBlock(),
                                In->getASTContext());
     break;
   }

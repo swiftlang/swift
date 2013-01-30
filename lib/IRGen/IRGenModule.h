@@ -340,6 +340,7 @@ public:
                             unsigned &naturalCurryLevel,
                             AbstractCC &cc,
                             BraceStmt* &body);
+  llvm::Function *getAddrOfBridgeToBlockConverter(CanType blockType);
 
   llvm::StringRef mangleType(CanType type,
                              llvm::SmallVectorImpl<char> &buffer);

@@ -79,9 +79,11 @@
 #include "GenPoly.h"
 #include "GenProto.h"
 #include "GenType.h"
+#include "HeapTypeInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "IRGenSIL.h"
+#include "Linking.h"
 #include "LValue.h"
 #include "Condition.h"
 #include "FixedTypeInfo.h"
@@ -473,9 +475,33 @@ namespace {
       IGF.emitRelease(IGF.Builder.CreateLoad(projectData(IGF, addr)));
     }
   };
+
+  /// The type-info class for ObjC blocks, which are represented by an ObjC
+  /// heap pointer.
+  class BlockTypeInfo : public HeapTypeInfo<BlockTypeInfo> {
+  public:
+    BlockTypeInfo(llvm::PointerType *storageType,
+                  Size size, Alignment align)
+      : HeapTypeInfo(storageType, size, align) {
+    }
+
+    bool hasSwiftRefcount() const { return false; }
+  };
+}
+
+bool irgen::isBlockFunctionType(Type t) {
+  if (FunctionType *ft = t->getAs<FunctionType>()) {
+    return ft->isBlock();
+  }
+  return false;
 }
 
 const TypeInfo *TypeConverter::convertFunctionType(AnyFunctionType *T) {
+  if (isBlockFunctionType(T))
+    return new BlockTypeInfo(IGM.ObjCPtrTy,
+                             IGM.getPointerSize(),
+                             IGM.getPointerAlignment());
+  
   return FuncTypeInfo::create(T, IGM.FunctionPairTy,
                               IGM.getPointerSize() * 2,
                               IGM.getPointerAlignment());
@@ -1886,7 +1912,7 @@ namespace {
 CalleeSource CalleeSource::decompose(Expr *E) {
   // Do the basic decomposition.
   CalleeSource source = FunctionDecomposer().visit(E);
-
+  
   // Remember the substituted result type, which is to say, the type
   // of the original expression.
   source.setSubstResultType(E->getType()->getCanonicalType());
@@ -1962,7 +1988,7 @@ llvm::CallSite CallEmission::emitCallSite(bool hasIndirectResult) {
                              hasIndirectResult, attrs);
 
   // Make the call and clear the arguments array.
-  auto fnPtr = getCallee().getFunctionPointer();
+  auto fnPtr = getCallee().getFunctionPointer();  
   llvm::CallSite call = IGF.emitInvoke(cc, fnPtr, Args,
                                      llvm::AttributeSet::get(fnPtr->getContext(),
                                                               attrs));
@@ -3593,3 +3619,54 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   out.addUnmanaged(data);
 }
 
+/// Fetch the declaration of the given block-to-
+llvm::Function *IRGenModule::getAddrOfBridgeToBlockConverter(CanType blockType)
+{
+  LinkEntity entity = LinkEntity::forBridgeToBlockConverter(blockType);
+  
+  // Check whether we've cached this.
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) return cast<llvm::Function>(entry);
+  
+  // The block converter is a C function with signature
+  // __typeof__(R (^)(A...)) converter(R (*)(A..., swift_refcounted*),
+  //                                   swift_refcounted*)
+  // We simplify that to the llvm type %objc(i8*, %swift.refcounted*)*.
+  llvm::Type *fnParams[] = {Int8PtrTy, RefCountedPtrTy};
+  llvm::FunctionType *fnType = llvm::FunctionType::get(ObjCPtrTy,
+                                                       fnParams,
+                                                       /*isVarArg=*/ false);
+  
+  
+  SmallVector<llvm::AttributeWithIndex, 4> attrs;
+  auto cc = expandAbstractCC(*this, AbstractCC::C,
+                             /*indirectResult=*/false,
+                             attrs);
+  
+  LinkInfo link = LinkInfo::get(*this, entity);
+  entry = link.createFunction(*this, fnType, cc, attrs);
+  return entry;
+}
+
+/// Emit a call to convert a Swift closure to an Objective-C block via a
+/// shim function defined in Objective-C.
+void irgen::emitBridgeToBlock(IRGenFunction &IGF,
+                              CanType blockTy,
+                              Explosion &swiftClosure,
+                              Explosion &outBlock) {
+  // Get the function pointer as an i8*.
+  llvm::Value *fn = swiftClosure.claimUnmanagedNext();
+  fn = IGF.Builder.CreateBitCast(fn, IGF.IGM.Int8PtrTy);
+  // Get the context pointer as a %swift.refcounted*.
+  ManagedValue mContext = swiftClosure.claimNext();
+  llvm::Value *context = IGF.Builder.CreateBitCast(mContext.getValue(),
+                                                   IGF.IGM.RefCountedPtrTy);
+  // Get the shim function we'll call.
+  llvm::Function *converter = IGF.IGM.getAddrOfBridgeToBlockConverter(blockTy);
+  
+  // Emit the call.
+  llvm::Value *result = IGF.Builder.CreateCall2(converter, fn, context);
+  
+  // Tag the result with a cleanup and pass it on.
+  outBlock.add(IGF.enterObjCReleaseCleanup(result));
+}

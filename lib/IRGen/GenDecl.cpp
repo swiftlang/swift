@@ -383,6 +383,10 @@ bool LinkEntity::isLocalLinkage() const {
   case Kind::SwiftMetaclassStub:
   case Kind::FieldOffset:
     return isLocalLinkageDecl(getDecl());
+      
+  case Kind::BridgeToBlockConverter:
+    // Bridge-to-block shims are currently always provided from a stub.
+    return false;
   }
   llvm_unreachable("bad link entity kind");
 }

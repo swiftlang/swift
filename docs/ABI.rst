@@ -30,6 +30,7 @@ All Swift-mangled names begin with this prefix.
   global ::= 'Wv' directness entity          // field offset
   global ::= local-marker? entity            // some identifiable thing
   global ::= 'To' global                     // swift-as-ObjC thunk
+  global ::= 'Tb' type                       // swift-to-ObjC block converter
   entity ::= context 'D'                     // deallocating destructor
   entity ::= context 'd'                     // non-deallocating destructor
   entity ::= context 'C' type                // allocating constructor
@@ -82,6 +83,7 @@ types where the metadata itself has unknown layout.)
   type ::= 'Bp'                              // Builtin.RawPointer
   type ::= 'Bu'                              // Builtin.OpaquePointer
   type ::= nominal-type
+  type ::= 'b' type type                     // objc block function type
   type ::= 'F' type type                     // function type
   type ::= 'f' type type                     // uncurried function type
   type ::= 'G' type <type>+ '_'              // generic type application

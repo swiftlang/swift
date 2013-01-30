@@ -469,7 +469,9 @@ namespace {
     }
     
     void visitBridgeToBlockExpr(BridgeToBlockExpr *E) {
-      llvm_unreachable("bridge to block not implemented");
+      Explosion closure(ExplosionKind::Minimal);
+      IGF.emitRValue(E->getSubExpr(), closure);
+      emitBridgeToBlock(IGF, E->getType()->getCanonicalType(), closure, Out);
     }
   };
 }

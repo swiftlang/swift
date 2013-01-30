@@ -73,6 +73,16 @@ namespace irgen {
                             Type type,
                             llvm::ArrayRef<Pattern*> paramClauses,
                             Explosion &args);
+  
+  /// Emit a call to convert a Swift closure to an Objective-C block via a
+  /// shim function defined in Objective-C.
+  void emitBridgeToBlock(IRGenFunction &IGF,
+                         CanType blockType,
+                         Explosion &swiftClosure,
+                         Explosion &outBlock);
+
+  /// Returns true if the given function type is represented as an ObjC block.
+  bool isBlockFunctionType(Type t);
 } // end namespace irgen
 } // end namespace swift
 

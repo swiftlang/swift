@@ -134,6 +134,10 @@ class LinkEntity {
     /// A type which is being mangled just for its string.
     /// The pointer is a canonical TypeBase*.
     TypeMangling,
+    
+    /// A Swift-to-ObjC block converter function.
+    /// The pointer is a canonical TypeBase*.
+    BridgeToBlockConverter,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -279,6 +283,12 @@ public:
   static LinkEntity forTypeMangling(CanType type) {
     LinkEntity entity;
     entity.setForType(Kind::TypeMangling, type);
+    return entity;
+  }
+  
+  static LinkEntity forBridgeToBlockConverter(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::BridgeToBlockConverter, type);
     return entity;
   }
 
