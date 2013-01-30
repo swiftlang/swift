@@ -1895,6 +1895,9 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
     // FIXME: If the destination is an [objc_block] function type, insert a
     // BridgeToBlockExpr.
     if (FT->isBlock()) {
+      if (E->getType()->isEqual(DestTy))
+        return unchanged(E, Flags);
+      
       FunctionType *NonBlockTy = FunctionType::get(FT->getInput(),
                                                    FT->getResult(),
                                                    TC.Context);
@@ -1905,6 +1908,8 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
           return DestTy;
         
         E = CoercedE.getExpr();
+        if (E->getType()->isEqual(DestTy))
+          return CoercedE;
       } else {
         return CoercedE;
       }
