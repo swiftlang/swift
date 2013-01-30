@@ -629,12 +629,21 @@ static void emitClassAllocatingConstructor(IRGenModule &IGM,
   // Gather our arguments.
   Explosion args = IGF.collectParameters();
   
-  // Pick out the metatype we received and use it as the local type data for
-  // the 'this' type.
-  ManagedValue metadata = args.takeLast();
+  // Pick out the metatype we received. There may be witness table
+  // arguments in the way.
+  SmallVector<llvm::Value *, 2> witnessTables;
+  llvm::Value *metadata;
+  while (metadata = args.takeLast().getUnmanagedValue(),
+         metadata->getType() == IGM.WitnessTablePtrTy) {
+    witnessTables.push_back(metadata);
+  }
+  assert(metadata->getType() == IGM.TypeMetadataPtrTy &&
+         "did not find a metadata argument to allocating constructor?");
+  
+  // Use the metadata we found as the local type data for the 'this' type.
   IGF.setUnscopedLocalTypeData(thisType,
                                LocalTypeData::Metatype,
-                               metadata.getValue());
+                               metadata);
 
   // We'll forward the rest of the arguments to the initializer.
   SmallVector<llvm::Value*, 8> argValues;
@@ -655,6 +664,10 @@ static void emitClassAllocatingConstructor(IRGenModule &IGM,
   
   // Pass 'this' on to the initializer.
   argValues.push_back(thisValue);
+  
+  // Pass along the witness tables.
+  argValues.insert(argValues.end(),
+                   witnessTables.begin(), witnessTables.end());
   
   // Emit a tail call to the initializing constructor.
   llvm::CallSite callSite = IGF.emitInvoke(initFn->getCallingConv(),
