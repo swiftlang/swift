@@ -33,7 +33,7 @@ namespace {
     bool HadError;
 
     /// \brief The stack of functions we're visiting.
-    llvm::SmallVector<FuncExpr *, 4> Functions;
+    llvm::SmallVector<FuncExprLike, 4> Functions;
 
   public:
     Verifier(TranslationUnit *TU) : TU(TU), Ctx(TU->Ctx), Out(llvm::errs()),
@@ -185,14 +185,37 @@ namespace {
       return shouldVerify(cast<Expr>(func));
     }
     
+    bool shouldVerify(ConstructorDecl *cd) {
+      Functions.push_back(cd);
+      return shouldVerify(cast<Decl>(cd));
+    }
+    
+    bool shouldVerify(DestructorDecl *dd) {
+      Functions.push_back(dd);
+      return shouldVerify(cast<Decl>(dd));
+    }
+    
     void cleanup(FuncExpr *func) {
-      assert(Functions.back() == func);
+      assert(Functions.back().get<FuncExpr*>() == func);
+      Functions.pop_back();
+    }
+    void cleanup(ConstructorDecl *cd) {
+      assert(Functions.back().get<ConstructorDecl*>() == cd);
+      Functions.pop_back();
+    }
+    void cleanup(DestructorDecl *cd) {
+      assert(Functions.back().get<DestructorDecl*>() == cd);
       Functions.pop_back();
     }
 
     void verifyChecked(ReturnStmt *S) {
       auto func = Functions.back();
-      auto resultType = func->getResultType(Ctx);
+      Type resultType;
+      if (FuncExpr *fe = func.dyn_cast<FuncExpr*>()) {
+        resultType = fe->getResultType(Ctx);
+      } else {
+        resultType = TupleType::getEmpty(Ctx);
+      }
       
       if (S->hasResult()) {
         auto result = S->getResult();

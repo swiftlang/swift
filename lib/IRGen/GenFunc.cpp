@@ -2948,6 +2948,16 @@ void irgen::emitParameterClauses(IRGenFunction &IGF,
   emitParameterClause(IGF, fnType, paramClauses[0], args);
 }
 
+/// Emit the basic block that 'return' should branch to and insert it into
+/// the current function. This creates a second
+/// insertion point that most blocks should be inserted before.
+void IRGenFunction::emitBBForReturn() {
+  ReturnBB = createBasicBlock("return");
+  CurFn->getBasicBlockList().push_back(ReturnBB);
+}
+
+
+
 /// Emit the prologue for the function.
 void IRGenFunction::emitPrologue() {  
   // Set up the IRBuilder.
@@ -2964,10 +2974,8 @@ void IRGenFunction::emitPrologue() {
   if (CurPrologue == Prologue::Bare)
     return;
 
-  // Set up the return block and insert it.  This creates a second
-  // insertion point that most blocks should be inserted before.
-  ReturnBB = createBasicBlock("return");
-  CurFn->getBasicBlockList().push_back(ReturnBB);
+  // Set up the return block.
+  emitBBForReturn();
 
   // List out the parameter values in an Explosion.
   Explosion values = collectParameters();
@@ -3035,6 +3043,41 @@ static void eraseAllocaIfOnlyStoredTo(llvm::AllocaInst *alloca) {
   alloca->eraseFromParent();
 }
 
+/// Emit a branch to the return block and set the insert point there.
+/// Returns true if the return block is reachable, false otherwise.
+bool IRGenFunction::emitBranchToReturnBB() {
+  // If there are no edges to the return block, we never want to emit it.
+  if (ReturnBB->use_empty()) {
+    ReturnBB->eraseFromParent();
+    
+    // Normally this means that we'll just insert the epilogue in the
+    // current block, but if the current IP is unreachable then so is
+    // the entire epilogue.
+    if (!Builder.hasValidIP())
+      return false;
+    
+    // Otherwise, branch to it if the current IP is reachable.
+  } else if (Builder.hasValidIP()) {
+    Builder.CreateBr(ReturnBB);
+    Builder.SetInsertPoint(ReturnBB);
+    
+    // Otherwise, if there is exactly one use of the return block, merge
+    // it into its predecessor.
+  } else if (ReturnBB->hasOneUse()) {
+    // return statements are never emitted as conditional branches.
+    llvm::BranchInst *Br = cast<llvm::BranchInst>(*ReturnBB->use_begin());
+    assert(Br->isUnconditional());
+    Builder.SetInsertPoint(Br->getParent());
+    Br->eraseFromParent();
+    ReturnBB->eraseFromParent();
+    
+    // Otherwise, just move the IP to the return block.
+  } else {
+    Builder.SetInsertPoint(ReturnBB);
+  }
+  return true;
+}
+
 /// Emit the epilogue for the function.
 void IRGenFunction::emitEpilogue() {
   // Leave the cleanups created for the parameters if we've got a full
@@ -3048,35 +3091,10 @@ void IRGenFunction::emitEpilogue() {
   // That's it for the 'bare' epilogue.
   if (CurPrologue == Prologue::Bare)
     return;
-
-  // If there are no edges to the return block, we never want to emit it.
-  if (ReturnBB->use_empty()) {
-    ReturnBB->eraseFromParent();
-
-    // Normally this means that we'll just insert the epilogue in the
-    // current block, but if the current IP is unreachable then so is
-    // the entire epilogue.
-    if (!Builder.hasValidIP()) return;
-
-  // Otherwise, branch to it if the current IP is reachable.
-  } else if (Builder.hasValidIP()) {
-    Builder.CreateBr(ReturnBB);
-    Builder.SetInsertPoint(ReturnBB);
-
-  // Otherwise, if there is exactly one use of the return block, merge
-  // it into its predecessor.
-  } else if (ReturnBB->hasOneUse()) {
-    // return statements are never emitted as conditional branches.
-    llvm::BranchInst *Br = cast<llvm::BranchInst>(*ReturnBB->use_begin());
-    assert(Br->isUnconditional());
-    Builder.SetInsertPoint(Br->getParent());
-    Br->eraseFromParent();
-    ReturnBB->eraseFromParent();
-
-  // Otherwise, just move the IP to the return block.
-  } else {
-    Builder.SetInsertPoint(ReturnBB);
-  }
+  
+  // Jump to the return block.
+  if (!emitBranchToReturnBB())
+    return;
 
   const TypeInfo &resultType = getResultTypeInfo();
   ExplosionSchema resultSchema(CurExplosionLevel);

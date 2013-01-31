@@ -244,6 +244,10 @@ public:
   Explosion collectParameters();
   void emitFunctionTopLevel(BraceStmt *S);
   void emitScalarReturn(Explosion &scalars);
+  
+  void emitBBForReturn();
+  bool emitBranchToReturnBB();
+  
 private:
   void emitPrologue();
   void emitEpilogue();

@@ -1495,6 +1495,14 @@ inline bool ValueDecl::isSettable() const {
     return false;
 }
   
+// FIXME: Fix up the AST representation of ConstructorDecls and DestructorDecls
+// to use real FuncExpr bodies.
+
+/// A convenience typedef for FuncExpr-like-things, including FuncExprs,
+/// constructors, and destructors.
+using FuncExprLike =
+  llvm::PointerUnion3<FuncExpr*, ConstructorDecl*, DestructorDecl*>;
+  
 } // end namespace swift
 
 #endif

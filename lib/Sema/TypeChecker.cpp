@@ -415,8 +415,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
     // FuncExprs - This is a list of all the FuncExprs we need to analyze, in
     // an appropriate order.
-    SmallVector<llvm::PointerUnion3<FuncExpr*, ConstructorDecl*,
-                                    DestructorDecl*>, 32> FuncExprs;
+    SmallVector<FuncExprLike, 32> FuncExprs;
 
     virtual bool walkToDeclPre(Decl *D) {
       if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D))

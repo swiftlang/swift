@@ -37,9 +37,12 @@ class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
 public:
   TypeChecker &TC;
   
-  // TheFunc - This is the current FuncExpr being checked.  This is null for
-  // top level code.
-  FuncExpr *TheFunc;
+  // FIXME: ConstructorDecls and DestructorDecls ought to represent their bodies
+  // as normal FuncExprs.
+  
+  /// TheFunc - This is the current FuncExpr, ConstructorDecl, or DestructorDecl
+  /// being checked.  This is null for top level code.
+  FuncExprLike TheFunc;
   
   /// DC - This is the current DeclContext.
   DeclContext *DC;
@@ -59,8 +62,14 @@ public:
   StmtChecker(TypeChecker &TC, FuncExpr *TheFunc)
     : TC(TC), TheFunc(TheFunc), DC(TheFunc), LoopNestLevel(0) { }
 
+  StmtChecker(TypeChecker &TC, ConstructorDecl *TheCtor)
+    : TC(TC), TheFunc(TheCtor), DC(TheCtor), LoopNestLevel(0) { }
+  
+  StmtChecker(TypeChecker &TC, DestructorDecl *TheDtor)
+    : TC(TC), TheFunc(TheDtor), DC(TheDtor), LoopNestLevel(0) { }
+  
   StmtChecker(TypeChecker &TC, DeclContext *DC)
-    : TC(TC), TheFunc(nullptr), DC(DC), LoopNestLevel(0) { }
+    : TC(TC), TheFunc(), DC(DC), LoopNestLevel(0) { }
 
   //===--------------------------------------------------------------------===//
   // Helper Functions.
@@ -106,19 +115,29 @@ public:
   
   Stmt *visitBraceStmt(BraceStmt *BS);
   
+  Type returnTypeOfFunc() {
+    if (auto fe = TheFunc.dyn_cast<FuncExpr*>()) {
+      Type resultTy = fe->getType();
+      if (resultTy->is<ErrorType>())
+        return resultTy;
+      for (unsigned i = 0, e = fe->getNumParamPatterns();
+           i != e;
+           ++i)
+        resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
+      return resultTy;
+    } else
+      return TupleType::getEmpty(TC.Context);
+  }
+  
   Stmt *visitReturnStmt(ReturnStmt *RS) {
-    if (TheFunc == 0) {
+    if (TheFunc.isNull()) {
       TC.diagnose(RS->getReturnLoc(), diag::return_invalid_outside_func);
       return 0;
     }
 
-    Type ResultTy = TheFunc->getType();
+    Type ResultTy = returnTypeOfFunc();
     if (ResultTy->is<ErrorType>())
       return 0;
-    for (unsigned i = 0, e = TheFunc->getNumParamPatterns();
-         i != e;
-         ++i)
-      ResultTy = ResultTy->castTo<AnyFunctionType>()->getResult();
 
     if (!RS->hasResult()) {
       if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context)))

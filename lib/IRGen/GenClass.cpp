@@ -512,6 +512,9 @@ static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
       IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();
   llvm::Value *thisValue = fn->arg_begin();
   thisValue = IGF.Builder.CreateBitCast(thisValue, info.getStorageType());
+  
+  // Set up a return block.
+  IGF.emitBBForReturn();
 
   // Bind generic parameters.  This is only really necessary if we
   // have either (1) an explicit destructor or (2) something dependent
@@ -531,9 +534,6 @@ static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
                                    IGF.IGM.Context);
     emitPolymorphicParameters(IGF, polyFn, fakeArgs);
   }
-
-  // FIXME: If the class is generic, we need some way to get at the
-  // witness table.
 
   // FIXME: This extra retain call is sort of strange, but it's necessary
   // for the moment to prevent re-triggering destruction.
@@ -556,8 +556,9 @@ static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
     IGF.emitFunctionTopLevel(DD->getBody());
   }
   scope.pop();
-
-  if (IGF.Builder.hasValidIP()) {
+  
+  // Return the size to the deallocator.
+  if (IGF.emitBranchToReturnBB()) {
     llvm::Value *size = info.getLayout(IGM).emitSize(IGF);
     IGF.Builder.CreateRet(size);
   }

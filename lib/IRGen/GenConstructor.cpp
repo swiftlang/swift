@@ -58,9 +58,16 @@ void IRGenFunction::emitConstructorBody(ConstructorDecl *CD) {
   // FIXME: Member init here?
 
   // Emit explicit body, if present.
-  if (CD->getBody())
+  if (CD->getBody()) {
+    // From the body's point of view, there is no return slot.
+    Address ThisReturnSlot = ReturnSlot;
+    ReturnSlot = Address();
+    
     emitFunctionTopLevel(CD->getBody());
 
+    ReturnSlot = ThisReturnSlot;
+  }
+  
   // Return "this".
   auto thisDecl = CD->getImplicitThisDecl();
   const TypeInfo &type = getFragileTypeInfo(thisDecl->getType());
