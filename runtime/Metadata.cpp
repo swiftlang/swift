@@ -194,10 +194,13 @@ instantiateGenericMetadata(GenericMetadata *pattern,
 /// The primary entrypoint.
 const void *
 swift::swift_dynamicCastClass(const void *object, const ClassMetadata *targetType) {
-  // FIXME -- we really need a dedicated ObjC story for 'nil'
-  if (object == NULL) {
-    return NULL;
-  }
+  // FIXME: This is the wrong check; really we want to ask if the object is
+  // a Swift object, not if the target type is a Swift type.
+  // FIXME: This should also be conditionally compiled based on whether
+  // Objective-C support is enabled.
+  if (!targetType->isTypeMetadata())
+    return swift_dynamicCastObjCClass(object, targetType);
+
   const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
   do {
     if (isa == targetType) {
@@ -212,6 +215,13 @@ swift::swift_dynamicCastClass(const void *object, const ClassMetadata *targetTyp
 const void *
 swift::swift_dynamicCastClassUnconditional(const void *object,
                                       const ClassMetadata *targetType) {
+  // FIXME: This is the wrong check; really we want to ask if the object is
+  // a Swift object, not if the target type is a Swift type.
+  // FIXME: This should also be conditionally compiled based on whether
+  // Objective-C support is enabled.
+  if (!targetType->isTypeMetadata())
+    return swift_dynamicCastObjCClassUnconditional(object, targetType);
+
   const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
   do {
     if (isa == targetType) {

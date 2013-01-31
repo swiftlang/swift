@@ -718,6 +718,32 @@ extern "C" const void *
 swift_dynamicCastClassUnconditional(const void *object,
                                     const ClassMetadata *targetType);
 
+/// \brief Checked Objective-C-style dynamic cast to a class type.
+///
+/// \param object The object to cast, or nil.
+/// \param targetType The type to which we are casting, which is known to be
+/// a class type.
+///
+/// \returns the object if the cast succeeds, or null otherwise.
+extern "C" const void *
+swift_dynamicCastObjCClass(const void *object, const ClassMetadata *targetType);
+
+/// \brief Unconditional, checked, Objective-C-style dynamic cast to a class
+/// type.
+///
+/// Aborts if the object isn't of the target type.
+/// Note that unlike swift_dynamicCastClassUnconditional, this does not abort
+/// if the object is 'nil'.
+///
+/// \param object The object to cast, or nil.
+/// \param targetType The type to which we are casting, which is known to be
+/// a class type.
+///
+/// \returns the object.
+extern "C" const void *
+swift_dynamicCastObjCClassUnconditional(const void *object,
+                                        const ClassMetadata *targetType);
+
 /// \brief Checked dynamic cast to the given type.
 ///
 /// \param object The object to cast.
