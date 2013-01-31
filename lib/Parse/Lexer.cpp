@@ -187,7 +187,17 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
   NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
 }
 
-bool Lexer::isStartOfLiteral() {
+void Lexer::formStartingToken(tok Kind,const char *TokStart,tok FollowingKind) {
+  if (isStartingToken(TokStart)) {
+    NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
+  } else {
+    if (FollowingKind == tok::unknown)
+      diagnose(TokStart, diag::lex_missing_whitespace);
+    NextToken.setToken(FollowingKind, StringRef(TokStart, CurPtr-TokStart));
+  }
+}
+
+bool Lexer::isStartingToken(const char *TokStart) {
   // Note: "NextToken" is actually the soon to be previous token.
   switch (NextToken.getKind()) {
 #define IDENTIFIER_KEYWORD(kw) case tok::kw_##kw:
@@ -203,7 +213,7 @@ bool Lexer::isStartOfLiteral() {
   case tok::r_brace: {
     // If there is whitespace between the above tokens and this one,
     // then the current token is a literal.
-    char LastChar = *(CurPtr - 2);
+    char LastChar = *(TokStart - 1);
     return isspace(LastChar) || LastChar == '\0';
   }
   default:
@@ -371,7 +381,7 @@ void Lexer::lexIdentifier() {
 
     .Default(tok::identifier);
 
-  return formToken(Kind, TokStart);
+  return formStartingToken(Kind, TokStart);
 }
 
 /// Is the operator beginning at the given character "left-bound"?
@@ -442,7 +452,7 @@ void Lexer::lexOperatorIdentifier() {
       // Parsing the '.' in ".5" in "3.14*.5" breaks the rules we have for
       // operators. It becomes a false-positive binary operator given our
       // simple left bound versus right bound rule.
-      if (isdigit(CurPtr[0]) && isStartOfLiteral())
+      if (isdigit(CurPtr[0]) && isStartingToken(TokStart))
         return lexNumber();
       if (leftBound == rightBound)
         return formToken(tok::period, TokStart);
@@ -502,7 +512,7 @@ void Lexer::lexDollarIdent() {
   while (isalnum(*CurPtr) || *CurPtr == '_' || *CurPtr == '$')
     ++CurPtr;
   
-  return formToken(tok::dollarident, TokStart);
+  return formStartingToken(tok::dollarident, TokStart);
 }
 
 
@@ -540,7 +550,7 @@ void Lexer::lexNumber() {
       diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
       return formToken(tok::unknown, TokStart);
     }
-    return formToken(tok::integer_literal, TokStart);
+    return formStartingToken(tok::integer_literal, TokStart);
   } else if (*TokStart == '0' && *CurPtr == 'o') {
     // 0o[0-7]+
     ++CurPtr;
@@ -550,7 +560,7 @@ void Lexer::lexNumber() {
       diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
       return formToken(tok::unknown, TokStart);
     }
-    return formToken(tok::integer_literal, TokStart);
+    return formStartingToken(tok::integer_literal, TokStart);
   } else if (*TokStart == '0' && *CurPtr == 'b') {
     // 0b[01]+
     ++CurPtr;
@@ -560,7 +570,7 @@ void Lexer::lexNumber() {
       diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
       return formToken(tok::unknown, TokStart);
     }
-    return formToken(tok::integer_literal, TokStart);
+    return formStartingToken(tok::integer_literal, TokStart);
   }
 
   // Handle the leading character here as well.
@@ -575,11 +585,11 @@ void Lexer::lexNumber() {
     // Floating literals must have '.', 'e', or 'E' after digits.  If it is
     // something else, then this is the end of the token.
     if (*CurPtr != '.' && *CurPtr != 'e' && *CurPtr != 'E')
-      return formToken(tok::integer_literal, TokStart);
+      return formStartingToken(tok::integer_literal, TokStart);
     
     // Lex things like 4.x as '4' followed by a tok::period.
     if (*CurPtr == '.' && !isdigit(CurPtr[1]) && !isValidExponent(CurPtr+1))
-      return formToken(tok::integer_literal, TokStart);
+      return formStartingToken(tok::integer_literal, TokStart);
   }
   
   // Lex decimal point.
@@ -609,7 +619,7 @@ void Lexer::lexNumber() {
       ++CurPtr;
   }
   
-  return formToken(tok::floating_literal, TokStart);
+  return formStartingToken(tok::floating_literal, TokStart);
 }
 
 /// lexCharacter - Read a character and return its UTF32 code.  If this is the
@@ -756,7 +766,7 @@ void Lexer::lexCharacterLiteral() {
     return formToken(tok::unknown, TokStart);;
   }
   ++CurPtr;
-  return formToken(tok::character_literal, TokStart);
+  return formStartingToken(tok::character_literal, TokStart);
 }
 
 /// getEncodedCharacterLiteral - Return the UTF32 codepoint for the specified
@@ -857,7 +867,7 @@ void Lexer::lexStringLiteral() {
     case '"':
       ++CurPtr;
       if (wasErroneous) return formToken(tok::unknown, TokStart);
-      return formToken(tok::string_literal, TokStart);
+      return formStartingToken(tok::string_literal, TokStart);
     case 0:
     case '\n':  // String literals cannot have \n or \r in them.
     case '\r':
@@ -1009,28 +1019,19 @@ Restart:
     // Otherwise, this is the end of the buffer.  Return EOF.
     return formToken(tok::eof, TokStart);
 
-  case '(':
-    return formToken(isStartOfLiteral() ?
-                     tok::l_paren_starting : tok::l_paren_following, TokStart);
-  case ')': 
+  case '{': return formStartingToken(tok::l_brace, TokStart);
+  case '[': return formStartingToken(tok::l_square_starting, TokStart,
+                                     tok::l_square_following);
+  case '(': return formStartingToken(tok::l_paren_starting, TokStart,
+                                     tok::l_paren_following);
+  case '}': return formToken(tok::r_brace,  TokStart);
+  case ']': return formToken(tok::r_square, TokStart);
+  case ')':
     // When lexing an interpolated string literal, the buffer will terminate
     // with a ')'.
     if (CurPtr-1 == BufferEnd)
       return formToken(tok::eof, TokStart);
-    
     return formToken(tok::r_paren,  TokStart);
-  case '{':
-    if (isStartOfLiteral()) {
-      return formToken(tok::l_brace, TokStart);
-    } else {
-      diagnose(CurPtr-1, diag::lex_reserved_non_literal_char);
-      return formToken(tok::unknown, TokStart);
-    }
-  case '}': return formToken(tok::r_brace,  TokStart);
-  case '[':
-    return formToken(isStartOfLiteral() ?
-                     tok::l_square_starting: tok::l_square_following, TokStart);
-  case ']': return formToken(tok::r_square, TokStart);
 
   case ',': return formToken(tok::comma,    TokStart);
   case ';': return formToken(tok::semi,     TokStart);
@@ -1061,27 +1062,18 @@ Restart:
   case 'v': case 'w': case 'x': case 'y': case 'z':
   case '_':
     return lexIdentifier();
-  
+
   case '$':
     return lexDollarIdent();
-      
+
   case '0': case '1': case '2': case '3': case '4':
   case '5': case '6': case '7': case '8': case '9':
     return lexNumber();
+
   case '\'':
-    if (isStartOfLiteral()) {
-      return lexCharacterLiteral();
-    } else {
-      diagnose(CurPtr-1, diag::lex_reserved_non_literal_char);
-      return formToken(tok::unknown, TokStart);
-    }
+    return lexCharacterLiteral();
   case '"':
-    if (isStartOfLiteral()) {
-      return lexStringLiteral();
-    } else {
-      diagnose(CurPtr-1, diag::lex_reserved_non_literal_char);
-      return formToken(tok::unknown, TokStart);
-    }
+    return lexStringLiteral();
   }
 }
 
