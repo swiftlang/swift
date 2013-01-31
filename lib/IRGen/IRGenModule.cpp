@@ -18,6 +18,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/IRGen/Options.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -454,8 +455,12 @@ llvm::Constant *IRGenModule::getObjCEmptyVTablePtr() {
   if (ObjCEmptyVTablePtr) return ObjCEmptyVTablePtr;
 
   // IMP _objc_empty_vtable;
-  ObjCEmptyVTablePtr = Module.getOrInsertGlobal("_objc_empty_vtable",
-                                                OpaquePtrTy->getElementType());
+  if (Opts.UseJIT) {
+    ObjCEmptyVTablePtr = llvm::ConstantPointerNull::get(OpaquePtrTy);
+  } else {
+    ObjCEmptyVTablePtr = Module.getOrInsertGlobal("_objc_empty_vtable",
+                                                  OpaquePtrTy->getElementType());
+  }
   return ObjCEmptyVTablePtr;
 }
 
