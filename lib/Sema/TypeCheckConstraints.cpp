@@ -2586,6 +2586,46 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
 
       return outputTy;
     }
+    
+    Type visitSuperConstructorRefCallExpr(SuperConstructorRefCallExpr *expr) {
+      // If the constructor ref was already resolved, handle as a normal
+      // ApplyExpr.
+      if (expr->getFn())
+        return visitApplyExpr(expr);
+      
+      // If the 'this' argument was not assigned, the form was deemed invalid
+      // at parse time.
+      if (!expr->getArg() || expr->getArg()->getType()->is<ErrorType>())
+        return Type();
+      
+      // Look up the base class type.
+      ValueDecl *thisDecl = cast<DeclRefExpr>(expr->getArg())->getDecl();
+      DeclContext *typeContext = thisDecl->getDeclContext()->getParent();
+      assert(typeContext && "constructor without parent context?!");
+      ClassDecl *classDecl = dyn_cast<ClassDecl>(typeContext);
+      if (!classDecl) {
+        CS.TC.diagnose(expr->getLoc(),
+                       diag::super_constructor_not_in_class_constructor);
+        return Type();
+      }
+      if (!classDecl->hasBaseClass()) {
+        CS.TC.diagnose(expr->getLoc(),
+                       diag::super_constructor_with_no_base_class);
+        return Type();
+      }
+      Type superTy = classDecl->getBaseClass();
+      
+      // Add a member constraint for constructors on the base class.
+      ASTContext &C = CS.getASTContext();
+      auto argsTy = CS.createTypeVariable(expr);
+      auto methodTy = FunctionType::get(argsTy, superTy, C);
+      CS.addValueMemberConstraint(superTy,
+                                  C.getIdentifier("constructor"),
+                                  methodTy, expr);
+      // The result of the expression is the partial application of the
+      // super constructor to 'this'.
+      return methodTy;
+    }
 
     Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
       llvm_unreachable("Already type-checked");
@@ -5146,7 +5186,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
     Expr *visitOverloadedSuperConstructorRefExpr(
                                          OverloadedSuperConstructorRefExpr *e) {
-      llvm_unreachable("not implemented");
+      llvm_unreachable("Already type-checked");
     }
     
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
@@ -5537,6 +5577,20 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
       // FIXME: Implement support for metatypes here.
       return tc.semaApplyExpr(expr);
+    }
+    
+    Expr *visitSuperConstructorRefCallExpr(SuperConstructorRefCallExpr *expr) {
+      // Resolve the callee to the constructor declaration selected.
+      auto ovl = CS.getGeneratedOverloadSet(expr);
+      assert(ovl && "No overload set associated with decl reference expr?");
+      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
+      ConstructorDecl *ctor = cast<ConstructorDecl>(selected.first.getDecl());
+      // Reference the initializer, not the allocator.
+      DeclRefExpr *ctorRef = new (CS.TC.Context) DeclRefExpr(ctor,
+                                                   SourceLoc(),
+                                                   ctor->getInitializerType());
+      expr->setFn(ctorRef);
+      return CS.TC.semaApplyExpr(expr);
     }
 
     Expr *visitNewReferenceExpr(NewReferenceExpr *expr) {
