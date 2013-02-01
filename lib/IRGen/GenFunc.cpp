@@ -1412,8 +1412,18 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     emission.setScalarUnmanagedSubstResult(valueTI.getAlignment(IGF));
     return;
   }
+  
+  // addressof expects an lvalue argument.
+  if (BuiltinName == "addressof") {
+    LValue lv = IGF.emitLValue(argExpr);
+    Address addr = IGF.emitMaterializeWithWriteback(std::move(lv), NotOnHeap);
+    llvm::Value *value = IGF.Builder.CreateBitCast(addr.getAddress(),
+                                                   IGF.IGM.Int8PtrTy);
+    emission.getSubstExplosion().addUnmanaged(value);
+    return;
+  }
 
-  // Everything else cares about the argument, so go ahead and
+  // Everything else cares about the (rvalue) argument, so go ahead and
   // evaluate it.
   Explosion args(ExplosionKind::Maximal);
   IGF.emitRValue(argExpr, args);

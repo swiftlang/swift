@@ -373,6 +373,24 @@ static ValueDecl *getObjectPointerCast(ASTContext &Context, Identifier Id,
                                 Context.TheBuiltinModule);
 }
 
+static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
+  // <T> ([byref] T) -> RawPointer
+  Type GenericTy;
+  GenericParamList *ParamList;
+  std::tie(GenericTy, ParamList) = getGenericParam(Context);
+  
+  Type ByrefTy = LValueType::get(GenericTy,
+                                 LValueType::Qual::DefaultForType,
+                                 Context);
+  
+  Type FnTy = PolymorphicFunctionType::get(ByrefTy, Context.TheRawPointerType,
+                                           ParamList,
+                                           Context);
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, SourceLoc(),
+                                ParamList, FnTy, /*init*/ nullptr,
+                                Context.TheBuiltinModule);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -688,6 +706,10 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::BridgeFromRawPointer:
     if (!Types.empty()) return nullptr;
     return getObjectPointerCast(Context, Id, BV);
+      
+  case BuiltinValueKind::AddressOf:
+    if (!Types.empty()) return nullptr;
+    return getAddressOfOperation(Context, Id);
   }
   llvm_unreachable("bad builtin value!");
 }

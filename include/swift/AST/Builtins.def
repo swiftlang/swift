@@ -148,6 +148,11 @@ BUILTIN_MISC_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)
 /// Bridging to/from a raw pointer does not imply a retain.
 BUILTIN_MISC_OPERATION(BridgeFromRawPointer, "bridgeFromRawPointer", Special)
 
+/// addressof ([byref] T) -> Builtin.RawPointer.
+/// Returns a RawPointer pointing to an lvalue. The returned pointer is only
+/// valid within the scope of the statement for logical lvalues.
+BUILTIN_MISC_OPERATION(AddressOf, "addressof", Special)
+
 /// Fence has type () -> ().
 BUILTIN_MISC_OPERATION(Fence, "fence", None)
 
