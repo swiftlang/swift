@@ -197,7 +197,7 @@ public:
 
   /// \brief Returns true if there's a clang declaration associated
   /// with this.
-  bool hasClangDecl() {
+  bool hasClangDecl() const {
     return DeclBits.FromClang;
   }
 

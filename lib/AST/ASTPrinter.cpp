@@ -667,8 +667,11 @@ bool Decl::shouldPrintInContext() const {
   if (isa<FuncDecl>(this) && cast<FuncDecl>(this)->isGetterOrSetter())
     return false;
 
-  // Skip non-property variables.
-  if (isa<VarDecl>(this) && !cast<VarDecl>(this)->isProperty())
+  // Skip non-property variables, unless they came from a Clang module.
+  // Non-property variables in Swift source will be picked up by the
+  // PatternBindingDecl.
+  if (isa<VarDecl>(this) && !this->hasClangDecl() &&
+      !cast<VarDecl>(this)->isProperty())
     return false;
 
   // Skip pattern bindings that consist of just one property.
