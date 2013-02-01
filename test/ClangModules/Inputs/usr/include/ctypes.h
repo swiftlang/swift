@@ -18,3 +18,10 @@ typedef struct {
     };
   };
 } AnonStructs;
+
+struct NSFastEnumerationState {
+  unsigned long state;
+  void *itemsPtr;
+  unsigned long *mutationsPtr;
+  unsigned long extra[5];
+};

@@ -214,6 +214,26 @@ namespace {
       // context.
       return Type();
     }
+    
+    Type VisitConstantArrayType(const clang::ConstantArrayType *type) {
+      // FIXME: In a function argument context, arrays should import as
+      // pointers.
+      
+      // FIXME: Map to a real fixed-size Swift array type when we have those.
+      // Importing as a tuple at least fills the right amount of space, and
+      // we can cheese static-offset "indexing" using .$n operations.
+      
+      Type elementType = Impl.importType(type->getElementType());
+      if (!elementType)
+        return Type();
+      
+      TupleTypeElt elt(elementType);
+      SmallVector<TupleTypeElt, 8> elts;
+      for (size_t i = 0, size = type->getSize().getZExtValue(); i < size; ++i)
+        elts.push_back(elt);
+      
+      return TupleType::get(elts, elementType->getASTContext());
+    }
 
     Type VisitVectorType(const clang::VectorType *type) {
       // FIXME: We could map these.
