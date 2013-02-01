@@ -163,7 +163,7 @@ namespace {
 
     Decl *VisitRecordDecl(clang::RecordDecl *decl) {
       // FIXME: Skip unions for now. We can't properly map them to oneofs,
-      // because they aren't descriminated in any way. We could map them to
+      // because they aren't discriminated in any way. We could map them to
       // structs, but that would make them very, very unsafe to use.
       if (decl->isUnion())
         return nullptr;
