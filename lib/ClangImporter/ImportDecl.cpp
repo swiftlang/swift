@@ -501,7 +501,7 @@ namespace {
       // Add the implicit 'this' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
-      auto thisTy = containerTy;
+      auto thisTy = getThisTypeForContext(dc);
       if (decl->isClassMethod())
         thisTy = MetaTypeType::get(thisTy, Impl.SwiftContext);
       auto thisName = Impl.SwiftContext.getIdentifier("this");
@@ -732,8 +732,8 @@ namespace {
       // Add the implicit 'this' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
-      auto thisTy = containerTy;
-      auto thisMetaTy = MetaTypeType::get(containerTy, Impl.SwiftContext);
+      auto thisTy = getThisTypeForContext(dc);
+      auto thisMetaTy = MetaTypeType::get(thisTy, Impl.SwiftContext);
       auto thisName = Impl.SwiftContext.getIdentifier("this");
       auto thisMetaVar = new (Impl.SwiftContext) VarDecl(SourceLoc(), thisName,
                                                          thisMetaTy,
@@ -1354,6 +1354,16 @@ namespace {
     }
 
   public:
+    /// \brief Retrieve the type of 'this' for the given context.
+    Type getThisTypeForContext(DeclContext *dc) {
+      // For a protocol, the type is 'This'.
+      if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
+        return proto->getThis()->getDeclaredType();
+      }
+
+      return dc->getDeclaredTypeOfContext();
+    }
+
     // Import the given Objective-C protocol list and return a context-allocated
     // ArrayRef that can be passed to the declaration.
     MutableArrayRef<TypeLoc>
@@ -1573,8 +1583,25 @@ namespace {
       // Note that this is an Objective-C protocol.
       result->getMutableAttrs().ObjC = true;
 
+      // Add the implicit 'This' associated type.
+      // FIXME: Mark as 'implicit'.
+      auto thisId = Impl.SwiftContext.getIdentifier("This");
+      auto thisDecl = new (Impl.SwiftContext) TypeAliasDecl(SourceLoc(), thisId,
+                                      SourceLoc(), TypeLoc(),
+                                      result,
+                                      MutableArrayRef<TypeLoc>());
+      auto thisArchetype = ArchetypeType::getNew(Impl.SwiftContext, nullptr,
+                                                 thisId,
+                                                 Type(result->getDeclaredType()),
+                                                 Type());
+      thisDecl->getUnderlyingTypeLoc() = TypeLoc::withoutLoc(thisArchetype);
+      Decl *thisDeclDecl = thisDecl;
+      result->setMembers(MutableArrayRef<Decl *>(&thisDeclDecl, 1),
+                         SourceRange());
+                         
       // Import each of the members.
       SmallVector<Decl *, 4> members;
+      members.push_back(thisDecl);
       for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
            m != mEnd; ++m) {
         auto nd = dyn_cast<clang::NamedDecl>(*m);
