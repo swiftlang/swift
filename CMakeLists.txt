@@ -402,6 +402,15 @@ endif()
 # On OS X 10.9, the magic "Swift bit" is not supported yet.
 # Note that this is using Darwin version numbers.
 if(NOT ${CMAKE_SYSTEM_VERSION} VERSION_LESS "13")
+  set(SWIFT_OBJC_SUPPORTS_SWIFT_BIT_DEFAULT NO) 
+else()
+  set(SWIFT_OBJC_SUPPORTS_SWIFT_BIT_DEFAULT YES) 
+endif()
+
+option(SWIFT_OBJC_SUPPORTS_SWIFT_BIT 
+  "Whether the target Objective-C library supports the Swift bit in class data" 
+  $(SWIFT_OBJC_SUPPORTS_SWIFT_BIT_DEFAULT))
+if (NOT ${SWIFT_OBJC_SUPPORTS_SWIFT_BIT})
   add_definitions(-DSWIFT_DISABLE_SWIFT_BIT_ON_CLASS_DATA)
 endif()
 
