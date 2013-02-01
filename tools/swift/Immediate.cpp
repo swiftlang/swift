@@ -27,6 +27,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -419,6 +420,19 @@ void swift::REPL(ASTContext &Context) {
               result.getValueDecl()->dump();
 
             if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
+              if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+                TypeDecl *origTypeDecl = typeAliasDecl->getUnderlyingType()
+                  ->getNominalOrBoundGenericNominal();
+                if (origTypeDecl) {
+                  if (doPrint) {
+                    origTypeDecl->print(llvm::outs());
+                    llvm::outs() << '\n';
+                  } else
+                    origTypeDecl->dump();
+                  typeDecl = origTypeDecl;
+                }
+              }
+              
               // FIXME: Hack!
               auto type = typeDecl->getDeclaredType();
               bool searchedClangModule = false;
