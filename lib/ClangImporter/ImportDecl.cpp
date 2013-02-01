@@ -591,7 +591,7 @@ namespace {
   private:
     /// \brief Given an imported method, try to import it as some kind of
     /// special declaration, e.g., a constructor or subscript.
-    Decl *importSpecialMethod(Decl *decl) {
+    Decl *importSpecialMethod(Decl *decl, DeclContext *dc) {
       // Only consider Objective-C methods...
       auto objcMethod
         = dyn_cast_or_null<clang::ObjCMethodDecl>(decl->getClangDecl());
@@ -606,14 +606,14 @@ namespace {
              objcMethod->getSelector() == Impl.setObjectAtIndexedSubscript ||
              objcMethod->getSelector() == Impl.objectForKeyedSubscript ||
              objcMethod->getSelector() == Impl.setObjectForKeyedSubscript))
-          return importSubscript(decl, objcMethod);
+          return importSubscript(decl, objcMethod, dc);
           
         return nullptr;
 
       case clang::OMF_init:
         // An init instance method can be a constructor.
         if (objcMethod->isInstanceMethod())
-          return importConstructor(decl, objcMethod);
+          return importConstructor(decl, objcMethod, dc);
         return nullptr;
 
       case clang::OMF_new:
@@ -642,15 +642,16 @@ namespace {
     /// new NSArray(1024) // same as NSArray.alloc.initWithCapacity:1024
     /// \endcode
     ConstructorDecl *importConstructor(Decl *decl,
-                                       clang::ObjCMethodDecl *objcMethod) {
+                                       clang::ObjCMethodDecl *objcMethod,
+                                       DeclContext *dc) {
       // Figure out the type of the container.
-      auto dc = decl->getDeclContext();
       auto containerTy = dc->getDeclaredTypeOfContext();
       assert(containerTy && "Method in non-type context?");
 
       // Make sure that NSObject is a supertype of the container.
       // FIXME: This is a hack because we don't have a suitable 'top' type for
       // Objective-C classes.
+      // FIXME: This hack is 
       auto checkTy = containerTy;
       do {
         auto classDecl = checkTy->getClassOrBoundGenericClass();
@@ -687,7 +688,23 @@ namespace {
       case clang::OMF_init: {
         // Make sure we have a usable 'alloc' method. Otherwise, we can't
         // build this constructor anyway.
-        auto interface = objcMethod->getClassInterface();
+        clang::ObjCInterfaceDecl *interface;
+        if (isa<clang::ObjCProtocolDecl>(objcMethod->getDeclContext())) {
+          // For a protocol method, look into the context in which we'll be
+          // mirroring the method to find 'alloc'.
+          // FIXME: Part of the mirroring hack.
+          auto classDecl = containerTy->getClassOrBoundGenericClass();
+          if (!classDecl)
+            return nullptr;
+
+          interface = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
+                        classDecl->getClangDecl());
+        } else {
+          // For non-protocol methods, just look for the interface.
+          interface = objcMethod->getClassInterface();
+        }
+
+        // If we couldn't find a class, we're done.
         if (!interface)
           return nullptr;
 
@@ -1155,7 +1172,8 @@ namespace {
     /// \brief Given either the getter or setter for a subscript operation,
     /// create the Swift subscript declaration.
     SubscriptDecl *importSubscript(Decl *decl,
-                                   clang::ObjCMethodDecl *objcMethod) {
+                                   clang::ObjCMethodDecl *objcMethod,
+                                   DeclContext *dc) {
       assert(objcMethod->isInstanceMethod() && "Caller must filter");
 
       // Make sure we have a usable 'alloc' method. Otherwise, we can't
@@ -1239,7 +1257,6 @@ namespace {
             ->castTo<AnyFunctionType>()->getResult();
 
       // Check the form of the getter.
-      auto dc = decl->getDeclContext();
       FuncDecl *getterThunk = nullptr;
       auto &context = Impl.SwiftContext;
       {
@@ -1378,7 +1395,13 @@ namespace {
               if (!decl->getMethod(objcMethod->getSelector(),
                                    objcMethod->isInstanceMethod())) {
                 if (auto imported = VisitObjCMethodDecl(objcMethod, dc)) {
+                  imported->setClangDecl(objcMethod);
                   members.push_back(imported);
+
+                  // Import any special methods based on this member.
+                  if (auto special = importSpecialMethod(imported, dc)) {
+                    members.push_back(special);
+                  }
                 }
               }
             }
@@ -1436,7 +1459,7 @@ namespace {
 
           // If there is a special declaration associated with this member,
           // add it now.
-          if (auto special = importSpecialMethod(member)) {
+          if (auto special = importSpecialMethod(member, result)) {
             members.push_back(special);
           }
         }
@@ -1519,7 +1542,7 @@ namespace {
 
           // If there is a special declaration associated with this member,
           // add it now.
-          if (auto special = importSpecialMethod(member)) {
+          if (auto special = importSpecialMethod(member, result)) {
             members.push_back(special);
           }
         }
@@ -1601,7 +1624,7 @@ namespace {
 
           // If there is a special declaration associated with this member,
           // add it now.
-          if (auto special = importSpecialMethod(member)) {
+          if (auto special = importSpecialMethod(member, result)) {
             members.push_back(special);
           }
         }

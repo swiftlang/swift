@@ -73,6 +73,7 @@
 
 @protocol P2
 - (void)p2Method;
+- (id)initViaP2:(double)x second:(double)y;
 @end
 
 @interface B(P2) <P2>
