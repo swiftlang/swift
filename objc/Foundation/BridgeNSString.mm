@@ -99,34 +99,48 @@ static const Class stringClasses[] = {
 __attribute__((noinline,used))
 static void
 _swift_NSStringToString_slow(NSString *nsstring, SwiftString *string) {
-  // XXX FIXME -- NSString is oblivious to surrogate pairs
-  string->owner = 0;
-
-  if (*(Class *)nsstring == stringClasses[2]) {
-    // XXX FIXME -- leaking and we need to sort out intermediate boxing
-    string->base  = [nsstring UTF8String];
-    string->len   = [nsstring length];
-    if (string->base) {
-      string->base = strdup(string->base);
-    }
-  }
-
-  if (string->base) {
-    return;
-  }
-
-  __builtin_trap();
-
   size_t len = [nsstring length];
   size_t bufSize = len * 2 + 1;
+  // XXX FIXME -- leaks the malloc. Should do a Swift heap allocation.
   char *buf = static_cast<char *>(malloc(bufSize));
-  assert(buf);
-  if (![nsstring getCString: buf maxLength: bufSize
-                   encoding: NSUTF8StringEncoding]) {
-    __builtin_trap();
+  char *p = buf;
+
+  NSRange rangeToEncode = NSMakeRange(0, len);
+  
+  if (rangeToEncode.length != 0) {
+    size_t pSize = bufSize - 1;
+    for (;;) {
+      NSUInteger usedLength = 0;
+      // Copy the encoded string to our buffer.
+      BOOL ok = [nsstring getBytes:p
+                         maxLength:pSize
+                        usedLength:&usedLength
+                          encoding:NSUTF8StringEncoding
+                           options:0
+                             range:rangeToEncode
+                    remainingRange:&rangeToEncode];
+      // The operation should have encoded some bytes.
+      if (!ok)
+        __builtin_trap();
+
+      p += usedLength;
+      
+      // If we encoded the entire string, we're done.
+      if (rangeToEncode.length == 0)
+        break;
+      
+      // Otherwise, grow the buffer and try again.
+      bufSize += pSize;
+      buf = static_cast<char*>(realloc(buf, bufSize));
+    }
   }
+  
+  // getBytes: doesn't add a null terminator.
+  *p = '\0';
+
   string->base  = buf;
-  string->len   = len;
+  string->len   = p - buf;
+  string->owner = nullptr;
 }
 
 void
