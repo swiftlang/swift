@@ -430,6 +430,37 @@ namespace {
 }
 
 Type ClangImporter::Implementation::importType(clang::QualType type) {
+  if (type.isNull())
+    return Type();
+
+  // The "built-in" Objective-C types id, Class, and SEL can actually be (and
+  // are) defined within the library. Clang tracks the redefinition types
+  // separately, so it can provide fallbacks in certain cases. For Swift, we
+  // map the redefinition types back to the equivalent of the built-in types.
+  // This bans some trickery that the redefinition types enable, but is a more
+  // sane model overall.
+  auto &clangContext = getClangASTContext();
+  if (clangContext.getLangOpts().ObjC1) {
+    if (clangContext.hasSameUnqualifiedType(
+          type, clangContext.getObjCIdRedefinitionType()) &&
+        !clangContext.hasSameUnqualifiedType(
+           clangContext.getObjCIdType(),
+           clangContext.getObjCIdRedefinitionType()))
+      type = clangContext.getObjCIdType();
+    else if (clangContext.hasSameUnqualifiedType(
+                type, clangContext.getObjCClassRedefinitionType()) &&
+             !clangContext.hasSameUnqualifiedType(
+                clangContext.getObjCClassType(),
+                clangContext.getObjCClassRedefinitionType()))
+      type = clangContext.getObjCClassType();
+    else if (clangContext.hasSameUnqualifiedType(
+                                                 type, clangContext.getObjCSelRedefinitionType()) &&
+             !clangContext.hasSameUnqualifiedType(
+                clangContext.getObjCSelType(),
+                clangContext.getObjCSelRedefinitionType()))
+      type = clangContext.getObjCSelType();
+  }
+  
   SwiftTypeConverter converter(*this);
   Type converted = converter.Visit(type.getTypePtr());
   if (converted)

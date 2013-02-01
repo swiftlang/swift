@@ -1,5 +1,7 @@
 @import ObjectiveC;
 
+typedef struct objc_object { void *isa; } *id;
+
 typedef unsigned long NSUInteger;
 
 @interface NSArray : NSObject
