@@ -478,10 +478,15 @@ namespace {
     }
 
     Decl *VisitObjCMethodDecl(clang::ObjCMethodDecl *decl) {
-      auto loc = Impl.importSourceLoc(decl->getLocStart());
       auto dc = Impl.importDeclContext(decl->getDeclContext());
       if (!dc)
         return nullptr;
+
+      return VisitObjCMethodDecl(decl, dc);
+    }
+
+    Decl *VisitObjCMethodDecl(clang::ObjCMethodDecl *decl, DeclContext *dc) {
+      auto loc = Impl.importSourceLoc(decl->getLocStart());
 
       // The name of the method is the first part of the selector.
       auto name
@@ -1353,6 +1358,35 @@ namespace {
       return Impl.SwiftContext.AllocateCopy(protocols);
     }
 
+    /// \brief Import the members of all of the protocols to which the given
+    /// Objective-C class, category, or extension explicitly conforms into
+    /// the given list of members, so long as the the method was not already
+    /// declared in the class.
+    ///
+    /// FIXME: This whole thing is a hack, because name lookup should really
+    /// just find these members when it looks in the protocol. Unfortunately,
+    /// that's not something the name lookup code can handle right now.
+    void importMirroredProtocolMembers(clang::ObjCContainerDecl *decl,
+                                       DeclContext *dc,
+                                       ArrayRef<ProtocolDecl *> protocols,
+                                       SmallVectorImpl<Decl *> &members) {
+      for (auto proto : protocols) {
+        for (auto member : proto->getMembers()) {
+          if (auto func = dyn_cast<FuncDecl>(member)) {
+            if (auto objcMethod = dyn_cast_or_null<clang::ObjCMethodDecl>(
+                                    func->getClangDecl())) {
+              if (!decl->getMethod(objcMethod->getSelector(),
+                                   objcMethod->isInstanceMethod())) {
+                if (auto imported = VisitObjCMethodDecl(objcMethod, dc)) {
+                  members.push_back(imported);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
     Decl *VisitObjCCategoryDecl(clang::ObjCCategoryDecl *decl) {
       // Objective-C categories and extensions map to Swift extensions.
 
@@ -1409,6 +1443,12 @@ namespace {
 
         members.push_back(member);
       }
+
+      // Import mirrored declarations for protocols to which this category
+      // or extension conforms.
+      // FIXME: This is a short-term hack.
+      importMirroredProtocolMembers(decl, result, result->getProtocols(),
+                                    members);
 
       // FIXME: Source range isn't accurate.
       result->setMembers(Impl.SwiftContext.AllocateCopy(members),
@@ -1568,6 +1608,12 @@ namespace {
 
         members.push_back(member);
       }
+
+      // Import mirrored declarations for protocols to which this class
+      // conforms.
+      // FIXME: This is a short-term hack.
+      importMirroredProtocolMembers(decl, result, result->getProtocols(),
+                                    members);
 
       // FIXME: Source range isn't accurate.
       result->setMembers(Impl.SwiftContext.AllocateCopy(members),

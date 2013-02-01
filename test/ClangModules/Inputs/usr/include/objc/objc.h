@@ -22,6 +22,7 @@
 
 @protocol B
 - (int)method:(int)arg withFloat:(float)f;
+- (int)otherMethod:(int)arg withFloat:(float)f;
 @end
 
 @protocol Cat1
@@ -68,6 +69,13 @@
 
 @interface B(Subscripting)
 - (void)setObject:(id)object forKeyedSubscript:(id)key;
+@end
+
+@protocol P2
+- (void)p2Method;
+@end
+
+@interface B(P2) <P2>
 @end
 
 @interface NSDate : NSObject

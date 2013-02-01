@@ -47,6 +47,7 @@ namespace swift {
   class NameAliasType;
   class Pattern;
   struct PrintOptions;
+  class ProtocolDecl;
   class ProtocolType;
   enum class Resilience : unsigned char;
   class TypeAliasDecl;
@@ -571,7 +572,12 @@ class ExtensionDecl : public Decl, public DeclContext {
   TypeLoc ExtendedType;
   MutableArrayRef<TypeLoc> Inherited;
   ArrayRef<Decl*> Members;
+
+  /// \brief The set of protocols to which this extension conforms.
+  ArrayRef<ProtocolDecl *> Protocols;
+
 public:
+  using Decl::getASTContext;
 
   ExtensionDecl(SourceLoc ExtensionLoc, TypeLoc ExtendedType,
                 MutableArrayRef<TypeLoc> Inherited,
@@ -595,6 +601,9 @@ public:
   /// explicitly conforms to).
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
+
+  /// \brief Retrieve the set of protocols to which this extension conforms.
+  ArrayRef<ProtocolDecl *> getProtocols();
 
   ArrayRef<Decl*> getMembers() const { return Members; }
   void setMembers(ArrayRef<Decl*> M, SourceRange B) {
@@ -778,6 +787,9 @@ public:
 class TypeDecl : public ValueDecl {
   MutableArrayRef<TypeLoc> Inherited;
 
+  /// \brief The set of protocols to which this type conforms.
+  ArrayRef<ProtocolDecl *> Protocols;
+
 public:
   TypeDecl(DeclKind K, DeclContext *DC, Identifier name,
            MutableArrayRef<TypeLoc> inherited, Type ty) :
@@ -789,6 +801,12 @@ public:
   /// explicitly conforms to).
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
+
+  /// \brief Retrieve the set of protocols to which this type conforms.
+  ///
+  /// FIXME: Include protocol conformance from extensions? This will require
+  /// semantic analysis to compute.
+  ArrayRef<ProtocolDecl *> getProtocols();
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 
