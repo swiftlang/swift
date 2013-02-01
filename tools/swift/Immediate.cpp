@@ -265,6 +265,16 @@ struct EditLineWrapper {
   operator EditLine*() { return e; }
 };
 
+enum class PrintOrDump { Print, Dump };
+
+static void printOrDumpDecl(Decl *d, PrintOrDump which) {
+  if (which == PrintOrDump::Print) {
+    d->print(llvm::outs());
+    llvm::outs() << '\n';
+  } else
+    d->dump();
+}
+
 void swift::REPL(ASTContext &Context) {
   // FIXME: We should do something a bit more elaborate than
   // "allocate a 1MB buffer and hope it's enough".
@@ -407,28 +417,21 @@ void swift::REPL(ASTContext &Context) {
         TU->dump();
       } else if (L.peekNextToken().getText() == "dump_decl" ||
                  L.peekNextToken().getText() == "print_decl") {
-        bool doPrint = (L.peekNextToken().getText() == "print_decl");
+        PrintOrDump doPrint = (L.peekNextToken().getText() == "print_decl")
+          ? PrintOrDump::Print : PrintOrDump::Dump;
         L.lex(Tok);
         L.lex(Tok);
         UnqualifiedLookup lookup(Context.getIdentifier(Tok.getText()), TU);
         for (auto result : lookup.Results) {
           if (result.hasValueDecl()) {
-            if (doPrint) {
-              result.getValueDecl()->print(llvm::outs());
-              llvm::outs() << '\n';
-            } else
-              result.getValueDecl()->dump();
+            printOrDumpDecl(result.getValueDecl(), doPrint);
 
             if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
               if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
                 TypeDecl *origTypeDecl = typeAliasDecl->getUnderlyingType()
                   ->getNominalOrBoundGenericNominal();
                 if (origTypeDecl) {
-                  if (doPrint) {
-                    origTypeDecl->print(llvm::outs());
-                    llvm::outs() << '\n';
-                  } else
-                    origTypeDecl->dump();
+                  printOrDumpDecl(origTypeDecl, doPrint);
                   typeDecl = origTypeDecl;
                 }
               }
@@ -460,11 +463,7 @@ void swift::REPL(ASTContext &Context) {
               }
 
               for (auto ext : extensions) {
-                if (doPrint) {
-                  ext->print(llvm::outs());
-                  llvm::outs() << '\n';
-                } else
-                  ext->dump();
+                printOrDumpDecl(ext, doPrint);
               }
             }
           }
