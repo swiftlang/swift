@@ -651,7 +651,6 @@ namespace {
       // Make sure that NSObject is a supertype of the container.
       // FIXME: This is a hack because we don't have a suitable 'top' type for
       // Objective-C classes.
-      // FIXME: This hack is 
       auto checkTy = containerTy;
       do {
         auto classDecl = checkTy->getClassOrBoundGenericClass();
@@ -1410,6 +1409,67 @@ namespace {
       }
     }
 
+    /// \brief Determine whether the given Objective-C class has an instance or
+    /// class method with the given selector directly declared (i.e., not in
+    /// a superclass or protocol).
+    static bool hasMethodShallow(clang::Selector sel, bool isInstance,
+                                 clang::ObjCInterfaceDecl *objcClass) {
+      if (objcClass->getMethod(sel, isInstance))
+        return true;
+
+      for (auto cat = objcClass->visible_categories_begin(),
+                catEnd = objcClass->visible_categories_end();
+           cat != catEnd;
+           ++cat) {
+        if ((*cat)->getMethod(sel, isInstance))
+          return true;
+      }
+
+      return false;
+    }
+
+    /// \brief Import constructors from our superclasses (and their
+    /// categories/extensions), effectively "inheriting" constructors.
+    ///
+    /// FIXME: Does it make sense to have inherited constructors as a real
+    /// Swift feature?
+    void importInheritedConstructors(clang::ObjCInterfaceDecl *objcClass,
+                                     DeclContext *dc,
+                                     SmallVectorImpl<Decl *> &members) {
+      // FIXME: Would like a more robust way to ensure that we aren't creating
+      // duplicates.
+      llvm::SmallSet<clang::Selector, 16> knownSelectors;
+      auto inheritConstructors = [&](clang::ObjCContainerDecl *container) {
+        for (auto meth = container->meth_begin(),
+                  methEnd = container->meth_end();
+             meth != methEnd; ++meth) {
+          if ((*meth)->getMethodFamily() == clang::OMF_init &&
+              (*meth)->isInstanceMethod() &&
+              !hasMethodShallow((*meth)->getSelector(),
+                                (*meth)->isInstanceMethod(),
+                                objcClass) &&
+              knownSelectors.insert((*meth)->getSelector())) {
+                if (auto imported = Impl.importDecl(*meth)) {
+                  if (auto special = importConstructor(imported, *meth, dc)) {
+                    members.push_back(special);
+                  }
+                }
+              }
+        }
+      };
+
+      for (auto curObjCClass = objcClass; curObjCClass;
+           curObjCClass = curObjCClass->getSuperClass()) {
+        inheritConstructors(curObjCClass);
+        for (auto cat = curObjCClass->visible_categories_begin(),
+                  catEnd = curObjCClass->visible_categories_end();
+             cat != catEnd;
+             ++cat) {
+            inheritConstructors(*cat);
+        }
+      }
+    }
+
     Decl *VisitObjCCategoryDecl(clang::ObjCCategoryDecl *decl) {
       // Objective-C categories and extensions map to Swift extensions.
 
@@ -1631,6 +1691,9 @@ namespace {
 
         members.push_back(member);
       }
+
+      // Import inherited constructors.
+      importInheritedConstructors(decl, result, members);
 
       // Import mirrored declarations for protocols to which this class
       // conforms.

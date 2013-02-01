@@ -16,6 +16,7 @@
 - (int)informalProp;
 
 - (int)informalMadeFormal;
+- init;
 
 @property int overriddenProp;
 @end
@@ -41,7 +42,6 @@
 
 @property int overriddenProp;
 
-- init;
 - initWithInt:(int)i;
 - initWithInt:(int)i andDouble:(double)d;
 @end
