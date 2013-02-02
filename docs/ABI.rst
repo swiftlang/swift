@@ -180,6 +180,34 @@ there's no ambiguity with the run-length.
 
 ::
 
+  substitution ::= 'S' index
+
+<substitution> is a back-reference to a previously mangled entity. The mangling
+algorithm maintains a mapping of entities to substitution indices as it runs.
+When an entity that can be represented by a substitution (a module, nominal
+type, or protocol) is mangled, a substitution is first looked for in the
+substitution map, and if it is present, the entity is mangled using the
+associated substitution index. Otherwise, the entity is mangled normally, and
+it is then added to the substitution map and associated with the next
+available substitution index.
+
+For example,  in mangling a function type
+``(zim.zang.zung, zim.zang.zung, zim.zippity) -> zim.zang.zoo``,
+the recurring contexts ``zim``, ``zim.zang``, and ``zim.zang.zung``
+will be mangled using substitutions after being mangled
+for the first time. The first argument type will mangle in long form,
+``C3zim4zang4zung``, and in doing so, ``zim`` will acquire substitution ``S_``,
+``zim.zang`` will acquire substitution ``S0_``, and ``zim.zang.zung`` will
+acquire ``S1_``. The second argument is the same as the first and will mangle
+using its substitution, ``CS1_``. The
+third argument type will mangle using the substitution for ``zim``,
+``CS_7zippity``. (It also acquires substitution ``S2_`` which would be used
+if it mangled again.) The result type will mangle using the substitution for
+``zim.zang``, ``CS0_zoo`` (and acquire substitution ``S3_``). The full
+function type thus mangles as ``fTC3zim4zang4zungCS1_CS_7zippity_CS0_zoo``.
+
+::
+
   index ::= '_'                              // 0
   index ::= natural '_'                      // N+1
   natural ::= [0-9]+
