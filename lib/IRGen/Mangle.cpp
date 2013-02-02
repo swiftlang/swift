@@ -289,32 +289,33 @@ void Mangler::bindGenericParameters(const GenericParamList *genericParams,
                                     bool mangle = false) {
   assert(genericParams);
   SmallVector<const GenericParamList *, 2> paramLists;
+  
+  // Determine the depth our parameter list is at. We don't actually need to
+  // emit the outer parameters because they should have been emitted as part of
+  // the outer context.
+  const GenericParamList *parent = genericParams;
   do {
-    paramLists.push_back(genericParams);
-  } while ((genericParams = genericParams->getOuterParameters()));
+    ++ArchetypesDepth;
+  } while ((parent = parent->getOuterParameters()));
 
-  for (auto gp = paramLists.rbegin(), gpEnd = paramLists.rend(); gp != gpEnd;
-       ++gp) {
-    ArchetypesDepth++;
-    unsigned index = 0;
+  unsigned index = 0;
 
-    for (auto archetype : (*gp)->getAllArchetypes()) {
-      // Remember the current depth and level.
-      ArchetypeInfo info;
-      info.Depth = ArchetypesDepth;
-      info.Index = index++;
-      assert(!Archetypes.count(archetype));
-      Archetypes.insert(std::make_pair(archetype, info));
+  for (auto archetype : genericParams->getAllArchetypes()) {
+    // Remember the current depth and level.
+    ArchetypeInfo info;
+    info.Depth = ArchetypesDepth;
+    info.Index = index++;
+    assert(!Archetypes.count(archetype));
+    Archetypes.insert(std::make_pair(archetype, info));
 
-      if (!mangle) continue;
+    if (!mangle) continue;
 
-      // Mangle this type parameter.
-      //   <generic-parameter> ::= <protocol-list> _
-      // FIXME: Only mangle the archetypes and protocol requirements
-      // that matter, rather than everything.
-      mangleProtocolList(archetype->getConformsTo());
-      Buffer << '_';
-    }
+    // Mangle this type parameter.
+    //   <generic-parameter> ::= <protocol-list> _
+    // FIXME: Only mangle the archetypes and protocol requirements
+    // that matter, rather than everything.
+    mangleProtocolList(archetype->getConformsTo());
+    Buffer << '_';
   }
 
   if (mangle) Buffer << '_';  
