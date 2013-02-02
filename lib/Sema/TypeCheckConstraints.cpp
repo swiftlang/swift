@@ -3356,6 +3356,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           switch (matchTypes(bound1->getParent(), bound2->getParent(),
                              TypeMatchKind::SameType, subFlags, trivial)) {
           case SolutionKind::Error:
+            // There may still be a Conversion or Construction we can satisfy
+            // the constraint with.
+            if (kind >= TypeMatchKind::Conversion)
+              break;
+              
             return SolutionKind::Error;
 
           case SolutionKind::TriviallySolved:
@@ -3379,6 +3384,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           switch (matchTypes(args1[i], args2[i], TypeMatchKind::SameType,
                              subFlags, trivial)) {
           case SolutionKind::Error:
+            // There may still be a Conversion or Construction we can satisfy
+            // the constraint with.
+            if (kind >= TypeMatchKind::Conversion)
+              break;
+
             return SolutionKind::Error;
 
           case SolutionKind::TriviallySolved:
