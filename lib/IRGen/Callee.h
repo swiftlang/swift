@@ -170,7 +170,7 @@ namespace irgen {
 
     /// The archetype substitutions under which the function is being
     /// called.
-    ArrayRef<Substitution> Substitutions;
+    std::vector<Substitution> Substitutions;
 
     /// A buffer for storing an OwnershipConventions implementation.
     OwnershipConventions::Buffer OwnershipConventionsBuffer;

@@ -917,7 +917,7 @@ namespace {
     };
     Kind TheKind;
     CanType SubstResultType;
-    ArrayRef<Substitution> Substitutions;
+    std::vector<Substitution> Substitutions;
     SmallVector<CallSite, 4> CallSites;
     Expr *SideEffects = nullptr;
 
@@ -1055,9 +1055,8 @@ namespace {
     }
 
     void addSubstitutions(ArrayRef<Substitution> subs) {
-      // FIXME: collect these through multiple layers
-      assert(Substitutions.empty());
-      Substitutions = subs;
+      Substitutions.insert(Substitutions.end(),
+                           subs.begin(), subs.end());
     }
 
     void setSubstResultType(CanType type) {

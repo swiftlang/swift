@@ -3124,7 +3124,6 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
                                     Explosion &out) {
   auto &generics = FnType->getGenericParams();
   (void)generics;
-  assert(generics.getAllArchetypes().size() == subs.size());
 
   emitSource(substInputType, out);
   
@@ -3133,8 +3132,15 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
   // because non-primary archetypes (which correspond to associated types)
   // will have their witness tables embedded in the witness table corresponding
   // to their parent.
-  for (const auto &sub : subs) {
-    auto archetype = sub.Archetype;
+  for (auto *archetype : generics.getAllArchetypes()) {
+    // Find the substitution for the archetype.
+    auto const *subp = std::find_if(subs.begin(), subs.end(),
+                                    [&](Substitution const &sub) {
+                                      return sub.Archetype == archetype;
+                                    });
+    assert(subp != subs.end() && "no substitution for generic param?");
+    auto const &sub = *subp;
+    
     CanType argType = sub.Replacement->getCanonicalType();
 
     // Add the metadata reference unelss it's fulfilled.
