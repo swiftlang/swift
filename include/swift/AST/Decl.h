@@ -818,7 +818,7 @@ public:
 
 /// TypeAliasDecl - This is a declaration of a typealias, for example:
 ///
-///    typealias foo : int
+///    typealias foo = int
 ///
 /// TypeAliasDecl's always have 'MetaTypeType' type.
 ///

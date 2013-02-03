@@ -67,6 +67,7 @@ namespace {
     void printMembers(ArrayRef<Decl *> members, bool needComma = false);
     void printNominalDeclName(NominalTypeDecl *decl);
     void printInherited(ArrayRef<TypeLoc> inherited);
+    void printBraceStmtElements(BraceStmt *stmt);
 
 #define DECL(Name,Parent) void visit##Name##Decl(Name##Decl *decl);
 #define ABSTRACT_DECL(Name, Parent)
@@ -396,7 +397,6 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   if (decl->isProperty()) {
     OS << " {";
     {
-      IndentRAII indentMore(*this);
       if (auto getter = decl->getGetter()) {
         OS << "\n";
         indent();
@@ -415,12 +415,29 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   }
 }
 
+void PrintAST::printBraceStmtElements(BraceStmt *stmt) {
+  IndentRAII indentMore(*this);
+  for (auto element : stmt->getElements()) {
+    OS << "\n";
+    indent();
+    if (auto decl = element.dyn_cast<Decl*>()) {
+      visit(decl);
+    } else if (auto stmt = element.dyn_cast<Stmt*>()) {
+      visit(stmt);
+    } else {
+      // FIXME: print expression
+      // visit(element.get<Expr*>());
+    }
+  }
+}
+
+
 void PrintAST::visitFuncDecl(FuncDecl *decl) {
   if (decl->isGetterOrSetter()) {
     // FIXME: Attributes
     recordDeclLoc(decl);
     if (decl->getGetterDecl()) {
-      OS << "get";
+      OS << "get: ";
     } else {
       OS << "set";
 
@@ -429,8 +446,14 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       if (auto named = dyn_cast<NamedPattern>(valueParam)) {
         OS << "(" << named->getBoundName().str() << ")";
       }
+      OS << ": ";
     }
-      
+
+    if (!Options.FunctionDefinitions || !decl->getBody()->getBody()) {
+      return;
+    }
+    
+    printBraceStmtElements(decl->getBody()->getBody());
   } else {
     if (decl->isStatic() && !decl->isOperator())
       OS << "static ";
@@ -463,14 +486,14 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       OS << " -> ";
       resultTy->print(OS);
     }
+    
+    if (!Options.FunctionDefinitions || !decl->getBody()->getBody()) {
+      return;
+    }
+    
+    OS << " ";
+    visit(decl->getBody()->getBody());
   }
-
-  if (!Options.FunctionDefinitions || !decl->getBody()->getBody()) {
-    return;
-  }
-
-  OS << " ";
-  visit(decl->getBody()->getBody());
 }
 
 void PrintAST::visitOneOfElementDecl(OneOfElementDecl *decl) {
@@ -550,21 +573,7 @@ void PrintAST::visitAssignStmt(AssignStmt *stmt) {
 
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   OS << "{";
-  {
-    IndentRAII indentMore(*this);
-    for (auto element : stmt->getElements()) {
-      OS << "\n";
-      indent();
-      if (auto decl = element.dyn_cast<Decl*>()) {
-        visit(decl);
-      } else if (auto stmt = element.dyn_cast<Stmt*>()) {
-        visit(stmt);
-      } else {
-        // FIXME: print expression
-        // visit(element.get<Expr*>());
-      }
-    }
-  }
+  printBraceStmtElements(stmt);
   OS << "\n";
   indent();
   OS << "}";
@@ -604,7 +613,7 @@ void PrintAST::visitDoWhileStmt(DoWhileStmt *stmt) {
 }
 
 void PrintAST::visitForStmt(ForStmt *stmt) {
-  OS << "for(";
+  OS << "for (";
   if (!stmt->getInitializer().isNull()) {
     if (auto assign = stmt->getInitializer().dyn_cast<AssignStmt *>())
       visit(assign);
