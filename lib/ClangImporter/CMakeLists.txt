@@ -8,6 +8,7 @@ endif ()
 add_swift_library(swiftClangImporter
   ClangImporter.cpp
   ImportDecl.cpp
+  ImportMacro.cpp
   ImportType.cpp
   DEPENDS swiftAST)
 

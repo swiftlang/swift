@@ -4,4 +4,5 @@ module cvars { header "cvars.h" }
 module blocks { header "blocks.h" }
 module Foundation { header "Foundation.h" }
 module objc_ext { header "objc_ext.h" }
+module macros { header "macros.h" }
 

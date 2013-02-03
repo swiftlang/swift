@@ -28,6 +28,7 @@ namespace clang {
 class CompilerInvocation;
 class Decl;
 class DeclarationName;
+class MacroInfo;
 class NamedDecl;
 class ParmVarDecl;
 class QualType;
@@ -65,6 +66,9 @@ struct ClangImporter::Implementation {
 
   /// \brief Mapping of already-imported declarations.
   llvm::DenseMap<clang::Decl *, Decl *> ImportedDecls;
+  
+  /// \brief Mapping of already-imported macros.
+  llvm::DenseMap<clang::MacroInfo *, ValueDecl *> ImportedMacros;
 
   /// \brief Generation number that is used for crude versioning.
   ///
@@ -164,6 +168,12 @@ public:
   /// \brief Import the given Clang source range into Swift.
   SourceRange importSourceRange(clang::SourceRange loc);
 
+  /// \brief Import the given Clang preprocessor macro as a Swift value decl.
+  ///
+  /// \returns The imported declaration, or null if the macro could not be
+  /// translated into Swift.
+  ValueDecl *importMacro(Identifier name, clang::MacroInfo *macro);
+  
   /// \brief Import the given Clang declaration into Swift.
   ///
   /// \returns The imported declaration, or null if this declaration could

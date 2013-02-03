@@ -332,6 +332,7 @@ void ClangImporter::lookupValue(Module *module,
                                 Identifier name,
                                 NLKind lookupKind,
                                 SmallVectorImpl<ValueDecl*> &results) {
+  auto &pp = Impl.Instance->getPreprocessor();
   auto &sema = Impl.Instance->getSema();
 
   // If the name ends with 'Proto', strip off the 'Proto' and look for an
@@ -352,6 +353,15 @@ void ClangImporter::lookupValue(Module *module,
   auto clangName = Impl.importName(name);
   if (!clangName)
     return;
+  
+  // See if there's a preprocessor macro we can import by this name.
+  clang::IdentifierInfo *clangID = clangName.getAsIdentifierInfo();
+  if (clangID) {
+    clang::MacroInfo *clangMacro = pp.getMacroInfo(clangID);
+    if (clangMacro)
+      if (auto valueDecl = Impl.importMacro(name, clangMacro))
+        results.push_back(valueDecl);
+  }
 
   // Perform name lookup into the global scope.
   // FIXME: Map source locations over.
