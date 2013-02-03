@@ -527,30 +527,80 @@ static bool isValidExponent(const char *P) {
   return isdigit(*P);
 }
 
+static bool isxdigit(char c) {
+  return isdigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+void Lexer::lexHexNumber() {
+  // We assume we're starting from the 'x' in a '0x...' floating-point literal.
+  assert(*CurPtr == 'x' && "not a hex literal");
+  const char *TokStart = CurPtr-1;
+  assert(*TokStart == '0' && "not a hex literal");
+
+  // 0x[0-9a-fA-F]+
+  ++CurPtr;
+  while (isxdigit(*CurPtr))
+    ++CurPtr;
+  if (CurPtr - TokStart == 2) {
+    diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
+    return formToken(tok::unknown, TokStart);
+  }
+  
+  if (*CurPtr != '.' && *CurPtr != 'p' && *CurPtr != 'P')
+    return formStartingToken(tok::integer_literal, TokStart);
+  
+  // (\.[0-9A-Fa-f]+)?
+  if (*CurPtr == '.') {
+    ++CurPtr;
+    
+    // If the character after the '.' is not a digit, assume we have an int
+    // literal followed by a dot expression.
+    if (!isxdigit(*CurPtr)) {
+      --CurPtr;
+      return formStartingToken(tok::integer_literal, TokStart);
+    }
+    
+    while (isxdigit(*CurPtr))
+      ++CurPtr;
+    if (*CurPtr != 'p' && *CurPtr != 'P') {
+      diagnose(CurPtr, diag::lex_expected_binary_exponent_in_hex_float_literal);
+      return formToken(tok::unknown, TokStart);
+    }
+  }
+  
+  // [pP][+-]?[0-9]+
+  assert(*CurPtr == 'p' || *CurPtr == 'P' && "not at a hex float exponent?!");
+  ++CurPtr;
+  
+  if (*CurPtr == '+' || *CurPtr == '-')
+    ++CurPtr;  // Eat the sign.
+
+  if (!isdigit(*CurPtr)) {
+    diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
+    return formToken(tok::unknown, TokStart);
+  }
+  
+  while (isdigit(*CurPtr))
+    ++CurPtr;
+
+  return formStartingToken(tok::floating_literal, TokStart);
+}
+
 /// lexNumber:
 ///   integer_literal  ::= [0-9]+
 ///   integer_literal  ::= 0x[0-9a-fA-F]+
 ///   integer_literal  ::= 0o[0-7]+
 ///   integer_literal  ::= 0b[01]+
 ///   floating_literal ::= [0-9]+\.[0-9]+
-///   floating_literal ::= [0-9]+(\.[0-9]*)?[eE][+-][0-9]+
-///   floating_literal ::= \.[0-9]+([eE][+-][0-9]+)?
+///   floating_literal ::= [0-9]+(\.[0-9]*)?[eE][+-]?[0-9]+
+///   floating_literal ::= \.[0-9]+([eE][+-]?[0-9]+)?
+///   floating_literal ::= 0x[0-9A-Fa-f]+(\.[0-9A-Fa-f]+)?[pP][+-]?[0-9]+
 void Lexer::lexNumber() {
   const char *TokStart = CurPtr-1;
   assert((isdigit(*TokStart) || *TokStart == '.') && "Unexpected start");
 
   if (*TokStart == '0' && *CurPtr == 'x') {
-    // 0x[0-9a-fA-F]+
-    ++CurPtr;
-    while (isdigit(*CurPtr) ||
-           (*CurPtr >= 'a' && *CurPtr <= 'f') ||
-           (*CurPtr >= 'A' && *CurPtr <= 'F'))
-      ++CurPtr;
-    if (CurPtr - TokStart == 2) {
-      diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
-      return formToken(tok::unknown, TokStart);
-    }
-    return formStartingToken(tok::integer_literal, TokStart);
+    return lexHexNumber();
   } else if (*TokStart == '0' && *CurPtr == 'o') {
     // 0o[0-7]+
     ++CurPtr;
@@ -604,12 +654,9 @@ void Lexer::lexNumber() {
   // Lex exponent.
   if (*CurPtr == 'e' || *CurPtr == 'E') {
     ++CurPtr;  // Eat the 'e'
-    if (*CurPtr != '+' && *CurPtr != '-') {
-      diagnose(CurPtr, diag::lex_expected_sign_in_fp);
-      return formToken(tok::unknown, TokStart);
-    }
-    ++CurPtr;  // Eat the sign.
-    
+    if (*CurPtr == '+' || *CurPtr == '-')
+      ++CurPtr;  // Eat the sign.
+      
     if (!isdigit(*CurPtr)) {
       diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
       return formToken(tok::unknown, TokStart);

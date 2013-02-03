@@ -106,12 +106,12 @@ ERROR(lex_invalid_hex_escape,lexing,none,
 
 ERROR(lex_invalid_character,lexing,none,
        "invalid character in source file", ())
-ERROR(lex_expected_sign_in_fp,lexing,none,
-       "expected '+' or '-' in floating point literal exponent", ())
 ERROR(lex_expected_digit_in_fp_exponent,lexing,none,
        "expected a digit after decimal point in floating point exponent", ())
 ERROR(lex_expected_digit_in_int_literal,lexing,none,
        "expected a digit after integer literal prefix", ())
+ERROR(lex_expected_binary_exponent_in_hex_float_literal,lexing,none,
+      "hexadecimal floating point literal must end with an exponent", ())
 ERROR(lex_unexpected_block_comment_end,lexing,none,
       "unexpected end of block comment", ())
 ERROR(lex_unary_postfix_dot_is_reserved,lexing,none,

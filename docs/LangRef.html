@@ -322,9 +322,9 @@
   
   <div class="commentary">
     We require a digit after a dot to allow lexing "4.km" as "4 . km" instead of
-    "4. km".  This regex is same as the Java floating point literal regex,
-    except that we do not allow "4." and do not allow a trailing suffix that
-    specifies a precision.
+    "4. km".  The regex for decimal literals is same as Java's, and the one for
+    hex literals is the same as C99's, except that we do not allow "4." and
+    do not allow a trailing suffix that specifies a precision.
 
     <br><br><b>FIXME:</b>
     Should we allow float literals without a digit in front of the dot?
@@ -336,12 +336,13 @@
   
   <pre class="grammar">
     floating_literal ::= [0-9]+\.[0-9]+
-    floating_literal ::= [0-9]+(\.[0-9]*)?[eE][+-][0-9]+
-    floating_literal ::= \.[0-9]+([eE][+-][0-9]+)?
+    floating_literal ::= [0-9]+(\.[0-9]*)?[eE][+-]?[0-9]+
+    floating_literal ::= \.[0-9]+([eE][+-]?[0-9]+)?
+    floating_literal ::= 0x[0-9A-Fa-f]+(\.[0-9A-Fa-f]+)?[pP][+-]?[0-9]+
   </pre>
   
   <p>floating_literal tokens represent floating point values of unspecified
-  precision.</p>
+  precision. Decimal and hexadecimal floating-point literals are supported.</p>
   
   <!-- ===================================================================== -->
   <h3 id="character_literal">Character Literals</h3>

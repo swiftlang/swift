@@ -123,6 +123,8 @@ public:
   /// getTokenKind - Retrieve the token kind for the given text, which must
   /// fall within the given source buffer.
   tok getTokenKind(StringRef Text);
+  
+  void lexHexNumber();
 
 private:
   void lexImpl();
