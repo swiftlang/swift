@@ -176,7 +176,6 @@ Compiler Engineering Tasks
 
 * Type Checker
 
-  * Dependencies: Modules (partial, to alleviate performance problems)
   * Diagnostics
   * Switch to new type checker, remove old type checking code
   * Performance
@@ -207,6 +206,7 @@ Compiler Engineering Tasks
 * IRgen
 
   * Level-of-abstraction differences for generics
+  * Generic values in structs/tuples
   * Using Clang types, calling convention code for interoperability
   * Writeback
   * Nested generics
