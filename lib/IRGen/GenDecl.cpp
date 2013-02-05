@@ -55,6 +55,7 @@ static bool isTrivialGlobalInit(llvm::Function *fn) {
   return true;
 }
 
+/// Generates a function to call +load on all the given classes. 
 static llvm::Function *emitObjCClassInitializer(IRGenModule &IGM,
                                                 ArrayRef<llvm::WeakVH> classes){
   llvm::FunctionType *fnType =
@@ -166,7 +167,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                                                      initAndPriority));
   }
 
-  if (ObjCInterop && !ObjCClasses.empty()) {
+  if (ObjCInterop && Opts.UseJIT && !ObjCClasses.empty()) {
     // Add an initializer for the Objective-C classes.
     llvm::Constant *initAndPriority[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
@@ -262,9 +263,12 @@ static void emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
 
 void IRGenModule::emitGlobalLists() {
   // Objective-C class references go in a variable with a meaningless
-  // name but a magic section.
+  // name but a magic section. The usual magic section is "__objc_classlist",
+  // but because Swift instances can be allocated without going through the
+  // Objective-C runtime, we need to make sure that the classes are realized
+  // non-lazily.
   emitGlobalList(*this, ObjCClasses, "objc_classes",
-                 "__DATA, __objc_classlist, regular, no_dead_strip",
+                 "__DATA, __objc_nlclslist, regular, no_dead_strip",
                  llvm::GlobalValue::InternalLinkage);
 
   // @llvm.used
