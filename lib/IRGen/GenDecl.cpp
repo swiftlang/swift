@@ -23,6 +23,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/IRGen/Options.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/SmallString.h"
@@ -52,6 +53,46 @@ static bool isTrivialGlobalInit(llvm::Function *fn) {
   // That instruction is necessarily a 'ret' instruction.
   assert(isa<llvm::ReturnInst>(entry->front()));
   return true;
+}
+
+static llvm::Function *emitObjCClassInitializer(IRGenModule &IGM,
+                                                ArrayRef<llvm::WeakVH> classes){
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(llvm::Type::getVoidTy(IGM.LLVMContext), false);
+  llvm::Function *initFn =
+    llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
+                           "_swift_initObjCClasses", &IGM.Module);
+
+  IRGenFunction initIGF(IGM, CanType(), nullptr, ExplosionKind::Minimal,
+                        /*uncurry*/ 0, initFn, Prologue::Bare);
+
+  llvm::Constant *loadSelRef = IGM.getAddrOfObjCSelectorRef("load");
+  llvm::Value *loadSel =
+    initIGF.Builder.CreateLoad(Address(loadSelRef,
+                                       initIGF.IGM.getPointerAlignment()));
+  loadSel = initIGF.Builder.CreateCall(IGM.getObjCSelRegisterNameFn(), loadSel);
+
+  llvm::Type *msgSendParams[] = {
+    IGM.ObjCPtrTy,
+    IGM.ObjCSELTy
+  };
+  llvm::FunctionType *msgSendType =
+    llvm::FunctionType::get(llvm::Type::getVoidTy(IGM.LLVMContext),
+                            msgSendParams, false);
+  llvm::Constant *msgSend =
+    llvm::ConstantExpr::getBitCast(IGM.getObjCMsgSendFn(),
+                                   msgSendType->getPointerTo());
+
+  for (auto nextClass : classes) {
+    llvm::Constant *receiver =
+      llvm::ConstantExpr::getBitCast(cast<llvm::Constant>(nextClass),
+                                     IGM.ObjCPtrTy);
+    initIGF.Builder.CreateCall2(msgSend, receiver, loadSel);
+  }
+
+  initIGF.Builder.CreateRetVoid();
+
+  return initFn;
 }
 
 /// Emit all the top-level code in the translation unit.
@@ -108,33 +149,46 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
       .emitGlobalTopLevel(tunit, StartElem);
   }
 
+  SmallVector<llvm::Constant *, 2> allInits;
   if (tunit->Kind == TranslationUnit::Main ||
       tunit->Kind == TranslationUnit::Repl) {
     // We don't need global init to call main().
-  }
-  // Not all translation units need a global initialization function.
-  else if (isTrivialGlobalInit(fn)) {
+  } else if (isTrivialGlobalInit(fn)) {
+    // Not all translation units need a global initialization function.
     fn->eraseFromParent();
   } else {
-  // Build the initializer for the global variable.
-  llvm::Constant *initAndPriority[] = {
-    llvm::ConstantInt::get(Int32Ty, 0),
-    fn
-  };
-  llvm::Constant *allInits[] = {
-    llvm::ConstantStruct::getAnon(LLVMContext, initAndPriority)
-  };
-  llvm::Constant *globalInits =
-    llvm::ConstantArray::get(llvm::ArrayType::get(allInits[0]->getType(), 1),
-                             allInits);
+    // Build the initializer for the module.
+    llvm::Constant *initAndPriority[] = {
+      llvm::ConstantInt::get(Int32Ty, 1),
+      fn
+    };
+    allInits.push_back(llvm::ConstantStruct::getAnon(LLVMContext,
+                                                     initAndPriority));
+  }
 
-  // Add this as a global initializer.
-  (void) new llvm::GlobalVariable(Module,
-                                  globalInits->getType(),
-                                  /*is constant*/ true,
-                                  llvm::GlobalValue::AppendingLinkage,
-                                  globalInits,
-                                  "llvm.global_ctors");
+  if (ObjCInterop && !ObjCClasses.empty()) {
+    // Add an initializer for the Objective-C classes.
+    llvm::Constant *initAndPriority[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      emitObjCClassInitializer(*this, ObjCClasses)
+    };
+    allInits.push_back(llvm::ConstantStruct::getAnon(LLVMContext,
+                                                     initAndPriority));
+  }
+
+  if (!allInits.empty()) {
+    llvm::ArrayType *initListType =
+      llvm::ArrayType::get(allInits[0]->getType(), allInits.size());
+    llvm::Constant *globalInits =
+      llvm::ConstantArray::get(initListType, allInits);
+
+    // Add this as a global initializer.
+    (void) new llvm::GlobalVariable(Module,
+                                    globalInits->getType(),
+                                    /*is constant*/ true,
+                                    llvm::GlobalValue::AppendingLinkage,
+                                    globalInits,
+                                    "llvm.global_ctors");
   }
   
   emitGlobalLists();

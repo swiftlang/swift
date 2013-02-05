@@ -190,6 +190,7 @@ void swift::RunImmediately(TranslationUnit *TU, SILModule *SILMod) {
   for (auto InitFn : InitFns)
     EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
 
+  EE->runStaticConstructorsDestructors(false);
   llvm::Function *EntryFn = Module.getFunction("main");
   EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
 }
@@ -585,6 +586,7 @@ void swift::REPL(ASTContext &Context) {
 
     // FIXME: The way we do this is really ugly... we should be able to
     // improve this.
+    EE->runStaticConstructorsDestructors(&Module, false);
     llvm::Function *EntryFn = Module.getFunction("main");
     EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
     EE->freeMachineCodeForFunction(EntryFn);
