@@ -3685,9 +3685,10 @@ void irgen::emitBridgeToBlock(IRGenFunction &IGF,
   // Get the function pointer as an i8*.
   llvm::Value *fn = swiftClosure.claimUnmanagedNext();
   fn = IGF.Builder.CreateBitCast(fn, IGF.IGM.Int8PtrTy);
+
   // Get the context pointer as a %swift.refcounted*.
   ManagedValue mContext = swiftClosure.claimNext();
-  llvm::Value *context = IGF.Builder.CreateBitCast(mContext.getValue(),
+  llvm::Value *context = IGF.Builder.CreateBitCast(mContext.forward(IGF),
                                                    IGF.IGM.RefCountedPtrTy);
   // Get the shim function we'll call.
   llvm::Function *converter = IGF.IGM.getAddrOfBridgeToBlockConverter(blockTy);

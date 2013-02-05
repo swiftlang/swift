@@ -184,6 +184,45 @@ extern "C" void swift_release(HeapObject *object);
 /// sizeof(SwiftHeapObject) to allocatedSize.
 extern "C" void swift_deallocObject(HeapObject *object, size_t allocatedSize);
 
+/// RAII object that wraps a Swift heap object and releases it upon
+/// destruction.
+class SwiftRAII {
+  HeapObject *object;
+
+public:
+  SwiftRAII(HeapObject *obj, bool AlreadyRetained) : object(obj) {
+    if (!AlreadyRetained)
+      swift_retain(obj);
+  }
+
+  ~SwiftRAII() {
+    if (object)
+      swift_release(object);
+  }
+
+  SwiftRAII(const SwiftRAII &other) : object(swift_retain(*other)) {
+    ;
+  }
+  SwiftRAII(SwiftRAII &&other) : object(*other) {
+    other.object = nullptr;
+  }
+  SwiftRAII &operator=(const SwiftRAII &other) {
+    if (object)
+      swift_release(object);
+    object = swift_retain(*other);
+    return *this;
+  }
+  SwiftRAII &operator=(SwiftRAII &&other) {
+    if (object)
+      swift_release(object);
+    object = *other;
+    other.object = nullptr;
+    return *this;
+  }
+
+  HeapObject *operator *() const { return object; }
+};
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_ALLOC_H */
