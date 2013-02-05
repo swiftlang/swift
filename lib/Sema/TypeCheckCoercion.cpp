@@ -483,6 +483,10 @@ public:
     return failed(E);
   }
   
+  CoercedResult visitArrayExpr(ArrayExpr *E) {
+    llvm_unreachable("not implemented");
+  }
+  
   CoercedResult visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     // FIXME: Is this an error-recovery case?
     if (!(Flags & CF_Apply) && !DestTy->isEqual(E->getType()))

@@ -1233,7 +1233,7 @@ namespace {
       assert(baseTy);
       assert(memberTy);
       assert(!name.empty());
-      addConstraint(new (*this) Constraint(ConstraintKind::ValueMember,
+      addConstraint(new (*this) Constraint(ConstraintKind::TypeMember,
                                            baseTy, memberTy, name, anchor));
     }
 
@@ -2324,6 +2324,55 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
                        expr->getIndex()->getType(),
                        inputTv, expr);
       return outputTv;
+    }
+    
+    Type visitArrayExpr(ArrayExpr *expr) {
+      ASTContext &C = CS.getASTContext();
+      // An array expression can be of a type T that conforms to the
+      // ArrayLiteralConvertible protocol.
+      ProtocolDecl *arrayProto = CS.TC.getArrayLiteralProtocol();
+      if (!arrayProto) {
+        CS.TC.diagnose(expr->getStartLoc(), diag::array_expr_missing_proto);
+        return Type();
+      }
+
+      auto arrayTy = CS.createTypeVariable(expr);
+
+      // FIXME: Constraint checker appears to be unable to solve a system in
+      // which the same type variable is a subtype of multiple types.
+      // The protocol conformance checker also has an issue with checking
+      // conformances of generic types <rdar://problem/13153805>
+      //Type arrayProtoTy = arrayProto->getDeclaredType();
+      //CS.addConstraint(ConstraintKind::Subtype,
+      //                 arrayTy, arrayProtoTy);
+      
+      // Its subexpression should be convertible to a tuple (T.Element...).
+      auto arrayElementTy = CS.createTypeVariable(expr);
+      auto arrayElementMetaTy = MetaTypeType::get(arrayElementTy, C);
+      CS.addTypeMemberConstraint(arrayTy,
+                                 C.getIdentifier("Element"),
+                                 arrayElementMetaTy);
+      
+      Type arrayEltsTy = CS.TC.getArraySliceType(expr->getLoc(),
+                                                 arrayElementTy);
+      TupleTypeElt arrayEltsElt{arrayEltsTy,
+                                /*name=*/ Identifier(),
+                                /*init=*/ nullptr,
+                                arrayElementTy};
+      Type arrayEltsTupleTy = TupleType::get(arrayEltsElt, C);
+      CS.addConstraint(ConstraintKind::Conversion,
+                       expr->getSubExpr()->getType(),
+                       arrayEltsTupleTy);
+      
+      // FIXME: Use the protocol constraint instead of this value constraint.
+      Type converterFuncTy = FunctionType::get(arrayEltsTupleTy,
+                                               arrayTy, C);
+      CS.addValueMemberConstraint(arrayTy,
+                                  C.getIdentifier("convertFromArrayLiteral"),
+                                  converterFuncTy,
+                                  expr);
+      
+      return arrayTy;
     }
 
     Type visitSuperSubscriptExpr(SuperSubscriptExpr *expr) {
@@ -5362,6 +5411,86 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // Subscripting a normal, nominal type.
       expr->setDecl(subscript);
       return tc.semaSubscriptExpr(expr);
+    }
+    
+    Expr *visitArrayExpr(ArrayExpr *expr) {
+      simplifyExprType(expr);
+      Type arrayTy = expr->getType();
+      
+      ProtocolDecl *arrayProto = CS.TC.getArrayLiteralProtocol();
+      assert(arrayProto && "type-checked array literal w/o protocol?!");
+      
+      /* FIXME: Ideally we'd use the protocol conformance as below, but
+       * generic types (an in particular, T[]) can't be checked for conformance
+       * yet <rdar://problem/13153805>
+       *
+       
+      // Get the ArrayLiteralConvertible conformance.
+      ProtocolConformance *conformance = nullptr;
+      if (!CS.TC.conformsToProtocol(arrayTy, arrayProto, &conformance,
+                                    expr->getLoc())) {
+        // FIXME: This shouldn't happen at all when we solve the system using
+        // a proper protocol constraint.
+        CS.TC.diagnose(arrayProto->getLoc(), diag::array_protocol_broken);
+        return nullptr;
+      }
+      
+      // Find the convertFromArrayLiteral witness.
+      FuncDecl *converterDecl;
+      for (auto member : arrayProto->getMembers()) {
+        auto func = dyn_cast<FuncDecl>(member);
+        if (!func) continue;
+        
+        if (func->getName().str().equals("convertFromArrayLiteral")) {
+          converterDecl = cast<FuncDecl>(conformance->Mapping[func]);
+          break;
+        }
+      }
+      
+      if (!converterDecl) {
+        CS.TC.diagnose(arrayProto->getLoc(), diag::array_protocol_broken);
+        return nullptr;
+      }
+      
+      if (!converterDecl->isStatic()) {
+        CS.TC.diagnose(arrayProto->getLoc(), diag::array_protocol_broken);
+        return nullptr;
+      }
+       
+       *
+       * For the time being, use a value member constraint to find the
+       * appropriate convertFromArrayLiteral call.
+       */
+      auto ovl = CS.getGeneratedOverloadSet(expr);
+      assert(ovl && "No overload set associated with subscript expr?");
+      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
+      auto converterDecl = cast<FuncDecl>(choice.getDecl());
+      
+      // Construct the semantic expr as a convertFromArrayLiteral application.
+      ASTContext &C = CS.getASTContext();
+      Expr *converterRef = new (C) DeclRefExpr(converterDecl, expr->getLoc(),
+                                           converterDecl->getTypeOfReference());
+      Expr *typeRef = new (C) MetatypeExpr(nullptr,
+                                           expr->getLoc(),
+                                           MetaTypeType::get(arrayTy, C));
+      
+      Expr *semanticExpr = new (C) DotSyntaxCallExpr(converterRef,
+                                                     expr->getLoc(),
+                                                     typeRef);
+      semanticExpr = CS.TC.recheckTypes(semanticExpr);
+      
+      semanticExpr = new (C) CallExpr(semanticExpr,
+                                      expr->getSubExpr());
+
+      semanticExpr = CS.TC.recheckTypes(semanticExpr);
+      
+      if (!semanticExpr) {
+        CS.TC.diagnose(arrayProto->getLoc(), diag::array_protocol_broken);
+        return nullptr;
+      }
+      
+      expr->setSemanticExpr(semanticExpr);
+      return expr;
     }
     
     Expr *visitSuperSubscriptExpr(SuperSubscriptExpr *expr) {

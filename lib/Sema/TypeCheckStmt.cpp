@@ -577,8 +577,20 @@ ProtocolDecl *TypeChecker::getEnumerableProtocol() {
 ProtocolDecl *TypeChecker::getEnumeratorProtocol() {
   if (!EnumeratorProto) {
     UnqualifiedLookup Globals(Context.getIdentifier("Enumerator"), &TU);
-    EnumeratorProto = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
+    EnumeratorProto
+      = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
   }
   
   return EnumeratorProto;
+}
+
+ProtocolDecl *TypeChecker::getArrayLiteralProtocol() {
+  if (!ArrayLiteralProto) {
+    UnqualifiedLookup Globals(Context.getIdentifier("ArrayLiteralConvertible"),
+                              &TU);
+    ArrayLiteralProto
+      = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
+  }
+  
+  return ArrayLiteralProto;
 }

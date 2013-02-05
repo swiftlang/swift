@@ -285,6 +285,9 @@ private:
   /// \brief The 'Enumerator' protocol, used by the for-each loop.
   ProtocolDecl *EnumeratorProto;
   
+  /// \brief The 'ArrayLiteralConvertible' protocol, used by [] array literals.
+  ProtocolDecl *ArrayLiteralProto;
+  
   Type IntLiteralType;
   Type FloatLiteralType;
   Type CharacterLiteralType;
@@ -292,7 +295,8 @@ private:
 
 public:
   TypeChecker(TranslationUnit &TU)
-    : TU(TU), Context(TU.Ctx), EnumerableProto(0), EnumeratorProto(0) {}
+    : TU(TU), Context(TU.Ctx),
+      EnumerableProto(0), EnumeratorProto(0), ArrayLiteralProto(0) {}
 
   LangOptions &getLangOpts() const { return Context.LangOpts; }
   
@@ -752,6 +756,9 @@ public:
   /// \brief Retrieve the Enumerator protocol declaration, if it exists.
   ProtocolDecl *getEnumeratorProtocol();
 
+  /// \brief Retrieve the ArrayLiteralConvertible protocol declaration, if it
+  /// exists.
+  ProtocolDecl *getArrayLiteralProtocol();
 
 };
 

@@ -798,6 +798,42 @@ public:
   
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Tuple; }
 };
+  
+/// ArrayExpr - Bracketed expressions like [x, y, z]. The subexpression is
+/// represented as a TupleExpr or ParenExpr and passed on to the semantics-
+/// providing conversion operation.
+class ArrayExpr : public Expr {
+  SourceLoc LBracketLoc;
+  SourceLoc RBracketLoc;
+  Expr *SubExpr;
+  Expr *SemanticExpr;
+
+public:
+  ArrayExpr(SourceLoc LBracketLoc, Expr *SubExpr, SourceLoc RBracketLoc,
+            Type Ty = Type())
+    : Expr(ExprKind::Array, Ty),
+      LBracketLoc(LBracketLoc), RBracketLoc(RBracketLoc),
+      SubExpr(SubExpr), SemanticExpr(nullptr) {
+  }
+  
+  /// Get the ParenExpr or TupleExpr representing the literal contents of the
+  /// array.
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *e) { SubExpr = e; }
+  
+  SourceLoc getLBracketLoc() const { return LBracketLoc; }
+  SourceLoc getRBracketLoc() const { return RBracketLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(LBracketLoc, RBracketLoc);
+  }
+  
+  Expr *getSemanticExpr() const { return SemanticExpr; }
+  void setSemanticExpr(Expr *e) { SemanticExpr = e; }
+  
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Array;
+  }
+};
 
 /// SubscriptExpr - Subscripting expressions like a[i] that refer to an element
 /// within a container.

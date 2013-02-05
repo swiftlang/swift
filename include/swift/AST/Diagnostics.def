@@ -429,9 +429,6 @@ ERROR(expected_foreach_lbrace,stmt_parsing,none,
 // Expression parsing diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(unsupported_container_literal,expr_parsing,none,
-      "container literals are not yet supported", ())
-
 ERROR(expected_expr,expr_parsing,none,
       "expected expression", ())
 
@@ -491,6 +488,12 @@ ERROR(expected_equal_in_tuple_expr,expr_parsing,none,
       "expected '=' in tuple expression", ())
 ERROR(expected_rparen_parenthesis_expr,expr_parsing,none,
       "expected ')' in parenthesis expression", ())
+
+// Array literal expressions
+ERROR(expected_expr_array,expr_parsing,none,
+      "expected subexpression in container literal", ())
+ERROR(expected_rsquare_array_expr,expr_parsing,none,
+      "expected ']' in container literal expression", ())
 
 // Func expressions
 ERROR(expected_lbrace_func_expr,decl_parsing,none,
@@ -948,6 +951,12 @@ ERROR(string_interpolation_convert_fail,sema_tce,none,
       "could not coerce expression %0 to string type %1", (Type, Type))
 ERROR(nonstring_interpolation_type,sema_tce,none,
       "string interpolation coerced to non-string type %0", (Type))
+
+// Array literals
+ERROR(array_expr_missing_proto,sema_tce,none,
+      "array literal expression requires the 'ArrayLiteralConvertible' protocol to be defined", ())
+ERROR(array_protocol_broken,sema_tce,none,
+      "ArrayLiteralConvertible protocol definition is broken", ())
 
 //------------------------------------------------------------------------------
 // Type Check Statements

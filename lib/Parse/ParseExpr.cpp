@@ -361,15 +361,10 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     Result = parseExprParen();
     break;
 
-  case tok::l_square_starting: {
-    SourceRange SB;
-    SB.Start = consumeToken();
-    skipUntil(tok::r_square);
-    SB.End = consumeToken(tok::r_square);
-    diagnose(SB.Start, diag::unsupported_container_literal) << SB;
-    return 0;
-  }
-
+  case tok::l_square_starting:
+    Result = parseExprArray();
+    break;
+      
   case tok::kw_func:
     Result = parseExprFunc();
     break;
@@ -610,13 +605,18 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
 ///   expr-paren-element:
 ///     (identifier '=')? expr
 ///
-NullablePtr<Expr> Parser::parseExprParen() {
+NullablePtr<Expr> Parser::parseExprParen(tok endTok,
+                                         Diag<> subErrorDiag,
+                                         Diag<> matchErrorDiag,
+                                         Diag<> otherNote) {
   SourceLoc LPLoc = consumeToken();
   
   SmallVector<Expr*, 8> SubExprs;
-  SmallVector<Identifier, 8> SubExprNames; 
+  SmallVector<Identifier, 8> SubExprNames;
   
-  if (Tok.isNot(tok::r_paren)) {
+  SourceLoc RPLoc;
+
+  if (Tok.isNot(endTok)) {
     do {
       Identifier FieldName;
       // Check to see if there is a field specifier, like "x =".
@@ -634,7 +634,7 @@ NullablePtr<Expr> Parser::parseExprParen() {
         SubExprNames.push_back(FieldName);
       }
       
-      NullablePtr<Expr> SubExpr = parseExpr(diag::expected_expr_parentheses);
+      NullablePtr<Expr> SubExpr = parseExpr(subErrorDiag);
       if (SubExpr.isNull())
         return 0;
       SubExprs.push_back(SubExpr.get());
@@ -646,13 +646,12 @@ NullablePtr<Expr> Parser::parseExprParen() {
   // If this happens, then this is actually the tuple that is a string literal
   // interpolation context.  Just accept the ) and build the tuple as we usually
   // do.
-  SourceLoc RPLoc;
   if (Tok.is(tok::eof) && Tok.getText()[0] == ')')
     RPLoc = Tok.getLoc();
   else {
-    if (parseMatchingToken(tok::r_paren, RPLoc,
-                           diag::expected_rparen_parenthesis_expr,
-                           LPLoc, diag::opening_paren))
+    if (parseMatchingToken(endTok, RPLoc,
+                           matchErrorDiag,
+                           LPLoc, otherNote))
       return 0;
   }
 
@@ -673,6 +672,27 @@ NullablePtr<Expr> Parser::parseExprParen() {
   return new (Context) TupleExpr(LPLoc, NewSubExprs, NewSubExprsNames, RPLoc);
 }
 
+/// parseExprArray - Parse an array literal expression.
+///
+///   expr-array:
+///     lbracket-any ']'
+///     lbracket-any expr-paren-element (',' expr-paren-element)* ']'
+NullablePtr<Expr> Parser::parseExprArray() {
+
+  NullablePtr<Expr> maybeSubExpr
+    = parseExprParen(tok::r_square,
+                     diag::expected_expr_array,
+                     diag::expected_rsquare_array_expr,
+                     diag::opening_bracket);
+  
+  if (maybeSubExpr.isNull())
+    return nullptr;
+  Expr *subExpr = maybeSubExpr.get();
+  
+  return new (Context) ArrayExpr(subExpr->getStartLoc(),
+                                 subExpr,
+                                 subExpr->getEndLoc());
+}
 
 /// parseExprFunc - Parse a func expression.
 ///

@@ -649,6 +649,11 @@ public:
     }
     OS << ')';
   }
+  void visitArrayExpr(ArrayExpr *E) {
+    printCommon(E, "array_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+  }
   void visitSubscriptExpr(SubscriptExpr *E) {
     printCommon(E, "subscript_expr");
     OS << '\n';

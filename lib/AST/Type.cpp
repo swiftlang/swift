@@ -272,8 +272,9 @@ static void gatherTypeVariables(
                                typeVariables);
 
   case TypeKind::ArraySlice:
-    return gatherTypeVariables(cast<ArraySliceType>(ty)->getImplementationType(),
-                               typeVariables);
+    gatherTypeVariables(cast<ArraySliceType>(ty)->getImplementationType(),
+                        typeVariables);
+    return;
 
   case TypeKind::LValue:
     return gatherTypeVariables(cast<LValueType>(ty)->getObjectType(),

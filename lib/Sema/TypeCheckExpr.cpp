@@ -991,6 +991,10 @@ public:
       return 0;
     return E;
   }
+    
+  Expr *visitArrayExpr(ArrayExpr *E) {
+    llvm_unreachable("not implemented");
+  }
 
   Expr *visitSubscriptExpr(SubscriptExpr *E) {
     return TC.semaSubscriptExpr(E);
