@@ -402,9 +402,9 @@ endif()
 # On OS X 10.9, the magic "Swift bit" is not supported yet.
 # Note that this is using Darwin version numbers.
 if(NOT ${CMAKE_SYSTEM_VERSION} VERSION_LESS "13")
-  set(SWIFT_OBJC_SUPPORTS_SWIFT_BIT_DEFAULT NO) 
+  set(SWIFT_OBJC_SUPPORTS_SWIFT_BIT_DEFAULT "OFF") 
 else()
-  set(SWIFT_OBJC_SUPPORTS_SWIFT_BIT_DEFAULT YES) 
+  set(SWIFT_OBJC_SUPPORTS_SWIFT_BIT_DEFAULT "ON") 
 endif()
 
 option(SWIFT_OBJC_SUPPORTS_SWIFT_BIT 
