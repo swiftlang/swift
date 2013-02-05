@@ -3358,6 +3358,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           case SolutionKind::Error:
             // There may still be a Conversion or Construction we can satisfy
             // the constraint with.
+            // FIXME: The recursive match may have introduced new equality
+            // constraints that are now invalid. rdar://problem/13140447
             if (kind >= TypeMatchKind::Conversion)
               break;
               
@@ -3386,6 +3388,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           case SolutionKind::Error:
             // There may still be a Conversion or Construction we can satisfy
             // the constraint with.
+            // FIXME: The recursive match may have introduced new equality
+            // constraints that are now invalid. rdar://problem/13140447
             if (kind >= TypeMatchKind::Conversion)
               break;
 
