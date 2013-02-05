@@ -27,12 +27,29 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclVisitor.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
 
+/// \brief Set the declaration context of each variable within the given
+/// patterns to \p dc.
+static void setVarDeclContexts(ArrayRef<Pattern *> patterns, DeclContext *dc) {
+  for (auto pattern : patterns) {
+    auto pat = pattern->getSemanticsProvidingPattern();
+    if (auto named = dyn_cast<NamedPattern>(pat))
+      named->getDecl()->setDeclContext(dc);
+    if (auto tuple = dyn_cast<TuplePattern>(pat)) {
+      for (auto elt : tuple->getFields())
+        setVarDeclContexts(elt.getPattern(), dc);
+    }
+  }
+}
+
 namespace {
+  typedef ClangImporter::Implementation::EnumKind EnumKind;
+
   /// \brief Convert Clang declarations into the corresponding Swift
   /// declarations.
   class SwiftDeclConverter
@@ -115,6 +132,98 @@ namespace {
       return nullptr;
     }
 
+    /// \brief Create a constructor that initializes a struct from its members.
+    ConstructorDecl *createValueConstructor(StructDecl *structDecl,
+                                            ArrayRef<Decl *> members) {
+      auto &context = Impl.SwiftContext;
+
+      // FIXME: Name hack.
+      auto name = context.getIdentifier("constructor");
+
+      // Create the 'this' declaration.
+      auto thisType = structDecl->getDeclaredTypeInContext();
+      auto thisMetaType = MetaTypeType::get(thisType, context);
+      auto thisName = context.getIdentifier("this");
+      auto thisDecl = new (context) VarDecl(SourceLoc(), thisName, thisType,
+                                            structDecl);
+
+      // Construct the set of parameters from the list of members.
+      SmallVector<Pattern *, 4> paramPatterns;
+      SmallVector<TuplePatternElt, 8> patternElts;
+      SmallVector<TupleTypeElt, 8> tupleElts;
+      SmallVector<VarDecl *, 8> params;
+      for (auto member : members) {
+        if (auto var = dyn_cast<VarDecl>(member)) {
+          if (var->isProperty())
+            continue;
+          
+          auto param = new (context) VarDecl(SourceLoc(), var->getName(),
+                                             var->getType(), structDecl);
+          params.push_back(param);
+          Pattern *pattern = new (context) NamedPattern(param);
+          pattern->setType(var->getType());
+          auto tyLoc = TypeLoc::withoutLoc(var->getType());
+          pattern = new (context) TypedPattern(pattern, tyLoc);
+          pattern->setType(var->getType());
+          paramPatterns.push_back(pattern);
+          patternElts.push_back(TuplePatternElt(pattern));
+          tupleElts.push_back(TupleTypeElt(var->getType(), var->getName()));
+        }
+      }
+      auto paramPattern = TuplePattern::create(context, SourceLoc(), patternElts,
+                                               SourceLoc());
+      auto paramTy = TupleType::get(tupleElts, context);
+      paramPattern->setType(paramTy);
+
+      // Create the constructor
+      auto constructor = new (context) ConstructorDecl(name, SourceLoc(),
+                                                       paramPattern, thisDecl,
+                                                       nullptr, structDecl);
+
+      // Set the constructor's type.
+      auto fnTy = FunctionType::get(paramTy, thisType, context);
+      auto allocFnTy = FunctionType::get(thisMetaType, fnTy, context);
+      auto initFnTy = FunctionType::get(thisType, fnTy, context);
+      constructor->setType(allocFnTy);
+      constructor->setInitializerType(initFnTy);
+
+      // Fix the declaration contexts.
+      thisDecl->setDeclContext(constructor);
+      setVarDeclContexts(paramPatterns, constructor);
+
+      // Assign all of the member variables appropriately.
+      SmallVector<BraceStmt::ExprStmtOrDecl, 4> stmts;
+      unsigned paramIdx = 0;
+      for (auto member : members) {
+        auto var = dyn_cast<VarDecl>(member);
+        if (!var || var->isProperty())
+          continue;
+
+        // Construct left-hand side.
+        Expr *lhs = new (context) DeclRefExpr(thisDecl, SourceLoc(),
+                                              thisDecl->getTypeOfReference());
+        lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var, SourceLoc());
+
+        // Construct right-hand side.
+        auto param = params[paramIdx++];
+        auto rhs = new (context) DeclRefExpr(param, SourceLoc(),
+                                             param->getTypeOfReference());
+
+        // Add assignment.
+        stmts.push_back(new (context) AssignStmt(lhs, SourceLoc(), rhs));
+      }
+
+      // Create the function body.
+      auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc());
+      constructor->setBody(body);
+
+      // Add this as an external definition.
+      Impl.firstClangModule->addExternalDefinition(constructor);
+
+      // We're done.
+      return constructor;
+    }
+
     Decl *VisitEnumDecl(clang::EnumDecl *decl) {
       decl = decl->getDefinition();
       if (!decl)
@@ -134,11 +243,68 @@ namespace {
         return nullptr;
 
       // Create the oneof declaration and record it.
-      auto result = new (Impl.SwiftContext)
-                      OneOfDecl(Impl.importSourceLoc(decl->getLocStart()),
-                                name,
-                                Impl.importSourceLoc(decl->getLocation()),
-                                { }, nullptr, dc);
+      Decl *result;
+      OneOfDecl *oneOfDecl = nullptr;
+      switch (Impl.classifyEnum(decl)) {
+      case EnumKind::Constants: {
+        // There is no declaration. Rather, the type is mapped to the
+        // underlying type.
+        return nullptr;
+      }
+
+      case EnumKind::Options: {
+        auto structDecl = new (Impl.SwiftContext)
+          StructDecl(SourceLoc(), name, SourceLoc(), { }, nullptr, dc);
+
+        // Compute the underlying type of the enumeration.
+        auto underlyingType = Impl.importType(decl->getIntegerType());
+        if (!underlyingType)
+          return nullptr;
+
+        // Create a field to store the underlying value.
+        auto fieldName = Impl.SwiftContext.getIdentifier("value");
+        auto field = new (Impl.SwiftContext) VarDecl(SourceLoc(), fieldName,
+                                                     underlyingType,
+                                                     structDecl);
+
+        // Create a pattern binding to describe the field.
+        Pattern * fieldPattern = new (Impl.SwiftContext) NamedPattern(field);
+        fieldPattern->setType(field->getType());
+        fieldPattern
+          = new (Impl.SwiftContext) TypedPattern(
+                                      fieldPattern,
+                                      TypeLoc::withoutLoc(field->getType()));
+        fieldPattern->setType(field->getType());
+        
+        auto patternBinding
+          = new (Impl.SwiftContext) PatternBindingDecl(SourceLoc(),
+                                                       fieldPattern,
+                                                       nullptr, structDecl);
+
+        // Create a constructor to initialize that value from a value of the
+        // underlying type.
+        Decl *fieldDecl = field;
+        auto constructor = createValueConstructor(structDecl, {&fieldDecl, 1});
+
+        // Set the members of the struct.
+        Decl *members[3] = { constructor, patternBinding, field };
+        structDecl->setMembers(
+          Impl.SwiftContext.AllocateCopy(ArrayRef<Decl *>(members, 3)),
+          SourceRange());
+
+        result = structDecl;
+        break;
+      }
+
+      case EnumKind::OneOf:
+        oneOfDecl = new (Impl.SwiftContext)
+          OneOfDecl(Impl.importSourceLoc(decl->getLocStart()),
+                    name,
+                    Impl.importSourceLoc(decl->getLocation()),
+                    { }, nullptr, dc);
+        result = oneOfDecl;
+        break;
+      }
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
       // Import each of the enumerators.
@@ -154,11 +320,15 @@ namespace {
 
       // FIXME: Source range isn't totally accurate because Clang lacks the
       // location of the '{'.
-      result->setMembers(Impl.SwiftContext.AllocateCopy(members),
-                         Impl.importSourceRange(clang::SourceRange(
-                                                  decl->getLocation(),
-                                                  decl->getRBraceLoc())));
-
+      // FIXME: Eventually, we'd like to be able to do this for structs as well,
+      // but we need static variables first.
+      if (oneOfDecl) {
+        oneOfDecl->setMembers(Impl.SwiftContext.AllocateCopy(members),
+                                Impl.importSourceRange(clang::SourceRange(
+                                                       decl->getLocation(),
+                                                       decl->getRBraceLoc())));
+      }
+      
       return result;
     }
 
@@ -259,27 +429,88 @@ namespace {
     }
 
     Decl *VisitEnumConstantDecl(clang::EnumConstantDecl *decl) {
+      auto &context = Impl.SwiftContext;
+      
       auto name = Impl.importName(decl->getDeclName());
       if (name.empty())
         return nullptr;
 
-      auto dc = Impl.importDeclContext(decl->getDeclContext());
-      if (!dc)
-        return nullptr;
+      auto clangEnum = cast<clang::EnumDecl>(decl->getDeclContext());
+      switch (Impl.classifyEnum(clangEnum)) {
+      case EnumKind::Constants: {
+        // The enumeration was simply mapped to an integral type. Create a
+        // constant with that integral type.
 
-      auto result
-        = new (Impl.SwiftContext)
-            OneOfElementDecl(Impl.importSourceLoc(decl->getLocation()),
-                             name, TypeLoc(), dc);
+        // FIXME: These should be able to end up in a record, but Swift
+        // can't represent that now.
+        auto clangDC = clangEnum->getDeclContext();
+        while (!clangDC->isFileContext())
+          clangDC = clangDC->getParent();
 
-      // Give the oneof element the appropriate type.
-      auto oneof = cast<OneOfDecl>(dc);
-      auto argTy = MetaTypeType::get(oneof->getDeclaredType(),
-                                     Impl.SwiftContext);
-      result->overwriteType(FunctionType::get(argTy, oneof->getDeclaredType(),
-                                              Impl.SwiftContext));
-      return result;
+        // The context where the constant will be introduced.
+        auto dc = Impl.importDeclContext(clangDC);
+        if (!dc)
+          return nullptr;
+
+        // Enumeration type.
+        auto type = Impl.importType(clangEnum->getIntegerType());
+        if (!type)
+          return nullptr;
+
+        // Create the global constant.
+        return Impl.createConstant(name, dc, type,
+                                   clang::APValue(decl->getInitVal()),
+                                   /*requiresConversion=*/false);
+      }
+          
+      case EnumKind::Options: {
+        // The enumeration was mapped to a struct containining the integral
+        // type. Create a constant with that struct type.
+
+        // FIXME: These should be able to end up in a record, but Swift
+        // can't represent that now.
+        auto clangDC = clangEnum->getDeclContext();
+        while (!clangDC->isFileContext())
+          clangDC = clangDC->getParent();
+
+        auto dc = Impl.importDeclContext(clangDC);
+        if (!dc)
+          return nullptr;
+
+        // Import the enumeration type.
+        auto enumType = Impl.importType(
+                          Impl.getClangASTContext().getTagDeclType(clangEnum));
+        if (!enumType)
+          return nullptr;
+
+        // Create the global constant.
+        return Impl.createConstant(name, dc, enumType,
+                                   clang::APValue(decl->getInitVal()),
+                                   /*requiresCast=*/true);
+      }
+
+      case EnumKind::OneOf: {
+        // The enumeration was mapped to a oneof. Create an element of that
+        // oneof.
+        // The enumeration was mapped to a oneof.
+        auto dc = Impl.importDeclContext(decl->getDeclContext());
+        if (!dc)
+          return nullptr;
+
+        auto element
+          = new (context) OneOfElementDecl(SourceLoc(), name, TypeLoc(), dc);
+
+        // Give the oneof element the appropriate type.
+        auto oneof = cast<OneOfDecl>(dc);
+        auto argTy = MetaTypeType::get(oneof->getDeclaredType(), context);
+        element->overwriteType(FunctionType::get(argTy,
+                                                 oneof->getDeclaredType(),
+                                                 context));
+        return element;
+      }
+      }
     }
+
 
     Decl *
     VisitUnresolvedUsingValueDecl(clang::UnresolvedUsingValueDecl *decl) {
@@ -314,21 +545,6 @@ namespace {
       return new (Impl.SwiftContext)
                VarDecl(Impl.importSourceLoc(decl->getLocStart()),
                        name, type, dc);
-    }
-
-    /// \brief Set the declaration context of each variable within the given
-    /// patterns to \p dc.
-    static void setVarDeclContexts(ArrayRef<Pattern *> patterns,
-                                   DeclContext *dc) {
-      for (auto pattern : patterns) {
-        auto pat = pattern->getSemanticsProvidingPattern();
-        if (auto named = dyn_cast<NamedPattern>(pat))
-          named->getDecl()->setDeclContext(dc);
-        if (auto tuple = dyn_cast<TuplePattern>(pat)) {
-          for (auto elt : tuple->getFields())
-            setVarDeclContexts(elt.getPattern(), dc);
-        }
-      }
     }
 
     Decl *VisitFunctionDecl(clang::FunctionDecl *decl) {
@@ -1923,6 +2139,25 @@ namespace {
   };
 }
 
+/// \brief Classify the given Clang enumeration to describe how it
+EnumKind ClangImporter::Implementation::classifyEnum(clang::EnumDecl *decl) {
+  Identifier name;
+  if (decl->getDeclName())
+    name = importName(decl->getDeclName());
+  else if (decl->getTypedefNameForAnonDecl())
+    name = importName(decl->getTypedefNameForAnonDecl()->getDeclName());
+
+  // Anonymous enumerations simply get mapped to constants of the
+  // underlying type of the enum, because there is no way to conjure up a
+  // name for the Swift type.
+  if (name.empty())
+    return EnumKind::Constants;
+
+  // FIXME: For now, Options is the only usable answer, because oneofs
+  // are broken in IRgen.
+  return EnumKind::Options;
+}
+
 Decl *ClangImporter::Implementation::importDecl(clang::NamedDecl *decl) {
   if (!decl)
     return nullptr;
@@ -1965,3 +2200,130 @@ ClangImporter::Implementation::importDeclContext(clang::DeclContext *dc) {
     return destructor;
   return nullptr;
 }
+
+ValueDecl *
+ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
+                                              Type type,
+                                              const clang::APValue &value,
+                                              bool requiresCast) {
+  auto &context = SwiftContext;
+
+  auto var = new (context) VarDecl(SourceLoc(), name, type, dc);
+
+  // Form the argument patterns.
+  SmallVector<Pattern *, 3> getterArgs;
+
+  // empty tuple
+  getterArgs.push_back(TuplePattern::create(context, SourceLoc(), { },
+                                            SourceLoc()));
+  getterArgs.back()->setType(TupleType::getEmpty(context));
+
+  // Form the type of the getter.
+  auto getterType = type;
+  for (auto it = getterArgs.rbegin(), itEnd = getterArgs.rend();
+       it != itEnd; ++it) {
+    getterType = FunctionType::get((*it)->getType(),
+                                   getterType,
+                                   context);
+  }
+
+  // Create the getter body.
+  auto funcExpr = FuncExpr::create(context, SourceLoc(),
+                                   getterArgs,
+                                   getterArgs,
+                                   TypeLoc::withoutLoc(type),
+                                   nullptr,
+                                   dc);
+  funcExpr->setType(getterType);
+  setVarDeclContexts(getterArgs, funcExpr);
+
+  // Create the getter function declaration.
+  auto func = new (context) FuncDecl(SourceLoc(), SourceLoc(),
+                                     Identifier(), SourceLoc(), nullptr,
+                                     getterType, funcExpr, dc);
+
+  // Create the integer literal value.
+  // FIXME: Handle other kinds of values.
+  Expr *expr = nullptr;
+  switch (value.getKind()) {
+  case clang::APValue::AddrLabelDiff:
+  case clang::APValue::Array:
+  case clang::APValue::ComplexFloat:
+  case clang::APValue::ComplexInt:
+  case clang::APValue::LValue:
+  case clang::APValue::MemberPointer:
+  case clang::APValue::Struct:
+  case clang::APValue::Uninitialized:
+  case clang::APValue::Union:
+  case clang::APValue::Vector:
+    llvm_unreachable("Unhandled APValue kind");
+
+  case clang::APValue::Float:
+  case clang::APValue::Int: {
+    // Print the value.
+    llvm::SmallString<16> printedValue;
+    if (value.getKind() == clang::APValue::Int) {
+      value.getInt().toString(printedValue);
+    } else {
+      value.getFloat().toString(printedValue);
+    }
+
+    // If this was a negative number, record that and strip off the '-'.
+    // FIXME: This is hideous!
+    // FIXME: Actually make the negation work.
+    bool isNegative = printedValue[0] == '-';
+    if (isNegative)
+      printedValue.erase(printedValue.begin());
+
+    // Create the expression node.
+    StringRef printedValueCopy(context.AllocateCopy(printedValue).data(),
+                               printedValue.size());
+    if (value.getKind() == clang::APValue::Int) {
+      expr = new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc());
+    } else {
+      expr = new (context) FloatLiteralExpr(printedValueCopy, SourceLoc());
+    }
+
+    // If it was a negative number, negate the integer literal.
+#if 0
+    // FIXME: Have to look into the Swift module for this to work. UGH!
+    if (isNegative) {
+      auto minusName = context.getIdentifier("-");
+      auto minusRef = new (context) UnresolvedDeclRefExpr(
+                                                          minusName,
+                                                          DeclRefKind::PrefixOperator,
+                                                          SourceLoc());
+      expr = new (context) PrefixUnaryExpr(minusRef, expr);
+    }
+#endif
+    break;
+  }
+  }
+
+  // If we need a cast, add one now.
+  if (requiresCast) {
+    // Create a reference to the struct type.
+    auto typeRef = new (context) MetatypeExpr(nullptr, SourceLoc(),
+                                              MetaTypeType::get(type, context));
+    expr = new (context) CallExpr(typeRef, expr);
+  }
+
+  // Create the return statement.
+  auto ret = new (context) ReturnStmt(SourceLoc(), expr);
+
+  // Finally, set the body.
+  funcExpr->setBody(BraceStmt::create(context, SourceLoc(),
+                                      BraceStmt::ExprStmtOrDecl(ret),
+                                      SourceLoc()));
+
+  // Write the function up as the getter.
+  func->makeGetter(var);
+  var->setProperty(context, SourceLoc(), func, nullptr, SourceLoc());
+
+  // Register this thunk as an external definition.
+  firstClangModule->addExternalDefinition(func);
+
+  return var;
+
+}
+

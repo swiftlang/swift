@@ -25,9 +25,11 @@
 #include "clang/Basic/IdentifierTable.h"
 
 namespace clang {
+class APValue;
 class CompilerInvocation;
 class Decl;
 class DeclarationName;
+class EnumDecl;
 class MacroInfo;
 class NamedDecl;
 class ParmVarDecl;
@@ -48,6 +50,22 @@ class ValueDecl;
 
 /// \brief Implementation of the Clang importer.
 struct ClangImporter::Implementation {
+  /// \brief Describes how a particular C enumeration type will be imported
+  /// into Swift. All of the possibilities have the same storage
+  /// representation, but can be used in different ways.
+  enum class EnumKind {
+    /// \brief The enumeration type should map to a oneof, which means that
+    /// all of the options are independent.
+    OneOf,
+    /// \brief The enumeration type should map to a distinct type that acts
+    /// as a bitset, for which each of the possible values represents a
+    /// specific bit.
+    Options,
+    /// \brief The enumeration type should simply map to the appropriate
+    /// integer
+    Constants
+  };
+
   Implementation(ASTContext &ctx) : SwiftContext(ctx) { }
 
   /// \brief Swift AST context.
@@ -173,7 +191,11 @@ public:
   /// \returns The imported declaration, or null if the macro could not be
   /// translated into Swift.
   ValueDecl *importMacro(Identifier name, clang::MacroInfo *macro);
-  
+
+  /// \brief Classify the given Clang enumeration type to describe how it
+  /// should be imported 
+  EnumKind classifyEnum(clang::EnumDecl *decl);
+
   /// \brief Import the given Clang declaration into Swift.
   ///
   /// \returns The imported declaration, or null if this declaration could
@@ -185,6 +207,18 @@ public:
   /// \returns The imported declaration context, or null if it could not
   /// be converted.
   DeclContext *importDeclContext(clang::DeclContext *dc);
+
+  /// \brief Create a new named constant with the given value.
+  ///
+  /// \param name The name of the constant.
+  /// \param dc The declaration context into which the name will be introduced.
+  /// \param type The type of the named constant.
+  /// \param value The value of the named constant.
+  /// \param requiresCast Whether a cast is necessary to make the constant
+  /// value work.
+  ValueDecl *createConstant(Identifier name, DeclContext *dc,
+                            Type type, const clang::APValue &value,
+                            bool requiresCast);
 
   /// \brief Retrieve the 'swift' module.
   ///

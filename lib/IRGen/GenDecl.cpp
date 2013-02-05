@@ -587,7 +587,10 @@ void IRGenFunction::emitExternalDefinition(Decl *D) {
       // The only functions available are getters and setters.
       assert(cast<FuncDecl>(D)->isGetterOrSetter() &&
              "Not a synthesized getter/setter");
-      IGM.emitInstanceMethod(cast<FuncDecl>(D));
+      if (D->getDeclContext()->isTypeContext())
+        IGM.emitInstanceMethod(cast<FuncDecl>(D));
+      else
+        IGM.emitGlobalFunction(cast<FuncDecl>(D));
       break;
 
     case DeclKind::Constructor:

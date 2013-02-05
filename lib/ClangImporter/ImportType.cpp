@@ -24,6 +24,7 @@
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/TypeVisitor.h"
 #include "llvm/ADT/SmallString.h"
@@ -338,11 +339,20 @@ namespace {
     }
 
     Type VisitEnumType(const clang::EnumType *type) {
-      auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
-      if (!decl)
-        return nullptr;
+      auto clangDecl = type->getDecl();
+      switch (Impl.classifyEnum(clangDecl)) {
+      case ClangImporter::Implementation::EnumKind::Constants:
+        return Impl.importType(clangDecl->getIntegerType());
 
-      return decl->getDeclaredType();
+      case ClangImporter::Implementation::EnumKind::OneOf:
+      case ClangImporter::Implementation::EnumKind::Options: {
+        auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(clangDecl));
+        if (!decl)
+          return nullptr;
+
+        return decl->getDeclaredType();
+      }
+      }
     }
 
     Type VisitElaboratedType(const clang::ElaboratedType *type) {

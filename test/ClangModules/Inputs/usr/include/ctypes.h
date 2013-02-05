@@ -4,6 +4,11 @@ enum Tribool {
   True, False, Indeterminate
 };
 
+enum {
+  AnonConst1 = 7,
+  AnonConst2
+};
+
 struct Point {
   float x;
   float y;
