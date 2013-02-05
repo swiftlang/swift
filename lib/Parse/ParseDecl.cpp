@@ -933,14 +933,15 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
 ///      'var' attribute-list identifier : type-annotation { get-set }
 bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
   SourceLoc VarLoc = consumeToken(tok::kw_var);
-  
-  DeclAttributes Attributes;
-  parseAttributeList(Attributes);
+
   SmallVector<PatternBindingDecl*, 4> PBDs;
   bool HasGetSet = false;
   bool Invalid = false;
 
   do {
+    DeclAttributes Attributes;
+    parseAttributeList(Attributes);
+
     bool CForLoopHack = false;
     NullablePtr<Pattern> pattern = parsePattern(CForLoopHack);
     if (pattern.isNull()) return true;
