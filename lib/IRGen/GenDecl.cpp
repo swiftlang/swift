@@ -899,7 +899,7 @@ llvm::Constant *IRGenModule::getAddrOfSwiftMetaclassStub(ClassDecl *theClass) {
 /// getAddrOfSwiftMetaclassStub or getAddrOfObjCMetaclass, depending
 /// on whether the class is published as an ObjC class.
 llvm::Constant *IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl) {
-  if (decl->getAttrs().ObjC || decl->hasClangDecl()) {
+  if (decl->getAttrs().ObjC || decl->hasClangNode()) {
     return getAddrOfObjCMetaclass(decl);
   } else {
     return getAddrOfSwiftMetaclassStub(decl);
@@ -1433,7 +1433,7 @@ StringRef IRGenModule::mangleType(CanType type, SmallVectorImpl<char> &buffer) {
 bool IRGenModule::isResilient(Decl *theDecl, ResilienceScope scope) {
   // Classes defined by Clang are resilient.
   if (auto theClass = dyn_cast<ClassDecl>(theDecl)) {
-    return theClass->hasClangDecl();
+    return theClass->hasClangNode();
   }
 
   return false;

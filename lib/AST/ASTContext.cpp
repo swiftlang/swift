@@ -37,9 +37,9 @@ struct ASTContext::Implementation {
   /// \brief The module loader used to load modules.
   llvm::IntrusiveRefCntPtr<swift::ModuleLoader> ModuleLoader;
 
-  /// \brief Map from Swift declarations to the Clang declarations from which
+  /// \brief Map from Swift declarations to the Clang nodes from which
   /// they were imported.
-  llvm::DenseMap<swift::Decl *, clang::Decl *> ClangDecls;
+  llvm::DenseMap<swift::Decl *, ClangNode> ClangNodes;
 
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
@@ -218,14 +218,14 @@ ModuleLoader &ASTContext::getModuleLoader() const {
   return *Impl.ModuleLoader;
 }
 
-clang::Decl *ASTContext::getClangDecl(Decl *decl) {
-  auto known = Impl.ClangDecls.find(decl);
-  assert(known != Impl.ClangDecls.end() && "No Clang declaration?");
+ClangNode ASTContext::getClangNode(Decl *decl) {
+  auto known = Impl.ClangNodes.find(decl);
+  assert(known != Impl.ClangNodes.end() && "No Clang node?");
   return known->second;
 }
 
-void ASTContext::setClangDecl(Decl *decl, clang::Decl *clangDecl) {
-  Impl.ClangDecls[decl] = clangDecl;
+void ASTContext::setClangNode(Decl *decl, ClangNode node) {
+  Impl.ClangNodes[decl] = node;
 }
 
 //===----------------------------------------------------------------------===//

@@ -679,7 +679,7 @@ bool Decl::shouldPrintInContext() const {
   // Skip non-property variables, unless they came from a Clang module.
   // Non-property variables in Swift source will be picked up by the
   // PatternBindingDecl.
-  if (isa<VarDecl>(this) && !this->hasClangDecl() &&
+  if (isa<VarDecl>(this) && !this->hasClangNode() &&
       !cast<VarDecl>(this)->isProperty())
     return false;
 

@@ -30,6 +30,7 @@
 
 namespace clang {
   class Decl;
+  class MacroInfo;
 }
 
 namespace swift {
@@ -53,6 +54,8 @@ namespace swift {
   class TypeAliasDecl;
   class Stmt;
   class ValueDecl;
+
+  typedef llvm::PointerUnion<clang::Decl *, clang::MacroInfo *> ClangNode;
   
 enum class DeclKind {
 #define DECL(Id, Parent) Id,
@@ -140,7 +143,7 @@ protected:
     DeclBits.FromClang = false;
   }
 
-  clang::Decl *getClangDeclSlow();
+  ClangNode getClangNodeSlow();
 
 public:
   /// Alignment - The required alignment of Decl objects.
@@ -195,10 +198,19 @@ public:
   /// \brief Mark this declaration invalid.
   void setInvalid() { DeclBits.Invalid = true; }
 
-  /// \brief Returns true if there's a clang declaration associated
+  /// \brief Returns true if there is a Clang AST node associated
   /// with this.
-  bool hasClangDecl() const {
+  bool hasClangNode() const {
     return DeclBits.FromClang;
+  }
+
+  /// \brief Retrieve the Clang AST node from which this declaration was
+  /// synthesized, if any.
+  ClangNode getClangNode() {
+    if (!DeclBits.FromClang)
+      return ClangNode();
+
+    return getClangNodeSlow();
   }
 
   /// \brief Retrieve the Clang declaration from which this declaration was
@@ -207,11 +219,20 @@ public:
     if (!DeclBits.FromClang)
       return nullptr;
 
-    return getClangDeclSlow();
+    return getClangNodeSlow().dyn_cast<clang::Decl *>();
   }
 
-  /// \brief Set the Clang declaration associated with this declaration.
-  void setClangDecl(clang::Decl *decl);
+  /// \brief Retrieve the Clang macro from which this declaration was
+  /// synthesized, if any.
+  clang::MacroInfo *getClangMacro() {
+    if (!DeclBits.FromClang)
+      return nullptr;
+
+    return getClangNodeSlow().dyn_cast<clang::MacroInfo *>();
+  }
+
+  /// \brief Set the Clang node associated with this declaration.
+  void setClangNode(ClangNode node);
 
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;

@@ -91,10 +91,6 @@ static bool isSignToken(clang::Token const &tok) {
 
 ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
                                                       clang::MacroInfo *macro) {
-  auto known = ImportedMacros.find(macro);
-  if (known != ImportedMacros.end())
-    return known->second;
-  
   // Don't import macros private to the module.
   if (!macro->isPublic())
     return nullptr;
@@ -103,7 +99,6 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
   if (macro->isFunctionLike())
     return nullptr;
 
-  // FIXME: setClangDecl on the returned decl to something?
   // FIXME: Ask Clang to try to parse and evaluate the expansion as a constant
   // expression instead of doing these special-case pattern matches.
   if (macro->getNumTokens() == 1) {

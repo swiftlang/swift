@@ -222,7 +222,7 @@ bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass) {
 
 /// Is the given class known to have an implementation in Swift?
 bool irgen::hasKnownSwiftImplementation(IRGenModule &IGM, ClassDecl *theClass) {
-  return !theClass->hasClangDecl();
+  return !theClass->hasClangNode();
 }
 
 /// Is the given method known to be callable by vtable lookup?

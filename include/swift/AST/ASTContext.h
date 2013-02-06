@@ -35,6 +35,7 @@ namespace llvm {
 
 namespace clang {
   class Decl;
+  class MacroInfo;
 }
 
 namespace swift {
@@ -58,7 +59,9 @@ namespace swift {
   class ValueDecl;
   class DiagnosticEngine;
   class Substitution;
-  
+
+  typedef llvm::PointerUnion<clang::Decl *, clang::MacroInfo *> ClangNode;
+
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
 typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
@@ -283,8 +286,8 @@ public:
 
 private:
   friend class Decl;
-  clang::Decl *getClangDecl(Decl *decl);
-  void setClangDecl(Decl *decl, clang::Decl *clangDecl);
+  ClangNode getClangNode(Decl *decl);
+  void setClangNode(Decl *decl, ClangNode node);
 
   friend class BoundGenericType;
 

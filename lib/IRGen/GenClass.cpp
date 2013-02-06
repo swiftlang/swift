@@ -175,7 +175,7 @@ namespace {
       // without a formal superclass will actually be parented by
       // SwiftObject (or maybe eventually something else like it),
       // which will be visible in the Objective-C type system.
-      if (Root->hasClangDecl()) return Root;
+      if (Root->hasClangNode()) return Root;
 
       return IGM.getSwiftRootClass();
     }

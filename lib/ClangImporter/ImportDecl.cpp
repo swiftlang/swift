@@ -1621,7 +1621,7 @@ namespace {
               if (!decl->getMethod(objcMethod->getSelector(),
                                    objcMethod->isInstanceMethod())) {
                 if (auto imported = VisitObjCMethodDecl(objcMethod, dc)) {
-                  imported->setClangDecl(objcMethod);
+                  imported->setClangNode(objcMethod);
                   members.push_back(imported);
 
                   // Import any special methods based on this member.
@@ -2171,7 +2171,7 @@ Decl *ClangImporter::Implementation::importDecl(clang::NamedDecl *decl) {
   auto canon = decl->getCanonicalDecl();
   if (result) {
     assert(!result->getClangDecl() || result->getClangDecl() == canon);
-    result->setClangDecl(canon);
+    result->setClangNode(canon);
   }
   return ImportedDecls[canon] = result;
 }

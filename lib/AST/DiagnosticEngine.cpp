@@ -243,7 +243,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   if (loc.isInvalid() && ActiveDiagnosticDecl) {
     // If a declaration was provided instead of a location, and that declaration
     // has a location we can point to, use that location.
-    if (!ActiveDiagnosticDecl->getClangDecl() &&
+    if (!ActiveDiagnosticDecl->hasClangNode() &&
         ActiveDiagnosticDecl->getLoc().isValid()) {
       loc = ActiveDiagnosticDecl->getLoc();
     } else {

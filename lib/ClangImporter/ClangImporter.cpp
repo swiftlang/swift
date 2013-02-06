@@ -358,9 +358,24 @@ void ClangImporter::lookupValue(Module *module,
   clang::IdentifierInfo *clangID = clangName.getAsIdentifierInfo();
   if (clangID) {
     clang::MacroInfo *clangMacro = pp.getMacroInfo(clangID);
-    if (clangMacro)
-      if (auto valueDecl = Impl.importMacro(name, clangMacro))
-        results.push_back(valueDecl);
+    if (clangMacro) {
+      // Look for the value for an already-imported macro.
+      auto known = Impl.ImportedMacros.find(clangMacro);
+      if (known != Impl.ImportedMacros.end()) {
+        if (known->second) {
+          results.push_back(known->second);
+        }
+      } else {
+        // We haven't tried to import this macro yet. Do so now, and cache the
+        // result.
+        auto valueDecl = Impl.importMacro(name, clangMacro);
+        Impl.ImportedMacros[clangMacro] = valueDecl;
+        if (valueDecl) {
+          valueDecl->setClangNode(clangMacro);
+          results.push_back(valueDecl);
+        }
+      }
+    }
   }
 
   // Perform name lookup into the global scope.

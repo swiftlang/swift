@@ -541,7 +541,7 @@ Type ClangImporter::Implementation::importFunctionType(
       auto bodyVar
         = new (SwiftContext) VarDecl(importSourceLoc(param->getLocation()),
                                      bodyName, swiftParamTy, firstClangModule);
-      bodyVar->setClangDecl(param);
+      bodyVar->setClangNode(param);
       bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
     }
     bodyPattern->setType(swiftParamTy);
@@ -561,7 +561,7 @@ Type ClangImporter::Implementation::importFunctionType(
         auto argVar = new (SwiftContext) VarDecl(SourceLoc(), name,
                                                  swiftParamTy,
                                                  firstClangModule);
-        argVar->setClangDecl(param);
+        argVar->setClangNode(param);
         argPattern = new (SwiftContext) NamedPattern(argVar);
       }
       argPattern->setType(swiftParamTy);
