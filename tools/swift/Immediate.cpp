@@ -218,6 +218,7 @@ struct EditLineWrapper {
   bool NeedPromptContinuation;
   bool ShowColors;
   bool PromptedForLine;
+  bool Outdented;
   
   llvm::SmallString<80> PromptString;
 
@@ -234,6 +235,9 @@ struct EditLineWrapper {
     el_set(e, EL_CLIENTDATA, (void*)this);
     el_set(e, EL_HIST, history, h);
     el_set(e, EL_SIGNAL, 1);
+    el_set(e, EL_ADDFN, "swift-close-brace", "Reduce {} indentation level",
+           CloseBraceFn);
+    el_set(e, EL_BIND, "}", "swift-close-brace", NULL);
     HistEvent ev;
     history(h, &ev, H_SETSIZE, 800);
   }
@@ -269,6 +273,26 @@ struct EditLineWrapper {
 
     PromptedForLine = true;
     return PromptString.c_str();
+  }
+  
+  static unsigned char CloseBraceFn(EditLine *e, int ch) {
+    void *clientdata;
+    el_get(e, EL_CLIENTDATA, &clientdata);
+    return ((EditLineWrapper*)clientdata)->onCloseBrace(ch);
+  }
+  
+  unsigned char onCloseBrace(int ch) {
+    // Add the character to the string.
+    char s[2] = {(char)ch, 0};
+    el_insertstr(e, s);
+    
+    // If we didn't already outdent, do so.
+    if (!Outdented) {
+      if (PromptContinuationLevel > 0)
+        --PromptContinuationLevel;
+      Outdented = true;
+    }
+    return CC_REFRESH;
   }
 
   ~EditLineWrapper() {
@@ -363,6 +387,7 @@ void swift::REPL(ASTContext &Context) {
     e.PromptContinuationLevel = BraceCount;
     e.NeedPromptContinuation = BraceCount != 0 || HadLineContinuation;
     e.PromptedForLine = false;
+    e.Outdented = false;
     int LineCount;
     const char* Line = el_gets(e, &LineCount);
     if (!Line) {
