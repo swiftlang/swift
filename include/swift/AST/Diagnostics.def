@@ -825,6 +825,9 @@ ERROR(overload_base_decl,sema_tcd,none,
 // Type Check Expressions
 //------------------------------------------------------------------------------
 
+ERROR(requires_constraint_checker,sema_tce,none,
+      "this feature is unimplemented in the old type checker, please use -constraint-checker", ())
+
 NOTE(found_candidate,sema_tce,none,
      "found this candidate", ())
 NOTE(first_declaration,sema_tce,none,

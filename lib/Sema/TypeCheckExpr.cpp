@@ -988,7 +988,8 @@ public:
   }
     
   Expr *visitArrayExpr(ArrayExpr *E) {
-    llvm_unreachable("not implemented");
+    TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
+    return nullptr;
   }
 
   Expr *visitSubscriptExpr(SubscriptExpr *E) {
