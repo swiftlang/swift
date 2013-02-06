@@ -881,17 +881,18 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
       return;
     }
 
-    // As another special case, Clang functions don't get mangled at all.
-    // FIXME: When we can import C++, use Clang's mangler.
-    if (auto clangDecl = getDecl()->getClangDecl()) {
-      if (auto clangFunc = dyn_cast<clang::FunctionDecl>(clangDecl)) {
-        buffer << clangFunc->getName();
-        return;
-      }
-    }
     // Otherwise, fallthrough into the 'other decl' case.
 
   case Kind::Other:
+    // As a special case, Clang functions and globals don't get mangled at all.
+    // FIXME: When we can import C++, use Clang's mangler.
+    if (auto clangDecl = getDecl()->getClangDecl()) {
+      if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
+        buffer << namedClangDecl->getName();
+        return;
+      }
+    }
+
     buffer << "_T";
     if (isLocalLinkage()) buffer << 'L';
     mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
