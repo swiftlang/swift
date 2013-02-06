@@ -393,6 +393,7 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
   case ' ': case '\r': case '\n': case '\t': // whitespace
   case '(': case '[': case '{':              // opening delimiters
   case ',': case ';':                        // expression separators
+  case '\0':                                 // whitespace / last char in file
     return false;
 
   default:
@@ -407,7 +408,7 @@ static bool isRightBound(const char *tokEnd) {
   case ' ': case '\r': case '\n': case '\t': // whitespace
   case ')': case ']': case '}':              // closing delimiters
   case ',': case ';':                        // expression separators
-  case '\0':                                 // last character in file
+  case '\0':                                 // whitespace / last char in file
     return false;
 
   default:
@@ -733,9 +734,13 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
       
   // Simple single-character escapes.
   case '0': ++CurPtr; return '\0';
-  case 't': ++CurPtr; return '\t';
+  case 'a': ++CurPtr; return '\a';
+  case 'b': ++CurPtr; return '\b';
+  case 'f': ++CurPtr; return '\f';
   case 'n': ++CurPtr; return '\n';
   case 'r': ++CurPtr; return '\r';
+  case 't': ++CurPtr; return '\t';
+  case 'v': ++CurPtr; return '\v';
   case '"': ++CurPtr; return '"';
   case '\'': ++CurPtr; return '\'';
   case '\\': ++CurPtr; return '\\';

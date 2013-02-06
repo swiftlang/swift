@@ -350,15 +350,30 @@
   
   <pre class="grammar">
     character_literal ::= '[^'\\\n\r]|character_escape'
-    character_escape  ::= [\]0 [\][\] | [\]t | [\]n | [\]r | [\]" | [\]'
-    character_escape  ::= [\]x hex hex  
-    character_escape  ::= [\]u hex hex hex hex  
+    character_escape  ::= [\]0 [\][\] | [\]t | [\]v | [\]f | [\]n | [\]r | [\]a | [\]b | [\]" | [\]'
+    character_escape  ::= [\]x hex hex
+    character_escape  ::= [\]u hex hex hex hex
     character_escape  ::= [\]U hex hex hex hex hex hex hex hex
     hex               ::= [0-9a-fA-F]
   </pre>
   
   <p>character_literal tokens represent a single character, and are surrounded
   by single quotes.</p>
+
+  <p>The ASCII and Unicode character escapes:</p>
+  <pre>
+    \0 == nul
+    \a == bell
+    \b == backspace
+    \f == form feed / new page
+    \n == new line
+    \r == carriage return
+    \t == horizontal tab
+    \u == small Unicode code points
+    \U == large Unicode code points
+    \v == vertical tab
+    \x == raw ASCII byte (less than 0x80)
+  </pre>
 
   <!-- ===================================================================== -->
   <h3 id="string_literal">String Literals</h3>
