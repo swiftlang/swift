@@ -263,11 +263,15 @@ static void emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
 
 void IRGenModule::emitGlobalLists() {
   // Objective-C class references go in a variable with a meaningless
-  // name but a magic section. The usual magic section is "__objc_classlist",
-  // but because Swift instances can be allocated without going through the
-  // Objective-C runtime, we need to make sure that the classes are realized
-  // non-lazily.
+  // name but a magic section.
   emitGlobalList(*this, ObjCClasses, "objc_classes",
+                 "__DATA, __objc_classlist, regular, no_dead_strip",
+                 llvm::GlobalValue::InternalLinkage);
+
+  // FIXME: We also emit the class references in a second magic section to make
+  // sure they are "realized" by the Objective-C runtime before any instances
+  // are allocated.
+  emitGlobalList(*this, ObjCClasses, "objc_non_lazy_classes",
                  "__DATA, __objc_nlclslist, regular, no_dead_strip",
                  llvm::GlobalValue::InternalLinkage);
 
