@@ -17,6 +17,7 @@
 
 #include "ImporterImpl.h"
 #include "llvm/ADT/SmallString.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/Expr.h"
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Sema/Sema.h"
@@ -28,53 +29,11 @@
 
 using namespace swift;
 
-// FIXME: Use actual constants when we have those.
-static ValueDecl *makeConstantDeclForLiteralExpr(ASTContext &C,
-                                                 DeclContext *dc,
-                                                 Identifier name,
-                                                 Type literalTy,
-                                                 Expr *literalExpr) {
-  auto getterTy = FunctionType::get(TupleType::getEmpty(C),
-                                    literalTy, C);
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), literalExpr);
-  auto bodyStmt = BraceStmt::create(C,
-                                    SourceLoc(),
-                                    BraceStmt::ExprStmtOrDecl(returnStmt),
-                                    SourceLoc());
-  auto getterFunc = FuncExpr::create(C, SourceLoc(),
-                                     /*ArgParams*/ {}, /*BodyParams*/ {},
-                                     TypeLoc::withoutLoc(literalTy),
-                                     bodyStmt, dc);
-  auto getterFuncDecl = new (C) FuncDecl(SourceLoc(), SourceLoc(),
-                                         Identifier(),
-                                         SourceLoc(),
-                                         nullptr,
-                                         getterTy,
-                                         getterFunc,
-                                         dc);
-  auto varDecl = new (C) VarDecl(SourceLoc(),
-                                 name, literalTy, dc);
-  varDecl->setProperty(C, SourceLoc(),
-                       getterFuncDecl,
-                       /*setter=*/ nullptr,
-                       SourceLoc());
-  return varDecl;
-}
-
-static Expr *applySignExpr(ASTContext &C, Expr *literalExpr,
-                           clang::Token const *signTok) {
-  if (signTok && signTok->getKind() == clang::tok::minus) {
-    // FIXME: apply unary minus
-    return literalExpr;
-  }
-  return literalExpr;
-}
-
 static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
                                        Identifier name,
                                        clang::Token const *signTok,
                                        clang::Token const &tok) {
-  ASTContext &C = Impl.SwiftContext;
+  auto &clangContext = Impl.getClangASTContext();
   DeclContext *dc = Impl.firstClangModule;
   
   assert(tok.getKind() == clang::tok::numeric_constant &&
@@ -84,32 +43,28 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
   if (result.isUsable()) {
     clang::Expr *parsed = result.get();
     if (auto *integer = dyn_cast<clang::IntegerLiteral>(parsed)) {
-      // FIXME: preserve the original radix.
-      llvm::SmallString<8> value;
-      integer->getValue().toString(value, 10, /*Signed*/ true);
-      auto valueTextArray = C.AllocateCopy(value);
-      StringRef valueText(valueTextArray.data(), valueTextArray.size());
-      Expr *valueExpr = new (C) IntegerLiteralExpr(valueText, SourceLoc());
-      valueExpr = applySignExpr(C, valueExpr, signTok);
+      // Note: all integer literals are imported with type 'int'.
+      // FIXME: What if int is too small?
+      auto type = Impl.importType(clangContext.IntTy);
+      if (!type)
+        return nullptr;
 
-      // Synthesize a read-only Int property.
-      // FIXME: 'Int' might not be the most convenient type for C APIs.
-      auto intTy = Impl.getNamedSwiftType(Impl.getSwiftModule(), "Int");
-      return makeConstantDeclForLiteralExpr(C, dc, name, intTy, valueExpr);
+      llvm::APSInt value(integer->getValue(),
+                         integer->getType()->isUnsignedIntegerType());
+      return Impl.createConstant(name, dc, type, clang::APValue(value),
+                                 /*requiresCast=*/true);
     }
-    if (auto *floating = dyn_cast<clang::FloatingLiteral>(parsed)) {
-      // FIXME: preserve the original radix.
-      llvm::SmallString<8> value;
-      floating->getValue().toString(value, 10, /*Signed*/ true);
-      auto valueTextArray = C.AllocateCopy(value);
-      StringRef valueText(valueTextArray.data(), valueTextArray.size());
-      Expr *valueExpr = new (C) FloatLiteralExpr(valueText, SourceLoc());
-      valueExpr = applySignExpr(C, valueExpr, signTok);
 
-      // Synthesize a read-only Double property.
-      // FIXME: 'Double' might not be the best type.
-      auto doubleTy = Impl.getNamedSwiftType(Impl.getSwiftModule(), "Double");
-      return makeConstantDeclForLiteralExpr(C, dc, name, doubleTy, valueExpr);
+    if (auto *floating = dyn_cast<clang::FloatingLiteral>(parsed)) {
+      // Note: all integer literals are imported with type 'double'.
+      // FIXME: What if double is too small?
+      auto type = Impl.importType(clangContext.DoubleTy);
+      if (!type)
+        return nullptr;
+
+      return Impl.createConstant(name, dc, type,
+                                 clang::APValue(floating->getValue()),
+                                 /*requiresCast=*/true);
     }
     // TODO: Other numeric literals (complex, imaginary, etc.)
   }
