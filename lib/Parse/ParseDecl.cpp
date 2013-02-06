@@ -200,8 +200,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
       SourceLoc endLoc;
       parseMatchingToken(tok::r_paren, endLoc,
                          diag::byref_attribute_expected_rparen,
-                         beginLoc,
-                         diag::opening_paren);
+                         beginLoc);
     }
     
     // Verify that we're not combining this attribute incorrectly.  Cannot be
@@ -350,7 +349,7 @@ bool Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
 
   if (parseMatchingToken(tok::r_square, Attributes.RSquareLoc,
                          diag::expected_in_attribute_list,
-                         Attributes.LSquareLoc, diag::opening_bracket)) {
+                         Attributes.LSquareLoc)) {
     skipUntil(tok::r_square);
     consumeIf(tok::r_square);
     return true;
@@ -543,8 +542,7 @@ Decl *Parser::parseDeclExtension(unsigned Flags) {
       skipUntilDeclRBrace();
   }
 
-  parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_extension,
-                     LBLoc, diag::opening_brace);
+  parseMatchingToken(tok::r_brace, RBLoc,diag::expected_rbrace_extension,LBLoc);
 
   ED->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
 
@@ -772,8 +770,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
         // Look for the closing ')'.
         SourceLoc EndLoc;
         if (parseMatchingToken(tok::r_paren, EndLoc,
-                               diag::expected_rparen_setname,
-                               StartLoc, diag::opening_paren))
+                               diag::expected_rparen_setname, StartLoc))
           EndLoc = SetNameLoc;
         SetNameParens = SourceRange(StartLoc, EndLoc);
       } else {
@@ -908,7 +905,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
   }
 
   if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
-                         LBLoc, diag::opening_brace)) {
+                         LBLoc)) {
     RBLoc = LastValidLoc;
   }
   
@@ -1286,7 +1283,7 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   ScopeInfo.addToScope(OOD);
 
   if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_oneof_type,
-                         LBLoc, diag::opening_brace))
+                         LBLoc))
     return true;
 
   if (Flags & PD_DisallowNominalTypes) {
@@ -1376,8 +1373,7 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, Tok.getLoc() });
   ScopeInfo.addToScope(SD);
 
-  if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_struct,
-                         LBLoc, diag::opening_brace))
+  if (parseMatchingToken(tok::r_brace,RBLoc,diag::expected_rbrace_struct,LBLoc))
     return true;
 
   if (Flags & PD_DisallowNominalTypes) {
@@ -1474,8 +1470,7 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   CD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, Tok.getLoc() });
   ScopeInfo.addToScope(CD);
 
-  if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_class,
-                         LBLoc, diag::opening_brace))
+  if (parseMatchingToken(tok::r_brace, RBLoc,diag::expected_rbrace_class,LBLoc))
     return true;
 
   if (Flags & PD_DisallowNominalTypes) {
@@ -1660,7 +1655,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   }
 
   if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
-                         LBLoc, diag::opening_brace)) {
+                         LBLoc)) {
     RBLoc = LastValidLoc;
   }
 

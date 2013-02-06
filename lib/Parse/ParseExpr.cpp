@@ -525,8 +525,7 @@ NullablePtr<Expr> Parser::parseExprExplicitClosure() {
   
   SourceLoc RBLoc;
   if (parseMatchingToken(tok::r_brace, RBLoc,
-                         diag::expected_rbrace_in_closure,
-                         LBLoc, diag::opening_brace))
+                         diag::expected_rbrace_in_closure, LBLoc))
     RBLoc = Body.get()->getEndLoc();
 
   ThisClosure->setRBraceLoc(RBLoc);
@@ -643,10 +642,7 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
     if (parseMatchingToken(RightTok, RLoc,
                            RightTok == tok::r_paren
                            ? diag::expected_rparen_expr_list
-                           : diag::expected_rsquare_expr_list, LLoc,
-                           RightTok == tok::r_paren
-                           ? diag::opening_paren
-                           : diag::opening_bracket))
+                           : diag::expected_rsquare_expr_list, LLoc))
       return 0;
   }
 

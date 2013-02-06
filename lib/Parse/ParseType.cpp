@@ -119,8 +119,7 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
     SourceLoc LPLoc = consumeToken(), RPLoc;
     if (parseTypeTupleBody(LPLoc, Result) ||
         parseMatchingToken(tok::r_paren, RPLoc,
-                           diag::expected_rparen_tuple_type_list,
-                           LPLoc, diag::opening_paren))
+                           diag::expected_rparen_tuple_type_list, LPLoc))
       return true;
     break;
   }
@@ -448,8 +447,7 @@ bool Parser::parseTypeArray(TypeLoc &result) {
 
   SourceLoc rsquareLoc;
   if (parseMatchingToken(tok::r_square, rsquareLoc,
-                         diag::expected_rbracket_array_type,
-                         lsquareLoc, diag::opening_bracket))
+                         diag::expected_rbracket_array_type, lsquareLoc))
     return true;
 
   // If we're starting another square-bracket clause, recurse.

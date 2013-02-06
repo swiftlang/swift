@@ -260,8 +260,7 @@ NullablePtr<BraceStmt> Parser::parseStmtBrace(Diag<> ID) {
 
   parseBraceItemList(Entries, false /*NotTopLevel*/);
   if (parseMatchingToken(tok::r_brace, RBLoc,
-                         diag::expected_rbrace_in_brace_stmt,
-                         LBLoc, diag::opening_brace))
+                         diag::expected_rbrace_in_brace_stmt, LBLoc))
     return 0;
   
   return BraceStmt::create(Context, LBLoc, Entries, RBLoc);
@@ -431,8 +430,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc, SourceLoc LPLoc,
     return 0;
 
   if (LPLocConsumed && parseMatchingToken(tok::r_paren, RPLoc,
-                                          diag::expected_rparen_for_stmt,
-                                          LPLoc, diag::opening_paren))
+                                          diag::expected_rparen_for_stmt,LPLoc))
     return 0;
 
   if ((Body = parseStmtBrace(diag::expected_lbrace_after_for)).isNull())
