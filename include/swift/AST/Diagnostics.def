@@ -482,12 +482,14 @@ ERROR(expected_bracket_array_new,expr_parsing,none,
       "expected ']' in new expression", ())
 
 // Tuples and parenthesized expressions
-ERROR(expected_expr_parentheses,expr_parsing,none,
-      "expected subexpression in parentheses", ())
+ERROR(expected_expr_in_expr_list,expr_parsing,none,
+      "expected expression in list of expressions", ())
 ERROR(expected_equal_in_tuple_expr,expr_parsing,none,
       "expected '=' in tuple expression", ())
-ERROR(expected_rparen_parenthesis_expr,expr_parsing,none,
-      "expected ')' in parenthesis expression", ())
+ERROR(expected_rparen_expr_list,expr_parsing,none,
+      "expected ')' in expression list", ())
+ERROR(expected_rsquare_expr_list,expr_parsing,none,
+      "expected ']' in expression list", ())
 
 // Array literal expressions
 ERROR(expected_expr_array,expr_parsing,none,

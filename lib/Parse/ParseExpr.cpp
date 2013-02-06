@@ -178,7 +178,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
   if (bounds.empty()) {
     NullablePtr<Expr> Init;
     if (Tok.is(tok::l_paren_following)) {
-      Init = parseExprParen();
+      Init = parseExprList(tok::l_paren_following, tok::r_paren);
       if (Init.isNull())
         return nullptr;
     }
@@ -247,18 +247,11 @@ NullablePtr<Expr> Parser::parseExprSuper() {
     }
   } else if (Tok.is(tok::l_square_following)) {
     // super[expr]
-    SourceLoc lBraceLoc = consumeToken(tok::l_square_following);
-    NullablePtr<Expr> idx = parseExpr(diag::expected_expr_subscript_value);
-    SourceLoc rBraceLoc;
-    if (idx.isNull() ||
-        parseMatchingToken(tok::r_square, rBraceLoc,
-                           diag::expected_bracket_array_subscript,
-                           lBraceLoc, diag::opening_bracket))
+    NullablePtr<Expr> idx = parseExprList(tok::l_square_following,
+                                          tok::r_square);
+    if (idx.isNull())
       return 0;
-    
-    return new (Context) SuperSubscriptExpr(nullptr,
-                                            superLoc,
-                                            lBraceLoc, idx.get(), rBraceLoc);
+    return new (Context) SuperSubscriptExpr(nullptr, superLoc, idx.get());
   } else {
     diagnose(superLoc, diag::expected_dot_or_subscript_after_super);
     return nullptr;
@@ -358,7 +351,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
   }
 
   case tok::l_paren_starting:
-    Result = parseExprParen();
+    Result = parseExprList(tok::l_paren_starting, tok::r_paren);
     break;
 
   case tok::l_square_starting:
@@ -414,7 +407,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     // Check for a () suffix, which indicates a call.
     // Note that this cannot be a l_paren_starting.
     if (Tok.is(tok::l_paren_following)) {
-      NullablePtr<Expr> Arg = parseExprParen();
+      NullablePtr<Expr> Arg =parseExprList(tok::l_paren_following,tok::r_paren);
       if (Arg.isNull())
         return 0;
       Result = new (Context) CallExpr(Result.get(), Arg.get());
@@ -424,16 +417,11 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     // Check for a [expr] suffix.
     // Note that this cannot be a l_square_starting.
     if (Tok.is(tok::l_square_following)) {
-      SourceLoc LLoc = consumeToken();
-      NullablePtr<Expr> Idx = parseExpr(diag::expected_expr_subscript_value);
-      SourceLoc RLoc;
-      if (Idx.isNull() ||
-          parseMatchingToken(tok::r_square, RLoc,
-                             diag::expected_bracket_array_subscript,
-                             TokLoc, diag::opening_bracket))
+      NullablePtr<Expr> Idx = parseExprList(tok::l_square_following,
+                                            tok::r_square);
+      if (Idx.isNull())
         return 0;
-      
-      Result = new (Context) SubscriptExpr(Result.get(), LLoc, Idx.get(), RLoc);
+      Result = new (Context) SubscriptExpr(Result.get(), Idx.get());
       continue;
     }
 
@@ -486,7 +474,7 @@ Expr *Parser::parseExprStringLiteral() {
              "Didn't get an lparen before interpolated expression");
       Tok.setToken(tok::l_paren_starting, StringRef(Segment.Data.data()-1, 1));
       
-      NullablePtr<Expr> E = parseExprParen();
+      NullablePtr<Expr> E = parseExprList(tok::l_paren_starting, tok::r_paren);
       if (E.isNonNull()) {
         Exprs.push_back(E.get());
         
@@ -596,27 +584,30 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
 }
 
 
-/// parseExprParen - Parse a tuple expression.
+/// parseExprList - Parse a list of expressions.
 ///
-///   expr-paren: 
+///   expr-paren:
 ///     lparen-any ')'
 ///     lparen-any expr-paren-element (',' expr-paren-element)* ')'
 ///
 ///   expr-paren-element:
 ///     (identifier '=')? expr
 ///
-NullablePtr<Expr> Parser::parseExprParen(tok endTok,
-                                         Diag<> subErrorDiag,
-                                         Diag<> matchErrorDiag,
-                                         Diag<> otherNote) {
-  SourceLoc LPLoc = consumeToken();
-  
+///   expr-square:
+///     lsquare-any ']'
+///     lsquare-any expr-paren-element (',' expr-paren-element)* ']'
+///
+///   expr-square-element:
+///     (identifier '=')? expr
+///
+NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
+  SourceLoc LLoc = consumeToken(LeftTok);
+  SourceLoc RLoc;
+
   SmallVector<Expr*, 8> SubExprs;
   SmallVector<Identifier, 8> SubExprNames;
-  
-  SourceLoc RPLoc;
 
-  if (Tok.isNot(endTok)) {
+  if (Tok.isNot(RightTok)) {
     do {
       Identifier FieldName;
       // Check to see if there is a field specifier, like "x =".
@@ -633,8 +624,8 @@ NullablePtr<Expr> Parser::parseExprParen(tok endTok,
         SubExprNames.resize(SubExprs.size());
         SubExprNames.push_back(FieldName);
       }
-      
-      NullablePtr<Expr> SubExpr = parseExpr(subErrorDiag);
+
+      NullablePtr<Expr> SubExpr = parseExpr(diag::expected_expr_in_expr_list);
       if (SubExpr.isNull())
         return 0;
       SubExprs.push_back(SubExpr.get());
@@ -647,11 +638,15 @@ NullablePtr<Expr> Parser::parseExprParen(tok endTok,
   // interpolation context.  Just accept the ) and build the tuple as we usually
   // do.
   if (Tok.is(tok::eof) && Tok.getText()[0] == ')')
-    RPLoc = Tok.getLoc();
+    RLoc = Tok.getLoc();
   else {
-    if (parseMatchingToken(endTok, RPLoc,
-                           matchErrorDiag,
-                           LPLoc, otherNote))
+    if (parseMatchingToken(RightTok, RLoc,
+                           RightTok == tok::r_paren
+                           ? diag::expected_rparen_expr_list
+                           : diag::expected_rsquare_expr_list, LLoc,
+                           RightTok == tok::r_paren
+                           ? diag::opening_paren
+                           : diag::opening_bracket))
       return 0;
   }
 
@@ -666,32 +661,27 @@ NullablePtr<Expr> Parser::parseExprParen(tok endTok,
   // A tuple with a single, unlabelled element is just parentheses.
   if (SubExprs.size() == 1 &&
       (SubExprNames.empty() || SubExprNames[0].empty())) {
-    return new (Context) ParenExpr(LPLoc, SubExprs[0], RPLoc);
+    return new (Context) ParenExpr(LLoc, SubExprs[0], RLoc);
   }
-  
-  return new (Context) TupleExpr(LPLoc, NewSubExprs, NewSubExprsNames, RPLoc);
+
+  return new (Context) TupleExpr(LLoc, NewSubExprs, NewSubExprsNames, RLoc);
 }
 
 /// parseExprArray - Parse an array literal expression.
 ///
 ///   expr-array:
-///     lbracket-any ']'
-///     lbracket-any expr-paren-element (',' expr-paren-element)* ']'
+///     lsquare-starting ']'
+///     lsquare-starting expr-paren-element (',' expr-paren-element)* ']'
 NullablePtr<Expr> Parser::parseExprArray() {
-
-  NullablePtr<Expr> maybeSubExpr
-    = parseExprParen(tok::r_square,
-                     diag::expected_expr_array,
-                     diag::expected_rsquare_array_expr,
-                     diag::opening_bracket);
-  
-  if (maybeSubExpr.isNull())
+  NullablePtr<Expr> MaybeSubExpr = parseExprList(tok::l_square_starting,
+                                                 tok::r_square);
+  if (MaybeSubExpr.isNull())
     return nullptr;
-  Expr *subExpr = maybeSubExpr.get();
+  Expr *SubExpr = MaybeSubExpr.get();
   
-  return new (Context) ArrayExpr(subExpr->getStartLoc(),
-                                 subExpr,
-                                 subExpr->getEndLoc());
+  return new (Context) ArrayExpr(SubExpr->getStartLoc(),
+                                 SubExpr,
+                                 SubExpr->getEndLoc());
 }
 
 /// parseExprFunc - Parse a func expression.

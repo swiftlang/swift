@@ -310,11 +310,7 @@ public:
   Expr *parseExprIdentifier();
   NullablePtr<Expr> parseExprExplicitClosure();
   Expr *parseExprAnonClosureArg();
-  NullablePtr<Expr> parseExprParen(tok endTok = tok::r_paren,
-               Diag<> subErrorDiag = diag::expected_expr_parentheses,
-               Diag<> matchErrorDiag = diag::expected_rparen_parenthesis_expr,
-               Diag<> otherNote = diag::opening_paren);
-
+  NullablePtr<Expr> parseExprList(tok LeftTok, tok RightTok);
   NullablePtr<Expr> parseExprArray();
   NullablePtr<Expr> parseExprFunc();
   

@@ -5379,9 +5379,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       if (baseTy->isExistentialType()) {
         auto result
           = new (tc.Context) ExistentialSubscriptExpr(expr->getBase(),
-                                                      expr->getLBracketLoc(),
                                                       expr->getIndex(),
-                                                      expr->getRBracketLoc(),
                                                       subscript);
         return tc.semaSubscriptExpr(result);
       }
@@ -5390,9 +5388,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       if (baseTy->is<ArchetypeType>()) {
         auto result
           = new (tc.Context) ArchetypeSubscriptExpr(expr->getBase(),
-                                                    expr->getLBracketLoc(),
                                                     expr->getIndex(),
-                                                    expr->getRBracketLoc(),
                                                     subscript);
         return tc.semaSubscriptExpr(result);
       }
@@ -5401,9 +5397,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       if (baseTy->isSpecialized()) {
         auto result
           = new (tc.Context) GenericSubscriptExpr(expr->getBase(),
-                                                  expr->getLBracketLoc(),
                                                   expr->getIndex(),
-                                                  expr->getRBracketLoc(),
                                                   subscript);
         return tc.semaSubscriptExpr(result);
       }

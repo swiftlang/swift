@@ -154,7 +154,8 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
   MemberLookup Lookup(BaseTy, Context.getIdentifier("__subscript"), TU);
   
   if (!Lookup.isSuccess()) {
-    diagnose(SE->getLBracketLoc(), diag::no_subscript_declaration, BaseTy)
+    diagnose(SE->getIndex()->getStartLoc(),
+             diag::no_subscript_declaration, BaseTy)
       << SE->getBase()->getSourceRange();
     SE->setType(ErrorType::get(Context));
     return SE;
@@ -174,9 +175,7 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
       // appropriate AST node.
       return semaSubscriptExpr(
                new (Context) ExistentialSubscriptExpr(SE->getBase(),
-                                                      SE->getLBracketLoc(),
                                                       SE->getIndex(),
-                                                      SE->getRBracketLoc(),
                                                       Sub));
     }
     if (BaseTy->is<ArchetypeType>()) {
@@ -184,9 +183,7 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
       // appropriate AST node.
       return semaSubscriptExpr(
                new (Context) ArchetypeSubscriptExpr(SE->getBase(),
-                                                    SE->getLBracketLoc(),
                                                     SE->getIndex(),
-                                                    SE->getRBracketLoc(),
                                                     Sub));
     }
 
@@ -195,9 +192,7 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
       // appropriate AST node.
       return semaSubscriptExpr(
                new (Context) GenericSubscriptExpr(SE->getBase(),
-                                                  SE->getLBracketLoc(),
                                                   SE->getIndex(),
-                                                  SE->getRBracketLoc(),
                                                   Sub));
     }
 
@@ -208,7 +203,7 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
   
   // If there were no viable candidates, complain.
   if (Viable.empty()) {
-    diagnose(SE->getLBracketLoc(), diag::subscript_overload_fail,
+    diagnose(SE->getIndex()->getStartLoc(), diag::subscript_overload_fail,
              false, BaseTy, SE->getIndex()->getType())
       << SE->getBase()->getSourceRange() << SE->getIndex()->getSourceRange();
     printOverloadSetCandidates(Viable.empty()? LookupResults : Viable);
@@ -219,9 +214,7 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
   // Create an overloaded subscript expression; type coercion may be able to
   // resolve it.
   return OverloadedSubscriptExpr::createWithCopy(SE->getBase(), Viable,
-                                                 SE->getLBracketLoc(),
-                                                 SE->getIndex(),
-                                                 SE->getRBracketLoc());
+                                                 SE->getIndex());
 }
 
 /// collectArchetypeToExistentialSubstitutions - Collect a set of substitutions
@@ -296,7 +289,8 @@ Expr *TypeChecker::semaSubscriptExpr(ExistentialSubscriptExpr *E) {
   // FIXME: For now, we don't allow any associated types to show up. We
   // may relax this restriction later.
   if (!SubstIndexType->isEqual(IndexType)) {
-    diagnose(E->getLBracketLoc(), diag::existential_subscript_assoc_types,
+    diagnose(E->getIndex()->getStartLoc(),
+             diag::existential_subscript_assoc_types,
              Proto->getDeclaredType(), true, IndexType);
     diagnose(E->getDecl(), diag::subscript_decl_here);
     
@@ -328,7 +322,8 @@ Expr *TypeChecker::semaSubscriptExpr(ExistentialSubscriptExpr *E) {
   // FIXME: For now, we don't allow any associated types to show up. We
   // may relax this restriction later.
   if (!SubstValueType->isEqual(ValueType)) {
-    diagnose(E->getLBracketLoc(), diag::existential_subscript_assoc_types,
+    diagnose(E->getIndex()->getStartLoc(),
+             diag::existential_subscript_assoc_types,
              Proto->getDeclaredType(), false, ValueType);
     diagnose(E->getDecl(), diag::subscript_decl_here);
     ValueType = SubstValueType;

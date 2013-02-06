@@ -317,9 +317,7 @@ public:
       if (ContainerTy->isExistentialType()) {
         ExistentialSubscriptExpr *Result
           = new (TC.Context) ExistentialSubscriptExpr(E->getBase(),
-                                                      E->getLBracketLoc(),
                                                       E->getIndex(),
-                                                      E->getRBracketLoc(),
                                                       BestSub);
         return coerced(TC.semaSubscriptExpr(Result));
       }
@@ -327,24 +325,20 @@ public:
       if (ContainerTy->is<ArchetypeType>()) {
         ArchetypeSubscriptExpr *Result
           = new (TC.Context) ArchetypeSubscriptExpr(E->getBase(),
-                                                    E->getLBracketLoc(),
                                                     E->getIndex(),
-                                                    E->getRBracketLoc(),
                                                     BestSub);
         return coerced(TC.semaSubscriptExpr(Result));
       }
 
       SubscriptExpr *Result
-        = new (TC.Context) SubscriptExpr(E->getBase(), E->getLBracketLoc(),
-                                         E->getIndex(), E->getRBracketLoc(),
-                                         BestSub);
+        = new (TC.Context) SubscriptExpr(E->getBase(), E->getIndex(), BestSub);
       return coerced(TC.semaSubscriptExpr(Result));
     }
     
     if (!(Flags & CF_Apply))
       return nullptr;
     
-    diagnose(E->getLBracketLoc(), diag::subscript_overload_fail,
+    diagnose(E->getIndex()->getStartLoc(), diag::subscript_overload_fail,
              !Viable.empty(), BaseTy, E->getIndex()->getType())
       << E->getBase()->getSourceRange() << E->getIndex()->getSourceRange();
     TC.printOverloadSetCandidates(Viable);

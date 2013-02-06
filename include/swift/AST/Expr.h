@@ -844,13 +844,11 @@ public:
 /// be used to perform reads/writes.
 class SubscriptExpr : public Expr {
   SubscriptDecl *D;
-  SourceRange Brackets;
   Expr *Base;
   Expr *Index;
   
 public:
-  SubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
-                SourceLoc RBracketLoc, SubscriptDecl *D = 0);
+  SubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D = 0);
   
   /// getBase - Retrieve the base of the subscript expression, i.e., the
   /// value being indexed.
@@ -873,12 +871,9 @@ public:
     return D;
   }
   void setDecl(SubscriptDecl *D) { this->D = D; }
-  
-  SourceLoc getLBracketLoc() const { return Brackets.Start; }
-  SourceLoc getRBracketLoc() const { return Brackets.End; }
-  
+
   SourceRange getSourceRange() const {
-    return SourceRange(Base->getStartLoc(), Brackets.End);
+    return SourceRange(Base->getStartLoc(), Index->getEndLoc());
   }
   
   static bool classof(const Expr *E) {
@@ -891,15 +886,12 @@ public:
 class SuperSubscriptExpr : public Expr {
   SubscriptDecl *D;
   SourceLoc SuperLoc;
-  SourceRange Brackets;
   VarDecl *This;
   Expr *Index;
   
 public:
-  SuperSubscriptExpr(VarDecl *This,
-                     SourceLoc SuperLoc,
-                     SourceLoc LBracketLoc, Expr *Index,
-                     SourceLoc RBracketLoc, SubscriptDecl *D = 0);
+  SuperSubscriptExpr(VarDecl *This, SourceLoc SuperLoc,
+                     Expr *Index, SubscriptDecl *D = 0);
   
   /// getThis - Retrieve the 'this' decl to use as the base of the application.
   VarDecl *getThis() const { return This; }
@@ -921,12 +913,9 @@ public:
     return D;
   }
   void setDecl(SubscriptDecl *D) { this->D = D; }
-  
-  SourceLoc getLBracketLoc() const { return Brackets.Start; }
-  SourceLoc getRBracketLoc() const { return Brackets.End; }
-  
+
   SourceRange getSourceRange() const {
-    return SourceRange(SuperLoc, Brackets.End);
+    return SourceRange(SuperLoc, Index->getEndLoc());
   }
   
   static bool classof(const Expr *E) {
@@ -943,13 +932,11 @@ public:
 /// be used to perform reads/writes.
 class ExistentialSubscriptExpr : public Expr {
   SubscriptDecl *D;
-  SourceRange Brackets;
   Expr *Base;
   Expr *Index;
   
 public:
-  ExistentialSubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
-                           SourceLoc RBracketLoc, SubscriptDecl *D);
+  ExistentialSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D);
   
   /// getBase - Retrieve the base of the subscript expression, i.e., the
   /// value being indexed. This value has existential type.
@@ -965,12 +952,9 @@ public:
   /// operation refers to. 
   SubscriptDecl *getDecl() const { return D; }
   void setDecl(SubscriptDecl *D) { this->D = D; }
-  
-  SourceLoc getLBracketLoc() const { return Brackets.Start; }
-  SourceLoc getRBracketLoc() const { return Brackets.End; }
-  
+
   SourceRange getSourceRange() const {
-    return SourceRange(Base->getStartLoc(), Brackets.End);
+    return SourceRange(Base->getStartLoc(), Index->getEndLoc());
   }
   
   static bool classof(const Expr *E) {
@@ -982,13 +966,11 @@ public:
 /// an element within a container, where the container is an archetype.
 class ArchetypeSubscriptExpr : public Expr {
   SubscriptDecl *D;
-  SourceRange Brackets;
   Expr *Base;
   Expr *Index;
   
 public:
-  ArchetypeSubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
-                         SourceLoc RBracketLoc, SubscriptDecl *D);
+  ArchetypeSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D);
   
   /// getBase - Retrieve the base of the subscript expression, i.e., the
   /// value being indexed. This value has archetype type.
@@ -1004,12 +986,9 @@ public:
   /// operation refers to. 
   SubscriptDecl *getDecl() const { return D; }
   void setDecl(SubscriptDecl *D) { this->D = D; }
-  
-  SourceLoc getLBracketLoc() const { return Brackets.Start; }
-  SourceLoc getRBracketLoc() const { return Brackets.End; }
-  
+
   SourceRange getSourceRange() const {
-    return SourceRange(Base->getStartLoc(), Brackets.End);
+    return SourceRange(Base->getStartLoc(), Index->getEndLoc());
   }
   
   static bool classof(const Expr *E) {
@@ -1021,14 +1000,12 @@ public:
 /// an element within a container, where the container is a generic type.
 class GenericSubscriptExpr : public Expr {
   SubscriptDecl *D;
-  SourceRange Brackets;
   Expr *Base;
   Expr *Index;
   ArrayRef<Substitution> Substitutions;
 
 public:
-  GenericSubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
-                       SourceLoc RBracketLoc, SubscriptDecl *D);
+  GenericSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D);
   
   /// getBase - Retrieve the base of the subscript expression, i.e., the
   /// value being indexed. This value has generic type.
@@ -1054,11 +1031,8 @@ public:
 
   void setSubstitutions(ArrayRef<Substitution> S) { Substitutions = S; }
 
-  SourceLoc getLBracketLoc() const { return Brackets.Start; }
-  SourceLoc getRBracketLoc() const { return Brackets.End; }
-  
   SourceRange getSourceRange() const {
-    return SourceRange(Base->getStartLoc(), Brackets.End);
+    return SourceRange(Base->getStartLoc(), Index->getEndLoc());
   }
   
   static bool classof(const Expr *E) {
@@ -1074,16 +1048,13 @@ public:
 /// Instances of OverloadedSubscriptExpr are mapped down to SubscriptExpr
 /// instances by type-checking.
 class OverloadedSubscriptExpr : public Expr {
-  SourceRange Brackets;
   ArrayRef<ValueDecl *> Decls;
   Expr *Base;
   Expr *Index;
   
   OverloadedSubscriptExpr(Expr *Base, ArrayRef<ValueDecl *> Decls,
-                          SourceLoc LBracketLoc, Expr *Index,
-                          SourceLoc RBracketLoc, Type Ty)
-    : Expr(ExprKind::OverloadedSubscript, Ty),
-      Brackets(LBracketLoc, RBracketLoc), Decls(Decls), Base(Base),
+                          Expr *Index, Type Ty)
+    : Expr(ExprKind::OverloadedSubscript, Ty), Decls(Decls), Base(Base),
       Index(Index) { }
   
 public:
@@ -1091,24 +1062,20 @@ public:
   Expr *getIndex() const { return Index; }
   
   ArrayRef<ValueDecl *> getDecls() const { return Decls; }
-  
-  SourceLoc getLBracketLoc() const { return Brackets.Start; }
-  SourceLoc getRBracketLoc() const { return Brackets.End; }
-  
-  SourceLoc getLoc() const { return getLBracketLoc(); }
+
+  SourceLoc getLoc() const { return Index->getStartLoc(); }
   SourceLoc getStartLoc() const { return getBase()->getStartLoc(); }
-  SourceLoc getEndLoc() const { return getRBracketLoc(); }
+  SourceLoc getEndLoc() const { return Index->getEndLoc(); }
   
   SourceRange getSourceRange() const {
-    return SourceRange(getBase()->getStartLoc(), getRBracketLoc());
+    return SourceRange(getBase()->getStartLoc(), getEndLoc());
   }
   
   /// createWithCopy - Create and return a new OverloadedSubscriptExpr or a
   /// new SubscriptExpr (if the list of decls has a single entry) from the
   /// specified (non-empty) list of decls and with the given base/index.
   static Expr *createWithCopy(Expr *Base, ArrayRef<ValueDecl*> Decls,
-                              SourceLoc LBracketLoc, Expr *Index,
-                              SourceLoc RBracketLoc);
+                              Expr *Index);
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OverloadedSubscript;
@@ -1123,7 +1090,6 @@ public:
 /// instances by type-checking.
 class OverloadedSuperSubscriptExpr : public Expr {
   SourceLoc SuperLoc;
-  SourceRange Brackets;
   ArrayRef<ValueDecl *> Decls;
   ValueDecl *This;
   Expr *Index;
@@ -1133,8 +1099,7 @@ class OverloadedSuperSubscriptExpr : public Expr {
                                SourceLoc LBracketLoc, Expr *Index,
                                SourceLoc RBracketLoc, Type Ty)
     : Expr(ExprKind::OverloadedSuperSubscript, Ty),
-      SuperLoc(SuperLoc),
-      Brackets(LBracketLoc, RBracketLoc), Decls(Decls), This(This),
+      SuperLoc(SuperLoc), Decls(Decls), This(This),
       Index(Index) { }
   
 public:
@@ -1142,16 +1107,13 @@ public:
   Expr *getIndex() const { return Index; }
   
   ArrayRef<ValueDecl *> getDecls() const { return Decls; }
-  
-  SourceLoc getLBracketLoc() const { return Brackets.Start; }
-  SourceLoc getRBracketLoc() const { return Brackets.End; }
-  
-  SourceLoc getLoc() const { return getLBracketLoc(); }
+
+  SourceLoc getLoc() const { return Index->getStartLoc(); }
   SourceLoc getStartLoc() const { return SuperLoc; }
-  SourceLoc getEndLoc() const { return getRBracketLoc(); }
-  
+  SourceLoc getEndLoc() const { return Index->getEndLoc(); }
+
   SourceRange getSourceRange() const {
-    return SourceRange(SuperLoc, getRBracketLoc());
+    return SourceRange(SuperLoc, getEndLoc());
   }
   
   /// createWithCopy - Create and return a new OverloadedSubscriptExpr or a

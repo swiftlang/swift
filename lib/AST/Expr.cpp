@@ -240,10 +240,9 @@ SourceRange TupleExpr::getSourceRange() const {
   return SourceRange(Start, End);
 }
 
-SubscriptExpr::SubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
-                             SourceLoc RBracketLoc, SubscriptDecl *D)
+SubscriptExpr::SubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
   : Expr(ExprKind::Subscript, D? D->getElementType() : Type()),
-    D(D), Brackets(LBracketLoc, RBracketLoc), Base(Base), Index(Index) {
+    D(D), Base(Base), Index(Index) {
   assert((!D ||
           !D->getDeclContext()->getDeclaredTypeOfContext()->isExistentialType())
          && "use ExistentialSubscriptExpr for existential type subscript");
@@ -251,38 +250,33 @@ SubscriptExpr::SubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
 
 SuperSubscriptExpr::SuperSubscriptExpr(VarDecl *This,
                                        SourceLoc SuperLoc,
-                                       SourceLoc LBracketLoc, Expr *Index,
-                                       SourceLoc RBracketLoc,
+                                       Expr *Index,
                                        SubscriptDecl *D)
   : Expr(ExprKind::SuperSubscript, D ? D->getElementType() : Type()),
-    D(D), SuperLoc(SuperLoc), Brackets(LBracketLoc, RBracketLoc), This(This),
-    Index(Index)
+    D(D), SuperLoc(SuperLoc), This(This), Index(Index)
 {
 }
 
 ExistentialSubscriptExpr::
-ExistentialSubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
-                         SourceLoc RBracketLoc, SubscriptDecl *D)
+ExistentialSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
   : Expr(ExprKind::ExistentialSubscript, D? D->getElementType() : Type()),
-    D(D), Brackets(LBracketLoc, RBracketLoc), Base(Base), Index(Index) {
+    D(D), Base(Base), Index(Index) {
   assert(Base->getType()->getRValueType()->isExistentialType() &&
          "use SubscriptExpr for non-existential type subscript");
 }
 
 ArchetypeSubscriptExpr::
-ArchetypeSubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
-                       SourceLoc RBracketLoc, SubscriptDecl *D)
+ArchetypeSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
   : Expr(ExprKind::ArchetypeSubscript, D? D->getElementType() : Type()),
-    D(D), Brackets(LBracketLoc, RBracketLoc), Base(Base), Index(Index) {
+    D(D), Base(Base), Index(Index) {
   assert(Base->getType()->getRValueType()->is<ArchetypeType>() &&
          "use SubscriptExpr for non-archetype type subscript");
 }
 
 GenericSubscriptExpr::
-GenericSubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
-                     SourceLoc RBracketLoc, SubscriptDecl *D)
+GenericSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
   : Expr(ExprKind::GenericSubscript, D? D->getElementType() : Type()),
-    D(D), Brackets(LBracketLoc, RBracketLoc), Base(Base), Index(Index) {
+    D(D), Base(Base), Index(Index) {
   assert(Base->getType()->getRValueType()->is<BoundGenericType>() &&
          "use SubscriptExpr for non-generic type subscript");
 }
@@ -318,9 +312,7 @@ Expr *OverloadedSuperConstructorRefExpr::createWithCopy(Expr *Base,
 
 Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
                                               ArrayRef<ValueDecl*> Decls,
-                                              SourceLoc LBracketLoc,
-                                              Expr *Index,
-                                              SourceLoc RBracketLoc) {
+                                              Expr *Index) {
   assert(!Decls.empty() &&
          "Cannot create an overloaded member ref with no decls");
   ASTContext &C = Decls[0]->getASTContext();
@@ -328,26 +320,21 @@ Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
   if (Decls.size() == 1) {
     Type ContainerTy = Decls[0]->getDeclContext()->getDeclaredTypeOfContext();
     if (ContainerTy->isExistentialType())
-      return new (C) ExistentialSubscriptExpr(Base, LBracketLoc, Index,
-                                              RBracketLoc,
+      return new (C) ExistentialSubscriptExpr(Base, Index,
                                               cast<SubscriptDecl>(Decls[0]));
     if (ContainerTy->is<ArchetypeType>())
-      return new (C) ArchetypeSubscriptExpr(Base, LBracketLoc, Index,
-                                            RBracketLoc,
+      return new (C) ArchetypeSubscriptExpr(Base, Index,
                                             cast<SubscriptDecl>(Decls[0]));
 
     if (ContainerTy->isSpecialized())
-      return new (C) GenericSubscriptExpr(Base, LBracketLoc, Index,
-                                          RBracketLoc,
+      return new (C) GenericSubscriptExpr(Base, Index,
                                           cast<SubscriptDecl>(Decls[0]));
 
-    return new (C) SubscriptExpr(Base, LBracketLoc, Index, RBracketLoc,
-                                 cast<SubscriptDecl>(Decls[0]));
+    return new (C) SubscriptExpr(Base, Index, cast<SubscriptDecl>(Decls[0]));
   }
   
   // Otherwise, copy the overload set into the ASTContext's memory.
-  return new (C) OverloadedSubscriptExpr(Base, C.AllocateCopy(Decls),
-                                         LBracketLoc, Index, RBracketLoc,
+  return new (C) OverloadedSubscriptExpr(Base, C.AllocateCopy(Decls), Index,
                                          UnstructuredUnresolvedType::get(C));
 }
 
