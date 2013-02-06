@@ -195,6 +195,22 @@ void swift::RunImmediately(TranslationUnit *TU, SILModule *SILMod) {
   EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
 }
 
+/// An arbitrary, otherwise-unused char value that editline interprets as
+/// entering/leaving "literal mode", meaning it passes prompt characters through
+/// to the terminal without affecting the line state. This prevents color
+/// escape sequences from interfering with editline's internal state.
+static constexpr char LITERAL_MODE_CHAR = '\1';
+
+/// Append a terminal escape sequence in "literal mode" so that editline
+/// ignores it.
+static void appendEscapeSequence(SmallVectorImpl<char> &dest,
+                                 llvm::StringRef src)
+{
+  dest.push_back(LITERAL_MODE_CHAR);
+  dest.insert(dest.end(), src.begin(), src.end());
+  dest.push_back(LITERAL_MODE_CHAR);
+}
+
 struct EditLineWrapper {
   EditLine *e;
   History *h;
@@ -206,20 +222,15 @@ struct EditLineWrapper {
   llvm::SmallString<80> PromptString;
 
   EditLineWrapper() {
-    // Only show colors if both stderr and stdin are displayed.
-#if 0
-    // FIXME: Colors disabled until we can figure out why they interact badly
-    // with history.
+    // Only show colors if both stderr and stdout are displayed.
     ShowColors = llvm::errs().is_displayed() && llvm::outs().is_displayed();
-#else
-    ShowColors = false;
-#endif
+    llvm::errs() << "ShowColors = " << ShowColors << '\n';
 
     e = el_init("swift", stdin, stdout, stderr);
     h = history_init();
     PromptContinuationLevel = 0;
     el_set(e, EL_EDITOR, "emacs");
-    el_set(e, EL_PROMPT, PromptFn);
+    el_set(e, EL_PROMPT_ESC, PromptFn, LITERAL_MODE_CHAR);
     el_set(e, EL_CLIENTDATA, (void*)this);
     el_set(e, EL_HIST, history, h);
     el_set(e, EL_SIGNAL, 1);
@@ -240,7 +251,7 @@ struct EditLineWrapper {
       const char *colorCode =
         llvm::sys::Process::OutputColor(llvm::raw_ostream::YELLOW, false, false);
       if (colorCode)
-        PromptString = colorCode;
+        appendEscapeSequence(PromptString, colorCode);
     }
     
     if (!NeedPromptContinuation)
@@ -253,7 +264,7 @@ struct EditLineWrapper {
     if (ShowColors) {
       const char *colorCode = llvm::sys::Process::ResetColor();
       if (colorCode)
-        PromptString += colorCode;
+        appendEscapeSequence(PromptString, colorCode);
     }
 
     PromptedForLine = true;
