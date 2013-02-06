@@ -234,9 +234,17 @@ struct EditLineWrapper {
     el_set(e, EL_CLIENTDATA, (void*)this);
     el_set(e, EL_HIST, history, h);
     el_set(e, EL_SIGNAL, 1);
+    
+    // Provide special outdenting behavior for '}'.
     el_set(e, EL_ADDFN, "swift-close-brace", "Reduce {} indentation level",
-           CloseBraceFn);
+           BindingFn<&EditLineWrapper::onCloseBrace>);
     el_set(e, EL_BIND, "}", "swift-close-brace", NULL);
+    // Provide special indent/completion behavior for tab.
+    el_set(e, EL_ADDFN, "swift-indent-or-complete",
+           "Indent line or trigger completion",
+           BindingFn<&EditLineWrapper::onIndentOrComplete>);
+    el_set(e, EL_BIND, "\t", "swift-indent-or-complete", NULL);
+    
     HistEvent ev;
     history(h, &ev, H_SETSIZE, 800);
   }
@@ -274,10 +282,11 @@ struct EditLineWrapper {
     return PromptString.c_str();
   }
   
-  static unsigned char CloseBraceFn(EditLine *e, int ch) {
+  template<unsigned char (EditLineWrapper::*method)(int)>
+  static unsigned char BindingFn(EditLine *e, int ch) {
     void *clientdata;
     el_get(e, EL_CLIENTDATA, &clientdata);
-    return ((EditLineWrapper*)clientdata)->onCloseBrace(ch);
+    return (((EditLineWrapper*)clientdata)->*method)(ch);
   }
   
   unsigned char onCloseBrace(int ch) {
@@ -292,6 +301,31 @@ struct EditLineWrapper {
       Outdented = true;
     }
     return CC_REFRESH;
+  }
+  
+  unsigned char onIndentOrComplete(int ch) {
+    // If there's nothing but whitespace before the cursor, indent to the next
+    // 2-character tab stop.
+    LineInfo const *line = el_line(e);
+    
+    bool shouldIndent = true;
+    // FIXME: UTF-8? What's that?
+    size_t cursorPos = line->cursor - line->buffer;
+    for (char c : StringRef(line->buffer, cursorPos)) {
+      if (!isspace(c)) {
+        shouldIndent = false;
+        break;
+      }
+    }
+    
+    if (shouldIndent) {
+      char const *indent = cursorPos & 1 ? " " : "  ";
+      el_insertstr(e, indent);
+      return CC_REFRESH;
+    }
+    
+    // TODO: Otherwise, look for completions.
+    return CC_REFRESH_BEEP;
   }
 
   ~EditLineWrapper() {
