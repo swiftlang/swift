@@ -2284,18 +2284,42 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
       expr = new (context) FloatLiteralExpr(printedValueCopy, SourceLoc());
     }
 
+    if (!isNegative)
+      break;
+
     // If it was a negative number, negate the integer literal.
-#if 0
-    // FIXME: Have to look into the Swift module for this to work. UGH!
-    if (isNegative) {
-      auto minusName = context.getIdentifier("-");
-      auto minusRef = new (context) UnresolvedDeclRefExpr(
-                                                          minusName,
-                                                          DeclRefKind::PrefixOperator,
-                                                          SourceLoc());
-      expr = new (context) PrefixUnaryExpr(minusRef, expr);
+    auto minus = context.getIdentifier("-");
+    UnqualifiedLookup lookup(minus, getSwiftModule());
+    if (!lookup.isSuccess())
+      return nullptr;
+
+    Expr* minusRef;
+    SmallVector<ValueDecl *, 4> found;
+    for (auto &result : lookup.Results) {
+      if (!result.hasValueDecl())
+        continue;
+
+      if (!isa<FuncDecl>(result.getValueDecl()))
+        continue;
+
+      found.push_back(result.getValueDecl());
     }
-#endif
+
+    if (found.empty())
+      return nullptr;
+
+    if (found.size() == 1) {
+      minusRef = new (context) DeclRefExpr(found[0],
+                                           SourceLoc(),
+                                           found[0]->getTypeOfReference());
+    } else {
+      auto foundCopy = context.AllocateCopy(found);
+      minusRef = new (context) OverloadedDeclRefExpr(
+                                 foundCopy, SourceLoc(),
+                                 UnstructuredUnresolvedType::get(context));
+    }
+
+    expr = new (context) PrefixUnaryExpr(minusRef, expr);
     break;
   }
   }

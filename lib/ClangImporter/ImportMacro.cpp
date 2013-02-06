@@ -49,8 +49,15 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
       if (!type)
         return nullptr;
 
+      // Determine the value.
       llvm::APSInt value(integer->getValue(),
                          integer->getType()->isUnsignedIntegerType());
+
+      // If there was a - sign, negate the value.
+      if (signTok && signTok->getKind() == clang::tok::minus) {
+        value = -value;
+      }
+
       return Impl.createConstant(name, dc, type, clang::APValue(value),
                                  /*requiresCast=*/true);
     }
@@ -62,8 +69,14 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
       if (!type)
         return nullptr;
 
-      return Impl.createConstant(name, dc, type,
-                                 clang::APValue(floating->getValue()),
+      llvm::APFloat value = floating->getValue();
+
+      // If there was a - sign, negate the value.
+      if (signTok && signTok->getKind() == clang::tok::minus) {
+        value.changeSign();
+      }
+
+      return Impl.createConstant(name, dc, type, clang::APValue(value),
                                  /*requiresCast=*/true);
     }
     // TODO: Other numeric literals (complex, imaginary, etc.)
