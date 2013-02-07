@@ -92,13 +92,13 @@ ERROR(lex_unterminated_string,lexing,none,
       "unterminated string literal", ())
 ERROR(lex_unexpected_quote_string_interpolation,lexing,none,
       "unexpected '\"' character in string interpolation", ())
-ERROR(lex_invalid_string_escape,lexing,none,
-       "invalid escape sequence in string literal", ())
-ERROR(lex_invalid_string_x_escape,lexing,none,
+ERROR(lex_invalid_escape,lexing,none,
+       "invalid escape sequence in literal", ())
+ERROR(lex_invalid_x_escape,lexing,none,
        "\\x escape sequence expects 2 hex digits to follow it", ())
-ERROR(lex_invalid_string_u_escape,lexing,none,
+ERROR(lex_invalid_u_escape,lexing,none,
        "\\u escape sequence expects 4 hex digits to follow it", ())
-ERROR(lex_invalid_string_U_escape,lexing,none,
+ERROR(lex_invalid_U_escape,lexing,none,
        "\\U escape sequence expects 8 hex digits to follow it", ())
 ERROR(lex_invalid_unicode_code_point,lexing,none,
        "invalid unicode code point", ())

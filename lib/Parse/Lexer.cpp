@@ -729,7 +729,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
   // Escape processing.  We already ate the "\".
   switch (*CurPtr) {
   default:  // Invalid escape.
-    diagnose(CurPtr, diag::lex_invalid_string_escape);
+    diagnose(CurPtr, diag::lex_invalid_escape);
     return 0;
       
   // Simple single-character escapes.
@@ -748,7 +748,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
   case 'x':  //  \x HEX HEX
     if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2])) {
       if (EmitDiagnostics)
-        diagnose(CurPtr, diag::lex_invalid_string_x_escape);
+        diagnose(CurPtr, diag::lex_invalid_x_escape);
       return 0;
     }
     
@@ -766,7 +766,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
     if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2]) ||
         !isxdigit(CurPtr[3]) || !isxdigit(CurPtr[4])) {
       if (EmitDiagnostics)
-        diagnose(CurPtr, diag::lex_invalid_string_u_escape);
+        diagnose(CurPtr, diag::lex_invalid_u_escape);
       return 0;
     }
     
@@ -779,7 +779,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
         !isxdigit(CurPtr[5]) || !isxdigit(CurPtr[6]) || 
         !isxdigit(CurPtr[7]) || !isxdigit(CurPtr[8])) {
       if (EmitDiagnostics)
-        diagnose(CurPtr, diag::lex_invalid_string_U_escape);
+        diagnose(CurPtr, diag::lex_invalid_U_escape);
       return 0;
     }
     StringRef(CurPtr+1, 8).getAsInteger(16, CharValue);
@@ -957,9 +957,13 @@ void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
       continue;   // Invalid escape, ignore it.
           
       // Simple single-character escapes.
-    case 't': TempString += '\t'; continue;
+    case 'a': TempString += '\a'; continue;
+    case 'b': TempString += '\b'; continue;
+    case 'f': TempString += '\f'; continue;
     case 'n': TempString += '\n'; continue;
     case 'r': TempString += '\r'; continue;
+    case 't': TempString += '\t'; continue;
+    case 'v': TempString += '\v'; continue;
     case '"': TempString += '"'; continue;
     case '\'': TempString += '\''; continue;
     case '\\': TempString += '\\'; continue;
