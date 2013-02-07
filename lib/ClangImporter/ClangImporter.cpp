@@ -115,11 +115,11 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
     llvm::SmallString<128> DefaultModuleCache;
     llvm::sys::path::system_temp_directory(/*erasedOnReboot=*/false,
                                            DefaultModuleCache);
-    invocationArgStrs.push_back("-fmodule-cache-path");
-    invocationArgStrs.push_back(DefaultModuleCache.str());
+    invocationArgStrs.push_back("-fmodules-cache-path=");
+    invocationArgStrs.back().append(DefaultModuleCache.str());
   } else {
-    invocationArgStrs.push_back("-fmodule-cache-path");
-    invocationArgStrs.push_back(moduleCachePath.str());
+    invocationArgStrs.push_back("-fmodules-cache-path=");
+    invocationArgStrs.back().append(moduleCachePath.str());
   }
 
   // Figure out where Swift lives; since Clang is linked into Swift,
