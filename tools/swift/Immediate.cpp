@@ -521,8 +521,10 @@ void swift::REPL(ASTContext &Context) {
       return;
     }
 
+    size_t indent = e.PromptContinuationLevel*2;
+    memset(CurBuffer, ' ', indent);
+    CurBuffer += indent;
     size_t LineLen = strlen(Line);
-
     memcpy(CurBuffer, Line, LineLen);
 
     // Special-case backslash for line continuations in the REPL.
@@ -542,7 +544,7 @@ void swift::REPL(ASTContext &Context) {
     history(e.h, &ev, H_ENTER, CurBuffer);
 
     CurBuffer += LineLen;
-    CurBufferEndOffset += LineLen;
+    CurBufferEndOffset += LineLen + indent;
     ++CurChunkLines;
 
     // If we detect a line starting with a colon, treat it as a special
@@ -616,7 +618,7 @@ void swift::REPL(ASTContext &Context) {
                   if (searchedClangModule)
                     continue;
 
-                  searchedClangModule= true;
+                  searchedClangModule = true;
                 }
 
                 for (auto ext : impEntry.second->lookupExtensions(type)) {
