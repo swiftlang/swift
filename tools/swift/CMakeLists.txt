@@ -1,4 +1,5 @@
 add_swift_executable(swift
+  Completion.cpp
   Frontend.cpp
   Immediate.cpp
   PrintingDiagnosticConsumer.cpp

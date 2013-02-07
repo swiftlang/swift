@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Completion.h"
 #include "Immediate.h"
 #include "Frontend.h"
 #include "swift/Subsystems.h"
@@ -212,6 +213,8 @@ static void appendEscapeSequence(SmallVectorImpl<char> &dest,
 }
 
 struct EditLineWrapper {
+  TranslationUnit *TU;
+  
   EditLine *e;
   History *h;
   size_t PromptContinuationLevel;
@@ -219,10 +222,11 @@ struct EditLineWrapper {
   bool ShowColors;
   bool PromptedForLine;
   bool Outdented;
+  Completions completions;
   
   llvm::SmallString<80> PromptString;
 
-  EditLineWrapper() {
+  EditLineWrapper(TranslationUnit *TU) : TU(TU) {
     // Only show colors if both stderr and stdout are displayed.
     ShowColors = llvm::errs().is_displayed() && llvm::outs().is_displayed();
 
@@ -234,6 +238,7 @@ struct EditLineWrapper {
     el_set(e, EL_CLIENTDATA, (void*)this);
     el_set(e, EL_HIST, history, h);
     el_set(e, EL_SIGNAL, 1);
+    el_set(e, EL_GETCFN, GetCharFn);
     
     // Provide special outdenting behavior for '}'.
     el_set(e, EL_ADDFN, "swift-close-brace", "Reduce {} indentation level",
@@ -244,6 +249,10 @@ struct EditLineWrapper {
            "Indent line or trigger completion",
            BindingFn<&EditLineWrapper::onIndentOrComplete>);
     el_set(e, EL_BIND, "\t", "swift-indent-or-complete", NULL);
+
+    el_set(e, EL_ADDFN, "swift-complete",
+           "Trigger completion",
+           BindingFn<&EditLineWrapper::onComplete>);
     
     HistEvent ev;
     history(h, &ev, H_SETSIZE, 800);
@@ -280,6 +289,36 @@ struct EditLineWrapper {
 
     PromptedForLine = true;
     return PromptString.c_str();
+  }
+
+  /// Custom GETCFN to reset completion state after typing.
+  static int GetCharFn(EditLine *e, char *out) {
+    void* clientdata;
+    el_get(e, EL_CLIENTDATA, &clientdata);
+    EditLineWrapper *that = (EditLineWrapper*)clientdata;
+    
+    int c;
+    do {
+      c = getc(stdin);
+      if (c == EOF) {
+        if (feof(stdin)) {
+          out = '\0';
+          return 0;
+        }
+        if (ferror(stdin)) {
+          if (errno == EINTR)
+            continue;
+          out = '\0';
+          return -1;
+        }
+      }
+    } while (false);
+      
+    // If the user typed anything other than tab, reset the completion state.
+    if (c != '\t')
+      that->completions.reset();
+    *out = c;
+    return 1;
   }
   
   template<unsigned char (EditLineWrapper::*method)(int)>
@@ -324,8 +363,61 @@ struct EditLineWrapper {
       return CC_REFRESH;
     }
     
-    // TODO: Otherwise, look for completions.
-    return CC_REFRESH_BEEP;
+    // Otherwise, look for completions.
+    return onComplete(ch);
+  }
+  
+  void insertStringRef(StringRef s) {
+    if (s.empty())
+      return;
+    char cstr[s.size()+1];
+    memcpy(cstr, s.data(), s.size());
+    cstr[s.size()] = '\0';
+    el_insertstr(e, cstr);
+  }
+  
+  unsigned char onComplete(int ch) {
+    LineInfo const *line = el_line(e);
+    llvm::StringRef prefix(line->buffer, line->cursor - line->buffer);
+    if (!completions) {
+      // If we aren't currently working with a completion set, generate one.
+      completions = Completions(TU, prefix);
+      // Display the common root of the found completions and beep unless we
+      // found a unique one.
+      insertStringRef(completions.getRoot());
+      return completions.isUnique()
+        ? CC_REFRESH
+        : CC_REFRESH_BEEP;
+    }
+    
+    // Otherwise, advance through the completion state machine.
+    switch (completions.getState()) {
+    case CompletionState::CompletedRoot:
+      // We completed the root. Next step is to display the completion list.
+      // FIXME: Do the print-completions-below-the-prompt thing bash does.
+      llvm::outs() << '\n';
+      for (StringRef completion : completions.getCompletionList()) {
+        llvm::outs() << "  " << completion << '\n';
+      }
+      completions.setState(CompletionState::DisplayedCompletionList);
+      return CC_REDISPLAY;
+
+    case CompletionState::DisplayedCompletionList: {
+      // Complete the next completion stem in the cycle.
+      llvm::StringRef last = completions.getPreviousStem();
+      el_deletestr(e, last.size());
+      insertStringRef(completions.getNextStem());
+      return CC_REFRESH;
+    }
+    
+    case CompletionState::Empty:
+    case CompletionState::Unique:
+      // We already provided a definitive completion--nothing else to do.
+      return CC_REFRESH_BEEP;
+
+    case CompletionState::Invalid:
+      llvm_unreachable("got an invalid completion set?!");
+    }
   }
 
   ~EditLineWrapper() {
@@ -383,7 +475,7 @@ void swift::REPL(ASTContext &Context) {
   Options.OutputKind = irgen::OutputKind::Module;
   Options.UseJIT = true;
   
-  EditLineWrapper e;
+  EditLineWrapper e(TU);
 
   char* CurBuffer = const_cast<char*>(Buffer->getBufferStart());
   unsigned CurBufferOffset = 0;
