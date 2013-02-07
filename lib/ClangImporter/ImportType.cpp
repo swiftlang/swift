@@ -145,6 +145,7 @@ namespace {
       case clang::BuiltinType::OCLImage2dArray:
       case clang::BuiltinType::OCLImage3d:
       case clang::BuiltinType::OCLEvent:
+      case clang::BuiltinType::OCLSampler:
         return Type();
       }
     }
