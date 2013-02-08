@@ -20,7 +20,7 @@
 #include "swift/AST/NameLookup.h"
 #include "llvm/Support/raw_ostream.h"
 
-namespace swift {
+using namespace swift;
 
 static bool isIdentifier(char c) {
   return isalnum(c) || c == '_';
@@ -158,5 +158,3 @@ void Completions::reset() {
     completions.clear();
   }
 }
-  
-} // end namespace swift
