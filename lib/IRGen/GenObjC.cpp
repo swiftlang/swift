@@ -858,8 +858,18 @@ llvm::Constant *irgen::emitObjCMethodDescriptor(IRGenModule &IGM,
   /// The first element is the selector.
   auto selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
 
-  /// The second element is the type @encoding.  Leave this null for now.
-  auto atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  /// The second element is the type @encoding. Handle some simple cases, and
+  /// leave the rest as null for now.
+  llvm::Constant *atEncoding;
+  AnyFunctionType *methodType = method->getType()->castTo<AnyFunctionType>();
+  // Account for the 'this' pointer being curried.
+  methodType = methodType->getResult()->castTo<AnyFunctionType>();
+
+  if (methodType->getResult()->getClassOrBoundGenericClass() &&
+      methodType->getInput()->isEqual(TupleType::getEmpty(IGM.Context)))
+    atEncoding = IGM.getAddrOfGlobalString("@@:");
+  else
+    atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
   /// The third element is the method implementation pointer.
   auto impl = getObjCMethodPointer(IGM, selector, method);
