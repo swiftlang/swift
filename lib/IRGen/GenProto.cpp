@@ -3365,8 +3365,7 @@ Address irgen::emitExistentialContainerInit(IRGenFunction &IGF,
   auto &destTI = IGF.getFragileTypeInfo(destType).as<ExistentialTypeInfo>();
   const TypeInfo &srcTI = IGF.getFragileTypeInfo(srcType);
   ExistentialLayout destLayout = destTI.getLayout();
-  ArrayRef<ProtocolEntry> destEntries = destTI.getProtocols();
-  assert(destEntries.size() == conformances.size());
+  assert(destTI.getProtocols().size() == conformances.size());
   
   assert(!srcType->isExistentialType() &&
          "SIL existential-to-existential erasure not yet supported");

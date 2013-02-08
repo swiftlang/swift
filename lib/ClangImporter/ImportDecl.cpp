@@ -711,9 +711,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      // Figure out the type of the container.
-      auto containerTy = dc->getDeclaredTypeOfContext();
-      assert(containerTy && "Method in non-type context?");
+      assert(dc->getDeclaredTypeOfContext() && "Method in non-type context?");
 
       // Add the implicit 'this' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;

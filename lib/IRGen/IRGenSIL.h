@@ -177,6 +177,7 @@ public:
     assert(v.getType().isAddress() && "address for non-address value?!");
     auto inserted = loweredValues.insert({v, address});
     assert(inserted.second && "already had lowered value for sil value?!");
+    (void)inserted;
   }
   
   /// Create a new Explosion corresponding to the given SIL value.
