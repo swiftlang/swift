@@ -302,13 +302,13 @@ struct EditLineWrapper {
       c = getc(stdin);
       if (c == EOF) {
         if (feof(stdin)) {
-          out = '\0';
+          *out = '\0';
           return 0;
         }
         if (ferror(stdin)) {
           if (errno == EINTR)
             continue;
-          out = '\0';
+          *out = '\0';
           return -1;
         }
       }
@@ -370,10 +370,10 @@ struct EditLineWrapper {
   void insertStringRef(StringRef s) {
     if (s.empty())
       return;
-    char cstr[s.size()+1];
-    memcpy(cstr, s.data(), s.size());
-    cstr[s.size()] = '\0';
-    el_insertstr(e, cstr);
+    // Ensure that s is null terminated for el_insertstr.
+    SmallVector<char, 64> TmpStr(s.begin(), s.end());
+    TmpStr.push_back('\0');
+    el_insertstr(e, TmpStr.data());
   }
   
   unsigned char onComplete(int ch) {
