@@ -716,7 +716,6 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
   case 'n': ++CurPtr; return '\n';
   case 'r': ++CurPtr; return '\r';
   case 't': ++CurPtr; return '\t';
-  case 'v': ++CurPtr; return '\v';
   case '"': ++CurPtr; return '"';
   case '\'': ++CurPtr; return '\'';
   case '\\': ++CurPtr; return '\\';
@@ -939,7 +938,6 @@ void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
     case 'n': TempString += '\n'; continue;
     case 'r': TempString += '\r'; continue;
     case 't': TempString += '\t'; continue;
-    case 'v': TempString += '\v'; continue;
     case '"': TempString += '"'; continue;
     case '\'': TempString += '\''; continue;
     case '\\': TempString += '\\'; continue;

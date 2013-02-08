@@ -344,7 +344,7 @@
   
   <pre class="grammar">
     character_literal ::= '[^'\\\n\r]|character_escape'
-    character_escape  ::= [\]0 [\][\] | [\]t | [\]v | [\]f | [\]n | [\]r | [\]a | [\]b | [\]" | [\]'
+    character_escape  ::= [\]0 [\][\] | [\]t | [\]f | [\]n | [\]r | [\]a | [\]b | [\]" | [\]'
     character_escape  ::= [\]x hex hex
     character_escape  ::= [\]u hex hex hex hex
     character_escape  ::= [\]U hex hex hex hex hex hex hex hex
@@ -365,7 +365,6 @@
     \t == horizontal tab
     \u == small Unicode code points
     \U == large Unicode code points
-    \v == vertical tab
     \x == raw ASCII byte (less than 0x80)
   </pre>
 
