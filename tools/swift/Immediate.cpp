@@ -243,16 +243,22 @@ struct EditLineWrapper {
     // Provide special outdenting behavior for '}'.
     el_set(e, EL_ADDFN, "swift-close-brace", "Reduce {} indentation level",
            BindingFn<&EditLineWrapper::onCloseBrace>);
-    el_set(e, EL_BIND, "}", "swift-close-brace", NULL);
+    el_set(e, EL_BIND, "}", "swift-close-brace", nullptr);
     // Provide special indent/completion behavior for tab.
     el_set(e, EL_ADDFN, "swift-indent-or-complete",
            "Indent line or trigger completion",
            BindingFn<&EditLineWrapper::onIndentOrComplete>);
-    el_set(e, EL_BIND, "\t", "swift-indent-or-complete", NULL);
+    el_set(e, EL_BIND, "\t", "swift-indent-or-complete", nullptr);
 
     el_set(e, EL_ADDFN, "swift-complete",
            "Trigger completion",
            BindingFn<&EditLineWrapper::onComplete>);
+    
+    // Provide some common bindings to complement editline's defaults.
+    // ^W should delete previous word, not the entire line.
+    el_set(e, EL_BIND, "\x17", "ed-delete-prev-word", nullptr);
+    // ^_ should undo.
+    el_set(e, EL_BIND, "\x1f", "vi-undo", nullptr);
     
     HistEvent ev;
     history(h, &ev, H_SETSIZE, 800);
