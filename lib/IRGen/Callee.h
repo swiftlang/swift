@@ -180,13 +180,14 @@ namespace irgen {
 
     /// Prepare a callee for a known freestanding function that
     /// requires no data pointer.
-    static Callee forFreestandingFunction(CanType origFormalType,
+    static Callee forFreestandingFunction(AbstractCC cc,
+                                          CanType origFormalType,
                                           CanType substResultType,
                                           ArrayRef<Substitution> subs,
                                           llvm::Constant *fn,
                                           ExplosionKind explosionLevel,
                                           unsigned uncurryLevel) {
-      return forKnownFunction(AbstractCC::Freestanding,
+      return forKnownFunction(cc,
                               origFormalType, substResultType, subs,
                               fn, ManagedValue(nullptr),
                               explosionLevel, uncurryLevel);

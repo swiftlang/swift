@@ -2146,7 +2146,8 @@ namespace {
       // function and do all our own translation.
       // FIXME: virtual calls!
       CallEmission emission(IGF,
-          Callee::forFreestandingFunction(ImplTy,
+          Callee::forFreestandingFunction(AbstractCC::Freestanding,
+                                          ImplTy,
                                           argSites.back().getImplResultType(),
                                           ArrayRef<Substitution>(),
                                           ImplPtr,

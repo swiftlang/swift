@@ -310,14 +310,15 @@ namespace {
   /// The type-info class.
   class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, FixedTypeInfo> {
     /// Each possible currying of a function type has different function
-    /// type variants along each of two orthogonal axes:
+    /// type variants along each of three orthogonal axes:
+    ///   - the calling convention
     ///   - the explosion kind desired
     ///   - whether a data pointer argument is required
     struct Currying {
-      Signature Signatures[2][3];
+      Signature Signatures[3][2][3];
 
-      Signature &select(ExplosionKind kind, ExtraData extraData) {
-        return Signatures[unsigned(kind)][unsigned(extraData)];
+      Signature &select(AbstractCC cc, ExplosionKind kind, ExtraData extraData) {
+        return Signatures[unsigned(cc)][unsigned(kind)][unsigned(extraData)];
       }
     };
 
@@ -529,9 +530,10 @@ static void addByvalArgumentAttributes(IRGenModule &IGM,
 }
 
 static void decomposeFunctionArg(IRGenModule &IGM, CanType argTy,
-                                 AbstractCC cc, ExplosionKind explosionKind,
-                                 SmallVectorImpl<llvm::Type*> &argTypes,
-                                 llvm::AttributeSet &attrs) {
+                       AbstractCC cc, ExplosionKind explosionKind,
+                       SmallVectorImpl<llvm::Type*> &argTypes,
+                       SmallVectorImpl<std::pair<unsigned, Alignment>> &byvals,
+                       llvm::AttributeSet &attrs) {
   if (cc == AbstractCC::C && requiresExternalByvalArgument(IGM, argTy)) {
     const TypeInfo &ti = IGM.getFragileTypeInfo(argTy);
     llvm::Constant *alignConstant = ti.getStaticAlignment(IGM);
@@ -539,8 +541,7 @@ static void decomposeFunctionArg(IRGenModule &IGM, CanType argTy,
     size_t alignValue = alignConstant
       ? alignConstant->getUniqueInteger().getZExtValue()
       : 1;
-    Alignment align(alignValue);
-    addByvalArgumentAttributes(IGM, attrs, argTypes.size(), align);
+    byvals.push_back({argTypes.size(), Alignment(alignValue)});
     argTypes.push_back(ti.getStorageType()->getPointerTo());
   } else {
     auto schema = IGM.getSchema(argTy, explosionKind);
@@ -569,11 +570,12 @@ static void decomposeFunctionArg(IRGenModule &IGM, CanType argTy,
 /// This is all somewhat optimized for register-passing CCs; it
 /// probably makes extra work when the stack gets involved.
 static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
-                                     AbstractCC cc,
-                                     ExplosionKind explosionKind,
-                                     unsigned uncurryLevel,
-                                     SmallVectorImpl<llvm::Type*> &argTypes,
-                                     llvm::AttributeSet &attrs) {
+                       AbstractCC cc,
+                       ExplosionKind explosionKind,
+                       unsigned uncurryLevel,
+                       SmallVectorImpl<llvm::Type*> &argTypes,
+                       SmallVectorImpl<std::pair<unsigned, Alignment>> &byvals,
+                       llvm::AttributeSet &attrs) {
   auto fn = cast<AnyFunctionType>(type);
 
   // Save up the formal parameter types in reverse order.
@@ -590,11 +592,11 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
     if (TupleType *tupleTy = inputTy->getAs<TupleType>()) {
       for (auto &field : tupleTy->getFields()) {
         decomposeFunctionArg(IGM, CanType(field.getType()), cc, explosionKind,
-                             argTypes, attrs);
+                             argTypes, byvals, attrs);
       }
     } else {
       decomposeFunctionArg(IGM, inputTy, cc, explosionKind,
-                           argTypes, attrs);
+                           argTypes, byvals, attrs);
     }
     
     if (auto polyTy = dyn_cast<PolymorphicFunctionType>(fnTy))
@@ -612,7 +614,7 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
   // Compute a reference to the appropriate signature cache.
   assert(uncurryLevel < getNumCurries(FormalType));
   Currying &currying = getCurryingsBuffer()[uncurryLevel];
-  Signature &signature = currying.select(explosionKind, extraData);
+  Signature &signature = currying.select(cc, explosionKind, extraData);
 
   // If it's already been filled in, we're done.
   if (signature.isValid())
@@ -623,11 +625,13 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
   // The argument types.
   // Save a slot for the aggregate return.
   SmallVector<llvm::Type*, 16> argTypes;
+  SmallVector<std::pair<unsigned, Alignment>, 16> byvals;
   argTypes.push_back(nullptr);
 
   CanType formalResultType = decomposeFunctionType(IGM, CanType(FormalType),
                                                    cc, explosionKind,
-                                                   uncurryLevel, argTypes,
+                                                   uncurryLevel,
+                                                   argTypes, byvals,
                                                    attrs);
 
   // Compute the result type.
@@ -647,6 +651,15 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
     } else {
       resultType = schema.getScalarResultType(IGM);
     }
+  }
+  
+  // Apply 'byval' argument attributes.
+  for (auto &byval : byvals) {
+    // If we didn't have an indirect result, the indices will be off-by-one
+    // because of the argument we reserved for it and didn't use.
+    addByvalArgumentAttributes(IGM, attrs,
+                               hasAggregateResult ? byval.first : byval.first-1,
+                               byval.second);
   }
 
   // Data arguments are last.
@@ -687,6 +700,8 @@ IRGenModule::getFunctionType(AbstractCC cc,
 AbstractCC irgen::getAbstractCC(ValueDecl *fn) {
   if (fn->isInstanceMember())
     return AbstractCC::Method;
+  if (fn->hasClangNode())
+    return AbstractCC::C;
   return AbstractCC::Freestanding;
 }
 
@@ -799,7 +814,8 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
       fnPtr = IGF.IGM.getAddrOfConstructor(ctor, ConstructorKind::Allocating,
                                            bestExplosion);
     }
-    return Callee::forFreestandingFunction(ctor->getType()->getCanonicalType(),
+    return Callee::forFreestandingFunction(AbstractCC::Freestanding,
+                                           ctor->getType()->getCanonicalType(),
                                            substResultType, subs, fnPtr,
                                            bestExplosion, bestUncurry);
   }
@@ -817,7 +833,8 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
     } else {
       fnPtr = IGF.IGM.getAddrOfInjectionFunction(oneofelt);
     }
-    return Callee::forFreestandingFunction(oneofelt->getType()->getCanonicalType(),
+    return Callee::forFreestandingFunction(AbstractCC::Freestanding,
+                                           oneofelt->getType()->getCanonicalType(),
                                            substResultType, subs, fnPtr,
                                            bestExplosion, bestUncurry);
   }
@@ -831,7 +848,8 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
                                substResultType, subs, fnPtr,
                                bestExplosion, bestUncurry);
     } else {
-      return Callee::forFreestandingFunction(fn->getType()->getCanonicalType(),
+      return Callee::forFreestandingFunction(getAbstractCC(fn),
+                                             fn->getType()->getCanonicalType(),
                                              substResultType, subs, fnPtr,
                                              bestExplosion, bestUncurry);
     }
@@ -878,7 +896,8 @@ static Callee emitSuperConstructorCallee(IRGenFunction &IGF,
                                          ConstructorKind::Initializing,
                                          bestExplosion);
   }
-  return Callee::forFreestandingFunction(ctor->getType()->getCanonicalType(),
+  return Callee::forFreestandingFunction(AbstractCC::Method,
+                                         ctor->getType()->getCanonicalType(),
                                          substResultType, subs, fnPtr,
                                          bestExplosion, bestUncurry);
 }
@@ -2668,7 +2687,7 @@ void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
     I.markAllocated(IGF, object, addr, CleanupsDepth::invalid());
     ti.initialize(IGF, in, addr.getAddress());
     I.markInitialized(IGF, object);
-
+    
     addByvalArgumentAttributes(IGF.IGM, Attrs,
                                Args.size() - LastArgWritten + out.size(),
                                addr.getAlignment());
