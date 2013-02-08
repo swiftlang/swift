@@ -319,28 +319,22 @@
   <!-- ===================================================================== -->
   <h3 id="floating_literal">Floating Point Literals</h3>
   <!-- ===================================================================== -->
-  
-  <div class="commentary">
-    We require a digit after a dot to allow lexing "4.km" as "4 . km" instead of
-    "4. km".  The regex for decimal literals is same as Java's, and the one for
-    hex literals is the same as C99's, except that we do not allow "4." and
-    do not allow a trailing suffix that specifies a precision.
 
-    <br><br><b>FIXME:</b>
-    Should we allow float literals without a digit in front of the dot?
-    Our public SDKs show that normal float literals outnumber "dot floats"
-    933.5 to 1. And if we do not allow dot float literals, then '.' can behave
-    like a normal operator character, unlike today where we limit '.' as an
-    operator to a series of '.' characters.
+  <div class="commentary">
+    We require a digit on both sides of the dot to allow lexing "4.km" as
+    "4 . km" instead of "4. km" and for a series of dots to be an operator (for
+    ranges).  The regex for decimal literals is same as Java, and the one for
+    hex literals is the same as C99, except that we do not allow a trailing
+    suffix that specifies a precision.
   </div>
-  
+
   <pre class="grammar">
     floating_literal ::= [0-9]+\.[0-9]+
-    floating_literal ::= [0-9]+(\.[0-9]*)?[eE][+-]?[0-9]+
-    floating_literal ::= \.[0-9]+([eE][+-]?[0-9]+)?
+    floating_literal ::= [0-9]+\.[0-9]+[eE][+-]?[0-9]+
+    floating_literal ::= [0-9]+[eE][+-]?[0-9]+
     floating_literal ::= 0x[0-9A-Fa-f]+(\.[0-9A-Fa-f]+)?[pP][+-]?[0-9]+
   </pre>
-  
+
   <p>floating_literal tokens represent floating point values of unspecified
   precision. Decimal and hexadecimal floating-point literals are supported.</p>
   

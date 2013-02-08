@@ -450,11 +450,6 @@ void Lexer::lexOperatorIdentifier() {
         break;
       return formToken(tok::make_ref, TokStart);
     case '.':
-      // Parsing the '.' in ".5" in "3.14*.5" breaks the rules we have for
-      // operators. It becomes a false-positive binary operator given our
-      // simple left bound versus right bound rule.
-      if (isdigit(CurPtr[0]) && isStartingToken(TokStart))
-        return lexNumber();
       if (leftBound == rightBound)
         return formToken(tok::period, TokStart);
       if (rightBound)
@@ -514,22 +509,6 @@ void Lexer::lexDollarIdent() {
     ++CurPtr;
   
   return formStartingToken(tok::dollarident, TokStart);
-}
-
-
-// Return true if the string starts with "[eE][+-][0-9]"
-static bool isValidExponent(const char *P) {
-  if (*P != 'e' && *P != 'E')
-    return false;
-  ++P;
-  if (*P != '+' && *P != '-')
-    return false;
-  ++P;
-  return isdigit(*P);
-}
-
-static bool isxdigit(char c) {
-  return isdigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
 void Lexer::lexHexNumber() {
@@ -593,8 +572,8 @@ void Lexer::lexHexNumber() {
 ///   integer_literal  ::= 0o[0-7]+
 ///   integer_literal  ::= 0b[01]+
 ///   floating_literal ::= [0-9]+\.[0-9]+
-///   floating_literal ::= [0-9]+(\.[0-9]*)?[eE][+-]?[0-9]+
-///   floating_literal ::= \.[0-9]+([eE][+-]?[0-9]+)?
+///   floating_literal ::= [0-9]+\.[0-9]+[eE][+-]?[0-9]+
+///   floating_literal ::= [0-9][eE][+-]?[0-9]+
 ///   floating_literal ::= 0x[0-9A-Fa-f]+(\.[0-9A-Fa-f]+)?[pP][+-]?[0-9]+
 void Lexer::lexNumber() {
   const char *TokStart = CurPtr-1;
@@ -624,25 +603,22 @@ void Lexer::lexNumber() {
     return formStartingToken(tok::integer_literal, TokStart);
   }
 
-  // Handle the leading character here as well.
-  --CurPtr;
-
   // Handle a leading [0-9]+, lexing an integer or falling through if we have a
   // floating point value.
-  if (isdigit(*CurPtr)) {
-    while (isdigit(*CurPtr))
-      ++CurPtr;
-    
+  while (isdigit(*CurPtr))
+    ++CurPtr;
+
+  // Lex things like 4.x as '4' followed by a tok::period.
+  if (*CurPtr == '.') {
+    if (!isdigit(CurPtr[1]))
+      return formStartingToken(tok::integer_literal, TokStart);
+  } else {
     // Floating literals must have '.', 'e', or 'E' after digits.  If it is
     // something else, then this is the end of the token.
-    if (*CurPtr != '.' && *CurPtr != 'e' && *CurPtr != 'E')
-      return formStartingToken(tok::integer_literal, TokStart);
-    
-    // Lex things like 4.x as '4' followed by a tok::period.
-    if (*CurPtr == '.' && !isdigit(CurPtr[1]) && !isValidExponent(CurPtr+1))
+    if (*CurPtr != 'e' && *CurPtr != 'E')
       return formStartingToken(tok::integer_literal, TokStart);
   }
-  
+
   // Lex decimal point.
   if (*CurPtr == '.') {
     ++CurPtr;
