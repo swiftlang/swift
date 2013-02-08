@@ -193,5 +193,7 @@ const Metadata *swift::swift_getObjectType(id object) {
 }
 
 extern "C" bool swift_comparePointers(id x, id y) {
+  [x release];
+  [y release];
   return x == y;
 }
