@@ -39,6 +39,7 @@ namespace llvm {
   class StructType;
   class StringRef;
   class Type;
+  class AttributeSet;
 }
 
 namespace swift {
@@ -301,9 +302,11 @@ public:
   
   void emitSILConstant(SILConstant c, swift::Function *f);
 
-  llvm::FunctionType *getFunctionType(CanType fnType, ExplosionKind kind,
+  llvm::FunctionType *getFunctionType(AbstractCC cc,
+                                      CanType fnType, ExplosionKind kind,
                                       unsigned uncurryLevel,
-                                      ExtraData data);
+                                      ExtraData data,
+                                      llvm::AttributeSet &attrs);
 
   FormalType getTypeOfGetter(ValueDecl *D);
   FormalType getTypeOfSetter(ValueDecl *D);

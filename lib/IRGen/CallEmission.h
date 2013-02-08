@@ -32,6 +32,9 @@ public:
   IRGenFunction &IGF;
 
 private:
+  /// The function attributes for the call.
+  llvm::AttributeSet Attrs;
+  
   /// The builtin/special arguments to pass to the call.
   llvm::SmallVector<llvm::Value*, 8> Args;
 
@@ -71,6 +74,10 @@ private:
   void emitToUnmappedMemory(Address addr);
   void emitToUnmappedExplosion(Explosion &out);
   llvm::CallSite emitCallSite(bool hasIndirectResult);
+  
+  void externalizeArgument(Explosion &out, Explosion &in, CanType ty);
+  void externalizeArguments(Explosion &arg, CanType inputsTy);
+
 public:
   CallEmission(IRGenFunction &IGF, const Callee &callee)
       : IGF(IGF), CurCallee(callee) {

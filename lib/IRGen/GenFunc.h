@@ -83,6 +83,17 @@ namespace irgen {
 
   /// Returns true if the given function type is represented as an ObjC block.
   bool isBlockFunctionType(Type t);
+  
+  /// Does an ObjC method or C function returning the given type require an
+  /// sret indirect result?
+  llvm::PointerType *requiresExternalIndirectResult(IRGenModule &IGM,
+                                                    CanType type);
+  
+  /// Does an argument of this type need to be passed by value on the stack to
+  /// C or ObjC arguments?
+  llvm::PointerType *requiresExternalByvalArgument(IRGenModule &IGM,
+                                                   CanType type);
+
 } // end namespace irgen
 } // end namespace swift
 

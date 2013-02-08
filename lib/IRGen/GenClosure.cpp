@@ -26,6 +26,7 @@
 
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "CallingConvention.h"
 #include "Explosion.h"
 #include "FunctionRef.h"
 #include "GenHeap.h"
@@ -279,15 +280,19 @@ void irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E, Explosion &out) {
   unsigned uncurryLevel = 0;
 
   // Create the LLVM function declaration.
+  llvm::AttributeSet attrs;
   llvm::FunctionType *fnType =
-    IGF.IGM.getFunctionType(E->getType()->getCanonicalType(),
+    IGF.IGM.getFunctionType(AbstractCC::Freestanding,
+                            E->getType()->getCanonicalType(),
                             explosionLevel, uncurryLevel,
                             info.requiresData() ? ExtraData::Retainable
-                                                : ExtraData::None);
+                                                : ExtraData::None,
+                            attrs);
   llvm::Function *fn =
     llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                            "closure", &IGF.IGM.Module);
-
+  fn->setAttributes(attrs);
+  
   ManagedValue data;
   if (!info.requiresData()) {
     emitLocalFunctionBody(IGF, fn, E, explosionLevel, uncurryLevel,

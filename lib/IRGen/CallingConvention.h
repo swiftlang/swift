@@ -45,11 +45,8 @@ enum class AbstractCC : unsigned char {
 
 AbstractCC getAbstractCC(ValueDecl *fn);
 
-/// Expand an abstract calling convention into a physical convention
-/// and a set of attributes.
-llvm::CallingConv::ID expandAbstractCC(IRGenModule &IGM, AbstractCC convention,
-                                       bool hasAggResult,
-                                       llvm::AttributeSet &attrs);
+/// Expand an abstract calling convention into a physical convention.
+llvm::CallingConv::ID expandAbstractCC(IRGenModule &IGM, AbstractCC convention);
 
 } // end namespace irgen
 } // end namespace swift

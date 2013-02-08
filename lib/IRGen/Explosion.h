@@ -81,7 +81,6 @@ public:
   // We want to be a move-only type.
   Explosion(const Explosion &) = delete;
   Explosion &operator=(const Explosion &) = delete;
-  Explosion &operator=(Explosion &&) = delete;
   Explosion(Explosion &&other) : NextValue(0), Kind(other.Kind) {
     // Do an uninitialized copy of the non-consumed elements.
     Values.reserve(other.size());
@@ -90,6 +89,15 @@ public:
 
     // Remove everything from the other explosion.
     other.reset();
+  }
+
+  Explosion &operator=(Explosion &&o) {
+    assert(empty() && "explosion had values remaining when reassigned!");
+    NextValue = o.NextValue;
+    Kind = o.Kind;
+    Values.swap(o.Values);
+    o.reset();
+    return *this;
   }
 
   ~Explosion() {
@@ -264,6 +272,9 @@ public:
     Kind = level;
     reset();
   }
+  
+  void print(llvm::raw_ostream &OS);
+  void dump();
 };
 
 /// An explosion schema is essentially the type of an Explosion.

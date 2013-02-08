@@ -17,8 +17,10 @@
 
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/SourceLoc.h"
 
+#include "Explosion.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Linking.h"
@@ -178,4 +180,17 @@ void IRGenFunction::emitDeallocObjectCall(llvm::Value *ptr, llvm::Value *size) {
 
 void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {
   return IGM.unimplemented(Loc, Message);
+}
+
+// Debug output for Explosions.
+
+void Explosion::print(llvm::raw_ostream &OS) {
+  for (auto value : makeArrayRef(Values).slice(NextValue)) {
+    value.getValue()->print(OS);
+    OS << '\n';
+  }
+}
+
+void Explosion::dump() {
+  print(llvm::errs());
 }

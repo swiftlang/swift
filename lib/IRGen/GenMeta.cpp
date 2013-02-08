@@ -1674,8 +1674,11 @@ Callee irgen::emitVirtualCallee(IRGenFunction &IGF,
   // Use the type of the method we were type-checked against, not the
   // type of the overridden method.
   auto formalType = method->getType()->getCanonicalType();
-  auto fnTy = IGF.IGM.getFunctionType(formalType, bestExplosion, bestUncurry,
-                                      ExtraData::None)->getPointerTo();
+  llvm::AttributeSet attrs;
+  auto fnTy = IGF.IGM.getFunctionType(AbstractCC::Method,
+                                      formalType, bestExplosion, bestUncurry,
+                                      ExtraData::None,
+                                      attrs)->getPointerTo();
 
   llvm::Value *fn;
   if (bestUncurry != naturalUncurry) {

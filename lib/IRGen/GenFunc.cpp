@@ -162,21 +162,9 @@ static llvm::CallingConv::ID getFreestandingConvention(IRGenModule &IGM) {
 }
 
 /// Expand the requirements of the given abstract calling convention
-/// into a "physical" calling convention and a set of attributes.
+/// into a "physical" calling convention.
 llvm::CallingConv::ID irgen::expandAbstractCC(IRGenModule &IGM,
-                                              AbstractCC convention,
-                                              bool hasIndirectResult,
-                                              llvm::AttributeSet &attrs) {
-  // If we have an indirect result, add the appropriate attributes.
-  if (hasIndirectResult) {
-    static const llvm::Attribute::AttrKind attrKinds[] = {
-      llvm::Attribute::StructRet,
-      llvm::Attribute::NoAlias
-    };
-    auto resultAttrs = llvm::AttributeSet::get(IGM.LLVMContext, 1, attrKinds);
-    attrs = attrs.addAttributes(IGM.LLVMContext, 1, resultAttrs);
-  }
-
+                                              AbstractCC convention) {
   switch (convention) {
   case AbstractCC::C:
     return llvm::CallingConv::C;
@@ -289,15 +277,18 @@ namespace {
   /// A signature represents something which can actually be called.
   class Signature {
     llvm::PointerIntPair<llvm::FunctionType*, 1, bool> TypeAndHasIndirectReturn;
+    llvm::AttributeSet Attributes;
 
   public:
     bool isValid() const {
       return TypeAndHasIndirectReturn.getPointer() != nullptr;
     }
 
-    void set(llvm::FunctionType *type, bool hasIndirectReturn) {
+    void set(llvm::FunctionType *type, bool hasIndirectReturn,
+             llvm::AttributeSet attrs) {
       TypeAndHasIndirectReturn.setPointer(type);
       TypeAndHasIndirectReturn.setInt(hasIndirectReturn);
+      Attributes = attrs;
       assert(isValid());
     }
 
@@ -309,6 +300,10 @@ namespace {
     bool hasIndirectReturn() const {
       assert(isValid());
       return TypeAndHasIndirectReturn.getInt();
+    }
+    
+    llvm::AttributeSet getAttributes() const {
+      return Attributes;
     }
   };
 
@@ -366,7 +361,8 @@ namespace {
       return cast<llvm::StructType>(TypeInfo::getStorageType());
     }
 
-    Signature getSignature(IRGenModule &IGM, ExplosionKind explosionKind,
+    Signature getSignature(IRGenModule &IGM, AbstractCC cc,
+                           ExplosionKind explosionKind,
                            unsigned currying, ExtraData extraData) const;
 
     unsigned getExplosionSize(ExplosionKind kind) const {
@@ -508,6 +504,50 @@ const TypeInfo *TypeConverter::convertFunctionType(AnyFunctionType *T) {
                               IGM.getPointerAlignment());
 }
 
+static void addIndirectReturnAttributes(IRGenModule &IGM,
+                                        llvm::AttributeSet &attrs) {
+  static const llvm::Attribute::AttrKind attrKinds[] = {
+    llvm::Attribute::StructRet,
+    llvm::Attribute::NoAlias
+  };
+  auto resultAttrs = llvm::AttributeSet::get(IGM.LLVMContext, 1, attrKinds);
+  attrs = attrs.addAttributes(IGM.LLVMContext, 1, resultAttrs);
+}
+
+static void addByvalArgumentAttributes(IRGenModule &IGM,
+                                       llvm::AttributeSet &attrs,
+                                       unsigned argIndex,
+                                       Alignment align) {
+  llvm::AttrBuilder b;
+  b.addAttribute(llvm::Attribute::ByVal);
+  b.addAttribute(llvm::Attribute::getWithAlignment(IGM.LLVMContext,
+                                                   align.getValue()));
+  auto resultAttrs = llvm::AttributeSet::get(IGM.LLVMContext, argIndex+1, b);
+  attrs = attrs.addAttributes(IGM.LLVMContext,
+                              argIndex+1,
+                              resultAttrs);
+}
+
+static void decomposeFunctionArg(IRGenModule &IGM, CanType argTy,
+                                 AbstractCC cc, ExplosionKind explosionKind,
+                                 SmallVectorImpl<llvm::Type*> &argTypes,
+                                 llvm::AttributeSet &attrs) {
+  if (cc == AbstractCC::C && requiresExternalByvalArgument(IGM, argTy)) {
+    const TypeInfo &ti = IGM.getFragileTypeInfo(argTy);
+    llvm::Constant *alignConstant = ti.getStaticAlignment(IGM);
+    // FIXME: non-static alignment?
+    size_t alignValue = alignConstant
+      ? alignConstant->getUniqueInteger().getZExtValue()
+      : 1;
+    Alignment align(alignValue);
+    addByvalArgumentAttributes(IGM, attrs, argTypes.size(), align);
+    argTypes.push_back(ti.getStorageType()->getPointerTo());
+  } else {
+    auto schema = IGM.getSchema(argTy, explosionKind);
+    schema.addToArgTypes(IGM, argTypes);
+  }
+}
+
 /// Decompose a function type into its exploded parameter types
 /// and its formal result type.
 ///
@@ -529,9 +569,11 @@ const TypeInfo *TypeConverter::convertFunctionType(AnyFunctionType *T) {
 /// This is all somewhat optimized for register-passing CCs; it
 /// probably makes extra work when the stack gets involved.
 static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
+                                     AbstractCC cc,
                                      ExplosionKind explosionKind,
                                      unsigned uncurryLevel,
-                                     SmallVectorImpl<llvm::Type*> &argTypes) {
+                                     SmallVectorImpl<llvm::Type*> &argTypes,
+                                     llvm::AttributeSet &attrs) {
   auto fn = cast<AnyFunctionType>(type);
 
   // Save up the formal parameter types in reverse order.
@@ -544,9 +586,17 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
 
   // Explode the argument clusters in that reversed order.
   for (AnyFunctionType *fnTy : formalFnTypes) {
-    auto schema = IGM.getSchema(CanType(fnTy->getInput()), explosionKind);
-    schema.addToArgTypes(IGM, argTypes);
-
+    CanType inputTy = CanType(fnTy->getInput());
+    if (TupleType *tupleTy = inputTy->getAs<TupleType>()) {
+      for (auto &field : tupleTy->getFields()) {
+        decomposeFunctionArg(IGM, CanType(field.getType()), cc, explosionKind,
+                             argTypes, attrs);
+      }
+    } else {
+      decomposeFunctionArg(IGM, inputTy, cc, explosionKind,
+                           argTypes, attrs);
+    }
+    
     if (auto polyTy = dyn_cast<PolymorphicFunctionType>(fnTy))
       expandPolymorphicSignature(IGM, polyTy, argTypes);
   }
@@ -555,6 +605,7 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
 }
 
 Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
+                                     AbstractCC cc,
                                      ExplosionKind explosionKind,
                                      unsigned uncurryLevel,
                                      ExtraData extraData) const {
@@ -567,14 +618,17 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
   if (signature.isValid())
     return signature;
 
+  llvm::AttributeSet attrs;
+
   // The argument types.
   // Save a slot for the aggregate return.
   SmallVector<llvm::Type*, 16> argTypes;
   argTypes.push_back(nullptr);
 
   CanType formalResultType = decomposeFunctionType(IGM, CanType(FormalType),
-                                                   explosionKind,
-                                                   uncurryLevel, argTypes);
+                                                   cc, explosionKind,
+                                                   uncurryLevel, argTypes,
+                                                   attrs);
 
   // Compute the result type.
   llvm::Type *resultType;
@@ -588,6 +642,8 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
       const TypeInfo &info = IGM.getFragileTypeInfo(formalResultType);
       argTypes[0] = info.StorageType->getPointerTo();
       resultType = IGM.VoidTy;
+      
+      addIndirectReturnAttributes(IGM, attrs);
     } else {
       resultType = schema.getScalarResultType(IGM);
     }
@@ -611,17 +667,20 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
     llvm::FunctionType::get(resultType, realArgTypes, /*variadic*/ false);
 
   // Update the cache and return.
-  signature.set(llvmType, hasAggregateResult);
+  signature.set(llvmType, hasAggregateResult, attrs);
   return signature;
 }
 
 llvm::FunctionType *
-IRGenModule::getFunctionType(CanType type, ExplosionKind explosionKind,
-                             unsigned curryingLevel, ExtraData extraData) {
+IRGenModule::getFunctionType(AbstractCC cc,
+                             CanType type, ExplosionKind explosionKind,
+                             unsigned curryingLevel, ExtraData extraData,
+                             llvm::AttributeSet &attrs) {
   assert(isa<AnyFunctionType>(type));
   const FuncTypeInfo &fnTypeInfo = getFragileTypeInfo(type).as<FuncTypeInfo>();
-  Signature sig = fnTypeInfo.getSignature(*this, explosionKind,
+  Signature sig = fnTypeInfo.getSignature(*this, cc, explosionKind,
                                           curryingLevel, extraData);
+  attrs = sig.getAttributes();
   return sig.getType();
 }
 
@@ -690,8 +749,10 @@ static llvm::Value *emitCastOfIndirectFunction(IRGenFunction &IGF,
                                                CanType origFnType) {
   bool hasData = !isa<llvm::ConstantPointerNull>(dataPtr.getValue());
   auto extraData = (hasData ? ExtraData::Retainable : ExtraData::None);
-  auto fnPtrTy = IGF.IGM.getFunctionType(origFnType, ExplosionKind::Minimal,
-                                         0, extraData)->getPointerTo();
+  llvm::AttributeSet attrs;
+  auto fnPtrTy = IGF.IGM.getFunctionType(AbstractCC::Freestanding,
+                                         origFnType, ExplosionKind::Minimal,
+                                         0, extraData, attrs)->getPointerTo();
   return IGF.Builder.CreateBitCast(fnPtr, fnPtrTy);
 }
 
@@ -717,6 +778,8 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
                                ArrayRef<Substitution> subs,
                                ExplosionKind bestExplosion,
                                unsigned bestUncurry) {
+  llvm::AttributeSet unusedAttrs;
+
   if (bestUncurry != 0 || bestExplosion != ExplosionKind::Minimal) {
     auto absCallee = AbstractCallee::forDirectFunction(IGF, val);
     bestUncurry = std::min(bestUncurry, absCallee.getMaxUncurryLevel());
@@ -728,9 +791,10 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
     if (bestUncurry != 1) {
       IGF.unimplemented(val->getLoc(), "uncurried reference to constructor");
       fnPtr = llvm::UndefValue::get(
-          IGF.IGM.getFunctionType(val->getType()->getCanonicalType(),
+          IGF.IGM.getFunctionType(AbstractCC::Freestanding,
+                                  val->getType()->getCanonicalType(),
                                   bestExplosion, bestUncurry,
-                                  ExtraData::None));
+                                  ExtraData::None, unusedAttrs));
     } else {
       fnPtr = IGF.IGM.getAddrOfConstructor(ctor, ConstructorKind::Allocating,
                                            bestExplosion);
@@ -745,9 +809,11 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
     if (bestUncurry != oneofelt->hasArgumentType() ? 1 : 0) {
       IGF.unimplemented(val->getLoc(), "uncurried reference to oneof element");
       fnPtr = llvm::UndefValue::get(
-          IGF.IGM.getFunctionType(val->getType()->getCanonicalType(),
+          IGF.IGM.getFunctionType(AbstractCC::Freestanding,
+                                  val->getType()->getCanonicalType(),
                                   bestExplosion, bestUncurry,
-                                  ExtraData::None));
+                                  ExtraData::None,
+                                  unusedAttrs));
     } else {
       fnPtr = IGF.IGM.getAddrOfInjectionFunction(oneofelt);
     }
@@ -800,10 +866,12 @@ static Callee emitSuperConstructorCallee(IRGenFunction &IGF,
   if (bestUncurry != 1) {
     IGF.unimplemented(ctor->getLoc(),
                       "uncurried reference to super.constructor");
+    llvm::AttributeSet unusedAttrs;
     fnPtr = llvm::UndefValue::get(
-                  IGF.IGM.getFunctionType(ctor->getType()->getCanonicalType(),
+                  IGF.IGM.getFunctionType(AbstractCC::Method,
+                                          ctor->getType()->getCanonicalType(),
                                           bestExplosion, bestUncurry,
-                                          ExtraData::None));
+                                          ExtraData::None, unusedAttrs));
 
   } else {
     fnPtr = IGF.IGM.getAddrOfConstructor(ctor,
@@ -1973,10 +2041,11 @@ void CallEmission::emitToUnmappedMemory(Address result) {
   assert(LastArgWritten == 1 && "emitting unnaturally to indirect result");
 
   Args[0] = result.getAddress();
+  addIndirectReturnAttributes(IGF.IGM, Attrs);
 #ifndef NDEBUG
   LastArgWritten = 0; // appease an assert
 #endif
-
+  
   emitCallSite(true);
 }
 
@@ -1993,15 +2062,14 @@ llvm::CallSite CallEmission::emitCallSite(bool hasIndirectResult) {
   Cleanups.clear();
 
   // Determine the calling convention.
-  llvm::AttributeSet attrs;
-  auto cc = expandAbstractCC(IGF.IGM, getCallee().getConvention(),
-                             hasIndirectResult, attrs);
+  // FIXME: collect attributes in the CallEmission.
+  auto cc = expandAbstractCC(IGF.IGM, getCallee().getConvention());
 
   // Make the call and clear the arguments array.
   auto fnPtr = getCallee().getFunctionPointer();  
   llvm::CallSite call = IGF.emitInvoke(cc, fnPtr, Args,
-                                     llvm::AttributeSet::get(fnPtr->getContext(),
-                                                              attrs));
+                                    llvm::AttributeSet::get(fnPtr->getContext(),
+                                                            Attrs));
   Args.clear();
 
   // Return.
@@ -2569,9 +2637,75 @@ static bool isLeftToRight(AbstractCC cc) {
   return cc == AbstractCC::C;
 }
 
+/// Does an ObjC method or C function returning the given type require an
+/// sret indirect result?
+llvm::PointerType *irgen::requiresExternalIndirectResult(IRGenModule &IGM,
+                                                         CanType type) {
+  // FIXME: we need to consider the target's C calling convention.
+  return IGM.requiresIndirectResult(type, ExplosionKind::Minimal);
+}
+
+/// Does an argument of this type need to be passed by value on the stack to
+/// C or ObjC arguments?
+llvm::PointerType *irgen::requiresExternalByvalArgument(IRGenModule &IGM,
+                                                        CanType type) {
+  // FIXME: we need to consider the target's C calling convention.
+  return IGM.requiresIndirectResult(type, ExplosionKind::Minimal);
+}
+
+void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
+                                       CanType ty) {
+  TypeInfo const &ti = IGF.getFragileTypeInfo(ty);
+  if (requiresExternalByvalArgument(IGF.IGM, ty)) {
+    Initialization I;
+    InitializedObject object = I.getObjectForTemporary();
+    I.registerObject(IGF, object, NotOnHeap, ti);
+    OwnedAddress addr = ti.allocate(IGF,
+                                    I,
+                                    object,
+                                    NotOnHeap,
+                                    "byval-temporary");
+    I.markAllocated(IGF, object, addr, CleanupsDepth::invalid());
+    ti.initialize(IGF, in, addr.getAddress());
+    I.markInitialized(IGF, object);
+
+    addByvalArgumentAttributes(IGF.IGM, Attrs,
+                               Args.size() - LastArgWritten + out.size(),
+                               addr.getAlignment());
+    
+    out.addUnmanaged(addr.getAddress().getAddress());
+  } else {
+    ti.reexplode(IGF, in, out);
+  }
+}
+
+/// Convert exploded Swift arguments into C-compatible arguments.
+void CallEmission::externalizeArguments(Explosion &arg, CanType inputsTy) {
+  Explosion externalized(arg.getKind());
+
+  if (TupleType *tupleTy = inputsTy->getAs<TupleType>()) {
+    for (auto &elt : tupleTy->getFields()) {
+      externalizeArgument(externalized, arg,
+                          elt.getType()->getCanonicalType());
+    }
+  } else {
+    externalizeArgument(externalized, arg, inputsTy);
+  }
+  
+  // Sometimes we get extra args such as the selector argument. Pass those
+  // through.
+  externalized.add(arg.claimAll());
+  arg = std::move(externalized);
+}
+
 /// Add a new set of arguments to the function.
 void CallEmission::addArg(Explosion &arg) {
   forceCallee();
+  
+  if (CurCallee.getConvention() == AbstractCC::C) {
+    externalizeArguments(arg,
+                   CanType(CurOrigType->castTo<AnyFunctionType>()->getInput()));
+  }
 
   // Add the given number of arguments.
   assert(getCallee().getExplosionLevel() == arg.getKind());
@@ -3285,15 +3419,18 @@ namespace {
     /// Create a forwarding stub.
     llvm::Function *getAddrOfForwardingStub(llvm::Function *nextEntrypoint,
                                             ExtraData extraData) {
+      llvm::AttributeSet attrs;
       llvm::FunctionType *fnType =
-        IGM.getFunctionType(Clauses[CurClause].ForwardingFnType,
-                            ExplosionLevel, /*uncurry*/ 0, extraData);
+        IGM.getFunctionType(AbstractCC::Freestanding,
+                            Clauses[CurClause].ForwardingFnType,
+                            ExplosionLevel, /*uncurry*/ 0, extraData, attrs);
 
       // Create the function and place it immediately before the next stub.
       llvm::Function *forwarder =
         llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                                nextEntrypoint->getName() + ".curry");
       forwarder->setCallingConv(getFreestandingConvention(IGM));
+      forwarder->setAttributes(attrs);
       IGM.Module.getFunctionList().insert(nextEntrypoint, forwarder);
 
       return forwarder;
@@ -3558,16 +3695,20 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                        ExplosionKind explosionLevel,
                                        CanType outType,
                                        HeapLayout const &layout) {
-  llvm::FunctionType *fwdTy = IGM.getFunctionType(outType,
+  llvm::AttributeSet attrs;
+  llvm::FunctionType *fwdTy = IGM.getFunctionType(AbstractCC::Freestanding,
+                                                  outType,
                                                   explosionLevel,
                                                   /*curryLevel=*/ 0,
-                                                  ExtraData::Retainable);
+                                                  ExtraData::Retainable,
+                                                  attrs);
   // FIXME: Give the thunk a real name.
   // FIXME: Maybe cache the thunk by function and closure types? Could there
   // be multiple same-type closures off the same 
   llvm::Function *fwd =
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
                            "closureinst", &IGM.Module);
+  fwd->setAttributes(attrs);
 
   IRGenFunction subIGF(IGM, outType, {}, explosionLevel, /*curryLevel=*/ 0,
                        fwd, Prologue::Bare);
@@ -3667,9 +3808,7 @@ llvm::Function *IRGenModule::getAddrOfBridgeToBlockConverter(CanType blockType)
   
   
   llvm::AttributeSet attrs;
-  auto cc = expandAbstractCC(*this, AbstractCC::C,
-                             /*indirectResult=*/false,
-                             attrs);
+  auto cc = expandAbstractCC(*this, AbstractCC::C);
   
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, cc, attrs);

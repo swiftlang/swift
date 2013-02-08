@@ -30,6 +30,7 @@
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "FunctionRef.h"
+#include "GenFunc.h"
 #include "GenMeta.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
@@ -271,19 +272,25 @@ AbstractCallee irgen::getAbstractObjCMethodCallee(IRGenFunction &IGF,
                         ExtraData::None);
 }
 
-/// Does an Objective-C method returning the given type require an
-/// indirect result?
-static llvm::PointerType *requiresObjCIndirectResult(IRGenModule &IGM,
-                                                     CanType type) {
-  // FIXME: we need to consider the target's C calling convention.
-  return IGM.requiresIndirectResult(type, ExplosionKind::Minimal);
-}
-
 namespace {
   struct ObjCMethodSignature {
     bool IsIndirectReturn;
     llvm::FunctionType *FnTy;
     CanType ResultType;
+    
+    void addFormalArg(IRGenModule &IGM,
+                      CanType inputTy,
+                      SmallVectorImpl<llvm::Type*> &argTys) {
+      // This is a totally wrong and shameful hack, but it lets us pass
+      // NSRect correctly.
+      if (requiresExternalByvalArgument(IGM, inputTy)) {
+        argTys.push_back(IGM.getFragileType(inputTy)->getPointerTo());
+      } else {
+        auto argSchema = IGM.getSchema(inputTy,
+                                       ExplosionKind::Minimal);
+        argSchema.addToArgTypes(IGM, argTys);
+      }
+    }
 
     ObjCMethodSignature(IRGenModule &IGM, CanType formalType) {
       auto selfFnType = cast<FunctionType>(formalType);
@@ -294,7 +301,7 @@ namespace {
 
       // Consider the result type first.
       ResultType = CanType(formalFnType->getResult());
-      if (auto ptrTy = requiresObjCIndirectResult(IGM, ResultType)) {
+      if (auto ptrTy = requiresExternalIndirectResult(IGM, ResultType)) {
         IsIndirectReturn = true;
         resultTy = IGM.VoidTy;
         argTys.push_back(ptrTy);
@@ -313,9 +320,12 @@ namespace {
       argTys.push_back(IGM.ObjCSELTy);
 
       // Add the formal arguments.
-      auto argSchema = IGM.getSchema(CanType(formalFnType->getInput()),
-                                     ExplosionKind::Minimal);
-      argSchema.addToArgTypes(IGM, argTys);
+      CanType inputs(formalFnType->getInput());
+      if (TupleType *tuple = dyn_cast<TupleType>(inputs)) {
+        for (const TupleTypeElt &field : tuple->getFields())
+          addFormalArg(IGM, CanType(field.getType()), argTys);
+      } else
+        addFormalArg(IGM, inputs, argTys);
 
       FnTy = llvm::FunctionType::get(resultTy, argTys, /*variadic*/ false);
     }

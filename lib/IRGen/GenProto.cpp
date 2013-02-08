@@ -2020,10 +2020,14 @@ namespace {
       if (fn) return asOpaquePtr(IGM, fn);
 
       // Create the function.
-      auto fnTy = IGM.getFunctionType(SignatureTy, ExplosionKind::Minimal,
-                                      UncurryLevel, ExtraData::Metatype);
+      llvm::AttributeSet attrs;
+      auto fnTy = IGM.getFunctionType(AbstractCC::Freestanding,
+                                      SignatureTy, ExplosionKind::Minimal,
+                                      UncurryLevel, ExtraData::Metatype,
+                                      attrs);
       fn = llvm::Function::Create(fnTy, llvm::Function::InternalLinkage,
                                   name.str(), &IGM.Module);
+      fn->setAttributes(attrs);
       //fn->setVisibility(llvm::Function::HiddenVisibility);
 
       // Start building it.
@@ -3610,14 +3614,18 @@ static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
   unsigned uncurryLevel = 1;
 
   CanType origFnType = fn->getType()->getCanonicalType();
+  AbstractCC convention = fn->isStatic()
+    ? AbstractCC::Freestanding
+    : AbstractCC::Method;
+  llvm::AttributeSet attrs;
   llvm::FunctionType *fnTy =
-    IGF.IGM.getFunctionType(origFnType, explosionLevel, uncurryLevel,
-                            ExtraData::Metatype);
+    IGF.IGM.getFunctionType(convention,
+                            origFnType, explosionLevel, uncurryLevel,
+                            ExtraData::Metatype, attrs);
   witness = IGF.Builder.CreateBitCast(witness, fnTy->getPointerTo());
 
   Callee callee =
-    Callee::forKnownFunction(fn->isStatic() ? AbstractCC::Freestanding
-                                            : AbstractCC::Method,
+    Callee::forKnownFunction(convention,
                              origFnType, substResultType, subs,
                              witness, ManagedValue(metadata),
                              explosionLevel, uncurryLevel);

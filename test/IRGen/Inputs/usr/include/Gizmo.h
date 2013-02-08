@@ -15,6 +15,17 @@ struct Rect {
   float height;
 };
 
+struct NSRect {
+  struct NSPoint {
+    double x;
+    double y;
+  } origin;
+  struct NSSize {
+    double width;
+    double height;
+  } size;
+};
+
 @interface Gizmo : NSObject
 - (Gizmo*) clone NS_RETURNS_RETAINED;
 - (Gizmo*) duplicate;
@@ -23,4 +34,12 @@ struct Rect {
 + (void) consume: (NS_CONSUMED Gizmo*) gizmo;
 + (void) inspect: (Gizmo*) gizmo;
 + (void) runWithRect: (struct Rect) rect andGizmo: (Gizmo*) gizmo;
+- (struct NSRect) frame;
+- (void) setFrame: (struct NSRect) rect;
 @end
+
+@interface NSString : NSObject
+@end
+
+struct NSRect NSMakeRect(double, double, double, double);
+NSString *NSStringFromRect(struct NSRect r);

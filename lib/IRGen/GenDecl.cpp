@@ -107,8 +107,11 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   };
   params[0]->setType(TupleType::getEmpty(Context));
 
+  llvm::AttributeSet attrs;
   llvm::FunctionType *fnType =
-      getFunctionType(unitToUnit, ExplosionKind::Minimal, 0, ExtraData::None);
+      getFunctionType(AbstractCC::Freestanding,
+                      unitToUnit, ExplosionKind::Minimal, 0, ExtraData::None,
+                      attrs);
   llvm::Function *fn;
   if (tunit->Kind == TranslationUnit::Main ||
       tunit->Kind == TranslationUnit::Repl) {
@@ -134,6 +137,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     fn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
                                 tunit->Name.str() + ".init", &Module);
   }
+  fn->setAttributes(attrs);
 
   if (SILMod) {
     IRGenSILFunction(*this, unitToUnit, ExplosionKind::Minimal, fn)
@@ -693,19 +697,6 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
   return Address(addr, align);
 }
 
-static bool hasIndirectResult(IRGenModule &IGM, CanType type,
-                              ExplosionKind explosionLevel,
-                              unsigned uncurryLevel) {
-  uncurryLevel++;
-  while (uncurryLevel--) {
-    type = CanType(cast<AnyFunctionType>(type)->getResult());
-  }
-
-  ExplosionSchema schema(explosionLevel);
-  IGM.getSchema(type, schema);
-  return schema.requiresIndirectResult();
-}
-
 /// Fetch the declaration of the given known function.
 llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
                                                ExtraData extraData) {
@@ -716,30 +707,30 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
   if (entry) return cast<llvm::Function>(entry);
 
   llvm::FunctionType *fnType;
+  AbstractCC convention = getAbstractCC(fn.getDecl());
   // A bit of a hack here. SIL represents closure functions with their context
   // expanded out and uses a partial application function to construct the
   // context. IRGen previously set up local functions to expect their extraData
   // prepackaged.
   SILConstant silConstant = SILConstant(fn.getDecl());
+  llvm::AttributeSet attrs;
   if (SILMod && SILMod->hasFunction(silConstant)) {
     swift::Function *silFn = SILMod->getFunction(silConstant);
-    fnType = getFunctionType(silFn->getLoweredType().getSwiftType(),
+    fnType = getFunctionType(convention,
+                             silFn->getLoweredType().getSwiftType(),
                              fn.getExplosionLevel(),
                              fn.getUncurryLevel(),
-                             ExtraData::None);
+                             ExtraData::None,
+                             attrs);
   } else {
-    fnType = getFunctionType(fn.getDecl()->getType()->getCanonicalType(),
+    fnType = getFunctionType(convention,
+                             fn.getDecl()->getType()->getCanonicalType(),
                              fn.getExplosionLevel(), fn.getUncurryLevel(),
-                             extraData);
+                             extraData,
+                             attrs);
   }
 
-  AbstractCC convention = getAbstractCC(fn.getDecl());
-  bool indirectResult =
-    hasIndirectResult(*this, fn.getDecl()->getType()->getCanonicalType(),
-                      fn.getExplosionLevel(), fn.getUncurryLevel());
-
-  llvm::AttributeSet attrs;
-  auto cc = expandAbstractCC(*this, convention, indirectResult, attrs);
+  auto cc = expandAbstractCC(*this, convention);
 
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, cc, attrs);
@@ -762,15 +753,13 @@ llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
 
   CanType formalType = D->getType()->getCanonicalType();
 
-  bool indirectResult =
-    hasIndirectResult(*this, formalType, explosionLevel, uncurryLevel);
-
   llvm::AttributeSet attrs;
-  auto cc = expandAbstractCC(*this, AbstractCC::Freestanding,
-                             indirectResult, attrs);
+  auto cc = expandAbstractCC(*this, AbstractCC::Freestanding);
 
   llvm::FunctionType *fnType =
-    getFunctionType(formalType, explosionLevel, uncurryLevel, ExtraData::None);
+    getFunctionType(AbstractCC::Freestanding,
+                    formalType, explosionLevel, uncurryLevel, ExtraData::None,
+                    attrs);
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, cc, attrs);
   return entry;
@@ -794,14 +783,13 @@ llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
   else
     formalType = cons->getType()->getCanonicalType();
   
-  llvm::FunctionType *fnType =
-    getFunctionType(formalType, explodeLevel, uncurryLevel, ExtraData::None);
-
-  bool indirectResult =
-    hasIndirectResult(*this, formalType, explodeLevel, uncurryLevel);
-
   llvm::AttributeSet attrs;
-  auto cc = expandAbstractCC(*this, AbstractCC::Method, indirectResult, attrs);
+  llvm::FunctionType *fnType =
+    getFunctionType(AbstractCC::Method,
+                    formalType, explodeLevel, uncurryLevel, ExtraData::None,
+                    attrs);
+
+  auto cc = expandAbstractCC(*this, AbstractCC::Method);
 
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, cc, attrs);
@@ -1003,7 +991,7 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
   // FIXME: deallocating and destroying destructors have different signatures
 
   llvm::AttributeSet attrs;
-  auto cc = expandAbstractCC(*this, AbstractCC::Method, false, attrs);
+  auto cc = expandAbstractCC(*this, AbstractCC::Method);
 
   LinkInfo link = LinkInfo::get(*this, entity);
   llvm::FunctionType *dtorTy = kind == DestructorKind::Deallocating
@@ -1128,12 +1116,14 @@ llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return entry;
 
-  llvm::FunctionType *fnType =
-    getFunctionType(formal.getType(), explosionLevel,
-                    formal.getNaturalUncurryLevel(), ExtraData::None);
-
   llvm::AttributeSet attrs;
-  auto convention = expandAbstractCC(*this, formal.getCC(), false, attrs);
+  auto convention = expandAbstractCC(*this, formal.getCC());
+  llvm::FunctionType *fnType =
+    getFunctionType(formal.getCC(),
+                    formal.getType(), explosionLevel,
+                    formal.getNaturalUncurryLevel(), ExtraData::None,
+                    attrs);
+
 
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, convention, attrs);
@@ -1175,12 +1165,13 @@ llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return entry;
 
-  llvm::FunctionType *fnType =
-    getFunctionType(formal.getType(), explosionLevel,
-                    formal.getNaturalUncurryLevel(), ExtraData::None);
-
   llvm::AttributeSet attrs;
-  auto convention = expandAbstractCC(*this, formal.getCC(), false, attrs);
+  llvm::FunctionType *fnType =
+    getFunctionType(formal.getCC(),
+                    formal.getType(), explosionLevel,
+                    formal.getNaturalUncurryLevel(), ExtraData::None, attrs);
+
+  auto convention = expandAbstractCC(*this, formal.getCC());
 
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, convention, attrs);
