@@ -1,5 +1,6 @@
 @import ObjectiveC;
 
 @interface B(Separate)
-- method:(int)i separateExtMethod:(double)d;
+- (id)method:(int)i separateExtMethod:(double)d;
+- (void)anotherCategoryMethod;
 @end

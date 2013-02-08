@@ -227,8 +227,12 @@ bool irgen::hasKnownSwiftImplementation(IRGenModule &IGM, ClassDecl *theClass) {
 
 /// Is the given method known to be callable by vtable lookup?
 bool irgen::hasKnownVTableEntry(IRGenModule &IGM, FuncDecl *theMethod) {
-  return hasKnownSwiftImplementation(IGM,
-                                 cast<ClassDecl>(theMethod->getDeclContext()));
+  auto theClass = dyn_cast<ClassDecl>(theMethod->getDeclContext());
+  if (!theClass) {
+    assert(theMethod->hasClangNode() && "overriding a non-imported method");
+    return false;
+  }
+  return hasKnownSwiftImplementation(IGM, theClass);
 }
 
 /// Emit a string encoding the labels in the given tuple type.

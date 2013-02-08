@@ -44,6 +44,8 @@
 
 - initWithInt:(int)i;
 - initWithInt:(int)i andDouble:(double)d;
+
+- (void)anotherMethodOnB;
 @end
 
 @interface A(Cat1) <Cat1>

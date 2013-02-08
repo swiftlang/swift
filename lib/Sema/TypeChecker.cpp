@@ -218,8 +218,10 @@ static void overrideDecl(TypeChecker &TC,
   }
   if (OverriddenDecl->getDeclContext()->getContextKind() ==
       DeclContextKind::ExtensionDecl) {
-    TC.diagnose(MemberVD->getLoc(), diag::override_decl_extension);
-    return;
+    if (!OverriddenDecl->hasClangNode()) {
+      TC.diagnose(MemberVD->getLoc(), diag::override_decl_extension);
+      return;
+    }
   }
   if (auto FD = dyn_cast<FuncDecl>(MemberVD)) {
     FD->setOverriddenDecl(cast<FuncDecl>(OverriddenDecl));
