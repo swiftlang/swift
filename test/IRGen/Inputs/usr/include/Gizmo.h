@@ -41,5 +41,10 @@ struct NSRect {
 @interface NSString : NSObject
 @end
 
+@interface NSView : NSObject
+- (struct NSRect) convertRectFromBase: (struct NSRect) r;
+@end
+
 struct NSRect NSMakeRect(double, double, double, double);
+struct NSRect NSInsetRect(struct NSRect, double, double);
 NSString *NSStringFromRect(struct NSRect r);

@@ -2673,7 +2673,8 @@ llvm::PointerType *irgen::requiresExternalByvalArgument(IRGenModule &IGM,
 }
 
 void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
-                                       CanType ty) {
+                     SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
+                     CanType ty) {
   TypeInfo const &ti = IGF.getFragileTypeInfo(ty);
   if (requiresExternalByvalArgument(IGF.IGM, ty)) {
     Initialization I;
@@ -2688,10 +2689,7 @@ void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
     ti.initialize(IGF, in, addr.getAddress());
     I.markInitialized(IGF, object);
     
-    addByvalArgumentAttributes(IGF.IGM, Attrs,
-                               Args.size() - LastArgWritten + out.size(),
-                               addr.getAlignment());
-    
+    newByvals.push_back({out.size(), addr.getAlignment()});
     out.addUnmanaged(addr.getAddress().getAddress());
   } else {
     ti.reexplode(IGF, in, out);
@@ -2699,16 +2697,18 @@ void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
 }
 
 /// Convert exploded Swift arguments into C-compatible arguments.
-void CallEmission::externalizeArguments(Explosion &arg, CanType inputsTy) {
+void CallEmission::externalizeArguments(Explosion &arg,
+                    SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
+                    CanType inputsTy) {
   Explosion externalized(arg.getKind());
 
   if (TupleType *tupleTy = inputsTy->getAs<TupleType>()) {
     for (auto &elt : tupleTy->getFields()) {
-      externalizeArgument(externalized, arg,
+      externalizeArgument(externalized, arg, newByvals,
                           elt.getType()->getCanonicalType());
     }
   } else {
-    externalizeArgument(externalized, arg, inputsTy);
+    externalizeArgument(externalized, arg, newByvals, inputsTy);
   }
   
   // Sometimes we get extra args such as the selector argument. Pass those
@@ -2720,9 +2720,10 @@ void CallEmission::externalizeArguments(Explosion &arg, CanType inputsTy) {
 /// Add a new set of arguments to the function.
 void CallEmission::addArg(Explosion &arg) {
   forceCallee();
+  llvm::SmallVector<std::pair<unsigned, Alignment>, 2> newByvals;
   
   if (CurCallee.getConvention() == AbstractCC::C) {
-    externalizeArguments(arg,
+    externalizeArguments(arg, newByvals,
                    CanType(CurOrigType->castTo<AnyFunctionType>()->getInput()));
   }
 
@@ -2743,6 +2744,14 @@ void CallEmission::addArg(Explosion &arg) {
   } else {
     targetIndex = newLastArgWritten;
   }
+  
+  // Add byval attributes.
+  // FIXME: These should in theory be moved around with the arguments when
+  // isLeftToRight, but luckily ObjC methods and C functions should only ever
+  // have byvals in the last argument clause.
+  for (auto &byval : newByvals)
+    addByvalArgumentAttributes(IGF.IGM, Attrs, byval.first+targetIndex,
+                               byval.second);
 
   // The argument index of the first value in this explosion, for
   // the purposes of the ownership conventions.

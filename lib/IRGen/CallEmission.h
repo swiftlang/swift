@@ -75,8 +75,12 @@ private:
   void emitToUnmappedExplosion(Explosion &out);
   llvm::CallSite emitCallSite(bool hasIndirectResult);
   
-  void externalizeArgument(Explosion &out, Explosion &in, CanType ty);
-  void externalizeArguments(Explosion &arg, CanType inputsTy);
+  void externalizeArgument(Explosion &out, Explosion &in,
+                     SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
+                     CanType ty);
+  void externalizeArguments(Explosion &arg,
+                     SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
+                     CanType inputsTy);
 
 public:
   CallEmission(IRGenFunction &IGF, const Callee &callee)
