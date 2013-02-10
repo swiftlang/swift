@@ -49,7 +49,8 @@ if (( $# == 1 )); then
 	SWIFT_BUILD_BASE="$(dirname $(dirname "$SWIFT_EXEC"))"
 fi
 
-XC_PLUGIN_DST="$HOME/Library/Application Support/Developer/Shared/Xcode/Plug-ins/S.xcplugin"
+XC_PLUGIN_DIR="$HOME/Library/Application Support/Developer/Shared/Xcode/Plug-ins"
+XC_PLUGIN_DST="$XC_PLUGIN_DIR/S.xcplugin"
 
 if [[ -e "$XC_PLUGIN_DST" ]]; then
 	if [[ -z "$REMOVE_EXISTING" ]]; then
@@ -61,23 +62,27 @@ if [[ -e "$XC_PLUGIN_DST" ]]; then
 		osascript -s o -e "tell app \"Finder\" to delete POSIX file \"$XC_PLUGIN_DST\"" > /dev/null
 		echo 'done'
 	fi
+else
+	echo -n 'Making sure' "$XC_PLUGIN_DIR" 'exists...'
+	mkdir -p "$XC_PLUGIN_DIR" || exit 1
+	echo 'done'
 fi
 
 if [[ -z "$SYMLINK" ]]; then
 	echo -n 'Copying to' "$XC_PLUGIN_DST..."
-	cp -Rf "$REL_PATH/Swift.xcplugin" "$XC_PLUGIN_DST"
+	cp -Rf "$REL_PATH/Swift.xcplugin" "$XC_PLUGIN_DST" || exit 1
 	echo 'done'
 else
 	echo -n 'Making a symbolic link at' "$XC_PLUGIN_DST..."
-	ln -sf "$REL_PATH/Swift.xcplugin" "$XC_PLUGIN_DST"
+	ln -sf "$REL_PATH/Swift.xcplugin" "$XC_PLUGIN_DST" || exit 1
 	echo 'done'
 fi
 
 if [[ ! -z "$SWIFT_EXEC" ]]; then
 	echo -n 'Setting default SWIFT_EXEC...'
-	sed -i "" -e "s:\\\$(DEVELOPER_DIR)/Toolchains/XcodeDefault\.xctoolchain/usr/bin/swift:$SWIFT_EXEC:" "$XC_PLUGIN_DST/Contents/Resources/Swift.xcspec"
+	sed -i "" -e "s:\\\$(DEVELOPER_DIR)/Toolchains/XcodeDefault\.xctoolchain/usr/bin/swift:$SWIFT_EXEC:" "$XC_PLUGIN_DST/Contents/Resources/Swift.xcspec" || exit 1
 
 	SWIFT_BASE=$(dirname $(dirname "$SWIFT_EXEC"))
-	sed -i "" -e "s:\\\$(DEVELOPER_DIR)/Toolchains/XcodeDefault\.xctoolchain/usr:$SWIFT_BASE:" "$XC_PLUGIN_DST/Contents/Resources/Swift.xcspec"
+	sed -i "" -e "s:\\\$(DEVELOPER_DIR)/Toolchains/XcodeDefault\.xctoolchain/usr:$SWIFT_BASE:" "$XC_PLUGIN_DST/Contents/Resources/Swift.xcspec" || exit 1
 	echo 'done'
 fi
