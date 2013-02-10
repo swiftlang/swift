@@ -188,7 +188,9 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   for (auto Result : PrintDeclLookup.Results)
     PrintDecls.push_back(Result.getValueDecl());
 
-  // Printing format is "Int = 0\n".
+  // Printing format is "Int = 0\n".  Unique the type string into an identifier
+  // since PrintLiteralString is building an AST around the string that must
+  // persist beyond the lifetime of getString().
   auto TypeStr = Context.getIdentifier(E->getType()->getString()).str();
   PrintLiteralString(TypeStr, *this, Loc, PrintDecls, BodyContent);
   PrintLiteralString(" = ", *this, Loc, PrintDecls, BodyContent);
@@ -299,6 +301,10 @@ void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
   PatternBindingPrintLHS PatPrinter(BodyContent, PrintDecls, Loc, *this);
   PatPrinter.visit(D->getPattern());
   PrintLiteralString(" : ", *this, Loc, PrintDecls, BodyContent);
+  
+  // Unique the type string into an identifier since PrintLiteralString is
+  // building an AST around the string that must persist beyond the lifetime of
+  // getString().
   auto TypeStr = Context.getIdentifier(E->getType()->getString()).str();
   PrintLiteralString(TypeStr, *this, Loc, PrintDecls, BodyContent);
   PrintLiteralString(" = ", *this, Loc, PrintDecls, BodyContent);
