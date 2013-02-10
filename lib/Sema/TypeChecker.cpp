@@ -392,6 +392,9 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD) {
         continue;
       if (SubtypeOverriddenDecls.count(CurDecls[i]))
         continue;
+      // Give [objc] decls a pass, because 'foo:' and 'foo:bar:' can coexist.
+      if (MemberVD->getAttrs().isObjC() || CurDecls[i]->getAttrs().isObjC())
+        continue;
       TC.diagnose(MemberVD->getLoc(), diag::overload_base_decl);
       break;
     }
