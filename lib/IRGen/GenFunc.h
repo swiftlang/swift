@@ -29,6 +29,7 @@ namespace swift {
 
 namespace irgen {
   class Address;
+  class Alignment;
   class CallEmission;
   class Explosion;
   class IRGenFunction;
@@ -93,7 +94,17 @@ namespace irgen {
   /// C or ObjC arguments?
   llvm::PointerType *requiresExternalByvalArgument(IRGenModule &IGM,
                                                    CanType type);
+  
+  /// Add function attributes to an attribute set for an indirect return
+  /// argument.
+  void addIndirectReturnAttributes(IRGenModule &IGM,
+                                   llvm::AttributeSet &attrs);
 
+  /// Add function attributes to an attribute set for a byval argument.
+  void addByvalArgumentAttributes(IRGenModule &IGM,
+                                  llvm::AttributeSet &attrs,
+                                  unsigned argIndex,
+                                  Alignment align);
 } // end namespace irgen
 } // end namespace swift
 

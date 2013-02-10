@@ -505,7 +505,7 @@ const TypeInfo *TypeConverter::convertFunctionType(AnyFunctionType *T) {
                               IGM.getPointerAlignment());
 }
 
-static void addIndirectReturnAttributes(IRGenModule &IGM,
+void irgen::addIndirectReturnAttributes(IRGenModule &IGM,
                                         llvm::AttributeSet &attrs) {
   static const llvm::Attribute::AttrKind attrKinds[] = {
     llvm::Attribute::StructRet,
@@ -515,7 +515,7 @@ static void addIndirectReturnAttributes(IRGenModule &IGM,
   attrs = attrs.addAttributes(IGM.LLVMContext, 1, resultAttrs);
 }
 
-static void addByvalArgumentAttributes(IRGenModule &IGM,
+void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
                                        llvm::AttributeSet &attrs,
                                        unsigned argIndex,
                                        Alignment align) {

@@ -277,6 +277,7 @@ namespace {
     bool IsIndirectReturn;
     llvm::FunctionType *FnTy;
     CanType ResultType;
+    llvm::AttributeSet Attrs;
     
     void addFormalArg(IRGenModule &IGM,
                       CanType inputTy,
@@ -284,7 +285,14 @@ namespace {
       // This is a totally wrong and shameful hack, but it lets us pass
       // NSRect correctly.
       if (requiresExternalByvalArgument(IGM, inputTy)) {
-        argTys.push_back(IGM.getFragileType(inputTy)->getPointerTo());
+        const TypeInfo &ti = IGM.getFragileTypeInfo(inputTy);
+        llvm::Constant *alignConstant = ti.getStaticAlignment(IGM);
+        unsigned alignValue = alignConstant
+          ? alignConstant->getUniqueInteger().getZExtValue()
+          : 1;
+        addByvalArgumentAttributes(IGM, Attrs, argTys.size(),
+                                   Alignment(alignValue));
+        argTys.push_back(ti.getStorageType()->getPointerTo());
       } else {
         auto argSchema = IGM.getSchema(inputTy,
                                        ExplosionKind::Minimal);
@@ -305,6 +313,7 @@ namespace {
         IsIndirectReturn = true;
         resultTy = IGM.VoidTy;
         argTys.push_back(ptrTy);
+        addIndirectReturnAttributes(IGM, Attrs);
       } else {
         IsIndirectReturn = false;
 
@@ -682,6 +691,7 @@ static llvm::Function *createSwiftAsObjCThunk(IRGenModule &IGM,
 
   auto fn = llvm::Function::Create(sig.FnTy, llvm::Function::InternalLinkage,
                                    buffer.str(), &IGM.Module);
+  fn->setAttributes(sig.Attrs);
   fn->setUnnamedAddr(true );
   return fn;
 }
@@ -733,10 +743,27 @@ namespace {
 
     // Everything else just gets passed directly.
     void visitType(TypeBase *type) {
-      unsigned width =
-        IGF.IGM.getExplosionSize(CanType(type), IGF.CurExplosionLevel);
-      Params.claimUnmanaged(width, Args);
-      NextParamIndex += width;
+      if (requiresExternalByvalArgument(IGF.IGM, CanType(type))) {
+        // If the argument was passed byval in the C calling convention,
+        // reexplode it.
+        llvm::Value *addrValue = Params.claimUnmanagedNext();
+        const TypeInfo &ti = IGF.getFragileTypeInfo(type);
+        llvm::Constant *alignConstant = ti.getStaticAlignment(IGF.IGM);
+        unsigned align = alignConstant
+          ? alignConstant->getUniqueInteger().getZExtValue()
+          : 1;
+        Address addr(addrValue, Alignment(align));
+        Explosion loaded(IGF.CurExplosionLevel);
+        ti.loadAsTake(IGF, addr, loaded);
+        unsigned width = ti.getExplosionSize(IGF.CurExplosionLevel);
+        loaded.claimUnmanaged(width, Args);
+        NextParamIndex += 1;
+      } else {
+        unsigned width =
+          IGF.IGM.getExplosionSize(CanType(type), IGF.CurExplosionLevel);
+        Params.claimUnmanaged(width, Args);
+        NextParamIndex += width;
+      }
     }
 
   private:
@@ -837,7 +864,7 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
     // FIXME: other fn attributes?
     auto call = IGF.Builder.CreateCall(swiftImpl, args);
     if (sig.IsIndirectReturn) {
-      call->addAttribute(0, llvm::Attribute::get(IGM.getLLVMContext(),
+      call->addAttribute(1, llvm::Attribute::get(IGM.getLLVMContext(),
                                                  llvm::Attribute::StructRet));
     }
 
