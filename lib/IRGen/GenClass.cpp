@@ -997,7 +997,9 @@ namespace {
 
   private:
     bool requiresObjCMethodDescriptor(FuncDecl *method) {
-      if (method->getAttrs().ObjC) return true;
+      if (method->getAttrs().isObjC() ||
+          method->getAttrs().isIBAction())
+        return true;
       if (auto override = method->getOverriddenDecl())
         return requiresObjCMethodDescriptor(override);
       return false;
