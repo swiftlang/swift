@@ -11,5 +11,9 @@ add_swift_executable(swift
 
 target_link_libraries(swift edit)
 
+if(HAVE_MODULES_SDK)
+  add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}" )
+endif()
+
 install(TARGETS swift
   RUNTIME DESTINATION bin)
