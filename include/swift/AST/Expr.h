@@ -522,22 +522,22 @@ public:
 /// nodes, because 'super.f' is an application of 'this' to the superclass's
 /// method 'f'.
 class SuperMemberRefExpr : public Expr {
-  VarDecl *This;
+  Expr *Base;
   VarDecl *Value;
   SourceLoc SuperLoc;
   SourceLoc DotLoc;
   SourceLoc NameLoc;
   
 public:
-  SuperMemberRefExpr(VarDecl *This,
+  SuperMemberRefExpr(Expr *Base,
                      SourceLoc SuperLoc, SourceLoc DotLoc, VarDecl *Value,
                      SourceLoc NameLoc);
-  VarDecl *getThis() const { return This; }
+  Expr *getBase() const { return Base; }
   VarDecl *getDecl() const { return Value; }
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
   
-  void setThis(VarDecl *D) { This = D; }
+  void setBase(Expr *E) { Base = E; }
   
   SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const {
@@ -1166,13 +1166,13 @@ public:
 /// UnresolvedSuperMemberExpr - A superclass field access (super.bar) on an
 /// expression with unresolved type.
 class UnresolvedSuperMemberExpr : public Expr {
-  ValueDecl *This;
+  VarDecl *This;
   SourceLoc SuperLoc;
   SourceLoc DotLoc;
   SourceLoc NameLoc;
   Identifier Name;
 public:
-  UnresolvedSuperMemberExpr(ValueDecl *This,
+  UnresolvedSuperMemberExpr(VarDecl *This,
                             SourceLoc superloc,
                             SourceLoc dotloc, Identifier name,
                             SourceLoc nameloc)
@@ -1186,9 +1186,10 @@ public:
     return SourceRange(SuperLoc, NameLoc);
   }
   
+  SourceLoc getSuperLoc() const { return SuperLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
-  ValueDecl *getThis() const { return This; }
-  void setThis(ValueDecl *e) { This = e; }
+  VarDecl *getThis() const { return This; }
+  void setThis(VarDecl *e) { This = e; }
 
   Identifier getName() const { return Name; }
   SourceLoc getNameLoc() const { return NameLoc; }
@@ -1721,6 +1722,11 @@ public:
   unsigned getNaturalArgumentCount() const {
     return NumPatterns;
   }
+  
+  /// getImplicitThisDecl - If this FuncExpr is a non-static method in an
+  /// extension context, it will have a 'this' argument.  This method returns it
+  /// if present, or returns null if not.
+  VarDecl *getImplicitThisDecl() const;
   
   FuncDecl *getDecl() const { return TheFuncDecl; }
   void setDecl(FuncDecl *f) { TheFuncDecl = f; }

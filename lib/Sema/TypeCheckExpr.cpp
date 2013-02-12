@@ -826,7 +826,24 @@ public:
   }
     
   Expr *visitSuperMemberRefExpr(SuperMemberRefExpr *E) {
-    llvm_unreachable("super member ref not implemented");
+    if (E->getDecl()->getType()->is<ErrorType>())
+      return nullptr;
+
+    // Coerce the base to an lvalue of the superclass, materializing it if is
+    // not an lvalue yet.
+    Type SuperTy
+      = E->getDecl()->getDeclContext()->getDeclaredTypeOfContext();
+    
+    if (Expr *Base = TC.coerceObjectArgument(E->getBase(), SuperTy))
+      E->setBase(Base);
+    else
+      return nullptr;
+    
+    // Compute the final lvalue type and we're done.
+    E->setType(LValueType::get(E->getDecl()->getType(),
+                               LValueType::Qual::DefaultForMemberAccess,
+                               TC.Context));
+    return E;
   }
     
   Expr *visitSuperConstructorRefCallExpr(SuperConstructorRefCallExpr *E) {
@@ -997,7 +1014,8 @@ public:
   }
 
   Expr *visitSuperSubscriptExpr(SuperSubscriptExpr *E) {
-    llvm_unreachable("super member ref not implemented");
+    TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
+    return nullptr;
   }
 
   Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
@@ -1024,7 +1042,8 @@ public:
   }
     
   Expr *visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *E) {
-    llvm_unreachable("not implemented");
+    TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
+    return nullptr;
   }
   
   Expr *visitTupleElementExpr(TupleElementExpr *E) {

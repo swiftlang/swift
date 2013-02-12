@@ -2264,7 +2264,30 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     }
     
     Type visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *expr) {
-      llvm_unreachable("not implemented");
+      // FIXME: Protocols with default implementations and base class
+      // constraints could introduce super references on archetypes:
+      //
+      // class Foo { func bar() {} }
+      // protocol Runcible : Foo {
+      //   func runce() {
+      //     super.bar()
+      //   }
+      // }
+      
+      if (expr->getThis()->getType()->is<ErrorType>())
+        return expr->getThis()->getType();
+      
+      // Look up the base class type.
+      Type superTy = getSuperType(expr->getThis(), expr->getLoc(),
+                                  diag::super_not_in_class_method,
+                                  diag::super_with_no_base_class);
+      if (!superTy)
+        return Type();
+      
+      // Add a member constraint on the base class.
+      auto tv = CS.createTypeVariable(expr);
+      CS.addValueMemberConstraint(superTy, expr->getName(), tv, expr);
+      return tv;
     }
 
     Type visitSequenceExpr(SequenceExpr *expr) {
@@ -2635,6 +2658,24 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
 
       return outputTy;
     }
+
+    Type getSuperType(ValueDecl *thisDecl,
+                      SourceLoc diagLoc,
+                      Diag<> diag_not_in_class,
+                      Diag<> diag_no_base_class) {
+      DeclContext *typeContext = thisDecl->getDeclContext()->getParent();
+      assert(typeContext && "constructor without parent context?!");
+      ClassDecl *classDecl = dyn_cast<ClassDecl>(typeContext);
+      if (!classDecl) {
+        CS.TC.diagnose(diagLoc, diag_not_in_class);
+        return Type();
+      }
+      if (!classDecl->hasBaseClass()) {
+        CS.TC.diagnose(diagLoc, diag_no_base_class);
+        return Type();
+      }
+      return classDecl->getBaseClass();
+    }
     
     Type visitSuperConstructorRefCallExpr(SuperConstructorRefCallExpr *expr) {
       // If the constructor ref was already resolved, handle as a normal
@@ -2649,20 +2690,12 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       
       // Look up the base class type.
       ValueDecl *thisDecl = cast<DeclRefExpr>(expr->getArg())->getDecl();
-      DeclContext *typeContext = thisDecl->getDeclContext()->getParent();
-      assert(typeContext && "constructor without parent context?!");
-      ClassDecl *classDecl = dyn_cast<ClassDecl>(typeContext);
-      if (!classDecl) {
-        CS.TC.diagnose(expr->getLoc(),
-                       diag::super_constructor_not_in_class_constructor);
+      Type superTy = getSuperType(thisDecl,
+                                  expr->getLoc(),
+                                  diag::super_constructor_not_in_class_constructor,
+                                  diag::super_constructor_with_no_base_class);
+      if (!superTy)
         return Type();
-      }
-      if (!classDecl->hasBaseClass()) {
-        CS.TC.diagnose(expr->getLoc(),
-                       diag::super_constructor_with_no_base_class);
-        return Type();
-      }
-      Type superTy = classDecl->getBaseClass();
       
       // Add a member constraint for constructors on the base class.
       ASTContext &C = CS.getASTContext();
@@ -5107,6 +5140,82 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return result;
     }
 
+    /// \brief Build a new super member reference with the given member.
+    Expr *buildSuperMemberRef(VarDecl *thisDecl,
+                              SourceLoc superLoc,
+                              SourceLoc dotLoc,
+                              ValueDecl *member,
+                              SourceLoc memberLoc,
+                              Type openedType) {
+      assert((isa<FuncDecl>(member) || isa<VarDecl>(member)) &&
+             "super.member resolved to something not a method or property?!");
+      
+      auto &tc = CS.getTypeChecker();
+      auto &C = CS.getASTContext();
+      Type baseTy = thisDecl->getType();
+      Expr *baseRef = new (C) DeclRefExpr(thisDecl, superLoc,
+                                          thisDecl->getTypeOfReference());
+      Expr *result;
+      
+      // Reference to a member of a generic type.
+      if (baseTy->isSpecialized()) {
+        if (isa<FuncDecl>(member)) {
+          // Bind a reference to the generic type.
+          CoercionContext CC(tc);
+          Type substTy = tc.substBaseForGenericTypeMember(member, baseTy,
+                                                          member->getTypeOfReference(),
+                                                          memberLoc, CC);
+          // Reference the generic member.
+          Expr *ref = new (C) DeclRefExpr(member, memberLoc,
+                                          member->getTypeOfReference());
+          
+          // Specialize the member with the types from the base class.
+          Expr *specializedRef
+            = tc.buildSpecializeExpr(ref, substTy, CC.Substitutions,
+                                     CC.Conformance,
+                                     /*OnlyInnermostParams=*/false);
+          result = new (C) SuperCallExpr(specializedRef,
+                                         superLoc,
+                                         dotLoc,
+                                         baseRef);
+        } else {
+          // FIXME: GenericSuperMemberRefExpr
+          VarDecl *vd = cast<VarDecl>(member);
+          result = new (C) SuperMemberRefExpr(baseRef,
+                                              superLoc,
+                                              dotLoc,
+                                              vd,
+                                              memberLoc);
+        }
+      } else {
+        // Reference to a member of a non-generic type.
+        if (isa<FuncDecl>(member)) {
+          // Reference the generic member.
+          Expr *ref = new (C) DeclRefExpr(member, memberLoc,
+                                          member->getTypeOfReference());
+          
+          result = new (C) SuperCallExpr(ref, superLoc, dotLoc, baseRef);
+        } else {
+          VarDecl *vd = cast<VarDecl>(member);
+          result = new (C) SuperMemberRefExpr(baseRef,
+                                              superLoc,
+                                              dotLoc,
+                                              vd,
+                                              memberLoc);
+        }
+      }
+      
+      result = tc.recheckTypes(result);
+      if (!result)
+        return nullptr;
+      
+      if (auto polyFn = result->getType()->getAs<PolymorphicFunctionType>()) {
+        return specialize(result, polyFn, openedType);
+      }
+      
+      return result;
+    }
+    
     /// \brief Build a reference to an operator within a protocol.
     Expr *buildProtocolOperatorRef(ProtocolDecl *proto, ValueDecl *value,
                                    SourceLoc nameLoc, Type openedType) {
@@ -5348,7 +5457,30 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
     
     Expr *visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *expr) {
-      llvm_unreachable("not implemented");
+      // Determine the declaration selected for this overloaded reference.
+      auto ovl = CS.getGeneratedOverloadSet(expr);
+      if (!ovl)
+        return new (CS.getASTContext()) ErrorExpr(expr->getSourceRange());
+
+      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
+      
+      switch (selected.first.getKind()) {
+      case OverloadChoiceKind::Decl: {
+        auto r = buildSuperMemberRef(expr->getThis(),
+                                   expr->getSuperLoc(),
+                                   expr->getDotLoc(),
+                                   selected.first.getDecl(), expr->getNameLoc(),
+                                   selected.second);
+        return r;
+      }
+        
+      case OverloadChoiceKind::TupleIndex:
+      case OverloadChoiceKind::BaseType:
+      case OverloadChoiceKind::FunctionReturningBaseType:
+      case OverloadChoiceKind::IdentityFunction:
+        llvm_unreachable("Nonsensical overload choice");
+      }
+
     }
 
     Expr *visitSequenceExpr(SequenceExpr *expr) {

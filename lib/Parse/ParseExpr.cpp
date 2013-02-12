@@ -195,6 +195,24 @@ NullablePtr<Expr> Parser::parseExprNew() {
   return NewArrayExpr::create(Context, newLoc, elementTy, bounds);
 }
 
+#include "llvm/Support/raw_ostream.h"
+
+static VarDecl *getImplicitThisDeclForSuperContext(Parser &P,
+                                                   DeclContext *dc,
+                                                   SourceLoc loc) {
+  if (ConstructorDecl *ctor = dyn_cast<ConstructorDecl>(dc)) {
+    return ctor->getImplicitThisDecl();
+  } else if (DestructorDecl *dtor = dyn_cast<DestructorDecl>(dc)) {
+    return dtor->getImplicitThisDecl();
+  } else if (FuncExpr *fe = dyn_cast<FuncExpr>(dc)) {
+    auto thisDecl = fe->getImplicitThisDecl();
+    if (thisDecl)
+      return thisDecl;
+  }
+  P.diagnose(loc, diag::super_not_in_class_method);
+  return nullptr;
+}
+
 /// parseExprSuper
 ///
 ///   expr-super:
@@ -239,7 +257,15 @@ NullablePtr<Expr> Parser::parseExprSuper() {
       Identifier name;
       if (parseIdentifier(name, diag::expected_identifier_after_super_dot_expr))
         return nullptr;
-      return new (Context) UnresolvedSuperMemberExpr(nullptr,
+      
+      VarDecl *thisDecl = getImplicitThisDeclForSuperContext(*this,
+                                                             CurDeclContext,
+                                                             nameLoc);
+      
+      if (!thisDecl)
+        return new (Context) ErrorExpr(SourceRange(superLoc, nameLoc));
+      
+      return new (Context) UnresolvedSuperMemberExpr(thisDecl,
                                                      superLoc,
                                                      dotLoc,
                                                      name,

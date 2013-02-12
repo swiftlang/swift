@@ -131,10 +131,10 @@ MemberRefExpr::MemberRefExpr(Expr *Base, SourceLoc DotLoc, VarDecl *Value,
   : Expr(ExprKind::MemberRef), Base(Base),
     Value(Value), DotLoc(DotLoc), NameLoc(NameLoc) { }
 
-SuperMemberRefExpr::SuperMemberRefExpr(VarDecl *This,
+SuperMemberRefExpr::SuperMemberRefExpr(Expr *Base,
                                        SourceLoc SuperLoc, SourceLoc DotLoc,
                                        VarDecl *Value, SourceLoc NameLoc)
-: Expr(ExprKind::SuperMemberRef), This(This), Value(Value),
+: Expr(ExprKind::SuperMemberRef), Base(Base), Value(Value),
   SuperLoc(SuperLoc), DotLoc(DotLoc), NameLoc(NameLoc)
 {
 }
@@ -462,6 +462,23 @@ ConstructorDecl *SuperConstructorRefCallExpr::getConstructor() const {
   return cast<ConstructorDecl>(cast<DeclRefExpr>(getFn())->getDecl());
 }
 
+/// getImplicitThisDecl - If this FuncExpr is a non-static method in an
+/// extension context, it will have a 'this' argument.  This method returns it
+/// if present, or returns null if not.
+VarDecl *FuncExpr::getImplicitThisDecl() const {
+  if (getNumParamPatterns() == 0) return nullptr;
+  
+  // "this" is represented as (typed_pattern (named_pattern (var_decl 'this')).
+  TypedPattern *TP = dyn_cast<TypedPattern>(getArgParamPatterns()[0]);
+  if (TP == 0) return nullptr;
+  
+  // The decl should be named 'this' and have no location information.
+  NamedPattern *NP = dyn_cast<NamedPattern>(TP->getSubPattern());
+  if (NP && NP->getBoundName().str() == "this" && !NP->getLoc().isValid())
+    return NP->getDecl();
+  return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 // Printing for Expr and all subclasses.
 //===----------------------------------------------------------------------===//
@@ -591,7 +608,9 @@ public:
   }
   void visitSuperMemberRefExpr(SuperMemberRefExpr *E) {
     printCommon(E, "super_member_ref_expr")
-      << " decl=" << E->getDecl()->getName() << ';';
+      << " decl=" << E->getDecl()->getName() << '\n';
+    printRec(E->getBase());
+    OS << ')';
   }
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
     printCommon(E, "existential_member_ref_expr")

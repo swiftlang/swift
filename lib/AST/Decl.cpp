@@ -595,6 +595,10 @@ void VarDecl::setProperty(ASTContext &Context, SourceLoc LBraceLoc,
     Set->makeSetter(this);
 }
 
+VarDecl *FuncDecl::getImplicitThisDecl() const {
+  return Body->getImplicitThisDecl();
+}
+
 /// getNaturalArgumentCount - Returns the "natural" number of
 /// argument clauses taken by this function.
 unsigned FuncDecl::getNaturalArgumentCount() const {
@@ -678,23 +682,6 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
   // 'this' is accepts implicit l-values and doesn't force them to the heap.
   return LValueType::get(ContainerType, LValueType::Qual::NonHeap,
                          getASTContext());
-}
-
-/// getImplicitThisDecl - If this FuncDecl is a non-static method in an
-/// extension context, it will have a 'this' argument.  This method returns it
-/// if present, or returns null if not.
-VarDecl *FuncDecl::getImplicitThisDecl() {
-  if (Body->getNumParamPatterns() == 0) return 0;
-  
-  // "this" is represented as (typed_pattern (named_pattern (var_decl 'this')).
-  TypedPattern *TP = dyn_cast<TypedPattern>(Body->getArgParamPatterns()[0]);
-  if (TP == 0) return 0;
-  
-  // The decl should be named 'this' and have no location information.
-  NamedPattern *NP = dyn_cast<NamedPattern>(TP->getSubPattern());
-  if (NP && NP->getBoundName().str() == "this" && !NP->getLoc().isValid())
-    return NP->getDecl();
-  return 0;
 }
 
 /// Produce the selector for this "Objective-C method" in the given buffer.
