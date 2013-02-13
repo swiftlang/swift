@@ -156,8 +156,10 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   if (isa<ErrorType>(T))
     return;
 
-  // Skip printing for expressions of void type.
+  // Skip printing for expressions of void or module type.
   if (isa<TupleType>(T) && cast<TupleType>(T)->getFields().empty())
+    return;
+  if (isa<ModuleType>(T))
     return;
 
   // Build a function to call to print the expression.
@@ -188,10 +190,11 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   for (auto Result : PrintDeclLookup.Results)
     PrintDecls.push_back(Result.getValueDecl());
 
-  // Printing format is "Int = 0\n".  Unique the type string into an identifier
-  // since PrintLiteralString is building an AST around the string that must
-  // persist beyond the lifetime of getString().
+  // Printing format is "// Int = 0\n". Unique the type string into an
+  // identifier since PrintLiteralString is building an AST around the string
+  // that must persist beyond the lifetime of getString().
   auto TypeStr = Context.getIdentifier(E->getType()->getString()).str();
+  PrintLiteralString("// ", *this, Loc, PrintDecls, BodyContent);
   PrintLiteralString(TypeStr, *this, Loc, PrintDecls, BodyContent);
   PrintLiteralString(" = ", *this, Loc, PrintDecls, BodyContent);
   PrintReplExpr(*this, Arg, T, Loc, EndLoc, MemberIndexes, BodyContent,
@@ -298,6 +301,7 @@ void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
   
   // Fill in body of function.
   SmallVector<BraceStmt::ExprStmtOrDecl, 4> BodyContent;
+  PrintLiteralString("// ", *this, Loc, PrintDecls, BodyContent);
   PatternBindingPrintLHS PatPrinter(BodyContent, PrintDecls, Loc, *this);
   PatPrinter.visit(D->getPattern());
   PrintLiteralString(" : ", *this, Loc, PrintDecls, BodyContent);
