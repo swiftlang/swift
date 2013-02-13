@@ -444,6 +444,9 @@ void Lexer::lexOperatorIdentifier() {
   if (CurPtr-TokStart == 1) {
     switch (TokStart[0]) {
     case '=':
+      if (leftBound != rightBound)
+        diagnose(TokStart, diag::lex_unary_equal_is_reserved);
+      // always emit 'tok::equal' to avoid trickle down parse errors
       return formToken(tok::equal, TokStart);
     case '&':
       if (leftBound == rightBound || leftBound)

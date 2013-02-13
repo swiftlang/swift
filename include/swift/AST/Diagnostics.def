@@ -116,6 +116,8 @@ ERROR(lex_expected_binary_exponent_in_hex_float_literal,lexing,none,
       "hexadecimal floating point literal must end with an exponent", ())
 ERROR(lex_unexpected_block_comment_end,lexing,none,
       "unexpected end of block comment", ())
+ERROR(lex_unary_equal_is_reserved,lexing,none,
+      "prefix/postfix '=' is reserved", ())
 ERROR(lex_unary_postfix_dot_is_reserved,lexing,none,
       "postfix '.' is reserved", ())
 ERROR(lex_unexpected_long_period_series,lexing,none,
