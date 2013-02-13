@@ -115,14 +115,18 @@ MemberLookup::MemberLookup(Type BaseTy, Identifier Name, Module &M,
   MemberName = Name;
   IsTypeLookup = TypeLookup;
   VisitedSet Visited;
-  doIt(BaseTy, M, Visited);
+  doIt(BaseTy, M, /*OnlyInstanceMembers=*/!TypeLookup, Visited);
 }
 
 /// doIt - Lookup a member 'Name' in 'BaseTy' within the context
 /// of a given module 'M'.  This operation corresponds to a standard "dot" 
 /// lookup operation like "a.b" where 'this' is the type of 'a'.  This
 /// operation is only valid after name binding.
-void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
+///
+/// \param OnlyInstanceMembers Only instance members should be found by
+/// name lookup.
+void MemberLookup::doIt(Type BaseTy, Module &M, bool OnlyInstanceMembers,
+                        VisitedSet &Visited) {
   typedef MemberLookupResult Result;
   
   // Just look through l-valueness.  It doesn't affect name lookup.
@@ -139,7 +143,7 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
     // member name to see if we find extensions or anything else.  For example,
     // type SomeTy.SomeMember can look up static functions, and can even look
     // up non-static functions as well (thus getting the address of the member).
-    doIt(Ty, M, Visited);
+    doIt(Ty, M, /*OnlyInstanceMembers=*/false, Visited);
     return;
   }
   
@@ -162,12 +166,15 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
       return;
       
     for (auto Inherited : PT->getDecl()->getInherited())
-      doIt(Inherited.getType(), M, Visited);
+      doIt(Inherited.getType(), M, OnlyInstanceMembers, Visited);
     
     for (auto Member : PT->getDecl()->getMembers()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
         if (VD->getName() != MemberName) continue;
         if (isa<VarDecl>(VD) || isa<SubscriptDecl>(VD) || isa<FuncDecl>(VD)) {
+          if (OnlyInstanceMembers && !VD->isInstanceMember())
+            continue;
+
           Results.push_back(Result::getExistentialMember(VD));
         } else {
           assert(isa<TypeDecl>(VD) && "Unhandled protocol member");
@@ -182,17 +189,17 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
   // declared protocol member in any of the protocols.
   if (auto PC = BaseTy->getAs<ProtocolCompositionType>()) {
     for (auto Proto : PC->getProtocols())
-      doIt(Proto, M, Visited);
+      doIt(Proto, M, OnlyInstanceMembers, Visited);
     return;
   }
 
   // Check to see if any of an archetype's requirements have the member.
   if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
     for (auto Proto : Archetype->getConformsTo())
-      doIt(Proto->getDeclaredType(), M, Visited);
+      doIt(Proto->getDeclaredType(), M, OnlyInstanceMembers, Visited);
 
     if (auto superclass = Archetype->getSuperclass())
-      doIt(superclass, M, Visited);
+      doIt(superclass, M, OnlyInstanceMembers, Visited);
 
     // Change existential and metatype members to archetype members, since
     // we're in an archetype.
@@ -234,6 +241,10 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
           Results.push_back(Result::getMetatypeMember(TD));
         continue;
       }
+
+      if (OnlyInstanceMembers && !VD->isInstanceMember())
+        continue;
+
       if (FuncDecl *FD = dyn_cast<FuncDecl>(VD)) {
         if (FD->isStatic())
           Results.push_back(Result::getMetatypeMember(FD));
@@ -518,7 +529,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       }
 
       FuncDecl *FD = FE->getDecl();
-      if (FD && FD->getExtensionType() && !FD->isStatic()) {
+      if (FD && FD->getExtensionType()) {
         ExtendedType = FD->getExtensionType();
         BaseDecl = FD->getImplicitThisDecl();
         if (NominalType *NT = ExtendedType->getAs<NominalType>())
@@ -526,6 +537,9 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
           MetaBaseDecl = UGT->getDecl();
         DC = DC->getParent();
+
+        if (FD->isStatic())
+          ExtendedType = MetaTypeType::get(ExtendedType, M.getASTContext());
       }
 
       // Look in the generic parameters after checking our local declaration.

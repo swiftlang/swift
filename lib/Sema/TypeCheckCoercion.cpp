@@ -665,10 +665,11 @@ TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
   }
   assert(MethodName && "Didn't know LitTy");
 
-  MemberLookup PrimaryLookup(Ty, Context.getIdentifier(MethodName), TU);
+  auto metaTy = MetaTypeType::get(Ty, Context);
+  MemberLookup PrimaryLookup(metaTy, Context.getIdentifier(MethodName), TU);
   Optional<MemberLookup> AltLookup;
   if (AltMethodName && !PrimaryLookup.isSuccess())
-    AltLookup.emplace(Ty, Context.getIdentifier(AltMethodName), TU);
+    AltLookup.emplace(metaTy, Context.getIdentifier(AltMethodName), TU);
   MemberLookup &Lookup = AltLookup ? AltLookup.getValue() : PrimaryLookup;
 
   if (!Lookup.isSuccess()) {

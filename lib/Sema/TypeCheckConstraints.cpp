@@ -2243,7 +2243,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // form (T2 -> T0) until T0 has been deduced, we cannot model this
       // directly within the constraint system. Instead, we introduce a new
       // overload set with two entries: one for T0 and one for T2 -> T0.
-      CS.addValueMemberConstraint(oneofTy, expr->getName(), memberTy, expr);
+      auto oneofMetaTy = MetaTypeType::get(oneofTy, CS.getASTContext());
+      CS.addValueMemberConstraint(oneofMetaTy, expr->getName(), memberTy, expr);
 
       OverloadChoice choices[2] = {
         OverloadChoice(oneofTy, OverloadChoiceKind::BaseType),
@@ -2390,7 +2391,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // FIXME: Use the protocol constraint instead of this value constraint.
       Type converterFuncTy = FunctionType::get(arrayEltsTupleTy,
                                                arrayTy, C);
-      CS.addValueMemberConstraint(arrayTy,
+      auto arrayMetaTy = MetaTypeType::get(arrayTy, C);
+      CS.addValueMemberConstraint(arrayMetaTy,
                                   C.getIdentifier("convertFromArrayLiteral"),
                                   converterFuncTy,
                                   expr);
@@ -2674,7 +2676,11 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
         CS.TC.diagnose(diagLoc, diag_no_base_class);
         return Type();
       }
-      return classDecl->getBaseClass();
+
+      Type baseTy = classDecl->getBaseClass();
+      if (thisDecl->getType()->is<MetaTypeType>())
+        baseTy = MetaTypeType::get(baseTy, CS.getASTContext());
+      return baseTy;
     }
     
     Type visitSuperConstructorRefCallExpr(SuperConstructorRefCallExpr *expr) {
@@ -3814,7 +3820,10 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   Type baseTy = simplifyType(constraint.getFirstType());
   Type baseObjTy = baseTy->getRValueType();
   
-  if (baseObjTy->is<TypeVariableType>())
+  if (baseObjTy->is<TypeVariableType>() ||
+      (baseObjTy->is<MetaTypeType>() && 
+       baseObjTy->castTo<MetaTypeType>()->getInstanceType()
+         ->is<TypeVariableType>()))
     return SolutionKind::Unsolved;
   
   // If the base type is a tuple type, look for the named or indexed member
@@ -3908,6 +3917,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   // Can't refer to a property without an object instance.
   // FIXME: Subscripts have a similar restriction. Check it here.
+  // FIXME: DEAD CODE?
   bool isMetatypeBase = baseObjTy->getRValueType()->is<MetaTypeType>();
   if (isMetatypeBase && lookup.Results.size() == 1 &&
       lookup.Results[0].Kind == MemberLookupResult::MemberProperty) {
@@ -5400,17 +5410,17 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       Type oneofTy = CS.simplifyType(expr->getType());
       if (auto funcTy = oneofTy->getAs<FunctionType>())
         oneofTy = funcTy->getResult();
+      auto &tc = CS.getTypeChecker();
+      auto oneofMetaTy = MetaTypeType::get(oneofTy, tc.Context);
 
       // The base expression is simply the metatype of a oneof type.
-      auto &tc = CS.getTypeChecker();
       auto base = new (tc.Context) MetatypeExpr(nullptr,
                                                 expr->getDotLoc(),
-                                                MetaTypeType::get(oneofTy,
-                                                                  tc.Context));
+                                                oneofMetaTy);
 
       // Find the member and build a reference to it.
       // FIXME: Redundant member lookup.
-      MemberLookup &lookup = CS.lookupMember(oneofTy, expr->getName());
+      MemberLookup &lookup = CS.lookupMember(oneofMetaTy, expr->getName());
       assert(lookup.isSuccess() && "Failed lookup?");
       auto member = lookup.Results[0].D;
       auto result = tc.buildMemberRefExpr(base, expr->getDotLoc(),

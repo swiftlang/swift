@@ -92,7 +92,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   }
   
   bool Complained = false;
-  
+  auto metaT = MetaTypeType::get(T, TC.Context);
+
   // First, resolve any associated type members. They'll be used for checking
   // other members.
   
@@ -112,8 +113,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         = T;
       continue;
     }
-    
-    MemberLookup Lookup(T, AssociatedType->getName(), TC.TU);
+
+    MemberLookup Lookup(metaT, AssociatedType->getName(), TC.TU);
     if (Lookup.isSuccess()) {
       SmallVector<TypeDecl *, 2> Viable;
       SmallVector<std::pair<TypeDecl *, ProtocolDecl *>, 2> NonViable;
@@ -335,7 +336,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     }
 
     // Variable/function/subscript requirements.
-    MemberLookup Lookup(T, Requirement->getName(), TC.TU);
+    MemberLookup Lookup(metaT, Requirement->getName(), TC.TU);
 
     if (Lookup.isSuccess()) {
       SmallVector<ValueDecl *, 2> Viable;

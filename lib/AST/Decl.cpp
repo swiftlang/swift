@@ -357,18 +357,48 @@ bool ValueDecl::isInstanceMember() const {
   DeclContext *DC = getDeclContext();
   if (!DC->isTypeContext())
     return false;
-  
-  // Variables in oneofs/extensions/protocols are instance members.
-  // FIXME: If we ever end up with static variables, we'll have to check for
-  // them here.
-  if (isa<VarDecl>(this))
+
+  switch (getKind()) {
+  case DeclKind::Import:
+  case DeclKind::Extension:
+  case DeclKind::PatternBinding:
+  case DeclKind::TopLevelCode:
+    llvm_unreachable("Not a ValueDecl");
+
+  case DeclKind::Class:
+  case DeclKind::OneOf:
+  case DeclKind::Protocol:
+  case DeclKind::Struct:
+  case DeclKind::TypeAlias:
+    // Types are not instance members.
+    return false;
+
+  case DeclKind::Constructor:
+    // Constructors are not instance members.
+    return false;
+
+  case DeclKind::Destructor:
+    // Destructors are technically instance members, although they
+    // can't actually be referenced as such.
     return true;
-  
-  // Non-static methods are instance members.
-  if (const FuncDecl *Func = dyn_cast<FuncDecl>(this))
-    return !Func->isStatic();
-  
-  return false;
+
+  case DeclKind::Func:
+    // Non-static methods are instance members.
+    return !cast<FuncDecl>(this)->isStatic();
+
+  case DeclKind::OneOfElement:
+    // oneof elements are not instance members.
+    return false;
+
+  case DeclKind::Subscript:
+    // Subscripts are always instance members.
+    return true;
+
+  case DeclKind::Var:
+    // Variables are always instance variables.
+    // FIXME: Until we get static variables.
+    return true;
+  }
 }
 
 bool ValueDecl::needsCapture() const {

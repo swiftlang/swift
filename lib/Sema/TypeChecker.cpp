@@ -259,6 +259,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD) {
   // the method introduces a new overload.
 
   Type Base = CD->getBaseClass();
+  auto BaseMetaTy = MetaTypeType::get(Base, TC.Context);
   llvm::DenseMap<Identifier, std::vector<ValueDecl*>> FoundDecls;
   llvm::SmallPtrSet<ValueDecl*, 16> ExactOverriddenDecls;
   llvm::SmallVector<ValueDecl*, 16> PossiblyOverridingDecls;
@@ -274,7 +275,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD) {
                                                std::vector<ValueDecl*>() });
     auto& CurDecls = FoundDeclResult.first->second;
     if (FoundDeclResult.second) {
-      MemberLookup Lookup(Base, MemberVD->getName(), TC.TU);
+      MemberLookup Lookup(BaseMetaTy, MemberVD->getName(), TC.TU);
       for (auto BaseMember : Lookup.Results)
         CurDecls.push_back(BaseMember.D);
     }
