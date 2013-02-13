@@ -292,11 +292,23 @@ ClangImporter::Implementation::importSourceRange(clang::SourceRange loc) {
 }
 
 #pragma mark Importing names
+
+/// \brief Determine whether the given name is reserved for Swift.
+static bool isSwiftReservedName(StringRef name) {
+  /// FIXME: Check Swift keywords.
+  return llvm::StringSwitch<bool>(name)
+           .Cases("true", "false", true)
+           .Default(false);
+}
+
 clang::DeclarationName
 ClangImporter::Implementation::importName(Identifier name) {
   // FIXME: When we start dealing with C++, we can map over some operator
   // names.
   if (name.isOperator())
+    return clang::DeclarationName();
+
+  if (isSwiftReservedName(name.str()))
     return clang::DeclarationName();
 
   // Map the identifier. If it's some kind of keyword, it can't be mapped.
@@ -315,13 +327,22 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
     return Identifier();
 
   // Get the Swift identifier.
-  // FIXME: Check for Swift keywords, and filter those out.
-  if (suffix.empty())
-    return SwiftContext.getIdentifier(name.getAsIdentifierInfo()->getName());
+  if (suffix.empty()) {
+    StringRef nameStr = name.getAsIdentifierInfo()->getName();
+    if (isSwiftReservedName(nameStr))
+      return Identifier();
 
+    return SwiftContext.getIdentifier(nameStr);
+  }
+
+  // Append the suffix, and try again.
   llvm::SmallString<64> nameBuf;
   nameBuf += name.getAsIdentifierInfo()->getName();
   nameBuf += suffix;
+
+  if (isSwiftReservedName(nameBuf))
+    return Identifier();
+
   return SwiftContext.getIdentifier(nameBuf);
 }
 

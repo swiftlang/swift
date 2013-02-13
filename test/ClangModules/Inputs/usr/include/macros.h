@@ -6,3 +6,6 @@
 #define UINT32_MAX 0xFFFFFFFFU
 #define INT64_MAX 0x7FFFFFFFFFFFFFFFLL
 #define INT64_MIN -0x8000000000000000LL
+#define true 1
+#define false 0
+
