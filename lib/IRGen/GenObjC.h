@@ -44,7 +44,8 @@ namespace irgen {
                                      CanType substResultType,
                                      llvm::ArrayRef<Substitution> subs,
                                      ExplosionKind bestExplosion,
-                                     unsigned bestUncurry);
+                                     unsigned bestUncurry,
+                                     CanType /*nullable*/ searchClass);
 
   /// Reclaim an autoreleased return value.
   llvm::Value *emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,

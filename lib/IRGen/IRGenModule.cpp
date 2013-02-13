@@ -150,6 +150,14 @@ IRGenModule::IRGenModule(ASTContext &Context,
   };
   ObjCClassStructTy->setBody(objcClassElts);
 
+  ObjCSuperStructTy = llvm::StructType::create(LLVMContext, "objc_super");
+  ObjCSuperPtrTy = ObjCSuperStructTy->getPointerTo(defaultAS);
+  llvm::Type *objcSuperElts[] = {
+    ObjCPtrTy,
+    ObjCClassPtrTy
+  };
+  ObjCSuperStructTy->setBody(objcSuperElts);
+      
   // TODO: use "tinycc" on platforms that support it
   RuntimeCC = llvm::CallingConv::C;
 }

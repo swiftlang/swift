@@ -135,6 +135,8 @@ public:
   llvm::PointerType *OpaquePtrTy;      /// %swift.opaque*
   llvm::StructType *ObjCClassStructTy; /// %objc_class
   llvm::PointerType *ObjCClassPtrTy;   /// %objc_class*
+  llvm::StructType *ObjCSuperStructTy; /// %objc_super
+  llvm::PointerType *ObjCSuperPtrTy;   /// %objc_super*
   llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
 
   Size getPointerSize() const { return PtrSize; }
@@ -232,6 +234,8 @@ public:
 
   llvm::Constant *getObjCMsgSendFn();
   llvm::Constant *getObjCMsgSendStretFn();
+  llvm::Constant *getObjCMsgSendSuperFn();
+  llvm::Constant *getObjCMsgSendSuperStretFn();
 
   llvm::Constant *getObjCSelRegisterNameFn();
   llvm::Constant *getGetObjectClassFn();
@@ -273,6 +277,8 @@ private:
   llvm::Constant *ObjCReleaseFn = nullptr;
   llvm::Constant *ObjCMsgSendFn = nullptr;
   llvm::Constant *ObjCMsgSendStretFn = nullptr;
+  llvm::Constant *ObjCMsgSendSuperFn = nullptr;
+  llvm::Constant *ObjCMsgSendSuperStretFn = nullptr;
   llvm::Constant *ObjCSelRegisterNameFn = nullptr;
   llvm::Constant *ObjCEmptyCachePtr = nullptr;
   llvm::Constant *ObjCEmptyVTablePtr = nullptr;

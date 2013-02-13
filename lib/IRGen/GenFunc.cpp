@@ -964,6 +964,9 @@ namespace {
 
       /// An Objective-C message send.
       ObjCMessage,
+      
+      /// An Objective-C super send.
+      ObjCSuper,
 
       /// A call to a protocol member on a value of existential type.
       Existential,
@@ -995,6 +998,10 @@ namespace {
       struct {
         FuncDecl *Fn;
       } ObjCMessage;
+      struct {
+        FuncDecl *Fn;
+        TypeBase *SearchClass;
+      } ObjCSuper;
       struct {
         ExistentialMemberRefExpr *Fn;
       } Existential;
@@ -1036,6 +1043,14 @@ namespace {
       CalleeSource result;
       result.TheKind = Kind::ObjCMessage;
       result.ObjCMessage.Fn = fn;
+      return result;
+    }
+    
+    static CalleeSource forObjCSuper(FuncDecl *fn, CanType searchClass) {
+      CalleeSource result;
+      result.TheKind = Kind::ObjCSuper;
+      result.ObjCSuper.Fn = fn;
+      result.ObjCSuper.SearchClass = searchClass.getPointer();
       return result;
     }
 
@@ -1095,8 +1110,14 @@ namespace {
     }
 
     FuncDecl *getObjCMethod() const {
-      assert(getKind() == Kind::ObjCMessage);
-      return ObjCMessage.Fn;
+      switch (getKind()) {
+      case Kind::ObjCMessage:
+        return ObjCMessage.Fn;
+      case Kind::ObjCSuper:
+        return ObjCSuper.Fn;
+      default:
+        llvm_unreachable("not an objc callee");
+      }
     }
 
     ExistentialMemberRefExpr *getExistentialFunction() const {
@@ -1127,6 +1148,7 @@ namespace {
       case Kind::Virtual:
         return getAbstractVirtualCallee(IGF, getVirtualFunction());
 
+      case Kind::ObjCSuper:
       case Kind::ObjCMessage:
         return getAbstractObjCMethodCallee(IGF, getObjCMethod());
 
@@ -1862,14 +1884,18 @@ CallEmission CalleeSource::prepareRootCall(IRGenFunction &IGF,
     return CallEmission(IGF, callee);
   }
       
-  case Kind::ObjCMessage: {
+  case Kind::ObjCMessage:
+  case Kind::ObjCSuper: {
     // Find the 'self' expression and pass it separately.
     Expr *self = CallSites[0].getArg();
     CallSites.erase(CallSites.begin());
 
     return prepareObjCMethodCall(IGF, getObjCMethod(), self,
                                  SubstResultType, getSubstitutions(),
-                                 maxExplosion, bestUncurry);
+                                 maxExplosion, bestUncurry,
+                                 getKind() == Kind::ObjCSuper
+                                   ? CanType(ObjCSuper.SearchClass)
+                                   : CanType());
   }
 
   case Kind::Virtual: {
@@ -1934,10 +1960,47 @@ namespace {
   struct FunctionDecomposer :
       irgen::ExprVisitor<FunctionDecomposer, CalleeSource> {
         
+    /// Get the original uncoerced type of a super call for objc_msgSendSuper2
+    /// search.
+    /// FIXME: Keep a ClassDecl ref directly in the AST.
+    CanType getSuperSearchClass(Expr *e) {
+      while (ImplicitConversionExpr *d = dyn_cast<ImplicitConversionExpr>(e)) {
+        e = d->getSubExpr();
+      }
+      Type origType = e->getType()->getRValueType();
+      if (MetaTypeType *meta = origType->getAs<MetaTypeType>()) {
+        origType = meta->getInstanceType();
+      }
+      return origType->getCanonicalType();
+    }
+        
     CalleeSource visitSuperConstructorRefCallExpr(
                                               SuperConstructorRefCallExpr *E) {
       CalleeSource source =
         CalleeSource::forDirectSuperConstructor(E->getConstructor());
+      source.addCallSite(CallSite(E));
+      return source;
+    }
+        
+    CalleeSource visitSuperCallExpr(SuperCallExpr *E) {
+      DeclRefExpr *D = cast<DeclRefExpr>(E->getFn());
+      FuncDecl *fn = cast<FuncDecl>(D->getDecl());
+
+      CalleeSource source;
+      
+      if (fn->getAttrs().isObjC())
+        // FIXME: The test we really want is to ask if this function ONLY has an
+        // Objective-C implementation, but for now we'll just always go through
+        // the Objective-C version.
+        source = CalleeSource::forObjCSuper(fn,
+                                            getSuperSearchClass(E->getArg()));
+      else
+        // Pure Swift super calls can be direct.
+        // FIXME: Need to consider the resilience of the base class hierarchy,
+        // in case we picked up a super from an ancestor class--a nearer
+        // ancestor could end up intervening.
+        source = CalleeSource::forDirect(fn);
+      
       source.addCallSite(CallSite(E));
       return source;
     }

@@ -52,28 +52,49 @@ static llvm::Constant *createObjCRuntimeFunction(IRGenModule &IGM, StringRef nam
   return addr;
 }
 
+namespace {
+  template<llvm::Constant * (IRGenModule::*FIELD), char const *NAME>
+  llvm::Constant *getObjCSendFn(IRGenModule &IGM) {
+    if (IGM.*FIELD)
+      return IGM.*FIELD;
+
+    // We use a totally bogus signature to make sure we *always* cast.
+    llvm::FunctionType *fnType =
+      llvm::FunctionType::get(IGM.VoidTy, ArrayRef<llvm::Type*>(), false);
+    IGM.*FIELD = createObjCRuntimeFunction(IGM, NAME, fnType);
+    return IGM.*FIELD;
+  }
+  // T objc_msgSend(id, SEL*, U...);
+  static const char objc_msgSend_name[] = "objc_msgSend";
+  // void objc_msgSend_stret([[sret]] T *, id, SEL, U...);
+  static const char objc_msgSend_stret_name[] = "objc_msgSend_stret";
+  // T objc_msgSendSuper2(struct objc_super *, SEL, U...);
+  static const char objc_msgSendSuper_name[] = "objc_msgSendSuper2";
+  // void objc_msgSendSuper2_stret([[sret]] T *, struct objc_super *, SEL, U...);
+  static const char objc_msgSendSuper_stret_name[]
+    = "objc_msgSendSuper2_stret";
+
+} // end anonymous namespace
+
+
 
 llvm::Constant *IRGenModule::getObjCMsgSendFn() {
-  if (ObjCMsgSendFn) return ObjCMsgSendFn;
-
-  // T objc_msgSend(id, SEL*, U...);
-  // We use a totally bogus signature to make sure we *always* cast.
-  llvm::FunctionType *fnType =
-    llvm::FunctionType::get(VoidTy, ArrayRef<llvm::Type*>(), false);
-  ObjCMsgSendFn = createObjCRuntimeFunction(*this, "objc_msgSend", fnType);
-  return ObjCMsgSendFn;
+  return getObjCSendFn<&IRGenModule::ObjCMsgSendFn, objc_msgSend_name>(*this);
 }
 
 llvm::Constant *IRGenModule::getObjCMsgSendStretFn() {
-  if (ObjCMsgSendStretFn) return ObjCMsgSendStretFn;
+  return getObjCSendFn<&IRGenModule::ObjCMsgSendStretFn,
+                       objc_msgSend_stret_name>(*this);
+}
 
-  // T objc_msgSend_stret(id, SEL*, U...);
-  // We use a totally bogus signature to make sure we *always* cast.
-  llvm::FunctionType *fnType =
-    llvm::FunctionType::get(VoidTy, ArrayRef<llvm::Type*>(), false);
-  ObjCMsgSendStretFn =
-    createObjCRuntimeFunction(*this, "objc_msgSend_stret", fnType);
-  return ObjCMsgSendStretFn;
+llvm::Constant *IRGenModule::getObjCMsgSendSuperFn() {
+  return getObjCSendFn<&IRGenModule::ObjCMsgSendSuperFn,
+                       objc_msgSendSuper_name>(*this);
+}
+
+llvm::Constant *IRGenModule::getObjCMsgSendSuperStretFn() {
+  return getObjCSendFn<&IRGenModule::ObjCMsgSendSuperStretFn,
+                       objc_msgSendSuper_stret_name>(*this);
 }
 
 llvm::Constant *IRGenModule::getObjCSelRegisterNameFn() {
@@ -300,7 +321,7 @@ namespace {
       }
     }
 
-    ObjCMethodSignature(IRGenModule &IGM, CanType formalType) {
+    ObjCMethodSignature(IRGenModule &IGM, CanType formalType, bool isSuper) {
       auto selfFnType = cast<FunctionType>(formalType);
       auto formalFnType = cast<FunctionType>(CanType(selfFnType->getResult()));
 
@@ -322,8 +343,11 @@ namespace {
         resultTy = resultSchema.getScalarResultType(IGM);
       }
 
-      // Add the 'self' argument.
-      argTys.push_back(IGM.getFragileType(CanType(selfFnType->getInput())));
+      // Add the 'self' or 'super' argument.
+      if (isSuper)
+        argTys.push_back(IGM.ObjCSuperPtrTy);
+      else
+        argTys.push_back(IGM.getFragileType(CanType(selfFnType->getInput())));
 
       // Add the _cmd argument.
       argTys.push_back(IGM.ObjCSELTy);
@@ -592,23 +616,81 @@ static const OwnershipConventions &setOwnershipConventions(Callee &callee,
   return callee.getOwnershipConventions();
 }
 
+static void emitSelfArgument(IRGenFunction &IGF, bool isInstanceMethod,
+                             Expr *self, Explosion &selfValues) {
+  if (isInstanceMethod) {
+    IGF.emitRValue(self, selfValues);
+  } else {
+    emitObjCClassRValue(IGF, self, selfValues);
+  }
+}
+
+static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
+                              Expr *self, Explosion &selfValues,
+                              CanType searchClass) {
+  // Allocate an objc_super struct.
+  Address super = IGF.createAlloca(IGF.IGM.ObjCSuperStructTy,
+                                   IGF.IGM.getPointerAlignment(),
+                                   "objc_super");
+  // Generate the 'self' receiver.
+  Explosion selfValueTmp(ExplosionKind::Minimal);
+  emitSelfArgument(IGF, isInstanceMethod, self, selfValueTmp);
+  llvm::Value *selfValue = selfValueTmp.claimNext().forward(IGF);
+  selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.ObjCPtrTy);
+  
+  // Generate the search class object reference.
+  llvm::Value *searchValue;
+  if (isInstanceMethod) {
+    searchValue = emitClassHeapMetadataRef(IGF, searchClass);
+  } else {
+    ClassDecl *searchClassDecl = searchClass->getClassOrBoundGenericClass();
+    searchValue = IGF.IGM.getAddrOfMetaclassObject(searchClassDecl);
+  }
+  searchValue = IGF.Builder.CreateBitCast(searchValue, IGF.IGM.ObjCClassPtrTy);
+  
+  // Store the receiver and class to the struct.
+  llvm::Value *selfIndices[2] = {
+    IGF.Builder.getInt32(0),
+    IGF.Builder.getInt32(0)
+  };
+  llvm::Value *selfAddr = IGF.Builder.CreateGEP(super.getAddress(),
+                                                selfIndices);
+  IGF.Builder.CreateStore(selfValue, selfAddr, super.getAlignment());
+
+  llvm::Value *searchIndices[2] = {
+    IGF.Builder.getInt32(0),
+    IGF.Builder.getInt32(1)
+  };
+  llvm::Value *searchAddr = IGF.Builder.CreateGEP(super.getAddress(),
+                                                  searchIndices);
+  IGF.Builder.CreateStore(searchValue, searchAddr, super.getAlignment());
+  
+  // Pass a pointer to the objc_super struct to the messenger.
+  selfValues.addUnmanaged(super.getAddress());
+}
+
 /// Prepare a call using ObjC method dispatch.
 CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF, FuncDecl *method,
                                           Expr *self,
                                           CanType substResultType,
                                           ArrayRef<Substitution> subs,
                                           ExplosionKind maxExplosion,
-                                          unsigned maxUncurry) {
+                                          unsigned maxUncurry,
+                                          CanType searchType) {
   CanType origFormalType = method->getType()->getCanonicalType();
-  ObjCMethodSignature sig(IGF.IGM, origFormalType);
+  ObjCMethodSignature sig(IGF.IGM, origFormalType, bool(searchType));
 
   // Create the appropriate messenger function.
   // FIXME: this needs to be target-specific.
   llvm::Constant *messenger;
   if (sig.IsIndirectReturn) {
-    messenger = IGF.IGM.getObjCMsgSendStretFn();
+    messenger = searchType
+      ? IGF.IGM.getObjCMsgSendSuperStretFn()
+      : IGF.IGM.getObjCMsgSendStretFn();
   } else {
-    messenger = IGF.IGM.getObjCMsgSendFn();
+    messenger = searchType
+      ? IGF.IGM.getObjCMsgSendSuperFn()
+      : IGF.IGM.getObjCMsgSendFn();
   }
 
   // Cast the messenger to the right type.
@@ -631,12 +713,13 @@ CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF, FuncDecl *method,
   Callee &callee = emission.getMutableCallee();
   setOwnershipConventions(callee, method, selector);
 
-  // Emit the self argument.
+  // Emit the self or super argument.
   Explosion selfValues(ExplosionKind::Minimal);
-  if (method->isInstanceMember()) {
-    IGF.emitRValue(self, selfValues);
+  if (searchType) {
+    emitSuperArgument(IGF, method->isInstanceMember(), self, selfValues,
+                      searchType);
   } else {
-    emitObjCClassRValue(IGF, self, selfValues);
+    emitSelfArgument(IGF, method->isInstanceMember(), self, selfValues);
   }
   assert(selfValues.size() == 1);
 
@@ -800,7 +883,7 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
 
   // Construct a callee and derive its ownership conventions.
   CanType origFormalType = method->getType()->getCanonicalType();
-  ObjCMethodSignature sig(IGM, origFormalType);
+  ObjCMethodSignature sig(IGM, origFormalType, /*isSuper*/ false);
   auto callee = Callee::forMethod(origFormalType, sig.ResultType,
                                   ArrayRef<Substitution>(),
                                   swiftImpl,

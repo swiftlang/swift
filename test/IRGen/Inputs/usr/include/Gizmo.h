@@ -36,6 +36,8 @@ struct NSRect {
 + (void) runWithRect: (struct Rect) rect andGizmo: (Gizmo*) gizmo;
 - (struct NSRect) frame;
 - (void) setFrame: (struct NSRect) rect;
+- (void) frob;
++ (void) runce;
 @end
 
 @interface NSString : NSObject
