@@ -129,7 +129,7 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
   }
 
   // '.metatype' still leaves us with type-simple.
-  while ((Tok.is(tok::period) || Tok.is(tok::unresolved_member)) &&
+  while ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
          peekToken().is(tok::kw_metatype)) {
     consumeToken();
     SourceLoc metatypeLoc = consumeToken(tok::kw_metatype);
@@ -238,7 +238,7 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
     // unless <anything> is 'metatype'.
-    if ((Tok.is(tok::period) || Tok.is(tok::unresolved_member)) &&
+    if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         peekToken().isNot(tok::kw_metatype)) {
       consumeToken();
     } else {

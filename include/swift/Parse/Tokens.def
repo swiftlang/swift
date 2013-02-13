@@ -83,14 +83,14 @@ PUNCTUATOR(l_square_following, "[")
 PUNCTUATOR(r_square,    "]")
 
 PUNCTUATOR(period,      ".")
-PUNCTUATOR(unresolved_member, ".")
+PUNCTUATOR(period_prefix, ".")
 PUNCTUATOR(comma,       ",")
 PUNCTUATOR(colon,       ":")
 PUNCTUATOR(semi,        ";")
 PUNCTUATOR(equal,       "=")
 PUNCTUATOR(ellipsis,    "...")
 
-PUNCTUATOR(make_ref,    "&")
+PUNCTUATOR(amp_prefix,  "&")
 PUNCTUATOR(arrow,       "->")
 
 #undef KEYWORD

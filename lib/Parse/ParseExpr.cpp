@@ -79,8 +79,8 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
     Tok.setKind(tok::oper_prefix);
   }
 
-  if (Tok.is(tok::make_ref)) {
-    SourceLoc Loc = consumeToken(tok::make_ref);
+  if (Tok.is(tok::amp_prefix)) {
+    SourceLoc Loc = consumeToken(tok::amp_prefix);
 
     if (Expr *SubExpr = parseExprUnary(Message).getPtrOrNull())
       return new (Context) AddressOfExpr(Loc, SubExpr, Type());
@@ -359,8 +359,8 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     Result = parseExprExplicitClosure();
     break;
 
-  case tok::unresolved_member: {     // .foo
-    SourceLoc DotLoc = consumeToken(tok::unresolved_member);
+  case tok::period_prefix: {     // .foo
+    SourceLoc DotLoc = consumeToken(tok::period_prefix);
     Identifier Name;
     SourceLoc NameLoc = Tok.getLoc();
     if (parseIdentifier(Name, diag::expected_identifier_after_dot_expr))

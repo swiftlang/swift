@@ -451,14 +451,15 @@ void Lexer::lexOperatorIdentifier() {
     case '&':
       if (leftBound == rightBound || leftBound)
         break;
-      return formToken(tok::make_ref, TokStart);
+      return formToken(tok::amp_prefix, TokStart);
     case '.':
       if (leftBound == rightBound)
         return formToken(tok::period, TokStart);
       if (rightBound)
-        return formToken(tok::unresolved_member, TokStart);
+        return formToken(tok::period_prefix, TokStart);
       diagnose(TokStart, diag::lex_unary_postfix_dot_is_reserved);
-      return formToken(tok::unknown, TokStart);
+      // always emit 'tok::period' to avoid trickle down parse errors
+      return formToken(tok::period, TokStart);
     }
   } else if (CurPtr-TokStart == 2) {
     switch ((TokStart[0] << 8) | TokStart[1]) {
