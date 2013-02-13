@@ -240,10 +240,15 @@ struct EditLineWrapper {
     el_set(e, EL_SIGNAL, 1);
     el_set(e, EL_GETCFN, GetCharFn);
     
-    // Provide special outdenting behavior for '}'.
+    // Provide special outdenting behavior for '}' and ':'.
     el_set(e, EL_ADDFN, "swift-close-brace", "Reduce {} indentation level",
            BindingFn<&EditLineWrapper::onCloseBrace>);
     el_set(e, EL_BIND, "}", "swift-close-brace", nullptr);
+    
+    el_set(e, EL_ADDFN, "swift-colon", "Reduce label indentation level",
+           BindingFn<&EditLineWrapper::onColon>);
+    el_set(e, EL_BIND, ":", "swift-colon", nullptr);
+    
     // Provide special indent/completion behavior for tab.
     el_set(e, EL_ADDFN, "swift-indent-or-complete",
            "Indent line or trigger completion",
@@ -341,6 +346,79 @@ struct EditLineWrapper {
     }
     return true;
   }
+
+  // /^\s*\w+\s*:$/
+  bool lineLooksLikeLabel(LineInfo const *line) {
+    char const *p = line->buffer;
+    while (p != line->cursor && isspace(*p))
+      ++p;
+
+    if (p == line->cursor)
+      return false;
+    
+    do {
+      ++p;
+    } while (p != line->cursor && (isalnum(*p) || *p == '_'));
+    
+    while (p != line->cursor && isspace(*p))
+      ++p;
+
+    return p+1 == line->cursor || *p == ':';
+  }
+  
+  // /^\s*set\s*\(.*\)\s*:$/
+  bool lineLooksLikeSetter(LineInfo const *line) {
+    char const *p = line->buffer;
+    while (p != line->cursor && isspace(*p))
+      ++p;
+    
+    if (p == line->cursor || *p++ != 's')
+      return false;
+    if (p == line->cursor || *p++ != 'e')
+      return false;
+    if (p == line->cursor || *p++ != 't')
+      return false;
+
+    while (p != line->cursor && isspace(*p))
+      ++p;
+    
+    if (p == line->cursor || *p++ != '(')
+      return false;
+    
+    if (line->cursor - p < 2 || line->cursor[-1] != ':')
+      return false;
+
+    p = line->cursor - 1;
+    while (isspace(*--p));
+
+    return *p == ')';
+  }
+
+  void outdent() {
+    // If we didn't already outdent, do so.
+    if (!Outdented) {
+      if (PromptContinuationLevel > 0)
+        --PromptContinuationLevel;
+      Outdented = true;
+    }
+  }
+  
+  unsigned char onColon(int ch) {
+    // Add the character to the string.
+    char s[2] = {(char)ch, 0};
+    el_insertstr(e, s);
+    
+    LineInfo const *line = el_line(e);
+
+    // Outdent if the line looks like a label.
+    if (lineLooksLikeLabel(line))
+      outdent();
+    // Outdent if the line looks like a setter.
+    if (lineLooksLikeSetter(line))
+      outdent();
+    
+    return CC_REFRESH;
+  }
   
   unsigned char onCloseBrace(int ch) {
     bool atStart = isAtStartOfLine(el_line(e));
@@ -354,12 +432,7 @@ struct EditLineWrapper {
       return CC_REFRESH;
     }
     
-    // If we didn't already outdent, do so.
-    if (!Outdented) {
-      if (PromptContinuationLevel > 0)
-        --PromptContinuationLevel;
-      Outdented = true;
-    }
+    outdent();
     return CC_REFRESH;
   }
   
