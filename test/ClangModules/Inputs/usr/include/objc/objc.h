@@ -1,4 +1,8 @@
-@interface NSObject
+@protocol NSObject
+- description;
+@end
+
+@interface NSObject <NSObject>
 + alloc;
 - init;
 + new;

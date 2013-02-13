@@ -737,8 +737,9 @@ StringRef FuncDecl::getObjCSelector(llvm::SmallVectorImpl<char> &buffer) const {
   out << ':';
 
   // If it's a unary selector, we're done.
-  if (!tuple)
-    return StringRef(buffer.data(), buffer.size());
+  if (!tuple) {
+    return out.str();
+  }
 
   // For every element except the first, add a selector component.
   for (auto &elt : tuple->getFields().slice(1)) {
@@ -755,7 +756,7 @@ StringRef FuncDecl::getObjCSelector(llvm::SmallVectorImpl<char> &buffer) const {
     out << ':';
   }
 
-  return StringRef(buffer.data(), buffer.size());
+  return out.str();
 }
 
 SourceRange FuncDecl::getSourceRange() const {

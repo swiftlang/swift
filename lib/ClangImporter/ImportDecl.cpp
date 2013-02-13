@@ -776,24 +776,31 @@ namespace {
       // If this method overrides another method, mark it as such.
       // FIXME: We'll eventually have to deal with having multiple overrides
       // in Swift.
-      if (decl->isOverriding()) {
-        SmallVector<const clang::ObjCMethodDecl *, 2> overridden;
-        decl->getOverriddenMethods(overridden);
-        clang::ObjCMethodDecl *superResult = nullptr;
-        clang::ObjCMethodDecl *categoryResult = nullptr;
-        for (auto ov : overridden) {
-          if (isa<clang::ObjCInterfaceDecl>(ov->getDeclContext()))
-            superResult = const_cast<clang::ObjCMethodDecl *>(ov);
-          else if (isa<clang::ObjCCategoryDecl>(ov->getDeclContext()))
-            categoryResult = const_cast<clang::ObjCMethodDecl *>(ov);
-        }
+      if (auto thisClassTy = thisTy->getAs<ClassType>()) {
+        if (auto superTy = thisClassTy->getDecl()->getBaseClass()) {
+          llvm::SmallString<128> mySelectorBuf;
+          StringRef mySelector = result->getObjCSelector(mySelectorBuf);
+          MemberLookup superLookup(superTy, name, *Impl.firstClangModule);
+          for (auto &res : superLookup.Results) {
+            auto superMethod = dyn_cast<FuncDecl>(res.D);
+            if (!superMethod)
+              continue;
 
-        if (superResult)
-          result->setOverriddenDecl(
-            cast_or_null<FuncDecl>(Impl.importDecl(superResult)));
-        else if (categoryResult)
-          result->setOverriddenDecl(
-            cast_or_null<FuncDecl>(Impl.importDecl(categoryResult)));
+            if (superMethod->isStatic() != result->isStatic())
+              continue;
+
+            llvm::SmallString<128> superSelectorBuf;
+            StringRef superSelector
+              = superMethod->getObjCSelector(superSelectorBuf);
+            if (mySelector != superSelector)
+              continue;
+
+            // This is an override.
+            // FIXME: Proper type checking here!
+            result->setOverriddenDecl(superMethod);
+            break;
+          }
+        }
       }
 
       // Handle attributes.

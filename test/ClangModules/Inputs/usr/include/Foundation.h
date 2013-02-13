@@ -6,6 +6,7 @@ typedef unsigned long NSUInteger;
 
 @interface NSArray : NSObject
 - (id)objectAtIndexedSubscript:(NSUInteger)idx;
+- description;
 @end
 
 @interface NSString : NSObject
