@@ -281,9 +281,9 @@ struct EditLineWrapper {
     }
     
     if (!NeedPromptContinuation)
-      PromptString += "/*swift*/ ";
+      PromptString += "(swift) ";
     else {
-      PromptString += "/* ... */ ";
+      PromptString += "(     ) ";
       PromptString.append(2*PromptContinuationLevel, ' ');
     }
     
