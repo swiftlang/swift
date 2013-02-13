@@ -334,10 +334,25 @@ struct EditLineWrapper {
     return (((EditLineWrapper*)clientdata)->*method)(ch);
   }
   
+  bool isAtStartOfLine(LineInfo const *line) {
+    for (char c : StringRef(line->buffer, line->cursor - line->buffer)) {
+      if (!isspace(c))
+        return false;
+    }
+    return true;
+  }
+  
   unsigned char onCloseBrace(int ch) {
+    bool atStart = isAtStartOfLine(el_line(e));
+    
     // Add the character to the string.
     char s[2] = {(char)ch, 0};
     el_insertstr(e, s);
+    
+    // Don't outdent if we weren't at the start of the line.
+    if (!atStart) {
+      return CC_REFRESH;
+    }
     
     // If we didn't already outdent, do so.
     if (!Outdented) {
@@ -349,21 +364,14 @@ struct EditLineWrapper {
   }
   
   unsigned char onIndentOrComplete(int ch) {
-    // If there's nothing but whitespace before the cursor, indent to the next
-    // 2-character tab stop.
     LineInfo const *line = el_line(e);
     
-    bool shouldIndent = true;
     // FIXME: UTF-8? What's that?
     size_t cursorPos = line->cursor - line->buffer;
-    for (char c : StringRef(line->buffer, cursorPos)) {
-      if (!isspace(c)) {
-        shouldIndent = false;
-        break;
-      }
-    }
     
-    if (shouldIndent) {
+    // If there's nothing but whitespace before the cursor, indent to the next
+    // 2-character tab stop.
+    if (isAtStartOfLine(line)) {
       char const *indent = cursorPos & 1 ? " " : "  ";
       el_insertstr(e, indent);
       return CC_REFRESH;
