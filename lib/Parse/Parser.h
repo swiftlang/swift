@@ -275,7 +275,9 @@ public:
   bool parseType(TypeLoc &ResultLoc, Diag<> ID);
   bool parseTypeAnnotation(TypeLoc &ResultLoc);
   bool parseTypeAnnotation(TypeLoc &ResultLoc, Diag<> ID);
-  bool parseGenericArguments(ArrayRef<TypeLoc> &Args);
+  bool parseGenericArguments(ArrayRef<TypeLoc> &Args,
+                             SourceLoc &LAngleLoc,
+                             SourceLoc &RAngleLoc);
   bool parseTypeIdentifier(TypeLoc &ResultLoc);
   bool parseTypeComposition(TypeLoc &ResultLoc);
   bool parseTypeTupleBody(SourceLoc LPLoc, TypeLoc &ResultLoc);
@@ -294,6 +296,30 @@ public:
   NullablePtr<Pattern> parsePatternAtom(bool &CForLoopHack);
   NullablePtr<Pattern> parsePatternIdentifier();
 
+  //===--------------------------------------------------------------------===//
+  // Speculative type list parsing
+  //===--------------------------------------------------------------------===//
+  
+  /// Returns true if we can parse a generic argument list at the current
+  /// location in expression context. This parses types without generating
+  /// AST nodes from the '<' at the current location up to a matching '>'. If
+  /// the type list parse succeeds, and the closing '>' is followed by one
+  /// of the following tokens:
+  ///   lparen_following rparen lsquare_following rsquare lbrace rbrace
+  ///   period_following comma semicolon
+  /// then this function returns true, and the expression will parse as a
+  /// generic parameter list. If the parse fails, or the closing '>' is not
+  /// followed by one of the above tokens, then this function returns false,
+  /// and the expression will parse with the '<' as an operator.
+  bool canParseAsGenericArgumentList();
+  
+  bool canParseType();
+  bool canParseTypeIdentifier();
+  bool canParseTypeComposition();
+  bool canParseTypeTupleBody();
+  bool canParseTypeArray();
+  bool canParseGenericArguments();
+  
   //===--------------------------------------------------------------------===//
   // Expression Parsing
   

@@ -18,6 +18,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -161,18 +162,18 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
   }
 
   // If there is a square bracket without a space, we have an array.
-  // FIXME TODO -- Generics makes x<y>[] look like a comparison to array literal
-  if (Tok.is(tok::l_square_following) ||
-      (Tok.is(tok::l_square_starting) && peekToken().is(tok::r_square)))
+  if (Tok.is(tok::l_square_following) || Tok.is(tok::l_square_starting))
     return parseTypeArray(Result);
   
   return false;
 }
 
-bool Parser::parseGenericArguments(ArrayRef<TypeLoc> &Args) {
+bool Parser::parseGenericArguments(ArrayRef<TypeLoc> &Args,
+                                   SourceLoc &LAngleLoc,
+                                   SourceLoc &RAngleLoc) {
   // Parse the opening '<'.
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
-  SourceLoc LAngleLoc = consumeStartingLess();
+  LAngleLoc = consumeStartingLess();
 
   SmallVector<TypeLoc, 4> GenericArgs;
   
@@ -197,10 +198,10 @@ bool Parser::parseGenericArguments(ArrayRef<TypeLoc> &Args) {
     // Skip until we hit the '>'.
     skipUntilAnyOperator();
     if (startsWithGreater(Tok))
-      consumeStartingGreater();
+      RAngleLoc = consumeStartingGreater();
     return true;
   } else {
-    consumeStartingGreater();
+    RAngleLoc = consumeStartingGreater();
   }
 
   Args = Context.AllocateCopy(GenericArgs);
@@ -226,11 +227,12 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
     Identifier Name;
     if (parseIdentifier(Name, diag::expected_identifier_in_dotted_type))
       return true;
+    SourceLoc LAngle, RAngle;
     ArrayRef<TypeLoc> GenericArgs;
     if (startsWithLess(Tok)) {
       // FIXME: There's an ambiguity here because code could be trying to
       // refer to a unary '<' operator.
-      if (parseGenericArguments(GenericArgs))
+      if (parseGenericArguments(GenericArgs, LAngle, RAngle))
         return true;
     }
     Components.push_back(IdentifierType::Component(Loc, Name, GenericArgs));
@@ -431,7 +433,7 @@ bool Parser::parseTypeArray(TypeLoc &result) {
   if (Tok.is(tok::r_square)) {
     SourceLoc rsquareLoc = consumeToken(tok::r_square);
 
-    // If we're starting another square-bracket clause, recurse.
+    // If we're starting another square-bracket clause, recur.
     if (Tok.is(tok::l_square_following) && parseTypeArray(result))
       return true;
 
@@ -450,7 +452,7 @@ bool Parser::parseTypeArray(TypeLoc &result) {
                          diag::expected_rbracket_array_type, lsquareLoc))
     return true;
 
-  // If we're starting another square-bracket clause, recurse.
+  // If we're starting another square-bracket clause, recur.
   if (Tok.is(tok::l_square_following) && parseTypeArray(result))
     return true;
   
@@ -459,5 +461,249 @@ bool Parser::parseTypeArray(TypeLoc &result) {
     << sizeEx.get()->getSourceRange();
   
   return true;
+}
+
+//===--------------------------------------------------------------------===//
+// Speculative type list parsing
+//===--------------------------------------------------------------------===//
+
+static bool isGenericTypeDisambiguatingToken(Token &tok) {
+  switch (tok.getKind()) {
+  default:
+    return false;
+  case tok::l_paren_following:
+  case tok::r_paren:
+  case tok::l_square_following:
+  case tok::r_square:
+  case tok::l_brace:
+  case tok::r_brace:
+  case tok::period:
+  case tok::comma:
+  case tok::semi:
+    return true;
+  
+  case tok::l_paren_starting:
+  case tok::l_square_starting:
+  case tok::period_prefix:
+    // These will be turned into following tokens if they appear unspaced after
+    // a generic angle bracket.
+    return tok.getText().data()[-1] == '>';
+  }
+}
+
+namespace {
+  /// RAII object that restores the parser and lexer to their original positions
+  /// at the time the object was constructed when it is destroyed.
+  struct BacktrackingScope {
+    Parser &P;
+    Token BacktrackParserTo;
+    
+    BacktrackingScope(Parser &P)
+      : P(P),
+        BacktrackParserTo(P.Tok) {}
+    
+    ~BacktrackingScope() {
+      P.Tok = BacktrackParserTo;
+      P.L->backtrackToToken(BacktrackParserTo);
+    }
+  };
+} // end anonymous namespace
+
+bool Parser::canParseAsGenericArgumentList() {
+  BacktrackingScope backtrack(*this);
+
+  if (canParseGenericArguments())
+    return isGenericTypeDisambiguatingToken(Tok);
+
+  return false;
+}
+
+bool Parser::canParseGenericArguments() {
+  // Parse the opening '<'.
+  if (!startsWithLess(Tok))
+    return false;
+  consumeStartingLess();
+  
+  do {
+    if (!canParseType())
+      return false;
+    // Parse the comma, if the list continues.
+  } while (consumeIf(tok::comma));
+  
+  if (!startsWithGreater(Tok)) {
+    return false;
+  } else {
+    consumeStartingGreater();
+    return true;
+  }
+}
+
+bool Parser::canParseType() {
+  bool isTupleType = false;
+
+  switch (Tok.getKind()) {
+  case tok::kw_This:
+  case tok::identifier:
+    if (!canParseTypeIdentifier())
+      return false;
+    break;
+  case tok::kw_protocol:
+    if (!canParseTypeComposition())
+      return false;
+    break;
+  case tok::l_paren_starting: {
+    isTupleType = true;
+    consumeToken();
+    if (!canParseTypeTupleBody())
+      return false;
+    break;
+  }
+  default:
+    return false;
+  }
+  
+  // '.metatype' still leaves us with type-simple.
+  while ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
+         peekToken().is(tok::kw_metatype)) {
+    consumeToken();
+    consumeToken(tok::kw_metatype);
+  }
+  
+  // Handle type-function if we have an arrow.
+  if (consumeIf(tok::arrow)) {
+    // If the argument was not syntactically a tuple type, report an error.
+    if (!isTupleType)
+      return false;
+    
+    if (!canParseType())
+      return false;
+    return true;
+  }
+  
+  // If there is a square bracket without a space, we have an array.
+  if (Tok.is(tok::l_square_following) || Tok.is(tok::l_square_starting))
+    return canParseTypeArray();
+  
+  return true;
+}
+
+bool Parser::canParseTypeIdentifier() {
+  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_This)) {
+    return false;
+  }
+  
+  while (true) {
+    switch (Tok.getKind()) {
+#define IDENTIFIER_KEYWORD(kw) case tok::kw_##kw:
+#include "swift/Parse/Tokens.def"
+    case tok::identifier:
+      consumeToken();
+      break;
+    default:
+      return false;
+    }
+    
+    if (startsWithLess(Tok)) {
+      if (canParseGenericArguments())
+        return true;
+    }
+
+    // Treat 'Foo.<anything>' as an attempt to write a dotted type
+    // unless <anything> is 'metatype'.
+    if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
+        peekToken().isNot(tok::kw_metatype)) {
+      consumeToken();
+    } else {
+      return true;
+    }
+  }
+}
+
+bool Parser::canParseTypeComposition() {
+  consumeToken(tok::kw_protocol);
+  
+  // Check for the starting '<'.
+  if (!startsWithLess(Tok)) {
+    return false;
+  }
+  consumeStartingLess();
+  
+  // Check for empty protocol composition.
+  if (startsWithGreater(Tok)) {
+    consumeStartingGreater();
+    return true;
+  }
+  
+  // Parse the type-composition-list.
+  do {
+    if (!canParseTypeIdentifier()) {
+      return false;
+    }
+  } while (consumeIf(tok::comma));
+  
+  // Check for the terminating '>'.
+  if (!startsWithGreater(Tok)) {
+    return false;
+  }
+  consumeStartingGreater();
+  
+  return true;
+}
+
+bool Parser::canParseTypeTupleBody() {
+  if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
+      Tok.isNot(tok::ellipsis) && !isStartOfDecl(Tok, peekToken())) {
+    do {
+      // If the tuple element starts with "ident :", then
+      // the identifier is an element tag, and it is followed by a
+      // value-specifier.
+      // FIXME: This doesn't catch type attrs or default initializing
+      //   expressions!
+      if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
+        consumeToken(tok::identifier);
+        consumeToken(tok::colon);
+
+        if (!canParseType())
+          return false;
+        continue;
+      }
+      
+      // Otherwise, this has to be a type.
+      // FIXME: Type attributes!
+      if (!canParseType())
+        return false;
+    } while (consumeIf(tok::comma));
+  }
+  
+  if (Tok.is(tok::ellipsis)) {
+    consumeToken();
+  }
+  
+  if (Tok.is(tok::r_paren)) {
+    consumeToken();
+    return true;
+  } else {
+    return false;
+  }
+}
+
+
+bool Parser::canParseTypeArray() {
+  assert(Tok.is(tok::l_square_following) || Tok.is(tok::l_square_starting));
+  consumeToken();
+  
+  // Handle the [] production, meaning an array slice.
+  if (Tok.is(tok::r_square)) {
+    consumeToken(tok::r_square);
+    
+    // If we're starting another square-bracket clause, recur.
+    if (Tok.is(tok::l_square_following))
+      return canParseTypeArray();
+    
+    return true;
+  }
+  
+  // FIXME: Size expressions!
+  return false;
 }
 

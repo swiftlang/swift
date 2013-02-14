@@ -19,8 +19,9 @@
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SaveAndRestore.h"
-using namespace swift;
+#include "llvm/Support/raw_ostream.h"
 
+using namespace swift;
 
 /// parseExpr
 ///   expr:
@@ -520,7 +521,14 @@ Expr *Parser::parseExprStringLiteral() {
 }
   
 ///   expr-identifier:
-///     identifier
+///     identifier generic-args?
+///   The generic-args case is ambiguous with an expression involving '<'
+///   and '>' operators. The operator expression is favored unless a generic
+///   argument list can be successfully parsed, and the closing bracket is
+///   followed by one of these tokens:
+///     lparen_following rparen lsquare_following rsquare lbrace rbrace
+///     period_following comma semicolon
+///
 Expr *Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier) || Tok.is(tok::kw_this));
   SourceLoc Loc = Tok.getLoc();
@@ -597,7 +605,43 @@ Expr *Parser::parseExprAnonClosureArg() {
   return new (Context) DeclRefExpr(AnonClosureVars.back()[ArgNo], Loc);
 }
 
+static void changeToFollowingTokenAfterRAngle(Token &token) {
+  // If there's no whitespace between a generic '>' angle bracket and a
+  // "starting" token, consider it as a following token.
+
+  tok followKind;
+  switch (token.getKind()) {
+  default:
+    return;
+  case tok::l_paren_starting:
+    followKind = tok::l_paren_following;
+    break;
+  case tok::l_square_starting:
+    followKind = tok::l_square_following;
+    break;
+  case tok::period_prefix:
+    followKind = tok::period;
+    break;
+  }
+  
+  if (token.getText().data()[-1] == '>') {
+    token.setKind(followKind);
+  }
+}
+
 Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
+  ArrayRef<TypeLoc> args;
+  bool hasGenericArgumentList;
+  if (Tok.isAnyOperator() && Tok.getText().equals("<")
+      && canParseAsGenericArgumentList()) {
+    hasGenericArgumentList = true;
+    SourceLoc LAngleLoc, RAngleLoc;
+    if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {
+      diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
+    }
+    changeToFollowingTokenAfterRAngle(Tok);
+  }
+  
   ValueDecl *D = ScopeInfo.lookupValueName(text);
   
   if (D == 0) {

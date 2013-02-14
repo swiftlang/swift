@@ -503,6 +503,11 @@ ERROR(expected_rsquare_array_expr,expr_parsing,none,
 ERROR(expected_lbrace_func_expr,decl_parsing,none,
       "expected '{' in func expression", ())
 
+// Generic disambiguation
+NOTE(while_parsing_as_left_angle_bracket,expr_parsing,none,
+     "while parsing this '<' as a type parameter bracket", ())
+NOTE(while_parsing_as_less_operator,expr_parsing,none,
+     "while parsing this '<' as an operator", ())
 
 //------------------------------------------------------------------------------
 // Literal parsing diagnostics

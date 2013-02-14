@@ -65,6 +65,16 @@ public:
   /// peekNextToken - Return the next token to be returned by Lex without
   /// actually lexing it.
   const Token &peekNextToken() const { return NextToken; }
+  
+  /// backtrackToToken - Backtrack the lexer to the state of having just lexed
+  /// the specified token.
+  void backtrackToToken(const Token &pos) {
+    assert(pos.getText().end() <= CurPtr && "can't backtrack forward");
+    CurPtr = pos.getText().end();
+    NextToken = pos;
+    if (pos.isNot(tok::eof))
+      lexImpl();
+  }
 
   /// \brief Retrieve the source location that points just past the
   /// end of the token refered to by \c Loc.
