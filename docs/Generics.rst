@@ -264,7 +264,7 @@ to a protocol if it meets the syntactic requirements of the protocol. For
 example, given::
 
   protocol Shape {
-    func draw();
+    func draw()
   }
 
 One could write a Circle struct such as::
@@ -287,7 +287,7 @@ matches a protocol doesn't provide the required semantics. For example, Cowboys
 also know how to "draw!"::
 
   struct Cowboy {
-    var gun : SixShooter;
+    var gun : SixShooter
   
     func draw() {
       // draw!
@@ -391,8 +391,8 @@ provide default implementations::
   
   protocol Numeric {
     func +(lhs : This, rhs : This) - > This
-    func -(lhs : this, rhs : This) - > This { return lhs + -rhs; }
-    func +(x : This) - > This { return x; }
+    func -(lhs : this, rhs : This) - > This { return lhs + -rhs }
+    func +(x : This) - > This { return x }
     func -(x : This) - > This
   }
 
@@ -429,7 +429,7 @@ existential type, meaning that we don't know the concrete type until run-time
 protocol. Thus, a variable can be declared with type "Serializable", e.g.,::
 
   var x : Serializable = // value of any Serializable type
-  x.serialize(); // okay: serialize() is part of the Serializable protocol
+  x.serialize() // okay: serialize() is part of the Serializable protocol
 
 Naturally, such polymorphism is dynamic, and will require boxing of value types
 to implement. We can now see how This types interact with subtype
@@ -453,7 +453,7 @@ create a new protocol aggregating those protocols::
   protocol SerializableDocument : Document, Serializable { }
   var doc : SerializableDocument
   print(doc.title()) // okay: title() is part of the Document protocol, so we can call it
-  doc.serialize(stout); // okay: serialize() is part of the Serializable protocol
+  doc.serialize(stout) // okay: serialize() is part of the Serializable protocol
 
 However, this only makes sense when the resulting protocol is a useful
 abstraction. A SerializableDocument may or may not be a useful abstraction. When
@@ -542,7 +542,7 @@ function. For example, let's generalize our find algorithm to work on any
 ordered collection::
   
   protocol OrderedCollection : Collection {
-    func size() -> Int;
+    func size() -> Int
     func getAt(index : Int) -> Element // Element is an associated type
   }
   
@@ -551,10 +551,10 @@ ordered collection::
   {
     for index in 0..collection.size() {
       if (collection.getAt(index) == value) { // okay: we know that C.Element is Comparable
-        return index;
+        return index
       }
     }
-    return -1;
+    return -1
   }
 
 The requires clause is actually the more general way of expressing constraints,
@@ -749,7 +749,7 @@ binarySearch might be called as a subroutine of another generic function with
 minimal requirements::
 
   func doSomethingWithSearch<C : EnumerableCollection>(collection : C, value : C.Element) -> C.EnumeratorType requires C.Element : Ordered {
-    binarySearch(collection, value);
+    binarySearch(collection, value)
   }
 
 At the time when the generic definition of doSomethingWithSearch is
