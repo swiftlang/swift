@@ -8,9 +8,6 @@ config.lit_tools_dir = "@LLVM_LIT_TOOLS_DIR@"
 config.swift_obj_root = "@SWIFT_BINARY_DIR@"
 config.target_triple = "@TARGET_TRIPLE@"
 
-if "@SWIFT_OBJC_SUPPORTS_SWIFT_BIT@" != "OFF":
-    config.available_features.add('metadata-swift-bit')
-
 # Support substitution of the tools and libs dirs with user parameters. This is
 # used when we can't determine the tool dir at configuration time.
 try:

@@ -809,13 +809,10 @@ namespace {
       // Derive the RO-data.
       llvm::Constant *data = emitClassPrivateData(IGM, TargetClass);
 
-      // FIXME: This is not supported on alpha OS builds yet.
-#ifndef SWIFT_DISABLE_SWIFT_BIT_ON_CLASS_DATA
       // We always set the low bit to indicate this is a Swift class.
       data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
       data = llvm::ConstantExpr::getAdd(data,
                                     llvm::ConstantInt::get(IGM.IntPtrTy, 1));
-#endif
 
       Fields.push_back(data);
     }

@@ -401,13 +401,6 @@ else()
   message(STATUS "warning: modules-enabled SDK is not available")
 endif()
 
-option(SWIFT_OBJC_SUPPORTS_SWIFT_BIT 
-  "Whether the target Objective-C library supports the Swift bit in class data" 
-  ON)
-if (NOT ${SWIFT_OBJC_SUPPORTS_SWIFT_BIT})
-  add_definitions(-DSWIFT_DISABLE_SWIFT_BIT_ON_CLASS_DATA)
-endif()
-
 # We'll need this once we have generated headers
 include_directories(BEFORE
   ${CMAKE_CURRENT_BINARY_DIR}/include
