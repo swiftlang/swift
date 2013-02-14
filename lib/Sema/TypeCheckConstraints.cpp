@@ -2200,10 +2200,6 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return CS.createTypeVariable(expr);
     }
     
-    Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
-      llvm_unreachable("not implemented");
-    }
-
     Type visitMemberRefExpr(MemberRefExpr *expr) {
       auto tv = CS.createTypeVariable(expr);
       OverloadChoice choice(expr->getBase()->getType(), expr->getDecl());
@@ -2266,6 +2262,61 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       auto tv = CS.createTypeVariable(expr);
       CS.addValueMemberConstraint(baseTy, expr->getName(), tv, expr);
       return tv;
+    }
+    
+    Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
+      auto baseTy = expr->getSubExpr()->getType();
+      
+      // We currently only support explicit specialization of generic types.
+      // FIXME: We could support explicit function specialization.
+      if (baseTy->is<AnyFunctionType>()) {
+        CS.TC.diagnose(expr->getSubExpr()->getLoc(),
+                       diag::cannot_explicitly_specialize_generic_function);
+        CS.TC.diagnose(expr->getLAngleLoc(),
+                      diag::while_parsing_as_left_angle_bracket);
+        return Type();
+      }
+      
+      if (MetaTypeType *meta = baseTy->getAs<MetaTypeType>()) {
+        if (BoundGenericType *bgt
+              = meta->getInstanceType()->getAs<BoundGenericType>()) {
+          ArrayRef<Type> typeVars = bgt->getGenericArgs();
+          ArrayRef<TypeLoc> specializations = expr->getUnresolvedParams();
+          
+          // FIXME: We could potentially allow unspecified type parameters
+          // to be deduced if there are fewer parameters than type variables.
+          if (typeVars.size() != specializations.size()) {
+            CS.TC.diagnose(expr->getSubExpr()->getLoc(),
+                           diag::type_parameter_count_mismatch,
+                           typeVars.size(), specializations.size());
+            CS.TC.diagnose(expr->getLAngleLoc(),
+                           diag::while_parsing_as_left_angle_bracket);
+            return Type();
+          }
+          
+          for (size_t i = 0, size = typeVars.size(); i < size; ++i) {
+            CS.addConstraint(ConstraintKind::Equal,
+                             typeVars[i], specializations[i].getType());
+          }
+          
+          return baseTy;
+        } else {
+          CS.TC.diagnose(expr->getSubExpr()->getLoc(),
+                         diag::not_a_generic_type);
+          CS.TC.diagnose(expr->getLAngleLoc(),
+                         diag::while_parsing_as_left_angle_bracket);
+          return Type();
+        }
+      }
+
+      // FIXME: If the base type is a type variable, constrain it to a metatype
+      // of a bound generic type.
+      
+      CS.TC.diagnose(expr->getSubExpr()->getLoc(),
+                     diag::not_a_generic_definition);
+      CS.TC.diagnose(expr->getLAngleLoc(),
+                     diag::while_parsing_as_left_angle_bracket);
+      return Type();
     }
     
     Type visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *expr) {
@@ -5314,14 +5365,24 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
       // Check whether this is a polymorphic function type, which needs to
       // be specialized.
-      auto polyFn = expr->getType()->getAs<PolymorphicFunctionType>();
-      if (!polyFn) {
-        // No polymorphic function; this a reference to a declaration with a
-        // deduced type, such as $0.
-        return expr;
+      if (auto polyFn = expr->getType()->getAs<PolymorphicFunctionType>()) {
+        return specialize(expr, polyFn, fromType);
+      }
+      
+      // Check whether this is a generic type.
+      if (auto meta = expr->getType()->getAs<MetaTypeType>()) {
+        if (meta->getInstanceType()->is<UnboundGenericType>()) {
+          // If so, type the declref as the bound generic type.
+          // FIXME: Is this right?
+          auto simplifiedType = CS.simplifyType(fromType);
+          expr->setType(simplifiedType);
+        }
       }
 
-      return specialize(expr, polyFn, fromType);
+      // No polymorphic function; this a reference to a declaration with a
+      // deduced type, such as $0.
+      return expr;
+
     }
 
     Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
@@ -5382,7 +5443,9 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
     
     Expr *visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
-      llvm_unreachable("not implemented");
+      // Our specializations should have resolved the subexpr to the right type.
+      // FIXME: Should preserve generic argument list for source fidelity
+      return expr->getSubExpr();
     }
 
     Expr *visitMemberRefExpr(MemberRefExpr *expr) {
@@ -6057,6 +6120,18 @@ namespace {
                             /*isFirstPass=*/false))
           return nullptr;
 
+        return expr;
+      }
+      
+      // Type check the type parameters in an UnresolvedSpecializeExpr
+      if (auto us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
+        for (TypeLoc &type : us->getUnresolvedParams()) {
+          if (TC.validateType(type, /*isFirstPass=*/false)) {
+            TC.diagnose(us->getLAngleLoc(),
+                        diag::while_parsing_as_left_angle_bracket);
+            return nullptr;
+          }
+        }
         return expr;
       }
 

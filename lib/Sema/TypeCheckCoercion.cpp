@@ -496,7 +496,8 @@ public:
     return CoercionResult::Unknowable;
   }
   CoercedResult visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E) {
-    llvm_unreachable("not implemented");
+    TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
+    return nullptr;
   }
   CoercedResult visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *E) {
     llvm_unreachable("not implemented");

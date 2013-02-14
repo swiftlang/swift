@@ -806,8 +806,8 @@ public:
     return 0;
   }
   Expr *visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E) {
-    llvm_unreachable("name binding should resolve all UnresolvedSpecializeExprs!");
-    return 0;
+    TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
+    return nullptr;
   }
   Expr *visitMemberRefExpr(MemberRefExpr *E) {
     if (E->getDecl()->getType()->is<ErrorType>())

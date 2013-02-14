@@ -508,7 +508,7 @@ NOTE(while_parsing_as_left_angle_bracket,expr_parsing,none,
      "while parsing this '<' as a type parameter bracket", ())
 NOTE(while_parsing_as_less_operator,expr_parsing,none,
      "while parsing this '<' as an operator", ())
-
+     
 //------------------------------------------------------------------------------
 // Literal parsing diagnostics
 //------------------------------------------------------------------------------
@@ -973,6 +973,18 @@ ERROR(array_expr_missing_proto,sema_tce,none,
       "array literal expression requires the 'ArrayLiteralConvertible' protocol to be defined", ())
 ERROR(array_protocol_broken,sema_tce,none,
       "ArrayLiteralConvertible protocol definition is broken", ())
+      
+// Generic specializations
+ERROR(cannot_explicitly_specialize_generic_function,tce_sema,none,
+      "cannot explicitly specialize a generic function", ())
+ERROR(not_a_generic_definition,tce_sema,none,
+      "cannot specialize a non-generic definition", ())
+ERROR(not_a_generic_type,tce_sema,none,
+      "cannot specialize a non-generic type", ())
+ERROR(type_parameter_count_mismatch,tce_sema,none,
+      "generic type specialized with wrong number of type parameters "
+      "(got %1, but expected %0)",
+      (unsigned, unsigned))
 
 //------------------------------------------------------------------------------
 // Type Check Statements

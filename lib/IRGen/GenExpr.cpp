@@ -130,8 +130,9 @@ static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
   case DeclKind::Struct:
   case DeclKind::Class:
   case DeclKind::Protocol: {
-    auto type = cast<TypeDecl>(D)->getDeclaredType()->getCanonicalType();
-    emitMetaTypeRef(IGF, type, explosion);
+    CanType instanceTy = E->getType()->castTo<MetaTypeType>()
+      ->getInstanceType()->getCanonicalType();
+    emitMetaTypeRef(IGF, instanceTy, explosion);
     return;
   }
 
