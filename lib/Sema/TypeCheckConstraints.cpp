@@ -2199,6 +2199,10 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // FIXME: Do we need to note that we're doing some kind of recovery?
       return CS.createTypeVariable(expr);
     }
+    
+    Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
+      llvm_unreachable("not implemented");
+    }
 
     Type visitMemberRefExpr(MemberRefExpr *expr) {
       auto tv = CS.createTypeVariable(expr);
@@ -5375,6 +5379,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // FIXME: We should have generated an overload set from this, in which
       // case we can emit a typo-correction error here but recover well.
       return nullptr;
+    }
+    
+    Expr *visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
+      llvm_unreachable("not implemented");
     }
 
     Expr *visitMemberRefExpr(MemberRefExpr *expr) {

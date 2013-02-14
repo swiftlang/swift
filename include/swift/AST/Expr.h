@@ -1480,6 +1480,43 @@ public:
     return E->getKind() == ExprKind::Specialize;
   }
 };
+  
+/// UnresolvedSpecializeExpr - Represents an explicit specialization using
+/// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
+class UnresolvedSpecializeExpr : public Expr {
+  Expr *SubExpr;
+  SourceLoc LAngleLoc;
+  SourceLoc RAngleLoc;
+  MutableArrayRef<TypeLoc> UnresolvedParams;
+public:
+  UnresolvedSpecializeExpr(Expr *SubExpr,
+                           SourceLoc LAngleLoc,
+                           MutableArrayRef<TypeLoc> UnresolvedParams,
+                           SourceLoc RAngleLoc)
+    : Expr(ExprKind::UnresolvedSpecialize),
+      SubExpr(SubExpr),
+      LAngleLoc(LAngleLoc), RAngleLoc(RAngleLoc),
+      UnresolvedParams(UnresolvedParams) { }
+  
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *e) { SubExpr = e; }
+  
+  /// \brief Retrieve the list of type parameters. These parameters have not yet
+  /// been bound to archetypes of the entity to be specialized.
+  ArrayRef<TypeLoc> getUnresolvedParams() const { return UnresolvedParams; }
+  MutableArrayRef<TypeLoc> getUnresolvedParams() { return UnresolvedParams; }
+  
+  SourceLoc getLoc() const { return LAngleLoc; }
+  SourceLoc getLAngleLoc() const { return LAngleLoc; }
+  SourceLoc getRAngleLoc() const { return RAngleLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(SubExpr->getStartLoc(), RAngleLoc);
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnresolvedSpecialize;
+  }
+};
 
 /// GetMetatypeExpr - Given a value of type T, returns the corresponding value
 /// of type T.metatype.

@@ -275,7 +275,7 @@ public:
   bool parseType(TypeLoc &ResultLoc, Diag<> ID);
   bool parseTypeAnnotation(TypeLoc &ResultLoc);
   bool parseTypeAnnotation(TypeLoc &ResultLoc, Diag<> ID);
-  bool parseGenericArguments(ArrayRef<TypeLoc> &Args,
+  bool parseGenericArguments(MutableArrayRef<TypeLoc> &Args,
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
   bool parseTypeIdentifier(TypeLoc &ResultLoc);

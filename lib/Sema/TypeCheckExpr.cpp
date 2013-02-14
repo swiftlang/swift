@@ -805,6 +805,10 @@ public:
     llvm_unreachable("name binding should resolve all UnresolvedDeclRefExprs!");
     return 0;
   }
+  Expr *visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E) {
+    llvm_unreachable("name binding should resolve all UnresolvedSpecializeExprs!");
+    return 0;
+  }
   Expr *visitMemberRefExpr(MemberRefExpr *E) {
     if (E->getDecl()->getType()->is<ErrorType>())
       return nullptr;

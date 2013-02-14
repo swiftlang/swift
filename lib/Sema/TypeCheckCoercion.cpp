@@ -495,6 +495,9 @@ public:
     // ill-formed.
     return CoercionResult::Unknowable;
   }
+  CoercedResult visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E) {
+    llvm_unreachable("not implemented");
+  }
   CoercedResult visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *E) {
     llvm_unreachable("not implemented");
   }

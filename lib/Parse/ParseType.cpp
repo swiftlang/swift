@@ -168,7 +168,7 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
   return false;
 }
 
-bool Parser::parseGenericArguments(ArrayRef<TypeLoc> &Args,
+bool Parser::parseGenericArguments(MutableArrayRef<TypeLoc> &Args,
                                    SourceLoc &LAngleLoc,
                                    SourceLoc &RAngleLoc) {
   // Parse the opening '<'.
@@ -228,7 +228,7 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
     if (parseIdentifier(Name, diag::expected_identifier_in_dotted_type))
       return true;
     SourceLoc LAngle, RAngle;
-    ArrayRef<TypeLoc> GenericArgs;
+    MutableArrayRef<TypeLoc> GenericArgs;
     if (startsWithLess(Tok)) {
       // FIXME: There's an ambiguity here because code could be trying to
       // refer to a unary '<' operator.
@@ -510,6 +510,9 @@ namespace {
 } // end anonymous namespace
 
 bool Parser::canParseAsGenericArgumentList() {
+  if (!Tok.isAnyOperator() || !Tok.getText().equals("<"))
+    return false;
+
   BacktrackingScope backtrack(*this);
 
   if (canParseGenericArguments())

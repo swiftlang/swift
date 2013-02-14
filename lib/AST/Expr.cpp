@@ -600,6 +600,17 @@ public:
     printCommon(E, "unresolved_decl_ref_expr")
       << " name=" << E->getName() << ')';
   }
+  void visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E) {
+    printCommon(E, "unresolved_specialize_expr") << '\n';
+    printRec(E->getSubExpr());
+    for (TypeLoc T : E->getUnresolvedParams()) {
+      OS << '\n';
+      OS.indent(Indent+2);
+      T.getType()->print(OS);
+    }
+    OS << ')';
+  }
+  
   void visitMemberRefExpr(MemberRefExpr *E) {
     printCommon(E, "member_ref_expr")
       << " decl=" << E->getDecl()->getName() << '\n';

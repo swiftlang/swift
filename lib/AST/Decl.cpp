@@ -1036,7 +1036,10 @@ namespace {
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
       OS << " type='";
-      TAD->getUnderlyingType()->print(OS);
+      if (TAD->hasUnderlyingType())
+        TAD->getUnderlyingType()->print(OS);
+      else
+        OS << "<<<unresolved>>>";
       printInherited(TAD->getInherited());
       OS << "')";
     }
