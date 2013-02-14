@@ -30,3 +30,7 @@ struct NSFastEnumerationState {
   unsigned long *mutationsPtr;
   unsigned long extra[5];
 };
+
+typedef void *CFTypeRef;
+typedef void const *HWND;
+typedef struct __CFString *CFStringRef;

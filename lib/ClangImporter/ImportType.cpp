@@ -175,12 +175,21 @@ namespace {
         return Impl.getNamedSwiftType(Impl.getNamedModule("ObjectiveC"), "ObjCSel");
       }
 
-      // All other C pointers map to CPointer<T>.
+      // Import void* as COpaquePointer.
+      if (type->isVoidPointerType()) {
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "COpaquePointer");
+      }
+
+      // All other C pointers to concrete types map to CPointer<T>.
       auto pointeeType = Impl.importType(type->getPointeeType());
-      if (!pointeeType)
-        return Type();
-      return Impl.getNamedSwiftTypeSpecialization(Impl.getSwiftModule(),
-                                                  "CPointer", pointeeType);
+      if (pointeeType)
+        return Impl.getNamedSwiftTypeSpecialization(Impl.getSwiftModule(),
+                                                    "CPointer", pointeeType);
+      
+      // If the pointed-to type is unrepresentable in Swift, import as
+      // COpaquePointer.
+      // FIXME: Should use something with a stronger type.
+      return Impl.getNamedSwiftType(Impl.getSwiftModule(), "COpaquePointer");
     }
 
     Type VisitBlockPointerType(const clang::BlockPointerType *type) {
