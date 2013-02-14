@@ -266,4 +266,4 @@ Tools and Integration
   * Explicit properties
   * Explicit conformance to protocol
   * Consistent NS_ENUM/NS_OPTION use
-  * Consitent ARC annotations  
+  * Consistent ARC annotations  
