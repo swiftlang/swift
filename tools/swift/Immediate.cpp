@@ -212,6 +212,12 @@ static void appendEscapeSequence(SmallVectorImpl<char> &dest,
   dest.push_back(LITERAL_MODE_CHAR);
 }
 
+static SourceLoc getTUEndLoc(TranslationUnit *TU) {
+  return TU->Decls.empty()
+    ? SourceLoc()
+    : TU->Decls.back()->getSourceRange().End;
+}
+
 struct EditLineWrapper {
   TranslationUnit *TU;
   
@@ -463,12 +469,32 @@ struct EditLineWrapper {
     el_insertstr(e, TmpStr.data());
   }
   
+  void displayCompletions(llvm::ArrayRef<llvm::StringRef> list) {
+    // FIXME: Do the print-completions-below-the-prompt thing bash does.
+    llvm::outs() << '\n';
+    // Trim the completion list to the terminal size.
+    // FIXME: Get real terminal size
+    // FIXME: Trim completion strings if too wide for number of columns
+    size_t lines = 24;
+    size_t trimmed = 0;
+    if (list.size() > lines - 1) {
+      trimmed = list.size() - (lines - 2);
+      list = list.slice(0, lines - 2);
+    }
+    
+    for (StringRef completion : list) {
+      llvm::outs() << "  " << completion << '\n';
+    }
+    if (trimmed > 0)
+      llvm::outs() << "  (and " << trimmed << " more)\n";
+  }
+  
   unsigned char onComplete(int ch) {
     LineInfo const *line = el_line(e);
     llvm::StringRef prefix(line->buffer, line->cursor - line->buffer);
     if (!completions) {
       // If we aren't currently working with a completion set, generate one.
-      completions = Completions(TU, prefix);
+      completions = Completions(TU, getTUEndLoc(TU), prefix);
       // Display the common root of the found completions and beep unless we
       // found a unique one.
       insertStringRef(completions.getRoot());
@@ -481,11 +507,7 @@ struct EditLineWrapper {
     switch (completions.getState()) {
     case CompletionState::CompletedRoot:
       // We completed the root. Next step is to display the completion list.
-      // FIXME: Do the print-completions-below-the-prompt thing bash does.
-      llvm::outs() << '\n';
-      for (StringRef completion : completions.getCompletionList()) {
-        llvm::outs() << "  " << completion << '\n';
-      }
+      displayCompletions(completions.getCompletionList());
       completions.setState(CompletionState::DisplayedCompletionList);
       return CC_REDISPLAY;
 

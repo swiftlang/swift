@@ -9,6 +9,7 @@ add_swift_library(swiftAST
   DiagnosticEngine.cpp
   Expr.cpp
   Identifier.cpp
+  LookupVisibleDecls.cpp
   Module.cpp
   NameLookup.cpp
   Pattern.cpp

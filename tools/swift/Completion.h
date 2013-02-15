@@ -22,6 +22,7 @@
 
 namespace swift {
   class DeclContext;
+  class SourceLoc;
 
 /// State of a completion operation.
 enum class CompletionState {
@@ -60,6 +61,7 @@ public:
   /// Create a completion set containing completions appropriate to the given
   /// string.
   Completions(DeclContext *dc,
+              SourceLoc loc,
               llvm::StringRef prefix);
   
   /// Returns true if this is a valid completion set.

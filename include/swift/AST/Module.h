@@ -34,15 +34,16 @@ namespace swift {
   class Component;
   class Decl;
   class ExtensionDecl;
-  class OneOfElementDecl;
+  class IdentifierType;
+  class LookupCache;
   class NameAliasType;
+  class OneOfElementDecl;
   struct PrintOptions;
   class TupleType;
   class Type;
   class TypeAliasDecl;
-  class LookupCache;
   class ValueDecl;
-  class IdentifierType;
+  class VisibleDeclConsumer;
   
   /// NLKind - This is a specifier for the kind of name lookup being performed
   /// by various query methods.
@@ -101,6 +102,12 @@ public:
   /// recursively looking through imports.  
   void lookupValue(AccessPathTy AccessPath, Identifier Name, NLKind LookupKind, 
                    SmallVectorImpl<ValueDecl*> &Result);
+  
+  /// lookupVisibleDecls - Find ValueDecls in the module and pass them to the
+  /// given consumer object.
+  void lookupVisibleDecls(AccessPathTy AccessPath,
+                          VisibleDeclConsumer &Consumer,
+                          NLKind LookupKind);
 
   /// lookupExtensions - Look up all of the extensions in the module that are
   /// extending the specified type and return a list of them.

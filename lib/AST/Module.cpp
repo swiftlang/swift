@@ -16,6 +16,7 @@
   
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/PrintOptions.h"
 #include "clang/Basic/Module.h"
@@ -97,6 +98,11 @@ namespace {
     void lookupValue(AccessPathTy AccessPath, Identifier Name, 
                      NLKind LookupKind, TranslationUnit &TU, 
                      SmallVectorImpl<ValueDecl*> &Result);
+    
+    void lookupVisibleDecls(AccessPathTy AccessPath,
+                            VisibleDeclConsumer &Consumer,
+                            NLKind LookupKind,
+                            TranslationUnit &TU);
   };
 } // end anonymous namespace.
 
@@ -149,6 +155,22 @@ void TUModuleCache::lookupValue(AccessPathTy AccessPath, Identifier Name,
   Result.reserve(I->second.size());
   for (ValueDecl *Elt : I->second)
     Result.push_back(Elt);
+}
+
+void TUModuleCache::lookupVisibleDecls(AccessPathTy AccessPath,
+                                       VisibleDeclConsumer &Consumer,
+                                       NLKind LookupKind,
+                                       TranslationUnit &TU) {
+  // TODO: ImportDecls cannot specified namespaces or individual entities
+  // yet, so everything is just a lookup at the top-level.
+  assert(AccessPath.size() <= 1 && "Don't handle this yet");
+  
+  // TODO: If this import is specific to some named type or decl ("import swift.int")
+  // then filter out any lookups that don't match.
+  for (auto &tlv : TopLevelValues) {
+    for (ValueDecl *vd : tlv.second)
+      Consumer.foundDecl(vd);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -239,6 +261,26 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
 
   return Ctx.getModuleLoader().lookupValue(cast<ClangModule>(this), AccessPath,
                                            Name, LookupKind, Result);
+}
+
+/// lookupVisibleDecls - Find ValueDecls in the module and pass them to the
+/// given consumer object.
+void Module::lookupVisibleDecls(AccessPathTy AccessPath,
+                                VisibleDeclConsumer &Consumer,
+                                NLKind LookupKind) {
+  if (BuiltinModule *BM = dyn_cast<BuiltinModule>(this)) {
+    // TODO Look through the Builtin module.
+    (void)BM;
+    return;
+  }
+
+  if (auto TU = dyn_cast<TranslationUnit>(this)) {
+    return getTUCachePimpl(LookupCachePimpl, *TU)
+      .lookupVisibleDecls(AccessPath, Consumer, LookupKind, *TU);
+  }
+
+  // TODO Delegate to Clang lookupVisibleDecls.
+  return;
 }
 
 //===----------------------------------------------------------------------===//

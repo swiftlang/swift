@@ -17,7 +17,9 @@
 #include "Completion.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -40,24 +42,11 @@ static StringRef getCompletionContext(DeclContext* &dc,
   return prefix;
 }
 
-static const char * const FakeCompletions[] = {
-  "Char",
-  "Int",
-  "Int8",
-  "Int16",
-  "Int32",
-  "Int64",
-  "String",
-  "UInt",
-  "UInt8",
-  "UInt16",
-  "UInt32",
-  "UInt64"
-};
-  
-/// A fake set of completions standing in for real completion lookup.
-struct CompletionLookup {
-  std::vector<StringRef> Results;
+/// Build completions by doing visible decl lookup from a context.
+class CompletionLookup : VisibleDeclConsumer {
+public:
+  llvm::StringRef Prefix;
+  llvm::StringSet<> Results;
   Optional<StringRef> Root;
   
   void updateRoot(StringRef S) {
@@ -78,13 +67,20 @@ struct CompletionLookup {
     Root = StringRef(Root->data(), len);
   }
   
-  CompletionLookup(DeclContext *dc, StringRef prefix) {
-    for (const char *completion : FakeCompletions) {
-      if (StringRef(completion).startswith(prefix)) {
-        Results.push_back(completion);
-        updateRoot(completion);
-      }
+  void foundDecl(ValueDecl *vd) override {
+    StringRef name = vd->getName().get();
+    if (!name.startswith(Prefix))
+      return;
+
+    if (Results.insert(name)) {
+      updateRoot(name);
     }
+  }
+  
+  CompletionLookup(DeclContext *dc, SourceLoc loc, StringRef prefix)
+    : Prefix(prefix)
+  {
+    lookupVisibleDecls(*this, dc, loc);
   }
 };
   
@@ -95,7 +91,7 @@ StringRef Completions::allocateCopy(StringRef s) {
   return StringRef(copy, s.size());
 }
 
-Completions::Completions(DeclContext *dc, StringRef prefix)
+Completions::Completions(DeclContext *dc, SourceLoc loc, StringRef prefix)
   : strings(new llvm::BumpPtrAllocator()),
     enteredLength(0),
     rootLength(0),
@@ -104,7 +100,7 @@ Completions::Completions(DeclContext *dc, StringRef prefix)
   StringRef completionPrefix = getCompletionContext(dc, prefix);
   enteredLength = completionPrefix.size();
 
-  CompletionLookup lookup(dc, completionPrefix);
+  CompletionLookup lookup(dc, loc, completionPrefix);
 
   if (lookup.Results.empty()) {
     rootLength = 0;
@@ -115,9 +111,11 @@ Completions::Completions(DeclContext *dc, StringRef prefix)
   rootLength = lookup.Root->size();
 
   assert(rootLength >= enteredLength && "completions don't match prefix?!");
-  for (StringRef c : lookup.Results) {
-    completions.push_back(allocateCopy(c));
+  for (auto &c : lookup.Results) {
+    completions.push_back(allocateCopy(c.getKey()));
   }
+  std::sort(completions.begin(), completions.end(),
+            [](StringRef a, StringRef b) { return a < b; });
   
   if (lookup.Results.size() == 1) {
     state = CompletionState::Unique;

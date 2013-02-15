@@ -338,6 +338,25 @@ public:
   /// a null type if that fails.
   TypeDecl* getSingleTypeResult();
 };
+  
+/// VisibleDeclConsumer - An abstract base class for a visitor that consumes
+/// visible declarations found within a given context. Subclasses of this class
+/// can be used with lookupVisibleDecls().
+class VisibleDeclConsumer {
+public:
+  virtual ~VisibleDeclConsumer();
+  
+  /// This method is called by findVisibleDecls() every time it finds a decl.
+  virtual void foundDecl(ValueDecl *decl) = 0;
+};
+  
+/// Finds decls visible in the given context and feeds them to the given
+/// VisibleDeclConsumer. If the current DeclContext is nested in a FuncExpr, the
+/// SourceLoc is used to determine which declarations in that FuncExpr's
+/// context are visible.
+void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
+                        DeclContext *DC, SourceLoc Loc = SourceLoc(),
+                        bool IsTypeLookup = false);
 
 } // end namespace swift
 
