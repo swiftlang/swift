@@ -1464,7 +1464,9 @@ if vec[3] {
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    type-identifier ::= <a href="#identifier">identifier</a> ('.' <a href="#identifier">identifier</a>)*
+    type-identifier ::= type-identifier-component ('.' type-identifier-component)*
+    type-identifier-component ::= <a href="#identifier">identifier</a> generic-params?
+    generic-params ::= '&lt;' <a href="#type">type</a> (',' <a href="#type">type</a>)* '&gt;'
   </pre>
 
   <p>Named types may be used simply by using their name.  Named types are
@@ -1484,6 +1486,16 @@ if vec[3] {
     var x : swift.Int
   </pre>
 
+  <p>Each component of a named type may be followed by a list of generic
+  parameters for that component enclosed in angle brackets <tt>&lt;&gt;</tt>.
+
+  <pre class="example">
+    <i>// A generic class definition.</i>
+    class Dict&lt;K, V&gt; { }
+
+    <i>// A variable of a generic instance type.</i>
+    var map : Dict&lt;String, Int&gt;
+  </pre>
   
   <!-- ===================================================================== -->
   <h3 id="type-tuple">Tuple Types</h3>
@@ -2073,7 +2085,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    expr-identifier ::= <a href="#identifier">identifier</a>
+    expr-identifier ::= <a href="#identifier">identifier</a> <a href="#type-identifier">generic-params</a>?
   </pre>
   
   <p>A raw identifier refers to a value found via <a
@@ -2082,6 +2094,73 @@ ill-formed if the type does not conform to the protocol.</p>
      resolution.  Value declarations are installed with <a 
      href="#decl-var">var</a> and the syntactic sugar forms like <a 
      href="decl-func">func</a> declarations.</p>
+
+  <p>If an identifier refers to a generic type, an instance of that generic may
+    be referenced by following the identifier with a list of type parameters
+    enclosed in angle brackets <tt>&lt;&gt;</tt>:</p>
+
+  <pre class="example">
+    <i>// A generic struct.</i>
+    struct Dict&lt;K,V&gt; {
+      constructor() {}
+      static func fromKeysAndValues(keys:K[], values:T[]) -&gt; Dict&lt;K,V&gt; {}
+    }
+
+    <i>// Construct an instance of the generic struct.</i>
+    var foo = Dict&lt;String, Int&gt;()
+    <i>// Invoke a static method of an instance of the generic struct.</i>
+    var bar = Dict&lt;String, Int&gt;.fromKeysAndValues(
+      ["zim", "zang", "zung"],
+      [ 123,    456,    789 ])
+  </pre>
+
+  <h4 id="expr-generic-disambiguation">Generic disambiguation</h4>
+  
+  <p>Note that <tt>&lt;</tt> and <tt>&gt;</tt> are used as both angle brackets in
+  <a href="#expr-identifier">generic identifiers</a> and as characters in
+  <a href="#expr-binary">binary operator</a> names. Because of this, there are
+  potential parsing ambiguities. Swift uses a context-free heuristic to
+  determine whether to parse an expression involving <tt>&lt;</tt> and <tt>&gt;</tt>
+  as a generic parameter list or a binary operator:
+
+  <ul>
+  <li>When an <a href="#identifier">identifier</a> is followed by <tt>&lt;</tt>,
+  Swift attempts to parse starting from the <tt>&lt;</tt> as a
+  <a href="#type-identifier">generic parameter list</a>.
+  <li>If it succeeds in parsing a generic parameter list, it looks at the
+  token after the closing <tt>&gt;</tt>. If it sees one of the following tokens:
+  <blockquote>
+    <tt>( [ { } ] ) . , ;</tt>
+  </blockquote>
+  then the expression is parsed as a generic parameter list.
+  <li>If Swift cannot parse a generic parameter list after the <tt>&lt;</tt>,
+  or the matching <tt>&gt;</tt> is not followed by one of the above tokens,
+  the <tt>&lt;</tt> is parsed as an operator character.
+  </ul>
+
+  <p>These rules assume that, in most cases, generic type names will be used
+  in constructor expressions as in <tt>Foo&lt;T&gt;(x)</tt> or to access static
+  members as in <tt>Foo&lt;T&gt;.bar()</tt>. Referring to a generic metatype as a
+  value in an expression may otherwise require parentheses.
+
+  <pre class="example">
+    <i>// An operator that operates on metatypes.</i>
+    func [infix] +-+ &lt;T, U&gt;(t:T.metatype, u:U.metatype) -&gt; Foo { }
+    
+    var foo = (Dict&lt;String, Int&gt;) +-+ (Slice&lt;Char&gt;)
+    println(foo)
+  </pre>
+
+  <p>On the other hand, some expressions involving <tt>&lt;</tt> and
+  <tt>&gt;</tt> operators may misparse as generic arguments as well. These
+  can also be corrected using parentheses.
+
+  <pre class="example">
+    func foo(x:Bool, y:Bool)
+
+    foo(a &lt; b, c &gt; (d + e)) // ERROR: Misparses as (a&lt;b,c&gt;)(d + e)
+    foo((a &lt; b), c &gt; (d + e)) // Force parsing as (a &lt; b), (c &gt; (d + e))
+  </pre>
 
   <!-- ===================================================================== -->
   <h3 id="expr-super">Super</h3>
@@ -2323,7 +2402,7 @@ ill-formed if the type does not conform to the protocol.</p>
   tuple.  Otherwise, this form is invalid.</p>
 
   <pre class="grammar">
-    expr-dot ::= <a href="#expr">expr-postfix</a> '.' <a href="#identifier">identifier</a>
+    expr-dot ::= <a href="#expr">expr-postfix</a> '.' <a href="#expr-identifier">expr-identifier</a>
   </pre>
 
   <p>If the base expression has <a href="#type-tuple">tuple type</a> and if the
