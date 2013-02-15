@@ -2141,7 +2141,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <p>These rules assume that, in most cases, generic type names will be used
   in constructor expressions as in <tt>Foo&lt;T&gt;(x)</tt> or to access static
   members as in <tt>Foo&lt;T&gt;.bar()</tt>. Referring to a generic metatype as a
-  value in an expression may otherwise require parentheses.
+  value in an expression may require parentheses around the type name.
 
   <pre class="example">
     <i>// An operator that operates on metatypes.</i>
@@ -2153,13 +2153,15 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <p>On the other hand, some expressions involving <tt>&lt;</tt> and
   <tt>&gt;</tt> operators may misparse as generic arguments as well. These
-  can also be corrected using parentheses.
+  can also be corrected by adding or removing parentheses.
 
   <pre class="example">
     func foo(x:Bool, y:Bool)
+    var a,b,c,d,e : Int
 
     foo(a &lt; b, c &gt; (d + e)) // ERROR: Misparses as (a&lt;b,c&gt;)(d + e)
     foo((a &lt; b), c &gt; (d + e)) // Force parsing as (a &lt; b), (c &gt; (d + e))
+    foo(a &lt; b, c &gt; d + e) // Also parses as (a &lt; b), (c &gt; (d + e))
   </pre>
 
   <!-- ===================================================================== -->
