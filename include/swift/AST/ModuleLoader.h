@@ -61,7 +61,7 @@ public:
                            Module::AccessPathTy accessPath, Identifier name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) { }
-
+  
   /// \brief Look for extensions associated with the given type.
   ///
   /// \param module The module to search.

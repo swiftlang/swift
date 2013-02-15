@@ -18,6 +18,10 @@
 
 #include "swift/AST/ModuleLoader.h"
 
+namespace clang {
+  class VisibleDeclConsumer;
+}
+
 namespace swift {
 
 class ASTContext;
@@ -95,6 +99,12 @@ public:
                            Module::AccessPathTy accessPath, Identifier name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result);
+  
+  /// \brief Look for visible declarations in the Clang translation unit.
+  ///
+  /// \param consumer The VisibleDeclConsumer that will be fed decls as they
+  ///   are found.
+  void lookupVisibleDecls(clang::VisibleDeclConsumer &consumer);
 
   /// \brief Look for extensions associated with the given type.
   ///

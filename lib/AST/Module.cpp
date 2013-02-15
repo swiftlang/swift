@@ -279,7 +279,10 @@ void Module::lookupVisibleDecls(AccessPathTy AccessPath,
       .lookupVisibleDecls(AccessPath, Consumer, LookupKind, *TU);
   }
 
-  // TODO Delegate to Clang lookupVisibleDecls.
+  // TODO: Visit clang modules using Clang's Sema::LookupVisibleDecls.
+  // Importing every single Clang decl as a Swift decl currently makes
+  // everything horrendously slow.
+  
   return;
 }
 

@@ -19,6 +19,7 @@
 #include "swift/AST/Component.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Sema/Lookup.h"
@@ -417,6 +418,13 @@ void ClangImporter::lookupValue(Module *module,
       if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl))
       results.push_back(valueDecl);
   }
+}
+
+void ClangImporter::lookupVisibleDecls(clang::VisibleDeclConsumer &consumer) {
+  auto &sema = Impl.Instance->getSema();
+  sema.LookupVisibleDecls(Impl.getClangASTContext().getTranslationUnitDecl(),
+                          clang::Sema::LookupNameKind::LookupAnyName,
+                          consumer);
 }
 
 ArrayRef<ExtensionDecl*>

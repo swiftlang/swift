@@ -19,8 +19,10 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/raw_ostream.h"
+#include "clang/Sema/Lookup.h"
 
 using namespace swift;
 
@@ -59,7 +61,9 @@ static StringRef getCompletionContext(DeclContext* &dc,
 }
 
 /// Build completions by doing visible decl lookup from a context.
-class CompletionLookup : VisibleDeclConsumer {
+class CompletionLookup : swift::VisibleDeclConsumer,
+                         clang::VisibleDeclConsumer
+{
 public:
   llvm::StringRef Prefix;
   llvm::StringSet<> Results;
@@ -83,20 +87,37 @@ public:
     Root = StringRef(Root->data(), len);
   }
   
+  // Implement swift::VisibleDeclConsumer
   void foundDecl(ValueDecl *vd) override {
     StringRef name = vd->getName().get();
     if (!name.startswith(Prefix))
       return;
 
-    if (Results.insert(name)) {
+    if (Results.insert(name))
       updateRoot(name);
-    }
+  }
+  
+  // Implement clang::VisibleDeclConsumer
+  void FoundDecl(clang::NamedDecl *ND, clang::NamedDecl *Hiding,
+                 clang::DeclContext *Ctx,
+                 bool InBaseClass) override {
+    StringRef name = ND->getName();
+    if (!name.startswith(Prefix))
+      return;
+    
+    if (Results.insert(name))
+      updateRoot(name);
   }
   
   CompletionLookup(DeclContext *dc, SourceLoc loc, StringRef prefix)
     : Prefix(prefix)
   {
     lookupVisibleDecls(*this, dc, loc);
+    // TODO: Integrate Clang LookupVisibleDecls with Swift LookupVisibleDecls.
+    // Doing so now makes REPL interaction too slow.
+    ClangImporter &clangImporter
+      = static_cast<ClangImporter&>(dc->getASTContext().getModuleLoader());
+    clangImporter.lookupVisibleDecls(*this);
   }
 };
   
