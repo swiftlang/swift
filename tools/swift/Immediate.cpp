@@ -473,16 +473,24 @@ struct EditLineWrapper {
     // FIXME: Do the print-completions-below-the-prompt thing bash does.
     llvm::outs() << '\n';
     // Trim the completion list to the terminal size.
-    // FIXME: Get real terminal size
-    // FIXME: Trim completion strings if too wide for number of columns
-    size_t lines = 24;
+    int lines_int = 0, columns_int = 0;
+    el_get(e, EL_GETTC, "li", &lines_int);
+    el_get(e, EL_GETTC, "co", &columns_int);
+    assert(lines_int > 0 && columns_int > 0 && "negative or zero screen size?!");
+    
+    auto lines = size_t(lines_int), columns = size_t(columns_int);
+    size_t trimToColumns = columns > 2 ? columns - 2 : 0;
+    
     size_t trimmed = 0;
     if (list.size() > lines - 1) {
-      trimmed = list.size() - (lines - 2);
-      list = list.slice(0, lines - 2);
+      size_t trimToLines = lines > 2 ? lines - 2 : 0;
+      trimmed = list.size() - trimToLines;
+      list = list.slice(0, trimToLines);
     }
     
     for (StringRef completion : list) {
+      if (completion.size() > trimToColumns)
+        completion = completion.slice(0, trimToColumns);
       llvm::outs() << "  " << completion << '\n';
     }
     if (trimmed > 0)
