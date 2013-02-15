@@ -480,6 +480,7 @@ static bool isGenericTypeDisambiguatingToken(Token &tok) {
   case tok::period:
   case tok::comma:
   case tok::semi:
+  case tok::eof:
     return true;
   
   case tok::l_paren_starting:
