@@ -27,19 +27,35 @@ using namespace swift;
 static bool isIdentifier(char c) {
   return isalnum(c) || c == '_';
 }
-  
+
 static StringRef getCompletionContext(DeclContext* &dc,
                                       StringRef prefix) {
-  // For now, we just walk backward from the end of the prefix until we run
-  // out of identifier chars. In the future we should walk back through dotted
-  // paths and maybe even matching brackets and type-check the subexpression
-  // to find our completion context.
-  for (char const *p = prefix.end(), *end = p; p != prefix.begin(); --p) {
-    if (!isIdentifier(*(p-1)))
-      return StringRef(p, end - p);
-  }
+  if (prefix.empty())
+    return prefix;
   
-  return prefix;
+  // For now, we just walk backward from the end of the prefix until we run
+  // out of identifier or operator chars. In the future we should walk back
+  // through dotted paths and maybe even matching brackets then type-check
+  // the subexpression to find our completion context.
+  if (isIdentifier(prefix.back())) {
+    for (char const *p = prefix.end(), *end = p, *begin = prefix.begin();
+         p != begin;
+         --p) {
+      if (!isIdentifier(*(p-1)))
+        return StringRef(p, end - p);
+    }
+    return prefix;
+  } else if (Identifier::isOperatorChar(prefix.back())) {
+    for (char const *p = prefix.end(), *end = p, *begin = prefix.begin();
+         p != begin;
+         --p) {
+      if (!Identifier::isOperatorChar(*(p-1)))
+        return StringRef(p, end - p);
+    }
+    return prefix;
+  }
+
+  return StringRef();
 }
 
 /// Build completions by doing visible decl lookup from a context.
