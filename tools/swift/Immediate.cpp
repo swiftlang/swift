@@ -212,12 +212,6 @@ static void appendEscapeSequence(SmallVectorImpl<char> &dest,
   dest.push_back(LITERAL_MODE_CHAR);
 }
 
-static SourceLoc getTUEndLoc(TranslationUnit *TU) {
-  return TU->Decls.empty()
-    ? SourceLoc()
-    : TU->Decls.back()->getSourceRange().End;
-}
-
 struct EditLineWrapper {
   TranslationUnit *TU;
   
@@ -294,7 +288,7 @@ struct EditLineWrapper {
     if (!NeedPromptContinuation)
       PromptString += "(swift) ";
     else {
-      PromptString += "(     ) ";
+      PromptString += "        ";
       PromptString.append(2*PromptContinuationLevel, ' ');
     }
     
@@ -502,7 +496,7 @@ struct EditLineWrapper {
     llvm::StringRef prefix(line->buffer, line->cursor - line->buffer);
     if (!completions) {
       // If we aren't currently working with a completion set, generate one.
-      completions = Completions(TU, getTUEndLoc(TU), prefix);
+      completions = Completions(TU, prefix);
       // Display the common root of the found completions and beep unless we
       // found a unique one.
       insertStringRef(completions.getRoot());

@@ -68,6 +68,14 @@ public:
                                 const DiagnosticInfo &Info) = 0;
 };
   
+/// \brief DiagnosticConsumer that discards all diagnostics.
+class NullDiagnosticConsumer : public DiagnosticConsumer {
+public:
+  void handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
+                        DiagnosticKind Kind, llvm::StringRef Text,
+                        const DiagnosticInfo &Info) override;
+};
+  
 }
 
 #endif

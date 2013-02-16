@@ -402,14 +402,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD) {
   }
 }
 
-
-/// performTypeChecking - Once parsing and namebinding are complete, these
-/// walks the AST to resolve types and diagnose problems therein.
-///
-/// FIXME: This should be moved out to somewhere else.
-void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
-  TypeChecker TC(*TU);
-
+namespace {
   struct ExprPrePassWalker : private ASTWalker {
     TypeChecker &TC;
 
@@ -509,6 +502,15 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       CurDeclContexts.pop_back();
     }
   };
+} // end anonymous namespace
+
+/// performTypeChecking - Once parsing and namebinding are complete, these
+/// walks the AST to resolve types and diagnose problems therein.
+///
+/// FIXME: This should be moved out to somewhere else.
+void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
+  TypeChecker TC(*TU);
+
   ExprPrePassWalker prePass(TC);
 
   // Validate the conformance types of all of the protocols in the translation
@@ -787,4 +789,23 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // Verify that we've checked types correctly.
   TU->ASTStage = TranslationUnit::TypeChecked;
   verify(TU);
+}
+
+bool swift::typeCheckCompletionContextExpr(TranslationUnit *TU,
+                                           Expr *&parsedExpr) {
+  // Set up a diagnostics engine that swallows diagnostics.
+  NullDiagnosticConsumer completionConsumer;
+  DiagnosticEngine diags(TU->Ctx.SourceMgr, completionConsumer);
+  
+  TypeChecker TC(*TU, diags);
+  
+  parsedExpr = ExprPrePassWalker(TC).doWalk(parsedExpr, TU);
+  if (!parsedExpr
+      || isa<ErrorExpr>(parsedExpr)
+      || (parsedExpr->getType() && parsedExpr->getType()->is<ErrorType>()))
+    return false;
+  TC.typeCheckExpression(parsedExpr);
+  return parsedExpr && !isa<ErrorExpr>(parsedExpr)
+                    && parsedExpr->getType()
+                    && !parsedExpr->getType()->is<ErrorType>();
 }

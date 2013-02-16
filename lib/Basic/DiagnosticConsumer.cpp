@@ -16,7 +16,18 @@
 
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
 DiagnosticConsumer::~DiagnosticConsumer() { }
+
+void NullDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM,
+                                              SourceLoc Loc,
+                                              DiagnosticKind Kind,
+                                              llvm::StringRef Text,
+                                              const DiagnosticInfo &Info) {
+  DEBUG(llvm::dbgs() << "NullDiagnosticConsumer received diagnostic: "
+                     << Text << "\n");
+}

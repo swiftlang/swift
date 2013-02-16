@@ -58,6 +58,19 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
 
   return P.FoundSideEffects;
 }
+
+Expr *swift::parseCompletionContextExpr(TranslationUnit *TU,
+                                        llvm::StringRef expr) {
+  // Set up a DiagnosticEngine to swallow errors.
+  NullDiagnosticConsumer completionConsumer;
+  DiagnosticEngine diags(TU->Ctx.SourceMgr, completionConsumer);
+  
+  Parser P(TU->getComponent(), TU->Ctx, expr, diags);
+  // Prime the lexer.
+  P.consumeToken();
+  
+  return P.parseExpr(diag::expected_expr).getPtrOrNull();
+}
   
 //===----------------------------------------------------------------------===//
 // Setup and Helper Methods
@@ -96,6 +109,22 @@ Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context,
     IsMainModule(IsMainModule),
     FoundSideEffects(false) {
 }
+
+Parser::Parser(swift::Component *Comp, ASTContext &Context,
+               llvm::StringRef fragment, DiagnosticEngine &Diags)
+  : SourceMgr(Context.SourceMgr),
+    Diags(Diags),
+    Buffer(llvm::MemoryBuffer::getMemBuffer(fragment, "",
+                                            /*RequiresTerminator*/ false)),
+    L(new Lexer(fragment, SourceMgr, &Diags)),
+    Component(Comp),
+    Context(Context),
+    ScopeInfo(*this),
+    IsMainModule(false),
+    FoundSideEffects(false)
+{
+}
+
 
 Parser::~Parser() {
   delete L;

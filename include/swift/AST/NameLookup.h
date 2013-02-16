@@ -357,6 +357,12 @@ public:
 void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                         DeclContext *DC, SourceLoc Loc = SourceLoc(),
                         bool IsTypeLookup = false);
+  
+/// Finds decls visible as members of the given type and feeds them to the given
+/// VisibleDeclConsumer.
+void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
+                        Type BaseTy,
+                        bool IsTypeLookup = false);
 
 } // end namespace swift
 

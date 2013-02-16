@@ -20,12 +20,14 @@
 namespace llvm {
   class Module;
   class FunctionPass;
+  class StringRef;
 }
 
 namespace swift {
   class TranslationUnit;
   class ASTContext;
   class Component;
+  class Expr;
   class SILModule;
 
   namespace irgen {
@@ -45,6 +47,12 @@ namespace swift {
                                 unsigned *BufferOffset = 0,
                                 unsigned BufferEndOffset = 0);
 
+  /// Attempt to parse a StringRef as a code completion context expression.
+  /// Returns the parsed expression if successful, or null if an expression
+  /// could not be parsed.
+  Expr *parseCompletionContextExpr(TranslationUnit *TU,
+                                   llvm::StringRef expr);
+
   /// performNameBinding - Once parsing is complete, this walks the AST to
   /// resolve names and do other top-level validation.  StartElem indicates
   /// where to start for incremental name binding in the main module.
@@ -56,6 +64,11 @@ namespace swift {
   /// main module.
   void performTypeChecking(TranslationUnit *TU, unsigned StartElem = 0);
 
+  /// typeCheckCompletionContextExpr - Typecheck an expression parsed as a
+  /// completion context.
+  bool typeCheckCompletionContextExpr(TranslationUnit *TU,
+                                      Expr *&parsedExpr);
+  
   /// performCaptureAnalysis - Analyse the AST and mark local declarations
   /// and expressions which can capture them so they can be emitted more
   /// efficiently.  StartElem indicates where to start for incremental capture

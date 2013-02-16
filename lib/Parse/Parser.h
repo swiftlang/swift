@@ -90,6 +90,8 @@ public:
 
   Parser(unsigned BufferID, swift::Component *Component, ASTContext &Ctx,
          unsigned Offset, unsigned EndOffset, bool IsMainModule);
+  Parser(swift::Component *Comp, ASTContext &Context,
+         llvm::StringRef fragment, DiagnosticEngine &Diags);
   ~Parser();
   
   //===--------------------------------------------------------------------===//

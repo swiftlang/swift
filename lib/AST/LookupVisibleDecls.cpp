@@ -534,3 +534,26 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
   //for (const auto &ImpEntry : TU.getImportedModules())
   //  Consumer.foundDecl(&ImpEntry.second);
 }
+
+void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
+                               bool IsTypeLookup) {
+  swift::NominalTypeDecl *ntd = nullptr;
+  
+  if (LValueType *lvt = BaseTy->getAs<LValueType>())
+    ntd = lvt->getObjectType()->getNominalOrBoundGenericNominal();
+  else if (MetaTypeType *mtt = BaseTy->getAs<MetaTypeType>())
+    ntd = mtt->getInstanceType()->getNominalOrBoundGenericNominal();
+  else
+    ntd = mtt->getNominalOrBoundGenericNominal();
+
+  if (!ntd)
+    return;
+  
+  DeclContext *ModuleDC = ntd->getDeclContext();
+  while (!ModuleDC->isModuleContext())
+    ModuleDC = ModuleDC->getParent();
+  
+  Module &M = *cast<Module>(ModuleDC);
+
+  lookupVisibleMemberDecls(BaseTy, Consumer, M, IsTypeLookup);
+}

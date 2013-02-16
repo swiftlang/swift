@@ -292,17 +292,25 @@ private:
   Type FloatLiteralType;
   Type CharacterLiteralType;
   Type StringLiteralType;
+  
+  DiagnosticEngine &Diags;
 
 public:
   TypeChecker(TranslationUnit &TU)
     : TU(TU), Context(TU.Ctx),
-      EnumerableProto(0), EnumeratorProto(0), ArrayLiteralProto(0) {}
+      EnumerableProto(0), EnumeratorProto(0), ArrayLiteralProto(0),
+      Diags(TU.Ctx.Diags) {}
+
+  TypeChecker(TranslationUnit &TU, DiagnosticEngine &Diags)
+    : TU(TU), Context(TU.Ctx),
+      EnumerableProto(0), EnumeratorProto(0), ArrayLiteralProto(0),
+      Diags(Diags) {}
 
   LangOptions &getLangOpts() const { return Context.LangOpts; }
   
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(ArgTypes... Args) {
-    return Context.Diags.diagnose(Args...);
+    return Diags.diagnose(Args...);
   }
 
   Type getArraySliceType(SourceLoc loc, Type elementType);

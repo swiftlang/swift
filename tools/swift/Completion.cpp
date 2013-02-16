@@ -18,8 +18,10 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include "clang/Sema/Lookup.h"
@@ -30,34 +32,167 @@ static bool isIdentifier(char c) {
   return isalnum(c) || c == '_';
 }
 
-static StringRef getCompletionContext(DeclContext* &dc,
-                                      StringRef prefix) {
-  if (prefix.empty())
-    return prefix;
+struct CompletionContext {
+  enum class Kind {
+    Invalid,
+    Unqualified,
+    Qualified
+  } Kind;
   
-  // For now, we just walk backward from the end of the prefix until we run
-  // out of identifier or operator chars. In the future we should walk back
-  // through dotted paths and maybe even matching brackets then type-check
-  // the subexpression to find our completion context.
+  union {
+    struct {
+      DeclContext *dc;
+      SourceLoc loc;
+    } Unqualified;
+    struct {
+      TypeBase *baseTy;
+    } Qualified;
+  };
+  
+  CompletionContext(const CompletionContext &) = default;
+  CompletionContext(CompletionContext &&) = default;
+  CompletionContext &operator=(const CompletionContext &) = default;
+  CompletionContext &operator=(CompletionContext &&) = default;
+  
+  CompletionContext() : Kind(Kind::Invalid) {}
+  
+  CompletionContext(DeclContext *dc, SourceLoc loc)
+    : Kind(Kind::Unqualified), Unqualified{dc, loc} {
+  }
+  
+  CompletionContext(Type baseTy)
+    : Kind(Kind::Qualified), Qualified{baseTy.getPointer()} {
+  }
+  
+  explicit operator bool() { return Kind != Kind::Invalid; }
+  
+  DeclContext *getDeclContext() const {
+    assert(Kind == Kind::Unqualified);
+    return Unqualified.dc;
+  }
+  SourceLoc getLoc() const {
+    assert(Kind == Kind::Unqualified);
+    return Unqualified.loc;
+  }
+  
+  Type getBaseType() const {
+    assert(Kind == Kind::Qualified);
+    return Qualified.baseTy;
+  }
+};
+
+static SourceLoc getTUEndLoc(TranslationUnit *TU) {
+  return TU->Decls.empty()
+    ? SourceLoc()
+    : TU->Decls.back()->getSourceRange().End;
+}
+
+static CompletionContext getCompletionContextFromDotExpression(
+                                                           TranslationUnit *TU,
+                                                           DeclContext *dc,
+                                                           StringRef expr) {
+  char const *begin = expr.begin(), *p = expr.end()-1, *end = expr.end();
+  
+  // Walk backward through identifier '.' identifier '.' ...
+  // TODO: Should also try walking through balanced () [] {} <>
+
+  while (true) {
+    while (p >= begin && isspace(*p))
+      --p;
+    if (p < begin || !isIdentifier(*p))
+      break;
+    do {
+      --p;
+    } while (p >= begin && isIdentifier(*p));
+    while (p >= begin && isspace(*p))
+      --p;
+    if (p < begin || *p != '.')
+      break;
+    --p;
+  }
+  ++p;
+  
+  // Try to parse and typecheck the thing we found as an expression.
+  StringRef exprPart = StringRef(p, end - p);
+
+  Expr *parsedExpr = parseCompletionContextExpr(TU, exprPart);
+  
+  // If we couldn't parse, give up.
+  if (!parsedExpr)
+    return CompletionContext();
+  
+  // Try to typecheck the expression.
+  if (!typeCheckCompletionContextExpr(TU, parsedExpr))
+    return CompletionContext();
+  
+  // Use the type as the context for qualified lookup.
+  return CompletionContext(parsedExpr->getType());
+}
+
+/// Determine the DeclContext, lookup kind, and starting prefix in which to
+/// perform a completion given an initial DeclContext and user-entered string.
+static CompletionContext getCompletionContext(DeclContext *dc,
+                                              StringRef &prefix) {
+  // Find the TranslationUnit.
+  DeclContext *tuDC = dc;
+  while (!isa<TranslationUnit>(tuDC))
+    tuDC = dc->getParent();
+  TranslationUnit *TU = cast<TranslationUnit>(tuDC);
+  
+  SourceLoc tuEndLoc = getTUEndLoc(TU);
+  
+  if (prefix.empty())
+    return CompletionContext(dc, tuEndLoc);
+  
   if (isIdentifier(prefix.back())) {
-    for (char const *p = prefix.end(), *end = p, *begin = prefix.begin();
-         p != begin;
-         --p) {
-      if (!isIdentifier(*(p-1)))
-        return StringRef(p, end - p);
+    // If the character preceding us looks like a named identifier character,
+    // walk backward to find as much of a name as we can.
+    char const *p = prefix.end(), *end = p, *begin = prefix.begin();
+    
+    for (; p != begin; --p) {
+      if (!isIdentifier(*(p-1))) {
+        prefix = StringRef(p, end - p);
+        break;
+      }
     }
-    return prefix;
+    
+    // See if we were preceded by a dot.
+    while (p >= begin && isspace(*--p));
+
+    if (p >= begin && *p == '.') {
+      // Try to figure out a qualified lookup context from the expression
+      // preceding the dot.
+      return getCompletionContextFromDotExpression(TU, dc,
+                                                   StringRef(begin, p - begin));
+    }
+    
+    // If there was no dot, do unqualified completion on the name.
+    return CompletionContext(dc, tuEndLoc);
+  } else if (prefix.back() == '.') {
+    // Try to figure out a qualified lookup context from the expression
+    // preceding the dot.
+    StringRef beforeDot = prefix.slice(0, prefix.size() - 1);
+    prefix = StringRef();
+    return getCompletionContextFromDotExpression(TU, dc, beforeDot);
   } else if (Identifier::isOperatorChar(prefix.back())) {
+    // If the character preceding us looks like an operator character,
+    // walk backward to find as much of an operator name as we can.
     for (char const *p = prefix.end(), *end = p, *begin = prefix.begin();
          p != begin;
          --p) {
-      if (!Identifier::isOperatorChar(*(p-1)))
-        return StringRef(p, end - p);
+      if (!Identifier::isOperatorChar(*(p-1))) {
+        prefix = StringRef(p, end - p);
+        return CompletionContext(dc, tuEndLoc);
+      }
     }
-    return prefix;
+    
+    // Operators only appear unqualified.
+    return CompletionContext(dc, tuEndLoc);
   }
 
-  return StringRef();
+  // Complete everything at the top level.
+  prefix = StringRef();
+  return CompletionContext(dc, tuEndLoc);
 }
 
 /// Build completions by doing visible decl lookup from a context.
@@ -109,35 +244,51 @@ public:
       updateRoot(name);
   }
   
-  CompletionLookup(DeclContext *dc, SourceLoc loc, StringRef prefix)
+  CompletionLookup(CompletionContext context, StringRef prefix)
     : Prefix(prefix)
   {
-    lookupVisibleDecls(*this, dc, loc);
-    // TODO: Integrate Clang LookupVisibleDecls with Swift LookupVisibleDecls.
-    // Doing so now makes REPL interaction too slow.
-    ClangImporter &clangImporter
-      = static_cast<ClangImporter&>(dc->getASTContext().getModuleLoader());
-    clangImporter.lookupVisibleDecls(*this);
+    assert(context && "invalid completion lookup context!");
+    
+    if (context.Kind == CompletionContext::Kind::Unqualified) {
+      lookupVisibleDecls(*this, context.getDeclContext(), context.getLoc());
+
+      // TODO: Integrate Clang LookupVisibleDecls with Swift LookupVisibleDecls.
+      // Doing so now makes REPL interaction too slow.
+      
+      ClangImporter &clangImporter
+        = static_cast<ClangImporter&>(
+                  context.getDeclContext()->getASTContext().getModuleLoader());
+      clangImporter.lookupVisibleDecls(*this);
+    } else
+      lookupVisibleDecls(*this, context.getBaseType());
   }
 };
   
 StringRef Completions::allocateCopy(StringRef s) {
-  char *copy = static_cast<char*>(strings->Allocate(s.size() + 1, 1));
-  memcpy(copy, s.data(), s.size());
-  copy[s.size()] = '\0';
-  return StringRef(copy, s.size());
+  size_t size = s.size();
+  char *copy = static_cast<char*>(strings->Allocate(size + 1, 1));
+  memcpy(copy, s.data(), size);
+  copy[size] = '\0';
+  return StringRef(copy, size);
 }
 
-Completions::Completions(DeclContext *dc, SourceLoc loc, StringRef prefix)
+Completions::Completions(DeclContext *dc, StringRef prefix)
   : strings(new llvm::BumpPtrAllocator()),
     enteredLength(0),
     rootLength(0),
     currentStem((size_t)-1)
 {
-  StringRef completionPrefix = getCompletionContext(dc, prefix);
-  enteredLength = completionPrefix.size();
+  Type lookupType;
+  CompletionContext context = getCompletionContext(dc, prefix);
+  enteredLength = prefix.size();
+  
+  if (!context) {
+    rootLength = 0;
+    state = CompletionState::Empty;
+    return;
+  }
 
-  CompletionLookup lookup(dc, loc, completionPrefix);
+  CompletionLookup lookup(context, prefix);
 
   if (lookup.Results.empty()) {
     rootLength = 0;

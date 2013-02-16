@@ -61,7 +61,6 @@ public:
   /// Create a completion set containing completions appropriate to the given
   /// string.
   Completions(DeclContext *dc,
-              SourceLoc loc,
               llvm::StringRef prefix);
   
   /// Returns true if this is a valid completion set.
