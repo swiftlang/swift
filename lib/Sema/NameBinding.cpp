@@ -83,7 +83,7 @@ namespace {
     /// getModule - Load a module referenced by an import statement,
     /// emitting an error at the specified location and returning null on
     /// failure.
-    Module *getModule(std::pair<Identifier,SourceLoc> ModuleID);
+    Module *getModule(llvm::ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
   };
 }
 
@@ -129,7 +129,12 @@ llvm::error_code NameBinder::findModule(StringRef Module,
   return Err;
 }
 
-Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
+Module *NameBinder::getModule(
+                        ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
+  // TODO: Swift submodules.
+  assert(ModulePath.size() >= 1 && "empty import path");
+  auto ModuleID = ModulePath[0];
+  
   // TODO: We currently just recursively parse referenced modules.  This works
   // fine for now since they are each a single file.  Ultimately we'll want a
   // compiled form of AST's like clang's that support lazy deserialization.
@@ -147,9 +152,15 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
   if (ModuleID.first == TU->Name && Context.hasModuleLoader())
     useClangModule = true;
 
-  Module *M = Context.LoadedModules.lookup(ModuleID.first.str());
-  if (M && !(useClangModule && !isa<ClangModule>(M))) {
-    return M;
+  Module *M = nullptr;
+  
+  // FIXME: For now, ignore submodule paths except for Clang modules.
+  if (ModulePath.size() > 1 && Context.hasModuleLoader()) {
+    useClangModule = true;
+  } else {
+    M = Context.LoadedModules.lookup(ModuleID.first.str());
+    if (M && !(useClangModule && !isa<ClangModule>(M)))
+      return M;
   }
 
   // Open the input file.
@@ -176,7 +187,7 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
     // as a fallback.
     // FIXME: Bad location info?
     return Context.getModuleLoader().loadModule(ModuleID.second,
-                                                { &ModuleID, 1 });
+                                                ModulePath);
   }
 
   unsigned BufferID =
@@ -211,7 +222,7 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
 void NameBinder::addImport(ImportDecl *ID, 
                            SmallVectorImpl<ImportedModule> &Result) {
   ArrayRef<ImportDecl::AccessPathElement> Path = ID->getAccessPath();
-  Module *M = getModule(Path[0]);
+  Module *M = getModule(Path);
   if (M == 0) return;
   
   // FIXME: Validate the access path against the module.  Reject things like

@@ -1,5 +1,10 @@
 module cfuncs { header "cfuncs.h" }
-module ctypes { header "ctypes.h" }
+module ctypes {
+  header "ctypes.h"
+  explicit module bits {
+    header "ctypes/bits.h"
+  }
+}
 module cvars { header "cvars.h" }
 module blocks { header "blocks.h" }
 module Foundation { header "Foundation.h" }
