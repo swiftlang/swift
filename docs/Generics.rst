@@ -299,7 +299,7 @@ signatures match, so implicit conformance deduces that Cowboy conforms to
 Shape. Random collisions between types are fairly rare. However, when one is
 using protocol inheritance with fine- grained (semantic or mostly-semantic)
 differences between protocols in the hierarchy, they become more common. See
-http://www.open- std.org/jtc1/sc22/wg21/docs/papers/2005/n1798.html for examples
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2005/n1798.html for examples
 of this problem as it surfaced with C++ concepts. It is not clear at this time
 whether we want implicit conformance in Swift: there's no existing code to worry
 about, and explicit conformance (described below) provides some benefits.

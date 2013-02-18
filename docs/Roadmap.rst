@@ -307,6 +307,7 @@ Tools and Integration
 
   * Command line
   * Xcode integration
+  * SCM integration (e.g. "import" modules from github, ala http://blog.natefinch.com/2013/01/go-is-for-open-source.html)
 
 * SDK Issues
 
