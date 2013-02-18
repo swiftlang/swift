@@ -875,8 +875,6 @@ namespace {
       auto containerTy = dc->getDeclaredTypeOfContext();
       assert(containerTy && "Method in non-type context?");
 
-      bool isMirrored = false;
-
       // Make sure that NSObject is a supertype of the container.
       // FIXME: This is a hack because we don't have a suitable 'top' type for
       // Objective-C classes.
