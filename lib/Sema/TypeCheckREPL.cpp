@@ -35,8 +35,53 @@ PrintLiteralString(StringRef Str, TypeChecker &TC, SourceLoc Loc,
 }
 
 static void
-PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
-              SourceLoc EndLoc,
+PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
+              Type SugarT, CanType T,
+              SourceLoc Loc, SourceLoc EndLoc,
+              SmallVectorImpl<unsigned> &MemberIndexes,
+              SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
+              SmallVectorImpl<ValueDecl*> &PrintDecls);
+
+static void
+PrintStruct(TypeChecker &TC, VarDecl *Arg,
+            Type SugarT, StructDecl *SD,
+            SourceLoc Loc, SourceLoc EndLoc,
+            SmallVectorImpl<unsigned> &MemberIndexes,
+            SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
+            SmallVectorImpl<ValueDecl*> &PrintDecls) {
+  auto TypeStr
+    = TC.Context.getIdentifier(SugarT->getString()).str();
+  PrintLiteralString(TypeStr, TC, Loc, PrintDecls, BodyContent);
+  
+  PrintLiteralString("(", TC, Loc, PrintDecls, BodyContent);
+  
+  unsigned idx = 0;
+  bool isFirstMember = true;
+  for (Decl *D : SD->getMembers()) {
+    if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
+      if (!VD->isProperty()) {
+        if (isFirstMember)
+          isFirstMember = false;
+        else
+          PrintLiteralString(", ", TC, Loc, PrintDecls, BodyContent);
+        
+        MemberIndexes.push_back(idx);
+        CanType SubType = VD->getType()->getCanonicalType();
+        PrintReplExpr(TC, Arg, VD->getType(), SubType,
+                      Loc, EndLoc, MemberIndexes,
+                      BodyContent, PrintDecls);
+        MemberIndexes.pop_back();
+      }
+    }
+    ++idx;
+  }
+  PrintLiteralString(")", TC, Loc, PrintDecls, BodyContent);
+}
+
+static void
+PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
+              Type SugarT, CanType T,
+              SourceLoc Loc, SourceLoc EndLoc,
               SmallVectorImpl<unsigned> &MemberIndexes,
               SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
               SmallVectorImpl<ValueDecl*> &PrintDecls) {
@@ -50,8 +95,8 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
     for (unsigned i = 0, e = TT->getFields().size(); i < e; ++i) {
       MemberIndexes.push_back(i);
       CanType SubType = TT->getElementType(i)->getCanonicalType();
-      PrintReplExpr(TC, Arg, SubType, Loc, EndLoc, MemberIndexes,
-                    BodyContent, PrintDecls);
+      PrintReplExpr(TC, Arg, TT->getElementType(i), SubType, Loc, EndLoc,
+                    MemberIndexes, BodyContent, PrintDecls);
       MemberIndexes.pop_back();
 
       if (i + 1 != e)
@@ -77,6 +122,12 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
         ArgRef = TC.recheckTypes(ArgRef);
         continue;
       }
+      if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(CurT)) {
+        VarDecl *VD = cast<VarDecl>(BGST->getDecl()->getMembers()[i]);
+        ArgRef = new (Context) GenericMemberRefExpr(ArgRef, Loc, VD, Loc);
+        ArgRef = TC.recheckTypes(ArgRef);
+        continue;
+      }
       TupleType *TT = cast<TupleType>(CurT);
       ArgRef = new (Context) TupleElementExpr(ArgRef, Loc, i, Loc,
                                               TT->getElementType(i));
@@ -96,32 +147,17 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
     return;
   }
 
+  // We print a struct by printing each non-property member variable.
   if (StructType *ST = dyn_cast<StructType>(T)) {
-    // We print a struct by printing each non-property member variable.
-    PrintLiteralString(ST->getDecl()->getName().str(), TC, Loc,
-                       PrintDecls, BodyContent);
-    PrintLiteralString("(", TC, Loc, PrintDecls, BodyContent);
-
-    unsigned idx = 0;
-    bool isFirstMember = true;
-    for (Decl *D : ST->getDecl()->getMembers()) {
-      if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
-        if (!VD->isProperty()) {
-          if (isFirstMember)
-            isFirstMember = false;
-          else
-            PrintLiteralString(", ", TC, Loc, PrintDecls, BodyContent);
-
-          MemberIndexes.push_back(idx);
-          CanType SubType = VD->getType()->getCanonicalType();
-          PrintReplExpr(TC, Arg, SubType, Loc, EndLoc, MemberIndexes,
-                        BodyContent, PrintDecls);
-          MemberIndexes.pop_back();
-        }
-      }
-      ++idx;
-    }
-    PrintLiteralString(")", TC, Loc, PrintDecls, BodyContent);
+    PrintStruct(TC, Arg, SugarT, ST->getDecl(), Loc, EndLoc,
+                MemberIndexes, BodyContent, PrintDecls);
+    return;
+  }
+  
+  if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(T)) {
+    
+    PrintStruct(TC, Arg, SugarT, BGST->getDecl(), Loc, EndLoc,
+                MemberIndexes, BodyContent, PrintDecls);
     return;
   }
 
@@ -197,8 +233,8 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   PrintLiteralString("// ", *this, Loc, PrintDecls, BodyContent);
   PrintLiteralString(TypeStr, *this, Loc, PrintDecls, BodyContent);
   PrintLiteralString(" = ", *this, Loc, PrintDecls, BodyContent);
-  PrintReplExpr(*this, Arg, T, Loc, EndLoc, MemberIndexes, BodyContent,
-                PrintDecls);
+  PrintReplExpr(*this, Arg, E->getType(), T, Loc, EndLoc,
+                MemberIndexes, BodyContent, PrintDecls);
   PrintLiteralString("\n", *this, Loc, PrintDecls, BodyContent);
 
   // Typecheck the function.
@@ -313,8 +349,8 @@ void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
   PrintLiteralString(TypeStr, *this, Loc, PrintDecls, BodyContent);
   PrintLiteralString(" = ", *this, Loc, PrintDecls, BodyContent);
   SmallVector<unsigned, 4> MemberIndexes;
-  PrintReplExpr(*this, Arg, T, Loc, EndLoc, MemberIndexes, BodyContent,
-                PrintDecls);
+  PrintReplExpr(*this, Arg, E->getType(), T, Loc, EndLoc, MemberIndexes,
+                BodyContent, PrintDecls);
   PrintLiteralString("\n", *this, Loc, PrintDecls, BodyContent);
   Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc, Arg->getTypeOfReference());
   BodyContent.push_back(new (Context) ReturnStmt(Loc, ArgRef));
