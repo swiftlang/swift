@@ -544,7 +544,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
   else if (MetaTypeType *mtt = BaseTy->getAs<MetaTypeType>())
     ntd = mtt->getInstanceType()->getNominalOrBoundGenericNominal();
   else
-    ntd = mtt->getNominalOrBoundGenericNominal();
+    ntd = BaseTy->getNominalOrBoundGenericNominal();
 
   if (!ntd)
     return;

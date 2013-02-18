@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "swift-completion"
+
 #include "Completion.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DeclContext.h"
@@ -23,6 +25,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "clang/Sema/Lookup.h"
 
@@ -87,6 +90,26 @@ static SourceLoc getTUEndLoc(TranslationUnit *TU) {
     : TU->Decls.back()->getSourceRange().End;
 }
 
+static void findBalancedBracket(char const *begin,
+                                char const *&p,
+                                char open,
+                                char close) {
+  unsigned depth = 1;
+  if (p == begin) {
+    --p;
+    return;
+  }
+  do {
+    --p;
+    if (*p == close)
+      ++depth;
+    else if (*p == open)
+      --depth;
+  } while (depth != 0 && p > begin);
+  
+  --p;
+}
+
 static CompletionContext getCompletionContextFromDotExpression(
                                                            TranslationUnit *TU,
                                                            DeclContext *dc,
@@ -94,16 +117,36 @@ static CompletionContext getCompletionContextFromDotExpression(
   char const *begin = expr.begin(), *p = expr.end()-1, *end = expr.end();
   
   // Walk backward through identifier '.' identifier '.' ...
-  // TODO: Should also try walking through balanced () [] {} <>
-
   while (true) {
     while (p >= begin && isspace(*p))
       --p;
-    if (p < begin || !isIdentifier(*p))
+    if (p < begin)
       break;
-    do {
+
+    bool requireIdentifier = true;
+    if (*p == ')') {
+      findBalancedBracket(begin, p, '(', ')');
+      requireIdentifier = false;
+    } else if (*p == ']') {
+      findBalancedBracket(begin, p, '[', ']');
+      requireIdentifier = false;
+    } else if (*p == '>') {
+      findBalancedBracket(begin, p, '<', '>');
+      requireIdentifier = true;
+    }
+    
+    while (p >= begin && isspace(*p))
       --p;
-    } while (p >= begin && isIdentifier(*p));
+    if (p < begin)
+      break;
+    if (requireIdentifier && !isIdentifier(*p))
+      break;
+    
+    while (p >= begin && isIdentifier(*p)) {
+      --p;
+    }
+    
+    
     while (p >= begin && isspace(*p))
       --p;
     if (p < begin || *p != '.')
@@ -114,16 +157,25 @@ static CompletionContext getCompletionContextFromDotExpression(
   
   // Try to parse and typecheck the thing we found as an expression.
   StringRef exprPart = StringRef(p, end - p);
+  DEBUG(llvm::dbgs() << "\ncompletion context string: " << exprPart << "\n");
 
   Expr *parsedExpr = parseCompletionContextExpr(TU, exprPart);
   
   // If we couldn't parse, give up.
   if (!parsedExpr)
     return CompletionContext();
+
+  DEBUG(llvm::dbgs() << "\nparsed:\n";
+        parsedExpr->print(llvm::dbgs());
+        llvm::dbgs() << "\n");
   
   // Try to typecheck the expression.
   if (!typeCheckCompletionContextExpr(TU, parsedExpr))
     return CompletionContext();
+  
+  DEBUG(llvm::dbgs() << "\ntypechecked:\n";
+        parsedExpr->print(llvm::dbgs());
+        llvm::dbgs() << "\n");
   
   // Use the type as the context for qualified lookup.
   return CompletionContext(parsedExpr->getType());
@@ -224,6 +276,8 @@ public:
   
   // Implement swift::VisibleDeclConsumer
   void foundDecl(ValueDecl *vd) override {
+    if (vd->getName().empty())
+      return;
     StringRef name = vd->getName().get();
     if (!name.startswith(Prefix))
       return;

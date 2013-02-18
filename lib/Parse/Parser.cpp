@@ -65,11 +65,17 @@ Expr *swift::parseCompletionContextExpr(TranslationUnit *TU,
   NullDiagnosticConsumer completionConsumer;
   DiagnosticEngine diags(TU->Ctx.SourceMgr, completionConsumer);
   
+  TU->ASTStage = TranslationUnit::Parsing;
   Parser P(TU->getComponent(), TU->Ctx, expr, diags);
   // Prime the lexer.
   P.consumeToken();
+  P.CurDeclContext = TU;
   
-  return P.parseExpr(diag::expected_expr).getPtrOrNull();
+  Expr *parsed = P.parseExpr(diag::expected_expr).getPtrOrNull();
+  TU->setUnresolvedIdentifierTypes(
+         TU->Ctx.AllocateCopy(llvm::makeArrayRef(P.UnresolvedIdentifierTypes)));
+  TU->ASTStage = TranslationUnit::Parsed;
+  return parsed;
 }
   
 //===----------------------------------------------------------------------===//

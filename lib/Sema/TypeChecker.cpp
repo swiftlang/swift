@@ -805,6 +805,8 @@ bool swift::typeCheckCompletionContextExpr(TranslationUnit *TU,
       || (parsedExpr->getType() && parsedExpr->getType()->is<ErrorType>()))
     return false;
   TC.typeCheckExpression(parsedExpr);
+  TU->ASTStage = TranslationUnit::TypeChecked;
+  
   return parsedExpr && !isa<ErrorExpr>(parsedExpr)
                     && parsedExpr->getType()
                     && !parsedExpr->getType()->is<ErrorType>();

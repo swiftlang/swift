@@ -197,13 +197,15 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
         SourceLoc Loc = C.Loc;
 
         // FIXME: This loop is ridiculously inefficient.
-        DeclContext *DC;
+        DeclContext *DC = nullptr;
         for (auto IdAndContext : TU.getUnresolvedIdentifierTypes()) {
           if (IdAndContext.first == DNT) {
             DC = IdAndContext.second;
             break;
           }
         }
+        assert(DC && "no entry in UnresolvedIdentifierTypes "
+                     "for unresolved identifier type!");
 
         // Perform an unqualified lookup.
         UnqualifiedLookup Globals(Name, DC, SourceLoc(), /*TypeLookup*/true);
