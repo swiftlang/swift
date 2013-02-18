@@ -32,6 +32,7 @@ class DeclarationName;
 class EnumDecl;
 class MacroInfo;
 class NamedDecl;
+class ObjCMethodDecl;
 class ParmVarDecl;
 class QualType;
 }
@@ -84,7 +85,12 @@ struct ClangImporter::Implementation {
 
   /// \brief Mapping of already-imported declarations.
   llvm::DenseMap<clang::Decl *, Decl *> ImportedDecls;
-  
+
+  /// \brief Mapping of already-imported declarations from protocols, which
+  /// can (and do) get replicated into classes.
+  llvm::DenseMap<std::pair<clang::Decl *, DeclContext *>, Decl *>
+    ImportedProtocolDecls;
+
   /// \brief Mapping of already-imported macros.
   llvm::DenseMap<clang::MacroInfo *, ValueDecl *> ImportedMacros;
 
@@ -201,6 +207,14 @@ public:
   /// \returns The imported declaration, or null if this declaration could
   /// not be represented in Swift.
   Decl *importDecl(clang::NamedDecl *decl);
+
+  /// \brief Import a cloned version of the given declaration, which is part of
+  /// an Objective-C protocol and currently must be a method, into the given
+  /// declaration context.
+  ///
+  /// \returns The imported declaration, or null if this declaration could not
+  /// be represented in Swift.
+  Decl *importMirroredDecl(clang::ObjCMethodDecl *decl, DeclContext *dc);
 
   /// \brief Import the given Clang declaration context into Swift.
   ///

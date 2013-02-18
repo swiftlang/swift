@@ -255,7 +255,7 @@ namespace {
       case EnumKind::Options: {
         auto structDecl = new (Impl.SwiftContext)
           StructDecl(SourceLoc(), name, SourceLoc(), { }, nullptr, dc);
-
+        
         // Compute the underlying type of the enumeration.
         auto underlyingType = Impl.importType(decl->getIntegerType());
         if (!underlyingType)
@@ -306,6 +306,7 @@ namespace {
         break;
       }
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+      result->setClangNode(decl->getCanonicalDecl());
 
       // Import each of the enumerators.
       SmallVector<Decl *, 4> members;
@@ -374,6 +375,7 @@ namespace {
                                  Impl.importSourceLoc(decl->getLocation()),
                                  { }, nullptr, dc);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+      result->setClangNode(decl->getCanonicalDecl());
 
       // FIXME: Figure out what to do with base classes in C++. One possible
       // solution would be to turn them into members and add conversion
@@ -774,31 +776,34 @@ namespace {
         result->setStatic();
 
       // If this method overrides another method, mark it as such.
+
       // FIXME: We'll eventually have to deal with having multiple overrides
       // in Swift.
       if (auto thisClassTy = thisTy->getAs<ClassType>()) {
         if (auto superTy = thisClassTy->getDecl()->getBaseClass()) {
-          llvm::SmallString<128> mySelectorBuf;
-          StringRef mySelector = result->getObjCSelector(mySelectorBuf);
-          MemberLookup superLookup(superTy, name, *Impl.firstClangModule);
-          for (auto &res : superLookup.Results) {
-            auto superMethod = dyn_cast<FuncDecl>(res.D);
-            if (!superMethod)
-              continue;
-
-            if (superMethod->isStatic() != result->isStatic())
-              continue;
-
-            llvm::SmallString<128> superSelectorBuf;
-            StringRef superSelector
-              = superMethod->getObjCSelector(superSelectorBuf);
-            if (mySelector != superSelector)
-              continue;
-
-            // This is an override.
-            // FIXME: Proper type checking here!
-            result->setOverriddenDecl(superMethod);
-            break;
+          auto superDecl = superTy->castTo<ClassType>()->getDecl();
+          if (auto superObjCClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
+                                      superDecl->getClangDecl())) {
+            if (auto superObjCMethod = superObjCClass->lookupMethod(
+                                         decl->getSelector(),
+                                         decl->isInstanceMethod())) {
+              // We found a method that we've overridden. Import it.
+              FuncDecl *superMethod = nullptr;
+              if (isa<clang::ObjCProtocolDecl>(
+                    superObjCMethod->getDeclContext())) {
+                superMethod = cast_or_null<FuncDecl>(
+                                Impl.importMirroredDecl(superObjCMethod,
+                                                        superDecl));
+              } else {
+                superMethod = cast_or_null<FuncDecl>(
+                                Impl.importDecl(superObjCMethod));
+              }
+              
+              if (superMethod) {
+                // FIXME: Proper type checking here!
+                result->setOverriddenDecl(superMethod);
+              }
+            }
           }
         }
       }
@@ -869,6 +874,8 @@ namespace {
       // Figure out the type of the container.
       auto containerTy = dc->getDeclaredTypeOfContext();
       assert(containerTy && "Method in non-type context?");
+
+      bool isMirrored = false;
 
       // Make sure that NSObject is a supertype of the container.
       // FIXME: This is a hack because we don't have a suitable 'top' type for
@@ -1626,8 +1633,7 @@ namespace {
                                     func->getClangDecl())) {
               if (!decl->getMethod(objcMethod->getSelector(),
                                    objcMethod->isInstanceMethod())) {
-                if (auto imported = VisitObjCMethodDecl(objcMethod, dc)) {
-                  imported->setClangNode(objcMethod);
+                if (auto imported = Impl.importMirroredDecl(objcMethod, dc)) {
                   members.push_back(imported);
 
                   // Import any special methods based on this member.
@@ -1726,6 +1732,7 @@ namespace {
                           importObjCProtocols(decl->getReferencedProtocols()),
                           dc);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+      result->setClangNode(decl->getCanonicalDecl());
 
       // Import each of the members.
       SmallVector<Decl *, 4> members;
@@ -1799,6 +1806,7 @@ namespace {
                                    name,
                                    { });
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+      result->setClangNode(decl->getCanonicalDecl());
 
       // Import protocols this protocol conforms to.
       result->setInherited(importObjCProtocols(decl->getReferencedProtocols()));
@@ -1891,6 +1899,7 @@ namespace {
                                 Impl.importSourceLoc(decl->getLocation()),
                                 { }, nullptr, dc);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+      result->setClangNode(decl->getCanonicalDecl());
 
       // If this Objective-C class has a supertype, import it.
       if (auto objcSuper = decl->getSuperClass()) {
@@ -2181,6 +2190,26 @@ Decl *ClangImporter::Implementation::importDecl(clang::NamedDecl *decl) {
     result->setClangNode(canon);
   }
   return ImportedDecls[canon] = result;
+}
+
+Decl *
+ClangImporter::Implementation::importMirroredDecl(clang::ObjCMethodDecl *decl,
+                                                  DeclContext *dc) {
+  if (!decl)
+    return nullptr;
+
+  auto known = ImportedProtocolDecls.find({decl->getCanonicalDecl(), dc});
+  if (known != ImportedProtocolDecls.end())
+    return known->second;
+
+  SwiftDeclConverter converter(*this);
+  auto result = converter.VisitObjCMethodDecl(decl, dc);
+  auto canon = decl->getCanonicalDecl();
+  if (result) {
+    assert(!result->getClangDecl() || result->getClangDecl() == canon);
+    result->setClangNode(canon);
+  }
+  return ImportedProtocolDecls[{canon, dc}] = result;
 }
 
 DeclContext *
