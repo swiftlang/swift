@@ -37,7 +37,6 @@ else
 endif
 
 SWIFT_OPTFLAG := -O3
-SWIFT_SDKFLAG := -sdk=$(SWIFT_SDK)
 
 LDFLAGS += -framework Foundation \
 	   -lswift_stdlib -lswift_runtime -Wl,-force_load,$(LibDir)/libswift_runtime.a
