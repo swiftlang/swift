@@ -3902,7 +3902,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       return SolutionKind::Error;
 
     // Add an overload set that selects this field.
-    OverloadChoice choice(constraint.getFirstType(), fieldIdx);
+    OverloadChoice choice(baseTy, fieldIdx);
     addOverloadSet(OverloadSet::getNew(*this, memberTy, &constraint,
                                        { &choice, 1 }));
     return SolutionKind::Solved;

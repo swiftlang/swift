@@ -194,9 +194,11 @@ Module *NameBinder::getModule(
     Context.SourceMgr.AddNewSourceBuffer(InputFile.take(),
                                          ModuleID.second.Value);
 
-  // FIXME: Turn off the constraint-based type checker for imported modules.
+  // FIXME: Turn off the constraint-based type checker for the imported 'swift'
+  // module.
   llvm::SaveAndRestore<bool> saveUseCS(Context.LangOpts.UseConstraintSolver,
-                                       false);
+                                       (Context.LangOpts.UseConstraintSolver &&
+                                        ModuleID.first.str() != "swift"));
 
   // For now, treat all separate modules as unique components.
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
