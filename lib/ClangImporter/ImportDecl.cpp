@@ -103,15 +103,38 @@ namespace {
 
       // If this is the Objective-C BOOL type, map it to ObjCBool.
       auto &clangContext = Impl.getClangASTContext();
-      if (clangContext.getLangOpts().ObjC1 &&
-          name.str() == "BOOL" &&
-          clangContext.hasSameType(decl->getUnderlyingType(),
-                                   clangContext.ObjCBuiltinBoolTy)) {
-        type = Impl.getNamedSwiftType(Impl.getNamedModule("ObjectiveC"),
-                                      "ObjCBool");
-      } else {
-        type = Impl.importType(decl->getUnderlyingType());
+      if (clangContext.getLangOpts().ObjC1) {
+        switch (name.str().size()) {
+        case 4:
+          // BOOL -> ObjCBool
+          if (name.str() == "BOOL" &&
+              decl->getDeclContext()->getRedeclContext()->isTranslationUnit() &&
+              clangContext.hasSameType(decl->getUnderlyingType(),
+                                       clangContext.ObjCBuiltinBoolTy))
+            type = Impl.getNamedSwiftType(Impl.getNamedModule("ObjectiveC"),
+                                          "ObjCBool");
+          break;
+
+        case 9:
+          // NSInteger -> Int
+          if (name.str() == "NSInteger" &&
+              decl->getDeclContext()->getRedeclContext()->isTranslationUnit() &&
+              decl->getUnderlyingType()->isIntegralType(clangContext))
+            type = Impl.getNamedSwiftType(Impl.getSwiftModule(), "Int");
+          break;
+
+        case 10:
+          // NSUInteger -> Int
+          if (name.str() == "NSUInteger" &&
+              decl->getDeclContext()->getRedeclContext()->isTranslationUnit() &&
+              decl->getUnderlyingType()->isIntegralType(clangContext))
+            type = Impl.getNamedSwiftType(Impl.getSwiftModule(), "Int");
+          break;
+        }
       }
+
+      if (!type)
+        type = Impl.importType(decl->getUnderlyingType());
 
       if (!type)
         return nullptr;

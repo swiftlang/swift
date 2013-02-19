@@ -66,9 +66,11 @@
 + newWithA:(A*)a;
 @end
 
+typedef long NSInteger;
+
 @interface A(Subscripting)
-- objectAtIndexedSubscript:(unsigned)idx;
-- (void)setObject:(id)object atIndexedSubscript:(unsigned)idx;
+- objectAtIndexedSubscript:(NSInteger)idx;
+- (void)setObject:(id)object atIndexedSubscript:(NSInteger)idx;
 
 - objectForKeyedSubscript:(id)key;
 @end
