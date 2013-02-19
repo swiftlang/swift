@@ -140,13 +140,16 @@ of raising a runtime error.
 are considered to be "uncatchable" failures that terminate the
 current thread/actor, and are
 
+
 Runtime errors can occur anywhere in the application
 
-assertion failure, typestate violation.
+array out of bounds
+assertion failure, pre/post conditions failures, typestate violation.
+cast<T>(V)
 
 
 
- (e.g. 
+
 
 
 
