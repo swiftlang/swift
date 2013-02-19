@@ -478,7 +478,8 @@ namespace {
           return nullptr;
 
         // Enumeration type.
-        auto type = Impl.importType(clangEnum->getIntegerType());
+        auto &clangContext = Impl.getClangASTContext();
+        auto type = Impl.importType(clangContext.getTagDeclType(clangEnum));
         if (!type)
           return nullptr;
 

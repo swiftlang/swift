@@ -350,8 +350,14 @@ namespace {
 
     Type VisitEnumType(const clang::EnumType *type) {
       auto clangDecl = type->getDecl();
+      auto &clangContext = Impl.getClangASTContext();
       switch (Impl.classifyEnum(clangDecl)) {
       case ClangImporter::Implementation::EnumKind::Constants:
+        // Map 64-bit enumeration types to Int.
+        if (clangContext.getTypeSize(clangDecl->getIntegerType()) == 64)
+          return Impl.getNamedSwiftType(Impl.getSwiftModule(), "Int");
+
+        // Import the underlying integer type.
         return Impl.importType(clangDecl->getIntegerType());
 
       case ClangImporter::Implementation::EnumKind::OneOf:

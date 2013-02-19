@@ -5,7 +5,7 @@ enum Tribool {
 };
 
 enum {
-  AnonConst1 = 7,
+  AnonConst1 = 0x700000000,
   AnonConst2
 };
 
