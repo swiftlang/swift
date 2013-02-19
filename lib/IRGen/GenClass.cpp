@@ -997,7 +997,7 @@ namespace {
 
   private:
     bool requiresObjCMethodDescriptor(FuncDecl *method) {
-      if (method->getAttrs().isObjC() ||
+      if (method->isObjC() ||
           method->getAttrs().isIBAction())
         return true;
       if (auto override = method->getOverriddenDecl())
@@ -1266,5 +1266,6 @@ ClassDecl *IRGenModule::getSwiftRootClass() {
                                            /*generics*/ nullptr,
                                            Context.TheBuiltinModule);
   SwiftRootClass->getMutableAttrs().ObjC = true;
+  SwiftRootClass->setIsObjC(true);
   return SwiftRootClass;
 }

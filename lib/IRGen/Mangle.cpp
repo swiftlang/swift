@@ -174,7 +174,7 @@ void Mangler::mangleContextOf(ValueDecl *decl) {
 
   // Classes published as Objective-C classes have a special context mangling.
   //   known-context ::= 'So'
-  if (isa<ClassDecl>(decl) && (clangDecl || decl->getAttrs().isObjC())) {
+  if (isa<ClassDecl>(decl) && (clangDecl || decl->isObjC())) {
     assert(!clangDecl || isa<clang::ObjCInterfaceDecl>(clangDecl));
     Buffer << "So";
     return;

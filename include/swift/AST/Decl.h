@@ -716,13 +716,13 @@ public:
 /// have a type, etc.
 class ValueDecl : public Decl {
   Identifier Name;
-  const DeclAttributes *Attrs;
+  llvm::PointerIntPair<const DeclAttributes *, 1, bool> AttrsAndIsObjC;
   static const DeclAttributes EmptyAttrs;
   Type Ty;
 
 protected:
   ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty)
-    : Decl(K, DC), Name(name), Attrs(&EmptyAttrs), Ty(ty) {
+    : Decl(K, DC), Name(name), AttrsAndIsObjC(&EmptyAttrs, false), Ty(ty) {
     ValueDeclBits.NeverUsedAsLValue = false;
     ValueDeclBits.HasFixedLifetime = false;
   }
@@ -738,7 +738,9 @@ public:
   bool isOperator() const { return Name.isOperator(); }
   
   DeclAttributes &getMutableAttrs();
-  const DeclAttributes &getAttrs() const { return *Attrs; }
+  const DeclAttributes &getAttrs() const {
+    return *AttrsAndIsObjC.getPointer();
+  }
   
   Resilience getResilienceFrom(Component *C) const;
 
@@ -797,6 +799,13 @@ public:
   /// needsCapture - Check whether referring to this decl from a nested
   /// function requires capturing it.
   bool needsCapture() const;
+  
+  /// isObjC - Returns true if the decl requires Objective-C interop.
+  bool isObjC() const { return AttrsAndIsObjC.getInt(); }
+  
+  void setIsObjC(bool value) {
+    AttrsAndIsObjC = {AttrsAndIsObjC.getPointer(), value};
+  }
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_ValueDecl &&

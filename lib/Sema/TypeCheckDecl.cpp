@@ -394,6 +394,13 @@ public:
       TC.validateTypeSimple(CD->getDeclaredTypeInContext());
 
       validateAttributes(CD);
+      
+      ClassDecl *baseClassDecl = CD->getBaseClass()
+        ? CD->getBaseClass()->getClassOrBoundGenericClass()
+        : nullptr;
+      
+      CD->setIsObjC(CD->getAttrs().isObjC()
+                    || (baseClassDecl && baseClassDecl->isObjC()));
     }
 
     for (Decl *Member : CD->getMembers())
@@ -480,6 +487,15 @@ public:
     FD->setType(body->getType());
 
     validateAttributes(FD);
+    
+    // A method is ObjC-compatible if it's explicitly [objc] or a member of an
+    // ObjC-compatible class.
+    // FIXME: Property methods are currently excluded.
+    if (!FD->isGetterOrSetter()) {
+      ClassDecl *classContext = dyn_cast<ClassDecl>(FD->getDeclContext());
+      FD->setIsObjC(FD->getAttrs().isObjC()
+                    || (classContext && classContext->isObjC()));
+    }
   }
 
   void visitOneOfElementDecl(OneOfElementDecl *ED) {

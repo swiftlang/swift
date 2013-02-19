@@ -887,7 +887,7 @@ llvm::Constant *IRGenModule::getAddrOfSwiftMetaclassStub(ClassDecl *theClass) {
 /// getAddrOfSwiftMetaclassStub or getAddrOfObjCMetaclass, depending
 /// on whether the class is published as an ObjC class.
 llvm::Constant *IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl) {
-  if (decl->getAttrs().ObjC || decl->hasClangNode()) {
+  if (decl->isObjC() || decl->hasClangNode()) {
     return getAddrOfObjCMetaclass(decl);
   } else {
     return getAddrOfSwiftMetaclassStub(decl);

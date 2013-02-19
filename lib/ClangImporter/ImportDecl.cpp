@@ -770,6 +770,7 @@ namespace {
 
       // Mark this as an Objective-C method.
       result->getMutableAttrs().ObjC = true;
+      result->setIsObjC(true);
 
       // Mark class methods as static.
       if (decl->isClassMethod())
@@ -1811,6 +1812,7 @@ namespace {
 
       // Note that this is an Objective-C protocol.
       result->getMutableAttrs().ObjC = true;
+      result->setIsObjC(true);
 
       // Add the implicit 'This' associated type.
       // FIXME: Mark as 'implicit'.
@@ -1915,6 +1917,7 @@ namespace {
 
       // Note that this is an Objective-C class.
       result->getMutableAttrs().ObjC = true;
+      result->setIsObjC(true);
       
       // Import each of the members.
       SmallVector<Decl *, 4> members;

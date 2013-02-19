@@ -1988,7 +1988,7 @@ namespace {
 
       CalleeSource source;
       
-      if (fn->getAttrs().isObjC())
+      if (fn->isObjC())
         // FIXME: The test we really want is to ask if this function ONLY has an
         // Objective-C implementation, but for now we'll just always go through
         // the Objective-C version.
@@ -2010,7 +2010,7 @@ namespace {
         // FIXME: The test we really want is to ask if this function ONLY has an
         // Objective-C implementation, but for now we'll just always go through
         // the Objective-C version.
-        if (fn->getAttrs().isObjC()) {
+        if (fn->isObjC()) {
           return CalleeSource::forObjCMessage(fn);
         } else if (isa<ClassDecl>(fn->getDeclContext())) {
           return CalleeSource::forVirtual(fn);

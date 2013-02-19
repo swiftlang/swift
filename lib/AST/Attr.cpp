@@ -28,9 +28,10 @@ const DeclAttributes ValueDecl::EmptyAttrs;
 
 DeclAttributes &ValueDecl::getMutableAttrs() {
   // If we don't have mutable attribute storage yet, allocate some.
-  if (Attrs == &EmptyAttrs)
-    Attrs = getASTContext().Allocate<DeclAttributes>(1);
-  return *const_cast<DeclAttributes*>(Attrs);
+  if (&getAttrs() == &EmptyAttrs)
+    AttrsAndIsObjC = {getASTContext().Allocate<DeclAttributes>(1),
+                      AttrsAndIsObjC.getInt()};
+  return *const_cast<DeclAttributes*>(&getAttrs());
 }
 
 /// getResilienceFrom - Find the resilience of this declaration from
