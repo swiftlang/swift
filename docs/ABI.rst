@@ -96,7 +96,7 @@ types where the metadata itself has unknown layout.)
   type ::= 'U' generics '_' type             // generic type
   nominal-type ::= known-nominal-type
   nominal-type ::= substitution
-  nominal-type ::= nominal-type-kind entity
+  nominal-type ::= nominal-type-kind context identifier
   nominal-type-kind ::= 'C'                  // class
   nominal-type-kind ::= 'O'                  // oneof
   nominal-type-kind ::= 'V'                  // struct
@@ -115,25 +115,6 @@ types where the metadata itself has unknown layout.)
 
 <protocol-list> is unambiguous because protocols are always top-level,
 and so the structure is quite simple.
-
-::
-
-  known-module ::= 'So'                      // Objective-C
-  known-module ::= 'Ss'                      // swift
-  known-nominal-type ::= 'Sb'                // swift.Bool
-  known-nominal-type ::= 'Sc'                // swift.Char
-  known-nominal-type ::= 'Sd'                // swift.Float64
-  known-nominal-type ::= 'Sf'                // swift.Float32
-  known-nominal-type ::= 'Si'                // swift.Int64
-  known-nominal-type ::= 'SS'                // swift.String
-  known-nominal-type ::= 'Su'                // swift.UInt64
-
-<known-module> and <known-nominal-type> are built-in substitutions for
-certain common entities.  Like any other substitution, they all start
-with 'S'.
-
-The Objective-C module is used as the context for mangling Objective-C
-classes as <type>s.
 
 ::
 
@@ -192,11 +173,12 @@ it is then added to the substitution map and associated with the next
 available substitution index.
 
 For example,  in mangling a function type
-``(zim.zang.zung, zim.zang.zung, zim.zippity) -> zim.zang.zoo``,
+``(zim.zang.zung, zim.zang.zung, zim.zippity) -> zim.zang.zoo`` (with module
+``zim`` and class ``zim.zang``),
 the recurring contexts ``zim``, ``zim.zang``, and ``zim.zang.zung``
 will be mangled using substitutions after being mangled
 for the first time. The first argument type will mangle in long form,
-``C3zim4zang4zung``, and in doing so, ``zim`` will acquire substitution ``S_``,
+``CC3zim4zang4zung``, and in doing so, ``zim`` will acquire substitution ``S_``,
 ``zim.zang`` will acquire substitution ``S0_``, and ``zim.zang.zung`` will
 acquire ``S1_``. The second argument is the same as the first and will mangle
 using its substitution, ``CS1_``. The
@@ -204,7 +186,26 @@ third argument type will mangle using the substitution for ``zim``,
 ``CS_7zippity``. (It also acquires substitution ``S2_`` which would be used
 if it mangled again.) The result type will mangle using the substitution for
 ``zim.zang``, ``CS0_zoo`` (and acquire substitution ``S3_``). The full
-function type thus mangles as ``fTC3zim4zang4zungCS1_CS_7zippity_CS0_zoo``.
+function type thus mangles as ``fTCC3zim4zang4zungCS1_CS_7zippity_CS0_zoo``.
+
+::
+
+  known-module ::= 'So'                      // Objective-C
+  known-module ::= 'Ss'                      // swift
+  known-nominal-type ::= 'Sb'                // swift.Bool
+  known-nominal-type ::= 'Sc'                // swift.Char
+  known-nominal-type ::= 'Sd'                // swift.Float64
+  known-nominal-type ::= 'Sf'                // swift.Float32
+  known-nominal-type ::= 'Si'                // swift.Int64
+  known-nominal-type ::= 'SS'                // swift.String
+  known-nominal-type ::= 'Su'                // swift.UInt64
+
+<known-module> and <known-nominal-type> are built-in substitutions for
+certain common entities.  Like any other substitution, they all start
+with 'S'.
+
+The Objective-C module is used as the context for mangling Objective-C
+classes as <type>s.
 
 ::
 
@@ -214,3 +215,4 @@ function type thus mangles as ``fTC3zim4zang4zungCS1_CS_7zippity_CS0_zoo``.
 
 <index> is a production for encoding numbers in contexts that can't
 end in a digit; it's optimized for encoding smaller numbers.
+
