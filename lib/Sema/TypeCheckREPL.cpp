@@ -78,6 +78,94 @@ PrintStruct(TypeChecker &TC, VarDecl *Arg,
   PrintLiteralString(")", TC, Loc, PrintDecls, BodyContent);
 }
 
+static Expr *
+getArgRefExpr(TypeChecker &TC,
+              VarDecl *Arg,
+              ArrayRef<unsigned> MemberIndexes,
+              SourceLoc Loc) {
+  ASTContext &Context = TC.Context;
+
+  Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc,
+                                           Arg->getTypeOfReference());
+  ArgRef = TC.convertToRValue(ArgRef);
+  for (unsigned i : MemberIndexes) {
+    // For each index, we look through a TupleType or StructType.
+    CanType CurT = ArgRef->getType()->getRValueType()->getCanonicalType();
+    if (StructType *ST = dyn_cast<StructType>(CurT)) {
+      VarDecl *VD = cast<VarDecl>(ST->getDecl()->getMembers()[i]);
+      ArgRef = new (Context) MemberRefExpr(ArgRef, Loc, VD, Loc);
+      ArgRef = TC.recheckTypes(ArgRef);
+      continue;
+    }
+    if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(CurT)) {
+      VarDecl *VD = cast<VarDecl>(BGST->getDecl()->getMembers()[i]);
+      ArgRef = new (Context) GenericMemberRefExpr(ArgRef, Loc, VD, Loc);
+      ArgRef = TC.recheckTypes(ArgRef);
+      continue;
+    }
+    TupleType *TT = cast<TupleType>(CurT);
+    ArgRef = new (Context) TupleElementExpr(ArgRef, Loc, i, Loc,
+                                            TT->getElementType(i));
+  }
+  return ArgRef;
+}
+
+static void
+PrintClass(TypeChecker &TC, VarDecl *Arg,
+           Type SugarT, ClassDecl *CD,
+           SourceLoc Loc, SourceLoc EndLoc,
+           SmallVectorImpl<unsigned> &MemberIndexes,
+           SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
+           SmallVectorImpl<ValueDecl*> &PrintDecls) {
+
+  ASTContext &Context = TC.Context;
+  TranslationUnit &TU = TC.TU;
+
+  PrintLiteralString("<", TC, Loc, PrintDecls, BodyContent);
+  
+  // If the metatype has a className() property, use it to display the dynamic
+  // type of the instance.
+  bool showedDynamicType = false;
+  Identifier MemberName = Context.getIdentifier("className");
+  Type MetaT = MetaTypeType::get(SugarT, Context);
+  MemberLookup Lookup(MetaT, MemberName, TU);
+  
+  if (Lookup.isSuccess()) {
+    Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
+    MetatypeExpr *Meta = new (Context) MetatypeExpr(ArgRef,
+                                                    Loc,
+                                                    MetaT);
+    Expr *Res = TC.recheckTypes(TC.buildMemberRefExpr(Meta, Loc, Lookup,
+                                                      EndLoc));
+    if (!Res)
+      return;
+    TupleExpr *CallArgs =
+      new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
+                              TupleType::getEmpty(Context));
+    CallExpr *CE = new (Context) CallExpr(Res, CallArgs, Type());
+    Res = TC.semaApplyExpr(CE);
+    if (!Res)
+      goto dynamicTypeFailed;
+    
+    Expr *PrintStrFn = TC.buildRefExpr(PrintDecls, Loc);
+    Res = TC.semaApplyExpr(new (Context) CallExpr(PrintStrFn, Res));
+    if (!Res)
+      goto dynamicTypeFailed;
+    
+    BodyContent.push_back(Res);
+    showedDynamicType = true;
+  }
+
+dynamicTypeFailed:
+  if (!showedDynamicType) {
+    auto TypeStr
+      = TC.Context.getIdentifier(SugarT->getString()).str();
+    PrintLiteralString(TypeStr, TC, Loc, PrintDecls, BodyContent);
+  }
+  
+  PrintLiteralString(" instance>", TC, Loc, PrintDecls, BodyContent);
+}
+
 static void
 PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
               Type SugarT, CanType T,
@@ -110,28 +198,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
   Identifier MemberName = Context.getIdentifier("replPrint");
   MemberLookup Lookup(T, MemberName, TU);
   if (Lookup.isSuccess()) {
-    Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc,
-                                             Arg->getTypeOfReference());
-    ArgRef = TC.convertToRValue(ArgRef);
-    for (unsigned i : MemberIndexes) {
-      // For each index, we look through a TupleType or StructType.
-      CanType CurT = ArgRef->getType()->getRValueType()->getCanonicalType();
-      if (StructType *ST = dyn_cast<StructType>(CurT)) {
-        VarDecl *VD = cast<VarDecl>(ST->getDecl()->getMembers()[i]);
-        ArgRef = new (Context) MemberRefExpr(ArgRef, Loc, VD, Loc);
-        ArgRef = TC.recheckTypes(ArgRef);
-        continue;
-      }
-      if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(CurT)) {
-        VarDecl *VD = cast<VarDecl>(BGST->getDecl()->getMembers()[i]);
-        ArgRef = new (Context) GenericMemberRefExpr(ArgRef, Loc, VD, Loc);
-        ArgRef = TC.recheckTypes(ArgRef);
-        continue;
-      }
-      TupleType *TT = cast<TupleType>(CurT);
-      ArgRef = new (Context) TupleElementExpr(ArgRef, Loc, i, Loc,
-                                              TT->getElementType(i));
-    }
+    Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
     Expr *Res = TC.recheckTypes(TC.buildMemberRefExpr(ArgRef, Loc, Lookup,
                                                       EndLoc));
     if (!Res)
@@ -161,8 +228,12 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
     return;
   }
 
-  // FIXME: Handle ClassTypes?
-
+  if (ClassType *CT = dyn_cast<ClassType>(T)) {
+    PrintClass(TC, Arg, SugarT, CT->getDecl(), Loc, EndLoc,
+               MemberIndexes, BodyContent, PrintDecls);
+    return;
+  }
+  
   // FIXME: We should handle OneOfTypes at some point, but
   // it's tricky to represent in the AST without a "match" statement.
 
