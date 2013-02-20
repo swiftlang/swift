@@ -4352,8 +4352,10 @@ findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc,
 
   std::pair<Type, Type> bounds;
   for (auto arg : tvc.Below) {
-    if (arg.second->hasTypeVariable())
+    if (arg.second->hasTypeVariable()) {
+      isDefinitive = false;
       continue;
+    }
 
     if (bounds.first) {
       // FIXME: Compute the meet of the types. We'll miss
@@ -4367,8 +4369,10 @@ findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc,
   }
 
   for (auto arg : tvc.Above) {
-    if (arg.second->hasTypeVariable())
+    if (arg.second->hasTypeVariable()) {
+      isDefinitive = false;
       continue;
+    }
 
     if (bounds.second) {
       // FIXME: Compute the join of the types. We'll miss
