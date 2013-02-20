@@ -103,8 +103,10 @@ set(SWIFT_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
 option(SWIFT_ASSERTS "Enable assertions for the Swift standard library" YES)
+set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
+  "Directory to use as the Clang module cache when building Swift source files")
 
-# Xcode: use libc++ and c++'0x using proper build settings.
+# Xcode: use libc++ and c++11 using proper build settings.
 if ( XCODE )
   # Force usage of Clang.
   set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvm.clang.1_0"
@@ -167,6 +169,11 @@ function(compile_swift_file file target objectvar)
   # If we have a modules SDK, use it for building.
   if (HAVE_MODULES_SDK)
     list(APPEND swift_flags "-sdk=${MODULES_SDK}")
+  endif()
+
+  # If we have a custom module cache path, use it.
+  if (SWIFT_MODULE_CACHE_PATH)
+    list(APPEND swift_flags "-module-cache-path=${SWIFT_MODULE_CACHE_PATH}")
   endif()
 
   # FIXME: Cleaner way to do this?
