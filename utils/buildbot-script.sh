@@ -30,6 +30,9 @@ test -d "$WORKSPACE/swift"
 # Symlink clang into the llvm tree.
 ln -sf "$WORKSPACE/clang" "$WORKSPACE/llvm/tools/clang"
 
+# Create a directory for the Swift Clang module cache.
+mkdir -p "$WORKSPACE/swift-module-cache"
+
 # Build LLVM and Clang (x86 target only).
 if [ \! "$SKIP_BUILD_LLVM" ]; then
   echo "--- Building LLVM and Clang ---"
@@ -58,6 +61,7 @@ if [ \! "$SKIP_BUILD_SWIFT" ]; then
       -DSWIFT_PATH_TO_CLANG_BUILD="$WORKSPACE/llvm/build" \
       -DSWIFT_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
       -DSWIFT_PATH_TO_LLVM_BUILD="$WORKSPACE/llvm/build" \
+      -DSWIFT_MODULE_CACHE_PATH="$WORKSPACE/swift-module-cache" \
       .. &&
     make -j) || exit 1
 fi
