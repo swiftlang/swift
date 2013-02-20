@@ -964,7 +964,7 @@ namespace {
 
       // If the class is being exported as an Objective-C class, we
       // should export it under its formal name.
-      if (TheClass->getAttrs().ObjC) {
+      if (TheClass->isObjC()) {
         Name = IGM.getAddrOfGlobalString(TheClass->getName().str());
         return Name;
       }
