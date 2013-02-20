@@ -104,10 +104,6 @@ static bool isSignToken(clang::Token const &tok) {
 
 ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
                                                       clang::MacroInfo *macro) {
-  // Don't import macros private to the module.
-  if (!macro->isPublic())
-    return nullptr;
-  
   // Currently we only convert non-function-like macros.
   if (macro->isFunctionLike())
     return nullptr;
