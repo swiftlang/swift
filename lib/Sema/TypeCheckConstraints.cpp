@@ -2409,6 +2409,7 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       ASTContext &C = CS.getASTContext();
       // An array expression can be of a type T that conforms to the
       // ArrayLiteralConvertible protocol.
+      // FIXME: This isn't actually used for anything at the moment.
       ProtocolDecl *arrayProto = CS.TC.getArrayLiteralProtocol();
       if (!arrayProto) {
         CS.TC.diagnose(expr->getStartLoc(), diag::array_expr_missing_proto);
@@ -3973,15 +3974,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Look for members within the base.
   MemberLookup &lookup = lookupMember(baseObjTy, name);
   if (!lookup.isSuccess()) {
-    return SolutionKind::Error;
-  }
-
-  // Can't refer to a property without an object instance.
-  // FIXME: Subscripts have a similar restriction. Check it here.
-  // FIXME: DEAD CODE?
-  bool isMetatypeBase = baseObjTy->getRValueType()->is<MetaTypeType>();
-  if (isMetatypeBase && lookup.Results.size() == 1 &&
-      lookup.Results[0].Kind == MemberLookupResult::MemberProperty) {
     return SolutionKind::Error;
   }
 
