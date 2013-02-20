@@ -32,6 +32,7 @@ ln -sf "$WORKSPACE/clang" "$WORKSPACE/llvm/tools/clang"
 
 # Create a directory for the Swift Clang module cache.
 mkdir -p "$WORKSPACE/swift-module-cache"
+rm -rf "$WORKSPACE/swift-module-cache/*" || true
 
 # Build LLVM and Clang (x86 target only).
 if [ \! "$SKIP_BUILD_LLVM" ]; then
