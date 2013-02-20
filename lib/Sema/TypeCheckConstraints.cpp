@@ -3526,6 +3526,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         // Match up the generic arguments, exactly.
         auto args1 = bound1->getGenericArgs();
         auto args2 = bound2->getGenericArgs();
+        bool checkConversions = false;
         assert(args1.size() == args2.size() && "Mismatched generic args");
         for (unsigned i = 0, n = args1.size(); i != n; ++i) {
           switch (matchTypes(args1[i], args2[i], TypeMatchKind::SameType,
@@ -3535,8 +3536,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             // the constraint with.
             // FIXME: The recursive match may have introduced new equality
             // constraints that are now invalid. rdar://problem/13140447
-            if (kind >= TypeMatchKind::Conversion)
+            if (kind >= TypeMatchKind::Conversion) {
+              checkConversions = true;
               break;
+            }
 
             return SolutionKind::Error;
 
@@ -3553,7 +3556,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           }
         }
 
-        return result;
+        if (!checkConversions)
+          return result;
       }
       break;
     }
