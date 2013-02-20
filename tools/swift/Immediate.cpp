@@ -33,6 +33,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ExecutionEngine/JIT.h"
+#include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -56,6 +57,96 @@
 #include <dlfcn.h>
 
 using namespace swift;
+
+namespace {
+template<size_t N>
+class ConvertForWcharSize;
+
+template<>
+class ConvertForWcharSize<2> {
+public:
+  static ConversionResult ConvertFromUTF8(const char** sourceStart,
+                                          const char* sourceEnd,
+                                          wchar_t** targetStart,
+                                          wchar_t* targetEnd,
+                                          ConversionFlags flags) {
+    return ConvertUTF8toUTF16(reinterpret_cast<const UTF8**>(sourceStart),
+                              reinterpret_cast<const UTF8*>(sourceEnd),
+                              reinterpret_cast<UTF16**>(targetStart),
+                              reinterpret_cast<UTF16*>(targetEnd),
+                              flags);
+  }
+  
+  static ConversionResult ConvertToUTF8(const wchar_t** sourceStart,
+                                        const wchar_t* sourceEnd,
+                                        char** targetStart,
+                                        char* targetEnd,
+                                        ConversionFlags flags) {
+    return ConvertUTF16toUTF8(reinterpret_cast<const UTF16**>(sourceStart),
+                              reinterpret_cast<const UTF16*>(sourceEnd),
+                              reinterpret_cast<UTF8**>(targetStart),
+                              reinterpret_cast<UTF8*>(targetEnd),
+                              flags);
+  }
+};
+
+template<>
+class ConvertForWcharSize<4> {
+public:
+  static ConversionResult ConvertFromUTF8(const char** sourceStart,
+                                          const char* sourceEnd,
+                                          wchar_t** targetStart,
+                                          wchar_t* targetEnd,
+                                          ConversionFlags flags) {
+    return ConvertUTF8toUTF32(reinterpret_cast<const UTF8**>(sourceStart),
+                              reinterpret_cast<const UTF8*>(sourceEnd),
+                              reinterpret_cast<UTF32**>(targetStart),
+                              reinterpret_cast<UTF32*>(targetEnd),
+                              flags);
+  }
+  
+  static ConversionResult ConvertToUTF8(const wchar_t** sourceStart,
+                                        const wchar_t* sourceEnd,
+                                        char** targetStart,
+                                        char* targetEnd,
+                                        ConversionFlags flags) {
+    return ConvertUTF32toUTF8(reinterpret_cast<const UTF32**>(sourceStart),
+                              reinterpret_cast<const UTF32*>(sourceEnd),
+                              reinterpret_cast<UTF8**>(targetStart),
+                              reinterpret_cast<UTF8*>(targetEnd),
+                              flags);
+  }
+};
+
+using Convert = ConvertForWcharSize<sizeof(wchar_t)>;
+  
+static void convertFromUTF8(llvm::StringRef utf8,
+                            llvm::SmallVectorImpl<wchar_t> &out) {
+  size_t reserve = out.size() + utf8.size();
+  out.reserve(reserve);
+  const char *utf8_begin = utf8.begin();
+  wchar_t *wide_begin = out.end();
+  auto res = Convert::ConvertFromUTF8(&utf8_begin, utf8.end(),
+                                      &wide_begin, out.data() + reserve,
+                                      lenientConversion);
+  assert(res == conversionOK && "utf8-to-wide conversion failed!");
+  out.set_size(wide_begin - out.begin());
+}
+  
+static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
+                          llvm::SmallVectorImpl<char> &out) {
+  size_t reserve = out.size() + wide.size()*4;
+  out.reserve(reserve);
+  const wchar_t *wide_begin = wide.begin();
+  char *utf8_begin = out.end();
+  auto res = Convert::ConvertToUTF8(&wide_begin, wide.end(),
+                                    &utf8_begin, out.data() + reserve,
+                                    lenientConversion);
+  assert(res == conversionOK && "wide-to-utf8 conversion failed!");
+  out.set_size(utf8_begin - out.begin());
+}
+
+} // end anonymous namespace
 
 static void loadRuntimeLib(StringRef sharedLibName) {
   // FIXME: Need error-checking.
@@ -201,15 +292,15 @@ void swift::RunImmediately(TranslationUnit *TU, SILModule *SILMod) {
 /// entering/leaving "literal mode", meaning it passes prompt characters through
 /// to the terminal without affecting the line state. This prevents color
 /// escape sequences from interfering with editline's internal state.
-static constexpr char LITERAL_MODE_CHAR = '\1';
+static constexpr wchar_t LITERAL_MODE_CHAR = L'\1';
 
 /// Append a terminal escape sequence in "literal mode" so that editline
 /// ignores it.
-static void appendEscapeSequence(SmallVectorImpl<char> &dest,
+static void appendEscapeSequence(SmallVectorImpl<wchar_t> &dest,
                                  llvm::StringRef src)
 {
   dest.push_back(LITERAL_MODE_CHAR);
-  dest.insert(dest.end(), src.begin(), src.end());
+  convertFromUTF8(src, dest);
   dest.push_back(LITERAL_MODE_CHAR);
 }
 
@@ -217,7 +308,7 @@ struct EditLineWrapper {
   TranslationUnit *TU;
   
   EditLine *e;
-  History *h;
+  HistoryW *h;
   size_t PromptContinuationLevel;
   bool NeedPromptContinuation;
   bool ShowColors;
@@ -225,58 +316,58 @@ struct EditLineWrapper {
   bool Outdented;
   Completions completions;
   
-  llvm::SmallString<80> PromptString;
+  llvm::SmallVector<wchar_t, 80> PromptString;
 
   EditLineWrapper(TranslationUnit *TU) : TU(TU) {
     // Only show colors if both stderr and stdout are displayed.
     ShowColors = llvm::errs().is_displayed() && llvm::outs().is_displayed();
 
     e = el_init("swift", stdin, stdout, stderr);
-    h = history_init();
+    h = history_winit();
     PromptContinuationLevel = 0;
-    el_set(e, EL_EDITOR, "emacs");
-    el_set(e, EL_PROMPT_ESC, PromptFn, LITERAL_MODE_CHAR);
-    el_set(e, EL_CLIENTDATA, (void*)this);
-    el_set(e, EL_HIST, history, h);
-    el_set(e, EL_SIGNAL, 1);
-    el_set(e, EL_GETCFN, GetCharFn);
+    el_wset(e, EL_EDITOR, L"emacs");
+    el_wset(e, EL_PROMPT_ESC, PromptFn, LITERAL_MODE_CHAR);
+    el_wset(e, EL_CLIENTDATA, (void*)this);
+    el_wset(e, EL_HIST, history, h);
+    el_wset(e, EL_SIGNAL, 1);
+    el_wset(e, EL_GETCFN, GetCharFn);
     
     // Provide special outdenting behavior for '}' and ':'.
-    el_set(e, EL_ADDFN, "swift-close-brace", "Reduce {} indentation level",
-           BindingFn<&EditLineWrapper::onCloseBrace>);
-    el_set(e, EL_BIND, "}", "swift-close-brace", nullptr);
+    el_wset(e, EL_ADDFN, L"swift-close-brace", L"Reduce {} indentation level",
+            BindingFn<&EditLineWrapper::onCloseBrace>);
+    el_wset(e, EL_BIND, L"}", L"swift-close-brace", nullptr);
     
-    el_set(e, EL_ADDFN, "swift-colon", "Reduce label indentation level",
-           BindingFn<&EditLineWrapper::onColon>);
-    el_set(e, EL_BIND, ":", "swift-colon", nullptr);
+    el_wset(e, EL_ADDFN, L"swift-colon", L"Reduce label indentation level",
+            BindingFn<&EditLineWrapper::onColon>);
+    el_wset(e, EL_BIND, L":", L"swift-colon", nullptr);
     
     // Provide special indent/completion behavior for tab.
-    el_set(e, EL_ADDFN, "swift-indent-or-complete",
-           "Indent line or trigger completion",
+    el_wset(e, EL_ADDFN, L"swift-indent-or-complete",
+           L"Indent line or trigger completion",
            BindingFn<&EditLineWrapper::onIndentOrComplete>);
-    el_set(e, EL_BIND, "\t", "swift-indent-or-complete", nullptr);
+    el_wset(e, EL_BIND, L"\t", L"swift-indent-or-complete", nullptr);
 
-    el_set(e, EL_ADDFN, "swift-complete",
-           "Trigger completion",
-           BindingFn<&EditLineWrapper::onComplete>);
+    el_wset(e, EL_ADDFN, L"swift-complete",
+            L"Trigger completion",
+            BindingFn<&EditLineWrapper::onComplete>);
     
     // Provide some common bindings to complement editline's defaults.
     // ^W should delete previous word, not the entire line.
-    el_set(e, EL_BIND, "\x17", "ed-delete-prev-word", nullptr);
+    el_wset(e, EL_BIND, L"\x17", L"ed-delete-prev-word", nullptr);
     // ^_ should undo.
-    el_set(e, EL_BIND, "\x1f", "vi-undo", nullptr);
+    el_wset(e, EL_BIND, L"\x1f", L"vi-undo", nullptr);
     
-    HistEvent ev;
-    history(h, &ev, H_SETSIZE, 800);
+    HistEventW ev;
+    history_w(h, &ev, H_SETSIZE, 800);
   }
 
-  static char *PromptFn(EditLine *e) {
+  static wchar_t *PromptFn(EditLine *e) {
     void* clientdata;
-    el_get(e, EL_CLIENTDATA, &clientdata);
-    return (char*)((EditLineWrapper*)clientdata)->getPrompt();
+    el_wget(e, EL_CLIENTDATA, &clientdata);
+    return const_cast<wchar_t*>(((EditLineWrapper*)clientdata)->getPrompt());
   }
   
-  const char *getPrompt() {
+  const wchar_t *getPrompt() {
     PromptString.clear();
 
     if (ShowColors) {
@@ -286,10 +377,13 @@ struct EditLineWrapper {
         appendEscapeSequence(PromptString, colorCode);
     }
     
+    static const wchar_t *PS1 = L"(swift) ";
+    static const wchar_t *PS2 = L"        ";
+    
     if (!NeedPromptContinuation)
-      PromptString += "(swift) ";
+      PromptString.insert(PromptString.end(), PS1, PS1 + wcslen(PS1));
     else {
-      PromptString += "        ";
+      PromptString.insert(PromptString.end(), PS2, PS2 + wcslen(PS1));
       PromptString.append(2*PromptContinuationLevel, ' ');
     }
     
@@ -300,18 +394,20 @@ struct EditLineWrapper {
     }
 
     PromptedForLine = true;
-    return PromptString.c_str();
+    PromptString.push_back(L'\0');
+    return PromptString.data();
   }
 
   /// Custom GETCFN to reset completion state after typing.
-  static int GetCharFn(EditLine *e, char *out) {
+  /// NB: editline expects a char even in "wide" mode
+  static int GetCharFn(EditLine *e, wchar_t *out) {
     void* clientdata;
-    el_get(e, EL_CLIENTDATA, &clientdata);
+    el_wget(e, EL_CLIENTDATA, &clientdata);
     EditLineWrapper *that = (EditLineWrapper*)clientdata;
     
-    int c;
+    wint_t c;
     do {
-      c = getc(stdin);
+      c = getwc(stdin);
       if (c == EOF) {
         if (feof(stdin)) {
           *out = '\0';
@@ -327,31 +423,32 @@ struct EditLineWrapper {
     } while (false);
       
     // If the user typed anything other than tab, reset the completion state.
-    if (c != '\t')
+    if (c != L'\t')
       that->completions.reset();
-    *out = c;
+    *out = wchar_t(c);
     return 1;
   }
   
   template<unsigned char (EditLineWrapper::*method)(int)>
   static unsigned char BindingFn(EditLine *e, int ch) {
     void *clientdata;
-    el_get(e, EL_CLIENTDATA, &clientdata);
+    el_wget(e, EL_CLIENTDATA, &clientdata);
     return (((EditLineWrapper*)clientdata)->*method)(ch);
   }
   
-  bool isAtStartOfLine(LineInfo const *line) {
-    for (char c : StringRef(line->buffer, line->cursor - line->buffer)) {
-      if (!isspace(c))
+  bool isAtStartOfLine(LineInfoW const *line) {
+    for (wchar_t c : llvm::makeArrayRef(line->buffer,
+                                        line->cursor - line->buffer)) {
+      if (!iswspace(c))
         return false;
     }
     return true;
   }
 
   // /^\s*\w+\s*:$/
-  bool lineLooksLikeLabel(LineInfo const *line) {
-    char const *p = line->buffer;
-    while (p != line->cursor && isspace(*p))
+  bool lineLooksLikeLabel(LineInfoW const *line) {
+    wchar_t const *p = line->buffer;
+    while (p != line->cursor && iswspace(*p))
       ++p;
 
     if (p == line->cursor)
@@ -359,40 +456,40 @@ struct EditLineWrapper {
     
     do {
       ++p;
-    } while (p != line->cursor && (isalnum(*p) || *p == '_'));
+    } while (p != line->cursor && (iswalnum(*p) || *p == L'_'));
     
-    while (p != line->cursor && isspace(*p))
+    while (p != line->cursor && iswspace(*p))
       ++p;
 
-    return p+1 == line->cursor || *p == ':';
+    return p+1 == line->cursor || *p == L':';
   }
   
   // /^\s*set\s*\(.*\)\s*:$/
-  bool lineLooksLikeSetter(LineInfo const *line) {
-    char const *p = line->buffer;
-    while (p != line->cursor && isspace(*p))
+  bool lineLooksLikeSetter(LineInfoW const *line) {
+    wchar_t const *p = line->buffer;
+    while (p != line->cursor && iswspace(*p))
       ++p;
     
-    if (p == line->cursor || *p++ != 's')
+    if (p == line->cursor || *p++ != L's')
       return false;
-    if (p == line->cursor || *p++ != 'e')
+    if (p == line->cursor || *p++ != L'e')
       return false;
-    if (p == line->cursor || *p++ != 't')
+    if (p == line->cursor || *p++ != L't')
       return false;
 
-    while (p != line->cursor && isspace(*p))
+    while (p != line->cursor && iswspace(*p))
       ++p;
     
-    if (p == line->cursor || *p++ != '(')
+    if (p == line->cursor || *p++ != L'(')
       return false;
     
-    if (line->cursor - p < 2 || line->cursor[-1] != ':')
+    if (line->cursor - p < 2 || line->cursor[-1] != L':')
       return false;
 
     p = line->cursor - 1;
-    while (isspace(*--p));
+    while (iswspace(*--p));
 
-    return *p == ')';
+    return *p == L')';
   }
 
   void outdent() {
@@ -406,10 +503,10 @@ struct EditLineWrapper {
   
   unsigned char onColon(int ch) {
     // Add the character to the string.
-    char s[2] = {(char)ch, 0};
-    el_insertstr(e, s);
+    wchar_t s[2] = {(wchar_t)ch, 0};
+    el_winsertstr(e, s);
     
-    LineInfo const *line = el_line(e);
+    LineInfoW const *line = el_wline(e);
 
     // Outdent if the line looks like a label.
     if (lineLooksLikeLabel(line))
@@ -422,11 +519,11 @@ struct EditLineWrapper {
   }
   
   unsigned char onCloseBrace(int ch) {
-    bool atStart = isAtStartOfLine(el_line(e));
+    bool atStart = isAtStartOfLine(el_wline(e));
     
     // Add the character to the string.
-    char s[2] = {(char)ch, 0};
-    el_insertstr(e, s);
+    wchar_t s[2] = {(wchar_t)ch, 0};
+    el_winsertstr(e, s);
     
     // Don't outdent if we weren't at the start of the line.
     if (!atStart) {
@@ -438,7 +535,7 @@ struct EditLineWrapper {
   }
   
   unsigned char onIndentOrComplete(int ch) {
-    LineInfo const *line = el_line(e);
+    LineInfoW const *line = el_wline(e);
     
     // FIXME: UTF-8? What's that?
     size_t cursorPos = line->cursor - line->buffer;
@@ -446,8 +543,8 @@ struct EditLineWrapper {
     // If there's nothing but whitespace before the cursor, indent to the next
     // 2-character tab stop.
     if (isAtStartOfLine(line)) {
-      char const *indent = cursorPos & 1 ? " " : "  ";
-      el_insertstr(e, indent);
+      wchar_t const *indent = cursorPos & 1 ? L" " : L"  ";
+      el_winsertstr(e, indent);
       return CC_REFRESH;
     }
     
@@ -458,10 +555,11 @@ struct EditLineWrapper {
   void insertStringRef(StringRef s) {
     if (s.empty())
       return;
-    // Ensure that s is null terminated for el_insertstr.
-    SmallVector<char, 64> TmpStr(s.begin(), s.end());
-    TmpStr.push_back('\0');
-    el_insertstr(e, TmpStr.data());
+    // Convert s to wchar_t* and null-terminate for el_winsertstr.
+    SmallVector<wchar_t, 64> TmpStr;
+    convertFromUTF8(s, TmpStr);
+    TmpStr.push_back(L'\0');
+    el_winsertstr(e, TmpStr.data());
   }
   
   void displayCompletions(llvm::ArrayRef<llvm::StringRef> list) {
@@ -469,6 +567,7 @@ struct EditLineWrapper {
     llvm::outs() << '\n';
     // Trim the completion list to the terminal size.
     int lines_int = 0, columns_int = 0;
+    // NB: EL_GETTC doesn't work with el_wget (?!)
     el_get(e, EL_GETTC, "li", &lines_int);
     el_get(e, EL_GETTC, "co", &columns_int);
     assert(lines_int > 0 && columns_int > 0 && "negative or zero screen size?!");
@@ -493,8 +592,11 @@ struct EditLineWrapper {
   }
   
   unsigned char onComplete(int ch) {
-    LineInfo const *line = el_line(e);
-    llvm::StringRef prefix(line->buffer, line->cursor - line->buffer);
+    LineInfoW const *line = el_wline(e);
+    llvm::ArrayRef<wchar_t> wprefix(line->buffer, line->cursor - line->buffer);
+    llvm::SmallString<16> prefix;
+    convertToUTF8(wprefix, prefix);
+    
     if (!completions) {
       // If we aren't currently working with a completion set, generate one.
       completions = Completions(TU, prefix);
@@ -517,7 +619,7 @@ struct EditLineWrapper {
     case CompletionState::DisplayedCompletionList: {
       // Complete the next completion stem in the cycle.
       llvm::StringRef last = completions.getPreviousStem();
-      el_deletestr(e, last.size());
+      el_wdeletestr(e, last.size());
       insertStringRef(completions.getNextStem());
       return CC_REFRESH;
     }
@@ -626,18 +728,21 @@ void swift::REPL(ASTContext &Context) {
     e.PromptedForLine = false;
     e.Outdented = false;
     int LineCount;
-    const char* Line = el_gets(e, &LineCount);
-    if (!Line) {
+    const wchar_t* WLine = el_wgets(e, &LineCount);
+    if (!WLine) {
       if (e.PromptedForLine)
         printf("\n");
       return;
     }
+    
+    llvm::SmallString<80> Line;
+    convertToUTF8(llvm::makeArrayRef(WLine, WLine + wcslen(WLine)), Line);
 
     size_t indent = e.PromptContinuationLevel*2;
     memset(CurBuffer, ' ', indent);
     CurBuffer += indent;
-    size_t LineLen = strlen(Line);
-    memcpy(CurBuffer, Line, LineLen);
+    size_t LineLen = Line.size();
+    memcpy(CurBuffer, Line.c_str(), LineLen);
 
     // Special-case backslash for line continuations in the REPL.
     if (LineLen > 1 && Line[LineLen-1] == '\n' && Line[LineLen-2] == '\\') {
@@ -652,8 +757,8 @@ void swift::REPL(ASTContext &Context) {
     // Enter the line into the line history.
     // FIXME: We should probably be a bit more clever here about which lines we
     // put into the history and when we put them in.
-    HistEvent ev;
-    history(e.h, &ev, H_ENTER, CurBuffer);
+    HistEventW ev;
+    history_w(e.h, &ev, H_ENTER, WLine);
 
     CurBuffer += LineLen;
     CurBufferEndOffset += LineLen + indent;
