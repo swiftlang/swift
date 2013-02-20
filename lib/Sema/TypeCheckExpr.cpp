@@ -1400,13 +1400,15 @@ Expr *TypeChecker::semaSuperConstructorRefCallExpr(
   // context.
   DeclContext *typeContext = thisDecl->getDeclContext()->getParent();
   assert(typeContext && "constructor without parent context?!");
-  ClassDecl *classDecl = dyn_cast<ClassDecl>(typeContext);
-  if (!classDecl) {
+  const ClassType *classType
+    = typeContext->getDeclaredTypeInContext()->getAs<ClassType>();
+  if (!classType) {
     diagnose(e->getLoc(), diag::super_constructor_not_in_class_constructor);
     e->setType(ErrorType::get(Context));
     return e;
   }
   // The class must have a base class.
+  ClassDecl *classDecl = classType->getDecl();
   if (!classDecl->hasBaseClass()) {
     diagnose(e->getLoc(), diag::super_constructor_with_no_base_class);
     e->setType(ErrorType::get(Context));

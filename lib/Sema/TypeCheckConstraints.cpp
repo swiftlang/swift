@@ -2722,11 +2722,13 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
                       Diag<> diag_no_base_class) {
       DeclContext *typeContext = thisDecl->getDeclContext()->getParent();
       assert(typeContext && "constructor without parent context?!");
-      ClassDecl *classDecl = dyn_cast<ClassDecl>(typeContext);
-      if (!classDecl) {
+      const ClassType *classType
+        = typeContext->getDeclaredTypeInContext()->getAs<ClassType>();
+      if (!classType) {
         CS.TC.diagnose(diagLoc, diag_not_in_class);
         return Type();
       }
+      ClassDecl *classDecl = classType->getDecl();
       if (!classDecl->hasBaseClass()) {
         CS.TC.diagnose(diagLoc, diag_no_base_class);
         return Type();
