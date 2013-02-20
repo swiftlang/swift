@@ -4582,9 +4582,7 @@ resolveTypeVariable(
         continue;
 
       if (auto type = tc.getDefaultLiteralType(constraint->getLiteralKind())) {
-        return std::make_tuple(tvc.TypeVar, type,
-                               tvc.KindConstraints.size() == 1 &&
-                               tvc.Above.empty() && tvc.Below.empty());
+        return std::make_tuple(tvc.TypeVar, type, false);
       }
     }
   }
