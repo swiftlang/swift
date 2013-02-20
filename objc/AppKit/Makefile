@@ -1,4 +1,4 @@
-##===- objc/Makefile -------------------------------------*- Makefile -*-===##
+##===- objc/AppKit/Makefile --------------------------------*- Makefile -*-===##
 #
 # This source file is part of the Swift.org open source project
 #
@@ -10,42 +10,47 @@
 #
 ##===----------------------------------------------------------------------===##
 
-# skip this if $(SWIFT_SDK) isn't installed.
-SWIFT_SDK := /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk
-ifeq ($(shell test -d $(SWIFT_SDK) && echo OK), OK)
+SWIFT_LEVEL := ../..
+include $(SWIFT_LEVEL)/../../Makefile.config
 
-SWIFT_LEVEL := ..
-LIBRARYNAME := swiftObjectiveC
+LIBRARYNAME := swiftAppKit
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
-SWIFT_SOURCES := ObjectiveC.swift
-SOURCES := ObjectiveC.swift
+SWIFT_SOURCES := AppKit.swift
+SOURCES := AppKit.swift
 NO_BUILD_ARCHIVE := 1
+#USEDLIBS := swift_runtime.a
 
-DIRS := Foundation AppKit
 include $(SWIFT_LEVEL)/Makefile
 
-SWIFT_OPTFLAG := -O3
+ifeq ($(ENABLE_OPTIMIZED),1)
+  SWIFT_OPTFLAG := -O2
+  ifeq ($(ARCH),x86_64)
+    CFLAGS += -momit-leaf-frame-pointer
+    CXXFLAGS += -momit-leaf-frame-pointer
+  else ifeq ($(ARCH),x86)
+    CFLAGS += -momit-leaf-frame-pointer
+    CXXFLAGS += -momit-leaf-frame-pointer
+  endif
+else
+  SWIFT_OPTFLAG := -O0
+endif
 
-LDFLAGS += -lobjc  \
+SWIFT_OPTFLAG := -O3
+SWIFT_SDKFLAG := -sdk=$(SWIFT_SDK)
+
+LDFLAGS += -framework AppKit \
 	   -lswift_stdlib -lswift_runtime -Wl,-force_load,$(LibDir)/libswift_runtime.a
 
 HeaderDir := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift/
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
-$(HeaderDir)/ObjectiveC.swift: $(PATH_TO_SWIFT_SOURCES) $(HeaderDir)/.dir
+$(HeaderDir)/AppKit.swift: $(PATH_TO_SWIFT_SOURCES) $(HeaderDir)/.dir
 	$(Echo) FIXME -- HACK -- Concatenating $(SWIFT_SOURCES) to build dir
 	$(Verb) cat $(PATH_TO_SWIFT_SOURCES) > $@
 
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
-$(ObjDir)/ObjectiveC.o: $(HeaderDir)/ObjectiveC.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
+$(ObjDir)/AppKit.o: $(HeaderDir)/AppKit.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
 	$(Verb) $(SWIFT_COMPILER) -c $(SWIFT_SDKFLAG) $< -o $@ -parse-as-library -constraint-checker $(SWIFT_OPTFLAG)
 
-all-local:: $(HeaderDir)/ObjectiveC.swift
-
-else
-
-all:
-	@echo "Skipping since SWIFT_SDK isn't installed."
-
-endif
+all-local:: $(HeaderDir)/AppKit.swift

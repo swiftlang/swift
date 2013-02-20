@@ -25,3 +25,4 @@ target_link_libraries(swiftObjectiveC
 install_swift_module(ObjectiveC.swift)
 
 add_subdirectory(Foundation)
+add_subdirectory(AppKit)
