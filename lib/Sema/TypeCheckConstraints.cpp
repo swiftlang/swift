@@ -1647,6 +1647,32 @@ OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
                                  boundType, choices);
 }
 
+/// \brief Check whether the given type can be used as a binding for the given
+/// type variable.
+///
+/// \returns the type to bind to, if the binding is okay.
+static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs, 
+                                         TypeVariableType *typeVar, Type type) {
+  if (!type)
+    return Nothing;
+
+  // Simplify the type.
+  type = cs.simplifyType(type);
+
+  // If the type references the type variable, don't permit the binding.
+  llvm::SetVector<TypeVariableType *> referencedTypeVars;
+  if (type->hasTypeVariable(referencedTypeVars) &&
+      referencedTypeVars.count(typeVar))
+    return Nothing;
+
+  // If the type is a type variable itself, don't permit the binding.
+  if (type->is<TypeVariableType>())
+    return Nothing;
+
+  // Okay, allow the binding (with the simplified type).
+  return type;
+}
+
 void ConstraintSystem::markChildInactive(ConstraintSystem *childCS) {
   assert(NumActiveChildren > 0);
   --NumActiveChildren;
@@ -1660,6 +1686,12 @@ void ConstraintSystem::markChildInactive(ConstraintSystem *childCS) {
 
     bool addedAny = false;
     for (auto supertype : supertypes) {
+      // Make sure we can actually do the binding.
+      if (auto bindingTy = checkTypeOfBinding(*this, typeVar, supertype))
+        supertype = *bindingTy;
+      else
+        continue;
+
       if (explored.count(supertype->getCanonicalType()) > 0)
         continue;
 
@@ -3413,7 +3445,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       llvm_unreachable("Unstructured unresolved type");
 
     case TypeKind::TypeVariable:
-      llvm_unreachable("Type variables handled above");
+      // Nothing to do here; handle type variables below.
+      break;
 
     case TypeKind::Tuple: {
       auto tuple1 = cast<TupleType>(desugar1);
@@ -4351,12 +4384,22 @@ findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc,
 
   std::pair<Type, Type> bounds;
   for (auto arg : tvc.Below) {
-    if (arg.second->hasTypeVariable()) {
+    // Make sure we can perform this binding.
+    auto type = arg.second;
+    if (auto boundTy = checkTypeOfBinding(cs, tvc.TypeVar, type)) {
+      type = *boundTy;
+
+      // Anything with a type variable in it is not definitive.
+      if (type->hasTypeVariable())
+        isDefinitive = false;
+    } else {
+      // We can't perform this binding at all; the result will be
+      // non-definitive.
       isDefinitive = false;
       continue;
     }
 
-    if (bounds.first) {
+    if (bounds.first && !bounds.first->isEqual(type)) {
       // FIXME: Compute the meet of the types. We'll miss
       // potential solutions with the current approach.
       isDefinitive = false;
@@ -4364,16 +4407,26 @@ findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc,
       break;
     }
 
-    bounds.first = arg.second;
+    bounds.first = type;
   }
 
   for (auto arg : tvc.Above) {
-    if (arg.second->hasTypeVariable()) {
+    // Make sure we can perform this binding.
+    auto type = arg.second;
+    if (auto boundTy = checkTypeOfBinding(cs, tvc.TypeVar, type)) {
+      type = *boundTy;
+
+      // Anything with a type variable in it is not definitive.
+      if (type->hasTypeVariable())
+        isDefinitive = false;
+    } else {
+      // We can't perform this binding at all; the result will be
+      // non-definitive.
       isDefinitive = false;
       continue;
     }
 
-    if (bounds.second) {
+    if (bounds.second && !bounds.second->isEqual(type)) {
       // FIXME: Compute the join of the types. We'll miss
       // potential solutions with the current approach.
       isDefinitive = false;
@@ -4381,7 +4434,7 @@ findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc,
       break;
     }
 
-    bounds.second = arg.second;
+    bounds.second = type;
   }
 
   return bounds;
