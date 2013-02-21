@@ -51,7 +51,6 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
 STATISTIC(NumExploredConstraintSystems, "# of constraint systems explored");
 STATISTIC(NumSimplifyIterations, "# of simplification iterations");
 STATISTIC(NumSupertypeFallbacks, "# of supertype fallbacks");
-STATISTIC(NumLameNonDefinitive, "# of type variables lamely non-definitive");
 
 //===--------------------------------------------------------------------===//
 // Type variable implementation.
@@ -59,7 +58,40 @@ STATISTIC(NumLameNonDefinitive, "# of type variables lamely non-definitive");
 #pragma mark Type variable implementation
 
 namespace {
-  
+
+/// \brief A bound on type variable, capturing the current bound type (which
+/// is either above or below) and whether this bound is definitive.
+class TypeVariableBound {
+  llvm::PointerIntPair<TypeBase *, 1, bool> BoundAndDefinitive;
+
+public:
+  TypeVariableBound() : BoundAndDefinitive(nullptr, true) { }
+
+  TypeVariableBound(Type type, bool isDefinitive)
+    : BoundAndDefinitive(type.getPointer(), isDefinitive) { }
+
+  /// \brief Determine whether the bound provided is definitive, meaning that
+  /// every constraint has been accounted for.
+  bool isDefinitive() const { return BoundAndDefinitive.getInt(); }
+
+  /// \brief Retrieve the type of the bound.
+  Type getType() const { return BoundAndDefinitive.getPointer(); }
+
+  /// \brief Determine whether this bound is interesting at all, meaning that
+  /// it is either non-definitive or it has a type.
+  explicit operator bool() const {
+    return getType() || isDefinitive();
+  }
+
+  friend bool operator==(TypeVariableBound bound1, TypeVariableBound bound2) {
+    return bound1.BoundAndDefinitive == bound2.BoundAndDefinitive;
+  }
+
+  friend bool operator!=(TypeVariableBound bound1, TypeVariableBound bound2) {
+    return bound1.BoundAndDefinitive != bound2.BoundAndDefinitive;
+  }
+};
+
 /// \brief A handle that holds the saved state of a type variable, which
 /// can be restored
 class SavedTypeVariableBinding {
@@ -68,6 +100,18 @@ class SavedTypeVariableBinding {
 
   /// \brief The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
+
+  /// \brief The bound above the type variable.
+  TypeVariableBound Above;
+
+  /// \brief The bound below the type variable.
+  TypeVariableBound Below;
+
+  /// \brief The literal kinds this type variable must meet.
+  unsigned LiteralKinds : 16;
+
+  /// \brief Whether this type constrains an overload set.
+  bool ConstrainsOverloadSet : 1;
 
 public:
   explicit SavedTypeVariableBinding(TypeVariableType *typeVar);
@@ -79,6 +123,54 @@ public:
 /// \brief A set of saved type variable bindings.
 typedef SmallVector<SavedTypeVariableBinding, 16> SavedTypeVariableBindings;
 
+}
+
+/// \brief Merge two bounds above the same type variable.
+///
+/// \returns the merged bound.
+static TypeVariableBound mergeBoundsAbove(TypeVariableBound bound1,
+                                          TypeVariableBound bound2) {
+  bool isDefinitive = bound1.isDefinitive() && bound2.isDefinitive();
+
+  auto type1 = bound1.getType();
+  auto type2 = bound2.getType();
+
+  // Retain the type if there is only one, or no type if neither bound has a
+  // type.
+  if (!(type1 && type2))
+    return TypeVariableBound(type1? type1 : type2, isDefinitive);
+
+  // FIXME: This should be computing the meet of the two types.
+  if (type1->isEqual(type2))
+    return TypeVariableBound(type1, isDefinitive);
+
+  // We don't have a useful type bound; just arbitrarily keep the first type we
+  // saw.
+  return TypeVariableBound(type1, /*isDefinitive=*/false);
+}
+
+/// \brief Merge two bounds below the same type variable.
+///
+/// \returns the merged bound.
+static TypeVariableBound mergeBoundsBelow(TypeVariableBound bound1,
+                                          TypeVariableBound bound2) {
+  bool isDefinitive = bound1.isDefinitive() && bound2.isDefinitive();
+
+  auto type1 = bound1.getType();
+  auto type2 = bound2.getType();
+
+  // Retain the type if there is only one, or no type if neither bound has a
+  // type.
+  if (!(type1 && type2))
+    return TypeVariableBound(type1? type1 : type2, isDefinitive);
+
+  // FIXME: This should be computing the join of the two types.
+  if (type1->isEqual(type2))
+    return TypeVariableBound(type1, isDefinitive);
+
+  // We don't have a useful type bound; just arbitrarily keep the first type
+  // we saw.
+  return TypeVariableBound(type1, /*isDefinitive=*/false);
 }
 
 /// \brief The implementation object for a type variable used within the
@@ -100,20 +192,38 @@ class TypeVariableType::Implementation {
   /// type is bound.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
 
+  /// \brief The bound above the type variable.
+  TypeVariableBound Above;
+
+  /// \brief The bound below the type variable.
+  TypeVariableBound Below;
+
+  /// \brief Bits describing what literal kinds this type variable is required
+  /// to match.
+  ///
+  /// The bits are access via 1 << (unsigned)Kind.
+  unsigned LiteralKinds : 16;
+
+  /// \brief Whether this type variable constrains an overload set.
+  bool ConstrainsOverloadSet : 1;
+
   friend class SavedTypeVariableBinding;
 
 public:
   explicit Implementation(unsigned ID)
     : ID(ID), Archetype(nullptr),
-      ParentOrFixed(getTypeVariable()) { }
+      ParentOrFixed(getTypeVariable()), LiteralKinds(), ConstrainsOverloadSet()
+  { }
 
   explicit Implementation(unsigned ID, Expr *TheExpr)
     : ID(ID), Archetype(nullptr),
-      ParentOrFixed(getTypeVariable()) { }
+      ParentOrFixed(getTypeVariable()), LiteralKinds(), ConstrainsOverloadSet()
+  { }
 
   explicit Implementation(unsigned ID, ArchetypeType *Archetype)
     : ID(ID), Archetype(Archetype),
-      ParentOrFixed(getTypeVariable()) { }
+      ParentOrFixed(getTypeVariable()), LiteralKinds(), ConstrainsOverloadSet()
+  { }
 
   /// \brief Retrieve the unique ID corresponding to this type variable.
   unsigned getID() const { return ID; }
@@ -173,6 +283,31 @@ public:
     return result;
   }
 
+private:
+  /// \brief Merge the constraints from the other type variable into this
+  /// type variable.
+  void mergeConstraintsFrom(TypeVariableType *other,
+                            SavedTypeVariableBindings &record) {
+    auto newAbove = mergeBoundsAbove(Above, other->getImpl().Above);
+    auto newBelow = mergeBoundsBelow(Below, other->getImpl().Below);
+    unsigned newLiteralKinds = LiteralKinds | other->getImpl().LiteralKinds;
+    
+    // If merging changed anything, record it.
+    if (newAbove != Above || newBelow != Below ||
+        newLiteralKinds != LiteralKinds) {
+      recordBinding(record);
+      Above = newAbove;
+      Below = newBelow;
+      LiteralKinds = newLiteralKinds;
+    }
+    
+    // Clear out the other above/below; they've been merged. 
+    other->getImpl().Above = TypeVariableBound();
+    other->getImpl().Below = TypeVariableBound();
+    other->getImpl().LiteralKinds = 0;
+  }
+
+public:
   /// \brief Merge the equivalence class of this type variable with the
   /// equivalence class of another type variable.
   ///
@@ -183,14 +318,35 @@ public:
                                SavedTypeVariableBindings &record) {
     // Merge the equivalence classes corresponding to these two type
     // variables. Always merge 'up' the constraint stack, because it is simpler.
-    if (getID() < other->getImpl().getID()) {
+    if (getID() < other->getImpl().getID() || ConstrainsOverloadSet) {
       auto rep = other->getImpl().getRepresentative(&record);
       rep->getImpl().recordBinding(record);
       rep->getImpl().ParentOrFixed = getTypeVariable();
+
+      // If we have an interesting bound above or below, merge them.
+      if (rep->getImpl().Above || rep->getImpl().Below) {
+        auto myRep = getRepresentative(&record);
+        myRep->getImpl().mergeConstraintsFrom(rep, record);
+      }
+      
+      if (rep->getImpl().ConstrainsOverloadSet) {
+        getRepresentative(&record)->getImpl().ConstrainsOverloadSet = true;
+      }
     } else {
       auto rep = getRepresentative(&record);
       rep->getImpl().recordBinding(record);
       rep->getImpl().ParentOrFixed = other;
+
+      // If we have an interesting bound above or below, merge them.
+      if (rep->getImpl().Above || rep->getImpl().Below) {
+        auto otherRep = other->getImpl().getRepresentative(&record);
+        otherRep->getImpl().mergeConstraintsFrom(rep, record);
+      }
+
+      if (rep->getImpl().ConstrainsOverloadSet) {
+        other->getImpl().getRepresentative(&record)->getImpl()
+          .ConstrainsOverloadSet = true;
+      }
     }
   }
 
@@ -246,6 +402,139 @@ public:
     rep->getImpl().ParentOrFixed = type.getPointer();
   }
 
+  /// \brief Retrieve the bound above this type variable.
+  TypeVariableBound getAbove() const { return Above; }
+
+  /// \brief Retrieve the bound below this type variable.
+  TypeVariableBound getBelow() const { return Below; }
+
+  /// \brief Return a bitmask of the literal kinds that this type variable is
+  /// bound to.
+  unsigned getLiteralKinds() const { return LiteralKinds; }
+
+  /// \brief Whether this type variable constrains an overload set.
+  bool constrainsOverloadSet() const { return ConstrainsOverloadSet; }
+
+  /// \brief Note that this type variable constrains an overload set.
+  void makeConstrainsOverloadSet(SavedTypeVariableBindings &record) {
+    if (ConstrainsOverloadSet)
+      return;
+
+    recordBinding(record);
+    ConstrainsOverloadSet = true;
+  }
+
+  /// \brief Apply a new type bound above this type variable, merging it with
+  /// any existing bound.
+  void applyBoundAbove(Type newAboveType, SavedTypeVariableBindings &record) {
+    // Track the size of the saved-type-variable record.
+    unsigned savedSize = record.size();
+
+    // Find the representative, and merge it.
+    auto rep = getRepresentative(&record);
+
+    // Merge the bounds above. If nothing changed, we're done.
+    auto newAbove = mergeBoundsAbove(rep->getImpl().Above,
+                                     TypeVariableBound(newAboveType, true));
+    if (newAbove == rep->getImpl().Above) {
+      return;
+    }
+
+    // If this type variable wasn't saved, do so now.
+    if (savedSize == record.size()) {
+      rep->getImpl().recordBinding(record);
+    }
+
+    // Save the updated bound.
+    rep->getImpl().Above = newAbove;
+  }
+
+  /// \brief Apply a new type bound below this type variable, merging it with
+  /// any existing bound.
+  void applyBoundBelow(Type newBelowType, SavedTypeVariableBindings &record) {
+    // Track the size of the saved-type-variable record.
+    unsigned savedSize = record.size();
+
+    // Find the representative, and merge it.
+    auto rep = getRepresentative(&record);
+
+    // Merge the bounds below. If nothing changed, we're done.
+    auto newBelow = mergeBoundsBelow(rep->getImpl().Below,
+                                     TypeVariableBound(newBelowType, true));
+    if (newBelow == rep->getImpl().Below) {
+      return;
+    }
+
+    // If this type variable wasn't saved, do so now.
+    if (savedSize == record.size()) {
+      rep->getImpl().recordBinding(record);
+    }
+
+    // Save the updated bound.
+    rep->getImpl().Below = newBelow;
+  }
+
+  /// \brief Apply the new literal requirement, with the given kind, to this
+  /// type variable.
+  void
+  applyLiteralRequirement(LiteralKind kind, SavedTypeVariableBindings &record) {
+    // Track the size of the saved-type-variable record.
+    unsigned savedSize = record.size();
+
+    // Find the representative, and merge it.
+    auto rep = getRepresentative(&record);
+
+    // Check whether this bit was already set.
+    unsigned flagBit = 1u << (unsigned)kind;
+    if (rep->getImpl().LiteralKinds & flagBit)
+      return;
+
+    // If this type variable wasn't saved, do so now.
+    if (savedSize == record.size()) {
+      rep->getImpl().recordBinding(record);
+    }
+
+    // Save the updated bitmask.
+    rep->getImpl().LiteralKinds |= flagBit;
+  }
+
+  /// \brief Note that the bounds of this type variable are non-definitive,
+  /// because it has occurred 
+  void
+  makeBoundsNonDefinitive(SavedTypeVariableBindings &record) {
+    unsigned savedSize = record.size();
+    auto rep = getRepresentative(&record);
+
+    // If both above and below are already non-definitive, there's nothing to
+    // do.
+    if (!rep->getImpl().Above.isDefinitive() &&
+        !rep->getImpl().Below.isDefinitive())
+      return;
+
+    // If this type variable wasn't saved, do so now.
+    if (savedSize == record.size()) {
+      rep->getImpl().recordBinding(record);
+    }
+
+    // Make both bounds non-definitive.
+    rep->getImpl().Above = TypeVariableBound(rep->getImpl().Above.getType(),
+                                             false);
+    rep->getImpl().Below = TypeVariableBound(rep->getImpl().Below.getType(),
+                                             false);
+  }
+
+  /// Clear out any bounds that we've computed for this type.
+  void clearBounds(SavedTypeVariableBindings &record) {
+    if (Above != TypeVariableBound() ||
+        Below != TypeVariableBound() ||
+        LiteralKinds != 0) {
+      recordBinding(record);
+      Above = TypeVariableBound();
+      Below = TypeVariableBound();
+      LiteralKinds = 0;
+    }
+  }
+
   void print(llvm::raw_ostream &Out) {
     Out << "$T" << ID;
   }
@@ -274,10 +563,17 @@ void TypeVariableType::print(raw_ostream &OS) const {
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVar(typeVar), ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
+  : TypeVar(typeVar), ParentOrFixed(typeVar->getImpl().ParentOrFixed),
+    Above(typeVar->getImpl().Above), Below(typeVar->getImpl().Below),
+    LiteralKinds(typeVar->getImpl().LiteralKinds),
+    ConstrainsOverloadSet(typeVar->getImpl().ConstrainsOverloadSet) { }
 
 void SavedTypeVariableBinding::restore() {
   TypeVar->getImpl().ParentOrFixed = ParentOrFixed;
+  TypeVar->getImpl().Above = Above;
+  TypeVar->getImpl().Below = Below;
+  TypeVar->getImpl().LiteralKinds = LiteralKinds;
+  TypeVar->getImpl().ConstrainsOverloadSet = ConstrainsOverloadSet;
 }
 
 //===--------------------------------------------------------------------===//
@@ -676,30 +972,6 @@ namespace {
                                ArrayRef<OverloadChoice> choices);
   };
 
-  /// \brief A representative type variable with the list of constraints
-  /// that apply to it.
-  struct TypeVariableConstraints {
-    TypeVariableConstraints(TypeVariableType *typeVar)
-      : HasNonConcreteConstraints(false), TypeVar(typeVar) {}
-
-    /// \brief Whether there are any non-concrete constraints placed on this
-    /// type variable that aren't represented by the stored \c Constraints.
-    bool HasNonConcreteConstraints;
-
-    /// \brief The representative type variable.
-    TypeVariableType *TypeVar;
-
-    /// \brief The set of constraints "above" the type variable.
-    SmallVector<std::pair<Constraint *, Type>, 4> Above;
-
-    /// \brief The set of constraints "below" the type variable.
-    SmallVector<std::pair<Constraint *, Type>, 4> Below;
-
-    /// \brief The set of archetype and literal constraints directly applicable
-    /// to the type variable T.
-    SmallVector<Constraint *, 4> KindConstraints;
-  };
-
   //===--------------------------------------------------------------------===//
   // Constraint system
   //===--------------------------------------------------------------------===//
@@ -985,6 +1257,9 @@ namespace {
       return false;
     }
 
+    /// \brief Retrieve the parent of this constraint system.
+    ConstraintSystem *getParent() const { return Parent; }
+
     /// \brief Retrieve the constraint that caused this system to fail.
     Constraint *getFailedConstraint() const { return failedConstraint; }
 
@@ -1169,6 +1444,11 @@ namespace {
                                          std::forward<Args>(args)...);
       TypeVariables.push_back(tv);
       return tv;
+    }
+
+    /// \brief Retrieve the set of type variables described in this system.
+    ArrayRef<TypeVariableType *> getTypeVariables() const {
+      return TypeVariables;
     }
 
     /// \brief Add a newly-allocated constraint after attempting to simplify
@@ -1365,6 +1645,15 @@ namespace {
         return;
       }
 
+      // For each type variable in the bound type, mark it as constraining
+      // an overload set.
+      llvm::SetVector<TypeVariableType *> referencedTypeVariables;
+      if (ovl->getBoundType()->hasTypeVariable(referencedTypeVariables)) {
+        for (auto tv : referencedTypeVariables) {
+          tv->getImpl().makeConstrainsOverloadSet(SavedBindings);
+        }
+      }
+
       UnresolvedOverloadSets.push_back(ovl);
     }
 
@@ -1528,16 +1817,6 @@ namespace {
 
     /// \brief Simplify the given constaint.
     SolutionKind simplifyConstraint(const Constraint &constraint);
-
-  public:
-    /// \brief Walks through the list of constraints, collecting the constraints
-    /// that directly apply to each representative type variable.
-    ///
-    /// \param typeVarConstraints will be populated with a list of
-    /// representative type variables and the constraints that apply directly
-    /// to them.
-    void collectConstraintsForTypeVariables(
-           SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints);
 
   public:
     /// \brief Simplify the system of constraints, by breaking down complex
@@ -3382,10 +3661,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
       // We couldn't solve this constraint. If only one of the types is a type
       // variable, perhaps we can do something with it below.
-      if (typeVar1 && typeVar2)
-        return typeVar1 == typeVar2? SolutionKind::TriviallySolved
-                                   : SolutionKind::Unsolved;
-        
+      if (typeVar1 && typeVar2) {
+        // If the type variables are the same, this is trivially solved.
+        if (typeVar1 == typeVar2)
+          return SolutionKind::TriviallySolved;
+
+        // Both type variables are non-definitive, and we haven't solved
+        // this constraint yet.
+        typeVar1->getImpl().makeBoundsNonDefinitive(SavedBindings);
+        typeVar2->getImpl().makeBoundsNonDefinitive(SavedBindings);
+        return SolutionKind::Unsolved;
+      }
+
+      // See if we can do anything with the type variable below.
       break;
     }
   }
@@ -3609,7 +3897,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             if (super1->getClassOrBoundGenericClass() != classDecl2)
               continue;
 
-            switch (auto result = matchTypes(super1, type2, TypeMatchKind::SameType,
+            switch (auto result = matchTypes(super1, type2,
+                                             TypeMatchKind::SameType,
                                              subFlags, trivial)) {
               case SolutionKind::Error:
                 continue;
@@ -3732,10 +4021,40 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
-  // If one of the types is a type variable, we leave this unsolved.
-  if (typeVar1 || typeVar2)
-    return SolutionKind::Unsolved;
+  if (typeVar1 || typeVar2) {
+    // One type variable bounds the other.
+    llvm::SetVector<TypeVariableType *> referencedTypeVariables;
 
+    // If the first type is a type variable, it is bounded above by
+    // the second type.
+    if (typeVar1) {
+      type2 = simplifyType(type2);
+
+      // Record any type variables referenced by the second type.
+      // So long as the type variable isn't part of the bound, merge it in.
+      if (!type2->hasTypeVariable(referencedTypeVariables) ||
+          !referencedTypeVariables.count(typeVar1))
+        typeVar1->getImpl().applyBoundAbove(type2, SavedBindings);
+    }
+    // Otherwise, the second type is a type variable, which is bounded below
+    // by the first type.
+    else {
+      type1 = simplifyType(type1);
+
+      // Record any type variables referenced by the first type.
+      // So long as the type variable isn't part of the bound, merge it in.
+      if (!type1->hasTypeVariable(referencedTypeVariables) ||
+          !referencedTypeVariables.count(typeVar2))
+        typeVar2->getImpl().applyBoundBelow(type1, SavedBindings);
+    }
+
+    // Make any type variables referenced by the bound non-definitive.
+    for (auto tv : referencedTypeVariables)
+      tv->getImpl().makeBoundsNonDefinitive(SavedBindings);
+
+    return SolutionKind::Unsolved;
+  }
+  
   return SolutionKind::Error;
 }
 
@@ -3856,8 +4175,12 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind) {
   if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
     auto fixed = getFixedType(tv);
-    if (!fixed)
+    if (!fixed) {
+      // Note that this type variable must be a literal of this kind.
+      tv->getImpl().applyLiteralRequirement(kind, SavedBindings);
+
       return SolutionKind::Unsolved;
+    }
 
     // Continue with the fixed type.
     type = fixed;
@@ -3884,12 +4207,27 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // then we can't solve this constraint.
   Type baseTy = simplifyType(constraint.getFirstType());
   Type baseObjTy = baseTy->getRValueType();
-  
-  if (baseObjTy->is<TypeVariableType>() ||
-      (baseObjTy->is<MetaTypeType>() && 
-       baseObjTy->castTo<MetaTypeType>()->getInstanceType()
-         ->is<TypeVariableType>()))
+
+  // We can't do any lookup for a type variable or metatype of a type variable.
+  auto typeVar = baseObjTy->getAs<TypeVariableType>();
+  if (typeVar ||
+      (baseObjTy->is<MetaTypeType>() &&
+       (typeVar = baseObjTy->castTo<MetaTypeType>()->getInstanceType()
+                    ->getAs<TypeVariableType>()))) {
+    // Mark this type variable, and any left in the second type,
+    // non-definitive.
+    typeVar->getImpl().makeBoundsNonDefinitive(SavedBindings);
+
+    llvm::SetVector<TypeVariableType *> referencedTypeVars;
+    if (simplifyType(constraint.getSecondType())
+          ->hasTypeVariable(referencedTypeVars)) {
+      for (auto tv : referencedTypeVars) {
+        tv->getImpl().makeBoundsNonDefinitive(SavedBindings);
+      }
+    }
+         
     return SolutionKind::Unsolved;
+  }
   
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
@@ -4063,99 +4401,122 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   }
 }
 
-void ConstraintSystem::collectConstraintsForTypeVariables(
-       SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints) {
-  typeVarConstraints.clear();
+/// \brief Count the number of 1 bits in the given value.
+static unsigned countOnes(unsigned value) {
+  unsigned result = 0;
+  while (value > 0) {
+    if (value & 1) ++result;
+    value = value >> 1;
+  }
+  return result;
+}
 
-  // Provide a mapping from type variable to its constraints. The getTVC
-  // function ties togeter the SmallVector and the DenseMap.
-  llvm::DenseMap<TypeVariableType *, unsigned> typeVarConstraintsMap;
-  auto getTVC = [&](TypeVariableType *tv) -> TypeVariableConstraints& {
-    tv = getRepresentative(tv);
-    unsigned& constraintsIdx = typeVarConstraintsMap[tv];
-    if (!constraintsIdx) {
-      typeVarConstraints.push_back(TypeVariableConstraints(tv));
-      constraintsIdx = typeVarConstraints.size();
-    }
-    return typeVarConstraints[constraintsIdx - 1];
-  };
+/// \brief Retrieve the lowest bit set.
+static unsigned lowestBit(unsigned value) {
+  assert(value != 0 && "No bits set!");
+  unsigned result = 0;
+  while (!(value & 1)) {
+    ++result;
+    value = value >> 1;
+  }
+  return result;
+}
 
-  // First, collect all of the constraints that relate directly to a
-  // type variable.
-  llvm::SetVector<TypeVariableType *> referencedTypeVars;
-  for (auto constraint : Constraints) {
-    auto first = simplifyType(constraint->getFirstType());
-    switch (constraint->getClassification()) {
-    case ConstraintClassification::Relational:
-      // Handle this interesting case below.
-      break;
+/// \brief Determine the definitive type binding for the given type
+/// variable.
+static Optional<Type> getDefinitiveBinding(TypeVariableType *tv,
+                                           TypeChecker &tc) {
+  Type type;
 
-    case ConstraintClassification::Archetype:
-    case ConstraintClassification::Literal:
-      if (auto firstTV = dyn_cast<TypeVariableType>(first.getPointer())) {
-        // Record this constraint on the type variable.
-        getTVC(firstTV).KindConstraints.push_back(constraint);
-      } else {
-        // Simply mark any type variables in the type as referenced.
-        first->hasTypeVariable(referencedTypeVars);
+  // If this type variable constrains an overload set, don't accept any binding.
+  if (tv->getImpl().constrainsOverloadSet())
+    return Nothing;
+
+  // If we have a definitive type below, that's our starting guess.
+  auto below = tv->getImpl().getBelow();
+  if (!below.isDefinitive())
+    return Nothing;
+  type = below.getType();
+
+  // If we have a definitive type above, check it against any type we've
+  // already computed.
+  auto above = tv->getImpl().getAbove();
+  if (!above.isDefinitive() )
+    return Nothing;
+
+  if (type && above.getType() && !type->isEqual(above.getType()))
+    return Nothing;
+  if (auto aboveType = above.getType())
+    type = aboveType;
+
+  // If we have a single literal constraint with a default literal
+  // type, check that against any type we've already computed.
+  if (countOnes(tv->getImpl().getLiteralKinds()) == 1) {
+    auto kind = static_cast<LiteralKind>(
+                  lowestBit(tv->getImpl().getLiteralKinds()));
+    auto litType = tc.getDefaultLiteralType(kind);
+    if (type && litType && !type->isEqual(litType))
+      return Nothing;
+
+    if (litType)
+      type = litType;
+  }
+
+  // If we never found anything, too bad.
+  if (!type)
+    return Nothing;
+
+  return type;
+}
+
+/// \brief Identify type variables for which can we determine a
+/// concrete binding, and immediately produce constraints describing
+/// that binding.
+///
+/// Any binding produced is either part of all solutions to this
+/// constraint system, or there are no solutions to this constraint
+/// system.
+///
+/// \return true if any type variables were bound.
+static bool bindDefinitiveTypeVariables(ConstraintSystem &cs) {
+  bool foundAny = false;
+
+  for (auto currentCS = &cs; currentCS; currentCS = currentCS->getParent()) {
+    for (auto tv : currentCS->getTypeVariables()) {
+      // If this type variable already has a fixed type, ignore it.
+      if (cs.getFixedType(tv))
+        continue;
+
+      // Look for a definitive binding.
+      if (auto binding = getDefinitiveBinding(tv, cs.getTypeChecker())) {
+        if (cs.getTypeChecker().getLangOpts().DebugConstraintSolver) {
+          llvm::errs() << "Definitively binding ";
+          tv->print(llvm::errs());
+          llvm::errs() << " to ";
+          binding->print(llvm::errs());
+          llvm::errs() << "\n";
+        }
+
+        cs.addConstraint(ConstraintKind::Equal, tv, *binding);
+        foundAny = true;
       }
-      continue;
-
-    case ConstraintClassification::Member:
-      // Mark the referenced type variables for both sides.
-      first->hasTypeVariable(referencedTypeVars);
-      simplifyType(constraint->getSecondType())
-        ->hasTypeVariable(referencedTypeVars);
-      continue;
-    }
-
-    auto second = simplifyType(constraint->getSecondType());
-
-    auto firstTV = first->getAs<TypeVariableType>();
-    if (firstTV) {
-      // Record the constraint.
-      getTVC(firstTV).Above.push_back(std::make_pair(constraint, second));
-    } else {
-      // Collect any type variables represented in the first type.
-      first->hasTypeVariable(referencedTypeVars);
-    }
-
-    auto secondTV = second->getAs<TypeVariableType>();
-    if (secondTV) {
-      // Record the constraint.
-      getTVC(secondTV).Below.push_back(std::make_pair(constraint, first));
-    } else {
-      // Collect any type variables represented in the second type.
-      second->hasTypeVariable(referencedTypeVars);
-    }
-
-    // If both types are type variables, mark both as referenced.
-    if (firstTV && secondTV) {
-      referencedTypeVars.insert(firstTV);
-      referencedTypeVars.insert(secondTV);
     }
   }
-
-  // Mark any type variables that specify the result of an unresolved overload
-  // set as having non-concrete constraints.
-  for (auto ovl : UnresolvedOverloadSets) {
-    ovl->getBoundType()->hasTypeVariable(referencedTypeVars);
-  }
-
-  // Mark any referenced type variables as having non-concrete constraints.
-  for (auto tv : referencedTypeVars) {
-    tv = getRepresentative(tv);
-    auto known = typeVarConstraintsMap.find(tv);
-    if (known == typeVarConstraintsMap.end())
-      continue;
-
-    typeVarConstraints[known->second-1].HasNonConcreteConstraints = true;
-  }
+  
+  return foundAny;
 }
 
 bool ConstraintSystem::simplify() {
   bool solvedAny;
   do {
+    // Clear out any previous bounds on the type variables, since we're
+    // reprocessing all of the constraints anyway.
+    for (auto currentCS = this; currentCS; currentCS = currentCS->getParent()) {
+      for (auto tv : currentCS->getTypeVariables()) {
+        tv->getImpl().clearBounds(SavedBindings);
+      }
+    }
+
     // Loop through all of the thus-far-unsolved constraints, attempting to
     // simplify each one.
     SmallVector<Constraint *, 16> existingConstraints;
@@ -4343,245 +4704,87 @@ static void resolveOverloadSet(ConstraintSystem &cs,
   }
 }
 
-/// \brief Find the lower and upper bounds on a type variable.
-static std::pair<Type, Type>
-findTypeVariableBounds(ConstraintSystem &cs, TypeVariableConstraints &tvc,
-                       bool &isDefinitive) {
-  isDefinitive = !tvc.HasNonConcreteConstraints && tvc.KindConstraints.empty();
-
-  std::pair<Type, Type> bounds;
-  for (auto arg : tvc.Below) {
-    if (arg.second->hasTypeVariable()) {
-      isDefinitive = false;
-      continue;
-    }
-
-    if (bounds.first) {
-      // FIXME: Compute the meet of the types. We'll miss
-      // potential solutions with the current approach.
-      isDefinitive = false;
-      ++NumLameNonDefinitive;
-      break;
-    }
-
-    bounds.first = arg.second;
-  }
-
-  for (auto arg : tvc.Above) {
-    if (arg.second->hasTypeVariable()) {
-      isDefinitive = false;
-      continue;
-    }
-
-    if (bounds.second) {
-      // FIXME: Compute the join of the types. We'll miss
-      // potential solutions with the current approach.
-      isDefinitive = false;
-      ++NumLameNonDefinitive;
-      break;
-    }
-
-    bounds.second = arg.second;
-  }
-
-  return bounds;
-}
-
-/// \brief Given a set of constraint/type pairs, find the unique concrete type.
+/// \brief Retrieve the binding type for the given type variable.
 ///
-/// \returns a pair (T, Conflict), where T is the unique concrete type
-/// found (or null if there is no such type) and Conflict is a bool
-/// indicating whether there was some kind of conflict that makes the
-/// type variable we're solving for not have an obvious solution.
-static std::pair<Type, bool> 
-findUniqueConcreteType(ConstraintSystem &cs,
-                       ArrayRef<std::pair<Constraint *, Type>> values) {
-  Type result;
-  for (const auto &value : values) {
-    if (value.second->hasTypeVariable()) {
-      return { Type(), true };
-    }
+/// \returns the binding type, or null if there is possible binding.
+static Type getBindingType(ConstraintSystem &cs, TypeVariableType *typeVar,
+                           Type type) {
+  if (!type)
+    return Type();
 
-    if (result && !result->isEqual(value.second)) {
-      return { Type(), true };
-    }
+  // Simplify the type.
+  type = cs.simplifyType(type);
 
+  // Don't allow bindings to types that still contain type variables.
+  // FIXME: We can loosen this constraint.
+  if (type->hasTypeVariable())
+    return Type();
 
-    result = value.second;
-  }
-
-  return { result, false };
-}
-
-/// \brief Given a set of 'kind' constraints, e.g., literal and
-/// archetype constraints, find the unique type that satisfies these
-/// constraints, if any.
-///
-/// \returns a pair (T, Conflict), where T is the unique concrete type
-/// found (or null if there is no such type) and Conflict is a bool
-/// indicating whether there was some kind of conflict that makes the
-/// type variable we're solving for not have an obvious solution.
-static std::pair<Type, bool> 
-findUniqueKindType(ConstraintSystem &cs,
-                   ArrayRef<Constraint *> constraints)  {
-  auto &tc = cs.getTypeChecker();
-  Type result;
-  for (auto constraint : constraints) {
-    if (constraint->getKind() != ConstraintKind::Literal) {
-      return { Type(), true };
-    }
-
-    auto literalType = tc.getDefaultLiteralType(constraint->getLiteralKind());
-    if (!literalType || (result && !result->isEqual(literalType))) {
-      return { Type(), true };
-    }
-
-    result = literalType;
-  }
-
-  return { result, false };
-}
-
-/// \brief Identify type variables for which can we determine a
-/// concrete binding, and immediately produce constraints describing
-/// that binding.
-///
-/// Any binding produced is either part of all solutions to this
-/// constraint system, or their are no solutions to this constraint
-/// system.
-///
-/// \return true if any type variables were bound.
-static bool bindDefinitiveTypeVariables(
-              ConstraintSystem &cs,
-              SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints) {
-  bool foundAny = false;
-  for (auto &tvc : typeVarConstraints) {
-    if (tvc.HasNonConcreteConstraints)
-      continue;
-
-    // Find unique concrete type below.
-    auto below = findUniqueConcreteType(cs, tvc.Below);
-    if (below.second)
-      continue;
-
-    auto type = below.first;
-    if (!type) {
-      // Find unique concrete type above.
-      auto above = findUniqueConcreteType(cs, tvc.Above);
-      if (above.second)
-        continue;
-
-      type = above.first;
-    }
-
-    // Find unique kind type.
-    auto kind = findUniqueKindType(cs, tvc.KindConstraints);
-    if (kind.second)
-      continue;
-
-    if (kind.first) {
-      if (type && !type->isEqual(kind.first))
-        continue;
-
-      type = kind.first;
-    } else if (!type) {
-      continue;
-    }
-    assert(type && "missing type?");
-
-    // We found a type. Use it.
-    cs.addConstraint(ConstraintKind::Equal, tvc.TypeVar, type);
-    foundAny = true;
-
-    // Directly solve the constraints associated with this type variable.
-    for (const auto &below : tvc.Below) {
-      cs.addConstraint(below.first, /*isExternallySolved=*/true);
-    }
-    for (const auto &above : tvc.Above) {
-      cs.addConstraint(above.first, /*isExternallySolved=*/true);
-    }
-    for (auto constraint : tvc.KindConstraints) {
-      cs.addConstraint(constraint, /*isExternallySolved=*/true);
-    }
-  }
-
-  return foundAny;
+  return type;
 }
 
 /// \brief Given the direct constraints placed on the type variables within
 /// a given constraint system, create potential bindings that resolve the
 /// constraints for a type variable.
 static Optional<std::tuple<TypeVariableType *, Type, bool>>
-resolveTypeVariable(
-  ConstraintSystem &cs,
-  SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints,
-  bool onlyDefinitive)
-{
-
-  // Find a type variable with a lower bound, because those are the most
-  // interesting.
-  TypeVariableConstraints *tvcWithUpper = nullptr;
-  Type tvcUpper;
-  bool tvcWithUpperIsDefinitive;
-  for (auto &tvc : typeVarConstraints) {
-    // If we already explored type bindings for this type variable, skip it.
-    if (cs.haveExploredTypeVar(tvc.TypeVar))
-      continue;
-
-    // If we're only allowed to look at type variables with concrete
-    // constraints, and this type variable has non-concrete constraints,
-    // skip it.
-    if (onlyDefinitive && tvc.HasNonConcreteConstraints)
-      continue;
-
-    bool isDefinitive;
-    auto bounds = findTypeVariableBounds(cs, tvc, isDefinitive);
-
-    if (onlyDefinitive && !isDefinitive)
-      continue;
-
-    // If we have a lower bound, introduce a child constraint system binding
-    // this type variable to that lower bound.
-    if (bounds.first) {
-      return std::make_tuple(tvc.TypeVar, bounds.first, isDefinitive);
-    }
-
-    // If there is an upper bound, record that (but don't use it yet).
-    if (bounds.second && !tvcWithUpper) {
-      tvcWithUpper = &tvc;
-      tvcUpper = bounds.second;
-      tvcWithUpperIsDefinitive = isDefinitive;
-    }
-  }
-
-  // If we had an upper bound, introduce a child constraint system binding
-  // this type variable to that upper bound.
-  // FIXME: This type may be too specific, but we'd really rather not
-  // go on a random search for subtypes that might work.
-  if (tvcWithUpper) {
-    return std::make_tuple(tvcWithUpper->TypeVar, tvcUpper,
-                           tvcWithUpperIsDefinitive);
-  }
-
-  // If we were only looking for concrete bindings, don't consider literal
-  // bindings.
-  if (onlyDefinitive)
-    return Nothing;
-
-  // If there are any literal constraints, add the default literal values as
-  // potential bindings.
-  auto &tc = cs.getTypeChecker();
-  for (auto &tvc : typeVarConstraints) {
-    // If we already explored type bindings for this type variable, skip it.
-    if (cs.haveExploredTypeVar(tvc.TypeVar))
-      continue;
-
-    for (auto &constraint : tvc.KindConstraints) {
-      if (constraint->getClassification() != ConstraintClassification::Literal)
+resolveTypeVariable(ConstraintSystem &cs) {
+  TypeVariableType *typeWithAbove = nullptr;
+  Type typeAboveTypeWithAbove;
+  TypeVariableType *typeWithLiteral = nullptr;
+  
+  // Search for a type variable to resolve.
+  for (auto currentCS = &cs; currentCS; currentCS = currentCS->getParent()) {
+    for (auto tv : currentCS->getTypeVariables()) {
+      // If we've already bound or explored this type variable, skip it.
+      if (cs.getFixedType(tv) || cs.haveExploredTypeVar(tv))
         continue;
 
-      if (auto type = tc.getDefaultLiteralType(constraint->getLiteralKind())) {
-        return std::make_tuple(tvc.TypeVar, type, false);
+      // First, check whether we have a type bounding us from below. If so, use
+      // it.
+      auto below = tv->getImpl().getBelow();
+      if (auto belowType = getBindingType(cs, tv, below.getType())) {
+        return { tv, belowType, /*FIXME:*/false };
+      }
+
+      // Check whether we have a type bounding us from above.
+      // If so, and we haven't seen such a type variable before, stash it
+      // for possible use later.
+      if (!typeWithAbove) {
+        auto above = tv->getImpl().getAbove();
+        if (auto aboveType = getBindingType(cs, tv, above.getType())) {
+          typeWithAbove = tv;
+          typeAboveTypeWithAbove = aboveType;
+        }
+      }
+
+      // Check whether we have any literal constraints. If so, and we haven't
+      // seen such a type variable before, stash it for possible use later.
+      if (!typeWithLiteral && tv->getImpl().getLiteralKinds()) {
+        typeWithLiteral = tv;
+      }
+    }
+  }
+
+  // If we didn't find anything we like, but we do have a type above, use it.
+  if (typeWithAbove) {
+    return { typeWithAbove, typeAboveTypeWithAbove, /*FIXME:*/false };
+  }
+
+  // If we didn't find anything we like, but we do have a literal constraint,
+  // use that to generate a type.
+  if (typeWithLiteral) {
+    unsigned kindVal = 0;
+    for (unsigned kinds = typeWithLiteral->getImpl().getLiteralKinds();
+         kinds;
+         kinds = kinds >> 1, ++kindVal) {
+      // If we don't have a constraint for this literal kind, skip it.
+      if ((kinds & 1) == 0)
+        continue;
+
+      // Figure out the default literal type.
+      auto kind = static_cast<LiteralKind>(kindVal);
+      if (auto type = cs.getTypeChecker().getDefaultLiteralType(kind)) {
+        return { typeWithLiteral, type, false };
       }
     }
   }
@@ -4609,13 +4812,10 @@ static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
   if (cs.hasPotentialBindings()) {
     return SolutionStep(SolutionStepKind::ExploreBindings);
   }
-  
-  SmallVector<TypeVariableConstraints, 16> typeVarConstraints;
-  cs.collectConstraintsForTypeVariables(typeVarConstraints);
 
   // If there are any type variables that we can definitively solve,
   // do so now.
-  if (bindDefinitiveTypeVariables(cs, typeVarConstraints)) {
+  if (bindDefinitiveTypeVariables(cs)) {
     return SolutionStep(SolutionStepKind::Simplify);
   }
 
@@ -4643,10 +4843,8 @@ static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
   }
 
   // Try to determine a binding for a type variable.
-  if (auto binding = resolveTypeVariable(cs, typeVarConstraints,
-                                         /*onlyDefinitive=*/false)) {
+  if (auto binding = resolveTypeVariable(cs)) {
     using std::get;
-    assert(!get<2>(*binding) && "Missing definitive result above?");
     return SolutionStep(get<0>(*binding), get<1>(*binding), get<2>(*binding));
   }
 
