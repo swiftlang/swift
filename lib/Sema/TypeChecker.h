@@ -70,7 +70,7 @@ public:
 
 /// \brief Describes the kind of a literal.
 enum class LiteralKind {
-  Int, Float, Char, UTFString, ASCIIString
+  Int, Float, Char, UTFString, ASCIIString, Array
 };
 
 /// \brief A mapping from substitutable types to the protocol-conformance
@@ -292,6 +292,7 @@ private:
   Type FloatLiteralType;
   Type CharacterLiteralType;
   Type StringLiteralType;
+  Type ArrayLiteralType;
   
   DiagnosticEngine &Diags;
 

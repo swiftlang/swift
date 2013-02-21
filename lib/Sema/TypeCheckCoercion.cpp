@@ -666,6 +666,8 @@ TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
     MethodName = "convertFromASCIIStringLiteral";
     AltMethodName = "convertFromStringLiteral";
     break;
+  case LiteralKind::Array:
+    llvm_unreachable("Cannot handle array literals here");
   }
   assert(MethodName && "Didn't know LitTy");
 

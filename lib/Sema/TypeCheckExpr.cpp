@@ -1813,6 +1813,11 @@ Type TypeChecker::getDefaultLiteralType(LiteralKind kind) {
     type = &IntLiteralType;
     name = "IntegerLiteralType";
     break;
+
+  case LiteralKind::Array:
+    type = &ArrayLiteralType;
+    name = "Slice";
+    break;
   }
 
   // If we haven't found the type yet, look for it now.

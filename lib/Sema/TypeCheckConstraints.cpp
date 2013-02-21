@@ -496,6 +496,10 @@ namespace {
         case LiteralKind::UTFString:
           Out << "a UTF-8 string";
           break;
+
+        case LiteralKind::Array:
+          Out << "an array";
+          break;
         }
         Out << " literal";
         return;
@@ -744,6 +748,28 @@ namespace {
     Worse
   };
 
+  /// \brief A potential binding of a type variable to another type.
+  class PotentialBinding {
+    llvm::PointerIntPair<TypeVariableType *, 1, bool> typeVarAndOpen;
+    Type type;
+
+  public:
+    PotentialBinding(TypeVariableType *typeVar, Type type, bool openType)
+      : typeVarAndOpen(typeVar, openType), type(type) { }
+
+    /// \brief Retrieve the type variable.
+    TypeVariableType *getTypeVariable() const {
+      return typeVarAndOpen.getPointer();
+    }
+
+    /// \brief Retrieve the type to which the type variable will be bound.
+    Type getType() const { return type; }
+
+    /// \brief Determine whether the type to which the type variable
+    /// will be bound should be opened.
+    bool shouldOpenType() const { return typeVarAndOpen.getInt(); }
+  };
+
   /// \brief Describes a system of constraints on type variables, the
   /// solution of which assigns concrete types to each of the type variables.
   /// Constraint systems are typically generated given an (untyped) expression.
@@ -803,7 +829,7 @@ namespace {
     ///
     /// These bindings tend to be for supertypes of type variable bindings
     /// we've already attempted.
-    SmallVector<std::pair<TypeVariableType *, Type>, 16> PotentialBindings;
+    SmallVector<PotentialBinding, 16> PotentialBindings;
 
     // Valid everywhere
     
@@ -897,22 +923,21 @@ namespace {
     ///
     /// \param parent The parent constraint system.
     ///
-    /// \param typeVar The type variable whose binding we will be exploring
+    /// \param binding The type variable binding we will be exploring
     /// within this child system.
-    ///
-    /// \param type The type to which type variable will be bound
-    /// within this child system.
-    ConstraintSystem(ConstraintSystem *parent, TypeVariableType *typeVar,
-                     Type type)
+    ConstraintSystem(ConstraintSystem *parent, const PotentialBinding &binding)
       : TC(parent->TC), Parent(parent), SharedState(parent->SharedState),
-        assumedTypeVar(typeVar),
+        assumedTypeVar(binding.getTypeVariable()),
         // FIXME: Lazily copy from parent system.
         Constraints(parent->Constraints),
         UnresolvedOverloadSets(parent->UnresolvedOverloadSets)
     {
       ++NumExploredConstraintSystems;
-      
-      addConstraint(ConstraintKind::Equal, typeVar, type);
+
+      auto type = binding.getType();
+      if (binding.shouldOpenType())
+        type = openType(type);
+      addConstraint(ConstraintKind::Equal, assumedTypeVar, type);
     }
 
     ~ConstraintSystem() {
@@ -1288,8 +1313,8 @@ namespace {
 
     /// \brief Add a new potential binding of a type variable to a particular
     /// type, to be explored by a child system.
-    void addPotentialBinding(TypeVariableType *typeVar, Type binding) {
-      PotentialBindings.push_back({typeVar, binding});
+    void addPotentialBinding(const PotentialBinding &binding) {
+      PotentialBindings.push_back(binding);
     }
 
     /// \brief Indicate a design to explore a specific binding for the given
@@ -1696,7 +1721,7 @@ void ConstraintSystem::markChildInactive(ConstraintSystem *childCS) {
         continue;
 
       ++NumSupertypeFallbacks;
-      PotentialBindings.push_back( { typeVar, supertype } );
+      PotentialBindings.push_back( { typeVar, supertype, false } );
       addedAny = true;
     }
 
@@ -1718,7 +1743,7 @@ void ConstraintSystem::markChildInactive(ConstraintSystem *childCS) {
           if (auto literalType =
                 TC.getDefaultLiteralType(constraint->getLiteralKind())) {
             if (explored.count(literalType->getCanonicalType()) == 0)
-              PotentialBindings.push_back({typeVar, literalType});
+              PotentialBindings.push_back({typeVar, literalType, true});
           }
         }
       }
@@ -2452,6 +2477,9 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       }
 
       auto arrayTy = CS.createTypeVariable(expr);
+
+      // The array must be an array literal type.
+      CS.addLiteralConstraint(arrayTy, LiteralKind::Array);
 
       // FIXME: Constraint checker appears to be unable to solve a system in
       // which the same type variable is a subtype of multiple types.
@@ -3896,6 +3924,15 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind) {
     type = fixed;
   }
 
+  // Array literals are special, because all of the real requirements for them
+  // are kept separate from the array-literal requirement. Let this constraint
+  // be satisfied when we've picked a concrete type.
+  if (kind == LiteralKind::Array) {
+    return (type->is<NominalType>() || type->is<BoundGenericType>())
+             ? SolutionKind::TriviallySolved
+             : SolutionKind::Unsolved;
+  }
+
   // Have we already checked whether this type is literal compatible?
   auto typePtr = type->getCanonicalType().getPointer();
   auto known = SharedState->LiteralChecks.find({typePtr, kind});
@@ -4256,6 +4293,9 @@ namespace {
         TypeVariableType *TypeVar;
         /// \brief The type to which the type variable will be bound.
         TypeBase *BoundType;
+        /// \brief Whether to open up the type to which the type variable
+        /// will be bound.
+        bool OpenType;
       } TypeBinding; 
     };
 
@@ -4275,10 +4315,11 @@ namespace {
         OvlSetIdx(ovlSetIdx) { }
 
     /// \brief Construct a solution step that binds a type variable.
-    SolutionStep(TypeVariableType *typeVar, Type boundType,
+    SolutionStep(const PotentialBinding &binding,
                  bool isDefinitive)
       : Kind(SolutionStepKind::TypeBinding), IsDefinitive(isDefinitive),
-        TypeBinding{typeVar, boundType.getPointer()} { }
+        TypeBinding{binding.getTypeVariable(), binding.getType().getPointer(),
+                    binding.shouldOpenType()} { }
 
     /// \brief Determine the kind of solution step to take.
     SolutionStepKind getKind() const { return Kind; }
@@ -4300,9 +4341,10 @@ namespace {
     /// \brief Retrieve the type variable and binding.
     ///
     /// Only valid for a type-binding solution step.
-    std::pair<TypeVariableType *, Type> getTypeBinding() const {
+    PotentialBinding getTypeBinding() const {
       assert(getKind() == SolutionStepKind::TypeBinding);
-      return { TypeBinding.TypeVar, Type(TypeBinding.BoundType) };
+      return { TypeBinding.TypeVar, Type(TypeBinding.BoundType),
+               TypeBinding.OpenType };
     }
   };
 
@@ -4328,20 +4370,15 @@ namespace {
         unsigned ChoiceIdx;
       } Overload;
 
-      struct {
-        TypeVariableType *TypeVar;
-        TypeBase *Binding;
-      } TypeBinding;
+      PotentialBinding TypeBinding;
     };
 
   public:
     ChildDescription() : Kind(ChildKind::None) { }
     ChildDescription(unsigned ovlSetIdx, unsigned ovlChoiceIdx)
       : Kind(ChildKind::OverloadChoice), Overload{ovlSetIdx, ovlChoiceIdx} { }
-    ChildDescription(TypeVariableType *typeVar, Type binding)
-      : Kind(ChildKind::TypeBinding), TypeBinding{typeVar, binding.getPointer()}
-    {
-    }
+    ChildDescription(const PotentialBinding &binding)
+      : Kind(ChildKind::TypeBinding), TypeBinding(binding) { }
 
     ChildKind getKind() const { return Kind; }
 
@@ -4350,9 +4387,9 @@ namespace {
       return {Overload.SetIdx, Overload.ChoiceIdx};
     }
 
-    std::pair<TypeVariableType *, Type> getTypeBinding() const {
+    const PotentialBinding &getTypeBinding() const {
       assert(getKind() == ChildKind::TypeBinding);
-      return {TypeBinding.TypeVar, Type(TypeBinding.Binding)};
+      return TypeBinding;
     }
   };
 
@@ -4536,7 +4573,8 @@ static bool bindDefinitiveTypeVariables(
       if (type && !type->isEqual(kind.first))
         continue;
 
-      type = kind.first;
+      // Open up the default literal type we chose.
+      type = cs.openType(kind.first);
     } else if (!type) {
       continue;
     }
@@ -4564,7 +4602,10 @@ static bool bindDefinitiveTypeVariables(
 /// \brief Given the direct constraints placed on the type variables within
 /// a given constraint system, create potential bindings that resolve the
 /// constraints for a type variable.
-static Optional<std::tuple<TypeVariableType *, Type, bool>>
+///
+/// \returns If successful, a pair containing a potential binding and a bit
+/// indicating whether this binding is definitive.
+static Optional<std::pair<PotentialBinding, bool>>
 resolveTypeVariable(
   ConstraintSystem &cs,
   SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints,
@@ -4596,7 +4637,8 @@ resolveTypeVariable(
     // If we have a lower bound, introduce a child constraint system binding
     // this type variable to that lower bound.
     if (bounds.first) {
-      return std::make_tuple(tvc.TypeVar, bounds.first, isDefinitive);
+      return { PotentialBinding(tvc.TypeVar, bounds.first, false),
+               isDefinitive };
     }
 
     // If there is an upper bound, record that (but don't use it yet).
@@ -4612,8 +4654,8 @@ resolveTypeVariable(
   // FIXME: This type may be too specific, but we'd really rather not
   // go on a random search for subtypes that might work.
   if (tvcWithUpper) {
-    return std::make_tuple(tvcWithUpper->TypeVar, tvcUpper,
-                           tvcWithUpperIsDefinitive);
+    return { PotentialBinding(tvcWithUpper->TypeVar, tvcUpper, false),
+             tvcWithUpperIsDefinitive };
   }
 
   // If we were only looking for concrete bindings, don't consider literal
@@ -4634,7 +4676,7 @@ resolveTypeVariable(
         continue;
 
       if (auto type = tc.getDefaultLiteralType(constraint->getLiteralKind())) {
-        return std::make_tuple(tvc.TypeVar, type, false);
+        return { PotentialBinding(tvc.TypeVar, type, true), false };
       }
     }
   }
@@ -4698,9 +4740,7 @@ static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
   // Try to determine a binding for a type variable.
   if (auto binding = resolveTypeVariable(cs, typeVarConstraints,
                                          /*onlyDefinitive=*/false)) {
-    using std::get;
-    assert(!get<2>(*binding) && "Missing definitive result above?");
-    return SolutionStep(get<0>(*binding), get<1>(*binding), get<2>(*binding));
+    return SolutionStep(binding->first, binding->second);
   }
 
   // We're out of ideas.
@@ -4750,8 +4790,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
 
     case ChildKind::TypeBinding: {
       auto binding = childDesc.getTypeBinding();
-      if (auto childCS = cs->createDerivedConstraintSystem(binding.first,
-                                                           binding.second)) {
+      if (auto childCS = cs->createDerivedConstraintSystem(binding)) {
         cs = childCS;
         break;
       }
@@ -4805,8 +4844,11 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
         // If we have a definitive type binding, apply it immediately;
         // there's no point in creating a child system.
         if (step->isDefinitive()) {
+          auto type = binding.getType();
+          if (binding.shouldOpenType())
+            type = openType(type);
           cs->addConstraint(ConstraintKind::Equal,
-                            binding.first, binding.second);
+                            binding.getTypeVariable(), type);
           if (cs->simplify()) {
             cs->finalize();
             done = true;
@@ -4816,7 +4858,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
         
         // Add this type binding as a potential binding; we'll
         // explore potential bindings below.
-        cs->addPotentialBinding(binding.first, binding.second);
+        cs->addPotentialBinding(binding);
 
         // Fall though to explore this binding.
       }
@@ -4839,9 +4881,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
         auto potentialBindings = std::move(cs->PotentialBindings);
         cs->PotentialBindings.clear();
         for (auto binding : potentialBindings) {
-          if (cs->exploreBinding(binding.first, binding.second)) {
-            stack.push_back({cs,
-                             ChildDescription(binding.first, binding.second)});
+          if (cs->exploreBinding(binding.getTypeVariable(), binding.getType())) {
+            stack.push_back({cs, ChildDescription(binding)});
           }
         }
         done = true;
@@ -4927,6 +4968,7 @@ bool ConstraintSystem::typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
 
     // If the type we were given matches the default literal type for this
     // constraint, we found what we're looking for.
+    // FIXME: isEqual() isn't right for Slice<T>.
     if (type->isEqual(TC.getDefaultLiteralType(constraint->getLiteralKind())))
       return true;
   }
