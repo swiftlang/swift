@@ -37,7 +37,7 @@ fi
 mkdir -p "$WORKSPACE/swift-module-cache"
 
 # Make extra sure it's empty.
-if [ "$(ls -A $WORKSPACE)" ]; then
+if [ "$(ls -A $WORKSPACE/swift-module-cache)" ]; then
   echo "Module cache not empty! Aborting."
   exit 1
 fi
