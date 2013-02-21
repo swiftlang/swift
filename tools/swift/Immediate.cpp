@@ -776,6 +776,85 @@ class REPLEnvironment {
   char *getBufferStart() {
     return const_cast<char*>(Buffer->getBufferStart());
   }
+  
+  bool executeSwiftSource(llvm::StringRef Line) {
+    assert(Line.size() < BUFFER_SIZE &&
+           "line too big for our stupid fixed-size repl buffer");
+    memcpy(getBufferStart(), Line.data(), Line.size());
+    getBufferStart()[Line.size()] = '\0';
+    
+    // Parse the current line(s).
+    unsigned BufferOffset = 0;
+    bool ShouldRun =
+    swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
+                                       BufferOffset, Line.size());
+    
+    if (Context.hadError()) {
+      Context.Diags.resetHadAnyError();
+      while (TU->Decls.size() > CurTUElem)
+        TU->Decls.pop_back();
+      TU->clearUnresolvedIdentifierTypes();
+      
+      // FIXME: Handling of "import" declarations?  Is there any other
+      // state which needs to be reset?
+      
+      return true;
+    }
+    
+    CurTUElem = TU->Decls.size();
+    
+    DumpSource += Line;
+    
+    // If we didn't see an expression, statement, or decl which might have
+    // side-effects, keep reading.
+    if (!ShouldRun)
+      return true;
+    
+    // IRGen the current line(s).
+    llvm::Module LineModule("REPLLine", LLVMContext);
+    performCaptureAnalysis(TU, CurIRGenElem);
+    performIRGeneration(Options, &LineModule, TU, /*sil=*/nullptr,
+                        CurIRGenElem);
+    CurIRGenElem = CurTUElem;
+    
+    if (Context.hadError())
+      return false;
+    
+    std::string ErrorMessage;
+    if (llvm::Linker::LinkModules(&Module, &LineModule,
+                                  llvm::Linker::PreserveSource,
+                                  &ErrorMessage)) {
+      llvm::errs() << "Error linking swift modules\n";
+      llvm::errs() << ErrorMessage << "\n";
+      return false;
+    }
+    if (llvm::Linker::LinkModules(&DumpModule, &LineModule,
+                                  llvm::Linker::DestroySource,
+                                  &ErrorMessage)) {
+      llvm::errs() << "Error linking swift modules\n";
+      llvm::errs() << ErrorMessage << "\n";
+      return false;
+    }
+    llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
+    DumpModuleMain->setName("repl.line");
+    
+    if (IRGenImportedModules(TU, Module, ImportedModules, InitFns, Options))
+      return false;
+    
+    for (auto InitFn : InitFns)
+      EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
+    InitFns.clear();
+    
+    // FIXME: The way we do this is really ugly... we should be able to
+    // improve this.
+    EE->runStaticConstructorsDestructors(&Module, false);
+    llvm::Function *EntryFn = Module.getFunction("main");
+    EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
+    EE->freeMachineCodeForFunction(EntryFn);
+    EntryFn->eraseFromParent();
+    
+    return true;
+  }
 
 public:
   REPLEnvironment(ASTContext &Context)
@@ -952,83 +1031,18 @@ public:
       }
         
       case REPLInputKind::SourceCode: {
-        assert(Line.size() < BUFFER_SIZE &&
-               "line too big for our stupid fixed-size repl buffer");
-        memcpy(getBufferStart(), Line.data(), Line.size());
-        getBufferStart()[Line.size()] = '\0';
-
-        // Parse the current line(s).
-        unsigned BufferOffset = 0;
-        bool ShouldRun =
-          swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
-                                             BufferOffset, Line.size());
-        
-        if (Context.hadError()) {
-          Context.Diags.resetHadAnyError();
-          while (TU->Decls.size() > CurTUElem)
-            TU->Decls.pop_back();
-          TU->clearUnresolvedIdentifierTypes();
-          
-          // FIXME: Handling of "import" declarations?  Is there any other
-          // state which needs to be reset?
-          
-          return true;
-        }
-        
-        CurTUElem = TU->Decls.size();
-        
-        DumpSource += Line;
-        
-        // If we didn't see an expression, statement, or decl which might have
-        // side-effects, keep reading.
-        if (!ShouldRun)
-          return true;
-        
-        // IRGen the current line(s).
-        llvm::Module LineModule("REPLLine", LLVMContext);
-        performCaptureAnalysis(TU, CurIRGenElem);
-        performIRGeneration(Options, &LineModule, TU, /*sil=*/nullptr,
-                            CurIRGenElem);
-        CurIRGenElem = CurTUElem;
-        
-        if (Context.hadError())
-          return false;
-        
-        std::string ErrorMessage;
-        if (llvm::Linker::LinkModules(&Module, &LineModule,
-                                      llvm::Linker::PreserveSource,
-                                      &ErrorMessage)) {
-          llvm::errs() << "Error linking swift modules\n";
-          llvm::errs() << ErrorMessage << "\n";
-          return false;
-        }
-        if (llvm::Linker::LinkModules(&DumpModule, &LineModule,
-                                      llvm::Linker::DestroySource,
-                                      &ErrorMessage)) {
-          llvm::errs() << "Error linking swift modules\n";
-          llvm::errs() << ErrorMessage << "\n";
-          return false;
-        }
-        llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
-        DumpModuleMain->setName("repl.line");
-        
-        if (IRGenImportedModules(TU, Module, ImportedModules, InitFns, Options))
-          return false;
-        
-        for (auto InitFn : InitFns)
-          EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
-        InitFns.clear();
-        
-        // FIXME: The way we do this is really ugly... we should be able to
-        // improve this.
-        EE->runStaticConstructorsDestructors(&Module, false);
-        llvm::Function *EntryFn = Module.getFunction("main");
-        EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
-        EE->freeMachineCodeForFunction(EntryFn);
-        EntryFn->eraseFromParent();
-        
-        return true;
+        return executeSwiftSource(Line);
       }
+    }
+  }
+  
+  /// Tear down the REPL environment, running REPL exit hooks set up by the
+  /// stdlib if available.
+  void exitREPL() {
+    /// Invoke replExit() if available.
+    UnqualifiedLookup lookup(Context.getIdentifier("replExit"), TU);
+    if (lookup.isSuccess()) {
+      executeSwiftSource("replExit()\n");
     }
   }
 };
@@ -1042,6 +1056,7 @@ void swift::REPL(ASTContext &Context) {
   do {
     inputKind = e.getREPLInput(Line);
   } while (env.handleREPLInput(inputKind, Line));
+  env.exitREPL();
 }
 
 void swift::REPLRunLoop(ASTContext &Context) {
@@ -1075,8 +1090,10 @@ void swift::REPLRunLoop(ASTContext &Context) {
          StringRef line(reinterpret_cast<char const*>(CFDataGetBytePtr(data)),
                         CFDataGetLength(data));
          UInt8 cont = env.handleREPLInput(REPLInputKind(msgid), line);
-         if (!cont)
+         if (!cont) {
+           env.exitREPL();
            CFRunLoopStop(CFRunLoopGetCurrent());
+         }
          return CFDataCreate(kCFAllocatorDefault, &cont, 1);
        },
        &portContext, &shouldFreeInfo);
@@ -1099,12 +1116,13 @@ void swift::REPLRunLoop(ASTContext &Context) {
                                    Line.size(),
                                    kCFAllocatorNull);
       CFDataRef response;
-      CFMessagePortSendRequest(replInputPortConn,
-                               SInt32(inputKind),
-                               lineData,
-                               1000.0, 1000.0,
-                               kCFRunLoopDefaultMode,
-                               &response);
+      auto res = CFMessagePortSendRequest(replInputPortConn,
+                                          SInt32(inputKind),
+                                          lineData,
+                                          DBL_MAX, DBL_MAX,
+                                          kCFRunLoopDefaultMode,
+                                          &response);
+      assert(res == kCFMessagePortSuccess && "failed to send repl message");
       assert(CFDataGetLength(response) >= 1 && "expected one-byte response");
       UInt8 cont = CFDataGetBytePtr(response)[0];
       CFRelease(lineData);
