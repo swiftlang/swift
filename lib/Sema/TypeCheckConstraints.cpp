@@ -75,7 +75,10 @@ public:
   /// \brief Restore the state of the type variable to the saved state.
   void restore();
 };
-  
+
+/// \brief A set of saved type variable bindings.
+typedef SmallVector<SavedTypeVariableBinding, 16> SavedTypeVariableBindings;
+
 }
 
 /// \brief The implementation object for a type variable used within the
@@ -123,9 +126,9 @@ public:
     return reinterpret_cast<TypeVariableType *>(this) - 1;
   }
 
-  /// \brief Retrieve the state of this type variable.
-  SavedTypeVariableBinding getSavedBinding() {
-    return SavedTypeVariableBinding(getTypeVariable());
+  /// \brief Record the current type-variable binding.
+  void recordBinding(SavedTypeVariableBindings &record) {
+    record.push_back(SavedTypeVariableBinding(getTypeVariable()));
   }
 
   /// \brief Retrieve the representative of the equivalence class to which this
@@ -135,7 +138,7 @@ public:
   /// which can happen due to path compression. If null, path compression is
   /// not performed.
   TypeVariableType *
-  getRepresentative(SmallVectorImpl<SavedTypeVariableBinding> *record) {
+  getRepresentative(SavedTypeVariableBindings *record) {
     // Find the representative type variable.
     auto result = getTypeVariable();
     Implementation *impl = this;
@@ -161,7 +164,7 @@ public:
         break;
 
       // Record the state change.
-      record->push_back(impl->getSavedBinding());
+      impl->recordBinding(*record);
 
       impl->ParentOrFixed = result;
       impl = &nextTV->getImpl();
@@ -177,16 +180,16 @@ public:
   ///
   /// \param record The record of state changes.
   void mergeEquivalenceClasses(TypeVariableType *other,
-                               SmallVectorImpl<SavedTypeVariableBinding> &record) {
+                               SavedTypeVariableBindings &record) {
     // Merge the equivalence classes corresponding to these two type
     // variables. Always merge 'up' the constraint stack, because it is simpler.
     if (getID() < other->getImpl().getID()) {
       auto rep = other->getImpl().getRepresentative(&record);
-      record.push_back(rep->getImpl().getSavedBinding());
+      rep->getImpl().recordBinding(record);
       rep->getImpl().ParentOrFixed = getTypeVariable();
     } else {
       auto rep = getRepresentative(&record);
-      record.push_back(rep->getImpl().getSavedBinding());
+      rep->getImpl().recordBinding(record);
       rep->getImpl().ParentOrFixed = other;
     }
   }
@@ -200,7 +203,7 @@ public:
   /// \param record The record of changes made by retrieving the representative,
   /// which can happen due to path compression. If null, path compression is
   /// not performed.
-  Type getFixedType(SmallVectorImpl<SavedTypeVariableBinding> *record) {
+  Type getFixedType(SavedTypeVariableBindings *record) {
     // Find the representative type variable.
     Implementation *impl = this;
     while (impl->ParentOrFixed.is<TypeVariableType *>()) {
@@ -226,7 +229,7 @@ public:
       if (nextTV == impl->getTypeVariable())
         return result;
 
-      record->push_back(impl->getSavedBinding());
+      impl->recordBinding(*record);
       impl->ParentOrFixed = result.getPointer();
       impl = &nextTV->getImpl();
     }
@@ -235,11 +238,11 @@ public:
   }
 
   /// \brief Assign a fixed type to this equivalence class.
-  void assignFixedType(Type type, SmallVectorImpl<SavedTypeVariableBinding> &record) {
+  void assignFixedType(Type type, SavedTypeVariableBindings &record) {
     assert((!getFixedType(0) || getFixedType(0)->isEqual(type)) &&
            "Already has a fixed type!");
     auto rep = getRepresentative(&record);
-    record.push_back(rep->getImpl().getSavedBinding());
+    rep->getImpl().recordBinding(record);
     rep->getImpl().ParentOrFixed = type.getPointer();
   }
 
@@ -825,7 +828,7 @@ namespace {
 
     /// \brief The set of type variable bindings that have changed while
     /// processing this constraint system.
-    SmallVector<SavedTypeVariableBinding, 16> SavedBindings;
+    SavedTypeVariableBindings SavedBindings;
 
     typedef llvm::PointerUnion<TypeVariableType *, TypeBase *>
       RepresentativeOrFixed;
