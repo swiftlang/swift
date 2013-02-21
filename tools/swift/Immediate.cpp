@@ -304,12 +304,24 @@ static void appendEscapeSequence(SmallVectorImpl<wchar_t> &dest,
   dest.push_back(LITERAL_MODE_CHAR);
 }
 
-/// RAII and Swift-specific setup wrapper for EditLine. All of its methods
-/// must be usable from a separate thread and so shouldn't touch anything
-/// outside of the EditLine, History, and member object state.
+enum class REPLInputKind {
+  /// The REPL got a "quit" signal.
+  REPLQuit,
+  /// Empty whitespace-only input.
+  Empty,
+  /// A REPL directive, such as ':help'.
+  REPLDirective,
+  /// Swift source code.
+  SourceCode,
+};
+
+/// EditLine wrapper that implements the user interface behavior for reading
+/// user input to the REPL. All of its methods must be usable from a separate
+/// thread and so shouldn't touch anything outside of the EditLine, History,
+/// and member object state.
 ///
 /// FIXME: Need the TU for completions--use a lock?
-struct EditLineWrapper {
+class REPLInput {
   TranslationUnit *TU;
   
   EditLine *e;
@@ -323,7 +335,8 @@ struct EditLineWrapper {
   
   llvm::SmallVector<wchar_t, 80> PromptString;
 
-  EditLineWrapper(TranslationUnit *TU) : TU(TU) {
+public:
+  REPLInput(TranslationUnit *TU) : TU(TU) {
     // Only show colors if both stderr and stdout are displayed.
     ShowColors = llvm::errs().is_displayed() && llvm::outs().is_displayed();
 
@@ -339,22 +352,22 @@ struct EditLineWrapper {
     
     // Provide special outdenting behavior for '}' and ':'.
     el_wset(e, EL_ADDFN, L"swift-close-brace", L"Reduce {} indentation level",
-            BindingFn<&EditLineWrapper::onCloseBrace>);
+            BindingFn<&REPLInput::onCloseBrace>);
     el_wset(e, EL_BIND, L"}", L"swift-close-brace", nullptr);
     
     el_wset(e, EL_ADDFN, L"swift-colon", L"Reduce label indentation level",
-            BindingFn<&EditLineWrapper::onColon>);
+            BindingFn<&REPLInput::onColon>);
     el_wset(e, EL_BIND, L":", L"swift-colon", nullptr);
     
     // Provide special indent/completion behavior for tab.
     el_wset(e, EL_ADDFN, L"swift-indent-or-complete",
            L"Indent line or trigger completion",
-           BindingFn<&EditLineWrapper::onIndentOrComplete>);
+           BindingFn<&REPLInput::onIndentOrComplete>);
     el_wset(e, EL_BIND, L"\t", L"swift-indent-or-complete", nullptr);
 
     el_wset(e, EL_ADDFN, L"swift-complete",
             L"Trigger completion",
-            BindingFn<&EditLineWrapper::onComplete>);
+            BindingFn<&REPLInput::onComplete>);
     
     // Provide some common bindings to complement editline's defaults.
     // ^W should delete previous word, not the entire line.
@@ -365,11 +378,90 @@ struct EditLineWrapper {
     HistEventW ev;
     history_w(h, &ev, H_SETSIZE, 800);
   }
+  
+  ~REPLInput() {
+    el_end(e);
+  }
 
+  REPLInputKind getREPLInput(llvm::SmallVectorImpl<char> &Line) {
+    unsigned BraceCount = 0;
+    bool HadLineContinuation = false;
+    unsigned CurChunkLines = 0;
+    
+    Line.clear();
+    
+    do {
+      // Read one line.
+      PromptContinuationLevel = BraceCount;
+      NeedPromptContinuation = BraceCount != 0 || HadLineContinuation;
+      PromptedForLine = false;
+      Outdented = false;
+      int LineCount;
+      size_t LineStart = Line.size();
+      const wchar_t* WLine = el_wgets(e, &LineCount);
+      if (!WLine) {
+        // End-of-file.
+        if (PromptedForLine)
+          printf("\n");
+        return REPLInputKind::REPLQuit;
+      }
+      
+      size_t indent = PromptContinuationLevel*2;
+      Line.append(indent, ' ');
+      
+      convertToUTF8(llvm::makeArrayRef(WLine, WLine + wcslen(WLine)), Line);
+      
+      // Special-case backslash for line continuations in the REPL.
+      if (Line.size() > 2 && Line.end()[-1] == '\n' && Line.end()[-2] == '\\') {
+        HadLineContinuation = true;
+        Line.erase(Line.end() - 2);
+      } else {
+        HadLineContinuation = false;
+      }
+      
+      // Enter the line into the line history.
+      // FIXME: We should probably be a bit more clever here about which lines we
+      // put into the history and when we put them in.
+      HistEventW ev;
+      history_w(h, &ev, H_ENTER, WLine);
+      
+      ++CurChunkLines;
+      
+      // If we detect a line starting with a colon, treat it as a special
+      // REPL escape.
+      char const *p = Line.data() + LineStart;
+      while (p < Line.end() && isspace(*p)) {
+        ++p;
+      }
+      if (p == Line.end())
+        return REPLInputKind::Empty;
+      
+      if (CurChunkLines == 1 && BraceCount == 0 && *p == ':')
+        return REPLInputKind::REPLDirective;
+      
+      // If we detect unbalanced braces, keep reading before
+      // we start parsing.
+      while (p < Line.end()) {
+        if (*p == '{' || *p == '(' || *p == '[')
+          ++BraceCount;
+        else if (*p == '}' || *p == ')' || *p == ']')
+          --BraceCount;
+        ++p;
+      }
+    } while (BraceCount != 0 || HadLineContinuation);
+    
+    // The lexer likes null-terminated data.
+    Line.push_back('\0');
+    Line.pop_back();
+    
+    return REPLInputKind::SourceCode;
+  }
+
+private:
   static wchar_t *PromptFn(EditLine *e) {
     void* clientdata;
     el_wget(e, EL_CLIENTDATA, &clientdata);
-    return const_cast<wchar_t*>(((EditLineWrapper*)clientdata)->getPrompt());
+    return const_cast<wchar_t*>(((REPLInput*)clientdata)->getPrompt());
   }
   
   const wchar_t *getPrompt() {
@@ -408,7 +500,7 @@ struct EditLineWrapper {
   static int GetCharFn(EditLine *e, wchar_t *out) {
     void* clientdata;
     el_wget(e, EL_CLIENTDATA, &clientdata);
-    EditLineWrapper *that = (EditLineWrapper*)clientdata;
+    REPLInput *that = (REPLInput*)clientdata;
     
     wint_t c;
     do {
@@ -434,11 +526,11 @@ struct EditLineWrapper {
     return 1;
   }
   
-  template<unsigned char (EditLineWrapper::*method)(int)>
+  template<unsigned char (REPLInput::*method)(int)>
   static unsigned char BindingFn(EditLine *e, int ch) {
     void *clientdata;
     el_wget(e, EL_CLIENTDATA, &clientdata);
-    return (((EditLineWrapper*)clientdata)->*method)(ch);
+    return (((REPLInput*)clientdata)->*method)(ch);
   }
   
   bool isAtStartOfLine(LineInfoW const *line) {
@@ -639,10 +731,6 @@ struct EditLineWrapper {
     }
   }
 
-  ~EditLineWrapper() {
-    el_end(e);
-  }
-  operator EditLine*() { return e; }
 };
 
 enum class PrintOrDump { Print, Dump };
@@ -655,358 +743,298 @@ static void printOrDumpDecl(Decl *d, PrintOrDump which) {
     d->dump();
 }
 
-enum class REPLInputKind {
-  /// The REPL got a "quit" signal.
-  REPLQuit,
-  /// Empty whitespace-only input.
-  Empty,
-  /// A REPL directive, such as ':help'.
-  REPLDirective,
-  /// Swift source code.
-  SourceCode,
-};
-
-// NOTE: This code has to be able to run in its own thread. It should not touch
-// anything other than the EditLineWrapper and Line objects.
-static REPLInputKind getREPLInput(EditLineWrapper &e,
-                                  llvm::SmallVectorImpl<char> &Line) {
-  unsigned BraceCount = 0;
-  bool HadLineContinuation = false;
-  unsigned CurChunkLines = 0;
-
-  Line.clear();
-  
-  do {
-    // Read one line.
-    e.PromptContinuationLevel = BraceCount;
-    e.NeedPromptContinuation = BraceCount != 0 || HadLineContinuation;
-    e.PromptedForLine = false;
-    e.Outdented = false;
-    int LineCount;
-    size_t LineStart = Line.size();
-    const wchar_t* WLine = el_wgets(e, &LineCount);
-    if (!WLine) {
-      // End-of-file.
-      if (e.PromptedForLine)
-        printf("\n");
-      return REPLInputKind::REPLQuit;
-    }
-    
-    size_t indent = e.PromptContinuationLevel*2;
-    Line.append(indent, ' ');
-    
-    convertToUTF8(llvm::makeArrayRef(WLine, WLine + wcslen(WLine)), Line);
-
-    // Special-case backslash for line continuations in the REPL.
-    if (Line.size() > 2 && Line.end()[-1] == '\n' && Line.end()[-2] == '\\') {
-      HadLineContinuation = true;
-      Line.erase(Line.end() - 2);
-    } else {
-      HadLineContinuation = false;
-    }
-
-    // Enter the line into the line history.
-    // FIXME: We should probably be a bit more clever here about which lines we
-    // put into the history and when we put them in.
-    HistEventW ev;
-    history_w(e.h, &ev, H_ENTER, WLine);
-    
-    ++CurChunkLines;
-    
-    // If we detect a line starting with a colon, treat it as a special
-    // REPL escape.
-    char const *p = Line.data() + LineStart;
-    while (p < Line.end() && isspace(*p)) {
-      ++p;
-    }
-    if (p == Line.end())
-      return REPLInputKind::Empty;
-    
-    if (CurChunkLines == 1 && BraceCount == 0 && *p == ':')
-      return REPLInputKind::REPLDirective;
-    
-    // If we detect unbalanced braces, keep reading before
-    // we start parsing.
-    while (p < Line.end()) {
-      if (*p == '{' || *p == '(' || *p == '[')
-        ++BraceCount;
-      else if (*p == '}' || *p == ')' || *p == ']')
-        --BraceCount;
-      ++p;
-    }
-  } while (BraceCount != 0 || HadLineContinuation);
-  
-  // The lexer likes null-terminated data.
-  Line.push_back('\0');
-  Line.pop_back();
-  
-  return REPLInputKind::SourceCode;
-}
-
-void swift::REPL(ASTContext &Context) {
+/// The compiler and execution environment for the REPL.
+class REPLEnvironment {
   // FIXME: We should do something a bit more elaborate than
   // "allocate a 1MB buffer and hope it's enough".
   static const size_t BUFFER_SIZE = 1 << 20;
-  llvm::MemoryBuffer *Buffer =
-      llvm::MemoryBuffer::getNewMemBuffer(BUFFER_SIZE, "<REPL Buffer>");
 
-  Component *Comp = new (Context.Allocate<Component>(1)) Component();
-  unsigned BufferID =
-    Context.SourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc());
-  Identifier ID = Context.getIdentifier("REPL");
-  TranslationUnit *TU = new (Context) TranslationUnit(ID, Comp, Context,
-                                                      /*IsMainModule=*/true,
-                                                      /*IsReplModule=*/true);
-
+  ASTContext &Context;
+  llvm::MemoryBuffer *Buffer;
+  Component *Comp;
+  unsigned BufferID;
+  TranslationUnit *TU;
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
   SmallVector<llvm::Function*, 8> InitFns;
   llvm::LLVMContext LLVMContext;
-  llvm::Module Module("REPL", LLVMContext);
-  llvm::Module DumpModule("REPL", LLVMContext);
+  llvm::Module Module;
+  llvm::Module DumpModule;
   llvm::SmallString<128> DumpSource;
 
-  loadSwiftRuntime();
-
-  llvm::EngineBuilder builder(&Module);
-  std::string ErrorMsg;
-  llvm::TargetOptions TargetOpt;
-  TargetOpt.NoFramePointerElimNonLeaf = true;
-  builder.setTargetOptions(TargetOpt);
-  builder.setErrorStr(&ErrorMsg);
-  builder.setEngineKind(llvm::EngineKind::JIT);
-  llvm::ExecutionEngine *EE = builder.create();
-
+  llvm::ExecutionEngine *EE;
   irgen::Options Options;
-  Options.OutputFilename = "";
-  Options.Triple = llvm::sys::getDefaultTargetTriple();
-  Options.OptLevel = 0;
-  Options.OutputKind = irgen::OutputKind::Module;
-  Options.UseJIT = true;
+
   
-  EditLineWrapper e(TU);
+  unsigned CurTUElem;
+  unsigned CurIRGenElem;
 
-  char* BufferStart = const_cast<char*>(Buffer->getBufferStart());
+  char *getBufferStart() {
+    return const_cast<char*>(Buffer->getBufferStart());
+  }
+
+public:
+  REPLEnvironment(ASTContext &Context)
+    : Context(Context),
+      Buffer(llvm::MemoryBuffer::getNewMemBuffer(BUFFER_SIZE, "<REPL Buffer>")),
+      Comp(new (Context.Allocate<Component>(1)) Component()),
+      BufferID(Context.SourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc())),
+      TU(new (Context) TranslationUnit(Context.getIdentifier("REPL"),
+                                       Comp, Context,
+                                       /*IsMainModule=*/true,
+                                       /*IsReplModule=*/true)),
+      Module("REPL", LLVMContext),
+      DumpModule("REPL", LLVMContext),
+      CurTUElem(0),
+      CurIRGenElem(0)
+  {
+    loadSwiftRuntime();
+
+    llvm::EngineBuilder builder(&Module);
+    std::string ErrorMsg;
+    llvm::TargetOptions TargetOpt;
+    TargetOpt.NoFramePointerElimNonLeaf = true;
+    builder.setTargetOptions(TargetOpt);
+    builder.setErrorStr(&ErrorMsg);
+    builder.setEngineKind(llvm::EngineKind::JIT);
+    EE = builder.create();
+
+    Options.OutputFilename = "";
+    Options.Triple = llvm::sys::getDefaultTargetTriple();
+    Options.OptLevel = 0;
+    Options.OutputKind = irgen::OutputKind::Module;
+    Options.UseJIT = true;
+
+    // Force swift.swift to be parsed/type-checked immediately.  This forces
+    // any errors to appear upfront, and helps eliminate some nasty lag after
+    // the first statement is typed into the REPL.
+    const char importstmt[] = "import swift\n";
+    strcpy(getBufferStart(), importstmt);
+    
+    unsigned BufferOffset = 0;
+    swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
+                                       /*startOffset*/ BufferOffset,
+                                       /*endOffset*/ strlen(importstmt));
+    if (Context.hadError())
+      return;
+    
+    CurTUElem = CurIRGenElem = TU->Decls.size();
+    
+    if (llvm::sys::Process::StandardInIsUserInput())
+      printf("%s", "Welcome to swift.  Type ':help' for assistance.\n");    
+  }
   
-  unsigned CurTUElem = 0;
-  unsigned CurIRGenElem = 0;
-
-  // Force swift.swift to be parsed/type-checked immediately.  This forces
-  // any errors to appear upfront, and helps eliminate some nasty lag after
-  // the first statement is typed into the REPL.
-  const char importstmt[] = "import swift\n";
-  strcpy(BufferStart, importstmt);
-
-  unsigned BufferOffset = 0;
-  swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
-                                     /*startOffset*/ BufferOffset,
-                                     /*endOffset*/ strlen(importstmt));
-  if (Context.hadError())
-    return;
-
-  CurTUElem = CurIRGenElem = TU->Decls.size();
-
-  if (llvm::sys::Process::StandardInIsUserInput())
-    printf("%s", "Welcome to swift.  Type ':help' for assistance.\n");
-
-  while (1) {
-    // Get the next input from the REPL.
-    llvm::SmallString<80> Line;
-    REPLInputKind inputKind = getREPLInput(e, Line);
-
+  TranslationUnit *getTranslationUnit() const { return TU; }
+  
+  /// Responds to a REPL input. Returns true if the repl should continue,
+  /// false if it should quit.
+  bool handleREPLInput(REPLInputKind inputKind, llvm::StringRef Line) {
     Lexer L(Line, Context.SourceMgr, nullptr);
     switch (inputKind) {
-    case REPLInputKind::REPLQuit:
-      return;
+      case REPLInputKind::REPLQuit:
+        return false;
         
-    case REPLInputKind::Empty:
-      break;
-      
-    case REPLInputKind::REPLDirective: {
-      Token Tok;
-      L.lex(Tok);
-      assert(Tok.is(tok::colon));
-
-      if (L.peekNextToken().getText() == "help") {
-        printf("%s", "Available commands:\n"
-               "  :quit - quit the interpreter (you can also use :exit"
-               " or Control+D or exit(0))\n"
-               "  :constraints (on|off) - turn on/off the constraint-"
-               "based type checker\n"
-               "  :constraints debug (on|off) - turn on/off the debug "
-               "output for the constraint-based type checker\n"
-               "  :dump_ir - dump the LLVM IR generated by the REPL\n"
-               "  :dump_ast - dump the AST representation of"
-               " the REPL input\n"
-               "  :dump_decl <name> - dump the AST representation of the "
-               "named declarations\n"
-               "  :dump_source - dump the user input (ignoring"
-               " lines with errors)\n"
-               "  :print_decl <name> - print the AST representation of the "
-               "named declarations\n"
-               "API documentation etc. will be here eventually.\n");
-      } else if (L.peekNextToken().getText() == "quit" ||
-                 L.peekNextToken().getText() == "exit") {
-        return;
-      } else if (L.peekNextToken().getText() == "dump_ir") {
-        DumpModule.dump();
-      } else if (L.peekNextToken().getText() == "dump_ast") {
-        TU->dump();
-      } else if (L.peekNextToken().getText() == "dump_decl" ||
-                 L.peekNextToken().getText() == "print_decl") {
-        PrintOrDump doPrint = (L.peekNextToken().getText() == "print_decl")
-          ? PrintOrDump::Print : PrintOrDump::Dump;
+      case REPLInputKind::Empty:
+        return true;
+        
+      case REPLInputKind::REPLDirective: {
+        Token Tok;
         L.lex(Tok);
-        L.lex(Tok);
-        UnqualifiedLookup lookup(Context.getIdentifier(Tok.getText()), TU);
-        for (auto result : lookup.Results) {
-          if (result.hasValueDecl()) {
-            printOrDumpDecl(result.getValueDecl(), doPrint);
-            
-            if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
-              if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-                TypeDecl *origTypeDecl = typeAliasDecl->getUnderlyingType()
-                  ->getNominalOrBoundGenericNominal();
-                if (origTypeDecl) {
-                  printOrDumpDecl(origTypeDecl, doPrint);
-                  typeDecl = origTypeDecl;
-                }
-              }
+        assert(Tok.is(tok::colon));
+        
+        if (L.peekNextToken().getText() == "help") {
+          printf("%s", "Available commands:\n"
+                 "  :quit - quit the interpreter (you can also use :exit "
+                 "or Control+D or exit(0))\n"
+                 "  :constraints (on|off) - turn on/off the constraint-"
+                 "based type checker\n"
+                 "  :constraints debug (on|off) - turn on/off the debug "
+                 "output for the constraint-based type checker\n"
+                 "  :dump_ir - dump the LLVM IR generated by the REPL\n"
+                 "  :dump_ast - dump the AST representation of"
+                 " the REPL input\n"
+                 "  :dump_decl <name> - dump the AST representation of the "
+                 "named declarations\n"
+                 "  :dump_source - dump the user input (ignoring"
+                 " lines with errors)\n"
+                 "  :print_decl <name> - print the AST representation of the "
+                 "named declarations\n"
+                 "API documentation etc. will be here eventually.\n");
+        } else if (L.peekNextToken().getText() == "quit" ||
+                   L.peekNextToken().getText() == "exit") {
+          return false;
+        } else if (L.peekNextToken().getText() == "dump_ir") {
+          DumpModule.dump();
+        } else if (L.peekNextToken().getText() == "dump_ast") {
+          TU->dump();
+        } else if (L.peekNextToken().getText() == "dump_decl" ||
+                   L.peekNextToken().getText() == "print_decl") {
+          PrintOrDump doPrint = (L.peekNextToken().getText() == "print_decl")
+            ? PrintOrDump::Print : PrintOrDump::Dump;
+          L.lex(Tok);
+          L.lex(Tok);
+          UnqualifiedLookup lookup(Context.getIdentifier(Tok.getText()), TU);
+          for (auto result : lookup.Results) {
+            if (result.hasValueDecl()) {
+              printOrDumpDecl(result.getValueDecl(), doPrint);
               
-              // FIXME: Hack!
-              auto type = typeDecl->getDeclaredType();
-              bool searchedClangModule = false;
-              SmallVector<ExtensionDecl *, 4> extensions;
-              for (auto ext : TU->lookupExtensions(type)) {
-                extensions.push_back(ext);
-              }
-              
-              llvm::SmallPtrSet<swift::Module *, 16> visited;
-              for (auto &impEntry : TU->getImportedModules()) {
-                if (!visited.insert(impEntry.second))
-                  continue;
-                
-                // FIXME: Don't visit clang modules twice.
-                if (isa<ClangModule>(impEntry.second)) {
-                  if (searchedClangModule)
-                    continue;
-                  
-                  searchedClangModule = true;
+              if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
+                if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+                  TypeDecl *origTypeDecl = typeAliasDecl->getUnderlyingType()
+                    ->getNominalOrBoundGenericNominal();
+                  if (origTypeDecl) {
+                    printOrDumpDecl(origTypeDecl, doPrint);
+                    typeDecl = origTypeDecl;
+                  }
                 }
                 
-                for (auto ext : impEntry.second->lookupExtensions(type)) {
+                // FIXME: Hack!
+                auto type = typeDecl->getDeclaredType();
+                bool searchedClangModule = false;
+                SmallVector<ExtensionDecl *, 4> extensions;
+                for (auto ext : TU->lookupExtensions(type)) {
                   extensions.push_back(ext);
                 }
-              }
-              
-              for (auto ext : extensions) {
-                printOrDumpDecl(ext, doPrint);
+                
+                llvm::SmallPtrSet<swift::Module *, 16> visited;
+                for (auto &impEntry : TU->getImportedModules()) {
+                  if (!visited.insert(impEntry.second))
+                    continue;
+                  
+                  // FIXME: Don't visit clang modules twice.
+                  if (isa<ClangModule>(impEntry.second)) {
+                    if (searchedClangModule)
+                      continue;
+                    
+                    searchedClangModule = true;
+                  }
+                  
+                  for (auto ext : impEntry.second->lookupExtensions(type)) {
+                    extensions.push_back(ext);
+                  }
+                }
+                
+                for (auto ext : extensions) {
+                  printOrDumpDecl(ext, doPrint);
+                }
               }
             }
           }
-        }
-      } else if (L.peekNextToken().getText() == "dump_source") {
-        llvm::errs() << DumpSource;
-      } else if (L.peekNextToken().getText() == "constraints") {
-        L.lex(Tok);
-        L.lex(Tok);
-        if (Tok.getText() == "on") {
-          TU->getASTContext().LangOpts.UseConstraintSolver = true;
-        } else if (Tok.getText() == "off") {
-          TU->getASTContext().LangOpts.UseConstraintSolver = false;
-        } else if (Tok.getText() == "debug") {
+        } else if (L.peekNextToken().getText() == "dump_source") {
+          llvm::errs() << DumpSource;
+        } else if (L.peekNextToken().getText() == "constraints") {
+          L.lex(Tok);
           L.lex(Tok);
           if (Tok.getText() == "on") {
-            TU->getASTContext().LangOpts.DebugConstraintSolver = true;
+            TU->getASTContext().LangOpts.UseConstraintSolver = true;
           } else if (Tok.getText() == "off") {
-            TU->getASTContext().LangOpts.DebugConstraintSolver = false;
+            TU->getASTContext().LangOpts.UseConstraintSolver = false;
+          } else if (Tok.getText() == "debug") {
+            L.lex(Tok);
+            if (Tok.getText() == "on") {
+              TU->getASTContext().LangOpts.DebugConstraintSolver = true;
+            } else if (Tok.getText() == "off") {
+              TU->getASTContext().LangOpts.DebugConstraintSolver = false;
+            } else {
+              printf("%s", "Unknown :constraints debug command; try :help\n");
+            }
           } else {
-            printf("%s", "Unknown :constraints debug command; try :help\n");
+            printf("%s", "Unknown :constraints command; try :help\n");
           }
         } else {
-          printf("%s", "Unknown :constraints command; try :help\n");
+          printf("%s", "Unknown interpreter escape; try :help\n");
         }
-      } else {
-        printf("%s", "Unknown interpreter escape; try :help\n");
+        return true;
       }
-      break;
-    }
-      
-    case REPLInputKind::SourceCode: {
-      assert(Line.size() < BUFFER_SIZE &&
-             "line too big for our stupid fixed-size repl buffer");
-      strcpy(BufferStart, Line.c_str());
-      BufferOffset = 0;
-      // Parse the current line(s).
-      bool ShouldRun =
-        swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
-                                           BufferOffset, Line.size());
+        
+      case REPLInputKind::SourceCode: {
+        assert(Line.size() < BUFFER_SIZE &&
+               "line too big for our stupid fixed-size repl buffer");
+        memcpy(getBufferStart(), Line.data(), Line.size());
+        getBufferStart()[Line.size()] = '\0';
 
-      if (Context.hadError()) {
-        Context.Diags.resetHadAnyError();
-        while (TU->Decls.size() > CurTUElem)
-          TU->Decls.pop_back();
-        TU->clearUnresolvedIdentifierTypes();
-
-        // FIXME: Handling of "import" declarations?  Is there any other
-        // state which needs to be reset?
-
-        break;
+        // Parse the current line(s).
+        unsigned BufferOffset = 0;
+        bool ShouldRun =
+          swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
+                                             BufferOffset, Line.size());
+        
+        if (Context.hadError()) {
+          Context.Diags.resetHadAnyError();
+          while (TU->Decls.size() > CurTUElem)
+            TU->Decls.pop_back();
+          TU->clearUnresolvedIdentifierTypes();
+          
+          // FIXME: Handling of "import" declarations?  Is there any other
+          // state which needs to be reset?
+          
+          return true;
+        }
+        
+        CurTUElem = TU->Decls.size();
+        
+        DumpSource += Line;
+        
+        // If we didn't see an expression, statement, or decl which might have
+        // side-effects, keep reading.
+        if (!ShouldRun)
+          return true;
+        
+        // IRGen the current line(s).
+        llvm::Module LineModule("REPLLine", LLVMContext);
+        performCaptureAnalysis(TU, CurIRGenElem);
+        performIRGeneration(Options, &LineModule, TU, /*sil=*/nullptr,
+                            CurIRGenElem);
+        CurIRGenElem = CurTUElem;
+        
+        if (Context.hadError())
+          return false;
+        
+        std::string ErrorMessage;
+        if (llvm::Linker::LinkModules(&Module, &LineModule,
+                                      llvm::Linker::PreserveSource,
+                                      &ErrorMessage)) {
+          llvm::errs() << "Error linking swift modules\n";
+          llvm::errs() << ErrorMessage << "\n";
+          return false;
+        }
+        if (llvm::Linker::LinkModules(&DumpModule, &LineModule,
+                                      llvm::Linker::DestroySource,
+                                      &ErrorMessage)) {
+          llvm::errs() << "Error linking swift modules\n";
+          llvm::errs() << ErrorMessage << "\n";
+          return false;
+        }
+        llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
+        DumpModuleMain->setName("repl.line");
+        
+        if (IRGenImportedModules(TU, Module, ImportedModules, InitFns, Options))
+          return false;
+        
+        for (auto InitFn : InitFns)
+          EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
+        InitFns.clear();
+        
+        // FIXME: The way we do this is really ugly... we should be able to
+        // improve this.
+        EE->runStaticConstructorsDestructors(&Module, false);
+        llvm::Function *EntryFn = Module.getFunction("main");
+        EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
+        EE->freeMachineCodeForFunction(EntryFn);
+        EntryFn->eraseFromParent();
+        
+        return true;
       }
-
-      CurTUElem = TU->Decls.size();
-      
-      DumpSource += Line;
-
-      // If we didn't see an expression, statement, or decl which might have
-      // side-effects, keep reading.
-      if (!ShouldRun)
-        continue;
-
-      // IRGen the current line(s).
-      llvm::Module LineModule("REPLLine", LLVMContext);
-      performCaptureAnalysis(TU, CurIRGenElem);
-      performIRGeneration(Options, &LineModule, TU, /*sil=*/nullptr,
-                          CurIRGenElem);
-      CurIRGenElem = CurTUElem;
-
-      if (Context.hadError())
-        return;
-
-      std::string ErrorMessage;
-      if (llvm::Linker::LinkModules(&Module, &LineModule,
-                                    llvm::Linker::PreserveSource,
-                                    &ErrorMessage)) {
-        llvm::errs() << "Error linking swift modules\n";
-        llvm::errs() << ErrorMessage << "\n";
-        return;
-      }
-      if (llvm::Linker::LinkModules(&DumpModule, &LineModule,
-                                    llvm::Linker::DestroySource,
-                                    &ErrorMessage)) {
-        llvm::errs() << "Error linking swift modules\n";
-        llvm::errs() << ErrorMessage << "\n";
-        return;
-      }
-      llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
-      DumpModuleMain->setName("repl.line");
-
-      if (IRGenImportedModules(TU, Module, ImportedModules, InitFns, Options))
-        return;
-
-      for (auto InitFn : InitFns)
-        EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
-      InitFns.clear();
-
-      // FIXME: The way we do this is really ugly... we should be able to
-      // improve this.
-      EE->runStaticConstructorsDestructors(&Module, false);
-      llvm::Function *EntryFn = Module.getFunction("main");
-      EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
-      EE->freeMachineCodeForFunction(EntryFn);
-      EntryFn->eraseFromParent();
-
-      break;
-    }
     }
   }
+};
+
+void swift::REPL(ASTContext &Context) {
+  REPLEnvironment env(Context);
+  REPLInput e(env.getTranslationUnit());
+
+  llvm::SmallString<80> Line;
+  REPLInputKind inputKind;
+  do {
+    inputKind = e.getREPLInput(Line);
+  } while (env.handleREPLInput(inputKind, Line));
 }
