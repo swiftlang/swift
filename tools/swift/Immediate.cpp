@@ -52,7 +52,12 @@
 #include "llvm/Linker.h"
 #include "llvm/PassManager.h"
 
+// FIXME: We need a more library-neutral way for frameworks to take ownership of
+// the main loop.
+#include <CoreFoundation/CoreFoundation.h>
+
 #include <cmath>
+#include <thread>
 #include <histedit.h>
 #include <dlfcn.h>
 
@@ -304,7 +309,7 @@ static void appendEscapeSequence(SmallVectorImpl<wchar_t> &dest,
   dest.push_back(LITERAL_MODE_CHAR);
 }
 
-enum class REPLInputKind {
+enum class REPLInputKind : int {
   /// The REPL got a "quit" signal.
   REPLQuit,
   /// Empty whitespace-only input.
@@ -1037,4 +1042,83 @@ void swift::REPL(ASTContext &Context) {
   do {
     inputKind = e.getREPLInput(Line);
   } while (env.handleREPLInput(inputKind, Line));
+}
+
+void swift::REPLRunLoop(ASTContext &Context) {
+  REPLEnvironment env(Context);
+  
+  CFMessagePortContext portContext;
+  portContext.version = 0;
+  portContext.info = &env;
+  portContext.retain = nullptr;
+  portContext.release = nullptr;
+  portContext.copyDescription = nullptr;
+  Boolean shouldFreeInfo = false;
+  
+  llvm::SmallString<16> portNameBuf;
+  llvm::raw_svector_ostream portNameS(portNameBuf);
+  portNameS << "REPLInput" << getpid();
+  llvm::StringRef portNameRef = portNameS.str();
+  CFStringRef portName = CFStringCreateWithBytes(kCFAllocatorDefault,
+                             reinterpret_cast<const UInt8*>(portNameRef.data()),
+                             portNameRef.size(),
+                             kCFStringEncodingUTF8,
+                             false);
+
+  CFMessagePortRef replInputPort
+    = CFMessagePortCreateLocal(kCFAllocatorDefault,
+       portName,
+       [](CFMessagePortRef local, SInt32 msgid, CFDataRef data, void *info)
+         -> CFDataRef
+       {
+         REPLEnvironment &env = *static_cast<REPLEnvironment*>(info);
+         StringRef line(reinterpret_cast<char const*>(CFDataGetBytePtr(data)),
+                        CFDataGetLength(data));
+         UInt8 cont = env.handleREPLInput(REPLInputKind(msgid), line);
+         if (!cont)
+           CFRunLoopStop(CFRunLoopGetCurrent());
+         return CFDataCreate(kCFAllocatorDefault, &cont, 1);
+       },
+       &portContext, &shouldFreeInfo);
+  assert(replInputPort && "failed to create message port for repl");
+  CFRunLoopSourceRef replSource
+    = CFMessagePortCreateRunLoopSource(kCFAllocatorDefault, replInputPort, 0);
+  CFRunLoopAddSource(CFRunLoopGetCurrent(), replSource, kCFRunLoopDefaultMode);
+  
+  std::thread replInputThread([&] {
+    CFMessagePortRef replInputPortConn
+      = CFMessagePortCreateRemote(kCFAllocatorDefault, portName);
+    
+    REPLInput e(env.getTranslationUnit());
+    llvm::SmallString<80> Line;
+    REPLInputKind inputKind;
+    while (true) {
+      inputKind = e.getREPLInput(Line);
+      CFDataRef lineData = CFDataCreateWithBytesNoCopy(kCFAllocatorDefault,
+                                   reinterpret_cast<const UInt8*>(Line.data()),
+                                   Line.size(),
+                                   kCFAllocatorNull);
+      CFDataRef response;
+      CFMessagePortSendRequest(replInputPortConn,
+                               SInt32(inputKind),
+                               lineData,
+                               1000.0, 1000.0,
+                               kCFRunLoopDefaultMode,
+                               &response);
+      assert(CFDataGetLength(response) >= 1 && "expected one-byte response");
+      UInt8 cont = CFDataGetBytePtr(response)[0];
+      CFRelease(lineData);
+      CFRelease(response);
+      if (!cont)
+        break;
+    }
+    
+    CFRelease(replInputPortConn);
+  });
+  
+  CFRunLoopRun();
+  replInputThread.join();
+  CFRelease(replSource);
+  CFRelease(replInputPort);
+  CFRelease(portName);
 }

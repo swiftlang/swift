@@ -9,7 +9,9 @@ add_swift_executable(swift
   COMPONENT_DEPENDS bitreader bitwriter codegen ipo jit linker mcjit asmparser
                                         selectiondag ${LLVM_TARGETS_TO_BUILD})
 
-target_link_libraries(swift edit)
+find_library(CORE_FOUNDATION NAMES CoreFoundation)
+
+target_link_libraries(swift edit ${CORE_FOUNDATION})
 
 if(HAVE_MODULES_SDK)
   add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}" )

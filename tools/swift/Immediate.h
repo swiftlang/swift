@@ -24,4 +24,5 @@ namespace swift {
 
   void RunImmediately(TranslationUnit *TU, SILModule *SILMod = nullptr);
   void REPL(ASTContext &Context);
+  void REPLRunLoop(ASTContext &Context);
 }
