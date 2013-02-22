@@ -936,7 +936,7 @@ namespace {
 
       auto type = binding.getType();
       if (binding.shouldOpenType())
-        type = openType(type);
+        type = openBindingType(type);
       addConstraint(ConstraintKind::Equal, assumedTypeVar, type);
     }
 
@@ -1351,6 +1351,31 @@ namespace {
     /// \returns The opened type, or \c type if there are no archetypes in it.
     Type openType(Type type, ArrayRef<ArchetypeType *> archetypes,
            llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements);
+
+    /// \brief "Open" the given binding type by replacing any occurrences of
+    /// archetypes (including those implicit in unbound generic types) with
+    /// fresh type variables.
+    ///
+    /// This variant of \c openType() tweaks the result from 
+    /// FIXME: This is a bit of a hack.
+    ///
+    /// \param type The type to open.
+    /// \returns The opened type, or \c type if there are no archetypes in it.
+    Type openBindingType(Type type) {
+      Type result = openType(type);
+      // FIXME: Better way to identify Slice<T>.
+      if (auto boundStruct
+            = dyn_cast<BoundGenericStructType>(result.getPointer())) {
+        if (!boundStruct->getParent() &&
+            boundStruct->getDecl()->getName().str() == "Slice" &&
+            boundStruct->getGenericArgs().size() == 1) {
+          return getTypeChecker().getArraySliceType(
+                   SourceLoc(), boundStruct->getGenericArgs()[0]);
+        }
+      }
+
+      return result;
+    }
 
     /// \brief Retrieve the type of a reference to the given value declaration.
     ///
@@ -4574,7 +4599,7 @@ static bool bindDefinitiveTypeVariables(
         continue;
 
       // Open up the default literal type we chose.
-      type = cs.openType(kind.first);
+      type = cs.openBindingType(kind.first);
     } else if (!type) {
       continue;
     }
@@ -4846,7 +4871,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
         if (step->isDefinitive()) {
           auto type = binding.getType();
           if (binding.shouldOpenType())
-            type = openType(type);
+            type = openBindingType(type);
           cs->addConstraint(ConstraintKind::Equal,
                             binding.getTypeVariable(), type);
           if (cs->simplify()) {
