@@ -166,6 +166,100 @@ dynamicTypeFailed:
   PrintLiteralString(" instance>", TC, Loc, PrintDecls, BodyContent);
 }
 
+/// \brief Print a slice.
+static void
+PrintSlice(TypeChecker &TC, VarDecl *Arg, Type ElementTy,
+           SourceLoc Loc, SourceLoc EndLoc,
+           SmallVectorImpl<unsigned> &MemberIndexes,
+           SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
+           SmallVectorImpl<ValueDecl*> &PrintDecls) {
+  ASTContext &context = TC.Context;
+
+  // Dig up Bool, true, and false. We'll need them.
+  UnqualifiedLookup lookupBool(context.getIdentifier("Bool"), &TC.TU);
+  auto boolDecl = lookupBool.getSingleTypeResult();
+  UnqualifiedLookup lookupTrue(context.getIdentifier("true"), &TC.TU);
+  auto trueDecl = lookupTrue.isSuccess()
+                    ? dyn_cast<VarDecl>(lookupTrue.Results[0].getValueDecl())
+                    : nullptr;
+  UnqualifiedLookup lookupFalse(context.getIdentifier("false"), &TC.TU);
+  auto falseDecl = lookupFalse.isSuccess()
+                     ? dyn_cast<VarDecl>(lookupFalse.Results[0].getValueDecl())
+                     : nullptr;
+
+  // If we have Bool/true/false, create the declaration "first" to capture the
+  // first walk through the loop and initialize it to "true".
+  VarDecl *firstVar = nullptr;
+  if (boolDecl && trueDecl && falseDecl) {
+    auto boolTy = boolDecl->getDeclaredType();
+    
+    firstVar = new (context) VarDecl(Loc, context.getIdentifier("first"),
+                                     boolDecl->getDeclaredType(), &TC.TU);
+    Pattern *pattern = new (context) NamedPattern(firstVar);
+    pattern->setType(boolTy);
+    pattern = new (context) TypedPattern(pattern, TypeLoc::withoutLoc(boolTy));
+    pattern->setType(boolTy);
+
+    Expr *init = new (context) DeclRefExpr(trueDecl, Loc,
+                                           trueDecl->getTypeOfReference());
+    BodyContent.push_back(new (context) PatternBindingDecl(Loc, pattern, init,
+                                                           &TC.TU));
+  }
+
+  // Add opening bracket '['.
+  PrintLiteralString("[", TC, Loc, PrintDecls, BodyContent);
+
+  // Create the pattern for a variable "elt".
+  auto elementVar = new (context) VarDecl(Loc, context.getIdentifier("elt"),
+                                          ElementTy, &TC.TU);
+  Pattern *pattern = new (context) NamedPattern(elementVar);
+  pattern->setType(ElementTy);
+  pattern = new (context) TypedPattern(pattern, TypeLoc::withoutLoc(ElementTy));
+  pattern->setType(ElementTy);
+
+  // Construct the loop body.
+  SmallVector<BraceStmt::ExprStmtOrDecl, 4> loopBodyContents;
+
+  // First, print the ", " between elements.
+  if (firstVar) {
+    // if branch: set first to false
+    Expr *firstRef = new (context) DeclRefExpr(firstVar, Loc,
+                                               firstVar->getTypeOfReference());
+    Expr *falseRef = new (context) DeclRefExpr(falseDecl, Loc,
+                                               falseDecl->getTypeOfReference());
+    Stmt *setFirstToFalse
+      = new (context) AssignStmt(firstRef, Loc, falseRef);
+
+    // else branch: print a comma.
+    SmallVector<BraceStmt::ExprStmtOrDecl, 4> elseBodyContents;
+    PrintLiteralString(", ", TC, Loc, PrintDecls, elseBodyContents);
+    Stmt *elseStmt = BraceStmt::create(context, Loc, elseBodyContents, Loc);
+
+    // if-then-else statement.
+    firstRef = new (context) DeclRefExpr(firstVar, Loc,
+                                         firstVar->getTypeOfReference());
+    loopBodyContents.push_back(new (context) IfStmt(Loc, firstRef,
+                                                    setFirstToFalse,
+                                                    Loc, elseStmt));
+  } else {
+    PrintLiteralString(", ", TC, Loc, PrintDecls, loopBodyContents);
+  }
+
+  // Print the value
+  PrintReplExpr(TC, elementVar, ElementTy, ElementTy->getCanonicalType(), Loc,
+                EndLoc, MemberIndexes, loopBodyContents, PrintDecls);
+
+  auto loopBody = BraceStmt::create(context, Loc, loopBodyContents, EndLoc);
+
+  // Construct the loop.
+  Expr *argRef = new (context) DeclRefExpr(Arg, Loc, Arg->getTypeOfReference());
+  BodyContent.push_back(new (context) ForEachStmt(Loc, pattern, Loc, argRef,
+                                                  loopBody));
+
+  // Add closing bracket ']'.
+  PrintLiteralString("]", TC, EndLoc, PrintDecls, BodyContent);
+}
+
 static void
 PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
               Type SugarT, CanType T,
@@ -222,7 +316,12 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
   }
   
   if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(T)) {
-    
+    if (!BGST->getParent() && BGST->getDecl()->getName().str() == "Slice") {
+      PrintSlice(TC, Arg, BGST->getGenericArgs()[0], Loc, EndLoc, MemberIndexes,
+                 BodyContent, PrintDecls);
+      return;
+    }
+
     PrintStruct(TC, Arg, SugarT, BGST->getDecl(), Loc, EndLoc,
                 MemberIndexes, BodyContent, PrintDecls);
     return;
@@ -233,6 +332,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
                MemberIndexes, BodyContent, PrintDecls);
     return;
   }
+
   
   // FIXME: We should handle OneOfTypes at some point, but
   // it's tricky to represent in the AST without a "match" statement.
