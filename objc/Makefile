@@ -46,6 +46,6 @@ all-local:: $(HeaderDir)/ObjectiveC.swift
 else
 
 all:
-	@echo "Skipping since SWIFT_SDK isn't installed."
+	@echo "Skipping ObjC support runtime since SWIFT_SDK isn't installed."
 
 endif
