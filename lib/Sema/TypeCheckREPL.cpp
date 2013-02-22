@@ -40,7 +40,8 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
               SourceLoc Loc, SourceLoc EndLoc,
               SmallVectorImpl<unsigned> &MemberIndexes,
               SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
-              SmallVectorImpl<ValueDecl*> &PrintDecls);
+              SmallVectorImpl<ValueDecl*> &PrintDecls,
+              DeclContext *DC);
 
 static void
 PrintStruct(TypeChecker &TC, VarDecl *Arg,
@@ -48,7 +49,8 @@ PrintStruct(TypeChecker &TC, VarDecl *Arg,
             SourceLoc Loc, SourceLoc EndLoc,
             SmallVectorImpl<unsigned> &MemberIndexes,
             SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
-            SmallVectorImpl<ValueDecl*> &PrintDecls) {
+            SmallVectorImpl<ValueDecl*> &PrintDecls,
+            DeclContext *DC) {
   auto TypeStr
     = TC.Context.getIdentifier(SugarT->getString()).str();
   PrintLiteralString(TypeStr, TC, Loc, PrintDecls, BodyContent);
@@ -69,7 +71,7 @@ PrintStruct(TypeChecker &TC, VarDecl *Arg,
         CanType SubType = VD->getType()->getCanonicalType();
         PrintReplExpr(TC, Arg, VD->getType(), SubType,
                       Loc, EndLoc, MemberIndexes,
-                      BodyContent, PrintDecls);
+                      BodyContent, PrintDecls, DC);
         MemberIndexes.pop_back();
       }
     }
@@ -172,7 +174,8 @@ PrintSlice(TypeChecker &TC, VarDecl *Arg, Type ElementTy,
            SourceLoc Loc, SourceLoc EndLoc,
            SmallVectorImpl<unsigned> &MemberIndexes,
            SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
-           SmallVectorImpl<ValueDecl*> &PrintDecls) {
+           SmallVectorImpl<ValueDecl*> &PrintDecls,
+           DeclContext *DC) {
   ASTContext &context = TC.Context;
 
   // Dig up Bool, true, and false. We'll need them.
@@ -194,7 +197,7 @@ PrintSlice(TypeChecker &TC, VarDecl *Arg, Type ElementTy,
     auto boolTy = boolDecl->getDeclaredType();
     
     firstVar = new (context) VarDecl(Loc, context.getIdentifier("first"),
-                                     boolDecl->getDeclaredType(), &TC.TU);
+                                     boolDecl->getDeclaredType(), DC);
     Pattern *pattern = new (context) NamedPattern(firstVar);
     pattern->setType(boolTy);
     pattern = new (context) TypedPattern(pattern, TypeLoc::withoutLoc(boolTy));
@@ -211,7 +214,7 @@ PrintSlice(TypeChecker &TC, VarDecl *Arg, Type ElementTy,
 
   // Create the pattern for a variable "elt".
   auto elementVar = new (context) VarDecl(Loc, context.getIdentifier("elt"),
-                                          ElementTy, &TC.TU);
+                                          ElementTy, DC);
   Pattern *pattern = new (context) NamedPattern(elementVar);
   pattern->setType(ElementTy);
   pattern = new (context) TypedPattern(pattern, TypeLoc::withoutLoc(ElementTy));
@@ -247,7 +250,7 @@ PrintSlice(TypeChecker &TC, VarDecl *Arg, Type ElementTy,
 
   // Print the value
   PrintReplExpr(TC, elementVar, ElementTy, ElementTy->getCanonicalType(), Loc,
-                EndLoc, MemberIndexes, loopBodyContents, PrintDecls);
+                EndLoc, MemberIndexes, loopBodyContents, PrintDecls, DC);
 
   auto loopBody = BraceStmt::create(context, Loc, loopBodyContents, EndLoc);
 
@@ -266,7 +269,8 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
               SourceLoc Loc, SourceLoc EndLoc,
               SmallVectorImpl<unsigned> &MemberIndexes,
               SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
-              SmallVectorImpl<ValueDecl*> &PrintDecls) {
+              SmallVectorImpl<ValueDecl*> &PrintDecls,
+              DeclContext *DC) {
   ASTContext &Context = TC.Context;
   TranslationUnit &TU = TC.TU;
 
@@ -278,7 +282,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
       MemberIndexes.push_back(i);
       CanType SubType = TT->getElementType(i)->getCanonicalType();
       PrintReplExpr(TC, Arg, TT->getElementType(i), SubType, Loc, EndLoc,
-                    MemberIndexes, BodyContent, PrintDecls);
+                    MemberIndexes, BodyContent, PrintDecls, DC);
       MemberIndexes.pop_back();
 
       if (i + 1 != e)
@@ -311,19 +315,19 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
   // We print a struct by printing each non-property member variable.
   if (StructType *ST = dyn_cast<StructType>(T)) {
     PrintStruct(TC, Arg, SugarT, ST->getDecl(), Loc, EndLoc,
-                MemberIndexes, BodyContent, PrintDecls);
+                MemberIndexes, BodyContent, PrintDecls, DC);
     return;
   }
   
   if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(T)) {
     if (!BGST->getParent() && BGST->getDecl()->getName().str() == "Slice") {
       PrintSlice(TC, Arg, BGST->getGenericArgs()[0], Loc, EndLoc, MemberIndexes,
-                 BodyContent, PrintDecls);
+                 BodyContent, PrintDecls, DC);
       return;
     }
 
     PrintStruct(TC, Arg, SugarT, BGST->getDecl(), Loc, EndLoc,
-                MemberIndexes, BodyContent, PrintDecls);
+                MemberIndexes, BodyContent, PrintDecls, DC);
     return;
   }
 
@@ -405,7 +409,7 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   PrintLiteralString(TypeStr, *this, Loc, PrintDecls, BodyContent);
   PrintLiteralString(" = ", *this, Loc, PrintDecls, BodyContent);
   PrintReplExpr(*this, Arg, E->getType(), T, Loc, EndLoc,
-                MemberIndexes, BodyContent, PrintDecls);
+                MemberIndexes, BodyContent, PrintDecls, FE);
   PrintLiteralString("\n", *this, Loc, PrintDecls, BodyContent);
 
   // Typecheck the function.
@@ -521,7 +525,7 @@ void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
   PrintLiteralString(" = ", *this, Loc, PrintDecls, BodyContent);
   SmallVector<unsigned, 4> MemberIndexes;
   PrintReplExpr(*this, Arg, E->getType(), T, Loc, EndLoc, MemberIndexes,
-                BodyContent, PrintDecls);
+                BodyContent, PrintDecls, FE);
   PrintLiteralString("\n", *this, Loc, PrintDecls, BodyContent);
   Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc, Arg->getTypeOfReference());
   BodyContent.push_back(new (Context) ReturnStmt(Loc, ArgRef));
