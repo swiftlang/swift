@@ -966,6 +966,35 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
 }
 
+/// Emit the components of an Objective-C method descriptor: its selector,
+/// type encoding, and IMP pointer.
+void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
+                                          FuncDecl *method,
+                                          llvm::Constant *&selectorRef,
+                                          llvm::Constant *&atEncoding,
+                                          llvm::Constant *&impl) {
+  Selector selector(method);
+  
+  /// The first element is the selector.
+  selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
+  
+  /// The second element is the type @encoding. Handle some simple cases, and
+  /// leave the rest as null for now.
+  AnyFunctionType *methodType = method->getType()->castTo<AnyFunctionType>();
+  // Account for the 'this' pointer being curried.
+  methodType = methodType->getResult()->castTo<AnyFunctionType>();
+  
+  if (methodType->getResult()->getClassOrBoundGenericClass() &&
+      methodType->getInput()->isEqual(TupleType::getEmpty(IGM.Context)))
+    atEncoding = IGM.getAddrOfGlobalString("@@:");
+  else
+    atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  
+  /// The third element is the method implementation pointer.
+  impl = getObjCMethodPointer(IGM, selector, method);
+  
+}
+
 /// Emit an Objective-C method descriptor for the given method.
 /// struct method_t {
 ///   SEL name;
@@ -974,27 +1003,10 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
 /// };
 llvm::Constant *irgen::emitObjCMethodDescriptor(IRGenModule &IGM,
                                                 FuncDecl *method) {
-  Selector selector(method);
+  llvm::Constant *selectorRef, *atEncoding, *impl;
+  emitObjCMethodDescriptorParts(IGM, method,
+                                selectorRef, atEncoding, impl);
   
-  /// The first element is the selector.
-  auto selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
-
-  /// The second element is the type @encoding. Handle some simple cases, and
-  /// leave the rest as null for now.
-  llvm::Constant *atEncoding;
-  AnyFunctionType *methodType = method->getType()->castTo<AnyFunctionType>();
-  // Account for the 'this' pointer being curried.
-  methodType = methodType->getResult()->castTo<AnyFunctionType>();
-
-  if (methodType->getResult()->getClassOrBoundGenericClass() &&
-      methodType->getInput()->isEqual(TupleType::getEmpty(IGM.Context)))
-    atEncoding = IGM.getAddrOfGlobalString("@@:");
-  else
-    atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-
-  /// The third element is the method implementation pointer.
-  auto impl = getObjCMethodPointer(IGM, selector, method);
-
   llvm::Constant *fields[] = { selectorRef, atEncoding, impl };
   return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
 }

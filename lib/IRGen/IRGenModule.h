@@ -208,6 +208,9 @@ private:
   llvm::SmallVector<llvm::WeakVH, 4> ObjCClasses;
   /// ObjCCategories - List of Objective-C categories, bitcast to i8*.
   llvm::SmallVector<llvm::WeakVH, 4> ObjCCategories;
+  /// ObjCCategoryDecls - List of ExtensionDecls corresponding to the generated
+  /// categories.
+  llvm::SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
 
   void mangleGlobalInitializer(raw_ostream &buffer, TranslationUnit *D);
   void emitGlobalLists();

@@ -99,6 +99,106 @@ static llvm::Function *emitObjCClassInitializer(IRGenModule &IGM,
   return initFn;
 }
 
+namespace {
+  
+class CategoryInitializerVisitor
+  : public ClassMemberVisitor<CategoryInitializerVisitor>
+{
+  IRGenFunction &IGF;
+  
+  llvm::Function *class_replaceMethod;
+  
+  llvm::Constant *classMetadata;
+  llvm::Constant *metaclassMetadata;
+  
+public:
+  CategoryInitializerVisitor(IRGenFunction &IGF, ExtensionDecl *ext)
+    : IGF(IGF)
+  {
+    // FIXME: Should also register new ObjC protocol conformances using
+    // class_addProtocol.
+
+    // IMP class_replaceMethod(Class cls, SEL name, IMP imp, const char *types);
+    llvm::Type *class_replaceMethod_params[] = {
+      IGF.IGM.TypeMetadataPtrTy,
+      IGF.IGM.Int8PtrTy,
+      IGF.IGM.Int8PtrTy,
+      IGF.IGM.Int8PtrTy
+    };
+    llvm::FunctionType *class_replaceMethod_ty =
+      llvm::FunctionType::get(IGF.IGM.Int8PtrTy,
+                              class_replaceMethod_params,
+                              false);
+    class_replaceMethod = IGF.IGM.Module.getFunction("class_replaceMethod");
+    if (!class_replaceMethod)
+      class_replaceMethod = llvm::Function::Create(class_replaceMethod_ty,
+                                             llvm::GlobalValue::ExternalLinkage,
+                                             "class_replaceMethod",
+                                             &IGF.IGM.Module);
+    
+    CanType origTy = ext->getDeclaredTypeOfContext()->getCanonicalType();
+    classMetadata = tryEmitConstantHeapMetadataRef(IGF.IGM, origTy);
+    assert(classMetadata &&
+           "extended objc class doesn't have constant metadata?!");
+    classMetadata = llvm::ConstantExpr::getBitCast(classMetadata,
+                                                   IGF.IGM.TypeMetadataPtrTy);
+    metaclassMetadata = IGF.IGM.getAddrOfObjCMetaclass(
+                                       origTy->getClassOrBoundGenericClass());
+    metaclassMetadata = llvm::ConstantExpr::getBitCast(metaclassMetadata,
+                                                   IGF.IGM.TypeMetadataPtrTy);
+  }
+  
+  void visitMembers(ExtensionDecl *ext) {
+    for (Decl *member : ext->getMembers())
+      return visit(member);
+  }
+  
+  void visitFuncDecl(FuncDecl *method) {
+    if (!requiresObjCMethodDescriptor(method)) return;
+    llvm::Constant *name, *imp, *types;
+    emitObjCMethodDescriptorParts(IGF.IGM, method, name, types, imp);
+    
+    // When generating JIT'd code, we need to call sel_registerName() to force
+    // the runtime to unique the selector.
+    llvm::Value *sel = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
+                                              name);
+    
+    llvm::Value *args[] = {
+      method->isStatic() ? metaclassMetadata : classMetadata,
+      sel,
+      imp,
+      types
+    };
+    
+    IGF.Builder.CreateCall(class_replaceMethod, args);
+  }
+  
+  void visitVarDecl(VarDecl *method) {
+    // FIXME: register properties
+  }
+};
+
+} // end anonymous namespace
+
+static llvm::Function *emitObjCCategoryInitializer(IRGenModule &IGM,
+                                         ArrayRef<ExtensionDecl*> categories) {
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(llvm::Type::getVoidTy(IGM.LLVMContext), false);
+  llvm::Function *initFn =
+    llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
+                           "_swift_initObjCCategories", &IGM.Module);
+  
+  IRGenFunction initIGF(IGM, CanType(), nullptr, ExplosionKind::Minimal,
+                        /*uncurry*/ 0, initFn, Prologue::Bare);
+  
+  for (ExtensionDecl *ext : categories) {
+    CategoryInitializerVisitor(initIGF, ext).visitMembers(ext);
+  }
+  
+  initIGF.Builder.CreateRetVoid();
+  return initFn;
+}
+
 /// Emit all the top-level code in the translation unit.
 void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                                       unsigned StartElem) {
@@ -174,14 +274,25 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                                                      initAndPriority));
   }
 
-  if (ObjCInterop && Opts.UseJIT && !ObjCClasses.empty()) {
-    // Add an initializer for the Objective-C classes.
-    llvm::Constant *initAndPriority[] = {
-      llvm::ConstantInt::get(Int32Ty, 0),
-      emitObjCClassInitializer(*this, ObjCClasses)
-    };
-    allInits.push_back(llvm::ConstantStruct::getAnon(LLVMContext,
-                                                     initAndPriority));
+  if (ObjCInterop && Opts.UseJIT) {
+    if (!ObjCClasses.empty()) {
+      // Add an initializer for the Objective-C classes.
+      llvm::Constant *initAndPriority[] = {
+        llvm::ConstantInt::get(Int32Ty, 0),
+        emitObjCClassInitializer(*this, ObjCClasses)
+      };
+      allInits.push_back(llvm::ConstantStruct::getAnon(LLVMContext,
+                                                       initAndPriority));
+    }
+    if (!ObjCCategoryDecls.empty()) {
+      // Add an initializer to add declarations from category decls.
+      llvm::Constant *initAndPriority[] = {
+        llvm::ConstantInt::get(Int32Ty, 0),
+        emitObjCCategoryInitializer(*this, ObjCCategoryDecls)
+      };
+      allInits.push_back(llvm::ConstantStruct::getAnon(LLVMContext,
+                                                       initAndPriority));
+    }
   }
 
   if (!allInits.empty()) {
@@ -1310,6 +1421,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     llvm::Constant *category = emitCategoryData(*this, ext);
     category = llvm::ConstantExpr::getBitCast(category, Int8PtrTy);
     ObjCCategories.push_back(category);
+    ObjCCategoryDecls.push_back(ext);
   }
 }
 
