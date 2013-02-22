@@ -55,6 +55,8 @@ namespace irgen {
   /// implementation.
   llvm::Constant *emitObjCMethodDescriptor(IRGenModule &IGM, FuncDecl *method);
 
+  /// True if the FuncDecl requires an ObjC method descriptor.
+  bool requiresObjCMethodDescriptor(FuncDecl *method);
 } // end namespace irgen
 } // end namespace swift
 

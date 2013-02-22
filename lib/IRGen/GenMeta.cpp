@@ -106,7 +106,7 @@ static bool isMetadataIndirect(IRGenModule &IGM, NominalTypeDecl *theDecl) {
 
 /// Attempts to return a constant heap metadata reference for a
 /// nominal type.
-static llvm::Constant *tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
+llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
                                                       CanType type) {
   assert(isa<NominalType>(type) || isa<BoundGenericType>(type));
 

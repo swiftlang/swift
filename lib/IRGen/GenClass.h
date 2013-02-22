@@ -25,6 +25,7 @@ namespace llvm {
 
 namespace swift {
   class ClassDecl;
+  class ExtensionDecl;
   class GenericMemberRefExpr;
   class MemberRefExpr;
   class CanType;
@@ -47,6 +48,7 @@ namespace irgen {
                                        GenericMemberRefExpr *E);
 
   llvm::Constant *emitClassPrivateData(IRGenModule &IGM, ClassDecl *theClass);
+  llvm::Constant *emitCategoryData(IRGenModule &IGM, ExtensionDecl *ext);
 
   /// Emit an allocation of a class.
   llvm::Value *emitClassAllocation(IRGenFunction &IGF, CanType thisType);

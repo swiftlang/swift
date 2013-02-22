@@ -2,6 +2,7 @@
 + (NSObject*) alloc;
 - (NSObject*) init;
 + (NSObject*) new;
++ (void) load;
 @end
 
 #define NS_RETURNS_RETAINED __attribute__((ns_returns_retained))

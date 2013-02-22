@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/Options.h"
 #include "swift/SIL/SILModule.h"
@@ -31,6 +32,8 @@
 #include "CallingConvention.h"
 #include "Explosion.h"
 #include "FormalType.h"
+#include "GenClass.h"
+#include "GenObjC.h"
 #include "GenMeta.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -270,6 +273,10 @@ void IRGenModule::emitGlobalLists() {
   // name but a magic section.
   emitGlobalList(*this, ObjCClasses, "objc_classes",
                  "__DATA, __objc_classlist, regular, no_dead_strip",
+                 llvm::GlobalValue::InternalLinkage);
+  // So do categories.
+  emitGlobalList(*this, ObjCCategories, "objc_categories",
+                 "__DATA, __objc_catlist, regular, no_dead_strip",
                  llvm::GlobalValue::InternalLinkage);
 
   // FIXME: We also emit the class references in a second magic section to make
@@ -1294,6 +1301,15 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     }
     }
     llvm_unreachable("bad extension member kind");
+  }
+  
+  // If the original class is ObjC, generate a category.
+  ClassDecl *origClass = ext->getDeclaredTypeInContext()
+    ->getClassOrBoundGenericClass();
+  if (origClass && origClass->isObjC()) {
+    llvm::Constant *category = emitCategoryData(*this, ext);
+    category = llvm::ConstantExpr::getBitCast(category, Int8PtrTy);
+    ObjCCategories.push_back(category);
   }
 }
 

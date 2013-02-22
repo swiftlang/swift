@@ -492,9 +492,13 @@ public:
     // ObjC-compatible class.
     // FIXME: Property methods are currently excluded.
     if (!FD->isGetterOrSetter()) {
-      ClassDecl *classContext = dyn_cast<ClassDecl>(FD->getDeclContext());
-      FD->setIsObjC(FD->getAttrs().isObjC()
-                    || (classContext && classContext->isObjC()));
+      DeclContext *dc = FD->getDeclContext();
+      if (dc && dc->getDeclaredTypeInContext()) {
+        ClassDecl *classContext = dc->getDeclaredTypeInContext()
+          ->getClassOrBoundGenericClass();
+        FD->setIsObjC(FD->getAttrs().isObjC()
+                      || (classContext && classContext->isObjC()));
+      }
     }
   }
 

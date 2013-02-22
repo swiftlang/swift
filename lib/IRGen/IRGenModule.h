@@ -206,6 +206,8 @@ private:
 
   /// ObjCClasses - List of Objective-C classes, bitcast to i8*.
   llvm::SmallVector<llvm::WeakVH, 4> ObjCClasses;
+  /// ObjCCategories - List of Objective-C categories, bitcast to i8*.
+  llvm::SmallVector<llvm::WeakVH, 4> ObjCCategories;
 
   void mangleGlobalInitializer(raw_ostream &buffer, TranslationUnit *D);
   void emitGlobalLists();

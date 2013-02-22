@@ -54,6 +54,12 @@ namespace irgen {
 
   /// Emit a reference to a piece of type metadata.
   llvm::Value *emitTypeMetadataRef(IRGenFunction &IGF, CanType type);
+  
+  /// Emit a reference to a compile-time constant piece of type metadata, or
+  /// return a null pointer if the type's metadata cannot be represented by a
+  /// constant.
+  llvm::Constant *tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
+                                                 CanType type);
 
   /// Emit a reference to the heap metadata for a class.
   llvm::Value *emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type);

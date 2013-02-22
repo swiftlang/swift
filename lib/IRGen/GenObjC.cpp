@@ -19,6 +19,7 @@
 #include "llvm/IR/Module.h"
 
 #include "swift/IRGen/Options.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "clang/AST/Attr.h"
@@ -996,4 +997,13 @@ llvm::Constant *irgen::emitObjCMethodDescriptor(IRGenModule &IGM,
 
   llvm::Constant *fields[] = { selectorRef, atEncoding, impl };
   return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
+}
+
+bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
+  if (method->isObjC() ||
+      method->getAttrs().isIBAction())
+    return true;
+  if (auto override = method->getOverriddenDecl())
+    return requiresObjCMethodDescriptor(override);
+  return false;
 }
