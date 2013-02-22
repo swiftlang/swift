@@ -218,22 +218,9 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   llvm::Function *fn;
   if (tunit->Kind == TranslationUnit::Main ||
       tunit->Kind == TranslationUnit::Repl) {
-    // Emit a top-level code function...
+    // Emit a top-level code function to be called from main().
     fn = llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                                 "top_level_code", &Module);
-
-    // and call it from main().
-    // FIXME: We should squirrel away argc and argv where relevant; maybe
-    // other startup initialization?
-    // FIXME: We should only emit this in non-JIT modes.
-    llvm::Function *mainFn =
-        llvm::Function::Create(llvm::FunctionType::get(Int32Ty, false),
-                               llvm::GlobalValue::ExternalLinkage,
-                               "main", &Module);
-    IRGenFunction mainIGF(*this, CanType(), nullptr, ExplosionKind::Minimal,
-                          /*uncurry*/ 0, mainFn, Prologue::Bare);
-    mainIGF.Builder.CreateCall(fn);
-    mainIGF.Builder.CreateRet(mainIGF.Builder.getInt32(0));
   } else {
     // Otherwise, create a global initializer.
     // FIXME: This is completely, utterly, wrong.
@@ -274,27 +261,6 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                                                      initAndPriority));
   }
 
-  if (ObjCInterop && Opts.UseJIT) {
-    if (!ObjCClasses.empty()) {
-      // Add an initializer for the Objective-C classes.
-      llvm::Constant *initAndPriority[] = {
-        llvm::ConstantInt::get(Int32Ty, 0),
-        emitObjCClassInitializer(*this, ObjCClasses)
-      };
-      allInits.push_back(llvm::ConstantStruct::getAnon(LLVMContext,
-                                                       initAndPriority));
-    }
-    if (!ObjCCategoryDecls.empty()) {
-      // Add an initializer to add declarations from category decls.
-      llvm::Constant *initAndPriority[] = {
-        llvm::ConstantInt::get(Int32Ty, 0),
-        emitObjCCategoryInitializer(*this, ObjCCategoryDecls)
-      };
-      allInits.push_back(llvm::ConstantStruct::getAnon(LLVMContext,
-                                                       initAndPriority));
-    }
-  }
-
   if (!allInits.empty()) {
     llvm::ArrayType *initListType =
       llvm::ArrayType::get(allInits[0]->getType(), allInits.size());
@@ -311,6 +277,40 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   }
   
   emitGlobalLists();
+  
+  if (tunit->Kind == TranslationUnit::Main ||
+      tunit->Kind == TranslationUnit::Repl) {
+    // Emit main().
+    // FIXME: We should squirrel away argc and argv where relevant; maybe
+    // other startup initialization?
+    // FIXME: We should only emit this in non-JIT modes.
+    llvm::Function *mainFn =
+      llvm::Function::Create(llvm::FunctionType::get(Int32Ty, false),
+                             llvm::GlobalValue::ExternalLinkage,
+                             "main", &Module);
+    
+    IRGenFunction mainIGF(*this, CanType(), nullptr, ExplosionKind::Minimal,
+                          /*uncurry*/ 0, mainFn, Prologue::Bare);
+    
+    // Emit Objective-C runtime interop setup for immediate-mode code.
+    if (ObjCInterop && Opts.UseJIT) {
+      if (!ObjCClasses.empty()) {
+        // Emit an initializer for the Objective-C classes.
+        llvm::Function *classInit = emitObjCClassInitializer(*this, ObjCClasses);
+        mainIGF.Builder.CreateCall(classInit);
+      }
+      if (!ObjCCategoryDecls.empty()) {
+        // Emit an initializer to add declarations from category decls.
+        llvm::Function *catInit = emitObjCCategoryInitializer(*this,
+                                                              ObjCCategoryDecls);
+        mainIGF.Builder.CreateCall(catInit);
+      }
+    }
+    
+    // Call the top-level code.
+    mainIGF.Builder.CreateCall(fn);
+    mainIGF.Builder.CreateRet(mainIGF.Builder.getInt32(0));
+  }
 
   // Objective-C image information.
   // Generate module-level named metadata to convey this information to the

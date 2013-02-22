@@ -761,6 +761,7 @@ class REPLEnvironment {
   TranslationUnit *TU;
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
   SmallVector<llvm::Function*, 8> InitFns;
+  bool RanGlobalInitializers;
   llvm::LLVMContext LLVMContext;
   llvm::Module Module;
   llvm::Module DumpModule;
@@ -786,8 +787,8 @@ class REPLEnvironment {
     // Parse the current line(s).
     unsigned BufferOffset = 0;
     bool ShouldRun =
-    swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
-                                       BufferOffset, Line.size());
+      swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
+                                         BufferOffset, Line.size());
     
     if (Context.hadError()) {
       Context.Diags.resetHadAnyError();
@@ -847,7 +848,10 @@ class REPLEnvironment {
     
     // FIXME: The way we do this is really ugly... we should be able to
     // improve this.
-    EE->runStaticConstructorsDestructors(&Module, false);
+    if (!RanGlobalInitializers) {
+      EE->runStaticConstructorsDestructors(&Module, false);
+      RanGlobalInitializers = true;
+    }
     llvm::Function *EntryFn = Module.getFunction("main");
     EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
     EE->freeMachineCodeForFunction(EntryFn);
@@ -866,6 +870,7 @@ public:
                                        Comp, Context,
                                        /*IsMainModule=*/true,
                                        /*IsReplModule=*/true)),
+      RanGlobalInitializers(false),
       Module("REPL", LLVMContext),
       DumpModule("REPL", LLVMContext),
       CurTUElem(0),
