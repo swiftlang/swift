@@ -778,6 +778,12 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
           def.setStage(ExternalDefinition::TypeChecked);
           continue;
         }
+        if (isa<StructDecl>(decl)) {
+          // StructDecls should already be typed by the ClangImporter and don't
+          // need additional typechecking.
+          def.setStage(ExternalDefinition::TypeChecked);
+          continue;
+        }
 
         llvm_unreachable("Unknown externally-sourced definition");
       }

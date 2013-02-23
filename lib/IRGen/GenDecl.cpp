@@ -576,20 +576,33 @@ bool LinkEntity::isLocalLinkage() const {
 }
 
 bool LinkEntity::isClangThunk() const {
-  if (!isDeclKind(getKind()))
-    return false;
+  // Constructors, subscripts, properties, and type metadata synthesized in the
+  // mapping to Clang modules are local.
 
-  ValueDecl *D = static_cast<ValueDecl *>(Pointer);
-  DeclContext *DC = D->getDeclContext();
-  while (!DC->isModuleContext()) {
-    DC = DC->getParent();
+  if (isDeclKind(getKind())) {
+    ValueDecl *D = static_cast<ValueDecl *>(Pointer);
+    DeclContext *DC = D->getDeclContext();
+    while (!DC->isModuleContext()) {
+      DC = DC->getParent();
+    }
+
+    return isa<ClangModule>(DC) &&
+      (isa<ConstructorDecl>(D) || isa<SubscriptDecl>(D) ||
+       (isa<VarDecl>(D) && cast<VarDecl>(D)->isProperty()));
+  } else { // isTypeKind(getKind())
+    CanType ty = CanType(static_cast<TypeBase*>(Pointer));
+    NominalTypeDecl *decl = ty->getNominalOrBoundGenericNominal();
+    
+    if (!decl)
+      return false;
+
+    DeclContext *DC = decl->getDeclContext();
+    while (!DC->isModuleContext()) {
+      DC = DC->getParent();
+    }
+    
+    return isa<ClangModule>(DC);
   }
-
-  // Constructors, subscripts, and properties synthesized in the mapping to
-  // Clang modules are local.
-  return isa<ClangModule>(DC) &&
-    (isa<ConstructorDecl>(D) || isa<SubscriptDecl>(D) ||
-     (isa<VarDecl>(D) && cast<VarDecl>(D)->isProperty()));
 }
 
 LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
@@ -754,7 +767,6 @@ void IRGenFunction::emitExternalDefinition(Decl *D) {
     case DeclKind::OneOfElement:
     case DeclKind::OneOf:
     case DeclKind::Class:
-    case DeclKind::Struct:
     case DeclKind::TopLevelCode:
     case DeclKind::TypeAlias:
     case DeclKind::Var:
@@ -787,6 +799,11 @@ void IRGenFunction::emitExternalDefinition(Decl *D) {
       } else {
         IGM.emitConstructor(cast<ConstructorDecl>(D));
       }
+      break;
+      
+    case DeclKind::Struct:
+      // Emit Swift metadata for the external struct.
+      emitStructMetadata(IGM, cast<StructDecl>(D));
       break;
   }
 }
