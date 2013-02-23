@@ -825,27 +825,29 @@ namespace {
       }
     }
 
-    // Everything else just gets passed directly.
+    // Everything else gets copied to raise the component retain counts to +1.
+    // FIXME: blocks could potentially be ns_consumed.
     void visitType(TypeBase *type) {
+      const TypeInfo &ti = IGF.getFragileTypeInfo(type);
       if (requiresExternalByvalArgument(IGF.IGM, CanType(type))) {
         // If the argument was passed byval in the C calling convention,
         // reexplode it.
         llvm::Value *addrValue = Params.claimUnmanagedNext();
-        const TypeInfo &ti = IGF.getFragileTypeInfo(type);
         llvm::Constant *alignConstant = ti.getStaticAlignment(IGF.IGM);
         unsigned align = alignConstant
           ? alignConstant->getUniqueInteger().getZExtValue()
           : 1;
         Address addr(addrValue, Alignment(align));
         Explosion loaded(IGF.CurExplosionLevel);
-        ti.loadAsTake(IGF, addr, loaded);
+        ti.load(IGF, addr, loaded);
         unsigned width = ti.getExplosionSize(IGF.CurExplosionLevel);
-        loaded.claimUnmanaged(width, Args);
+        loaded.forward(IGF, width, Args);
         NextParamIndex += 1;
       } else {
-        unsigned width =
-          IGF.IGM.getExplosionSize(CanType(type), IGF.CurExplosionLevel);
-        Params.claimUnmanaged(width, Args);
+        unsigned width = ti.getExplosionSize(IGF.CurExplosionLevel);
+        Explosion copied(IGF.CurExplosionLevel);
+        ti.copy(IGF, Params, copied);
+        copied.forward(IGF, width, Args);
         NextParamIndex += width;
       }
     }
