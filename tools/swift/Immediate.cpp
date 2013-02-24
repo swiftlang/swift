@@ -438,8 +438,10 @@ public:
       while (p < Line.end() && isspace(*p)) {
         ++p;
       }
-      if (p == Line.end())
+      if (p == Line.end()) {
+        if (BraceCount != 0) continue;
         return REPLInputKind::Empty;
+      }
       
       if (CurChunkLines == 1 && BraceCount == 0 && *p == ':')
         return REPLInputKind::REPLDirective;
