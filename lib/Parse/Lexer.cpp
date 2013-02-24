@@ -1051,7 +1051,7 @@ Restart:
     }
 
     // Otherwise, this is the end of the buffer.  Return EOF.
-    if (CurPtr[-2] != '\n' && CurPtr[-2] != '\r') {
+    if (BufferStart != BufferEnd && CurPtr[-2] != '\n' && CurPtr[-2] != '\r') {
       // While we are not C, we should not ignore the strong Unix command-line
       // tool conventions that motivate this warning.
       diagnose(CurPtr-1, diag::lex_missing_newline_eof);
