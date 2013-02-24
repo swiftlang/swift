@@ -391,6 +391,7 @@ public:
   REPLInputKind getREPLInput(llvm::SmallVectorImpl<char> &Line) {
     unsigned BraceCount = 0;
     bool HadLineContinuation = false;
+    bool UnfinishedInfixExpr = false;
     unsigned CurChunkLines = 0;
     
     Line.clear();
@@ -398,7 +399,8 @@ public:
     do {
       // Read one line.
       PromptContinuationLevel = BraceCount;
-      NeedPromptContinuation = BraceCount != 0 || HadLineContinuation;
+      NeedPromptContinuation = BraceCount != 0 || HadLineContinuation ||
+                               UnfinishedInfixExpr;
       PromptedForLine = false;
       Outdented = false;
       int LineCount;
@@ -434,15 +436,18 @@ public:
       
       // If we detect a line starting with a colon, treat it as a special
       // REPL escape.
-      char const *p = Line.data() + LineStart;
+      char const *s = Line.data() + LineStart;
+      char const *p = s;
       while (p < Line.end() && isspace(*p)) {
         ++p;
       }
       if (p == Line.end()) {
-        if (BraceCount != 0) continue;
+        if (BraceCount != 0 || UnfinishedInfixExpr) continue;
         return REPLInputKind::Empty;
       }
-      
+
+      UnfinishedInfixExpr = false;
+
       if (CurChunkLines == 1 && BraceCount == 0 && *p == ':')
         return REPLInputKind::REPLDirective;
       
@@ -455,7 +460,15 @@ public:
           --BraceCount;
         ++p;
       }
-    } while (BraceCount != 0 || HadLineContinuation);
+      while (isspace(*--p) && p >= s);
+      while (--p >= s) {
+        if (Identifier::isOperatorChar(*p))
+          continue;
+        if (*p == ' ' || *p == '\t')
+          UnfinishedInfixExpr = true;
+        break;
+      }
+    } while (BraceCount != 0 || HadLineContinuation || UnfinishedInfixExpr);
     
     // The lexer likes null-terminated data.
     Line.push_back('\0');
