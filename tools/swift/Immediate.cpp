@@ -325,7 +325,14 @@ enum class REPLInputKind : int {
 /// thread and so shouldn't touch anything outside of the EditLine, History,
 /// and member object state.
 ///
-/// FIXME: Need the TU for completions--use a lock?
+/// FIXME: Need the TU for completions! Currently REPLRunLoop uses
+/// synchronous messaging between the REPLInput thread and the main thread,
+/// and client code shouldn't have access to the AST, so only one thread will
+/// be accessing the TU at a time. However, if REPLRunLoop
+/// (or a new REPL application) ever requires asynchronous messaging between
+/// REPLInput and REPLEnvironment, or if client code expected to be able to
+/// grovel into the REPL's AST, then locking will be necessary to serialize
+/// access to the AST.
 class REPLInput {
   TranslationUnit *TU;
   
@@ -516,7 +523,6 @@ private:
   }
 
   /// Custom GETCFN to reset completion state after typing.
-  /// NB: editline expects a char even in "wide" mode
   static int GetCharFn(EditLine *e, wchar_t *out) {
     void* clientdata;
     el_wget(e, EL_CLIENTDATA, &clientdata);
