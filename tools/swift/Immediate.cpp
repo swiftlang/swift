@@ -527,24 +527,15 @@ private:
     void* clientdata;
     el_wget(e, EL_CLIENTDATA, &clientdata);
     REPLInput *that = (REPLInput*)clientdata;
-    
+
     wint_t c;
-    do {
-      c = getwc(stdin);
-      if (c == EOF) {
-        if (feof(stdin)) {
-          *out = '\0';
-          return 0;
-        }
-        if (ferror(stdin)) {
-          if (errno == EINTR)
-            continue;
-          *out = '\0';
-          return -1;
-        }
-      }
-    } while (false);
-      
+    while (errno = 0, (c = getwc(stdin)) == WEOF) {
+      if (errno == EINTR)
+        continue;
+      *out = L'\0';
+      return feof(stdin) ? 0 : -1;
+    }
+
     // If the user typed anything other than tab, reset the completion state.
     if (c != L'\t')
       that->completions.reset();
