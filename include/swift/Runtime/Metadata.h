@@ -363,6 +363,9 @@ static inline const FullMetadata<T> *asFullMetadata(const T *metadata) {
 
 /// The common structure of all type metadata.
 struct Metadata {
+  constexpr Metadata() : Kind(MetadataKind::Class) {}
+  constexpr Metadata(MetadataKind Kind) : Kind(Kind) {}
+  
   /// The basic header type.
   typedef TypeMetadataHeader HeaderType;
 
@@ -381,6 +384,15 @@ struct Metadata {
   void setValueWitnesses(const ValueWitnessTable *table) {
     asFullMetadata(this)->ValueWitnesses = table;
   }
+
+protected:
+  friend struct OpaqueMetadata;
+  
+  /// Metadata should not be publicly copied or moved.
+  constexpr Metadata(const Metadata &) = default;
+  Metadata &operator=(const Metadata &) = default;
+  constexpr Metadata(Metadata &&) = default;
+  Metadata &operator=(Metadata &&) = default;
 };
 
 /// The common structure of opaque metadata.  Adds nothing.
