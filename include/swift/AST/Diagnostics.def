@@ -486,6 +486,8 @@ ERROR(expected_bracket_array_new,expr_parsing,none,
 // Tuples and parenthesized expressions
 ERROR(expected_expr_in_expr_list,expr_parsing,none,
       "expected expression in list of expressions", ())
+ERROR(expected_expr_in_collection_literal,expr_parsing,none,
+      "expected expression in container literal", ())
 ERROR(expected_equal_in_tuple_expr,expr_parsing,none,
       "expected '=' in tuple expression", ())
 ERROR(expected_rparen_expr_list,expr_parsing,none,

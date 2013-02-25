@@ -406,7 +406,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     break;
 
   case tok::l_square_starting:
-    Result = parseExprArray();
+    Result = parseExprCollection();
     break;
       
   case tok::kw_func:
@@ -751,21 +751,90 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
   return new (Context) TupleExpr(LLoc, NewSubExprs, NewSubExprsNames, RLoc);
 }
 
+/// parseExprCollection - Parse a collection literal expression.
+///
+///   expr-collection:
+///     expr-array
+//      '[' ']'
+NullablePtr<Expr> Parser::parseExprCollection() {
+  SourceLoc LSquareLoc = consumeToken(tok::l_square_starting);
+
+  // Parse an empty collection literal.
+  if (Tok.is(tok::r_square)) {
+    // FIXME: We want a special 'empty collection' literal kind.
+    SourceLoc RSquareLoc = consumeToken();
+    return new (Context) TupleExpr(RSquareLoc, { }, nullptr, RSquareLoc);
+  }
+
+  // Parse the first expression.
+  NullablePtr<Expr> FirstExpr
+    = parseExpr(diag::expected_expr_in_collection_literal);
+  if (FirstExpr.isNull()) {
+    skipUntil(tok::r_square);
+    if (Tok.is(tok::r_square))
+      consumeToken();
+    return 0;
+  }
+
+  return parseExprArray(LSquareLoc, FirstExpr.get());
+}
+
 /// parseExprArray - Parse an array literal expression.
+///
+/// The lsquare-starting and first expression have already been
+/// parsed, and are passed in as parameters.
 ///
 ///   expr-array:
 ///     lsquare-starting ']'
 ///     lsquare-starting expr-paren-element (',' expr-paren-element)* ']'
-NullablePtr<Expr> Parser::parseExprArray() {
-  NullablePtr<Expr> MaybeSubExpr = parseExprList(tok::l_square_starting,
-                                                 tok::r_square);
-  if (MaybeSubExpr.isNull())
-    return nullptr;
-  Expr *SubExpr = MaybeSubExpr.get();
-  
-  return new (Context) ArrayExpr(SubExpr->getStartLoc(),
-                                 SubExpr,
-                                 SubExpr->getEndLoc());
+NullablePtr<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
+                                         Expr *FirstExpr) {
+  SmallVector<Expr *, 8> SubExprs;
+  SubExprs.push_back(FirstExpr);
+  SourceLoc RSquareLoc;
+  do {
+    // If we see the closing square bracket, we're done.
+    if (Tok.is(tok::r_square)) {
+      RSquareLoc = consumeToken();
+      break;
+    }
+
+    // If we don't see a comma, we're done.
+    if (!Tok.is(tok::comma)) {
+      skipUntil(tok::r_square);
+      RSquareLoc = Tok.getLoc();
+      if (Tok.is(tok::r_square))
+        consumeToken();
+      break;
+    }
+
+    // Parse the comma.
+    consumeToken(tok::comma);
+
+    // Parse the next expression.
+    NullablePtr<Expr> Element
+      = parseExpr(diag::expected_expr_in_collection_literal);
+    if (Element.isNull()) {
+      skipUntil(tok::r_square);
+      RSquareLoc = Tok.getLoc();
+      if (Tok.is(tok::r_square))
+        consumeToken();
+      break;
+    }
+
+    SubExprs.push_back(Element.get());
+  } while (true);
+
+  Expr *SubExpr;
+  if (SubExprs.size() == 1)
+    SubExpr = new (Context) ParenExpr(LSquareLoc, SubExprs[0],
+                                      RSquareLoc);
+  else
+    SubExpr = new (Context) TupleExpr(LSquareLoc,
+                                      Context.AllocateCopy(SubExprs),
+                                      nullptr, RSquareLoc);
+
+  return new (Context) ArrayExpr(LSquareLoc, SubExpr, RSquareLoc);
 }
 
 /// parseExprFunc - Parse a func expression.

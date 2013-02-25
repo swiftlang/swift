@@ -338,7 +338,9 @@ public:
   NullablePtr<Expr> parseExprExplicitClosure();
   Expr *parseExprAnonClosureArg();
   NullablePtr<Expr> parseExprList(tok LeftTok, tok RightTok);
-  NullablePtr<Expr> parseExprArray();
+  NullablePtr<Expr> parseExprCollection();
+  NullablePtr<Expr> parseExprArray(SourceLoc LSquareLoc,
+                                   Expr *FirstExpr);
   NullablePtr<Expr> parseExprFunc();
   
   Expr *parseExprOperator();
