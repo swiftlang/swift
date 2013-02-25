@@ -417,7 +417,7 @@ llvm::Constant *IRGenModule::getGetTupleMetadataFn() {
     llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
   // This could be 'readnone' except for the elements buffer.
   GetTupleMetadataFn =
-    createReadonlyRuntimeFunction(*this, "swift_getTupleMetadata", fnType);
+    createReadonlyRuntimeFunction(*this, "swift_getTupleTypeMetadata", fnType);
   return GetTupleMetadataFn;
 }
 
