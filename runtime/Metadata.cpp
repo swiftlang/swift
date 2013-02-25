@@ -529,7 +529,7 @@ static OpaqueValue *tuple_forEachField(OpaqueValue *destTuple,
                                        OpaqueValue *srcTuple,
                                        const Metadata *_metatype,
                                        forEachOperation member) {
-  auto metatype = *(const TupleTypeMetadata*) _metatype;
+  auto &metatype = *(const TupleTypeMetadata*) _metatype;
   for (size_t i = 0, e = metatype.NumElements; i != e; ++i) {
     auto &eltInfo = metatype.getElements()[i];
     auto eltValueWitnesses = eltInfo.Type->getValueWitnesses();
