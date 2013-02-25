@@ -31,7 +31,8 @@ SWIFT_SOURCES += FixedPoint.swift Float32.swift Float64.swift \
 		 Algorithm.swift \
 		 Demangle.swift InputStream.swift OutputStream.swift \
 		 CString.swift \
-		 POSIX/Descriptor.swift POSIX/File.swift POSIX/Misc.swift
+		 POSIX/Descriptor.swift POSIX/File.swift POSIX/Misc.swift \
+		 REPL.swift
 ifeq ($(DISABLE_ASSERTIONS),1)
   SWIFT_SOURCES += Assert.swift
 else

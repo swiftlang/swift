@@ -37,10 +37,9 @@ else
 endif
 
 SWIFT_OPTFLAG := -O3
-SWIFT_SDKFLAG := -sdk=$(SWIFT_SDK)
 
 LDFLAGS += -framework AppKit \
-	   -lswift_stdlib -lswift_runtime -Wl,-force_load,$(LibDir)/libswift_runtime.a
+	   -lswift_stdlib -lswift_runtime -lswiftObjectiveC -lswiftFoundation -Wl,-force_load,$(LibDir)/libswift_runtime.a
 
 HeaderDir := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift/
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
