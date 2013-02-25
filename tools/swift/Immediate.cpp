@@ -30,6 +30,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/DiagnosticConsumer.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ExecutionEngine/JIT.h"
@@ -177,8 +178,40 @@ static bool IRGenImportedModules(TranslationUnit *TU,
                                  bool IsREPL = true) {
   // IRGen the modules this module depends on.
   for (auto ModPair : TU->getImportedModules()) {
-    if (isa<BuiltinModule>(ModPair.second) || isa<ClangModule>(ModPair.second))
+    // Nothing to do for the builtin module.
+    if (isa<BuiltinModule>(ModPair.second))
       continue;
+
+    if (auto clangMod = dyn_cast<ClangModule>(ModPair.second)) {
+      // Automatically link against whatever the Clang module requires.
+      // FIXME: Can we be sure to find what the static linker would find?
+      // This is pretty hacky.
+      for (auto &linkLib : clangMod->getClangModule()->LinkLibraries) {
+        // If we have an absolute path, just try to load it now.
+        if (llvm::sys::path::is_absolute(linkLib.Library)) {
+          dlopen(linkLib.Library.c_str(), 0);
+          continue;
+        }
+
+        // If we have a framework, try /System/Library/Frameworks.
+        if (linkLib.IsFramework) {
+          std::string path = "/System/Library/Frameworks/";
+          path += linkLib.Library;
+          path += ".framework/";
+          path += linkLib.Library;
+          dlopen(path.c_str(), 0);
+          continue;
+        }
+
+        // Try /usr/lib.
+        std::string path = "/usr/lib/";
+        path += linkLib.Library;
+        path += ".dylib";
+        dlopen(path.c_str(), 0);
+      }
+
+      continue;
+    }
 
     TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.second);
     if (!ImportedModules.insert(SubTU))
