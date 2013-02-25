@@ -680,13 +680,6 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
 ///   expr-paren-element:
 ///     (identifier '=')? expr
 ///
-///   expr-square:
-///     lsquare-any ']'
-///     lsquare-any expr-paren-element (',' expr-paren-element)* ']'
-///
-///   expr-square-element:
-///     (identifier '=')? expr
-///
 NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
   SourceLoc LLoc = consumeToken(LeftTok);
   SourceLoc RLoc;
@@ -755,7 +748,8 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
 ///
 ///   expr-collection:
 ///     expr-array
-//      '[' ']'
+///     expr-dictionary
+//      lsquare-starting ']'
 NullablePtr<Expr> Parser::parseExprCollection() {
   SourceLoc LSquareLoc = consumeToken(tok::l_square_starting);
 
@@ -776,6 +770,12 @@ NullablePtr<Expr> Parser::parseExprCollection() {
     return 0;
   }
 
+  // If we have a ':', this is a dictionary literal.
+  if (Tok.is(tok::colon)) {
+    return parseExprDictionary(LSquareLoc, FirstExpr.get());
+  }
+
+  // Otherwise, we have an array literal.
   return parseExprArray(LSquareLoc, FirstExpr.get());
 }
 
@@ -785,8 +785,7 @@ NullablePtr<Expr> Parser::parseExprCollection() {
 /// parsed, and are passed in as parameters.
 ///
 ///   expr-array:
-///     lsquare-starting ']'
-///     lsquare-starting expr-paren-element (',' expr-paren-element)* ']'
+///     lsquare-starting expr (',' expr)* ']'
 NullablePtr<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
                                          Expr *FirstExpr) {
   SmallVector<Expr *, 8> SubExprs;
@@ -835,6 +834,116 @@ NullablePtr<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
                                       nullptr, RSquareLoc);
 
   return new (Context) ArrayExpr(LSquareLoc, SubExpr, RSquareLoc);
+}
+
+/// parseExprDictionary - Parse a dictionary literal expression.
+///
+/// The lsquare-starting and first key have already been parsed, and
+/// are passed in as parameters.
+///
+///   expr-dictionary:
+///     lsquare-starting expr ':' expr (',' expr ':' expr)* ']'
+NullablePtr<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
+                                              Expr *FirstKey) {
+  // Each subexpression is a (key, value) tuple. 
+  // FIXME: We're not tracking the colon locations in the AST.
+  SmallVector<Expr *, 8> SubExprs;
+  SourceLoc RSquareLoc;
+
+  // Consume the ':'.
+  consumeToken(tok::colon);
+
+  // Parse the first value.
+  NullablePtr<Expr> FirstValue 
+    = parseExpr(diag::expected_value_in_dictionary_literal);
+  if (FirstValue.isNull()) {
+    skipUntil(tok::r_square);
+    RSquareLoc = Tok.getLoc();
+    if (Tok.is(tok::r_square))
+      consumeToken();
+    return 0;
+  }
+
+  // Function that adds a new key/value pair.
+  auto addKeyValuePair = [&](Expr *Key, Expr *Value) -> void {
+    SmallVector<Expr *, 2> Exprs;
+    Exprs.push_back(Key);
+    Exprs.push_back(Value);
+    SubExprs.push_back(new (Context) TupleExpr(SourceLoc(),
+                                               Context.AllocateCopy(Exprs),
+                                               nullptr,
+                                               SourceLoc()));
+  };
+
+  // Add the first key/value pair.
+  addKeyValuePair(FirstKey, FirstValue.get());
+
+  do {
+    // If we see the closing square bracket, we're done.
+    if (Tok.is(tok::r_square)) {
+      RSquareLoc = consumeToken();
+      break;
+    }
+
+    // If we don't see a comma, we're done.
+    if (!Tok.is(tok::comma)) {
+      skipUntil(tok::r_square);
+      RSquareLoc = Tok.getLoc();
+      if (Tok.is(tok::r_square))
+        consumeToken();
+      break;
+    }
+
+    // Parse the comma.
+    consumeToken(tok::comma);
+
+    // Parse the next key.
+    NullablePtr<Expr> Key
+      = parseExpr(diag::expected_key_in_dictionary_literal);
+    if (Key.isNull()) {
+      skipUntil(tok::r_square);
+      RSquareLoc = Tok.getLoc();
+      if (Tok.is(tok::r_square))
+        consumeToken();
+      break;
+    }
+
+    // Parse the ':'.
+    if (Tok.isNot(tok::colon)) {
+      diagnose(Tok, diag::expected_colon_in_dictionary_literal);
+      skipUntil(tok::r_square);
+      RSquareLoc = Tok.getLoc();
+      if (Tok.is(tok::r_square))
+        consumeToken();
+      break;      
+    }
+    consumeToken();
+
+    // Parse the next value.
+    NullablePtr<Expr> Value
+      = parseExpr(diag::expected_value_in_dictionary_literal);
+    if (Value.isNull()) {
+      skipUntil(tok::r_square);
+      RSquareLoc = Tok.getLoc();
+      if (Tok.is(tok::r_square))
+        consumeToken();
+      break;
+    }
+
+    // Add this key/value pair.
+    addKeyValuePair(Key.get(), Value.get());
+  } while (true);
+
+  Expr *SubExpr;
+  if (SubExprs.size() == 1)
+    SubExpr = new (Context) ParenExpr(LSquareLoc, SubExprs[0],
+                                      RSquareLoc);
+  else
+    SubExpr = new (Context) TupleExpr(LSquareLoc,
+                                      Context.AllocateCopy(SubExprs),
+                                      nullptr, RSquareLoc);
+
+  return new (Context) DictionaryExpr(LSquareLoc, SubExpr, RSquareLoc);
 }
 
 /// parseExprFunc - Parse a func expression.

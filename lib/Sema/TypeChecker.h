@@ -70,7 +70,7 @@ public:
 
 /// \brief Describes the kind of a literal.
 enum class LiteralKind {
-  Int, Float, Char, UTFString, ASCIIString, Array
+  Int, Float, Char, UTFString, ASCIIString, Array, Dictionary
 };
 
 /// \brief A mapping from substitutable types to the protocol-conformance
@@ -287,12 +287,17 @@ private:
   
   /// \brief The 'ArrayLiteralConvertible' protocol, used by [] array literals.
   ProtocolDecl *ArrayLiteralProto;
+
+  /// \brief The 'DictionaryLiteralConvertible' protocol, used by []
+  /// dictionary literals.
+  ProtocolDecl *DictionaryLiteralProto = nullptr;
   
   Type IntLiteralType;
   Type FloatLiteralType;
   Type CharacterLiteralType;
   Type StringLiteralType;
   Type ArrayLiteralType;
+  Type DictionaryLiteralType;
   
   DiagnosticEngine &Diags;
 
@@ -769,6 +774,9 @@ public:
   /// exists.
   ProtocolDecl *getArrayLiteralProtocol();
 
+  /// \brief Retrieve the DictionaryLiteralConvertible protocol
+  /// declaration, if it exists.
+  ProtocolDecl *getDictionaryLiteralProtocol();
 };
 
 } // end namespace swift

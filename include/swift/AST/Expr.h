@@ -798,26 +798,28 @@ public:
   
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Tuple; }
 };
-  
-/// ArrayExpr - Bracketed expressions like [x, y, z]. The subexpression is
-/// represented as a TupleExpr or ParenExpr and passed on to the semantics-
-/// providing conversion operation.
-class ArrayExpr : public Expr {
+
+/// \brief A collection literal expression.
+///
+/// The subexpression is represented as a TupleExpr or ParenExpr and
+/// passed on to the appropriate semantics-providing conversion
+/// operation.
+class CollectionExpr : public Expr {
   SourceLoc LBracketLoc;
   SourceLoc RBracketLoc;
   Expr *SubExpr;
   Expr *SemanticExpr;
 
-public:
-  ArrayExpr(SourceLoc LBracketLoc, Expr *SubExpr, SourceLoc RBracketLoc,
-            Type Ty = Type())
-    : Expr(ExprKind::Array, Ty),
+protected:
+  CollectionExpr(ExprKind Kind, SourceLoc LBracketLoc, Expr *SubExpr, 
+                 SourceLoc RBracketLoc, Type Ty)
+    : Expr(Kind, Ty),
       LBracketLoc(LBracketLoc), RBracketLoc(RBracketLoc),
-      SubExpr(SubExpr), SemanticExpr(nullptr) {
-  }
-  
-  /// Get the ParenExpr or TupleExpr representing the literal contents of the
-  /// array.
+      SubExpr(SubExpr), SemanticExpr(nullptr) { }
+
+public:
+  /// Get the ParenExpr or TupleExpr representing the literal contents
+  /// of the container.
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *e) { SubExpr = e; }
   
@@ -829,9 +831,36 @@ public:
   
   Expr *getSemanticExpr() const { return SemanticExpr; }
   void setSemanticExpr(Expr *e) { SemanticExpr = e; }
-  
+
+  static bool classof(const Expr *e) {
+    return e->getKind() >= ExprKind::First_CollectionExpr &&
+           e->getKind() <= ExprKind::Last_CollectionExpr;
+  }
+
+};
+ 
+/// \brief An array literal expression [a, b, c].
+class ArrayExpr : public CollectionExpr {
+public:
+  ArrayExpr(SourceLoc LBracketLoc, Expr *SubExpr, SourceLoc RBracketLoc,
+            Type Ty = Type())
+    : CollectionExpr(ExprKind::Array, LBracketLoc, SubExpr, RBracketLoc, Ty) { }
+    
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Array;
+  }
+};
+
+/// \brief A dictionary literal expression [a : x, b : y, c : z].
+class DictionaryExpr : public CollectionExpr {
+public:
+  DictionaryExpr(SourceLoc LBracketLoc, Expr *SubExpr, SourceLoc RBracketLoc,
+                 Type Ty = Type())
+    : CollectionExpr(ExprKind::Dictionary, LBracketLoc, SubExpr, RBracketLoc, 
+                     Ty) { }
+    
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Dictionary;
   }
 };
 

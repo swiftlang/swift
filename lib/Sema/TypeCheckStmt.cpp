@@ -594,3 +594,15 @@ ProtocolDecl *TypeChecker::getArrayLiteralProtocol() {
   
   return ArrayLiteralProto;
 }
+
+ProtocolDecl *TypeChecker::getDictionaryLiteralProtocol() {
+  if (!DictionaryLiteralProto) {
+    UnqualifiedLookup Globals(
+                        Context.getIdentifier("DictionaryLiteralConvertible"),
+                        &TU);
+    DictionaryLiteralProto
+      = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
+  }
+  
+  return DictionaryLiteralProto;
+}

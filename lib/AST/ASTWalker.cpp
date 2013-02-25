@@ -97,7 +97,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;
   }
   
-  Expr *visitArrayExpr(ArrayExpr *E) {
+  Expr *visitCollectionExpr(CollectionExpr *E) {
     if (Expr *Sub = doIt(E->getSubExpr())) {
       E->setSubExpr(Sub);
       return E;

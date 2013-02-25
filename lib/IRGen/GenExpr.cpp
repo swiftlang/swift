@@ -411,7 +411,7 @@ namespace {
     void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
       visit(E->getSemanticExpr());
     }
-    void visitArrayExpr(ArrayExpr *E) {
+    void visitCollectionExpr(CollectionExpr *E) {
       visit(E->getSemanticExpr());
     }
 
@@ -565,6 +565,7 @@ namespace {
     NOT_LVALUE_EXPR(Load)
     NOT_LVALUE_EXPR(Tuple)
     NOT_LVALUE_EXPR(Array)
+    NOT_LVALUE_EXPR(Collection)
     NOT_LVALUE_EXPR(NewArray)
     NOT_LVALUE_EXPR(NewReference)
     NOT_LVALUE_EXPR(Metatype)
@@ -728,6 +729,7 @@ namespace {
     // These expressions aren't naturally already in memory.
     NON_LOCATEABLE(TupleExpr)
     NON_LOCATEABLE(ArrayExpr)
+    NON_LOCATEABLE(CollectionExpr)
     NON_LOCATEABLE(IntegerLiteralExpr)
     NON_LOCATEABLE(FloatLiteralExpr)
     NON_LOCATEABLE(CharacterLiteralExpr)

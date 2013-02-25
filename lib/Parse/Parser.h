@@ -341,6 +341,8 @@ public:
   NullablePtr<Expr> parseExprCollection();
   NullablePtr<Expr> parseExprArray(SourceLoc LSquareLoc,
                                    Expr *FirstExpr);
+  NullablePtr<Expr> parseExprDictionary(SourceLoc LSquareLoc,
+                                        Expr *FirstKey);
   NullablePtr<Expr> parseExprFunc();
   
   Expr *parseExprOperator();

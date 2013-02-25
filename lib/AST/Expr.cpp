@@ -671,6 +671,11 @@ public:
     OS << '\n';
     printRec(E->getSubExpr());
   }
+  void visitDictionaryExpr(DictionaryExpr *E) {
+    printCommon(E, "dictionary_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+  }
   void visitSubscriptExpr(SubscriptExpr *E) {
     printCommon(E, "subscript_expr");
     OS << '\n';

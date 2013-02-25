@@ -500,6 +500,10 @@ namespace {
         case LiteralKind::Array:
           Out << "an array";
           break;
+
+        case LiteralKind::Dictionary:
+          Out << "a dictionary";
+          break;
         }
         Out << " literal";
         return;
@@ -2544,6 +2548,70 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return arrayTy;
     }
 
+    Type visitDictionaryExpr(DictionaryExpr *expr) {
+      ASTContext &C = CS.getASTContext();
+      // A dictionary expression can be of a type T that conforms to the
+      // DictionaryLiteralConvertible protocol.
+      // FIXME: This isn't actually used for anything at the moment.
+      ProtocolDecl *dictionaryProto = CS.TC.getDictionaryLiteralProtocol();
+      if (!dictionaryProto) {
+        CS.TC.diagnose(expr->getStartLoc(), diag::dictionary_expr_missing_proto);
+        return Type();
+      }
+
+      auto dictionaryTy = CS.createTypeVariable(expr);
+
+      // The array must be a dictionary literal type.
+      CS.addLiteralConstraint(dictionaryTy, LiteralKind::Dictionary);
+
+      // FIXME: Constraint checker appears to be unable to solve a system in
+      // which the same type variable is a subtype of multiple types.
+      // The protocol conformance checker also has an issue with checking
+      // conformances of generic types <rdar://problem/13153805>
+      //Type dictionaryProtoTy = dictionaryProto->getDeclaredType();
+      //CS.addConstraint(ConstraintKind::Subtype,
+      //                 dictionaryTy, dictionaryProtoTy);
+      
+      // Its subexpression should be convertible to a tuple ((T.Key,T.Value)...).
+      auto dictionaryKeyTy = CS.createTypeVariable(expr);
+      auto dictionaryKeyMetaTy = MetaTypeType::get(dictionaryKeyTy, C);
+      CS.addTypeMemberConstraint(dictionaryTy,
+                                 C.getIdentifier("Key"),
+                                 dictionaryKeyMetaTy);
+
+      auto dictionaryValueTy = CS.createTypeVariable(expr);
+      auto dictionaryValueMetaTy = MetaTypeType::get(dictionaryValueTy, C);
+      CS.addTypeMemberConstraint(dictionaryTy,
+                                 C.getIdentifier("Value"),
+                                 dictionaryValueMetaTy);
+      
+      TupleTypeElt tupleElts[2] = { TupleTypeElt(dictionaryKeyTy),
+                                    TupleTypeElt(dictionaryValueTy) };
+      Type elementTy = TupleType::get(tupleElts, C);
+      Type dictionaryEltsTy = CS.TC.getArraySliceType(expr->getLoc(),
+                                                      elementTy);
+      TupleTypeElt dictionaryEltsElt(dictionaryEltsTy,
+                                     /*name=*/ Identifier(),
+                                     /*init=*/ nullptr,
+                                     elementTy);
+      Type dictionaryEltsTupleTy = TupleType::get(dictionaryEltsElt, C);
+      CS.addConstraint(ConstraintKind::Conversion,
+                       expr->getSubExpr()->getType(),
+                       dictionaryEltsTupleTy);
+      
+      // FIXME: Use the protocol constraint instead of this value constraint.
+      Type converterFuncTy = FunctionType::get(dictionaryEltsTupleTy,
+                                               dictionaryTy, C);
+      auto dictionaryMetaTy = MetaTypeType::get(dictionaryTy, C);
+      CS.addValueMemberConstraint(
+        dictionaryMetaTy,
+        C.getIdentifier("convertFromDictionaryLiteral"),
+        converterFuncTy,
+        expr);
+      
+      return dictionaryTy;
+    }
+
     Type visitSuperSubscriptExpr(SuperSubscriptExpr *expr) {
       llvm_unreachable("not implemented");
     }
@@ -3949,10 +4017,11 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind) {
     type = fixed;
   }
 
-  // Array literals are special, because all of the real requirements for them
-  // are kept separate from the array-literal requirement. Let this constraint
-  // be satisfied when we've picked a concrete type.
-  if (kind == LiteralKind::Array) {
+  // Collection literals are special, because all of the real
+  // requirements for them are kept separate from the
+  // collection-literal requirement. Let this constraint be satisfied
+  // when we've picked a concrete type.
+  if (kind == LiteralKind::Array || kind == LiteralKind::Dictionary) {
     return (type->is<NominalType>() || type->is<BoundGenericType>())
              ? SolutionKind::TriviallySolved
              : SolutionKind::Unsolved;
@@ -5816,6 +5885,55 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       
       if (!semanticExpr) {
         CS.TC.diagnose(arrayProto->getLoc(), diag::array_protocol_broken);
+        return nullptr;
+      }
+      
+      expr->setSemanticExpr(semanticExpr);
+      return expr;
+    }
+
+    Expr *visitDictionaryExpr(DictionaryExpr *expr) {
+      simplifyExprType(expr);
+      Type dictionaryTy = expr->getType();
+      
+      ProtocolDecl *dictionaryProto = CS.TC.getDictionaryLiteralProtocol();
+      assert(dictionaryProto && "type-checked dictionary literal w/o protocol?");
+      
+      /* FIXME: Ideally we'd use the protocol conformance as below, but
+       * generic types (an in particular, T[]) can't be checked for conformance
+       * yet <rdar://problem/13153805>
+       *
+       *
+       * For the time being, use a value member constraint to find the
+       * appropriate convertFromDictionaryLiteral call.
+       */
+      auto ovl = CS.getGeneratedOverloadSet(expr);
+      assert(ovl && "No overload set associated with subscript expr?");
+      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
+      auto converterDecl = cast<FuncDecl>(choice.getDecl());
+      
+      // Construct the semantic expr as a convertFromDictionaryLiteral
+      // application.
+      ASTContext &C = CS.getASTContext();
+      Expr *converterRef = new (C) DeclRefExpr(converterDecl, expr->getLoc(),
+                                           converterDecl->getTypeOfReference());
+      Expr *typeRef = new (C) MetatypeExpr(nullptr,
+                                           expr->getLoc(),
+                                           MetaTypeType::get(dictionaryTy, C));
+      
+      Expr *semanticExpr = new (C) DotSyntaxCallExpr(converterRef,
+                                                     expr->getLoc(),
+                                                     typeRef);
+      semanticExpr = CS.TC.recheckTypes(semanticExpr);
+      
+      semanticExpr = new (C) CallExpr(semanticExpr,
+                                      expr->getSubExpr());
+
+      semanticExpr = CS.TC.recheckTypes(semanticExpr);
+      
+      if (!semanticExpr) {
+        CS.TC.diagnose(dictionaryProto->getLoc(), 
+                       diag::dictionary_protocol_broken);
         return nullptr;
       }
       

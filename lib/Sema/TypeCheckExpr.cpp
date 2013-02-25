@@ -1008,7 +1008,7 @@ public:
     return E;
   }
     
-  Expr *visitArrayExpr(ArrayExpr *E) {
+  Expr *visitCollectionExpr(CollectionExpr *E) {
     TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
     return nullptr;
   }
@@ -1817,6 +1817,11 @@ Type TypeChecker::getDefaultLiteralType(LiteralKind kind) {
   case LiteralKind::Array:
     type = &ArrayLiteralType;
     name = "Slice";
+    break;
+
+  case LiteralKind::Dictionary:
+    type = &DictionaryLiteralType;
+    name = "Dictionary";
     break;
   }
 

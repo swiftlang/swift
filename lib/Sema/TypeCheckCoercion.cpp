@@ -477,7 +477,7 @@ public:
     return failed(E);
   }
   
-  CoercedResult visitArrayExpr(ArrayExpr *E) {
+  CoercedResult visitCollectionExpr(CollectionExpr *E) {
     llvm_unreachable("not implemented");
   }
   
@@ -668,6 +668,8 @@ TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
     break;
   case LiteralKind::Array:
     llvm_unreachable("Cannot handle array literals here");
+  case LiteralKind::Dictionary:
+    llvm_unreachable("Cannot handle dictionary literals here");
   }
   assert(MethodName && "Didn't know LitTy");
 

@@ -488,6 +488,12 @@ ERROR(expected_expr_in_expr_list,expr_parsing,none,
       "expected expression in list of expressions", ())
 ERROR(expected_expr_in_collection_literal,expr_parsing,none,
       "expected expression in container literal", ())
+ERROR(expected_key_in_dictionary_literal,expr_parsing,none,
+      "expected key expression in dictionary literal", ())
+ERROR(expected_value_in_dictionary_literal,expr_parsing,none,
+      "expected value in dictionary literal", ())
+ERROR(expected_colon_in_dictionary_literal,expr_parsing,none,
+      "expected ':' in dictionary literal", ())
 ERROR(expected_equal_in_tuple_expr,expr_parsing,none,
       "expected '=' in tuple expression", ())
 ERROR(expected_rparen_expr_list,expr_parsing,none,
@@ -975,6 +981,12 @@ ERROR(array_expr_missing_proto,sema_tce,none,
       "array literal expression requires the 'ArrayLiteralConvertible' protocol to be defined", ())
 ERROR(array_protocol_broken,sema_tce,none,
       "ArrayLiteralConvertible protocol definition is broken", ())
+
+// Dictionary literals
+ERROR(dictionary_expr_missing_proto,sema_tce,none,
+      "dictionary literal expression requires the 'DictionaryLiteralConvertible' protocol to be defined", ())
+ERROR(dictionary_protocol_broken,sema_tce,none,
+      "DictionaryLiteralConvertible protocol definition is broken", ())
       
 // Generic specializations
 ERROR(cannot_explicitly_specialize_generic_function,tce_sema,none,
