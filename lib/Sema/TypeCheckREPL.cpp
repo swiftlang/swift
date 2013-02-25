@@ -345,6 +345,17 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
                      BodyContent);
 }
 
+/// If an expression consists only of a DeclRef (with potential implicit
+/// conversions such as Load/Materialize), returns the name of the referenced
+/// declaration. Otherwise, returns an empty StringRef.
+static llvm::StringRef getDisplayNameOfExpr(Expr *E) {
+  while (auto *ICE = dyn_cast<ImplicitConversionExpr>(E))
+    E = ICE->getSubExpr();
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E))
+    return DRE->getDecl()->getName().str();
+  return {};
+}
+
 /// Check an expression at the top level in a REPL.
 void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   // FIXME: Remove this once the constraints-based type checker is the
@@ -401,11 +412,19 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   for (auto Result : PrintDeclLookup.Results)
     PrintDecls.push_back(Result.getValueDecl());
 
-  // Printing format is "// Int = 0\n". Unique the type string into an
-  // identifier since PrintLiteralString is building an AST around the string
-  // that must persist beyond the lifetime of getString().
+  // Printing format is:
+  //   "// Int = 0\n"        for an anonymous expression, or
+  //   "// name : Int = 0\n" for an expression bound to a variable 'name'.
+  
+  auto NameStr = getDisplayNameOfExpr(E);
+  // Use an Identifier since PrintLiteralString is building an AST around the
+  // string that must persist beyond the lifetime of getString().
   auto TypeStr = Context.getIdentifier(E->getType()->getString()).str();
   PrintLiteralString("// ", *this, Loc, PrintDecls, BodyContent);
+  if (!NameStr.empty()) {
+    PrintLiteralString(NameStr, *this, Loc, PrintDecls, BodyContent);
+    PrintLiteralString(" : ", *this, Loc, PrintDecls, BodyContent);
+  }
   PrintLiteralString(TypeStr, *this, Loc, PrintDecls, BodyContent);
   PrintLiteralString(" = ", *this, Loc, PrintDecls, BodyContent);
   PrintReplExpr(*this, Arg, E->getType(), T, Loc, EndLoc,
