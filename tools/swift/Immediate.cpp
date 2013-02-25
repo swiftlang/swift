@@ -468,12 +468,10 @@ public:
         ++p;
       }
       while (isspace(*--p) && p >= s);
-      while (--p >= s) {
-        if (Identifier::isOperatorChar(*p))
-          continue;
+      if (Identifier::isOperatorChar(*p)) {
+        while (Identifier::isOperatorChar(*p) && --p >= s);
         if (*p == ' ' || *p == '\t')
           UnfinishedInfixExpr = true;
-        break;
       }
     } while (BraceCount != 0 || HadLineContinuation || UnfinishedInfixExpr);
     
