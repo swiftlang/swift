@@ -830,7 +830,7 @@ class REPLEnvironment {
     // Parse the current line(s).
     unsigned BufferOffset = 0;
     bool ShouldRun =
-      swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
+      swift::appendToREPLTranslationUnit(TU, BufferID, CurTUElem,
                                          BufferOffset, Line.size());
     
     if (Context.hadError()) {
@@ -943,7 +943,7 @@ public:
     strcpy(getBufferStart(), importstmt);
     
     unsigned BufferOffset = 0;
-    swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
+    swift::appendToREPLTranslationUnit(TU, BufferID, CurTUElem,
                                        /*startOffset*/ BufferOffset,
                                        /*endOffset*/ strlen(importstmt));
     if (Context.hadError())

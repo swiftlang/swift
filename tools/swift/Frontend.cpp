@@ -20,13 +20,19 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PathV2.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -81,7 +87,74 @@ swift::buildSingleTranslationUnit(ASTContext &Context, unsigned BufferID,
   return TU;
 }
 
-bool swift::appendToMainTranslationUnit(TranslationUnit *TU, unsigned BufferID,
+static VarDecl *getNextREPLMetavar(DeclContext *DC, SourceLoc Loc) {
+  static unsigned MetavarIndex = 0;
+  static const char * const MetavarPrefix = "r";
+  
+  ASTContext &C = DC->getASTContext();
+  
+  llvm::SmallString<4> namebuf;
+  llvm::raw_svector_ostream names(namebuf);
+  Identifier ident;
+  
+  bool nameUsed = false;
+  do {
+    names.flush();
+    namebuf.clear();
+    
+    names << MetavarPrefix << MetavarIndex++;
+  
+    ident = C.getIdentifier(names.str());
+    UnqualifiedLookup lookup(ident, DC);
+    nameUsed = lookup.isSuccess();
+  } while (nameUsed);
+  
+  VarDecl *vd = new (C) VarDecl(Loc, ident,
+                                UnstructuredUnresolvedType::get(C),
+                                DC);
+  vd->setREPLResult(true);
+  return vd;
+}
+
+static bool shouldBindREPLMetavariableToExpr(Expr *E) {
+  // Don't mind REPL metavariables to simple declrefs.
+  if (isa<DeclRefExpr>(E))
+    return false;
+  if (isa<UnresolvedDeclRefExpr>(E))
+    return false;
+  
+  return true;
+}
+
+static void reparseREPLMetavariable(TranslationUnit *TU, unsigned CurTUElem) {
+  // Turn a TopLevelCodeDecl containing an expression into a variable binding.
+  if (TU->Decls.size() != CurTUElem + 1)
+    return;
+  
+  auto *TLCD = dyn_cast<TopLevelCodeDecl>(TU->Decls[CurTUElem]);
+  if (!TLCD)
+    return;
+  
+  auto *E = TLCD->getBody().dyn_cast<Expr*>();
+  if (!E)
+    return;
+
+  if (!shouldBindREPLMetavariableToExpr(E))
+    return;
+        
+  ASTContext &C = TU->getASTContext();
+
+  VarDecl *metavar = getNextREPLMetavar(TU, E->getStartLoc());
+  Pattern *metavarPat = new (C) NamedPattern(metavar);
+  PatternBindingDecl *metavarBinding
+    = new (C) PatternBindingDecl(E->getStartLoc(), metavarPat, E, TU);
+  
+  TU->Decls.pop_back();
+  TU->Decls.push_back(metavar);
+  TU->Decls.push_back(metavarBinding);
+}
+
+bool swift::appendToREPLTranslationUnit(TranslationUnit *TU, unsigned BufferID,
                                         unsigned CurTUElem,
                                         unsigned &BufferOffset,
                                         unsigned BufferEndOffset) {
@@ -90,6 +163,10 @@ bool swift::appendToMainTranslationUnit(TranslationUnit *TU, unsigned BufferID,
     FoundAnySideEffects |= parseIntoTranslationUnit(TU, BufferID,
                                                     &BufferOffset,
                                                     BufferEndOffset);
+    // If we got a top-level expression, transform it into a VarDecl and
+    // PatternBinding to bind the result to a metavariable.
+    reparseREPLMetavariable(TU, CurTUElem);
+    
     performNameBinding(TU, CurTUElem);
     performTypeChecking(TU, CurTUElem);
     CurTUElem = TU->Decls.size();

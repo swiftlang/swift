@@ -468,6 +468,13 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
   }
 };
 
+static bool isREPLResultPattern(PatternBindingDecl *D) {
+  NamedPattern *named = dyn_cast<NamedPattern>(D->getPattern());
+  if (!named)
+    return false;
+  return named->getDecl()->isREPLResult();
+}
+
 void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
   // FIXME: Remove this once the constraints-based type checker is the
   // only type checker.
@@ -476,6 +483,11 @@ void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
                                false);
   Expr *E = D->getInit();
 
+  // Don't print the binding if it's a REPL result binding of void type.
+  if (isREPLResultPattern(D) &&
+      E->getType()->isEqual(TupleType::getEmpty(D->getASTContext())))
+    return;
+  
   // FIXME: I'm assuming we don't need to bother printing the pattern binding
   // if it's a null initialization.
   if (!E)

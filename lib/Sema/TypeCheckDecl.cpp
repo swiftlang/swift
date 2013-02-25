@@ -176,7 +176,7 @@ public:
 
   void visitBoundVars(Pattern *P) {
     switch (P->getKind()) {
-    // Recurse into patterns.
+    // Recur into patterns.
     case PatternKind::Tuple:
       for (auto &field : cast<TuplePattern>(P)->getFields())
         visitBoundVars(field.getPattern());

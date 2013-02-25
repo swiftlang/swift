@@ -595,7 +595,7 @@ void Parser::addVarsToScope(Pattern *Pat,
                             SmallVectorImpl<Decl*> &Decls,
                             DeclAttributes &Attributes) {
   switch (Pat->getKind()) {
-  // Recurse into patterns.
+  // Recur into patterns.
   case PatternKind::Tuple:
     for (auto &field : cast<TuplePattern>(Pat)->getFields())
       addVarsToScope(field.getPattern(), Decls, Attributes);

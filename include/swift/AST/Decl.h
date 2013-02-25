@@ -1117,12 +1117,12 @@ private:
   };
   
   GetSetRecord *GetSet;
-  VarDecl *OverriddenDecl;
+  llvm::PointerIntPair<VarDecl *, 1, bool> OverriddenDeclAndIsREPLResult;
 
 public:
   VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, DeclContext *DC)
     : ValueDecl(DeclKind::Var, DC, Name, Ty),
-      VarLoc(VarLoc), GetSet(), OverriddenDecl(nullptr) {}
+      VarLoc(VarLoc), GetSet(), OverriddenDeclAndIsREPLResult() {}
 
   SourceLoc getLoc() const { return VarLoc; }
   SourceLoc getStartLoc() const { return VarLoc; }
@@ -1147,8 +1147,20 @@ public:
   /// simple var or because it is a property with a setter.
   bool isSettable() const { return !GetSet || GetSet->Set; }
   
-  VarDecl *getOverriddenDecl() const { return OverriddenDecl; }
-  void setOverriddenDecl(VarDecl *over) { OverriddenDecl = over; }
+  VarDecl *getOverriddenDecl() const {
+    return OverriddenDeclAndIsREPLResult.getPointer();
+  }
+  void setOverriddenDecl(VarDecl *over) {
+    OverriddenDeclAndIsREPLResult =
+      {over, OverriddenDeclAndIsREPLResult.getInt()};
+  }
+  
+  /// \brief Returns whether the var was bound by the REPL to hold a result.
+  bool isREPLResult() const { return OverriddenDeclAndIsREPLResult.getInt(); }
+  void setREPLResult(bool value) {
+    OverriddenDeclAndIsREPLResult =
+      {OverriddenDeclAndIsREPLResult.getPointer(), value};
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }

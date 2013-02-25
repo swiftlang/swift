@@ -24,7 +24,7 @@ namespace swift {
                                               bool ParseOnly,
                                               bool IsMainModule);
 
-  bool appendToMainTranslationUnit(TranslationUnit *TU, unsigned BufferID,
+  bool appendToREPLTranslationUnit(TranslationUnit *TU, unsigned BufferID,
                                    unsigned CurTUElem,
                                    unsigned &BufferOffset,
                                    unsigned BufferEndOffset);
