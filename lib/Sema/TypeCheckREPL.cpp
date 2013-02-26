@@ -295,6 +295,18 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
 
   Identifier MemberName = Context.getIdentifier("replPrint");
   MemberLookup Lookup(T, MemberName, TU);
+
+  // Don't try to use an instance method to print a metatype. Filter out
+  // instance members if our expression evaluated to a metatype.
+  if (T->is<MetaTypeType>()) {
+    auto staticEnd = std::remove_if(
+                        Lookup.Results.begin(), Lookup.Results.end(),
+                        [](MemberLookupResult const &r) {
+                          return r.Kind != MemberLookupResult::MetatypeMember;
+                        });
+    Lookup.Results.erase(staticEnd, Lookup.Results.end());
+  }
+  
   if (Lookup.isSuccess()) {
     Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
     Expr *Res = TC.recheckTypes(TC.buildMemberRefExpr(ArgRef, Loc, Lookup,
