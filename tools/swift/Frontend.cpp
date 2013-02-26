@@ -164,6 +164,7 @@ bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,
   assert(TU->Kind == TranslationUnit::Repl && "Can't append to a non-REPL TU");
   
   bool FoundAnySideEffects = false;
+  unsigned CurTUElem = RC.CurTUElem;
   do {
     FoundAnySideEffects |= parseIntoTranslationUnit(TU, RC.BufferID,
                                                     &BufferOffset,
@@ -172,9 +173,9 @@ bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,
     // PatternBinding to bind the result to a metavariable.
     reparseREPLMetavariable(TU, RC);
     
-    performNameBinding(TU, RC.CurTUElem);
-    performTypeChecking(TU, RC.CurTUElem);
-    RC.CurTUElem = TU->Decls.size();
+    performNameBinding(TU, CurTUElem);
+    performTypeChecking(TU, CurTUElem);
+    CurTUElem = TU->Decls.size();
   } while (BufferOffset != BufferEndOffset);
   return FoundAnySideEffects;
 }
