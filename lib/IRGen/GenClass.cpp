@@ -1205,14 +1205,54 @@ namespace {
     void visitProperty(VarDecl *var) {
       Properties.push_back(buildProperty(var));
     }
+    
+    /// Build the property attribute string for a property decl.
+    void buildPropertyAttributes(VarDecl *prop,
+                                 llvm::SmallVectorImpl<char> &out) {
+      llvm::raw_svector_ostream outs(out);
+      
+      // Emit the type encoding.
+      // FIXME: Only correct for class types.
+      outs << "T@";
+      ClassDecl *theClass = prop->getType()->getClassOrBoundGenericClass();
+      // FIXME: Assume 'NSObject' really means 'id'.
+      if (theClass->getName() != prop->getASTContext().getIdentifier("NSObject"))
+        outs << '"' << theClass->getName().str() << '"';
+      
+      // FIXME: Emit attributes for (nonatomic, strong) if the property has a
+      // setter, or (nonatomic, readonly) if the property has only a getter.
+      // Are these attributes always appropriate?
+      outs << (prop->isSettable()
+        ? ",&,N" // strong, nonatomic
+        : ",R,N"); // readonly, nonatomic
+      
+      // Emit the selector name for the getter. Clang only appears to emit the
+      // setter name if the property has an explicit setter= attribute.
+      outs << ",V" << prop->getName();
+      
+      outs.flush();
+    }
 
     /// struct property_t {
     ///   const char *name;
     ///   const char *attributes;
     /// };
     llvm::Constant *buildProperty(VarDecl *prop) {
-      // FIXME
-      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+      // FIXME: For now we only emit properties of ObjC class type.
+      ClassDecl *theClass = prop->getType()->getClassOrBoundGenericClass();
+      if (!theClass)
+        return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+      if (!theClass->isObjC())
+        return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+
+      llvm::SmallString<16> propertyAttributes;
+      buildPropertyAttributes(prop, propertyAttributes);
+      
+      llvm::Constant *fields[] = {
+        IGM.getAddrOfGlobalString(prop->getName().str()),
+        IGM.getAddrOfGlobalString(propertyAttributes)
+      };
+      return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
     }
 
     /// struct property_list_t {

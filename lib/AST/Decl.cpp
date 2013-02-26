@@ -714,9 +714,37 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
                          getASTContext());
 }
 
+static StringRef getObjCSelectorForAccessor(FuncDecl const *accessorDecl,
+                                          llvm::SmallVectorImpl<char> &buffer) {
+  llvm::raw_svector_ostream out(buffer);
+
+  if (Decl *gd = accessorDecl->getGetterDecl()) {
+    // The getter selector is the property name itself.
+    // FIXME: 'is' prefix for boolean properties?
+    out << cast<VarDecl>(gd)->getName().str();
+    return out.str();
+  }
+  
+  if (Decl *sd = accessorDecl->getSetterDecl()) {
+    // The setter selector for, e.g., 'fooBar' is 'setFooBar:', with the
+    // property name capitalized and preceded by 'set'.
+    StringRef name = cast<VarDecl>(sd)->getName().str();
+    assert(name.size() >= 1 && "empty var name?!");
+    
+    out << "set" << char(toupper(name[0])) << name.slice(1, name.size()) << ':';
+    return out.str();
+  }
+  
+  llvm_unreachable("property accessor not a getter or setter?!");
+}
+
 /// Produce the selector for this "Objective-C method" in the given buffer.
 StringRef FuncDecl::getObjCSelector(llvm::SmallVectorImpl<char> &buffer) const {
   assert(buffer.empty());
+  
+  // Follow ObjC conventions for property getter/setters.
+  if (this->isGetterOrSetter())
+    return getObjCSelectorForAccessor(this, buffer);
 
   llvm::raw_svector_ostream out(buffer);
 

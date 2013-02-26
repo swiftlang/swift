@@ -880,9 +880,32 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   auto absCallee = AbstractCallee::forDirectGlobalFunction(IGM, method);
 
   // Find the swift method implementation.
-  auto fnRef = FunctionRef(method, absCallee.getBestExplosionLevel(),
-                           absCallee.getMaxUncurryLevel());
-  auto swiftImpl = IGM.getAddrOfFunction(fnRef, ExtraData::None);
+  ExplosionKind explosionLevel;
+  unsigned uncurryLevel;
+  llvm::Function *swiftImpl;
+  
+  if (method->isGetterOrSetter()) {
+    explosionLevel = absCallee.getBestExplosionLevel();
+    uncurryLevel = absCallee.getMaxUncurryLevel();
+
+    if (Decl *gd = method->getGetterDecl()) {
+      
+      swiftImpl = IGM.getAddrOfGetter(cast<ValueDecl>(gd),
+                                      explosionLevel);
+    } else if (Decl *sd = method->getSetterDecl()) {
+      swiftImpl = IGM.getAddrOfSetter(cast<ValueDecl>(sd),
+                                      explosionLevel);
+    } else {
+      llvm_unreachable("property accessor not getter or setter?!");
+    }
+  } else {
+    auto fnRef = FunctionRef(method, absCallee.getBestExplosionLevel(),
+                             absCallee.getMaxUncurryLevel());
+    
+    swiftImpl = IGM.getAddrOfFunction(fnRef, ExtraData::None);
+    explosionLevel = fnRef.getExplosionLevel();
+    uncurryLevel = fnRef.getUncurryLevel();
+  }
 
   // Construct a callee and derive its ownership conventions.
   CanType origFormalType = method->getType()->getCanonicalType();
@@ -890,8 +913,8 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   auto callee = Callee::forMethod(origFormalType, sig.ResultType,
                                   ArrayRef<Substitution>(),
                                   swiftImpl,
-                                  fnRef.getExplosionLevel(),
-                                  fnRef.getUncurryLevel());
+                                  explosionLevel,
+                                  uncurryLevel);
   auto &conventions = setOwnershipConventions(callee, method, selector);
 
   // Build the Objective-C function.
@@ -906,7 +929,7 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   } else {
     objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftImpl);
     IRGenFunction IGF(IGM, origFormalType, ArrayRef<Pattern*>(),
-                      fnRef.getExplosionLevel(), fnRef.getUncurryLevel(),
+                      explosionLevel, uncurryLevel,
                       objcImpl, Prologue::Bare);
     Explosion params = IGF.collectParameters();
 

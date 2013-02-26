@@ -490,15 +490,12 @@ public:
     
     // A method is ObjC-compatible if it's explicitly [objc] or a member of an
     // ObjC-compatible class.
-    // FIXME: Property methods are currently excluded.
-    if (!FD->isGetterOrSetter()) {
-      DeclContext *dc = FD->getDeclContext();
-      if (dc && dc->getDeclaredTypeInContext()) {
-        ClassDecl *classContext = dc->getDeclaredTypeInContext()
-          ->getClassOrBoundGenericClass();
-        FD->setIsObjC(FD->getAttrs().isObjC()
-                      || (classContext && classContext->isObjC()));
-      }
+    DeclContext *dc = FD->getDeclContext();
+    if (dc && dc->getDeclaredTypeInContext()) {
+      ClassDecl *classContext = dc->getDeclaredTypeInContext()
+        ->getClassOrBoundGenericClass();
+      FD->setIsObjC(FD->getAttrs().isObjC()
+                    || (classContext && classContext->isObjC()));
     }
   }
 
