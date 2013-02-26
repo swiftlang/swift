@@ -323,8 +323,8 @@ namespace {
     }
 
     ObjCMethodSignature(IRGenModule &IGM, CanType formalType, bool isSuper) {
-      auto selfFnType = cast<FunctionType>(formalType);
-      auto formalFnType = cast<FunctionType>(CanType(selfFnType->getResult()));
+      auto selfFnType = cast<AnyFunctionType>(formalType);
+      auto formalFnType = cast<AnyFunctionType>(CanType(selfFnType->getResult()));
 
       llvm::Type *resultTy;
       SmallVector<llvm::Type*, 8> argTys;
