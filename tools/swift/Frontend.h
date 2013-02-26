@@ -18,14 +18,15 @@
 namespace swift {
   class ASTContext;
   class TranslationUnit;
+  class REPLContext;
   
   TranslationUnit* buildSingleTranslationUnit(ASTContext &Context,
                                               unsigned BufferID,
                                               bool ParseOnly,
                                               bool IsMainModule);
 
-  bool appendToREPLTranslationUnit(TranslationUnit *TU, unsigned BufferID,
-                                   unsigned CurTUElem,
+  bool appendToREPLTranslationUnit(TranslationUnit *TU,
+                                   REPLContext &RC,
                                    unsigned &BufferOffset,
                                    unsigned BufferEndOffset);
 }

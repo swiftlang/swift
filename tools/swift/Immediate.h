@@ -21,6 +21,24 @@ namespace swift {
   class ASTContext;
   class TranslationUnit;
   class SILModule;
+  
+  /// Publicly available REPL state information.
+  class REPLContext {
+  public:
+    /// The index of the next response metavariable to bind to a REPL result.
+    unsigned NextResponseVariableIndex;
+    
+    /// The SourceMgr buffer ID of the REPL input.
+    unsigned BufferID;
+    
+    /// The index into the TranslationUnit's Decls at which to start
+    /// typechecking the next REPL input.
+    unsigned CurTUElem;
+
+    /// The index into the TranslationUnit's Decls at which to start
+    /// irgenning the next REPL input.
+    unsigned CurIRGenElem;
+  };
 
   void RunImmediately(TranslationUnit *TU, SILModule *SILMod = nullptr);
   void REPL(ASTContext &Context);

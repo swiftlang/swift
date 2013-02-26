@@ -800,7 +800,6 @@ class REPLEnvironment {
   ASTContext &Context;
   llvm::MemoryBuffer *Buffer;
   Component *Comp;
-  unsigned BufferID;
   TranslationUnit *TU;
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
   SmallVector<llvm::Function*, 8> InitFns;
@@ -813,9 +812,7 @@ class REPLEnvironment {
   llvm::ExecutionEngine *EE;
   irgen::Options Options;
 
-  
-  unsigned CurTUElem;
-  unsigned CurIRGenElem;
+  REPLContext RC;
 
   char *getBufferStart() {
     return const_cast<char*>(Buffer->getBufferStart());
@@ -830,12 +827,12 @@ class REPLEnvironment {
     // Parse the current line(s).
     unsigned BufferOffset = 0;
     bool ShouldRun =
-      swift::appendToREPLTranslationUnit(TU, BufferID, CurTUElem,
+      swift::appendToREPLTranslationUnit(TU, RC,
                                          BufferOffset, Line.size());
     
     if (Context.hadError()) {
       Context.Diags.resetHadAnyError();
-      while (TU->Decls.size() > CurTUElem)
+      while (TU->Decls.size() > RC.CurTUElem)
         TU->Decls.pop_back();
       TU->clearUnresolvedIdentifierTypes();
       
@@ -845,7 +842,7 @@ class REPLEnvironment {
       return true;
     }
     
-    CurTUElem = TU->Decls.size();
+    RC.CurTUElem = TU->Decls.size();
     
     DumpSource += Line;
     
@@ -856,10 +853,10 @@ class REPLEnvironment {
     
     // IRGen the current line(s).
     llvm::Module LineModule("REPLLine", LLVMContext);
-    performCaptureAnalysis(TU, CurIRGenElem);
+    performCaptureAnalysis(TU, RC.CurIRGenElem);
     performIRGeneration(Options, &LineModule, TU, /*sil=*/nullptr,
-                        CurIRGenElem);
-    CurIRGenElem = CurTUElem;
+                        RC.CurIRGenElem);
+    RC.CurIRGenElem = RC.CurTUElem;
     
     if (Context.hadError())
       return false;
@@ -908,7 +905,6 @@ public:
     : Context(Context),
       Buffer(llvm::MemoryBuffer::getNewMemBuffer(BUFFER_SIZE, "<REPL Buffer>")),
       Comp(new (Context.Allocate<Component>(1)) Component()),
-      BufferID(Context.SourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc())),
       TU(new (Context) TranslationUnit(Context.getIdentifier("REPL"),
                                        Comp, Context,
                                        /*IsMainModule=*/true,
@@ -916,8 +912,12 @@ public:
       RanGlobalInitializers(false),
       Module("REPL", LLVMContext),
       DumpModule("REPL", LLVMContext),
-      CurTUElem(0),
-      CurIRGenElem(0)
+      RC{
+        /*NextResponseVariableIndex*/ 0,
+        /*BufferID*/ Context.SourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc()),
+        /*CurTUElem*/ 0,
+        /*CurIRGenElem*/ 0
+      }
   {
     loadSwiftRuntime();
 
@@ -943,13 +943,13 @@ public:
     strcpy(getBufferStart(), importstmt);
     
     unsigned BufferOffset = 0;
-    swift::appendToREPLTranslationUnit(TU, BufferID, CurTUElem,
+    swift::appendToREPLTranslationUnit(TU, RC,
                                        /*startOffset*/ BufferOffset,
                                        /*endOffset*/ strlen(importstmt));
     if (Context.hadError())
       return;
     
-    CurTUElem = CurIRGenElem = TU->Decls.size();
+    RC.CurTUElem = RC.CurIRGenElem = TU->Decls.size();
     
     if (llvm::sys::Process::StandardInIsUserInput())
       printf("%s", "Welcome to swift.  Type ':help' for assistance.\n");    
