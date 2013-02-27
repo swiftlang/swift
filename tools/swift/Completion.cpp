@@ -336,6 +336,8 @@ public:
 
       // TODO: Integrate Clang LookupVisibleDecls with Swift LookupVisibleDecls.
       // Doing so now makes REPL interaction too slow.
+      if (!context.getDeclContext()->getASTContext().hasModuleLoader())
+        return;
       
       ClangImporter &clangImporter
         = static_cast<ClangImporter&>(
