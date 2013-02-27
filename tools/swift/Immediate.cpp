@@ -353,6 +353,11 @@ enum class REPLInputKind : int {
   SourceCode,
 };
 
+/// The main REPL prompt string.
+static const wchar_t * const PS1 = L"(swift) ";
+/// The REPL prompt string for line continuations.
+static const wchar_t * const PS2 = L"        ";
+
 /// EditLine wrapper that implements the user interface behavior for reading
 /// user input to the REPL. All of its methods must be usable from a separate
 /// thread and so shouldn't touch anything outside of the EditLine, History,
@@ -413,6 +418,10 @@ public:
     el_wset(e, EL_ADDFN, L"swift-complete",
             L"Trigger completion",
             BindingFn<&REPLInput::onComplete>);
+    el_wset(e, EL_ADDFN, L"swift-newline",
+            L"Handle newline",
+            BindingFn<&REPLInput::onNewline>);
+    el_wset(e, EL_BIND, L"\n", L"swift-newline", nullptr);
     
     // Provide some common bindings to complement editline's defaults.
     // ^W should delete previous word, not the entire line.
@@ -435,6 +444,10 @@ public:
     unsigned CurChunkLines = 0;
     
     Line.clear();
+    
+    // Reset color before showing the prompt.
+    if (ShowColors)
+      llvm::outs().resetColor();
     
     do {
       // Read one line.
@@ -488,8 +501,13 @@ public:
 
       UnfinishedInfixExpr = false;
 
-      if (CurChunkLines == 1 && BraceCount == 0 && *p == ':')
+      if (CurChunkLines == 1 && BraceCount == 0 && *p == ':') {
+        // Colorize the response output.
+        if (ShowColors)
+          llvm::outs().changeColor(llvm::raw_ostream::GREEN);
+
         return REPLInputKind::REPLDirective;
+      }
       
       // If we detect unbalanced braces, keep reading before
       // we start parsing.
@@ -512,6 +530,10 @@ public:
     Line.push_back('\0');
     Line.pop_back();
     
+    // Colorize the response output.
+    if (ShowColors)
+      llvm::outs().changeColor(llvm::raw_ostream::CYAN);
+    
     return REPLInputKind::SourceCode;
   }
 
@@ -532,13 +554,11 @@ private:
         appendEscapeSequence(PromptString, colorCode);
     }
     
-    static const wchar_t *PS1 = L"(swift) ";
-    static const wchar_t *PS2 = L"        ";
     
     if (!NeedPromptContinuation)
       PromptString.insert(PromptString.end(), PS1, PS1 + wcslen(PS1));
     else {
-      PromptString.insert(PromptString.end(), PS2, PS2 + wcslen(PS1));
+      PromptString.insert(PromptString.end(), PS2, PS2 + wcslen(PS2));
       PromptString.append(2*PromptContinuationLevel, ' ');
     }
     
@@ -777,6 +797,33 @@ private:
     case CompletionState::Invalid:
       llvm_unreachable("got an invalid completion set?!");
     }
+  }
+  
+  unsigned char onNewline(int ch) {
+    // Add the character to the string.
+    wchar_t s[2] = {(wchar_t)ch, 0};
+    el_winsertstr(e, s);
+
+    if (ShowColors) {
+      // Reprint the line in bold.
+      LineInfoW const *line = el_wline(e);
+      llvm::SmallString<100> toDisplay;
+      convertToUTF8(NeedPromptContinuation
+                      ? llvm::makeArrayRef(PS2, wcslen(PS2))
+                      : llvm::makeArrayRef(PS1, wcslen(PS1)),
+                    toDisplay);
+      llvm::outs() << '\r' << toDisplay;
+      toDisplay.clear();
+      convertToUTF8(llvm::makeArrayRef(line->buffer, line->lastchar),
+                    toDisplay);
+      llvm::outs().changeColor(llvm::raw_ostream::SAVEDCOLOR,
+                               /*Bold*/ true);
+      llvm::outs() << toDisplay;
+      llvm::outs().resetColor();
+    } else
+      llvm::outs() << '\n';
+    
+    return CC_NEWLINE;
   }
 
 };
