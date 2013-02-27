@@ -333,6 +333,7 @@ Tools and Integration
   * Explicit conformance to protocol
   * Consistent NS_ENUM/NS_OPTION use
   * Consistent ARC annotations  
+  * Mark designated initializers
 
 * Unit Testing
 
