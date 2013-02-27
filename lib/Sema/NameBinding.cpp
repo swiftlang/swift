@@ -21,6 +21,7 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ModuleLoader.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -41,11 +42,7 @@ typedef TranslationUnit::ImportedModule ImportedModule;
 typedef llvm::PointerUnion<const ImportedModule*, OneOfType*> BoundScope;
 
 namespace {  
-  class NameBinder {
-    llvm::error_code findModule(StringRef Module, 
-                                SourceLoc ImportLoc,
-                                llvm::OwningPtr<llvm::MemoryBuffer> &Buffer);
-    
+  class NameBinder {    
   public:
     TranslationUnit *TU;
     ASTContext &Context;
@@ -78,6 +75,10 @@ namespace {
     /// failure.  On failure, this leaves IdentifierType alone, otherwise it
     /// fills in the Components.
     bool resolveIdentifierType(IdentifierType *DNT, DeclContext *DC);
+
+    llvm::error_code findModule(StringRef Module,
+                                SourceLoc ImportLoc,
+                                llvm::OwningPtr<llvm::MemoryBuffer> &Buffer);
 
   private:
     /// getModule - Load a module referenced by an import statement,
@@ -237,7 +238,7 @@ void NameBinder::addImport(ImportDecl *ID,
   Result.push_back(std::make_pair(Path.slice(1), M));
 
   // If the module we loaded is a translation unit that imports a Clang
-  // module with the same name, add that Clang module to
+  // module with the same name, add that Clang module to our own set of imports.
   // FIXME: This is a horrible, horrible way to provide transitive inclusion.
   // We really need a re-export syntax.
   if (Context.hasModuleLoader()) {
@@ -395,6 +396,33 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
 // performNameBinding
 //===----------------------------------------------------------------------===//
 
+/// \brief Collect all of the Clang modules exported from this module
+/// and its implicit submodules.
+static void collectExportedClangModules(clang::Module *mod, SourceLoc importLoc,
+              SmallVectorImpl<std::pair<clang::Module *, SourceLoc>> &results,
+              llvm::SmallPtrSet<clang::Module *, 8> &visited) {
+  // Collect Clang modules exported from this particular module.
+  SmallVector<clang::Module *, 4> exported;
+  mod->getExportedModules(exported);
+  for (auto exportedModule : exported) {
+    if (visited.insert(exportedModule)) {
+      results.push_back({ exportedModule, importLoc });
+
+      collectExportedClangModules(exportedModule, importLoc, results, visited);
+    }
+  }
+
+  // Recurse into available, implicit submodules.
+  for (auto sm = mod->submodule_begin(), smEnd = mod->submodule_end();
+       sm != smEnd; ++sm) {
+    if ((*sm)->IsExplicit || !(*sm)->IsAvailable)
+      continue;
+
+    if (visited.insert(*sm))
+      collectExportedClangModules(*sm, importLoc, results, visited);
+  }
+}
+
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
 ///
@@ -425,6 +453,73 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i)
     if (ImportDecl *ID = dyn_cast<ImportDecl>(TU->Decls[i]))
       Binder.addImport(ID, ImportedModules);
+
+  // Walk the dependencies of imported Clang modules. For any imported
+  // dependencies, also load the corresponding Swift module, if it exists.
+  // FIXME: The Swift modules themselves should re-export their dependencies,
+  // if they show up in the interface.
+  {
+    SmallVector<std::pair<clang::Module *, SourceLoc>, 4> importedClangModules;
+    llvm::SmallPtrSet<clang::Module *, 8> visited;
+    for (auto imported : ImportedModules) {
+      auto mod = dyn_cast<ClangModule>(imported.second);
+      if (!mod)
+        continue;
+
+      SourceLoc loc;
+      if (imported.first.empty())
+        loc = TU->Decls[0]->getStartLoc();
+      else
+        loc = imported.first[0].second;
+      
+      auto clangMod = mod->getClangModule();
+      if (visited.insert(clangMod))
+        collectExportedClangModules(clangMod, loc, importedClangModules,
+                                    visited);
+    }
+
+    llvm::DenseMap<clang::Module *, bool> topModules;
+    for (auto clangImport : importedClangModules) {
+      // Look at the top-level module.
+      auto topClangMod = clangImport.first->getTopLevelModule();
+      auto knownTop = topModules.find(topClangMod);
+      bool hasSwiftModule;
+      if (knownTop == topModules.end()) {
+        // If we haven't looked for a Swift module corresponding to the
+        // top-level module yet, do so now.
+        llvm::OwningPtr<llvm::MemoryBuffer> buffer; // FIXME: wasteful!
+        if (Binder.findModule(topClangMod->Name, clangImport.second, buffer)) {
+          hasSwiftModule = false;
+        } else {
+          hasSwiftModule = true;
+        }
+
+        topModules[topClangMod] = hasSwiftModule;
+      } else {
+        hasSwiftModule = knownTop->second;
+      }
+
+      if (!hasSwiftModule)
+        continue;
+
+      // Form an implicit import of the Swift module.
+      SmallVector<ImportDecl::AccessPathElement, 4> accessPath;
+      ASTContext &context = TU->getASTContext();
+      for (auto mod = clangImport.first; mod; mod = mod->Parent) {
+        accessPath.push_back({ context.getIdentifier(mod->Name),
+                               clangImport.second });
+      }
+      std::reverse(accessPath.begin(), accessPath.end());
+
+      // Create an implicit import declaration and import it.
+      // FIXME: Mark as implicit!
+      // FIXME: Actually pass through the whole access path.
+      auto import = ImportDecl::create(context, TU, clangImport.second,
+                                       accessPath[0]);
+      TU->Decls.push_back(import);
+      Binder.addImport(import, ImportedModules);
+    }
+  }
 
   // Add the standard library import.
   // FIXME: The semantics here are sort of strange if an import statement is
