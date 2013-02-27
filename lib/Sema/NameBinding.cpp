@@ -514,7 +514,6 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
           
           do {
             underlying = TAD->getUnderlyingType().getPointer();
-            underlying->dump();
           
             if (auto *underlyingAlias = dyn_cast<NameAliasType>(underlying)) {
               TAD = underlyingAlias->getDecl();
