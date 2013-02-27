@@ -300,11 +300,7 @@ public:
     return true;
   }
   
-  // Implement swift::VisibleDeclConsumer
-  void foundDecl(ValueDecl *vd) override {
-    if (!shouldCompleteDecl(vd))
-      return;
-    StringRef name = vd->getName().get();
+  void addCompletionString(llvm::StringRef name) {
     if (!name.startswith(Prefix))
       return;
 
@@ -312,16 +308,22 @@ public:
       updateRoot(name);
   }
   
+  // Implement swift::VisibleDeclConsumer
+  void foundDecl(ValueDecl *vd) override {
+    if (!shouldCompleteDecl(vd))
+      return;
+    StringRef name = vd->getName().get();
+
+    addCompletionString(name);
+  }
+  
   // Implement clang::VisibleDeclConsumer
   void FoundDecl(clang::NamedDecl *ND, clang::NamedDecl *Hiding,
                  clang::DeclContext *Ctx,
                  bool InBaseClass) override {
     StringRef name = ND->getName();
-    if (!name.startswith(Prefix))
-      return;
     
-    if (Results.insert(name))
-      updateRoot(name);
+    addCompletionString(name);
   }
   
   CompletionLookup(CompletionContext context, StringRef prefix)
@@ -339,8 +341,13 @@ public:
         = static_cast<ClangImporter&>(
                   context.getDeclContext()->getASTContext().getModuleLoader());
       clangImporter.lookupVisibleDecls(*this);
-    } else
+    } else {
       lookupVisibleDecls(*this, context.getBaseType());
+    
+      // Add the special qualified keyword 'metatype' so that, for example,
+      // 'Int.metatype' can be completed.
+      addCompletionString("metatype");
+    }
   }
 };
   
