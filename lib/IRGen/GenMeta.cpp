@@ -751,7 +751,11 @@ namespace {
 
     /// The runtime provides a value witness table for Builtin.ObjectPointer.
     void addValueWitnessTable() {
-      auto type = CanType(this->IGM.Context.TheObjectPointerType);
+      ClassDecl *cls = TargetClass;
+      
+      auto type = cls->isObjC()
+        ? CanType(this->IGM.Context.TheObjCPointerType)
+        : CanType(this->IGM.Context.TheObjectPointerType);
       auto wtable = this->IGM.getAddrOfValueWitnessTable(type);
       Fields.push_back(wtable);
     }

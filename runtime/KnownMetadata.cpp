@@ -119,7 +119,7 @@ const ValueWitnessTable swift::_TWVBo = {
   (value_witness_types::assignWithTake*) &assignWithoutRetain,
   (value_witness_types::allocateBuffer*) &projectBuffer,
   (value_witness_types::size) sizeof(void*),
-  (value_witness_types::alignment) sizeof(void*),
+  (value_witness_types::alignment) alignof(void*),
   (value_witness_types::stride) sizeof(void*)
 };
 
