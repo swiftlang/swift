@@ -543,7 +543,7 @@ public:
     if (!IsSecondPass) {
       TC.validateType(ED->getExtendedTypeLoc(), IsFirstPass);
 
-      Type ExtendedTy = ED->getExtendedType();
+      Type ExtendedTy = ED->getExtendedType()->getCanonicalType();
       if (!ExtendedTy->is<OneOfType>() && !ExtendedTy->is<StructType>() &&
           !ExtendedTy->is<ClassType>() && !ExtendedTy->is<ErrorType>() &&
           !ExtendedTy->is<UnboundGenericType>()) {

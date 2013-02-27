@@ -492,7 +492,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
           // three possibilities here:
           // 1. The type is already canonical, because it's either a NominalType
           // or comes from an imported module.
-          // 2. The type is a NameAliasType from the current module, which
+          // 2. The type is a NameAliasType, which
           // we need to resolve immediately because we can't leave a
           // non-canonical type here in the AST.
           // 3. The type is a BoundGenericType; it's illegal to extend
@@ -510,7 +510,23 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
 
           TypeAliasDecl *TAD =
               cast<NameAliasType>(FoundType.getPointer())->getDecl();
-          DNT = dyn_cast<IdentifierType>(TAD->getUnderlyingType().getPointer());
+          TypeBase *underlying;
+          
+          do {
+            underlying = TAD->getUnderlyingType().getPointer();
+            underlying->dump();
+          
+            if (auto *underlyingAlias = dyn_cast<NameAliasType>(underlying)) {
+              TAD = underlyingAlias->getDecl();
+              continue;
+            }
+            break;
+          } while (true);
+          
+          if (isa<NominalType>(underlying))
+            break;
+          
+          DNT = dyn_cast<IdentifierType>(underlying);
 
           if (!DNT) {
             Binder.diagnose(ED->getLoc(), diag::non_nominal_extension,

@@ -1,4 +1,4 @@
-typedef enum { red, green, blue} Color;
+typedef enum { red, green, blue } Color;
 
 enum Tribool {
   True, False, Indeterminate
@@ -24,13 +24,26 @@ typedef struct {
   };
 } AnonStructs;
 
-struct NSFastEnumerationState {
+typedef struct __NSFastEnumerationState_s {
   unsigned long state;
   void *itemsPtr;
   unsigned long *mutationsPtr;
   unsigned long extra[5];
-};
+} NSFastEnumerationState;
 
 typedef void *CFTypeRef;
 typedef void const *HWND;
 typedef struct __CFString *CFStringRef;
+
+typedef struct {
+  struct CGPoint {
+    double x;
+    double y;
+  } origin;
+  struct CGSize {
+    double width;
+    double height;
+  } size;
+} CGRect;
+
+typedef CGRect NSRect;
