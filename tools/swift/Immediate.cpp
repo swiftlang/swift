@@ -559,7 +559,7 @@ private:
       PromptString.insert(PromptString.end(), PS1, PS1 + wcslen(PS1));
     else {
       PromptString.insert(PromptString.end(), PS2, PS2 + wcslen(PS2));
-      PromptString.append(2*PromptContinuationLevel, ' ');
+      PromptString.append(2*PromptContinuationLevel, L' ');
     }
     
     if (ShowColors) {
@@ -812,6 +812,9 @@ private:
                       ? llvm::makeArrayRef(PS2, wcslen(PS2))
                       : llvm::makeArrayRef(PS1, wcslen(PS1)),
                     toDisplay);
+      if (NeedPromptContinuation)
+        toDisplay.append(2*PromptContinuationLevel, ' ');
+
       llvm::outs() << '\r' << toDisplay;
       toDisplay.clear();
       convertToUTF8(llvm::makeArrayRef(line->buffer, line->lastchar),
