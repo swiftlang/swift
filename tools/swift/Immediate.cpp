@@ -39,6 +39,7 @@
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/Signals.h"
@@ -358,6 +359,19 @@ static const wchar_t * const PS1 = L"(swift) ";
 /// The REPL prompt string for line continuations.
 static const wchar_t * const PS2 = L"        ";
 
+class REPLInput;
+class REPLEnvironment;
+
+/// PrettyStackTraceREPL - Observe that we are processing REPL input. Dump
+/// source and reset any colorization before dying.
+class PrettyStackTraceREPL : public llvm::PrettyStackTraceEntry {
+  REPLInput &Input;
+public:
+  PrettyStackTraceREPL(REPLInput &Input) : Input(Input) {}
+  
+  virtual void print(llvm::raw_ostream &out) const;
+};
+
 /// EditLine wrapper that implements the user interface behavior for reading
 /// user input to the REPL. All of its methods must be usable from a separate
 /// thread and so shouldn't touch anything outside of the EditLine, History,
@@ -372,7 +386,7 @@ static const wchar_t * const PS2 = L"        ";
 /// grovel into the REPL's AST, then locking will be necessary to serialize
 /// access to the AST.
 class REPLInput {
-  TranslationUnit *TU;
+  PrettyStackTraceREPL StackTrace;  
   
   EditLine *e;
   HistoryW *h;
@@ -386,9 +400,12 @@ class REPLInput {
   llvm::SmallVector<wchar_t, 80> PromptString;
 
 public:
+  REPLEnvironment &Env;
   bool Autoindent;
 
-  REPLInput(TranslationUnit *TU) : TU(TU), Autoindent(true) {
+  REPLInput(REPLEnvironment &env)
+    : StackTrace(*this), Env(env), Autoindent(true)
+  {
     // Only show colors if both stderr and stdout are displayed.
     ShowColors = llvm::errs().is_displayed() && llvm::outs().is_displayed();
 
@@ -432,8 +449,12 @@ public:
   }
   
   ~REPLInput() {
+    if (ShowColors)
+      llvm::outs().resetColor();
     el_end(e);
   }
+  
+  TranslationUnit *getTU();
 
   REPLInputKind getREPLInput(llvm::SmallVectorImpl<char> &Line) {
     unsigned BraceCount = 0;
@@ -765,7 +786,7 @@ private:
     
     if (!completions) {
       // If we aren't currently working with a completion set, generate one.
-      completions = Completions(TU, prefix);
+      completions = Completions(getTU(), prefix);
       // Display the common root of the found completions and beep unless we
       // found a unique one.
       insertStringRef(completions.getRoot());
@@ -933,7 +954,7 @@ public:
       RanGlobalInitializers(false),
       Module("REPL", LLVMContext),
       DumpModule("REPL", LLVMContext),
-      Input(TU), // NOTE: order dependency
+      Input(*this),
       RC{
         /*NextResponseVariableIndex*/ 0,
         /*BufferID*/ Context.SourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc()),
@@ -978,6 +999,7 @@ public:
   }
   
   TranslationUnit *getTranslationUnit() const { return TU; }
+  StringRef getDumpSource() const { return DumpSource; }
   
   /// Get the REPLInput object owned by the REPL instance.
   REPLInput &getInput() { return Input; }
@@ -1131,6 +1153,15 @@ public:
     }
   }
 };
+
+inline TranslationUnit *REPLInput::getTU() { return Env.getTranslationUnit(); }
+
+void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
+  out << "while processing REPL source:\n";
+  out << Input.Env.getDumpSource();
+  llvm::outs().resetColor();
+  llvm::errs().resetColor();
+}
 
 void swift::REPL(ASTContext &Context) {
   REPLEnvironment env(Context);
