@@ -18,6 +18,13 @@ if(SWIFT_OPTIMIZED)
  endif()
 endif()
 
+set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS OFF
+    CACHE BOOL "Overwrite memory for deallocated Swift objects")
+if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
+  set_target_properties(swift_runtime PROPERTIES
+                        COMPILE_FLAGS "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
+endif()
+
 # Link against Foundation, for ObjC bridging.
 set_target_properties(swift_runtime PROPERTIES 
                                     LINK_FLAGS "-framework Foundation")

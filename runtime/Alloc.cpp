@@ -20,6 +20,7 @@
 #include "llvm/Support/MathExtras.h"
 // We'll include this and do per-thread clean up once we actually have threads
 //#include <System/pthread_machdep.h>
+#include <cstring>
 #include <cstdlib>
 #include <unistd.h>
 
@@ -97,6 +98,10 @@ void _swift_release_slow(HeapObject *object) {
 }
 
 void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize) {
+#ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
+  memset_pattern8(object, "\xAB\xAD\x1D\xEA\xF4\xEE\xD0\bB9",
+                  allocatedSize);
+#endif
   free(object);
 }
 
