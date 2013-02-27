@@ -22,6 +22,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/StringSet.h"
@@ -252,6 +253,7 @@ class CompletionLookup : swift::VisibleDeclConsumer,
                          clang::VisibleDeclConsumer
 {
 public:
+  CompletionContext Context;
   llvm::StringRef Prefix;
   llvm::StringSet<> Results;
   Optional<StringRef> Root;
@@ -274,9 +276,33 @@ public:
     Root = StringRef(Root->data(), len);
   }
   
+  bool shouldCompleteDecl(ValueDecl *vd) {
+    // Don't complete nameless values.
+    if (vd->getName().empty())
+      return false;
+    
+    // Don't complete constructors, destructors, or subscripts, since references
+    // to them can't be spelled.
+    // FIXME: except for super.constructor!
+    if (isa<ConstructorDecl>(vd))
+      return false;
+    if (isa<DestructorDecl>(vd))
+      return false;
+    if (isa<SubscriptDecl>(vd))
+      return false;
+    
+    // Don't complete class methods of instances.
+    if (Context.Kind == CompletionContext::Kind::Qualified)
+      if (auto *fd = dyn_cast<FuncDecl>(vd))
+        if (fd->isStatic() && !Context.getBaseType()->is<MetaTypeType>())
+          return false;
+    
+    return true;
+  }
+  
   // Implement swift::VisibleDeclConsumer
   void foundDecl(ValueDecl *vd) override {
-    if (vd->getName().empty())
+    if (!shouldCompleteDecl(vd))
       return;
     StringRef name = vd->getName().get();
     if (!name.startswith(Prefix))
@@ -299,7 +325,7 @@ public:
   }
   
   CompletionLookup(CompletionContext context, StringRef prefix)
-    : Prefix(prefix)
+    : Context(context), Prefix(prefix)
   {
     assert(context && "invalid completion lookup context!");
     
