@@ -420,10 +420,6 @@ public:
     el_wset(e, EL_ADDFN, L"swift-complete",
             L"Trigger completion",
             BindingFn<&REPLInput::onComplete>);
-    el_wset(e, EL_ADDFN, L"swift-newline",
-            L"Handle newline",
-            BindingFn<&REPLInput::onNewline>);
-    el_wset(e, EL_BIND, L"\n", L"swift-newline", nullptr);
     
     // Provide some common bindings to complement editline's defaults.
     // ^W should delete previous word, not the entire line.
@@ -803,37 +799,6 @@ private:
       llvm_unreachable("got an invalid completion set?!");
     }
   }
-  
-  unsigned char onNewline(int ch) {
-    // Add the character to the string.
-    wchar_t s[2] = {(wchar_t)ch, 0};
-    el_winsertstr(e, s);
-
-    if (ShowColors) {
-      // Reprint the line in bold.
-      LineInfoW const *line = el_wline(e);
-      llvm::SmallString<100> toDisplay;
-      convertToUTF8(NeedPromptContinuation
-                      ? llvm::makeArrayRef(PS2, wcslen(PS2))
-                      : llvm::makeArrayRef(PS1, wcslen(PS1)),
-                    toDisplay);
-      if (Autoindent && NeedPromptContinuation)
-        toDisplay.append(2*PromptContinuationLevel, ' ');
-
-      llvm::outs() << '\r' << toDisplay;
-      toDisplay.clear();
-      convertToUTF8(llvm::makeArrayRef(line->buffer, line->lastchar),
-                    toDisplay);
-      llvm::outs().changeColor(llvm::raw_ostream::SAVEDCOLOR,
-                               /*Bold*/ true);
-      llvm::outs() << toDisplay;
-      llvm::outs().resetColor();
-    } else
-      llvm::outs() << '\n';
-    
-    return CC_NEWLINE;
-  }
-
 };
 
 enum class PrintOrDump { Print, Dump };
