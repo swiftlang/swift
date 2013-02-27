@@ -38,6 +38,9 @@ namespace swift {
     /// The index into the TranslationUnit's Decls at which to start
     /// irgenning the next REPL input.
     unsigned CurIRGenElem;
+
+    /// \brief Whether we have run replApplicationMain().
+    bool RanREPLApplicationMain;
   };
 
   void RunImmediately(TranslationUnit *TU, SILModule *SILMod = nullptr);

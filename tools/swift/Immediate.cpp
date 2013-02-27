@@ -839,6 +839,7 @@ class REPLEnvironment {
   static const size_t BUFFER_SIZE = 1 << 20;
 
   ASTContext &Context;
+  bool ShouldRunREPLApplicationMain;
   llvm::MemoryBuffer *Buffer;
   Component *Comp;
   TranslationUnit *TU;
@@ -943,8 +944,9 @@ class REPLEnvironment {
   }
 
 public:
-  REPLEnvironment(ASTContext &Context)
+  REPLEnvironment(ASTContext &Context, bool ShouldRunREPLApplicationMain)
     : Context(Context),
+      ShouldRunREPLApplicationMain(ShouldRunREPLApplicationMain),
       Buffer(llvm::MemoryBuffer::getNewMemBuffer(BUFFER_SIZE, "<REPL Buffer>")),
       Comp(new (Context.Allocate<Component>(1)) Component()),
       TU(new (Context) TranslationUnit(Context.getIdentifier("REPL"),
@@ -1138,7 +1140,21 @@ public:
       }
         
       case REPLInputKind::SourceCode: {
-        return executeSwiftSource(Line);
+        // Execute this source line.
+        auto result = executeSwiftSource(Line);
+        if (RC.RanREPLApplicationMain || !ShouldRunREPLApplicationMain)
+          return result;
+
+        // We haven't run replApplicationMain() yet. Look for it.
+        UnqualifiedLookup lookup(Context.getIdentifier("replApplicationMain"),
+                                 TU);
+        if (lookup.isSuccess()) {
+          // Execute replApplicationMain().
+          executeSwiftSource("replApplicationMain()\n");
+          RC.RanREPLApplicationMain = true;
+        }
+
+        return result;
       }
     }
   }
@@ -1164,7 +1180,7 @@ void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
 }
 
 void swift::REPL(ASTContext &Context) {
-  REPLEnvironment env(Context);
+  REPLEnvironment env(Context, /*ShouldRunREPLApplicationMain=*/false);
 
   llvm::SmallString<80> Line;
   REPLInputKind inputKind;
@@ -1175,7 +1191,7 @@ void swift::REPL(ASTContext &Context) {
 }
 
 void swift::REPLRunLoop(ASTContext &Context) {
-  REPLEnvironment env(Context);
+  REPLEnvironment env(Context, /*ShouldRunREPLApplicationMain=*/true);
   
   CFMessagePortContext portContext;
   portContext.version = 0;
