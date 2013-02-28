@@ -150,7 +150,7 @@ public:
   
   void visitMembers(ExtensionDecl *ext) {
     for (Decl *member : ext->getMembers())
-      return visit(member);
+      visit(member);
   }
   
   void visitFuncDecl(FuncDecl *method) {
@@ -179,7 +179,6 @@ public:
     llvm::Constant *name, *imp, *types;
     emitObjCGetterDescriptorParts(IGF.IGM, prop,
                                   name, types, imp);
-    
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
     llvm::Value *sel = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
