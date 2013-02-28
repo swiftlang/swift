@@ -19,3 +19,8 @@ except KeyError,e:
 
 # Let the main config do the real work.
 lit.load_config(config, "@SWIFT_SOURCE_DIR@/test/lit.cfg")
+
+# Enable SDK-dependent tests if we have an SDK.
+if "@MODULES_SDK@" != "":
+  config.available_features.add("sdk")
+  config.substitutions.append(('%sdk', "@MODULES_SDK@"))

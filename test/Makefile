@@ -45,6 +45,7 @@ lit.site.cfg: FORCE
 	@$(ECHOPATH) s=@SWIFT_SOURCE_DIR@=$(PROJ_SRC_DIR)/..=g >> lit.tmp
 	@$(ECHOPATH) s=@SWIFT_BINARY_DIR@=$(PROJ_OBJ_DIR)/..=g >> lit.tmp
 	@$(ECHOPATH) s=@TARGET_TRIPLE@=$(TARGET_TRIPLE)=g >> lit.tmp
+	@$(ECHOPATH) s=@MODULES_SDK@=$(MODULES_SDK)=g >> lit.tmp
 	@sed -f lit.tmp $(PROJ_SRC_DIR)/lit.site.cfg.in > $@
 	@-rm -f lit.tmp
 
