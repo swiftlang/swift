@@ -173,8 +173,31 @@ public:
     IGF.Builder.CreateCall(class_replaceMethod, args);
   }
   
-  void visitVarDecl(VarDecl *method) {
-    // FIXME: register properties
+  void visitVarDecl(VarDecl *prop) {
+    if (!requiresObjCPropertyDescriptor(prop)) return;
+    
+    llvm::Constant *name, *imp, *types;
+    emitObjCGetterDescriptorParts(IGF.IGM, prop,
+                                  name, types, imp);
+    
+    // When generating JIT'd code, we need to call sel_registerName() to force
+    // the runtime to unique the selector.
+    llvm::Value *sel = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
+                                              name);
+    llvm::Value *getterArgs[] = {classMetadata, sel, imp, types};
+    IGF.Builder.CreateCall(class_replaceMethod, getterArgs);
+
+    if (prop->isSettable()) {
+      emitObjCSetterDescriptorParts(IGF.IGM, prop,
+                                    name, types, imp);
+      sel = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
+                                   name);
+      llvm::Value *setterArgs[] = {classMetadata, sel, imp, types};
+      
+      IGF.Builder.CreateCall(class_replaceMethod, setterArgs);
+    }
+
+    // FIXME: register property metadata in addition to the methods.
   }
 };
 

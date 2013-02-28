@@ -1161,7 +1161,15 @@ public:
     OverriddenDeclAndIsREPLResult =
       {OverriddenDeclAndIsREPLResult.getPointer(), value};
   }
+  
+  /// Given that this is an Objective-C property declaration, produce
+  /// its getter selector in the given buffer (as UTF-8).
+  StringRef getObjCGetterSelector(llvm::SmallVectorImpl<char> &buffer) const;
 
+  /// Given that this is an Objective-C property declaration, produce
+  /// its setter selector in the given buffer (as UTF-8).
+  StringRef getObjCSetterSelector(llvm::SmallVectorImpl<char> &buffer) const;
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
 };

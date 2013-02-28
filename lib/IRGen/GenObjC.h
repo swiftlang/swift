@@ -59,12 +59,38 @@ namespace irgen {
                                      llvm::Constant *&atEncoding,
                                      llvm::Constant *&impl);
 
+  /// Build the components of an Objective-C method descriptor for the given
+  /// property's method implementations.
+  void emitObjCGetterDescriptorParts(IRGenModule &IGM,
+                                     VarDecl *property,
+                                     llvm::Constant *&selectorRef,
+                                     llvm::Constant *&atEncoding,
+                                     llvm::Constant *&impl);
+
+  /// Build the components of an Objective-C method descriptor for the given
+  /// property's method implementations.
+  void emitObjCSetterDescriptorParts(IRGenModule &IGM,
+                                     VarDecl *property,
+                                     llvm::Constant *&selectorRef,
+                                     llvm::Constant *&atEncoding,
+                                     llvm::Constant *&impl);
+
   /// Build an Objective-C method descriptor for the given method
   /// implementation.
   llvm::Constant *emitObjCMethodDescriptor(IRGenModule &IGM, FuncDecl *method);
+  
+  /// Build an Objective-C method descriptor for the given property's
+  /// getter and setter methods.
+  std::pair<llvm::Constant *, llvm::Constant *>
+  emitObjCPropertyMethodDescriptors(IRGenModule &IGM, VarDecl *property);
 
   /// True if the FuncDecl requires an ObjC method descriptor.
   bool requiresObjCMethodDescriptor(FuncDecl *method);
+
+  /// True if the VarDecl requires ObjC accessor methods and a property
+  /// descriptor.
+  bool requiresObjCPropertyDescriptor(VarDecl *property);
+
 } // end namespace irgen
 } // end namespace swift
 

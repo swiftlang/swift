@@ -30,13 +30,16 @@
 #include "Cleanup.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
+#include "FormalType.h"
 #include "FunctionRef.h"
+#include "GenClass.h"
 #include "GenFunc.h"
 #include "GenMeta.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "Linking.h"
 #include "ScalarTypeInfo.h"
 #include "TypeVisitor.h"
 
@@ -366,9 +369,13 @@ namespace {
   };
 
   class Selector {
+    
     llvm::SmallString<80> Text;
 
   public:
+
+    static constexpr struct ForGetter_t { } ForGetter{};
+    static constexpr struct ForSetter_t { } ForSetter{};
 
 #define FOREACH_FAMILY(FAMILY)         \
     FAMILY(Alloc, "alloc")             \
@@ -387,6 +394,14 @@ namespace {
 
     Selector(FuncDecl *method) {
       method->getObjCSelector(Text);
+    }
+    
+    Selector(VarDecl *property, ForGetter_t) {
+      property->getObjCGetterSelector(Text);
+    }
+
+    Selector(VarDecl *property, ForSetter_t) {
+      property->getObjCSetterSelector(Text);
     }
 
     StringRef str() const {
@@ -764,9 +779,8 @@ static bool canUseSwiftFunctionAsObjCFunction(IRGenModule &IGM,
 /// an Objective-C method for a Swift method implementation.
 static llvm::Function *createSwiftAsObjCThunk(IRGenModule &IGM,
                                               const ObjCMethodSignature &sig,
-                                              llvm::Function *impl) {
+                                              llvm::StringRef name) {
   // Construct the thunk name.
-  auto name = impl->getName();
   llvm::SmallString<128> buffer;
   buffer.reserve(name.size() + 2);
   buffer.append("_TTo");
@@ -870,42 +884,14 @@ namespace {
   };
 }
 
-/// Produce a function pointer, suitable for invocation by
-/// objc_msgSend, for the given method implementation.
-///
-/// Returns a value of type i8*.
-static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
-                                            const Selector &selector,
-                                            FuncDecl *method) {
-  auto absCallee = AbstractCallee::forDirectGlobalFunction(IGM, method);
-
-  // Find the swift method implementation.
-  ExplosionKind explosionLevel;
-  unsigned uncurryLevel;
-  llvm::Function *swiftImpl;
-  
-  if (method->isGetterOrSetter()) {
-    explosionLevel = absCallee.getBestExplosionLevel();
-    uncurryLevel = absCallee.getMaxUncurryLevel();
-
-    if (Decl *gd = method->getGetterDecl()) {
-      
-      swiftImpl = IGM.getAddrOfGetter(cast<ValueDecl>(gd),
-                                      explosionLevel);
-    } else if (Decl *sd = method->getSetterDecl()) {
-      swiftImpl = IGM.getAddrOfSetter(cast<ValueDecl>(sd),
-                                      explosionLevel);
-    } else {
-      llvm_unreachable("property accessor not getter or setter?!");
-    }
-  } else {
-    auto fnRef = FunctionRef(method, absCallee.getBestExplosionLevel(),
-                             absCallee.getMaxUncurryLevel());
-    
-    swiftImpl = IGM.getAddrOfFunction(fnRef, ExtraData::None);
-    explosionLevel = fnRef.getExplosionLevel();
-    uncurryLevel = fnRef.getUncurryLevel();
-  }
+/// Produce a pointer to the objc_msgSend-compatible thunk wrapping the
+/// given Swift implementation, at the given explosion and uncurry levels.
+static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
+                                                  const Selector &selector,
+                                                  FuncDecl *method,
+                                                  llvm::Function *swiftImpl,
+                                                  ExplosionKind explosionLevel,
+                                                  unsigned uncurryLevel) {
 
   // Construct a callee and derive its ownership conventions.
   CanType origFormalType = method->getType()->getCanonicalType();
@@ -927,7 +913,7 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
 
   // Otherwise, build a function.
   } else {
-    objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftImpl);
+    objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftImpl->getName());
     IRGenFunction IGF(IGM, origFormalType, ArrayRef<Pattern*>(),
                       explosionLevel, uncurryLevel,
                       objcImpl, Prologue::Bare);
@@ -991,6 +977,224 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
 }
 
+/// Produce a function pointer, suitable for invocation by
+/// objc_msgSend, for the given property's getter method implementation.
+///
+/// Returns a value of type i8*.
+static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
+                                            const Selector &selector,
+                                            VarDecl *property) {
+  // FIXME: Explosion level
+  ExplosionKind explosionLevel = ExplosionKind::Minimal;
+  
+  // Thunk the getter method, if there is one.
+  if (FuncDecl *getter = property->getGetter()) {
+    llvm::Function *swiftImpl = IGM.getAddrOfGetter(property, explosionLevel);
+    return getObjCMethodPointerForSwiftImpl(IGM, selector, getter,
+                                            swiftImpl, explosionLevel,
+                                            /*uncurryLevel=*/ 2);
+  } else {
+    assert(!property->isProperty() && "property without getter?!");
+    
+    // Synthesize a getter.
+    
+    FormalType getterType = IGM.getTypeOfGetter(property);
+    CanType origFormalType = getterType.getType();
+    ObjCMethodSignature sig(IGM, origFormalType, /*isSuper*/ false);
+    llvm::SmallString<32> swiftName;
+    
+    // Generate the mangled name of the Swift getter (without actually creating
+    // a Function for it).
+    CodeRef getterCode = CodeRef::forGetter(property, explosionLevel,
+                                          getterType.getNaturalUncurryLevel());
+    LinkEntity getterEntity = LinkEntity::forFunction(getterCode);
+    getterEntity.mangle(swiftName);
+    
+    llvm::Function *objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftName);
+
+    // Emit the ObjC method.
+    IRGenFunction IGF(IGM, origFormalType, ArrayRef<Pattern*>(),
+                      explosionLevel,
+                      getterType.getNaturalUncurryLevel(),
+                      objcImpl, Prologue::Bare);
+    Explosion params = IGF.collectParameters();
+    CanType propTy = property->getType()->getCanonicalType();
+    CanType classTy = property->getDeclContext()->getDeclaredTypeInContext()
+      ->getCanonicalType();
+    TypeInfo const &ti = IGM.getFragileTypeInfo(propTy);
+    llvm::Constant *alignConstant = ti.getStaticAlignment(IGF.IGM);
+    Alignment align(alignConstant
+                      ? alignConstant->getUniqueInteger().getZExtValue()
+                      : 1);
+    
+    // Pick out the arguments:
+    // - indirect return (if any)
+    Address indirectReturn;
+    if (requiresExternalIndirectResult(IGM, propTy)) {
+      indirectReturn = Address(params.claimUnmanagedNext(), align);
+    }
+    // - self (passed in at +0)
+    llvm::Value *thisValue = params.forwardNext(IGF);
+    // - _cmd
+    params.claimUnmanagedNext();
+    
+    // Load the physical ivar.
+    OwnedAddress ivar = projectPhysicalClassMemberAddress(IGF,
+                                                          thisValue,
+                                                          classTy,
+                                                          property);
+    
+    // Return it at +0.
+    if (indirectReturn.isValid()) {
+      // "initializeWithTake" because ObjC getter convention is to return at
+      // +0.
+      ti.initializeWithTake(IGF, indirectReturn, ivar.getAddress());
+      IGF.Builder.CreateRetVoid();
+    } else {
+      Explosion value(explosionLevel);
+      // "loadAsTake" because ObjC getter convention is to return at +0.
+      ti.loadAsTake(IGF, ivar.getAddress(), value);
+      IGF.emitScalarReturn(value);
+    }
+    
+    // Cast the method pointer to i8* and return it.
+    return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
+  }
+}
+
+/// Produce a function pointer, suitable for invocation by
+/// objc_msgSend, for the given property's setter method implementation.
+///
+/// Returns a value of type i8*.
+static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
+                                            const Selector &selector,
+                                            VarDecl *property) {
+  assert(property->isSettable() && "property is not settable?!");
+  
+  // FIXME: Explosion level
+  ExplosionKind explosionLevel = ExplosionKind::Minimal;
+  
+  // Thunk the setter method, if there is one.
+  if (FuncDecl *setter = property->getSetter()) {
+    llvm::Function *swiftImpl = IGM.getAddrOfSetter(property, explosionLevel);
+    return getObjCMethodPointerForSwiftImpl(IGM, selector, setter,
+                                            swiftImpl, explosionLevel,
+                                            /*uncurryLevel=*/ 2);
+  } else {
+    assert(!property->isProperty() && "settable property w/o setter?!");
+    
+    // Synthesize a setter.
+    
+    FormalType setterType = IGM.getTypeOfSetter(property);
+    CanType origFormalType = setterType.getType();
+    ObjCMethodSignature sig(IGM, origFormalType, /*isSuper*/ false);
+    llvm::SmallString<32> swiftName;
+    
+    // Generate the mangled name of the Swift setter (without actually creating
+    // a Function for it).
+    CodeRef setterCode = CodeRef::forSetter(property, explosionLevel,
+                                            setterType.getNaturalUncurryLevel());
+    LinkEntity setterEntity = LinkEntity::forFunction(setterCode);
+    setterEntity.mangle(swiftName);
+    
+    llvm::Function *objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftName);
+
+    // Emit the ObjC method.
+    IRGenFunction IGF(IGM, origFormalType, ArrayRef<Pattern*>(),
+                      explosionLevel,
+                      setterType.getNaturalUncurryLevel(),
+                      objcImpl, Prologue::Bare);
+    Explosion params = IGF.collectParameters();
+    CanType propTy = property->getType()->getCanonicalType();
+    CanType classTy = property->getDeclContext()->getDeclaredTypeInContext()
+      ->getCanonicalType();
+    TypeInfo const &ti = IGM.getFragileTypeInfo(propTy);
+    llvm::Constant *alignConstant = ti.getStaticAlignment(IGF.IGM);
+    Alignment align(alignConstant
+                    ? alignConstant->getUniqueInteger().getZExtValue()
+                    : 1);
+
+    // Pick out the arguments:
+    // - self (passed in at +0)
+    llvm::Value *thisValue = params.forwardNext(IGF);
+    // - _cmd
+    params.claimUnmanagedNext();
+    // - value (passed in at +0) -- we'll deal with that below.
+    
+    // Project the physical ivar.
+    OwnedAddress ivar = projectPhysicalClassMemberAddress(IGF,
+                                                          thisValue,
+                                                          classTy,
+                                                          property);
+    
+    if (requiresExternalByvalArgument(IGM, propTy)) {
+      // If the argument was passed byval in the C calling convention,
+      // assign it (with copy so that we retain it) into the ivar.
+      llvm::Value *value = params.claimUnmanagedNext();
+      Address valueAddr(value, align);
+      ti.assignWithCopy(IGF, ivar.getAddress(), valueAddr);
+    } else {
+      Explosion copy(explosionLevel);
+      // Copy the argument values so they get retained.
+      ti.copy(IGF, params, copy);
+      
+      // Assign the exploded value to the ivar.
+      ti.assign(IGF, copy, ivar.getAddress());
+    }
+    
+    IGF.Builder.CreateRetVoid();
+    
+    // Cast the method pointer to i8* and return it.
+    return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
+  }
+}
+
+/// Produce a function pointer, suitable for invocation by
+/// objc_msgSend, for the given method implementation.
+///
+/// Returns a value of type i8*.
+static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
+                                            const Selector &selector,
+                                            FuncDecl *method) {
+  auto absCallee = AbstractCallee::forDirectGlobalFunction(IGM, method);
+  auto fnRef = FunctionRef(method, absCallee.getBestExplosionLevel(),
+                             absCallee.getMaxUncurryLevel());
+    
+  llvm::Function *swiftImpl = IGM.getAddrOfFunction(fnRef, ExtraData::None);
+  ExplosionKind explosionLevel = fnRef.getExplosionLevel();
+  unsigned uncurryLevel = fnRef.getUncurryLevel();
+  
+  return getObjCMethodPointerForSwiftImpl(IGM, selector, method,
+                                          swiftImpl, explosionLevel,
+                                          uncurryLevel);
+}
+
+static bool isObjCGetterSignature(IRGenModule &IGM,
+                                  AnyFunctionType *methodType) {
+  return methodType->getResult()->getClassOrBoundGenericClass() &&
+    methodType->getInput()->isEqual(TupleType::getEmpty(IGM.Context));
+}
+
+static bool isObjCSetterSignature(IRGenModule &IGM,
+                                  AnyFunctionType *methodType) {
+  if (!methodType->getResult()->isEqual(TupleType::getEmpty(IGM.Context)))
+    return false;
+  if (methodType->getInput()->getClassOrBoundGenericClass())
+    return true;
+  if (TupleType *inputTuple = methodType->getInput()->getAs<TupleType>()) {
+    return inputTuple->getFields().size() == 1
+      && inputTuple->getFields()[0].getType()->getClassOrBoundGenericClass();
+  }
+  return false;
+}
+
+/// ObjC method encoding for a property getter of class type.
+/// - (SomeClass*)foo;
+static const char * const GetterMethodSignature = "@@:";
+/// ObjC method encoding for a property setter of class type.
+/// - (void)setFoo:(SomeClass*);
+static const char * const SetterMethodSignature = "v@:@";
+
 /// Emit the components of an Objective-C method descriptor: its selector,
 /// type encoding, and IMP pointer.
 void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
@@ -1009,15 +1213,51 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   // Account for the 'this' pointer being curried.
   methodType = methodType->getResult()->castTo<AnyFunctionType>();
   
-  if (methodType->getResult()->getClassOrBoundGenericClass() &&
-      methodType->getInput()->isEqual(TupleType::getEmpty(IGM.Context)))
-    atEncoding = IGM.getAddrOfGlobalString("@@:");
+  if (isObjCGetterSignature(IGM, methodType))
+    atEncoding = IGM.getAddrOfGlobalString(GetterMethodSignature);
+  else if (isObjCSetterSignature(IGM, methodType))
+    atEncoding = IGM.getAddrOfGlobalString(SetterMethodSignature);
   else
     atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   
   /// The third element is the method implementation pointer.
   impl = getObjCMethodPointer(IGM, selector, method);
+}
+
+/// Emit the components of an Objective-C method descriptor for a
+/// property getter method.
+void irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
+                                          VarDecl *property,
+                                          llvm::Constant *&selectorRef,
+                                          llvm::Constant *&atEncoding,
+                                          llvm::Constant *&impl) {
+  bool isClassProperty = property->getType()->getClassOrBoundGenericClass();
   
+  Selector getterSel(property, Selector::ForGetter);
+  selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
+  atEncoding = isClassProperty
+   ? IGM.getAddrOfGlobalString(GetterMethodSignature)
+   : llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  impl = getObjCGetterPointer(IGM, getterSel, property);
+}
+
+/// Emit the components of an Objective-C method descriptor for a
+/// property getter method.
+void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
+                                          VarDecl *property,
+                                          llvm::Constant *&selectorRef,
+                                          llvm::Constant *&atEncoding,
+                                          llvm::Constant *&impl) {
+  assert(property->isSettable() && "not a settable property?!");
+
+  bool isClassProperty = property->getType()->getClassOrBoundGenericClass();
+  
+  Selector setterSel(property, Selector::ForSetter);
+  selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
+  atEncoding = isClassProperty
+     ? IGM.getAddrOfGlobalString(SetterMethodSignature)
+     : llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  impl = getObjCSetterPointer(IGM, setterSel, property);
 }
 
 /// Emit an Objective-C method descriptor for the given method.
@@ -1036,11 +1276,49 @@ llvm::Constant *irgen::emitObjCMethodDescriptor(IRGenModule &IGM,
   return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
 }
 
+/// Emit Objective-C method descriptors for the property accessors of the given
+/// property. Returns a pair of Constants consisting of the getter and setter
+/// function pointers, in that order. The setter llvm::Constant* will be null if
+/// the property is not settable.
+std::pair<llvm::Constant *, llvm::Constant *>
+irgen::emitObjCPropertyMethodDescriptors(IRGenModule &IGM,
+                                         VarDecl *property) {
+  llvm::Constant *selectorRef, *atEncoding, *impl;
+  emitObjCGetterDescriptorParts(IGM, property,
+                                selectorRef, atEncoding, impl);
+  
+  llvm::Constant *getterFields[] = {selectorRef, atEncoding, impl};
+  llvm::Constant *getter = llvm::ConstantStruct::getAnon(IGM.getLLVMContext(),
+                                                         getterFields);
+  llvm::Constant *setter = nullptr;
+  
+  if (property->isSettable()) {
+    emitObjCSetterDescriptorParts(IGM, property,
+                                  selectorRef, atEncoding, impl);
+    
+    llvm::Constant *setterFields[] = {selectorRef, atEncoding, impl};
+    setter = llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), setterFields);
+  }
+  
+  return {getter, setter};
+}
+
 bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
-  if (method->isObjC() ||
-      method->getAttrs().isIBAction())
+  // Property accessors should be generated alongside the property.
+  if (method->isGetterOrSetter())
+    return false;
+  
+  if (method->isObjC() || method->getAttrs().isIBAction())
     return true;
   if (auto override = method->getOverriddenDecl())
     return requiresObjCMethodDescriptor(override);
+  return false;
+}
+
+bool irgen::requiresObjCPropertyDescriptor(VarDecl *property) {
+  if (property->isObjC())
+    return true;
+  if (auto override = property->getOverriddenDecl())
+    return requiresObjCPropertyDescriptor(override);
   return false;
 }

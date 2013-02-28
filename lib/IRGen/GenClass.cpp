@@ -1138,6 +1138,9 @@ namespace {
                      ResilienceScope::Local)) {
         HasNonTrivialDestructor = true;
       }
+
+      // Build property accessors for the ivar if necessary.
+      visitProperty(var);
     }
 
     /// struct ivar_t {
@@ -1203,7 +1206,14 @@ namespace {
 
     /// Properties need to be collected in the properties list.
     void visitProperty(VarDecl *var) {
-      Properties.push_back(buildProperty(var));
+      if (requiresObjCPropertyDescriptor(var)) {
+        if (llvm::Constant *prop = buildProperty(var))
+          Properties.push_back(prop);
+        auto getter_setter = emitObjCPropertyMethodDescriptors(IGM, var);
+        InstanceMethods.push_back(getter_setter.first);
+        if (getter_setter.second)
+          InstanceMethods.push_back(getter_setter.second);
+      }
     }
     
     /// Build the property attribute string for a property decl.
@@ -1241,9 +1251,9 @@ namespace {
       // FIXME: For now we only emit properties of ObjC class type.
       ClassDecl *theClass = prop->getType()->getClassOrBoundGenericClass();
       if (!theClass)
-        return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+        return nullptr;
       if (!theClass->isObjC())
-        return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+        return nullptr;
 
       llvm::SmallString<16> propertyAttributes;
       buildPropertyAttributes(prop, propertyAttributes);

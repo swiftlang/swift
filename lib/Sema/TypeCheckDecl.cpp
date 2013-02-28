@@ -197,6 +197,17 @@ public:
       }
 
       validateAttributes(VD);
+      
+      // The var requires ObjC interop if it has an [objc] or [iboutlet]
+      // attribute or if it's a member of an ObjC class.
+      DeclContext *dc = VD->getDeclContext();
+      if (dc && dc->getDeclaredTypeInContext()) {
+        ClassDecl *classContext = dc->getDeclaredTypeInContext()
+          ->getClassOrBoundGenericClass();
+        VD->setIsObjC(VD->getAttrs().isObjC()
+                      || (classContext && classContext->isObjC()));
+      }
+      
       return;
     }
 
@@ -488,14 +499,27 @@ public:
 
     validateAttributes(FD);
     
-    // A method is ObjC-compatible if it's explicitly [objc] or a member of an
-    // ObjC-compatible class.
+    // A method is ObjC-compatible if it's explicitly [objc], a member of an
+    // ObjC-compatible class, or an accessor for an ObjC property.
     DeclContext *dc = FD->getDeclContext();
     if (dc && dc->getDeclaredTypeInContext()) {
       ClassDecl *classContext = dc->getDeclaredTypeInContext()
         ->getClassOrBoundGenericClass();
-      FD->setIsObjC(FD->getAttrs().isObjC()
-                    || (classContext && classContext->isObjC()));
+      
+      bool isObjC = FD->getAttrs().isObjC()
+        || (classContext && classContext->isObjC());
+      if (!isObjC && FD->isGetterOrSetter()) {
+        // If the property decl is an instance property, its accessors will
+        // be instance methods and the above condition will mark them ObjC.
+        // The only additional condition we need to check is if the var decl
+        // had an [objc] or [iboutlet] property. We don't use prop->isObjC()
+        // because the property accessors may be visited before the VarDecl and
+        // prop->isObjC() may not yet be set by typechecking.
+        ValueDecl *prop = cast<ValueDecl>(FD->getGetterOrSetterDecl());
+        isObjC = prop->getAttrs().isObjC() || prop->getAttrs().isIBOutlet();
+      }
+      
+      FD->setIsObjC(isObjC);
     }
   }
 
@@ -700,13 +724,20 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     }
   }
 
+  auto isInClassContext = [](ValueDecl *vd) {
+    return bool(vd->getDeclContext()->getDeclaredTypeOfContext()
+                  ->getClassOrBoundGenericClass());
+  };
+  
   if (Attrs.isObjC()) {
-    // Only classes and methods can be ObjC.
+    // Only classes, instance properties, and methods can be ObjC.
     bool isLegal = false;
     if (isa<ClassDecl>(VD)) {
       isLegal = true;
-    } else if (isa<FuncDecl>(VD) && isa<ClassDecl>(VD->getDeclContext())) {
+    } else if (isa<FuncDecl>(VD) && isInClassContext(VD)) {
       isLegal = !isOperator;
+    } else if (isa<VarDecl>(VD) && isInClassContext(VD)) {
+      isLegal = true;
     }
     if (!isLegal) {
       TC.diagnose(VD->getStartLoc(), diag::invalid_objc_decl);
@@ -719,7 +750,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     // Only instance properties can be IBOutlets.
     // FIXME: This could do some type validation as well (all IBOutlets refer
     // to objects).
-    if (!(isa<VarDecl>(VD) && isa<ClassDecl>(VD->getDeclContext()))) {
+    if (!(isa<VarDecl>(VD) && isInClassContext(VD))) {
       TC.diagnose(VD->getStartLoc(), diag::invalid_iboutlet);
       VD->getMutableAttrs().IBOutlet = false;
       return;
