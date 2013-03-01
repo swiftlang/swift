@@ -13,7 +13,7 @@ endfunction()
 
 # Build the swiftObjC dylib.
 set(SHARED_LIBRARY ON)
-add_swift_library(swiftObjectiveC
+add_swift_library(swiftObjectiveC INSTALL
   ObjectiveC.swift
   DEPENDS swift_stdlib)
 

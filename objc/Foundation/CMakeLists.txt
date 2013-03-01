@@ -1,5 +1,5 @@
 set(SHARED_LIBRARY ON)
-add_swift_library(swiftFoundation
+add_swift_library(swiftFoundation INSTALL
   Foundation.swift
   BridgeNSString.mm
   DEPENDS swift_stdlib swiftObjectiveC)

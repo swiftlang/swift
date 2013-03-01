@@ -299,7 +299,7 @@ endfunction()
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library name)
-  parse_arguments(SWIFTLIB  "DEPENDS;COMPONENT_DEPENDS" "" ${ARGN})
+  parse_arguments(SWIFTLIB  "DEPENDS;COMPONENT_DEPENDS" "INSTALL" ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS})
 
   if(MSVC_IDE OR XCODE)
@@ -322,9 +322,6 @@ macro(add_swift_library name)
 
   handle_swift_sources(SWIFTLIB_SOURCES SWIFTLIB_EXTERNAL_SOURCES ${name})
   add_library( ${name} ${libkind} ${SWIFTLIB_SOURCES} )
-
-  set_target_properties(${name} PROPERTIES
-    INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib")
 
   if( LLVM_COMMON_DEPENDS )
     add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
@@ -351,20 +348,25 @@ macro(add_swift_library name)
     set_target_properties(${name} PROPERTIES COMPILE_FLAGS ${cflag})
   endif(MSVC)
 
-  install(TARGETS ${name}
-    LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-    ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX})
+  if(SWIFTLIB_INSTALL)
+    set_target_properties(${name} PROPERTIES
+      INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib")
 
-  # FIXME: Install .swift files so they can be parsed on import.
-  # Really we want to install a preparsed metadata file.
-  foreach(external_source ${SWIFTLIB_EXTERNAL_SOURCES})
-    get_filename_component(extension ${external_source} EXT)
-    if(extension STREQUAL ".swift")
-      set(filename ${external_source})
-      install(FILES ${filename}
-        DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift)
-    endif()
-  endforeach(external_source)
+    install(TARGETS ${name}
+      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX})
+
+    # FIXME: Install .swift files so they can be parsed on import.
+    # Really we want to install a preparsed metadata file.
+    foreach(external_source ${SWIFTLIB_EXTERNAL_SOURCES})
+      get_filename_component(extension ${external_source} EXT)
+      if(extension STREQUAL ".swift")
+        set(filename ${external_source})
+        install(FILES ${filename}
+          DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift)
+      endif()
+    endforeach(external_source)
+  endif(SWIFTLIB_INSTALL)
 
   set_target_properties(${name} PROPERTIES FOLDER "Swift libraries")
 endmacro(add_swift_library)

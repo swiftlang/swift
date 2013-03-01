@@ -1,5 +1,5 @@
 set(SHARED_LIBRARY ON)
-add_swift_library(swiftAppKit
+add_swift_library(swiftAppKit INSTALL
   AppKit.swift
   DEPENDS swift_stdlib swiftObjectiveC swiftFoundation)
 

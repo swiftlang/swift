@@ -1,6 +1,6 @@
 # FIXME: We'd love to just enable the assembler support in CMake, but
 # it doesn't work with the Xcode generator. Lame!
-add_swift_library(swift_runtime
+add_swift_library(swift_runtime INSTALL
   FastEntryPoints.s
   Alloc.cpp
   KnownMetadata.cpp
