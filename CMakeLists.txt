@@ -323,6 +323,9 @@ macro(add_swift_library name)
   handle_swift_sources(SWIFTLIB_SOURCES SWIFTLIB_EXTERNAL_SOURCES ${name})
   add_library( ${name} ${libkind} ${SWIFTLIB_SOURCES} )
 
+  set_target_properties(${name} PROPERTIES
+    INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib")
+
   if( LLVM_COMMON_DEPENDS )
     add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
   endif( LLVM_COMMON_DEPENDS )
@@ -357,8 +360,6 @@ macro(add_swift_library name)
   foreach(external_source ${SWIFTLIB_EXTERNAL_SOURCES})
     get_filename_component(extension ${external_source} EXT)
     if(extension STREQUAL ".swift")
-      message(STATUS "registering swift source for install: "
-        ${external_source})
       set(filename ${external_source})
       install(FILES ${filename}
         DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift)
