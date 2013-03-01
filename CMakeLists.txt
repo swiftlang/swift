@@ -430,7 +430,7 @@ include_directories(BEFORE
 # Set SWIFTLIB_DIR to the directory in the build tree where Swift source files
 # should be placed.
 if(XCODE)
-  set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${BUILD_TYPE}")
+  set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${CMAKE_BUILD_TYPE}")
 else()
   set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib")
 endif()
