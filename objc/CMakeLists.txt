@@ -1,5 +1,4 @@
 # Installation for Swift modules.
-set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}")
 function(install_swift_module items)
   foreach(item ${items})
     add_custom_command(
