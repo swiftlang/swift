@@ -665,8 +665,11 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
   switch (*CurPtr++) {
   default: {// Normal characters are part of the string.
     // If this is a "high" UTF-8 character, validate it.
-    if ((signed char)(CurPtr[-1]) >= 0)
+    if ((signed char)(CurPtr[-1]) >= 0) {
+      if (isprint(CurPtr[-1]) == 0)
+        diagnose(CharStart, diag::lex_unprintable_ascii_character);
       return CurPtr[-1];
+    }
     --CurPtr;
     unsigned CharValue = validateUTF8CharacterAndAdvance(CurPtr);
     if (CharValue != ~0U) return CharValue;

@@ -75,8 +75,10 @@ WARNING(lex_nul_character,lexing,none,
 WARNING(lex_missing_newline_eof,lexing,none,
         "missing newline at end of file", ())
 
+ERROR(lex_unprintable_ascii_character,lexing,none,
+      "unprintable ASCII character found in source file", ())
 ERROR(lex_invalid_utf8_character,lexing,none,
-      "invalid utf8-encoded character found in source file", ())
+      "invalid UTF8-encoded character found in source file", ())
 ERROR(lex_missing_whitespace,lexing,none,
         "missing whitespace", ())
 
