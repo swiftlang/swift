@@ -451,6 +451,7 @@ endif()
 
 add_subdirectory(examples)
 add_subdirectory(unittests)
+add_subdirectory(docs)
 
 # Add a documentation target so that documentation shows up in the
 # Xcode project.
