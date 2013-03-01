@@ -813,8 +813,146 @@ bool IdentifierType::isMapped() const {
 
 Type IdentifierType::getMappedType() {
   assert(!Components.back().Value.isNull() &&
-         "Name binding haven't resolved this to a type yet");
+         "Name binding hasn't resolved this to a type yet");
   return Components.back().Value.get<Type>();
+}
+
+bool TypeBase::isSpelledLike(Type other) {
+  TypeBase *me = this;
+  TypeBase *them = other.getPointer();
+  
+  // Skim any IdentifierTypes off the top.
+  while (IdentifierType *i = dyn_cast<IdentifierType>(me))
+    me = i->getMappedType().getPointer();
+  while (IdentifierType *i = dyn_cast<IdentifierType>(them))
+    them = i->getMappedType().getPointer();
+  
+  if (me == them)
+    return true;
+  
+  if (me->getKind() != them->getKind())
+    return false;
+
+  switch (me->getKind()) {
+#define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
+#define UNCHECKED_TYPE(id, parent) case TypeKind::id:
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Identifier:
+    llvm_unreachable("should have dealt with this type already!");
+
+  case TypeKind::OneOf:
+  case TypeKind::Struct:
+  case TypeKind::Class:
+  case TypeKind::NameAlias:
+  case TypeKind::Substituted:
+  case TypeKind::UnboundGeneric:
+    return false;
+
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct: {
+    auto bgMe = cast<BoundGenericType>(me);
+    auto bgThem = cast<BoundGenericType>(them);
+    if (bgMe->getDecl() != bgThem->getDecl())
+      return false;
+    if (bgMe->getGenericArgs().size() != bgThem->getGenericArgs().size())
+      return false;
+    for (size_t i = 0, sz = bgMe->getGenericArgs().size(); i < sz; ++i)
+      if (!bgMe->getGenericArgs()[i]->isSpelledLike(bgThem->getGenericArgs()[i]))
+        return false;
+    return true;
+  }
+
+  case TypeKind::Tuple: {
+    auto tMe = cast<TupleType>(me);
+    auto tThem = cast<TupleType>(them);
+    if (tMe->getFields().size() != tThem->getFields().size())
+      return false;
+    for (size_t i = 0, sz = tMe->getFields().size(); i < sz; ++i) {
+      auto &myField = tMe->getFields()[i], &theirField = tThem->getFields()[i];
+      // FIXME: Should tuple types w/ same initializer be considered the same?
+      if (myField.hasInit() || theirField.hasInit())
+        return false;
+      
+      if (myField.getName() != theirField.getName())
+        return false;
+      
+      if (myField.isVararg() != theirField.isVararg())
+        return false;
+      if (myField.isVararg()) {
+        if (!myField.getVarargBaseTy()
+              ->isSpelledLike(theirField.getVarargBaseTy()))
+          return false;
+      } else {
+        if (!myField.getType()->isSpelledLike(theirField.getType()))
+          return false;
+      }
+    }
+    return true;
+  }
+
+  case TypeKind::PolymorphicFunction: {
+    // Polymorphic function types should never be explicitly spelled.
+    return false;
+  }
+    
+  case TypeKind::Function: {
+    auto fMe = cast<FunctionType>(me);
+    auto fThem = cast<FunctionType>(them);
+    if (fMe->isAutoClosure() != fThem->isAutoClosure())
+      return false;
+    if (fMe->isBlock() != fThem->isBlock())
+      return false;
+    if (!fMe->getInput()->isSpelledLike(fThem->getInput()))
+      return false;
+    if (!fMe->getResult()->isSpelledLike(fThem->getResult()))
+      return false;
+    return true;
+  }
+
+  case TypeKind::Array: {
+    auto aMe = cast<ArrayType>(me);
+    auto aThem = cast<ArrayType>(them);
+    if (aMe->getSize() != aThem->getSize())
+      return false;
+    return aMe->getBaseType()->isSpelledLike(aThem->getBaseType());
+  }
+      
+  case TypeKind::LValue: {
+    auto lMe = cast<LValueType>(me);
+    auto lThem = cast<LValueType>(them);
+    return lMe->getObjectType()->isSpelledLike(lThem->getObjectType());
+  }
+  case TypeKind::ProtocolComposition: {
+    auto pMe = cast<ProtocolCompositionType>(me);
+    auto pThem = cast<ProtocolCompositionType>(them);
+    if (pMe->getProtocols().size() != pThem->getProtocols().size())
+      return false;
+    for (size_t i = 0, sz = pMe->getProtocols().size(); i < sz; ++i)
+      if (!pMe->getProtocols()[i]->isSpelledLike(pThem->getProtocols()[i]))
+        return false;
+    return true;
+  }
+  case TypeKind::MetaType: {
+    auto mMe = cast<MetaTypeType>(me);
+    auto mThem = cast<MetaTypeType>(them);
+    return mMe->getInstanceType()->isSpelledLike(mThem->getInstanceType());
+  }
+  case TypeKind::Paren: {
+    auto pMe = cast<ParenType>(me);
+    auto pThem = cast<ParenType>(them);
+    return pMe->getUnderlyingType()->isSpelledLike(pThem->getUnderlyingType());
+  }
+  case TypeKind::ArraySlice: {
+    auto aMe = cast<ArraySliceType>(me);
+    auto aThem = cast<ArraySliceType>(them);
+    return aMe->getBaseType()->isSpelledLike(aThem->getBaseType());
+  }
+  }
+
+  llvm_unreachable("Unknown type kind");
+
 }
 
 TupleType::TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx,

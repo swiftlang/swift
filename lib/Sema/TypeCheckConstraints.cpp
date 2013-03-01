@@ -6163,7 +6163,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
           return specialize(expr, polyFn, origType);
         }
 
-        return expr;
+        return tc.substituteInputSugarTypeForResult(expr);
       }
 
       // FIXME: Implement support for metatypes here.

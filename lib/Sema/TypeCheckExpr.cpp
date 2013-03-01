@@ -486,6 +486,62 @@ static ValueDecl *getReferencedDecl(Expr *E) {
   llvm_unreachable("Expression does not reference a declaration");
 }
 
+void substituteInputSugarArgumentType(Type argTy,
+                                      CanType resultTy,
+                                      Type &resultSugarTy,
+                                      bool &uniqueSugarTy) {
+  // If we already failed finding a unique sugar, bail out.
+  if (!uniqueSugarTy)
+    return;
+    
+  if (TupleType *argTupleTy = argTy->getAs<TupleType>()) {
+    // Recursively walk tuple arguments.
+    for (auto &field : argTupleTy->getFields()) {
+      substituteInputSugarArgumentType(field.getType(), resultTy,
+                                       resultSugarTy, uniqueSugarTy);
+      if (!uniqueSugarTy)
+        return;
+    }
+  } else {
+    if (argTy->getCanonicalType() == resultTy) {
+      if (resultSugarTy) {
+        // Make sure this argument's sugar is consistent with the sugar we
+        // already found.
+        if (argTy->isSpelledLike(resultSugarTy))
+          return;
+        uniqueSugarTy = false;
+        return;
+      } else {
+        resultSugarTy = argTy;
+      }
+    }
+  }
+}
+
+/// If the inputs to an apply expression use a consistent "sugar" type
+/// (that is, a typealias or shorthand syntax) equivalent to the result type of
+/// the function, set the result type of the expression to that sugar type.
+Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
+  if (!E->getType() || E->getType()->is<ErrorType>())
+    return E;
+  
+  Type argTy = E->getArg()->getType();
+  
+  CanType resultTy = E->getFn()->getType()->castTo<FunctionType>()->getResult()
+    ->getCanonicalType();
+  
+  Type resultSugarTy; // null if no sugar found, set when sugar found
+  bool uniqueSugarTy = true; // true if a unique sugar mapping found
+  
+  substituteInputSugarArgumentType(argTy, resultTy,
+                                   resultSugarTy, uniqueSugarTy);
+  
+  if (resultSugarTy && uniqueSugarTy)
+    E->setType(resultSugarTy);
+
+  return E;
+}
+
 Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   Expr *E1 = E->getFn();
   Expr *E2 = E->getArg();
@@ -562,7 +618,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     E->setFn(E1);
     E->setArg(E2);
     E->setType(FT->getResult());
-    return E;
+    return substituteInputSugarTypeForResult(E);
   }
   
   // If the "function" is actually a type (i.e. its type is 'metatype'), then we

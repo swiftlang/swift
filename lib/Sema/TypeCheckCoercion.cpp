@@ -1376,7 +1376,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   TypeChecker &TC = CC.TC;
   
   assert(E->getType()->is<TupleType>() && "Unexpected expression");
-
+  
   // If the tuple expression or destination type have named elements, we
   // have to match them up to handle the swizzle case for when:
   //   (.y = 4, .x = 3)
@@ -1640,14 +1640,14 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   } else if (Unknowable) {
     return CoercionResult::Unknowable;
   }
-
+  
   if (!(Flags & CF_Apply))
     return Type(DestTy);
 
   // If we don't actually need to shuffle, skip building a shuffle.
   bool NullShuffle = TE != 0;
   if (NullShuffle) {
-    for (int i = 0, e = NewElements.size(); i != e; i++) {
+    for (int i = 0, e = NewElements.size(); i != e; ++i) {
       if (i != NewElements[i]) {
         NullShuffle = false;
         break;
@@ -1656,9 +1656,45 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   }
   
   if (NullShuffle) {
-    // Force the type of the expression to match the destination to make
-    // the AST consistent.
-    E->setType(DestTy);
+    // Build a tuple type equivalent to the destination type but preserving the
+    // sugar of the source elements.
+    // FIXME: This doesn't work if the type has default values because they fail
+    // to canonicalize.
+    bool hasInits = false;
+    SmallVector<TupleTypeElt, 4> destSugarFields;
+    
+    if (TE) {
+      for (int i = 0, e = NewElements.size(); i != e; ++i) {
+        TupleTypeElt const &destField = DestTy->getFields()[i];
+        assert((destField.getType()->isUnresolvedType() ||
+                TE->getElement(i)->getType()->isEqual(destField.getType()))
+               && "tuple subexpr type is not equivalent to coerced tuple field");
+        destSugarFields.push_back(TupleTypeElt(TE->getElement(i)->getType(),
+                                               destField.getName(),
+                                               destField.getInit(),
+                                               destField.getVarargBaseTy()));
+        hasInits |= destField.hasInit();
+          
+      }
+    } else {
+      for (int i = 0, e = NewElements.size(); i != e; ++i) {
+        TupleTypeElt const &destField = DestTy->getFields()[i];
+        assert((destField.getType()->isUnresolvedType() ||
+                ETy->getFields()[i].getType()->isEqual(destField.getType()))
+               && "subtuple type is not equivalent to coerced tuple field");
+        destSugarFields.push_back(TupleTypeElt(ETy->getFields()[i].getType(),
+                                               destField.getName(),
+                                               destField.getInit(),
+                                               destField.getVarargBaseTy()));
+        hasInits |= destField.hasInit();
+      }
+    }
+    
+    Type destSugarTy = hasInits
+      ? DestTy
+      : TupleType::get(destSugarFields, DestTy->getASTContext());
+
+    E->setType(destSugarTy);
     return unchanged(E, Flags);
   }
 
@@ -1676,7 +1712,8 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     
   // If we got here, the type conversion is successful, create a new TupleExpr.  
   ArrayRef<int> Mapping = TC.Context.AllocateCopy(NewElements);
-  TupleShuffleExpr *TSE = new (TC.Context) TupleShuffleExpr(E, Mapping, DestTy);
+  TupleShuffleExpr *TSE = new (TC.Context) TupleShuffleExpr(E, Mapping,
+                                                            DestTy);
   TSE->setVarargsInjectionFunction(injectionFn);
   return coerced(TSE, Flags);
 }
@@ -1728,12 +1765,50 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   CoercedResult ERes = coerceToType(E, ScalarType, CC, SubFlags);
   if (!ERes)
     return ERes;
+  
+  // Preserve the sugar of the scalar field.
+  // FIXME: This doesn't work if the type has default values because they fail
+  // to canonicalize.
+  SmallVector<TupleTypeElt, 4> sugarFields;
+  bool hasInit = false;
+  size_t i = 0;
+  for (auto &field : DestTy->getFields()) {
+    if (field.hasInit()) {
+      hasInit = true;
+      break;
+    }
+    if (i == ScalarField) {
+      if (field.isVararg()) {
+        assert((field.getVarargBaseTy()->isUnresolvedType() ||
+                ERes.getType()->isEqual(field.getVarargBaseTy())) &&
+               "scalar field is not equivalent to dest vararg field?!");
+
+        sugarFields.push_back(TupleTypeElt(field.getType(),
+                                           field.getName(),
+                                           field.getInit(),
+                                           ERes.getType()));
+      }
+      else {
+        assert((field.getType()->isUnresolvedType() ||
+                ERes.getType()->isEqual(field.getType())) &&
+               "scalar field is not equivalent to dest tuple field?!");
+        sugarFields.push_back(TupleTypeElt(ERes.getType(),
+                                           field.getName()));
+      }
+    } else {
+      sugarFields.push_back(field);
+    }
+    ++i;
+  }
+  
+  Type destSugarTy = hasInit ? DestTy : TupleType::get(sugarFields,
+                                                       DestTy->getASTContext());
 
   if (!(Flags & CF_Apply))
-    return Type(DestTy);
+    return Type(destSugarTy);
 
   return CoercedResult(new (TC.Context) ScalarToTupleExpr(ERes.getExpr(),
-                                                          DestTy,
+                                                          destSugarTy,
                                                           ScalarField,
                                                           injectionFn));
 }
@@ -2275,6 +2350,10 @@ static bool finalizeSubstitutions(CoercionContext &CC, SourceLoc ComplainLoc) {
 
 CoercedExpr TypeChecker::coerceToType(Expr *E, Type DestTy, CoercionKind Kind,
                                       CoercionContext *CC) {
+  // Preserve the input as-is if it's already of the appropriate type.
+  if (E->getType()->isEqual(DestTy))
+    return CoercedExpr(*this, CoercionResult::Succeeded, E, DestTy);
+  
   unsigned Flags = CF_Apply | CF_UserConversions;
   switch (Kind) {
   case CoercionKind::Normal:

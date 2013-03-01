@@ -383,6 +383,11 @@ public:
   Expr *semaApplyExpr(ApplyExpr *E);
   Expr *semaUnresolvedDotExpr(UnresolvedDotExpr *E);
   Expr *semaSuperConstructorRefCallExpr(SuperConstructorRefCallExpr *E);
+  
+  /// If the inputs to an apply expression use a consistent "sugar" type
+  /// (that is, a typealias or shorthand syntax) equivalent to the result type
+  /// of the function, set the result type of the expression to that sugar type.
+  Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
   void typeCheckIgnoredExpr(Expr *E);
   void typeCheckFunctionBody(FuncExpr *FE);
