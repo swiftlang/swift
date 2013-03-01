@@ -459,3 +459,21 @@ add_custom_target(Documentation
   SOURCES README.txt
   docs/LangRef.html
   docs/toc.js)
+
+# Configure CPack.
+set(CPACK_GENERATOR "TGZ")
+set(CPACK_PACKAGE_RELOCATABLE "false")
+set(CPACK_PACKAGE_VENDOR "LLVM Project")
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY "OFF")
+set(CPACK_SET_DESTDIR "ON")
+
+set(CPACK_PACKAGE_NAME "swift")
+set(CPACK_SYSTEM_NAME "macosx")
+
+# FIXME: Real version number.
+execute_process(COMMAND date "+%Y%m%d"
+  OUTPUT_VARIABLE CPACK_PACKAGE_VERSION
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+# CPack must be included *after* its configuration variables are set.
+include(CPack)
