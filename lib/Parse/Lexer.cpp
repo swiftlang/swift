@@ -714,9 +714,6 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
       
   // Simple single-character escapes.
   case '0': ++CurPtr; return '\0';
-  case 'a': ++CurPtr; return '\a';
-  case 'b': ++CurPtr; return '\b';
-  case 'f': ++CurPtr; return '\f';
   case 'n': ++CurPtr; return '\n';
   case 'r': ++CurPtr; return '\r';
   case 't': ++CurPtr; return '\t';
@@ -936,9 +933,7 @@ void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
       continue;   // Invalid escape, ignore it.
           
       // Simple single-character escapes.
-    case 'a': TempString += '\a'; continue;
-    case 'b': TempString += '\b'; continue;
-    case 'f': TempString += '\f'; continue;
+    case '0': TempString += '\0'; continue;
     case 'n': TempString += '\n'; continue;
     case 'r': TempString += '\r'; continue;
     case 't': TempString += '\t'; continue;
