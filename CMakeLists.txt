@@ -352,6 +352,19 @@ macro(add_swift_library name)
     LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
     ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX})
 
+  # FIXME: Install .swift files so they can be parsed on import.
+  # Really we want to install a preparsed metadata file.
+  foreach(external_source ${SWIFTLIB_EXTERNAL_SOURCES})
+    get_filename_component(extension ${external_source} EXT)
+    if(extension STREQUAL ".swift")
+      message(STATUS "registering swift source for install: "
+        ${external_source})
+      set(filename ${external_source})
+      install(FILES ${filename}
+        DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift)
+    endif()
+  endforeach(external_source)
+
   set_target_properties(${name} PROPERTIES FOLDER "Swift libraries")
 endmacro(add_swift_library)
 
@@ -417,7 +430,7 @@ include_directories(BEFORE
 # Set SWIFTLIB_DIR to the directory in the build tree where Swift source files
 # should be placed.
 if(XCODE)
-  set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}")
+  set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${BUILD_TYPE}")
 else()
   set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib")
 endif()
