@@ -959,8 +959,7 @@ static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
     // FIXME: other fn attributes?
     auto call = IGF.Builder.CreateCall(swiftImpl, args);
     if (sig.IsIndirectReturn) {
-      call->addAttribute(1, llvm::Attribute::get(IGM.getLLVMContext(),
-                                                 llvm::Attribute::StructRet));
+      call->addAttribute(1, llvm::Attribute::StructRet);
     }
 
     if (call->getType()->isVoidTy()) {
