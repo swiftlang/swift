@@ -31,7 +31,7 @@ TOOLCHAIN=/Applications/Xcode.app/Contents/Developer/Toolchains/OSX10.9.xctoolch
 CMAKE=/usr/local/bin/cmake
 
 # Set this to the install prefix for release builds.
-INSTALL_PREFIX=/usr/local
+INSTALL_PREFIX=/usr
 
 # Set this to the path on matte to which release packages should be delivered.
 PACKAGE_PATH=/Users/Shared/swift-discuss
