@@ -23,7 +23,7 @@ else
   PACKAGE=
 fi
 
-# Set these to the paths of the OS X SDK and toolchain
+# Set these to the paths of the OS X SDK and toolchain.
 SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk
 TOOLCHAIN=/Applications/Xcode.app/Contents/Developer/Toolchains/OSX10.9.xctoolchain
 
@@ -32,6 +32,9 @@ CMAKE=/usr/local/bin/cmake
 
 # Set this to the install prefix for release builds.
 INSTALL_PREFIX=/usr/local
+
+# Set this to the path on matte to which release packages should be delivered.
+PACKAGE_PATH=/Users/Shared/swift-discuss
 
 # Make sure the variables and directories we expect to exist actually do.
 test "$WORKSPACE"
@@ -104,4 +107,20 @@ if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
   echo "--- Building Swift Package ---"
   (cd "$WORKSPACE/swift/build" &&
     make -j package) || exit 1
+
+  saw_package=
+  for package in "$WORKSPACE/swift/build/swift-*.tar.gz"; do
+    if [ "$saw_package" ]; then
+      echo "More than one package file built!"
+      exit 1
+    fi
+    saw_package=1
+    echo "--- Delivering $package ---"
+    cp "$package" "$PACKAGE_PATH" || exit 1
+
+    if [ \! "$saw_package" ]; then
+      echo "No package file built!"
+      exit 1
+    fi
+  done
 fi
