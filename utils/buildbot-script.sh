@@ -11,6 +11,17 @@
 # SKIP_BUILD_LLVM -- set to skip building LLVM/Clang
 # SKIP_BUILD_SWIFT -- set to skip building Swift
 # SKIP_TEST_SWIFT -- set to skip testing Swift
+# SKIP_PACKAGE_SWIFT -- set to skip packaging Swift
+
+# The -release flag enables a release build, which will additionally build
+# a package if the build and test succeeds.
+if [ "$1" = "-release" ]; then
+  BUILD_TYPE=RelWithDebInfo
+  PACKAGE=1
+else
+  BUILD_TYPE=Debug
+  PACKAGE=
+fi
 
 # Set these to the paths of the OS X SDK and toolchain
 SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk
@@ -18,6 +29,9 @@ TOOLCHAIN=/Applications/Xcode.app/Contents/Developer/Toolchains/OSX10.9.xctoolch
 
 # Set this to the path to the 'cmake' executable.
 CMAKE=/usr/local/bin/cmake
+
+# Set this to the install prefix for release builds.
+INSTALL_PREFIX=/usr/local
 
 # Make sure the variables and directories we expect to exist actually do.
 test "$WORKSPACE"
@@ -37,7 +51,7 @@ fi
 mkdir -p "$WORKSPACE/swift-module-cache"
 
 # Make extra sure it's empty.
-if [ "$(ls -A $WORKSPACE/swift-module-cache)" ]; then
+if [ "$(ls -A "$WORKSPACE/swift-module-cache")" ]; then
   echo "Module cache not empty! Aborting."
   exit 1
 fi
@@ -53,6 +67,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
       -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
       -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
       -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
+      -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
       -DLLVM_TARGETS_TO_BUILD="X86" \
       .. &&
     make -j) || exit 1
@@ -66,6 +81,8 @@ if [ \! "$SKIP_BUILD_SWIFT" ]; then
     "$CMAKE" -G "Unix Makefiles" \
       -DCMAKE_C_COMPILER="$TOOLCHAIN/usr/bin/clang" \
       -DCMAKE_CXX_COMPILER="$TOOLCHAIN/usr/bin/clang++" \
+      -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+      -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
       -DSWIFT_PATH_TO_CLANG_SOURCE="$WORKSPACE/llvm/tools/clang" \
       -DSWIFT_PATH_TO_CLANG_BUILD="$WORKSPACE/llvm/build" \
       -DSWIFT_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
@@ -81,4 +98,10 @@ if [ \! "$SKIP_TEST_SWIFT" ]; then
   echo "--- Running Swift Tests ---"
   (cd "$WORKSPACE/swift/build" &&
     "$WORKSPACE/llvm/build/bin/llvm-lit" -sv test) || exit 1
+fi
+
+if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
+  echo "--- Building Swift Package ---"
+  (cd "$WORKSPACE/swift/build" &&
+    make -j package) || exit 1
 fi
