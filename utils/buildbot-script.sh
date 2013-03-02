@@ -109,7 +109,7 @@ if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
     make -j package) || exit 1
 
   saw_package=
-  for package in "$WORKSPACE/swift/build/swift-*.tar.gz"; do
+  for package in "$WORKSPACE/swift/build"/swift-*.tar.gz; do
     if [ "$saw_package" ]; then
       echo "More than one package file built!"
       exit 1
