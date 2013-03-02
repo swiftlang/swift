@@ -2385,19 +2385,13 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   <h3 id="expr-dot">Dot Expressions</h3>
   <!-- ===================================================================== -->
-  
-  <div class="commentary">
-    "foo.$1" is a pretty ugly way to get to fields of a tuple, but we don't
-    want to use "foo[1]" (that would encourage people to use variable indexes)
-    and tuples should generally be accessed with pattern matching anyway.
-  </div>
 
   <pre class="grammar">
     expr-dot ::= <a href="#expr">expr-postfix</a> '.' <a href="#dollarident">dollarident</a>
   </pre>
     
   <p>If the base expression has <a href="#type-tuple">tuple type</a>, then the
-  magic identifier "$[0-9]+" accesses the specified anonymous member of the
+  magic identifier "[0-9]+" accesses the specified anonymous member of the
   tuple.  Otherwise, this form is invalid.</p>
 
   <pre class="grammar">

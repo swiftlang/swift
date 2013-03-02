@@ -614,7 +614,9 @@ void Lexer::lexNumber() {
 
   // Lex things like 4.x as '4' followed by a tok::period.
   if (*CurPtr == '.') {
-    if (!isdigit(CurPtr[1]))
+    // NextToken is the soon to be previos token
+    // Therefore: x.0.1 is sub-tuple access, not x.float_literal
+    if (!isdigit(CurPtr[1]) || NextToken.is(tok::period))
       return formStartingToken(tok::integer_literal, TokStart);
   } else {
     // Floating literals must have '.', 'e', or 'E' after digits.  If it is

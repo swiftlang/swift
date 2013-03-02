@@ -1535,12 +1535,9 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
     int FieldNo = TT->getNamedElementId(MemberName);
     if (FieldNo == -1) {
       StringRef NameStr = MemberName.str();
-      if (NameStr.startswith("$")) {
-        unsigned Value = 0;
-        if (!NameStr.substr(1).getAsInteger(10, Value) &&
-            Value < TT->getFields().size())
-          FieldNo = Value;
-      }
+      unsigned Value = 0;
+      if (!NameStr.getAsInteger(10, Value) && Value < TT->getFields().size())
+        FieldNo = Value;
     }
     if (FieldNo == -1) {
       // FIXME: This diagnostic is a bit painful.

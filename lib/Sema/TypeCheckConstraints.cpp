@@ -4062,12 +4062,11 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
     StringRef nameStr = name.str();
     int fieldIdx = -1;
-    if (nameStr[0] == '$') {
-      // Resolve a number reference into the tuple type.
-      unsigned Value = 0;
-      if (!nameStr.substr(1).getAsInteger(10, Value) &&
-          Value < baseTuple->getFields().size())
-        fieldIdx = Value;
+    // Resolve a number reference into the tuple type.
+    unsigned Value = 0;
+    if (!nameStr.getAsInteger(10, Value) &&
+        Value < baseTuple->getFields().size()) {
+      fieldIdx = Value;
     } else {
       fieldIdx = baseTuple->getNamedElementId(name);
     }

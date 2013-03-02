@@ -332,7 +332,7 @@ static void changeToFollowingTokenAfterRAngle(Token &token) {
 ///
 ///   expr-dot:
 ///     expr-postfix '.' identifier generic-args?
-///     expr-postfix '.' dollarident
+///     expr-postfix '.' integer_literal
 ///
 ///   expr-subscript:
 ///     expr-postfix '[' expr ']'
@@ -440,7 +440,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
         continue;
       }
 
-      if (Tok.isNot(tok::identifier) && Tok.isNot(tok::dollarident)) {
+      if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal)) {
         diagnose(Tok, diag::expected_field_name);
         return 0;
       }
@@ -464,7 +464,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
                                                           RAngleLoc);
         }
       } else
-        consumeToken(tok::dollarident);
+        consumeToken(tok::integer_literal);
       
       continue;
     }
