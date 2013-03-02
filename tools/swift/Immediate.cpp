@@ -408,6 +408,13 @@ public:
   {
     // Only show colors if both stderr and stdout are displayed.
     ShowColors = llvm::errs().is_displayed() && llvm::outs().is_displayed();
+    
+    // Make sure the terminal color gets restored when the REPL is quit.
+    if (ShowColors)
+      atexit([] {
+        llvm::outs().resetColor();
+        llvm::errs().resetColor();
+      });
 
     e = el_init("swift", stdin, stdout, stderr);
     h = history_winit();
