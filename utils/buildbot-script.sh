@@ -34,7 +34,7 @@ CMAKE=/usr/local/bin/cmake
 INSTALL_PREFIX=/usr
 
 # Set this to the path on matte to which release packages should be delivered.
-PACKAGE_PATH=/Users/Shared/swift-discuss
+PACKAGE_PATH=/Users/swift-discuss
 
 # Make sure the variables and directories we expect to exist actually do.
 test "$WORKSPACE"
