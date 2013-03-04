@@ -1703,7 +1703,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     E->setType(destSugarTy);
     return unchanged(E, Flags);
   }
-
+  
   // If we need to rebuild the type of the source due to coercion, do so now.
   if (RebuildSourceType) {
     SmallVector<TupleTypeElt, 4> NewTypeElts;
@@ -1715,11 +1715,52 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     
     E->setType(TupleType::get(NewTypeElts, TC.Context));
   }
+  
+  ETy = E->getType()->castTo<TupleType>();
     
-  // If we got here, the type conversion is successful, create a new TupleExpr.  
+  // If we got here, the type conversion is successful, create a new TupleExpr.
+  
+  // Build a tuple type equivalent to the destination type but preserving the
+  // sugar of the shuffled source elements.
+  // FIXME: This doesn't work if the type has default values because they fail
+  // to canonicalize.
+  bool hasInits = false;
+  SmallVector<TupleTypeElt, 4> destSugarFields;
+  for (int i = 0, e = NewElements.size(); i != e; ++i) {
+    TupleTypeElt const &destField = DestTy->getFields()[i];
+    if (NewElements[i] == TupleShuffleExpr::DefaultInitialize) {
+      hasInits = true;
+      destSugarFields.push_back(destField);
+      continue;
+    }
+    
+    // FIXME: Transfer sugar from variadic arguments.
+    if (NewElements[i] == TupleShuffleExpr::FirstVariadic) {
+      destSugarFields.push_back(destField);
+      break;
+    }
+    
+    assert(NewElements[i] >= 0);
+    
+    TupleTypeElt const &srcField = ETy->getFields()[NewElements[i]];
+    
+    assert((destField.getType()->isUnresolvedType() ||
+            srcField.getType()->isEqual(destField.getType()))
+           && "shuffled tuple type is not equivalent to result tuple field");
+    destSugarFields.push_back(TupleTypeElt(srcField.getType(),
+                                           destField.getName(),
+                                           destField.getInit(),
+                                           destField.getVarargBaseTy()));
+    hasInits |= destField.hasInit();
+  }
+  
+  Type destSugarTy = hasInits
+    ? DestTy
+    : TupleType::get(destSugarFields, DestTy->getASTContext());
+  
   ArrayRef<int> Mapping = TC.Context.AllocateCopy(NewElements);
   TupleShuffleExpr *TSE = new (TC.Context) TupleShuffleExpr(E, Mapping,
-                                                            DestTy);
+                                                            destSugarTy);
   TSE->setVarargsInjectionFunction(injectionFn);
   return coerced(TSE, Flags);
 }
