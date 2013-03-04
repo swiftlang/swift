@@ -687,26 +687,27 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
 
   SmallVector<Expr*, 8> SubExprs;
   SmallVector<Identifier, 8> SubExprNames;
-  
-  // See if we have an operator decl ref '(<op>)'. The operator token in this
-  // case lexes as a binary operator because it neither leads nor follows a
-  // proper subexpression.
-  if (Tok.is(tok::oper_binary) &&
-      (peekToken().is(RightTok) || peekToken().is(tok::comma))) {
+
+  if (Tok.isNot(RightTok)) {
     do {
-      SourceLoc Loc = Tok.getLoc();
-      Identifier OperName;
-      if (parseAnyIdentifier(OperName, diag::expected_operator_ref))
-        return nullptr;
-      // Bypass local lookup. Use an 'Ordinary' reference kind so that the
-      // reference may resolve to any unary or binary operator based on context.
-      auto *SubExpr = new (Context) UnresolvedDeclRefExpr(OperName,
+      // See if we have an operator decl ref '(<op>)'. The operator token in
+      // this case lexes as a binary operator because it neither leads nor
+      // follows a proper subexpression.
+      if (Tok.is(tok::oper_binary) &&
+          (peekToken().is(RightTok) || peekToken().is(tok::comma))) {
+        SourceLoc Loc = Tok.getLoc();
+        Identifier OperName;
+        if (parseAnyIdentifier(OperName, diag::expected_operator_ref))
+          return nullptr;
+        // Bypass local lookup. Use an 'Ordinary' reference kind so that the
+        // reference may resolve to any unary or binary operator based on
+        // context.
+        auto *SubExpr = new(Context)UnresolvedDeclRefExpr(OperName,
                                                           DeclRefKind::Ordinary,
                                                           Loc);
-      SubExprs.push_back(SubExpr);
-    } while (consumeIf(tok::comma));
-  } else if (Tok.isNot(RightTok)) {
-    do {
+        SubExprs.push_back(SubExpr);
+        continue;
+      }
       Identifier FieldName;
       // Check to see if there is a field specifier, like "x =".
       if (Tok.is(tok::identifier) && peekToken().is(tok::equal)) {
