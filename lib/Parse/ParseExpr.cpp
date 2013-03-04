@@ -690,6 +690,22 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
 
   if (Tok.isNot(RightTok)) {
     do {
+      Identifier FieldName;
+      // Check to see if there is a field specifier, like "x =".
+      if (Tok.is(tok::identifier) && peekToken().is(tok::equal)) {
+        if (parseIdentifier(FieldName,
+                            diag::expected_field_spec_name_tuple_expr) ||
+            parseToken(tok::equal, diag::expected_equal_in_tuple_expr))
+          return 0;
+      }
+
+      if (!SubExprNames.empty())
+        SubExprNames.push_back(FieldName);
+      else if (FieldName.get()) {
+        SubExprNames.resize(SubExprs.size());
+        SubExprNames.push_back(FieldName);
+      }
+
       // See if we have an operator decl ref '(<op>)'. The operator token in
       // this case lexes as a binary operator because it neither leads nor
       // follows a proper subexpression.
@@ -706,28 +722,12 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
                                                           DeclRefKind::Ordinary,
                                                           Loc);
         SubExprs.push_back(SubExpr);
-        continue;
-      }
-      Identifier FieldName;
-      // Check to see if there is a field specifier, like "x =".
-      if (Tok.is(tok::identifier) && peekToken().is(tok::equal)) {
-        if (parseIdentifier(FieldName,
-                            diag::expected_field_spec_name_tuple_expr) ||
-            parseToken(tok::equal, diag::expected_equal_in_tuple_expr))
+      } else {
+        NullablePtr<Expr> SubExpr = parseExpr(diag::expected_expr_in_expr_list);
+        if (SubExpr.isNull())
           return 0;
+        SubExprs.push_back(SubExpr.get());
       }
-      
-      if (!SubExprNames.empty())
-        SubExprNames.push_back(FieldName);
-      else if (FieldName.get()) {
-        SubExprNames.resize(SubExprs.size());
-        SubExprNames.push_back(FieldName);
-      }
-
-      NullablePtr<Expr> SubExpr = parseExpr(diag::expected_expr_in_expr_list);
-      if (SubExpr.isNull())
-        return 0;
-      SubExprs.push_back(SubExpr.get());
     } while (consumeIf(tok::comma));
   }
   
