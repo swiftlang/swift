@@ -759,6 +759,12 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
   // type, because we haven't picked a literal type yet.
   if (DestTy->isExistentialType())
     return CoercionResult::Unknowable;
+  
+  // If the destination type is equivalent to the default literal type, use
+  // the default literal type as the sugared type of the literal.
+  Type defaultLiteralTy = TC.getDefaultLiteralType(E);
+  if (DestTy->isEqual(defaultLiteralTy))
+    DestTy = defaultLiteralTy;
 
   LiteralKind LitTy;
   if (isa<IntegerLiteralExpr>(E))
