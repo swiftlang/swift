@@ -896,11 +896,11 @@ namespace {
 
     /// \brief Given an imported method, try to import it as a constructor.
     ///
-    /// Objective-C methods in the 'init' and 'new' family are imported as
+    /// Objective-C methods in the 'init' family are imported as
     /// constructors in Swift, enabling the 'new' syntax, e.g.,
     ///
     /// \code
-    /// new NSArray(1024) // same as NSArray.alloc.initWithCapacity:1024
+    /// new NSArray(1024) // in objc: [[NSArray alloc] initWithCapacity:1024]
     /// \endcode
     ConstructorDecl *importConstructor(Decl *decl,
                                        clang::ObjCMethodDecl *objcMethod,
@@ -927,7 +927,7 @@ namespace {
           return nullptr;
       } while (true);
 
-      // Only methods in the 'init' and 'new' family can become constructors.
+      // Only methods in the 'init' family can become constructors.
       FuncDecl *alloc = nullptr;
       switch (objcMethod->getMethodFamily()) {
       case clang::OMF_alloc:
