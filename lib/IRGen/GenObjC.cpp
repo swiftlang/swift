@@ -291,7 +291,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
 /// Determine the natural limits on how we can call the given method
 /// using Objective-C method dispatch.
 AbstractCallee irgen::getAbstractObjCMethodCallee(IRGenFunction &IGF,
-                                                  FuncDecl *fn) {
+                                                  ValueDecl *fn) {
   return AbstractCallee(AbstractCC::C, ExplosionKind::Minimal,
                         /*minUncurry*/ 1, /*maxUncurry*/ 1,
                         ExtraData::None);
@@ -394,6 +394,21 @@ namespace {
 
     Selector(FuncDecl *method) {
       method->getObjCSelector(Text);
+    }
+    
+    Selector(ConstructorDecl *ctor) {
+      ctor->getObjCSelector(Text);
+    }
+    
+    Selector(ValueDecl *methodOrCtor) {
+      if (auto *method = dyn_cast<FuncDecl>(methodOrCtor)) {
+        method->getObjCSelector(Text);
+      } else if (auto *ctor = dyn_cast<ConstructorDecl>(methodOrCtor)) {
+        ctor->getObjCSelector(Text);
+      } else {
+        llvm_unreachable("property selector should be generated using ForGetter"
+                         " or ForSetter constructors");
+      }
     }
     
     Selector(VarDecl *property, ForGetter_t) {
@@ -606,12 +621,14 @@ static void emitObjCClassRValue(IRGenFunction &IGF, Expr *E, Explosion &out) {
 }
 
 /// Try to find a clang method declaration for the given function.
-static clang::ObjCMethodDecl *findClangMethod(FuncDecl *method) {
-  if (auto decl = method->getClangDecl())
-    return cast<clang::ObjCMethodDecl>(decl);
+static clang::ObjCMethodDecl *findClangMethod(ValueDecl *method) {
+  if (FuncDecl *methodFn = dyn_cast<FuncDecl>(method)) {
+    if (auto decl = methodFn->getClangDecl())
+      return cast<clang::ObjCMethodDecl>(decl);
 
-  if (auto overridden = method->getOverriddenDecl())
-    return findClangMethod(overridden);
+    if (auto overridden = methodFn->getOverriddenDecl())
+      return findClangMethod(overridden);
+  }
 
   return nullptr;
 }
@@ -619,7 +636,7 @@ static clang::ObjCMethodDecl *findClangMethod(FuncDecl *method) {
 /// Set the appropriate ownership conventions for an Objective-C
 /// method on the given callee.
 static const OwnershipConventions &setOwnershipConventions(Callee &callee,
-                                                           FuncDecl *method,
+                                                     ValueDecl *method,
                                                      const Selector &selector) {
   if (auto clangDecl = findClangMethod(method)) {
     callee.setOwnershipConventions<ObjCMethodConventions>(clangDecl);
@@ -686,14 +703,23 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
 }
 
 /// Prepare a call using ObjC method dispatch.
-CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF, FuncDecl *method,
+CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF,
+                                          ValueDecl *method,
                                           Expr *self,
                                           CanType substResultType,
                                           ArrayRef<Substitution> subs,
                                           ExplosionKind maxExplosion,
                                           unsigned maxUncurry,
                                           CanType searchType) {
-  CanType origFormalType = method->getType()->getCanonicalType();
+  assert((isa<FuncDecl>(method) || isa<ConstructorDecl>(method))
+         && "objc method call must be to a func or constructor decl");
+  Type formalType;
+  if (auto *ctor = dyn_cast<ConstructorDecl>(method)) {
+    formalType = ctor->getInitializerType();
+  } else {
+    formalType = method->getType();
+  }
+  CanType origFormalType = formalType->getCanonicalType();
   ObjCMethodSignature sig(IGF.IGM, origFormalType, bool(searchType));
 
   // Create the appropriate messenger function.
@@ -731,11 +757,17 @@ CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF, FuncDecl *method,
 
   // Emit the self or super argument.
   Explosion selfValues(ExplosionKind::Minimal);
+  
+  // super.constructor references an instance method (even though the
+  // decl is really a 'static' member).
+  bool isInstanceMethod
+    = isa<ConstructorDecl>(method) || method->isInstanceMember();
+  
   if (searchType) {
-    emitSuperArgument(IGF, method->isInstanceMember(), self, selfValues,
+    emitSuperArgument(IGF, isInstanceMethod, self, selfValues,
                       searchType);
   } else {
-    emitSelfArgument(IGF, method->isInstanceMember(), self, selfValues);
+    emitSelfArgument(IGF, isInstanceMethod, self, selfValues);
   }
   assert(selfValues.size() == 1);
 

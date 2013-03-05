@@ -36,10 +36,10 @@ namespace irgen {
 
   /// Determine the natural limits on how we can call the given
   /// Objective-C member function.
-  AbstractCallee getAbstractObjCMethodCallee(IRGenFunction &IGF, FuncDecl *fn);
+  AbstractCallee getAbstractObjCMethodCallee(IRGenFunction &IGF, ValueDecl *fn);
 
   CallEmission prepareObjCMethodCall(IRGenFunction &IGF,
-                                     FuncDecl *method,
+                                     ValueDecl *method,
                                      Expr *self,
                                      CanType substResultType,
                                      llvm::ArrayRef<Substitution> subs,

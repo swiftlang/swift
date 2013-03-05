@@ -967,6 +967,9 @@ namespace {
       
       /// An Objective-C super send.
       ObjCSuper,
+      
+      /// An Objective-C super send to a constructor (init method).
+      ObjCSuperConstructor,
 
       /// A call to a protocol member on a value of existential type.
       Existential,
@@ -1002,6 +1005,10 @@ namespace {
         FuncDecl *Fn;
         TypeBase *SearchClass;
       } ObjCSuper;
+      struct {
+        ConstructorDecl *Ctor;
+        TypeBase *SearchClass;
+      } ObjCSuperConstructor;
       struct {
         ExistentialMemberRefExpr *Fn;
       } Existential;
@@ -1051,6 +1058,15 @@ namespace {
       result.TheKind = Kind::ObjCSuper;
       result.ObjCSuper.Fn = fn;
       result.ObjCSuper.SearchClass = searchClass.getPointer();
+      return result;
+    }
+    
+    static CalleeSource forObjCSuperConstructor(ConstructorDecl *ctor,
+                                                CanType searchClass) {
+      CalleeSource result;
+      result.TheKind = Kind::ObjCSuperConstructor;
+      result.ObjCSuperConstructor.Ctor = ctor;
+      result.ObjCSuperConstructor.SearchClass = searchClass.getPointer();
       return result;
     }
 
@@ -1109,15 +1125,35 @@ namespace {
       return Virtual.Fn;
     }
 
-    FuncDecl *getObjCMethod() const {
+    ValueDecl *getObjCMethod() const {
       switch (getKind()) {
       case Kind::ObjCMessage:
         return ObjCMessage.Fn;
       case Kind::ObjCSuper:
         return ObjCSuper.Fn;
+      case Kind::ObjCSuperConstructor:
+        return ObjCSuperConstructor.Ctor;
       default:
         llvm_unreachable("not an objc callee");
       }
+    }
+    
+    CanType getObjCSuperSearchTypeOrNull() const {
+      switch (getKind()) {
+      case Kind::ObjCSuper:
+        return CanType(ObjCSuper.SearchClass);
+      case Kind::ObjCSuperConstructor:
+        return CanType(ObjCSuperConstructor.SearchClass);
+      case Kind::ObjCMessage:
+        return CanType();
+      default:
+        llvm_unreachable("not an objc callee");
+      }
+    }
+    
+    ConstructorDecl *getObjCSuperConstructor() const {
+      assert(getKind() == Kind::ObjCSuperConstructor);
+      return ObjCSuperConstructor.Ctor;
     }
 
     ExistentialMemberRefExpr *getExistentialFunction() const {
@@ -1150,6 +1186,7 @@ namespace {
 
       case Kind::ObjCSuper:
       case Kind::ObjCMessage:
+      case Kind::ObjCSuperConstructor:
         return getAbstractObjCMethodCallee(IGF, getObjCMethod());
 
       case Kind::Existential:
@@ -1885,7 +1922,8 @@ CallEmission CalleeSource::prepareRootCall(IRGenFunction &IGF,
   }
       
   case Kind::ObjCMessage:
-  case Kind::ObjCSuper: {
+  case Kind::ObjCSuper:
+  case Kind::ObjCSuperConstructor: {
     // Find the 'self' expression and pass it separately.
     Expr *self = CallSites[0].getArg();
     CallSites.erase(CallSites.begin());
@@ -1893,9 +1931,7 @@ CallEmission CalleeSource::prepareRootCall(IRGenFunction &IGF,
     return prepareObjCMethodCall(IGF, getObjCMethod(), self,
                                  SubstResultType, getSubstitutions(),
                                  maxExplosion, bestUncurry,
-                                 getKind() == Kind::ObjCSuper
-                                   ? CanType(ObjCSuper.SearchClass)
-                                   : CanType());
+                                 getObjCSuperSearchTypeOrNull());
   }
 
   case Kind::Virtual: {
@@ -2027,13 +2063,20 @@ namespace {
     CalleeSource getSourceForSuper(Expr *FnRef, CanType SuperTy) {
       // The callee should only ever be a constructor or member method.
       if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(FnRef)) {
-        return visitOtherConstructorDeclRefExpr(ctorRef);
+        if (SuperTy->getClassOrBoundGenericClass()->isObjC())
+          // Use ObjC super dispatch to the super init method.
+          return CalleeSource::forObjCSuperConstructor(ctorRef->getDecl(),
+                                                       SuperTy);
+        else
+          // Swift super.constructor calls are direct, like other constructor-
+          // to-constructor calls.
+          return visitOtherConstructorDeclRefExpr(ctorRef);
       }
       if (auto *declRef = dyn_cast<DeclRefExpr>(FnRef)) {
         FuncDecl *fn = cast<FuncDecl>(declRef->getDecl());
         
         if (fn->isObjC())
-          // User ObjC super dispatch.
+          // Use ObjC super dispatch.
           // FIXME: The test we really want is to ask if this function ONLY has an
           // Objective-C implementation, but for now we'll just always go through
           // the Objective-C version.

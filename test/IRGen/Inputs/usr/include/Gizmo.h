@@ -27,9 +27,12 @@ struct NSRect {
   } size;
 };
 
+typedef long NSInteger;
+
 @interface Gizmo : NSObject
 - (Gizmo*) clone NS_RETURNS_RETAINED;
 - (Gizmo*) duplicate;
+- (Gizmo*) initWithBellsOn:(NSInteger)x;
 - (void) fork NS_CONSUMES_SELF;
 - (void) enumerateSubGizmos: (void (^)(Gizmo*))f;
 + (void) consume: (NS_CONSUMED Gizmo*) gizmo;
