@@ -231,19 +231,6 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E, SGFContext C) {
   return emitApply(E, FnV, ArgsV);
 }
 
-ManagedValue SILGenFunction::visitSuperConstructorRefCallExpr(
-                                                SuperConstructorRefCallExpr *E,
-                                                SGFContext C) {
-  // A SuperConstructorRefCall really references the initializing constructor,
-  // not the main allocating constructor entry point.
-  ConstructorDecl *ctor = E->getConstructor();
-  Value initializer = emitGlobalConstantRef(E->getFn(),
-                                  SILConstant(ctor, SILConstant::Initializer));
-  llvm::SmallVector<Value, 10> ArgsV;
-  emitApplyArguments(E->getArg(), ArgsV);
-  return emitApply(E, initializer, ArgsV);
-}
-
 Value SILGenFunction::emitGlobalConstantRef(SILLocation loc,
                                             SILConstant constant) {
   return B.createConstantRef(loc, constant, SGM.getConstantType(constant));

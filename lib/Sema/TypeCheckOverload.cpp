@@ -821,15 +821,6 @@ Expr *TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
     result = recheckTypes(result);
     if (!result)
       return nullptr;
-  } else if (auto SCRE = dyn_cast<OverloadedSuperConstructorRefExpr>(expr)) {
-    result = OverloadedSuperConstructorRefExpr::createWithCopy(SCRE->getBase(),
-                                                             SCRE->getSuperLoc(),
-                                                             SCRE->getDotLoc(),
-                                                             Remaining,
-                                                             SCRE->getLoc());
-    result = recheckTypes(result);
-    if (!result)
-      return nullptr;
   } else {
     assert((isa<DeclRefExpr>(expr) || isa<MemberRefExpr>(expr) ||
             isa<ExistentialMemberRefExpr>(expr) ||
@@ -863,18 +854,6 @@ TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
                                              decls, MRE->getMemberLoc()));
     if (!result)
       return nullptr;
-  } else if (auto SCRE = dyn_cast<OverloadedSuperConstructorRefExpr>(expr)) {
-    ConstructorDecl *candidateCtor = cast<ConstructorDecl>(Candidate.getDecl());
-    DeclRefExpr *candidateFn = new (Context) DeclRefExpr(candidateCtor,
-                                           SCRE->getLoc(),
-                                           candidateCtor->getInitializerType());
-    
-    result = new (Context) SuperConstructorRefCallExpr(SCRE->getSuperLoc(),
-                                                       SCRE->getDotLoc(),
-                                                       SCRE->getLoc(),
-                                                       candidateFn,
-                                                       SCRE->getBase());
-    result = recheckTypes(result);
   } else {
     assert((isa<DeclRefExpr>(expr) || isa<MemberRefExpr>(expr) ||
             isa<ExistentialMemberRefExpr>(expr) ||

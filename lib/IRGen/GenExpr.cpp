@@ -81,8 +81,7 @@ static void emitStringLiteralExpr(IRGenFunction &IGF,
   emitStringLiteral(IGF, E->getValue(), includeSize, out);
 }
 
-static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
-  ValueDecl *D = E->getDecl();
+static LValue emitDeclRefLValue(IRGenFunction &IGF, ValueDecl *D, Type Ty) {
   switch (D->getKind()) {
 #define VALUE_DECL(id, parent)
 #define DECL(id, parent) case DeclKind::id:
@@ -116,9 +115,8 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
 }
 
 /// Emit a declaration reference as an exploded r-value.
-static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
+static void emitDeclRef(IRGenFunction &IGF, ValueDecl *D, Type Ty, SourceLoc Loc,
                         Explosion &explosion) {
-  ValueDecl *D = E->getDecl();
   switch (D->getKind()) {
 #define VALUE_DECL(id, parent)
 #define DECL(id, parent) case DeclKind::id:
@@ -130,22 +128,22 @@ static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
   case DeclKind::Struct:
   case DeclKind::Class:
   case DeclKind::Protocol: {
-    CanType instanceTy = E->getType()->castTo<MetaTypeType>()
+    CanType instanceTy = Ty->castTo<MetaTypeType>()
       ->getInstanceType()->getCanonicalType();
     emitMetaTypeRef(IGF, instanceTy, explosion);
     return;
   }
 
   case DeclKind::Var:
-    return IGF.emitLValueAsScalar(emitDeclRefLValue(IGF, E),
+    return IGF.emitLValueAsScalar(emitDeclRefLValue(IGF, D, Ty),
                                   OnHeap, explosion);
 
   case DeclKind::Func:
     return emitRValueForFunction(IGF, cast<FuncDecl>(D), explosion);
 
   case DeclKind::OneOfElement: {
-    IGF.unimplemented(E->getLoc(), "uncurried reference to oneof");
-    IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), explosion);
+    IGF.unimplemented(Loc, "uncurried reference to oneof");
+    IGF.emitFakeExplosion(IGF.getFragileTypeInfo(Ty), explosion);
     return;
   }
 
@@ -153,8 +151,8 @@ static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
     llvm_unreachable("subscript decl cannot be referenced");
 
   case DeclKind::Constructor: {
-    IGF.unimplemented(E->getLoc(), "uncurried reference to constructor");
-    IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), explosion);
+    IGF.unimplemented(Loc, "uncurried reference to constructor");
+    IGF.emitFakeExplosion(IGF.getFragileTypeInfo(Ty), explosion);
     return;
   }
   case DeclKind::Destructor:
@@ -283,10 +281,6 @@ namespace {
                              isOnHeap(E->getType()), Out);
     }
     
-    void visitSuperSubscriptExpr(SuperSubscriptExpr *E) {
-      llvm_unreachable("super subscript not implemented");
-    }
-
     void visitTupleShuffleExpr(TupleShuffleExpr *E) {
       emitTupleShuffle(IGF, E, Out);
     }
@@ -416,7 +410,15 @@ namespace {
     }
 
     void visitDeclRefExpr(DeclRefExpr *E) {
-      emitDeclRef(IGF, E, Out);
+      emitDeclRef(IGF, E->getDecl(), E->getType(), E->getLoc(), Out);
+    }
+    void visitSuperRefExpr(SuperRefExpr *E) {
+      emitDeclRef(IGF, E->getThis(), E->getType(), E->getLoc(), Out);
+    }
+    void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {
+      IGF.unimplemented(E->getLoc(), "uncurried reference to constructor");
+      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
+      return;
     }
 
     void visitMemberRefExpr(MemberRefExpr *E) {
@@ -424,10 +426,6 @@ namespace {
                              isOnHeap(E->getType()), Out);
     }
     
-    void visitSuperMemberRefExpr(SuperMemberRefExpr *E) {
-      llvm_unreachable("super member ref not implemented");
-    }
-
     bool isLValueMember(ValueDecl *D) {
       return isa<VarDecl>(D) || isa<SubscriptDecl>(D);
     }
@@ -575,6 +573,7 @@ namespace {
     NOT_LVALUE_EXPR(SuperToArchetype)
     NOT_LVALUE_EXPR(Module)
     NOT_LVALUE_EXPR(BridgeToBlock)
+    NOT_LVALUE_EXPR(OtherConstructorDeclRef)
 #undef NOT_LVALUE_EXPR
 
     LValue visitTupleElementExpr(TupleElementExpr *E) {
@@ -592,25 +591,21 @@ namespace {
     }
 
     LValue visitDeclRefExpr(DeclRefExpr *E) {
-      return emitDeclRefLValue(IGF, E);
+      return emitDeclRefLValue(IGF, E->getDecl(), E->getType());
+    }
+    
+    LValue visitSuperRefExpr(SuperRefExpr *E) {
+      return emitDeclRefLValue(IGF, E->getThis(), E->getType());
     }
     
     LValue visitMemberRefExpr(MemberRefExpr *E) {
       return emitMemberRefLValue(IGF, E);
     }
     
-    LValue visitSuperMemberRefExpr(SuperMemberRefExpr *E) {
-      llvm_unreachable("super member ref not implemented");
-    }
-    
     LValue visitSubscriptExpr(SubscriptExpr *E) {
       return emitSubscriptLValue(IGF, E);
     }
 
-    LValue visitSuperSubscriptExpr(SuperSubscriptExpr *E) {
-      llvm_unreachable("super subscript not implemented");
-    }
-    
 #define FOR_MEMBER_KIND(KIND)                                              \
     LValue visit##KIND##MemberRefExpr(KIND##MemberRefExpr *E) {            \
       return emit##KIND##MemberRefLValue(IGF, E);                          \
@@ -639,7 +634,8 @@ namespace {
   class AddressEmitter : public irgen::ASTVisitor<AddressEmitter,
                                                   Optional<Address>,
                                                   void,
-                                                  Optional<Address> > {
+                                                  Optional<Address> >
+  {
     IRGenFunction &IGF;
     const TypeInfo &ObjectType;
 
@@ -658,6 +654,9 @@ namespace {
     // We can find addresses for some locals.
     Optional<Address> visitDeclRefExpr(DeclRefExpr *E) {
       return visit(E->getDecl());
+    }
+    Optional<Address> visitSuperRefExpr(SuperRefExpr *E) {
+      return visit(E->getThis());
     }
 
     // Visiting a decl is equivalent to visiting a reference to it.
@@ -722,10 +721,6 @@ namespace {
       return tryEmitMemberRefAsAddress(IGF, E);
     }
 
-    Optional<Address> visitSuperMemberRefExpr(SuperMemberRefExpr *E) {
-      llvm_unreachable("super member ref not implemented");
-    }
-
     // These expressions aren't naturally already in memory.
     NON_LOCATEABLE(TupleExpr)
     NON_LOCATEABLE(ArrayExpr)
@@ -757,10 +752,10 @@ namespace {
     NON_LOCATEABLE(ArchetypeMemberRefExpr)
     NON_LOCATEABLE(GenericMemberRefExpr)
     NON_LOCATEABLE(BridgeToBlockExpr)
+    NON_LOCATEABLE(OtherConstructorDeclRefExpr)
 
     // FIXME: We may want to specialize IR generation for array subscripts.
     NON_LOCATEABLE(SubscriptExpr)
-    NON_LOCATEABLE(SuperSubscriptExpr)
     NON_LOCATEABLE(ExistentialSubscriptExpr)
     NON_LOCATEABLE(ArchetypeSubscriptExpr)
     NON_LOCATEABLE(GenericSubscriptExpr)

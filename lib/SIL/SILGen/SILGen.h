@@ -432,8 +432,6 @@ public:
   ManagedValue visitExpr(Expr *E, SGFContext C);
   
   ManagedValue visitApplyExpr(ApplyExpr *E, SGFContext C);
-  ManagedValue visitSuperConstructorRefCallExpr(SuperConstructorRefCallExpr *E,
-                                                SGFContext C);
 
   ManagedValue visitDeclRefExpr(DeclRefExpr *E, SGFContext C);
   ManagedValue visitIntegerLiteralExpr(IntegerLiteralExpr *E, SGFContext C);

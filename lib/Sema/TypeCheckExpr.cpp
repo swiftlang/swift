@@ -865,6 +865,18 @@ public:
     TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
     return nullptr;
   }
+  Expr *visitSuperRefExpr(SuperRefExpr *E) {
+    TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
+    return nullptr;
+  }
+  Expr *visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {
+    TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
+    return nullptr;
+  }
+  Expr *visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *E) {
+    TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
+    return nullptr;
+  }
   Expr *visitMemberRefExpr(MemberRefExpr *E) {
     if (E->getDecl()->getType()->is<ErrorType>())
       return nullptr;
@@ -883,31 +895,6 @@ public:
                                LValueType::Qual::DefaultForMemberAccess,
                                TC.Context));
     return E;
-  }
-    
-  Expr *visitSuperMemberRefExpr(SuperMemberRefExpr *E) {
-    if (E->getDecl()->getType()->is<ErrorType>())
-      return nullptr;
-
-    // Coerce the base to an lvalue of the superclass, materializing it if is
-    // not an lvalue yet.
-    Type SuperTy
-      = E->getDecl()->getDeclContext()->getDeclaredTypeOfContext();
-    
-    if (Expr *Base = TC.coerceObjectArgument(E->getBase(), SuperTy))
-      E->setBase(Base);
-    else
-      return nullptr;
-    
-    // Compute the final lvalue type and we're done.
-    E->setType(LValueType::get(E->getDecl()->getType(),
-                               LValueType::Qual::DefaultForMemberAccess,
-                               TC.Context));
-    return E;
-  }
-    
-  Expr *visitSuperConstructorRefCallExpr(SuperConstructorRefCallExpr *E) {
-    return TC.semaSuperConstructorRefCallExpr(E);
   }
     
   Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
@@ -1073,11 +1060,6 @@ public:
     return TC.semaSubscriptExpr(E);
   }
 
-  Expr *visitSuperSubscriptExpr(SuperSubscriptExpr *E) {
-    TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
-    return nullptr;
-  }
-
   Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
     return TC.semaSubscriptExpr(E);
   }
@@ -1093,19 +1075,10 @@ public:
     return E;
   }
     
-  Expr *visitOverloadedSuperSubscriptExpr(OverloadedSuperSubscriptExpr *E) {
-    llvm_unreachable("not implemented");
-  }
-    
   Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     return TC.semaUnresolvedDotExpr(E);
   }
     
-  Expr *visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *E) {
-    TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
-    return nullptr;
-  }
-  
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
     // FIXME: This will not always be the case?
@@ -1378,7 +1351,7 @@ public:
   }
 
   bool walkToStmtPre(Stmt *S) {
-    // Never recurse into statements.
+    // Never recur into statements.
     return false;
   }
 };
@@ -1431,75 +1404,6 @@ static Type makeSimilarLValue(Type objectType, Type lvalueType,
                               ASTContext &Context) {
   LValueType::Qual qs = lvalueType->castTo<LValueType>()->getQualifiers();
   return LValueType::get(objectType, qs, Context);
-}
-
-Expr *TypeChecker::semaSuperConstructorRefCallExpr(
-                                               SuperConstructorRefCallExpr *e) {
-  // If we already diagnosed an error, don't complain again.
-  if (e->getType() && e->getType()->is<ErrorType>())
-    return nullptr;
-
-  // If we already resolved the constructor function, analyze as a typical
-  // ApplyExpr.
-  if (e->getFn()) {
-    return semaApplyExpr(e);
-  }
-  
-  // If this is a valid super constructor call, the base should be a reference
-  // to a 'this' decl.
-  Expr *base = e->getArg();
-  if (!base || base->getType()->is<ErrorType>())
-    return nullptr;
-  ValueDecl *thisDecl = cast<DeclRefExpr>(base)->getDecl();
-  
-  // Get the superclass context, which will be the parent of the constructor
-  // context.
-  DeclContext *typeContext = thisDecl->getDeclContext()->getParent();
-  assert(typeContext && "constructor without parent context?!");
-  const ClassType *classType
-    = typeContext->getDeclaredTypeInContext()->getAs<ClassType>();
-  if (!classType) {
-    diagnose(e->getLoc(), diag::super_constructor_not_in_class_constructor);
-    e->setType(ErrorType::get(Context));
-    return e;
-  }
-  // The class must have a base class.
-  ClassDecl *classDecl = classType->getDecl();
-  if (!classDecl->hasBaseClass()) {
-    diagnose(e->getLoc(), diag::super_constructor_with_no_base_class);
-    e->setType(ErrorType::get(Context));
-    return e;
-  }
-  
-  Type superTy = classDecl->getBaseClass();
-  
-  // Look for constructors in the superclass.
-  ConstructorLookup lookup(superTy, TU);
-  assert(lookup.isSuccess() && "class with no constructor?!");
-  
-  // If there's only one, use it.
-  if (lookup.Results.size() == 1) {
-    ConstructorDecl *theCtor = cast<ConstructorDecl>(lookup.Results[0]);
-    assert(theCtor->getInitializerType() && "ctor not type checked");
-    // Since we're inside a constructor and have already allocated the instance,
-    // we reference the superclass initializing constructor, not the normal
-    // allocating constructor, so this DeclRef uses the constructor's
-    // InitializerType.
-    e->setFn(new (Context) DeclRefExpr(theCtor, e->getLoc(),
-                                       theCtor->getInitializerType()));
-    // Type-check the call.
-    return semaApplyExpr(e);
-  } else {
-    // Otherwise, build an overloaded reference.
-    auto resultsCopy = Context.AllocateCopy(lookup.Results);
-    auto unresolvedTy = UnstructuredUnresolvedType::get(Context);
-    return new (Context) OverloadedSuperConstructorRefExpr(e->getArg(),
-                                                           e->getSuperLoc(),
-                                                           e->getDotLoc(),
-                                                           resultsCopy,
-                                                           e->getLoc(),
-                                                           unresolvedTy);
-  }
 }
 
 Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {

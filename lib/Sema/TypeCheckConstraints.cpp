@@ -2236,6 +2236,46 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
                                       CS.getASTContext());
     }
 
+    Type visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {
+      return E->getType();
+    }
+
+    Type visitSuperRefExpr(SuperRefExpr *E) {
+      if (!E->getType()) {
+        // Resolve the super type of 'this'.
+        Type superTy = getSuperType(E->getThis(), E->getLoc(),
+                                    diag::super_not_in_class_method,
+                                    diag::super_with_no_base_class);
+        if (!superTy)
+          return nullptr;
+        
+        superTy = LValueType::get(superTy,
+                                  LValueType::Qual::DefaultForVar,
+                                  CS.getASTContext());
+        
+        return adjustLValueForReference(superTy,
+                                        E->getThis()->getAttrs().isAssignment(),
+                                        CS.getASTContext());
+      }
+      
+      return E->getType();
+    }
+    
+    Type visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *E) {
+      ASTContext &C = CS.getASTContext();
+      
+      // Open a member constraint for constructors on the subexpr type.
+      auto baseTy = E->getSubExpr()->getType()->getRValueType();
+      auto argsTy = CS.createTypeVariable(E);
+      auto methodTy = FunctionType::get(argsTy, baseTy, C);
+      CS.addValueMemberConstraint(baseTy,
+                                  C.getIdentifier("constructor"),
+                                  methodTy, E);
+      // The result of the expression is the partial application of the
+      // constructor to 'this'.
+      return methodTy;
+    }
+    
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
       llvm_unreachable("Already type-checked");
     }
@@ -2273,15 +2313,6 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return tv;
     }
     
-    Type visitOverloadedSuperMemberRefExpr(OverloadedSuperMemberRefExpr *e) {
-      llvm_unreachable("not implemented");
-    }
-
-    Type visitOverloadedSuperConstructorRefExpr(
-                                         OverloadedSuperConstructorRefExpr *e) {
-      llvm_unreachable("not implemented");
-    }
-    
     Type visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
       // This is an error case, where we're trying to use type inference
       // to help us determine which declaration the user meant to refer to.
@@ -2296,10 +2327,6 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return tv;
     }
     
-    Type visitSuperMemberRefExpr(SuperMemberRefExpr *expr) {
-      llvm_unreachable("not implemented");
-    }
-
     Type visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -2408,33 +2435,6 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return Type();
     }
     
-    Type visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *expr) {
-      // FIXME: Protocols with default implementations and base class
-      // constraints could introduce super references on archetypes:
-      //
-      // class Foo { func bar() {} }
-      // protocol Runcible : Foo {
-      //   func runce() {
-      //     super.bar()
-      //   }
-      // }
-      
-      if (expr->getThis()->getType()->is<ErrorType>())
-        return expr->getThis()->getType();
-      
-      // Look up the base class type.
-      Type superTy = getSuperType(expr->getThis(), expr->getLoc(),
-                                  diag::super_not_in_class_method,
-                                  diag::super_with_no_base_class);
-      if (!superTy)
-        return Type();
-      
-      // Add a member constraint on the base class.
-      auto tv = CS.createTypeVariable(expr);
-      CS.addValueMemberConstraint(superTy, expr->getName(), tv, expr);
-      return tv;
-    }
-
     Type visitSequenceExpr(SequenceExpr *expr) {
       llvm_unreachable("Didn't even parse?");
     }
@@ -2612,18 +2612,10 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return dictionaryTy;
     }
 
-    Type visitSuperSubscriptExpr(SuperSubscriptExpr *expr) {
-      llvm_unreachable("not implemented");
-    }
-    
     Type visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
     
-    Type visitOverloadedSuperSubscriptExpr(OverloadedSuperSubscriptExpr *expr) {
-      llvm_unreachable("not implemented");
-    }
-
     Type visitExistentialSubscriptExpr(ExistentialSubscriptExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -2897,38 +2889,6 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return baseTy;
     }
     
-    Type visitSuperConstructorRefCallExpr(SuperConstructorRefCallExpr *expr) {
-      // If the constructor ref was already resolved, handle as a normal
-      // ApplyExpr.
-      if (expr->getFn())
-        return visitApplyExpr(expr);
-      
-      // If the 'this' argument was not assigned, the form was deemed invalid
-      // at parse time.
-      if (!expr->getArg() || expr->getArg()->getType()->is<ErrorType>())
-        return Type();
-      
-      // Look up the base class type.
-      ValueDecl *thisDecl = cast<DeclRefExpr>(expr->getArg())->getDecl();
-      Type superTy = getSuperType(thisDecl,
-                                  expr->getLoc(),
-                                  diag::super_constructor_not_in_class_constructor,
-                                  diag::super_constructor_with_no_base_class);
-      if (!superTy)
-        return Type();
-      
-      // Add a member constraint for constructors on the base class.
-      ASTContext &C = CS.getASTContext();
-      auto argsTy = CS.createTypeVariable(expr);
-      auto methodTy = FunctionType::get(argsTy, superTy, C);
-      CS.addValueMemberConstraint(superTy,
-                                  C.getIdentifier("constructor"),
-                                  methodTy, expr);
-      // The result of the expression is the partial application of the
-      // super constructor to 'this'.
-      return methodTy;
-    }
-
     Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -5396,82 +5356,6 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return result;
     }
 
-    /// \brief Build a new super member reference with the given member.
-    Expr *buildSuperMemberRef(VarDecl *thisDecl,
-                              SourceLoc superLoc,
-                              SourceLoc dotLoc,
-                              ValueDecl *member,
-                              SourceLoc memberLoc,
-                              Type openedType) {
-      assert((isa<FuncDecl>(member) || isa<VarDecl>(member)) &&
-             "super.member resolved to something not a method or property?!");
-      
-      auto &tc = CS.getTypeChecker();
-      auto &C = CS.getASTContext();
-      Type baseTy = thisDecl->getType();
-      Expr *baseRef = new (C) DeclRefExpr(thisDecl, superLoc,
-                                          thisDecl->getTypeOfReference());
-      Expr *result;
-      
-      // Reference to a member of a generic type.
-      if (baseTy->isSpecialized()) {
-        if (isa<FuncDecl>(member)) {
-          // Bind a reference to the generic type.
-          CoercionContext CC(tc);
-          Type substTy = tc.substBaseForGenericTypeMember(member, baseTy,
-                                                          member->getTypeOfReference(),
-                                                          memberLoc, CC);
-          // Reference the generic member.
-          Expr *ref = new (C) DeclRefExpr(member, memberLoc,
-                                          member->getTypeOfReference());
-          
-          // Specialize the member with the types from the base class.
-          Expr *specializedRef
-            = tc.buildSpecializeExpr(ref, substTy, CC.Substitutions,
-                                     CC.Conformance,
-                                     /*OnlyInnermostParams=*/false);
-          result = new (C) SuperCallExpr(specializedRef,
-                                         superLoc,
-                                         dotLoc,
-                                         baseRef);
-        } else {
-          // FIXME: GenericSuperMemberRefExpr
-          VarDecl *vd = cast<VarDecl>(member);
-          result = new (C) SuperMemberRefExpr(baseRef,
-                                              superLoc,
-                                              dotLoc,
-                                              vd,
-                                              memberLoc);
-        }
-      } else {
-        // Reference to a member of a non-generic type.
-        if (isa<FuncDecl>(member)) {
-          // Reference the generic member.
-          Expr *ref = new (C) DeclRefExpr(member, memberLoc,
-                                          member->getTypeOfReference());
-          
-          result = new (C) SuperCallExpr(ref, superLoc, dotLoc, baseRef);
-        } else {
-          VarDecl *vd = cast<VarDecl>(member);
-          result = new (C) SuperMemberRefExpr(baseRef,
-                                              superLoc,
-                                              dotLoc,
-                                              vd,
-                                              memberLoc);
-        }
-      }
-      
-      result = tc.recheckTypes(result);
-      if (!result)
-        return nullptr;
-      
-      if (auto polyFn = result->getType()->getAs<PolymorphicFunctionType>()) {
-        return specialize(result, polyFn, openedType);
-      }
-      
-      return result;
-    }
-    
     /// \brief Build a reference to an operator within a protocol.
     Expr *buildProtocolOperatorRef(ProtocolDecl *proto, ValueDecl *value,
                                    SourceLoc nameLoc, Type openedType) {
@@ -5573,7 +5457,36 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // No polymorphic function; this a reference to a declaration with a
       // deduced type, such as $0.
       return expr;
-
+    }
+    
+    Expr *visitSuperRefExpr(SuperRefExpr *expr) {
+      // Recast the expr as being of the original type of 'this' so that
+      // coercion inserts the necessary conversion nodes for IRGen.
+      expr->setType(expr->getThis()->getTypeOfReference());
+      return expr;
+    }
+    
+    Expr *visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *expr) {
+      expr->setType(expr->getDecl()->getInitializerType());
+      return expr;
+    }
+    
+    Expr *visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
+      // Resolve the callee to the constructor declaration selected.
+      auto ovl = CS.getGeneratedOverloadSet(expr);
+      assert(ovl && "No overload set associated with decl reference expr?");
+      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto *ctor = cast<ConstructorDecl>(selected.first.getDecl());
+      // Build a call to the initializer for the constructor.
+      auto *ctorRef
+        = new (CS.getASTContext()) OtherConstructorDeclRefExpr(ctor,
+                                                 expr->getConstructorLoc(),
+                                                 ctor->getInitializerType());
+      auto *call
+        = new (CS.getASTContext()) DotSyntaxCallExpr(ctorRef,
+                                                     expr->getDotLoc(),
+                                                     expr->getSubExpr());
+      return CS.TC.semaApplyExpr(call);
     }
 
     Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
@@ -5618,15 +5531,6 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
                             selected.second);
     }
     
-    Expr *visitOverloadedSuperMemberRefExpr(OverloadedSuperMemberRefExpr *e) {
-      llvm_unreachable("not implemented");
-    }
-
-    Expr *visitOverloadedSuperConstructorRefExpr(
-                                         OverloadedSuperConstructorRefExpr *e) {
-      llvm_unreachable("Already type-checked");
-    }
-    
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
       // FIXME: We should have generated an overload set from this, in which
       // case we can emit a typo-correction error here but recover well.
@@ -5644,10 +5548,6 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return CS.getTypeChecker().recheckTypes(expr);
     }
     
-    Expr *visitSuperMemberRefExpr(SuperMemberRefExpr *expr) {
-      llvm_unreachable("not implemented");
-    }
-
     Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -5728,33 +5628,6 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       }
     }
     
-    Expr *visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *expr) {
-      // Determine the declaration selected for this overloaded reference.
-      auto ovl = CS.getGeneratedOverloadSet(expr);
-      if (!ovl)
-        return new (CS.getASTContext()) ErrorExpr(expr->getSourceRange());
-
-      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
-      
-      switch (selected.first.getKind()) {
-      case OverloadChoiceKind::Decl: {
-        auto r = buildSuperMemberRef(expr->getThis(),
-                                   expr->getSuperLoc(),
-                                   expr->getDotLoc(),
-                                   selected.first.getDecl(), expr->getNameLoc(),
-                                   selected.second);
-        return r;
-      }
-        
-      case OverloadChoiceKind::TupleIndex:
-      case OverloadChoiceKind::BaseType:
-      case OverloadChoiceKind::FunctionReturningBaseType:
-      case OverloadChoiceKind::IdentityFunction:
-        llvm_unreachable("Nonsensical overload choice");
-      }
-
-    }
-
     Expr *visitSequenceExpr(SequenceExpr *expr) {
       llvm_unreachable("Expression wasn't parsed?");
     }
@@ -5940,18 +5813,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return expr;
     }
     
-    Expr *visitSuperSubscriptExpr(SuperSubscriptExpr *expr) {
-      llvm_unreachable("super subscript not implemented");
-    }
-
     Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
     
-    Expr *visitOverloadedSuperSubscriptExpr(OverloadedSuperSubscriptExpr *expr) {
-      llvm_unreachable("not implemented");
-    }
-
     Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -6169,20 +6034,6 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return tc.semaApplyExpr(expr);
     }
     
-    Expr *visitSuperConstructorRefCallExpr(SuperConstructorRefCallExpr *expr) {
-      // Resolve the callee to the constructor declaration selected.
-      auto ovl = CS.getGeneratedOverloadSet(expr);
-      assert(ovl && "No overload set associated with decl reference expr?");
-      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
-      ConstructorDecl *ctor = cast<ConstructorDecl>(selected.first.getDecl());
-      // Reference the initializer, not the allocator.
-      DeclRefExpr *ctorRef = new (CS.TC.Context) DeclRefExpr(ctor,
-                                                   SourceLoc(),
-                                                   ctor->getInitializerType());
-      expr->setFn(ctorRef);
-      return CS.TC.semaApplyExpr(expr);
-    }
-
     Expr *visitNewReferenceExpr(NewReferenceExpr *expr) {
       auto instanceTy = CS.simplifyType(expr->getType());
       expr->setType(instanceTy);

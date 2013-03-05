@@ -243,14 +243,18 @@ public:
     // will be deduced to.
     return CoercionResult::Unknowable;
   }
+  CoercedResult visitSuperRefExpr(SuperRefExpr *E) {
+    return failed(E); // FIXME: Is this reachable?
+  }
+  CoercedResult visitOtherConstructorDeclRefExpr(
+                                               OtherConstructorDeclRefExpr *E) {
+    return failed(E); // FIXME: Is this reachable?
+  }
   CoercedResult visitMemberRefExpr(MemberRefExpr *E) {
     if (E->getType()->isUnresolvedType())
       return CoercionResult::Unknowable;
 
     return failed(E); // FIXME: Is this reachable?
-  }
-  CoercedResult visitSuperMemberRefExpr(SuperMemberRefExpr *E) {
-    llvm_unreachable("super member ref not implemented");
   }
   CoercedResult visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
     return failed(E); // FIXME: Is this reachable?
@@ -280,9 +284,6 @@ public:
       return CoercionResult::Unknowable;
 
     return failed(E);
-  }
-  CoercedResult visitSuperSubscriptExpr(SuperSubscriptExpr *E) {
-    llvm_unreachable("super subscript not implemented");
   }
   CoercedResult visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
     return failed(E); // FIXME: Is this reachable?
@@ -347,11 +348,6 @@ public:
 
   }
   
-  CoercedResult visitOverloadedSuperSubscriptExpr(
-                                              OverloadedSuperSubscriptExpr *E) {
-    llvm_unreachable("not implemented");
-  }
-
   CoercedResult visitOverloadedExpr(OverloadedExpr Ovl) {
     SourceLoc Loc = Ovl.getExpr()->getLoc();
     SmallVector<ValueDecl *, 4> Viable;
@@ -499,9 +495,6 @@ public:
     TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
     return nullptr;
   }
-  CoercedResult visitUnresolvedSuperMemberExpr(UnresolvedSuperMemberExpr *E) {
-    llvm_unreachable("not implemented");
-  }
 
   CoercedResult visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
@@ -548,6 +541,10 @@ public:
     llvm_unreachable("This node doesn't exist for unresolved types");
   }
 
+  CoercedResult visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *E) {
+    llvm_unreachable("This node doesn't exist for unresolved types");
+  }
+  
   CoercedResult visitAddressOfExpr(AddressOfExpr *E) {
     LValueType *DestLT = DestTy->getAs<LValueType>();
     if (!DestLT) {

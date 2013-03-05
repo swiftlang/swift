@@ -956,7 +956,7 @@ namespace {
       Direct,
       
       /// A direct call to a superclass's constructor.
-      DirectSuperConstructor,
+      InitializingConstructor,
 
       /// A virtual call to a class member.  The first argument is a
       /// pointer to a class instance or metatype.
@@ -991,7 +991,7 @@ namespace {
       } Direct;
       struct {
         ConstructorDecl *Ctor;
-      } DirectSuperConstructor;
+      } InitializingConstructor;
       struct {
         FuncDecl *Fn;
       } Virtual;
@@ -1032,10 +1032,10 @@ namespace {
       return result;
     }
     
-    static CalleeSource forDirectSuperConstructor(ConstructorDecl *ctor) {
+    static CalleeSource forInitializingConstructor(ConstructorDecl *ctor) {
       CalleeSource result;
-      result.TheKind = Kind::DirectSuperConstructor;
-      result.DirectSuperConstructor.Ctor = ctor;
+      result.TheKind = Kind::InitializingConstructor;
+      result.InitializingConstructor.Ctor = ctor;
       return result;
     }
 
@@ -1086,9 +1086,9 @@ namespace {
       return Direct.Fn;
     }
     
-    ConstructorDecl *getDirectSuperConstructor() const {
-      assert(getKind() == Kind::DirectSuperConstructor);
-      return DirectSuperConstructor.Ctor;
+    ConstructorDecl *getInitializingConstructor() const {
+      assert(getKind() == Kind::InitializingConstructor);
+      return InitializingConstructor.Ctor;
     }
 
     Expr *getSideEffects() const {
@@ -1141,9 +1141,9 @@ namespace {
       case Kind::Direct:
         return AbstractCallee::forDirectFunction(IGF, getDirectFunction());
           
-      case Kind::DirectSuperConstructor:
+      case Kind::InitializingConstructor:
         return AbstractCallee::forDirectFunction(IGF,
-                                                 getDirectSuperConstructor());
+                                                 getInitializingConstructor());
 
       case Kind::Virtual:
         return getAbstractVirtualCallee(IGF, getVirtualFunction());
@@ -1876,8 +1876,8 @@ CallEmission CalleeSource::prepareRootCall(IRGenFunction &IGF,
                                               getSubstitutions(),
                                               maxExplosion, bestUncurry));
 
-  case Kind::DirectSuperConstructor: {
-    Callee callee = emitSuperConstructorCallee(IGF, getDirectSuperConstructor(),
+  case Kind::InitializingConstructor: {
+    Callee callee = emitSuperConstructorCallee(IGF, getInitializingConstructor(),
                                                SubstResultType,
                                                getSubstitutions(),
                                                maxExplosion, bestUncurry);
@@ -1962,11 +1962,13 @@ namespace {
         
     /// Get the original uncoerced type of a super call for objc_msgSendSuper2
     /// search.
-    /// FIXME: Keep a ClassDecl ref directly in the AST.
     CanType getSuperSearchClass(Expr *e) {
       while (ImplicitConversionExpr *d = dyn_cast<ImplicitConversionExpr>(e)) {
         e = d->getSubExpr();
       }
+      if (!isa<SuperRefExpr>(e))
+        return CanType();
+      
       Type origType = e->getType()->getRValueType();
       if (MetaTypeType *meta = origType->getAs<MetaTypeType>()) {
         origType = meta->getInstanceType();
@@ -1974,37 +1976,14 @@ namespace {
       return origType->getCanonicalType();
     }
         
-    CalleeSource visitSuperConstructorRefCallExpr(
-                                              SuperConstructorRefCallExpr *E) {
+    CalleeSource visitOtherConstructorDeclRefExpr(
+                                              OtherConstructorDeclRefExpr *E) {
+      // Reference the initializing entry point of the other constructor.
       CalleeSource source =
-        CalleeSource::forDirectSuperConstructor(E->getConstructor());
-      source.addCallSite(CallSite(E));
+        CalleeSource::forInitializingConstructor(E->getDecl());
       return source;
     }
         
-    CalleeSource visitSuperCallExpr(SuperCallExpr *E) {
-      DeclRefExpr *D = cast<DeclRefExpr>(E->getFn());
-      FuncDecl *fn = cast<FuncDecl>(D->getDecl());
-
-      CalleeSource source;
-      
-      if (fn->isObjC())
-        // FIXME: The test we really want is to ask if this function ONLY has an
-        // Objective-C implementation, but for now we'll just always go through
-        // the Objective-C version.
-        source = CalleeSource::forObjCSuper(fn,
-                                            getSuperSearchClass(E->getArg()));
-      else
-        // Pure Swift super calls can be direct.
-        // FIXME: Need to consider the resilience of the base class hierarchy,
-        // in case we picked up a super from an ancestor class--a nearer
-        // ancestor could end up intervening.
-        source = CalleeSource::forDirect(fn);
-      
-      source.addCallSite(CallSite(E));
-      return source;
-    }
-      
     CalleeSource visitDeclRefExpr(DeclRefExpr *E) {
       if (FuncDecl *fn = dyn_cast<FuncDecl>(E->getDecl())) {
         // FIXME: The test we really want is to ask if this function ONLY has an
@@ -2044,9 +2023,40 @@ namespace {
       src.addSubstitutions(E->getSubstitutions());
       return src;
     }
+        
+    CalleeSource getSourceForSuper(Expr *FnRef, CanType SuperTy) {
+      // The callee should only ever be a constructor or member method.
+      if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(FnRef)) {
+        return visitOtherConstructorDeclRefExpr(ctorRef);
+      }
+      if (auto *declRef = dyn_cast<DeclRefExpr>(FnRef)) {
+        FuncDecl *fn = cast<FuncDecl>(declRef->getDecl());
+        
+        if (fn->isObjC())
+          // User ObjC super dispatch.
+          // FIXME: The test we really want is to ask if this function ONLY has an
+          // Objective-C implementation, but for now we'll just always go through
+          // the Objective-C version.
+          return CalleeSource::forObjCSuper(fn, SuperTy);
+        else
+          // Pure Swift super calls can be direct.
+          // FIXME: Need to consider the resilience of the base class hierarchy,
+          // in case we picked up a super from an ancestor class--a nearer
+          // ancestor could end up intervening.
+          return CalleeSource::forDirect(fn);
+      }
+      llvm_unreachable("unexpected super call expr?!");
+    }
 
     CalleeSource visitApplyExpr(ApplyExpr *E) {
-      CalleeSource source = visit(E->getFn());
+      // If the argument to the call is 'super', the callee has different
+      // semantics.
+      // FIXME: Separate ApplyExpr and SuperApplyExpr in the expr class tree.
+      CanType superClass = getSuperSearchClass(E->getArg());
+      CalleeSource source = superClass
+        ? getSourceForSuper(E->getFn(), superClass)
+        : visit(E->getFn());
+
       source.addCallSite(CallSite(E));
       return source;
     }

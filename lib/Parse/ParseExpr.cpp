@@ -227,31 +227,34 @@ static VarDecl *getImplicitThisDeclForSuperContext(Parser &P,
 ///   expr-super-subscript:
 ///     'super' '[' expr ']'
 NullablePtr<Expr> Parser::parseExprSuper() {
+  // Parse the 'super' reference.
   SourceLoc superLoc = consumeToken(tok::kw_super);
   
+  VarDecl *thisDecl = getImplicitThisDeclForSuperContext(*this,
+                                                         CurDeclContext,
+                                                         superLoc);
+  Expr *superRef = thisDecl
+    ? cast<Expr>(new (Context) SuperRefExpr(thisDecl, superLoc))
+    : cast<Expr>(new (Context) ErrorExpr(superLoc));
+  
   if (Tok.is(tok::period)) {
-    // 'super.' must be a member or constructor ref.
+    // 'super.' must be followed by a member or constructor ref.
+
     SourceLoc dotLoc = consumeToken(tok::period);
     
     if (Tok.is(tok::kw_constructor)) {
       // super.constructor
       SourceLoc ctorLoc = consumeToken(tok::kw_constructor);
       
-      // The function expr will be resolved by sema. The base however should be
-      // 'this', which we get from the constructor context.
-      Expr *thisExpr = nullptr;
-      ConstructorDecl *ctor = dyn_cast<ConstructorDecl>(CurDeclContext);
-      if (ctor) {
-        thisExpr = new (Context) DeclRefExpr(ctor->getImplicitThisDecl(),
-                                             SourceLoc());
-      } else
+      // Check that we're actually in a constructor.
+      if (!isa<ConstructorDecl>(CurDeclContext)) {
         diagnose(ctorLoc, diag::super_constructor_not_in_constructor);
-      
-      return new (Context) SuperConstructorRefCallExpr(superLoc,
-                                                       dotLoc,
-                                                       ctorLoc,
-                                                       /*fnExpr=*/ nullptr,
-                                                       /*baseExpr=*/ thisExpr);
+        return new (Context) ErrorExpr(SourceRange(superLoc, ctorLoc),
+                                       ErrorType::get(Context));
+      }
+      // The constructor decl will be resolved by sema.
+      return new (Context) UnresolvedConstructorExpr(superRef,
+                                                     dotLoc, ctorLoc);
     } else {
       // super.foo
       SourceLoc nameLoc = Tok.getLoc();
@@ -259,18 +262,12 @@ NullablePtr<Expr> Parser::parseExprSuper() {
       if (parseIdentifier(name, diag::expected_identifier_after_super_dot_expr))
         return nullptr;
       
-      VarDecl *thisDecl = getImplicitThisDeclForSuperContext(*this,
-                                                             CurDeclContext,
-                                                             nameLoc);
-      
       if (!thisDecl)
-        return new (Context) ErrorExpr(SourceRange(superLoc, nameLoc));
+        return new (Context) ErrorExpr(SourceRange(superLoc, nameLoc),
+                                       ErrorType::get(Context));
       
-      return new (Context) UnresolvedSuperMemberExpr(thisDecl,
-                                                     superLoc,
-                                                     dotLoc,
-                                                     name,
-                                                     nameLoc);
+      return new (Context) UnresolvedDotExpr(superRef, dotLoc,
+                                             name, nameLoc);
     }
   } else if (Tok.is(tok::l_square_following)) {
     // super[expr]
@@ -278,7 +275,7 @@ NullablePtr<Expr> Parser::parseExprSuper() {
                                           tok::r_square);
     if (idx.isNull())
       return 0;
-    return new (Context) SuperSubscriptExpr(nullptr, superLoc, idx.get());
+    return new (Context) SubscriptExpr(superRef, idx.get());
   } else {
     diagnose(superLoc, diag::expected_dot_or_subscript_after_super);
     return nullptr;
