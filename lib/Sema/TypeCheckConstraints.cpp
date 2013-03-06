@@ -6196,10 +6196,6 @@ namespace {
 
       // Type check the type in an array new expression.
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
-        llvm::SaveAndRestore<bool> savedUseCS(
-                                     TC.getLangOpts().UseConstraintSolver,
-                                     false);
-
         // FIXME: Check that the element type has a default constructor.
         
         if (TC.validateType(newArray->getElementTypeLoc(),
