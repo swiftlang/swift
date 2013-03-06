@@ -1,4 +1,4 @@
-// RUN: %swift -sil-i %s | FileCheck %s
+// RUN: %swift -no-constraint-checker -sil-i %s | FileCheck %s
 
 typealias Interval = (lo:Int, hi:Int)
 

@@ -1,5 +1,4 @@
 // RUN: %swift -sil-i %s | FileCheck %s
-// XFAIL: *
 
 func localFunc(x:Int) -> Int {
   func addToX(y:Int) -> Int {
@@ -7,3 +6,6 @@ func localFunc(x:Int) -> Int {
   }
   return addToX(1)
 }
+
+// CHECK: 3
+println(localFunc(2))

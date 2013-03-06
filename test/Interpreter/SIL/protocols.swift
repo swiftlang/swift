@@ -1,9 +1,11 @@
 // RUN: %swift -sil-i %s | FileCheck %s
-// requires irgen support for SIL protocol_method instruction
-// XFAIL: *
 
 protocol RollCallable {
   func rollCall() -> String
+}
+
+protocol Snarker {
+  func snark() -> String
 }
 
 struct Cambot : RollCallable {
@@ -15,14 +17,26 @@ struct Gypsy : RollCallable {
 struct TomServo : RollCallable {
   func rollCall() -> String { return "Tom Servo!" }
 }
-struct Crow : RollCallable {
+struct Crow : RollCallable, Snarker {
   func rollCall() -> String { return "Croooow!" }
+  func snark() -> String { return "That's one O!" }
 }
 
-// FIXME: ProtocolMethodInst not irgenned yet
-func printRollCall(x:RollCallable) -> () /*{
+func printRollCall(x:RollCallable) {
   println(x.rollCall())
-}*/
+}
+
+func printRollCallWithSnark(x:protocol<RollCallable, Snarker>) {
+  printRollCall(x)
+  println("(\(x.snark()))")
+}
+
+func uninitializedProto() -> RollCallable {
+  // This just checks that zero_addr on an uninitialized protocol variable
+  // works
+  var x:RollCallable
+  return x
+}
 
 // CHECK: Cambot!
 printRollCall(Cambot())
@@ -31,4 +45,5 @@ printRollCall(Gypsy())
 // CHECK: Tom Servo!
 printRollCall(TomServo())
 // CHECK: Croooow!
-printRollCall(Crow())
+// CHECK: (That's one O!)
+printRollCallWithSnark(Crow())
