@@ -104,7 +104,8 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   
   // Create a target machine.
   TargetMachine *TargetMachine
-    = Target->createTargetMachine(Opts.Triple, /*cpu*/ "", /*features*/ "",
+    = Target->createTargetMachine(Opts.Triple, /*cpu*/ "generic",
+                                  /*features*/ "",
                                   TargetOpts, Reloc::Default,
                                   CodeModel::Default, OptLevel);
   if (!TargetMachine) {
