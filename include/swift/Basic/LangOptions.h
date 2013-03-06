@@ -34,7 +34,7 @@ namespace swift {
     ///
     /// FIXME: This option is temporary, and will be removed once the constraint
     /// solver is the only type checker.
-    bool UseConstraintSolver = false;
+    bool UseConstraintSolver = true;
 
     /// \brief Whether we are debugging the constraint solver.
     ///

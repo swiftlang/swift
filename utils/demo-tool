@@ -117,7 +117,10 @@ for example::
         print "sending command: %r" % (command.replace('\n', '<cr>'),)
         for c in command:
             send(c)
-            time.sleep(0.01)
+            if c == "\n":
+                time.sleep(0.75)
+            else:
+                time.sleep(0.005)
 
         # Wait for user input, then send a return.
         raw_input('press enter to send return...')
