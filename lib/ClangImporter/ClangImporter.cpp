@@ -123,8 +123,7 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
     invocationArgStrs.back().append(moduleCachePath.str());
   }
 
-  // Figure out where Swift lives; since Clang is linked into Swift,
-  // we assume that the headers are in the same place Clang would look.
+  // Figure out where Swift lives.
   // This silly cast below avoids a C++ warning.
   Dl_info info;
   if (dladdr((void *)(uintptr_t)swift_clang_importer, &info) == 0)
@@ -139,15 +138,13 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
 
   llvm::SmallString<128> resourceDir(swiftPath);
 
-  // We now have the swift executable/library path. Adjust it to refer to Clang.
+  // We now have the swift executable/library path. Adjust it to refer to our
+  // copy of the Clang headers under lib/swift/clang.
+
   llvm::sys::path::remove_filename(resourceDir);
   llvm::sys::path::remove_filename(resourceDir);
-#ifdef SWIFT_BUILT_WITH_CMAKE
-  // One extra level of adjustment to do.
-  // FIXME: This is unspeakably horrible.
-  llvm::sys::path::remove_filename(resourceDir);
-#endif
-  llvm::sys::path::append(resourceDir, "lib", "clang", CLANG_VERSION_STRING);
+  llvm::sys::path::append(resourceDir, "lib", "swift",
+                          "clang", CLANG_VERSION_STRING);
 
   // Set the Clang resource directory to the path we computed.
   invocationArgStrs.push_back("-resource-dir");
