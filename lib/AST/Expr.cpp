@@ -813,7 +813,10 @@ public:
   }
   
   void printApplyExpr(ApplyExpr *E, const char *NodeName) {
-    printCommon(E, NodeName) << '\n';
+    printCommon(E, NodeName);
+    if (E->isSuper())
+      OS << " super";
+    OS << '\n';
     printRec(E->getFn());
     OS << '\n';
     printRec(E->getArg());

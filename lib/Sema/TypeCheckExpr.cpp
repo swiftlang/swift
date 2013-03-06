@@ -560,6 +560,9 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     E1->setType(E2->getType());
     return E;
   }
+  
+  // If the arg is a 'super' ref, flag the apply as a 'super' call.
+  bool isSuper = isa<SuperRefExpr>(E->getArg());
 
   // Perform lvalue-to-rvalue conversion on the function.
   E1 = convertToRValue(E1);
@@ -618,6 +621,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     E->setFn(E1);
     E->setArg(E2);
     E->setType(FT->getResult());
+    E->setIsSuper(isSuper);
     return substituteInputSugarTypeForResult(E);
   }
   

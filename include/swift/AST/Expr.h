@@ -1869,15 +1869,15 @@ public:
 /// ApplyExpr - Superclass of various function calls, which apply an argument to
 /// a function to get a result.
 class ApplyExpr : public Expr {
-  /// Fn - The function being called.
+  /// The function being called.
   Expr *Fn;
 
-  /// Argument - The one argument being passed to it.
-  Expr *Arg;
+  /// The argument being passed to it, and whether it's a 'super' argument.
+  llvm::PointerIntPair<Expr *, 1, bool> ArgAndIsSuper;
 
 protected:
   ApplyExpr(ExprKind Kind, Expr *Fn, Expr *Arg, Type Ty = Type())
-    : Expr(Kind, Ty), Fn(Fn), Arg(Arg) {
+    : Expr(Kind, Ty), Fn(Fn), ArgAndIsSuper(Arg, false) {
     assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
   }
 
@@ -1885,11 +1885,16 @@ public:
   Expr *getFn() const { return Fn; }
   void setFn(Expr *e) { Fn = e; }
 
-  Expr *getArg() const { return Arg; }
+  Expr *getArg() const { return ArgAndIsSuper.getPointer(); }
   void setArg(Expr *e) {
     assert((getKind() != ExprKind::Binary || isa<TupleExpr>(e)) &&
            "BinaryExprs must have a TupleExpr as the argument");
-    Arg = e;
+    ArgAndIsSuper = {e, ArgAndIsSuper.getInt()};
+  }
+  
+  bool isSuper() const { return ArgAndIsSuper.getInt(); }
+  void setIsSuper(bool super) {
+    ArgAndIsSuper = {ArgAndIsSuper.getPointer(), super};
   }
 
   ValueDecl *getCalledValue() const;

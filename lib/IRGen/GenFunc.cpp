@@ -2002,8 +2002,8 @@ namespace {
       while (ImplicitConversionExpr *d = dyn_cast<ImplicitConversionExpr>(e)) {
         e = d->getSubExpr();
       }
-      if (!isa<SuperRefExpr>(e))
-        return CanType();
+      assert(isa<SuperRefExpr>(e)
+             && "apply expr flagged super with no 'super' expr in argument?!");
       
       Type origType = e->getType()->getRValueType();
       if (MetaTypeType *meta = origType->getAs<MetaTypeType>()) {
@@ -2094,10 +2094,8 @@ namespace {
     CalleeSource visitApplyExpr(ApplyExpr *E) {
       // If the argument to the call is 'super', the callee has different
       // semantics.
-      // FIXME: Separate ApplyExpr and SuperApplyExpr in the expr class tree.
-      CanType superClass = getSuperSearchClass(E->getArg());
-      CalleeSource source = superClass
-        ? getSourceForSuper(E->getFn(), superClass)
+      CalleeSource source = E->isSuper()
+        ? getSourceForSuper(E->getFn(), getSuperSearchClass(E->getArg()))
         : visit(E->getFn());
 
       source.addCallSite(CallSite(E));
