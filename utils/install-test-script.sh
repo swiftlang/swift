@@ -61,7 +61,7 @@ elif [ "$(cat "$TMPDIR/test_repl_1_$$")" != "Hello world" ]; then
   RESULT=1
 fi
 
-if ! /usr/bin/swift -repl -sdk=$SDK 2>"$TMPDIR/test_repl_1_err_$$" >"$TMPDIR/test_repl_2_$$" <<REPL
+if ! /usr/bin/swift -repl -sdk=$SYSROOT 2>"$TMPDIR/test_repl_1_err_$$" >"$TMPDIR/test_repl_2_$$" <<REPL
 import Foundation
 println(NSString("Hello world"))
 REPL
