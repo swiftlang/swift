@@ -368,10 +368,10 @@ and smaller protocols that make it easier to write conforming types. For
 example, should a Numeric protocol implement all operations, e.g.,::
   
   protocol Numeric {
-    func +(lhs : This, rhs : This) - > This
-    func -(lhs : This, rhs : This) - > This
-    func +(x : This) - > This
-    func -(x : This) - > This
+    func +(lhs : This, rhs : This) -> This
+    func -(lhs : This, rhs : This) -> This
+    func +(x : This) -> This
+    func -(x : This) -> This
   }
 
 which would make it easy to write general numeric algorithms, but requires the
@@ -379,8 +379,8 @@ author of some BigInt class to implement a lot of functionality, or should the
 numeric protocol implement just the core operations::
 
   protocol Numeric {
-    func +(lhs : This, rhs : This) - > This
-    func -(x : This) - > This
+    func +(lhs : This, rhs : This) -> This
+    func -(x : This) -> This
   }
 
 to make it easier to adopt the protocol (but harder to write numeric
@@ -390,10 +390,10 @@ other algorithms. However, it's far easier to allow the protocol itself to
 provide default implementations::
   
   protocol Numeric {
-    func +(lhs : This, rhs : This) - > This
-    func -(lhs : this, rhs : This) - > This { return lhs + -rhs }
-    func +(x : This) - > This { return x }
-    func -(x : This) - > This
+    func +(lhs : This, rhs : This) -> This
+    func -(lhs : this, rhs : This) -> This { return lhs + -rhs }
+    func +(x : This) -> This { return x }
+    func -(x : This) -> This
   }
 
 This makes it easier both to implement generic algorithms (which can use the
