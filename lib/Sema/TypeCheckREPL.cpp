@@ -370,12 +370,6 @@ static llvm::StringRef getDisplayNameOfExpr(Expr *E) {
 
 /// Check an expression at the top level in a REPL.
 void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
-  // FIXME: Remove this once the constraints-based type checker is the
-  // only type checker.
-  llvm::SaveAndRestore<bool> turnOffConstraints(
-                               getLangOpts().UseConstraintSolver,
-                               false);
-
   // If the input is an lvalue, force an lvalue-to-rvalue conversion.
   Expr *ConvertedE = convertToMaterializable(E);
   if (!ConvertedE)
@@ -507,11 +501,6 @@ static bool isREPLResultPattern(PatternBindingDecl *D) {
 }
 
 void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
-  // FIXME: Remove this once the constraints-based type checker is the
-  // only type checker.
-  llvm::SaveAndRestore<bool> turnOffConstraints(
-                               getLangOpts().UseConstraintSolver,
-                               false);
   Expr *E = D->getInit();
 
   // Don't print the binding if it's a REPL result binding of void type.
