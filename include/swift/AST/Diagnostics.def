@@ -838,7 +838,10 @@ ERROR(override_multiple_decls_derived,sema_tcd,none,
       "declaration cannot be overridden by more than one derived class "
       "declaration", ())
 ERROR(override_decl_extension,sema_tcd,none,
-      "declarations from extensions cannot be overridden yet", ())
+      "declarations %select{in extensions|from extensions}0 cannot "
+      "%select{override|be overridden}0 yet", (bool))
+NOTE(overridden_here,sema_tcd,none,
+     "overridden declaration is here", ())
 ERROR(overload_base_decl,sema_tcd,none,
       "cannot overload a declaration from a base class", ())
 

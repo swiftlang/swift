@@ -111,7 +111,12 @@ public:
     return getContextKind() == DeclContextKind::NominalTypeDecl ||
            getContextKind() == DeclContextKind::ExtensionDecl;
   }
-  
+
+  /// \brief Determine whether this is an extension context.
+  bool isExtensionContext() const {
+    return getContextKind() == DeclContextKind::ExtensionDecl;
+  }
+
   /// getDeclaredTypeOfContext - For a type context, retrieves the declared
   /// type of the context. Returns a null type for non-type contexts.
   Type getDeclaredTypeOfContext() const;

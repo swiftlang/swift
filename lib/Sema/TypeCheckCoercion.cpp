@@ -1018,7 +1018,8 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
   TypeDecl *DestTyDecl = 0;
   if (NominalType *Nominal = DestTy->getAs<NominalType>()) {
     DestTyDecl = Nominal->getDecl();
-    if (!isa<StructDecl>(DestTyDecl) && !isa<OneOfDecl>(DestTyDecl))
+    if (!isa<StructDecl>(DestTyDecl) && !isa<OneOfDecl>(DestTyDecl) &&
+        !isa<ClassDecl>(DestTyDecl))
       DestTyDecl = 0;
   }
   if (!DestTyDecl) {

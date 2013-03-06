@@ -216,12 +216,13 @@ static void overrideDecl(TypeChecker &TC,
                 diag::override_multiple_decls_derived);
     return;
   }
-  if (OverriddenDecl->getDeclContext()->getContextKind() ==
-      DeclContextKind::ExtensionDecl) {
-    if (!OverriddenDecl->hasClangNode()) {
-      TC.diagnose(MemberVD->getLoc(), diag::override_decl_extension);
-      return;
-    }
+  if ((OverriddenDecl->getDeclContext()->isExtensionContext() ||
+       MemberVD->getDeclContext()->isExtensionContext()) &&
+      !OverriddenDecl->isObjC()) {
+    TC.diagnose(MemberVD->getLoc(), diag::override_decl_extension,
+                OverriddenDecl->getDeclContext()->isExtensionContext());
+    TC.diagnose(OverriddenDecl->getLoc(), diag::overridden_here);
+    return;
   }
   if (auto FD = dyn_cast<FuncDecl>(MemberVD)) {
     FD->setOverriddenDecl(cast<FuncDecl>(OverriddenDecl));
@@ -244,7 +245,16 @@ static Type getBaseMemberDeclType(TypeChecker &TC,
   return TC.substMemberTypeWithBase(D->getType(), nullptr, Base);
 }
 
-static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD) {
+/// \brief Check the given set of members for any members that override a member
+/// of a base class (or its extensions).
+///
+/// \param TC The type checker.
+///
+/// \param ClassDecl The class for which we're checking overrides.
+///
+/// \param Members The set of members for which we are checking overrides.
+static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
+                                ArrayRef<Decl *> Members) {
   if (!CD->hasBaseClass())
     return;
 
@@ -263,7 +273,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD) {
   llvm::DenseMap<Identifier, std::vector<ValueDecl*>> FoundDecls;
   llvm::SmallPtrSet<ValueDecl*, 16> ExactOverriddenDecls;
   llvm::SmallVector<ValueDecl*, 16> PossiblyOverridingDecls;
-  for (Decl *MemberD : CD->getMembers()) {
+  for (Decl *MemberD : Members) {
     ValueDecl *MemberVD = dyn_cast<ValueDecl>(MemberD);
     if (!MemberVD)
       continue;
@@ -574,31 +584,68 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // it affects name lookup.  The loop here is a bit complicated because we
   // can't check a class before we've checked its base.
   {
-    llvm::SmallPtrSet<ClassDecl *, 16> CheckedClasses;
+    enum ClassState { CheckNone, CheckExtensions, CheckAll };
+    llvm::DenseMap<ClassDecl *, ClassState> CheckedClasses;
     llvm::SmallVector<ClassDecl *, 16> QueuedClasses;
     for (unsigned i = 0, e = StartElem; i != e; ++i) {
       ClassDecl *CD = dyn_cast<ClassDecl>(TU->Decls[i]);
       if (CD)
-        CheckedClasses.insert(CD);
+        CheckedClasses[CD] = CheckNone;
     }
+
+    // Find all of the classes and class extensions.
+    llvm::DenseMap<ClassDecl *, llvm::SmallVector<ExtensionDecl *, 2>>
+      Extensions;
     for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
-      ClassDecl *CD = dyn_cast<ClassDecl>(TU->Decls[i]);
-      if (!CD)
-        continue;
-      if (!CheckedClasses.insert(CD))
-        continue;
-      QueuedClasses.push_back(CD);
-      while (!QueuedClasses.empty()) {
-        CD = QueuedClasses.back();
-        if (CD->hasBaseClass()) {
-          ClassDecl *Base = CD->getBaseClass()->getClassOrBoundGenericClass();
-          if (CheckedClasses.insert(Base)) {
-            QueuedClasses.push_back(Base);
-            continue;
-          }
+      // We found a class; record it.
+      if (auto classDecl = dyn_cast<ClassDecl>(TU->Decls[i])) {
+        if (CheckedClasses.find(classDecl) == CheckedClasses.end()) {
+          QueuedClasses.push_back(classDecl);
+          CheckedClasses[classDecl] = CheckAll;
         }
-        checkClassOverrides(TC, CD);
-        QueuedClasses.pop_back();
+        continue;
+      }
+
+      auto ext = dyn_cast<ExtensionDecl>(TU->Decls[i]);
+      if (!ext)
+        continue;
+
+      auto classDecl = ext->getExtendedType()->getClassOrBoundGenericClass();
+      if (!classDecl)
+        continue;
+
+      Extensions[classDecl].push_back(ext);
+      if (CheckedClasses[classDecl] == CheckNone) {
+        QueuedClasses.push_back(classDecl);
+        ClassState &State = CheckedClasses[classDecl];
+        State = std::max(State, CheckExtensions);
+      }
+    }
+
+    // Check overrides in all of the classes and their extensions.
+    while (!QueuedClasses.empty()) {
+      auto classDecl = QueuedClasses.back();
+      if (classDecl->hasBaseClass()) {
+        ClassDecl *Base = classDecl->getBaseClass()->getClassOrBoundGenericClass();
+        if (CheckedClasses[Base] != CheckNone) {
+          QueuedClasses.push_back(Base);
+          continue;
+        }
+      }
+      if (CheckedClasses[classDecl] == CheckAll) {
+        checkClassOverrides(TC, classDecl, classDecl->getMembers());
+      }
+      CheckedClasses[classDecl] = CheckNone;
+      
+      QueuedClasses.pop_back();
+
+      // Check overrides in extensions of this class.
+      auto knownExts = Extensions.find(classDecl);
+      if (knownExts == Extensions.end())
+        continue;
+
+      for (auto ext : knownExts->second) {
+        checkClassOverrides(TC, classDecl, ext->getMembers());
       }
     }
   }
