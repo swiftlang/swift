@@ -1094,7 +1094,8 @@ public:
 
   unsigned getFieldNumber() const { return FieldNo; }
   SourceLoc getNameLoc() const { return NameLoc; }  
-
+  SourceLoc getDotLoc() const { return DotLoc; }
+  
   SourceRange getSourceRange() const { 
     return SourceRange(getBase()->getStartLoc(), getNameLoc());
   }

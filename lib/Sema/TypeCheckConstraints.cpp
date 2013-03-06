@@ -25,6 +25,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -2177,6 +2178,65 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
 
+    /// \brief Add constraints for a reference to a named member of the given
+    /// base type, and return the type of such a reference.
+    Type addMemberRefConstraints(Expr *expr, Expr *base, Identifier name) {
+      // The base must have a member of the given name, such that accessing
+      // that member through the base returns a value convertible to the type
+      // of this expression.
+      auto baseTy = base->getType();
+      auto tv = CS.createTypeVariable(expr);
+      CS.addValueMemberConstraint(baseTy, name, tv, expr);
+      return tv;
+    }
+
+    /// \brief Add constraints for a reference to a specific member of the given
+    /// base type, and return the type of such a reference.
+    Type addMemberRefConstraints(Expr *expr, Expr *base, ValueDecl *decl) {
+      auto tv = CS.createTypeVariable(expr);
+      OverloadChoice choice(base->getType(), decl);
+      CS.addOverloadSet(OverloadSet::getNew(CS, tv, expr, { &choice, 1 }));
+      return tv;
+    }
+
+    /// \brief Add constraints for a subscript operation.
+    Type addSubscriptConstraints(Expr *expr, Expr *base, Expr *index) {
+      ASTContext &Context = CS.getASTContext();
+
+      // The base type must have a subscript declaration with type
+      // I -> [byref] O, where I and O are fresh type variables. The index
+      // expression must be convertible to I and the subscript expression
+      // itself has type [byref] O, where O may or may not be settable.
+      auto inputTv = CS.createTypeVariable(expr);
+      auto outputTv = CS.createTypeVariable(expr);
+
+      auto outputSuperTv = CS.createTypeVariable(expr);
+      auto outputSuperTy = LValueType::get(outputSuperTv,
+                                           LValueType::Qual::DefaultForMemberAccess|
+                                           LValueType::Qual::Implicit|
+                                           LValueType::Qual::NonSettable,
+                                           Context);
+
+      // Add the member constraint for a subscript declaration.
+      // FIXME: lame name!
+      auto baseTy = base->getType();
+      auto fnTy = FunctionType::get(inputTv, outputTv, Context);
+      CS.addValueMemberConstraint(baseTy, Context.getIdentifier("__subscript"),
+                                  fnTy, expr);
+
+      // Add the subtype constraint that the output type must be some lvalue
+      // subtype.
+      CS.addConstraint(ConstraintKind::Subtype,
+                       outputTv,
+                       outputSuperTy);
+
+      // Add the constraint that the index expression's type be convertible
+      // to the input type of the subscript operator.
+      CS.addConstraint(ConstraintKind::Conversion, index->getType(),
+                       inputTv, expr);
+      return outputTv;
+    }
+
   public:
     ConstraintGenerator(ConstraintSystem &CS) : CS(CS) { }
 
@@ -2321,25 +2381,19 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     }
     
     Type visitMemberRefExpr(MemberRefExpr *expr) {
-      auto tv = CS.createTypeVariable(expr);
-      OverloadChoice choice(expr->getBase()->getType(), expr->getDecl());
-      CS.addOverloadSet(OverloadSet::getNew(CS, tv, expr, { &choice, 1 }));
-      return tv;
+      return addMemberRefConstraints(expr, expr->getBase(), expr->getDecl());
     }
     
     Type visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      return addMemberRefConstraints(expr, expr->getBase(), expr->getDecl());
     }
 
     Type visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      return addMemberRefConstraints(expr, expr->getBase(), expr->getDecl());
     }
 
     Type visitGenericMemberRefExpr(GenericMemberRefExpr *expr) {
-      auto tv = CS.createTypeVariable(expr);
-      OverloadChoice choice(expr->getBase()->getType(), expr->getDecl());
-      CS.addOverloadSet(OverloadSet::getNew(CS, tv, expr, { &choice, 1 }));
-      return tv;
+      return addMemberRefConstraints(expr, expr->getBase(), expr->getDecl());
     }
 
     Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
@@ -2371,13 +2425,7 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
-      // The base must have a member of the given name, such that accessing
-      // that member through the base returns a value convertible to the type
-      // of this expression.
-      auto baseTy = expr->getBase()->getType();
-      auto tv = CS.createTypeVariable(expr);
-      CS.addValueMemberConstraint(baseTy, expr->getName(), tv, expr);
-      return tv;
+      return addMemberRefConstraints(expr, expr->getBase(), expr->getName());
     }
     
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
@@ -2457,41 +2505,7 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitSubscriptExpr(SubscriptExpr *expr) {
-      ASTContext &Context = CS.getASTContext();
-
-      // The base type must have a subscript declaration with type 
-      // I -> [byref] O, where I and O are fresh type variables. The index
-      // expression must be convertible to I and the subscript expression
-      // itself has type [byref] O, where O may or may not be settable.
-      auto inputTv = CS.createTypeVariable(expr);
-      auto outputTv = CS.createTypeVariable(expr);
-
-      auto outputSuperTv = CS.createTypeVariable(expr);
-      auto outputSuperTy = LValueType::get(outputSuperTv,
-                                      LValueType::Qual::DefaultForMemberAccess|
-                                      LValueType::Qual::Implicit|
-                                      LValueType::Qual::NonSettable,
-                                      Context);
-
-      // Add the member constraint for a subscript declaration.
-      // FIXME: lame name!
-      auto baseTy = expr->getBase()->getType();
-      auto fnTy = FunctionType::get(inputTv, outputTv, Context);
-      CS.addValueMemberConstraint(baseTy, Context.getIdentifier("__subscript"),
-                                  fnTy, expr);
-      
-      // Add the subtype constraint that the output type must be some lvalue
-      // subtype.
-      CS.addConstraint(ConstraintKind::Subtype,
-                       outputTv,
-                       outputSuperTy);
-      
-      // Add the constraint that the index expression's type be convertible
-      // to the input type of the subscript operator.
-      CS.addConstraint(ConstraintKind::Conversion,
-                       expr->getIndex()->getType(),
-                       inputTv, expr);
-      return outputTv;
+      return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
     }
     
     Type visitArrayExpr(ArrayExpr *expr) {
@@ -2613,23 +2627,26 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
     }
     
     Type visitExistentialSubscriptExpr(ExistentialSubscriptExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
     }
 
     Type visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
     }
 
     Type visitGenericSubscriptExpr(GenericSubscriptExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
     }
 
     Type visitTupleElementExpr(TupleElementExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      ASTContext &context = CS.getASTContext();
+      Identifier name
+        = context.getIdentifier(llvm::utostr(expr->getFieldNumber()));
+      return addMemberRefConstraints(expr, expr->getBase(), name);
     }
 
     /// \brief Produces a type for the given pattern, filling in any missing
@@ -5356,6 +5373,46 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return result;
     }
 
+    /// \brief Build a new subscript.
+    Expr *buildSubscript(Expr *expr, Expr *base, Expr *index) {
+      // Determine the declaration selected for this subscript operation.
+      auto ovl = CS.getGeneratedOverloadSet(expr);
+      assert(ovl && "No overload set associated with subscript expr?");
+      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
+      auto subscript = cast<SubscriptDecl>(choice.getDecl());
+
+      // FIXME: Falls back to existing type checker to actually populate
+      // these nodes.
+      auto &tc = CS.getTypeChecker();
+      auto baseTy = base->getType()->getRValueType();
+
+      // Subscripting an existential type.
+      if (baseTy->isExistentialType()) {
+        auto result
+          = new (tc.Context) ExistentialSubscriptExpr(base, index, subscript);
+        return tc.semaSubscriptExpr(result);
+      }
+
+      // Subscripting an archetype.
+      if (baseTy->is<ArchetypeType>()) {
+        auto result
+        = new (tc.Context) ArchetypeSubscriptExpr(base, index, subscript);
+        return tc.semaSubscriptExpr(result);
+      }
+
+      // Subscripting a specialization of a generic type.
+      if (baseTy->isSpecialized()) {
+        auto result
+        = new (tc.Context) GenericSubscriptExpr(base, index, subscript);
+        return tc.semaSubscriptExpr(result);
+      }
+
+      // Subscripting a normal, nominal type.
+      SubscriptExpr *subscriptExpr = new (tc.Context) SubscriptExpr(base,index);
+      subscriptExpr->setDecl(subscript);
+      return tc.semaSubscriptExpr(subscriptExpr);
+    }
+
     /// \brief Build a reference to an operator within a protocol.
     Expr *buildProtocolOperatorRef(ProtocolDecl *proto, ValueDecl *value,
                                    SourceLoc nameLoc, Type openedType) {
@@ -5549,11 +5606,18 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
     
     Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
+      // FIXME: Falls back to the old type checker.
+      
       llvm_unreachable("Already type-checked");
     }
 
     Expr *visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      auto ovl = CS.getGeneratedOverloadSet(expr);
+      assert(ovl && "No overload set associated with decl reference expr?");
+      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
+      return buildMemberRef(expr->getBase(), expr->getDotLoc(),
+                            selected.first.getDecl(), expr->getNameLoc(),
+                            selected.second);
     }
 
     Expr *visitGenericMemberRefExpr(GenericMemberRefExpr *expr) {
@@ -5641,47 +5705,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
-      // Determine the declaration selected for this subscript operation.
-      auto ovl = CS.getGeneratedOverloadSet(expr);
-      assert(ovl && "No overload set associated with subscript expr?");
-      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
-      auto subscript = cast<SubscriptDecl>(choice.getDecl());
-
-      // FIXME: Falls back to existing type checker to actually populate
-      // these nodes.
-      auto &tc = CS.getTypeChecker();
-      auto baseTy = expr->getBase()->getType()->getRValueType();
-
-      // Subscripting an existential type.
-      if (baseTy->isExistentialType()) {
-        auto result
-          = new (tc.Context) ExistentialSubscriptExpr(expr->getBase(),
-                                                      expr->getIndex(),
-                                                      subscript);
-        return tc.semaSubscriptExpr(result);
-      }
-
-      // Subscripting an archetype.
-      if (baseTy->is<ArchetypeType>()) {
-        auto result
-          = new (tc.Context) ArchetypeSubscriptExpr(expr->getBase(),
-                                                    expr->getIndex(),
-                                                    subscript);
-        return tc.semaSubscriptExpr(result);
-      }
-
-      // Subscripting a specialization of a generic type.
-      if (baseTy->isSpecialized()) {
-        auto result
-          = new (tc.Context) GenericSubscriptExpr(expr->getBase(),
-                                                  expr->getIndex(),
-                                                  subscript);
-        return tc.semaSubscriptExpr(result);
-      }
-
-      // Subscripting a normal, nominal type.
-      expr->setDecl(subscript);
-      return tc.semaSubscriptExpr(expr);
+      return buildSubscript(expr, expr->getBase(), expr->getIndex());
     }
     
     Expr *visitArrayExpr(ArrayExpr *expr) {
@@ -5733,7 +5757,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
        * appropriate convertFromArrayLiteral call.
        */
       auto ovl = CS.getGeneratedOverloadSet(expr);
-      assert(ovl && "No overload set associated with subscript expr?");
+      assert(ovl && "No overload set associated with array expr?");
       auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
       auto converterDecl = cast<FuncDecl>(choice.getDecl());
       
@@ -5780,7 +5804,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
        * appropriate convertFromDictionaryLiteral call.
        */
       auto ovl = CS.getGeneratedOverloadSet(expr);
-      assert(ovl && "No overload set associated with subscript expr?");
+      assert(ovl && "No overload set associated with dictionary expr?");
       auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
       auto converterDecl = cast<FuncDecl>(choice.getDecl());
       
@@ -5814,23 +5838,24 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
     
     Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      return buildSubscript(expr, expr->getBase(), expr->getIndex());
     }
     
     Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      return buildSubscript(expr, expr->getBase(), expr->getIndex());
     }
 
     Expr *visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      return buildSubscript(expr, expr->getBase(), expr->getIndex());
     }
 
     Expr *visitGenericSubscriptExpr(GenericSubscriptExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      return buildSubscript(expr, expr->getBase(), expr->getIndex());
     }
 
     Expr *visitTupleElementExpr(TupleElementExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      simplifyExprType(expr);
+      return expr;
     }
 
     void simplifyPatternTypes(Pattern *pattern) {
