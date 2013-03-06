@@ -36,6 +36,9 @@ INSTALL_PREFIX=/usr
 # Set this to the path on matte to which release packages should be delivered.
 PACKAGE_PATH=/Users/swift-discuss
 
+# Set this to the address to which release announcements should be sent.
+PACKAGE_ANNOUNCEMENT_ADDRESS=jgroff@apple.com
+
 # Make sure the variables and directories we expect to exist actually do.
 test "$WORKSPACE"
 test -d "$WORKSPACE"
@@ -43,6 +46,14 @@ test -d "$WORKSPACE/llvm"
 test -d "$WORKSPACE/llvm/tools"
 test -d "$WORKSPACE/clang"
 test -d "$WORKSPACE/swift"
+
+# Make sure install-test-script.sh is available alongside us.
+INSTALL_TEST_SCRIPT="$(basename "$0")/install-test-script.sh"
+
+if [ \! -x "$INSTALL_TEST_SCRIPT" ]; then
+  echo "Install test script $INSTALL_TEST_SCRIPT is unavailable or not executable!"
+  exit 1
+fi
 
 # Symlink clang into the llvm tree.
 ln -sf "$WORKSPACE/clang" "$WORKSPACE/llvm/tools/clang"
@@ -115,12 +126,32 @@ if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
       exit 1
     fi
     saw_package=1
+
+    echo "--- Testing $package ---"
+    if ! "$INSTALL_TEST_SCRIPT" "$package"; then
+      echo "$package failed test!"
+      exit 1
+    fi
+
     echo "--- Delivering $package ---"
     cp "$package" "$PACKAGE_PATH" || exit 1
 
-    if [ \! "$saw_package" ]; then
-      echo "No package file built!"
-      exit 1
-    fi
+    echo "--- Announcing $package ---"
+    package_basename="$(basename "$package")"
+    sendmail -r "$PACKAGE_ANNOUNCEMENT_ADDRESS" "$PACKAGE_ANNOUNCEMENT_ADDRESS" <<EOM
+To: $PACKAGE_ANNOUNCEMENT_ADDRESS
+Subject: Release build $package_basename now available
+
+A new Swift release build has been made available at:
+  sftp://matte.apple.com/$package_basename
+Use 'darwinup install $package_basename' to install. Please report bugs
+using the 'Swift (New Bugs)' Radar component.
+.
+EOM
   done
+
+  if [ \! "$saw_package" ]; then
+    echo "No package file built!"
+    exit 1
+  fi
 fi
