@@ -48,7 +48,7 @@ test -d "$WORKSPACE/clang"
 test -d "$WORKSPACE/swift"
 
 # Make sure install-test-script.sh is available alongside us.
-INSTALL_TEST_SCRIPT="$(basename "$0")/install-test-script.sh"
+INSTALL_TEST_SCRIPT="$(dirname "$0")/install-test-script.sh"
 
 if [ \! -x "$INSTALL_TEST_SCRIPT" ]; then
   echo "Install test script $INSTALL_TEST_SCRIPT is unavailable or not executable!"
