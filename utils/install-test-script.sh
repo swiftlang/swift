@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -x
 
 # Smoke tests a Swift installation package.
 # Set these to the paths of the OS X SDK and toolchain.
@@ -9,6 +9,11 @@ TOOLCHAIN=/Applications/Xcode.app/Contents/Developer/Toolchains/OSX10.9.xctoolch
 if [ ! "$TMPDIR" ]; then
   TMPDIR=/tmp
 fi
+
+# Wipe out stale module caches.
+find "$TMPDIR" -name "*.pcm" -exec rm '{}' ';'
+find /var/tmp -name "*.pcm" -exec rm '{}' ';'
+find /tmp -name "*.pcm" -exec rm '{}' ';'
 
 # The package name should be given as the first argument.
 PACKAGE_NAME="$1"
@@ -41,12 +46,11 @@ fi
 #
 
 # Ensure that basic REPL stuff works.
-# FIXME: Remove flags when it becomes default.
 # FIXME: REPL bug--when stdout is redirected but stderr is a terminal, no
 # output appears on stdout.
 RESULT=0
 
-if ! /usr/bin/swift -repl 2>/dev/null >"$TMPDIR/test_repl_1_$$" <<REPL
+if ! /usr/bin/swift -repl 2>"$TMPDIR/test_repl_1_err_$$" >"$TMPDIR/test_repl_1_$$" <<REPL
 println("Hello world")
 REPL
 then
@@ -57,7 +61,7 @@ elif [ "$(cat "$TMPDIR/test_repl_1_$$")" != "Hello world" ]; then
   RESULT=1
 fi
 
-if ! /usr/bin/swift -repl -sdk=$SDK 2>/dev/null >"$TMPDIR/test_repl_2_$$" <<REPL
+if ! /usr/bin/swift -repl -sdk=$SDK 2>"$TMPDIR/test_repl_1_err_$$" >"$TMPDIR/test_repl_2_$$" <<REPL
 import Foundation
 println(NSString("Hello world"))
 REPL
