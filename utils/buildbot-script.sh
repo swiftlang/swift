@@ -140,10 +140,12 @@ if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
     package_basename="$(basename "$package")"
     sendmail -r "$PACKAGE_ANNOUNCEMENT_ADDRESS" "$PACKAGE_ANNOUNCEMENT_ADDRESS" <<EOM
 To: $PACKAGE_ANNOUNCEMENT_ADDRESS
-Subject: Release build $package_basename now available
+Subject: Swift release build $package_basename now available
 
 A new Swift release build has been made available at:
-  sftp://matte.apple.com/$package_basename
+
+        sftp://matte.apple.com/$package_basename
+
 Use 'darwinup install $package_basename' to install. Please report bugs
 using the 'Swift (New Bugs)' Radar component.
 .
