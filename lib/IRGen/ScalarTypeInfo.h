@@ -166,12 +166,12 @@ public:
   }
   
   void retain(IRGenFunction &IGF, Explosion &e) const {
-    llvm::Value *value = e.getRange(0, 1)[0].getValue();
+    llvm::Value *value = e.claimNext().getValue();
     asDerived().emitScalarRetain(IGF, value);
   }
 
   void release(IRGenFunction &IGF, Explosion &e) const {
-    llvm::Value *value = e.getRange(0, 1)[0].getValue();
+    llvm::Value *value = e.claimNext().getValue();
     asDerived().emitScalarRelease(IGF, value);
   }
   

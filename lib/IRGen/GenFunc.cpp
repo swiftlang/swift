@@ -462,11 +462,13 @@ namespace {
     }
 
     void retain(IRGenFunction &IGF, Explosion &e) const {
-      IGF.emitRetainCall(e.getRange(1, 2)[0].getValue());
+      e.claimUnmanagedNext();
+      IGF.emitRetainCall(e.claimNext().getValue());
     }
     
     void release(IRGenFunction &IGF, Explosion &e) const {
-      IGF.emitRelease(e.getRange(1, 2)[0].getValue());
+      e.claimUnmanagedNext();
+      IGF.emitRelease(e.claimNext().getValue());
     }
     
     void destroy(IRGenFunction &IGF, Address addr) const {

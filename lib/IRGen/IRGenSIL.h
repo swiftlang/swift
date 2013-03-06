@@ -54,7 +54,8 @@ struct PartialCall {
 /// - an Address, corresponding to a SIL address value;
 /// - an Explosion of (unmanaged) Values, corresponding to a SIL "register"; or
 /// - a CallEmission for a partially-applied curried function or method.
-struct LoweredValue {
+class LoweredValue {
+public:
   enum class Kind {
     Address,
     Explosion,
@@ -64,9 +65,14 @@ struct LoweredValue {
   Kind kind;
   
 private:
+  using ExplosionVector = llvm::SmallVector<llvm::Value*, 4>;
+  
   union {
     Address address;
-    Explosion explosion;
+    struct {
+      ExplosionKind explosionKind;
+      ExplosionVector explosionValues;
+    };
     PartialCall partialCall;
   };
 
@@ -75,9 +81,23 @@ public:
     : kind(Kind::Address), address(address)
   {}
   
-  LoweredValue(Explosion &&explosion)
-    : kind(Kind::Explosion), explosion(std::move(explosion))
-  {}
+  LoweredValue(Explosion &explosion)
+    : kind(Kind::Explosion),
+      explosionKind(explosion.getKind()),
+      explosionValues()
+  {
+    explosion.claimUnmanaged(explosion.size(), explosionValues);
+  }
+  
+  /// This is a hack to kill off cleanups emitted by some IRGen infrastructure.
+  /// SIL code should always have memory management within it explicitly lowered.
+  LoweredValue(Explosion &explosion, IRGenFunction &IGF)
+    : kind(Kind::Explosion),
+      explosionKind(explosion.getKind()),
+      explosionValues()
+  {
+    explosion.forward(IGF, explosion.size(), explosionValues);
+  }
   
   LoweredValue(PartialCall &&call)
     : kind(Kind::PartialCall), partialCall(std::move(call))
@@ -85,13 +105,14 @@ public:
   
   LoweredValue(LoweredValue &&lv)
     : kind(lv.kind)
-  {
+  {    
     switch (kind) {
     case Kind::Address:
       ::new (&address) Address(std::move(lv.address));
       break;
     case Kind::Explosion:
-      ::new (&explosion) Explosion(std::move(lv.explosion));
+      explosionKind = lv.explosionKind;
+      ::new (&explosionValues) ExplosionVector(std::move(lv.explosionValues));
       break;
     case Kind::PartialCall:
       ::new (&partialCall) PartialCall(std::move(lv.partialCall));
@@ -104,9 +125,24 @@ public:
     return address;
   }
   
-  Explosion &getExplosion() {
+  void getExplosion(Explosion &ex) {
     assert(kind == Kind::Explosion && "not an explosion");
-    return explosion;
+    assert(ex.getKind() == explosionKind &&
+           "destination explosion kind mismatch");
+    for (auto *value : explosionValues)
+      ex.addUnmanaged(value);
+  }
+  
+  Explosion getExplosion() {
+    assert(kind == Kind::Explosion && "not an explosion");
+    Explosion e(explosionKind);
+    getExplosion(e);
+    return e;
+  }
+  
+  ExplosionKind getExplosionKind() {
+    assert(kind == Kind::Explosion && "not an explosion");
+    return explosionKind;
   }
   
   PartialCall &getPartialCall() {
@@ -120,11 +156,7 @@ public:
       address.~Address();
       break;
     case Kind::Explosion:
-      // Work around Explosion's "empty" sanity check by discarding all the
-      // managed values (which should never actually be managed when generated
-      // from SIL).
-      explosion.claimAll();
-      explosion.~Explosion();
+      explosionValues.~ExplosionVector();
       break;
     case Kind::PartialCall:
       partialCall.~PartialCall();
@@ -181,13 +213,18 @@ public:
   }
   
   /// Create a new Explosion corresponding to the given SIL value.
-  Explosion &newLoweredExplosion(swift::Value v) {
+  void newLoweredExplosion(swift::Value v, Explosion &e) {
     assert(!v.getType().isAddress() && "explosion for address value?!");
-    auto inserted = loweredValues.insert({v, LoweredValue{
-      Explosion(ExplosionKind::Minimal)
-    }});
+    auto inserted = loweredValues.insert({v, LoweredValue(e)});
     assert(inserted.second && "already had lowered value for sil value?!");
-    return inserted.first->second.getExplosion();
+  }
+  
+  /// Create a new Explosion corresponding to the given SIL value, disabling
+  /// cleanups on the input Explosion if necessary.
+  void newLoweredExplosion(swift::Value v, Explosion &e, IRGenFunction &IGF) {
+    assert(!v.getType().isAddress() && "explosion for address value?!");
+    auto inserted = loweredValues.insert({v, LoweredValue(e, IGF)});
+    assert(inserted.second && "already had lowered value for sil value?!");
   }
   
   /// Create a new PartialCall corresponding to the given SIL value.
@@ -224,9 +261,16 @@ public:
   Address getLoweredAddress(swift::Value v) {
     return getLoweredValue(v).getAddress();
   }
-  Explosion &getLoweredExplosion(swift::Value v) {
+  void getLoweredExplosion(swift::Value v, Explosion &e) {
+    getLoweredValue(v).getExplosion(e);
+  }
+  Explosion getLoweredExplosion(swift::Value v) {
     return getLoweredValue(v).getExplosion();
   }
+  ExplosionKind getExplosionKind(swift::Value v) {
+    return getLoweredValue(v).getExplosionKind();
+  }
+  
   PartialCall getLoweredPartialCall(swift::Value v);
   
   LoweredBB &getLoweredBB(swift::BasicBlock *bb) {

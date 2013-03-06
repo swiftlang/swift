@@ -373,11 +373,13 @@ namespace {
     }
 
     void retain(IRGenFunction &IGF, Explosion &e) const {
-      IGF.emitRetainCall(e.getRange(1, 2)[0].getValue());
+      e.claimNext();
+      IGF.emitRetainCall(e.claimNext().getValue());
     }
       
     void release(IRGenFunction &IGF, Explosion &e) const {
-      IGF.emitRelease(e.getRange(1, 2)[0].getValue());
+      e.claimNext();
+      IGF.emitRelease(e.claimNext().getValue());
     }
       
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
