@@ -50,6 +50,6 @@ $(HeaderDir)/Foundation.swift: $(PATH_TO_SWIFT_SOURCES) $(HeaderDir)/.dir
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
 $(ObjDir)/Foundation.o: $(HeaderDir)/Foundation.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) -c $(SWIFT_SDKFLAG) $< -o $@ -parse-as-library -constraint-checker $(SWIFT_OPTFLAG)
+	$(Verb) $(SWIFT_COMPILER) -c $(SWIFT_SDKFLAG) $< -o $@ -parse-as-library $(SWIFT_OPTFLAG)
 
 all-local:: $(HeaderDir)/Foundation.swift

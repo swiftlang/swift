@@ -41,12 +41,12 @@ fi
 #
 
 # Ensure that basic REPL stuff works.
-# FIXME: Remove -constraint-checker flags when it becomes default.
+# FIXME: Remove flags when it becomes default.
 # FIXME: REPL bug--when stdout is redirected but stderr is a terminal, no
 # output appears on stdout.
 RESULT=0
 
-if ! /usr/bin/swift -repl -constraint-checker 2>/dev/null >"$TMPDIR/test_repl_1_$$" <<REPL
+if ! /usr/bin/swift -repl 2>/dev/null >"$TMPDIR/test_repl_1_$$" <<REPL
 println("Hello world")
 REPL
 then
@@ -57,7 +57,7 @@ elif [ "$(cat "$TMPDIR/test_repl_1_$$")" != "Hello world" ]; then
   RESULT=1
 fi
 
-if ! /usr/bin/swift -repl -constraint-checker -sdk=$SDK 2>/dev/null >"$TMPDIR/test_repl_2_$$" <<REPL
+if ! /usr/bin/swift -repl -sdk=$SDK 2>/dev/null >"$TMPDIR/test_repl_2_$$" <<REPL
 import Foundation
 println(NSString("Hello world"))
 REPL
@@ -78,7 +78,7 @@ print("Hello ")
 println(s)
 TEST_COMPILE
 
-if ! /usr/bin/swift -constraint-checker -c "$TMPDIR/test_compile_$$.swift" \
+if ! /usr/bin/swift -c "$TMPDIR/test_compile_$$.swift" \
   -o "$TMPDIR/test_compile_$$.o"
 then
   echo "Failed to compile Swift program!"
