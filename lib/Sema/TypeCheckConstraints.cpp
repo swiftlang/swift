@@ -6288,7 +6288,8 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   // Attempt to solve the constraint system.
   SmallVector<ConstraintSystem *, 4> viable;
   if (cs.solve(viable)) {
-    if (getLangOpts().DebugConstraintSolver) {
+    // FIXME: Dumping constraints by default due to crummy diagnostics.
+    if (getLangOpts().DebugConstraintSolver || true) {
       log << "---Solved constraints---\n";
       cs.dump();
 
@@ -6445,7 +6446,8 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   // Attempt to solve the constraint system.
   SmallVector<ConstraintSystem *, 4> viable;
   if (cs.solve(viable)) {
-    if (getLangOpts().DebugConstraintSolver) {
+    // FIXME: Dumping constraints by default due to crummy diagnostics.
+    if (getLangOpts().DebugConstraintSolver || true) {
       log << "---Solved constraints---\n";
       cs.dump();
 
