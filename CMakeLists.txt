@@ -291,12 +291,21 @@ function(handle_swift_sources sourcesvar externalvar target)
   set(${externalvar} "${externally_compiled}" PARENT_SCOPE)
 endfunction()
 
+# Set SWIFTLIB_DIR to the directory in the build tree where Swift source files
+# should be placed.
+if(XCODE)
+  set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${CMAKE_BUILD_TYPE}")
+else()
+  set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib")
+endif()
+
 # Add a new Swift library.
 #
 # Usage:
 #   add_swift_library(name           # Name of the library (e.g., swiftParse)
 #     [DEPENDS dep1 ...]             # Libraries this library depends on
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
+#     [INSTALL]                      # Install library to lib/swift
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library name)
   parse_arguments(SWIFTLIB  "DEPENDS;COMPONENT_DEPENDS" "INSTALL" ${ARGN})
@@ -350,11 +359,20 @@ macro(add_swift_library name)
 
   if(SWIFTLIB_INSTALL)
     set_target_properties(${name} PROPERTIES
-      INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib")
+      INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib/swift")
+
+    # Install runtime libraries to lib/swift instead of lib. This works around
+    # the fact that -isysroot prevents linking to libraries in the system
+    # /usr/lib if Swift is installed in /usr.
+    set_target_properties(${name} PROPERTIES
+      LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/swift
+      LIBRARY_OUTPUT_DIRECTORY_DEBUG ${SWIFTLIB_DIR}/swift
+      ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/swift
+      ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${SWIFTLIB_DIR}/swift)
 
     install(TARGETS ${name}
-      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX})
+      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift
+      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift)
 
     # FIXME: Install .swift files so they can be parsed on import.
     # Really we want to install a preparsed metadata file.
@@ -429,14 +447,6 @@ include_directories(BEFORE
   ${CMAKE_CURRENT_BINARY_DIR}/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   )
-
-# Set SWIFTLIB_DIR to the directory in the build tree where Swift source files
-# should be placed.
-if(XCODE)
-  set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${CMAKE_BUILD_TYPE}")
-else()
-  set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib")
-endif()
 
 # Add all of the subdirectories, where we actually do work.
 add_subdirectory(lib)

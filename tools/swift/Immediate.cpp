@@ -162,6 +162,7 @@ static void loadRuntimeLib(StringRef sharedLibName) {
   LibPath.eraseComponent();
   LibPath.eraseComponent();
   LibPath.appendComponent("lib");
+  LibPath.appendComponent("swift");
   LibPath.appendComponent(sharedLibName);
   dlopen(LibPath.c_str(), 0);
 }
