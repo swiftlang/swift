@@ -239,9 +239,10 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
     EndLoc = Loc;
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
-    // unless <anything> is 'metatype'.
+    // unless <anything> is 'metatype' or '('.
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
-        peekToken().isNot(tok::kw_metatype)) {
+        (peekToken().isNot(tok::kw_metatype) && 
+         peekToken().isNot(tok::l_paren_starting))) {
       consumeToken();
     } else {
       break;

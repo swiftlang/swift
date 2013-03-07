@@ -2174,6 +2174,7 @@ ill-formed if the type does not conform to the protocol.</p>
                       ::= 'super' '.' <a href="#selector-args">selector-args</a>
     expr-super-subscript ::= 'super' '[' <a href="#expr">expr</a> ']'
     expr-super-constructor ::= 'super' '.' 'constructor'
+    expr-super-constructor ::= 'super' '.' 'constructor' '.' <a href="#selector-args">selector-args</a>
   </pre>
 
   <p>The keyword <tt>super</tt> is used to refer to superclass members from
@@ -2491,8 +2492,10 @@ ill-formed if the type does not conform to the protocol.</p>
   </div>
 
   <pre class="grammar">
-    expr-new        ::= 'new' <a href="#type">type-identifier</a> expr-new-bounds?
-
+    expr-new        ::= 'new' <a href="#type">type-identifier</a> expr-new-bounds
+    expr-new        ::= 'new' <a href="#type">type-identifier</a> <a href="#expr-paren">expr-paren</a>?
+    expr-new        ::= 'new' <a href="#type">type-identifier</a> '.' <a href="#selector-args">selector-args</a>
+  
     expr-new-bounds ::= expr-new-bound
     expr-new-bounds ::= expr-new-bounds expr-new-bound
     expr-new-bound  ::= lsquare-following <a href="#expr">expr?</a> ']'

@@ -338,7 +338,24 @@ public:
   NullablePtr<Expr> parseExprExplicitClosure();
   Expr *parseExprAnonClosureArg();
   NullablePtr<Expr> parseExprList(tok LeftTok, tok RightTok);
-  bool parseSelectorArgs(Identifier &Name, SourceLoc &NameLoc, Expr *&Arg);
+
+  /// \brief Parse selector arguments where the first name is part of
+  /// the resulting tuple expression.
+  bool parseSelectorArgs(Expr *&Arg) {
+    Identifier Name;
+    SourceLoc NameLoc;
+    return parseSelectorArgs(Name, NameLoc, Arg, /*SeparateFirstName=*/false);
+  }
+
+  /// \brief Parse selector arguments where the first name is
+  /// separated out from the resulting tuple expression.
+  bool parseSelectorArgs(Identifier &Name, SourceLoc &NameLoc, Expr *&Arg) {
+    return parseSelectorArgs(Name, NameLoc, Arg, /*SeparateFirstName=*/true);
+  }
+
+  bool parseSelectorArgs(Identifier &Name, SourceLoc &NameLoc, Expr *&Arg,
+                         bool SeparateFirstName);
+
   NullablePtr<Expr> parseExprCollection();
   NullablePtr<Expr> parseExprArray(SourceLoc LSquareLoc,
                                    Expr *FirstExpr);

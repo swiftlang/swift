@@ -126,7 +126,9 @@ Expr *Parser::parseExprOperator() {
 /// parseExprNew
 ///
 ///   expr-new:
-///     'new' type-identifier expr-new-bounds?
+///     'new' type-identifier expr-new-bounds
+///     'new' type-identifier expr-paren?
+///     'new' type-identifier '.' selector-args
 ///   expr-new-bounds:
 ///     expr-new-bound
 ///     expr-new-bounds expr-new-bound
@@ -178,11 +180,26 @@ NullablePtr<Expr> Parser::parseExprNew() {
 
   if (bounds.empty()) {
     NullablePtr<Expr> Init;
-    if (Tok.is(tok::l_paren_following)) {
+
+    // Parse '.' selector-args
+    if (Tok.is(tok::period) && peekToken().is(tok::l_paren_starting)) {
+      // Consume the '.'.
+      consumeToken(tok::period);
+
+      Expr *Arg = nullptr;
+      if (parseSelectorArgs(Arg)) {
+        return nullptr;
+      }
+
+      Init = Arg;
+    } 
+    // Parse the optional expr-paren.
+    else if (Tok.is(tok::l_paren_following)) {
       Init = parseExprList(tok::l_paren_following, tok::r_paren);
       if (Init.isNull())
         return nullptr;
     }
+
     return new (Context) NewReferenceExpr(elementTy, newLoc,
                                           Init.getPtrOrNull());
   }
@@ -224,7 +241,8 @@ static VarDecl *getImplicitThisDeclForSuperContext(Parser &P,
 ///     'super' '.' identifier
 ///     'super' '.' selector-args
 ///   expr-super-constructor:
-///     'super' '.' 'constructor'
+///     'super' '.' 'constructor' 
+///     'super' '.' 'constructor' '.' selector-args
 ///   expr-super-subscript:
 ///     'super' '[' expr ']'
 NullablePtr<Expr> Parser::parseExprSuper() {
@@ -254,8 +272,25 @@ NullablePtr<Expr> Parser::parseExprSuper() {
                                        ErrorType::get(Context));
       }
       // The constructor decl will be resolved by sema.
-      return new (Context) UnresolvedConstructorExpr(superRef,
-                                                     dotLoc, ctorLoc);
+      Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
+                                                             dotLoc, ctorLoc);
+
+      // If we have a '.' '(', there are selector arguments following
+      // this.
+      if (Tok.is(tok::period) && peekToken().is(tok::l_paren_starting)) {
+        // Parse the '.'.
+        consumeToken(tok::period);
+
+        // Parse the selector arguments.
+        Expr *args;
+        if (parseSelectorArgs(args)) {
+          return nullptr;
+        }
+        
+        result = new (Context) CallExpr(result, args);
+      }
+
+      return result;
     } else if (Tok.is(tok::l_paren_starting)) {
       Identifier name;
       SourceLoc nameLoc;
@@ -814,7 +849,8 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
 /// selector-variadic-args:
 ///   ',' expr selector-variadic-args?
 bool
-Parser::parseSelectorArgs(Identifier &Name, SourceLoc &NameLoc, Expr *&Arg) {
+Parser::parseSelectorArgs(Identifier &Name, SourceLoc &NameLoc, Expr *&Arg,
+                          bool SeparateFirstName) {
   SourceLoc leftParen = consumeToken(tok::l_paren_starting);
 
   bool isFirst = true;
@@ -867,9 +903,13 @@ Parser::parseSelectorArgs(Identifier &Name, SourceLoc &NameLoc, Expr *&Arg) {
     }
 
     if (isFirst) {
-      Name = argName;
-      NameLoc = argNameLoc;
-      argNames.push_back(Identifier());
+      if (SeparateFirstName) {
+        Name = argName;
+        NameLoc = argNameLoc;
+        argNames.push_back(Identifier());
+      } else {
+        argNames.push_back(argName);
+      }
       args.push_back(arg.get());
       isFirst = false;
     } else {
