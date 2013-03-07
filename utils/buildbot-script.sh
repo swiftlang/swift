@@ -158,6 +158,22 @@ before installing this package. Uninstall as follows:
         darwinup list
         sudo darwinup uninstall $UUID_FROM_DARWINUP_LIST
 
+Once installed, run 'swift' to bring up the interactive prompt:
+
+        swift
+
+Run Swift programs using the '-i' flag:
+
+        swift -i /usr/share/swift/examples/hello.swift
+
+Compile Swift programs to .o files using the '-c' flag. Currently they must
+then be linked manually to the swift_stdlib library using Clang:
+
+        swift -c /usr/share/swift/examples/hello.swift -o hello.o
+        clang -o hello hello.o -lswift_stdlib
+        ./hello
+
+Language documentation and examples are installed under /usr/share/swift.
 If you find bugs in Swift, please report them using the 'Swift (New Bugs)'
 Radar component.
 .
