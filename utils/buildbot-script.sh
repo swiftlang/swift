@@ -142,12 +142,8 @@ if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
 To: $PACKAGE_ANNOUNCEMENT_ADDRESS
 Subject: Swift package $package_basename now available
 
-A new Swift package has been made available at:
-
-        sftp://matte.apple.com/$package_basename
-
-If you do not have an SFTP client that recognizes sftp:// URLs, you can
-download and install using the command line:
+A new Swift package sftp://matte.apple.com/$package_basename
+is available. You can download and install it using the command line:
 
         sftp matte.apple.com:/$package_basename ~/Downloads
         sudo darwinup install ~/Downloads/$package_basename
@@ -158,6 +154,11 @@ before installing this package. Uninstall as follows:
         darwinup list
         sudo darwinup uninstall $UUID_FROM_DARWINUP_LIST
 
+When you find bugs in Swift, please report them using the 'Swift (New Bugs)'
+Radar component.
+
+=== GETTING STARTED WITH SWIFT ===
+
 Once installed, run 'swift' to bring up the interactive prompt:
 
         swift
@@ -167,15 +168,16 @@ Run Swift programs using the '-i' flag:
         swift -i /usr/share/swift/examples/hello.swift
 
 Compile Swift programs to .o files using the '-c' flag. Currently they must
-then be linked manually to the swift_stdlib library using Clang:
+then be linked manually to the swift_stdlib library in /usr/lib/swift using
+Clang:
 
         swift -c /usr/share/swift/examples/hello.swift -o hello.o
-        clang -o hello hello.o -lswift_stdlib
+        clang -o hello hello.o -L/usr/lib/swift -lswift_stdlib
         ./hello
 
 Language documentation and examples are installed under /usr/share/swift.
-When you find bugs in Swift, please report them using the 'Swift (New Bugs)'
-Radar component.
+
+Have fun!
 .
 EOM
   done
