@@ -238,36 +238,6 @@ property declaration. If the definition is generic, the result will be of a
 generic function type; the generic variables of such a result will need to be
 bound with a ``specialize`` instruction before the object can be ``apply``-ed.
 
-zero_value
-``````````
-::
-
-  %1 = zero_value $T
-  ; %1 has type $T
-
-FIXME: this is a stopgap that will be eliminated when we have dataflow passes
-to prevent uninitialized access
-
-Creates a "zero" value of type ``T``. This value represents the uninitialized
-state of a variable, so it may not be a semantically valid value of type ``T``.
-
-zero_addr
-`````````
-::
-
-  zero_addr %0
-  ; %0 must be the address of an address-only type
-
-FIXME: this is a stopgap that will be eliminated when we have dataflow passes
-to prevent uninitialized access
-
-Zero-initializes the memory referenced by ``%0``. This is similar to::
-
-  %1 = zero_value $T
-  store %1 to %0
-
-but ``zero_addr`` must be used if ``$T`` is an address-only type.
-
 integer_literal
 ```````````````
 ::
@@ -956,6 +926,96 @@ type.
 unwind
 ``````
 TBD
+
+Dataflow pseudo-instructions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+These instructions are emitted by Swift-to-SIL lowering in order to inform
+SIL dataflow analysis passes. They must be processed and transformed by
+dataflow analysis before SIL is further lowered to an executable representation.
+
+initialize_var
+``````````````
+::
+
+  initialize_var %0
+  ; %0 must be an address $*T
+
+TODO: Dataflow analysis not implemented yet. initialize_var currently just
+does a zero initialization.
+
+A pseudo-instruction that semantically "stores" a pseudo-value to the address
+``%0`` representing the default state of a variable without an initializer.
+Dataflow analysis must replace this instruction in one of the following ways:
+
+- If there is a definitive assignment to ``%0`` along every code path
+  dominated by the ``initialize_var``, those assignments become
+  initializations of ``%0``. A definitive assignment is a store to ``%0`` that
+  precedes any use of the pseudo-value loaded from ``%0`` other than as the
+  operand of ``retain`` or ``release`` or as the destination
+  for ``copy_addr assign``. For example, this definitive assignment sequence
+  for a reference type::
+    
+    ; Foo is a class type
+    %x = alloc_var stack $Foo
+    initialize_var %x
+    ; Reassignment sequence
+    %x.old = load %x
+    retain %y
+    store %y to %x
+    release %x.old
+
+  becomes an initialization sequence::
+
+    %x = alloc_var stack $Foo
+    retain %y
+    store %y to %x
+
+  Likewise, in this definitive assignment sequence for an address-only type::
+
+    ; T is an archetype
+    %x = alloc_var stack $T
+    initialize_var %x
+    copy_addr %y to assign %x
+
+  the ``copy_addr`` becomes an initialization::
+
+    %x = alloc_var stack $T
+    copy_addr %y to %x
+
+- If dataflow analysis fails to find a definitive assignment for ``%0`` and the
+  type referenced by ``%0`` has a default constructor, then ``initialize_var``
+  becomes a call to the default constructor for the type referenced by ``%0``,
+  with its result stored to ``%0``. So in this sequence, in which the
+  ``initialize_var`` pseudo-value is used before being stored over::
+
+    ; Foo is a struct type with default constructor
+    %x = alloc_var stack $Foo
+    initialize_var %x
+    ; Pass the initialized x to a function
+    %x.value = load %x
+    %bar = constant_ref $(Foo) -> (), @bar
+    apply %bar(%x.value)
+    ; Store a new value to x
+    %bas = constant_ref $() -> Foo, @bas
+    %y = apply %bas()
+    store %y to %x
+
+  the ``initialize_var`` becomes a constructor call::
+
+    %x = alloc_var stack $Foo
+    %constructor = constant_ref $(Foo.metatype) -> () -> Foo, @Foo.constructor
+    %Foo = metatype $Foo
+    %constructor.0 = apply %constructor(%Foo)
+    %x.init = apply %constructor.0()
+    store %x.init to %x
+    ; ...
+
+  and the subsequent code continues normally.
+
+If neither definitive assignment nor default construction are possible, then
+dataflow analysis of ``initialize_var`` raises an error. ``initialize_var``
+cannot be lowered to IR.
 
 Calling convention
 ------------------
