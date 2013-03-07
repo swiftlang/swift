@@ -174,7 +174,7 @@ then be linked manually to the swift_stdlib library using Clang:
         ./hello
 
 Language documentation and examples are installed under /usr/share/swift.
-If you find bugs in Swift, please report them using the 'Swift (New Bugs)'
+When you find bugs in Swift, please report them using the 'Swift (New Bugs)'
 Radar component.
 .
 EOM
