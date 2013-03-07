@@ -147,18 +147,16 @@ A new Swift package has been made available at:
         sftp://matte.apple.com/$package_basename
 
 If you do not have an SFTP client that recognizes sftp:// URLs, you can
-download using the command line like this:
+download and install using the command line:
 
-        $ sftp matte.apple.com:/$package_basename ~/Downloads
-
-The package can then be installed using darwinup:
-
-        $ sudo darwinup install ~/Downloads/$package_basename
+        sftp matte.apple.com:/$package_basename ~/Downloads
+        sudo darwinup install ~/Downloads/$package_basename
 
 We recommend uninstalling any previous Swift packages you have installed
 before installing this package. Uninstall as follows:
 
-        $ sudo darwinup uninstall swift-<old package version>-macosx.tar.gz
+        darwinup list
+        sudo darwinup uninstall $UUID_FROM_DARWINUP_LIST
 
 If you find bugs in Swift, please report them using the 'Swift (New Bugs)'
 Radar component.
