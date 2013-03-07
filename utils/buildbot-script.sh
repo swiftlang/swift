@@ -140,14 +140,28 @@ if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
     package_basename="$(basename "$package")"
     sendmail -r "$PACKAGE_ANNOUNCEMENT_ADDRESS" "$PACKAGE_ANNOUNCEMENT_ADDRESS" <<EOM
 To: $PACKAGE_ANNOUNCEMENT_ADDRESS
-Subject: Swift release build $package_basename now available
+Subject: Swift package $package_basename now available
 
-A new Swift release build has been made available at:
+A new Swift package has been made available at:
 
         sftp://matte.apple.com/$package_basename
 
-Use 'darwinup install $package_basename' to install. Please report bugs
-using the 'Swift (New Bugs)' Radar component.
+If you do not have an SFTP client that recognizes sftp:// URLs, you can
+download using the command line like this:
+
+        $ sftp matte.apple.com:/$package_basename ~/Downloads
+
+The package can then be installed using darwinup:
+
+        $ sudo darwinup install ~/Downloads/$package_basename
+
+We recommend uninstalling any previous Swift packages you have installed
+before installing this package. Uninstall as follows:
+
+        $ sudo darwinup uninstall swift-<old package version>-macosx.tar.gz
+
+If you find bugs in Swift, please report them using the 'Swift (New Bugs)'
+Radar component.
 .
 EOM
   done
