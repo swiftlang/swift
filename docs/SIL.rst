@@ -283,6 +283,16 @@ metatype
 
 Retrieves the metatype object for type ``T``.
 
+module
+``````
+::
+
+  %1 = module @M
+  ; @M must be a module name
+  ; %1 has type $module<M>
+
+Creates a module value referencing module ``M``.
+
 Memory Management
 ~~~~~~~~~~~~~~~~~
 
@@ -687,7 +697,7 @@ archetype_method
   %1 = archetype_method %0, @method
   ; %0 must be an address of an archetype $*T
   ; @method must be a reference to a method of one of the constraints of T
-  ; %1 will be of type T -> U' -> V' for method type U -> V,
+  ; %1 will be of uncurried type (U'..., T) -> V' for method type (U...) -> V,
   ;   where self and associated types in U and V are bound relative to T in
   ;   U' and V'
   ;   e.g. method `(This, Foo) -> Protocol.Bar` becomes `(T, Foo) -> T.Bar`
@@ -695,7 +705,7 @@ archetype_method
 Obtains a reference to function implementing ``@method`` for the archetype
 referenced by ``%0``. Self and associated types in the signature of ``@method``
 are bound relative to the type referenced by ``%0`` in the resulting function
-value.
+value. The returned function reference is uncurried.
 
 associated_metatype
 ```````````````````
@@ -791,17 +801,38 @@ protocol_method
 ::
 
   %1 = protocol_method %0, @method
-  ; %0 must be of a $*P type for protocol or protocol composition type P
+  ; %0 must be of an address type $*P for protocol or protocol composition
+  ;   type P
   ; @method must be a reference to a method of (one of the) protocol(s) P
-  ; %1 will be of type $Builtin.RawPointer -> T -> U
-  ;   for method type T -> U
+  ; %1 will be of uncurried type (T..., Builtin.OpaquePointer) -> U
+  ;   for method type (T...) -> U
 
 Obtains a reference to the function implementing protocol method ``@method``
 for the concrete value referenced by the existential container
 referenced by ``%0``. The resulting function value will take a pointer
-to the ``this`` value as a ``RawPointer``. The ``this`` pointer value can
+to the ``this`` value as an ``OpaquePointer``. The ``this`` pointer value can
 be derived from the existential container with a ``project_existential``
-instruction.
+instruction (for instance methods) or ``existential_metatype`` (for static
+methods). The returned function reference is uncurried.
+
+existential_metatype
+````````````````````
+::
+
+  %1 = existential_metatype %0
+  ; %0 must be of an address type $*P for protocol or protocol composition
+  ;   type P
+  ; %1 will be a $Builtin.OpaquePointer referencing the metatype of the
+  ;   concrete value of %0
+
+Obtains an ``OpaquePointer`` pointing to the metatype of the concrete value
+reference by the existential container referenced by ``%0``. This pointer
+can be passed to protocol static methods obtained by ``protocol_method`` from
+the same existential container.
+
+It is an error if the result of ``existential_metatype`` is used as anything
+other than the "This" argument of a static method reference obtained by
+``protocol_method`` from the same existential container.
 
 project_existential
 ```````````````````
@@ -809,12 +840,12 @@ project_existential
 
   %1 = project_existential %0
   ; %0 must be of a $*P type for protocol or protocol composition type P
-  ; %1 will be of type $Builtin.RawPointer
+  ; %1 will be of type $Builtin.OpaquePointer
 
-Obtains a ``RawPointer`` pointing to the concrete value referenced by the
-existential container referenced by ``%0``. This raw pointer can be passed to
-protocol methods obtained by ``protocol_method``. A method call on a
-protocol-type value in Swift::
+Obtains an ``OpaquePointer`` pointing to the concrete value referenced by the
+existential container referenced by ``%0``. This pointer can be passed to
+protocol instance methods obtained by ``protocol_method`` from the same
+existential container. A method call on a protocol-type value in Swift::
 
   protocol Foo {
     func bar(x:Int)
@@ -831,6 +862,10 @@ compiles to this SIL::
   %foo_p = project_existential %foo
   %one_two_three = integer_literal $Builtin.Int64, 123
   %_ = apply %bar(%foo_p, %one_two_three)
+
+It is an error if the result of ``project_existential`` is used as anything
+other than the "this" argument of an instance method reference obtained by
+``protocol_method`` from the same existential container.
 
 Functions
 ~~~~~~~~~
@@ -868,6 +903,55 @@ of a concrete function type; generic functions must have all of their generic
 parameters bound with ``specialize`` instructions before they can be applied.
 
 TODO: should have normal/unwind branch targets like LLVM ``invoke``
+
+Classes
+~~~~~~~
+
+Classes provide inheritance with dynamically-dispatched methods and thus have
+additional instructions for referencing methods and metatypes of their runtime
+types.
+
+class_method
+````````````
+::
+
+  %1 = class_method %0, @method
+  ; %0 must be of a class type or class metatype $T
+  ; @method must be a reference to a dynamically-dispatched method of T or
+  ; of one of its superclasses
+  ; %1 will be of uncurried type (U..., T) -> V for method type (U...) -> V
+
+Obtains a reference to the function that implements the specified method for
+the runtime type of ``%0``. The returned function reference is uncurried.
+
+super_method
+````````````
+::
+
+  %1 = super_method %0, @method
+  ; %0 must be of a non-root class type or class metatype $T
+  ; @method must be a reference to a dynamically-dispatched method of T or
+  ; of one of its superclasses
+  ; %1 will be of uncurried type (U..., T) -> V for method type (U...) -> V
+
+Obtains a reference to the function that implements the specified method for
+the immediate superclass of the *static* type of ``%0``. The returned function
+reference is uncurried.
+
+Note that for native Swift methods, ``super_method`` is equivalent to a
+static reference to the (uncurried) superclass method implementation using
+``constant_ref``. However, interop with external object systems such as
+Objective-C may require dynamic dispatch even for super calls.
+
+class_metatype
+``````````````
+::
+
+  %1 = class_metatype %0
+  ; %0 must be of a class type $T
+  ; %1 will be of type $T.metatype and reference the runtime metatype of %0
+
+Obtains a reference to the runtime metatype of ``%0``.
 
 Branching
 ~~~~~~~~~
