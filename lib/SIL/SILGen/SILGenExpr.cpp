@@ -824,8 +824,7 @@ ManagedValue SILGenFunction::visitDotSyntaxBaseIgnoredExpr(
 ManagedValue SILGenFunction::visitModuleExpr(ModuleExpr *E, SGFContext C) {
   // FIXME: modules are currently empty types. if we end up having module
   // metatypes this will need to change.
-  return ManagedValue(B.createZeroValue(E,
-                                        getLoweredLoadableType(E->getType())));
+  return ManagedValue(B.createModule(E, getLoweredLoadableType(E->getType())));
 }
 
 namespace {

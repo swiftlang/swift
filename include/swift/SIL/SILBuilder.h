@@ -136,10 +136,6 @@ public:
     return insert(new ConstantRefInst(loc, c, ty));
   }
 
-  ZeroValueInst *createZeroValue(SILLocation Loc, SILType Ty) {
-    return insert(new ZeroValueInst(Loc, Ty));
-  }
-
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E) {
     return insert(new IntegerLiteralInst(E));
   }
@@ -161,9 +157,9 @@ public:
     return insert(new StoreInst(Loc, Src, DestLValue));
   }
 
-  ZeroAddrInst *createZeroAddr(SILLocation Loc,
-                               Value DestLValue) {
-    return insert(new ZeroAddrInst(Loc, DestLValue));
+  InitializeVarInst *createInitializeVar(SILLocation Loc,
+                                         Value DestLValue) {
+    return insert(new InitializeVarInst(Loc, DestLValue));
   }
 
   CopyAddrInst *createCopyAddr(SILLocation Loc,
@@ -285,6 +281,10 @@ public:
     return insert(new MetatypeInst(Loc, Metatype));
   }
 
+  ModuleInst *createModule(SILLocation Loc, SILType ModuleType) {
+    return insert(new ModuleInst(Loc, ModuleType));
+  }
+  
   AssociatedMetatypeInst *createAssociatedMetatype(SILLocation Loc,
                                                    Value MetatypeSrc,
                                                    SILType MetatypeDest) {

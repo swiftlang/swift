@@ -216,10 +216,6 @@ SILConstant ConstantRefInst::getConstant() const {
   return Constant;
 }
 
-ZeroValueInst::ZeroValueInst(SILLocation Loc, SILType Ty)
-  : Instruction(ValueKind::ZeroValueInst, Loc, Ty) {
-}
-
 IntegerLiteralInst::IntegerLiteralInst(IntegerLiteralExpr *E)
   : Instruction(ValueKind::IntegerLiteralInst, E,
                 // Builtin integer types are always valid SIL types.
@@ -301,8 +297,8 @@ CopyAddrInst::CopyAddrInst(SILLocation Loc, Value SrcLValue, Value DestLValue,
 {
 }
 
-ZeroAddrInst::ZeroAddrInst(SILLocation Loc, Value Dest)
-  : Instruction(ValueKind::ZeroAddrInst, Loc), Dest(Dest) {
+InitializeVarInst::InitializeVarInst(SILLocation Loc, Value Dest)
+  : Instruction(ValueKind::InitializeVarInst, Loc), Dest(Dest) {
 }
 
 SpecializeInst *SpecializeInst::create(SILLocation Loc, Value Operand,
@@ -372,6 +368,9 @@ TupleInst::TupleInst(SILLocation Loc, SILType Ty, ArrayRef<Value> Elems)
 
 MetatypeInst::MetatypeInst(SILLocation Loc, SILType Metatype)
   : Instruction(ValueKind::MetatypeInst, Loc, Metatype) {}
+
+ModuleInst::ModuleInst(SILLocation Loc, SILType ModuleType)
+  : Instruction(ValueKind::ModuleInst, Loc, ModuleType) {}
 
 AssociatedMetatypeInst::AssociatedMetatypeInst(SILLocation Loc,
                                                Value MetatypeSrc,

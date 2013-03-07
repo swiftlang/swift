@@ -301,7 +301,6 @@ public:
 
   void visitConstantRefInst(ConstantRefInst *i);
 
-  void visitZeroValueInst(ZeroValueInst *i);
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
   void visitFloatLiteralInst(FloatLiteralInst *i);
   void visitStringLiteralInst(StringLiteralInst *i);
@@ -328,7 +327,7 @@ public:
   void visitDeallocVarInst(DeallocVarInst *i);
   //void visitDeallocRefInst(DeallocRefInst *i);
 
-  void visitZeroAddrInst(ZeroAddrInst *i);
+  void visitInitializeVarInst(InitializeVarInst *i);
   void visitCopyAddrInst(CopyAddrInst *i);
   void visitDestroyAddrInst(DestroyAddrInst *i);
 

@@ -297,20 +297,6 @@ public:
   }
 };
 
-/// A default "zero" value used to initialize a variable that was not otherwise
-/// explicitly initialized.
-class ZeroValueInst : public Instruction {
-public:
-  ZeroValueInst(SILLocation Loc, SILType Ty);
-
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
-  static bool classof(Value V) {
-    return V->getKind() == ValueKind::ZeroValueInst;
-  }
-};
-
 /// IntegerLiteralInst - Encapsulates an integer constant, as defined originally
 /// by an an IntegerLiteralExpr or CharacterLiteralExpr.
 class IntegerLiteralInst : public Instruction {
@@ -409,29 +395,25 @@ public:
   }
 };
 
-/// ZeroAddrInst - Represents a zeroing of a buffer in memory. This is similar
-/// to:
-///   %1 = zero_value $T
-///   store %1 to %dest
-/// but zero_addr must be used for address-only types.
-class ZeroAddrInst : public Instruction {
-  /// Dest - the address of the buffer to be zeroed.
+/// InitializeVarInst - Represents a default initialization of a variable.
+class InitializeVarInst : public Instruction {
+  /// Dest - the address of the var to be initialize.
   Value Dest;
   
 public:
-  ZeroAddrInst(SILLocation Loc, Value Dest);
+  InitializeVarInst(SILLocation Loc, Value Dest);
   
   Value getDest() const { return Dest; }
   
   static bool classof(Value V) {
-    return V->getKind() == ValueKind::ZeroAddrInst;
+    return V->getKind() == ValueKind::InitializeVarInst;
   }
 };
 
 /// CopyAddrInst - Represents a copy from one memory location to another. This
 /// is similar to:
 ///   %1 = load %src
-///   store %1 -> %dest
+///   store %1 to %dest
 /// but a copy instruction must be used for address-only types.
 class CopyAddrInst : public Instruction {
   /// Src - The lvalue being loaded from.
@@ -643,6 +625,20 @@ public:
   }
 };
 
+/// ModuleInst - Represents a reference to a module as a value.
+class ModuleInst : public Instruction {
+public:
+  
+  ModuleInst(SILLocation Loc, SILType ModuleType);
+  
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ModuleInst;
+  }
+};
+  
 /// AssociatedMetatypeInst - Extract the metatype of an associated type from a
 /// metatype.
 class AssociatedMetatypeInst : public Instruction {

@@ -415,27 +415,6 @@ void IRGenSILFunction::visitClosureInst(swift::ClosureInst *i) {
   newLoweredExplosion(v, function);
 }
 
-void IRGenSILFunction::visitZeroValueInst(swift::ZeroValueInst *i) {
-  const TypeInfo &ti = getFragileTypeInfo(i->getType().getSwiftType());
-  Explosion lowered(CurExplosionLevel);
-
-  // No work is necessary if the type is empty or the address is global.
-  if (ti.isEmpty(ResilienceScope::Local))
-    return;
-  
-  ExplosionSchema schema(lowered.getKind());
-  ti.getSchema(schema);
-  
-  // FIXME: irgen's emitZeroInit puts a heuristic limit on the schema size
-  // for which a zero explosion will be created (vs doing a memset to
-  // initialize the stored variable). Should we do the same?
-  assert(!schema.containsAggregate() && "aggregate in zero_value schema");
-  for (auto elt : schema) {
-    lowered.addUnmanaged(llvm::Constant::getNullValue(elt.getScalarType()));
-  }
-  newLoweredExplosion(Value(i, 0), lowered);
-}
-
 void IRGenSILFunction::visitIntegerLiteralInst(swift::IntegerLiteralInst *i) {
   llvm::Value *constant = llvm::ConstantInt::get(IGM.LLVMContext,
                                                  i->getValue());
@@ -783,7 +762,7 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
                         std::move(call));
 }
 
-void IRGenSILFunction::visitZeroAddrInst(swift::ZeroAddrInst *i) {
+void IRGenSILFunction::visitInitializeVarInst(swift::InitializeVarInst *i) {
   CanType ty = i->getDest().getType().getSwiftRValueType();
   TypeInfo const &ti = getFragileTypeInfo(ty);
   Address dest = getLoweredAddress(i->getDest());

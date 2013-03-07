@@ -90,13 +90,7 @@ public:
   
   void zeroInitialize(SILGenFunction &gen) override {
     Value address = getAddress();
-    if (address.getType().isAddressOnly())
-      gen.B.createZeroAddr(SILLocation(), address);
-    else {
-      Value zero = gen.B.createZeroValue(SILLocation(),
-                                         address.getType().getObjectType());
-      gen.B.createStore(SILLocation(), zero, address);
-    }
+    gen.B.createInitializeVar(SILLocation(), address);
     finishInitialization(gen);
   }
 };

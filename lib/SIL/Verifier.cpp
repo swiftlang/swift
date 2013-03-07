@@ -181,14 +181,9 @@ public:
            "Store operand type and dest type mismatch");
   }
   
-  void visitZeroAddrInst(ZeroAddrInst *ZI) {
+  void visitInitializeVarInst(InitializeVarInst *ZI) {
     assert(ZI->getDest().getType().isAddress() &&
            "Dest address should be lvalue");
-  }
-  
-  void visitZeroValueInst(ZeroValueInst *ZVI) {
-    assert(!ZVI->getType().isAddress() &&
-           "zero_value cannot create an address");
   }
   
   void visitSpecializeInst(SpecializeInst *SI) {
@@ -208,6 +203,10 @@ public:
   void visitMetatypeInst(MetatypeInst *MI) {
     assert(MI->getType(0).is<MetaTypeType>() &&
            "metatype instruction must be of metatype type");
+  }
+  void visitModuleInst(ModuleInst *MI) {
+    assert(MI->getType(0).is<ModuleType>() &&
+           "module instruction must be of module type");
   }
   void visitAssociatedMetatypeInst(AssociatedMetatypeInst *MI) {
     assert(MI->getType(0).is<MetaTypeType>() &&

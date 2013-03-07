@@ -18,6 +18,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
@@ -229,10 +230,6 @@ public:
     DRI->getConstant().print(OS);
   }
 
-  void visitZeroValueInst(ZeroValueInst *ZVI) {
-    OS << "zero_value $" << ZVI->getType();
-  }
-
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     const auto &lit = ILI->getValue();
     OS << "integer_literal $" << ILI->getType() << ", " << lit;
@@ -260,8 +257,8 @@ public:
     if (CI->isInitializationOfDest())
       OS << " [initialization]";
   }
-  void visitZeroAddrInst(ZeroAddrInst *ZI) {
-    OS << "zero_addr " << getID(ZI->getDest());
+  void visitInitializeVarInst(InitializeVarInst *ZI) {
+    OS << "initialize_var " << getID(ZI->getDest());
   }
   void visitSpecializeInst(SpecializeInst *SI) {
     OS << "specialize " << getID(SI->getOperand()) << ", $"
@@ -354,6 +351,9 @@ public:
   }
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype $" << MI->getType();
+  }
+  void visitModuleInst(ModuleInst *MI) {
+    OS << "module @" << MI->getType().castTo<ModuleType>()->getModule()->Name;
   }
   void visitAssociatedMetatypeInst(AssociatedMetatypeInst *MI) {
     OS << "associated_metatype " << getID(MI->getSourceMetatype())
