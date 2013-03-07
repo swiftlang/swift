@@ -100,7 +100,7 @@ elif [ "$($TMPDIR/test_compile_$$)" != "Hello world" ]; then
   RESULT=1
 # Ensure that we can link a Swift program even if -isysroot points to an SDK.
 elif ! "$TOOLCHAIN/usr/bin/clang" "$TMPDIR/test_compile_$$.o" \
-  -isysroot "$SYSROOT"
+  -isysroot "$SYSROOT" \
   -o "$TMPDIR/test_compile_2_$$" \
   -L/usr/lib/swift \
   -framework Cocoa -lswift_stdlib -lswiftFoundation -lswiftObjectiveC \
