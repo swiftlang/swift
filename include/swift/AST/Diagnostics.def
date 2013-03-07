@@ -445,8 +445,8 @@ ERROR(expected_operator_ref,expr_parsing,none,
 ERROR(expected_rparen_operator_ref,expr_parsing,none,
       "expected closing ')' after operator name in operator reference", ())
 
-ERROR(expected_field_name,expr_parsing,none,
-      "expected field name following '.'", ())
+ERROR(expected_field_name_or_selector_args,expr_parsing,none,
+      "expected field name or selector arguments following '.'", ())
 ERROR(expected_dollar_numeric,expr_parsing,none,
       "expected numeric value following '$'", ())
 ERROR(dollar_numeric_too_large,expr_parsing,none,
@@ -500,12 +500,23 @@ ERROR(expected_value_in_dictionary_literal,expr_parsing,none,
       "expected value in dictionary literal", ())
 ERROR(expected_colon_in_dictionary_literal,expr_parsing,none,
       "expected ':' in dictionary literal", ())
-ERROR(expected_equal_in_tuple_expr,expr_parsing,none,
-      "expected '=' in tuple expression", ())
 ERROR(expected_rparen_expr_list,expr_parsing,none,
       "expected ')' in expression list", ())
 ERROR(expected_rsquare_expr_list,expr_parsing,none,
       "expected ']' in expression list", ())
+
+// Selector arguments
+ERROR(expected_selector_piece,expr_parsing,none,
+      "expected identifier naming the next argument", ())
+ERROR(expected_selector_colon_separator,expr_parsing,none,
+      "expected ':' to separate the argument name (%0) and the argument",
+      (Identifier))
+ERROR(expected_selector_argument,expr_parsing,none,
+      "expected argument expression", ())
+ERROR(expected_selector_variadic_argument,expr_parsing,none,
+      "expected argument expression", ())
+ERROR(expected_rparen_selector_args,expr_parsing,none,
+      "expected ')' to close message argument list", ())
 
 // Array literal expressions
 ERROR(expected_expr_array,expr_parsing,none,

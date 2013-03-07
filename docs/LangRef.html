@@ -2171,6 +2171,7 @@ ill-formed if the type does not conform to the protocol.</p>
     expr-super ::= expr-super-constructor
 
     expr-super-method ::= 'super' '.' <a href="#expr-identifier">expr-identifier</a>
+                      ::= 'super' '.' <a href="#selector-args">selector-args</a>
     expr-super-subscript ::= 'super' '[' <a href="#expr">expr</a> ']'
     expr-super-constructor ::= 'super' '.' 'constructor'
   </pre>
@@ -2181,7 +2182,7 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <ul>
   <li>A base class property or method can be accessed with the form
-    <tt>super.name</tt>.</li>
+    <tt>super.name</tt> or <tt>super.(selector arguments)</tt>.</li>
   <li>A base class subscript accessor can be accessed with the form
     <tt>super[index]</tt>.</li>
   <li>Within a constructor, a base class constructor can be accessed with the
@@ -2405,6 +2406,24 @@ ill-formed if the type does not conform to the protocol.</p>
   <p>Otherwise, <a href="#namebind_value_lookup_dot">dot name lookup</a> is
   performed, and this expression is treated as function application.  This
   allows looking up members in modules, metatypes, etc.</p>
+
+  <pre class="grammar">
+    expr-dot ::= <a href="#expr">expr-postfix</a> '.' selector-args
+
+    <a name="selector-args">selector-args ::= lparen-starting selector-arg-list selector-variadic-args? ')'
+
+    selector-arg-list:
+      selector-arg selector-arg-list?
+
+    selector-arg:
+      identifier ':' expr
+
+    selector-variadic-args:
+      ',' expr selector-variadic-args?
+  </pre>
+
+  <p>A method call specified via selector syntax, which names each of the
+  arguments in the order in which they are declared.</p>
 
   <!-- ===================================================================== -->
   <h3 id="expr-metatype">Metatype Expressions</h3>

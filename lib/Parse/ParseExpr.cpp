@@ -222,6 +222,7 @@ static VarDecl *getImplicitThisDeclForSuperContext(Parser &P,
 ///     expr-super-subscript
 ///   expr-super-member:
 ///     'super' '.' identifier
+///     'super' '.' selector-args
 ///   expr-super-constructor:
 ///     'super' '.' 'constructor'
 ///   expr-super-subscript:
@@ -255,6 +256,20 @@ NullablePtr<Expr> Parser::parseExprSuper() {
       // The constructor decl will be resolved by sema.
       return new (Context) UnresolvedConstructorExpr(superRef,
                                                      dotLoc, ctorLoc);
+    } else if (Tok.is(tok::l_paren_starting)) {
+      Identifier name;
+      SourceLoc nameLoc;
+      Expr *arg;
+      // FIXME: Unfortunate recovery here.
+      if (parseSelectorArgs(name, nameLoc, arg))
+        return 0;
+
+      // FIXME: Loses sugar, which also means we can't differentiate
+      // semantics or pretty-print cleanly.
+      Expr *result = new (Context) UnresolvedDotExpr(superRef, dotLoc,
+                                                     name, nameLoc);
+
+      return new (Context) CallExpr(result, arg);
     } else {
       // super.foo
       SourceLoc nameLoc = Tok.getLoc();
@@ -330,6 +345,7 @@ static void changeToFollowingTokenAfterRAngle(Token &token) {
 ///   expr-dot:
 ///     expr-postfix '.' identifier generic-args?
 ///     expr-postfix '.' integer_literal
+///     expr-postfix '.' selector-args
 ///
 ///   expr-subscript:
 ///     expr-postfix '[' expr ']'
@@ -437,11 +453,28 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
         continue;
       }
 
+      if (Tok.is(tok::l_paren_starting)) {
+        Identifier Name;
+        SourceLoc NameLoc;
+        Expr *Arg;
+        // FIXME: Unfortunate recovery here.
+        if (parseSelectorArgs(Name, NameLoc, Arg))
+          return 0;
+
+        // FIXME: Loses sugar, which also means we can't differentiate
+        // semantics or pretty-print cleanly.
+        Result = new (Context) UnresolvedDotExpr(Result.get(), TokLoc,
+                                                 Name, NameLoc);
+
+        Result = new (Context) CallExpr(Result.get(), Arg);
+        continue;
+      }
+
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal)) {
-        diagnose(Tok, diag::expected_field_name);
+        diagnose(Tok, diag::expected_field_name_or_selector_args);
         return 0;
       }
-        
+
       Identifier Name = Context.getIdentifier(Tok.getText());
       Result = new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name,
                                                Tok.getLoc());
@@ -470,6 +503,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     // Note that this cannot be a l_paren_starting.
     if (Tok.is(tok::l_paren_following)) {
       NullablePtr<Expr> Arg =parseExprList(tok::l_paren_following,tok::r_paren);
+      // FIXME: Unfortunate recovery here.
       if (Arg.isNull())
         return 0;
       Result = new (Context) CallExpr(Result.get(), Arg.get());
@@ -676,7 +710,10 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
 ///     lparen-any expr-paren-element (',' expr-paren-element)* ')'
 ///
 ///   expr-paren-element:
-///     (identifier '=')? expr
+///     (identifier '=')? expr // FIXME: To be removed.
+///     (identifier ':')? expr
+///
+/// FIXME: the '=' form above will likely go away.
 ///
 NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
   SourceLoc LLoc = consumeToken(LeftTok);
@@ -688,12 +725,15 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
   if (Tok.isNot(RightTok)) {
     do {
       Identifier FieldName;
-      // Check to see if there is a field specifier, like "x =".
-      if (Tok.is(tok::identifier) && peekToken().is(tok::equal)) {
+      // Check to see if there is a field specifier, like "x =" or "x : ".
+      if (Tok.is(tok::identifier) &&
+          (peekToken().is(tok::equal) || peekToken().is(tok::colon))) {
         if (parseIdentifier(FieldName,
-                            diag::expected_field_spec_name_tuple_expr) ||
-            parseToken(tok::equal, diag::expected_equal_in_tuple_expr))
+                            diag::expected_field_spec_name_tuple_expr))
           return 0;
+
+        assert(Tok.is(tok::equal) || Tok.is(tok::colon));
+        consumeToken();
       }
 
       if (!SubExprNames.empty())
@@ -758,6 +798,127 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
   }
 
   return new (Context) TupleExpr(LLoc, NewSubExprs, NewSubExprsNames, RLoc);
+}
+
+/// \brief Parse a selector argument following the ".".
+///
+/// selector-args:
+///   lparen_starting selector-arg-list selector-variadic-args? ')'
+///
+/// selector-arg-list:
+///   selector-arg selector-arg-list?
+///
+/// selector-arg:
+///   identifier ':' expr
+///
+/// selector-variadic-args:
+///   ',' expr selector-variadic-args?
+bool
+Parser::parseSelectorArgs(Identifier &Name, SourceLoc &NameLoc, Expr *&Arg) {
+  SourceLoc leftParen = consumeToken(tok::l_paren_starting);
+
+  bool isFirst = true;
+
+  SmallVector<Expr*, 8> args;
+  SmallVector<Identifier, 8> argNames;
+
+  // Parse selector-arg-list.
+  while (true) {
+    if (Tok.isNot(tok::identifier)) {
+      // If we saw a right paren and we already have at least one argument,
+      // we're done.
+      if (Tok.is(tok::r_paren) && !isFirst)
+        break;
+
+      // If we saw a comma, parse the selector-variadic-args below.
+      if (Tok.is(tok::comma))
+        break;
+
+      diagnose(Tok, diag::expected_selector_piece);
+      skipUntil(tok::r_paren);
+      if (Tok.is(tok::r_paren))
+        consumeToken();
+      return true;
+    }
+
+    // Parse the identifier.
+    Identifier argName = Context.getIdentifier(Tok.getText());
+    SourceLoc argNameLoc = consumeToken(tok::identifier);
+
+    // Parse the ':'.
+    if (Tok.isNot(tok::colon)) {
+      diagnose(Tok, diag::expected_selector_colon_separator, argName);
+      skipUntil(tok::r_paren);
+      if (Tok.is(tok::r_paren))
+        consumeToken();
+      return true;
+    }
+    consumeToken(tok::colon);
+
+    // Parse the expression.
+    // FIXME: Pass through the name of the argument?
+    NullablePtr<Expr> arg = parseExpr(diag::expected_selector_argument);
+    if (arg.isNull()) {
+      // FIXME: Lame recovery.
+      skipUntil(tok::r_paren);
+      if (Tok.is(tok::r_paren))
+        consumeToken();
+      return true;
+    }
+
+    if (isFirst) {
+      Name = argName;
+      NameLoc = argNameLoc;
+      argNames.push_back(Identifier());
+      args.push_back(arg.get());
+      isFirst = false;
+    } else {
+      argNames.push_back(argName);
+      args.push_back(arg.get());
+    }
+  }
+
+  // Parse selector-variadic-args.
+  while (Tok.is(tok::comma)) {
+    // Parse the ','.
+    consumeToken(tok::comma);
+
+    NullablePtr<Expr> arg =parseExpr(diag::expected_selector_variadic_argument);
+    if (arg.isNull()) {
+      // FIXME: Lame recovery.
+      skipUntil(tok::r_paren);
+      if (Tok.is(tok::r_paren))
+        consumeToken();
+      return true;
+    }
+
+    argNames.push_back(Identifier());
+    args.push_back(arg.get());
+  }
+
+  SourceLoc rightParen;
+  if (Tok.is(tok::r_paren)) {
+    rightParen = consumeToken(tok::r_paren);
+  } else {
+    diagnose(Tok, diag::expected_rparen_selector_args);
+    diagnose(leftParen, diag::opening_paren);
+
+    skipUntil(tok::r_paren);
+    rightParen = Tok.getLoc();
+    if (Tok.is(tok::r_paren))
+      consumeToken();
+    return true;
+  }
+
+  // Allocate the argument.
+  if (args.size() == 1) {
+    Arg = new (Context) ParenExpr(leftParen, args.front(), rightParen);
+  } else {
+    Arg = new (Context) TupleExpr(leftParen, Context.AllocateCopy(args),
+                                  Context.AllocateCopy(argNames).data(),
+                                  rightParen);
+  }
+  return false;
 }
 
 /// parseExprCollection - Parse a collection literal expression.
