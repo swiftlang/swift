@@ -346,7 +346,11 @@ namespace {
   /// \brief A constraint between two type variables.
   class Constraint {
     /// \brief The kind of constraint.
-    ConstraintKind Kind;
+    ConstraintKind Kind : 8;
+
+    /// \brief For a literal-type constraint, the kind of literal we're
+    /// expecting.
+    LiteralKind Literal : 8;
 
     /// \brief The first type.
     Type First;
@@ -357,10 +361,6 @@ namespace {
     /// \brief If non-null, the name of a member of the first type is that
     /// being related to the second type.
     Identifier Member;
-
-    /// \brief For a literal-type constraint, the kind of literal we're
-    /// expecting.
-    LiteralKind Literal;
 
     /// \brief For a constraint that was directly generated from an expression,
     /// the expression from which it was generated.
@@ -406,8 +406,8 @@ namespace {
     }
 
     Constraint(Type type, LiteralKind literal, Expr *anchor = nullptr)
-      : Kind(ConstraintKind::Literal), First(type), Literal(literal),
-        Anchor(anchor){ }
+      : Kind(ConstraintKind::Literal), Literal(literal), First(type),
+        Anchor(anchor) { }
 
     // FIXME: Need some context information here.
 
