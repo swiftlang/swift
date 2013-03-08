@@ -509,7 +509,7 @@ ERROR(expected_rsquare_expr_list,expr_parsing,none,
 
 // Selector arguments
 ERROR(expected_selector_piece,expr_parsing,none,
-      "expected identifier naming the next argument", ())
+      "expected identifier naming the argument", ())
 ERROR(expected_selector_colon_separator,expr_parsing,none,
       "expected ':' to separate the argument name (%0) and the argument",
       (Identifier))

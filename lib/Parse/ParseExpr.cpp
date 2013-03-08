@@ -867,31 +867,16 @@ bool
 Parser::parseSelectorArgs(Identifier &Name, SourceLoc &NameLoc, Expr *&Arg,
                           bool SeparateFirstName) {
   SourceLoc leftParen = consumeToken(tok::l_paren_starting);
+  SourceLoc SelectorIdent = Tok.getLoc();
 
+  bool Invalid = false;
   bool isFirst = true;
 
   SmallVector<Expr*, 8> args;
   SmallVector<Identifier, 8> argNames;
 
   // Parse selector-arg-list.
-  while (true) {
-    if (Tok.isNot(tok::identifier)) {
-      // If we saw a right paren and we already have at least one argument,
-      // we're done.
-      if (Tok.is(tok::r_paren) && !isFirst)
-        break;
-
-      // If we saw a comma, parse the selector-variadic-args below.
-      if (Tok.is(tok::comma))
-        break;
-
-      diagnose(Tok, diag::expected_selector_piece);
-      skipUntil(tok::r_paren);
-      if (Tok.is(tok::r_paren))
-        consumeToken();
-      return true;
-    }
-
+  for (; Tok.is(tok::identifier); SelectorIdent = Tok.getLoc()) {
     // Parse the identifier.
     Identifier argName = Context.getIdentifier(Tok.getText());
     SourceLoc argNameLoc = consumeToken(tok::identifier);
@@ -899,10 +884,10 @@ Parser::parseSelectorArgs(Identifier &Name, SourceLoc &NameLoc, Expr *&Arg,
     // Parse the ':'.
     if (Tok.isNot(tok::colon)) {
       diagnose(Tok, diag::expected_selector_colon_separator, argName);
-      skipUntil(tok::r_paren);
-      if (Tok.is(tok::r_paren))
+      Invalid = true;
+      if (Tok.isNot(tok::identifier))
         consumeToken();
-      return true;
+      continue;
     }
     consumeToken(tok::colon);
 
@@ -910,11 +895,8 @@ Parser::parseSelectorArgs(Identifier &Name, SourceLoc &NameLoc, Expr *&Arg,
     // FIXME: Pass through the name of the argument?
     NullablePtr<Expr> arg = parseExpr(diag::expected_selector_argument);
     if (arg.isNull()) {
-      // FIXME: Lame recovery.
-      skipUntil(tok::r_paren);
-      if (Tok.is(tok::r_paren))
-        consumeToken();
-      return true;
+      Invalid = true;
+      continue;
     }
 
     if (isFirst) {
@@ -933,35 +915,25 @@ Parser::parseSelectorArgs(Identifier &Name, SourceLoc &NameLoc, Expr *&Arg,
     }
   }
 
-  // Parse selector-variadic-args.
-  while (Tok.is(tok::comma)) {
-    // Parse the ','.
-    consumeToken(tok::comma);
+  if (argNames.empty() && Invalid == false) {
+    diagnose(SelectorIdent, diag::expected_selector_piece);
+    return true;
+  }
 
+  // Parse selector-variadic-args.
+  while (consumeIf(tok::comma)) {
     NullablePtr<Expr> arg =parseExpr(diag::expected_selector_variadic_argument);
     if (arg.isNull()) {
-      // FIXME: Lame recovery.
-      skipUntil(tok::r_paren);
-      if (Tok.is(tok::r_paren))
-        consumeToken();
-      return true;
+      Invalid = true;
+    } else {
+      argNames.push_back(Identifier());
+      args.push_back(arg.get());
     }
-
-    argNames.push_back(Identifier());
-    args.push_back(arg.get());
   }
 
   SourceLoc rightParen;
-  if (Tok.is(tok::r_paren)) {
-    rightParen = consumeToken(tok::r_paren);
-  } else {
-    diagnose(Tok, diag::expected_rparen_selector_args);
-    diagnose(leftParen, diag::opening_paren);
-
-    skipUntil(tok::r_paren);
-    rightParen = Tok.getLoc();
-    if (Tok.is(tok::r_paren))
-      consumeToken();
+  if (parseMatchingToken(tok::r_paren, rightParen,
+                         diag::expected_rparen_selector_args, leftParen)) {
     return true;
   }
 
@@ -973,7 +945,7 @@ Parser::parseSelectorArgs(Identifier &Name, SourceLoc &NameLoc, Expr *&Arg,
                                   Context.AllocateCopy(argNames).data(),
                                   rightParen);
   }
-  return false;
+  return Invalid;
 }
 
 /// parseExprCollection - Parse a collection literal expression.
