@@ -206,9 +206,8 @@ bool TypeBase::isSpecialized() {
 }
 
 /// \brief Gather the type variables in the given type, recursively.
-static void gatherTypeVariables(
-              Type wrappedTy, 
-              llvm::SetVector<TypeVariableType *> &typeVariables) {
+static void gatherTypeVariables(Type wrappedTy,
+                          SmallVectorImpl<TypeVariableType *> &typeVariables) {
   auto ty = wrappedTy.getPointer();
   if (!ty)
     return;
@@ -295,7 +294,7 @@ static void gatherTypeVariables(
   }
 
   case TypeKind::TypeVariable:
-    typeVariables.insert(cast<TypeVariableType>(ty));
+    typeVariables.push_back(cast<TypeVariableType>(ty));
     return;
   }
 
@@ -303,7 +302,7 @@ static void gatherTypeVariables(
 }
 
 void
-TypeBase::getTypeVariables(llvm::SetVector<TypeVariableType *> &typeVariables) {
+TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
   // If we know we don't have any type variables, we're done.
   if (hasTypeVariable()) {
     gatherTypeVariables(this, typeVariables);

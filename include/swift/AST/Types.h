@@ -26,7 +26,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SetVector.h"
 
 namespace llvm {
   struct fltSemantics;
@@ -191,7 +190,7 @@ public:
   ///
   /// \param typeVariables This vector is populated with the set of
   /// type variables referenced by this type.
-  void getTypeVariables(llvm::SetVector<TypeVariableType *> &typeVariables);
+  void getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables);
 
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to

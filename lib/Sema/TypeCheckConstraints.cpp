@@ -1716,9 +1716,9 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
   type = cs.simplifyType(type);
 
   // If the type references the type variable, don't permit the binding.
-  llvm::SetVector<TypeVariableType *> referencedTypeVars;
+  SmallVector<TypeVariableType *, 4> referencedTypeVars;
   type->getTypeVariables(referencedTypeVars);
-  if (referencedTypeVars.count(typeVar))
+  if (std::count(referencedTypeVars.begin(), referencedTypeVars.end(), typeVar))
     return Nothing;
 
   // If the type is a type variable itself, don't permit the binding.
@@ -4232,7 +4232,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
 
   // First, collect all of the constraints that relate directly to a
   // type variable.
-  llvm::SetVector<TypeVariableType *> referencedTypeVars;
+  SmallVector<TypeVariableType *, 8> referencedTypeVars;
   for (auto constraint : Constraints) {
     auto first = simplifyType(constraint->getFirstType());
     switch (constraint->getClassification()) {
@@ -4281,8 +4281,8 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
 
     // If both types are type variables, mark both as referenced.
     if (firstTV && secondTV) {
-      referencedTypeVars.insert(firstTV);
-      referencedTypeVars.insert(secondTV);
+      referencedTypeVars.push_back(firstTV);
+      referencedTypeVars.push_back(secondTV);
     }
   }
 
@@ -4293,7 +4293,11 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
   }
 
   // Mark any referenced type variables as having non-concrete constraints.
+  SmallPtrSet<TypeVariableType *, 8> SeenVars;
   for (auto tv : referencedTypeVars) {
+    // If this type variable is redundantly in the list, skip it.
+    if (!SeenVars.insert(tv)) continue;
+    
     tv = getRepresentative(tv);
     auto known = typeVarConstraintsMap.find(tv);
     if (known == typeVarConstraintsMap.end())
