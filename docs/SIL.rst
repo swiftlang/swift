@@ -1135,26 +1135,42 @@ gets called in SIL as::
   %z.1 = extract %z, 1
   release %z.1
 
-Address-only arguments are passed by address and are callee-copied. The
-caller maintains ownership of the referenced arguments, and the callee must
-not modify them. An address-only return value is handled by passing the address
-of a caller-owned uninitialized buffer as the final argument to the callee. The
-callee must initialize this buffer before returning. This Swift function::
+For address-only arguments, the caller allocates a copy and passes the address
+of the copy to the callee. The callee takes ownership of the copy and is
+responsible for destroying or consuming the value, though the caller must
+deallocate the memory. For address-only return values, the
+caller allocates an uninitialized buffer and passes its address as the final
+argument to the callee. The callee must initialize this buffer before
+returning. This Swift function::
 
   struct [API] A {}
 
-  func bas(x:A, y:Int) -> A
+  func bas(x:A, y:Int) -> A { return x }
 
-  bas(x, y)
+  var z = bas(x, y)
+  // ... use z ...
 
 gets called in SIL as::
 
   %bas = constant_ref $(*A, Int, *A) -> (), @bas
-  %tmp = alloc_var stack $A
-  apply %bas(%x, %y, %z)
+  %z = alloc_var stack $A
+  %x.arg = alloc_var stack $A
+  copy_addr %x to initialize %x.arg
+  apply %bas(%x.arg, %y, %z)
+  dealloc_var stack %x.arg ; callee consumes %x.arg, caller deallocs
   ; ... use %z ...
-  destroy_addr %tmp
-  dealloc_var stack %tmp
+  destroy_addr %z
+  dealloc_var stack %z
+
+The implementation of ``bas`` is then responsible for consuming ``%x.arg`` and
+initializing ``%z``. In this trivial case, it could optimize down to a
+take-initialization of the return value::
+  
+  func bas : $(*A, Int, *A) -> () {
+  entry(%x, %y, %ret):
+    copy_addr take %x to initialize %ret
+    ret
+  }
 
 Tuple arguments are destructured recursively, regardless of the
 address-only-ness of the tuple type. The destructured fields are passed
@@ -1169,9 +1185,16 @@ individually according to the above convention. This Swift function::
 gets called in SIL as::
 
   %zim = constant_ref $(Int, *A, Int, *A, Int) -> (), @bas
-  %w.0 = extract %w, 0
-  %w.1 = extract %w, 1
-  apply %zim(%x, %y, %z, %w.0, %w.1)
+  %y.arg = alloc_var stack $A
+  copy_addr %y to initialize %y.arg
+  %w.0 = element_addr %w, 0
+  %w.0.arg = alloc_var stack $A
+  copy_addr %w.0 to initialize %w.0.arg
+  %w.1.addr = element_addr %w, 1
+  %w.1 = load %w.1.addr
+  apply %zim(%x, %y.arg, %z, %w.0.arg, %w.1)
+  dealloc_var stack %w.0.arg
+  dealloc_var stack %y.arg
 
 Variadic arguments and tuple elements are packaged into an array and passed as
 a single array argument. This Swift function::

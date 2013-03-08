@@ -359,8 +359,7 @@ public:
   /// emitDestructorProlog - Generates prolog code for a destructor. Unlike
   /// a normal function, the destructor does not consume a reference to its
   /// argument. Returns the 'this' argument Value.
-  Value emitDestructorProlog(ClassDecl *CD,
-                             DestructorDecl *DD);
+  Value emitDestructorProlog(ClassDecl *CD, DestructorDecl *DD);
   
   /// emitRetainRValue - Emits the instructions necessary to increase the
   /// retain count of a temporary, in order to use it as part of another
@@ -382,6 +381,10 @@ public:
   /// - For address-only types, the value at the address is destroyed using
   ///   a destroy_addr instruction.
   void emitReleaseRValue(SILLocation loc, Value v);
+
+  /// Emits a temporary allocation that will be deallocated automatically at the
+  /// end of the current scope. Returns the address of the allocation.
+  Value emitTemporaryAllocation(SILLocation loc, SILType ty);
                         
   //===--------------------------------------------------------------------===//
   // Recursive entry points

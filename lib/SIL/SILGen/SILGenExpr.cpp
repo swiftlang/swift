@@ -35,20 +35,20 @@ namespace {
     }
   };
   
-  class CleanupMaterializeAllocation : public Cleanup {
+  class CleanupTemporaryAllocation : public Cleanup {
     Value alloc;
   public:
-    CleanupMaterializeAllocation(Value alloc) : alloc(alloc) {}
+    CleanupTemporaryAllocation(Value alloc) : alloc(alloc) {}
     
     void emit(SILGenFunction &gen) override {
       gen.B.createDeallocVar(SILLocation(), AllocKind::Stack, alloc);
     }
   };
   
-  class CleanupMaterializeValue : public Cleanup {
+  class CleanupMaterializedValue : public Cleanup {
     Value address;
   public:
-    CleanupMaterializeValue(Value address) : address(address) {}
+    CleanupMaterializedValue(Value address) : address(address) {}
     
     void emit(SILGenFunction &gen) override {
       Value tmpValue = gen.B.createLoad(SILLocation(), address);
@@ -56,10 +56,10 @@ namespace {
     }
   };
   
-  class CleanupMaterializeAddressOnlyValue : public Cleanup {
+  class CleanupMaterializedAddressOnlyValue : public Cleanup {
     Value address;
   public:
-    CleanupMaterializeAddressOnlyValue(Value address) : address(address) {}
+    CleanupMaterializedAddressOnlyValue(Value address) : address(address) {}
     
     void emit(SILGenFunction &gen) override {
       gen.B.createDestroyAddr(SILLocation(), address);
@@ -186,7 +186,7 @@ void SILGenFunction::emitApplyArgumentValue(SILLocation loc,
   }
   
   // Otherwise, the value is a single argument.
-  argsV.push_back(argValue.forwardArgument(*this));
+  argsV.push_back(argValue.forwardArgument(*this, loc));
 }
 
 void SILGenFunction::emitApplyArguments(Expr *argsExpr,
@@ -206,13 +206,11 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
     // Allocate a temporary to house the indirect return, and pass it to the
     // function as an implicit argument.
     SmallVector<Value, 4> argsWithReturn(Args.begin(), Args.end());
-    Value buffer = B.createAllocVar(Loc, AllocKind::Stack,
-                                    resultTI.getLoweredType());
-    Cleanups.pushCleanup<CleanupMaterializeAllocation>(buffer);
+    Value buffer = emitTemporaryAllocation(Loc, resultTI.getLoweredType());
     argsWithReturn.push_back(buffer);
     B.createApply(Loc, Fn, SILType::getEmptyTupleType(F.getContext()),
                   argsWithReturn);
-    Cleanups.pushCleanup<CleanupMaterializeAddressOnlyValue>(buffer);
+    Cleanups.pushCleanup<CleanupMaterializedAddressOnlyValue>(buffer);
     return ManagedValue(buffer, getCleanupsDepth(),
                         /*isAddressOnlyValue=*/true);
   } else {
@@ -334,6 +332,13 @@ ManagedValue SILGenFunction::visitLoadExpr(LoadExpr *E, SGFContext C) {
   return emitManagedRValueWithCleanup(loadedV);
 }
 
+Value SILGenFunction::emitTemporaryAllocation(SILLocation loc,
+                                              SILType ty) {
+  Value tmpMem = B.createAllocVar(loc, AllocKind::Stack, ty);
+  Cleanups.pushCleanup<CleanupTemporaryAllocation>(tmpMem);
+  return tmpMem;
+}
+
 namespace {
   static Materialize emitMaterialize(SILGenFunction &gen,
                                      SILLocation loc, ManagedValue v) {
@@ -346,13 +351,12 @@ namespace {
     assert(!v.getType().isAddress() &&
            "can't materialize a reference");
     
-    Value tmpMem = gen.B.createAllocVar(loc, AllocKind::Stack, v.getType());
-    gen.Cleanups.pushCleanup<CleanupMaterializeAllocation>(tmpMem);
+    Value tmpMem = gen.emitTemporaryAllocation(loc, v.getType());
     gen.B.createStore(loc, v.forward(gen), tmpMem);
     
     CleanupsDepth valueCleanup = CleanupsDepth::invalid();
     if (!gen.getTypeLoweringInfo(v.getType().getSwiftType()).isTrivial()) {
-      gen.Cleanups.pushCleanup<CleanupMaterializeValue>(tmpMem);
+      gen.Cleanups.pushCleanup<CleanupMaterializedValue>(tmpMem);
       valueCleanup = gen.getCleanupsDepth();
     }
     
@@ -442,9 +446,7 @@ ManagedValue SILGenFunction::visitFunctionConversionExpr(
 ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   ManagedValue concrete = visit(E->getSubExpr());
   // Allocate the existential.
-  Value existential = B.createAllocVar(E, AllocKind::Stack,
-                                       getLoweredType(E->getType()));
-  Cleanups.pushCleanup<CleanupMaterializeAllocation>(existential);
+  Value existential = emitTemporaryAllocation(E, getLoweredType(E->getType()));
 
   if (concrete.getType().isExistentialType()) {
     // If the source value is already of a protocol type, we can use
@@ -457,6 +459,10 @@ ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   } else {
     // Otherwise, we need to initialize a new existential container from
     // scratch.
+    
+    // FIXME: Need to stage cleanups better here. If code fails between
+    // InitExistential and initializing the value, clean up using
+    // DeinitExistential.
     
     // Allocate the concrete value inside the container.
     Value valueAddr = B.createInitExistential(E, existential,
@@ -471,7 +477,7 @@ ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
     }
   }
   
-  Cleanups.pushCleanup<CleanupMaterializeAddressOnlyValue>(existential);
+  Cleanups.pushCleanup<CleanupMaterializedAddressOnlyValue>(existential);
   
   return ManagedValue(existential, getCleanupsDepth(),
                       /*isAddressOnlyValue=*/true);
@@ -498,12 +504,10 @@ ManagedValue SILGenFunction::visitSuperToArchetypeExpr(SuperToArchetypeExpr *E,
   visit(E->getLHS());
   ManagedValue base = visit(E->getRHS());
   // Allocate an archetype to hold the downcast value.
-  Value archetype = B.createAllocVar(E, AllocKind::Stack,
-                                     getLoweredType(E->getType()));
-  Cleanups.pushCleanup<CleanupMaterializeAllocation>(archetype);
+  Value archetype = emitTemporaryAllocation(E, getLoweredType(E->getType()));
   // Initialize it with a SuperToArchetypeInst.
   B.createSuperToArchetype(E, base.forward(*this), archetype);
-  Cleanups.pushCleanup<CleanupMaterializeAddressOnlyValue>(archetype);
+  Cleanups.pushCleanup<CleanupMaterializedAddressOnlyValue>(archetype);
   
   return ManagedValue(archetype, getCleanupsDepth(),
                       /*isAddressOnlyValue=*/true);
@@ -1503,11 +1507,10 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   assert(thisTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");
   Value thisValue = new (SGM.M) BBArgument(thisTy, F.begin());
-  Value thisLV = B.createAllocVar(ctor, AllocKind::Stack, thisTy);
-  Cleanups.pushCleanup<CleanupMaterializeAllocation>(thisLV);
+  Value thisLV = emitTemporaryAllocation(ctor, thisTy);
   B.createRetain(ctor, thisValue);
   B.createStore(ctor, thisValue, thisLV);
-  Cleanups.pushCleanup<CleanupMaterializeValue>(thisLV);
+  Cleanups.pushCleanup<CleanupMaterializedValue>(thisLV);
   VarLocs[thisDecl] = {Value(), thisLV};
   
   // Create a basic block to jump to for the implicit 'this' return.

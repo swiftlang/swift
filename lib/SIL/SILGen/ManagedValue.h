@@ -27,41 +27,41 @@ namespace swift {
   
 namespace Lowering {
 
-/// ManagedValue - represents a SIL rvalue. It constists of a Value and an
+/// ManagedValue - represents a SIL rvalue. It consists of a Value and an
 /// optional cleanup. Ownership of the ManagedValue can be "forwarded" to
 /// disable its cleanup when the rvalue is consumed. Read-only addresses may
 /// also be stored in a ManagedValue, but for general lvalues, the LValue type
 /// must be used instead, which also handles writeback through logical
 /// properties.
 class ManagedValue {
-  /// The value (or address of an address-only value) being managed.
-  Value value;
+  /// The value (or address of an address-only value) being managed, and
+  /// whether it represents an address-only value.
+  llvm::PointerIntPair<Value, 1, bool> valueAndIsAddressOnlyValue;
   /// A handle to the cleanup that destroys this value, or
   /// CleanupsDepth::invalid if the value has no cleanup.
   CleanupsDepth cleanup;
-  /// True if this ManagedValue represents an address-only value.
-  bool addressOnlyValue : 1;
 
 public:
   ManagedValue() = default;
   explicit ManagedValue(Value value, bool addressOnlyValue = false)
-    : value(value), cleanup(CleanupsDepth::invalid()),
-      addressOnlyValue(addressOnlyValue)
-    {}
+    : valueAndIsAddressOnlyValue(value, addressOnlyValue),
+      cleanup(CleanupsDepth::invalid())
+  {}
   ManagedValue(Value value, CleanupsDepth cleanup,
                bool isAddressOnlyValue = false)
-    : value(value), cleanup(cleanup), addressOnlyValue(isAddressOnlyValue)
-    {}
+    : valueAndIsAddressOnlyValue(value, isAddressOnlyValue),
+      cleanup(cleanup)
+  {}
 
   Value getUnmanagedValue() const {
     assert(!hasCleanup());
     return getValue();
   }
-  Value getValue() const { return value; }
+  Value getValue() const { return valueAndIsAddressOnlyValue.getPointer(); }
   
-  SILType getType() const { return value.getType(); }
+  SILType getType() const { return getValue().getType(); }
   
-  bool isAddressOnlyValue() const { return addressOnlyValue; }
+  bool isAddressOnlyValue() const { return valueAndIsAddressOnlyValue.getInt(); }
 
   bool hasCleanup() const { return cleanup.isValid(); }
   CleanupsDepth getCleanup() const { return cleanup; }
@@ -69,20 +69,28 @@ public:
   /// Forward this value, deactivating the cleanup and returning the
   /// underlying value. Not valid for address-only values.
   Value forward(SILGenFunction &gen) {
-    assert(!addressOnlyValue &&
+    assert(!isAddressOnlyValue() &&
            "must forward an address-only value using forwardInto");
     if (hasCleanup())
       gen.Cleanups.setCleanupState(getCleanup(), CleanupState::Dead);
     return getValue();
   }
   
-  /// Forward this value if it's loadable, or just provide the address if it's
-  /// address-only, per the argument passing convention.
-  Value forwardArgument(SILGenFunction &gen) {
-    if (getType().isAddress())
+  /// Forward this value if it's loadable, or create a temporary copy if
+  /// it's address-only, per the argument passing convention.
+  Value forwardArgument(SILGenFunction &gen, SILLocation loc) {
+    if (isAddressOnlyValue()) {
+      // Make a copy of the address-only value for the callee to consume.
+      Value copy = gen.emitTemporaryAllocation(loc, getType());
+      forwardInto(gen, loc, copy, /*isInitialize*/ true);
+      return copy;
+    } else if (getType().isAddress()) {
+      // Simply pass other addresses--they should correspond to byref args.
       return getValue();
-    else
+    } else {
+      // Forward loadable values.
       return forward(gen);
+    }
   }
   
   /// Forward this value into memory by storing it to the given address.
@@ -99,7 +107,7 @@ public:
   /// this method.
   void forwardInto(SILGenFunction &gen, SILLocation loc,
                    Value address, bool isInitialize) {
-    assert(addressOnlyValue &&
+    assert(isAddressOnlyValue() &&
            "must forward loadable value using forward");
     // If we own a cleanup for this value, we can "take" the value and disable
     // the cleanup.
@@ -107,7 +115,7 @@ public:
     if (canTake) {
       gen.Cleanups.setCleanupState(getCleanup(), CleanupState::Dead);
     }
-    gen.B.createCopyAddr(loc, value, address, canTake, isInitialize);
+    gen.B.createCopyAddr(loc, getValue(), address, canTake, isInitialize);
   }
 
   /// Split this value into its underlying value and, if present, its cleanup.

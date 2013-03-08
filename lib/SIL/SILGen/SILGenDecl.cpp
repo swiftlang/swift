@@ -305,8 +305,8 @@ struct ArgumentInitVisitor :
         I->bindAddress(arg, gen);
       } else if (arg.getType().isAddressOnly()) {
         initB.createCopyAddr(loc, arg, I->getAddress(),
-                             /*isTake=*/false,
-                             /*isInitialize=*/true);
+                             /*isTake=*/ true,
+                             /*isInitialize=*/ true);
       } else {
         initB.createStore(loc, arg, I->getAddress());
       }
@@ -324,7 +324,7 @@ struct ArgumentInitVisitor :
     return arg;
   }
     
-  // Paren & Typed patterns are noops, just look through them.
+  // Paren & Typed patterns are no-ops, just look through them.
   Value visitParenPattern(ParenPattern *P, Initialization *I) {
     return visit(P->getSubPattern(), I);
   }
