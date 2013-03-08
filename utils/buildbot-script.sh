@@ -37,7 +37,6 @@ INSTALL_PREFIX=/usr
 PACKAGE_PATH=/Users/swift-discuss
 
 # Set this to the address to which release announcements should be sent.
-PACKAGE_ANNOUNCEMENT_ADDRESS=jgroff@apple.com
 
 # Make sure the variables and directories we expect to exist actually do.
 test "$WORKSPACE"
