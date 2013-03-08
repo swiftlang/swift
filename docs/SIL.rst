@@ -702,10 +702,10 @@ archetype_method
   ;   U' and V'
   ;   e.g. method `(This, Foo) -> Protocol.Bar` becomes `(T, Foo) -> T.Bar`
 
-Obtains a reference to function implementing ``@method`` for the archetype
-referenced by ``%0``. Self and associated types in the signature of ``@method``
-are bound relative to the type referenced by ``%0`` in the resulting function
-value. The returned function reference is uncurried.
+Obtains a reference to the function implementing ``@method`` for the archetype
+referenced by ``%0``. In the type of the resulting function, self and
+associated types in the signature of ``@method`` are bound relative to
+the type pointed to by ``%0``. The returned function reference is uncurried.
 
 associated_metatype
 ```````````````````
@@ -938,7 +938,7 @@ Obtains a reference to the function that implements the specified method for
 the immediate superclass of the *static* type of ``%0``. The returned function
 reference is uncurried.
 
-Note that for native Swift methods, ``super_method`` is equivalent to a
+Note that for native Swift methods, ``super_method`` lowers equivalently to a
 static reference to the (uncurried) superclass method implementation using
 ``constant_ref``. However, interop with external object systems such as
 Objective-C may require dynamic dispatch even for super calls.
