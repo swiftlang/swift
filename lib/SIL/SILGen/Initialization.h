@@ -73,9 +73,9 @@ public:
   /// Perform post-initialization bookkeeping for this initialization.
   virtual void finishInitialization(SILGenFunction &gen) {}
 
-  /// Perform a zero initialization of this buffer or buffers, then
+  /// Perform a default initialization of this buffer or buffers, then
   /// invoke finishInitialization() if necessary.
-  virtual void zeroInitialize(SILGenFunction &gen) = 0;
+  virtual void defaultInitialize(SILGenFunction &gen) = 0;
   
 private:
   virtual void _anchor();
@@ -88,7 +88,7 @@ public:
     return {};
   }
   
-  void zeroInitialize(SILGenFunction &gen) override {
+  void defaultInitialize(SILGenFunction &gen) override {
     Value address = getAddress();
     gen.B.createInitializeVar(SILLocation(), address);
     finishInitialization(gen);

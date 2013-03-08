@@ -82,9 +82,9 @@ public:
     return subInitializations;
   }
   
-  void zeroInitialize(SILGenFunction &gen) override {
+  void defaultInitialize(SILGenFunction &gen) override {
     for (auto sub : subInitializations)
-      sub->zeroInitialize(gen);
+      sub->defaultInitialize(gen);
   }
 };
 
@@ -164,7 +164,7 @@ public:
     gen.VarLocs[vd] = {Value(), address};
   }
 
-  void zeroInitialize(SILGenFunction &gen) override {}
+  void defaultInitialize(SILGenFunction &gen) override {}
 };
 
 /// A "null" initialization that indicates that any value being initialized into
@@ -179,7 +179,7 @@ public:
     return {};
   }
   
-  void zeroInitialize(SILGenFunction &gen) override {}
+  void defaultInitialize(SILGenFunction &gen) override {}
 };
 
 /// InitializationForPattern - A visitor for traversing a pattern, generating
@@ -257,12 +257,13 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D,
     InitializationForPattern(*this).visit(D->getPattern()));
   
   // If an initial value expression was specified by the decl, emit it into
-  // the initialization. Otherwise, use "zero" placeholder initialization.
+  // the initialization. Otherwise, emit 'initialize_var' placeholder
+  // instructions.
   if (D->getInit()) {
     FullExpr Scope(Cleanups);
     emitExprInto(D->getInit(), initialization.get());
   } else {
-    initialization->zeroInitialize(*this);
+    initialization->defaultInitialize(*this);
   }
 }
 
