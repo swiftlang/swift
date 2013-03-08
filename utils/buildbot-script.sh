@@ -181,15 +181,32 @@ Have fun!
 
 === KNOWN ISSUES ===
 
-The Swift compiler is under active development and has a number of known problems. Here are some of the most commonly encountered issues:
+The Swift compiler is under active development and has a number of known
+problems. Here are some of the most commonly encountered issues:
 
-* Spectacularly poor error messages: the compiler will often report the unhelpful errors "expression does not type-check" or "assignment does not type-check", preceded by a debugging dump.
+* Spectacularly poor error messages: the compiler will often report the
+  unhelpful errors "expression does not type-check" or "assignment does not
+  type-check", preceded by a debugging dump.
 
-* Run-time errors abort: run-time errors such as an out-of-bounds array access are detected by the standard library, which immediately aborts without reporting a problem. Moreover, such errors are not trapped in the REPL, and will cause the REPL itself to crash.
+* Run-time errors abort: run-time errors such as an out-of-bounds array access
+  are detected by the standard library, which immediately aborts without
+  reporting a problem. Moreover, such errors are not trapped in the REPL, and
+  will cause the REPL itself to crash.
 
-* Protocol support is limited: creating a variable of protocl type without initializing it results in a variable that is unusable; any attempt to query or assign it will cause a crash. Additionally, Objective-C protocols are not supported.
+* Run-time safety: The compiler does not yet check for many error conditions
+  and instead compiles and executes code with undefined behavior. In
+  particular, functions can fall off the end without returning a value, and
+  uninitialized variables will be zero-initialized instead of using a default
+  constructor or raising an error.
 
-* Generics support is limited: only basic generic types and functions currently work. For example, one cannot create a type that has an instance variable whose type is that of a type parameter.
+* Protocol support is limited: creating a variable of protocol type without
+  initializing it results in a variable that is unusable; any attempt to query
+  or assign it will cause a crash. Additionally, Objective-C protocols are not
+  supported.
+
+* Generics support is limited: only basic generic types and functions
+  currently work. For example, one cannot create a type that has an instance
+  variable whose type is that of a type parameter.
 
 .
 EOM
