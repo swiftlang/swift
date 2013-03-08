@@ -1717,8 +1717,8 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
 
   // If the type references the type variable, don't permit the binding.
   llvm::SetVector<TypeVariableType *> referencedTypeVars;
-  if (type->hasTypeVariable(referencedTypeVars) &&
-      referencedTypeVars.count(typeVar))
+  type->getTypeVariables(referencedTypeVars);
+  if (referencedTypeVars.count(typeVar))
     return Nothing;
 
   // If the type is a type variable itself, don't permit the binding.
@@ -4247,15 +4247,15 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
         getTVC(firstTV).KindConstraints.push_back(constraint);
       } else {
         // Simply mark any type variables in the type as referenced.
-        first->hasTypeVariable(referencedTypeVars);
+        first->getTypeVariables(referencedTypeVars);
       }
       continue;
 
     case ConstraintClassification::Member:
       // Mark the referenced type variables for both sides.
-      first->hasTypeVariable(referencedTypeVars);
+      first->getTypeVariables(referencedTypeVars);
       simplifyType(constraint->getSecondType())
-        ->hasTypeVariable(referencedTypeVars);
+        ->getTypeVariables(referencedTypeVars);
       continue;
     }
 
@@ -4267,7 +4267,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       getTVC(firstTV).Above.push_back(std::make_pair(constraint, second));
     } else {
       // Collect any type variables represented in the first type.
-      first->hasTypeVariable(referencedTypeVars);
+      first->getTypeVariables(referencedTypeVars);
     }
 
     auto secondTV = second->getAs<TypeVariableType>();
@@ -4276,7 +4276,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       getTVC(secondTV).Below.push_back(std::make_pair(constraint, first));
     } else {
       // Collect any type variables represented in the second type.
-      second->hasTypeVariable(referencedTypeVars);
+      second->getTypeVariables(referencedTypeVars);
     }
 
     // If both types are type variables, mark both as referenced.
@@ -4289,7 +4289,7 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
   // Mark any type variables that specify the result of an unresolved overload
   // set as having non-concrete constraints.
   for (auto ovl : UnresolvedOverloadSets) {
-    ovl->getBoundType()->hasTypeVariable(referencedTypeVars);
+    ovl->getBoundType()->getTypeVariables(referencedTypeVars);
   }
 
   // Mark any referenced type variables as having non-concrete constraints.

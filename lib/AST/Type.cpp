@@ -302,15 +302,13 @@ static void gatherTypeVariables(
   llvm_unreachable("Unhandling type kind");
 }
 
-bool
-TypeBase::hasTypeVariable(llvm::SetVector<TypeVariableType *> &typeVariables) {
+void
+TypeBase::getTypeVariables(llvm::SetVector<TypeVariableType *> &typeVariables) {
   // If we know we don't have any type variables, we're done.
-  if (!hasTypeVariable())
-    return false;
-
-  gatherTypeVariables(this, typeVariables);
-  assert(!typeVariables.empty() && "Did not find type variables!");
-  return true;
+  if (hasTypeVariable()) {
+    gatherTypeVariables(this, typeVariables);
+    assert(!typeVariables.empty() && "Did not find type variables!");
+  }
 }
 
 

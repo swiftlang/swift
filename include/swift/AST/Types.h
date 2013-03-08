@@ -186,12 +186,12 @@ public:
   /// \brief Determine whether this type involves a type variable.
   bool hasTypeVariable() const;
 
-  /// \brief Determine whether this type involves a type variable and compute the
-  /// set of type variables that occur within this type.
+  /// \brief Compute and return the set of type variables that occur within this
+  /// type.
   ///
   /// \param typeVariables This vector is populated with the set of
   /// type variables referenced by this type.
-  bool hasTypeVariable(llvm::SetVector<TypeVariableType *> &typeVariables);
+  void getTypeVariables(llvm::SetVector<TypeVariableType *> &typeVariables);
 
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to
