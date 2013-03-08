@@ -70,9 +70,9 @@ private:
   union {
     Address address;
     struct {
-      ExplosionKind explosionKind;
-      ExplosionVector explosionValues;
-    };
+      ExplosionKind kind;
+      ExplosionVector values;
+    } explosion;
     PartialCall partialCall;
   };
 
@@ -81,22 +81,20 @@ public:
     : kind(Kind::Address), address(address)
   {}
   
-  LoweredValue(Explosion &explosion)
+  LoweredValue(Explosion &e)
     : kind(Kind::Explosion),
-      explosionKind(explosion.getKind()),
-      explosionValues()
+      explosion{e.getKind(), {}}
   {
-    explosion.claimUnmanaged(explosion.size(), explosionValues);
+    e.claimUnmanaged(e.size(), explosion.values);
   }
   
   /// This is a hack to kill off cleanups emitted by some IRGen infrastructure.
   /// SIL code should always have memory management within it explicitly lowered.
-  LoweredValue(Explosion &explosion, IRGenFunction &IGF)
+  LoweredValue(Explosion &e, IRGenFunction &IGF)
     : kind(Kind::Explosion),
-      explosionKind(explosion.getKind()),
-      explosionValues()
+      explosion{e.getKind(), {}}
   {
-    explosion.forward(IGF, explosion.size(), explosionValues);
+    e.forward(IGF, e.size(), explosion.values);
   }
   
   LoweredValue(PartialCall &&call)
@@ -111,8 +109,8 @@ public:
       ::new (&address) Address(std::move(lv.address));
       break;
     case Kind::Explosion:
-      explosionKind = lv.explosionKind;
-      ::new (&explosionValues) ExplosionVector(std::move(lv.explosionValues));
+      explosion.kind = lv.explosion.kind;
+      ::new (&explosion.values) ExplosionVector(std::move(lv.explosion.values));
       break;
     case Kind::PartialCall:
       ::new (&partialCall) PartialCall(std::move(lv.partialCall));
@@ -127,22 +125,22 @@ public:
   
   void getExplosion(Explosion &ex) {
     assert(kind == Kind::Explosion && "not an explosion");
-    assert(ex.getKind() == explosionKind &&
+    assert(ex.getKind() == explosion.kind &&
            "destination explosion kind mismatch");
-    for (auto *value : explosionValues)
+    for (auto *value : explosion.values)
       ex.addUnmanaged(value);
   }
   
   Explosion getExplosion() {
     assert(kind == Kind::Explosion && "not an explosion");
-    Explosion e(explosionKind);
+    Explosion e(explosion.kind);
     getExplosion(e);
     return e;
   }
   
   ExplosionKind getExplosionKind() {
     assert(kind == Kind::Explosion && "not an explosion");
-    return explosionKind;
+    return explosion.kind;
   }
   
   PartialCall &getPartialCall() {
@@ -156,7 +154,7 @@ public:
       address.~Address();
       break;
     case Kind::Explosion:
-      explosionValues.~ExplosionVector();
+      explosion.values.~ExplosionVector();
       break;
     case Kind::PartialCall:
       partialCall.~PartialCall();
