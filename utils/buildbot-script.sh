@@ -151,7 +151,7 @@ We recommend uninstalling any previous Swift packages you have installed
 before installing this package. Uninstall as follows:
 
         darwinup list
-        sudo darwinup uninstall $UUID_FROM_DARWINUP_LIST
+        sudo darwinup uninstall \$UUID_FROM_DARWINUP_LIST
 
 When you find bugs in Swift, please report them using the 'Swift (New Bugs)'
 Radar component.
