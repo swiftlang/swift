@@ -574,8 +574,7 @@ namespace {
     }
 
     OverloadChoice(Type base, OverloadChoiceKind kind)
-      : Base(base), DeclOrKind((uintptr_t)kind << 1 | (uintptr_t)0x01)
-    {
+      : Base(base), DeclOrKind((uintptr_t)kind << 1 | (uintptr_t)0x01) {
       assert(base && "Must have a base type for overload choice");
       assert(kind != OverloadChoiceKind::Decl && "wrong constructor for decl");
     }
@@ -637,14 +636,11 @@ namespace {
     /// system.
     void *operator new(size_t) = delete;
 
-    OverloadSet(unsigned ID,
-                llvm::PointerUnion<Expr *, const Constraint *> from,
-                Type boundType,
-                ArrayRef<OverloadChoice> choices)
+    OverloadSet(unsigned ID, llvm::PointerUnion<Expr *,const Constraint *> from,
+                Type boundType, ArrayRef<OverloadChoice> choices)
       : ID(ID), NumChoices(choices.size()), ExprOrConstraint(from),
-        BoundType(boundType)
-    {
-      memmove(this+1, choices.data(), sizeof(OverloadChoice)*choices.size());
+        BoundType(boundType) {
+      memcpy(this+1, choices.data(), sizeof(OverloadChoice)*choices.size());
     }
 
   public:
@@ -807,8 +803,10 @@ namespace {
       llvm::DenseMap<std::pair<Type, Identifier>, std::unique_ptr<MemberLookup>>
         MemberLookups;
 
-      /// \brief Cached literal checks.
-      std::map<std::pair<TypeBase *, LiteralKind>, bool> LiteralChecks;
+      /// \brief Cached literal checks.  The key is a canonical type + literal
+      /// kind.  The value is a tristate of 0 -> uncomputed, 1 -> computed
+      /// false, 2 -> computed true.
+      llvm::DenseMap<std::pair<CanType, unsigned>, unsigned> LiteralChecks;
 
     public:
       SharedStateType(TypeChecker &tc) : Arena(tc.Context, Allocator) {}
@@ -4014,19 +4012,19 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind) {
              : SolutionKind::Unsolved;
   }
 
-  // Have we already checked whether this type is literal compatible?
-  auto typePtr = type->getCanonicalType().getPointer();
-  auto known = SharedState->LiteralChecks.find({typePtr, kind});
-  if (known != SharedState->LiteralChecks.end())
-    return known->second? SolutionKind::TriviallySolved : SolutionKind::Error;
+  // Look up the entry for this type/literalkind pair in LiteralChecks.
+  unsigned &known = SharedState->LiteralChecks[{type->getCanonicalType(),
+                                               (unsigned)kind}];
 
-  // We have not yet checked this type; check it now, and cache the result.
-  // FIXME: We should do this caching in the translation unit.
-  bool &result = SharedState->LiteralChecks[{typePtr, kind}];
-  result = TC.isLiteralCompatibleType(type, SourceLoc(), kind,
-                                      /*Complain=*/false).first;
-
-  return result? SolutionKind::TriviallySolved : SolutionKind::Error;
+  // If we haven't already checked whether this type is literal compatible, do
+  // it now.
+  if (known == 0) {
+    // FIXME: We should do this caching in the translation unit.
+    known = 1+(TC.isLiteralCompatibleType(type, SourceLoc(), kind,
+                                          /*Complain=*/false).first != nullptr);
+  }
+  
+  return known == 2 ? SolutionKind::TriviallySolved : SolutionKind::Error;
 }
 
 ConstraintSystem::SolutionKind
