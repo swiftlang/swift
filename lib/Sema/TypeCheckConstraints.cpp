@@ -14,6 +14,7 @@
 // inference.
 //
 //===----------------------------------------------------------------------===//
+
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -62,7 +63,7 @@ STATISTIC(NumLameNonDefinitive, "# of type variables lamely non-definitive");
 namespace {
   
 /// \brief A handle that holds the saved state of a type variable, which
-/// can be restored
+/// can be restored.
 class SavedTypeVariableBinding {
   /// \brief The type variable.
   TypeVariableType *TypeVar;
@@ -4217,8 +4218,8 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
   typeVarConstraints.clear();
 
   // Provide a mapping from type variable to its constraints. The getTVC
-  // function ties togeter the SmallVector and the DenseMap.
-  llvm::DenseMap<TypeVariableType *, unsigned> typeVarConstraintsMap;
+  // function ties together the SmallVector and the DenseMap.
+  llvm::SmallDenseMap<TypeVariableType *, unsigned, 8> typeVarConstraintsMap;
   auto getTVC = [&](TypeVariableType *tv) -> TypeVariableConstraints& {
     tv = getRepresentative(tv);
     unsigned& constraintsIdx = typeVarConstraintsMap[tv];
