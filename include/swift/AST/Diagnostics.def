@@ -467,6 +467,8 @@ ERROR(expected_dot_or_subscript_after_super,expr_parsing,none,
       "expected '.' or '[' after 'super'", ())
 ERROR(super_constructor_not_in_constructor,expr_parsing,none,
       "'super.constructor' cannot be called outside of a constructor", ())
+ERROR(super_constructor_must_be_called,expr_parsing,none,
+      "'super.constructor' cannot be referenced without arguments", ())
 
 ERROR(expected_expr_closure,expr_parsing,none,
       "expected expression in closure", ())

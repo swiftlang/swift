@@ -426,6 +426,13 @@ VarDecl *FuncExpr::getImplicitThisDecl() const {
   return nullptr;
 }
 
+RebindThisInConstructorExpr::RebindThisInConstructorExpr(Expr *SubExpr,
+                                                         ValueDecl *This)
+  : Expr(ExprKind::RebindThisInConstructor,
+         TupleType::getEmpty(This->getASTContext())),
+    SubExpr(SubExpr), This(This)
+{}
+
 //===----------------------------------------------------------------------===//
 // Printing for Expr and all subclasses.
 //===----------------------------------------------------------------------===//
@@ -870,6 +877,11 @@ public:
     printRec(E->getLHS());
     OS << '\n';
     printRec(E->getRHS());
+    OS << ')';
+  }
+  void visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E) {
+    printCommon(E, "rebind_this_in_constructor_expr") << '\n';
+    printRec(E->getSubExpr());
     OS << ')';
   }
 };

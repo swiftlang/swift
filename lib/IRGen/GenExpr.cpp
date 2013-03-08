@@ -420,6 +420,39 @@ namespace {
       IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
       return;
     }
+    
+    void visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E) {
+      // FIXME: For delegating value constructors, we want to emitRValueAsInit
+      // 'this' in place with the result of the subexpression.
+      if (!E->getThis()->getType()->hasReferenceSemantics()) {
+        IGF.unimplemented(E->getLoc(), "delegating value constructor");
+        IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
+        return;
+      }
+      
+      // FIXME: We should conditionalize the 'this' rebinding below on the
+      // ObjC-ness of the called constructor. Swift constructors should never
+      // rebind 'this'.
+      
+      Explosion sub(IGF.CurExplosionLevel);
+      IGF.emitRValue(E->getSubExpr(), sub);
+      
+      // Coerce the result to 'this' type.
+      CanType thisTy = E->getThis()->getType()->getCanonicalType();
+      llvm::Value *newThis = sub.forwardNext(IGF);
+      if (!E->getSubExpr()->getType()->isEqual(E->getThis()->getType()))
+        newThis = IGF.emitUnconditionalDowncast(newThis, thisTy);
+
+      // Reassign 'this' with the result.
+      LValue thisLV = emitDeclRefLValue(IGF, E->getThis(),
+                                        E->getThis()->getTypeOfReference());
+      OwnedAddress addr = IGF.emitAddressForPhysicalLValue(thisLV);
+      
+      Explosion newThisE(IGF.CurExplosionLevel);
+      newThisE.addUnmanaged(newThis);
+      
+      IGF.getFragileTypeInfo(thisTy).assign(IGF, newThisE, addr);
+    }
 
     void visitMemberRefExpr(MemberRefExpr *E) {
       IGF.emitLValueAsScalar(emitMemberRefLValue(IGF, E),
@@ -574,6 +607,7 @@ namespace {
     NOT_LVALUE_EXPR(Module)
     NOT_LVALUE_EXPR(BridgeToBlock)
     NOT_LVALUE_EXPR(OtherConstructorDeclRef)
+    NOT_LVALUE_EXPR(RebindThisInConstructor)
 #undef NOT_LVALUE_EXPR
 
     LValue visitTupleElementExpr(TupleElementExpr *E) {
@@ -753,6 +787,7 @@ namespace {
     NON_LOCATEABLE(GenericMemberRefExpr)
     NON_LOCATEABLE(BridgeToBlockExpr)
     NON_LOCATEABLE(OtherConstructorDeclRefExpr)
+    NON_LOCATEABLE(RebindThisInConstructorExpr)
 
     // FIXME: We may want to specialize IR generation for array subscripts.
     NON_LOCATEABLE(SubscriptExpr)

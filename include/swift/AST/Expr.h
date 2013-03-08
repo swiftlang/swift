@@ -2187,7 +2187,36 @@ public:
     return E->getKind() == ExprKind::SuperToArchetype;
   }
 };
-
+  
+/// \brief Represents the rebinding of 'this' in a constructor that calls out
+/// to another constructor. The result of the subexpression is assigned to
+/// 'this', and the expression returns void.
+///
+/// When a super.constructor or delegating constructor is invoked, 'this' is
+/// reassigned to the result of the constructor (after being downcast in the
+/// case of super.constructor).
+/// This is needed for reference types with ObjC interop, where
+/// reassigning 'self' is a supported feature, and for value type delegating
+/// constructors, where the delegatee constructor is responsible for
+/// initializing 'this' in-place before the delegator's logic executes.
+class RebindThisInConstructorExpr : public Expr {
+  Expr *SubExpr;
+  ValueDecl *This;
+public:
+  RebindThisInConstructorExpr(Expr *SubExpr, ValueDecl *This);
+  
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
+  
+  ValueDecl *getThis() const { return This; }
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *Sub) { SubExpr = Sub; }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::RebindThisInConstructor;
+  }
+};
+  
 } // end namespace swift
 
 #endif

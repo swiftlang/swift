@@ -294,6 +294,9 @@ public:
   CoercedResult visitGenericSubscriptExpr(GenericSubscriptExpr *E) {
     return failed(E); // FIXME: Is this reachable?
   }
+  CoercedResult visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E) {
+    return failed(E); // FIXME: Is this reachable?
+  }
   CoercedResult visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) {
     Type BaseTy = E->getBase()->getType()->getRValueType();
 

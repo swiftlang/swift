@@ -1325,6 +1325,11 @@ public:
   Expr *visitApplyExpr(ApplyExpr *E) {
     return TC.semaApplyExpr(E);
   }
+    
+  Expr *visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E) {
+    TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
+    return nullptr;
+  }
   
   SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
   

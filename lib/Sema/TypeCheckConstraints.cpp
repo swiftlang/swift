@@ -2906,6 +2906,15 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return baseTy;
     }
     
+    Type visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *expr) {
+      // The subexpression must be a supertype of 'this' type.
+      CS.addConstraint(ConstraintKind::Subtype,
+                       expr->getThis()->getType(),
+                       expr->getSubExpr()->getType());
+      // The result is void.
+      return TupleType::getEmpty(CS.getASTContext());
+    }
+    
     Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -6097,6 +6106,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     // FIXME: Other subclasses of ApplyExpr?
+    
+    Expr *visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *expr) {
+      return expr;
+    }
 
     Expr *visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
       llvm_unreachable("Already type-checked");

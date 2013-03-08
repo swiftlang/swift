@@ -288,9 +288,24 @@ NullablePtr<Expr> Parser::parseExprSuper() {
         }
         
         result = new (Context) CallExpr(result, args);
+      } else if (Tok.is(tok::l_paren_following)) {
+        // Parse Swift-style constructor arguments.
+        NullablePtr<Expr> arg = parseExprList(tok::l_paren_following,
+                                              tok::r_paren);
+        // FIXME: Unfortunate recovery here.
+        if (arg.isNull())
+          return nullptr;
+        
+        result = new (Context) CallExpr(result, arg.get());
+      } // It's invalid to refer to an uncalled constructor.
+        else {
+        diagnose(ctorLoc, diag::super_constructor_must_be_called);
+        result->setType(ErrorType::get(Context));
+        return result;
       }
 
-      return result;
+      // The result of the called constructor is used to rebind 'this'.
+      return new (Context) RebindThisInConstructorExpr(result, thisDecl);
     } else if (Tok.is(tok::l_paren_starting)) {
       Identifier name;
       SourceLoc nameLoc;
