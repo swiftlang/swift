@@ -527,6 +527,8 @@ void Lexer::lexHexNumber() {
     ++CurPtr;
   if (CurPtr - TokStart == 2) {
     diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
+    while (isValidContinuationOfIdentifier(*CurPtr))
+      ++CurPtr;
     return formToken(tok::unknown, TokStart);
   }
   
@@ -592,6 +594,8 @@ void Lexer::lexNumber() {
       ++CurPtr;
     if (CurPtr - TokStart == 2) {
       diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
+      while (isValidContinuationOfIdentifier(*CurPtr))
+        ++CurPtr;
       return formToken(tok::unknown, TokStart);
     }
     return formStartingToken(tok::integer_literal, TokStart);
@@ -602,6 +606,8 @@ void Lexer::lexNumber() {
       ++CurPtr;
     if (CurPtr - TokStart == 2) {
       diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
+      while (isValidContinuationOfIdentifier(*CurPtr))
+        ++CurPtr;
       return formToken(tok::unknown, TokStart);
     }
     return formStartingToken(tok::integer_literal, TokStart);
@@ -621,8 +627,15 @@ void Lexer::lexNumber() {
   } else {
     // Floating literals must have '.', 'e', or 'E' after digits.  If it is
     // something else, then this is the end of the token.
-    if (*CurPtr != 'e' && *CurPtr != 'E')
+    if (*CurPtr != 'e' && *CurPtr != 'E') {
+      if (isValidContinuationOfIdentifier(*CurPtr)) {
+        diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
+        while (isValidContinuationOfIdentifier(*CurPtr))
+          ++CurPtr;
+        return formToken(tok::unknown, TokStart);
+      }
       return formStartingToken(tok::integer_literal, TokStart);
+    }
   }
 
   // Lex decimal point.
@@ -642,6 +655,8 @@ void Lexer::lexNumber() {
       
     if (!isdigit(*CurPtr)) {
       diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
+      while (isValidContinuationOfIdentifier(*CurPtr))
+        ++CurPtr;
       return formToken(tok::unknown, TokStart);
     }
     
