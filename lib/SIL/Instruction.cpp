@@ -220,14 +220,14 @@ IntegerLiteralInst::IntegerLiteralInst(IntegerLiteralExpr *E)
   : Instruction(ValueKind::IntegerLiteralInst, E,
                 // Builtin integer types are always valid SIL types.
                 SILType::getPreLoweredType(E->getType()->getCanonicalType(),
-                                       /*address=*/false, /*loadable=*/true)) {
+                                     /*address=*/false, /*loadable=*/true, 0)) {
 }
 
 IntegerLiteralInst::IntegerLiteralInst(CharacterLiteralExpr *E)
   : Instruction(ValueKind::IntegerLiteralInst, E,
                 // Builtin integer types are always valid SIL types.
                 SILType::getPreLoweredType(E->getType()->getCanonicalType(),
-                                       /*address=*/false, /*loadable=*/true)) {
+                                     /*address=*/false, /*loadable=*/true, 0)) {
 }
 
 Expr *IntegerLiteralInst::getExpr() const {
@@ -250,7 +250,7 @@ FloatLiteralInst::FloatLiteralInst(FloatLiteralExpr *E)
   : Instruction(ValueKind::FloatLiteralInst, E,
                 // Builtin floating-point types are always valid SIL types.
                 SILType::getPreLoweredType(E->getType()->getCanonicalType(),
-                                       /*address=*/false, /*loadable=*/true)) {
+                                     /*address=*/false, /*loadable=*/true, 0)) {
 }
 
 FloatLiteralExpr *FloatLiteralInst::getExpr() const {
@@ -265,7 +265,7 @@ StringLiteralInst::StringLiteralInst(StringLiteralExpr *E)
   : Instruction(ValueKind::StringLiteralInst, E,
                 // The string literal tuple type is always a valid SIL type.
                 SILType::getPreLoweredType(E->getType()->getCanonicalType(),
-                                       /*address=*/false, /*loadable=*/true)) {
+                                     /*address=*/false, /*loadable=*/true, 0)) {
 }
 
 StringLiteralExpr *StringLiteralInst::getExpr() const {

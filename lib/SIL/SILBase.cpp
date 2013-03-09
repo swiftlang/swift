@@ -27,21 +27,23 @@ public:
   SILType Types[1];  // Actually variable sized.
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
-    for (unsigned i = 0, e = NumTypes; i != e; ++i)
-      ID.AddPointer(Types[i].getOpaqueValue());
+    for (unsigned i = 0, e = NumTypes; i != e; ++i) {
+      ID.AddPointer(Types[i].getOpaqueTypeValue());
+      ID.AddInteger(Types[i].getUncurryLevel());
+    }
   }
 };
 }
 
 ArrayRef<SILType> ValueBase::getTypes() const {
   // No results.
-  if (Types.isNull())
+  if (TypeOrTypeList.isNull())
     return ArrayRef<SILType>();
   // Arbitrary list of results.
-  if (auto TypeList = Types.dyn_cast<SILTypeList*>())
+  if (auto *TypeList = TypeOrTypeList.getTypeListOrNull())
     return ArrayRef<SILType>(TypeList->Types, TypeList->NumTypes);
   // Single result.
-  return Types.get<SILType>();
+  return TypeOrTypeList.getType();
 }
 
 /// SILTypeListUniquingType - This is the type of the folding set maintained by
@@ -64,8 +66,10 @@ SILTypeList *SILBase::getSILTypeList(ArrayRef<SILType> Types) const {
   auto UniqueMap = (SILTypeListUniquingType*)TypeListUniquing;
 
   llvm::FoldingSetNodeID ID;
-  for (auto T : Types)
-    ID.AddPointer(T.getOpaqueValue());
+  for (auto T : Types) {
+    ID.AddPointer(T.getOpaqueTypeValue());
+    ID.AddInteger(T.getUncurryLevel());
+  }
 
   // If we already have this type list, just return it.
   void *InsertPoint = 0;

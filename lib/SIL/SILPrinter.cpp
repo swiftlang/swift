@@ -89,7 +89,15 @@ void SILType::print(raw_ostream &OS) const {
   if (isAddress()) {
     OS << "*";
   }
-  getSwiftRValueType()->print(OS);
+  CanType swiftTy = getSwiftRValueType();
+  unsigned uncurries = uncurryLevel;
+  while (uncurries-- > 0) {
+    AnyFunctionType *fTy = cast<AnyFunctionType>(swiftTy);
+    // FIXME print generic params
+    fTy->getInput()->print(OS);
+    swiftTy = CanType(fTy->getResult());
+  }
+  swiftTy->print(OS);
 }
 
 void SILType::dump() const {

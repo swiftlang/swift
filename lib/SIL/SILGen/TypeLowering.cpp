@@ -258,8 +258,9 @@ TypeLoweringInfo const &TypeConverter::makeTypeLoweringInfo(CanType t) {
 
   // Generate the lowered type.
   theInfo->loweredType = SILType(t,
-                                 /*address=*/address || addressOnly,
-                                 /*loadable=*/!addressOnly);
+                                 /*address=*/ address || addressOnly,
+                                 /*loadable=*/ !addressOnly,
+                                 /*uncurryLevel=*/ 0);
   
   // Generate the SILTypeInfo for the lowered type.
   if (SILTypeInfo *sti = makeSILTypeInfo(*theInfo)) {

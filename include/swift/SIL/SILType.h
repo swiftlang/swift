@@ -43,6 +43,7 @@ namespace Lowering {
 class SILType {
   typedef llvm::PointerIntPair<Type, 2> ValueType;
   ValueType value;
+  unsigned uncurryLevel;
   
   enum {
     // Set if this is an address type.
@@ -56,24 +57,27 @@ class SILType {
   /// TypeInfo::getLoweredType() in SILGen.
   SILType(CanType ty,
           bool address,
-          bool loadable)
+          bool loadable,
+          unsigned uncurryLevel)
     : value(ty.getPointer(),
-            (address << 0) | (loadable << 1)) {
+            (address << 0) | (loadable << 1)),
+      uncurryLevel(uncurryLevel)
+  {
     assert((address || loadable) &&
            "SILType can't be the value of an address-only type");
     assert(!(ty && ty->is<LValueType>()) &&
            "LValueTypes should be eliminated by SIL lowering");
+    assert((uncurryLevel == 0 || (isa<AnyFunctionType>(ty) && !address))
+           && "Only function types can be uncurried");
   }
   
-  SILType(Type ty, unsigned flags)
-    : value(ty, flags) {}
-  explicit SILType(ValueType value)
-    : value(value) {}
+  SILType(ValueType value, unsigned uncurryLevel)
+    : value(value), uncurryLevel(uncurryLevel) {}
   
   friend class Lowering::TypeConverter;
-  friend class llvm::PointerLikeTypeTraits<SILType>;
+  friend struct llvm::DenseMapInfo<SILType>;
 public:
-  SILType() = default;
+  SILType() : value(), uncurryLevel(0) {}
   
   bool isNull() const { return value.getPointer().isNull(); }
   explicit operator bool() const { return value.getPointer().operator bool(); }
@@ -81,25 +85,19 @@ public:
   void dump() const;
   void print(raw_ostream &OS) const;
   
-  // Direct comparison is allowed for SILTypes because they are canonicalized.
-  bool operator==(SILType T) const {
-    return value == T.value;
-  }
-  bool operator!=(SILType T) const {
-    return value != T.value;
-  }
-  
   /// Gets the address type referencing this type, or the type itself if it is
   /// already an address type.
   SILType getAddressType() const {
-    return SILType(value.getPointer(), value.getInt() | IsAddressFlag);
+    return SILType(ValueType{value.getPointer(), value.getInt() | IsAddressFlag},
+                   uncurryLevel);
   }
   /// Gets the type referenced by an address type, or the type itself if it is
   /// not an address type. Invalid for address-only types.
   SILType getObjectType() const {
     assert((value.getInt() | IsLoadableFlag) &&
            "dereferencing an address-only address");
-    return SILType(value.getPointer(), value.getInt() & ~IsAddressFlag);
+    return SILType({value.getPointer(), value.getInt() & ~IsAddressFlag},
+                   uncurryLevel);
   }
   
   /// Returns the Swift type referenced by this SIL type.
@@ -114,6 +112,12 @@ public:
               ->getCanonicalType();
     } else
       return CanType(value.getPointer());
+  }
+  
+  /// Returns the uncurry level of the type. Returns zero for non-function
+  /// types.
+  unsigned getUncurryLevel() const {
+    return uncurryLevel;
   }
   
   /// Cast the Swift type referenced by this SIL type, or return null if the
@@ -157,14 +161,16 @@ public:
   /// TypeInfo::getLoweredType().
   static SILType getPreLoweredType(TypeBase *t,
                                    bool address,
-                                   bool loadable) {
-    return SILType(CanType(t), address, loadable);
+                                   bool loadable,
+                                   unsigned uncurryLevel) {
+    return SILType(CanType(t), address, loadable, uncurryLevel);
   }
 
   static SILType getPreLoweredType(Type t,
                                    bool address,
-                                   bool loadable) {
-    return SILType(CanType(t), address, loadable);
+                                   bool loadable,
+                                   unsigned uncurryLevel) {
+    return SILType(CanType(t), address, loadable, uncurryLevel);
   }
   
   //
@@ -185,9 +191,20 @@ public:
   //
   // Utilities for treating SILType as a pointer-like type.
   //
-  void *getOpaqueValue() const { return value.getOpaqueValue(); }
-  static SILType getFromOpaqueValue(void *P) {
-    return SILType(ValueType::getFromOpaqueValue(P));
+  static SILType getFromOpaqueValue(void *P, unsigned U) {
+    return SILType(ValueType::getFromOpaqueValue(P), U);
+  }
+  void *getOpaqueTypeValue() const {
+    return value.getOpaqueValue();
+  }
+  
+  bool operator==(SILType rhs) const {
+    return value.getOpaqueValue() == rhs.value.getOpaqueValue()
+      && uncurryLevel == rhs.uncurryLevel;
+  }
+  bool operator!=(SILType rhs) const {
+    return value.getOpaqueValue() != rhs.value.getOpaqueValue()
+      || uncurryLevel != rhs.uncurryLevel;
   }
 };
 
@@ -195,35 +212,25 @@ public:
 
 namespace llvm {
 
-// Allow SILType to be treated as a pointer-like type.
-template<>
-class PointerLikeTypeTraits<swift::SILType> {
-public:
-  static inline swift::SILType getFromVoidPointer(void *P) {
-    return swift::SILType::getFromOpaqueValue(P);
-  }
-
-  static inline void *getAsVoidPointer(swift::SILType T) {
-    return T.getOpaqueValue();
-  }
-  
-  enum { NumLowBitsAvailable = 1 };
-};
-
 // Allow SILType to be used as a DenseMap key.
 template<>
-class DenseMapInfo<swift::SILType> {
+struct DenseMapInfo<swift::SILType> {
   using SILType = swift::SILType;
   using PointerMapInfo = DenseMapInfo<void*>;
+  using UnsignedMapInfo = DenseMapInfo<unsigned>;
 public:
   static SILType getEmptyKey() {
-    return SILType::getFromOpaqueValue(PointerMapInfo::getEmptyKey());
+    return SILType::getFromOpaqueValue(PointerMapInfo::getEmptyKey(),
+                                       UnsignedMapInfo::getEmptyKey());
   }
   static SILType getTombstoneKey() {
-    return SILType::getFromOpaqueValue(PointerMapInfo::getTombstoneKey());
+    return SILType::getFromOpaqueValue(PointerMapInfo::getTombstoneKey(),
+                                       UnsignedMapInfo::getTombstoneKey());
   }
   static unsigned getHashValue(SILType t) {
-    return PointerMapInfo::getHashValue(t.getOpaqueValue());
+    unsigned h1 = PointerMapInfo::getHashValue(t.getOpaqueTypeValue());
+    unsigned h2 = UnsignedMapInfo::getHashValue(t.uncurryLevel);
+    return h1 ^ (h2 << 9);
   }
   static bool isEqual(SILType LHS, SILType RHS) {
     return LHS == RHS;

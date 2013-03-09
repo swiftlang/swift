@@ -55,8 +55,9 @@ public:
 /// SILFunctionTypeInfo - type info for a FunctionType or PolymorphicFunctionType.
 /// Specifies the SIL-level calling convention for the function.
 class SILFunctionTypeInfo : public SILTypeInfo {
-  llvm::PointerIntPair<SILType, 1, bool> resultTypeAndIndirectReturn;
-  size_t inputTypeCount;
+  SILType resultType;
+  unsigned inputTypeCount : 31;
+  unsigned indirectReturn : 1;
 
   SILType *getInputTypeBuffer() {
     return reinterpret_cast<SILType*>(this+1);
@@ -66,11 +67,12 @@ class SILFunctionTypeInfo : public SILTypeInfo {
   }
   
   SILFunctionTypeInfo(unsigned inputTypeCount,
-                  SILType resultType,
-                  bool hasIndirectReturn)
+                      SILType resultType,
+                      bool hasIndirectReturn)
     : SILTypeInfo(SILTypeInfoKind::SILFunctionTypeInfo),
-      resultTypeAndIndirectReturn(resultType, hasIndirectReturn),
-      inputTypeCount(inputTypeCount)
+      resultType(resultType),
+      inputTypeCount(inputTypeCount),
+      indirectReturn(hasIndirectReturn)
   {}
 
 public:
@@ -84,11 +86,11 @@ public:
   }
   
   SILType getResultType() const {
-    return resultTypeAndIndirectReturn.getPointer();
+    return resultType;
   }
   
   bool hasIndirectReturn() const {
-    return resultTypeAndIndirectReturn.getInt();
+    return bool(indirectReturn);
   }
   
   static bool classof(SILTypeInfo const *ti) {

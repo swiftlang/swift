@@ -30,25 +30,66 @@ namespace swift {
     First_##Id = FirstId, Last_##Id = LastId,
 #include "swift/SIL/SILNodes.def"
   };
-
+  
   /// ValueBase - This is the base class of the SIL value hierarchy, which
   /// represents a runtime computed value.  Things like Instruction derive from
   /// this.
   class ValueBase : public SILAllocated<ValueBase> {
-    PointerUnion<SILTypeList*, SILType> Types;
+    struct SILTypeOrTypeList {
+      static constexpr unsigned TypeListMarker = ~0U;
+      
+      union {
+        SILType Ty;
+        struct {
+          SILTypeList *Ptr;
+          unsigned Marker;
+        } Types;
+      };
+      
+      static_assert(sizeof(Types) == sizeof(SILType),
+                    "SILTypeOrTypeList union size mismatch");
+      
+      SILTypeOrTypeList() : Ty() {}
+      
+      SILTypeOrTypeList(SILType Ty) : Ty(Ty) {}
+      
+      SILTypeOrTypeList(SILTypeList *Ptr)
+        : Types{Ptr, TypeListMarker} {}
+      
+      bool isNull() const {
+        return Ty.isNull();
+      }
+      
+      SILTypeList *getTypeListOrNull() const {
+        if (Types.Marker == TypeListMarker)
+          return Types.Ptr;
+        return nullptr;
+      }
+      
+      SILType getType() const {
+        assert(Types.Marker != TypeListMarker);
+        return Ty;
+      }
+    } TypeOrTypeList;
+    
     const ValueKind Kind;
+
   protected:
     ValueBase(ValueKind Kind, SILTypeList *TypeList = 0)
-      : Types(TypeList), Kind(Kind) {}
+      : TypeOrTypeList(TypeList), Kind(Kind) {}
     ValueBase(ValueKind Kind, SILType Ty)
-      : Types(Ty), Kind(Kind) {}
+      : TypeOrTypeList(Ty), Kind(Kind) {}
+    
   public:
-
     ValueKind getKind() const { return Kind; }
 
     ArrayRef<SILType> getTypes() const;
 
-    SILType getType(unsigned i) const { return getTypes()[i]; }
+    SILType getType(unsigned i) const {
+      SILType ty = getTypes()[i];
+      ty.dump();
+      return ty;
+    }
 
     /// Pretty-print the Instruction.
     void dump() const;

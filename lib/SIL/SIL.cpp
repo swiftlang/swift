@@ -29,8 +29,9 @@ static SILType toplevelFunctionType(ASTContext &C) {
                              TupleType::getEmpty(C),
                              C);
   return SILType::getPreLoweredType(t,
-                                    /*isAddress=*/false,
-                                    /*isLoadable=*/true);
+                                    /*isAddress=*/ false,
+                                    /*isLoadable=*/ true,
+                                    /*uncurryLevel=*/ 0);
 }
 
 SILModule::SILModule(ASTContext &Context, bool hasTopLevel) :
@@ -78,32 +79,37 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc) {
 
 SILType SILType::getObjectPointerType(ASTContext &C) {
   return SILType(CanType(C.TheObjectPointerType),
-                 /*isAddress=*/false,
-                 /*isLoadable=*/true);
+                 /*isAddress=*/ false,
+                 /*isLoadable=*/ true,
+                 /*uncurryLevel=*/ 0);
 }
 
 SILType SILType::getRawPointerType(ASTContext &C) {
   return SILType(CanType(C.TheRawPointerType),
                  /*isAddress=*/false,
-                 /*isLoadable=*/true);
+                 /*isLoadable=*/true,
+                 /*uncurryLevel=*/ 0);
 }
 
 SILType SILType::getOpaquePointerType(ASTContext &C) {
   return SILType(CanType(C.TheOpaquePointerType),
                  /*isAddress=*/false,
-                 /*isLoadable=*/true);
+                 /*isLoadable=*/true,
+                 /*uncurryLevel=*/ 0);
 }
 
 SILType SILType::getEmptyTupleType(ASTContext &C) {
   return SILType(CanType(TupleType::getEmpty(C)),
                  /*isAddress=*/false,
-                 /*isLoadable=*/true);
+                 /*isLoadable=*/true,
+                 /*uncurryLevel=*/ 0);
 }
 
 SILType SILType::getBuiltinIntegerType(unsigned bitWidth, ASTContext &C) {
   return SILType(CanType(BuiltinIntegerType::get(bitWidth, C)),
                  /*isAddress=*/false,
-                 /*isLoadable=*/true);
+                 /*isLoadable=*/true,
+                 /*uncurryLevel=*/ 0);
 }
 
 TupleInst *SILBuilder::createEmptyTuple(SILLocation Loc) {

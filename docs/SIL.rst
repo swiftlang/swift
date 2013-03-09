@@ -185,6 +185,15 @@ types but are needed for some operations:
   Its type variables can be bound with a ``specialize`` instruction to
   give a value of a *concrete function type* ``$(A...) -> R`` that can then
   be ``apply``-ed.
+* Unlike Swift, *uncurried function types* are distinct in SIL. An uncurry
+  level is denoted using juxtaposition. For a curried function of type
+  ``(T) -> (U) -> (V) -> W``, the first uncurried entry point will be of type
+  ``(T)(U) -> (V) -> W``, and the second uncurried entry point will be of
+  type ``(T)(U)(V) -> W``. Function types cannot return uncurried function
+  types, so ``(A)(B) -> (C) -> D`` is a valid SIL type, but
+  ``(A) -> (B)(C) -> D`` is not. Any or all of the uncurry levels may
+  individually be generic, as in ``<T> (A)(B) -> C``,
+  ``<T> (A) <U> (B) -> C``, or ``(A) <U> (B) -> C``.
 
 Swift types may not translate one-to-one to SIL types. In particular, tuple
 types are canonicalized, and function types are canonicalized and mangled in
@@ -204,9 +213,18 @@ Functions
   }
 
 A SIL function definition gives the function's name as a global symbol, its
-generic parameters (if any), and the types of its inputs and outputs. Implicit
-parameters for closures and curried functions in Swift are translated into
-explicit arguments.
+generic parameters (if any), and the types of its inputs and outputs. The
+arguments are bound to parameters of the first basic block in left-to-right
+order. For an uncurried function, the arguments of each clause are bound
+to the first basic block's parameters in outer-to-inner order::
+
+  func @uncurried : $(A1, A2)(B1, B2) -> R {
+  entry(%a1:$A1, %a2:$A2, %b1:$B1, %b2:$B2):
+    ...
+  }
+
+For a local function or closure with context, the context values become
+an extra uncurry level of the closure function.
 
 Basic blocks
 ------------
@@ -644,13 +662,15 @@ specialize
 ::
 
   %1 = specialize %0, $T
-  ; %0 must be of a generic function type $<T1, T2, ...> A -> R
-  ; $T must be of either the concrete function type $A -> R or a generic
+  ; %0 must be of a generic function type $<T1, T2, ...> (A) -> R
+  ; $T must be of either the concrete function type $(A) -> R or a generic
   ; function type $<T3, ...> A -> R with some type variables removed.
   ; %1 will be of the function type $T
 
 Specializes a generic function ``%0`` to the generic or concrete function type
-``T``, binding some or all of its generic type variables.
+``T``, binding its generic type variables. ``%0`` may be of an uncurried
+function type, in which case ``specialize`` must bind all of its generic
+parameters at every uncurry level.
 
 generalize
 ``````````
@@ -697,7 +717,7 @@ archetype_method
   %1 = archetype_method %0, @method
   ; %0 must be an address of an archetype $*T
   ; @method must be a reference to a method of one of the constraints of T
-  ; %1 will be of uncurried type (U'..., T) -> V' for method type (U...) -> V,
+  ; %1 will be of uncurried type (T)(U') -> V' for method type U -> V,
   ;   where self and associated types in U and V are bound relative to T in
   ;   U' and V'
   ;   e.g. method `(This, Foo) -> Protocol.Bar` becomes `(T, Foo) -> T.Bar`
@@ -870,28 +890,93 @@ other than the "this" argument of an instance method reference obtained by
 Functions
 ~~~~~~~~~
 
-closure
-```````
+curry
+`````
 ::
 
-  %C = closure %0(%1, %2, ...)
-  ; %0 must be of a concrete function type $(..., A1, A2, ..., AN) -> R
-  ; %1, %2, etc. must be of the types A1...AN of the last N arguments to %0
-  ; %C will be of the function type of %0 with the last N arguments removed
+  %C = curry %0(%1, %2, ...)
+  ; %0 must be of a concrete uncurried function type $(A...)(B...)...(C) -> R
+  ; %1, %2, etc. must be of the types A..., B..., etc. of the outermost
+  ;   uncurry levels
+  ; %C will be of the function type (C) -> R
 
-Allocates a closure by partially applying the function ``%0`` to its last
-N arguments. The closure context will be allocated with retain
+Allocates a closure by partially applying the function ``%0`` to its outer
+curry levels. The closure context will be allocated with retain
 count 1 containing the values ``%1``, ``%2``, etc. The closed-over values
 will not be retained; that must be done separately if necessary. Retaining
 or releasing the closure object will retain or release its context.
+
+This instruction is used to implement both curry thunks and closures. A
+curried function in Swift::
+  
+  func foo(a:A)(b:B)(c:C)(d:D) -> E { /* body of foo */ }
+
+emits curry thunks in SIL as follows::
+  
+  func @foo : $(a:A) -> (b:B) -> (c:C) -> (d:D) -> E {
+  entry(%a:$A):
+    %foo.1 = constant_ref $(a:A)(b:B) -> (c:C) -> (d:D) -> E, @foo.1
+    %thunk = curry %foo.1(%a)
+    return %thunk
+  }
+
+  func @foo.1 : $(a:A)(b:B) -> (c:C) -> (d:D) -> E {
+  entry(%a:$A, %b:$B):
+    %foo.2 = constant_ref $(a:A)(b:B)(c:C) -> (d:D) -> E, @foo.2
+    %thunk = curry %foo.2(%a, %b)
+    return %thunk
+  }
+
+  func @foo.2 : $(a:A)(b:B)(c:C) -> (d:D) -> E {
+  entry(%a:$A, %b:$B, %c:$C):
+    %foo.3 = constant_ref $(a:A)(b:B)(c:C)(d:D) -> E, @foo.3
+    %thunk = curry %foo.3(%a, %b, %c)
+    return %thunk
+  }
+
+  func @foo.3 : $(a:A)(b:B)(c:C)(d:D) -> E {
+  entry(%a:$A, %b:$B, %c:$C, %d:$D):
+    ; body of foo
+  }
+
+A local function in Swift that captures context::
+  
+  func foo(x:Int) -> Int {
+    func bar(y:Int) -> Int {
+      return x + y
+    }
+    return bar(1)
+  }
+
+lowers to an uncurried entry point and is curried by the enclosing function::
+
+  func @bar : $(x:Int)(y:Int) -> Int {
+  entry(%x:$Int, %y:$Int):
+    ; body of bar
+  }
+
+  func @foo : $(x:Int) -> Int {
+  entry(%x:$Int):
+    ; Create the bar closure
+    %bar.uncurry = constant_ref $(x:Int)(y:Int) -> Int, @bar
+    %bar = curry %bar.uncurry(%x)
+
+    ; Apply it
+    %1 = integer_literal 1
+    %ret = apply %bar(%1)
+
+    ; Clean up
+    release %bar
+    return %ret
+  }
 
 apply
 `````
 ::
 
   %R = apply %0(%1, %2, ...)
-  ; %0 must be of a concrete function type $(A1, A2, ...) -> R
-  ; %1, %2, etc. must be of the argument types $A1, $A2, etc.
+  ; %0 must be of a concrete function type $(A...)(B...) ... -> R
+  ; %1, %2, etc. must be of the argument types $A..., $B..., etc.
   ; %R will be of the return type $R
 
 Transfers control to function ``%0``, passing in the given arguments. The
@@ -901,6 +986,8 @@ separate explicit ``retain`` and ``release`` instructions. The return value
 will likewise not be implicitly retained or released. ``%0`` must be an object
 of a concrete function type; generic functions must have all of their generic
 parameters bound with ``specialize`` instructions before they can be applied.
+If ``%0`` is an uncurried function, the arguments for the uncurried clauses
+are specified in outer-to-inner (that is, left-to-right) order.
 
 TODO: should have normal/unwind branch targets like LLVM ``invoke``
 
@@ -919,7 +1006,7 @@ class_method
   ; %0 must be of a class type or class metatype $T
   ; @method must be a reference to a dynamically-dispatched method of T or
   ; of one of its superclasses
-  ; %1 will be of uncurried type (U..., T) -> V for method type (U...) -> V
+  ; %1 will be of uncurried type (T)(U) -> V for method type (U) -> V
 
 Obtains a reference to the function that implements the specified method for
 the runtime type of ``%0``. The returned function reference is uncurried.
@@ -932,7 +1019,7 @@ super_method
   ; %0 must be of a non-root class type or class metatype $T
   ; @method must be a reference to a dynamically-dispatched method of T or
   ; of one of its superclasses
-  ; %1 will be of uncurried type (U..., T) -> V for method type (U...) -> V
+  ; %1 will be of uncurried type (T)(U) -> V for method type (U) -> V
 
 Obtains a reference to the function that implements the specified method for
 the immediate superclass of the *static* type of ``%0``. The returned function
