@@ -66,13 +66,19 @@ public:
   bool hasCleanup() const { return cleanup.isValid(); }
   CleanupsDepth getCleanup() const { return cleanup; }
 
+  /// Disable the cleanup for this value.
+  void forwardCleanup(SILGenFunction &gen) {
+    assert(hasCleanup() && "value doesn't have cleanup!");
+    gen.Cleanups.setCleanupState(getCleanup(), CleanupState::Dead);
+  }
+  
   /// Forward this value, deactivating the cleanup and returning the
   /// underlying value. Not valid for address-only values.
   Value forward(SILGenFunction &gen) {
     assert(!isAddressOnlyValue() &&
            "must forward an address-only value using forwardInto");
     if (hasCleanup())
-      gen.Cleanups.setCleanupState(getCleanup(), CleanupState::Dead);
+      forwardCleanup(gen);
     return getValue();
   }
   
@@ -80,6 +86,13 @@ public:
   /// it's address-only, per the argument passing convention.
   Value forwardArgument(SILGenFunction &gen, SILLocation loc) {
     if (isAddressOnlyValue()) {
+      // If the value is already take-able, we don't need to make another copy.
+      // Just pass cleanup responsibility to the callee.
+      if (hasCleanup()) {
+        forwardCleanup(gen);
+        return getValue();
+      }
+      
       // Make a copy of the address-only value for the callee to consume.
       Value copy = gen.emitTemporaryAllocation(loc, getType());
       forwardInto(gen, loc, copy, /*isInitialize*/ true);
@@ -113,17 +126,11 @@ public:
     // the cleanup.
     bool canTake = hasCleanup();
     if (canTake) {
-      gen.Cleanups.setCleanupState(getCleanup(), CleanupState::Dead);
+      forwardCleanup(gen);
     }
     gen.B.createCopyAddr(loc, getValue(), address, canTake, isInitialize);
   }
 
-  /// Split this value into its underlying value and, if present, its cleanup.
-  Value split(llvm::SmallVectorImpl<CleanupsDepth> &cleanups) {
-    if (hasCleanup()) cleanups.push_back(getCleanup());
-    return getValue();
-  }
-  
   /// Returns true if this value corresponds to an lvalue in Swift.
   bool isLValue() const {
     return getType().isAddress() && !isAddressOnlyValue();
