@@ -153,8 +153,8 @@ before installing this package. Uninstall as follows:
         darwinup list
         sudo darwinup uninstall \$UUID_FROM_DARWINUP_LIST
 
-When you find bugs in Swift, please report them using the 'Swift (New Bugs)'
-Radar component.
+When you find bugs in Swift, please report them using the 'Swift' Radar
+component.
 
 === GETTING STARTED WITH SWIFT ===
 
