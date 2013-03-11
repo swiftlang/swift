@@ -42,28 +42,70 @@ namespace swift {
 /// multiple associated entry points, such as a curried function.
 struct SILConstant {
   typedef llvm::PointerUnion<ValueDecl*, CapturingExpr*> Loc;
-  Loc loc;
-  unsigned id;
   
-  enum : unsigned {
-    KindMask = 0xFU << 28U,
-    /// Getter - this constant references the getter for the VarDecl in loc.
-    Getter = 1U << 28U,
-    /// Setter - this constant references the setter for the VarDecl in loc.
-    Setter = 2U << 28U,
+  /// Represents the "kind" of the SILConstant. For some Swift decls there
+  /// are multiple SIL entry points, and the kind is used to distinguish them.
+  enum class Kind : unsigned {
+    /// Func - this constant references the FuncDecl or CapturingExpr in loc
+    /// directly.
+    Func,
+    
+    /// Getter - this constant references the getter for the ValueDecl in loc.
+    Getter,
+    /// Setter - this constant references the setter for the ValueDecl in loc.
+    Setter,
+    
+    /// Allocator - this constant references the allocating constructor
+    /// entry point of a class ConstructorDecl or the constructor of a value
+    /// ConstructorDecl.
+    Allocator,
+    /// Initializer - this constant references the initializing constructor
+    /// entry point of the class ConstructorDecl in loc.
+    Initializer,
+    
     /// Destructor = this constant references the destructor for the ClassDecl
     /// in loc.
-    Destructor = 3U << 28U,
-    /// Initializer - this constant references the initializer entry point for
-    /// the ConstructorDecl in loc.
-    Initializer = 4U << 28U
+    Destructor,
+    
+    /// GlobalAccessor - this constant references the lazy-initializing
+    /// accessor for the global VarDecl in loc.
+    GlobalAccessor
   };
   
-  SILConstant() : loc(), id(0) {}
-  explicit SILConstant(Loc loc, unsigned id)
-    : loc(loc), id(id) {}
+  /// The ValueDecl or CapturingExpr represented by this SILConstant.
+  Loc loc;
+  /// The Kind of this SILConstant.
+  Kind kind : 4;
+  /// The uncurry level of this SILConstant.
+  unsigned uncurryLevel : 16;
   
-  SILConstant(Loc loc);
+  /// A magic value for SILConstant constructors to ask for the natural uncurry
+  /// level of the constant.
+  enum : unsigned { ConstructAtNaturalUncurryLevel = ~0U };
+  
+  /// Produces a null SILConstant.
+  SILConstant() : loc(), kind(Kind::Func), uncurryLevel(0) {}
+  
+  /// Produces a SILConstant of the given kind for the given decl.
+  explicit SILConstant(ValueDecl *decl, Kind kind,
+                       unsigned uncurryLevel = ConstructAtNaturalUncurryLevel);
+  
+  /// Produces the 'natural' SILConstant for the given ValueDecl or
+  /// CapturingExpr:
+  /// - If 'loc' is a func or closure, this returns a Func SILConstant.
+  /// - If 'loc' is a getter or setter FuncDecl, this returns the Getter or
+  ///   Setter SILConstant for the property VarDecl.
+  /// - If 'loc' is a ConstructorDecl, this returns the Allocator SILConstant
+  ///   for the constructor.
+  /// - If 'loc' is a DestructorDecl, this returns the Destructor SILConstant
+  ///   for the containing ClassDecl.
+  /// - If 'loc' is a global VarDecl, this returns its GlobalAccessor
+  ///   SILConstant.
+  /// If the uncurry level is unspecified or specified as NaturalUncurryLevel,
+  /// then the SILConstant for the natural uncurry level of the definition is
+  /// used.
+  explicit SILConstant(Loc loc,
+                       unsigned uncurryLevel = ConstructAtNaturalUncurryLevel);
     
   bool isNull() const { return loc.isNull(); }
   
@@ -72,22 +114,47 @@ struct SILConstant {
   
   ValueDecl *getDecl() const { return loc.get<ValueDecl*>(); }
   CapturingExpr *getExpr() const { return loc.get<CapturingExpr*>(); }
-    
-  unsigned getKind() const { return id & KindMask; }
-  bool isProperty() const { return getKind() == Getter || getKind() == Setter; }
+  
+  /// True if the SILConstant references a function.
+  bool isFunc() const {
+    return kind == Kind::Func;
+  }
+  /// True if the SILConstant references a property accessor.
+  bool isProperty() const {
+    return kind == Kind::Getter || kind == Kind::Setter;
+  }
+  /// True if the SILConstant references a constructor entry point.
+  bool isConstructor() const {
+    return kind == Kind::Allocator || kind == Kind::Initializer;
+  }
+  /// True if the SILConstant references a destructor.
   bool isDestructor() const {
-    return getKind() == Destructor;
+    return kind == Kind::Destructor;
+  }
+  /// True if the SILConstant references a global variable accessor.
+  bool isGlobal() const {
+    return kind == Kind::GlobalAccessor;
   }
   
   bool operator==(SILConstant rhs) const {
-    return loc.getOpaqueValue() == rhs.loc.getOpaqueValue() && id == rhs.id;
+    return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()
+      && kind == rhs.kind
+      && uncurryLevel == rhs.uncurryLevel;
   }
   bool operator!=(SILConstant rhs) const {
-    return loc.getOpaqueValue() != rhs.loc.getOpaqueValue() || id != rhs.id;
+    return loc.getOpaqueValue() != rhs.loc.getOpaqueValue()
+      || kind != rhs.kind
+      || uncurryLevel != rhs.uncurryLevel;
   }
-    
+  
   void print(llvm::raw_ostream &os) const;
   void dump() const;
+  
+  /// Produces a SILConstant from an opaque value.
+  explicit SILConstant(void *opaqueLoc, Kind kind, unsigned uncurryLevel)
+    : loc(Loc::getFromOpaqueValue(opaqueLoc)),
+      kind(kind), uncurryLevel(uncurryLevel)
+  {}
 };
 
 /// PrettyStackTraceSILConstant - Observe that we are processing a specific
@@ -107,20 +174,23 @@ namespace llvm {
 
 // DenseMap key support for SILConstant.
 template<> struct DenseMapInfo<swift::SILConstant> {
-  static swift::SILConstant getEmptyKey() {
-    void *xx = DenseMapInfo<void*>::getEmptyKey();
-    return swift::SILConstant(swift::SILConstant::Loc::getFromOpaqueValue(xx),
-                              DenseMapInfo<unsigned>::getEmptyKey());
+  using SILConstant = swift::SILConstant;
+  using Kind = SILConstant::Kind;
+  using Loc = SILConstant::Loc;
+  using PointerInfo = DenseMapInfo<void*>;
+  using UnsignedInfo = DenseMapInfo<unsigned>;
+
+  static SILConstant getEmptyKey() {
+    return SILConstant(PointerInfo::getEmptyKey(), Kind::Func, 0);
   }
   static swift::SILConstant getTombstoneKey() {
-    void *xx = DenseMapInfo<void*>::getTombstoneKey();
-    return swift::SILConstant(swift::SILConstant::Loc::getFromOpaqueValue(xx),
-                              DenseMapInfo<unsigned>::getTombstoneKey());
+    return SILConstant(PointerInfo::getEmptyKey(), Kind::Func, 0);
   }
   static unsigned getHashValue(swift::SILConstant Val) {
-    unsigned h1 = DenseMapInfo<void*>::getHashValue(Val.loc.getOpaqueValue());
-    unsigned h2 = DenseMapInfo<unsigned>::getHashValue(Val.id);
-    return h1 ^ (h2 << 9);
+    unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());
+    unsigned h2 = UnsignedInfo::getHashValue(unsigned(Val.kind));
+    unsigned h3 = UnsignedInfo::getHashValue(Val.uncurryLevel);
+    return h1 ^ (h2 << 4) ^ (h3 << 9);
   }
   static bool isEqual(swift::SILConstant const &LHS,
                       swift::SILConstant const &RHS) {

@@ -139,7 +139,7 @@ Function *SILGenModule::emitConstructor(ConstructorDecl *decl) {
       .emitClassConstructorAllocator(decl);
     postEmitFunction(constant, f);
     
-    SILConstant initConstant(decl, SILConstant::Initializer);
+    SILConstant initConstant(decl, SILConstant::Kind::Initializer);
     Function *initF = preEmitFunction(initConstant, decl);
     SILGenFunction(*this, *initF, /*hasVoidReturn=*/true)
       .emitClassConstructorInitializer(decl);
@@ -165,7 +165,7 @@ Function *SILGenModule::emitClosure(ClosureExpr *ce) {
 
 Function *SILGenModule::emitDestructor(ClassDecl *cd,
                                        DestructorDecl /*nullable*/ *dd) {
-  SILConstant constant(cd, SILConstant::Destructor);
+  SILConstant constant(cd, SILConstant::Kind::Destructor);
   
   Function *f = preEmitFunction(constant, dd);
   SILGenFunction(*this, *f, /*hasVoidReturn=*/true).emitDestructor(cd, dd);

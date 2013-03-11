@@ -1124,6 +1124,7 @@ public:
   GenericParamList &getGenericParams() const { return *Params; }
 
   void print(raw_ostream &OS) const;
+  void printGenericParams(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

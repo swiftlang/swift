@@ -450,21 +450,21 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
   }
   case CaptureKind::GetterSetter: {
     // Capture the setter and getter closures by value.
-    Type setTy = gen.SGM.Types.getPropertyType(SILConstant::Setter,
+    Type setTy = gen.SGM.Types.getPropertyType(SILConstant::Kind::Setter,
                                                capture->getType());
     SILType lSetTy = gen.getLoweredType(setTy);
     Value value = new (gen.SGM.M) BBArgument(lSetTy, gen.F.begin());
-    gen.LocalConstants[SILConstant(capture, SILConstant::Setter)] = value;
+    gen.LocalConstants[SILConstant(capture, SILConstant::Kind::Setter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     /* FALLTHROUGH */
   }
   case CaptureKind::Getter: {
     // Capture the getter closure by value.
-    Type getTy = gen.SGM.Types.getPropertyType(SILConstant::Getter,
+    Type getTy = gen.SGM.Types.getPropertyType(SILConstant::Kind::Getter,
                                                capture->getType());
     SILType lGetTy = gen.getLoweredType(getTy);
     Value value = new (gen.SGM.M) BBArgument(lGetTy, gen.F.begin());
-    gen.LocalConstants[SILConstant(capture, SILConstant::Getter)] = value;
+    gen.LocalConstants[SILConstant(capture, SILConstant::Kind::Getter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     break;
   }

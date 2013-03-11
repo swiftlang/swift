@@ -88,7 +88,9 @@ public:
   
   /// getLoweredType - Get the type used to represent values of the Swift type
   /// in SIL.
-  SILType getLoweredType() const { return loweredType; }
+  SILType getLoweredType() const {
+    return loweredType;
+  }
 };
 
 /// TypeConverter - helper class for creating and managing TypeLoweringInfos.
@@ -97,7 +99,8 @@ class LLVM_LIBRARY_VISIBILITY TypeConverter {
   llvm::DenseMap<TypeBase *, TypeLoweringInfo *> types;
   llvm::DenseMap<SILConstant, SILType> constantTypes;
   
-  TypeLoweringInfo const &makeTypeLoweringInfo(CanType t);
+  TypeLoweringInfo const &makeTypeLoweringInfo(CanType t,
+                                               unsigned uncurryLevel);
   SILTypeInfo *makeSILTypeInfo(TypeLoweringInfo &theInfo);
   void makeLayoutForDecl(SmallVectorImpl<SILCompoundTypeInfo::Element> &theInfo,
                          NominalTypeDecl *decl);
@@ -115,10 +118,13 @@ public:
   TypeConverter &operator=(TypeConverter const &) = delete;
 
   /// Returns the SIL TypeLoweringInfo for a SIL type.
-  TypeLoweringInfo const &getTypeLoweringInfo(Type t);
+  TypeLoweringInfo const &getTypeLoweringInfo(Type t,
+                                              unsigned uncurryLevel = 0);
   
   // Returns the lowered SIL type for a Swift type.
-  SILType getLoweredType(Type t) { return getTypeLoweringInfo(t).loweredType; }
+  SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
+    return getTypeLoweringInfo(t, uncurryLevel).loweredType;
+  }
   
   /// Returns the SIL type of a constant reference.
   SILType getConstantType(SILConstant constant);
@@ -128,12 +134,12 @@ public:
   /// Returns the type of a property accessor, () -> T for a getter,
   /// or (value:T) -> () for a setter. 'kind' must be one of the Kind constants
   /// from SILConstant, SILConstant::Getter or SILConstant::Setter.
-  Type getPropertyType(unsigned kind, Type propType) const;
+  Type getPropertyType(SILConstant::Kind kind, Type propType) const;
   /// Returns the type of a subscript property accessor, Index -> () -> T
   /// for a getter, or Index -> (value:T) -> () for a setter.
   /// 'kind' must be one of the Kind constants
   /// from SILConstant, SILConstant::Getter or SILConstant::Setter.
-  Type getSubscriptPropertyType(unsigned kind,
+  Type getSubscriptPropertyType(SILConstant::Kind kind,
                                 Type indexType,
                                 Type elementType) const;
 

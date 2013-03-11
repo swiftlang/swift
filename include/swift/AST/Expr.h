@@ -1533,6 +1533,10 @@ public:
 
   bool isNotCaptured() { return IsNotCaptured; }
   void setIsNotCaptured(bool v) { IsNotCaptured = v; }
+  
+  /// Returns the parameter patterns of the function, using
+  /// FuncExpr::getArgParamPatterns or ClosureExpr::getParamPatterns.
+  ArrayRef<Pattern *> getParamPatterns() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_CapturingExpr &&
@@ -1612,7 +1616,7 @@ public:
   ///
   /// In all cases `getArgParamPatterns().size()` should equal
   /// `getBodyParamPatterns().size()`, and the corresponding elements of each
-  /// array should resolve to equivalent unlabeled types.
+  /// tuple type should have equivalent types.
   
   ArrayRef<Pattern*> getBodyParamPatterns() const {
     return ArrayRef<Pattern*>(getParamsBuffer() + NumPatterns, NumPatterns);

@@ -222,19 +222,17 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
                                        AbstractCC &cc,
                                        BraceStmt* &body)
 {
-  // FIXME: currently only does ValueDecls. Needs to handle closures.
+  ValueDecl *vd = constant.loc.get<ValueDecl*>();  
+  naturalCurryLevel = constant.uncurryLevel;
 
-  ValueDecl *vd = constant.loc.get<ValueDecl*>();
-
-  switch (vd->getKind()) {
-  case DeclKind::Func: {
+  switch (constant.kind) {
+  case SILConstant::Kind::Func: {
+    // FIXME: currently only does ValueDecls. Handle CapturingExprs
     FuncDecl *fd = cast<FuncDecl>(vd);
-    assert(constant.id == 0 && "alternate entry point for func?!");
-    // Get the function pointer at the natural uncurry level.
-    naturalCurryLevel = getDeclNaturalUncurryLevel(vd);
+
     FunctionRef fnRef(fd,
                       ExplosionKind::Minimal,
-                      naturalCurryLevel);
+                      constant.uncurryLevel);
     
     fnptr = getAddrOfFunction(fnRef, ExtraData::None);
     // FIXME: c calling convention
@@ -242,56 +240,53 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
     body = fd->getBody()->getBody();
     break;
   }
-  case DeclKind::Constructor: {
-    ConstructorDecl *cd = cast<ConstructorDecl>(vd);
-    ConstructorKind kind = constant.getKind() == SILConstant::Initializer
-      ? ConstructorKind::Initializing
-      : ConstructorKind::Allocating;
-    naturalCurryLevel = getDeclNaturalUncurryLevel(vd);
-    fnptr = getAddrOfConstructor(cd,
-                                 kind,
-                                 ExplosionKind::Minimal);
-    cc = AbstractCC::Freestanding;
-    body = cd->getBody();
-    break;
-  }
-  case DeclKind::Class: {
-    // FIXME: distinguish between destructor variants in SIL
-    assert(constant.id == SILConstant::Destructor &&
-           "non-destructor reference to ClassDecl?!");
-    naturalCurryLevel = 0;
-    fnptr = getAddrOfDestructor(cast<ClassDecl>(vd),
-                                DestructorKind::Destroying);
-    cc = AbstractCC::Method;
-    // FIXME: get destructor body from destructor decl
-    body = nullptr;
-    break;
-  }
-  case DeclKind::Var: {
+  case SILConstant::Kind::Getter: {
+    fnptr = getAddrOfGetter(vd, ExplosionKind::Minimal);
+    // FIXME: subscript
     VarDecl *var = cast<VarDecl>(vd);
-    FuncDecl *propFunc;
-    if (constant.getKind() == SILConstant::Getter) {
-      fnptr = getAddrOfGetter(vd, ExplosionKind::Minimal);
-      propFunc = var->getGetter();
-    } else if (constant.getKind() == SILConstant::Setter) {
-      fnptr = getAddrOfSetter(vd, ExplosionKind::Minimal);
-      propFunc = var->getSetter();
-    } else {
-      // FIXME: physical global variable accessor.
-      constant.dump();
-      llvm_unreachable("unimplemented constant_ref to var");
-    }
+    body = var->getGetter()->getBody()->getBody();
     cc = vd->isInstanceMember()
       ? AbstractCC::Method
       : AbstractCC::Freestanding;
-    // FIXME: a more canonical place to ask for this?
-    naturalCurryLevel = vd->isInstanceMember() ? 1 : 0;
-    body = propFunc ? propFunc->getBody()->getBody() : nullptr;
     break;
   }
-  default:
-    constant.dump();
-    llvm_unreachable("codegen for constant_ref not yet implemented");
+  case SILConstant::Kind::Setter: {
+    fnptr = getAddrOfSetter(vd, ExplosionKind::Minimal);
+    // FIXME: subscript
+    VarDecl *var = cast<VarDecl>(vd);
+    body = var->getSetter()->getBody()->getBody();
+    cc = vd->isInstanceMember()
+      ? AbstractCC::Method
+      : AbstractCC::Freestanding;
+    break;
+  }
+  case SILConstant::Kind::Allocator: {
+    ConstructorDecl *cd = cast<ConstructorDecl>(vd);
+    fnptr = getAddrOfConstructor(cd, ConstructorKind::Allocating,
+                                 ExplosionKind::Minimal);
+    body = cd->getBody();
+    cc = AbstractCC::Freestanding;
+    break;
+  }
+  case SILConstant::Kind::Initializer: {
+    ConstructorDecl *cd = cast<ConstructorDecl>(vd);
+    fnptr = getAddrOfConstructor(cd, ConstructorKind::Initializing,
+                                 ExplosionKind::Minimal);
+    body = cd->getBody();
+    cc = AbstractCC::Freestanding;
+    break;
+  }
+  case SILConstant::Kind::Destructor: {
+    ClassDecl *cd = cast<ClassDecl>(vd);
+    fnptr = getAddrOfDestructor(cd, DestructorKind::Destroying);
+    cc = AbstractCC::Method;
+    // FIXME: get body from DestructorDecl
+    body = nullptr;
+    break;
+  }
+  case SILConstant::Kind::GlobalAccessor: {
+    llvm_unreachable("unimplemented constant_ref to global var");
+  }
   }
 }
 

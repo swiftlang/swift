@@ -87,7 +87,6 @@ namespace swift {
 
     SILType getType(unsigned i) const {
       SILType ty = getTypes()[i];
-      ty.dump();
       return ty;
     }
 

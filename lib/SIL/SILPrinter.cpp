@@ -50,7 +50,7 @@ raw_ostream &operator<<(raw_ostream &OS, ID i) {
 
 void SILConstant::print(raw_ostream &OS) const {
   if (isNull()) {
-    OS << "<null sil constant>";
+    OS << "<null>";
     return;
   }
   
@@ -59,24 +59,30 @@ void SILConstant::print(raw_ostream &OS) const {
   } else {
     OS << "<anonymous function>";
   }
-  // TODO: bikeshed a SIL syntax for decl ids
-  switch (getKind()) {
-  case SILConstant::Getter:
+  switch (kind) {
+  case SILConstant::Kind::Func:
+    break;
+  case SILConstant::Kind::Getter:
     OS << ".getter";
     break;
-  case SILConstant::Setter:
+  case SILConstant::Kind::Setter:
     OS << ".setter";
     break;
-  case SILConstant::Destructor:
-    OS << ".destructor";
+  case SILConstant::Kind::Allocator:
+    OS << ".allocator";
     break;
-  case SILConstant::Initializer:
+  case SILConstant::Kind::Initializer:
     OS << ".initializer";
     break;
+  case SILConstant::Kind::Destructor:
+    OS << ".destructor";
+    break;
+  case SILConstant::Kind::GlobalAccessor:
+    OS << ".globalaccessor";
+    break;
   }
-  unsigned number = id & ~(SILConstant::KindMask);
-  if (number != 0) {
-    OS << "." << number;
+  if (uncurryLevel != 0) {
+    OS << "." << uncurryLevel;
   }
 }
 
@@ -93,8 +99,12 @@ void SILType::print(raw_ostream &OS) const {
   unsigned uncurries = uncurryLevel;
   while (uncurries-- > 0) {
     AnyFunctionType *fTy = cast<AnyFunctionType>(swiftTy);
-    // FIXME print generic params
+    if (auto *pfTy = dyn_cast<PolymorphicFunctionType>(fTy))
+      pfTy->printGenericParams(OS);
+    bool hasParens = fTy->getInput()->is<TupleType>();
+    if (!hasParens) OS << '(';
     fTy->getInput()->print(OS);
+    if (!hasParens) OS << ')';
     swiftTy = CanType(fTy->getResult());
   }
   swiftTy->print(OS);
@@ -117,8 +127,8 @@ raw_ostream &operator<<(raw_ostream &OS, SILConstant t) {
 
 namespace {
   
-/// SILPrinter class - This is the internal implementation details of printing
-/// for SIL structures.
+/// SILPrinter class - This holds the internal implementation details of
+/// printing SIL structures.
 class SILPrinter : public SILVisitor<SILPrinter> {
   raw_ostream &OS;
 

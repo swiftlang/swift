@@ -1365,12 +1365,12 @@ void FunctionType::print(raw_ostream &OS) const {
   OS << getInput() << " -> " << getResult();
 }
 
-void PolymorphicFunctionType::print(raw_ostream &OS) const {
+void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
   OS << '<';
   auto params = getGenericParams().getParams();
   for (unsigned i = 0, e = params.size(); i != e; ++i) {
     if (i) OS << ", ";
-
+    
     TypeAliasDecl *paramTy = params[i].getAsTypeParam();
     OS << paramTy->getName().str();
     auto inherited = paramTy->getInherited();
@@ -1378,7 +1378,12 @@ void PolymorphicFunctionType::print(raw_ostream &OS) const {
       OS << (ii ? StringRef(", ") : " : ") << inherited[ii].getType();
     }
   }
-  OS << "> " << getInput() << " -> " << getResult();
+  OS << '>';
+}
+
+void PolymorphicFunctionType::print(raw_ostream &OS) const {
+  printGenericParams(OS);
+  OS << ' ' << getInput() << " -> " << getResult();
 }
 
 void ArraySliceType::print(raw_ostream &OS) const {

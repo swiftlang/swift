@@ -342,6 +342,14 @@ void CapturingExpr::computeCaptures(ASTContext &Context) {
   setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
 }
 
+ArrayRef<Pattern *> CapturingExpr::getParamPatterns() const {
+  if (auto *func = dyn_cast<FuncExpr>(this))
+    return func->getArgParamPatterns();
+  if (auto *closure = dyn_cast<ClosureExpr>(this))
+    return closure->getParamPatterns();
+  llvm_unreachable("unknown capturing expr");
+}
+
 FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
                            ArrayRef<Pattern*> argParams,
                            ArrayRef<Pattern*> bodyParams,

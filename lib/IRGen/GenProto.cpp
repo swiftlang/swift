@@ -3691,7 +3691,8 @@ irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
   
   // The function we're going to call.
   // FIXME: Support getters and setters (and curried entry points?)
-  assert(member.id == 0 && "getters, setters, and curries not yet supported");
+  assert(member.kind == SILConstant::Kind::Func
+         && "getters and setters not yet supported");
   ValueDecl *vd = member.getDecl();
   FuncDecl *fn = cast<FuncDecl>(vd);
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());

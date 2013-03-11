@@ -187,9 +187,9 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     if (var->isProperty()) {
       Value get = gen.emitUnmanagedConstantRef(e,
-                                        SILConstant(var, SILConstant::Getter));
+                                  SILConstant(var, SILConstant::Kind::Getter));
       Value set = gen.emitUnmanagedConstantRef(e,
-                                        SILConstant(var, SILConstant::Setter));
+                                  SILConstant(var, SILConstant::Kind::Setter));
       lv.add<GetterSetterComponent>(get, set);
       return ::std::move(lv);
     }
@@ -244,13 +244,13 @@ LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
   
   // Otherwise, use the property accessors.
   ManagedValue get = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
-                                       /*subscriptExpr=*/nullptr,
-                                       SILConstant(decl, SILConstant::Getter),
-                                       substitutions);
+                                   /*subscriptExpr=*/nullptr,
+                                   SILConstant(decl, SILConstant::Kind::Getter),
+                                   substitutions);
   ManagedValue set = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
-                                       /*subscriptExpr=*/nullptr,
-                                       SILConstant(decl, SILConstant::Setter),
-                                       substitutions);
+                                   /*subscriptExpr=*/nullptr,
+                                   SILConstant(decl, SILConstant::Kind::Setter),
+                                   substitutions);
   lv.add<GetterSetterComponent>(get.getValue(), set.getValue());
   return ::std::move(lv);
 }
@@ -263,13 +263,13 @@ LValue emitAnySubscriptExpr(SILGenLValue &sgl,
   LValue lv = sgl.visitRec(e->getBase());
   SubscriptDecl *sd = e->getDecl();
   ManagedValue get = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
-                                           e->getIndex(),
-                                           SILConstant(sd, SILConstant::Getter),
-                                           substitutions);
+                                     e->getIndex(),
+                                     SILConstant(sd, SILConstant::Kind::Getter),
+                                     substitutions);
   ManagedValue set = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
-                                           e->getIndex(),
-                                           SILConstant(sd, SILConstant::Setter),
-                                           substitutions);
+                                     e->getIndex(),
+                                     SILConstant(sd, SILConstant::Kind::Setter),
+                                     substitutions);
   lv.add<GetterSetterComponent>(get.getValue(), set.getValue(),
                                 e->getIndex());
   return ::std::move(lv);

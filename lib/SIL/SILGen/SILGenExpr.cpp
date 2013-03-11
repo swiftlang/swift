@@ -273,7 +273,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
     // If it's a property, invoke its getter.
     if (var->isProperty()) {
       ManagedValue get = emitConstantRef(loc,
-                                        SILConstant(decl, SILConstant::Getter));
+                                  SILConstant(decl, SILConstant::Kind::Getter));
       return ManagedValue(emitGetProperty(loc, get).address);
     }
     
@@ -677,11 +677,11 @@ ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
   // Get the getter function, which will have type This -> () -> T.
   // The type will be a polymorphic function if the This type is generic.
   ManagedValue getter = gen.emitSpecializedPropertyConstantRef(e,
-                                            e->getBase(),
-                                            /*subscriptExpr=*/nullptr,
-                                            SILConstant(e->getDecl(),
-                                                        SILConstant::Getter),
-                                            substitutions);
+                                        e->getBase(),
+                                        /*subscriptExpr=*/nullptr,
+                                        SILConstant(e->getDecl(),
+                                                    SILConstant::Kind::Getter),
+                                        substitutions);
   // Apply the "this" parameter.
   ManagedValue getterDel = gen.emitApply(e,
                                          getter.forward(gen),
@@ -709,11 +709,11 @@ ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
     TypeConverter &tc = SGM.Types;
     Type propType;
     if (subscriptExpr) {
-      propType = tc.getSubscriptPropertyType(constant.getKind(),
+      propType = tc.getSubscriptPropertyType(constant.kind,
                                             subscriptExpr->getType(),
                                             expr->getType()->getRValueType());
     } else {
-      propType = tc.getPropertyType(constant.getKind(),
+      propType = tc.getPropertyType(constant.kind,
                                    expr->getType()->getRValueType());
     }
     propType = tc.getMethodTypeInContext(baseExpr->getType()->getRValueType(),
@@ -846,9 +846,9 @@ ManagedValue emitAnySubscriptExpr(SILGenFunction &gen,
   
   // Get the getter function, which will have type This -> Index -> () -> T.
   ManagedValue getterMethod = gen.emitSpecializedPropertyConstantRef(
-                                          e, e->getBase(), e->getIndex(),
-                                          SILConstant(sd, SILConstant::Getter),
-                                          substitutions);
+                                    e, e->getBase(), e->getIndex(),
+                                    SILConstant(sd, SILConstant::Kind::Getter),
+                                    substitutions);
   
   // Apply the "this" parameter.
   ManagedValue getterDelegate = gen.emitApply(e,
@@ -1183,14 +1183,14 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
         case CaptureKind::GetterSetter: {
           // Pass the setter and getter closure references on.
           ManagedValue v = emitConstantRef(loc, SILConstant(capture,
-                                                       SILConstant::Setter));
+                                                   SILConstant::Kind::Setter));
           capturedArgs.push_back(v.forward(*this));
           /* FALLTHROUGH */
         }
         case CaptureKind::Getter: {
           // Pass the getter closure reference on.
           ManagedValue v = emitConstantRef(loc, SILConstant(capture,
-                                                       SILConstant::Getter));
+                                                   SILConstant::Kind::Getter));
           capturedArgs.push_back(v.forward(*this));
           break;
         }
@@ -1319,7 +1319,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   if (Type baseTy = cd->getBaseClass()) {
     SILConstant dtorConstant =
       SILConstant(baseTy->getClassOrBoundGenericClass(),
-                  SILConstant::Destructor);
+                  SILConstant::Kind::Destructor);
     Value baseThis = B.createUpcast(dd,
                                     thisValue,
                                     getLoweredLoadableType(baseTy));
@@ -1485,7 +1485,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   }
 
   // Call the initializer.
-  SILConstant initConstant = SILConstant(ctor, SILConstant::Initializer);
+  SILConstant initConstant = SILConstant(ctor, SILConstant::Kind::Initializer);
   ManagedValue initVal = emitMethodRef(ctor, thisValue, initConstant);
   SILType initDelType = getLoweredLoadableType(
                      initVal.getType().castTo<AnyFunctionType>()->getResult());
