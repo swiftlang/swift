@@ -36,8 +36,7 @@ static bool parseCurriedFunctionArguments(Parser *parser,
   // parseFunctionArguments parsed the first argument pattern.
   // Parse additional curried argument clauses as long as we can.
   while (parser->Tok.isAnyLParen()) {
-    bool CForLoopHack = false;
-    NullablePtr<Pattern> pattern = parser->parsePatternTuple(CForLoopHack,
+    NullablePtr<Pattern> pattern = parser->parsePatternTuple(
                                                  /*AllowInitExpr=*/true);
     if (pattern.isNull())
       return true;
@@ -84,8 +83,7 @@ static bool parseSelectorArgument(Parser *parser,
     return true;
   }
 
-  bool CForLoopHack = false;
-  NullablePtr<Pattern> bodyPattern = parser->parsePatternAtom(CForLoopHack);
+  NullablePtr<Pattern> bodyPattern = parser->parsePatternAtom();
   if (bodyPattern.isNull()) {
     parser->skipUntil(tok::r_paren);
     return true;
@@ -200,9 +198,7 @@ static bool parseSelectorFunctionArguments(Parser *parser,
 bool Parser::parseFunctionArguments(SmallVectorImpl<Pattern*> &argPatterns,
                                     SmallVectorImpl<Pattern*> &bodyPatterns) {
   // Parse the first function argument clause.
-  bool CForLoopHack = false;
-  NullablePtr<Pattern> pattern = parsePatternTuple(CForLoopHack,
-                                                   /*AllowInitExpr=*/true);
+  NullablePtr<Pattern> pattern = parsePatternTuple(/*AllowInitExpr=*/true);
   if (pattern.isNull())
     return true;
   else {
@@ -250,9 +246,9 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &argPatterns,
 /// Parse a pattern.
 ///   pattern ::= pattern-atom
 ///   pattern ::= pattern-atom ':' type-annotation
-NullablePtr<Pattern> Parser::parsePattern(bool &CForLoopHack) {
+NullablePtr<Pattern> Parser::parsePattern() {
   // First, parse the pattern atom.
-  NullablePtr<Pattern> pattern = parsePatternAtom(CForLoopHack);
+  NullablePtr<Pattern> pattern = parsePatternAtom();
   if (pattern.isNull()) return nullptr;
 
   // Now parse an optional type annotation.
@@ -289,24 +285,21 @@ NullablePtr<Pattern> Parser::parsePatternIdentifier() {
 ///
 ///   pattern-atom ::= identifier
 ///   pattern-atom ::= pattern-tuple
-NullablePtr<Pattern> Parser::parsePatternAtom(bool &CForLoopHack) {
+NullablePtr<Pattern> Parser::parsePatternAtom() {
   switch (Tok.getKind()) {
   case tok::l_paren_starting:
-    return parsePatternTuple(CForLoopHack, /*AllowInitExpr*/false);
+    return parsePatternTuple(/*AllowInitExpr*/false);
 
   case tok::identifier:
-    CForLoopHack = false;
     return parsePatternIdentifier();
 
 #define IDENTIFIER_KEYWORD(kw) case tok::kw_##kw:
 #include "swift/Parse/Tokens.def"
-    CForLoopHack = false;
     diagnose(Tok, diag::expected_pattern_is_keyword);
     consumeToken();
     return nullptr;
 
   default:
-    CForLoopHack = false;
     diagnose(Tok, diag::expected_pattern);
     return nullptr;
   }
@@ -321,19 +314,11 @@ NullablePtr<Pattern> Parser::parsePatternAtom(bool &CForLoopHack) {
 ///   pattern-tuple-element:
 ///     pattern ('=' expr)?
 
-NullablePtr<Pattern> Parser::parsePatternTuple(bool &CForLoopHack,
-                                               bool AllowInitExpr) {
+NullablePtr<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
   assert(Tok.isAnyLParen());
 
   // We're looking at the left parenthesis; consume it.
   SourceLoc lp = consumeToken();
-
-  // We have a gross hack/contract with c-style-for loop parsing
-  if (CForLoopHack && peekToken().is(tok::equal)) {
-    return nullptr;
-  } else {
-    CForLoopHack = false;
-  }
 
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
@@ -341,8 +326,7 @@ NullablePtr<Pattern> Parser::parsePatternTuple(bool &CForLoopHack,
   bool Invalid = false;
   if (Tok.isNot(tok::r_paren)) {
     do {
-      bool CForLoopHack = false;
-      NullablePtr<Pattern> pattern = parsePattern(CForLoopHack);
+      NullablePtr<Pattern> pattern = parsePattern();
       ExprHandle *init = nullptr;
 
       if (pattern.isNull()) {

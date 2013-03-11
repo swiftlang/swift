@@ -496,6 +496,17 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     // Check for a .foo suffix.
     SourceLoc TokLoc = Tok.getLoc();
     
+    if (Tok.is(tok::period_prefix) && (peekToken().is(tok::identifier) ||
+                                       peekToken().is(tok::integer_literal))) {
+      auto Backup = Tok;
+      consumeToken();
+      bool IsPeriod = peekToken().is(tok::l_paren_following) ||
+                      peekToken().is(tok::l_square_following);
+      Tok = Backup;
+      L->backtrackToToken(Backup);
+      if (IsPeriod)
+        Tok.setKind(tok::period);
+    }
     if (consumeIf(tok::period)) {
       if (Tok.is(tok::kw_metatype)) {
         SourceLoc metatypeLoc = consumeToken(tok::kw_metatype);

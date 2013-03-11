@@ -939,8 +939,7 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
     DeclAttributes Attributes;
     parseAttributeList(Attributes);
 
-    bool CForLoopHack = false;
-    NullablePtr<Pattern> pattern = parsePattern(CForLoopHack);
+    NullablePtr<Pattern> pattern = parsePattern();
     if (pattern.isNull()) return true;
 
     // If we syntactically match the second decl-var production, with a
@@ -1604,9 +1603,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
     return true;
   }
 
-  bool CForLoopHack = false;
-  NullablePtr<Pattern> Indices = parsePatternTuple(CForLoopHack,
-                                                   /*AllowInitExpr=*/false);
+  NullablePtr<Pattern> Indices = parsePatternTuple(/*AllowInitExpr=*/false);
   if (Indices.isNull())
     return true;
   
@@ -1751,9 +1748,7 @@ ConstructorDecl *Parser::parseDeclConstructor(bool HasContainerType) {
     return nullptr;
   }
 
-  bool CForLoopHack = false;
-  NullablePtr<Pattern> Arguments = parsePatternTuple(CForLoopHack,
-                                                     /*AllowInitExpr=*/true);
+  NullablePtr<Pattern> Arguments = parsePatternTuple(/*AllowInitExpr=*/true);
   if (Arguments.isNull())
     return nullptr;
 

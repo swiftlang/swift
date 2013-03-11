@@ -16,6 +16,7 @@
 
 #include "Parser.h"
 #include "swift/AST/Attr.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/Twine.h"
@@ -362,23 +363,23 @@ NullablePtr<Stmt> Parser::parseStmtDoWhile() {
 
 NullablePtr<Stmt> Parser::parseStmtFor() {
   SourceLoc ForLoc = consumeToken(tok::kw_for);
-  SourceLoc LPLoc;
-  
+
   // The c-style-for loop and foreach-style-for loop are conflated together into
   // a single keyword, so we have to do some lookahead to resolve what is going
-  // on.  Eventually we might allow optional ()'s around the condition of the
-  // c-style-for loop, which will require us to do arbitrary lookahead.  For now
-  // though, we can distinguish between the two with two-token lookahead and a
-  // gross hack between this statement parser and the pattern parser.
+  // on.
 
   if (Tok.is(tok::l_paren_starting)) {
-    if (peekToken().is(tok::kw_var) || peekToken().is(tok::semi)) {
-      return parseStmtForCStyle(ForLoc, LPLoc, false);
-    }
-    // Assume foreach loop.
+    auto Backup = Tok;
+    consumeToken(tok::l_paren_starting);
+    skipUntil(tok::r_paren);
+    bool IsCStyle = peekToken().is(tok::l_brace);
+    Tok = Backup;
+    L->backtrackToToken(Backup);
+    if (IsCStyle)
+      return parseStmtForCStyle(ForLoc);
     return parseStmtForEach(ForLoc);
   }
-  
+
   // If we have a leading identifier followed by a ':' or 'in', then this is a
   // pattern, so it is foreach.
   if (Tok.is(tok::identifier) &&
@@ -386,7 +387,7 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
     return parseStmtForEach(ForLoc);
 
   // Otherwise, this is some sort of c-style for loop.
-  return parseStmtForCStyle(ForLoc, LPLoc, false);
+  return parseStmtForCStyle(ForLoc);
 }
       
 ///   stmt-for-c-style:
@@ -395,10 +396,10 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
 ///   stmt-for-c-style-init:
 ///     decl-var
 ///     expr-or-stmt-assign
-NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc, SourceLoc LPLoc,
-                                             bool LPLocConsumed) {
+NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   SourceLoc Semi1Loc, Semi2Loc;
-  SourceLoc RPLoc;
+  SourceLoc LPLoc, RPLoc;
+  bool LPLocConsumed = false;
 
   ExprStmtOrDecl First;
   SmallVector<Decl*, 2> FirstDecls;
@@ -409,7 +410,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc, SourceLoc LPLoc,
   // Introduce a new scope to contain any var decls in the init value.
   Scope ForScope(this, /*AllowLookup=*/true);
   
-  if (!LPLocConsumed && Tok.is(tok::l_paren_starting)) {
+  if (Tok.is(tok::l_paren_starting)) {
     LPLoc = consumeToken();
     LPLocConsumed = true;
   }
@@ -464,24 +465,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc, SourceLoc LPLoc,
 ///   stmt-for-each:
 ///     'for' pattern 'in' expr stmt-brace
 NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
-  SourceLoc LPLoc;
-  bool CForLoopHack = false;
-
-  // We have a gross contract with parsePattern() to back out if
-  // CForLoopHack is true and the pattern smells like a for loop
-  // initialization list. This saves us from arbitrary token lookahead
-  // but at the cost of parsePattern() consuming the left paren.
-  if (Tok.is(tok::l_paren_starting)) {
-    LPLoc = Tok.getLoc();
-    CForLoopHack = true;
-  }
-
-  // pattern
-  NullablePtr<Pattern> Pattern = parsePattern(CForLoopHack);
-
-  if (CForLoopHack) {
-    return parseStmtForCStyle(ForLoc, LPLoc, CForLoopHack);
-  }
+  NullablePtr<Pattern> Pattern = parsePattern();
 
   if (!Tok.isContextualKeyword("in")) {
     if (Pattern.isNonNull())
