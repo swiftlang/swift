@@ -38,6 +38,13 @@ void *Expr::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
+StringRef Expr::getKindName(ExprKind kind) {
+  switch (kind) {
+#define EXPR(Id, Parent) case ExprKind::Id: return #Id;
+#include "swift/AST/ExprNodes.def"
+  }
+}
+
 // Helper functions to verify statically whether the getSourceRange()
 // function has been overridden.
 typedef const char (&TwoChars)[2];

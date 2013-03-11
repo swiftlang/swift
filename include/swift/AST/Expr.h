@@ -70,6 +70,13 @@ public:
   /// getKind - Return the kind of this expression.
   ExprKind getKind() const { return Kind; }
 
+  /// \brief Retrieve the name of the given expression kind.
+  ///
+  /// This name should only be used for debugging dumps and other
+  /// developer aids, and should never be part of a diagnostic or exposed
+  /// to the user of the compiler in any way.
+  static StringRef getKindName(ExprKind kind);
+
   /// getType - Return the type of this expression.
   Type getType() const { return Ty; }
 

@@ -22,6 +22,7 @@
 #include "swift/AST/NameLookup.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -30,6 +31,7 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/SourceMgr.h"
 #include <iterator>
 #include <map>
 #include <memory>
@@ -343,6 +345,415 @@ namespace {
     Archetype
   };
 
+  /// \brief Locates a given constraint within the expression being
+  /// type-checked, which may refer down into subexpressions and parts of
+  /// the types of those subexpressions.
+  ///
+  /// Each locator as anchored at some expression, e.g., (3, (x, 3.14)),
+  /// and contains a path that digs further into the type of that expression.
+  /// For example, the path "tuple element #1" -> "tuple element #0" with the
+  /// above expression would refer to 'x'. If 'x' had function type, the
+  /// path could be further extended with either "-> argument" or "-> result",
+  /// to indicate constraints on its argument or result type.
+  class ConstraintLocator : public llvm::FoldingSetNode {
+  public:
+    /// \brief Describes the kind of a a particular path element, e.g.,
+    /// "tuple element", "call result", "base of member lookup", etc.
+    enum PathElementKind : unsigned char {
+      /// \brief The argument of function application.
+      ApplyArgument,
+      /// \brief The function being applied.
+      ApplyFunction,
+      /// \brief The argument type of a function.
+      FunctionArgument,
+      /// \brief The result type of a function.
+      FunctionResult,
+      /// \brief A tuple element referenced by position.
+      TupleElement,
+      /// \brief A tuple element referenced by name.
+      NamedTupleElement,
+      /// \brief A generic argument.
+      /// FIXME: Add support for named generic arguments?
+      GenericArgument,
+      /// \brief The base of a member expression.
+      MemberRefBase,
+      /// \brief The lookup for a subscript member.
+      SubscriptMember,
+      /// \brief The index of a subscript expression.
+      SubscriptIndex,
+      /// \brief The result of a subscript expression.
+      SubscriptResult,
+      /// \brief An argument to string interpolation.
+      InterpolationArgument,
+      /// \brief The lookup for a constructor member.
+      ConstructorMember,
+      /// \brief The argument for construction of an object.
+      ConstructionArgument,
+      /// \brief The base of an unresolved member expression.
+      UnresolvedMemberRefBase,
+      /// \brief Address of subexpression.
+      AddressOf,
+      /// \brief Rvalue adjustment.
+      RvalueAdjustment,
+      /// \brief The result of an explicit closure expression.
+      ClosureResult,
+      /// \brief The parent of a nested type.
+      ParentType,
+      /// \brief The instance of a metatype type.
+      InstanceType,
+      /// \brief The element of an array type.
+      ArrayElementType,
+      /// \brief The object type of an lvalue type.
+      LvalueObjectType,
+      /// \brief The scalar type of a tuple type.
+      ScalarToTuple,
+      /// \brief The load of an lvalue.
+      Load,
+      /// \brief The lookup for a conversion member.
+      ConversionMember,
+      /// \brief The conversion result.
+      ConversionResult,
+    };
+
+    /// \brief Determine whether the given path element kind has an associated
+    /// value.
+    static bool pathElementHasValue(PathElementKind kind) {
+      switch (kind) {
+      case ApplyArgument:
+      case ApplyFunction:
+      case FunctionArgument:
+      case FunctionResult:
+      case MemberRefBase:
+      case SubscriptIndex:
+      case SubscriptMember:
+      case SubscriptResult:
+      case ConstructorMember:
+      case ConstructionArgument:
+      case UnresolvedMemberRefBase:
+      case AddressOf:
+      case RvalueAdjustment:
+      case ClosureResult:
+      case ParentType:
+      case InstanceType:
+      case ArrayElementType:
+      case LvalueObjectType:
+      case ScalarToTuple:
+      case Load:
+      case ConversionMember:
+      case ConversionResult:
+        return false;
+
+      case GenericArgument:
+      case InterpolationArgument:
+      case NamedTupleElement:
+      case TupleElement:
+        return true;
+      }
+    }
+
+    /// \brief One element in the path of a locator, which can include both
+    /// a kind (PathElementKind) and a value used to describe specific
+    /// kinds further (e.g., the position of a tuple element).
+    class PathElement {
+      /// \brief The kind of path element.
+      PathElementKind kind : 8;
+
+      ///\ brief The value of the path element, if applicable.
+      unsigned value : 24;
+
+      PathElement(PathElementKind kind, unsigned value)
+        : kind(kind), value(value) { }
+
+      friend class ConstraintLocator;
+      
+    public:
+      PathElement(PathElementKind kind) : kind(kind), value(0) {
+        assert(!pathElementHasValue(kind) && "Path element requires value");
+      }
+
+      /// \brief Retrieve a path element for a tuple element referred to by
+      /// its position.
+      static PathElement getTupleElement(unsigned position) {
+        return PathElement(TupleElement, position);
+      }
+
+      /// \brief Retrieve a path element for a tuple element referred to by
+      /// its name.
+      static PathElement getNamedTupleElement(unsigned position) {
+        return PathElement(NamedTupleElement, position);
+      }
+
+      /// \brief Retrieve a path element for a generic argument referred to by
+      /// its position.
+      static PathElement getGenericArgument(unsigned position) {
+        return PathElement(GenericArgument, position);
+      }
+
+      /// \brief Retrieve a path element for an argument to string
+      /// interpolation.
+      static PathElement getInterpolationArgument(unsigned position) {
+        return PathElement(InterpolationArgument, position);
+      }
+
+      /// \brief Retrieve the kind of path element.
+      PathElementKind getKind() const { return kind; }
+
+      /// \brief Retrieve the value associated with this path element,
+      /// if it has one.
+      unsigned getValue() const {
+        assert(pathElementHasValue(kind) && "No value in path element!");
+        return value;
+      }
+    };
+
+    /// \brief Retrieve the expression that anchors this locator.
+    Expr *getAnchor() const { return anchor; }
+    
+    /// \brief Retrieve the path that extends from the anchor to a specific
+    /// subcomponent.
+    ArrayRef<PathElement> getPath() const {
+      // FIXME: Alignment.
+      return llvm::makeArrayRef(reinterpret_cast<const PathElement *>(this + 1),
+                                numPathElements);
+    }
+
+    /// \brief Produce a profile of this locator, for use in a folding set.
+    static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
+                        ArrayRef<PathElement> path) {
+      id.AddPointer(anchor);
+      id.AddInteger(path.size());
+      for (auto elt : path) {
+        id.AddInteger(elt.getKind());
+        if (pathElementHasValue(elt.getKind()))
+          id.AddInteger(elt.getValue());
+      }
+    }
+    
+    /// \brief Produce a profile of this locator, for use in a folding set.
+    void Profile(llvm::FoldingSetNodeID &id) {
+      Profile(id, anchor, getPath());
+    }
+
+    /// \brief Produce a debugging dump of this locator.
+    void dump(llvm::SourceMgr *sm) LLVM_ATTRIBUTE_USED {
+      llvm::raw_ostream &out = llvm::errs();
+
+      if (anchor) {
+        out << Expr::getKindName(anchor->getKind());
+        if (sm) {
+          out << '@';
+          anchor->getLoc().print(out, *sm);
+        }
+      }
+
+      for (auto elt : getPath()) {
+        out << " -> ";
+        switch (elt.getKind()) {
+        case AddressOf:
+          out << "address of";
+          break;
+
+        case ArrayElementType:
+          out << "array element";
+          break;
+
+        case ApplyArgument:
+          out << "apply argument";
+          break;
+
+        case ApplyFunction:
+          out << "apply function";
+          break;
+
+        case ClosureResult:
+          out << "closure result";
+          break;
+
+        case ConversionMember:
+          out << "conversion member";
+          break;
+
+        case ConversionResult:
+          out << "conversion result";
+          break;
+
+        case ConstructionArgument:
+          out << "construction argument";
+          break;
+
+        case ConstructorMember:
+          out << "constructor member";
+          break;
+
+        case FunctionArgument:
+          out << "function argument";
+          break;
+
+        case FunctionResult:
+          out << "function result";
+          break;
+
+        case GenericArgument:
+          out << "generic argument #" << llvm::utostr(elt.getValue());
+          break;
+
+        case InstanceType:
+          out << "instance type";
+          break;
+
+        case InterpolationArgument:
+          out << "interpolation argument #" << llvm::utostr(elt.getValue());
+          break;
+
+        case Load:
+          out << "load";
+          break;
+
+        case LvalueObjectType:
+          out << "lvalue object type";
+          break;
+
+        case MemberRefBase:
+          out << "member reference base";
+          break;
+
+        case NamedTupleElement:
+          out << "named tuple element #" << llvm::utostr(elt.getValue());
+          break;
+
+        case ParentType:
+          out << "parent type";
+          break;
+
+        case RvalueAdjustment:
+          out << "rvalue adjustment";
+          break;
+
+        case ScalarToTuple:
+          out << "scalar to tuple";
+          break;
+
+        case SubscriptIndex:
+          out << "subscript index";
+          break;
+
+        case SubscriptMember:
+          out << "subscript member";
+          break;
+
+        case SubscriptResult:
+          out << "subscript result";
+          break;
+
+        case UnresolvedMemberRefBase:
+          out << "unresolved member reference base";
+          break;
+
+        case TupleElement:
+          out << "tuple element #" << llvm::utostr(elt.getValue());
+          break;
+        }
+      }
+    }
+
+  private:
+    /// \brief Initialize a constraint locator with an anchor and a path.
+    ConstraintLocator(Expr *anchor, ArrayRef<PathElement> path)
+      : anchor(anchor), numPathElements(path.size()) {
+      // FIXME: Alignment.
+      std::copy(path.begin(), path.end(),
+                reinterpret_cast<PathElement *>(this + 1));
+    }
+
+    /// \brief Create a new locator from an anchor and an array of path
+    /// elements.
+    ///
+    /// Note that this routine only handles the allocation and initialization
+    /// of the locator. The ConstraintSystem object is responsible for
+    /// uniquing via the FoldingSet.
+    static ConstraintLocator *create(llvm::BumpPtrAllocator &allocator,
+                                     Expr *anchor,
+                                     ArrayRef<PathElement> path) {
+      // FIXME: Alignment.
+      unsigned size = sizeof(ConstraintLocator)
+                    + path.size() * sizeof(PathElement);
+      void *mem = allocator.Allocate(size, llvm::alignOf<ConstraintLocator>());
+      return new (mem) ConstraintLocator(anchor, path);
+    }
+
+    /// \brief The expression at which this locator is anchored.
+    Expr *anchor;
+
+    /// \brief The number of path elements in this locator.
+    ///
+    /// The actual path elements are stored after the locator.
+    unsigned numPathElements;
+
+    friend class ConstraintSystem;
+  };
+
+  typedef ConstraintLocator::PathElement LocatorPathElt;
+
+  /// \brief A simple stack-only builder object that constructs a
+  /// constraint locator without allocating memory.
+  ///
+  /// Use this object to build a path when passing components down the
+  /// stack, e.g., when recursively breaking apart types as in \c matchTypes().
+  class ConstraintLocatorBuilder {
+    /// \brief The constraint locator that this builder extends or the
+    /// previous builder in the chain.
+    llvm::PointerUnion<ConstraintLocator *, ConstraintLocatorBuilder *>
+      previous;
+
+    /// \brief The current path element, if there is one.
+    Optional<LocatorPathElt> element;
+
+    ConstraintLocatorBuilder(llvm::PointerUnion<ConstraintLocator *,
+                                                ConstraintLocatorBuilder *>
+                               previous,
+                             LocatorPathElt element)
+      : previous(previous), element(element) { }
+
+  public:
+    ConstraintLocatorBuilder(ConstraintLocator *locator)
+      : previous(locator), element() { }
+
+    /// \brief Retrieve a new path with the given path element added to it.
+    ConstraintLocatorBuilder withPathElement(LocatorPathElt newElt) {
+      if (!element)
+        return ConstraintLocatorBuilder(previous, newElt);
+
+      return ConstraintLocatorBuilder(this, newElt);
+    }
+
+    /// \brief Retrieve the components of the complete locator, which includes
+    /// the anchor expression and the path.
+    Expr *getLocator(llvm::SmallVectorImpl<LocatorPathElt> &path) const {
+      Expr *anchor = nullptr;
+      for (auto prev = this;
+           prev;
+           prev = prev->previous.dyn_cast<ConstraintLocatorBuilder *>()) {
+        // If there is an element at this level, add it.
+        if (prev->element)
+          path.push_back(*prev->element);
+
+        if (auto locator = prev->previous.dyn_cast<ConstraintLocator *>()) {
+          // We found the end of the chain. Reverse the path we've built up,
+          // then prepend the locator's path.
+          std::reverse(path.begin(), path.end());
+          path.insert(path.begin(),
+                      locator->getPath().begin(),
+                      locator->getPath().end());
+          return anchor;
+        }
+      }
+
+      // We only get here if there was no locator; fail gracefully.
+      path.clear();
+      return nullptr;
+    }
+  };
+
   /// \brief A constraint between two type variables.
   class Constraint {
     /// \brief The kind of constraint.
@@ -362,12 +773,9 @@ namespace {
     /// being related to the second type.
     Identifier Member;
 
-    /// \brief For a constraint that was directly generated from an expression,
-    /// the expression from which it was generated.
-    ///
-    /// FIXME: We need more information for cases where a given expression
-    /// might have generated several constraints. Which one is it?
-    Expr *Anchor;
+    /// \brief The locator that describes where in the expression this
+    /// constraint applies.
+    ConstraintLocator *Locator;
 
     /// \brief Constraints are always allocated within a given constraint
     /// system.
@@ -375,8 +783,9 @@ namespace {
 
   public:
     Constraint(ConstraintKind Kind, Type First, Type Second, Identifier Member,
-               Expr *anchor)
-      : Kind(Kind), First(First), Second(Second), Member(Member), Anchor(anchor)
+               ConstraintLocator *locator)
+      : Kind(Kind), First(First), Second(Second), Member(Member),
+        Locator(locator)
     {
       switch (Kind) {
       case ConstraintKind::Bind:
@@ -405,9 +814,9 @@ namespace {
       }
     }
 
-    Constraint(Type type, LiteralKind literal, Expr *anchor = nullptr)
+    Constraint(Type type, LiteralKind literal, ConstraintLocator *locator)
       : Kind(ConstraintKind::Literal), Literal(literal), First(type),
-        Anchor(anchor) { }
+        Locator(locator) { }
 
     // FIXME: Need some context information here.
 
@@ -449,11 +858,22 @@ namespace {
       return Second;
     }
 
+    /// \brief Determine whether this constraint kind has a second type.
+    static bool hasSecondType(ConstraintKind kind) {
+      return kind != ConstraintKind::Literal;
+    }
+
     /// \brief Retrieve the name of the member for a member constraint.
     Identifier getMember() const {
       assert(Kind == ConstraintKind::ValueMember ||
              Kind == ConstraintKind::TypeMember);
       return Member;
+    }
+
+    /// \brief Determine whether this constraint kind has a second type.
+    static bool hasMember(ConstraintKind kind) {
+      return kind == ConstraintKind::ValueMember
+          || kind == ConstraintKind::TypeMember;
     }
 
     /// \brief Determine the kind of literal for a literal constraint.
@@ -462,12 +882,14 @@ namespace {
       return Literal;
     }
 
-    /// \brief Retrieve the expression that directly generated this
-    /// constraint.
-    Expr *getAnchorExpr() const { return Anchor; }
+    /// \brief Retrieve the locator for this constraint.
+    ConstraintLocator *getLocator() const { return Locator; }
 
-    void print(llvm::raw_ostream &Out) {
+    void print(llvm::raw_ostream &Out, llvm::SourceMgr *sm) {
       First->print(Out);
+
+      bool skipSecond = false;
+      
       switch (Kind) {
       case ConstraintKind::Bind: Out << " := "; break;
       case ConstraintKind::Equal: Out << " == "; break;
@@ -508,7 +930,9 @@ namespace {
           break;
         }
         Out << " literal";
-        return;
+        skipSecond = true;
+        break;
+          
       case ConstraintKind::ValueMember:
         Out << "[." << Member.str() << ": value] == ";
         break;
@@ -517,13 +941,23 @@ namespace {
         break;
       case ConstraintKind::Archetype:
         Out << " is an archetype";
-        return;
+        skipSecond = true;
+        break;
       }
 
-      Second->print(Out);
+      if (!skipSecond)
+        Second->print(Out);
+
+      if (Locator) {
+        Out << " (";
+        Locator->dump(sm);
+        Out << ");";
+      }
     }
 
-    void dump() LLVM_ATTRIBUTE_USED { print(llvm::errs()); }
+    void dump(llvm::SourceMgr *sm) LLVM_ATTRIBUTE_USED {
+      print(llvm::errs(), sm);
+    }
 
     void *operator new(size_t bytes, ConstraintSystem& cs,
                        size_t alignment = alignof(Constraint)) {
@@ -808,7 +1242,10 @@ namespace {
       /// false, 2 -> computed true.
       llvm::DenseMap<std::pair<CanType, unsigned>, unsigned> LiteralChecks;
 
-    public:
+      /// \brief Folding set containing all of the locators used in this
+      /// constraint system.
+      llvm::FoldingSet<ConstraintLocator> ConstraintLocators;
+
       SharedStateType(TypeChecker &tc) : Arena(tc.Context, Allocator) {}
     };
 
@@ -1200,6 +1637,65 @@ namespace {
       return tv;
     }
 
+    /// \brief Retrieve the constraint locator for the given anchor and
+    /// path, uniqued.
+    ConstraintLocator *
+    getConstraintLocator(Expr *anchor,
+                         ArrayRef<ConstraintLocator::PathElement> path) {
+      // Check whether a locator with this anchor + path already exists.
+      llvm::FoldingSetNodeID id;
+      ConstraintLocator::Profile(id, anchor, path);
+      void *insertPos = nullptr;
+      auto locator
+        = SharedState->ConstraintLocators.FindNodeOrInsertPos(id, insertPos);
+      if (locator)
+        return locator;
+
+      // Allocate a new locator and add it to the set.
+      locator = ConstraintLocator::create(getAllocator(), anchor, path);
+      SharedState->ConstraintLocators.InsertNode(locator, insertPos);
+      return locator;
+    }
+
+    /// \brief Retrieve the constraint locator for the given anchor and
+    /// path element.
+    ConstraintLocator *
+    getConstraintLocator(Expr *anchor, ConstraintLocator::PathElement pathElt) {
+      return getConstraintLocator(anchor, llvm::makeArrayRef(pathElt));
+    }
+
+    /// \brief Retrieve the constraint locator described by the given
+    /// builder.
+    ConstraintLocator *
+    getConstraintLocator(const ConstraintLocatorBuilder &builder) {
+      SmallVector<LocatorPathElt, 4> path;
+      Expr *anchor = builder.getLocator(path);
+      if (!anchor)
+        return nullptr;
+
+      return getConstraintLocator(anchor, path);
+    }
+
+    /// \brief Record that the given constraint could not be satisfied.
+    void recordFailure(Constraint *constraint) {
+      recordFailure(constraint->getKind(), constraint->getFirstType(),
+                    Constraint::hasSecondType(constraint->getKind())
+                      ? constraint->getSecondType()
+                      : Type(),
+                    Constraint::hasMember(constraint->getKind())
+                      ? constraint->getMember()
+                      : Identifier(),
+                    constraint->getLocator());
+    }
+
+    /// \brief Record that the given (unpacked) constraint could not be
+    /// satisfied.
+    void recordFailure(ConstraintKind Kind, Type First, Type Second,
+                       Identifier Member,
+                       ConstraintLocator *locator) {
+      
+    }
+
     /// \brief Add a newly-allocated constraint after attempting to simplify
     /// it.
     ///
@@ -1211,6 +1707,7 @@ namespace {
         if (!failedConstraint) {
           failedConstraint = constraint;
           markUnsolvable();
+          recordFailure(failedConstraint);
         }
         return false;
 
@@ -1235,46 +1732,46 @@ namespace {
 
     /// \brief Add a constraint to the constraint system.
     void addConstraint(ConstraintKind kind, Type first, Type second,
-                       Expr *anchor = nullptr) {
+                       ConstraintLocator *locator = nullptr) {
       assert(first && "Missing first type");
       assert(second && "Missing first type");
       addConstraint(new (*this) Constraint(kind, first, second, Identifier(),
-                                           anchor));
+                                           locator));
     }
 
     ///\ brief Add a literal constraint to the constraint system.
     void addLiteralConstraint(Type type, LiteralKind kind,
-                              Expr *anchor = nullptr) {
+                              ConstraintLocator *locator = nullptr) {
       assert(type && "missing type for literal constraint");
-      addConstraint(new (*this) Constraint(type, kind, anchor));
+      addConstraint(new (*this) Constraint(type, kind, locator));
     }
 
     /// \brief Add a value member constraint to the constraint system.
     void addValueMemberConstraint(Type baseTy, Identifier name, Type memberTy,
-                                  Expr *anchor = nullptr) {
+                                  ConstraintLocator *locator = nullptr) {
       assert(baseTy);
       assert(memberTy);
       assert(!name.empty());
       addConstraint(new (*this) Constraint(ConstraintKind::ValueMember,
-                                           baseTy, memberTy, name, anchor));
+                                           baseTy, memberTy, name, locator));
     }
 
     /// \brief Add a type member constraint to the constraint system.
     void addTypeMemberConstraint(Type baseTy, Identifier name, Type memberTy,
-                                 Expr *anchor = nullptr) {
+                                 ConstraintLocator *locator = nullptr) {
       assert(baseTy);
       assert(memberTy);
       assert(!name.empty());
       addConstraint(new (*this) Constraint(ConstraintKind::TypeMember,
-                                           baseTy, memberTy, name, anchor));
+                                           baseTy, memberTy, name, locator));
     }
 
     /// \brief Add an archetype constraint.
-    void addArchetypeConstraint(Type baseTy, Expr *anchor = nullptr) {
+    void addArchetypeConstraint(Type baseTy, ConstraintLocator *locator = nullptr) {
       assert(baseTy);
       addConstraint(new (*this) Constraint(ConstraintKind::Archetype,
                                            baseTy, Type(), Identifier(),
-                                           anchor));
+                                           locator));
     }
 
     /// \brief Retrieve the representative of the equivalence class containing
@@ -1407,8 +1904,10 @@ namespace {
       if (auto introducer = ovl->getIntroducingExpr()) {
         GeneratedOverloadSets[introducer] = ovl;
       } else if (auto constraint = ovl->getIntroducingConstraint()) {
-        if (auto anchor = constraint->getAnchorExpr()) {
-          GeneratedOverloadSets[anchor] = ovl;
+        if (auto locator = constraint->getLocator()) {
+          if (auto anchor = locator->getAnchor()) {
+            GeneratedOverloadSets[anchor] = ovl;
+          }
         }
       }
 
@@ -1512,12 +2011,14 @@ namespace {
     /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
     SolutionKind matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                  TypeMatchKind kind, unsigned flags,
+                                 ConstraintLocatorBuilder locator,
                                  bool &trivial);
 
     /// \brief Subroutine of \c matchTypes(), which matches up two function
     /// types.
     SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                     TypeMatchKind kind, unsigned flags,
+                                    ConstraintLocatorBuilder locator,
                                     bool &trivial);
 
     /// \brief Attempt to match up types \c type1 and \c type2, which in effect
@@ -1533,12 +2034,16 @@ namespace {
     /// \param flags A set of flags composed from the TMF_* constants, which
     /// indicates how
     ///
+    /// \param locator The locator that will be used to track the location of
+    /// the specific types being matched.
+    ///
     /// \param trivial Will be set false if any non-trivial subtyping or
     /// conversion is applied.
     ///
     /// \returns the result of attempting to solve this constraint.
     SolutionKind matchTypes(Type type1, Type type2, TypeMatchKind kind,
-                            unsigned flags, bool &trivial);
+                            unsigned flags, ConstraintLocatorBuilder locator,
+                            bool &trivial);
 
   public:
     /// \brief Resolve the given overload set to the choice with the given
@@ -2185,7 +2690,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // of this expression.
       auto baseTy = base->getType();
       auto tv = CS.createTypeVariable(expr);
-      CS.addValueMemberConstraint(baseTy, name, tv, expr);
+      CS.addValueMemberConstraint(baseTy, name, tv,
+        CS.getConstraintLocator(expr, ConstraintLocator::MemberRefBase));
       return tv;
     }
 
@@ -2221,18 +2727,18 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       auto baseTy = base->getType();
       auto fnTy = FunctionType::get(inputTv, outputTv, Context);
       CS.addValueMemberConstraint(baseTy, Context.getIdentifier("__subscript"),
-                                  fnTy, expr);
+        fnTy,
+        CS.getConstraintLocator(expr, ConstraintLocator::SubscriptMember));
 
       // Add the subtype constraint that the output type must be some lvalue
       // subtype.
-      CS.addConstraint(ConstraintKind::Subtype,
-                       outputTv,
-                       outputSuperTy);
+      CS.addConstraint(ConstraintKind::Subtype, outputTv, outputSuperTy,
+        CS.getConstraintLocator(expr, ConstraintLocator::SubscriptResult));
 
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
-      CS.addConstraint(ConstraintKind::Conversion, index->getType(),
-                       inputTv, expr);
+      CS.addConstraint(ConstraintKind::Conversion, index->getType(), inputTv,
+        CS.getConstraintLocator(expr, ConstraintLocator::SubscriptIndex));
       return outputTv;
     }
 
@@ -2248,19 +2754,22 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
 
     Type visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
       auto tv = CS.createTypeVariable(expr);
-      CS.addLiteralConstraint(tv, LiteralKind::Int, expr);
+      CS.addLiteralConstraint(tv, LiteralKind::Int,
+                              CS.getConstraintLocator(expr, { }));
       return tv;
     }
 
     Type visitFloatLiteralExpr(FloatLiteralExpr *expr) {
       auto tv = CS.createTypeVariable(expr);
-      CS.addLiteralConstraint(tv, LiteralKind::Float, expr);
+      CS.addLiteralConstraint(tv, LiteralKind::Float,
+                              CS.getConstraintLocator(expr, { }));
       return tv;
     }
 
     Type visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
       auto tv = CS.createTypeVariable(expr);
-      CS.addLiteralConstraint(tv, LiteralKind::Char, expr);
+      CS.addLiteralConstraint(tv, LiteralKind::Char,
+                              CS.getConstraintLocator(expr, { }));
       return tv;
     }
 
@@ -2271,18 +2780,22 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
                        [](char c) { return c > 127; })
             != expr->getValue().end())
         kind = LiteralKind::UTFString;
-      CS.addLiteralConstraint(tv, kind, expr);
+      CS.addLiteralConstraint(tv, kind, CS.getConstraintLocator(expr, { }));
       return tv;
     }
 
     Type
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
       auto tv = CS.createTypeVariable(expr);
-      CS.addLiteralConstraint(tv, LiteralKind::UTFString, expr);
+      CS.addLiteralConstraint(tv, LiteralKind::UTFString,
+                              CS.getConstraintLocator(expr, { }));
+      unsigned index = 0;
       for (auto segment : expr->getSegments()) {
         CS.addConstraint(ConstraintKind::Construction, segment->getType(), tv,
-                         expr);
+          CS.getConstraintLocator(expr,
+            LocatorPathElt::getInterpolationArgument(index++)));
       }
+      
       return tv;
     }
 
@@ -2327,9 +2840,10 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       auto baseTy = E->getSubExpr()->getType()->getRValueType();
       auto argsTy = CS.createTypeVariable(E);
       auto methodTy = FunctionType::get(argsTy, baseTy, C);
-      CS.addValueMemberConstraint(baseTy,
-                                  C.getIdentifier("constructor"),
-                                  methodTy, E);
+      CS.addValueMemberConstraint(baseTy, C.getIdentifier("constructor"),
+        methodTy,
+        CS.getConstraintLocator(E, ConstraintLocator::ConstructorMember));
+      
       // The result of the expression is the partial application of the
       // constructor to 'this'.
       return methodTy;
@@ -2413,7 +2927,9 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // directly within the constraint system. Instead, we introduce a new
       // overload set with two entries: one for T0 and one for T2 -> T0.
       auto oneofMetaTy = MetaTypeType::get(oneofTy, CS.getASTContext());
-      CS.addValueMemberConstraint(oneofMetaTy, expr->getName(), memberTy, expr);
+      CS.addValueMemberConstraint(oneofMetaTy, expr->getName(), memberTy,
+        CS.getConstraintLocator(expr,
+                                ConstraintLocator::UnresolvedMemberRefBase));
 
       OverloadChoice choices[2] = {
         OverloadChoice(oneofTy, OverloadChoiceKind::BaseType),
@@ -2554,10 +3070,10 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
                                                arrayTy, C);
       auto arrayMetaTy = MetaTypeType::get(arrayTy, C);
       CS.addValueMemberConstraint(arrayMetaTy,
-                                  C.getIdentifier("convertFromArrayLiteral"),
-                                  converterFuncTy,
-                                  expr);
-      
+        C.getIdentifier("convertFromArrayLiteral"),
+        converterFuncTy,
+        CS.getConstraintLocator(expr, ConstraintLocator::MemberRefBase));
+
       return arrayTy;
     }
 
@@ -2620,7 +3136,7 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
         dictionaryMetaTy,
         C.getIdentifier("convertFromDictionaryLiteral"),
         converterFuncTy,
-        expr);
+        CS.getConstraintLocator(expr, ConstraintLocator::MemberRefBase));
       
       return dictionaryTy;
     }
@@ -2772,7 +3288,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
 
       CS.addConstraint(ConstraintKind::Subtype,
                        expr->getSubExpr()->getType(), bound,
-                       expr);
+                       CS.getConstraintLocator(expr,
+                                               ConstraintLocator::AddressOf));
       return result;
     }
 
@@ -2821,11 +3338,12 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // FIXME: When we add support for class clusters, we'll need a new type
       // variable for the return type that is a subtype of instanceTy.
       CS.addValueMemberConstraint(instanceTy, name,
-                                  FunctionType::get(tv, instanceTy, context),
-                                  expr);
+        FunctionType::get(tv, instanceTy, context),
+        CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
 
       // The first type must be convertible to the constructor's argument type.
-      CS.addConstraint(ConstraintKind::Conversion, argTy, tv, expr);
+      CS.addConstraint(ConstraintKind::Conversion, argTy, tv,
+        CS.getConstraintLocator(expr, ConstraintLocator::ConstructionArgument));
       return instanceTy;
     }
 
@@ -2836,8 +3354,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       if (!base) return expr->getType();
 
       auto tv = CS.createTypeVariable();
-      CS.addConstraint(ConstraintKind::EqualRvalue, tv,
-                       base->getType(), expr);
+      CS.addConstraint(ConstraintKind::EqualRvalue, tv, base->getType(),
+        CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
 
       return MetaTypeType::get(tv, CS.getASTContext());
     }
@@ -2861,7 +3379,9 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
         if (auto metaTy = fnTy->getAs<MetaTypeType>()) {
           auto instanceTy = metaTy->getInstanceType();
           CS.addConstraint(ConstraintKind::Construction,
-                           expr->getArg()->getType(), instanceTy, expr);
+                           expr->getArg()->getType(), instanceTy,
+            CS.getConstraintLocator(expr,
+                                    ConstraintLocator::ConstructionArgument));
           return instanceTy;
         }
       }
@@ -2872,11 +3392,13 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       auto outputTy = CS.createTypeVariable(expr);
       auto funcTy = FunctionType::get(inputTy, outputTy, Context);
       CS.addConstraint(ConstraintKind::EqualRvalue, funcTy,
-                       expr->getFn()->getType(), expr);
+        expr->getFn()->getType(),
+        CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
       // The argument type must be convertible to the input type.
       CS.addConstraint(ConstraintKind::Conversion, expr->getArg()->getType(),
-                       inputTy, expr);
+        inputTy,
+        CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
 
       return outputTy;
     }
@@ -3028,10 +3550,11 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
         // body expression to the type of the closure.
         CG.getConstraintSystem()
           .addConstraint(ConstraintKind::Conversion,
-                         explicitClosure->getBody()->getType(),
-                         explicitClosure->getType()->castTo<FunctionType>()
-                           ->getResult(),
-                         expr);
+            explicitClosure->getBody()->getType(),
+            explicitClosure->getType()->castTo<FunctionType>()
+              ->getResult(),
+            CG.getConstraintSystem()
+              .getConstraintLocator(expr, ConstraintLocator::ClosureResult));
         return expr;
       }
 
@@ -3107,6 +3630,7 @@ SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                   TypeMatchKind kind, unsigned flags,
+                                  ConstraintLocatorBuilder locator,
                                   bool &trivial) {
   unsigned subFlags = flags | TMF_GenerateConstraints;
 
@@ -3142,6 +3666,8 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 
       // Compare the element types.
       switch (matchTypes(elt1.getType(), elt2.getType(), kind, subFlags,
+                         locator.withPathElement(
+                           LocatorPathElt::getTupleElement(i)),
                          trivial)) {
       case SolutionKind::Error:
         return SolutionKind::Error;
@@ -3276,7 +3802,10 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       Type variadicBaseType = elt2.getVarargBaseTy();
       for (unsigned variadicSrc : variadicArguments) {
         switch (matchTypes(tuple1->getElementType(variadicSrc),
-                           variadicBaseType, kind, subFlags, trivial)) {
+                           variadicBaseType, kind, subFlags,
+                           locator.withPathElement(
+                             LocatorPathElt::getTupleElement(variadicSrc)),
+                           trivial)) {
         case SolutionKind::Error:
           return SolutionKind::Error;
 
@@ -3298,7 +3827,10 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     const auto &elt1 = tuple1->getFields()[source];
 
     switch (matchTypes(elt1.getType(), elt2.getType(),
-                       TypeMatchKind::Conversion, subFlags, trivial)) {
+                       TypeMatchKind::Conversion, subFlags,
+                       locator.withPathElement(
+                         LocatorPathElt::getTupleElement(source)),
+                       trivial)) {
     case SolutionKind::Error:
       return SolutionKind::Error;
 
@@ -3321,6 +3853,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      TypeMatchKind kind, unsigned flags,
+                                     ConstraintLocatorBuilder locator,
                                      bool &trivial) {
   // An [auto_closure] function type can be a subtype of a
   // non-[auto_closure] function type.
@@ -3358,13 +3891,18 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   unsigned subFlags = flags | TMF_GenerateConstraints;
   // Input types can be contravariant (or equal).
   SolutionKind result = matchTypes(func2->getInput(), func1->getInput(),
-                                   subKind, subFlags, trivial);
+                                   subKind, subFlags,
+                                   locator.withPathElement(
+                                     ConstraintLocator::FunctionArgument),
+                                   trivial);
   if (result == SolutionKind::Error)
     return SolutionKind::Error;
 
   // Result type can be covariant (or equal).
   switch (matchTypes(func1->getResult(), func2->getResult(), subKind,
-                     subFlags, trivial)) {
+                     subFlags,
+                     locator.withPathElement(ConstraintLocator::FunctionResult),
+                     trivial)) {
   case SolutionKind::Error:
     return SolutionKind::Error;
 
@@ -3413,7 +3951,9 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
-                             unsigned flags, bool &trivial) {
+                             unsigned flags,
+                             ConstraintLocatorBuilder locator,
+                             bool &trivial) {
   // Desugar both types.
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
@@ -3440,7 +3980,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   // If we have a same-type-as-rvalue constraint, and the right-hand side
   // has a form that is either definitely an lvalue or definitely an rvalue,
-  // force the right-hand side to be an rvalue and
+  // force the right-hand side to be an rvalue and tighten the constraint
+  // to a same-type constraint.
   if (kind == TypeMatchKind::SameTypeRvalue) {
     if (isa<LValueType>(desugar2)) {
       // The right-hand side is an lvalue type. Strip off the lvalue and
@@ -3514,7 +4055,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         // this new constraint will be solved at a later point.
         // Obviously, this must not happen at the top level, or the algorithm
         // would not terminate.
-        addConstraint(getConstraintKind(kind), type1, type2);
+        addConstraint(getConstraintKind(kind), type1, type2,
+                      getConstraintLocator(locator));
         return SolutionKind::Solved;
       }
 
@@ -3557,7 +4099,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::Tuple: {
       auto tuple1 = cast<TupleType>(desugar1);
       auto tuple2 = cast<TupleType>(desugar2);
-      return matchTupleTypes(tuple1, tuple2, kind, flags, trivial);
+      return matchTupleTypes(tuple1, tuple2, kind, flags, locator, trivial);
     }
 
     case TypeKind::OneOf:
@@ -3574,7 +4116,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
         // Match up the parents, exactly.
         return matchTypes(nominal1->getParent(), nominal2->getParent(),
-                          TypeMatchKind::SameType, subFlags, trivial);
+                          TypeMatchKind::SameType, subFlags,
+                          locator.withPathElement(
+                            ConstraintLocator::ParentType),
+                          trivial);
       }
       break;
     }
@@ -3591,13 +4136,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         subKind = std::min(kind, TypeMatchKind::Subtype);
       
       return matchTypes(meta1->getInstanceType(), meta2->getInstanceType(),
-                        subKind, subFlags, trivial);
+                        subKind, subFlags,
+                        locator.withPathElement(
+                          ConstraintLocator::InstanceType),
+                        trivial);
     }
 
     case TypeKind::Function: {
       auto func1 = cast<FunctionType>(desugar1);
       auto func2 = cast<FunctionType>(desugar2);
-      return matchFunctionTypes(func1, func2, kind, flags, trivial);
+      return matchFunctionTypes(func1, func2, kind, flags, locator, trivial);
     }
 
     case TypeKind::PolymorphicFunction:
@@ -3607,7 +4155,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       auto array1 = cast<ArrayType>(desugar1);
       auto array2 = cast<ArrayType>(desugar2);
       return matchTypes(array1->getBaseType(), array2->getBaseType(),
-                        TypeMatchKind::SameType, subFlags, trivial);
+                        TypeMatchKind::SameType, subFlags,
+                        locator.withPathElement(
+                          ConstraintLocator::ArrayElementType),
+                        trivial);
     }
 
     case TypeKind::ProtocolComposition:
@@ -3623,7 +4174,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         return SolutionKind::Error;
 
       return matchTypes(lvalue1->getObjectType(), lvalue2->getObjectType(),
-                        TypeMatchKind::SameType, subFlags, trivial);
+                        TypeMatchKind::SameType, subFlags,
+                        locator.withPathElement(
+                          ConstraintLocator::ArrayElementType),
+                        trivial);
     }
 
     case TypeKind::UnboundGeneric:
@@ -3642,7 +4196,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                "Mismatched parents of bound generics");
         if (bound1->getParent()) {
           switch (matchTypes(bound1->getParent(), bound2->getParent(),
-                             TypeMatchKind::SameType, subFlags, trivial)) {
+                             TypeMatchKind::SameType, subFlags,
+                             locator.withPathElement(
+                               ConstraintLocator::ParentType),
+                             trivial)) {
           case SolutionKind::Error:
             // There may still be a Conversion or Construction we can satisfy
             // the constraint with.
@@ -3673,7 +4230,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         assert(args1.size() == args2.size() && "Mismatched generic args");
         for (unsigned i = 0, n = args1.size(); i != n; ++i) {
           switch (matchTypes(args1[i], args2[i], TypeMatchKind::SameType,
-                             subFlags, trivial)) {
+                             subFlags,
+                             locator.withPathElement(
+                               LocatorPathElt::getGenericArgument(i)),
+                             trivial)) {
           case SolutionKind::Error:
             // There may still be a Conversion or Construction we can satisfy
             // the constraint with.
@@ -3718,6 +4278,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       if (tuple2->getFields().size() == 1 &&
           !tuple2->getFields()[0].isVararg()) {
         return matchTypes(type1, tuple2->getElementType(0), kind, subFlags,
+                          locator.withPathElement(
+                            ConstraintLocator::ScalarToTuple),
                           trivial);
       }
 
@@ -3729,7 +4291,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           const auto &elt = tuple2->getFields()[scalarFieldIdx];
           auto scalarFieldTy = elt.isVararg()? elt.getVarargBaseTy()
                                              : elt.getType();
-          return matchTypes(type1, scalarFieldTy, kind, subFlags, trivial);
+          return matchTypes(type1, scalarFieldTy, kind, subFlags,
+                            locator.withPathElement(
+                              ConstraintLocator::ScalarToTuple),
+                            trivial);
         }
       }
     }
@@ -3748,8 +4313,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             if (super1->getClassOrBoundGenericClass() != classDecl2)
               continue;
 
-            switch (auto result = matchTypes(super1, type2, TypeMatchKind::SameType,
-                                             subFlags, trivial)) {
+            // FIXME: If we end up generating any constraints from this
+            // match, we can't solve them immediately. We'll need to
+            // split into another system.
+            switch (auto result = matchTypes(super1, type2,
+                                             TypeMatchKind::SameType,
+                                             subFlags, locator, trivial)) {
               case SolutionKind::Error:
                 continue;
 
@@ -3782,6 +4351,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     // T1 is convertible to T2 (by loading the value).
     if (auto lvalue1 = type1->getAs<LValueType>()) {
       return matchTypes(lvalue1->getObjectType(), type2, kind, subFlags,
+                        locator.withPathElement(
+                          ConstraintLocator::RvalueAdjustment),
                         trivial);
     }
 
@@ -3791,6 +4362,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       if (function2->isAutoClosure()) {
         trivial = false;
         return matchTypes(type1, function2->getResult(), kind, subFlags,
+                          locator.withPathElement(ConstraintLocator::Load),
                           trivial);
       }
     }
@@ -3829,11 +4401,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // match on the result type because the constructors for oneofs and struct
       // types always return a value of exactly that type.
       addValueMemberConstraint(type2, name,
-                               FunctionType::get(tv, type2, context));
+                               FunctionType::get(tv, type2, context),
+                               getConstraintLocator(
+                                 locator.withPathElement(
+                                   ConstraintLocator::ConstructorMember)));
 
       // The first type must be convertible to the constructor's argument type.
-      addConstraint(ConstraintKind::Conversion, type1, tv);
-      
+      addConstraint(ConstraintKind::Conversion, type1, tv,
+                    getConstraintLocator(
+                      locator.withPathElement(
+                        ConstraintLocator::ConstructionArgument)));
+
       // FIXME: Do we want to consider conversion functions simultaneously with
       // constructors? Right now, we prefer constructors if they exist.
       return SolutionKind::Solved;
@@ -3845,6 +4423,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   if (concrete && kind >= TypeMatchKind::Conversion &&
       type1->getNominalOrBoundGenericNominal()) {
     auto &context = getASTContext();
+    // FIXME: lame name!
     auto name = context.getIdentifier("__conversion");
     MemberLookup &lookup = lookupMember(type1, name);
     if (lookup.isSuccess()) {
@@ -3853,20 +4432,28 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
       // The conversion function will have function type TI -> TO, for fresh
       // type variables TI and TO.
-      // FIXME: lame name!
       addValueMemberConstraint(type1, name,
-                               FunctionType::get(inputTV, outputTV, context));
+                               FunctionType::get(inputTV, outputTV, context),
+                               getConstraintLocator(
+                                  locator.withPathElement(
+                                    ConstraintLocator::ConstructorMember)));
 
       // A conversion function must accept an empty parameter list ().
+      // Note: This should never fail, because the declaration checker
+      // should ensure that conversions have no non-defaulted parameters.
       addConstraint(ConstraintKind::Conversion, TupleType::getEmpty(context),
-                    inputTV);
+                    inputTV, getConstraintLocator(locator));
 
       // The output of the conversion function must be a subtype of the
       // type we're trying to convert to. The use of subtyping here eliminates
       // multiple-step user-defined conversions, which also eliminates concerns
       // about cyclic conversions causing infinite loops in the constraint
       // solver.
-      addConstraint(ConstraintKind::Subtype, outputTV, type2);
+      addConstraint(ConstraintKind::Subtype, outputTV, type2,
+                    getConstraintLocator(
+                      locator.withPathElement(
+                        ConstraintLocator::ConversionResult)));
+      
       return SolutionKind::Solved;
     }
   }
@@ -4195,7 +4782,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     bool trivial = true;
     return matchTypes(constraint.getFirstType(), constraint.getSecondType(),
                       getTypeMatchKind(constraint.getKind()), TMF_None,
-                      trivial);
+                      constraint.getLocator(), trivial);
   }
 
   case ConstraintKind::Literal:
@@ -5172,11 +5759,15 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs1,
           bool trivial = false;
           bool type1Better = cs1->matchTypes(type1, type2,
                                              TypeMatchKind::Subtype,
-                                             TMF_None, trivial)
+                                             TMF_None,
+                                             ConstraintLocatorBuilder(nullptr),
+                                             trivial)
                                == SolutionKind::TriviallySolved;
           bool type2Better = cs2->matchTypes(type2, type1,
                                              TypeMatchKind::Subtype,
-                                             TMF_None, trivial)
+                                             TMF_None,
+                                             ConstraintLocatorBuilder(nullptr),
+                                             trivial)
                                == SolutionKind::TriviallySolved;
           if (updateSolutionCompareResult(result, type1Better, type2Better))
             return result;
@@ -6620,14 +7211,14 @@ void ConstraintSystem::dump() {
   out << "\nUnsolved Constraints:\n";
   for (auto constraint : Constraints) {
     out.indent(2);
-    constraint->print(out);
+    constraint->print(out, &getTypeChecker().Context.SourceMgr);
     out << "\n";
   }
 
   out << "\nSolved Constraints:\n";
   for (auto constraint : SolvedConstraints) {
     out.indent(2);
-    constraint->print(out);
+    constraint->print(out, &getTypeChecker().Context.SourceMgr);
     out << "\n";
   }
 
@@ -6670,7 +7261,7 @@ void ConstraintSystem::dump() {
   if (failedConstraint) {
     out << "\nFailed constraint:\n";
     out.indent(2);
-    failedConstraint->print(out);
+    failedConstraint->print(out, &getTypeChecker().Context.SourceMgr);
     out << "\n";
   }
 
