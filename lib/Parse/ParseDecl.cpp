@@ -721,7 +721,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       ContextChange CC(*this, GetFn);
 
       SmallVector<ExprStmtOrDecl, 16> Entries;
-      parseBraceItemList(Entries, false /*NotTopLevel*/, true /*IsGetSet*/);
+      parseBraceItemList(Entries, false /*NotTopLevel*/,
+                         BraceItemListKind::Property);
       NullablePtr<BraceStmt> Body = BraceStmt::create(Context, ColonLoc,
                                                       Entries, Tok.getLoc());
 
@@ -832,7 +833,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     
     // Parse the body.
     SmallVector<ExprStmtOrDecl, 16> Entries;
-    parseBraceItemList(Entries, false /*NotTopLevel*/, true /*IsGetSet*/);
+    parseBraceItemList(Entries, false /*NotTopLevel*/,
+                       BraceItemListKind::Property);
     NullablePtr<BraceStmt> Body = BraceStmt::create(Context, ColonLoc,
                                                     Entries, Tok.getLoc());
 

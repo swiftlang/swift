@@ -16,6 +16,7 @@
 
 #include "Parser.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Decl.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/OwningPtr.h"
@@ -39,6 +40,9 @@ bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
   case tok::kw_for:
   case tok::kw_break:
   case tok::kw_continue:
+  case tok::kw_switch:
+  case tok::kw_case:
+  case tok::kw_default:
     return true;
   }
 }
@@ -124,6 +128,18 @@ bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
   return parseExprOrStmtAssign(Result);
 }
 
+static bool isTerminatorForBraceItemListKind(Token const &Tok,
+                                             BraceItemListKind Kind) {
+  switch (Kind) {
+  case BraceItemListKind::Brace:
+    return false;
+  case BraceItemListKind::Property:
+    return Tok.isContextualKeyword("get") || Tok.isContextualKeyword("set");
+  case BraceItemListKind::Case:
+    return Tok.is(tok::kw_case) || Tok.is(tok::kw_default);
+  }
+}
+
 ///   stmt-brace-item:
 ///     decl
 ///     expr
@@ -135,22 +151,20 @@ bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
 ///     stmt-return
 ///     stmt-if
 ///     stmt-for-c-style
-///     stmt-for-c-each
+///     stmt-for-each
+///     stmt-switch
 ///   stmt-assign:
 ///     expr '=' expr
 void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
-                                bool IsTopLevel, bool IsGetSet) {
+                                bool IsTopLevel,
+                                BraceItemListKind Kind) {
   // This forms a lexical scope.
   Scope BraceScope(this, !IsTopLevel);
     
   SmallVector<Decl*, 8> TmpDecls;
   
-  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    if (IsGetSet) {
-      if (Tok.isContextualKeyword("get") || Tok.isContextualKeyword("set"))
-        break;
-    }
-
+  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)
+         && !isTerminatorForBraceItemListKind(Tok, Kind)) {
     bool NeedParseErrorRecovery = false;
     TopLevelCodeDecl *TLCD = 0;
     llvm::OwningPtr<ContextChange> CC;
@@ -221,6 +235,17 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
   }
 }
 
+/// Recover from a 'case' or 'default' outside of a 'switch' by consuming up to
+/// the next ':'.
+static NullablePtr<Stmt> recoverFromInvalidCase(Parser &P) {
+  assert(P.Tok.is(tok::kw_case) || P.Tok.is(tok::kw_default)
+         && "not case or default?!");
+  P.diagnose(P.Tok.getLoc(), diag::case_outside_of_switch, P.Tok.getText());
+  P.skipUntil(tok::colon);
+  // FIXME: Return an ErrorStmt?
+  return nullptr;
+}
+
 /// parseStmtOtherThanAssignment - Note that this doesn't handle the
 /// "expr '=' expr" production.
 ///
@@ -236,6 +261,10 @@ NullablePtr<Stmt> Parser::parseStmtOtherThanAssignment() {
   case tok::kw_while:  return parseStmtWhile();
   case tok::kw_do:     return parseStmtDoWhile();
   case tok::kw_for:    return parseStmtFor();
+  case tok::kw_switch: return parseStmtSwitch();
+  /// 'case' and 'default' are only valid at the top level of a switch.
+  case tok::kw_case:
+  case tok::kw_default: return recoverFromInvalidCase(*this);
   case tok::kw_break:
     return new (Context) BreakStmt(consumeToken(tok::kw_break));
   case tok::kw_continue:
@@ -277,9 +306,10 @@ NullablePtr<Stmt> Parser::parseStmtReturn() {
 
   // Handle the ambiguity between consuming the expression and allowing the
   // enclosing stmt-brace to get it by eagerly eating it unless the return is
-  // followed by a '}' or ';'.
+  // followed by a '}', ';', or statement keyword.
   Expr *RetExpr = nullptr;
-  if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi)) {
+  if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi)
+      && (Tok.is(tok::l_brace) || !isStartOfStmtOtherThanAssignment(Tok))) {
     NullablePtr<Expr> Result = parseExpr(diag::expected_expr_return);
     if (Result.isNull())
       return 0;
@@ -497,4 +527,106 @@ NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
                                    Container.get(), Body.get());
 }
 
+///
+///    stmt-switch:
+///      'switch' expr '{' stmt-case* '}'
+NullablePtr<Stmt> Parser::parseStmtSwitch() {
+  SourceLoc switchLoc = consumeToken(tok::kw_switch);
+  NullablePtr<Expr> subjectExpr = parseExpr(diag::expected_switch_expr);
+  
+  if (subjectExpr.isNull())
+    return nullptr;
+  
+  if (!Tok.is(tok::l_brace)) {
+    diagnose(Tok.getLoc(), diag::expected_lbrace_after_switch);
+    return nullptr;
+  }
+  
+  SourceLoc lBraceLoc = consumeToken(tok::l_brace);
+  SourceLoc rBraceLoc;
+  
+  llvm::SmallVector<CaseStmt*, 8> cases;
+  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
+    NullablePtr<CaseStmt> c = parseStmtCase();
+    if (!c.isNull())
+      cases.push_back(c.get());
+  }
+  
+  if (parseMatchingToken(tok::r_brace, rBraceLoc,
+                         diag::expected_rbrace_switch, lBraceLoc))
+    return nullptr;
+  
+  // Synthesize a VarDecl to bind the subject to.
+  VarDecl *subjectVar = new (Context) VarDecl(SourceLoc(),
+                                              Context.getIdentifier("$switch"),
+                                              Type(),
+                                              CurDeclContext);
+  
+  return SwitchStmt::create(switchLoc,
+                            subjectExpr.get(),
+                            subjectVar,
+                            lBraceLoc,
+                            cases,
+                            rBraceLoc,
+                            Context);
+}
+
+///
+///    stmt-case:
+///      'case' expr (',' expr)* ':' stmt-brace-item*
+///      'default' ':' stmt-brace-item*
+NullablePtr<CaseStmt> Parser::parseStmtCase() {
+  SourceLoc caseLoc = Tok.getLoc();
+  StringRef caseLabel = Tok.getText();
+  
+  llvm::SmallVector<Expr*, 2> valueExprs;
+  if (Tok.is(tok::kw_case)) {
+    consumeToken(tok::kw_case);
+    NullablePtr<Expr> expr = parseExpr(diag::expected_case_expr);
+    if (expr.isNull())
+      skipUntil(tok::colon);
+    else
+      valueExprs.push_back(expr.get());
+    
+    while (Tok.is(tok::comma)) {
+      consumeToken(tok::comma);
+      NullablePtr<Expr> expr = parseExpr(diag::expected_case_expr);
+      if (expr.isNull())
+        skipUntil(tok::colon);
+      else
+        valueExprs.push_back(expr.get());
+    }
+  } else if (Tok.is(tok::kw_default)) {
+    consumeToken(tok::kw_default);
+  } else {
+    // If we see a statement before any 'case' or 'default', give a descriptive
+    // error and recover by trying to parse the statement.
+    ExprStmtOrDecl junk;
+    if (!parseExprOrStmt(junk)) {
+      diagnose(caseLoc, diag::stmt_in_switch_not_covered_by_case);
+      return nullptr;
+    }
+    
+    // Otherwise, we got something malformed, so try to find the closing brace
+    // of the switch and bail out.
+    skipUntil(tok::r_brace);
+    return nullptr;
+  }
+  
+  if (Tok.isNot(tok::colon)) {
+    diagnose(Tok.getLoc(), diag::expected_case_colon, caseLabel);
+    return nullptr;
+  }
+
+  SourceLoc colonLoc = consumeToken(tok::colon);
+  
+  llvm::SmallVector<ExprStmtOrDecl, 8> bodyItems;
+  parseBraceItemList(bodyItems,
+                     /*isTopLevel*/ false,
+                     BraceItemListKind::Case);
+  BraceStmt *body = BraceStmt::create(Context,
+                                      colonLoc, bodyItems, Tok.getLoc());
+  
+  return CaseStmt::create(caseLoc, valueExprs, colonLoc, body, Context);
+}
 

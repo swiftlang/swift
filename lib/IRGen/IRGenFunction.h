@@ -57,6 +57,7 @@ namespace swift {
   class Stmt;
   class StructType;
   class Substitution;
+  class SwitchStmt;
   class TranslationUnit;
   class ValueDecl;
   class VarDecl;
@@ -315,6 +316,7 @@ private:
   void emitForEachStmt(ForEachStmt *S);
   void emitBreakStmt(BreakStmt *S);
   void emitContinueStmt(ContinueStmt *S);
+  void emitSwitchStmt(SwitchStmt *S);
 
 //--- Expression emission ------------------------------------------------------
 public:

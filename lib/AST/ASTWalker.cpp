@@ -552,6 +552,47 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return S;
   }
   
+  Stmt *visitSwitchStmt(SwitchStmt *S) {
+    if (Expr *newSubject = doIt(S->getSubjectExpr()))
+      S->setSubjectExpr(newSubject);
+    else
+      return nullptr;
+
+    for (CaseStmt *aCase : S->getCases()) {
+      if (Stmt *aStmt = doIt(aCase)) {
+        assert(aCase == aStmt && "switch case remap not supported");
+      } else
+        return nullptr;
+    }
+    
+    return S;
+  }
+  
+  Stmt *visitCaseStmt(CaseStmt *S) {
+    // If type-checking has built a condition expr for this case, walk it.
+    // The value exprs are just for source fidelity.
+    if (Expr *condExpr = S->getConditionExpr()) {
+      if (Expr *newCondExpr = doIt(condExpr))
+        S->setConditionExpr(newCondExpr);
+      else
+        return nullptr;
+    } else {
+      for (Expr *&valueExpr : S->getMutableValueExprs()) {
+        if (Expr *newExpr = doIt(valueExpr))
+          valueExpr = newExpr;
+        else
+          return nullptr;
+      }
+    }
+    
+    if (Stmt *newBody = doIt(S->getBody()))
+      S->setBody(newBody);
+    else
+      return nullptr;
+
+    return S;
+  }
+  
   bool visitPatternVarGetSet(Pattern *P) {
     switch (P->getKind()) {
     case PatternKind::Paren:

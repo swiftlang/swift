@@ -44,6 +44,9 @@
 ERROR(invalid_diagnostic,parsing,none,
       "INTERNAL ERROR: this diagnostic should not be produced", ())
 
+ERROR(not_implemented,TODO,none,
+      "INTERNAL ERROR: feature not implemented", ())
+
 ERROR(expected_lbrace,parsing,none,
      "to match this opening '{'", ())
 
@@ -428,7 +431,28 @@ ERROR(expected_foreach_container,stmt_parsing,none,
       "expected container expression for for-each loop", ())
 ERROR(expected_foreach_lbrace,stmt_parsing,none,
       "expected '{' to start the body of for-each loop", ())
-      
+
+// Switch Stmt
+ERROR(expected_switch_expr,stmt_parsing,none,
+      "expected expression for 'switch' statement", ())
+ERROR(expected_lbrace_after_switch,stmt_parsing,none,
+      "expected '{' after 'switch' subject", ())
+ERROR(expected_rbrace_switch,stmt_parsing,none,
+      "expected '}' at end of 'switch' statement", ())
+ERROR(case_outside_of_switch,stmt_parsing,none,
+      "'%0' can only appear inside a 'switch' statement", (StringRef))
+ERROR(stmt_in_switch_not_covered_by_case,stmt_parsing,none,
+      "all statements inside a switch must be covered by a 'case' or 'default'",
+      ())
+
+// Case Stmt
+ERROR(expected_case_expr,stmt_parsing,none,
+      "expected expression for 'case'", ())
+ERROR(expected_case_colon,stmt_parsing,none,
+      "expected ':' after '%0'", (StringRef))
+ERROR(expected_case_stmt,stmt_parsing,none,
+      "expected statement or expression in 'switch'", ())
+
 //------------------------------------------------------------------------------
 // Expression parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1055,6 +1079,16 @@ ERROR(break_outside_loop,sema_tcs,none,
       "'break' is only allowed inside a loop", ())
 ERROR(continue_outside_loop,sema_tcs,none,
       "'continue' is only allowed inside a loop", ())
+      
+// Switch Stmt
+ERROR(multiple_defaults_in_switch,sema_tcs,none,
+      "multiple 'default' branches in 'switch' statement", ())
+NOTE(previous_default,sema_tcs,none,
+     "previous 'default' here", ())
+ERROR(no_match_operator,sema_tcs,none,
+      "no binary '=~' operator available for 'switch' statement", ())
+ERROR(no_or_operator,sema_tcs,none,
+      "no binary '||' operator available for 'switch' statement", ())
 
 //------------------------------------------------------------------------------
 // Type Check Patterns

@@ -422,7 +422,6 @@ public:
   bool typeCheckArrayBound(Expr *&E, bool requireConstant);
   bool typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc, Expr *&Src);
 
-
   /// \brief Type check an assignment expression using the constraint-based
   /// type checker.
   ///

@@ -21,6 +21,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Interleave.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -652,6 +653,29 @@ void PrintAST::visitBreakStmt(BreakStmt *stmt) {
 
 void PrintAST::visitContinueStmt(ContinueStmt *stmt) {
   OS << "continue";
+}
+
+void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
+  OS << "switch ";
+  // FIXME: print subject
+  OS << "{\n";
+  for (CaseStmt *C : stmt->getCases()) {
+    visit(C);
+  }
+  OS << '\n';
+  indent();
+  OS << "}";
+}
+
+void PrintAST::visitCaseStmt(CaseStmt *stmt) {
+  if (stmt->isDefault())
+    OS << "default:";
+  else {
+    OS << "case ";
+    // FIXME: print case exprs
+    OS << ':';
+    printBraceStmtElements(cast<BraceStmt>(stmt->getBody()));
+  }
 }
 
 void Decl::print(raw_ostream &os) const {

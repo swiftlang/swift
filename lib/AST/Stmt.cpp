@@ -103,6 +103,41 @@ Pattern *ForEachStmt::getPattern() const {
   return Pat.get<PatternBindingDecl *>()->getPattern();
 }
 
+CaseStmt *CaseStmt::create(SourceLoc CaseOrDefaultLoc,
+                           ArrayRef<Expr*> ValueExprs,
+                           SourceLoc ColonLoc,
+                           BraceStmt *Body,
+                           ASTContext &C) {
+  void *p = C.Allocate(sizeof(CaseStmt) + ValueExprs.size() * sizeof(Expr*),
+                       alignof(CaseStmt));
+  CaseStmt *theCase = ::new (p) CaseStmt(CaseOrDefaultLoc,
+                                         ValueExprs.size(),
+                                         ColonLoc, Body);
+  memcpy(theCase->getValueExprBuffer(),
+         ValueExprs.data(), ValueExprs.size() * sizeof(Expr*));
+  return theCase;
+}
+
+SwitchStmt *SwitchStmt::create(SourceLoc SwitchLoc,
+                               Expr *SubjectExpr,
+                               VarDecl *SubjectDecl,
+                               SourceLoc LBraceLoc,
+                               ArrayRef<CaseStmt *> Cases,
+                               SourceLoc RBraceLoc,
+                               ASTContext &C) {
+  void *p = C.Allocate(sizeof(SwitchStmt) + Cases.size() * sizeof(SwitchStmt*),
+                       alignof(SwitchStmt));
+  SwitchStmt *theSwitch = ::new (p) SwitchStmt(SwitchLoc,
+                                               SubjectExpr,
+                                               SubjectDecl,
+                                               LBraceLoc,
+                                               Cases.size(),
+                                               RBraceLoc);
+  memcpy(theSwitch->getCaseBuffer(),
+         Cases.data(), Cases.size() * sizeof(CaseStmt*));
+  return theSwitch;
+}
+
 //===----------------------------------------------------------------------===//
 // Printing for Stmt and all subclasses.
 //===----------------------------------------------------------------------===//
@@ -231,6 +266,31 @@ public:
   }
   void visitContinueStmt(ContinueStmt *S) {
     OS.indent(Indent) << "(continue_stmt)";
+  }
+  void visitSwitchStmt(SwitchStmt *S) {
+    OS.indent(Indent) << "(switch_stmt\n";
+    printRec(S->getSubjectExpr());
+    for (CaseStmt *C : S->getCases()) {
+      OS << '\n';
+      printRec(C);
+    }
+    OS << ')';
+  }
+  void visitCaseStmt(CaseStmt *S) {
+    OS.indent(Indent) << "(case_stmt";
+    for (Expr *valueExpr : S->getValueExprs()) {
+      OS << '\n';
+      printRec(valueExpr);
+    }
+    if (Expr *condExpr = S->getConditionExpr()) {
+      OS << "\n";
+      OS.indent(Indent+2);
+      OS << "condition=";
+      condExpr->print(OS, Indent+2);
+    }
+    OS << '\n';
+    printRec(S->getBody());
+    OS << ')';
   }
 };
 

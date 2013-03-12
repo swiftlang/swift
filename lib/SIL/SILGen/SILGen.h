@@ -420,6 +420,10 @@ public:
   
   void visitContinueStmt(ContinueStmt *S, SGFContext C);
   
+  void visitSwitchStmt(SwitchStmt *S, SGFContext C);
+
+  void visitCaseStmt(CaseStmt *S, SGFContext C);
+  
   //===--------------------------------------------------------------------===//
   // Expressions
   //===--------------------------------------------------------------------===//

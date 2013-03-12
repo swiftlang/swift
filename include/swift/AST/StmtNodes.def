@@ -37,6 +37,8 @@ STMT(While, Stmt)
 STMT(DoWhile, Stmt)
 STMT(For, Stmt)
 STMT(ForEach, Stmt)
+STMT(Switch, Stmt)
+STMT(Case, Stmt)
 STMT(Break, Stmt)
 STMT(Continue, Stmt)
 

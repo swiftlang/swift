@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
@@ -23,6 +24,7 @@
 #include "Explosion.h"
 #include "Scope.h"
 #include "GenType.h"
+#include "GenInit.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "JumpDest.h"
@@ -63,6 +65,12 @@ void IRGenFunction::emitStmt(Stmt *S) {
 
   case StmtKind::Continue:
     return emitContinueStmt(cast<ContinueStmt>(S));
+      
+  case StmtKind::Switch:
+    return emitSwitchStmt(cast<SwitchStmt>(S));
+  
+  case StmtKind::Case:
+    llvm_unreachable("case outside of switch");
   }
   llvm_unreachable("bad statement kind!");
 }
@@ -372,4 +380,56 @@ void IRGenFunction::emitBreakStmt(BreakStmt *S) {
 void IRGenFunction::emitContinueStmt(ContinueStmt *S) {
   emitBranch(ContinueDestStack.back());
   Builder.ClearInsertionPoint();
+}
+
+void IRGenFunction::emitSwitchStmt(SwitchStmt *S) {
+  Scope OuterSwitchScope(*this);
+
+  // Evaluate and bind the subject value.
+  Initialization I;
+  VarDecl *subject = S->getSubjectDecl();
+  const TypeInfo &ty = getFragileTypeInfo(subject->getType());
+  I.registerObject(*this, I.getObjectForDecl(subject), NotOnHeap, ty);
+  Address addr = I.emitVariable(*this, subject, ty);
+  I.emitInit(*this, I.getObjectForDecl(subject), addr, S->getSubjectExpr(), ty);
+  
+  // Emit the case branches.
+  CaseStmt *dflt = nullptr;
+  
+  std::vector<Condition> conds;
+  
+  for (size_t i = 0; i < S->getCases().size(); ++i) {
+    CaseStmt *cas = S->getCases()[i];
+    // Save the default branch for last.
+    if (cas->isDefault()) {
+      assert(!dflt && "multiple defaults in switch!");
+      dflt = cas;
+      continue;
+    }
+    
+    conds.push_back(emitCondition(cas->getConditionExpr(),
+                           /*hasFalse=*/ dflt || i < S->getCases().size() - 1));
+    auto &cond = conds.back();
+    cond.enterTrue(*this);
+    emitStmt(cas->getBody());
+    cond.exitTrue(*this);
+
+    if (cond.hasFalse())
+      cond.enterFalse(*this);
+    else {
+      cond.complete(*this);
+      conds.pop_back();
+    }
+  }
+  
+  // Emit the default case if present.
+  if (dflt) {
+    emitStmt(dflt->getBody());
+  }
+  
+  // Unwind all the conditions.
+  for (auto condi = conds.rbegin(), end = conds.rend(); condi != end; ++condi) {
+    condi->exitFalse(*this);
+    condi->complete(*this);
+  }
 }

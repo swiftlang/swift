@@ -375,6 +375,14 @@ void SILGenFunction::visitContinueStmt(ContinueStmt *S, SGFContext C) {
   Cleanups.emitBranchAndCleanups(ContinueDestStack.back());
 }
 
+void SILGenFunction::visitSwitchStmt(SwitchStmt *S, SGFContext C) {
+  llvm_unreachable("not implemented");
+}
+
+void SILGenFunction::visitCaseStmt(CaseStmt *S, SGFContext C) {
+  llvm_unreachable("not implemented");
+}
+
 ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
                                                            LValue const &src) {
   Value addr;

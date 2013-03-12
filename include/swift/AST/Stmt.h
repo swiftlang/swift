@@ -30,6 +30,7 @@ namespace swift {
   class ASTWalker;
   class Pattern;
   class PatternBindingDecl;
+  class VarDecl;
   
 enum class StmtKind {
 #define STMT(ID, PARENT) ID,
@@ -73,11 +74,10 @@ public:
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = Stmt::Alignment);
   
-  // Make placement new and vanilla new/delete illegal for Exprs.
+  // Make vanilla new/delete illegal for Stmts.
   void *operator new(size_t Bytes) throw() = delete;
   void operator delete(void *Data) throw() = delete;
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
-
 };
 
 /// AssignStmt - A value assignment, like "x = y".
@@ -365,6 +365,147 @@ public:
   
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::ForEach;
+  }
+};
+  
+/// A 'case' or 'default' block of a switch statement. Only valid as the
+/// substatement of a SwitchStmt. Type-checking synthesizes a condition expr
+/// using the '=~' operator to compare the subject of the switch to the
+/// value(s) of the case.
+class CaseStmt : public Stmt {
+  SourceLoc CaseOrDefaultLoc;
+  SourceLoc ColonLoc;
+  Stmt *Body;
+  Expr *ConditionExpr;
+  unsigned ValueExprCount;
+
+  Expr * const *getValueExprBuffer() const {
+    return reinterpret_cast<Expr * const *>(this + 1);
+  }
+  Expr **getValueExprBuffer() {
+    return reinterpret_cast<Expr**>(this + 1);
+  }
+  
+  CaseStmt(SourceLoc CaseOrDefaultLoc,
+           unsigned ValueExprCount,
+           SourceLoc ColonLoc,
+           BraceStmt *Body)
+    : Stmt(StmtKind::Case),
+      CaseOrDefaultLoc(CaseOrDefaultLoc),
+      ColonLoc(ColonLoc),
+      Body(Body),
+      ConditionExpr(nullptr),
+      ValueExprCount(ValueExprCount)
+  {}
+  
+public:
+  /// Allocate a new CaseStmt in the given ASTContext.
+  static CaseStmt *create(SourceLoc CaseOrDefaultLoc,
+                          ArrayRef<Expr*> ValueExprs,
+                          SourceLoc ColonLoc,
+                          BraceStmt *Body,
+                          ASTContext &C);
+  
+  /// True if this is the 'default' block of a switch.
+  bool isDefault() const { return ValueExprCount == 0; }
+  
+  /// Get the source location of the 'case' or 'default' keyword.
+  SourceLoc getCaseOrDefaultLoc() const { return CaseOrDefaultLoc; }
+  /// Get the source location of the label colon.
+  SourceLoc getColonLoc() const { return ColonLoc; }
+
+  SourceLoc getLoc() const { return CaseOrDefaultLoc; }
+  SourceRange getSourceRange() const {
+    return {CaseOrDefaultLoc, Body->getEndLoc()};
+  }
+  
+  /// Get the list of value expressions for this case. Empty for a 'default'
+  /// block.
+  ArrayRef<Expr*> getValueExprs() const {
+    return {getValueExprBuffer(), ValueExprCount};
+  }
+  MutableArrayRef<Expr*> getMutableValueExprs() {
+    return {getValueExprBuffer(), ValueExprCount};
+  }
+
+  /// Get the body of the case or default block.
+  Stmt *getBody() const { return Body; }
+  void setBody(Stmt *S) { Body = S; }
+  
+  /// Get the condition expr for this case. This expr is synthesized during
+  /// type-checking and returns an Int1 indicating whether this case branch
+  /// is taken. This returns null if the case has not been type-checked or if
+  /// this is the default case.
+  Expr *getConditionExpr() const { return ConditionExpr; }
+  void setConditionExpr(Expr *e) { ConditionExpr = e; }
+  
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Case;
+  }
+};
+
+/// Switch statement.
+class SwitchStmt : public Stmt {
+  SourceLoc SwitchLoc, LBraceLoc, RBraceLoc;
+  Expr *SubjectExpr;
+  VarDecl *SubjectDecl;
+  unsigned CaseCount;
+  
+  CaseStmt * const *getCaseBuffer() const {
+    return reinterpret_cast<CaseStmt * const *>(this + 1);
+  }
+
+  CaseStmt **getCaseBuffer() {
+    return reinterpret_cast<CaseStmt **>(this + 1);
+  }
+  
+  SwitchStmt(SourceLoc SwitchLoc,
+             Expr *SubjectExpr,
+             VarDecl *SubjectDecl,
+             SourceLoc LBraceLoc,
+             unsigned CaseCount,
+             SourceLoc RBraceLoc)
+    : Stmt(StmtKind::Switch),
+      SwitchLoc(SwitchLoc), LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
+      SubjectExpr(SubjectExpr), SubjectDecl(SubjectDecl), CaseCount(CaseCount)
+  {}
+
+public:
+  /// Allocate a new SwitchStmt in the given ASTContext.
+  static SwitchStmt *create(SourceLoc SwitchLoc,
+                            Expr *SubjectExpr, VarDecl *SubjectDecl,
+                            SourceLoc LBraceLoc,
+                            ArrayRef<CaseStmt*> Cases,
+                            SourceLoc RBraceLoc,
+                            ASTContext &C);
+  
+  /// Get the source location of the 'switch' keyword.
+  SourceLoc getSwitchLoc() const { return SwitchLoc; }
+  /// Get the source location of the opening brace.
+  SourceLoc getLBraceLoc() const { return LBraceLoc; }
+  /// Get the source location of the closing brace.
+  SourceLoc getRBraceLoc() const { return RBraceLoc; }
+  
+  SourceLoc getLoc() const { return SwitchLoc; }
+  SourceRange getSourceRange() const { return {SwitchLoc, RBraceLoc}; }
+  
+  /// Get the subject expression of the switch.
+  Expr *getSubjectExpr() const { return SubjectExpr; }
+  void setSubjectExpr(Expr *e) { SubjectExpr = e; }
+  
+  /// Get the VarDecl bound to the result of the subject expression. This
+  /// decl cannot be referenced by name lookup; it is only used to synthesize
+  /// the condition exprs of CaseStmts.
+  VarDecl *getSubjectDecl() const { return SubjectDecl; }
+  void setSubjectDecl(VarDecl *d) { SubjectDecl = d; }
+  
+  /// Get the list of case clauses.
+  ArrayRef<CaseStmt*> getCases() const {
+    return {getCaseBuffer(), CaseCount};
+  }
+  
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Switch;
   }
 };
 

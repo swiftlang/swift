@@ -38,6 +38,18 @@ namespace swift {
   class TupleType;
   
   struct OneOfElementInfo;
+  
+  /// Different contexts in which BraceStmt item lists are parsed.
+  enum class BraceItemListKind {
+    /// A statement list terminated by a closing brace. The default.
+    Brace,
+    /// A statement list in a property getter or setter. The list
+    /// is terminated by a closing brace or a 'get:' or 'set:' label.
+    Property,
+    /// A statement list in a case block. The list is terminated
+    /// by a closing brace or a 'case' or 'default' label.
+    Case
+  };
 
 class Parser {
   Parser(const Parser&) = delete;
@@ -212,7 +224,8 @@ public:
   bool parseValueSpecifier(TypeLoc &Loc, NullablePtr<Expr> &Init);
 
   void parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Decls,
-                          bool IsTopLevel, bool IsGetSet = false);
+                          bool IsTopLevel,
+                          BraceItemListKind Kind = BraceItemListKind::Brace);
 
   //===--------------------------------------------------------------------===//
   // Decl Parsing
@@ -385,6 +398,8 @@ public:
   NullablePtr<Stmt> parseStmtFor();
   NullablePtr<Stmt> parseStmtForCStyle(SourceLoc ForLoc);
   NullablePtr<Stmt> parseStmtForEach(SourceLoc ForLoc);
+  NullablePtr<Stmt> parseStmtSwitch();
+  NullablePtr<CaseStmt> parseStmtCase();
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing

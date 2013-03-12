@@ -489,6 +489,21 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       }
     }
   }
+  void visitSwitchStmt(SwitchStmt *S) {
+    if (!IntersectsRange(S->getSourceRange()))
+      return;
+    for (CaseStmt *C : S->getCases()) {
+      visit(C);
+    }
+  }
+  
+  void visitCaseStmt(CaseStmt *S) {
+    if (!IntersectsRange(S->getSourceRange()))
+      return;
+    
+    // TODO: Check patterns in pattern-matching case.
+    visit(S->getBody());
+  }
 };
 
 UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,

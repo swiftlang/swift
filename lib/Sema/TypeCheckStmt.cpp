@@ -23,6 +23,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/Basic/Interleave.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
@@ -463,6 +464,116 @@ public:
       return nullptr;
     }
     return S;
+  }
+  
+  /// Check a case of a switch statement.
+  bool typeCheckCaseStmt(CaseStmt *Case, SwitchStmt *ParentSwitch) {
+    if (!Case->isDefault()) {      
+      // Synthesize the expression ($switch =~ value) || ($switch =~ value) || ...
+      // from the value expressions of the case as its condition expression.
+      VarDecl *subject = ParentSwitch->getSubjectDecl();
+      
+      // Make overloaded refs for the '=~' and '||' operators.
+      
+      Identifier matchOp = TC.Context.getIdentifier("=~");
+      UnqualifiedLookup matchLookup(matchOp, &TC.TU);
+      if (!matchLookup.isSuccess()) {
+        TC.diagnose(ParentSwitch->getLoc(), diag::no_match_operator);
+        return true;
+      }
+      SmallVector<ValueDecl*, 8> matchDecls;
+      std::transform(matchLookup.Results.begin(), matchLookup.Results.end(),
+                     std::back_inserter(matchDecls),
+                     [](UnqualifiedLookupResult &res) {
+                       return res.getValueDecl();
+                     });
+      
+      Identifier orOp = TC.Context.getIdentifier("||");
+      UnqualifiedLookup orLookup(orOp, &TC.TU);
+      if (!orLookup.isSuccess()) {
+        TC.diagnose(ParentSwitch->getLoc(), diag::no_or_operator);
+        return true;
+      }
+      SmallVector<ValueDecl*, 2> orDecls;
+      std::transform(orLookup.Results.begin(), orLookup.Results.end(),
+                     std::back_inserter(orDecls),
+                     [](UnqualifiedLookupResult &res) {
+                       return res.getValueDecl();
+                     });
+      
+      // Construct the condition expression.
+      Expr *condition = nullptr;
+      
+      for (Expr *valueExpr : Case->getValueExprs()) {
+        auto *subjRef
+          = new (TC.Context) DeclRefExpr(subject,
+                                         valueExpr->getLoc(),
+                                         subject->getTypeOfReference());
+        Expr *matchArgs[] = {subjRef, valueExpr};
+        TupleExpr *matchArgExpr
+          = new (TC.Context) TupleExpr(SourceLoc(),
+                     TC.Context.AllocateCopy(MutableArrayRef<Expr*>(matchArgs)),
+                     nullptr,
+                     SourceLoc());
+        Expr *matchRef = TC.buildRefExpr(matchDecls, valueExpr->getLoc());
+        Expr *nextCondition
+          = new (TC.Context) BinaryExpr(matchRef, matchArgExpr);
+        
+        if (condition) {
+          Expr *orArgs[] = {condition, nextCondition};
+          TupleExpr *orArgExpr
+            = new (TC.Context) TupleExpr(SourceLoc(),
+                       TC.Context.AllocateCopy(MutableArrayRef<Expr*>(orArgs)),
+                       nullptr,
+                       SourceLoc());
+          Expr *orRef = TC.buildRefExpr(orDecls, valueExpr->getLoc());
+          condition = new (TC.Context) BinaryExpr(orRef, orArgExpr);
+        } else
+          condition = nextCondition;
+      }
+      
+      if (TC.typeCheckCondition(condition))
+        return true;
+      Case->setConditionExpr(condition);
+    }
+    
+    Stmt *Body = Case->getBody();
+    if (typeCheckStmt(Body))
+      return true;
+    Case->setBody(Body);
+    
+    return false;
+  }
+  
+  Stmt *visitSwitchStmt(SwitchStmt *S) {
+    Expr *subjectExpr = S->getSubjectExpr();
+    if (typeCheckExpr(subjectExpr))
+      return nullptr;
+    subjectExpr = TC.convertToMaterializable(subjectExpr);
+    if (!subjectExpr)
+      return nullptr;
+    S->setSubjectExpr(subjectExpr);
+    S->getSubjectDecl()->setType(subjectExpr->getType());
+    
+    bool failed = false;
+    CaseStmt *defaultCase = nullptr;
+    for (CaseStmt *C : S->getCases()) {
+      if (C->isDefault()) {
+        if (defaultCase) {
+          TC.diagnose(C->getLoc(), diag::multiple_defaults_in_switch);
+          TC.diagnose(defaultCase->getLoc(), diag::previous_default);
+        } else
+          defaultCase = C;
+      }
+      failed |= typeCheckCaseStmt(C, S);
+    }
+    
+    return failed ? nullptr : S;
+  }
+
+  Stmt *visitCaseStmt(CaseStmt *S) {
+    // Cases are handled in typeCheckCaseStmt.
+    llvm_unreachable("case stmt outside of switch?!");
   }
 };
   
