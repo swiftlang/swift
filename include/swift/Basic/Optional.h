@@ -17,7 +17,7 @@
 //  Note that this is a C++11-only re-implementation of LLVM's Optional class,
 //  which provides the benefit of not constructing the object. This could also
 //  be implemented in C++98/03 for LLVM (and will eventually be), but it's a
-//  pain to re-implement std::aligned_storage.
+//  pain to re-implement unrestricted unions.
 //
 //===----------------------------------------------------------------------===//
 
@@ -37,10 +37,10 @@ namespace swift {
 
   template<typename T>
   class Optional {
+    // Place Value in an anonymous union to suppress implicit value semantics.
     union {
-      std::aligned_storage<sizeof(T), alignof(T)> Aligner;
-      char Bytes[sizeof(T)];
-    } Storage;
+      T Value;
+    };
     unsigned HasValue : 1;
     
   public:
@@ -56,30 +56,31 @@ namespace swift {
     /// \param Args The arguments with which the \c T object will be
     /// direct-initialized.
     template<typename ...ArgTypes>
-    Optional(ArgTypes &&...Args) : HasValue(true) {
-      new (getPointer()) T(std::forward<ArgTypes>(Args)...);
+    Optional(ArgTypes &&...Args)
+      : Value(std::forward<ArgTypes>(Args)...), HasValue(true)
+    {
     }
 
     Optional(Optional &Other) : HasValue(Other.HasValue) {
-      if (Other)
-        new (getPointer()) T(Other.getValue());
+      if (HasValue)
+        ::new ((void*)&Value) T(Other.Value);
     }
 
     Optional(const Optional &Other) : HasValue(Other.HasValue) {
-      if (Other)
-        new (getPointer()) T(Other.getValue());
+      if (HasValue)
+        ::new ((void*)&Value) T(Other.Value);
     }
     
     Optional(Optional &&Other) : HasValue(Other.HasValue) {
-      if (Other) {
-        new (getPointer()) T(std::move(Other.getValue()));
+      if (HasValue) {
+        ::new ((void*)&Value) T(std::move(Other.Value));
         Other.HasValue = false;
       }
     }
     
     Optional &operator=(const Optional &Other) {
       if (HasValue && Other.HasValue) {
-        getValue() = Other.getValue();
+        Value = Other.Value;
         return *this;
       }
       
@@ -89,13 +90,13 @@ namespace swift {
       }
       
       HasValue = true;
-      new (getPointer()) T(Other.getValue());
+      ::new ((void*)&Value) T(Other.Value);
       return *this;
     }
     
     Optional &operator=(Optional &&Other) {
       if (HasValue && Other.HasValue) {
-        getValue() = std::move(Other.getValue());
+        Value = std::move(Other.Value);
         Other.HasValue = false;
         return *this;
       }
@@ -106,7 +107,7 @@ namespace swift {
       }
       
       HasValue = true;
-      new (getPointer()) T(std::move(Other.getValue()));
+      ::new ((void*)&Value) T(std::move(Other.Value));
       Other.HasValue = false;
       return *this;
     }
@@ -118,37 +119,27 @@ namespace swift {
     void emplace(ArgTypes &&...Args) {
       reset();
       HasValue = true;
-      new (getPointer()) T(std::forward<ArgTypes>(Args)...);
+      ::new ((void*)&Value) T(std::forward<ArgTypes>(Args)...);
     }
 
     void reset() {
       if (!HasValue)
         return;
       
-      getPointer()->~T();
+      Value.~T();
       HasValue = false;
     }
     
-    T *getPointer() { 
-      assert(HasValue); 
-      return reinterpret_cast<T *>(&Storage.Bytes[0]);
-    }
-    
-    const T *getPointer() const { 
-      assert(HasValue); 
-      return reinterpret_cast<const T *>(&Storage.Bytes[0]);
-    }
-    
-    T &getValue() { return *getPointer(); }
-    const T &getValue() const { return *getPointer(); }
+    T &getValue() { assert(HasValue); return Value; }
+    const T &getValue() const { assert(HasValue); return Value; }
     
     bool hasValue() const { return HasValue; }
     explicit operator bool() const { return HasValue; }
     
-    const T* operator->() const { return getPointer(); }
-          T* operator->()       { return getPointer(); }
-    const T& operator*() const { return getValue(); }
-          T& operator*()       { return getValue(); }
+    const T* operator->() const { assert(HasValue); return &Value; }
+          T* operator->()       { assert(HasValue); return &Value; }
+    const T& operator*() const { assert(HasValue); return Value; }
+          T& operator*()       { assert(HasValue); return Value; }
   };
 }
 
