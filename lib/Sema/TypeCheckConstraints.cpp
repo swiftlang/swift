@@ -6364,17 +6364,77 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<ConstraintSystem *> &viable){
 // Diagnose failed constraint systems
 //===--------------------------------------------------------------------===//
 #pragma mark Diagnose failed constraint systems.
+
+/// \brief Simplify the given locator by zeroing in on the most specific
+/// subexpression described by the locator.
+static ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
+                                          ConstraintLocator *locator) {
+  auto path = locator->getPath();
+  auto anchor = locator->getAnchor();
+  while (!path.empty()) {
+    switch (path[0].getKind()) {
+    case ConstraintLocator::ApplyArgument:
+      // Extract application argument.
+      if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
+        anchor = applyExpr->getArg();
+        path = path.slice(1);
+        continue;
+      }
+      break;
+
+    case ConstraintLocator::ApplyFunction:
+      // Extract application function.
+      if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
+        anchor = applyExpr->getArg();
+        path = path.slice(1);
+        continue;
+      }
+      break;
+
+    case ConstraintLocator::Load:
+    case ConstraintLocator::RvalueAdjustment:
+      // Loads and rvalue adjustments are implicit.
+      path = path.slice(1);
+      continue;
+
+    case ConstraintLocator::NamedTupleElement:
+    case ConstraintLocator::TupleElement:
+      // Extract tuple element.
+      if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
+        anchor = tupleExpr->getElement(path[0].getValue());
+        path = path.slice(1);
+        continue;
+      }
+      break;
+
+    default:
+      // FIXME: Lots of other cases to handle.
+      break;
+    }
+
+    // If we get here, we couldn't simplify the path further.
+    break;
+  }
+
+  if (anchor == locator->getAnchor() &&
+      path.size() == locator->getPath().size()) {
+    return locator;
+  }
+
+  return cs.getConstraintLocator(anchor, path);
+}
+
 bool ConstraintSystem::diagnose() {
   if (SharedState->Failures.size() == 1) {
     auto &failure = *SharedState->Failures.begin();
     if (failure.getKind() == Failure::TypesNotConvertible) {
-      if (auto locator = failure.getLocator()) {
-        if (auto anchor = locator->getAnchor()) {
-          getTypeChecker().diagnose(anchor->getLoc(), diag::invalid_conversion,
-                                    failure.getFirstType(),
-                                    failure.getSecondType());
-          return true;
-        }
+      if (failure.getLocator() && failure.getLocator()->getAnchor()) {
+        auto locator = simplifyLocator(*this, failure.getLocator());
+        getTypeChecker().diagnose(locator->getAnchor()->getLoc(),
+                                  diag::invalid_conversion,
+                                  failure.getFirstType(),
+                                  failure.getSecondType());
+        return true;
       }
     }
   }
@@ -7399,6 +7459,11 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   // Attempt to solve the constraint system.
   SmallVector<ConstraintSystem *, 4> viable;
   if (cs.solve(viable)) {
+    // Try to provide a decent diagnostic.
+    if (cs.diagnose()) {
+      return nullptr;
+    }
+
     // FIXME: Dumping constraints by default due to crummy diagnostics.
     if (getLangOpts().DebugConstraintSolver || true) {
       log << "---Solved constraints---\n";
@@ -7419,11 +7484,6 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
       else {
         log << "Found " << viable.size() << " potential solutions.\n";
       }
-    }
-
-    // Try to provide a decent diagnostic.
-    if (cs.diagnose()) {
-      return nullptr;
     }
 
     // FIXME: Crappy diagnostic.
