@@ -282,12 +282,15 @@
 
     // Statements
     keyword ::= 'break'
+    keyword ::= 'case'
     keyword ::= 'continue'
+    keyword ::= 'default'
     keyword ::= 'do'
     keyword ::= 'else'
     keyword ::= 'if'
     keyword ::= 'for'
     keyword ::= 'return'
+    keyword ::= 'switch'
     keyword ::= 'while'
 
     // Expressions
@@ -2576,6 +2579,7 @@ ill-formed if the type does not conform to the protocol.</p>
     stmt ::= <a href="#stmt-while">stmt-while</a>
     stmt ::= <a href="#stmt-for-c-style">stmt-for-c-style</a>
     stmt ::= <a href="#stmt-for-each">stmt-for-each</a>
+    stmt ::= <a href="#stmt-for-each">stmt-switch</a>
   </pre>
 
   <p>Statements provide the control flow constructs of function bodies and
@@ -2831,6 +2835,53 @@ ill-formed if the type does not conform to the protocol.</p>
     }
  </pre>
 
+  <!-- ===================================================================== -->
+  <h3 id="stmt-switch">'switch' Statement</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    stmt-switch ::= 'switch' <a href="#expr">expr</a> '{' stmt-switch-case* '}'
+    stmt-switch-case ::= (case-label | default-label) <a href="#stmt-brace">stmt-brace-item</a>*
+
+    case-label ::= 'case' expr (',' expr)* ':'
+    default-label ::= 'default' ':'
+  </pre>
+
+  <p>TODO: Design subject to change. Pattern matching and more efficient IR switch-
+  able implementation of value switching need to be integrated into the design.
+
+  <p>'switch' statements provide convenient branching over multiple possible
+  values of a single expression. The subject expression of the switch is evaluated
+  and compared to the values in each case using the <tt>=~</tt> operator, and the
+  first matching case block is branched to. If no case matches, then the 'default'
+  block is branched to, or if there is no 'default' block, control flow moves past
+  the 'switch'. Cases may specify multiple comma-separated expressions; the case
+  will be branched to if any expression matches the subject.
+
+  <p>Some examples:
+
+  <pre class="example">
+    func judge(n:Int) {
+      switch n {
+      case 0:
+        println("I was using that before it was cool.")
+
+      case 2, 3, 5, 7:
+        println("A bit past its prime.")
+
+      case 6:
+        println("A little too perfect, if you ask me.")
+
+      default:
+        println("I dunno. It's just some number.")
+      }
+    }
+  </pre>
+
+  <p>Unlike a C-style 'switch', every 'case' and 'default' block has its own scope,
+  and control does not implicitly 'fall through' from one case block to the next.
+  'break' and 'continue' within a 'switch' will break or continue out of an enclosing
+  'while' or 'for' loop, not out of the 'switch' itself.
 
   <!-- ********************************************************************* -->
   <h2>Protocols</h2>
