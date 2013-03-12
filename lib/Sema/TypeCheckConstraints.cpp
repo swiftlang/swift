@@ -4158,8 +4158,9 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       unsigned index = notConsumed - consumed.begin();
       recordFailure(getConstraintLocator(
                       locator.withPathElement(
-                        LocatorPathElt::getNamedTupleElement(index))),
-                    Failure::TupleUnused, tuple1, tuple2);
+                        LocatorPathElt::getTupleElement(index))),
+                    Failure::TupleUnused, tuple1->getElementType(index),
+                    tuple2);
     }
 
     return SolutionKind::Error;
@@ -6367,8 +6368,15 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<ConstraintSystem *> &viable){
 
 /// \brief Simplify the given locator by zeroing in on the most specific
 /// subexpression described by the locator.
+///
+/// \param range1 Will be populated with an "interesting" range 
 static ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
-                                          ConstraintLocator *locator) {
+                                          ConstraintLocator *locator,
+                                          SourceRange &range1,
+                                          SourceRange &range2) {
+  range1 = SourceRange();
+  range2 = SourceRange();
+
   auto path = locator->getPath();
   auto anchor = locator->getAnchor();
   while (!path.empty()) {
@@ -6407,6 +6415,15 @@ static ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
       }
       break;
 
+    case ConstraintLocator::MemberRefBase:
+      if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(anchor)) {
+        range1 = dotExpr->getNameLoc();
+        anchor = dotExpr->getBase();
+        path = path.slice(1);
+        continue;
+      }
+      break;
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
@@ -6427,15 +6444,58 @@ static ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
 bool ConstraintSystem::diagnose() {
   if (SharedState->Failures.size() == 1) {
     auto &failure = *SharedState->Failures.begin();
-    if (failure.getKind() == Failure::TypesNotConvertible) {
-      if (failure.getLocator() && failure.getLocator()->getAnchor()) {
-        auto locator = simplifyLocator(*this, failure.getLocator());
-        getTypeChecker().diagnose(locator->getAnchor()->getLoc(),
-                                  diag::invalid_conversion,
-                                  failure.getFirstType(),
-                                  failure.getSecondType());
-        return true;
+    if (failure.getLocator() && failure.getLocator()->getAnchor()) {
+      SourceRange range1, range2;
+
+      auto locator = simplifyLocator(*this, failure.getLocator(), range1,
+                                     range2);
+      auto &tc = getTypeChecker();
+
+      auto anchor = locator->getAnchor();
+      auto loc = anchor->getLoc();
+      switch (failure.getKind()) {
+      case Failure::TupleSizeMismatch: {
+        auto tuple1 = failure.getFirstType()->castTo<TupleType>();
+        auto tuple2 = failure.getSecondType()->castTo<TupleType>();
+        tc.diagnose(loc, diag::invalid_tuple_size, tuple1, tuple2,
+                    tuple1->getFields().size(),
+                    tuple2->getFields().size())
+          << range1 << range2;
+        break;
       }
+
+      case Failure::TupleUnused:
+        tc.diagnose(loc, diag::invalid_tuple_element_unused,
+                    failure.getFirstType(),
+                    failure.getSecondType())
+          << range1 << range2;
+        break;
+
+      case Failure::TypesNotEqual:
+      case Failure::TypesNotTrivialSubtypes:
+      case Failure::TypesNotSubtypes:
+      case Failure::TypesNotConvertible:
+      case Failure::TypesNotConstructible:
+        tc.diagnose(loc, diag::invalid_relation,
+                    failure.getKind() - Failure::TypesNotEqual,
+                    failure.getFirstType(),
+                    failure.getSecondType())
+          << range1 << range2;
+        break;
+
+      case Failure::DoesNotHaveMember:
+        tc.diagnose(loc, diag::does_not_have_member,
+                    failure.getFirstType(),
+                    failure.getName())
+          << range1 << range2;
+        break;
+          
+      default:
+        // FIXME: Handle all failure kinds
+        return false;
+      }
+
+      return true;
     }
   }
 
