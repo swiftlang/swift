@@ -517,6 +517,46 @@ namespace {
                                 numPathElements);
     }
 
+    /// \brief Determines whether this locator has a "simple" path, without
+    /// any transformations that break apart types.
+    bool hasSimplePath() const {
+      for (auto elt : getPath()) {
+        switch (elt.getKind()) {
+        case AddressOf:
+        case ApplyArgument:
+        case ApplyFunction:
+        case ArrayElementType:
+        case ClosureResult:
+        case ConstructionArgument:
+        case ConstructorMember:
+        case ConversionMember:
+        case ConversionResult:
+        case FunctionArgument:
+        case FunctionResult:
+        case InstanceType:
+        case Load:
+        case LvalueObjectType:
+        case MemberRefBase:
+        case ParentType:
+        case RvalueAdjustment:
+        case ScalarToTuple:
+        case SubscriptIndex:
+        case SubscriptMember:
+        case SubscriptResult:
+        case UnresolvedMemberRefBase:
+          continue;
+
+        case GenericArgument:
+        case InterpolationArgument:
+        case NamedTupleElement:
+        case TupleElement:
+          return false;
+        }
+      }
+
+      return true;
+    }
+
     /// \brief Produce a profile of this locator, for use in a folding set.
     static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
                         ArrayRef<PathElement> path) {
@@ -2184,11 +2224,15 @@ namespace {
     void addOverloadSet(OverloadSet *ovl) {
       // If we have an introducing expression, record it.
       if (auto introducer = ovl->getIntroducingExpr()) {
+        assert(!GeneratedOverloadSets[introducer]);
         GeneratedOverloadSets[introducer] = ovl;
       } else if (auto constraint = ovl->getIntroducingConstraint()) {
         if (auto locator = constraint->getLocator()) {
           if (auto anchor = locator->getAnchor()) {
-            GeneratedOverloadSets[anchor] = ovl;
+            if (locator->hasSimplePath()) {
+              assert(!GeneratedOverloadSets[anchor]);
+              GeneratedOverloadSets[anchor] = ovl;
+            }
           }
         }
       }
