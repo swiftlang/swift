@@ -726,10 +726,27 @@ namespace {
       return ConstraintLocatorBuilder(this, newElt);
     }
 
+    /// \brief Determine whether this builder has an empty path.
+    bool hasEmptyPath() const {
+      return !element;
+    }
+
+    /// \brief Retrieve the base constraint locator, on which this builder's
+    /// path is based.
+    ConstraintLocator *getBaseLocator() const {
+      for (auto prev = this;
+           prev;
+           prev = prev->previous.dyn_cast<ConstraintLocatorBuilder *>()) {
+        if (auto locator = prev->previous.dyn_cast<ConstraintLocator *>())
+          return locator;
+      }
+
+      return nullptr;
+    }
+
     /// \brief Retrieve the components of the complete locator, which includes
     /// the anchor expression and the path.
-    Expr *getLocator(llvm::SmallVectorImpl<LocatorPathElt> &path) const {
-      Expr *anchor = nullptr;
+    Expr *getLocatorParts(llvm::SmallVectorImpl<LocatorPathElt> &path) const {
       for (auto prev = this;
            prev;
            prev = prev->previous.dyn_cast<ConstraintLocatorBuilder *>()) {
@@ -744,7 +761,7 @@ namespace {
           path.insert(path.begin(),
                       locator->getPath().begin(),
                       locator->getPath().end());
-          return anchor;
+          return locator->getAnchor();
         }
       }
 
@@ -753,6 +770,221 @@ namespace {
       return nullptr;
     }
   };
+
+  /// \brief Describes a failure.
+  class Failure : public llvm::FoldingSetNode {
+  public:
+    /// \brief The various kinds of failures that can occur 
+    enum FailureKind {
+      /// \brief Tuple types with different numbers of elements.
+      TupleSizeMismatch,
+      /// \brief Tuple element names mismatch when they need to match.
+      TupleNameMismatch,
+      /// \brief Tuple element name matched, but at a different position.
+      TupleNamePositionMismatch,
+      /// \brief One tuple type is variadic, the other is not.
+      TupleVariadicMismatch,
+      /// \brief Unused element in tuple.
+      TupleUnused,
+      /// \brief Autoclosure function type mismatch.
+      FunctionAutoclosureMismatch,
+      /// \brief Types are not the same.
+      TypesNotEqual,
+      /// \brief Types are not trivial subtypes.
+      TypesNotTrivialSubtypes,
+      /// \brief Types are not subtypes.
+      TypesNotSubtypes,
+      /// \brief Types are not convertible.
+      TypesNotConvertible,
+      /// \brief Types are not constructible.
+      TypesNotConstructible,
+      /// \brief Lvalue type qualifiers mismatch.
+      LValueQualifiers,
+      /// \brief The first type doesn't conform to a protocol in the second
+      /// type.
+      DoesNotConformToProtocol,
+      /// \brief The first type does not have a member with the given name.
+      DoesNotHaveMember,
+      /// \brief The type is not an archetype.
+      IsNotArchetype,
+      /// \brief The type is not a literal type.
+      IsNotLiteralType,
+    };
+
+  private:
+    /// \brief The kind of failure this describes.
+    FailureKind kind : 8;
+
+    /// \brief A value, if used.
+    unsigned value : 32;
+
+    /// \brief Describes the location of this failure.
+    ConstraintLocator *locator;
+
+    /// \brief The first type.
+    Type first;
+
+    /// \brief The second value, which may be one of several things (type,
+    /// member name, literal kind, etc.).
+    union {
+      TypeBase *type;
+      void *name;
+      LiteralKind literal;
+    } second;
+
+  public:
+    /// \brief Retrieve the failure kind.
+    FailureKind getKind() const { return kind; }
+
+    /// \brief Retrieve the failure locator.
+    ConstraintLocator *getLocator() const {
+      return locator;
+    }
+
+    /// \brief Retrieve the first type.
+    Type getFirstType() const { return first; }
+
+    /// \brief Retrieve the second type.
+    Type getSecondType() const {
+      return second.type;
+    }
+
+    /// \brief Retrieve the name.
+    Identifier getName() const {
+      return Identifier::getFromOpaquePointer(second.name);
+    }
+
+    /// \brief Retrieve the literal kind.
+    LiteralKind getLiteralKind() const {
+      return second.literal;
+    }
+
+    /// \brief Retrieve the value.
+    unsigned getValue() const { return value; }
+
+    /// \brief Profile the given failure.
+    void Profile(llvm::FoldingSetNodeID &id) {
+      switch (kind) {
+      case FunctionAutoclosureMismatch:
+      case LValueQualifiers:
+      case TupleNameMismatch:
+      case TupleNamePositionMismatch:
+      case TupleSizeMismatch:
+      case TupleUnused:
+      case TupleVariadicMismatch:
+      case TypesNotConstructible:
+      case TypesNotConvertible:
+      case TypesNotEqual:
+      case TypesNotSubtypes:
+      case TypesNotTrivialSubtypes:
+        return Profile(id, locator, kind, getFirstType(), getSecondType());
+
+      case DoesNotConformToProtocol:
+        return Profile(id, locator, kind, getFirstType(), getSecondType(),
+                       getValue());
+
+      case DoesNotHaveMember:
+        return Profile(id, locator, kind, getFirstType(), getName());
+
+      case IsNotArchetype:
+        return Profile(id, locator, kind, getFirstType());
+
+      case IsNotLiteralType:
+        return Profile(id, locator, kind, getFirstType(), getLiteralKind());
+      }
+    }
+
+  private:
+    friend class ConstraintSystem;
+
+    /// \brief Construct a failure involving one type.
+    Failure(ConstraintLocator *locator, FailureKind kind, Type type)
+      : kind(kind), value(0), locator(locator), first(type)
+    {
+      second.type = nullptr;
+    }
+
+    /// \brief Construct a failure involving two types and an optional value.
+    Failure(ConstraintLocator *locator, FailureKind kind,
+            Type type1, Type type2, unsigned value = 0)
+      : kind(kind), value(value), locator(locator), first(type1)
+    {
+      second.type = type2.getPointer();
+    }
+
+    /// \brief Construct a failure involving a type and a name.
+    Failure(ConstraintLocator *locator, FailureKind kind,
+            Type type, Identifier name)
+    : kind(kind), value(0), locator(locator), first(type)
+    {
+      second.name = name.getAsOpaquePointer();
+    }
+
+    /// \brief Construct a failure involving a type and a literal kind.
+    Failure(ConstraintLocator *locator, FailureKind kind, Type type,
+            LiteralKind literal)
+    : kind(kind), value(0), locator(locator), first(type)
+    {
+      second.literal = literal;
+    }
+
+    /// \brief Profile a failure involving one type.
+    static void Profile(llvm::FoldingSetNodeID &id, ConstraintLocator *locator,
+                        FailureKind kind, Type type) {
+      id.AddPointer(locator);
+      id.AddInteger(kind);
+      id.AddPointer(type.getPointer());
+    }
+
+    /// \brief Profile a failure involving two types.
+    static void Profile(llvm::FoldingSetNodeID &id, ConstraintLocator *locator,
+                        FailureKind kind, Type type1, Type type2) {
+      id.AddPointer(locator);
+      id.AddInteger(kind);
+      id.AddPointer(type1.getPointer());
+      id.AddPointer(type2.getPointer());
+    }
+
+    /// \brief Profile a failure involving two types and a value.
+    static void Profile(llvm::FoldingSetNodeID &id, ConstraintLocator *locator,
+                        FailureKind kind, Type type1, Type type2,
+                        unsigned value) {
+      id.AddPointer(locator);
+      id.AddInteger(kind);
+      id.AddPointer(type1.getPointer());
+      id.AddPointer(type2.getPointer());
+      id.AddInteger(value);
+    }
+
+    /// \brief Profile a failure involving a type and a name.
+    static void Profile(llvm::FoldingSetNodeID &id, ConstraintLocator *locator,
+                        FailureKind kind, Type type, Identifier name) {
+      id.AddPointer(locator);
+      id.AddInteger(kind);
+      id.AddPointer(type.getPointer());
+      id.AddPointer(name.getAsOpaquePointer());
+    }
+
+    /// \brief Profile a failure involving a type and a literal kind.
+    static void Profile(llvm::FoldingSetNodeID &id, ConstraintLocator *locator,
+                        FailureKind kind, Type type, LiteralKind literal) {
+      id.AddPointer(locator);
+      id.AddInteger(kind);
+      id.AddPointer(type.getPointer());
+      id.AddInteger(static_cast<unsigned>(literal));
+    }
+
+    /// \brief Create a new Failure object with the given arguments, allocated
+    /// from the given bump pointer allocator.
+    template<typename ...Args>
+    static Failure *create(llvm::BumpPtrAllocator &allocator,
+                           ConstraintLocator *locator, FailureKind kind,
+                           Args &&...args) {
+      void *mem = allocator.Allocate(sizeof(Failure), alignof(Failure));
+      return new (mem) Failure(locator, kind, args...);
+    }
+  };
+
 
   /// \brief A constraint between two type variables.
   class Constraint {
@@ -949,9 +1181,9 @@ namespace {
         Second->print(Out);
 
       if (Locator) {
-        Out << " (";
+        Out << " [[";
         Locator->dump(sm);
-        Out << ");";
+        Out << "]];";
       }
     }
 
@@ -1245,6 +1477,10 @@ namespace {
       /// \brief Folding set containing all of the locators used in this
       /// constraint system.
       llvm::FoldingSet<ConstraintLocator> ConstraintLocators;
+
+      /// \brief Folding set containing all of the failures that have occurred
+      /// while exploring this constraint system.
+      llvm::FoldingSet<Failure> Failures;
 
       SharedStateType(TypeChecker &tc) : Arena(tc.Context, Allocator) {}
     };
@@ -1668,33 +1904,80 @@ namespace {
     /// builder.
     ConstraintLocator *
     getConstraintLocator(const ConstraintLocatorBuilder &builder) {
+      // If the builder has an empty path, just extract its base locator.
+      if (builder.hasEmptyPath()) {
+        return builder.getBaseLocator();
+      }
+
+      // We have to build a new locator. Extract the paths from the builder.
       SmallVector<LocatorPathElt, 4> path;
-      Expr *anchor = builder.getLocator(path);
+      Expr *anchor = builder.getLocatorParts(path);
       if (!anchor)
         return nullptr;
 
       return getConstraintLocator(anchor, path);
     }
 
-    /// \brief Record that the given constraint could not be satisfied.
-    void recordFailure(Constraint *constraint) {
-      recordFailure(constraint->getKind(), constraint->getFirstType(),
-                    Constraint::hasSecondType(constraint->getKind())
-                      ? constraint->getSecondType()
-                      : Type(),
-                    Constraint::hasMember(constraint->getKind())
-                      ? constraint->getMember()
-                      : Identifier(),
-                    constraint->getLocator());
+    /// \brief Record failure with already-simplified arguments.
+    template<typename ...Args>
+    void recordFailureSimplified(ConstraintLocator *locator,
+                                 Failure::FailureKind kind,
+                                 Args &&...args) {
+      // Check whether we've recorded this failure already. If so, we're done.
+      llvm::FoldingSetNodeID id;
+      Failure::Profile(id, locator, kind, args...);
+      auto &failures = SharedState->Failures;
+      void *insertPos = nullptr;
+      if (failures.FindNodeOrInsertPos(id, insertPos))
+        return;
+
+      // Allocate a new failure and record it.
+      auto failure = Failure::create(getAllocator(), locator, kind, args...);
+      failures.InsertNode(failure, insertPos);
     }
 
-    /// \brief Record that the given (unpacked) constraint could not be
-    /// satisfied.
-    void recordFailure(ConstraintKind Kind, Type First, Type Second,
-                       Identifier Member,
-                       ConstraintLocator *locator) {
-      
+    /// \brief Simplifies an argument to the failure by simplifying the type.
+    Type simplifyFailureArg(Type type) {
+      // FIXME: Should also map type variables back to their corresponding
+      // archetypes here.
+      return simplifyType(type);
     }
+
+    /// \brief Simplifies an argument to the failure by simplifying the type.
+    Type simplifyFailureArg(TypeBase *type) {
+      return simplifyType(type);
+    }
+
+    /// \brief Simplifies an argument to the failure (a no-op).
+    unsigned simplifyFailureArg(unsigned arg) {
+      return arg;
+    }
+
+    /// \brief Simplifies an argument to the failure (a no-op).
+    LiteralKind simplifyFailureArg(LiteralKind arg) {
+      return arg;
+    }
+
+    /// \brief Simplifies an argument to the failure (a no-op).
+    Identifier simplifyFailureArg(Identifier arg) {
+      return arg;
+    }
+
+    /// \brief Record a failure at the given location with the given kind,
+    /// along with any additional arguments to be passed to the failure
+    /// constructor.
+    template<typename ...Args>
+    void recordFailure(ConstraintLocator *locator, Failure::FailureKind kind,
+                       Args &&...args) {
+      recordFailureSimplified(locator, kind,
+                              simplifyFailureArg(std::forward<Args>(args))...);
+    }
+
+    /// \brief Try to diagnose the problem that caused this constraint system
+    /// to fail.
+    ///
+    /// \returns true if a diagnostic was produced, false otherwise.
+    bool diagnose();
 
     /// \brief Add a newly-allocated constraint after attempting to simplify
     /// it.
@@ -1707,7 +1990,6 @@ namespace {
         if (!failedConstraint) {
           failedConstraint = constraint;
           markUnsolvable();
-          recordFailure(failedConstraint);
         }
         return false;
 
@@ -2005,7 +2287,10 @@ namespace {
       /// This flag is automatically introduced when type matching destructures
       /// a type constructor (tuple, function type, etc.), solving that
       /// constraint while potentially generating others.
-      TMF_GenerateConstraints = 0x01
+      TMF_GenerateConstraints = 0x01,
+
+      /// \brief Record failures when they occur.
+      TMF_RecordFailures = 0x02
     };
 
     /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
@@ -2077,7 +2362,8 @@ namespace {
 
 
     /// \brief Attempt to simplify the given literal constraint.
-    SolutionKind simplifyLiteralConstraint(Type type, LiteralKind kind);
+    SolutionKind simplifyLiteralConstraint(Type type, LiteralKind kind,
+                                           ConstraintLocator *locator);
 
     /// \brief Attempt to simplify the given member constraint.
     SolutionKind simplifyMemberConstraint(const Constraint &constraint);
@@ -3637,8 +3923,15 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   // Equality and subtyping have fairly strict requirements on tuple matching,
   // requiring element names to either match up or be disjoint.
   if (kind < TypeMatchKind::Conversion) {
-    if (tuple1->getFields().size() != tuple2->getFields().size())
+    if (tuple1->getFields().size() != tuple2->getFields().size()) {
+      // Record this failure.
+      if (flags & TMF_RecordFailures) {
+        recordFailure(getConstraintLocator(locator),
+                      Failure::TupleSizeMismatch, tuple1, tuple2);
+      }
+
       return SolutionKind::Error;
+    }
 
     SolutionKind result = SolutionKind::TriviallySolved;
     for (unsigned i = 0, n = tuple1->getFields().size(); i != n; ++i) {
@@ -3648,21 +3941,48 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       // If the names don't match, we may have a conflict.
       if (elt1.getName() != elt2.getName()) {
         // Same-type requirements require exact name matches.
-        if (kind == TypeMatchKind::SameType)
+        if (kind == TypeMatchKind::SameType) {
+          // Record this failure.
+          if (flags & TMF_RecordFailures) {
+            recordFailure(getConstraintLocator(
+                            locator.withPathElement(
+                              LocatorPathElt::getNamedTupleElement(i))),
+                          Failure::TupleNameMismatch, tuple1, tuple2);
+          }
+
           return SolutionKind::Error;
+        }
 
         // For subtyping constraints, just make sure that this name isn't
         // used at some other position.
         if (!elt2.getName().empty()) {
           int matched = tuple1->getNamedElementId(elt2.getName());
-          if (matched != -1)
+          if (matched != -1) {
+            // Record this failure.
+            if (flags & TMF_RecordFailures) {
+              recordFailure(getConstraintLocator(
+                              locator.withPathElement(
+                                LocatorPathElt::getNamedTupleElement(i))),
+                            Failure::TupleNamePositionMismatch, tuple1, tuple2);
+            }
+
             return SolutionKind::Error;
+          }
         }
       }
 
       // Variadic bit must match.
-      if (elt1.isVararg() != elt2.isVararg())
+      if (elt1.isVararg() != elt2.isVararg()) {
+        // Record this failure.
+        if (flags & TMF_RecordFailures) {
+          recordFailure(getConstraintLocator(
+                          locator.withPathElement(
+                            LocatorPathElt::getNamedTupleElement(i))),
+                        Failure::TupleVariadicMismatch, tuple1, tuple2);
+        }
+        
         return SolutionKind::Error;
+      }
 
       // Compare the element types.
       switch (matchTypes(elt1.getType(), elt2.getType(), kind, subFlags,
@@ -3725,6 +4045,14 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 
     // If this is not a conversion constraint, shuffles are not permitted.
     if (i != (unsigned)matched && kind < TypeMatchKind::Conversion) {
+      // Record this failure.
+      if (flags & TMF_RecordFailures) {
+        recordFailure(getConstraintLocator(
+                        locator.withPathElement(
+                          LocatorPathElt::getNamedTupleElement(i))),
+                      Failure::TupleNamePositionMismatch, tuple1, tuple2);
+      }
+
       return SolutionKind::Error;
     }
 
@@ -3779,8 +4107,19 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   // Check whether there were any unused input values.
   // FIXME: Could short-circuit this check, above, by not skipping named
   // input values.
-  if (std::find(consumed.begin(), consumed.end(), false) != consumed.end())
+  auto notConsumed = std::find(consumed.begin(), consumed.end(), false);
+  if (notConsumed != consumed.end()) {
+    // Record this failure.
+    if (flags & TMF_RecordFailures) {
+      unsigned index = notConsumed - consumed.begin();
+      recordFailure(getConstraintLocator(
+                      locator.withPathElement(
+                        LocatorPathElt::getNamedTupleElement(index))),
+                    Failure::TupleUnused, tuple1, tuple2);
+    }
+
     return SolutionKind::Error;
+  }
 
   // Check conversion constraints on the individual elements.
   SolutionKind result = SolutionKind::TriviallySolved;
@@ -3858,11 +4197,15 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // An [auto_closure] function type can be a subtype of a
   // non-[auto_closure] function type.
   if (func1->isAutoClosure() != func2->isAutoClosure()) {
-    if (func2->isAutoClosure())
-      return SolutionKind::Error;
+    if (func2->isAutoClosure() || kind < TypeMatchKind::TrivialSubtype) {
+      // Record this failure.
+      if (flags & TMF_RecordFailures) {
+        recordFailure(getConstraintLocator(locator),
+                      Failure::FunctionAutoclosureMismatch, func1, func2);
+      }
 
-    if (kind < TypeMatchKind::TrivialSubtype)
       return SolutionKind::Error;
+    }
   }
 
   // Determine how we match up the input/result types.
@@ -3944,6 +4287,30 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 
   case TypeMatchKind::Construction:
     return ConstraintKind::Construction;
+  }
+
+  llvm_unreachable("unhandled type matching kind");
+}
+
+/// \brief Map a failed type-matching kind to a failure kind, generically.
+static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
+  switch (kind) {
+  case TypeMatchKind::BindType:
+  case TypeMatchKind::SameType:
+  case TypeMatchKind::SameTypeRvalue:
+    return Failure::TypesNotEqual;
+
+  case TypeMatchKind::TrivialSubtype:
+    return Failure::TypesNotTrivialSubtypes;
+
+  case TypeMatchKind::Subtype:
+    return Failure::TypesNotSubtypes;
+
+  case TypeMatchKind::Conversion:
+    return Failure::TypesNotConvertible;
+
+  case TypeMatchKind::Construction:
+    return Failure::TypesNotConstructible;
   }
 
   llvm_unreachable("unhandled type matching kind");
@@ -4082,9 +4449,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 #define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-        return desugar1 == desugar2
-                 ? SolutionKind::TriviallySolved
-                 : SolutionKind::Error;
+        if (desugar1 == desugar2) {
+          return SolutionKind::TriviallySolved;
+        }
+
+        // Record this failure.
+        if (flags & TMF_RecordFailures) {
+          recordFailure(getConstraintLocator(locator),
+                        getRelationalFailureKind(kind), type1, type2);
+        }
+
+        return SolutionKind::Error;
 
     case TypeKind::Error:
       return SolutionKind::Error;
@@ -4170,8 +4545,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       auto lvalue2 = cast<LValueType>(desugar2);
       if (lvalue1->getQualifiers() != lvalue2->getQualifiers() &&
           !(kind >= TypeMatchKind::TrivialSubtype &&
-            lvalue1->getQualifiers() < lvalue2->getQualifiers()))
+            lvalue1->getQualifiers() < lvalue2->getQualifiers())) {
+        // Record this failure.
+        if (flags & TMF_RecordFailures) {
+          recordFailure(getConstraintLocator(locator),
+                        Failure::LValueQualifiers, type1, type2);
+        }
+
         return SolutionKind::Error;
+      }
 
       return matchTypes(lvalue1->getObjectType(), lvalue2->getObjectType(),
                         TypeMatchKind::SameType, subFlags,
@@ -4196,7 +4578,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                "Mismatched parents of bound generics");
         if (bound1->getParent()) {
           switch (matchTypes(bound1->getParent(), bound2->getParent(),
-                             TypeMatchKind::SameType, subFlags,
+                             TypeMatchKind::SameType, TMF_GenerateConstraints,
                              locator.withPathElement(
                                ConstraintLocator::ParentType),
                              trivial)) {
@@ -4207,7 +4589,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             // constraints that are now invalid. rdar://problem/13140447
             if (kind >= TypeMatchKind::Conversion)
               break;
-              
+
+            // Record this failure.
+            if (flags & TMF_RecordFailures) {
+              recordFailure(getConstraintLocator(
+                              locator.withPathElement(
+                                ConstraintLocator::ParentType)),
+                            getRelationalFailureKind(kind), type1, type2);
+            }
+
             return SolutionKind::Error;
 
           case SolutionKind::TriviallySolved:
@@ -4230,7 +4620,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         assert(args1.size() == args2.size() && "Mismatched generic args");
         for (unsigned i = 0, n = args1.size(); i != n; ++i) {
           switch (matchTypes(args1[i], args2[i], TypeMatchKind::SameType,
-                             subFlags,
+                             TMF_GenerateConstraints,
                              locator.withPathElement(
                                LocatorPathElt::getGenericArgument(i)),
                              trivial)) {
@@ -4242,6 +4632,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             if (kind >= TypeMatchKind::Conversion) {
               checkConversions = true;
               break;
+            }
+
+            // Record this failure.
+            if (flags & TMF_RecordFailures) {
+              recordFailure(getConstraintLocator(
+                              locator.withPathElement(
+                                LocatorPathElt::getGenericArgument(i))),
+                            getRelationalFailureKind(kind), type1, type2);
             }
 
             return SolutionKind::Error;
@@ -4318,7 +4716,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             // split into another system.
             switch (auto result = matchTypes(super1, type2,
                                              TypeMatchKind::SameType,
-                                             subFlags, locator, trivial)) {
+                                             TMF_GenerateConstraints, locator,
+                                             trivial)) {
               case SolutionKind::Error:
                 continue;
 
@@ -4375,9 +4774,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
        (kind == TypeMatchKind::Subtype && type1->isExistentialType()))) {
     SmallVector<ProtocolDecl *, 4> protocols;
     if (!type1->hasTypeVariable() && type2->isExistentialType(protocols)) {
+      unsigned index = 0;
       for (auto proto : protocols) {
-        if (!TC.conformsToProtocol(type1, proto))
+        if (!TC.conformsToProtocol(type1, proto)) {
+          // Record this failure.
+          if (flags & TMF_RecordFailures) {
+            recordFailure(getConstraintLocator(locator),
+                          Failure::DoesNotConformToProtocol, type1, type2,
+                          index);
+          }
+
           return SolutionKind::Error;
+        }
+
+        ++index;
       }
 
       trivial = false;
@@ -4461,6 +4871,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // If one of the types is a type variable, we leave this unsolved.
   if (typeVar1 || typeVar2)
     return SolutionKind::Unsolved;
+
+  // If we are supposed to record failures, do so.
+  if (flags & TMF_RecordFailures) {
+    recordFailure(getConstraintLocator(locator),
+                  getRelationalFailureKind(kind), type1, type2);
+  }
 
   return SolutionKind::Error;
 }
@@ -4579,7 +4995,8 @@ Type ConstraintSystem::simplifyType(Type type,
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind) {
+ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind,
+                                            ConstraintLocator *locator) {
   if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
     auto fixed = getFixedType(tv);
     if (!fixed)
@@ -4610,8 +5027,14 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind) {
     known = 1+(TC.isLiteralCompatibleType(type, SourceLoc(), kind,
                                           /*Complain=*/false).first != nullptr);
   }
-  
-  return known == 2 ? SolutionKind::TriviallySolved : SolutionKind::Error;
+
+  if (known == 2) {
+    return SolutionKind::TriviallySolved;
+  }
+
+  // Record this failure.
+  recordFailure(locator, Failure::IsNotLiteralType, type, kind);
+  return  SolutionKind::Error;
 }
 
 ConstraintSystem::SolutionKind
@@ -4643,8 +5066,11 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       fieldIdx = baseTuple->getNamedElementId(name);
     }
 
-    if (fieldIdx == -1)
+    if (fieldIdx == -1) {
+      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
+                    baseObjTy, name);
       return SolutionKind::Error;
+    }
 
     // Add an overload set that selects this field.
     OverloadChoice choice(baseTy, fieldIdx);
@@ -4661,6 +5087,9 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // Constructors have their own approach to name lookup.
     ConstructorLookup constructors(baseObjTy, TC.TU);
     if (!constructors.isSuccess()) {
+      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
+                    baseObjTy, name);
+
       return SolutionKind::Error;
     }
 
@@ -4712,6 +5141,9 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Look for members within the base.
   MemberLookup &lookup = lookupMember(baseObjTy, name);
   if (!lookup.isSuccess()) {
+    recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
+                  baseObjTy, name);
+
     return SolutionKind::Error;
   }
 
@@ -4740,8 +5172,13 @@ ConstraintSystem::simplifyArchetypeConstraint(const Constraint &constraint) {
     baseTy = fixed->getRValueType();
   }
 
-  return baseTy->is<ArchetypeType>()? SolutionKind::TriviallySolved
-                                    : SolutionKind::Error;
+  if (baseTy->is<ArchetypeType>()) {
+    return SolutionKind::TriviallySolved;
+  }
+
+  // Record this failure.
+  recordFailure(constraint.getLocator(), Failure::IsNotArchetype, baseTy);
+  return SolutionKind::Error;
 }
 
 /// \brief Retrieve the type-matching kind corresponding to the given
@@ -4781,13 +5218,14 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     // For relational constraints, match up the types.
     bool trivial = true;
     return matchTypes(constraint.getFirstType(), constraint.getSecondType(),
-                      getTypeMatchKind(constraint.getKind()), TMF_None,
-                      constraint.getLocator(), trivial);
+                      getTypeMatchKind(constraint.getKind()),
+                      TMF_RecordFailures, constraint.getLocator(), trivial);
   }
 
   case ConstraintKind::Literal:
     return simplifyLiteralConstraint(constraint.getFirstType(),
-                                     constraint.getLiteralKind());
+                                     constraint.getLiteralKind(),
+                                     constraint.getLocator());
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::TypeMember:
@@ -5879,6 +6317,28 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<ConstraintSystem *> &viable){
 }
 
 //===--------------------------------------------------------------------===//
+// Diagnose failed constraint systems
+//===--------------------------------------------------------------------===//
+#pragma mark Diagnose failed constraint systems.
+bool ConstraintSystem::diagnose() {
+  if (SharedState->Failures.size() == 1) {
+    auto &failure = *SharedState->Failures.begin();
+    if (failure.getKind() == Failure::TypesNotConvertible) {
+      if (auto locator = failure.getLocator()) {
+        if (auto anchor = locator->getAnchor()) {
+          getTypeChecker().diagnose(anchor->getLoc(), diag::invalid_conversion,
+                                    failure.getFirstType(),
+                                    failure.getSecondType());
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+//===--------------------------------------------------------------------===//
 // Applying a solution to an expression
 //===--------------------------------------------------------------------===//
 #pragma mark Applying a solution to an expression.
@@ -6915,6 +7375,11 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
       else {
         log << "Found " << viable.size() << " potential solutions.\n";
       }
+    }
+
+    // Try to provide a decent diagnostic.
+    if (cs.diagnose()) {
+      return nullptr;
     }
 
     // FIXME: Crappy diagnostic.
