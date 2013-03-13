@@ -499,13 +499,16 @@ namespace {
   struct BacktrackingScope {
     Parser &P;
     Token BacktrackParserTo;
-    
+    SourceLoc BacktrackPreviousLocTo;
+
     BacktrackingScope(Parser &P)
       : P(P),
-        BacktrackParserTo(P.Tok) {}
+        BacktrackParserTo(P.Tok),
+        BacktrackPreviousLocTo(P.PreviousLoc){}
     
     ~BacktrackingScope() {
       P.Tok = BacktrackParserTo;
+      P.PreviousLoc = BacktrackPreviousLocTo;
       P.L->backtrackToToken(BacktrackParserTo);
     }
   };

@@ -145,6 +145,7 @@ SourceLoc Parser::consumeToken() {
   SourceLoc Loc = Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
   L->lex(Tok);
+  PreviousLoc = Loc;
   return Loc;
 }
 

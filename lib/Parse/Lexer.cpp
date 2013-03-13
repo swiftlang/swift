@@ -164,6 +164,7 @@ Lexer::Lexer(StringRef Buffer, llvm::SourceMgr &SourceMgr,
     
   // Prime the lexer.
   lexImpl();
+  NextToken.setAtStartOfLine(true);
 }
 
 InFlightDiagnostic Lexer::diagnose(const char *Loc, Diag<> ID) {
@@ -232,6 +233,7 @@ void Lexer::skipSlashSlashComment() {
     switch (*CurPtr++) {
     case '\n':
     case '\r':
+      NextToken.setAtStartOfLine(true);
       return;  // If we found the end of the line, return.
     default:
       // If this is a "high" UTF-8 character, validate it.
@@ -286,6 +288,12 @@ void Lexer::skipSlashStarComment() {
         ++Depth;
       }
       break;
+
+    case '\n':
+    case '\r':
+      NextToken.setAtStartOfLine(true);
+      break;
+
     default:
       // If this is a "high" UTF-8 character, validate it.
       if ((signed char)(CurPtr[-1]) < 0) {
@@ -1045,7 +1053,9 @@ void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
 void Lexer::lexImpl() {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Cur Char Pointer out of range!");
-  
+
+  NextToken.setAtStartOfLine(false);
+
 Restart:
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
@@ -1055,10 +1065,13 @@ Restart:
     diagnose(CurPtr-1, diag::lex_invalid_character);
     return formToken(tok::unknown, TokStart);
 
-  case ' ':
-  case '\t':
   case '\n':
   case '\r':
+    NextToken.setAtStartOfLine(true);
+    goto Restart;  // Skip whitespace.
+
+  case ' ':
+  case '\t':
     goto Restart;  // Skip whitespace.
   case 0:
     // If this is a random nul character in the middle of a buffer, skip it as

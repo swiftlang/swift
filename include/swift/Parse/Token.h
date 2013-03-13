@@ -52,12 +52,15 @@ class Token {
   /// Kind - The actual flavor of token this is.
   ///
   tok Kind;
-  
+
+  /// \brief Whether this token is the first token on the line.
+  bool AtStartOfLine;
+
   /// Text - The actual string covered by the token in the source buffer.
   StringRef Text;
   
 public:
-  Token() : Kind(tok::unknown) {}
+  Token() : Kind(tok::unknown), AtStartOfLine(false) {}
   
   tok getKind() const { return Kind; }
   void setKind(tok K) { Kind = K; }
@@ -75,6 +78,12 @@ public:
   bool isNotAnyOperator() const {
     return !isAnyOperator();
   }
+
+  /// \brief Determine whether this token occurred at the start of a line.
+  bool isAtStartOfLine() const { return AtStartOfLine; }
+
+  /// \brief Set whether this token occurred at the start of a line.
+  void setAtStartOfLine(bool value) { AtStartOfLine = value; }
 
   bool isContextualKeyword(StringRef ContextKW) const {
     return is(tok::identifier) && Text == ContextKW;

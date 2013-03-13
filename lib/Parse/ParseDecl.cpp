@@ -1272,11 +1272,7 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   {
     ContextChange CC(*this, OOD);
     Scope OneofBodyScope(this, /*AllowLookup=*/false);
-    while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-      if (parseDecl(MemberDecls,
-                    PD_HasContainerType|PD_DisallowVar))
-        skipUntilDeclRBrace();
-    }
+    parseNominalDeclMembers(MemberDecls, PD_HasContainerType|PD_DisallowVar);
   }
 
   OOD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, Tok.getLoc() });
@@ -1293,6 +1289,37 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   }
 
   return false;
+}
+
+/// \brief Parse the members in a struct/class/protocol definition.
+///
+///    decl*
+bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
+                                     unsigned flags) {
+  bool hadError = false;
+  bool previousHadSemi = true;
+  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
+    // If the previous declaration didn't have a semicolon and this new
+    // declaration doesn't start a line, complain.
+    if (!previousHadSemi && !Tok.isAtStartOfLine()) {
+      // FIXME: Fix-It here to add the ';'.
+      SourceLoc EndOfPreviousLoc = Lexer::getLocForEndOfToken(SourceMgr,
+                                                              PreviousLoc);
+      diagnose(EndOfPreviousLoc, diag::declaration_same_line_without_semi);
+      // FIXME: Add semicolon to the AST?
+    }
+
+    previousHadSemi = false;
+    if (parseDecl(memberDecls, flags)) {
+      hadError = true;
+      skipUntilDeclRBrace();
+    }
+
+    // Check whether the previous declaration had a semicolon after it.
+    if (!memberDecls.empty() && memberDecls.back()->TrailingSemiLoc.isValid())
+      previousHadSemi = true;
+  }
+  return hadError;
 }
 
 /// parseDeclStruct - Parse a 'struct' declaration, returning true (and doing no
@@ -1353,10 +1380,7 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   {
     ContextChange CC(*this, SD);
     Scope StructBodyScope(this, /*AllowLookup=*/false);
-    while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-      if (parseDecl(MemberDecls, PD_HasContainerType))
-        skipUntilDeclRBrace();
-    }
+    parseNominalDeclMembers(MemberDecls, PD_HasContainerType);
   }
 
   // FIXME: Need better handling for implicit constructors.
@@ -1441,10 +1465,7 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   {
     ContextChange CC(*this, CD);
     Scope ClassBodyScope(this, /*AllowLookup=*/false);
-    while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-      if (parseDecl(MemberDecls, PD_HasContainerType|PD_AllowDestructor))
-        skipUntilDeclRBrace();
-    }
+    parseNominalDeclMembers(MemberDecls,PD_HasContainerType|PD_AllowDestructor);
   }
 
   bool hasConstructor = false;
@@ -1530,7 +1551,7 @@ Decl *Parser::parseDeclProtocol(unsigned Flags) {
     
     // Parse the list of protocol elements.
     SmallVector<Decl*, 8> Members;
-    
+
     // Add the implicit 'This' associated type.
     // FIXME: Mark as 'implicit'.
     Members.push_back(new (Context) TypeAliasDecl(ProtocolLoc,
@@ -1538,18 +1559,13 @@ Decl *Parser::parseDeclProtocol(unsigned Flags) {
                                                   ProtocolLoc, TypeLoc(),
                                                   CurDeclContext,
                                                   MutableArrayRef<TypeLoc>()));
-    
-    bool HadError = false;
-    while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-      if (parseDecl(Members,
-                    PD_HasContainerType|PD_DisallowProperty|
-                    PD_DisallowFuncDef|PD_DisallowNominalTypes|
-                    PD_DisallowInit|PD_DisallowTypeAliasDef)) {
-        skipUntilDeclRBrace();
-        HadError = true;
-      }
-    }
-    
+
+    // Parse the members.
+    bool HadError = parseNominalDeclMembers(Members,
+                      PD_HasContainerType|PD_DisallowProperty|
+                      PD_DisallowFuncDef|PD_DisallowNominalTypes|
+                      PD_DisallowInit|PD_DisallowTypeAliasDef);
+
     // Find the closing brace.
     SourceLoc RBraceLoc = Tok.getLoc();
     if (Tok.is(tok::r_brace))

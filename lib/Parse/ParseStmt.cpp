@@ -162,7 +162,8 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
   Scope BraceScope(this, !IsTopLevel);
     
   SmallVector<Decl*, 8> TmpDecls;
-  
+
+  bool previousHadSemi = true;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)
          && !isTerminatorForBraceItemListKind(Tok, Kind)) {
     bool NeedParseErrorRecovery = false;
@@ -170,13 +171,26 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     llvm::OwningPtr<ContextChange> CC;
     ExprStmtOrDecl Result;
 
+    // If the previous statement didn't have a semicolon and this new
+    // statement doesn't start a line, complain.
+    if (!previousHadSemi && !Tok.isAtStartOfLine()) {
+      // FIXME: Fix-It here to add the ';'.
+      SourceLoc EndOfPreviousLoc = Lexer::getLocForEndOfToken(SourceMgr,
+                                                              PreviousLoc);
+      diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi);
+      // FIXME: Add semicolon to the AST?
+    }
+
     // Parse the decl, stmt, or expression.
+    previousHadSemi = false;
     if (isStartOfDecl(Tok, peekToken())) {
       if (parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default))
         NeedParseErrorRecovery = true;
       else {
         for (Decl *D : TmpDecls)
           Entries.push_back(D);
+        if (!TmpDecls.empty())
+          previousHadSemi = TmpDecls.back()->TrailingSemiLoc.isValid();
       }
 
       TmpDecls.clear();
@@ -199,12 +213,13 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       else
         Entries.push_back(Result);
     }
-    if (!NeedParseErrorRecovery && Tok.is(tok::semi)) {
+    if (!NeedParseErrorRecovery && !previousHadSemi && Tok.is(tok::semi)) {
       if (Result.is<Expr*>()) {
         Result.get<Expr*>()->TrailingSemiLoc = consumeToken(tok::semi);
       } else {
         Result.get<Stmt*>()->TrailingSemiLoc = consumeToken(tok::semi);
       }
+      previousHadSemi = true;
     }
 
     // If we had a parse error, skip to the start of the next stmt or decl.  It
@@ -229,9 +244,18 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     if (IsTopLevel && IsMainModule && !NeedParseErrorRecovery) {
       if (TLCD || isa<PatternBindingDecl>(Entries.back().get<Decl*>())) {
         FoundSideEffects = true;
-        break;
+
+        // If the next token is the end of the buffer or starts a new line,
+        // we're done. Otherwise, keep parsing; we may need to complain here.
+        if (Tok.is(tok::eof) || Tok.isAtStartOfLine())
+          break;
       }
     }
+
+    // If we have to recover, pretend that we had a semicolon; it's less
+    // noisy that way.
+    if (NeedParseErrorRecovery)
+      previousHadSemi = true;
   }
 }
 

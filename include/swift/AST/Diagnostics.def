@@ -136,6 +136,9 @@ ERROR(lex_unexpected_long_period_series,lexing,none,
 ERROR(bad_module_name,decl_parsing,none,
       "file name is not a valid identifier", ())
 
+ERROR(declaration_same_line_without_semi,decl_parsing,none,
+      "consecutive declarations on a line must be separated by ';'", ())
+
 ERROR(expected_decl,decl_parsing,none,
       "expected declaration", ())
 ERROR(top_level_decl_without_type,decl_parsing,none,
@@ -377,6 +380,9 @@ ERROR(illegal_top_level_expr,stmt_parsing,none,
       "expressions are not allowed at the top level", ())
 ERROR(illegal_semi_stmt,stmt_parsing,none,
       "';' statements are not allowed", ())
+ERROR(statement_same_line_without_semi,stmt_parsing,none,
+      "consecutive statements on a line must be separated by ';'", ())
+
 
 // Assignment statement
 ERROR(expected_expr_assignment,stmt_parsing,none,

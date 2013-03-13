@@ -72,6 +72,9 @@ public:
 
   /// Tok - This is the current token being considered by the parser.
   Token Tok;
+
+  /// \brief The location of the previous token.
+  SourceLoc PreviousLoc;
   
   typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
 
@@ -265,6 +268,8 @@ public:
   Decl *parseDeclExtension(unsigned Flags);
   bool parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
 
+  bool parseNominalDeclMembers(llvm::SmallVectorImpl<Decl *> &memberDecls,
+                               unsigned flags);
   bool parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
