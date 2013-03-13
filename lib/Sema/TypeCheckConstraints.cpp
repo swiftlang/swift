@@ -375,6 +375,9 @@ namespace {
       /// \brief A generic argument.
       /// FIXME: Add support for named generic arguments?
       GenericArgument,
+      /// \brief A member.
+      /// FIXME: Do we need the actual member name here?
+      Member,
       /// \brief The base of a member expression.
       MemberRefBase,
       /// \brief The lookup for a subscript member.
@@ -423,6 +426,7 @@ namespace {
       case ApplyFunction:
       case FunctionArgument:
       case FunctionResult:
+      case Member:
       case MemberRefBase:
       case SubscriptIndex:
       case SubscriptMember:
@@ -536,6 +540,7 @@ namespace {
         case InstanceType:
         case Load:
         case LvalueObjectType:
+        case Member:
         case MemberRefBase:
         case ParentType:
         case RvalueAdjustment:
@@ -651,6 +656,10 @@ namespace {
 
         case LvalueObjectType:
           out << "lvalue object type";
+          break;
+
+        case Member:
+          out << "member";
           break;
 
         case MemberRefBase:
@@ -917,11 +926,8 @@ namespace {
       case TypesNotEqual:
       case TypesNotSubtypes:
       case TypesNotTrivialSubtypes:
-        return Profile(id, locator, kind, getFirstType(), getSecondType());
-
       case DoesNotConformToProtocol:
-        return Profile(id, locator, kind, getFirstType(), getSecondType(),
-                       getValue());
+        return Profile(id, locator, kind, getFirstType(), getSecondType());
 
       case DoesNotHaveMember:
         return Profile(id, locator, kind, getFirstType(), getName());
@@ -1332,8 +1338,8 @@ namespace {
     /// \brief The number of choices in the overload set.
     unsigned NumChoices;
 
-    /// \brief The expression or constraint that introduced the overload choice.
-    llvm::PointerUnion<Expr *, const Constraint *> ExprOrConstraint;
+    /// \brief The locator for this overload set.
+    ConstraintLocator *Locator;
 
     /// \brief The type bound by this overload set.
     Type BoundType;
@@ -1342,25 +1348,17 @@ namespace {
     /// system.
     void *operator new(size_t) = delete;
 
-    OverloadSet(unsigned ID, llvm::PointerUnion<Expr *,const Constraint *> from,
+    OverloadSet(unsigned ID, ConstraintLocator *locator,
                 Type boundType, ArrayRef<OverloadChoice> choices)
-      : ID(ID), NumChoices(choices.size()), ExprOrConstraint(from),
+      : ID(ID), NumChoices(choices.size()), Locator(locator),
         BoundType(boundType) {
       memcpy(this+1, choices.data(), sizeof(OverloadChoice)*choices.size());
     }
 
   public:
-    /// \brief Retrieve the expression that introduced this overload set, or
-    /// null if it was not introduced by an expression.
-    Expr *getIntroducingExpr() const {
-      return ExprOrConstraint.dyn_cast<Expr *>();
-    }
-
-    /// \brief Retrieve the constraint that introduced this overload set, or
-    /// null if it was not introduced by a constraint.
-    const Constraint *getIntroducingConstraint() const {
-      return ExprOrConstraint.dyn_cast<const Constraint *>();
-    }
+    /// \brief Retrieve the locator that identifies where this overload set
+    /// same from.
+    ConstraintLocator *getLocator() const { return Locator; }
 
     /// \brief Retrieve the ID associated with this overload set.
     unsigned getID() const { return ID; }
@@ -1378,13 +1376,7 @@ namespace {
     /// \brief Create a new overload set, using (and copying) the given choices.
     static OverloadSet *getNew(ConstraintSystem &CS,
                                Type boundType,
-                               Expr *expr,
-                               ArrayRef<OverloadChoice> choices);
-
-    /// \brief Create a new overload set, using (and copying) the given choices.
-    static OverloadSet *getNew(ConstraintSystem &CS,
-                               Type boundType,
-                               const Constraint *constraint,
+                               ConstraintLocator *locator,
                                ArrayRef<OverloadChoice> choices);
   };
 
@@ -1566,7 +1558,7 @@ namespace {
     SmallVector<Constraint *, 16> Constraints;
     llvm::SmallPtrSet<Constraint *, 4> ExternallySolved;
     SmallVector<OverloadSet *, 4> UnresolvedOverloadSets;
-    llvm::DenseMap<Expr *, OverloadSet *> GeneratedOverloadSets;
+    llvm::DenseMap<ConstraintLocator *, OverloadSet *> GeneratedOverloadSets;
     SmallVector<std::unique_ptr<ConstraintSystem>, 2> Children;
 
     /// \brief The set of type variable bindings that have changed while
@@ -1940,6 +1932,14 @@ namespace {
       return getConstraintLocator(anchor, llvm::makeArrayRef(pathElt));
     }
 
+    /// \brief Extend the given constraint locator with a path element.
+    ConstraintLocator *
+    getConstraintLocator(ConstraintLocator *locator,
+                         ConstraintLocator::PathElement pathElt) {
+      return getConstraintLocator(ConstraintLocatorBuilder(locator)
+                                    .withPathElement(pathElt));
+    }
+
     /// \brief Retrieve the constraint locator described by the given
     /// builder.
     ConstraintLocator *
@@ -2222,19 +2222,11 @@ namespace {
     /// \brief Add a new overload set to the list of unresolved overload
     /// sets.
     void addOverloadSet(OverloadSet *ovl) {
-      // If we have an introducing expression, record it.
-      if (auto introducer = ovl->getIntroducingExpr()) {
-        assert(!GeneratedOverloadSets[introducer]);
-        GeneratedOverloadSets[introducer] = ovl;
-      } else if (auto constraint = ovl->getIntroducingConstraint()) {
-        if (auto locator = constraint->getLocator()) {
-          if (auto anchor = locator->getAnchor()) {
-            if (locator->hasSimplePath()) {
-              assert(!GeneratedOverloadSets[anchor]);
-              GeneratedOverloadSets[anchor] = ovl;
-            }
-          }
-        }
+      // If we have a locator, we can use it to find this overload set.
+      // FIXME: We want to get to the point where we always have a locator.
+      if (auto locator = ovl->getLocator()) {
+        assert(!GeneratedOverloadSets[locator]);
+        GeneratedOverloadSets[locator] = ovl;
       }
 
       // If there are fewer than two choices, then we can simply resolve this
@@ -2247,11 +2239,10 @@ namespace {
       UnresolvedOverloadSets.push_back(ovl);
     }
 
-    /// \brief Find the overload set generated by the current expression, if
-    /// any.
-    OverloadSet *getGeneratedOverloadSet(Expr *expr) {
+    /// \brief Find the overload set generated by the given locator, if any.
+    OverloadSet *getGeneratedOverloadSet(ConstraintLocator *locator) {
       for (auto cs = this; cs; cs = cs->Parent) {
-        auto known = cs->GeneratedOverloadSets.find(expr);
+        auto known = cs->GeneratedOverloadSets.find(locator);
         if (known != cs->GeneratedOverloadSets.end())
           return known->second;
       }
@@ -2516,24 +2507,13 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
 
 OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
                                  Type boundType,
-                                 Expr *expr,
+                                 ConstraintLocator *locator,
                                  ArrayRef<OverloadChoice> choices) {
   unsigned size = sizeof(OverloadSet)
                 + sizeof(OverloadChoice) * choices.size();
   void *mem = CS.getAllocator().Allocate(size, alignof(OverloadSet));
-  return ::new (mem) OverloadSet(CS.assignOverloadSetID(), expr, boundType,
+  return ::new (mem) OverloadSet(CS.assignOverloadSetID(), locator, boundType,
                                  choices);
-}
-
-OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
-                                 Type boundType,
-                                 const Constraint *constraint,
-                                 ArrayRef<OverloadChoice> choices) {
-  unsigned size = sizeof(OverloadSet)
-                + sizeof(OverloadChoice) * choices.size();
-  void *mem = CS.getAllocator().Allocate(size, alignof(OverloadSet));
-  return ::new (mem) OverloadSet(CS.assignOverloadSetID(), constraint,
-                                 boundType, choices);
 }
 
 /// \brief Check whether the given type can be used as a binding for the given
@@ -3030,7 +3010,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     Type addMemberRefConstraints(Expr *expr, Expr *base, ValueDecl *decl) {
       auto tv = CS.createTypeVariable(expr);
       OverloadChoice choice(base->getType(), decl);
-      CS.addOverloadSet(OverloadSet::getNew(CS, tv, expr, { &choice, 1 }));
+      auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
+      CS.addOverloadSet(OverloadSet::getNew(CS, tv, locator, { &choice, 1 }));
       return tv;
     }
 
@@ -3057,8 +3038,9 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       auto baseTy = base->getType();
       auto fnTy = FunctionType::get(inputTv, outputTv, Context);
       CS.addValueMemberConstraint(baseTy, Context.getIdentifier("__subscript"),
-        fnTy,
-        CS.getConstraintLocator(expr, ConstraintLocator::SubscriptMember));
+                                  fnTy,
+                                  CS.getConstraintLocator(expr,
+                                    ConstraintLocator::SubscriptMember));
 
       // Add the subtype constraint that the output type must be some lvalue
       // subtype.
@@ -3195,7 +3177,9 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       }
 
       // Record this overload set.
-      CS.addOverloadSet(OverloadSet::getNew(CS, tv, expr, choices));
+      CS.addOverloadSet(OverloadSet::getNew(CS, tv,
+                                            CS.getConstraintLocator(expr, { }),
+                                            choices));
       return tv;
     }
 
@@ -3212,7 +3196,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       }
       
       // Record this overload set.
-      CS.addOverloadSet(OverloadSet::getNew(CS, tv, expr, choices));
+      auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
+      CS.addOverloadSet(OverloadSet::getNew(CS, tv, locator, choices));
       return tv;
     }
     
@@ -3257,15 +3242,17 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // directly within the constraint system. Instead, we introduce a new
       // overload set with two entries: one for T0 and one for T2 -> T0.
       auto oneofMetaTy = MetaTypeType::get(oneofTy, CS.getASTContext());
+      auto locator = CS.getConstraintLocator(
+                       expr,
+                       ConstraintLocator::UnresolvedMemberRefBase);
       CS.addValueMemberConstraint(oneofMetaTy, expr->getName(), memberTy,
-        CS.getConstraintLocator(expr,
-                                ConstraintLocator::UnresolvedMemberRefBase));
+                                  locator);
 
       OverloadChoice choices[2] = {
         OverloadChoice(oneofTy, OverloadChoiceKind::BaseType),
         OverloadChoice(oneofTy, OverloadChoiceKind::FunctionReturningBaseType),
       };
-      CS.addOverloadSet(OverloadSet::getNew(CS, memberTy, expr, choices));
+      CS.addOverloadSet(OverloadSet::getNew(CS, memberTy, locator, choices));
       return memberTy;
     }
 
@@ -3669,7 +3656,9 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // variable for the return type that is a subtype of instanceTy.
       CS.addValueMemberConstraint(instanceTy, name,
         FunctionType::get(tv, instanceTy, context),
-        CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
+                          CS.getConstraintLocator(
+                            expr,
+                            ConstraintLocator::ConstructorMember));
 
       // The first type must be convertible to the constructor's argument type.
       CS.addConstraint(ConstraintKind::Conversion, argTy, tv,
@@ -4819,20 +4808,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
        (kind == TypeMatchKind::Subtype && type1->isExistentialType()))) {
     SmallVector<ProtocolDecl *, 4> protocols;
     if (!type1->hasTypeVariable() && type2->isExistentialType(protocols)) {
-      unsigned index = 0;
       for (auto proto : protocols) {
         if (!TC.conformsToProtocol(type1, proto)) {
           // Record this failure.
           if (flags & TMF_RecordFailures) {
             recordFailure(getConstraintLocator(locator),
-                          Failure::DoesNotConformToProtocol, type1, type2,
-                          index);
+                          Failure::DoesNotConformToProtocol, type1,
+                          proto->getDeclaredType());
           }
 
           return SolutionKind::Error;
         }
-
-        ++index;
       }
 
       trivial = false;
@@ -5102,13 +5088,16 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
     StringRef nameStr = name.str();
     int fieldIdx = -1;
+    bool isNamed;
     // Resolve a number reference into the tuple type.
     unsigned Value = 0;
     if (!nameStr.getAsInteger(10, Value) &&
         Value < baseTuple->getFields().size()) {
       fieldIdx = Value;
+      isNamed = false;
     } else {
       fieldIdx = baseTuple->getNamedElementId(name);
+      isNamed = true;
     }
 
     if (fieldIdx == -1) {
@@ -5119,7 +5108,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
     // Add an overload set that selects this field.
     OverloadChoice choice(baseTy, fieldIdx);
-    addOverloadSet(OverloadSet::getNew(*this, memberTy, &constraint,
+    addOverloadSet(OverloadSet::getNew(*this, memberTy, constraint.getLocator(),
                                        { &choice, 1 }));
     return SolutionKind::Solved;
   }
@@ -5179,7 +5168,9 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       choices.push_back(OverloadChoice(baseTy,
                                        OverloadChoiceKind::IdentityFunction));
     }
-    addOverloadSet(OverloadSet::getNew(*this, memberTy, &constraint, choices));
+
+    addOverloadSet(OverloadSet::getNew(*this, memberTy, constraint.getLocator(),
+                                       choices));
     return SolutionKind::Solved;
   }
 
@@ -5199,7 +5190,9 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   for (auto &result : lookup.Results) {
     choices.push_back(OverloadChoice(baseTy, result.D));
   }
-  addOverloadSet(OverloadSet::getNew(*this, memberTy, &constraint, choices));
+
+  auto locator = getConstraintLocator(constraint.getLocator());
+  addOverloadSet(OverloadSet::getNew(*this, memberTy, locator, choices));
   return SolutionKind::Solved;
 }
 
@@ -6489,7 +6482,14 @@ bool ConstraintSystem::diagnose() {
                     failure.getName())
           << range1 << range2;
         break;
-          
+
+      case Failure::DoesNotConformToProtocol:
+        tc.diagnose(loc, diag::type_does_not_conform,
+                    failure.getFirstType(),
+                    failure.getSecondType())
+            << range1 << range2;
+        break;
+
       default:
         // FIXME: Handle all failure kinds
         return false;
@@ -6603,7 +6603,9 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     /// \brief Build a new subscript.
     Expr *buildSubscript(Expr *expr, Expr *base, Expr *index) {
       // Determine the declaration selected for this subscript operation.
-      auto ovl = CS.getGeneratedOverloadSet(expr);
+      auto ovl = CS.getGeneratedOverloadSet(
+                   CS.getConstraintLocator(expr,
+                                           ConstraintLocator::SubscriptMember));
       assert(ovl && "No overload set associated with subscript expr?");
       auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
       auto subscript = cast<SubscriptDecl>(choice.getDecl());
@@ -6757,7 +6759,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     
     Expr *visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
       // Resolve the callee to the constructor declaration selected.
-      auto ovl = CS.getGeneratedOverloadSet(expr);
+      auto ovl = CS.getGeneratedOverloadSet(
+                   CS.getConstraintLocator(
+                     expr,
+                     ConstraintLocator::ConstructorMember));
       assert(ovl && "No overload set associated with decl reference expr?");
       auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
       auto *ctor = cast<ConstructorDecl>(selected.first.getDecl());
@@ -6780,7 +6785,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *expr) {
       // Determine the declaration selected for this overloaded reference.
       auto &context = CS.getASTContext();
-      auto ovl = CS.getGeneratedOverloadSet(expr);
+      auto ovl = CS.getGeneratedOverloadSet(CS.getConstraintLocator(expr, { }));
       assert(ovl && "No overload set associated with decl reference expr?");
       auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
       auto choice = selected.first;
@@ -6807,7 +6812,8 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
-      auto ovl = CS.getGeneratedOverloadSet(expr);
+      auto ovl = CS.getGeneratedOverloadSet(
+                   CS.getConstraintLocator(expr, ConstraintLocator::Member));
       assert(ovl && "No overload set associated with decl reference expr?");
       auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
       return buildMemberRef(expr->getBase(), expr->getDotLoc(),
@@ -6839,7 +6845,8 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *expr) {
-      auto ovl = CS.getGeneratedOverloadSet(expr);
+      auto ovl = CS.getGeneratedOverloadSet(
+                   CS.getConstraintLocator(expr, ConstraintLocator::Member));
       assert(ovl && "No overload set associated with decl reference expr?");
       auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
       return buildMemberRef(expr->getBase(), expr->getDotLoc(),
@@ -6848,7 +6855,8 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitGenericMemberRefExpr(GenericMemberRefExpr *expr) {
-      auto ovl = CS.getGeneratedOverloadSet(expr);
+      auto ovl = CS.getGeneratedOverloadSet(
+                   CS.getConstraintLocator(expr, ConstraintLocator::Member));
       assert(ovl && "No overload set associated with decl reference expr?");
       auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
       return buildMemberRef(expr->getBase(), expr->getDotLoc(),
@@ -6884,8 +6892,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
       // Determine the declaration selected for this overloaded reference.
-      auto ovl = CS.getGeneratedOverloadSet(expr);
-      assert(ovl && "No overload set associated with decl reference expr?");
+      auto ovl = CS.getGeneratedOverloadSet(
+                   CS.getConstraintLocator(expr,
+                                           ConstraintLocator::MemberRefBase));
+      assert(ovl && "No overload set associated with unresolved dot expr?");
       auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
 
       switch (selected.first.getKind()) {
@@ -6983,7 +6993,9 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
        * For the time being, use a value member constraint to find the
        * appropriate convertFromArrayLiteral call.
        */
-      auto ovl = CS.getGeneratedOverloadSet(expr);
+      auto ovl = CS.getGeneratedOverloadSet(
+                   CS.getConstraintLocator(expr,
+                                           ConstraintLocator::MemberRefBase));
       assert(ovl && "No overload set associated with array expr?");
       auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
       auto converterDecl = cast<FuncDecl>(choice.getDecl());
@@ -7030,7 +7042,9 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
        * For the time being, use a value member constraint to find the
        * appropriate convertFromDictionaryLiteral call.
        */
-      auto ovl = CS.getGeneratedOverloadSet(expr);
+      auto ovl = CS.getGeneratedOverloadSet(
+                   CS.getConstraintLocator(expr,
+                                           ConstraintLocator::MemberRefBase));
       assert(ovl && "No overload set associated with dictionary expr?");
       auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
       auto converterDecl = cast<FuncDecl>(choice.getDecl());
@@ -7291,7 +7305,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       expr->setType(instanceTy);
 
       // Find the constructor we selected for this expression.
-      auto ovl = CS.getGeneratedOverloadSet(expr);
+      auto ovl = CS.getGeneratedOverloadSet(
+                   CS.getConstraintLocator(
+                     expr,
+                     ConstraintLocator::ConstructorMember));
       assert(ovl && "No overload set associated with new reference expr?");
       auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
       auto constructor = cast<ConstructorDecl>(choice.getDecl());
