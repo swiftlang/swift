@@ -642,6 +642,11 @@ NullablePtr<CaseStmt> Parser::parseStmtCase() {
     return nullptr;
   }
 
+  // The ':' following a case cannot start a new line,
+  if (Tok.isAtStartOfLine()) {
+    diagnose(Tok.getLoc(), diag::case_colon_start_of_line);
+  }
+
   SourceLoc colonLoc = consumeToken(tok::colon);
   
   llvm::SmallVector<ExprStmtOrDecl, 8> bodyItems;
