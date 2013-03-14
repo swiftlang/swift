@@ -83,7 +83,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
       -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
       -DLLVM_TARGETS_TO_BUILD="X86" \
       .. &&
-    make -j) || exit 1
+    make -j8) || exit 1
 fi
 
 # Build Swift.
@@ -102,7 +102,7 @@ if [ \! "$SKIP_BUILD_SWIFT" ]; then
       -DSWIFT_PATH_TO_LLVM_BUILD="$WORKSPACE/llvm/build" \
       -DSWIFT_MODULE_CACHE_PATH="$WORKSPACE/swift-module-cache" \
       .. &&
-    make -j) || exit 1
+    make -j8) || exit 1
 fi
 
 # Run the Swift tests.
@@ -116,7 +116,7 @@ fi
 if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
   echo "--- Building Swift Package ---"
   (cd "$WORKSPACE/swift/build" &&
-    make -j package) || exit 1
+    make -j8 package) || exit 1
 
   saw_package=
   for package in "$WORKSPACE/swift/build"/swift-*.tar.gz; do
