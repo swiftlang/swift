@@ -804,24 +804,6 @@ ManagedValue SILGenFunction::visitTupleElementExpr(TupleElementExpr *E,
                                     E->getFieldNumber());
 }
 
-/// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
-/// (which represents the retain count), a base pointer to some elements, and a
-/// length
-ManagedValue SILGenFunction::emitArrayInjectionCall(Value ObjectPtr,
-                                            Value BasePtr,
-                                            Value Length,
-                                            Expr *ArrayInjectionFunction) {
-  // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
-  if (BasePtr.getType() != SILType::getRawPointerType(F.getContext()))
-    BasePtr = B.createImplicitConvert(SILLocation(),
-                              BasePtr,
-                              SILType::getRawPointerType(F.getContext()));
-
-  Value InjectionFn = visit(ArrayInjectionFunction).forward(*this);
-  Value InjectionArgs[] = { BasePtr, ObjectPtr, Length };
-  return emitApply(SILLocation(), InjectionFn, InjectionArgs);
-}
-
 ManagedValue SILGenFunction::emitTupleShuffleOfExprs(Expr *E,
                                              ArrayRef<Expr *> InExprs,
                                              ArrayRef<int> ElementMapping,

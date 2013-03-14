@@ -29,10 +29,13 @@ public:
   ManagedValue callee;
   ManagedValue thisParam;
   std::vector<ApplyExpr*> callSites;
-  std::vector<ArrayRef<Substitution>> substitutions;
+  std::vector<Substitution> substitutions;
+  FunctionType *specializedType;
+  SpecializeExpr *specializeLoc;
   Expr *sideEffect;
   
-  SILGenApply(SILGenFunction &gen) : gen(gen), sideEffect(nullptr) {}
+  SILGenApply(SILGenFunction &gen) : gen(gen),
+    specializedType(nullptr), specializeLoc(nullptr), sideEffect(nullptr) {}
   
   void setCallee(ManagedValue theCallee) {
     assert(!callee.getValue() && "already set callee!");
@@ -48,7 +51,7 @@ public:
     assert(!thisParam.getValue() && "already set this!");
     thisParam = theThisParam;
   }
-  
+
   /// Fall back to an unknown, indirect callee.
   void visitExpr(Expr *e) {
     setCallee(gen.visit(e));
@@ -66,8 +69,27 @@ public:
   
   /// Add specializations to the curry.
   void visitSpecializeExpr(SpecializeExpr *e) {
-    substitutions.push_back(e->getSubstitutions());
     visit(e->getSubExpr());
+    substitutions.insert(substitutions.end(),
+                         e->getSubstitutions().begin(),
+                         e->getSubstitutions().end());
+    // Currently generic methods of generic types are the deepest we should
+    // be able to stack specializations.
+    // Save the type of the SpecializeExpr.
+    if (!specializedType) {
+      assert(substitutions.size() == 1 &&
+             "saw specialization before setting specialized type?");
+      specializedType = e->getType()->castTo<FunctionType>();
+      specializeLoc = e;
+    } else {
+      assert(substitutions.size() == 2 &&
+             "saw more than two specializations?!");
+      assert(callee.getType().getUncurryLevel() >= 1 &&
+             "multiple specializations of non-uncurried method?!");
+      specializedType = FunctionType::get(specializedType->getInput(),
+                                          e->getType(),
+                                          specializedType->getASTContext());
+    }
   }
   
   //
@@ -146,6 +168,20 @@ public:
   
     setCallee(ManagedValue(gen.B.createSuperMethod(apply, super.getValue(),
                                  constant, gen.SGM.getConstantType(constant))));
+  }
+  
+  ManagedValue getSpecializedCallee() {
+    // If the callee needs to be specialized, do so.
+    if (specializedType) {
+      CleanupsDepth cleanup = callee.getCleanup();
+      SILType ty = gen.getLoweredLoadableType(specializedType,
+                                              callee.getType().getUncurryLevel());
+      Value spec = gen.B.createSpecialize(specializeLoc, callee.getValue(),
+                                          substitutions, ty);
+      return ManagedValue(spec, cleanup);
+    }
+    
+    return callee;
   }
 };
 
@@ -232,48 +268,130 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
   }
 }
 
-ManagedValue SILGenFunction::emitApplyExpr(ApplyExpr *e) {
-  SILGenApply apply(*this);
+namespace {
+  class CallEmission {
+    SILGenFunction &gen;
+    
+    // FIXME: Need to fix emitApplyArgument to preserve cleanups and emit into
+    // a ManagedValue vector instead of Value. We shouldn't forward until the
+    // final apply is emitted.
+    SmallVector<Value, 8> uncurriedArgs;
+    std::vector<SmallVector<Value, 2>> extraArgs;
+    ManagedValue callee;
+    unsigned uncurries;
+    bool applied;
+    
+  public:
+    CallEmission(SILGenFunction &gen, ManagedValue callee)
+      : gen(gen),
+        callee(callee),
+        uncurries(callee.getType().getUncurryLevel() + 1),
+        applied(false)
+    {}
+    
+    SmallVectorImpl<Value> &addArgs() {
+      assert(!applied && "already applied!");
+
+      // Append to the main argument list if we have uncurry levels remaining.
+      if (uncurries > 0) {
+        --uncurries;
+        return uncurriedArgs;
+      }
+      // Otherwise, apply these arguments to the result of the uncurried call.
+      extraArgs.emplace_back();
+      return extraArgs.back();
+    }
+    
+    // FIXME: Tie argument clauses to more specific expr nodes.
+    ManagedValue apply(SILLocation loc) {
+      assert(!applied && "already applied!");
+      
+      applied = true;
+
+      // See if we need a curried thunk.
+      // FIXME: Implement this.
+      if (uncurries > 0) {
+        llvm_unreachable("curried thunk not yet implemented");
+      }
+
+      // Emit the uncurried call.
+      ManagedValue result = gen.emitApply(loc, callee.forward(gen), uncurriedArgs);
+      
+      // If there are remaining call sites, apply them to the result function.
+      for (ArrayRef<Value> args : extraArgs) {
+        result = gen.emitApply(loc, result.forward(gen), args);
+      }
+      
+      return result;
+    }
+    
+    ~CallEmission() { assert(applied && "never applied!"); }
+
+    // Movable, but not copyable.
+    CallEmission(CallEmission &&e)
+      : gen(e.gen),
+        uncurriedArgs(e.uncurriedArgs),
+        extraArgs(std::move(e.extraArgs)),
+        callee(std::move(e.callee)),
+        uncurries(e.uncurries),
+        applied(e.applied) {
+      e.applied = true;
+    }
+  private:
+    CallEmission(const CallEmission &) = delete;
+    CallEmission &operator=(const CallEmission &) = delete;
+  };
+}
+
+static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
+  SILGenApply apply(gen);
   
   // Decompose the call site.
   apply.visit(e);
   
   // Evaluate and discard the side effect if present.
   if (apply.sideEffect)
-    visit(apply.sideEffect);
+    gen.visit(apply.sideEffect);
   
-  // Build the call to the best uncurried entry point.
-  unsigned curries = apply.callee.getType().getUncurryLevel() + 1;
-  // FIXME: Need to fix emitApplyArgument to preserve cleanups and emit into
-  // a ManagedValue vector instead of Value. We shouldn't forward until the
-  // final apply is emitted.
-  SmallVector<Value, 8> args;
+  // Build the call.
+  CallEmission emission(gen, apply.getSpecializedCallee());
+  
   // Apply 'this' if provided.
   if (apply.thisParam.getValue()) {
-    args.push_back(apply.thisParam.forward(*this));
-    --curries;
+    emission.addArgs().push_back(apply.thisParam.forward(gen));
   }
   // Apply arguments from call sites, innermost to outermost.
-  auto site = apply.callSites.rbegin(), end = apply.callSites.rend();
-  for (; curries > 0 && site != end; ++site, --curries) {
-    emitApplyArguments((*site)->getArg(), args);
-  }
-  // Find the right callee.
-  ManagedValue callee = apply.callee;
-  // FIXME: If we had curry levels remaining, ask for a curried thunk.
-  if (curries > 0) {
-    llvm_unreachable("curried thunk not yet implemented");
+  for (auto site = apply.callSites.rbegin(), end = apply.callSites.rend();
+       site != end;
+       ++site) {
+    gen.emitApplyArguments((*site)->getArg(), emission.addArgs());
   }
   
-  // Emit the call.
-  ManagedValue result = emitApply(e, callee.forward(*this), args);
+  return emission;
+}
+
+ManagedValue SILGenFunction::emitApplyExpr(ApplyExpr *e) {
+  return prepareApplyExpr(*this, e).apply(e);
+}
+
+/// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
+/// (which represents the retain count), a base pointer to some elements, and a
+/// length.
+ManagedValue SILGenFunction::emitArrayInjectionCall(Value ObjectPtr,
+                                            Value BasePtr,
+                                            Value Length,
+                                            Expr *ArrayInjectionFunction) {
+  // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
+  if (BasePtr.getType() != SILType::getRawPointerType(F.getContext()))
+    BasePtr = B.createImplicitConvert(SILLocation(),
+                              BasePtr,
+                              SILType::getRawPointerType(F.getContext()));
+
+  // Construct a call to the injection function.
+  CallEmission emission = prepareApplyExpr(*this, ArrayInjectionFunction);
+  Value InjectionArgs[] = {BasePtr, ObjectPtr, Length};
   
-  // If there are remaining call sites, apply them to the result function.
-  for (; site != end; ++site) {
-    args.clear();
-    emitApplyArguments((*site)->getArg(), args);
-    result = emitApply(e, result.forward(*this), args);
-  }
+  emission.addArgs().append(std::begin(InjectionArgs), std::end(InjectionArgs));
   
-  return result;
+  return emission.apply(SILLocation());
 }
