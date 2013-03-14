@@ -396,7 +396,7 @@ RefElementAddrInst::RefElementAddrInst(SILLocation Loc, Value Operand,
     Operand(Operand), Field(Field) {
 }
 
-WitnessTableMethodInst::WitnessTableMethodInst(ValueKind Kind,
+DynamicMethodInst::DynamicMethodInst(ValueKind Kind,
                                                SILLocation Loc, Value Operand,
                                                SILConstant Member,
                                                SILType Ty,
@@ -405,20 +405,38 @@ WitnessTableMethodInst::WitnessTableMethodInst(ValueKind Kind,
     Operand(Operand), Member(Member) {
 }
 
+ClassMethodInst::ClassMethodInst(SILLocation Loc, Value Operand,
+                                 SILConstant Member,
+                                 SILType Ty,
+                                 Function &F)
+  : DynamicMethodInst(ValueKind::ClassMethodInst,
+                      Loc, Operand, Member,
+                      Ty, F) {
+}
+
+SuperMethodInst::SuperMethodInst(SILLocation Loc, Value Operand,
+                                 SILConstant Member,
+                                 SILType Ty,
+                                 Function &F)
+  : DynamicMethodInst(ValueKind::SuperMethodInst,
+                      Loc, Operand, Member,
+                      Ty, F) {
+}
+
 ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, Value Operand,
                                          SILConstant Member,
                                          SILType Ty,
                                          Function &F)
-  : WitnessTableMethodInst(ValueKind::ArchetypeMethodInst,
-                           Loc, Operand, Member,
-                           Ty, F) {
+: DynamicMethodInst(ValueKind::ArchetypeMethodInst,
+                    Loc, Operand, Member,
+                    Ty, F) {
 }
 
 ProtocolMethodInst::ProtocolMethodInst(SILLocation Loc, Value Operand,
                                              SILConstant Member,
                                              SILType Ty,
                                              Function &F)
-  : WitnessTableMethodInst(ValueKind::ProtocolMethodInst,
+  : DynamicMethodInst(ValueKind::ProtocolMethodInst,
                            Loc, Operand, Member,
                            Ty, F) {
 }

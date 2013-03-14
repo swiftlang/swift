@@ -709,28 +709,54 @@ public:
   }
 };
   
-/// WitnessTableMethodInst - Abstract base for instructions that query
-/// protocol witness tables for method implementations.
-class WitnessTableMethodInst : public Instruction {
+/// DynamicMethodInst - Abstract base for instructions that implement dynamic
+/// method lookup.
+class DynamicMethodInst : public Instruction {
   Value Operand;
   SILConstant Member;
 public:
-  WitnessTableMethodInst(ValueKind Kind,
-                         SILLocation Loc, Value Operand, SILConstant Member,
-                         SILType Ty, Function &F);
+  DynamicMethodInst(ValueKind Kind,
+                    SILLocation Loc, Value Operand, SILConstant Member,
+                    SILType Ty, Function &F);
   
   Value getOperand() const { return Operand; }
   SILConstant getMember() const { return Member; }
   
   static bool classof(Value V) {
-    return V->getKind() >= ValueKind::First_WitnessTableMethodInst &&
-      V->getKind() <= ValueKind::Last_WitnessTableMethodInst;
+    return V->getKind() >= ValueKind::First_DynamicMethodInst &&
+      V->getKind() <= ValueKind::Last_DynamicMethodInst;
   }
 };
+
+/// ClassMethodInst - Given the address of a value of class type and a method
+/// constant, extracts the implementation of that method for the dynamic
+/// instance type of the class.
+class ClassMethodInst : public DynamicMethodInst {
+public:
+  ClassMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
+                  SILType Ty, Function &F);
   
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ClassMethodInst;
+  }
+};
+
+/// SuperMethodInst - Given the address of a value of class type and a method
+/// constant, extracts the implementation of that method for the superclass of
+/// the static type of the class.
+class SuperMethodInst : public DynamicMethodInst {
+public:
+  SuperMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
+                  SILType Ty, Function &F);
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::SuperMethodInst;
+  }
+};
+
 /// ArchetypeMethodInst - Given the address of an archetype value and a method
 /// constant, extracts the implementation of that method for the archetype.
-class ArchetypeMethodInst : public WitnessTableMethodInst {
+class ArchetypeMethodInst : public DynamicMethodInst {
 public:
   ArchetypeMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
                       SILType Ty, Function &F);
@@ -745,7 +771,7 @@ public:
 /// The result will be of the type RawPointer -> F for a method of function type
 /// F. The RawPointer "this" argument can be derived from the same existential
 /// using a ProjectExistentialInst.
-class ProtocolMethodInst : public WitnessTableMethodInst {
+class ProtocolMethodInst : public DynamicMethodInst {
 public:
   ProtocolMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
                      SILType Ty, Function &F);

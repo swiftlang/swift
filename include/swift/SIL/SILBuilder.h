@@ -231,6 +231,20 @@ public:
     return insert(new RefElementAddrInst(Loc, Operand, Field, ResultTy));
   }
   
+  ClassMethodInst *createClassMethod(SILLocation Loc, Value Operand,
+                                     SILConstant Member,
+                                     SILType MethodTy)
+  {
+    return insert(new ClassMethodInst(Loc, Operand, Member, MethodTy, F));
+  }
+  
+  SuperMethodInst *createSuperMethod(SILLocation Loc, Value Operand,
+                                     SILConstant Member,
+                                     SILType MethodTy)
+  {
+    return insert(new SuperMethodInst(Loc, Operand, Member, MethodTy, F));
+  }
+  
   ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc, Value Operand,
                                              SILConstant Member,
                                              SILType MethodTy)

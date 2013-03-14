@@ -59,7 +59,7 @@ public:
            && "alloc_ref must return reference type value");
   }
   
-  void visitApplyInst(ApplyInst *AI) {    
+  void visitApplyInst(ApplyInst *AI) {
     DEBUG(llvm::dbgs() << "verifying";
           AI->print(llvm::dbgs()));
     SILType calleeTy = AI->getCallee().getType();
@@ -116,34 +116,34 @@ public:
     assert(!appliedTy.isAddress() && "result of closure cannot be an address");
     assert(appliedTy.is<FunctionType>() &&
            "result of closure must have concrete function type");
-    
-    SILFunctionTypeInfo *calleeTI = F.getModule().getFunctionTypeInfo(calleeTy);
-    SILFunctionTypeInfo *appliedTI
-      = F.getModule().getFunctionTypeInfo(appliedTy);
 
-    // Check that the partially applied arguments match.
-    size_t allArgsCount = calleeTI->getInputTypes().size();
-    size_t appliedArgsCount = CI->getArguments().size();
-    size_t unappliedArgsCount = appliedTI->getInputTypes().size();
-    assert(allArgsCount >= unappliedArgsCount &&
-           "result type of closure has more arguments than callee");
-    assert(allArgsCount >= appliedArgsCount &&
-           "closure applies more arguments than callee has");
-    assert(unappliedArgsCount + appliedArgsCount == allArgsCount &&
-           "result type of closure does not have right amount of unapplied args");
-    for (size_t i = 0; i < unappliedArgsCount; ++i) {
-      assert(appliedTI->getInputTypes()[i] == calleeTI->getInputTypes()[i] &&
-             "result type's input types do not match callee's");
-    }
-    for (size_t i = 0; i < appliedArgsCount; ++i) {
-      assert(CI->getArguments()[i].getType() ==
-               calleeTI->getInputTypes()[i + unappliedArgsCount] &&
-             "closure argument types do not match callee's");
-    }
+    SILFunctionTypeInfo *ti = F.getModule().getFunctionTypeInfo(calleeTy);
     
-    // Check that the result types match.
-    assert(calleeTI->getResultType() == appliedTI->getResultType() &&
-           "result type of closure does not match result type of callee");
+    // Check that the arguments match the curry levels.
+    assert(CI->getArguments().size() == ti->getCurryInputTypes().size() &&
+           "closure doesn't have right number of curry arguments for function");
+    for (size_t i = 0, size = CI->getArguments().size(); i < size; ++i) {
+      DEBUG(llvm::dbgs() << "  argument type ";
+            CI->getArguments()[i].getType().print(llvm::dbgs());
+            llvm::dbgs() << " for input type ";
+            ti->getCurryInputTypes()[i].print(llvm::dbgs());
+            llvm::dbgs() << '\n');
+      assert(CI->getArguments()[i].getType() == ti->getCurryInputTypes()[i] &&
+             "input types to closure don't match function input types");
+    }
+    DEBUG(llvm::dbgs() << "result type ";
+          CI->getType().print(llvm::dbgs());
+          llvm::dbgs() << '\n');
+    
+    // The result type should match the uncurried type.
+    FunctionType *ft = calleeTy.castTo<FunctionType>();
+    for (unsigned i = 0; i < calleeTy.getUncurryLevel(); ++i)
+      ft = ft->getResult()->castTo<FunctionType>();
+    
+    assert(CI->getType().getSwiftType()->isEqual(ft)
+           && CI->getType().getUncurryLevel() == 0
+           && "type of apply instruction doesn't match function result type");
+    
   }
 
   void visitConstantRefInst(ConstantRefInst *CRI) {
@@ -281,6 +281,8 @@ public:
   void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
     DEBUG(llvm::dbgs() << "verifying";
           AMI->print(llvm::dbgs()));
+    assert(AMI->getType(0).getUncurryLevel() == AMI->getMember().uncurryLevel &&
+           "result method must be at natural uncurry level of method");
     FunctionType *methodType = AMI->getType(0).getAs<FunctionType>();
     DEBUG(llvm::dbgs() << "method type ";
           methodType->print(llvm::dbgs());
@@ -306,6 +308,8 @@ public:
   }
   
   void visitProtocolMethodInst(ProtocolMethodInst *EMI) {
+    assert(EMI->getType(0).getUncurryLevel() == EMI->getMember().uncurryLevel &&
+           "result method must be at natural uncurry level of method");
     FunctionType *methodType = EMI->getType(0).getAs<FunctionType>();
     assert(methodType &&
            "result method must be of a concrete function type");
@@ -319,6 +323,44 @@ public:
            "protocol_method must apply to an existential address");
     assert(operandType.isExistentialType() &&
            "protocol_method must apply to an existential address");    
+  }
+  
+  static bool isClassOrClassMetatype(Type t) {
+    if (auto *meta = t->getAs<MetaTypeType>()) {
+      return bool(meta->getInstanceType()->getClassOrBoundGenericClass());
+    } else {
+      return bool(t->getClassOrBoundGenericClass());
+    }
+  }
+  
+  void visitClassMethodInst(ClassMethodInst *CMI) {
+    assert(CMI->getType(0).getUncurryLevel() == CMI->getMember().uncurryLevel &&
+           "result method must be at natural uncurry level of method");
+    auto *methodType = CMI->getType(0).getAs<AnyFunctionType>();
+    assert(methodType &&
+           "result method must be of a function type");
+    SILType operandType = CMI->getOperand().getType();
+    assert(isClassOrClassMetatype(operandType.getSwiftType()) &&
+           "operand must be of a class type");
+    assert(isClassOrClassMetatype(methodType->getInput()) &&
+           "result must be a method of a class");
+    assert(methodType->getResult()->is<AnyFunctionType>() &&
+           "result must be a method");
+  }
+  
+  void visitSuperMethodInst(SuperMethodInst *CMI) {
+    assert(CMI->getType(0).getUncurryLevel() == CMI->getMember().uncurryLevel &&
+           "result method must be at natural uncurry level of method");
+    auto *methodType = CMI->getType(0).getAs<AnyFunctionType>();
+    assert(methodType &&
+           "result method must be of a function type");
+    SILType operandType = CMI->getOperand().getType();
+    assert(isClassOrClassMetatype(operandType.getSwiftType()) &&
+           "operand must be of a class type");
+    assert(isClassOrClassMetatype(methodType->getInput()) &&
+           "result must be a method of a class");
+    assert(methodType->getResult()->is<AnyFunctionType>() &&
+           "result must be a method");
   }
   
   void visitProjectExistentialInst(ProjectExistentialInst *PEI) {

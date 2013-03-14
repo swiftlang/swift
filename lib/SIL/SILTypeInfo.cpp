@@ -20,6 +20,8 @@ using namespace swift;
 
 SILFunctionTypeInfo *SILFunctionTypeInfo::create(ArrayRef<SILType> inputTypes,
                                          SILType resultType,
+                                         unsigned curriedInputCount,
+                                         bool isUncurried,
                                          bool hasIndirectReturn,
                                          SILBase &base)
 {
@@ -29,6 +31,8 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(ArrayRef<SILType> inputTypes,
   SILFunctionTypeInfo *fi = ::new (buffer) SILFunctionTypeInfo(
                                                        inputTypes.size(),
                                                        resultType,
+                                                       curriedInputCount,
+                                                       isUncurried,
                                                        hasIndirectReturn);
   memcpy(fi->getInputTypeBuffer(), inputTypes.data(),
          sizeof(SILType) * inputTypes.size());

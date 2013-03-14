@@ -57,6 +57,8 @@ public:
 class SILFunctionTypeInfo : public SILTypeInfo {
   SILType resultType;
   unsigned inputTypeCount : 31;
+  unsigned uncurried : 1;
+  unsigned curriedInputCount : 31;
   unsigned indirectReturn : 1;
 
   SILType *getInputTypeBuffer() {
@@ -68,29 +70,51 @@ class SILFunctionTypeInfo : public SILTypeInfo {
   
   SILFunctionTypeInfo(unsigned inputTypeCount,
                       SILType resultType,
+                      unsigned curriedInputCount,
+                      bool isUncurried,
                       bool hasIndirectReturn)
     : SILTypeInfo(SILTypeInfoKind::SILFunctionTypeInfo),
       resultType(resultType),
       inputTypeCount(inputTypeCount),
+      uncurried(isUncurried),
+      curriedInputCount(curriedInputCount),
       indirectReturn(hasIndirectReturn)
   {}
 
 public:
   static SILFunctionTypeInfo *create(ArrayRef<SILType> inputTypes,
-                                 SILType resultType,
-                                 bool hasIndirectReturn,
-                                 SILBase &base);
+                                     SILType resultType,
+                                     unsigned curriedInputCount,
+                                     bool isUncurried,
+                                     bool hasIndirectReturn,
+                                     SILBase &base);
   
+  /// Returns the list of input types needed to fully apply a function of
+  /// this function type with an ApplyInst.
   ArrayRef<SILType> getInputTypes() const {
     return ArrayRef<SILType>(getInputTypeBuffer(), inputTypeCount);
   }
   
+  /// Returns the result of an ApplyInst applied to this function type.
   SILType getResultType() const {
     return resultType;
   }
   
+  /// True if this function type takes an indirect return address as its
+  /// final argument.
   bool hasIndirectReturn() const {
     return bool(indirectReturn);
+  }
+  
+  /// True if this function type can be curried with a CurryInst.
+  bool isUncurried() const {
+    return bool(uncurried);
+  }
+  
+  /// Returns the list of input types needed to partially apply a function of
+  /// this function type with a CurryInst.
+  ArrayRef<SILType> getCurryInputTypes() const {
+    return ArrayRef<SILType>(getInputTypeBuffer(), curriedInputCount);
   }
   
   static bool classof(SILTypeInfo const *ti) {

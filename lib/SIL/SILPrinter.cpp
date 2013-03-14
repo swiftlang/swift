@@ -342,6 +342,14 @@ public:
     OS << "ref_element_addr " << getID(EI->getOperand()) << ", @"
        << EI->getField()->getName().get();
   }
+  void visitClassMethodInst(ClassMethodInst *AMI) {
+    OS << "class_method " << getID(AMI->getOperand()) << ", @";
+    AMI->getMember().print(OS);
+  }
+  void visitSuperMethodInst(SuperMethodInst *AMI) {
+    OS << "super_method " << getID(AMI->getOperand()) << ", @";
+    AMI->getMember().print(OS);
+  }
   void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
     OS << "archetype_method " << getID(AMI->getOperand()) << ", @";
     AMI->getMember().print(OS);

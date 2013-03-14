@@ -167,13 +167,21 @@ namespace {
   };
 } // end anonymous namespace
   
-SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft)
+SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
+                                                            unsigned uncurries)
 {
   SmallVector<SILType, 8> inputTypes;
-  
-  // Destructure the input tuple type.
-  LoweredFunctionInputTypeVisitor(*this, inputTypes)
-    .visit(ft->getInput()->getCanonicalType());
+
+  unsigned curriedInputCount = 0;
+  // Destructure the uncurried input tuple types.
+  for (;;) {
+    curriedInputCount = inputTypes.size();
+    LoweredFunctionInputTypeVisitor(*this, inputTypes)
+      .visit(ft->getInput()->getCanonicalType());
+    if (uncurries-- == 0)
+      break;
+    ft = ft->getResult()->castTo<AnyFunctionType>();
+  }
   
   // If the result type lowers to an address-only type, add it as an indirect
   // return argument.
@@ -186,6 +194,8 @@ SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft)
   
   return SILFunctionTypeInfo::create(inputTypes,
                                      resultType,
+                                     curriedInputCount,
+                                     uncurries > 0,
                                      hasIndirectReturn,
                                      SGM.M);
 }
@@ -219,9 +229,9 @@ SILTypeInfo *TypeConverter::makeSILTypeInfo(TypeLoweringInfo &theInfo) {
   }
   
   //
-  // Make a SILFunctionTypeInfo for
+  // Make a SILFunctionTypeInfo for function types.
   if (AnyFunctionType *ft = ty.getAs<AnyFunctionType>()) {
-    return makeInfoForFunctionType(ft);
+    return makeInfoForFunctionType(ft, ty.getUncurryLevel());
   }
   
   //

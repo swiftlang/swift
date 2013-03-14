@@ -476,35 +476,31 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
 void SILGenFunction::emitProlog(CapturingExpr *ce,
                                 ArrayRef<Pattern*> paramPatterns,
                                 Type resultType) {
-  emitProlog(paramPatterns, resultType);
-
-  // Emit the capture argument variables. These are placed last because they
-  // are conceptually the first implicit "curry level" of the function.
+  // Emit the capture argument variables. These are placed first because they
+  // become the first curry level of the SIL function.
   for (auto capture : ce->getCaptures()) {
     makeCaptureBBArguments(*this, capture);
   }
+
+  emitProlog(paramPatterns, resultType);
 }
 
 void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
                                 Type resultType) {
-  // If the return type is address-only, emit the indirect return argument.
-  TypeLoweringInfo const &returnTI = getTypeLoweringInfo(resultType);
-  if (returnTI.isAddressOnly()) {
-    IndirectReturnAddress = new (SGM.M) BBArgument(returnTI.getLoweredType(),
-                                                   F.begin());
-  }
-
-  // Emit the argument variables. We walk the patterns
-  // in reverse order so that, at the IRGen level, ClosureInst can place its
-  // captured arguments without affecting the calling convention of the
-  // explicit arguments.
-  for (size_t i = paramPatterns.size(); i-- != 0;) {
+  // Emit the argument variables.
+  for (size_t i = 0; i < paramPatterns.size(); ++i) {
     // Allocate the local mutable argument storage and set up an Initialization.
     llvm::OwningPtr<Initialization> argInit(
                        InitializationForPattern(*this).visit(paramPatterns[i]));
     // Add the BBArguments and use them to initialize the local argument values.
     ArgumentInitVisitor(*this, F).visit(paramPatterns[i], argInit.get());
-    
+  }
+
+  // If the return type is address-only, emit the indirect return argument.
+  TypeLoweringInfo const &returnTI = getTypeLoweringInfo(resultType);
+  if (returnTI.isAddressOnly()) {
+    IndirectReturnAddress = new (SGM.M) BBArgument(returnTI.getLoweredType(),
+                                                   F.begin());
   }
 }
 

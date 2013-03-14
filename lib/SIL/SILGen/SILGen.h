@@ -284,10 +284,15 @@ public:
   Function &getFunction() { return F; }
   SILBuilder &getBuilder() { return B; }
   
-  TypeLoweringInfo const &getTypeLoweringInfo(Type t) { return SGM.Types.getTypeLoweringInfo(t); }
-  SILType getLoweredType(Type t) { return getTypeLoweringInfo(t).getLoweredType(); }
-  SILType getLoweredLoadableType(Type t) {
-    TypeLoweringInfo const &ti = getTypeLoweringInfo(t);
+  TypeLoweringInfo const &getTypeLoweringInfo(Type t,
+                                              unsigned uncurryLevel = 0) {
+    return SGM.Types.getTypeLoweringInfo(t, uncurryLevel);
+  }
+  SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
+    return getTypeLoweringInfo(t, uncurryLevel).getLoweredType();
+  }
+  SILType getLoweredLoadableType(Type t, unsigned uncurryLevel = 0) {
+    TypeLoweringInfo const &ti = getTypeLoweringInfo(t, 0);
     assert(ti.isLoadable() && "unexpected address-only type");
     return ti.getLoweredType();
   }
@@ -535,7 +540,8 @@ public:
   Materialize emitGetProperty(SILLocation loc, ManagedValue getter);
     
   ManagedValue emitManagedRValueWithCleanup(Value v);
-    
+  ManagedValue emitManagedAddressOnlyValue(Value v);
+  
   void emitAssignToLValue(SILLocation loc, ManagedValue src,
                           LValue const &dest);
   ManagedValue emitMaterializedLoadFromLValue(SILLocation loc,
@@ -547,6 +553,15 @@ public:
   ManagedValue emitMethodRef(SILLocation loc,
                              Value thisValue,
                              SILConstant methodConstant);
+  
+  //
+  // Helpers for emitting ApplyExpr chains.
+  //
+  
+  Value emitArchetypeMethod(ArchetypeMemberRefExpr *e, Value archetype);
+  Value emitProtocolMethod(ExistentialMemberRefExpr *e, Value existential);
+  
+  ManagedValue emitApplyExpr(ApplyExpr *e);
 
   //===--------------------------------------------------------------------===//
   // Declarations
@@ -601,8 +616,7 @@ public:
   
   LValue visitRec(Expr *e);
   
-  /// Dummy handler to log unimplemented nodes
-  
+  /// Dummy handler to log unimplemented nodes.
   LValue visitExpr(Expr *e);
 
   // Nodes that form the root of lvalue paths
@@ -625,7 +639,7 @@ public:
   LValue visitRequalifyExpr(RequalifyExpr *e); // FIXME kill lvalue qualifiers
   LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e);
 };
-  
+
 } // end namespace Lowering
 } // end namespace swift
 
