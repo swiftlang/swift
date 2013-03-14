@@ -16,6 +16,7 @@
 using namespace swift;
 using namespace Lowering;
 
+namespace {
 /// SILGenApply - An ASTVisitor for building SIL function calls.
 /// Nested ApplyExprs applied to an underlying curried function or method
 /// reference are flattened into a single SIL apply to the most uncurried entry
@@ -134,7 +135,8 @@ public:
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
     setThisParam(gen.visit(e->getBase()));
-    assert(thisParam.getValue().getType().isAddress()
+    assert((thisParam.getValue().getType().isAddress()
+            || thisParam.getValue().getType().is<MetaTypeType>())
            && "loadable archetype?!");
     setCallee(ManagedValue(gen.emitArchetypeMethod(e, thisParam.getValue())));
   }
@@ -185,25 +187,24 @@ public:
   }
 };
 
-
-namespace {  
-  static void emitDestructureArgumentTuple(SILGenFunction &gen,
-                                           SILLocation loc,
-                                           Value argValue,
-                                           SmallVectorImpl<Value> &argsV) {
-    TupleType *ty = argValue.getType().castTo<TupleType>();
-    
-    // FIXME: address-only tuple
-    // FIXME: varargs
-    for (size_t i = 0, size = ty->getFields().size(); i < size; ++i) {
-      Value elt = gen.B.createExtract(loc, argValue, i,
-                      gen.getLoweredLoadableType(ty->getFields()[i].getType()));
-      if (ty->getFields()[i].getType()->is<TupleType>())
-        emitDestructureArgumentTuple(gen, loc, elt, argsV);
-      else
-        argsV.push_back(elt);
-    }
+static void emitDestructureArgumentTuple(SILGenFunction &gen,
+                                         SILLocation loc,
+                                         Value argValue,
+                                         SmallVectorImpl<Value> &argsV) {
+  TupleType *ty = argValue.getType().castTo<TupleType>();
+  
+  // FIXME: address-only tuple
+  // FIXME: varargs
+  for (size_t i = 0, size = ty->getFields().size(); i < size; ++i) {
+    Value elt = gen.B.createExtract(loc, argValue, i,
+                    gen.getLoweredLoadableType(ty->getFields()[i].getType()));
+    if (ty->getFields()[i].getType()->is<TupleType>())
+      emitDestructureArgumentTuple(gen, loc, elt, argsV);
+    else
+      argsV.push_back(elt);
   }
+}
+
 } // end anonymous namespace
 
 void SILGenFunction::emitApplyArgumentValue(SILLocation loc,
