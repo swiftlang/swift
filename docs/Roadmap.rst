@@ -334,6 +334,7 @@ Tools and Integration
   * Consistent NS_ENUM/NS_OPTION use
   * Consistent ARC annotations  
   * Mark designated initializers
+  * Mark APIs that take references to objects but don't retain them <rdar://problem/13275351>
 
 * Unit Testing
 
