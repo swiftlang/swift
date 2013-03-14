@@ -292,7 +292,7 @@ public:
     return getTypeLoweringInfo(t, uncurryLevel).getLoweredType();
   }
   SILType getLoweredLoadableType(Type t, unsigned uncurryLevel = 0) {
-    TypeLoweringInfo const &ti = getTypeLoweringInfo(t, 0);
+    TypeLoweringInfo const &ti = getTypeLoweringInfo(t, uncurryLevel);
     assert(ti.isLoadable() && "unexpected address-only type");
     return ti.getLoweredType();
   }

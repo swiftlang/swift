@@ -108,7 +108,7 @@ public:
     assert(existential.getType().isAddress() && "loadable existential?!");
     // FIXME: Use existential_metatype if method is static.
     setThisParam(ManagedValue(gen.B.createProjectExistential(e, existential)));
-    setCallee(ManagedValue(gen.emitProtocolMethod(e, thisParam.getValue())));
+    setCallee(ManagedValue(gen.emitProtocolMethod(e, existential)));
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
     setThisParam(gen.visit(e->getBase()));
