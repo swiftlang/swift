@@ -104,7 +104,7 @@ I'm not sure which is better.
 Generics
 ========
 
-``val`` and ``ref`` are also protocols known to the compiler.  When a 
+``val`` and ``ref`` are also protocols known to the compiler.  When a
 
 * Don't forget to cover Vector<ref X> vs. Vector<val X>
 
@@ -112,6 +112,14 @@ Generics
 
 Non-Copyability
 ===============
+
+A non-``Cloneable`` ``class`` is not copyable.  That leaves us with
+several options:
+
+1. Make it illegal to declare a non-copyable ``val``
+2. Make non-copyable ``val``\ s legal, but not copyable, thus
+   infecting their enclosing object with non-copyability.
+3. Like #2, but also formalize move semantics
 
 Objective C Interoperability
 ============================
