@@ -96,7 +96,7 @@ same object as the argument.
 There are two obvious choices for non-``class`` instance variables
 passed to a ``ref`` parameter:
 
-1. Copy the value to the heap
+1. Copy the value to the heap (essentially ref-boxing a copy)
 2. Make it illegal
 
 I'm not sure which is better.
@@ -105,6 +105,16 @@ Generics
 ========
 
 ``val`` and ``ref`` are also protocols known to the compiler.  When a
+``class`` ``T`` is passed where a ``val`` is required, the
+``T`` is auto-boxed into a value as-if::
+
+  struct TBox {
+    constructor(x: ref T) { _x=x }
+    val _x: T
+  }
+
+When a non-class ``T`` is passed where a ``ref`` is required, we
+should treat
 
 * Don't forget to cover Vector<ref X> vs. Vector<val X>
 
@@ -120,7 +130,9 @@ several options:
 2. Make non-copyable ``val``\ s legal, but not copyable, thus
    infecting their enclosing object with non-copyability.
 3. Like #2, but also formalize move semantics.  All ``val``\ s,
-   including non-copyable ones, would be explicitly movable.
+   including non-copyable ones, would be explicitly movable.  Generic
+   ``var`` parameters would probably be treated as movable but
+   non-copyable.
 
 We favor taking all three steps, but it's useful to know that there
 are valid stopping points along the way.
