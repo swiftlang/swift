@@ -429,7 +429,7 @@ void SILGenFunction::emitSetProperty(SILLocation loc,
   if (subscripts)
     emission.addArgs().append(subscripts->begin(), subscripts->end());
   // T ->
-  emission.addArgs().push_back(result.forward(*this));
+  emitApplyArgumentValue(loc, result, emission.addArgs());
   // ()
   emission.apply(loc);
 }
