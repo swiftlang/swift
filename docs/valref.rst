@@ -119,10 +119,16 @@ several options:
 1. Make it illegal to declare a non-copyable ``val``
 2. Make non-copyable ``val``\ s legal, but not copyable, thus
    infecting their enclosing object with non-copyability.
-3. Like #2, but also formalize move semantics
+3. Like #2, but also formalize move semantics.  All ``val``\ s,
+   including non-copyable ones, would be explicitly movable.
+
+We favor taking all three steps, but it's useful to know that there
+are valid stopping points along the way.
 
 Objective C Interoperability
 ============================
+
+*Joe to write this section*
 
 Why This Design Beats Rust/C++/etc.
 ===================================
