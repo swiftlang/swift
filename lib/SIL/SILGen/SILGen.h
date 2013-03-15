@@ -537,8 +537,17 @@ public:
                                            SILConstant function,
                                            CapturingExpr *body);
   
-  Materialize emitGetProperty(SILLocation loc, ManagedValue getter);
-    
+  Materialize emitMaterialize(SILLocation loc, ManagedValue v);
+  Materialize emitGetProperty(SILLocation loc,
+                              ManagedValue getter,
+                              Optional<ManagedValue> thisValue,
+                              Optional<ArrayRef<Value>> subscripts);
+  void emitSetProperty(SILLocation loc,
+                       ManagedValue setter,
+                       Optional<ManagedValue> thisValue,
+                       Optional<ArrayRef<Value>> subscripts,
+                       ManagedValue value);
+  
   ManagedValue emitManagedRValueWithCleanup(Value v);
   ManagedValue emitManagedAddressOnlyValue(Value v);
   

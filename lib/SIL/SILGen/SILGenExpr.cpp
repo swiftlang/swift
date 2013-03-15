@@ -189,10 +189,10 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
     if (var->isProperty()) {
       ManagedValue get = emitConstantRef(loc,
                                   SILConstant(decl, SILConstant::Kind::Getter));
-      return ManagedValue(emitGetProperty(loc, get).address);
+      return ManagedValue(emitGetProperty(loc, get, Nothing, Nothing).address);
     }
     
-    // For local decls, we should have the address we allocated on hand.
+    // For local decls, use the address we allocated.
     if (VarLocs.count(decl)) {
       return ManagedValue(VarLocs[decl].address);
     }
@@ -254,30 +254,27 @@ Value SILGenFunction::emitTemporaryAllocation(SILLocation loc,
   return tmpMem;
 }
 
-namespace {
-  static Materialize emitMaterialize(SILGenFunction &gen,
-                                     SILLocation loc, ManagedValue v) {
-    // Address-only values are already materialized.
-    if (v.isAddressOnlyValue()) {
-      return Materialize{v.getValue(), v.getCleanup(),
-                         /*isAddressOnlyValue=*/ true};
-    }
-    
-    assert(!v.getType().isAddress() &&
-           "can't materialize a reference");
-    
-    Value tmpMem = gen.emitTemporaryAllocation(loc, v.getType());
-    gen.B.createStore(loc, v.forward(gen), tmpMem);
-    
-    CleanupsDepth valueCleanup = CleanupsDepth::invalid();
-    if (!gen.getTypeLoweringInfo(v.getType().getSwiftType()).isTrivial()) {
-      gen.Cleanups.pushCleanup<CleanupMaterializedValue>(tmpMem);
-      valueCleanup = gen.getCleanupsDepth();
-    }
-    
-    return Materialize{tmpMem, valueCleanup,
-                       /*isAddressOnlyValue=*/ false};
+Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
+  // Address-only values are already materialized.
+  if (v.isAddressOnlyValue()) {
+    return Materialize{v.getValue(), v.getCleanup(),
+                       /*isAddressOnlyValue=*/ true};
   }
+  
+  assert(!v.getType().isAddress() &&
+         "can't materialize a reference");
+  
+  Value tmpMem = emitTemporaryAllocation(loc, v.getType());
+  B.createStore(loc, v.forward(*this), tmpMem);
+  
+  CleanupsDepth valueCleanup = CleanupsDepth::invalid();
+  if (!getTypeLoweringInfo(v.getType().getSwiftType()).isTrivial()) {
+    Cleanups.pushCleanup<CleanupMaterializedValue>(tmpMem);
+    valueCleanup = getCleanupsDepth();
+  }
+  
+  return Materialize{tmpMem, valueCleanup,
+                     /*isAddressOnlyValue=*/ false};
 }
 
 ManagedValue Materialize::consume(SILGenFunction &gen, SILLocation loc) {
@@ -293,7 +290,7 @@ ManagedValue SILGenFunction::visitMaterializeExpr(MaterializeExpr *E,
   // Evaluate the value, then use it to initialize a new temporary and return
   // the temp's address.
   ManagedValue V = visit(E->getSubExpr());
-  return ManagedValue(emitMaterialize(*this, E, V).address);
+  return ManagedValue(emitMaterialize(E, V).address);
 }
 
 ManagedValue SILGenFunction::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
@@ -592,12 +589,8 @@ ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
                                         SILConstant(e->getDecl(),
                                                     SILConstant::Kind::Getter),
                                         substitutions);
-  // Apply the "this" parameter.
-  ManagedValue getterDel = gen.emitApply(e,
-                                         getter.forward(gen),
-                                         base.forward(gen));
   // Apply the getter.
-  Materialize propTemp = gen.emitGetProperty(e, getterDel);
+  Materialize propTemp = gen.emitGetProperty(e, getter, base, Nothing);
   return ManagedValue(propTemp.address);
 }
 
@@ -767,20 +760,12 @@ ManagedValue emitAnySubscriptExpr(SILGenFunction &gen,
   gen.emitApplyArguments(e->getIndex(), indexArgs);
   
   // Get the getter function, which will have type This -> Index -> () -> T.
-  ManagedValue getterMethod = gen.emitSpecializedPropertyConstantRef(
+  ManagedValue getter = gen.emitSpecializedPropertyConstantRef(
                                     e, e->getBase(), e->getIndex(),
                                     SILConstant(sd, SILConstant::Kind::Getter),
                                     substitutions);
-  
-  // Apply the "this" parameter.
-  ManagedValue getterDelegate = gen.emitApply(e,
-                                           getterMethod.forward(gen),
-                                           base.forward(gen));
-  // Apply the index parameter.
-  ManagedValue getter = gen.emitApply(e, getterDelegate.forward(gen),
-                                      indexArgs);
   // Apply the getter.
-  Materialize propTemp = gen.emitGetProperty(e, getter);
+  Materialize propTemp = gen.emitGetProperty(e, getter, base, indexArgs);
   return ManagedValue(propTemp.address);
 }
 
@@ -1093,13 +1078,6 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
   } else {
     return ManagedValue(emitGlobalConstantRef(loc, constant));
   }
-}
-
-Materialize SILGenFunction::emitGetProperty(SILLocation loc,
-                                            ManagedValue getter) {
-  // Call the getter and then materialize the return value as an lvalue.
-  ManagedValue result = emitApply(loc, getter.forward(*this), {});
-  return emitMaterialize(*this, loc, result);
 }
 
 ManagedValue SILGenFunction::visitFuncExpr(FuncExpr *e, SGFContext C) {

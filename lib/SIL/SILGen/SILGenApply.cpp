@@ -396,3 +396,40 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(Value ObjectPtr,
   
   return emission.apply(SILLocation());
 }
+
+/// Emit a call to a getter and materialize its result.
+Materialize SILGenFunction::emitGetProperty(SILLocation loc,
+                                  ManagedValue getter,
+                                  Optional<ManagedValue> thisValue,
+                                  Optional<ArrayRef<Value>> subscripts) {
+  CallEmission emission(*this, getter);
+  // This ->
+  if (thisValue)
+    emission.addArgs().push_back(thisValue->forward(*this));
+  // Index ->
+  if (subscripts)
+    emission.addArgs().append(subscripts->begin(), subscripts->end());
+  // () ->
+  emission.addArgs();
+  // T
+  ManagedValue result = emission.apply(loc);
+  return emitMaterialize(loc, result);
+}
+
+void SILGenFunction::emitSetProperty(SILLocation loc,
+                                     ManagedValue setter,
+                                     Optional<ManagedValue> thisValue,
+                                     Optional<ArrayRef<Value>> subscripts,
+                                     ManagedValue result) {
+  CallEmission emission(*this, setter);
+  // This ->
+  if (thisValue)
+    emission.addArgs().push_back(thisValue->forward(*this));
+  // Index ->
+  if (subscripts)
+    emission.addArgs().append(subscripts->begin(), subscripts->end());
+  // T ->
+  emission.addArgs().push_back(result.forward(*this));
+  // ()
+  emission.apply(loc);
+}

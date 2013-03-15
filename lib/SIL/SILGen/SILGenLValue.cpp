@@ -105,26 +105,24 @@ namespace {
       gen.emitApplyArguments(subscriptExpr, args);
     }
     
-    ManagedValue partialApplyAccessor(SILGenFunction &gen, SILLocation loc,
-                                      Value accessor, Value base) const {
+    void prepareAccessorArgs(SILGenFunction &gen, SILLocation loc,
+                             Value accessor, Value base,
+                             SmallVectorImpl<Value> &subscripts) const
+    {
+      
+      
       assert((!base || (base.getType().isAddress() ^
               base.getType().hasReferenceSemantics())) &&
              "base of getter/setter component must be invalid, lvalue, or "
              "of reference type");
+      
       gen.B.createRetain(loc, accessor);
+      
       if (base && base.getType().hasReferenceSemantics())
         gen.B.createRetain(loc, base);
-      // Apply the base "this" argument, if any.
-      ManagedValue appliedThis = base
-        ? gen.emitApply(loc, accessor, base)
-        : ManagedValue(accessor);
-      // Apply the subscript argument, if any.
-      if (subscriptExpr) {
-        llvm::SmallVector<Value, 2> args;
-        getSubscriptArguments(gen, args);
-        return gen.emitApply(loc, appliedThis.forward(gen), args);
-      } else
-        return appliedThis;
+      
+      if (subscriptExpr)
+        getSubscriptArguments(gen, subscripts);
     }
     
   public:
@@ -144,21 +142,26 @@ namespace {
     }
     
     void storeRValue(SILGenFunction &gen, SILLocation loc,
-                     ManagedValue rvalue, Value base) const override {
-      ManagedValue appliedSetter = partialApplyAccessor(gen, loc,
-                                                        setter, base);
-      SmallVector<Value, 2> setterArgs;
-      gen.emitApplyArgumentValue(loc, rvalue, setterArgs);
-      gen.emitApply(loc, appliedSetter.forward(gen), setterArgs);
+                     ManagedValue rvalue, Value base) const override
+    {
+      llvm::SmallVector<Value, 2> subscripts;
+      prepareAccessorArgs(gen, loc, setter, base, subscripts);
+      
+      return gen.emitSetProperty(loc, ManagedValue(setter), base, subscriptExpr
+                                   ? Optional<ArrayRef<Value>>(subscripts)
+                                   : Nothing,
+                                 rvalue);
     }
     
     Materialize loadAndMaterialize(SILGenFunction &gen, SILLocation loc,
                                    Value base) const override
     {
-      // FIXME: ignores base and preserve
-      ManagedValue appliedGetter = partialApplyAccessor(gen, loc,
-                                                        getter, base);
-      return gen.emitGetProperty(loc, appliedGetter);
+      llvm::SmallVector<Value, 2> subscripts;
+      prepareAccessorArgs(gen, loc, getter, base, subscripts);
+      
+      return gen.emitGetProperty(loc, ManagedValue(getter), base, subscriptExpr
+                                   ? Optional<ArrayRef<Value>>(subscripts)
+                                   : Nothing);
     }
   };
 }
