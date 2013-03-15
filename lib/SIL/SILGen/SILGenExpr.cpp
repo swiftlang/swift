@@ -621,7 +621,8 @@ ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
     }
     propType = tc.getMethodTypeInContext(baseExpr->getType()->getRValueType(),
                                         propType);
-    SILType lPropType = getLoweredLoadableType(propType);
+    SILType lPropType = getLoweredLoadableType(propType,
+                                               method.getType().getUncurryLevel());
     method = emitManagedRValueWithCleanup(
                             B.createSpecialize(expr, method.getUnmanagedValue(),
                                                substitutions, lPropType));
@@ -640,15 +641,16 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
                                           methodType);
   /// If the 'this' type is a bound generic, specialize the method ref with
   /// its substitutions
+  /// FIXME: Doesn't specialize generic method archetypes.
   if (BoundGenericType *bgt = thisValue.getType().getAs<BoundGenericType>()) {
     PolymorphicFunctionType *methodFT =
       methodType.castTo<PolymorphicFunctionType>();
     Type specializedType = FunctionType::get(thisValue.getType().getSwiftType(),
                                              methodFT->getResult(),
                                              F.getContext());
-    methodValue = B.createSpecialize(loc, methodValue,
-                                     bgt->getSubstitutions(),
-                                     getLoweredLoadableType(specializedType));
+    methodValue = B.createSpecialize(loc, methodValue, bgt->getSubstitutions(),
+               getLoweredLoadableType(specializedType,
+                                      methodValue.getType().getUncurryLevel()));
     return emitManagedRValueWithCleanup(methodValue);
   }
   
@@ -1224,8 +1226,8 @@ static void emitConstructorMetatypeArg(SILGenFunction &gen,
 
 void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Emit the prolog.
-  emitProlog(ctor->getArguments(), ctor->getImplicitThisDecl()->getType());
   emitConstructorMetatypeArg(*this, ctor);
+  emitProlog(ctor->getArguments(), ctor->getImplicitThisDecl()->getType());
   
   //
   // Create the 'this' value.
