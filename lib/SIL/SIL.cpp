@@ -74,20 +74,42 @@ SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
     assert(kind == Kind::Destructor
            && "can only create Destructor SILConstant for class");
     naturalUncurryLevel = 0;
-  } else if (isa<VarDecl>(vd)) {
+  } else if (auto *var = dyn_cast<VarDecl>(vd)) {
     assert((kind == Kind::Getter
             || kind == Kind::Setter
             || kind == Kind::GlobalAccessor)
            && "can only create Getter, Setter, or GlobalAccessor SILConstant "
               "for var");
-    naturalUncurryLevel = this->isProperty()
-      ? (vd->isInstanceMember() ? 1 : 0)
-      : 0;
+    
+    assert(((kind == Kind::GlobalAccessor) ^ var->isProperty())
+           && "can't reference global accessor of property");
+    assert(!(kind == Kind::GlobalAccessor && var->getDeclContext()->isLocalContext())
+           && "can't reference global accessor of local var");
+    
+    if (kind == Kind::GlobalAccessor) {
+      naturalUncurryLevel = 0;
+    } else {
+      // Instance properties have a 'this' curry.
+      if (var->isInstanceMember())
+        naturalUncurryLevel = 1;
+      // Local properties may have captures that affect the natural uncurry
+      // level.
+      else if (kind == Kind::Getter && var->getGetter())
+        naturalUncurryLevel = getNaturalUncurryLevel(var->getGetter()->getBody());
+      else if (kind == Kind::Setter && var->getSetter())
+        naturalUncurryLevel = getNaturalUncurryLevel(var->getSetter()->getBody());
+      // A property accessor for a non-instance variable without getters and
+      // setters must be a resilient property, so it can't have context.
+      else
+        naturalUncurryLevel = 0;
+    }
     
   } else if (isa<SubscriptDecl>(vd)) {
     assert((kind == Kind::Getter || kind == Kind::Setter)
            && "can only create Getter or Setter SILConstant for subscript");
-    // T -> Index -> () -> U
+    // Subscript accessors have
+    //   getter type (T)(Index)() -> U and
+    //   setter type (T)(Index)(U) -> ()
     naturalUncurryLevel = 2;
   }
   
@@ -138,6 +160,10 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc, unsigned atUncurryLevel) {
     }
     // Map global VarDecls to their GlobalAccessor SILConstant.
     else if (VarDecl *vard = dyn_cast<VarDecl>(vd)) {
+      assert(!vard->isProperty() &&
+             "can't reference global accessor of property");
+      assert(!vard->getDeclContext()->isLocalContext() &&
+             "can't reference global accessor of local var");
       loc = vard;
       kind = Kind::GlobalAccessor;
       naturalUncurryLevel = 0;
