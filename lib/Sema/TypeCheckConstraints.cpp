@@ -1473,13 +1473,36 @@ namespace {
   };
 
   /// \brief A complete solution to a constraint system.
+  ///
+  /// A solution to a constraint system consists of type variable bindings to
+  /// concrete types for every type variable that is used in the constraint
+  /// system along with a set of mappings from each constraint locator
+  /// involving an overload set to the selected overload.
   class Solution {
   public:
+    Solution() {}
+
+    // Solution is a non-copyable type for performance reasons.
+    Solution(const Solution &other) = delete;
+    Solution &operator=(const Solution &other) = delete;
+
+    Solution(Solution &&other)
+      : typeBindings(std::move(other.typeBindings)),
+        overloadChoices(std::move(other.overloadChoices))
+    {
+    }
+
+    Solution &operator=(Solution &&other) {
+      typeBindings = std::move(other.typeBindings);
+      overloadChoices = std::move(other.overloadChoices);
+      return *this;
+    }
+
     /// \brief The set of type bindings.
-    llvm::DenseMap<TypeVariableType *, Type> typeBindings;
+    llvm::SmallDenseMap<TypeVariableType *, Type> typeBindings;
 
     /// \brief The set of overload choices along with their types.
-    llvm::DenseMap<ConstraintLocator *,
+    llvm::SmallDenseMap<ConstraintLocator *,
                         std::pair<OverloadChoice, Type>> overloadChoices;
 
     /// \brief Simplify the given type by substituting all occurrences of
@@ -1817,7 +1840,7 @@ namespace {
           auto result = createSolution();
           removeInactiveChildren();
           restoreTypeVariableBindings();
-          return result;
+          return std::move(result);
         }
 
         // We don't have a solution;
@@ -7532,9 +7555,9 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
 
       if (!viable.empty()) {
         unsigned idx = 0;
-        for (auto cs : viable) {
+        for (auto &solution : viable) {
           log << "---Solution #" << ++idx << "---\n";
-          cs.dump(&Context.SourceMgr);
+          solution.dump(&Context.SourceMgr);
         }
       }
 
@@ -7554,7 +7577,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
     return nullptr;
   }
 
-  auto solution = viable[0];
+  auto &solution = viable[0];
   if (getLangOpts().DebugConstraintSolver) {
     log << "---Solution---\n";
     solution.dump(&Context.SourceMgr);
