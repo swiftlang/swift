@@ -1280,6 +1280,8 @@ namespace {
     uintptr_t DeclOrKind;
 
   public:
+    OverloadChoice() : Base(), DeclOrKind() { }
+
     OverloadChoice(Type base, ValueDecl *value) : Base(base) {
       DeclOrKind = reinterpret_cast<uintptr_t>(value);
       assert((DeclOrKind & (uintptr_t)0x01) == 0 && "Badly aligned decl");
@@ -1470,6 +1472,35 @@ namespace {
     bool shouldOpenType() const { return typeVarAndOpen.getInt(); }
   };
 
+  /// \brief A complete solution to a constraint system.
+  class Solution {
+  public:
+    /// \brief The set of type bindings.
+    llvm::DenseMap<TypeVariableType *, Type> typeBindings;
+
+    /// \brief The set of overload choices along with their types.
+    llvm::DenseMap<ConstraintLocator *,
+                        std::pair<OverloadChoice, Type>> overloadChoices;
+
+    /// \brief Simplify the given type by substituting all occurrences of
+    /// type variables for their fixed types.
+    Type simplifyType(TypeChecker &tc, Type type) const {
+      return tc.transformType(type,
+               [&](Type type) -> Type {
+                 if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
+                   auto known = typeBindings.find(tvt);
+                   assert(known != typeBindings.end());
+                   return known->second;
+                 }
+
+                 return type;
+               });
+    }
+
+    /// \brief Dump this solution to standard error.
+    void dump(llvm::SourceMgr *sm) LLVM_ATTRIBUTE_USED;
+  };
+
   /// \brief Describes a system of constraints on type variables, the
   /// solution of which assigns concrete types to each of the type variables.
   /// Constraint systems are typically generated given an (untyped) expression.
@@ -1567,12 +1598,6 @@ namespace {
 
     typedef llvm::PointerUnion<TypeVariableType *, TypeBase *>
       RepresentativeOrFixed;
-
-    /// \brief For each type variable, maps to either the representative of that
-    /// type variable or to the fixed type to which that type variable is
-    /// bound.
-    llvm::DenseMap<TypeVariableType *, RepresentativeOrFixed>
-      TypeVariableInfo;
 
     // Valid everywhere, for debugging
     SmallVector<Constraint *, 16> SolvedConstraints;
@@ -1764,13 +1789,13 @@ namespace {
     /// \brief Finalize this constraint system; we're done attempting to solve
     /// it.
     ///
-    /// \returns true if this constraint system is unsolvable.
-    bool finalize() {
+    /// \returns an empty solution if this constraint system is unsolvable.
+    Optional<Solution> finalize() {
       switch (State) {
       case Unsolvable:
         removeInactiveChildren();
         restoreTypeVariableBindings();
-        return true;
+        return Nothing;
 
       case Solved:
         llvm_unreachable("Already finalized (?)");
@@ -1782,24 +1807,24 @@ namespace {
           removeInactiveChildren();
           clearIntermediateData();
           restoreTypeVariableBindings();
-          return true;
+          return Nothing;
         }
 
         // Check whether we have a proper solution.
         if (Constraints.empty() && UnresolvedOverloadSets.empty() &&
             !hasFreeTypeVariables()) {
           State = Solved;
-          makeStandalone();
+          auto result = createSolution();
           removeInactiveChildren();
           restoreTypeVariableBindings();
-          return false;
+          return result;
         }
 
         // We don't have a solution;
         markUnsolvable();
         removeInactiveChildren();
           restoreTypeVariableBindings();
-        return true;
+        return Nothing;
       }
     }
 
@@ -1815,19 +1840,30 @@ namespace {
                      Children.end());
     }
 
-    /// \brief Make this constraint system 'standalone', in the sense that it
-    /// will not need to look to its parent for any information.
-    void makeStandalone() {
+    /// \brief Create the solution based on this constraint system.
+    Solution createSolution() {
+      assert(State == Solved);
+
       decltype(ExploredTypeBindings)().swap(ExploredTypeBindings);
       PotentialBindings.clear();
       decltype(ExternallySolved)().swap(ExternallySolved);
 
-      // For each of the type variables, get its fixed type.
+      Solution solution;
       for (auto cs = this; cs; cs = cs->Parent) {
+        // For each of the type variables, get its fixed type.
         for (auto tv : cs->TypeVariables) {
-          TypeVariableInfo[tv] = getFixedType(tv).getPointer();
+          solution.typeBindings[tv] = simplifyType(tv);
+        }
+
+        // For each of the overload sets, get its overload choice.
+        for (auto resolved : cs->ResolvedOverloads) {
+          solution.overloadChoices[resolved.first->getLocator()]
+            = { resolved.first->getChoices()[resolved.second.first],
+                resolved.second.second };
         }
       }
+
+      return solution;
     }
 
     /// \brief Clear out any 'intermediate' data that is no longer useful when
@@ -1836,7 +1872,6 @@ namespace {
       decltype(ExploredTypeBindings)().swap(ExploredTypeBindings);
       PotentialBindings.clear();
       decltype(ExternallySolved)().swap(ExternallySolved);
-      decltype(TypeVariableInfo)().swap(TypeVariableInfo);
     }
 
     /// \brief Restore the type variable bindings to what they were before
@@ -1849,17 +1884,7 @@ namespace {
       SavedBindings.clear();
     }
 
-    /// \brief Take the permanent type variable bindings and push them into
-    /// the type variables.
-    void injectPermanentTypeVariableBindings() {
-      for (const auto &tvi : TypeVariableInfo) {
-        tvi.first->getImpl().assignFixedType(tvi.second.get<TypeBase *>(),
-                                             SavedBindings);
-      }
-    }
-
-    friend class ReinstateTypeVariableBindingsRAII;
-
+  public:
     /// \brief Lookup for a member with the given name in the given base type.
     ///
     /// This routine caches the results of member lookups in the top constraint
@@ -1878,7 +1903,6 @@ namespace {
       return *ptr;
     }
 
-  public:
     /// \brief Retrieve an unresolved overload set.
     OverloadSet *getUnresolvedOverloadSet(unsigned Idx) const {
       return UnresolvedOverloadSets[Idx];
@@ -2435,10 +2459,10 @@ namespace {
 
     /// \brief Solve the system of constraints.
     ///
-    /// \param viable The set of constraint systems that are still viable.
+    /// \param solutions The set of solutions to this system of constraints.
     ///
     /// \returns true if an error occurred, false otherwise.
-    bool solve(SmallVectorImpl<ConstraintSystem *> &viable);
+    bool solve(SmallVectorImpl<Solution> &solutions);
 
     /// \brief Determine whether this constraint system is fully solved, with
     /// no free variables.
@@ -2451,52 +2475,18 @@ namespace {
                                              Type type);
 
     // \brief Compare two solutions to the same set of constraints.
-    static SolutionCompareResult compareSolutions(ConstraintSystem &cs1,
-                                                  ConstraintSystem &cs2);
+    static SolutionCompareResult compareSolutions(ConstraintSystem &cs,
+                                                  const Solution &sol1,
+                                                  const Solution &sol2);
 
   public:
-    /// \brief Given a set of viable constraint systems, find the best
+    /// \brief Given a set of viable solutions, find the best
     /// solution.
     ///
     /// \returns the best solution, or null if there is no best solution.
-    static ConstraintSystem *
-    findBestSolution(SmallVectorImpl<ConstraintSystem *> &viable);
-
-    /// \brief Convert the expression to the given type.
-    Expr *convertToType(Expr *expr, Type toType, bool isAssignment = false);
-
-    /// \brief Convert the object argumet to the given type.
-    Expr *convertObjectArgumentToType(Expr *expr, Type toType);
-
-    /// \brief Apply the solution to the given expression, returning the
-    /// rewritten, fully-typed expression.
-    Expr *applySolution(Expr *expr);
+    Solution *findBestSolution(SmallVectorImpl<Solution> &solutions);
 
     void dump();
-  };
-
-  /// \brief RAII object that re-instates the type variable bindings for
-  /// the given constraint system.
-  class ReinstateTypeVariableBindingsRAII {
-    ConstraintSystem &CS;
-
-  public:
-    ReinstateTypeVariableBindingsRAII(ConstraintSystem &cs) : CS(cs) {
-      cs.injectPermanentTypeVariableBindings();
-    }
-
-    ~ReinstateTypeVariableBindingsRAII() {
-      CS.restoreTypeVariableBindings();
-    }
-
-    ReinstateTypeVariableBindingsRAII(const ReinstateTypeVariableBindingsRAII&)
-      = delete;
-    ReinstateTypeVariableBindingsRAII(ReinstateTypeVariableBindingsRAII&&)
-      = delete;
-    ReinstateTypeVariableBindingsRAII &
-    operator=(const ReinstateTypeVariableBindingsRAII&) = delete;
-    ReinstateTypeVariableBindingsRAII &
-    operator=(ReinstateTypeVariableBindingsRAII&&) = delete;
   };
 }
 
@@ -5892,7 +5882,7 @@ static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
   return Nothing;
 }
 
-bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
+bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
   assert(!Parent &&"Can only solve at the top level");
 
   // Simplify this constraint system.
@@ -5954,8 +5944,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
     // If there are no unsolved constraints and no unresolved overload sets,
     // this system is either a solution or it is underconstrained.
     if (cs->Constraints.empty() && cs->UnresolvedOverloadSets.empty()) {
-      if (!cs->finalize())
-        viable.push_back(cs);
+      if (auto solution = cs->finalize())
+        solutions.push_back(std::move(*solution));
       continue;
     }
 
@@ -6039,8 +6029,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
         break;
 
       if (cs->Constraints.empty() && cs->UnresolvedOverloadSets.empty()) {
-        if (!cs->finalize())
-          viable.push_back(cs);
+        if (auto solution = cs->finalize())
+          solutions.push_back(std::move(*solution));
         done = true;
         break;
       }
@@ -6050,8 +6040,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
       // If there are no unsolved constraints and no unresolved overload sets,
       // this system is either a solution or it is underconstrained.
       if (cs->Constraints.empty() && cs->UnresolvedOverloadSets.empty()) {
-        if (!cs->finalize())
-          viable.push_back(cs);
+        if (auto solution = cs->finalize())
+          solutions.push_back(std::move(*solution));
         continue;
       }
 
@@ -6063,27 +6053,15 @@ bool ConstraintSystem::solve(SmallVectorImpl<ConstraintSystem *> &viable) {
 
 
   // If there is more than one viable system, attempt to pick the best solution.
-  if (viable.size() > 1) {
-    if (auto best = findBestSolution(viable)) {
-      if (TC.getLangOpts().DebugConstraintSolver) {
-        unsigned idx = 0;
-        for (auto cs : viable) {
-          SmallVector<TypeVariableType *, 4> freeVariables;
-          llvm::errs() << "---Child system #" << ++idx;
-          if (cs == best) {
-            llvm::errs() << " (best)";
-          }
-          llvm::errs() << "---\n";
-          cs->dump();
-        }
-      }
-
-      viable.clear();
-      viable.push_back(best);
+  if (solutions.size() > 1) {
+    if (auto best = findBestSolution(solutions)) {
+      if (best != &solutions[0])
+        solutions[0] = std::move(*best);
+      solutions.erase(solutions.begin() + 1, solutions.end());
     }
   }
 
-  return viable.size() != 1;
+  return solutions.size() != 1;
 }
 
 //===--------------------------------------------------------------------===//
@@ -6179,96 +6157,78 @@ static Type stripInitializers(TypeChecker &tc, Type origType) {
            });
 }
 
-SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs1,
-                                                         ConstraintSystem &cs2){
-  // FIXME: Find least common ancestor. We don't need to look further than
-  // than for a decision.
-
+SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs,
+                                                         const Solution &sol1,
+                                                         const Solution &sol2) {
   // Compare the sets of bound type variables in the two systems.
-  // FIXME: This would be a good place to stop at the LCA.
   auto compareTypeVariables =
-    [&](ConstraintSystem *cs1, ConstraintSystem *cs2) -> SolutionCompareResult {
+    [&](const Solution &sol1, const Solution &sol2) -> SolutionCompareResult {
       SolutionCompareResult result = SolutionCompareResult::Identical;
 
-      // Collect all of the fixed types in CS1.
-      llvm::MapVector<TypeVariableType *, Type> cs1FixedTypes;
-      for (auto walkCS1 = cs1; walkCS1; walkCS1 = walkCS1->Parent) {
-        for (const auto &fixed : walkCS1->TypeVariableInfo)
-          if (auto type = fixed.second.dyn_cast<TypeBase *>())
-            cs1FixedTypes[fixed.first] = type;
-      }
-
-      auto &topSystem = cs1->getTopConstraintSystem();
-      for (const auto &fixedTV1 : cs1FixedTypes) {
-        if (!fixedTV1.first)
-          continue;
-
+      for (auto fixedTV1 : sol1.typeBindings) {
         auto boundTV1 = fixedTV1.first;
 
         // Find the fixed type in the second constraint system.
-        Type type2;
-        auto known2 = cs2->TypeVariableInfo.find(boundTV1);
-        if (known2 != cs2->TypeVariableInfo.end() &&
-            known2->second.is<TypeBase *>())
-          type2 = known2->second.get<TypeBase *>();
-        if (type2) {
-          auto type1 = fixedTV1.second;
-
-          // Strip any initializers from tuples in the type; they aren't
-          // to be compared.
-          type1 = stripInitializers(cs1->getTypeChecker(), type1);
-          type2 = stripInitializers(cs1->getTypeChecker(), type2);
-
-          // If the types are equivalent, there's nothing more to do.
-          if (type1->isEqual(type2))
-            continue;
-
-          // If either of the types still contains type variables, we can't
-          // compare them.
-          // FIXME: This is really unfortunate. More type variable sharing
-          // (when it's sane) would help us do much better here.
-          if (type1->hasTypeVariable() || type2->hasTypeVariable())
-            return SolutionCompareResult::Incomparable;
-
-          // If one type is a subtype of the other, but not vice-verse,
-          // we prefer the system with the more-constrained type.
-          bool trivial = false;
-          bool type1Better = cs1->matchTypes(type1, type2,
-                                             TypeMatchKind::Subtype,
-                                             TMF_None,
-                                             ConstraintLocatorBuilder(nullptr),
-                                             trivial)
-                               == SolutionKind::TriviallySolved;
-          bool type2Better = cs2->matchTypes(type2, type1,
-                                             TypeMatchKind::Subtype,
-                                             TMF_None,
-                                             ConstraintLocatorBuilder(nullptr),
-                                             trivial)
-                               == SolutionKind::TriviallySolved;
-          if (updateSolutionCompareResult(result, type1Better, type2Better))
-            return result;
-          if (type1Better || type2Better)
-            continue;
-
-          // If the type variable was bound by a literal constraint, and the
-          // type it is bound to happens to match the default literal
-          // constraint in one system but not the other, we prefer the one
-          // that matches the default.
-          // Note that the constraint will be available in the parent of
-          // the constraint system that assumed a value for the type variable
-          // (or, of course, in the original system, since these constraints
-          // are generated directly from the expression).
-          // FIXME: Make it efficient to find these constraints. This is
-          // silly.
-          bool defaultLit1
-            = topSystem.typeMatchesDefaultLiteralConstraint(boundTV1, type1);
-          bool defaultLit2
-            = topSystem.typeMatchesDefaultLiteralConstraint(boundTV1, type2);
-          if (updateSolutionCompareResult(result, defaultLit1, defaultLit2))
-            return result;
-          
+        auto known2 = sol2.typeBindings.find(boundTV1);
+        if (known2 == sol2.typeBindings.end())
           continue;
-        }
+
+        Type type2 = known2->second;
+
+        auto type1 = fixedTV1.second;
+
+        // Strip any initializers from tuples in the type; they aren't
+        // to be compared.
+        type1 = stripInitializers(cs.getTypeChecker(), type1);
+        type2 = stripInitializers(cs.getTypeChecker(), type2);
+
+        // If the types are equivalent, there's nothing more to do.
+        if (type1->isEqual(type2))
+          continue;
+
+        // If either of the types still contains type variables, we can't
+        // compare them.
+        // FIXME: This is really unfortunate. More type variable sharing
+        // (when it's sane) would help us do much better here.
+        if (type1->hasTypeVariable() || type2->hasTypeVariable())
+          return SolutionCompareResult::Incomparable;
+
+        // If one type is a subtype of the other, but not vice-verse,
+        // we prefer the system with the more-constrained type.
+        bool trivial = false;
+        bool type1Better = cs.matchTypes(type1, type2,
+                                         TypeMatchKind::Subtype,
+                                         TMF_None,
+                                         ConstraintLocatorBuilder(nullptr),
+                                         trivial)
+                             == SolutionKind::TriviallySolved;
+        bool type2Better = cs.matchTypes(type2, type1,
+                                         TypeMatchKind::Subtype,
+                                         TMF_None,
+                                         ConstraintLocatorBuilder(nullptr),
+                                         trivial)
+                             == SolutionKind::TriviallySolved;
+        if (updateSolutionCompareResult(result, type1Better, type2Better))
+          return result;
+        if (type1Better || type2Better)
+          continue;
+
+        // If the type variable was bound by a literal constraint, and the
+        // type it is bound to happens to match the default literal
+        // constraint in one system but not the other, we prefer the one
+        // that matches the default.
+        // Note that the constraint will be available in the parent of
+        // the constraint system that assumed a value for the type variable
+        // (or, of course, in the original system, since these constraints
+        // are generated directly from the expression).
+        // FIXME: Make it efficient to find these constraints. This is
+        // silly.
+        bool defaultLit1
+          = cs.typeMatchesDefaultLiteralConstraint(boundTV1, type1);
+        bool defaultLit2
+          = cs.typeMatchesDefaultLiteralConstraint(boundTV1, type2);
+        if (updateSolutionCompareResult(result, defaultLit1, defaultLit2))
+          return result;
       }
 
       return result;
@@ -6276,7 +6236,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs1,
 
   // Compare the type variables bound in the first system to the type variables
   // bound in the second type system.
-  SolutionCompareResult result = compareTypeVariables(&cs1, &cs2);
+  SolutionCompareResult result = compareTypeVariables(sol1, sol2);
   
   // FIXME: There might be variables bound in the second type system but not
   // the first, but for now we don't really care.
@@ -6296,23 +6256,23 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs1,
   }
 }
 
-ConstraintSystem *
-ConstraintSystem::findBestSolution(SmallVectorImpl<ConstraintSystem *> &viable){
+Solution *
+ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable){
   if (viable.empty())
     return nullptr;
   if (viable.size() == 1)
-    return viable[0];
+    return &viable[0];
 
   // Find a potential best. 
-  ConstraintSystem *best = nullptr;
-  for (auto cs : viable) {
+  Solution *best = nullptr;
+  for (auto &solution : viable) {
     if (!best) {
       // Found the first solved system.
-      best = cs;
+      best = &solution;
       continue;
     }
 
-    switch (compareSolutions(*cs, *best)) {
+    switch (compareSolutions(*this, solution, *best)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -6321,7 +6281,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<ConstraintSystem *> &viable){
       break;
 
     case SolutionCompareResult::Better:
-      best = cs;
+      best = &solution;
       break;
     }
   }
@@ -6330,11 +6290,11 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<ConstraintSystem *> &viable){
     return nullptr;
 
   // Make sure that our current best is better than all of the solved systems.
-  for (auto cs : viable) {
-    if (best == cs)
+  for (auto &solution : viable) {
+    if (best == &solution)
       continue;
 
-    switch (compareSolutions(*best, *cs)) {
+    switch (compareSolutions(*this, *best, solution)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -6507,17 +6467,19 @@ bool ConstraintSystem::diagnose() {
 //===--------------------------------------------------------------------===//
 #pragma mark Applying a solution to an expression.
 
-Expr *ConstraintSystem::convertToType(Expr *expr, Type toType,
-                                      bool isAssignment) {
+static Expr *convertToType(TypeChecker &tc, Expr *expr, Type toType,
+                           bool isAssignment = false) {
   // FIXME: Temporary hack that uses the existing coercion logic.
-  return TC.coerceToType(expr, toType,
+  return tc.coerceToType(expr, toType,
                          isAssignment? CoercionKind::Assignment
                                      : CoercionKind::Normal);
 }
 
-Expr *ConstraintSystem::convertObjectArgumentToType(Expr *expr, Type toType) {
+/// \brief Convert the object argument to the given type.
+static Expr *convertObjectArgumentToType(TypeChecker &tc, Expr *expr,
+                                         Type toType) {
   // FIXME: Temporary hack that uses the existing coercion logic.
-  return TC.coerceObjectArgument(expr, toType);
+  return tc.coerceObjectArgument(expr, toType);
 }
 
 /// \brief Determine whether the given expression refers to an assignment
@@ -6537,22 +6499,26 @@ static bool isAssignmentFn(Expr *expr) {
   return false;
 }
 
-Expr *ConstraintSystem::applySolution(Expr *expr) {
+/// \brief Apply a given solution to the expression, producing a fully
+/// type-checked expression.
+static Expr *applySolution(ConstraintSystem &cs, const Solution &solution,
+                           Expr *expr) {
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
-    ConstraintSystem &CS;
+    ConstraintSystem &cs;
+    const Solution &solution;
 
     Expr *specialize(Expr *expr, PolymorphicFunctionType *polyFn,
                      Type openedType) {
       // Gather the substitutions from archetypes to concrete types, found
       // by identifying all of the type variables in the original type
-      auto &tc = CS.getTypeChecker();
       TypeSubstitutionMap substitutions;
+      auto &tc = cs.getTypeChecker();
       auto type
         = tc.transformType(openedType,
             [&](Type type) -> Type {
               if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
                 auto archetype = tv->getImpl().getArchetype();
-                auto simplified = CS.simplifyType(tv);
+                auto simplified = getFixedType(tv);
                 substitutions[archetype] = simplified;
 
                 return SubstitutedType::get(archetype, simplified,
@@ -6583,7 +6549,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
                          SourceLoc memberLoc, Type openedType) {
       // FIXME: Falls back to the old type checker.
 
-      auto &tc = CS.getTypeChecker();
+      auto &tc = cs.getTypeChecker();
       auto result = tc.buildMemberRefExpr(base, dotLoc, { &member, 1 },
                                           memberLoc);
       if (!result)
@@ -6600,19 +6566,40 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       return result;
     }
 
+    /// \brief Retrieve the fixed type for the given type variable.
+    Type getFixedType(TypeVariableType *typeVar) {
+      auto knownBinding = solution.typeBindings.find(typeVar);
+      assert(knownBinding != solution.typeBindings.end());
+      return knownBinding->second;
+    }
+
+    /// \brief Retrieve the overload choice associated with the given
+    /// locator.
+    std::pair<OverloadChoice, Type>
+    getOverloadChoice(ConstraintLocator *locator) {
+      auto known = solution.overloadChoices.find(locator);
+      assert(known != solution.overloadChoices.end());
+      return known->second;
+    }
+
+    /// \brief Simplify the given type by substituting all occurrences of
+    /// type variables for their fixed types.
+    Type simplifyType(Type type) {
+      return solution.simplifyType(cs.getTypeChecker(), type);
+    }
+
     /// \brief Build a new subscript.
     Expr *buildSubscript(Expr *expr, Expr *base, Expr *index) {
       // Determine the declaration selected for this subscript operation.
-      auto ovl = CS.getGeneratedOverloadSet(
-                   CS.getConstraintLocator(expr,
-                                           ConstraintLocator::SubscriptMember));
-      assert(ovl && "No overload set associated with subscript expr?");
-      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
+      auto choice = getOverloadChoice(
+                      cs.getConstraintLocator(
+                        expr,
+                        ConstraintLocator::SubscriptMember)).first;
       auto subscript = cast<SubscriptDecl>(choice.getDecl());
 
       // FIXME: Falls back to existing type checker to actually populate
       // these nodes.
-      auto &tc = CS.getTypeChecker();
+      auto &tc = cs.getTypeChecker();
       auto baseTy = base->getType()->getRValueType();
 
       // Subscripting an existential type.
@@ -6657,10 +6644,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       Type baseTy;
       auto thisArchetype
         = proto->getThis()->getDeclaredType()->castTo<ArchetypeType>();
-      CS.getTypeChecker().transformType(openedType, [&](Type type) -> Type {
+      cs.getTypeChecker().transformType(openedType, [&](Type type) -> Type {
         if (auto typeVar = dyn_cast<TypeVariableType>(type.getPointer())) {
           if (typeVar->getImpl().getArchetype() == thisArchetype) {
-            baseTy = CS.simplifyType(typeVar);
+            baseTy = getFixedType(typeVar);
             return nullptr;
           }
         }
@@ -6670,23 +6657,24 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       assert(baseTy && "Unable to find base type for protocol operator ref");
       // FIXME: Check whether baseTy is an archetype?
 
-      auto &ctx = CS.getASTContext();
+      auto &ctx = cs.getASTContext();
       auto base = new (ctx) MetatypeExpr(nullptr, nameLoc,
                                          MetaTypeType::get(baseTy, ctx));
       return buildMemberRef(base, SourceLoc(), value, nameLoc, openedType);
     }
 
   public:
-    ExprRewriter(ConstraintSystem &CS) : CS(CS) { }
+    ExprRewriter(ConstraintSystem &cs, const Solution &solution)
+      : cs(cs), solution(solution) { }
 
-    ConstraintSystem &getConstraintSystem() const { return CS; }
+    ConstraintSystem &getConstraintSystem() const { return cs; }
 
     /// \brief Simplify the expression type and return the expression.
     ///
     /// This routine is used for 'simple' expressions that only need their
     /// types simplified, with no further computation.
     Expr *simplifyExprType(Expr *expr) {
-      auto toType = CS.simplifyType(expr->getType());
+      auto toType = simplifyType(expr->getType());
       expr->setType(toType);
       return expr;
     }
@@ -6698,9 +6686,9 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
     Expr *visitLiteralExpr(LiteralExpr *expr) {
       // FIXME: The existing literal coercion code should move here.
-      auto type = CS.simplifyType(expr->getType());
-      expr->setType(UnstructuredUnresolvedType::get(CS.getASTContext()));
-      return CS.convertToType(expr, type);
+      auto type = simplifyType(expr->getType());
+      expr->setType(UnstructuredUnresolvedType::get(cs.getASTContext()));
+      return convertToType(cs.getTypeChecker(), expr, type);
     }
     
     // FIXME: Add specific entries for the various literal expressions.
@@ -6729,19 +6717,23 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       if (auto polyFn = expr->getType()->getAs<PolymorphicFunctionType>()) {
         return specialize(expr, polyFn, fromType);
       }
-      
+
+      simplifyExprType(expr);
+
       // Check whether this is a generic type.
       if (auto meta = expr->getType()->getAs<MetaTypeType>()) {
         if (meta->getInstanceType()->is<UnboundGenericType>()) {
           // If so, type the declref as the bound generic type.
           // FIXME: Is this right?
-          auto simplifiedType = CS.simplifyType(fromType);
+          auto simplifiedType = simplifyType(fromType);
           expr->setType(simplifiedType);
+          return expr;
         }
       }
 
       // No polymorphic function; this a reference to a declaration with a
       // deduced type, such as $0.
+      simplifyExprType(expr);
       return expr;
     }
     
@@ -6759,23 +6751,22 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     
     Expr *visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
       // Resolve the callee to the constructor declaration selected.
-      auto ovl = CS.getGeneratedOverloadSet(
-                   CS.getConstraintLocator(
-                     expr,
-                     ConstraintLocator::ConstructorMember));
-      assert(ovl && "No overload set associated with decl reference expr?");
-      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
-      auto *ctor = cast<ConstructorDecl>(selected.first.getDecl());
+      auto selected = getOverloadChoice(
+                        cs.getConstraintLocator(
+                          expr,
+                          ConstraintLocator::ConstructorMember)).first;
+      auto *ctor = cast<ConstructorDecl>(selected.getDecl());
       // Build a call to the initializer for the constructor.
       auto *ctorRef
-        = new (CS.getASTContext()) OtherConstructorDeclRefExpr(ctor,
+        = new (cs.getASTContext()) OtherConstructorDeclRefExpr(ctor,
                                                  expr->getConstructorLoc(),
                                                  ctor->getInitializerType());
       auto *call
-        = new (CS.getASTContext()) DotSyntaxCallExpr(ctorRef,
+        = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef,
                                                      expr->getDotLoc(),
                                                      expr->getSubExpr());
-      return CS.TC.semaApplyExpr(call);
+      auto &tc = cs.getTypeChecker();
+      return tc.semaApplyExpr(call);
     }
 
     Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
@@ -6784,10 +6775,8 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
     Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *expr) {
       // Determine the declaration selected for this overloaded reference.
-      auto &context = CS.getASTContext();
-      auto ovl = CS.getGeneratedOverloadSet(CS.getConstraintLocator(expr, { }));
-      assert(ovl && "No overload set associated with decl reference expr?");
-      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto &context = cs.getASTContext();
+      auto selected = getOverloadChoice(cs.getConstraintLocator(expr, { }));
       auto choice = selected.first;
       auto decl = choice.getDecl();
 
@@ -6795,7 +6784,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
         // If this a member of a protocol, build an appropriate operator
         // reference.
         return buildProtocolOperatorRef(proto, decl, expr->getLoc(),
-                                          selected.second);
+                                        selected.second);
       }
 
       // Normal path: build a declaration reference.
@@ -6812,10 +6801,9 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
-      auto ovl = CS.getGeneratedOverloadSet(
-                   CS.getConstraintLocator(expr, ConstraintLocator::Member));
-      assert(ovl && "No overload set associated with decl reference expr?");
-      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto selected = getOverloadChoice(
+                        cs.getConstraintLocator(expr,
+                                                ConstraintLocator::Member));
       return buildMemberRef(expr->getBase(), expr->getDotLoc(),
                             selected.first.getDecl(), expr->getMemberLoc(),
                             selected.second);
@@ -6835,7 +6823,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
     Expr *visitMemberRefExpr(MemberRefExpr *expr) {
       // FIXME: Falls back to the old type checker.
-      return CS.getTypeChecker().recheckTypes(expr);
+      return cs.getTypeChecker().recheckTypes(expr);
     }
     
     Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
@@ -6845,20 +6833,18 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *expr) {
-      auto ovl = CS.getGeneratedOverloadSet(
-                   CS.getConstraintLocator(expr, ConstraintLocator::Member));
-      assert(ovl && "No overload set associated with decl reference expr?");
-      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto selected = getOverloadChoice(
+                        cs.getConstraintLocator(expr,
+                                                ConstraintLocator::Member));
       return buildMemberRef(expr->getBase(), expr->getDotLoc(),
                             selected.first.getDecl(), expr->getNameLoc(),
                             selected.second);
     }
 
     Expr *visitGenericMemberRefExpr(GenericMemberRefExpr *expr) {
-      auto ovl = CS.getGeneratedOverloadSet(
-                   CS.getConstraintLocator(expr, ConstraintLocator::Member));
-      assert(ovl && "No overload set associated with decl reference expr?");
-      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto selected = getOverloadChoice(
+                        cs.getConstraintLocator(expr,
+                                                ConstraintLocator::Member));
       return buildMemberRef(expr->getBase(), expr->getDotLoc(),
                             selected.first.getDecl(), expr->getNameLoc(),
                             selected.second);
@@ -6868,10 +6854,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // Dig out the type of the 'oneof', which will either be the result
       // type of this expression (for unit OneOfElements) or the result of
       // the function type of this expression (for non-unit OneOfElements).
-      Type oneofTy = CS.simplifyType(expr->getType());
+      Type oneofTy = simplifyType(expr->getType());
       if (auto funcTy = oneofTy->getAs<FunctionType>())
         oneofTy = funcTy->getResult();
-      auto &tc = CS.getTypeChecker();
+      auto &tc = cs.getTypeChecker();
       auto oneofMetaTy = MetaTypeType::get(oneofTy, tc.Context);
 
       // The base expression is simply the metatype of a oneof type.
@@ -6881,7 +6867,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
       // Find the member and build a reference to it.
       // FIXME: Redundant member lookup.
-      MemberLookup &lookup = CS.lookupMember(oneofMetaTy, expr->getName());
+      MemberLookup &lookup = cs.lookupMember(oneofMetaTy, expr->getName());
       assert(lookup.isSuccess() && "Failed lookup?");
       auto member = lookup.Results[0].D;
       auto result = tc.buildMemberRefExpr(base, expr->getDotLoc(),
@@ -6892,11 +6878,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
       // Determine the declaration selected for this overloaded reference.
-      auto ovl = CS.getGeneratedOverloadSet(
-                   CS.getConstraintLocator(expr,
-                                           ConstraintLocator::MemberRefBase));
-      assert(ovl && "No overload set associated with unresolved dot expr?");
-      auto selected = CS.getSelectedOverloadFromSet(ovl).getValue();
+      auto selected = getOverloadChoice(
+                        cs.getConstraintLocator(
+                          expr,
+                          ConstraintLocator::MemberRefBase));
 
       switch (selected.first.getKind()) {
       case OverloadChoiceKind::Decl:
@@ -6909,17 +6894,17 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
         // If the base expression is not an lvalue, make everything inside it
         // materializable.
         if (!base->getType()->is<LValueType>()) {
-          base = CS.getTypeChecker().convertToMaterializable(base);
+          base = cs.getTypeChecker().convertToMaterializable(base);
           if (!base)
             return nullptr;
         }
 
-        return new (CS.getASTContext()) TupleElementExpr(
+        return new (cs.getASTContext()) TupleElementExpr(
                                           base,
                                           expr->getDotLoc(),
                                           selected.first.getTupleIndex(),
                                           expr->getNameLoc(),
-                                          CS.simplifyType(expr->getType()));
+                                          simplifyType(expr->getType()));
       }
 
       case OverloadChoiceKind::BaseType:
@@ -6949,7 +6934,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       simplifyExprType(expr);
       Type arrayTy = expr->getType();
       
-      ProtocolDecl *arrayProto = CS.TC.getArrayLiteralProtocol();
+      ProtocolDecl *arrayProto = cs.getTypeChecker().getArrayLiteralProtocol();
       assert(arrayProto && "type-checked array literal w/o protocol?!");
       
       /* FIXME: Ideally we'd use the protocol conformance as below, but
@@ -6993,15 +6978,14 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
        * For the time being, use a value member constraint to find the
        * appropriate convertFromArrayLiteral call.
        */
-      auto ovl = CS.getGeneratedOverloadSet(
-                   CS.getConstraintLocator(expr,
-                                           ConstraintLocator::MemberRefBase));
-      assert(ovl && "No overload set associated with array expr?");
-      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
+      auto choice = getOverloadChoice(
+                      cs.getConstraintLocator(
+                        expr,
+                        ConstraintLocator::MemberRefBase)).first;
       auto converterDecl = cast<FuncDecl>(choice.getDecl());
       
       // Construct the semantic expr as a convertFromArrayLiteral application.
-      ASTContext &C = CS.getASTContext();
+      ASTContext &C = cs.getASTContext();
       Expr *converterRef = new (C) DeclRefExpr(converterDecl, expr->getLoc(),
                                            converterDecl->getTypeOfReference());
       Expr *typeRef = new (C) MetatypeExpr(nullptr,
@@ -7011,15 +6995,16 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       Expr *semanticExpr = new (C) DotSyntaxCallExpr(converterRef,
                                                      expr->getLoc(),
                                                      typeRef);
-      semanticExpr = CS.TC.recheckTypes(semanticExpr);
+      semanticExpr = cs.getTypeChecker().recheckTypes(semanticExpr);
       
       semanticExpr = new (C) CallExpr(semanticExpr,
                                       expr->getSubExpr());
 
-      semanticExpr = CS.TC.recheckTypes(semanticExpr);
+      semanticExpr = cs.getTypeChecker().recheckTypes(semanticExpr);
       
       if (!semanticExpr) {
-        CS.TC.diagnose(arrayProto->getLoc(), diag::array_protocol_broken);
+        cs.getTypeChecker().diagnose(arrayProto->getLoc(),
+                                     diag::array_protocol_broken);
         return nullptr;
       }
       
@@ -7031,7 +7016,8 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       simplifyExprType(expr);
       Type dictionaryTy = expr->getType();
       
-      ProtocolDecl *dictionaryProto = CS.TC.getDictionaryLiteralProtocol();
+      ProtocolDecl *dictionaryProto
+        = cs.getTypeChecker().getDictionaryLiteralProtocol();
       assert(dictionaryProto && "type-checked dictionary literal w/o protocol?");
       
       /* FIXME: Ideally we'd use the protocol conformance as below, but
@@ -7042,16 +7028,15 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
        * For the time being, use a value member constraint to find the
        * appropriate convertFromDictionaryLiteral call.
        */
-      auto ovl = CS.getGeneratedOverloadSet(
-                   CS.getConstraintLocator(expr,
-                                           ConstraintLocator::MemberRefBase));
-      assert(ovl && "No overload set associated with dictionary expr?");
-      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
+      auto choice = getOverloadChoice(
+                      cs.getConstraintLocator(
+                        expr,
+                        ConstraintLocator::MemberRefBase)).first;
       auto converterDecl = cast<FuncDecl>(choice.getDecl());
       
       // Construct the semantic expr as a convertFromDictionaryLiteral
       // application.
-      ASTContext &C = CS.getASTContext();
+      ASTContext &C = cs.getASTContext();
       Expr *converterRef = new (C) DeclRefExpr(converterDecl, expr->getLoc(),
                                            converterDecl->getTypeOfReference());
       Expr *typeRef = new (C) MetatypeExpr(nullptr,
@@ -7061,16 +7046,16 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       Expr *semanticExpr = new (C) DotSyntaxCallExpr(converterRef,
                                                      expr->getLoc(),
                                                      typeRef);
-      semanticExpr = CS.TC.recheckTypes(semanticExpr);
+      semanticExpr = cs.getTypeChecker().recheckTypes(semanticExpr);
       
       semanticExpr = new (C) CallExpr(semanticExpr,
                                       expr->getSubExpr());
 
-      semanticExpr = CS.TC.recheckTypes(semanticExpr);
+      semanticExpr = cs.getTypeChecker().recheckTypes(semanticExpr);
       
       if (!semanticExpr) {
-        CS.TC.diagnose(dictionaryProto->getLoc(), 
-                       diag::dictionary_protocol_broken);
+        cs.getTypeChecker().diagnose(dictionaryProto->getLoc(),
+                                     diag::dictionary_protocol_broken);
         return nullptr;
       }
       
@@ -7113,7 +7098,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       case PatternKind::Named: {
         // Simplify the type of any variables.
         auto var = cast<NamedPattern>(pattern)->getDecl();
-        var->overwriteType(CS.simplifyType(var->getType()));
+        var->overwriteType(simplifyType(var->getType()));
         return;
       }
 
@@ -7135,16 +7120,17 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
 
       // Coerce the FuncExpr's pattern, in case we resolved something.
       Type input = expr->getType()->castTo<FunctionType>()->getInput();
-      if (CS.TC.coerceToType(expr->getArgParamPatterns()[0], input, false))
+      auto &tc = cs.getTypeChecker();
+      if (tc.coerceToType(expr->getArgParamPatterns()[0], input, false))
         return nullptr;
-      if (CS.TC.coerceToType(expr->getBodyParamPatterns()[0], input, false))
+      if (tc.coerceToType(expr->getBodyParamPatterns()[0], input, false))
         return nullptr;
 
       return expr;
     }
 
     Expr *visitExplicitClosureExpr(ExplicitClosureExpr *expr) {
-      auto type = CS.simplifyType(expr->getType())->castTo<FunctionType>();
+      auto type = simplifyType(expr->getType())->castTo<FunctionType>();
 
       // Count the number of arguments.
       unsigned numInputArgs = 1;
@@ -7157,21 +7143,21 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
                                     expr->getParserVarDecls().end());
       Pattern *argPat;
       SourceLoc loc = expr->getLoc();
-      expr->GenerateVarDecls(numInputArgs, argVars, CS.getASTContext());
+      expr->GenerateVarDecls(numInputArgs, argVars, cs.getASTContext());
 
       // Build the patterns and update the variable types.
       if (inputTT) {
         std::vector<TuplePatternElt> argElts;
         for (unsigned i = 0; i < numInputArgs; ++i) {
           argVars[i]->overwriteType(inputTT->getElementType(i));
-          auto p = new (CS.getASTContext()) NamedPattern(argVars[i]);
+          auto p = new (cs.getASTContext()) NamedPattern(argVars[i]);
           p->setType(inputTT->getElementType(i));
           argElts.emplace_back(p);
         }
-        argPat = TuplePattern::create(CS.getASTContext(), loc, argElts, loc);
+        argPat = TuplePattern::create(cs.getASTContext(), loc, argElts, loc);
       } else {
         argVars[0]->overwriteType(type->getInput());
-        argPat = new (CS.getASTContext()) NamedPattern(argVars[0]);
+        argPat = new (cs.getASTContext()) NamedPattern(argVars[0]);
       }
       argPat->setType(type->getInput());
       expr->setPattern(argPat);
@@ -7179,12 +7165,13 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       // Convert the expression in the body to the result type of the explicit
       // closure.
       auto resultType = type->getResult();
-      if (Expr *body = CS.convertToType(expr->getBody(), resultType))
+      if (Expr *body = convertToType(cs.getTypeChecker(), expr->getBody(),
+                                     resultType))
         expr->setBody(body);
       expr->setType(type);
 
       // Compute the capture list, now that we have analyzed the expression.
-      expr->computeCaptures(CS.getASTContext());
+      expr->computeCaptures(cs.getASTContext());
 
       return expr;
     }
@@ -7206,15 +7193,15 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
       
       auto destQuals = lv->getQualifiers() - LValueType::Qual::Implicit;
       expr->setType(LValueType::get(lv->getObjectType(), destQuals,
-                                    CS.getASTContext()));
+                                    cs.getASTContext()));
       return expr;
     }
 
     Expr *visitNewArrayExpr(NewArrayExpr *expr) {
-      auto &tc = CS.getTypeChecker();
+      auto &tc = cs.getTypeChecker();
 
       // Dig out the element type of the new array expression.
-      auto resultType = CS.simplifyType(expr->getType());
+      auto resultType = simplifyType(expr->getType());
       auto elementType = resultType->castTo<BoundGenericType>()
                            ->getGenericArgs()[0];
       expr->setElementType(elementType);
@@ -7242,7 +7229,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
 
     Expr *visitMetatypeExpr(MetatypeExpr *expr) {
-      auto &tc = CS.getTypeChecker();
+      auto &tc = cs.getTypeChecker();
 
       if (Expr *base = expr->getBase()) {
         base = tc.convertToRValue(base);
@@ -7258,7 +7245,7 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
     
     Expr *visitApplyExpr(ApplyExpr *expr) {
-      auto &tc = CS.getTypeChecker();
+      auto &tc = cs.getTypeChecker();
 
       // The function is always an rvalue.
       auto fn = tc.convertToRValue(expr->getFn());
@@ -7272,10 +7259,10 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
         auto origArg = expr->getArg();
         Expr *arg = nullptr;
         if (isa<DotSyntaxCallExpr>(expr))
-          arg = CS.convertObjectArgumentToType(origArg, fnType->getInput());
+          arg = convertObjectArgumentToType(tc, origArg, fnType->getInput());
         else
-          arg = CS.convertToType(origArg, fnType->getInput(),
-                                 isAssignmentFn(fn));
+          arg = convertToType(tc, origArg, fnType->getInput(),
+                              isAssignmentFn(fn));
 
         if (!arg) {
           tc.diagnose(fn->getLoc(), diag::while_converting_function_argument,
@@ -7301,20 +7288,18 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     }
     
     Expr *visitNewReferenceExpr(NewReferenceExpr *expr) {
-      auto instanceTy = CS.simplifyType(expr->getType());
+      auto instanceTy = simplifyType(expr->getType());
       expr->setType(instanceTy);
 
       // Find the constructor we selected for this expression.
-      auto ovl = CS.getGeneratedOverloadSet(
-                   CS.getConstraintLocator(
-                     expr,
-                     ConstraintLocator::ConstructorMember));
-      assert(ovl && "No overload set associated with new reference expr?");
-      auto choice = CS.getSelectedOverloadFromSet(ovl).getValue().first;
+      auto choice = getOverloadChoice(
+                      cs.getConstraintLocator(
+                        expr,
+                        ConstraintLocator::ConstructorMember)).first;
       auto constructor = cast<ConstructorDecl>(choice.getDecl());
 
       // Form the constructor call expression.
-      auto &tc = CS.getTypeChecker();
+      auto &tc = cs.getTypeChecker();
       auto classMetaTy = MetaTypeType::get(instanceTy, tc.Context);
       Expr *typeBase = new (tc.Context) MetatypeExpr(nullptr, expr->getLoc(),
                                                      classMetaTy);
@@ -7403,13 +7388,12 @@ Expr *ConstraintSystem::applySolution(Expr *expr) {
     virtual bool walkToDeclPre(Decl *decl) { return false; }
   };
 
-  assert(isSolved() && "Solution is not solved!");
-
   // FIXME: Disable the constraint-based type checker here, because we depend
   // heavily on the existing type checker.
-  llvm::SaveAndRestore<bool> savedUseCS(TC.getLangOpts().UseConstraintSolver,
+  llvm::SaveAndRestore<bool> savedUseCS(cs.getTypeChecker().getLangOpts()
+                                          .UseConstraintSolver,
                                         false);
-  ExprRewriter rewriter(*this);
+  ExprRewriter rewriter(cs, solution);
   ExprWalker walker(rewriter);
   return expr->walk(walker);
 }
@@ -7534,7 +7518,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   }
 
   // Attempt to solve the constraint system.
-  SmallVector<ConstraintSystem *, 4> viable;
+  SmallVector<Solution, 4> viable;
   if (cs.solve(viable)) {
     // Try to provide a decent diagnostic.
     if (cs.diagnose()) {
@@ -7549,8 +7533,8 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
       if (!viable.empty()) {
         unsigned idx = 0;
         for (auto cs : viable) {
-          log << "---Child system #" << ++idx << "---\n";
-          cs->dump();
+          log << "---Solution #" << ++idx << "---\n";
+          cs.dump(&Context.SourceMgr);
         }
       }
 
@@ -7573,14 +7557,11 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   auto solution = viable[0];
   if (getLangOpts().DebugConstraintSolver) {
     log << "---Solution---\n";
-    solution->dump();
+    solution.dump(&Context.SourceMgr);
   }
 
-  // Inject the permanent type bindings from this solution.
-  ReinstateTypeVariableBindingsRAII reinstateBindings(*solution);
-
   // Apply the solution to the expression.
-  auto result = solution->applySolution(expr);
+  auto result = applySolution(cs, solution, expr);
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
    return nullptr;
@@ -7589,7 +7570,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   // If we're supposed to convert the expression to some particular type,
   // do so now.
   if (convertType) {
-    result = solution->convertToType(result, convertType);
+    result = convertToType(*this, result, convertType);
     if (!result) {
       return nullptr;
     }
@@ -7697,28 +7678,27 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   }
 
   // Attempt to solve the constraint system.
-  SmallVector<ConstraintSystem *, 4> viable;
-  if (cs.solve(viable)) {
+  SmallVector<Solution, 4> solutions;
+  if (cs.solve(solutions)) {
     // FIXME: Dumping constraints by default due to crummy diagnostics.
     if (getLangOpts().DebugConstraintSolver || true) {
       log << "---Solved constraints---\n";
       cs.dump();
 
-      if (!viable.empty()) {
+      if (!solutions.empty()) {
         unsigned idx = 0;
-        for (auto cs : viable) {
-          SmallVector<TypeVariableType *, 4> freeVariables;
-          log << "---Child system #" << ++idx << "---\n";
-          cs->dump();
+        for (auto &solution : solutions) {
+          log << "---Solution #" << ++idx << "---\n";
+          solution.dump(&Context.SourceMgr);
         }
       }
 
-      if (viable.size() == 0)
+      if (solutions.size() == 0)
         log << "No solution found.\n";
-      else if (viable.size() == 1)
+      else if (solutions.size() == 1)
         log << "Unique solution found.\n";
       else {
-        log << "Found " << viable.size() << " potential solutions.\n";
+        log << "Found " << solutions.size() << " potential solutions.\n";
       }
     }
 
@@ -7729,31 +7709,28 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
     return { nullptr, nullptr };
   }
 
-  auto solution = viable[0];
+  auto &solution = solutions[0];
   if (getLangOpts().DebugConstraintSolver) {
     log << "---Solution---\n";
-    solution->dump();
+    solution.dump(&Context.SourceMgr);
   }
 
-  // Inject the permanent type bindings from this solution.
-  ReinstateTypeVariableBindingsRAII reinstateBindings(*solution);
-
   // Apply the solution to the destination.
-  dest = solution->applySolution(dest);
+  dest = applySolution(cs, solution, dest);
   if (!dest) {
     // Failure already diagnosed, above, as part of applying the solution.
     return { nullptr, nullptr };
   }
 
   // Apply the solution to the source.
-  src = solution->applySolution(src);
+  src = applySolution(cs, solution, src);
   if (!src) {
     // Failure already diagnosed, above, as part of applying the solution.
     return { nullptr, nullptr };
   }
 
   // Convert the source to the simplified destination type.
-  src = solution->convertToType(src, solution->simplifyType(destTy));
+  src = convertToType(*this, src, solution.simplifyType(*this, destTy));
   if (!src) {
     // Failure already diagnosed, above, as part of applying the solution.
     return { nullptr, nullptr };
@@ -7776,6 +7753,56 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
 // Debugging
 //===--------------------------------------------------------------------===//
 #pragma mark Debugging
+
+void Solution::dump(llvm::SourceMgr *sm) {
+  llvm::raw_ostream &out = llvm::errs();
+
+  out << "Type variables:\n";
+  for (auto binding : typeBindings) {
+    out.indent(2);
+    binding.first->getImpl().print(out);
+    out << " as ";
+    binding.second.print(out);
+    out << "\n";
+  }
+
+  out << "\n";
+  out << "Overload choices:\n";
+  for (auto ovl : overloadChoices) {
+    out.indent(2);
+    ovl.first->dump(sm);
+    out << " with ";
+
+    auto choice = ovl.second.first;
+    switch (choice.getKind()) {
+    case OverloadChoiceKind::Decl:
+      if (choice.getBaseType())
+        out << choice.getBaseType()->getString() << ".";
+        
+      out << choice.getDecl()->getName().str() << ": "
+        << ovl.second.second->getString() << "\n";
+      break;
+
+    case OverloadChoiceKind::BaseType:
+      out << "base type " << choice.getBaseType()->getString() << "\n";
+      break;
+
+    case OverloadChoiceKind::FunctionReturningBaseType:
+      out << "function returning base type "
+        << choice.getBaseType()->getString() << "\n";
+      break;
+    case OverloadChoiceKind::IdentityFunction:
+      out << "identity " << choice.getBaseType()->getString() << " -> "
+        << choice.getBaseType()->getString() << "\n";
+      break;
+    case OverloadChoiceKind::TupleIndex:
+      out << "tuple " << choice.getBaseType()->getString() << " index "
+        << choice.getTupleIndex() << "\n";
+      break;
+    }
+    out << "\n";
+  }
+}
 
 void ConstraintSystem::dump() {
   llvm::raw_ostream &out = llvm::errs();
