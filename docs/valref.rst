@@ -175,7 +175,13 @@ Interaction with `[byref]`
 Generics
 ========
 
-In generics, it is possible
+As with an array's element type, a generic type parameter can also be
+a ``ref`` or a ``val``.  The rules for declarations in terms of
+``ref`` or ``val`` types are as follows::
+
+   ref x : T // always declares a ref
+   val x : T // always declares a val
+   var x : T // declares a val iff T is a val
 
 * Do we need to say something special about generic classes?  I think not.
 
