@@ -127,6 +127,18 @@ The new rules are as follows:
   its enclosing ``struct`` or ``class`` is copied.  We discuss below__
   what to do when the ``class`` is not ``Cloneable``.
 
+Arrays
+======
+
+* You can explicitly declare an array of `ref T` or `val T`.
+  Semantics should follow those of instance variables.
+
+``oneof``\ s
+============
+
+* Semantics of ``oneof`` elements should follow those of instance
+  variables.
+
 __ non-copyable_
 
 Function Parameters
@@ -149,18 +161,14 @@ A function parameter declared ``val`` contains a distinct copy of the
 argument's value.  A function parameter declared ``ref`` refers to the
 same object as the argument.  
 
-There are two obvious choices for non-``class`` instance variables
-passed to a ``ref`` parameter:
-
-1. Copy the value to the heap (essentially ref-boxing a copy)
-2. Make it illegal
-
-I'm not sure which is better.
+The semantics of passing arguments to functions follow those of
+assignments and initializations: when a ``val`` is involved, the value
+is copied.
 
 Interaction with `[byref]`
 --------------------------
 
-TBD
+
 
 Generics
 ========
