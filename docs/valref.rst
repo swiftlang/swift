@@ -130,8 +130,13 @@ The new rules are as follows:
 Arrays
 ======
 
-* You can explicitly declare an array of `ref T` or `val T`.
-  Semantics should follow those of instance variables.
+Array elements can be explicitly declared ``val`` or ``ref``::
+
+  var x : Int[42]       // an array of 42 integers
+  var y : val Int[42]   // an array of 42 integers
+  var y : ref Int[42]   // an array of 42 integers-on-the-heap
+
+Semantics of array elements follow those of instance variables.
 
 ``oneof``\ s
 ============
@@ -151,41 +156,28 @@ Function parameters can be explicitly declared ``val``, or ``ref``::
     , val y: Int  // just like "y: Int"
     , ref z: Int  // allocate z on the heap
 
-    , var q: SomeClass          // q is stored by-reference
-    , ref r: SomeClass          // just like "var r: SomeClass"
-    , val s: SomeCloneableClass // clone() s when Bar is clone()d
+    , q: SomeClass               // passing a reference
+    , ref r: SomeClass           // just like "var r: SomeClass"
+    , val s: SomeCloneableClass) // Passing a copy of the argument
 
-.. Note:: do we also want to allow explicit ``var`` function parameters?
+.. Note:: We suggest allowing explicit ``var`` function parameters for
+          uniformity.
 
-A function parameter declared ``val`` contains a distinct copy of the
-argument's value.  A function parameter declared ``ref`` refers to the
-same object as the argument.  
-
-The semantics of passing arguments to functions follow those of
-assignments and initializations: when a ``val`` is involved, the value
-is copied.
+Semantics of passing arguments to functions follow those of
+assignments and initializations: when a ``val`` is involved, the
+argument value is copied.
 
 Interaction with `[byref]`
 --------------------------
 
-
+* Is there anything to say here?
 
 Generics
 ========
 
-``val`` and ``ref`` are also protocols known to the compiler.  When a
-``class`` ``T`` is passed where a ``val`` is required, the
-``T`` is auto-boxed into a value as-if::
+In generics, it is possible
 
-  struct TBox {
-    constructor(x: ref T) { _x=x }
-    val _x: T
-  }
-
-When a non-class ``T`` is passed where a ``ref`` is required, we
-should treat
-
-* Don't forget to cover Vector<ref X> vs. Vector<val X>
+* Do we need to say something special about generic classes?  I think not.
 
 .. _non-copyable:
 
