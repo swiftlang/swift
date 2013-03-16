@@ -503,6 +503,7 @@ public:
   ManagedValue visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E,
                                                 SGFContext C);
   ManagedValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
+  ManagedValue visitIfExpr(IfExpr *E, SGFContext C);
 
   void emitApplyArgumentValue(SILLocation loc,
                               ManagedValue argValue,

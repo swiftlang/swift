@@ -400,9 +400,14 @@ ERROR(expected_expr_return,stmt_parsing,none,
 ERROR(expected_expr_if,stmt_parsing,none,
       "expected expression in 'if' condition", ())
 ERROR(expected_lbrace_after_if,stmt_parsing,none,
-      "expected '{' after 'if' condition", ())
+      "expected '{' after 'if' statement condition", ())
+ERROR(expected_lbrace_or_then_after_if,stmt_parsing,none,
+      "expected '{' or 'then' after 'if' condition", ())
 ERROR(expected_lbrace_after_else,stmt_parsing,none,
       "expected '{' after 'else'", ())
+ERROR(unexpected_if_expression,stmt_parsing,none,
+      "'if...then' expression cannot be used as 'else' clause of 'if' statement",
+      ())
 
 // While Statement
 ERROR(expected_expr_while,stmt_parsing,none,
@@ -578,7 +583,19 @@ NOTE(while_parsing_as_left_angle_bracket,expr_parsing,none,
      "while parsing this '<' as a type parameter bracket", ())
 NOTE(while_parsing_as_less_operator,expr_parsing,none,
      "while parsing this '<' as an operator", ())
-     
+
+// If expressions
+ERROR(unexpected_if_statement,expr_parsing,none,
+      "'if' statement cannot be used inside an expression", ())
+ERROR(expected_then_after_if_expression,expr_parsing,none,
+      "expected 'then' after 'if' expression condition", ())
+ERROR(expected_expr_then,expr_parsing,none,
+      "expected expression after 'if...then'", ())
+ERROR(expected_else_after_if_expression,expr_parsing,none,
+      "'if...then' expression must have an 'else' clause", ())
+ERROR(expected_expr_else,expr_parsing,none,
+      "expected expression after 'if...then...else'", ())
+
 //------------------------------------------------------------------------------
 // Literal parsing diagnostics
 //------------------------------------------------------------------------------

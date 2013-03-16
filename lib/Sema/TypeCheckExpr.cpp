@@ -1330,6 +1330,11 @@ public:
     TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
     return nullptr;
   }
+    
+  Expr *visitIfExpr(IfExpr *E) {
+    TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
+    return nullptr;
+  }
   
   SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
   

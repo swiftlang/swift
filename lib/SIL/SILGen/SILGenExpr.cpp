@@ -1447,3 +1447,7 @@ ManagedValue SILGenFunction::visitBridgeToBlockExpr(BridgeToBlockExpr *E,
                                                     SGFContext C) {
   llvm_unreachable("not implemented");
 }
+
+ManagedValue SILGenFunction::visitIfExpr(IfExpr *E, SGFContext C) {
+  llvm_unreachable("not implemented");
+}

@@ -60,6 +60,7 @@ KEYWORD(subscript)
 // Statement keywords.
 KEYWORD(if)
 KEYWORD(do)
+KEYWORD(then)
 KEYWORD(else)
 KEYWORD(for)
 KEYWORD(while)

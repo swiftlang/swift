@@ -29,12 +29,11 @@ using namespace swift;
 /// Note this also returns true for '{' which can be the start of a stmt-brace
 /// or the start of an expr-closure.  This ambiguity is resolved towards
 /// statements when not in a subexpression context.
-bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
+bool Parser::isStartOfStmtOtherThanAssignmentOrIf(const Token &Tok) {
   switch (Tok.getKind()) {
   default: return false;
   case tok::l_brace:
   case tok::kw_return:
-  case tok::kw_if:
   case tok::kw_while:
   case tok::kw_do:
   case tok::kw_for:
@@ -115,12 +114,14 @@ bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
     diagnose(Tok.getLoc(), diag::illegal_semi_stmt);
     consumeToken();
     return true;
-  } else if (isStartOfStmtOtherThanAssignment(Tok)) {
-    NullablePtr<Stmt> Res = parseStmtOtherThanAssignment();
+  } else if (isStartOfStmtOtherThanAssignmentOrIf(Tok)) {
+    NullablePtr<Stmt> Res = parseStmtOtherThanAssignmentOrIf();
     if (Res.isNull())
       return true;
     Result = Res.get();
     return false;
+  } else if (Tok.is(tok::kw_if)) {
+    return parseExprOrStmtIf(Result);
   }
 
   assert(Tok.isNot(tok::l_brace) &&
@@ -271,9 +272,9 @@ static NullablePtr<Stmt> recoverFromInvalidCase(Parser &P) {
 }
 
 /// parseStmtOtherThanAssignment - Note that this doesn't handle the
-/// "expr '=' expr" production.
+/// "expr '=' expr" or "if expr ..." productions.
 ///
-NullablePtr<Stmt> Parser::parseStmtOtherThanAssignment() {
+NullablePtr<Stmt> Parser::parseStmtOtherThanAssignmentOrIf() {
   switch (Tok.getKind()) {
   default:
     diagnose(Tok, diag::expected_stmt);
@@ -281,7 +282,6 @@ NullablePtr<Stmt> Parser::parseStmtOtherThanAssignment() {
   case tok::l_brace:
     return parseStmtBrace(diag::invalid_diagnostic).getPtrOrNull();
   case tok::kw_return: return parseStmtReturn();
-  case tok::kw_if:     return parseStmtIf();
   case tok::kw_while:  return parseStmtWhile();
   case tok::kw_do:     return parseStmtDoWhile();
   case tok::kw_for:    return parseStmtFor();
@@ -333,7 +333,7 @@ NullablePtr<Stmt> Parser::parseStmtReturn() {
   // followed by a '}', ';', or statement keyword.
   Expr *RetExpr = nullptr;
   if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi)
-      && (Tok.is(tok::l_brace) || !isStartOfStmtOtherThanAssignment(Tok))) {
+      && (Tok.is(tok::l_brace) || !isStartOfStmtOtherThanAssignmentOrIf(Tok))) {
     NullablePtr<Expr> Result = parseExpr(diag::expected_expr_return);
     if (Result.isNull())
       return 0;
@@ -350,15 +350,72 @@ NullablePtr<Stmt> Parser::parseStmtReturn() {
 ///   stmt-if-else:
 ///    'else' stmt-brace
 ///    'else' stmt-if
-NullablePtr<Stmt> Parser::parseStmtIf() {
-  SourceLoc IfLoc = consumeToken(tok::kw_if);
+///
+///   expr-if:
+///     'if' expr 'then' expr 'else' expr
 
+bool Parser::parseIfConditionClause(SourceLoc &IfLoc, Expr *&CondExpr) {
+  IfLoc = consumeToken(tok::kw_if);
+  
   NullablePtr<Expr> Condition = parseExpr(diag::expected_expr_if);
-  if (Condition.isNull()) return 0;
+  if (Condition.isNull()) return true;
+  
+  CondExpr = Condition.get();
+  return false;
+}
+
+bool Parser::parseExprOrStmtIf(ExprStmtOrDecl &Result) {
+  SourceLoc IfLoc;
+  Expr *Condition;
+  
+  if (parseIfConditionClause(IfLoc, Condition))
+    return true;
+
+  if (Tok.is(tok::l_brace)) {
+    NullablePtr<Stmt> ifStmt = parseStmtIf(IfLoc, Condition);
+    if (ifStmt.isNull())
+      return true;
+    Result = ifStmt.get();
+    return false;
+  }
+  
+  if (Tok.is(tok::kw_then)) {
+    NullablePtr<Expr> ifExpr = parseExprIf(IfLoc, Condition);
+    if (ifExpr.isNull())
+      return true;
+    Result = ifExpr.get();
+    return false;
+  }
+  
+  diagnose(Tok.getLoc(), diag::expected_lbrace_or_then_after_if);
+  Result = ExprStmtOrDecl();
+  return true;
+}
+
+NullablePtr<Stmt> Parser::parseStmtIf() {
+  SourceLoc IfLoc;
+  Expr *Condition;
+  
+  if (parseIfConditionClause(IfLoc, Condition))
+    return nullptr;
+
+  // We're in a context where an 'if' expression is invalid (namely, after the
+  // 'else' of a previous 'if' statement).
+  if (Tok.is(tok::kw_then)) {
+    diagnose(Tok.getLoc(), diag::unexpected_if_expression);
+    // Parse and discard the if expression for recovery purposes.
+    parseExprIf(IfLoc, Condition);
+    return nullptr;
+  }
+
+  return parseStmtIf(IfLoc, Condition);
+}
+
+NullablePtr<Stmt> Parser::parseStmtIf(SourceLoc IfLoc, Expr *Condition) {
   NullablePtr<BraceStmt> NormalBody =
     parseStmtBrace(diag::expected_lbrace_after_if);
   if (NormalBody.isNull())
-    return 0;
+    return nullptr;
     
   NullablePtr<Stmt> ElseBody;
   SourceLoc ElseLoc = Tok.getLoc();
@@ -368,13 +425,13 @@ NullablePtr<Stmt> Parser::parseStmtIf() {
     else
       ElseBody =parseStmtBrace(diag::expected_lbrace_after_else).getPtrOrNull();
     if (ElseBody.isNull())
-      return 0;
+      return nullptr;
   } else {
     ElseLoc = SourceLoc();
   }
 
   // If our condition and normal expression parsed correctly, build an AST.
-  return new (Context) IfStmt(IfLoc, Condition.get(), NormalBody.get(),
+  return new (Context) IfStmt(IfLoc, Condition, NormalBody.get(),
                               ElseLoc, ElseBody.getPtrOrNull());
 }
 

@@ -271,6 +271,9 @@ public:
   CoercedResult visitNewReferenceExpr(NewReferenceExpr *E) {
     return failed(E); // FIXME: Is this reachable?
   }
+  CoercedResult visitIfExpr(IfExpr *E) {
+    return failed(E); // FIXME: Is this reachable?
+  }
   CoercedResult visitMetatypeExpr(MetatypeExpr *E) {
     return failed(E); // We actually could potentially do a coercion here.
   }

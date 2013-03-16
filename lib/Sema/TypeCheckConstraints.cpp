@@ -3768,6 +3768,29 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return TupleType::getEmpty(CS.getASTContext());
     }
     
+    Type visitIfExpr(IfExpr *expr) {
+      // The condition expression must be convertible with getLogicValue.
+      // FIXME: Add a constraint kind for Condition?
+      ASTContext &C = CS.getASTContext();
+      Expr *condExpr = expr->getCondExpr();
+      
+      auto logicValueResultTy = CS.createTypeVariable(expr->getCondExpr());
+      auto getLogicValueTy = FunctionType::get(TupleType::getEmpty(C),
+                                               logicValueResultTy,
+                                               C);
+      CS.addValueMemberConstraint(condExpr->getType(),
+                              CS.getASTContext().getIdentifier("getLogicValue"),
+                              getLogicValueTy);
+      
+      // The branches must be convertible to a common type.
+      auto resultTy = CS.createTypeVariable(expr);
+      CS.addConstraint(ConstraintKind::Conversion,
+                       expr->getThenExpr()->getType(), resultTy);
+      CS.addConstraint(ConstraintKind::Conversion,
+                       expr->getElseExpr()->getType(), resultTy);
+      return resultTy;
+    }
+    
     Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -7351,6 +7374,25 @@ static Expr *applySolution(ConstraintSystem &cs, const Solution &solution,
     // FIXME: Other subclasses of ApplyExpr?
     
     Expr *visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *expr) {
+      return expr;
+    }
+    
+    Expr *visitIfExpr(IfExpr *expr) {
+      Expr *condExpr = expr->getCondExpr();
+      if (cs.getTypeChecker().typeCheckCondition(condExpr))
+        return nullptr;
+      expr->setCondExpr(condExpr);
+
+      auto resultTy = simplifyType(expr->getType());
+      expr->setType(resultTy);
+
+      expr->setThenExpr(convertToType(cs.getTypeChecker(),
+                                      expr->getThenExpr(),
+                                      resultTy));
+      expr->setElseExpr(convertToType(cs.getTypeChecker(),
+                                      expr->getElseExpr(),
+                                      resultTy));
+      
       return expr;
     }
 

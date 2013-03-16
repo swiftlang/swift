@@ -899,6 +899,15 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitIfExpr(IfExpr *E) {
+    printCommon(E, "if_expr") << '\n';
+    printRec(E->getCondExpr());
+    OS << '\n';
+    printRec(E->getThenExpr());
+    OS << '\n';
+    printRec(E->getElseExpr());
+    OS << ')';
+  }
 };
 
 } // end anonymous namespace.

@@ -221,7 +221,7 @@ void Parser::skipUntilDeclRBrace() {
 
 void Parser::skipUntilDeclStmtRBrace() {
   while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
-         !isStartOfStmtOtherThanAssignment(Tok) &&
+         !isStartOfStmtOtherThanAssignmentOrIf(Tok) &&
          !isStartOfDecl(Tok, peekToken())) {
     skipSingle();
   }

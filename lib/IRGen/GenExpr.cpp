@@ -24,6 +24,7 @@
 #include "llvm/IR/Function.h"
 
 #include "ASTVisitor.h"
+#include "Condition.h"
 #include "GenArray.h"
 #include "GenClass.h"
 #include "GenClosure.h"
@@ -508,6 +509,67 @@ namespace {
       IGF.emitRValue(E->getSubExpr(), closure);
       emitBridgeToBlock(IGF, E->getType()->getCanonicalType(), closure, Out);
     }
+    
+    void visitIfExpr(IfExpr *E) {
+      // Emit the condition.
+      Condition cond = IGF.emitCondition(E->getCondExpr(),
+                                         /*hasFalse=*/ true);
+      
+      // Emit the branches.
+      Explosion thenResult(Out.getKind()),
+                elseResult(Out.getKind());
+      const TypeInfo &ti = IGF.getFragileTypeInfo(E->getType());
+      
+      llvm::BasicBlock *thenPred, *elsePred;
+      
+      if (cond.hasTrue()) {
+        cond.enterTrue(IGF);
+        IGF.emitRValue(E->getThenExpr(), thenResult);
+        thenPred = IGF.Builder.GetInsertBlock();
+        cond.exitTrue(IGF);
+      }
+      
+      if (cond.hasFalse()) {
+        cond.enterFalse(IGF);
+        IGF.emitRValue(E->getElseExpr(), elseResult);
+        elsePred = IGF.Builder.GetInsertBlock();
+        cond.exitFalse(IGF);
+      }
+      
+      cond.complete(IGF);
+      
+      // Join the results of the branches.
+      
+      // If only one branch was valid, use the result from that branch.
+      if (cond.hasTrue() && !cond.hasFalse()) {
+        ti.reexplode(IGF, thenResult, Out);
+        return;
+      }
+      
+      if (cond.hasFalse() && !cond.hasTrue()) {
+        ti.reexplode(IGF, elseResult, Out);
+        return;
+      }
+      
+      // Otherwise, phi the results from both branches.
+      assert(thenResult.size() == elseResult.size()
+             && "mismatched explosion sizes in branches of if expr");
+      
+      Explosion phiResult(Out.getKind());
+      while (!thenResult.empty()) {
+        // Strip cleanups from the incoming values. We'll introduce new cleanups
+        // on the phi-ed values by TypeInfo::manage-ing them.
+        llvm::Value *thenVal = thenResult.forwardNext(IGF);
+        llvm::Value *elseVal = elseResult.forwardNext(IGF);
+        assert(thenVal->getType() == elseVal->getType()
+               && "mismatched explosion types in branches of if expr");
+        llvm::PHINode *phi = IGF.Builder.CreatePHI(thenVal->getType(), 2);
+        phi->addIncoming(thenVal, thenPred);
+        phi->addIncoming(elseVal, elsePred);
+        phiResult.addUnmanaged(phi);
+      }
+      ti.manage(IGF, phiResult, Out);
+    }
   };
 }
 
@@ -608,6 +670,7 @@ namespace {
     NOT_LVALUE_EXPR(BridgeToBlock)
     NOT_LVALUE_EXPR(OtherConstructorDeclRef)
     NOT_LVALUE_EXPR(RebindThisInConstructor)
+    NOT_LVALUE_EXPR(If)
 #undef NOT_LVALUE_EXPR
 
     LValue visitTupleElementExpr(TupleElementExpr *E) {
@@ -788,6 +851,7 @@ namespace {
     NON_LOCATEABLE(BridgeToBlockExpr)
     NON_LOCATEABLE(OtherConstructorDeclRefExpr)
     NON_LOCATEABLE(RebindThisInConstructorExpr)
+    NON_LOCATEABLE(IfExpr)
 
     // FIXME: We may want to specialize IR generation for array subscripts.
     NON_LOCATEABLE(SubscriptExpr)
