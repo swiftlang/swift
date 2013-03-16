@@ -61,13 +61,56 @@ When we refer to the “value” of a class, we mean the combination of
 values of its ``val`` instance variables and the identities of its
 ``ref`` instance variables.
 
+Variables
+=========
+
+Variables can be explicitly declared ``val`` or ``ref``::
+
+    var x: Int  // x is stored by-value
+    val y: Int  // just like "var y: Int"
+    ref z: Int  // z is allocated on the heap.
+
+    var q: SomeClass          // q is a reference to SomeClass
+    ref r: SomeClass          // just like "var r: SomeClass"
+    val s: SomeCloneableClass // s is a unique value of SomeCloneableClass
+
+Assignments and initializations involving at least one ``val`` result
+in a copy.  Creating a ``ref`` from a ``val`` copies into heap memory::
+
+    ref z2 = x         // z2 is a copy of x's value on the heap
+    y = z              // z2's value is copied into y
+    
+    ref z2 = z         // z and z2 refer to the same Int value
+    ref z3 = z.clone() // z3 refers to a copy of z's value
+
+    val t = r          // Illegal unless SomeClass is Cloneable
+    ref u = s          // s's value is copied into u
+    val v = s          // s's value is copied into v
+
 Instance Variables
 ==================
 
-.. Note:: Don't we want to talk about ``oneof``, arrays and their
-          elements, tuples and their elements, etc. all in one breath
-          here?  We should consider re-phrasing all statements about
-          instance variables.
+Instance variables can be explicitly declared ``val`` or ``ref``::
+
+  struct Foo {
+      var x: Int  // x is stored by-value
+      val y: Int  // just like "var y: Int"
+      ref z: Int  // allocate z on the heap
+
+      var q: SomeClass          // q is a reference to SomeClass
+      ref r: SomeClass          // just like "var r: SomeClass"
+      val s: SomeCloneableClass // clone() s when Foo is copied
+  }
+
+  class Bar : Cloneable {
+      var x: Int  // x is stored by-value
+      val y: Int  // just like "var y: Int"
+      ref z: Int  // allocate z on the heap
+
+      var q: SomeClass          // q is stored by-reference
+      ref r: SomeClass          // just like "var r: SomeClass"
+      val s: SomeCloneableClass // clone() s when Bar is clone()d
+  }
 
 When a value is copied, all of its instance variables declared ``val``
 (implicitly or explicitly) are copied.  Instance variables declared
@@ -89,6 +132,19 @@ __ non-copyable_
 Function Parameters
 ===================
 
+Function parameters can be explicitly declared ``val``, or ``ref``::
+
+  func baz(
+      x: Int      // x is passed by-value
+    , val y: Int  // just like "y: Int"
+    , ref z: Int  // allocate z on the heap
+
+    , var q: SomeClass          // q is stored by-reference
+    , ref r: SomeClass          // just like "var r: SomeClass"
+    , val s: SomeCloneableClass // clone() s when Bar is clone()d
+
+.. Note:: do we also want to allow explicit ``var`` function parameters?
+
 A function parameter declared ``val`` contains a distinct copy of the
 argument's value.  A function parameter declared ``ref`` refers to the
 same object as the argument.  
@@ -100,6 +156,11 @@ passed to a ``ref`` parameter:
 2. Make it illegal
 
 I'm not sure which is better.
+
+Interaction with `[byref]`
+--------------------------
+
+TBD
 
 Generics
 ========
