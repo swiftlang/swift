@@ -13,13 +13,13 @@
 #ifndef SILGen_H
 #define SILGen_H
 
+#include "ASTVisitor.h"
 #include "Cleanup.h"
 #include "Scope.h"
 #include "TypeLowering.h"
 #include "swift/SIL/Function.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/AST/ASTVisitor.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 
@@ -390,7 +390,12 @@ public:
   /// Emits a temporary allocation that will be deallocated automatically at the
   /// end of the current scope. Returns the address of the allocation.
   Value emitTemporaryAllocation(SILLocation loc, SILType ty);
-                        
+  
+  /// Emits a reassignment to a physical address.
+  void emitAssignPhysicalAddress(SILLocation loc,
+                                 ManagedValue src,
+                                 Value addr);
+  
   //===--------------------------------------------------------------------===//
   // Recursive entry points
   //===--------------------------------------------------------------------===//
@@ -439,13 +444,14 @@ public:
   ///
   /// *FIXME: does not actually avoid copy yet!
   void emitExprInto(Expr *E, Initialization *I);
-    
-  /// Unreachable default case for unimplemented expr nodes.
-  ManagedValue visitExpr(Expr *E, SGFContext C);
   
   ManagedValue visitApplyExpr(ApplyExpr *E, SGFContext C);
 
   ManagedValue visitDeclRefExpr(DeclRefExpr *E, SGFContext C);
+  ManagedValue visitSuperRefExpr(SuperRefExpr *E, SGFContext C);
+  ManagedValue visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E,
+                                                SGFContext C);
+  
   ManagedValue visitIntegerLiteralExpr(IntegerLiteralExpr *E, SGFContext C);
   ManagedValue visitFloatLiteralExpr(FloatLiteralExpr *E, SGFContext C);
   ManagedValue visitCharacterLiteralExpr(CharacterLiteralExpr *E, SGFContext C);
@@ -481,6 +487,10 @@ public:
   ManagedValue visitTupleElementExpr(TupleElementExpr *E, SGFContext C);
   ManagedValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
   ManagedValue visitGenericSubscriptExpr(GenericSubscriptExpr *E, SGFContext C);
+  ManagedValue visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E,
+                                           SGFContext C);
+  ManagedValue visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E,
+                                             SGFContext C);
   ManagedValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
   ManagedValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
   ManagedValue visitMetatypeExpr(MetatypeExpr *E, SGFContext C);
@@ -489,6 +499,10 @@ public:
   ManagedValue visitInterpolatedStringLiteralExpr(
                                               InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
+  ManagedValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
+  ManagedValue visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E,
+                                                SGFContext C);
+  ManagedValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
 
   void emitApplyArgumentValue(SILLocation loc,
                               ManagedValue argValue,

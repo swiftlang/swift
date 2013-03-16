@@ -135,11 +135,6 @@ ManagedValue SILGenFunction::visit(swift::Expr *E) {
   return visit(E, SGFContext());
 }
 
-ManagedValue SILGenFunction::visitExpr(Expr *E, SGFContext C) {
-  E->dump();
-  llvm_unreachable("Not yet implemented");
-}
-
 ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E, SGFContext C) {
   return emitApplyExpr(E);
 }
@@ -214,6 +209,15 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
 
 ManagedValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
   return emitReferenceToDecl(E, E->getDecl());
+}
+
+ManagedValue SILGenFunction::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
+  return emitReferenceToDecl(E, E->getThis());
+}
+
+ManagedValue SILGenFunction::visitOtherConstructorDeclRefExpr(
+                                OtherConstructorDeclRefExpr *E, SGFContext C) {
+  llvm_unreachable("unapplied reference to constructor?!");
 }
 
 ManagedValue SILGenFunction::visitIntegerLiteralExpr(IntegerLiteralExpr *E,
@@ -1400,4 +1404,46 @@ ManagedValue SILGenFunction::visitInterpolatedStringLiteralExpr(
                                               SGFContext C)
 {
   return visit(E->getSemanticExpr());
+}
+
+ManagedValue SILGenFunction::visitCollectionExpr(CollectionExpr *E,
+                                                 SGFContext C) {
+  return visit(E->getSemanticExpr());
+}
+
+ManagedValue SILGenFunction::visitRebindThisInConstructorExpr(
+                                RebindThisInConstructorExpr *E, SGFContext C) {
+  // FIXME: Use a different instruction from 'downcast'. IRGen can make
+  // "rebind this" into a no-op if the called constructor is a Swift one.
+  ManagedValue newThis = visit(E->getSubExpr());
+  if (!newThis.getType().getSwiftRValueType()
+        ->isEqual(E->getThis()->getType())) {
+    assert(!newThis.getType().isAddress() &&
+           newThis.getType().hasReferenceSemantics() &&
+           "delegating ctor type mismatch for non-reference type?!");
+    CleanupsDepth newThisCleanup = newThis.getCleanup();
+    Value newThisValue = B.createDowncast(E, newThis.getValue(),
+                              getLoweredLoadableType(E->getThis()->getType()));
+    newThis = ManagedValue(newThisValue, newThisCleanup);
+  }
+  
+  Value thisAddr = emitReferenceToDecl(E, E->getThis()).getUnmanagedValue();
+  emitAssignPhysicalAddress(E, newThis, thisAddr);
+  
+  return ManagedValue(B.createEmptyTuple(E));
+}
+
+ManagedValue SILGenFunction::visitArchetypeSubscriptExpr(
+                                     ArchetypeSubscriptExpr *E, SGFContext C) {
+  llvm_unreachable("not implemented");
+}
+
+ManagedValue SILGenFunction::visitExistentialSubscriptExpr(
+                                   ExistentialSubscriptExpr *E, SGFContext C) {
+  llvm_unreachable("not implemented");
+}
+
+ManagedValue SILGenFunction::visitBridgeToBlockExpr(BridgeToBlockExpr *E,
+                                                    SGFContext C) {
+  llvm_unreachable("not implemented");
 }

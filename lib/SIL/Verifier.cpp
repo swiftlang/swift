@@ -187,8 +187,6 @@ public:
   }
   
   void visitSpecializeInst(SpecializeInst *SI) {
-    SI->getType().dump();
-    SI->getOperand().getType().dump();
     assert(SI->getType().is<FunctionType>() &&
            "Specialize dest should be a function type");
     assert(SI->getOperand().getType().is<PolymorphicFunctionType>() &&

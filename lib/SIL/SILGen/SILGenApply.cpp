@@ -154,8 +154,8 @@ public:
     if (super.isLValue()) {
       super = gen.emitManagedRValueWithCleanup(
                                        gen.B.createLoad(arg, super.getValue()));
+      gen.emitRetainRValue(arg, super.getValue());
     }
-    setThisParam(super);
     
     // The callee for a super call has to be either a method or constructor.
     Expr *fn = apply->getFn();
@@ -167,9 +167,18 @@ public:
       constant = SILConstant(declRef->getDecl());
     } else
       llvm_unreachable("invalid super callee");
-  
+
+    // Upcast 'this' parameter to the super type.
+    // FIXME: Specialize generic.
+    SILType constantTy = gen.SGM.getConstantType(constant);
+    SILType constantThisTy
+      = gen.getLoweredLoadableType(constantTy.castTo<FunctionType>()->getInput());
+    Value superUpcast = gen.B.createUpcast(apply->getArg(), super.getValue(),
+                                           constantThisTy);
+    setThisParam(ManagedValue(superUpcast, super.getCleanup()));
+
     setCallee(ManagedValue(gen.B.createSuperMethod(apply, super.getValue(),
-                                 constant, gen.SGM.getConstantType(constant))));
+                                 constant, constantTy)));
   }
   
   ManagedValue getSpecializedCallee() {
