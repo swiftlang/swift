@@ -189,8 +189,12 @@ public:
   void visitSpecializeInst(SpecializeInst *SI) {
     assert(SI->getType().is<FunctionType>() &&
            "Specialize dest should be a function type");
-    assert(SI->getOperand().getType().is<PolymorphicFunctionType>() &&
-           "Specialize source should be a polymorphic function type");
+    SILType operandTy = SI->getOperand().getType();
+    assert((operandTy.is<PolymorphicFunctionType>()
+            || (operandTy.is<FunctionType>()
+                && operandTy.castTo<FunctionType>()->getResult()
+                  ->is<PolymorphicFunctionType>()))
+           && "Specialize source should be a polymorphic function type");
     assert(SI->getType().getUncurryLevel()
              == SI->getOperand().getType().getUncurryLevel()
            && "Specialize source and dest uncurry levels must match");

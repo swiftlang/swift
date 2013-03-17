@@ -31,16 +31,21 @@ public:
   ManagedValue thisParam;
   std::vector<ApplyExpr*> callSites;
   std::vector<Substitution> substitutions;
-  FunctionType *specializedType;
+  SILType specializedType;
   SpecializeExpr *specializeLoc;
   Expr *sideEffect;
+  unsigned callDepth;
   
-  SILGenApply(SILGenFunction &gen) : gen(gen),
-    specializedType(nullptr), specializeLoc(nullptr), sideEffect(nullptr) {}
+  SILGenApply(SILGenFunction &gen)
+    : gen(gen), specializeLoc(nullptr), sideEffect(nullptr), callDepth(0)
+  {}
   
   void setCallee(ManagedValue theCallee) {
+    assert((thisParam.getValue() ? callDepth == 1 : callDepth == 0)
+           && "setting callee at non-zero call depth?!");
     assert(!callee.getValue() && "already set callee!");
     callee = theCallee;
+    specializedType = theCallee.getType();
   }
   
   void setSideEffect(Expr *sideEffectExpr) {
@@ -51,6 +56,7 @@ public:
   void setThisParam(ManagedValue theThisParam) {
     assert(!thisParam.getValue() && "already set this!");
     thisParam = theThisParam;
+    ++callDepth;
   }
 
   /// Fall back to an unknown, indirect callee.
@@ -66,31 +72,33 @@ public:
       callSites.push_back(e);
       visit(e->getFn());
     }
+    ++callDepth;
   }
   
   /// Add specializations to the curry.
   void visitSpecializeExpr(SpecializeExpr *e) {
     visit(e->getSubExpr());
+    // Currently generic methods of generic types are the deepest we should
+    // be able to stack specializations.
+    assert(callDepth < 2 && "specialization below 'this' or argument depth?!");
     substitutions.insert(substitutions.end(),
                          e->getSubstitutions().begin(),
                          e->getSubstitutions().end());
-    // Currently generic methods of generic types are the deepest we should
-    // be able to stack specializations.
-    // Save the type of the SpecializeExpr.
-    if (!specializedType) {
-      assert(substitutions.size() == 1 &&
-             "saw specialization before setting specialized type?");
-      specializedType = e->getType()->castTo<FunctionType>();
-      specializeLoc = e;
+    // Save the type of the SpecializeExpr at the right depth in the type..
+    assert(specializedType.getUncurryLevel() >= callDepth
+           && "specializations below uncurry level?!");
+    if (callDepth == 0) {
+      specializedType = gen.getLoweredLoadableType(e->getType(),
+                                             specializedType.getUncurryLevel());
     } else {
-      assert(substitutions.size() == 2 &&
-             "saw more than two specializations?!");
-      assert(callee.getType().getUncurryLevel() >= 1 &&
-             "multiple specializations of non-uncurried method?!");
-      specializedType = FunctionType::get(specializedType->getInput(),
-                                          e->getType(),
-                                          specializedType->getASTContext());
+      Type outerInput = specializedType.castTo<FunctionType>()->getInput();
+      Type newSpecialized = FunctionType::get(outerInput,
+                                              e->getType(),
+                                              outerInput->getASTContext());
+      specializedType = gen.getLoweredLoadableType(newSpecialized,
+                                             specializedType.getUncurryLevel());
     }
+    specializeLoc = e;
   }
   
   //
@@ -110,6 +118,9 @@ public:
                                            thisParam.getValue(),
                                            constant,
                                            gen.SGM.getConstantType(constant))));
+        // setThisParam bumps the callDepth, but we aren't really past the
+        // 'this' call depth in this case.
+        --callDepth;
         return;
       }
     }
@@ -169,7 +180,6 @@ public:
       llvm_unreachable("invalid super callee");
 
     // Upcast 'this' parameter to the super type.
-    // FIXME: Specialize generic.
     SILType constantTy = gen.SGM.getConstantType(constant);
     SILType constantThisTy
       = gen.getLoweredLoadableType(constantTy.castTo<FunctionType>()->getInput());
@@ -183,12 +193,10 @@ public:
   
   ManagedValue getSpecializedCallee() {
     // If the callee needs to be specialized, do so.
-    if (specializedType) {
+    if (specializeLoc) {
       CleanupsDepth cleanup = callee.getCleanup();
-      SILType ty = gen.getLoweredLoadableType(specializedType,
-                                              callee.getType().getUncurryLevel());
       Value spec = gen.B.createSpecialize(specializeLoc, callee.getValue(),
-                                          substitutions, ty);
+                                          substitutions, specializedType);
       return ManagedValue(spec, cleanup);
     }
     
