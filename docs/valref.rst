@@ -75,19 +75,6 @@ Variables can be explicitly declared ``val`` or ``ref``::
     ref r: SomeClass          // just like "var r: SomeClass"
     val s: SomeClonableClass // a unique value of SomeClonableClass type
 
-``val``\ - or ``ref``\ -ness is part of the type.  When the type
-appears without a variable name, it can be written this way::
-
-   ref Int                 // an Int on the heap
-   val SomeCloneableClass  // a value of SomeCloneableClass type
-
-Therefore, although it is not recommended style, we can also write::
-
-    var y: val Int               // just like "var y: Int"
-    var z: ref Int               // z is allocated on the heap.
-    var s: val SomeClonableClass // a unique value of type SomeClonableClass
-
-
 Assignments and initializations involving at least one ``val`` result
 in a copy.  Creating a ``ref`` from a ``val`` copies into heap memory::
 
@@ -100,6 +87,21 @@ in a copy.  Creating a ``ref`` from a ``val`` copies into heap memory::
     val t = r          // Illegal unless SomeClass is Clonable
     ref u = s          // s's value is copied into u
     val v = s          // s's value is copied into v
+
+Standalone Types
+================
+
+``val``\ - or ``ref``\ -ness is part of the type.  When the type
+appears without a variable name, it can be written this way::
+
+   ref Int                 // an Int on the heap
+   val SomeCloneableClass  // a value of SomeCloneableClass type
+
+Therefore, although it is not recommended style, we can also write::
+
+    var y: val Int               // just like "var y: Int"
+    var z: ref Int               // z is allocated on the heap.
+    var s: val SomeClonableClass // a unique value of type SomeClonableClass
 
 Instance Variables
 ==================
