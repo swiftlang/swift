@@ -321,17 +321,27 @@ Why This Design Beats Rust/C++/etc.
   ability to provide a default semantics for their types and avoid confronting
   their users with a constant ``T*`` vs. ``T`` choice like C/C++.
 
-``structs`` with Reference Semantics Are Evil 
-=============================================
+``structs`` Really Should Have Value Semantics
+==============================================
 
-* Dave
+It is *possible* to build a struct with reference semantics. For
+example, ::
 
-In this model it doesn't work, because there's no way to get the
-``val``\ -ness back.  Therefore vectors and dictionaries should be
-value types.
+  struct XPair
+  {
+     constructor(f : X, s : X) {
+         first = f
+         second = s
+     }
+     ref first : X
+     ref second : X
+  }
 
-Also, variable-sized arrays have to be values just like regular
-arrays.
+However, the results can be surprising::
+
+  val a = XPair(y1, y2)  // I want an independent value, please
+  val b = a              // and a copy of that value
+  a.first.mutate()       // changes b.first
 
 Getting the ``ref`` out of a ``val`` ``class``
 ==============================================
