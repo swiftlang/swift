@@ -343,12 +343,32 @@ However, the results can be surprising::
   val b = a              // and a copy of that value
   a.first.mutate()       // changes b.first
 
-Getting the ``ref`` out of a ``val`` ``class``
-==============================================
+If ``XPair`` had been declared a class, ::
 
-* Dave
+  val a = XPair(y1, y2)  // I want an independent value, please
 
-use a method.
+would only compile if ``XPair`` is also ``Cloneable``, thereby
+protecting the user's intention to create an independent value from
+being thwarted.
+
+Getting the ``ref`` out of a ``class`` instance declared ``val``
+================================================================
+
+A ``class`` instance is always accessed through a reference, but when
+an instance is declared ``val``, that reference is effectively hidden
+behind the ``val`` wrapper.  However, because ``this`` is passed to
+``class`` methods as a reference, we can unwrap the underlying ``ref``
+as follows::
+
+  val x : SomeClass
+
+  extension SomeClass {
+    func get_ref() { return this }
+  }
+
+  ref y : x.get_ref()
+  y.mutate()          // mutates x
+
 
 Bikeshed
 ========
