@@ -24,6 +24,7 @@ compromising ease of use.
 Introduction
 ============
 
+* Dave
 
 General Description
 ===================
@@ -130,6 +131,8 @@ The new rules are as follows:
 Arrays
 ======
 
+* Dave
+
 Array elements can be explicitly declared ``val`` or ``ref``::
 
   var x : Int[42]       // an array of 42 integers
@@ -170,7 +173,7 @@ argument value is copied.
 Interaction with `[byref]`
 --------------------------
 
-* Is there anything to say here?
+* Joe
 
 Generics
 ========
