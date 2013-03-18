@@ -71,9 +71,22 @@ Variables can be explicitly declared ``val`` or ``ref``::
     val y: Int  // just like "var y: Int"
     ref z: Int  // z is allocated on the heap.
 
-    var q: SomeClass          // q is a reference to SomeClass
+    var q: SomeClass          // a reference to SomeClass
     ref r: SomeClass          // just like "var r: SomeClass"
-    val s: SomeClonableClass // s is a unique value of SomeClonableClass
+    val s: SomeClonableClass // a unique value of SomeClonableClass type
+
+``val``\ - or ``ref``\ -ness is part of the type.  When the type
+appears without a variable name, it can be written this way::
+
+   ref Int                 // an Int on the heap
+   val SomeCloneableClass  // a value of SomeCloneableClass type
+
+Therefore, although it is not recommended style, we can also write::
+
+    var y: val Int               // just like "var y: Int"
+    var z: ref Int               // z is allocated on the heap.
+    var s: val SomeClonableClass // a unique value of type SomeClonableClass
+
 
 Assignments and initializations involving at least one ``val`` result
 in a copy.  Creating a ``ref`` from a ``val`` copies into heap memory::
@@ -131,13 +144,18 @@ The new rules are as follows:
 Arrays
 ======
 
-* Dave
-
 Array elements can be explicitly declared ``val`` or ``ref``::
 
-  var x : Int[42]       // an array of 42 integers
-  var y : Int[val 42]   // an array of 42 integers
-  var y : Int[ref 42]   // an array of 42 integers-on-the-heap
+  var x : Int[42]         // an array of 42 integers
+  var y : Int[val 42]     // an array of 42 integers
+  var z : Int[ref 42]     // an array of 42 integers-on-the-heap
+  var z : Int[ref 2][42]  // an array of 2 references to arrays
+
+Note that because the full declaration of a type
+
+  ref a : Int[42]         // a reference to an array of 42 integers
+  var f : ()->ref Int[42] // a closure returning a reference to an array
+  var b : ref Int[42]     // equivalent to to "ref b : Int[42]"
 
 Semantics of array elements follow those of instance variables.
 
