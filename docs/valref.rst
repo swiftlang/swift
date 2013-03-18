@@ -152,14 +152,28 @@ Array elements can be explicitly declared ``val`` or ``ref``::
   var y : Int[val 42]     // an array of 42 integers
   var z : Int[ref 42]     // an array of 42 integers-on-the-heap
   var z : Int[ref 2][42]  // an array of 2 references to arrays
-
-Note that because the full declaration of a type
-
   ref a : Int[42]         // a reference to an array of 42 integers
+
+When a reference to an array appears without a variable name, it can
+be written using the `usual syntax`__::
+
   var f : ()->ref Int[42] // a closure returning a reference to an array
   var b : ref Int[42]     // equivalent to to "ref b : Int[42]"
 
-Semantics of array elements follow those of instance variables.
+__ `standalone types`_
+
+Presumably there is also some fully-desugared syntax using angle
+brackets, that most users will never touch, e.g.::
+
+  var x : Array<Int,42>               // an array of 42 integers
+  var y : Array<Int,val 42>           // an array of 42 integers
+  var z : Array<Int,ref 42>           // an array of 42 integers-on-the-heap
+  var z : Array<ref Array<Int,42>, 2> // an array of 2 references to arrays
+  ref a : Array<Int,42>               // a reference to an array of 42 integers
+  var f : ()->ref Array<Int,42>       // a closure returning a reference to an array
+  var b : ref Array<Int,42>           // equivalent to to "ref b : Int[42]"
+
+Rules for copying array elements follow those of instance variables.
 
 ``oneof``\ s
 ============
