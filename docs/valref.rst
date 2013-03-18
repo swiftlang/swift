@@ -278,8 +278,29 @@ Why This Design Beats Rust/C++/etc.
   ability to provide a default semantics for their types and avoid confronting
   their users with a constant ``T*`` vs. ``T`` choice like C/C++.
 
-Spelling
+``structs`` with Reference Semantics Are Evil 
+=============================================
+
+* Dave
+
+In this model it doesn't work, because there's no way to get the
+``val``\ -ness back.  Therefore vectors and dictionaries should be
+value types.
+
+Also, variable-sized arrays have to be values just like regular
+arrays.
+
+Getting the ``ref`` out of a ``val`` ``class``
+==============================================
+
+* Dave
+
+use a method.
+
+Bikeshed
 ========
+
+* Dave
 
 * ``var`` is like ``val``
   * What about ``let``?
