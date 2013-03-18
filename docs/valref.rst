@@ -166,8 +166,8 @@ Presumably there is also some fully-desugared syntax using angle
 brackets, that most users will never touch, e.g.::
 
   var x : Array<Int,42>               // an array of 42 integers
-  var y : Array<Int,val 42>           // an array of 42 integers
-  var z : Array<Int,ref 42>           // an array of 42 integers-on-the-heap
+  var y : Array<val Int,42>           // an array of 42 integers
+  var z : Array<ref Int,42>           // an array of 42 integers-on-the-heap
   var z : Array<ref Array<Int,42>, 2> // an array of 2 references to arrays
   ref a : Array<Int,42>               // a reference to an array of 42 integers
   var f : ()->ref Array<Int,42>       // a closure returning a reference to an array
