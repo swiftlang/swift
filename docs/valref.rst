@@ -356,19 +356,29 @@ as follows::
 Bikeshed
 ========
 
-* Dave
+There are a number of naming issues we might want to discuss.  For
+example:
 
-* ``var`` is like ``val``
-  * What about ``let``?
-  * Should we drop ``let`` for ivars?
+* ``var`` is only one character different from ``val``.  Is that too
+  confusable?  Syntax highlighting can help, but it might not be enough.
 
-* ``ref`` is like ``[byref]``.
-  * We don't think they can be collapsed--"ref" requires shared ownership and is
-    escapable and aliasable, unlike "[byref]".
+  * What about ``let`` as a replacement for ``var``?  
+    There's always the dreaded ``auto``.
+
+  * Should we drop ``let``\ /``var``\ /``auto`` for ivars, because it
+    “just feels wrong” there?
+
+* ``ref`` is spelled like ``[byref]``, but they mean very different things
+
+  * We don't think they can be collapsed into one keyword: ``ref``
+    requires shared ownership and is escapable and aliasable, unlike
+    ``[byref]``.
+
   * Should we spell ``[byref]`` differently?  I think at a high level
-    it means something like "rebind the name to a new value."
+    it means something like “``[rebind]`` the name to a new value.”
 
 * Do we want to consider replacing ``struct`` and/or ``class`` with
-  new names such as ``valtype`` and ``reftype``?
-
-* Do we need to name the ``val`` and ``ref`` protocols ``Val`` and ``Ref``?
+  new names such as ``valtype`` and ``reftype``?  We don't love those
+  particular suggestions.  One argument in favor of a change:
+  ``struct`` comes with a strong connotation of weakness or
+  second-class-ness for some people.
