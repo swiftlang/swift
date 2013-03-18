@@ -24,7 +24,32 @@ compromising ease of use.
 Introduction
 ============
 
-* Dave
+We think of Swift as notionally providing at least three nested
+“boxes” in which to program:
+
+1. Innermost is the “easy” box, where considerations are kept to a
+   minimum and even novice programmers can get a lot of useful work
+   done.
+
+2. In the middle is the “safe” box, where memory-safety is guaranteed
+   and there's no undefined behavior.  Everything that is “easy” is
+   also safe.
+
+3. Outermost is the “wild west,” which provides programmers with
+   control comparable to that of C++, and a corresponding length of
+   rope with which to hang onesself.
+
+Until recently, Swift's support for value semantics outside the “wild
+west” has been weak.  While the recent ``Cloneable`` proposal makes
+new things possible in the “safe” box, it leaves the language
+syntactically and semantically lumpy, keeping interactions between
+value and reference types firmly outside the “easy” box and failing to
+address the issue of generic programming.
+
+This proposal builds on the ``Cloneable`` proposal to create a more
+uniform, flexible, and interoperable type system while solving the
+generic programming problem and expanding the “easy” box.
+
 
 General Description
 ===================
