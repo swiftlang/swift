@@ -1038,21 +1038,27 @@ private:
 /// function may be an arbitrary type.
 ///
 /// There are two kinds of function types:  monomorphic (FunctionType) and
-/// polymorphic (PolymorphicFunctionType).
+/// polymorphic (PolymorphicFunctionType). Both type families additionally can
+/// be 'thin', indicating that a function value has no capture context and can be
+/// represented at the binary level as a single function pointer.
 class AnyFunctionType : public TypeBase {
   const Type Input;
-  const Type Output;
+  const llvm::PointerIntPair<Type, 1, bool> OutputAndIsThin;
 protected:
   AnyFunctionType(TypeKind Kind, ASTContext *CanTypeContext,
                   Type Input, Type Output, bool isUnresolved,
-                  bool HasTypeVariable)
+                  bool HasTypeVariable, bool isThin)
     : TypeBase(Kind, CanTypeContext, isUnresolved, HasTypeVariable),
-      Input(Input), Output(Output) {
+      Input(Input), OutputAndIsThin(Output, isThin) {
   }
 
 public:
   Type getInput() const { return Input; }
-  Type getResult() const { return Output; }
+  Type getResult() const { return OutputAndIsThin.getPointer(); }
+  
+  /// True if the function type is "thin", meaning values of the type can be
+  /// represented as simple function pointers without context.
+  bool isThin() const { return OutputAndIsThin.getInt(); }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1077,17 +1083,26 @@ class FunctionType : public AnyFunctionType {
 public:
   /// 'Constructor' Factory Function
   static FunctionType *get(Type Input, Type Result, ASTContext &C) {
-    return get(Input, Result, false, false, C);
+    return get(Input, Result, false, false, false, C);
   }
   static FunctionType *get(Type Input, Type Result, bool isAutoClosure,
                            ASTContext &C) {
-    return get(Input, Result, isAutoClosure, false, C);
+    return get(Input, Result, isAutoClosure, false, false, C);
   }
   static FunctionType *get(Type Input, Type Result,
                            bool isAutoClosure, bool isBlock,
+                           ASTContext &C) {
+    return get(Input, Result, isAutoClosure, isBlock, false, C);
+  }
+  static FunctionType *get(Type Input, Type Result,
+                           bool isAutoClosure, bool isBlock, bool isThin,
                            ASTContext &C);
 
+  /// True if this type allows an implicit conversion from a function argument
+  /// expression of type T to a function of type () -> T.
   bool isAutoClosure() const { return AutoClosure; }
+  
+  /// True if this type is an Objective-C-compatible block type.
   bool isBlock() const { return Block; }
   
   void print(raw_ostream &OS) const;
@@ -1101,7 +1116,8 @@ private:
   FunctionType(Type Input, Type Result,
                bool isAutoClosure,
                bool isBlock,
-               bool HasTypeVariable);
+               bool HasTypeVariable,
+               bool isThin);
 };
   
 /// PolymorphicFunctionType - A polymorphic function type.
@@ -1119,6 +1135,13 @@ public:
   /// 'Constructor' Factory Function
   static PolymorphicFunctionType *get(Type input, Type output,
                                       GenericParamList *params,
+                                      ASTContext &C) {
+    return get(input, output, params, false, C);
+  }
+
+  static PolymorphicFunctionType *get(Type input, Type output,
+                                      GenericParamList *params,
+                                      bool isThin,
                                       ASTContext &C);
 
   GenericParamList &getGenericParams() const { return *Params; }
@@ -1133,6 +1156,7 @@ public:
   
 private:
   PolymorphicFunctionType(Type input, Type output, GenericParamList *params,
+                          bool isThin,
                           ASTContext &C);
 };  
   

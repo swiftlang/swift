@@ -204,6 +204,7 @@ namespace {
                                fTy->getResult(),
                                /*isAutoClosure*/ false,
                                /*isBlock*/ true,
+                               /*isThin*/ false,
                                fTy->getASTContext());
     }
 

@@ -776,6 +776,7 @@ Type TypeChecker::transformType(Type type,
       return FunctionType::get(InputTy, ResultTy,
                                fn->isAutoClosure(),
                                fn->isBlock(),
+                               fn->isThin(),
                                Context);
     }
   }

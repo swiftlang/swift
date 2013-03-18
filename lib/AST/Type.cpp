@@ -669,6 +669,7 @@ CanType TypeBase::getCanonicalType() {
     Type In = FT->getInput()->getCanonicalType();
     Type Out = FT->getResult()->getCanonicalType();
     Result = PolymorphicFunctionType::get(In, Out, &FT->getGenericParams(),
+                                          FT->isThin(),
                                           In->getASTContext());
     break;
   }
@@ -679,6 +680,7 @@ CanType TypeBase::getCanonicalType() {
     Result = FunctionType::get(In, Out,
                                FT->isAutoClosure(),
                                FT->isBlock(),
+                               FT->isThin(),
                                In->getASTContext());
     break;
   }
@@ -900,6 +902,8 @@ bool TypeBase::isSpelledLike(Type other) {
     if (fMe->isAutoClosure() != fThem->isAutoClosure())
       return false;
     if (fMe->isBlock() != fThem->isBlock())
+      return false;
+    if (fMe->isThin() != fThem->isThin())
       return false;
     if (!fMe->getInput()->isSpelledLike(fThem->getInput()))
       return false;
@@ -1356,16 +1360,30 @@ void TupleType::print(raw_ostream &OS) const {
 }
 
 void FunctionType::print(raw_ostream &OS) const {
-  if (isAutoClosure() && isBlock())
-    OS << "[auto_closure, objc_block] ";
-  else if (isAutoClosure())
-    OS << "[auto_closure] ";
-  else if (isBlock())
-    OS << "[objc_block] ";
+  bool firstAttr = true, hasAttr = false;
+  auto printAttr = [&](llvm::StringRef s) {
+    OS << (firstAttr ? "[" : ", ") << s;
+    firstAttr = false;
+    hasAttr = true;
+  };
+  
+  if (isAutoClosure())
+    printAttr("auto_closure");
+  if (isBlock())
+    printAttr("objc_block");
+  if (isThin())
+    printAttr("thin");
+  
+  if (hasAttr)
+    OS << "] ";
+    
   OS << getInput() << " -> " << getResult();
 }
 
 void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
+  if (isThin())
+    OS << "[thin] ";
+  
   OS << '<';
   auto params = getGenericParams().getParams();
   for (unsigned i = 0, e = params.size(); i != e; ++i) {
