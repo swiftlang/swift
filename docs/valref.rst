@@ -133,8 +133,8 @@ Arrays
 Array elements can be explicitly declared ``val`` or ``ref``::
 
   var x : Int[42]       // an array of 42 integers
-  var y : val Int[42]   // an array of 42 integers
-  var y : ref Int[42]   // an array of 42 integers-on-the-heap
+  var y : Int[val 42]   // an array of 42 integers
+  var y : Int[ref 42]   // an array of 42 integers-on-the-heap
 
 Semantics of array elements follow those of instance variables.
 
