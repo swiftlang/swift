@@ -207,10 +207,11 @@ Semantics of passing arguments to functions follow those of
 assignments and initializations: when a ``val`` is involved, the
 argument value is copied.
 
-Interaction with `[byref]`
---------------------------
+.. Note::
 
-* Joe
+  We believe that ``[byref]`` is an independent concept and still very
+  much needed, even with an explicit ``ref`` keyword.  See also the
+  BikeShed_ discussion at the end of this document.
 
 Generics
 ========
