@@ -88,12 +88,17 @@ public:
     assert(specializedType.getUncurryLevel() >= callDepth
            && "specializations below uncurry level?!");
     if (callDepth == 0) {
-      specializedType = gen.getLoweredLoadableType(e->getType(),
+      specializedType = gen.getLoweredLoadableType(
+                                             getThinFunctionType(e->getType()),
                                              specializedType.getUncurryLevel());
     } else {
-      Type outerInput = specializedType.castTo<FunctionType>()->getInput();
+      FunctionType *ft = specializedType.castTo<FunctionType>();
+      Type outerInput = ft->getInput();
       Type newSpecialized = FunctionType::get(outerInput,
                                               e->getType(),
+                                              /*isAutoClosure*/ false,
+                                              /*isBlock*/ false,
+                                              /*isThin*/ true,
                                               outerInput->getASTContext());
       specializedType = gen.getLoweredLoadableType(newSpecialized,
                                              specializedType.getUncurryLevel());

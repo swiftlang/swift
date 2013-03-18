@@ -290,11 +290,11 @@ TypeConverter::getTypeLoweringInfo(Type t, unsigned uncurryLevel) {
   } else
     return *existing->second;
 }
-  
+
 SILType TypeConverter::getConstantType(SILConstant constant) {
   auto found = constantTypes.find(constant);
   if (found == constantTypes.end()) {
-    Type swiftTy = makeConstantType(constant);
+    Type swiftTy = getThinFunctionType(makeConstantType(constant));
     SILType loweredTy
       = getTypeLoweringInfo(swiftTy, constant.uncurryLevel).getLoweredType();
     constantTypes[constant] = loweredTy;
@@ -349,7 +349,8 @@ Type TypeConverter::getMethodTypeInContext(Type /*nullable*/ contextType,
                                         Context);
   }
 
-  return FunctionType::get(thisType, methodType, Context);
+  return FunctionType::get(thisType, methodType,
+                           Context);
 }
 
 /// Get the type of a global variable accessor function, () -> [byref] T.
@@ -381,6 +382,7 @@ static Type getDestructorType(ClassDecl *cd, ASTContext &C) {
 static Type getFunctionTypeWithCaptures(TypeConverter &types,
                                         AnyFunctionType *funcType,
                                         ArrayRef<ValueDecl*> captures) {
+  assert(!funcType->isThin());
   if (captures.empty())
     return funcType;
   

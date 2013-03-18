@@ -664,6 +664,25 @@ public:
   LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e);
 };
 
+/// A bit of a hack. The types of func decls should natively be thin function
+/// types.
+static inline Type getThinFunctionType(Type t) {
+  if (auto *ft = t->getAs<FunctionType>()) {
+    return FunctionType::get(ft->getInput(), ft->getResult(),
+                             ft->isAutoClosure(),
+                             ft->isBlock(),
+                             /*isThin*/ true,
+                             ft->getASTContext());
+  } else if (auto *pft = t->getAs<PolymorphicFunctionType>()) {
+    return PolymorphicFunctionType::get(pft->getInput(), pft->getResult(),
+                                        &pft->getGenericParams(),
+                                        /*isThin*/ true,
+                                        pft->getASTContext());
+  } else {
+    return t;
+  }
+}
+  
 } // end namespace Lowering
 } // end namespace swift
 

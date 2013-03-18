@@ -508,11 +508,11 @@ ManagedValue SILGenFunction::visitGetMetatypeExpr(GetMetatypeExpr *E,
 
 ManagedValue SILGenFunction::visitSpecializeExpr(SpecializeExpr *E,
                                                  SGFContext C) {
-  return emitManagedRValueWithCleanup(B.createSpecialize(
-                                    E,
-                                    visit(E->getSubExpr()).getUnmanagedValue(),
-                                    E->getSubstitutions(),
-                                    getLoweredLoadableType(E->getType())));
+  return ManagedValue(B.createSpecialize(
+                    E,
+                    visit(E->getSubExpr()).getUnmanagedValue(),
+                    E->getSubstitutions(),
+                    getLoweredLoadableType(getThinFunctionType(E->getType()))));
 }
 
 ManagedValue SILGenFunction::visitAddressOfExpr(AddressOfExpr *E,
@@ -625,11 +625,10 @@ ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
     }
     propType = tc.getMethodTypeInContext(baseExpr->getType()->getRValueType(),
                                         propType);
-    SILType lPropType = getLoweredLoadableType(propType,
+    SILType lPropType = getLoweredLoadableType(getThinFunctionType(propType),
                                                method.getType().getUncurryLevel());
-    method = emitManagedRValueWithCleanup(
-                            B.createSpecialize(expr, method.getUnmanagedValue(),
-                                               substitutions, lPropType));
+    method = ManagedValue(B.createSpecialize(expr, method.getUnmanagedValue(),
+                                             substitutions, lPropType));
   }
   assert(method.getType().is<FunctionType>() &&
          "getter is not of a concrete function type");
@@ -651,6 +650,9 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
       methodType.castTo<PolymorphicFunctionType>();
     Type specializedType = FunctionType::get(thisValue.getType().getSwiftType(),
                                              methodFT->getResult(),
+                                             /*isAutoClosure*/ false,
+                                             /*isBlock*/ false,
+                                             /*isThin*/ true,
                                              F.getContext());
     methodValue = B.createSpecialize(loc, methodValue, bgt->getSubstitutions(),
                getLoweredLoadableType(specializedType,
@@ -690,6 +692,9 @@ Value SILGenFunction::emitArchetypeMethod(ArchetypeMemberRefExpr *e,
     // archetype and apply the "this" argument.
     Type methodType = FunctionType::get(archetype.getType().getSwiftType(),
                                         e->getType(),
+                                        /*isAutoClosure*/ false,
+                                        /*isBlock*/ false,
+                                        /*isThin*/ true,
                                         F.getContext());
     SILConstant c(e->getDecl());
     return B.createArchetypeMethod(e, archetype,
@@ -718,6 +723,9 @@ Value SILGenFunction::emitProtocolMethod(ExistentialMemberRefExpr *e,
     // archetype and apply the "this" argument.
     Type methodType = FunctionType::get(F.getContext().TheOpaquePointerType,
                                         e->getType(),
+                                        /*isAutoClosure*/ false,
+                                        /*isBlock*/ false,
+                                        /*isThin*/ true,
                                         F.getContext());
     SILConstant c(e->getDecl());
     return B.createProtocolMethod(e, existential,

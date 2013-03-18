@@ -112,10 +112,15 @@ public:
     assert(!calleeTy.isAddress() && "callee of closure cannot be an address");
     assert(calleeTy.is<FunctionType>() &&
            "callee of closure must have concrete function type");
+    assert(calleeTy.castTo<FunctionType>()->isThin() &&
+           "callee of closure must have a thin function type");
     SILType appliedTy = CI->getType();
     assert(!appliedTy.isAddress() && "result of closure cannot be an address");
     assert(appliedTy.is<FunctionType>() &&
            "result of closure must have concrete function type");
+    // FIXME: A "curry" with no arguments could remain thin.
+    assert(!appliedTy.castTo<FunctionType>()->isThin() &&
+           "result of closure cannot have a thin function type");
 
     SILFunctionTypeInfo *ti = F.getModule().getFunctionTypeInfo(calleeTy);
     
@@ -149,6 +154,8 @@ public:
   void visitConstantRefInst(ConstantRefInst *CRI) {
     assert(CRI->getType().is<AnyFunctionType>() &&
            "constant_ref should have a function result");
+    assert(CRI->getType().castTo<AnyFunctionType>()->isThin() &&
+           "constant_ref should have a thin function result");
   }
 
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
@@ -188,13 +195,18 @@ public:
   
   void visitSpecializeInst(SpecializeInst *SI) {
     assert(SI->getType().is<FunctionType>() &&
-           "Specialize dest should be a function type");
+           "Specialize result should have a function type");
+    assert(SI->getType().castTo<FunctionType>()->isThin() &&
+           "Specialize result should have a thin function type");
+    
     SILType operandTy = SI->getOperand().getType();
     assert((operandTy.is<PolymorphicFunctionType>()
             || (operandTy.is<FunctionType>()
                 && operandTy.castTo<FunctionType>()->getResult()
                   ->is<PolymorphicFunctionType>()))
-           && "Specialize source should be a polymorphic function type");
+           && "Specialize source should have a polymorphic function type");
+    assert(operandTy.castTo<AnyFunctionType>()->isThin()
+           && "Specialize source should have a thin function type");
     assert(SI->getType().getUncurryLevel()
              == SI->getOperand().getType().getUncurryLevel()
            && "Specialize source and dest uncurry levels must match");
@@ -296,6 +308,8 @@ public:
           llvm::dbgs() << "\n");
     assert(methodType &&
            "result method must be of a concrete function type");
+    assert(methodType->isThin() &&
+           "result method must be of a thin function type");
     SILType operandType = AMI->getOperand().getType();
     DEBUG(llvm::dbgs() << "operand type ";
           operandType.print(llvm::dbgs());
@@ -320,6 +334,8 @@ public:
     FunctionType *methodType = EMI->getType(0).getAs<FunctionType>();
     assert(methodType &&
            "result method must be of a concrete function type");
+    assert(methodType->isThin() &&
+           "result method must be of a thin function type");
     SILType operandType = EMI->getOperand().getType();
     assert(methodType->getInput()->isEqual(
                             operandType.getASTContext().TheOpaquePointerType) &&
@@ -346,6 +362,8 @@ public:
     auto *methodType = CMI->getType(0).getAs<AnyFunctionType>();
     assert(methodType &&
            "result method must be of a function type");
+    assert(methodType->isThin() &&
+           "result method must be of a thin function type");
     SILType operandType = CMI->getOperand().getType();
     assert(isClassOrClassMetatype(operandType.getSwiftType()) &&
            "operand must be of a class type");
@@ -361,6 +379,8 @@ public:
     auto *methodType = CMI->getType(0).getAs<AnyFunctionType>();
     assert(methodType &&
            "result method must be of a function type");
+    assert(methodType->isThin() &&
+           "result method must be of a thin function type");
     SILType operandType = CMI->getOperand().getType();
     assert(isClassOrClassMetatype(operandType.getSwiftType()) &&
            "operand must be of a class type");
