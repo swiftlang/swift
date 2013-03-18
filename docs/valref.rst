@@ -332,8 +332,7 @@ If ``XPair`` had been declared a class, ::
   val a = XPair(y1, y2)  // I want an independent value, please
 
 would only compile if ``XPair`` is also ``Cloneable``, thereby
-protecting the user's intention to create an independent value from
-being thwarted.
+protecting the user's intention to create an independent value
 
 Getting the ``ref`` out of a ``class`` instance declared ``val``
 ================================================================
