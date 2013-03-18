@@ -18,8 +18,8 @@ compromising ease of use.
 .. Note::
 
    We are aware of some issues with naming of these new keywords; to
-   avoid chaos we discuss alternative spelling schemes in a section at
-   the end of this document.
+   avoid chaos we discuss alternative spelling schemes in a BikeShed_
+   section at the end of this document.
 
 Introduction
 ============
