@@ -93,7 +93,7 @@ in a copy.  Creating a ``ref`` from a ``val`` copies into heap memory::
 
     ref z2 = x         // z2 is a copy of x's value on the heap
     y = z              // z2's value is copied into y
-    
+
     ref z2 = z         // z and z2 refer to the same Int value
     ref z3 = z.clone() // z3 refers to a copy of z's value
 
@@ -333,7 +333,7 @@ Bikeshed
   * What about ``let``?
   * Should we drop ``let`` for ivars?
 
-* ``ref`` is like ``[byref]``.  
+* ``ref`` is like ``[byref]``.
   * We don't think they can be collapsed--"ref" requires shared ownership and is
     escapable and aliasable, unlike "[byref]".
   * Should we spell ``[byref]`` differently?  I think at a high level
