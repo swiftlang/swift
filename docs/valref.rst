@@ -266,6 +266,15 @@ is thus presumed to have references semantics. Swift protocols
 imported from Objective-C or declared as ``[objc]`` thus must inherit ``ref``
 as a protocol constraint.
 
+Why This Design Improves Swift
+==============================
+
+Choose semantics at the point of use.  You might *want* a reference to
+a struct, tuple, etc.  You might *want* some class type to be a
+component of the value of some value type.  The designer of the type
+doesn't know whether you want to use it via a reference; she can only
+guess.
+
 Why This Design Beats Rust/C++/etc.
 ===================================
 
