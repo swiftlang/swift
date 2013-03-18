@@ -342,6 +342,11 @@ DowncastInst::DowncastInst(SILLocation Loc, Value Operand, SILType Ty)
   : ConversionInst(ValueKind::DowncastInst, Loc, Operand, Ty) {
 }
 
+AddressToPointerInst::AddressToPointerInst(SILLocation Loc, Value Operand,
+                                           SILType Ty)
+  : ConversionInst(ValueKind::AddressToPointerInst, Loc, Operand, Ty) {
+}
+
 ArchetypeToSuperInst::ArchetypeToSuperInst(SILLocation Loc,
                                            Value Operand, SILType Ty)
   : ConversionInst(ValueKind::ArchetypeToSuperInst, Loc, Operand, Ty) {

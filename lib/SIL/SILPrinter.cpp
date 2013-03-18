@@ -309,6 +309,9 @@ public:
   void visitDowncastInst(DowncastInst *CI) {
     printConversionInst(CI, "downcast");
   }
+  void visitAddressToPointerInst(AddressToPointerInst *CI) {
+    printConversionInst(CI, "address_to_pointer");
+  }
   void visitArchetypeToSuperInst(ArchetypeToSuperInst *CI) {
     printConversionInst(CI, "archetype_to_super");
   }

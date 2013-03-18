@@ -401,7 +401,7 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(Value ObjectPtr,
                                             Expr *ArrayInjectionFunction) {
   // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
   if (BasePtr.getType() != SILType::getRawPointerType(F.getContext()))
-    BasePtr = B.createImplicitConvert(SILLocation(),
+    BasePtr = B.createAddressToPointer(SILLocation(),
                               BasePtr,
                               SILType::getRawPointerType(F.getContext()));
 

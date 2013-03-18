@@ -195,6 +195,11 @@ public:
     return insert(new DowncastInst(Loc, Op, Ty));
   }
   
+  AddressToPointerInst *createAddressToPointer(
+                                       SILLocation Loc, Value Op, SILType Ty) {
+    return insert(new AddressToPointerInst(Loc, Op, Ty));
+  }
+  
   ArchetypeToSuperInst *createArchetypeToSuper(SILLocation Loc,
                                                Value Archetype, SILType BaseTy) {
     return insert(new ArchetypeToSuperInst(Loc, Archetype, BaseTy));

@@ -544,6 +544,16 @@ public:
   }
 };
   
+/// AddressToPointerInst - Convert a SIL address to a Builtin.RawPointer value.
+class AddressToPointerInst : public ConversionInst {
+public:
+  AddressToPointerInst(SILLocation Loc, Value Operand, SILType ty);
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::AddressToPointerInst;
+  }
+};
+  
 /// ArchetypeToSuperInst - Given the address of an archetype value with a base
 /// class constraint, returns a reference to the base class instance.
 class ArchetypeToSuperInst : public ConversionInst {

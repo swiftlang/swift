@@ -439,6 +439,21 @@ public:
            "downcast must convert to a reference type");
   }
   
+  void visitAddressToPointerInst(AddressToPointerInst *AI) {
+    assert(AI->getOperand().getType().isAddress() &&
+           "address-to-pointer operand must be an address");
+    assert(AI->getType().getSwiftType()->isEqual(
+                              AI->getType().getASTContext().TheRawPointerType)
+           && "address-to-pointer result type must be RawPointer");
+  }
+  
+  void visitImplicitConvertInst(ImplicitConvertInst *ICI) {
+    assert(!ICI->getOperand().getType().isAddress() &&
+           "conversion operand cannot be an address");
+    assert(!ICI->getType().isAddress() &&
+           "conversion result cannot be an address");
+  }
+  
   void visitIntegerValueInst(IntegerValueInst *IVI) {
     assert(IVI->getType().is<BuiltinIntegerType>() &&
            "invalid integer value type");

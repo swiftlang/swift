@@ -654,6 +654,16 @@ coerce
 Represents an explicit type coercion with no runtime effect. ``%1`` will be
 equivalent to ``%0``.
 
+address_to_pointer
+``````````````````
+::
+
+  %1 = address_to_pointer %0
+  ; %0 must be of an address type $*T
+  ; %1 will be of type Builtin.RawPointer
+
+Creates a ``Builtin.RawPointer`` value corresponding to the address ``%0``.
+
 Generics
 ~~~~~~~~
 
