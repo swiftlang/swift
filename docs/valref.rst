@@ -334,14 +334,29 @@ is thus presumed to have references semantics. Swift protocols
 imported from Objective-C or declared as ``[objc]`` thus must inherit ``ref``
 as a protocol constraint.
 
-Why This Design Improves Swift
+How This Design Improves Swift
 ==============================
 
-Choose semantics at the point of use.  You might *want* a reference to
-a struct, tuple, etc.  You might *want* some class type to be a
-component of the value of some value type.  The designer of the type
-doesn't know whether you want to use it via a reference; she can only
-guess.
+1. You can choose semantics at the point of use.  The designer of a
+   type doesn't know whether you will want to use it via a reference;
+   she can only guess.  You might *want* to share a reference to a
+   struct, tuple, etc.  You might *want* some class type to be a
+   component of the value of some other type.  We allow that, without
+   requiring awkward explicit wrapping, and without discarding the
+   obvious defaults for types that have them.
+
+2. We provide a continuum of strictness in which to program.  If
+   you're writing a script, you can go with ``var`` everywhere: don't
+   worry; be happy.  If you're writing a large-scale program and want
+   to be very sure of what you're getting, you can forbid ``var``
+   except in carefully-vetted generic functions.  The choice is yours.
+
+3. We allow generic programmers to avoid subtle semantic errors by
+   explicitly specifying value or reference semantics where it
+   matters.
+
+4. We move the cases where values and references interact much closer
+   to, and arguably into, the “easy” zone.
 
 Why This Design Beats Rust/C++/etc.
 ===================================
