@@ -255,6 +255,26 @@ type parameter, as follows::
    val x : T // always declares a val
    var x : T // declares a val iff T is a val
 
+``ref`` and ``val`` can be specified as protocol constraints for type
+parameters::
+
+  // Fill an array with independent copies of x
+  func fill<T:val>(array:T[], x:T) {
+    for i in 0..array.length {
+      array[i] = x
+    }
+  }
+
+Protocols similarly can inherit from ``val`` or ``ref`` constraints, to require
+conforming types to have the specified semantics::
+
+  protocol Disposable : ref {
+    func dispose()
+  }
+
+* Are ref/val constraints actually necessary with argument and variable
+  qualifications? Dave thinks not.
+
 .. _non-copyable:
 
 Non-Copyability
