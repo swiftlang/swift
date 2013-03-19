@@ -45,7 +45,10 @@ write ``val`` or ``ref`` to request value or reference semantics,
 respectively.  Writing ``var`` requests the default semantics for a
 given type.  Non-``class`` types (``struct``\ s, tuples, arrays,
 ``oneof``\ s) default to ``val`` semantics, while ``class``\ es
-default to ``ref`` semantics.  
+default to ``ref`` semantics. The types ``val SomeClass`` and
+``ref SomeStruct`` also become part of the type system and can
+be used as generic parameters or as parts of tuple, array, and
+function types.
 
 Because the current specification already describes the default
 behaviors, we will restrict ourselves to discussing the new
@@ -218,6 +221,16 @@ and has value semantics::
     Nil()
     Cons(car:T, ref cdr:Node<T>)
   }
+
+A special ``oneof`` type is the nullable type ``T?``, which is
+sugar syntax for a generic oneof type ``Nullable<T>``. Since both nullable
+refs and refs-that-are-nullable are useful, we could provide sugar syntax for
+both to avoid requiring parens::
+
+  ref? Int // Nullable reference to Int: Nullable<ref T>
+  ref Int? // Reference to nullable Int: ref Nullable<T>
+  val? SomeClass // Nullable SomeClass value: Nullable<val T>
+  val Int? // nullable Int: val Nullable<T> -- the default for Nullable<T>
 
 __ non-copyable_
 
