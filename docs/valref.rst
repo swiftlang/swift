@@ -272,6 +272,12 @@ conforming types to have the specified semantics::
     func dispose()
   }
 
+The ability to explicitly declare ``val`` and ``ref`` allow us to
+smooth out behavioral differences between value and reference types
+where they could affect the correctness of algorithms.  The continued
+existence of ``var`` allows value-agnostic generic algorithms, such as
+``swap``, to go on working as before.
+
 .. _non-copyable:
 
 Non-Copyability
