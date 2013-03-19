@@ -69,7 +69,7 @@ public:
 };
 
 /// \brief Describes the kind of a literal.
-enum class LiteralKind {
+enum class LiteralKind : char {
   Int, Float, Char, UTFString, ASCIIString, Array, Dictionary
 };
 
