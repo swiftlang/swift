@@ -417,6 +417,14 @@ realize that having ``val`` and ``ref`` available will probably change
 the optimal way to express the standard library APIs, and choosing
 where to use the new capabilities may be an interesting balancing act.
 
+(Im)Mutability
+==============
+
+We have looked, but so far, we don't think this proposal closes (or,
+for that matter, opens) the door to anything fundamentally new with
+respect to declared (im)mutability.  The issues that arise with
+explicit ``val`` and ``ref`` also arise without them.
+
 Bikeshed
 ========
 
