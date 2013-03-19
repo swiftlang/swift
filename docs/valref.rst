@@ -390,7 +390,7 @@ How This Design Improves Swift
 4. We move the cases where values and references interact much closer
    to, and arguably into, the “easy” zone.
 
-How This Design Beats Rust/C++/etc.
+How This Design Beats Rust/C++/C#/etc.
 ===================================
 
 * We retain the “easy” zone.  Rust has a great low-level memory safety
@@ -421,6 +421,16 @@ __ http://static.rust-lang.org/doc/tutorial-borrowed-ptr.html#borrowing-managed-
   authors the ability to provide a default semantics for their types
   and avoid confronting their users with a constant ``T*`` vs. ``T``
   choice like C/C++.
+
+* C# also provides a ``class`` vs. ``struct`` distinction with a
+  generics system, but it provides no facilities for nontrivial value semantics
+  on struct types, and the only means for writing generic
+  algorithms that rely on value or reference semantics is to apply a
+  blunt ``struct`` or ``class`` constraint to type parameters and limit the
+  type domain of the generic. By generalizing both value and reference semantics
+  to all types, we allow both for structs with interesting value semantics and
+  for generics that can reliably specify and use value or reference semantics
+  without limiting the types they can be used with.
 
 ``structs`` Really Should Have Value Semantics
 ==============================================
