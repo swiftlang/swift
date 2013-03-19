@@ -272,9 +272,6 @@ conforming types to have the specified semantics::
     func dispose()
   }
 
-* Are ref/val constraints actually necessary with argument and variable
-  qualifications? Dave thinks not.
-
 .. _non-copyable:
 
 Non-Copyability
