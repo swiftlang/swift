@@ -18,7 +18,7 @@ compromising ease of use.
 .. Note::
 
    We are aware of some issues with naming of these new keywords; to
-   avoid chaos we discuss alternative spelling schemes in a BikeShed_
+   avoid chaos we discuss alternative spelling schemes in a Bikeshed_
    section at the end of this document.
 
 Introduction
@@ -40,13 +40,13 @@ We think of Swift as notionally providing at least three nested
    rope with which to hang onesself.
 
 Until recently, Swift's support for value semantics outside the “wild
-west” has been weak.  While the recent ``Cloneable`` proposal makes
+west” has been weak.  While the recent ``Clonable`` proposal makes
 new things possible in the “safe” zone, it leaves the language
 syntactically and semantically lumpy, keeping interactions between
 value and reference types firmly outside the “easy” zone and failing to
 address the issue of generic programming.
 
-This proposal builds on the ``Cloneable`` proposal to create a more
+This proposal builds on the ``Clonable`` proposal to create a more
 uniform, flexible, and interoperable type system while solving the
 generic programming problem and expanding the “easy” zone.
 
@@ -123,7 +123,7 @@ Standalone Types
 appears without a variable name, it can be written this way::
 
    ref Int                 // an Int on the heap
-   val SomeCloneableClass  // a value of SomeCloneableClass type
+   val SomeClonableClass  // a value of SomeClonableClass type
 
 Therefore, although it is not recommended style, we can also write::
 
@@ -206,10 +206,33 @@ Rules for copying array elements follow those of instance variables.
 ``oneof``\ s
 ============
 
-* Semantics of ``oneof`` elements should follow those of instance
-  variables.
+Oneof types, like structs, have default value semantics. Constructors for the
+oneof can declare the ``val``- or ``ref``-ness of their associated values, using
+the same syntax as function parameters, described below::
 
-* Joe to write this section
+  oneof Foo {
+    Bar(ref bar:Int)
+    Bas(val bas:SomeClass)
+  }
+
+Oneofs allow the definition of recursive types. A constructor for a oneof
+may recursively reference the oneof as a member; the necessary
+indirection and heap allocation of the recursive data structure is implicit
+and has value semantics::
+
+  // A list with value semantics--copying the list recursively copies the
+  // entire list
+  oneof List<T> {
+    Nil()
+    Cons(car:T, cdr:List<T>)
+  }
+
+  // A list node with reference semantics—copying the node creates a node
+  // that shares structure with the tail of the list
+  oneof Node<T> {
+    Nil()
+    Cons(car:T, ref cdr:Node<T>)
+  }
 
 __ non-copyable_
 
@@ -238,7 +261,7 @@ argument value is copied.
 
   We believe that ``[byref]`` is an independent concept and still very
   much needed, even with an explicit ``ref`` keyword.  See also the
-  BikeShed_ discussion at the end of this document.
+  Bikeshed_ discussion at the end of this document.
 
 Generics
 ========
@@ -305,34 +328,43 @@ Objective-C Interoperability
 Clonable Objective-C classes
 -----------------------------
 
-In Cocoa, a notion similar to cloneability is captured in the ``NSCopying`` and
+In Cocoa, a notion similar to clonability is captured in the ``NSCopying`` and
 ``NSMutableCopying`` protocols, and a notion similar to ``val`` instance
 variables is captured by the behavior of ``(copy)`` properties. However, there
-are some behavioral and semantic differences that need to be taken into account:
+are some behavioral and semantic differences that need to be taken into account.
+``NSCopying`` and ``NSMutableCopying`` are entangled with Foundation's
+idiosyncratic management of container mutability: ``-[NSMutableThing copy]``
+produces a freshly copied immutable ``NSThing``, whereas ``-[NSThing copy]``
+returns the same object back if the receiver is already immutable.
+``-[NSMutableThing mutableCopy]`` and ``-[NSThing mutableCopy]`` both return
+a freshly copied ``NSMutableThing``. In order to avoid requiring special case
+Foundation-specific knowledge of whether class types are notionally immutable
+or mutable, we propose this first-draft approach to mapping the Cocoa concepts
+to ``Clonable``:
 
-* ``NSCopying`` and ``NSMutableCopying`` are entangled with Foundation's
-  idiosyncratic management of container mutability.
-  ``-[NSMutableThing copy]`` produces a freshly copied immutable ``NSThing``,
-  whereas ``-[NSThing copy]`` returns the same object back if the receiver is
-  already immutable. ``-[NSMutableThing mutableCopy]`` and
-  ``-[NSThing mutableCopy]`` both return a freshly copied ``NSMutableThing``.
-* ``(copy)`` properties only affect the behavior of the synthesized setter
-  method for the property. The default property getter is unaffected, and since
-  there is no implicit ``NSCopying`` or ``NSMutableCopying`` conformance in
-  Objective-C, ``-[copy]``-ing the object may have behavior inconsistent with
-  the declared behavior of its properties.
+* If an Objective-C class conforms to ``NSMutableCopying``, use the
+  ``-mutableCopyWithZone:`` method to fulfill the Swift ``Clonable`` concept,
+  casting the result of ``-mutableCopyWithZone:`` back to the original type.
+* If an Objective-C class conforms to ``NSCopying`` but not ``NSMutableCopying``,
+  use ``-copyWithZone:``, also casting the result back to the original type.
 
-* Ask Jordan about other semantic pitfalls.
+This is suboptimal for immutable types, but should work for any Cocoa class
+that fulfills the ``NSMutableCopying`` or ``NSCopying`` contracts without
+requiring knowledge of the intended semantics of the class beyond what the
+compiler can see.
 
-* Design how to map well-behaved Cocoa copying to Swift cloning and vice-versa.
+Objective-C ``(copy)`` properties should behave closely enough to Swift ``val``
+properties to be able to vend Objective-C ``(copy)`` properties to Swift as
+``val`` properties, and vice versa.
 
 Objective-C protocols
 ---------------------
 
 In Objective-C, only classes can conform to protocols, and the ``This`` type
 is thus presumed to have references semantics. Swift protocols
-imported from Objective-C or declared as ``[objc]`` thus must inherit ``ref``
-as a protocol constraint.
+imported from Objective-C or declared as ``[objc]`` could be conformed to by
+``val`` types, but doing so would need to incur an implicit copy to the heap
+to create a ``ref`` value to conform to the protocol.
 
 How This Design Improves Swift
 ==============================
@@ -421,7 +453,7 @@ If ``XPair`` had been declared a class, ::
 
   val a : XPair      // I want an independent value, please!
 
-would only compile if ``XPair`` was also ``Cloneable``, thereby
+would only compile if ``XPair`` was also ``Clonable``, thereby
 protecting the user's intention to create an independent value
 
 Getting the ``ref`` out of a ``class`` instance declared ``val``
