@@ -209,6 +209,8 @@ Rules for copying array elements follow those of instance variables.
 * Semantics of ``oneof`` elements should follow those of instance
   variables.
 
+* Joe to write this section
+
 __ non-copyable_
 
 Function Parameters
