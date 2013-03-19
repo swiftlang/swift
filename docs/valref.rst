@@ -358,17 +358,37 @@ How This Design Improves Swift
 4. We move the cases where values and references interact much closer
    to, and arguably into, the “easy” zone.
 
-Why This Design Beats Rust/C++/etc.
+How This Design Beats Rust/C++/etc.
 ===================================
 
-* We retain the "easy box".
+* We retain the “easy” zone.  Rust has a great low-level memory safety
+  story, but it comes at the expense of ease-of-use.  You can't learn
+  to use that system effectively without confronting three `kinds`__
+  of pointer, `named lifetimes`__, `borrowing managed boxes and
+  rooting`__, etc.  By contrast, there's a path to learning swift that
+  postpones the ``val``\ /``ref`` distinction, and that's pretty much
+  *all* one must learn to have a complete understanding of the object
+  model in the “easy” and “safe” zones.
 
-* Types meant to be reference types with inheritance aren't Clonable
-  by default.
+__ http://static.rust-lang.org/doc/tutorial.html#boxes-and-pointers
+__ http://static.rust-lang.org/doc/tutorial-borrowed-ptr.html#named-lifetimes
+__ http://static.rust-lang.org/doc/tutorial-borrowed-ptr.html#borrowing-managed-boxes-and-rooting
 
-* By retaining the class vs. struct distinction, we give type authors the
-  ability to provide a default semantics for their types and avoid confronting
-  their users with a constant ``T*`` vs. ``T`` choice like C/C++.
+* We retain the “safe” zone.  C++ offers great control over
+  everything, but the sharp edges are always exposed.  This design
+  allows programmers to accomplish most of what people want to do with
+  C++, but do it safely and expressively.  The rest is still
+  available, or can be added—at least to the “wild west” zone—without
+  harming the rest of the language.
+
+* Unlike C++, types meant to be reference types, supporting
+  inheritance, aren't copyable by default.  This prevents inadvertent
+  slicing and wrong semantics.
+
+* By retaining the ``class`` vs. ``struct`` distinction, we give type
+  authors the ability to provide a default semantics for their types
+  and avoid confronting their users with a constant ``T*`` vs. ``T``
+  choice like C/C++.
 
 ``structs`` Really Should Have Value Semantics
 ==============================================
