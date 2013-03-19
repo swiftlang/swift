@@ -19,23 +19,24 @@
 using namespace swift;
 
 SILFunctionTypeInfo *SILFunctionTypeInfo::create(ArrayRef<SILType> inputTypes,
-                                         SILType resultType,
-                                         unsigned curriedInputCount,
-                                         bool isUncurried,
-                                         bool hasIndirectReturn,
-                                         SILBase &base)
+                                       SILType resultType,
+                                       ArrayRef<unsigned> uncurriedInputCounts,
+                                       bool hasIndirectReturn,
+                                       SILBase &base)
 {
   void *buffer = base.allocate(sizeof(SILFunctionTypeInfo)
-                                 + sizeof(SILType) * inputTypes.size(),
+                                 + sizeof(SILType) * inputTypes.size()
+                                 + sizeof(unsigned) * uncurriedInputCounts.size(),
                                llvm::AlignOf<SILFunctionTypeInfo>::Alignment);
   SILFunctionTypeInfo *fi = ::new (buffer) SILFunctionTypeInfo(
-                                                       inputTypes.size(),
-                                                       resultType,
-                                                       curriedInputCount,
-                                                       isUncurried,
-                                                       hasIndirectReturn);
+                                                     inputTypes.size(),
+                                                     resultType,
+                                                     uncurriedInputCounts.size(),
+                                                     hasIndirectReturn);
   memcpy(fi->getInputTypeBuffer(), inputTypes.data(),
          sizeof(SILType) * inputTypes.size());
+  memcpy(fi->getUncurryBuffer(), uncurriedInputCounts.data(),
+         sizeof(unsigned) * uncurriedInputCounts.size());
   return fi;
 }
 

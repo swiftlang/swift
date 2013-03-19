@@ -56,9 +56,8 @@ public:
 /// Specifies the SIL-level calling convention for the function.
 class SILFunctionTypeInfo : public SILTypeInfo {
   SILType resultType;
-  unsigned inputTypeCount : 31;
-  unsigned uncurried : 1;
-  unsigned curriedInputCount : 31;
+  unsigned inputTypeCount;
+  unsigned uncurryCount : 31;
   unsigned indirectReturn : 1;
 
   SILType *getInputTypeBuffer() {
@@ -68,24 +67,29 @@ class SILFunctionTypeInfo : public SILTypeInfo {
     return reinterpret_cast<SILType const *>(this+1);
   }
   
+  unsigned *getUncurryBuffer() {
+    return reinterpret_cast<unsigned*>(getInputTypeBuffer() + inputTypeCount);
+  }
+  unsigned const *getUncurryBuffer() const {
+    return reinterpret_cast<unsigned const *>(
+                                        getInputTypeBuffer() + inputTypeCount);
+  }
+  
   SILFunctionTypeInfo(unsigned inputTypeCount,
                       SILType resultType,
-                      unsigned curriedInputCount,
-                      bool isUncurried,
+                      unsigned uncurryCount,
                       bool hasIndirectReturn)
     : SILTypeInfo(SILTypeInfoKind::SILFunctionTypeInfo),
       resultType(resultType),
       inputTypeCount(inputTypeCount),
-      uncurried(isUncurried),
-      curriedInputCount(curriedInputCount),
+      uncurryCount(uncurryCount),
       indirectReturn(hasIndirectReturn)
   {}
 
 public:
   static SILFunctionTypeInfo *create(ArrayRef<SILType> inputTypes,
                                      SILType resultType,
-                                     unsigned curriedInputCount,
-                                     bool isUncurried,
+                                     ArrayRef<unsigned> uncurriedInputCounts,
                                      bool hasIndirectReturn,
                                      SILBase &base);
   
@@ -108,13 +112,23 @@ public:
   
   /// True if this function type can be curried with a CurryInst.
   bool isUncurried() const {
-    return bool(uncurried);
+    return uncurryCount > 1;
+  }
+  
+  /// Returns an ArrayRef containing the offset of the first SIL argument
+  /// used by each uncurry level of the function. For example, for a simple
+  /// function of type (Int, Int) -> Int, this will contain {0}. For a curried
+  /// function (Int, Int)(Int)(Int, (Int, Int)) -> Int, this will contain
+  /// {0, 2, 3}.
+  ArrayRef<unsigned> getUncurriedInputCounts() const {
+    return {getUncurryBuffer(), uncurryCount};
   }
   
   /// Returns the list of input types needed to partially apply a function of
   /// this function type with a CurryInst.
   ArrayRef<SILType> getCurryInputTypes() const {
-    return ArrayRef<SILType>(getInputTypeBuffer(), curriedInputCount);
+    assert(isUncurried());
+    return {getInputTypeBuffer(), getUncurriedInputCounts()[uncurryCount-1]};
   }
   
   static bool classof(SILTypeInfo const *ti) {

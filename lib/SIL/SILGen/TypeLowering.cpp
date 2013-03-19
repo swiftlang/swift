@@ -171,11 +171,10 @@ SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
                                                             unsigned uncurries)
 {
   SmallVector<SILType, 8> inputTypes;
-
-  unsigned curriedInputCount = 0;
+  SmallVector<unsigned, 3> uncurriedInputCounts;
   // Destructure the uncurried input tuple types.
   for (;;) {
-    curriedInputCount = inputTypes.size();
+    uncurriedInputCounts.push_back(inputTypes.size());
     LoweredFunctionInputTypeVisitor(*this, inputTypes)
       .visit(ft->getInput()->getCanonicalType());
     if (uncurries-- == 0)
@@ -194,8 +193,7 @@ SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
   
   return SILFunctionTypeInfo::create(inputTypes,
                                      resultType,
-                                     curriedInputCount,
-                                     uncurries > 0,
+                                     uncurriedInputCounts,
                                      hasIndirectReturn,
                                      SGM.M);
 }
