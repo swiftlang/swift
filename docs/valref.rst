@@ -400,6 +400,22 @@ as follows::
   ref y : x.get_ref()
   y.mutate()          // mutates x
 
+Teachability
+============
+
+By expanding the type system we have added complexity to the language.
+To what degree will these changes make Swift harder to learn?
+
+We believe the costs can be mitigated by teaching plain ``var``
+programming first.  The need to confront ``val`` and ``ref`` can be
+postponed until the point where students must see them in the
+interfaces of library functions.  All the same standard library
+interfaces that could be expressed before the introduction of ``val``
+and ``ref`` can still be expressed without them, so this discovery can
+happen arbitrarily late in the game.  However, it's important to
+realize that having ``val`` and ``ref`` available will probably change
+the optimal way to express the standard library APIs, and choosing
+where to use the new capabilities may be an interesting balancing act.
 
 Bikeshed
 ========
