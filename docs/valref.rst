@@ -394,29 +394,34 @@ __ http://static.rust-lang.org/doc/tutorial-borrowed-ptr.html#borrowing-managed-
 ==============================================
 
 It is *possible* to build a struct with reference semantics. For
-example, ::
+example, 
+
+..parsed-literal::
 
   struct XPair
   {
-     constructor(f : X, s : X) {
-         first = f
-         second = s
+     constructor() {
+         // These Xs are notionally **part of my value**
+         first = new X
+         second = new X
      }
-     ref first : X
-     ref second : X
+     **ref** first : X
+     **ref** second : X
   }
 
-However, the results can be surprising::
+However, the results can be surprising:
 
-  val a = XPair(y1, y2)  // I want an independent value, please
-  val b = a              // and a copy of that value
-  a.first.mutate()       // changes b.first
+.. parsed-literal::
+
+  **val** a : XPair  // I want an **independent value**, please!
+  val b = a          // and a copy of that value
+  a.first.mutate()   // Oops, changes b.first!
 
 If ``XPair`` had been declared a class, ::
 
-  val a = XPair(y1, y2)  // I want an independent value, please
+  val a : XPair      // I want an independent value, please!
 
-would only compile if ``XPair`` is also ``Cloneable``, thereby
+would only compile if ``XPair`` was also ``Cloneable``, thereby
 protecting the user's intention to create an independent value
 
 Getting the ``ref`` out of a ``class`` instance declared ``val``
