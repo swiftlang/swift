@@ -24,32 +24,17 @@ compromising ease of use.
 Introduction
 ============
 
-We think of Swift as notionally providing at least three nested
-“zones” in which to program:
-
-1. Innermost is the “easy” zone, where considerations are kept to a
-   minimum and even novice programmers can get a lot of useful work
-   done.
-
-2. In the middle is the “safe” zone, where memory-safety is guaranteed
-   and there's no undefined behavior.  Everything that is “easy” is
-   also safe.
-
-3. Outermost is the “wild west,” which provides programmers with
-   control comparable to that of C++, and a corresponding length of
-   rope with which to hang onesself.
-
-Until recently, Swift's support for value semantics outside the “wild
-west” has been weak.  While the recent ``Clonable`` proposal makes
-new things possible in the “safe” zone, it leaves the language
-syntactically and semantically lumpy, keeping interactions between
-value and reference types firmly outside the “easy” zone and failing to
-address the issue of generic programming.
+Until recently, Swift's support for value semantics outside trivial
+types like scalars and immutable strings has been weak.  While the
+recent ``Clonable`` proposal makes new things possible in the “safe”
+zone, it leaves the language syntactically and semantically lumpy,
+keeping interactions between value and reference types firmly outside
+the “easy” zone and failing to address the issue of generic
+programming.
 
 This proposal builds on the ``Clonable`` proposal to create a more
 uniform, flexible, and interoperable type system while solving the
 generic programming problem and expanding the “easy” zone.
-
 
 General Description
 ===================
@@ -393,7 +378,7 @@ How This Design Improves Swift
 How This Design Beats Rust/C++/C#/etc.
 ===================================
 
-* We retain the “easy” zone.  Rust has a great low-level memory safety
+* Simple programs stay simple.  Rust has a great low-level memory safety
   story, but it comes at the expense of ease-of-use.  You can't learn
   to use that system effectively without confronting three `kinds`__
   of pointer, `named lifetimes`__, `borrowing managed boxes and
@@ -406,12 +391,12 @@ __ http://static.rust-lang.org/doc/tutorial.html#boxes-and-pointers
 __ http://static.rust-lang.org/doc/tutorial-borrowed-ptr.html#named-lifetimes
 __ http://static.rust-lang.org/doc/tutorial-borrowed-ptr.html#borrowing-managed-boxes-and-rooting
 
-* We retain the “safe” zone.  C++ offers great control over
+* Simple programs stay safe.  C++ offers great control over
   everything, but the sharp edges are always exposed.  This design
-  allows programmers to accomplish most of what people want to do with
-  C++, but do it safely and expressively.  The rest is still
-  available, or can be added—at least to the “wild west” zone—without
-  harming the rest of the language.
+  allows programmers to accomplish most of what people want to with
+  C++, but to do it safely and expressively.  As with the rest of Swift,
+  the sharp edges are still available as an opt-in feature, and
+  without harming the rest of the language.
 
 * Unlike C++, types meant to be reference types, supporting
   inheritance, aren't copyable by default.  This prevents inadvertent
