@@ -285,7 +285,7 @@ void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
   // Destructors have LLVM type void (%swift.refcounted*), but in SIL
   // are used with type T -> ().
   if (i->getConstant().isDestructor()) {
-    Type classTy = i->getType().getSwiftRValueType();
+    Type classTy = i->getType().castTo<FunctionType>()->getInput();
     TypeInfo const &ti = getFragileTypeInfo(classTy);
     
     auto *destructorTy
