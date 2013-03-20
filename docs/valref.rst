@@ -162,6 +162,8 @@ The new rules are as follows:
 Arrays
 ======
 
+TODO: reconsider sugared array syntax.  Maybe val<Int>[42] would be better
+
 Array elements can be explicitly declared ``val`` or ``ref``::
 
   var x : Int[42]         // an array of 42 integers
@@ -264,6 +266,9 @@ argument value is copied.
 Generics
 ========
 
+TODO: Why do we need these constraints?
+TODO: Consider generic classes/structs
+
 As with an array's element type, a generic type parameter can also be bound to
 a ``ref`` or a ``val`` type.
 
@@ -319,6 +324,37 @@ several options:
 
 We favor taking all three steps, but it's useful to know that there
 are valid stopping points along the way.
+
+Default Initialization of ref
+=============================
+
+TODO
+
+Vector, Slice, and Array
+========================
+
+TODO: Int[..], etc.
+
+Equality and Identity
+=====================
+
+TODO
+
+Why Expand the Type System?
+===========================
+
+TODO
+
+Why do We Need ``[byref]`` if we have ``ref``?
+==============================================
+
+TODO
+
+Why Does the Outer Qualifier Win?
+=================================
+
+TODO
+
 
 Objective-C Interoperability
 ============================
@@ -463,6 +499,7 @@ If ``XPair`` had been declared a class, ::
 
 would only compile if ``XPair`` was also ``Clonable``, thereby
 protecting the user's intention to create an independent value
+
 
 Getting the ``ref`` out of a ``class`` instance declared ``val``
 ================================================================
