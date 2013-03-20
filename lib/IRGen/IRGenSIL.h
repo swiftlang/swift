@@ -253,6 +253,8 @@ public:
   void visitElementAddrInst(ElementAddrInst *i);
   void visitRefElementAddrInst(RefElementAddrInst *i);
 
+  //void visitClassMethodInst(ClassMethodInst *i);
+  void visitSuperMethodInst(SuperMethodInst *i);
   //void visitArchetypeMethodInst(ArchetypeMethodInst *i);
   void visitProtocolMethodInst(ProtocolMethodInst *i);
   

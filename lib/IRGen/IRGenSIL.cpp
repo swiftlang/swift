@@ -795,3 +795,20 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   TypeInfo const &addrTI = getFragileTypeInfo(addrTy);
   addrTI.destroy(*this, base);
 }
+
+void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
+  // FIXME: For Objective-C classes we need to arrange for a super dispatch
+  // to happen when the method is called.
+  
+  // For Swift classes, just emit a direct ref to the referenced super method.
+  llvm::Function *fnptr;
+  unsigned naturalCurryLevel;
+  AbstractCC cc;
+  BraceStmt *body;
+  IGM.getAddrOfSILConstant(i->getMember(),
+                           fnptr, naturalCurryLevel, cc, body);
+  
+  Explosion e(CurExplosionLevel);
+  e.addUnmanaged(fnptr);
+  newLoweredExplosion(Value(i, 0), e);
+}
