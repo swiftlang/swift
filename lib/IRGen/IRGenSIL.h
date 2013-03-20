@@ -32,24 +32,6 @@
 namespace swift {
 namespace irgen {
 
-struct PartialCall {
-  CallEmission emission;
-  unsigned remainingCurryLevels : 31;
-  bool isDestructor : 1;
-  
-  PartialCall() = default;
-  PartialCall(PartialCall const &) = default;
-  PartialCall(PartialCall &&) = default;
-  PartialCall &operator=(PartialCall const &) = default;
-  PartialCall &operator=(PartialCall &&) = default;
-  
-  ~PartialCall() {
-    // It's ok in SIL to reference a function without applying it, so suppress
-    // ~CallEmission's "RemainingArgsForCallee == 0" sanity check.
-    emission.invalidate();
-  }
-};
-  
 /// Represents a SIL value lowered to IR, in one of these forms:
 /// - an Address, corresponding to a SIL address value;
 /// - an Explosion of (unmanaged) Values, corresponding to a SIL "register"; or
@@ -59,7 +41,6 @@ public:
   enum class Kind {
     Address,
     Explosion,
-    PartialCall
   };
   
   Kind kind;
@@ -73,7 +54,6 @@ private:
       ExplosionKind kind;
       ExplosionVector values;
     } explosion;
-    PartialCall partialCall;
   };
 
 public:
@@ -97,10 +77,6 @@ public:
     e.forward(IGF, e.size(), explosion.values);
   }
   
-  LoweredValue(PartialCall &&call)
-    : kind(Kind::PartialCall), partialCall(std::move(call))
-  {}
-  
   LoweredValue(LoweredValue &&lv)
     : kind(lv.kind)
   {    
@@ -111,9 +87,6 @@ public:
     case Kind::Explosion:
       explosion.kind = lv.explosion.kind;
       ::new (&explosion.values) ExplosionVector(std::move(lv.explosion.values));
-      break;
-    case Kind::PartialCall:
-      ::new (&partialCall) PartialCall(std::move(lv.partialCall));
       break;
     }
   }
@@ -143,11 +116,6 @@ public:
     return explosion.kind;
   }
   
-  PartialCall &getPartialCall() {
-    assert(kind == Kind::PartialCall && "not a partial call");
-    return partialCall;
-  }
-  
   ~LoweredValue() {
     switch (kind) {
     case Kind::Address:
@@ -155,9 +123,6 @@ public:
       break;
     case Kind::Explosion:
       explosion.values.~ExplosionVector();
-      break;
-    case Kind::PartialCall:
-      partialCall.~PartialCall();
       break;
     }
   }
@@ -225,28 +190,6 @@ public:
     assert(inserted.second && "already had lowered value for sil value?!");
   }
   
-  /// Create a new PartialCall corresponding to the given SIL value.
-  PartialCall &newLoweredPartialCall(swift::Value v,
-                                     SILConstant c,
-                                     unsigned naturalCurryLevel,
-                                     CallEmission &&emission) {
-    auto inserted = loweredValues.insert({v, LoweredValue{
-      PartialCall{
-        std::move(emission),
-        naturalCurryLevel+1,
-        /*isDestructor=*/ c.isDestructor()
-      }
-    }});
-    assert(inserted.second && "already had lowered value for sil value?!");
-    return inserted.first->second.getPartialCall();
-  }
-  
-  void moveLoweredPartialCall(swift::Value v, PartialCall parent) {
-    auto inserted = loweredValues.insert({v, LoweredValue{std::move(parent)}});
-    (void)inserted;
-    assert(inserted.second && "already had lowered value for sil value?!");
-  }
-  
   /// Get the Explosion corresponding to the given SIL value, which must
   /// previously exist.
   LoweredValue &getLoweredValue(swift::Value v) {
@@ -268,8 +211,6 @@ public:
   ExplosionKind getExplosionKind(swift::Value v) {
     return getLoweredValue(v).getExplosionKind();
   }
-  
-  PartialCall getLoweredPartialCall(swift::Value v);
   
   LoweredBB &getLoweredBB(swift::BasicBlock *bb) {
     auto foundBB = loweredBBs.find(bb);
@@ -333,6 +274,7 @@ public:
   void visitCoerceInst(CoerceInst *i);
   void visitUpcastInst(UpcastInst *i);
   void visitDowncastInst(DowncastInst *i);
+  void visitAddressToPointerInst(AddressToPointerInst *i);
   //void visitArchetypeToSuperInst(ArchetypeToSuperInst *i);
   //void visitSuperToArchetypeInst(SuperToArchetypeInst *i);
 

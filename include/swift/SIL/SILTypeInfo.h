@@ -115,11 +115,11 @@ public:
     return uncurryCount > 1;
   }
   
-  /// Returns an ArrayRef containing the offset of the first SIL argument
+  /// Returns an ArrayRef containing the offset of the last SIL argument
   /// used by each uncurry level of the function. For example, for a simple
-  /// function of type (Int, Int) -> Int, this will contain {0}. For a curried
+  /// function of type (Int, Int) -> Int, this will contain {2}. For a curried
   /// function (Int, Int)(Int)(Int, (Int, Int)) -> Int, this will contain
-  /// {0, 2, 3}.
+  /// {2, 3, 6}.
   ArrayRef<unsigned> getUncurriedInputCounts() const {
     return {getUncurryBuffer(), uncurryCount};
   }
@@ -128,7 +128,7 @@ public:
   /// this function type with a CurryInst.
   ArrayRef<SILType> getCurryInputTypes() const {
     assert(isUncurried());
-    return {getInputTypeBuffer(), getUncurriedInputCounts()[uncurryCount-1]};
+    return {getInputTypeBuffer(), getUncurriedInputCounts()[uncurryCount-2]};
   }
   
   static bool classof(SILTypeInfo const *ti) {

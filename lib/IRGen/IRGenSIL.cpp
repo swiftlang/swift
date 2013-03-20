@@ -25,6 +25,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/SIL/SILConstant.h"
+#include "swift/SIL/SILTypeInfo.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -171,34 +172,6 @@ void IRGenSILFunction::emitGlobalTopLevel(TranslationUnit *TU,
   IRGenFunction::emitGlobalTopLevel(TU, 0);
 }
 
-PartialCall IRGenSILFunction::getLoweredPartialCall(swift::Value v) {
-  LoweredValue &lowered = getLoweredValue(v);
-  switch (lowered.kind) {
-  case LoweredValue::Kind::PartialCall:
-    return std::move(lowered.getPartialCall());
-  case LoweredValue::Kind::Explosion: {
-    // Create a CallEmission from the function and its context.
-    Explosion e = lowered.getExplosion();
-    llvm::Value *fnPtr = e.claimUnmanagedNext();
-    ManagedValue data = e.claimNext();
-    CanType fnTy = v.getType().getSwiftType();
-    Callee callee = Callee::forKnownFunction(AbstractCC::Freestanding,
-                                             fnTy,
-                                             getResultType(fnTy, 0),
-                                             {},
-                                             fnPtr,
-                                             data,
-                                             // FIXME how to know explosion kind?
-                                             e.getKind(),
-                                             0);
-    return PartialCall{CallEmission(*this, callee), 1, false};
-  }
-  case LoweredValue::Kind::Address:
-    llvm_unreachable("function lowered as address?!");
-  }
-}
-
-
 void IRGenSILFunction::visitBasicBlock(swift::BasicBlock *BB) {
   // Insert into the lowered basic block.
   llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
@@ -297,25 +270,25 @@ void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
   BraceStmt *body;
   IGM.getAddrOfSILConstant(i->getConstant(),
                            fnptr, naturalCurryLevel, cc, body);
-
-  // Prepare a CallEmission for this function.
-  // FIXME generic call specialization
-  CanType origType = i->getType().getSwiftType();
-  CanType resultType = getResultType(origType, naturalCurryLevel);
   
-  Callee callee = Callee::forKnownFunction(
-                               cc,
-                               origType,
-                               resultType,
-                               /*Substitutions=*/ {},
-                               fnptr,
-                               ManagedValue(),
-                               ExplosionKind::Minimal,
-                               naturalCurryLevel);
-  newLoweredPartialCall(Value(i, 0),
-                        i->getConstant(),
-                        naturalCurryLevel,
-                        CallEmission(*this, callee));
+  llvm::Value *fnValue = fnptr;
+  
+  // Destructors have LLVM type void (%swift.refcounted*), but in SIL
+  // are used with type T -> ().
+  if (i->getConstant().isDestructor()) {
+    Type classTy = i->getType().getSwiftRValueType();
+    TypeInfo const &ti = getFragileTypeInfo(classTy);
+    
+    auto *destructorTy
+      = llvm::FunctionType::get(IGM.VoidTy, ti.getStorageType(),
+                                /*isVarArg*/ false)
+        ->getPointerTo();
+    fnValue = Builder.CreateBitCast(fnValue, destructorTy);
+  }
+  
+  Explosion e(CurExplosionLevel);
+  e.addUnmanaged(fnValue);
+  newLoweredExplosion(Value(i, 0), e);
 }
 
 void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
@@ -325,69 +298,70 @@ void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
 }
 
 static void emitApplyArgument(IRGenSILFunction &IGF,
-                              PartialCall const &call,
                               Explosion &args,
                               LoweredValue &newArg) {
   switch (newArg.kind) {
   case LoweredValue::Kind::Explosion: {
-    Explosion e(newArg.getExplosion());
-    if (call.isDestructor) {
-      // Destructors surface to SIL as T -> () but have LLVM signature
-      // void (%swift.refcounted*).
-      assert(e.size() == 1 &&
-             "destructible thing should explode to one argument");
-      llvm::Value *v = e.claimUnmanagedNext();
-      args.addUnmanaged(IGF.Builder.CreateBitCast(v, IGF.IGM.RefCountedPtrTy));
-      break;
-    }
-    
-    args.add(e.claimAll());
+    newArg.getExplosion(args);
     break;
   }
   case LoweredValue::Kind::Address:
     args.addUnmanaged(newArg.getAddress().getAddress());
-    break;
-  case LoweredValue::Kind::PartialCall:
-    llvm_unreachable("partial call lowering not implemented");
     break;
   }
 }
 
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   Value v(i, 0);
+  Explosion calleeValues = getLoweredExplosion(i->getCallee());
   
-  // FIXME: This assumes that a curried application always reaches the "natural"
-  // curry level and that intermediate curries are never used as values. These
-  // conditions aren't supported for many decls in IRGen anyway though.
+  llvm::Value *calleeFn = calleeValues.claimUnmanagedNext();
+  llvm::Value *calleeData = nullptr;
   
-  // Pile our arguments onto the CallEmission.
-  PartialCall parent = getLoweredPartialCall(i->getCallee());
-  Explosion args(CurExplosionLevel);
-  for (Value arg : i->getArguments()) {
-    emitApplyArgument(*this, parent, args, getLoweredValue(arg));
+  if (!i->getCallee().getType().castTo<FunctionType>()->isThin())
+    calleeData = calleeValues.claimUnmanagedNext();
+
+  // FIXME: calling convention for entrypoint
+  // FIXME: apply substitutions from specialization
+  Callee callee = Callee::forKnownFunction(AbstractCC::Freestanding,
+                                           i->getCallee().getType().getSwiftType(),
+                                           i->getType().getSwiftType(),
+                                           /*FIXME substitutions*/ {},
+                                           calleeFn,
+                                           ManagedValue(calleeData),
+                                           CurExplosionLevel,
+                                           i->getCallee().getType().getUncurryLevel());
+  CallEmission emission(*this, callee);
+  
+  SILFunctionTypeInfo *ti
+    = IGM.SILMod->getFunctionTypeInfo(i->getCallee().getType());
+  
+  // Lower the SIL arguments to IR arguments, and pass them to the CallEmission
+  // one curry at a time. CallEmission will arrange the curries in the proper
+  // order for the callee.
+  unsigned arg = 0;
+  for (unsigned inputCount : ti->getUncurriedInputCounts()) {
+    Explosion curryArgs(CurExplosionLevel);
+    for (; arg < inputCount; ++arg) {
+      emitApplyArgument(*this, curryArgs,
+                        getLoweredValue(i->getArguments()[arg]));
+    }
+    emission.addArg(curryArgs);
   }
-  parent.emission.addArg(args);
   
-  if (--parent.remainingCurryLevels == 0) {
-    // If this brought the call to its natural curry level, emit the call.
-    Explosion result(CurExplosionLevel);
-    parent.emission.emitToExplosion(result);
-    newLoweredExplosion(v, result, *this);
-  } else {
-    // If not, pass the partial emission forward.
-    moveLoweredPartialCall(v, std::move(parent));
-  }
+  // FIXME: handle the result being an address. This doesn't happen normally
+  // in Swift but is how SIL currently models global accessors, and could also
+  // be how we model "address" properties in the future.
+  Explosion result(CurExplosionLevel);
+  emission.emitToExplosion(result);
+  newLoweredExplosion(Value(i,0), result, *this);
 }
 
 void IRGenSILFunction::visitClosureInst(swift::ClosureInst *i) {
+  llvm_unreachable("not implemented");
+  /*
   Value v(i, 0);
 
-  // FIXME: This only works for unapplied "thin" function values.
-  // FIXME: Really need to move CallEmission to the silgen level to get rid
-  // of this crap!
-  
-  // Get the function pointer from the parent CallEmission, which should be
-  // unapplied.
   PartialCall parent = getLoweredPartialCall(i->getCallee());
   llvm::Function *fnPtr = cast<llvm::Function>
     (parent.emission.getCallee().getFunctionPointer());
@@ -408,6 +382,7 @@ void IRGenSILFunction::visitClosureInst(swift::ClosureInst *i) {
                                  closureTy,
                                  function);
   newLoweredExplosion(v, function);
+   */
 }
 
 void IRGenSILFunction::visitIntegerLiteralInst(swift::IntegerLiteralInst *i) {
@@ -638,29 +613,22 @@ void IRGenSILFunction::visitAllocArrayInst(swift::AllocArrayInst *i) {
 
 void IRGenSILFunction::visitImplicitConvertInst(swift::ImplicitConvertInst *i) {
   Explosion to(CurExplosionLevel);
-  LoweredValue &from = getLoweredValue(i->getOperand());
-  switch (from.kind) {
-  case LoweredValue::Kind::Explosion: {
-    // FIXME: could change explosion level here?
-    Explosion fromEx = from.getExplosion();
-    assert(to.getKind() == fromEx.getKind());
-    to.add(fromEx.claimAll());
-    break;
-  }
+  Explosion from = getLoweredExplosion(i->getOperand());
 
-  case LoweredValue::Kind::Address: {
-    // implicit_convert can convert a SIL address type to Builtin.RawPointer.
-    // FIXME: Make this its own instruction.
-    llvm::Value *addrValue = from.getAddress().getAddress();
-    if (addrValue->getType() != IGM.Int8PtrTy)
-      addrValue = Builder.CreateBitCast(addrValue, IGM.Int8PtrTy);
-    to.addUnmanaged(addrValue);
-    break;
-  }
-  
-  case LoweredValue::Kind::PartialCall:
-    llvm_unreachable("forcing partial call not yet supported");
-  }
+  // FIXME: could change explosion level here?
+  assert(to.getKind() == from.getKind());
+  to.add(from.claimAll());
+
+  newLoweredExplosion(Value(i, 0), to);
+}
+
+void IRGenSILFunction::visitAddressToPointerInst(swift::AddressToPointerInst *i)
+{
+  Explosion to(CurExplosionLevel);
+  llvm::Value *addrValue = getLoweredAddress(i->getOperand()).getAddress();
+  if (addrValue->getType() != IGM.Int8PtrTy)
+    addrValue = Builder.CreateBitCast(addrValue, IGM.Int8PtrTy);
+  to.addUnmanaged(addrValue);
   newLoweredExplosion(Value(i, 0), to);
 }
 
@@ -744,17 +712,14 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
   CanType resultTy = getResultType(i->getType(0).getSwiftType(),
                                    /*uncurryLevel=*/1);
   SILConstant member = i->getMember();
-  // FIXME: get substitution list from outer function
+  // FIXME: get a pointer we can forward independent of CallEmission.
   CallEmission call = prepareExistentialMemberRefCall(*this,
                                                       base,
                                                       baseTy,
                                                       member,
                                                       resultTy,
                                                       /*subs=*/ {});
-  newLoweredPartialCall(Value(i,0),
-                        SILConstant(),
-                        /*naturalCurryLevel=*/1,
-                        std::move(call));
+  llvm_unreachable("not implemented");
 }
 
 void IRGenSILFunction::visitInitializeVarInst(swift::InitializeVarInst *i) {

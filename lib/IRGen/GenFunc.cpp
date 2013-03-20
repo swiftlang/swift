@@ -3817,8 +3817,7 @@ void IRGenModule::emitSILConstant(SILConstant c,
   unsigned naturalCurryLevel;
   AbstractCC cc;
   BraceStmt *body;
-  getAddrOfSILConstant(c,
-                       entrypoint, naturalCurryLevel, cc, body);
+  getAddrOfSILConstant(c, entrypoint, naturalCurryLevel, cc, body);
   emitSILFunction(*this, c, f, entrypoint, body);
 }
 
