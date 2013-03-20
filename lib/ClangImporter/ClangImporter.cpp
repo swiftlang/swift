@@ -244,7 +244,10 @@ Module *ClangImporter::loadModule(
   }
 
   // Load the Clang module.
-  auto clangModule = Impl.Instance->loadModule(clang::SourceLocation(),
+  auto &srcMgr = clangContext.getSourceManager();
+  clang::SourceLocation clangImportLoc
+    = srcMgr.getLocForStartOfFile(srcMgr.getMainFileID());
+  auto clangModule = Impl.Instance->loadModule(clangImportLoc,
                                                clangPath,
                                                clang::Module::AllVisible,
                                                /*IsInclusionDirective=*/false);
