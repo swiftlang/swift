@@ -322,8 +322,8 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
 
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   Value v(i, 0);
-  Explosion calleeValues = getLoweredExplosion(i->getCallee());
   
+  Explosion calleeValues = getLoweredExplosion(i->getCallee());
   llvm::Value *calleeFn = calleeValues.claimUnmanagedNext();
   llvm::Value *calleeData = nullptr;
   
@@ -333,13 +333,13 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   // FIXME: calling convention for entrypoint
   // FIXME: apply substitutions from specialization
   Callee callee = Callee::forKnownFunction(AbstractCC::Freestanding,
-                                           i->getCallee().getType().getSwiftType(),
-                                           i->getType().getSwiftType(),
-                                           /*FIXME substitutions*/ {},
-                                           calleeFn,
-                                           ManagedValue(calleeData),
-                                           CurExplosionLevel,
-                                           i->getCallee().getType().getUncurryLevel());
+                                     i->getCallee().getType().getSwiftType(),
+                                     i->getType().getSwiftType(),
+                                     /*FIXME substitutions*/ {},
+                                     calleeFn,
+                                     ManagedValue(calleeData),
+                                     CurExplosionLevel,
+                                     i->getCallee().getType().getUncurryLevel());
   CallEmission emission(*this, callee);
   
   SILFunctionTypeInfo *ti
@@ -367,31 +367,40 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
 }
 
 void IRGenSILFunction::visitClosureInst(swift::ClosureInst *i) {
-  llvm_unreachable("not implemented");
-  /*
   Value v(i, 0);
-
-  PartialCall parent = getLoweredPartialCall(i->getCallee());
-  llvm::Function *fnPtr = cast<llvm::Function>
-    (parent.emission.getCallee().getFunctionPointer());
-  parent.emission.invalidate();
   
-  // Collect the context arguments.
-  Explosion args(ExplosionKind::Minimal);
+  // Apply the closure up to the next-to-last uncurry level to gather the
+  // context arguments.
+  Explosion calleeValues = getLoweredExplosion(i->getCallee());
+  auto *calleeFn = cast<llvm::Function>(calleeValues.claimUnmanagedNext());
+
+  assert(i->getCallee().getType().castTo<FunctionType>()->isThin() &&
+         "can't closure a function that already has context");
+  assert(i->getCallee().getType().getUncurryLevel() >= 1 &&
+         "can't closure a function that isn't uncurried");
+  
+  unsigned uncurryLevel = i->getCallee().getType().getUncurryLevel();
+  SILFunctionTypeInfo *ti
+    = IGM.SILMod->getFunctionTypeInfo(i->getCallee().getType());
+
+  Explosion args(CurExplosionLevel);
   SmallVector<const TypeInfo *, 8> argTypes;
-  for (Value arg : i->getArguments()) {
-    emitApplyArgument(*this, parent, args, getLoweredValue(arg));
-    argTypes.push_back(&getFragileTypeInfo(arg.getType().getSwiftType()));
+  while (uncurryLevel-- != 0) {
+    unsigned from = ti->getUncurriedInputBegins()[uncurryLevel],
+      to = ti->getUncurriedInputEnds()[uncurryLevel];
+    for (Value arg : i->getArguments().slice(from, to - from)) {
+      emitApplyArgument(*this, args, getLoweredValue(arg));
+      argTypes.push_back(&getFragileTypeInfo(arg.getType().getSwiftType()));
+    }
   }
   
   // Create the thunk and function value.
   Explosion function(CurExplosionLevel);
   CanType closureTy = i->getType().getSwiftType();
-  emitFunctionPartialApplication(*this, fnPtr, args, argTypes,
+  emitFunctionPartialApplication(*this, calleeFn, args, argTypes,
                                  closureTy,
                                  function);
   newLoweredExplosion(v, function);
-   */
 }
 
 void IRGenSILFunction::visitIntegerLiteralInst(swift::IntegerLiteralInst *i) {
