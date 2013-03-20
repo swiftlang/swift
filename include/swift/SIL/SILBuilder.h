@@ -300,6 +300,11 @@ public:
     return insert(new MetatypeInst(Loc, Metatype));
   }
 
+  ClassMetatypeInst *createClassMetatype(SILLocation Loc, SILType Metatype,
+                                         Value Base) {
+    return insert(new ClassMetatypeInst(Loc, Metatype, Base));
+  }
+
   ModuleInst *createModule(SILLocation Loc, SILType ModuleType) {
     return insert(new ModuleInst(Loc, ModuleType));
   }

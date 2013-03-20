@@ -374,6 +374,11 @@ TupleInst::TupleInst(SILLocation Loc, SILType Ty, ArrayRef<Value> Elems)
 MetatypeInst::MetatypeInst(SILLocation Loc, SILType Metatype)
   : Instruction(ValueKind::MetatypeInst, Loc, Metatype) {}
 
+ClassMetatypeInst::ClassMetatypeInst(SILLocation Loc, SILType Metatype,
+                                     Value Base)
+  : Instruction(ValueKind::ClassMetatypeInst, Loc, Metatype),
+    Base(Base) {}
+
 ModuleInst::ModuleInst(SILLocation Loc, SILType ModuleType)
   : Instruction(ValueKind::ModuleInst, Loc, ModuleType) {}
 

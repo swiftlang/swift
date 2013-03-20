@@ -223,6 +223,15 @@ public:
     assert(MI->getType(0).is<MetaTypeType>() &&
            "metatype instruction must be of metatype type");
   }
+  void visitClassMetatypeInst(ClassMetatypeInst *MI) {
+    assert(MI->getType().is<MetaTypeType>() &&
+           "class_metatype instruction must be of metatype type");
+    assert(MI->getBase().getType().getSwiftType()->getClassOrBoundGenericClass() &&
+           "class_metatype base must be of class type");
+    assert(MI->getBase().getType().getSwiftType() ==
+             CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()) &&
+           "class_metatype result must be metatype of base class type");
+  }
   void visitModuleInst(ModuleInst *MI) {
     assert(MI->getType(0).is<ModuleType>() &&
            "module instruction must be of module type");
@@ -448,10 +457,23 @@ public:
   }
 
   void visitUpcastInst(UpcastInst *UI) {
-    assert(UI->getOperand().getType().hasReferenceSemantics() &&
-           "upcast operand must be a reference type");
-    assert(UI->getType().hasReferenceSemantics() &&
-           "upcast must convert to a reference type");
+    if (UI->getType().is<MetaTypeType>()) {
+      CanType instTy(UI->getType().castTo<MetaTypeType>()->getInstanceType());
+      assert(UI->getOperand().getType().is<MetaTypeType>()
+             && "upcast operand must be a class or class metatype instance");
+      CanType opInstTy(UI->getOperand().getType().castTo<MetaTypeType>()
+                         ->getInstanceType());
+      assert(opInstTy->getClassOrBoundGenericClass()
+             && "upcast operand must be a class or class metatype instance");
+      assert(instTy->getClassOrBoundGenericClass()
+             && "upcast must convert a class metatype to a class metatype");
+    } else {
+      assert(UI->getOperand().getType().getSwiftType()
+              ->getClassOrBoundGenericClass() &&
+             "upcast operand must be a class or class metatype instance");
+      assert(UI->getType().getSwiftType()->getClassOrBoundGenericClass() &&
+             "upcast must convert a class instance to a class type");
+    }
   }
   
   void visitDowncastInst(DowncastInst *DI) {

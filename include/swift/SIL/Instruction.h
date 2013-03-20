@@ -620,7 +620,8 @@ public:
   }
 };
 
-/// MetatypeInst - Represents the production of an instance of a given metatype.
+/// MetatypeInst - Represents the production of an instance of a given metatype
+/// named statically.
 class MetatypeInst : public Instruction {
 public:
 
@@ -632,6 +633,25 @@ public:
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::MetatypeInst;
+  }
+};
+  
+/// ClassMetatypeInst - Represents loading a dynamic class metatype
+/// for a class instance.
+class ClassMetatypeInst : public Instruction {
+  Value Base;
+  
+public:
+  ClassMetatypeInst(SILLocation Loc, SILType Metatype, Value Base);
+  
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  
+  /// Get the base instance from which the metatype will be loaded.
+  Value getBase() const { return Base; }
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ClassMetatypeInst;
   }
 };
 

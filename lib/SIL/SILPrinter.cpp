@@ -378,6 +378,9 @@ public:
   void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
     OS << "deinit_existential " << getID(DEI->getExistential());
   }
+  void visitClassMetatypeInst(ClassMetatypeInst *MI) {
+    OS << "class_metatype $" << MI->getType() << ", " << getID(MI->getBase());
+  }
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype $" << MI->getType();
   }

@@ -309,9 +309,9 @@ ManagedValue SILGenFunction::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
 ManagedValue SILGenFunction::visitMetatypeConversionExpr(
                                                    MetatypeConversionExpr *E,
                                                    SGFContext C) {
-  visit(E->getSubExpr());
-  return ManagedValue(B.createMetatype(E,
-                                       getLoweredLoadableType(E->getType())));
+  ManagedValue metaBase = visit(E->getSubExpr());
+  return ManagedValue(B.createUpcast(E, metaBase.getUnmanagedValue(),
+                                     getLoweredLoadableType(E->getType())));
 }
 
 ManagedValue SILGenFunction::visitArchetypeToSuperExpr(
@@ -1015,11 +1015,23 @@ ManagedValue SILGenFunction::visitNewArrayExpr(NewArrayExpr *E, SGFContext C) {
                                 E->getInjectionFunction());
 }
 
-
-
 ManagedValue SILGenFunction::visitMetatypeExpr(MetatypeExpr *E, SGFContext C) {
-  return ManagedValue(B.createMetatype(E,
-                                       getLoweredLoadableType(E->getType())));
+  // Evaluate the base if present.
+  if (E->getBase()) {
+    ManagedValue base = visit(E->getBase());
+    // For class types, look up the dynamic metatype.
+    if (base.getType().getSwiftType()->getClassOrBoundGenericClass()) {
+      return ManagedValue(
+        B.createClassMetatype(E, getLoweredLoadableType(E->getType()),
+                              base.getValue()));
+    }
+    // FIXME: Archetypes and protocol types should need dynamic metatype lookup
+    // too.
+  }
+  
+  // Otherwise, ignore the base and return the static metatype.
+  return ManagedValue(
+                    B.createMetatype(E, getLoweredLoadableType(E->getType())));
 }
 
 ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
