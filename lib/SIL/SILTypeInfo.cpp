@@ -24,9 +24,12 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(ArrayRef<SILType> inputTypes,
                                        bool hasIndirectReturn,
                                        SILBase &base)
 {
+  // We allocate room for an extra unsigned in the uncurriedInputCounts array,
+  // so that we can stuff a leading zero in there and be able to efficiently
+  // return both the begins and ends of each uncurried argument group.
   void *buffer = base.allocate(sizeof(SILFunctionTypeInfo)
-                                 + sizeof(SILType) * inputTypes.size()
-                                 + sizeof(unsigned) * uncurriedInputCounts.size(),
+                                 + sizeof(SILType)*inputTypes.size()
+                                 + sizeof(unsigned)*(1+uncurriedInputCounts.size()),
                                llvm::AlignOf<SILFunctionTypeInfo>::Alignment);
   SILFunctionTypeInfo *fi = ::new (buffer) SILFunctionTypeInfo(
                                                      inputTypes.size(),
@@ -35,7 +38,8 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(ArrayRef<SILType> inputTypes,
                                                      hasIndirectReturn);
   memcpy(fi->getInputTypeBuffer(), inputTypes.data(),
          sizeof(SILType) * inputTypes.size());
-  memcpy(fi->getUncurryBuffer(), uncurriedInputCounts.data(),
+  fi->getUncurryBuffer()[0] = 0;
+  memcpy(fi->getUncurryBuffer()+1, uncurriedInputCounts.data(),
          sizeof(unsigned) * uncurriedInputCounts.size());
   return fi;
 }

@@ -27,6 +27,9 @@ Function::~Function() {
 static SILType toplevelFunctionType(ASTContext &C) {
   auto t = FunctionType::get(TupleType::getEmpty(C),
                              TupleType::getEmpty(C),
+                             /*isAutoClosure=*/ false,
+                             /*isBlock=*/ false,
+                             /*isThin=*/ true,
                              C);
   return SILType::getPreLoweredType(t,
                                     /*isAddress=*/ false,

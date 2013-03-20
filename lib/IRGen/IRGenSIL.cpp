@@ -87,34 +87,43 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
 
   // Map the LLVM arguments to arguments on the entry point BB.
   Explosion params = collectParameters();
+  SILType funcTy = CurSILFn->getLoweredType();
+  SILFunctionTypeInfo *funcTI = IGM.SILMod->getFunctionTypeInfo(funcTy);
   
-  for (auto argi = entry->first->bbarg_begin(),
-            argend = entry->first->bbarg_end();
-       argi != argend;
-       ++argi) {
-    BBArgument *arg = *argi;
-    Value argv(arg, 0);
-    TypeInfo const &argType = IGM.getFragileTypeInfo(
+  // Map LLVM arguments in inner-to-outer curry order to match the Swift
+  // convention.
+  unsigned level = c.uncurryLevel;
+  do {
+    unsigned from = funcTI->getUncurriedInputBegins()[level],
+      to = funcTI->getUncurriedInputEnds()[level];
+    for (auto argi = entry->first->bbarg_begin() + from,
+           argend = entry->first->bbarg_begin() + to;
+         argi != argend; ++argi) {
+      BBArgument *arg = *argi;
+      Value argv(arg, 0);
+      TypeInfo const &argType = IGM.getFragileTypeInfo(
                                            arg->getType().getSwiftRValueType());
-    if (arg->getType().isAddress()) {
-      newLoweredAddress(argv, Address(params.claimUnmanagedNext(),
-                                      argType.StorageAlignment));
-    } else {
-      Explosion explosion(CurExplosionLevel);
-
-      if (c.isDestructor()) {
-        // The argument for a destructor comes in as a %swift.refcounted*. Cast
-        // to the correct local type.
-        TypeInfo const &thisTI
-          = getFragileTypeInfo(arg->getType().getSwiftType());
-        llvm::Value *argValue = params.claimUnmanagedNext();
-        argValue = Builder.CreateBitCast(argValue, thisTI.getStorageType());
-        explosion.addUnmanaged(argValue);
-      } else
-        argType.reexplode(*this, params, explosion);
-      newLoweredExplosion(arg, explosion);
+      if (arg->getType().isAddress()) {
+        newLoweredAddress(argv, Address(params.claimUnmanagedNext(),
+                                        argType.StorageAlignment));
+      } else {
+        Explosion explosion(CurExplosionLevel);
+        
+        if (c.isDestructor()) {
+          // The argument for a destructor comes in as a %swift.refcounted*. Cast
+          // to the correct local type.
+          TypeInfo const &thisTI
+            = getFragileTypeInfo(arg->getType().getSwiftType());
+          llvm::Value *argValue = params.claimUnmanagedNext();
+          argValue = Builder.CreateBitCast(argValue, thisTI.getStorageType());
+          explosion.addUnmanaged(argValue);
+        } else
+          argType.reexplode(*this, params, explosion);
+        newLoweredExplosion(arg, explosion);
+      }
     }
-  }
+  } while (level-- != 0);
+  
   assert(params.empty() && "did not map all llvm params to SIL params?!");
   
   // Emit the function body.
@@ -340,7 +349,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   // one curry at a time. CallEmission will arrange the curries in the proper
   // order for the callee.
   unsigned arg = 0;
-  for (unsigned inputCount : ti->getUncurriedInputCounts()) {
+  for (unsigned inputCount : ti->getUncurriedInputEnds()) {
     Explosion curryArgs(CurExplosionLevel);
     for (; arg < inputCount; ++arg) {
       emitApplyArgument(*this, curryArgs,
