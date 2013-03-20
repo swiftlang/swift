@@ -124,6 +124,17 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
     }
   } while (level-- != 0);
   
+  // Map the indirect return if present.
+  if (funcTI->hasIndirectReturn()) {
+    BBArgument *ret = entry->first->bbarg_end()[-1];
+    Value retv(ret, 0);
+    TypeInfo const &retType = IGM.getFragileTypeInfo(
+                                           ret->getType().getSwiftRValueType());
+    
+    newLoweredAddress(retv, Address(params.claimUnmanagedNext(),
+                                    retType.StorageAlignment));
+  }
+  
   assert(params.empty() && "did not map all llvm params to SIL params?!");
   
   // Emit the function body.
@@ -730,14 +741,12 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
   CanType resultTy = getResultType(i->getType(0).getSwiftType(),
                                    /*uncurryLevel=*/1);
   SILConstant member = i->getMember();
-  // FIXME: get a pointer we can forward independent of CallEmission.
-  CallEmission call = prepareExistentialMemberRefCall(*this,
-                                                      base,
-                                                      baseTy,
-                                                      member,
-                                                      resultTy,
-                                                      /*subs=*/ {});
-  llvm_unreachable("not implemented");
+  
+  Explosion lowered(CurExplosionLevel);
+  getProtocolMethodValue(*this, base, baseTy, member, resultTy,
+                         /*FIXME substitutions*/ {},
+                         lowered);
+  newLoweredExplosion(Value(i, 0), lowered);
 }
 
 void IRGenSILFunction::visitInitializeVarInst(swift::InitializeVarInst *i) {

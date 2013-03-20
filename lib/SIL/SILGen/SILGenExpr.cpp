@@ -723,9 +723,6 @@ Value SILGenFunction::emitProtocolMethod(ExistentialMemberRefExpr *e,
     // archetype and apply the "this" argument.
     Type methodType = FunctionType::get(F.getContext().TheOpaquePointerType,
                                         e->getType(),
-                                        /*isAutoClosure*/ false,
-                                        /*isBlock*/ false,
-                                        /*isThin*/ true,
                                         F.getContext());
     SILConstant c(e->getDecl());
     return B.createProtocolMethod(e, existential,

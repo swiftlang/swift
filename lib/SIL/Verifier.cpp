@@ -331,11 +331,13 @@ public:
   void visitProtocolMethodInst(ProtocolMethodInst *EMI) {
     assert(EMI->getType(0).getUncurryLevel() == EMI->getMember().uncurryLevel &&
            "result method must be at natural uncurry level of method");
+    assert(EMI->getType(0).getUncurryLevel() == 1 &&
+           "protocol method result must be at uncurry level 1");
     FunctionType *methodType = EMI->getType(0).getAs<FunctionType>();
     assert(methodType &&
            "result method must be of a concrete function type");
-    assert(methodType->isThin() &&
-           "result method must be of a thin function type");
+    assert(!methodType->isThin() &&
+           "result method must not be of a thin function type");
     SILType operandType = EMI->getOperand().getType();
     assert(methodType->getInput()->isEqual(
                             operandType.getASTContext().TheOpaquePointerType) &&
@@ -345,7 +347,7 @@ public:
     assert(operandType.isAddress() &&
            "protocol_method must apply to an existential address");
     assert(operandType.isExistentialType() &&
-           "protocol_method must apply to an existential address");    
+           "protocol_method must apply to an existential address");
   }
   
   static bool isClassOrClassMetatype(Type t) {

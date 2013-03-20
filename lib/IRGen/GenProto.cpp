@@ -3604,13 +3604,15 @@ LValue irgen::emitExistentialSubscriptLValue(IRGenFunction &IGF,
 ///
 /// \param fn - the protocol member being called
 /// \param witness - the actual function address being called
-/// \param metadata - the metatype data for the concrete type
-///   to which the function will be applied
+/// \param metadata - the metatype data for the concrete type of thisObject
+///   (or the type itself for a static method)
+/// \param thisObject - the object (if applicable) to call the method on
 static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
                                               CanType substResultType,
                                               ArrayRef<Substitution> subs,
                                               llvm::Value *witness,
-                                              llvm::Value *metadata) {
+                                              llvm::Value *metadata,
+                                              Address thisObject) {
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   unsigned uncurryLevel = 1;
 
@@ -3631,28 +3633,7 @@ static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
                              witness, ManagedValue(metadata),
                              explosionLevel, uncurryLevel);
 
-  return CallEmission(IGF, callee);
-}
-
-/// Emit a callee for a protocol method.
-///
-/// \param fn - the protocol member being called
-/// \param witness - the actual function address being called
-/// \param metadata - the metatype data for the concrete type of thisObject
-///   (or the type itself for a static method)
-/// \param thisObject - the object (if applicable) to call the method on
-static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
-                                              CanType substResultType,
-                                              ArrayRef<Substitution> subs,
-                                              llvm::Value *witness,
-                                              llvm::Value *metadata,
-                                              Address thisObject) {
-  CallEmission emission = prepareProtocolMethodCall(IGF,
-                                                    fn,
-                                                    substResultType,
-                                                    subs,
-                                                    witness,
-                                                    metadata);
+  CallEmission emission(IGF, callee);
 
   // If this isn't a static method, add the temporary address as a
   // callee argument.  This argument is bitcast to the type of the
@@ -3676,14 +3657,16 @@ static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
   return emission;
 }
 
-/// Emit an existential member reference as a callee.
-CallEmission
-irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
-                                       Address existAddr,
-                                       CanType baseTy,
-                                       SILConstant member,
-                                       CanType substResultType,
-                                       ArrayRef<Substitution> subs) {
+/// Extract the method pointer and metadata from a protocol witness table
+/// as a function value.
+void
+irgen::getProtocolMethodValue(IRGenFunction &IGF,
+                              Address existAddr,
+                              CanType baseTy,
+                              SILConstant member,
+                              CanType substResultType,
+                              ArrayRef<Substitution> subs,
+                              Explosion &out) {
   // The protocol we're calling on.
   // TODO: support protocol compositions here.
   assert(baseTy->isExistentialType());
@@ -3708,10 +3691,23 @@ irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(fnProto);
   auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
   llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
+
+  // Cast the witness pointer to the right type.
+  CanType origFnType = fn->getType()->getCanonicalType();
+  AbstractCC convention = fn->isStatic()
+    ? AbstractCC::Freestanding
+    : AbstractCC::Method;
+  llvm::AttributeSet attrs;
+  llvm::FunctionType *fnTy =
+    IGF.IGM.getFunctionType(convention,
+                            origFnType, out.getKind(), /*uncurryLevel*/ 1,
+                            ExtraData::Metatype, attrs);
+  witness = IGF.Builder.CreateBitCast(witness, fnTy->getPointerTo());
+
   
-  // Emit the callee.
-  return prepareProtocolMethodCall(IGF, fn, substResultType, subs,
-                                   witness, metadata);
+  // Build the value.
+  out.addUnmanaged(witness);
+  out.addUnmanaged(metadata);
 }
 
 /// Emit an existential member reference as a callee.

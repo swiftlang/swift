@@ -101,13 +101,15 @@ namespace irgen {
   LValue emitArchetypeSubscriptLValue(IRGenFunction &IGF,
                                       ArchetypeSubscriptExpr *E);
 
-  /// Emit an existential member reference as a callee.
-  CallEmission prepareExistentialMemberRefCall(IRGenFunction &IGF,
-                                         Address existAddr,
-                                         CanType baseTy,
-                                         SILConstant member,
-                                         CanType substResultType,
-                                         ArrayRef<Substitution> subs);
+  /// Extract the method pointer and metadata from a protocol witness table
+  /// as a function value.
+  void getProtocolMethodValue(IRGenFunction &IGF,
+                              Address existAddr,
+                              CanType baseTy,
+                              SILConstant member,
+                              CanType substResultType,
+                              ArrayRef<Substitution> subs,
+                              Explosion &out);
 
   /// Emit an existential member reference as a callee.
   CallEmission prepareExistentialMemberRefCall(IRGenFunction &IGF,
