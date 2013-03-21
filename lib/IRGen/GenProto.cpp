@@ -3692,18 +3692,8 @@ irgen::getProtocolMethodValue(IRGenFunction &IGF,
   auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
   llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
 
-  // Cast the witness pointer to the right type.
-  CanType origFnType = fn->getType()->getCanonicalType();
-  AbstractCC convention = fn->isStatic()
-    ? AbstractCC::Freestanding
-    : AbstractCC::Method;
-  llvm::AttributeSet attrs;
-  llvm::FunctionType *fnTy =
-    IGF.IGM.getFunctionType(convention,
-                            origFnType, out.getKind(), /*uncurryLevel*/ 1,
-                            ExtraData::Metatype, attrs);
-  witness = IGF.Builder.CreateBitCast(witness, fnTy->getPointerTo());
-
+  // Cast the witness pointer to i8*.
+  witness = IGF.Builder.CreateBitCast(witness, IGF.IGM.Int8PtrTy);
   
   // Build the value.
   out.addUnmanaged(witness);

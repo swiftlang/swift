@@ -3921,7 +3921,9 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                                               args.getKind(),
                                                               outType,
                                                               layout);
-  out.addUnmanaged(forwarder);
+  llvm::Value *forwarderValue = IGF.Builder.CreateBitCast(forwarder,
+                                                          IGF.IGM.Int8PtrTy);
+  out.addUnmanaged(forwarderValue);
   out.addUnmanaged(data);
 }
 

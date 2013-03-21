@@ -291,20 +291,12 @@ void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
   IGM.getAddrOfSILConstant(i->getConstant(),
                            fnptr, naturalCurryLevel, cc, body);
   
-  llvm::Value *fnValue = fnptr;
   
+  // Bitcast the reference to i8*, the expected storage type for function
+  // values.
   // Destructors have LLVM type void (%swift.refcounted*), but in SIL
   // are used with type T -> ().
-  if (i->getConstant().isDestructor()) {
-    Type classTy = i->getType().castTo<FunctionType>()->getInput();
-    TypeInfo const &ti = getFragileTypeInfo(classTy);
-    
-    auto *destructorTy
-      = llvm::FunctionType::get(IGM.VoidTy, ti.getStorageType(),
-                                /*isVarArg*/ false)
-        ->getPointerTo();
-    fnValue = Builder.CreateBitCast(fnValue, destructorTy);
-  }
+  llvm::Value *fnValue = Builder.CreateBitCast(fnptr, IGM.Int8PtrTy);
   
   Explosion e(CurExplosionLevel);
   e.addUnmanaged(fnValue);
@@ -347,19 +339,42 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   llvm::Value *calleeFn = calleeValues.claimUnmanagedNext();
   llvm::Value *calleeData = nullptr;
   
-  if (!i->getCallee().getType().castTo<FunctionType>()->isThin())
+  SILType calleeTy = i->getCallee().getType();
+  if (!calleeTy.castTo<FunctionType>()->isThin())
     calleeData = calleeValues.claimUnmanagedNext();
+  
+  // FIXME Guess the "ExtraData" kind from the type of CalleeData.
+  ExtraData extraData;
+  if (!calleeData)
+    extraData = ExtraData::None;
+  else if (calleeData->getType() == IGM.RefCountedPtrTy)
+    extraData = ExtraData::Retainable;
+  else if (calleeData->getType() == IGM.TypeMetadataPtrTy)
+    extraData = ExtraData::Metatype;
+  else
+    llvm_unreachable("unexpected extra data for function value");
+  
+  // Cast the callee pointer to the right function type.
+  // FIXME calling convention. attrs are important for C/ObjC functions too.
+  llvm::AttributeSet attrs;
+  auto fnPtrTy = IGM.getFunctionType(AbstractCC::Freestanding,
+                                     calleeTy.getSwiftType(),
+                                     CurExplosionLevel,
+                                     calleeTy.getUncurryLevel(),
+                                     extraData,
+                                     attrs)->getPointerTo();
+  calleeFn = Builder.CreateBitCast(calleeFn, fnPtrTy);
 
   // FIXME: calling convention for entrypoint
   // FIXME: apply substitutions from specialization
   Callee callee = Callee::forKnownFunction(AbstractCC::Freestanding,
-                                     i->getCallee().getType().getSwiftType(),
+                                     calleeTy.getSwiftType(),
                                      i->getType().getSwiftType(),
                                      /*FIXME substitutions*/ {},
                                      calleeFn,
                                      ManagedValue(calleeData),
                                      CurExplosionLevel,
-                                     i->getCallee().getType().getUncurryLevel());
+                                     calleeTy.getUncurryLevel());
   CallEmission emission(*this, callee);
   
   SILFunctionTypeInfo *ti
@@ -388,11 +403,15 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
 
 void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   Value v(i, 0);
+
+  // For a closure thunk to make sense there must be an llvm::Function*
+  // underlying the operand value. It may have been bitcast.
+  Explosion calleeValues = getLoweredExplosion(i->getCallee());
+  auto *calleeValue = cast<llvm::Constant>(calleeValues.claimUnmanagedNext());
+  auto *calleeFn = cast<llvm::Function>(calleeValue->getOperand(0));
   
   // Apply the closure up to the next-to-last uncurry level to gather the
   // context arguments.
-  Explosion calleeValues = getLoweredExplosion(i->getCallee());
-  auto *calleeFn = cast<llvm::Function>(calleeValues.claimUnmanagedNext());
 
   assert(i->getCallee().getType().castTo<FunctionType>()->isThin() &&
          "can't closure a function that already has context");
@@ -670,6 +689,16 @@ void IRGenSILFunction::visitAddressToPointerInst(swift::AddressToPointerInst *i)
   newLoweredExplosion(Value(i, 0), to);
 }
 
+void IRGenSILFunction::visitThinToThickFunctionInst(
+                                            swift::ThinToThickFunctionInst *i) {
+  // Take the incoming function pointer and add a null context pointer to it.
+  Explosion from = getLoweredExplosion(i->getOperand());
+  Explosion to(CurExplosionLevel);
+  to.addUnmanaged(from.claimUnmanagedNext());
+  to.addUnmanaged(IGM.RefCountedNull);
+  newLoweredExplosion(Value(i, 0), to);
+}
+
 void IRGenSILFunction::visitCoerceInst(swift::CoerceInst *i) {
   Explosion from = getLoweredExplosion(i->getOperand());
   newLoweredExplosion(Value(i, 0), from);
@@ -755,6 +784,7 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
   getProtocolMethodValue(*this, base, baseTy, member, resultTy,
                          /*FIXME substitutions*/ {},
                          lowered);
+  
   newLoweredExplosion(Value(i, 0), lowered);
 }
 
@@ -817,8 +847,11 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   IGM.getAddrOfSILConstant(i->getMember(),
                            fnptr, naturalCurryLevel, cc, body);
   
+  // Bitcast to i8*.
+  llvm::Value *fnValue = Builder.CreateBitCast(fnptr, IGM.Int8PtrTy);
+  
   Explosion e(CurExplosionLevel);
-  e.addUnmanaged(fnptr);
+  e.addUnmanaged(fnValue);
   newLoweredExplosion(Value(i, 0), e);
 }
 
@@ -839,7 +872,11 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
                                   /*FIXME substitutions*/ {},
                                   CurExplosionLevel,
                                   method.uncurryLevel);
+
+  // Bitcast the callee pointer to i8*.
+  llvm::Value *fnValue = Builder.CreateBitCast(
+                                   callee.getFunctionPointer(), IGM.Int8PtrTy);
   Explosion e(CurExplosionLevel);
-  e.addUnmanaged(callee.getFunctionPointer());
+  e.addUnmanaged(fnValue);
   newLoweredExplosion(Value(i, 0), e);
 }
