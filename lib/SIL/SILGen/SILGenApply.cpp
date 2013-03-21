@@ -267,13 +267,8 @@ void SILGenFunction::emitApplyArguments(Expr *argsExpr,
 ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                        Value Fn, ArrayRef<Value> Args) {
   // Get the result type.
-  FunctionType *fty = Fn.getType().castTo<FunctionType>();
-  for (unsigned uncurry = 0;
-       uncurry < Fn.getType().getUncurryLevel();
-       ++uncurry) {
-    fty = fty->getResult()->castTo<FunctionType>();
-  }
-  TypeLoweringInfo const &resultTI = getTypeLoweringInfo(fty->getResult());
+  TypeLoweringInfo const &resultTI = getTypeLoweringInfo(
+                                         Fn.getType().getFunctionResultType());
   
   if (resultTI.isAddressOnly()) {
     // Allocate a temporary to house the indirect return, and pass it to the

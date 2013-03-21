@@ -120,6 +120,19 @@ public:
     return uncurryLevel;
   }
   
+  /// Returns the Swift return type of a function type at the right uncurry
+  /// level.
+  /// The SILType must refer to a function type.
+  CanType getFunctionResultType() const {
+    auto *fty = castTo<AnyFunctionType>();
+    for (unsigned uncurry = 0;
+         uncurry < getUncurryLevel();
+         ++uncurry) {
+      fty = fty->getResult()->castTo<AnyFunctionType>();
+    }
+    return CanType(fty->getResult());
+  }
+  
   /// Cast the Swift type referenced by this SIL type, or return null if the
   /// cast fails.
   template<typename TYPE>

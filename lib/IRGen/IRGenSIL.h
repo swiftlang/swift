@@ -248,12 +248,13 @@ public:
   void visitStoreInst(StoreInst *i);
   void visitTupleInst(TupleInst *i);
   void visitMetatypeInst(MetatypeInst *i);
+  void visitClassMetatypeInst(ClassMetatypeInst *i);
   //void visitAssociatedMetatypeInst(AssociatedMetatypeInst *i);
   void visitExtractInst(ExtractInst *i);
   void visitElementAddrInst(ElementAddrInst *i);
   void visitRefElementAddrInst(RefElementAddrInst *i);
 
-  //void visitClassMethodInst(ClassMethodInst *i);
+  void visitClassMethodInst(ClassMethodInst *i);
   void visitSuperMethodInst(SuperMethodInst *i);
   //void visitArchetypeMethodInst(ArchetypeMethodInst *i);
   void visitProtocolMethodInst(ProtocolMethodInst *i);

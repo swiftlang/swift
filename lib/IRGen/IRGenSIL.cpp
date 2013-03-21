@@ -317,6 +317,15 @@ void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
   newLoweredExplosion(Value(i, 0), e);
 }
 
+void IRGenSILFunction::visitClassMetatypeInst(swift::ClassMetatypeInst *i) {
+  Explosion base = getLoweredExplosion(i->getBase());
+  auto baseValue = base.claimUnmanagedNext();
+  Explosion out(CurExplosionLevel);
+  out.addUnmanaged(emitTypeMetadataRefForHeapObject(*this, baseValue,
+                                        i->getBase().getType().getSwiftType()));
+  newLoweredExplosion(Value(i, 0), out);
+}
+
 static void emitApplyArgument(IRGenSILFunction &IGF,
                               Explosion &args,
                               LoweredValue &newArg) {
@@ -797,7 +806,7 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
 }
 
 void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
-  // FIXME: For Objective-C classes we need to arrange for a super dispatch
+  // FIXME: For Objective-C classes we need to arrange for a msgSendSuper2
   // to happen when the method is called.
   
   // For Swift classes, just emit a direct ref to the referenced super method.
@@ -810,5 +819,27 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   
   Explosion e(CurExplosionLevel);
   e.addUnmanaged(fnptr);
+  newLoweredExplosion(Value(i, 0), e);
+}
+
+void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
+  // FIXME: For Objective-C classes we need to arrange for a msgSend
+  // to happen when the method is called.
+  Explosion base = getLoweredExplosion(i->getOperand());
+  llvm::Value *baseValue = base.claimUnmanagedNext();
+  
+  SILConstant method = i->getMember();
+  
+  // For Swift classes, get the method implementation from the vtable.
+  Callee callee = emitVirtualCallee(*this,
+                                  baseValue,
+                                  i->getOperand().getType().getSwiftType(),
+                                  cast<FuncDecl>(method.loc.get<ValueDecl*>()),
+                                  i->getType(0).getFunctionResultType(),
+                                  /*FIXME substitutions*/ {},
+                                  CurExplosionLevel,
+                                  method.uncurryLevel);
+  Explosion e(CurExplosionLevel);
+  e.addUnmanaged(callee.getFunctionPointer());
   newLoweredExplosion(Value(i, 0), e);
 }
