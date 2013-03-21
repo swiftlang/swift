@@ -23,7 +23,7 @@ PARALLEL_DIRS :=
 
 endif
 
-CXX.Flags += -std=gnu++0x
+CXX.Flags += -std=gnu++0x -Wno-nested-anon-types
 
 ifeq ($(MAKECMDGOALS),libs-only)
   DIRS := $(filter-out tools docs, $(DIRS))
