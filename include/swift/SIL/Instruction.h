@@ -264,17 +264,17 @@ public:
                            Function &F);
 };
 
-/// ClosureInst - Represents the creation of a closure object by partial
+/// PartialApplyInst - Represents the creation of a closure object by partial
 /// application of a function value.
-class ClosureInst : public FunctionInst {
+class PartialApplyInst : public FunctionInst {
   friend class FunctionInst;
-  ClosureInst(SILLocation Loc, Value Callee, ArrayRef<Value> Args,
-              SILType ClosureType);
+  PartialApplyInst(SILLocation Loc, Value Callee, ArrayRef<Value> Args,
+                   SILType ClosureType);
 public:
-  static ClosureInst *create(SILLocation Loc, Value Callee,
-                             ArrayRef<Value> Args,
-                             SILType ClosureType,
-                             Function &F);
+  static PartialApplyInst *create(SILLocation Loc, Value Callee,
+                                  ArrayRef<Value> Args,
+                                  SILType ClosureType,
+                                  Function &F);
 };
 
 /// ConstantRefInst - Represents a reference to a *constant* declaration,

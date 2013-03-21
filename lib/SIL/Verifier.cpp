@@ -107,14 +107,14 @@ public:
            "type of apply instruction doesn't match function result type");
   }
   
-  void visitClosureInst(ClosureInst *CI) {
-    SILType calleeTy = CI->getCallee().getType();
+  void visitPartialApplyInst(PartialApplyInst *PAI) {
+    SILType calleeTy = PAI->getCallee().getType();
     assert(!calleeTy.isAddress() && "callee of closure cannot be an address");
     assert(calleeTy.is<FunctionType>() &&
            "callee of closure must have concrete function type");
     assert(calleeTy.castTo<FunctionType>()->isThin() &&
            "callee of closure must have a thin function type");
-    SILType appliedTy = CI->getType();
+    SILType appliedTy = PAI->getType();
     assert(!appliedTy.isAddress() && "result of closure cannot be an address");
     assert(appliedTy.is<FunctionType>() &&
            "result of closure must have concrete function type");
@@ -125,19 +125,19 @@ public:
     SILFunctionTypeInfo *ti = F.getModule().getFunctionTypeInfo(calleeTy);
     
     // Check that the arguments match the curry levels.
-    assert(CI->getArguments().size() == ti->getCurryInputTypes().size() &&
+    assert(PAI->getArguments().size() == ti->getCurryInputTypes().size() &&
            "closure doesn't have right number of curry arguments for function");
-    for (size_t i = 0, size = CI->getArguments().size(); i < size; ++i) {
+    for (size_t i = 0, size = PAI->getArguments().size(); i < size; ++i) {
       DEBUG(llvm::dbgs() << "  argument type ";
-            CI->getArguments()[i].getType().print(llvm::dbgs());
+            PAI->getArguments()[i].getType().print(llvm::dbgs());
             llvm::dbgs() << " for input type ";
             ti->getCurryInputTypes()[i].print(llvm::dbgs());
             llvm::dbgs() << '\n');
-      assert(CI->getArguments()[i].getType() == ti->getCurryInputTypes()[i] &&
+      assert(PAI->getArguments()[i].getType() == ti->getCurryInputTypes()[i] &&
              "input types to closure don't match function input types");
     }
     DEBUG(llvm::dbgs() << "result type ";
-          CI->getType().print(llvm::dbgs());
+          PAI->getType().print(llvm::dbgs());
           llvm::dbgs() << '\n');
     
     // The result type should match the uncurried type.
@@ -145,8 +145,8 @@ public:
     for (unsigned i = 0; i < calleeTy.getUncurryLevel(); ++i)
       ft = ft->getResult()->castTo<FunctionType>();
     
-    assert(CI->getType().getSwiftType()->isEqual(ft)
-           && CI->getType().getUncurryLevel() == 0
+    assert(PAI->getType().getSwiftType()->isEqual(ft)
+           && PAI->getType().getUncurryLevel() == 0
            && "type of apply instruction doesn't match function result type");
     
   }

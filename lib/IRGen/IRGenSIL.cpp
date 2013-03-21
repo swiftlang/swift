@@ -386,7 +386,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   newLoweredExplosion(Value(i,0), result, *this);
 }
 
-void IRGenSILFunction::visitClosureInst(swift::ClosureInst *i) {
+void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   Value v(i, 0);
   
   // Apply the closure up to the next-to-last uncurry level to gather the

@@ -238,8 +238,8 @@ public:
     printFunctionInst(AI);
   }
   
-  void visitClosureInst(ClosureInst *CI) {
-    OS << "closure ";
+  void visitPartialApplyInst(PartialApplyInst *CI) {
+    OS << "partial_apply ";
     printFunctionInst(CI);
   }
 

@@ -1097,7 +1097,8 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
       = functionRef.getType().getAs<AnyFunctionType>()->getResult();
     SILType closureTy = getLoweredLoadableType(closureSwiftTy);
     return emitManagedRValueWithCleanup(
-                    B.createClosure(loc, functionRef, capturedArgs, closureTy));
+                    B.createPartialApply(loc, functionRef, capturedArgs,
+                                         closureTy));
   } else {
     return ManagedValue(emitGlobalConstantRef(loc, constant));
   }

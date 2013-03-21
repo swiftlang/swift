@@ -127,9 +127,10 @@ public:
     return insert(ApplyInst::create(Loc, Fn, Result, Args, F));
   }
 
-  ClosureInst *createClosure(SILLocation Loc, Value Fn, ArrayRef<Value> Args,
-                             SILType ClosureTy) {
-    return insert(ClosureInst::create(Loc, Fn, Args, ClosureTy, F));
+  PartialApplyInst *createPartialApply(SILLocation Loc, Value Fn,
+                                       ArrayRef<Value> Args,
+                                       SILType ClosureTy) {
+    return insert(PartialApplyInst::create(Loc, Fn, Args, ClosureTy, F));
   }
 
   ConstantRefInst *createConstantRef(SILLocation loc, SILConstant c, SILType ty) {

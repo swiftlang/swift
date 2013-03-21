@@ -235,7 +235,7 @@ public:
   void visitAllocArrayInst(AllocArrayInst *i);
 
   void visitApplyInst(ApplyInst *i);
-  void visitClosureInst(ClosureInst *i);
+  void visitPartialApplyInst(PartialApplyInst *i);
   //void visitSpecializeInst(SpecializeInst *i);
 
   void visitConstantRefInst(ConstantRefInst *i);

@@ -191,23 +191,22 @@ ApplyInst *ApplyInst::create(SILLocation Loc, Value Callee,
                                          Loc, Callee, Result, Args);
 }
 
-ClosureInst::ClosureInst(SILLocation Loc, Value Callee, ArrayRef<Value> Args,
-                         SILType ClosureType)
-// FIXME: the callee should have a lowered SIL function type, and ClosureInst
+PartialApplyInst::PartialApplyInst(SILLocation Loc, Value Callee,
+                                   ArrayRef<Value> Args, SILType ClosureType)
+// FIXME: the callee should have a lowered SIL function type, and PartialApplyInst
 // should derive the type of its result by partially applying the callee's type.
-  : FunctionInst(ValueKind::ClosureInst, Loc,
+  : FunctionInst(ValueKind::PartialApplyInst, Loc,
                  ClosureType,
                  Callee, Args) {
   
 }
 
-ClosureInst *ClosureInst::create(SILLocation Loc, Value Callee,
-                                 ArrayRef<Value> Args,
-                                 SILType ClosureType,
-                                 Function &F) {
-  
-  return FunctionInst::create<ClosureInst>(F, Args,
-                                           Loc, Callee, Args, ClosureType);
+PartialApplyInst *PartialApplyInst::create(SILLocation Loc, Value Callee,
+                                           ArrayRef<Value> Args,
+                                           SILType ClosureType,
+                                           Function &F) {
+  return FunctionInst::create<PartialApplyInst>(F, Args, Loc, Callee,
+                                                Args, ClosureType);
 }
 
 ConstantRefInst::ConstantRefInst(SILLocation Loc, SILConstant C, SILType Ty)

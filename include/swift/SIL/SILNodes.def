@@ -58,8 +58,8 @@ ABSTRACT_VALUE(Instruction, Value)
 
   ABSTRACT_VALUE(FunctionInst, Instruction)
     INST(ApplyInst, FunctionInst)
-    INST(ClosureInst, FunctionInst)
-    VALUE_RANGE(FunctionInst, ApplyInst, ClosureInst)
+    INST(PartialApplyInst, FunctionInst)
+    VALUE_RANGE(FunctionInst, ApplyInst, PartialApplyInst)
 
   // Literals
   INST(IntegerLiteralInst, Instruction)
