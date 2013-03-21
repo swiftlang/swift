@@ -163,85 +163,31 @@ However, the situation is different for functions with arguments of
 protocol or parameterized type.  In the absence of specific
 constraints to the contrary, the semantics of the big three can vary.
 
-For example, ::
+For example, there's an algorithm called ``cycle_length`` that
+measures the length of a cycle of states (e.g. the states of a
+pseudo-random number generator).  It needs to make one copy and do
+in-place mutation of the state, rather than wholesale value
+replacement via assignment, which might be expensive.
 
-  // Fill seq with the value x
-  func fill<T>(seq: T[], x: T)  {
-      for var i = 0; i < seq.length; ++i  {
-          seq[i] = x
-      }
-  }
+Here’s a version of cycle_length that works on non-classes, but breaks
+on classes::
 
-  // Accumulate the elements of N sequences into an array of N
-  // values, each starting with init, by calling the in-place update
-  // function accumulate(&x, e)
-  func inplace_fold<
-    T, 
-    E:Enumerable requires E.EnumeratorType.Element == T
-  >(sequences: E[], init : T, accumulate : ([byref] T, T)->Void) 
-    -> T[] 
-  {
-      var result = new T[sequences.length]
-      fill(result, init)
-      for i in 0..result.length {
-          for x in sequences[i] {
-              accumulate( &result[i], x )
-          }
-      }
-      return result
-  }
+ func cycle_length<State>(s : State, mutate : ([byref]State)->()) {
+     State x = s    // one copy
+     mutate(x)      // in-place mutation
+     Int n = 1
+     while x != s {
+          mutate(x) // in-place mutation
+          ++n
+     }
+     return n
+ }
 
-  // A type that is inplace-multipliable supports *= and a
-  // multiplicative identity value
-  protocol InplaceMultipliable
-  {
-      func [infix=90,assignment] *= (lhs : [byref] This, rhs : This) -> Void
-      static func identity() -> This
-  }
-
-  // Use inplace_fold to compute products of sequences of values
-  func products<
-       T: InplaceMultipliable,
-       E: Enumerable requires E.EnumeratorType.Element == T
-  >(sequences: E[]) -> T[]
-  {
-      return inplace_fold(sequences, T.identity(), { $0 *= $1 })
-  }
-
-If we make `Int` `InplaceMultipliable`, this algorithm works fine::
-
-  // Int is InplaceMultipliable
-  extension Int : InplaceMultipliable {
-      static func identity() -> Int { return 1 }
-  }
-
-  println(products([[1, 2, 3], [4, 5, 6]]))  // prints [6, 120]
-
-However, consider a `BigNum` class that has reference semantics::
-
-  class BigNum {
-    constructor(v: Int) { value = v }
-    var value : Int
-  }
-
-  func print(BigNum x) { print("BigNum(") print(x.value) print(")") }
-
-  func [infix=90,assignment] *= (lhs : [byref] BigNum, rhs : BigNum) -> Void {
-    lhs.value *= rhs.value
-  }
-
-  extension BigNum : InplaceMultipliable {
-      static func identity() -> BigNum { return new BigNum(1) }
-  }
-
-  println(products([[new BigNum(1), new BigNum(2), new BigNum(3)], 
-                    [new BigNum(4), new BigNum(5), new BigNum(6)]]))
-
-  // Surprise: prints [BigNum(720), BigNum(720)]
-
-The problem here is that the initial call to `fill()` generates an
-array of *references* to a single `BigNum(1)`, rather than an array of
-independent values.
+You can write a different one that only works on clonable classes and
+another one that works on both values and clonable classes but does
+O(N) copies instead just one.  I don't believe there's a reasonable
+way write this so it works on clonable classes, non-classes, and
+avoids the O(N) copies. [#extension]_
 
 The Role of Moves
 =================
@@ -469,3 +415,11 @@ Notes
 
 .. [#cow] Note that this definition *does* allow for value semantics
               using copy-on-write
+
+.. [#extension] I can think of a language extension that would allow
+                this, but it requires creating a protocol for generic
+                copying, adding compiler magic to get both classes and
+                structs to conform to it, and telling generic
+                algorithm and container authors to use that protocol
+                instead of ``=``, which IMO is really ugly and
+                probably not worth the cost.
