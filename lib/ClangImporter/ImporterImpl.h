@@ -72,6 +72,10 @@ struct ClangImporter::Implementation {
   /// \brief Swift AST context.
   ASTContext &SwiftContext;
 
+  /// \brief A count of the number of load module operations.
+  /// FIXME: Horrible, horrible hack for \c loadModule().
+  unsigned ImportCounter = 0;
+
   /// \brief Clang compiler invocation.
   llvm::IntrusiveRefCntPtr<clang::CompilerInvocation> Invocation;
 

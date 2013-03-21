@@ -107,10 +107,6 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
     invocationArgStrs.push_back(path);
   }
 
-  // FIXME: Hack around poor module search heuristics.
-  invocationArgStrs.push_back("-iwithsysroot");
-  invocationArgStrs.push_back("/usr/include/objc");
-
   // Set the module cache path.
   if (moduleCachePath.empty()) {
     llvm::SmallString<128> DefaultModuleCache;
@@ -244,9 +240,13 @@ Module *ClangImporter::loadModule(
   }
 
   // Load the Clang module.
+  // FIXME: The source location here is completely bogus. It can't be
+  // invalid, and it can't be the same thing twice in a row, so we just use
+  // a counter. Having real source locations would be far, far better.
   auto &srcMgr = clangContext.getSourceManager();
   clang::SourceLocation clangImportLoc
-    = srcMgr.getLocForStartOfFile(srcMgr.getMainFileID());
+    = srcMgr.getLocForStartOfFile(srcMgr.getMainFileID())
+            .getLocWithOffset(Impl.ImportCounter++);
   auto clangModule = Impl.Instance->loadModule(clangImportLoc,
                                                clangPath,
                                                clang::Module::AllVisible,
