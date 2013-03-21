@@ -21,12 +21,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_BASIC_OPTIONAL_H
+#define SWIFT_BASIC_OPTIONAL_H
+
 #include <type_traits>
 #include <utility>
 #include <cassert>
-
-#ifndef SWIFT_BASIC_OPTIONAL_H
-#define SWIFT_BASIC_OPTIONAL_H
 
 namespace swift {
   /// An enum whose purpose is to make it easier to initialize an
