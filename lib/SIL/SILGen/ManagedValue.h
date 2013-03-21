@@ -102,7 +102,14 @@ public:
       return getValue();
     } else {
       // Forward loadable values.
-      return forward(gen);
+      Value v = forward(gen);
+      // Thicken thin function values.
+      // FIXME: Swift type-checking should do this.
+      if (v.getType().is<AnyFunctionType>() &&
+          v.getType().castTo<AnyFunctionType>()->isThin()) {
+        v = gen.emitThickenFunction(loc, v);
+      }
+      return v;
     }
   }
   

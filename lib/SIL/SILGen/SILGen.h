@@ -578,6 +578,9 @@ public:
                              Value thisValue,
                              SILConstant methodConstant);
   
+  Value emitThickenFunction(SILLocation loc, Value thinFn);
+  void emitStore(SILLocation loc, ManagedValue src, Value destAddr);
+  
   //
   // Helpers for emitting ApplyExpr chains.
   //
@@ -682,6 +685,26 @@ static inline Type getThinFunctionType(Type t) {
     return t;
   }
 }
+
+static inline Type getThickFunctionType(Type t) {
+  if (auto *fTy = t->getAs<FunctionType>()) {
+    return FunctionType::get(fTy->getInput(),
+                             fTy->getResult(),
+                             fTy->isAutoClosure(),
+                             fTy->isBlock(),
+                             /*isThin*/ false,
+                             fTy->getASTContext());
+  } else if (auto *pfTy = t->getAs<PolymorphicFunctionType>()) {
+    return PolymorphicFunctionType::get(pfTy->getInput(),
+                                        pfTy->getResult(),
+                                        &pfTy->getGenericParams(),
+                                        /*isThin*/ false,
+                                        pfTy->getASTContext());
+  } else {
+    return t;
+  }
+}
+
   
 } // end namespace Lowering
 } // end namespace swift

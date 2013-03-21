@@ -201,6 +201,11 @@ public:
     return insert(new AddressToPointerInst(Loc, Op, Ty));
   }
   
+  ThinToThickFunctionInst *createThinToThickFunction(
+                                       SILLocation Loc, Value Op, SILType Ty) {
+    return insert(new ThinToThickFunctionInst(Loc, Op, Ty));
+  }
+  
   ArchetypeToSuperInst *createArchetypeToSuper(SILLocation Loc,
                                                Value Archetype, SILType BaseTy) {
     return insert(new ArchetypeToSuperInst(Loc, Archetype, BaseTy));

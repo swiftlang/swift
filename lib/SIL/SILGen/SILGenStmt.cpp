@@ -426,7 +426,7 @@ void SILGenFunction::emitAssignPhysicalAddress(SILLocation loc,
       old = B.createLoad(loc, addr);
     }
     
-    B.createStore(loc, src.forward(*this), addr);
+    emitStore(loc, src, addr);
     if (old)
       emitReleaseRValue(loc, old);
   }

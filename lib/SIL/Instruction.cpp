@@ -349,6 +349,11 @@ AddressToPointerInst::AddressToPointerInst(SILLocation Loc, Value Operand,
   : ConversionInst(ValueKind::AddressToPointerInst, Loc, Operand, Ty) {
 }
 
+ThinToThickFunctionInst::ThinToThickFunctionInst(SILLocation Loc, Value Operand,
+                                                 SILType Ty)
+  : ConversionInst(ValueKind::ThinToThickFunctionInst, Loc, Operand, Ty) {
+}
+
 ArchetypeToSuperInst::ArchetypeToSuperInst(SILLocation Loc,
                                            Value Operand, SILType Ty)
   : ConversionInst(ValueKind::ArchetypeToSuperInst, Loc, Operand, Ty) {

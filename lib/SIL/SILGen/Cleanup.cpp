@@ -117,6 +117,13 @@ void CleanupManager::emitReturnAndCleanups(SILLocation loc, Value returnValue) {
     assert(Gen.hasVoidReturn && "ctor or dtor with non-void return?!");
     B.createBranch(Gen.epilogBB);
   } else {
+    // Thicken thin function return values.
+    // FIXME: Swift type-checking should to this for us.
+    if (returnValue.getType().is<AnyFunctionType>() &&
+        returnValue.getType().castTo<AnyFunctionType>()->isThin()) {
+      returnValue = Gen.emitThickenFunction(loc, returnValue);
+    }
+
     B.createReturn(loc, returnValue);
   }
 }

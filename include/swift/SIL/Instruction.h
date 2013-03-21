@@ -580,7 +580,18 @@ public:
     return V->getKind() == ValueKind::AddressToPointerInst;
   }
 };
+
+/// ThinToThickFunctionInst - Given a thin function reference, adds a null
+/// context to convert the value to a thick function type.
+class ThinToThickFunctionInst : public ConversionInst {
+public:
+  ThinToThickFunctionInst(SILLocation Loc, Value Operand, SILType ty);
   
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ThinToThickFunctionInst;
+  }
+};
+
 /// ArchetypeToSuperInst - Given the address of an archetype value with a base
 /// class constraint, returns a reference to the base class instance.
 class ArchetypeToSuperInst : public ConversionInst {
@@ -591,7 +602,7 @@ public:
     return V->getKind() == ValueKind::ArchetypeToSuperInst;
   }
 };
-
+  
 /// SuperToArchetypeInst - Given a value of a class type, initializes an
 /// archetype with a base class constraint to contain a reference to the value.
 class SuperToArchetypeInst : public Instruction {

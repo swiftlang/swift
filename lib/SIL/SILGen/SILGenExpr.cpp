@@ -91,7 +91,7 @@ static void initializeWithResult(SILGenFunction &gen,
     if (result.getType().isAddressOnly())
       result.forwardInto(gen, loc, I->getAddress(), /*isInitialize=*/true);
     else {
-      gen.B.createStore(loc, result.forward(gen), I->getAddress());
+      gen.emitStore(loc, result, I->getAddress());
     }
     I->finishInitialization(gen);
     return;
@@ -269,7 +269,7 @@ Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
          "can't materialize a reference");
   
   Value tmpMem = emitTemporaryAllocation(loc, v.getType());
-  B.createStore(loc, v.forward(*this), tmpMem);
+  emitStore(loc, v, tmpMem);
   
   CleanupsDepth valueCleanup = CleanupsDepth::invalid();
   if (!getTypeLoweringInfo(v.getType().getSwiftType()).isTrivial()) {
@@ -389,7 +389,7 @@ ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
       concrete.forwardInto(*this, E, valueAddr,
                            /*isInitialize=*/true);
     } else {
-      B.createStore(E, concrete.forward(*this), valueAddr);
+      emitStore(E, concrete, valueAddr);
     }
   }
   
@@ -446,7 +446,7 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
     Value eltPtr = i == 0
       ? basePtr
       : gen.B.createIndexAddr(loc, basePtr, i);
-    gen.B.createStore(loc, elements[i], eltPtr);
+    gen.emitStore(loc, ManagedValue(elements[i]), eltPtr);
   }
 
   return gen.emitArrayInjectionCall(objectPtr, basePtr,
@@ -1395,7 +1395,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
          "can't emit a value type ctor here");
   Value thisLV = emitTemporaryAllocation(ctor, thisTy);
   B.createRetain(ctor, thisValue);
-  B.createStore(ctor, thisValue, thisLV);
+  emitStore(ctor, ManagedValue(thisValue), thisLV);
   Cleanups.pushCleanup<CleanupMaterializedValue>(thisLV);
   VarLocs[thisDecl] = {Value(), thisLV};
   
@@ -1468,4 +1468,29 @@ ManagedValue SILGenFunction::visitBridgeToBlockExpr(BridgeToBlockExpr *E,
 
 ManagedValue SILGenFunction::visitIfExpr(IfExpr *E, SGFContext C) {
   llvm_unreachable("not implemented");
+}
+
+Value SILGenFunction::emitThickenFunction(SILLocation loc, Value thinFn) {
+  Type thickTy = getThickFunctionType(thinFn.getType().getSwiftType());
+  
+  return B.createThinToThickFunction(loc, thinFn,
+                                     getLoweredLoadableType(thickTy));
+}
+
+void SILGenFunction::emitStore(SILLocation loc, ManagedValue src,
+                               Value destAddr) {
+  Value fwdSrc = src.forward(*this);
+  // If we store a function value, we lose its thinness.
+  // FIXME: This should go away when Swift typechecking learns how to handle
+  // thin functions.
+  if (src.getType().is<AnyFunctionType>() &&
+      src.getType().castTo<AnyFunctionType>()->isThin()) {
+    assert(!destAddr.getType().getObjectType().castTo<AnyFunctionType>()
+             ->isThin()
+           && "remove this when Swift actually emits thin function types");
+    
+    fwdSrc = emitThickenFunction(loc, fwdSrc);
+  }
+  
+  B.createStore(loc, fwdSrc, destAddr);
 }

@@ -449,6 +449,47 @@ public:
            "archetype_to_super must convert to a reference type");
   }
   
+  void visitThinToThickFunctionInst(ThinToThickFunctionInst *TTFI) {
+    assert(!TTFI->getOperand().getType().isAddress() &&
+           "thin_to_thick_function operand cannot be an address");
+    assert(!TTFI->getType().isAddress() &&
+           "thin_to_thick_function result cannot be an address");
+    assert(TTFI->getOperand().getType().is<AnyFunctionType>() &&
+           "thin_to_thick_function operand must be a function");
+    assert(TTFI->getType().is<AnyFunctionType>() &&
+           "thin_to_thick_function result must be a function");
+    if (auto *opFTy = dyn_cast<FunctionType>(
+                                 TTFI->getOperand().getType().getSwiftType())) {
+      auto *resFTy = dyn_cast<FunctionType>(TTFI->getType().getSwiftType());
+      assert(resFTy &&
+             opFTy->getInput()->isEqual(resFTy->getInput()) &&
+             opFTy->getResult()->isEqual(resFTy->getResult()) &&
+             opFTy->isAutoClosure() == resFTy->isAutoClosure() &&
+             opFTy->isBlock() == resFTy->isBlock() &&
+             "thin_to_thick_function operand and result type must differ only "
+             " in thinness");
+      assert(!resFTy->isThin() &&
+             "thin_to_thick_function result must not be thin");
+      assert(opFTy->isThin() &&
+             "thin_to_thick_function operand must be thin");
+    } else if (auto *opPTy = dyn_cast<PolymorphicFunctionType>(
+                                 TTFI->getOperand().getType().getSwiftType())) {
+      auto *resPTy = dyn_cast<PolymorphicFunctionType>(
+                                               TTFI->getType().getSwiftType());
+      assert(resPTy &&
+             opPTy->getInput()->isEqual(resPTy->getInput()) &&
+             opPTy->getResult()->isEqual(resPTy->getResult()) &&
+             "thin_to_thick_function operand and result type must differ only "
+             " in thinness");
+      assert(!resPTy->isThin() &&
+             "thin_to_thick_function result must not be thin");
+      assert(opPTy->isThin() &&
+             "thin_to_thick_function operand must be thin");
+    } else {
+      llvm_unreachable("invalid AnyFunctionType?!");
+    }
+  }
+  
   void visitSuperToArchetypeInst(SuperToArchetypeInst *SAI) {
     assert(SAI->getSrcBase().getType().hasReferenceSemantics() &&
            "super_to_archetype source must be a reference type");

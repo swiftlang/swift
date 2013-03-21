@@ -312,6 +312,9 @@ public:
   void visitAddressToPointerInst(AddressToPointerInst *CI) {
     printConversionInst(CI, "address_to_pointer");
   }
+  void visitThinToThickFunctionInst(ThinToThickFunctionInst *CI) {
+    printConversionInst(CI, "thin_to_thick_function");
+  }
   void visitArchetypeToSuperInst(ArchetypeToSuperInst *CI) {
     printConversionInst(CI, "archetype_to_super");
   }
