@@ -537,6 +537,13 @@ public:
            "conversion operand cannot be an address");
     assert(!ICI->getType().isAddress() &&
            "conversion result cannot be an address");
+    
+    if (auto *opFTy = ICI->getOperand().getType().getAs<FunctionType>()) {
+      auto *resFTy = ICI->getType().getAs<FunctionType>();
+      assert(resFTy && "function must be converted to another function");
+      assert(opFTy->isThin() == resFTy->isThin() &&
+             "implicit_convert cannot change function thinness");
+    }
   }
   
   void visitIntegerValueInst(IntegerValueInst *IVI) {

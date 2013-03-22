@@ -334,29 +334,28 @@ ManagedValue SILGenFunction::visitArchetypeToSuperExpr(
   return emitManagedRValueWithCleanup(base);
 }
 
-static ManagedValue emitImplicitConvert(SILGenFunction &gen,
-                                        ImplicitConversionExpr *e) {
-  ManagedValue original = gen.visit(e->getSubExpr());
-  Value converted = gen.B.createImplicitConvert(e,
-                                                original.getValue(),
-                                                gen.getLoweredType(e->getType()));
-  return ManagedValue(converted, original.getCleanup());
-}
-
 ManagedValue SILGenFunction::visitRequalifyExpr(RequalifyExpr *E,
                                                 SGFContext C) {
-  if (E->getType()->is<LValueType>()) {
-    // Ignore lvalue qualifiers.
-    return visit(E->getSubExpr());
-  }
-  return emitImplicitConvert(*this, E);
+  assert(E->getType()->is<LValueType>() && "non-lvalue requalify");
+  // Ignore lvalue qualifiers.
+  return visit(E->getSubExpr());
 }
 
 ManagedValue SILGenFunction::visitFunctionConversionExpr(
-                                                      FunctionConversionExpr *E,
+                                                      FunctionConversionExpr *e,
                                                       SGFContext C)
 {
-  return emitImplicitConvert(*this, E);
+  ManagedValue original = visit(e->getSubExpr());
+  
+  // Retain the thinness of the original function type.
+  Type destTy = e->getType();
+  if (original.getType().castTo<FunctionType>()->isThin())
+    destTy = getThinFunctionType(destTy);
+  
+  Value converted = B.createImplicitConvert(e,
+                                            original.getValue(),
+                                            getLoweredType(destTy));
+  return ManagedValue(converted, original.getCleanup());
 }
 
 ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
