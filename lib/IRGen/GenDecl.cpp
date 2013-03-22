@@ -589,7 +589,10 @@ bool LinkEntity::isLocalLinkage() const {
   case Kind::SwiftMetaclassStub:
   case Kind::FieldOffset:
     return isLocalLinkageDecl(getDecl());
-      
+  
+  case Kind::AnonymousFunction:
+    return true;
+
   case Kind::BridgeToBlockConverter:
     // Bridge-to-block shims are currently always provided from a stub.
     return false;
@@ -852,6 +855,31 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
 
   entry = addr;
   return Address(addr, align);
+}
+
+/// Fetch the declaration corresponding to the given CapturingExpr.
+llvm::Function *IRGenModule::getAddrOfAnonymousFunction(SILConstant c,
+                                                        CapturingExpr *expr) {
+  LinkEntity entity = LinkEntity::forAnonymousFunction(expr,
+                                                       ExplosionKind::Minimal,
+                                                       c.uncurryLevel);
+  
+  // Check whether we've cached this.
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) return cast<llvm::Function>(entry);
+
+  llvm::AttributeSet attrs;
+  auto *fnType = getFunctionType(AbstractCC::Freestanding,
+                       SILMod->getFunction(c)->getLoweredType().getSwiftType(),
+                       entity.getExplosionKind(),
+                       c.uncurryLevel,
+                       ExtraData::None,
+                       attrs);
+  auto cc = expandAbstractCC(*this, AbstractCC::Freestanding);
+  
+  LinkInfo link = LinkInfo::get(*this, entity);
+  entry = link.createFunction(*this, fnType, cc, attrs);
+  return entry;
 }
 
 /// Fetch the declaration of the given known function.

@@ -21,6 +21,7 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/CallingConv.h"
@@ -46,7 +47,7 @@ class IRGenModule;
 /// levels, each of which potentially creates a different top-level
 /// function.
 class LinkEntity {
-  /// Either a ValueDecl* or a TypeBase*, depending on Kind.
+  /// A ValueDecl*, CapturingExpr*, or a TypeBase*, depending on Kind.
   void *Pointer;
 
   /// A hand-rolled bitfield with the following layout:
@@ -79,6 +80,10 @@ class LinkEntity {
     /// A function.
     /// The pointer is a FuncDecl*.
     Function,
+    
+    /// An anonymous function.
+    /// The pointer is a CapturingExpr*.
+    AnonymousFunction,
 
     /// The getter for an entity.
     /// The pointer is a VarDecl* or SubscriptDecl*.
@@ -155,7 +160,10 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return !isTypeKind(k);
+    return !isTypeKind(k) && !isCapturingExprKind(k);
+  }
+  static bool isCapturingExprKind(Kind k) {
+    return k == Kind::AnonymousFunction;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ValueWitness;
@@ -166,6 +174,16 @@ class LinkEntity {
                   unsigned uncurryLevel) {
     assert(isDeclKind(kind));
     Pointer = decl;
+    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
+         | LINKENTITY_SET_FIELD(ExplosionLevel, unsigned(explosionKind))
+         | LINKENTITY_SET_FIELD(UncurryLevel, uncurryLevel);
+  }
+
+  void setForCapturingExpr(Kind kind,
+                  CapturingExpr *expr, ExplosionKind explosionKind,
+                  unsigned uncurryLevel) {
+    assert(isCapturingExprKind(kind));
+    Pointer = expr;
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
          | LINKENTITY_SET_FIELD(ExplosionLevel, unsigned(explosionKind))
          | LINKENTITY_SET_FIELD(UncurryLevel, uncurryLevel);
@@ -194,6 +212,15 @@ public:
     LinkEntity entity;
     entity.setForDecl(getKindForFunction(fn.getKind()), fn.getDecl(),
                       fn.getExplosionLevel(), fn.getUncurryLevel());
+    return entity;
+  }
+  
+  static LinkEntity forAnonymousFunction(CapturingExpr *expr,
+                                         ExplosionKind explosionLevel,
+                                         unsigned uncurryLevel) {
+    LinkEntity entity;
+    entity.setForCapturingExpr(Kind::AnonymousFunction,
+                               expr, explosionLevel, uncurryLevel);
     return entity;
   }
 
@@ -301,8 +328,14 @@ public:
     assert(isDeclKind(getKind()));
     return reinterpret_cast<ValueDecl*>(Pointer);
   }
+  
+  CapturingExpr *getCapturingExpr() const {
+    assert(isCapturingExprKind(getKind()));
+    return reinterpret_cast<CapturingExpr*>(Pointer);
+  }
+  
   ExplosionKind getExplosionKind() const {
-    assert(isDeclKind(getKind()));
+    assert(isDeclKind(getKind()) || isCapturingExprKind(getKind()));
     return ExplosionKind(LINKENTITY_GET_FIELD(Data, ExplosionLevel));
   }
   unsigned getUncurryLevel() const {

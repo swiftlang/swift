@@ -46,6 +46,7 @@ namespace swift {
   class ASTContext;
   class BraceStmt;
   class CanType;
+  class CapturingExpr;
   class ClassDecl;
   class ConstructorDecl;
   class Decl;
@@ -324,6 +325,8 @@ public:
 
   Address getAddrOfGlobalVariable(VarDecl *D);
   Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect);
+  llvm::Function *getAddrOfAnonymousFunction(SILConstant c,
+                                             CapturingExpr *expr);
   llvm::Function *getAddrOfFunction(FunctionRef ref, ExtraData data);
   llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);
   llvm::Function *getAddrOfGetter(ValueDecl *D, FormalType type,

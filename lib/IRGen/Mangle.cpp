@@ -786,7 +786,11 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   Mangler mangler(buffer);
   switch (getKind()) {
-
+  // FIXME: Mangle a more descriptive symbol name for anonymous funcs.
+  case Kind::AnonymousFunction:
+    buffer << "closure";
+    return;
+      
   //   global ::= 'w' value-witness-kind type     // value witness
   case Kind::ValueWitness:
     buffer << "_Tw";

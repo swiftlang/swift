@@ -215,6 +215,21 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
                                        AbstractCC &cc,
                                        BraceStmt* &body)
 {
+  if (CapturingExpr *anon = constant.loc.dyn_cast<CapturingExpr*>()) {    
+    fnptr = getAddrOfAnonymousFunction(constant, anon);
+    naturalCurryLevel = constant.uncurryLevel;
+    
+    // FIXME: c calling convention
+    cc = AbstractCC::Freestanding;
+    
+    if (auto *func = dyn_cast<FuncExpr>(anon)) {
+      body = func->getBody();
+    } else {
+      body = nullptr;
+    }
+    return;
+  }
+  
   ValueDecl *vd = constant.loc.get<ValueDecl*>();  
   naturalCurryLevel = constant.uncurryLevel;
 
@@ -393,6 +408,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
     emission.addArg(curryArgs);
   }
   
+  // FIXME: Handle indirect return.
   // FIXME: handle the result being an address. This doesn't happen normally
   // in Swift but is how SIL currently models global accessors, and could also
   // be how we model "address" properties in the future.
