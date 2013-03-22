@@ -499,13 +499,6 @@ ManagedValue SILGenFunction::visitTupleExpr(TupleExpr *E, SGFContext C) {
                    C);
 }
 
-ManagedValue SILGenFunction::visitGetMetatypeExpr(GetMetatypeExpr *E,
-                                                  SGFContext C) {
-  visit(E->getSubExpr());
-  return ManagedValue(B.createMetatype(E,
-                                       getLoweredLoadableType(E->getType())));
-}
-
 ManagedValue SILGenFunction::visitSpecializeExpr(SpecializeExpr *E,
                                                  SGFContext C) {
   return ManagedValue(B.createSpecialize(

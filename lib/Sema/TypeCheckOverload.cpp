@@ -1076,11 +1076,8 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
           apply = new (Context) DotSyntaxBaseIgnoredExpr(Base, DotLoc,
                                                          specializedRef);
         } else {
-          if (baseIsInstance && !Member->isInstanceMember()) {
-            Type baseMetaTy = MetaTypeType::get(baseTy, Context);
-            Base = convertToRValue(Base);
-            Base = new (Context) GetMetatypeExpr(Base, baseMetaTy);
-          }
+          assert((!baseIsInstance || Member->isInstanceMember()) &&
+                 "can't call a static method on an instance");
           apply = new (Context) DotSyntaxCallExpr(specializedRef, DotLoc, Base);
         }
         return recheckTypes(apply);
@@ -1107,12 +1104,8 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
       if (baseIsInstance == Member->isInstanceMember())
         return new (Context) DotSyntaxCallExpr(Ref, DotLoc, Base);
 
-      if (baseIsInstance && !Member->isInstanceMember()) {
-        Type baseMetaTy = MetaTypeType::get(baseTy, Context);
-        Base = convertToRValue(Base);
-        Base = new (Context) GetMetatypeExpr(Base, baseMetaTy);
-        return new (Context) DotSyntaxCallExpr(Ref, DotLoc, Base);
-      }
+      assert((!baseIsInstance || Member->isInstanceMember()) &&
+             "can't call a static method on an instance");
     }
 
     return new (Context) DotSyntaxBaseIgnoredExpr(Base, DotLoc, Ref);

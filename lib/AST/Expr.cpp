@@ -724,11 +724,6 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitGetMetatypeExpr(GetMetatypeExpr *E) {
-    printCommon(E, "get_metatype_expr") << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
   void visitMetatypeConversionExpr(MetatypeConversionExpr *E) {
     printCommon(E, "metatype_conversion_expr") << '\n';
     printRec(E->getSubExpr());

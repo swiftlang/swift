@@ -1383,18 +1383,6 @@ public:
   }
 };
 
-/// GetMetatypeExpr - Given a value of type T, returns the corresponding value
-/// of type T.metatype.
-class GetMetatypeExpr : public ImplicitConversionExpr {
-public:
-  GetMetatypeExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::GetMetatype, subExpr, type) {}
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::GetMetatype;
-  }
-};
-
 /// \brief Describes an implicit conversion from a derived class to one of its
 /// base classes.
 class DerivedToBaseExpr : public ImplicitConversionExpr {

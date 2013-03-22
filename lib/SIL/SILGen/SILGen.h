@@ -472,7 +472,6 @@ public:
   ManagedValue visitParenExpr(ParenExpr *E, SGFContext C);
   ManagedValue visitTupleExpr(TupleExpr *E, SGFContext C);
   ManagedValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);
-  ManagedValue visitGetMetatypeExpr(GetMetatypeExpr *E, SGFContext C);
   ManagedValue visitSpecializeExpr(SpecializeExpr *E, SGFContext C);
   ManagedValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C);
   ManagedValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);

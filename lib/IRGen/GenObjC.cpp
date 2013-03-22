@@ -478,11 +478,6 @@ namespace {
       return emitHeapMetadataRefForHeapObject(IGF, value, baseType);
     }
 
-    /// Special-case the .metatype implicit conversion.
-    llvm::Value *visitGetMetatypeExpr(GetMetatypeExpr *E) {
-      return emitGetMetatype(E->getSubExpr());
-    }
-
     /// Special-case explicit .metatype expressions.
     llvm::Value *visitMetatypeExpr(MetatypeExpr *E) {
       // If there's a base, we need to evaluate it and then grab the

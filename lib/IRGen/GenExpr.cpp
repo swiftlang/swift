@@ -300,9 +300,6 @@ namespace {
       IGF.unimplemented(E->getLoc(), "specialize expressions");
       IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
     }
-    void visitGetMetatypeExpr(GetMetatypeExpr *E) {
-      emitGetMetatype(IGF, E->getSubExpr(), Out);
-    }
     void visitDerivedToBaseExpr(DerivedToBaseExpr *E) {
       Explosion subResult(ExplosionKind::Maximal);
       IGF.emitRValue(E->getSubExpr(), subResult);
@@ -649,7 +646,6 @@ namespace {
     NOT_LVALUE_EXPR(MetatypeConversion)
     NOT_LVALUE_EXPR(Erasure)
     NOT_LVALUE_EXPR(Specialize) // FIXME: Generic subscripts?
-    NOT_LVALUE_EXPR(GetMetatype)
     NOT_LVALUE_EXPR(DerivedToBase)
     NOT_LVALUE_EXPR(ArchetypeToSuper)
     NOT_LVALUE_EXPR(ScalarToTuple)
@@ -830,7 +826,6 @@ namespace {
     NON_LOCATEABLE(TupleShuffleExpr)
     NON_LOCATEABLE(ErasureExpr)
     NON_LOCATEABLE(SpecializeExpr) // FIXME: Generic subscripts?
-    NON_LOCATEABLE(GetMetatypeExpr)
     NON_LOCATEABLE(DerivedToBaseExpr)
     NON_LOCATEABLE(ArchetypeToSuperExpr)
     NON_LOCATEABLE(ScalarToTupleExpr)
