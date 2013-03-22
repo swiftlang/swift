@@ -208,7 +208,7 @@ void IRGenSILFunction::visitBasicBlock(swift::BasicBlock *BB) {
 }
 
 /// Find the entry point, natural curry level, and calling convention for a
-/// SILConstant.
+/// SILConstant function.
 void IRGenModule::getAddrOfSILConstant(SILConstant constant,
                                        llvm::Function* &fnptr,
                                        unsigned &naturalCurryLevel,
@@ -294,6 +294,9 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
   }
   case SILConstant::Kind::GlobalAccessor: {
     llvm_unreachable("unimplemented constant_ref to global var");
+  }
+  case SILConstant::Kind::GlobalAddress: {
+    llvm_unreachable("GlobalAddress is not a function");
   }
   }
 }

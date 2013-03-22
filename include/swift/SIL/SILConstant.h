@@ -69,7 +69,11 @@ struct SILConstant {
     
     /// GlobalAccessor - this constant references the lazy-initializing
     /// accessor for the global VarDecl in loc.
-    GlobalAccessor
+    GlobalAccessor,
+    
+    /// GlobalAddress - this constant references the physical address of the
+    /// global VarDecl in loc.
+    GlobalAddress
   };
   
   /// The ValueDecl or CapturingExpr represented by this SILConstant.

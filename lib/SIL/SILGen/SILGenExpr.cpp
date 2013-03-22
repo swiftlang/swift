@@ -169,6 +169,29 @@ ManagedValue SILGenFunction::emitConstantRef(SILLocation loc,
   return ManagedValue(c);
 }
 
+static ManagedValue emitGlobalVariable(SILGenFunction &gen,
+                                       SILLocation loc, VarDecl *var) {
+  assert(!var->getDeclContext()->isLocalContext() &&
+         "not a global variable!");
+  assert(!var->isProperty() &&
+         "not a physical global variable!");
+  
+  // For global vars in top-level code, emit the address of the variable
+  // directly.
+  auto *TU = dyn_cast<TranslationUnit>(var->getDeclContext());
+  if (TU && (TU->Kind == TranslationUnit::Main
+             || TU->Kind == TranslationUnit::Repl)) {
+    Value addr = gen.emitGlobalConstantRef(loc,
+                           SILConstant(var, SILConstant::Kind::GlobalAddress));
+    return ManagedValue(addr);
+  }
+  
+  // Otherwise, emit a call to the global accessor.
+  Value accessor = gen.emitGlobalConstantRef(loc,
+                           SILConstant(var, SILConstant::Kind::GlobalAccessor));
+  return gen.emitApply(loc, accessor, {});
+}
+
 ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
                                                  ValueDecl *decl) {
   // If this is a reference to a type, produce a metatype.
@@ -191,12 +214,9 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
     if (VarLocs.count(decl)) {
       return ManagedValue(VarLocs[decl].address);
     }
-    assert(!decl->getDeclContext()->isLocalContext() &&
-           "no location for local var!");
     // If this is a global variable, invoke its accessor function to get its
     // address.
-    Value accessor = emitGlobalConstantRef(loc, SILConstant(decl));
-    return emitApply(loc, accessor, {});
+    return emitGlobalVariable(*this, loc, var);
   }
   
   // If the referenced decl isn't a VarDecl, it should be a constant of some

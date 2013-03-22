@@ -80,16 +80,19 @@ SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
   } else if (auto *var = dyn_cast<VarDecl>(vd)) {
     assert((kind == Kind::Getter
             || kind == Kind::Setter
-            || kind == Kind::GlobalAccessor)
-           && "can only create Getter, Setter, or GlobalAccessor SILConstant "
-              "for var");
+            || kind == Kind::GlobalAccessor
+            || kind == Kind::GlobalAddress)
+           && "can only create Getter, Setter, GlobalAccessor, or GlobalAddress "
+              "SILConstant for var");
     
-    assert(((kind == Kind::GlobalAccessor) ^ var->isProperty())
-           && "can't reference global accessor of property");
-    assert(!(kind == Kind::GlobalAccessor && var->getDeclContext()->isLocalContext())
-           && "can't reference global accessor of local var");
+    bool isGlobal = kind == Kind::GlobalAccessor || kind == Kind::GlobalAddress;
     
-    if (kind == Kind::GlobalAccessor) {
+    assert((isGlobal ^ var->isProperty())
+           && "can't reference property as global var");
+    assert(!(isGlobal && var->getDeclContext()->isLocalContext())
+           && "can't reference local var as global var");
+    
+    if (isGlobal) {
       naturalUncurryLevel = 0;
     } else {
       // Instance properties have a 'this' curry.
@@ -161,15 +164,9 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc, unsigned atUncurryLevel) {
       kind = Kind::Allocator;
       naturalUncurryLevel = 1;
     }
-    // Map global VarDecls to their GlobalAccessor SILConstant.
-    else if (VarDecl *vard = dyn_cast<VarDecl>(vd)) {
-      assert(!vard->isProperty() &&
-             "can't reference global accessor of property");
-      assert(!vard->getDeclContext()->isLocalContext() &&
-             "can't reference global accessor of local var");
-      loc = vard;
-      kind = Kind::GlobalAccessor;
-      naturalUncurryLevel = 0;
+    // VarDecl constants require an explicit kind.
+    else if (isa<VarDecl>(vd)) {
+      llvm_unreachable("must create SILConstant for VarDecl with explicit kind");
     }
     else {
       llvm_unreachable("invalid loc decl for SILConstant!");

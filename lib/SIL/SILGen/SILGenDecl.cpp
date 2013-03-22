@@ -145,6 +145,23 @@ public:
   }
 };
   
+/// An initialization for a global variable.
+class GlobalInitialization : public SingleInitializationBase {
+  /// The physical address of the global.
+  Value address;
+  
+public:
+  GlobalInitialization(Value address) : address(address) {}
+  
+  Value getAddressOrNull() override {
+    return address;
+  }
+  
+  void finishInitialization(SILGenFunction &) override {
+    // Globals don't need to be cleaned up.
+  }
+};
+  
 /// An initialization for a byref argument.
 class ByrefArgumentInitialization : public Initialization {
   /// The VarDecl for the byref symbol.
@@ -220,6 +237,14 @@ struct InitializationForPattern
     if (vd->getType()->is<LValueType>())
       return new ByrefArgumentInitialization(vd);
 
+    // If this is a global variable, initialize it without allocations or
+    // cleanups.
+    if (!vd->getDeclContext()->isLocalContext()) {
+      Value addr = Gen.emitGlobalConstantRef(vd,
+                             SILConstant(vd, SILConstant::Kind::GlobalAddress));
+      return new GlobalInitialization(addr);
+    }
+    
     // FIXME: Use escape analysis info to generate "alloc_var"/"dealloc_var"
     // stack allocations instead of "alloc_box"/"release" for values that don't
     // escape and thus don't need boxes.

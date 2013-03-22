@@ -178,6 +178,14 @@ Function *SILGenModule::emitDestructor(ClassDecl *cd,
 }
 
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
+  // Emit initializers for variables in top-level code.
+  if (TopLevelSGF) {
+    if (!TopLevelSGF->B.hasValidInsertionPoint())
+      return;
+    
+    TopLevelSGF->visit(pd);
+  }
+  
   // FIXME: generate accessor functions for global variables
 }
 

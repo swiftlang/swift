@@ -437,6 +437,8 @@ static Type getFunctionTypeWithCaptures(TypeConverter &types,
 }
 
 Type TypeConverter::makeConstantType(SILConstant c) {
+  // FIXME: This needs to be cleaned up to switch on c.kind
+  
   if (ValueDecl *vd = c.loc.dyn_cast<ValueDecl*>()) {
     Type /*nullable*/ contextType =
       vd->getDeclContext()->getDeclaredTypeOfContext();
@@ -491,10 +493,12 @@ Type TypeConverter::makeConstantType(SILConstant c) {
       // If it's a global var, derive the initializer/accessor function type
       // () -> [byref] T
       if (VarDecl *var = dyn_cast<VarDecl>(vd)) {
-        assert(c.kind == SILConstant::Kind::GlobalAccessor &&
-               "constant ref to non-accessor of global var");
         assert(!var->isProperty() && "constant ref to non-physical global var");
-        return getGlobalAccessorType(var->getType(), Context);
+        if (c.kind == SILConstant::Kind::GlobalAccessor) {
+          return getGlobalAccessorType(var->getType(), Context);
+        } else if (c.kind == SILConstant::Kind::GlobalAddress) {
+          return var->getTypeOfReference();
+        }
       }
       
       // If it's a function, mangle the function type with its capture

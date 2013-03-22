@@ -80,6 +80,9 @@ void SILConstant::print(raw_ostream &OS) const {
   case SILConstant::Kind::GlobalAccessor:
     OS << ".globalaccessor";
     break;
+  case SILConstant::Kind::GlobalAddress:
+    OS << ".globaladdress";
+    break;
   }
   if (uncurryLevel != 0) {
     OS << "." << uncurryLevel;

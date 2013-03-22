@@ -152,6 +152,12 @@ public:
   }
 
   void visitConstantRefInst(ConstantRefInst *CRI) {
+    if (CRI->getConstant().kind == SILConstant::Kind::GlobalAddress) {
+      assert(CRI->getType().isAddress() &&
+             "GlobalAddress SILConstant must have an address result type");
+      return;
+    }
+    
     assert(CRI->getType().is<AnyFunctionType>() &&
            "constant_ref should have a function result");
     assert(CRI->getType().castTo<AnyFunctionType>()->isThin() &&
