@@ -1032,8 +1032,9 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
                                                          CapturingExpr *body) {
   // FIXME: Stash the capture args somewhere and curry them on demand rather
   // than here.
-  assert(constant.uncurryLevel == 1 &&
-         "curried local functions not yet supported");
+  assert(((constant.uncurryLevel == 1 && !body->getCaptures().empty())
+          || (constant.uncurryLevel == 0 && body->getCaptures().empty()))
+         && "curried local functions not yet supported");
 
   auto captures = body->getCaptures();
   if (!captures.empty()) {
