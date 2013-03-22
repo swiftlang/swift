@@ -726,6 +726,11 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     return IGM.emitProtocolDecl(cast<ProtocolDecl>(D));
       
   case DeclKind::PatternBinding:
+    // If we have a SIL module, the global initializations will be lowered
+    // separately.
+    if (IGM.SILMod)
+      return;
+
     emitPatternBindingDecl(cast<PatternBindingDecl>(D));
     return;
 

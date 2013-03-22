@@ -184,9 +184,16 @@ void IRGenSILFunction::emitLocalDecls(BraceStmt *body) {
 void IRGenSILFunction::emitGlobalTopLevel(TranslationUnit *TU,
                                           SILModule *SILMod) {
   // Emit the toplevel function.
-  if (SILMod->hasTopLevelFunction())
+  if (SILMod->hasTopLevelFunction()) {
     emitSILFunction(SILConstant(),
                     SILMod->getTopLevelFunction());
+  }
+  
+  // Emit global variables.
+  for (VarDecl *global : SILMod->getGlobals()) {
+    TypeInfo const &ti = getFragileTypeInfo(global->getType());
+    IGM.emitGlobalVariable(global, ti);
+  }
   
   // FIXME: should support nonzero StartElems for interactive contexts.
   IRGenFunction::emitGlobalTopLevel(TU, 0);
@@ -251,8 +258,15 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
   case SILConstant::Kind::Getter: {
     fnptr = getAddrOfGetter(vd, ExplosionKind::Minimal);
     // FIXME: subscript
-    VarDecl *var = cast<VarDecl>(vd);
-    body = var->getGetter()->getBody()->getBody();
+    FuncDecl *getter;
+    if (auto *var = dyn_cast<VarDecl>(vd))
+      getter = var->getGetter();
+    else if (auto *sub = dyn_cast<SubscriptDecl>(vd))
+      getter = sub->getGetter();
+    else
+      llvm_unreachable("getter for decl that's not Var or Subscript");
+    
+    body = getter->getBody()->getBody();
     cc = vd->isInstanceMember()
       ? AbstractCC::Method
       : AbstractCC::Freestanding;
@@ -261,8 +275,15 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
   case SILConstant::Kind::Setter: {
     fnptr = getAddrOfSetter(vd, ExplosionKind::Minimal);
     // FIXME: subscript
-    VarDecl *var = cast<VarDecl>(vd);
-    body = var->getSetter()->getBody()->getBody();
+    FuncDecl *setter;
+    if (auto *var = dyn_cast<VarDecl>(vd))
+      setter = var->getSetter();
+    else if (auto *sub = dyn_cast<SubscriptDecl>(vd))
+      setter = sub->getSetter();
+    else
+      llvm_unreachable("getter for decl that's not Var or Subscript");
+
+    body = setter->getBody()->getBody();
     cc = vd->isInstanceMember()
       ? AbstractCC::Method
       : AbstractCC::Freestanding;
@@ -302,6 +323,15 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
 }
 
 void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
+  // Emit GlobalAddress SILConstants by getting the global variable
+  // address.
+  if (i->getConstant().kind == SILConstant::Kind::GlobalAddress) {
+    VarDecl *global = cast<VarDecl>(i->getConstant().getDecl());
+    newLoweredAddress(Value(i, 0),
+                      IGM.getAddrOfGlobalVariable(global));
+    return;
+  }
+  
   llvm::Function *fnptr;
   unsigned naturalCurryLevel;
   AbstractCC cc;

@@ -311,6 +311,7 @@ public:
   void emitInstanceMethod(FuncDecl *D);
   void emitConstructor(ConstructorDecl *D);
   void emitClassConstructors(ConstructorDecl *D);
+  Address emitGlobalVariable(VarDecl *var, const TypeInfo &type);
   
   void emitSILConstant(SILConstant c, swift::Function *f);
 

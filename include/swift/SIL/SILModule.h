@@ -17,11 +17,13 @@
 #ifndef SWIFT_SIL_SILMODULE_H
 #define SWIFT_SIL_SILMODULE_H
 
+#include "swift/Basic/Range.h"
 #include "swift/SIL/SILBase.h"
 #include "swift/SIL/SILConstant.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILTypeInfo.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/raw_ostream.h"
@@ -56,6 +58,9 @@ private:
 
   /// SILTypeInfos for SILTypes used in the module.
   llvm::DenseMap<SILType, SILTypeInfo*> typeInfos;
+  
+  /// The collection of global variables used in the module.
+  llvm::DenseSet<VarDecl*> globals;
   
   /// The top-level Function for the module.
   Function *toplevel;
@@ -131,6 +136,20 @@ public:
               || ty.is<TupleType>())
            && "not a tuple, struct, or class type?!");
     return cast<SILCompoundTypeInfo>(getTypeInfo(ty));
+  }
+  
+  using global_iterator = decltype(globals)::const_iterator;
+  using GlobalRange = Range<global_iterator>;
+  
+  /// Returns the set of global variables in this module.
+  GlobalRange getGlobals() const {
+    return {globals.begin(), globals.end()};
+  }
+  global_iterator global_begin() const {
+    return globals.begin();
+  }
+  global_iterator global_end() const {
+    return globals.end();
   }
   
   typedef llvm::MapVector<SILConstant, Function*>::const_iterator iterator;

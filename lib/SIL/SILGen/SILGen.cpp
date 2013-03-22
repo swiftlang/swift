@@ -126,6 +126,10 @@ Function *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   return f;
 }
 
+void SILGenModule::addGlobalVariable(VarDecl *global) {
+  M.globals.insert(global);
+}
+
 Function *SILGenModule::emitConstructor(ConstructorDecl *decl) {
   // Ignore prototypes.
   // FIXME: generate default constructor, which appears in the AST as a

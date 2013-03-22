@@ -95,6 +95,9 @@ public:
   template<typename T>
   Function *preEmitFunction(SILConstant constant, T *astNode);
   void postEmitFunction(SILConstant constant, Function *F);
+  
+  /// Add a global variable to the SILModule.
+  void addGlobalVariable(VarDecl *global);
 };
   
 /// SILGenType - an ASTVisitor for generating SIL from method declarations
