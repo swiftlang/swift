@@ -116,7 +116,6 @@ void Condition::complete(SILBuilder &B) {
   // normal insertion state (i.e. not a post-terminator IP) with
   // nothing to clean up after.
   if (!ContBB) {
-    assert(B.hasValidInsertionPoint());
     return;
   }
   
