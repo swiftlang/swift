@@ -576,22 +576,21 @@ public:
     DEBUG(RI->print(llvm::dbgs()));
     assert(RI->getReturnValue() && "Return of null value is invalid");
     
-    // FIXME: when curry entry points are typed properly, verify return type
-    // here.
-    /*
     SILFunctionTypeInfo *ti =
       F.getModule().getFunctionTypeInfo(F.getLoweredType());
-    DEBUG(llvm::dbgs() << "  operand type ";
-          RI->getReturnValue().getType().print(llvm::dbgs());
-          llvm::dbgs() << " for return type ";
-          ti->getResultType().print(llvm::dbgs());
-          llvm::dbgs() << '\n');
     assert(RI->getReturnValue().getType() == ti->getResultType() &&
            "return value type does not match return type of function");
-     */
   }
   
   void visitBranchInst(BranchInst *BI) {
+    assert(BI->getArgs().size() == BI->getDestBB()->bbarg_size() &&
+           "branch has wrong number of arguments for dest bb");
+    assert(std::equal(BI->getArgs().begin(), BI->getArgs().end(),
+                      BI->getDestBB()->bbarg_begin(),
+                      [](Value branchArg, BBArgument *bbArg) {
+                        return branchArg.getType() == bbArg->getType();
+                      }) &&
+           "branch argument types do not match arguments for dest bb");
   }
   
   void visitCondBranchInst(CondBranchInst *CBI) {
@@ -601,6 +600,42 @@ public:
              SILType::getBuiltinIntegerType(1,
                                  CBI->getCondition().getType().getASTContext())
            && "condition of conditional branch must have Int1 type");
+    
+    assert(CBI->getTrueArgs().size() == CBI->getTrueBB()->bbarg_size() &&
+           "true branch has wrong number of arguments for dest bb");
+    assert(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
+                      CBI->getTrueBB()->bbarg_begin(),
+                      [](Value branchArg, BBArgument *bbArg) {
+                        return branchArg.getType() == bbArg->getType();
+                      }) &&
+           "true branch argument types do not match arguments for dest bb");
+
+    assert(CBI->getFalseArgs().size() == CBI->getFalseBB()->bbarg_size() &&
+           "false branch has wrong number of arguments for dest bb");
+    assert(std::equal(CBI->getFalseArgs().begin(), CBI->getFalseArgs().end(),
+                      CBI->getFalseBB()->bbarg_begin(),
+                      [](Value branchArg, BBArgument *bbArg) {
+                        return branchArg.getType() == bbArg->getType();
+                      }) &&
+           "false branch argument types do not match arguments for dest bb");
+  }
+  
+  void verifyEntryPointArguments(BasicBlock *entry) {
+    SILType ty = F.getLoweredType();
+    SILFunctionTypeInfo *ti = F.getModule().getFunctionTypeInfo(ty);
+    
+    assert(entry->bbarg_size() == ti->getInputTypes().size() &&
+           "entry point has wrong number of arguments");
+    assert(std::equal(entry->bbarg_begin(), entry->bbarg_end(),
+                      ti->getInputTypes().begin(),
+                      [](BBArgument *bbarg, SILType ty) {
+                        return bbarg->getType() == ty;
+                      }) &&
+           "entry point argument types do not match function type");
+  }
+  
+  void visitFunction(Function *F) {
+    verifyEntryPointArguments(F->getBlocks().begin());
   }
   
   void verify() {
