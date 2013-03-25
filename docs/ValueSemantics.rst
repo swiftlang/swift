@@ -137,11 +137,11 @@ the same mutable state**. [#cow]_
    trivially has value semantics (*and* reference semantics).
 
    Second, it's easy to implement a `struct` with reference semantics:
-   simply keep the primary value in a `class` and refer to it through an
-   instance variable.  So, one cannot assume that a `struct` type has
-   value semantics.  `Slice` is an example of a reference-semantics
-   `struct` from the standard library.
-
+   simply keep the primary value in a `class` and refer to it through
+   an instance variable.  So, one cannot assume that a `struct` type
+   has value semantics.  `Slice` could be seen (depending on how you
+   view its value) as an example of a reference-semantics `struct`
+   from the standard library.
 
 The Problem With Generics
 =========================
@@ -163,6 +163,9 @@ However, the situation is different for functions with arguments of
 protocol or parameterized type.  In the absence of specific
 constraints to the contrary, the semantics of the big three can vary.
 
+Example
+-------
+
 For example, there's an algorithm called ``cycle_length`` that
 measures the length of a cycle of states (e.g. the states of a
 pseudo-random number generator).  It needs to make one copy and do
@@ -173,14 +176,15 @@ Here’s a version of cycle_length that works when state is a mutable
 value type::
 
  func cycle_length<State>(
-   s : State, mutate : ([byref]State)->()) -> Int
+   s : State, mutate : ( [byref] State )->() 
+ ) -> Int
    requires State : EqualityComparable
  {
-     State x = s    // one copy                // 1
-     mutate(x)      // in-place mutation
+     State x = s     // one copy                // 1
+     mutate(&x)      // in-place mutation
      Int n = 1
      while x != s {                            // 2
-          mutate(x) // in-place mutation
+          mutate(&x) // in-place mutation
           ++n
      }
      return n
@@ -192,16 +196,32 @@ the same state, and the comparison in line 2 (regardless of whether we
 decide ``!=`` does “identity” or “value” comparison) always succeeds.
 
 You can write a different implementation that only works on clonable
-classes (assuming value comparison semantics for ``!=``):
+classes:
 
 .. parsed-literal::
 
+ // Various random number generators will implement this interface
+ abstract class RandomNumberGenerator
+   : Clonable, Equalable
+ {
+   func nextValue() -> Int
+ }
+
  func cycle_length<State>(
-   s : State, mutate : ([byref]State)->()) -> Int
+   s : State, mutate : ( [byref] State )->() 
+ ) -> Int
    requires State : EqualityComparable, **Clonable**
  {
-     State x = s\ **.clone()** // one copy
-     *etc.*
+     State x = s\ **.clone()**
+     Int n = 1
+     while **! x.equal(s)** {
+         *etc.*
+ }
+
+ RandomNumberGenerator x = new MersenneTwister()
+ println(
+    cycle_length(x, (x : [byref] RandomNumberGenerator) { x.nextValue() })
+ )
 
 You could also redefine the interface so that it works on both values and
 clonable classes:
@@ -209,12 +229,15 @@ clonable classes:
 .. parsed-literal::
 
  func cycle_length<State>(
-   s : State, **next : (State)->State**) -> Int
+   s : State, 
+   **next : (x : State)->State,**
+   **equal : ([byref] x : State, [byref] y : State)->Bool**
+ ) -> Int
    requires State : EqualityComparable
  {
      State **x = next(s)**
      Int n = 1
-     while x != s {
+     while **!equal(x, s)** {
           **x = next(x)**
           ++n
      }
@@ -226,38 +249,71 @@ I don't believe there's a reasonable way write this so it works on
 clonable classes, non-classes, and avoids the O(N)
 copies. [#extension]_
 
+Class Identities are Values
+---------------------------
+
+It's important to note that the first implementation of
+``cycle_length`` works when the state is the *identity*, rather than
+the *contents* of a class instance.  For example, imagine a circular
+linked list::
+
+ class Node {
+     constructor(Int) { next = this; prev = this }
+     
+     // link two circular lists into one big cycle.
+     func join(otherNode : Node) -> () { ... }
+
+     var next : WeakRef<Node> // identity of next node
+     var prev : WeakRef<Node> // identity of previous node
+ }
+
+We can measure the length of a cycle in these nodes as follows::
+
+ cycle_length( someNode, (x: [byref] Node){ x = x.next } )
+
+This is why so many generic algorithms seem to work on both ``class``\
+es and non-``class``\ es: ``class` *identities* work just fine as
+values.
+
 The Role of Moves
 =================
 
 Further complicating matters is the fact that the big three operations
 can be—and often are—combined in ways that mask the value/reference
-distinction.  Take, for example, `swap`, which uses variable
-initialization and assignment to exchange two values::
+distinction.  In fact both of the following must be present in order
+to observe a difference in behavior:
 
-  var tmp = lhs
-  lhs = rhs
-  rhs = tmp
+1. Use of (one of) the big three operations on an object ``x``,
+   creating shared mutable state iff ``x`` is a reference
 
-This implementation “just works” for types with either value or
-reference semantics.  When the type referred to by `lhs` and `rhs` have
-reference semantics, primary values are exchanged along with the
-reference values.  `swap` is reference-agnostic because shared mutable
-state doesn't persist.
+2. In-place mutation of ``x`` *while a (reference) copy is extant* and
+   thus can be observed through the copy iff ``x`` is a reference.
 
-In fact, any algorithm whose copies can be replaced
-with destructive moves (where the
+Take, for example, `swap`, which uses variable initialization and
+assignment to exchange two values::
 
+  func swap<T>(lhs : [byref] T, rhs : [byref] T)
+  {
+      var tmp = lhs   // big 3: initialization - ref copy in tmp
+      lhs = rhs       // big 3: assignment     - ref copy in lhs
+      rhs = tmp       // big 3: assignment     - no ref copies remain
+  }
 
-Furthermore, any operation whose
-mutations can be implemented
-entirely in terms of
+Whether ``T`` is a reference type makes no observable difference in
+the behavior of ``swap``.  Why?  Because although ``swap`` makes
+reference copies to mutable state, the existence of those copies is
+encapsulated within the algorithm, and it makes no in-place mutations.
 
-This equivalence is due to the fact that `swap` is
-built on *moves*, rather than copies.  
+Any such algorithm can be implemented such that copy operations are
+replaced by destructive *moves*, where the source value is not
+(necessarily) preserved.  Because movability is a weaker requirement
+than copyability, it's reasonable to say that ``swap`` is built on
+*moves*, rather than copies, in the same way that C++'s ``std::find``
+is built on input iterators rather than on forward iterators.
 
-You can use copies to implement `swap`, but the same algorithm worksWe could imagine a hypothetical
-syntax for moving in swift, where (unlike assignment) the value of the
-right-hand-side of the `<-` is not necessarily preserved::
+We could imagine a hypothetical syntax for moving in swift, where
+(unlike assignment) the value of the right-hand-side of the `<-` is
+not necessarily preserved::
 
   var tmp <- lhs
   lhs <- rhs
@@ -300,147 +356,6 @@ variable-sized data:
    this way is extremely limited.  For example, while a singly-linked
    list is trivial to implement, an efficient doubly-linked list is
    effectively impossible.
-
-What Sucks About Reference Semantics
-====================================
-
-* Thread safety is difficult and expensive
-* Correctness is difficult
-  * Defensive copying
-* 
-
-What Sucks about Value Semantics
-================================
-
-* Copies are easy to make by mistake and may be expensive.
-* Some programmers may not be expecting value semantics
-
-Remedies
-========
-
-Because non-generic functions normally don't have this problem and
-there is no tradition among generic programmers of explicitly handling
-reference semantics differently from value semantics, we can't expect
-existing habits to make this issue go away.
-
-================================
- IGNORE EVERYTHING FROM HERE ON
-================================
-
-Options
-=======
-
-var x: T
-val x :T
-ref x :T
-
-The Problem
-===========
-
-The problem boils down to this: value and reference types share syntax
-for fundamental operations
-
-Goals
-=====
-
-- Make value types easy to build and use
-- Make it possible to achieve highest efficiency
-- Make it possible to write generic programs
-- Make it easy to work with handle types
-
-- What is the relationship between byref and auto-closure?  Wouldn't
-  it be nice to do byref with auto-closure?  I think that may imply
-  admitting lvalues if increment(x[1]) is going to work.
-
-
-Problems
-========
-
-::
-
-  protocol Number {
-      func [infix] *=(x [byref]: Number, y: Number)->Number
-  }
-
-  func <T: Number> square(T n) {
-      n *= n
-      return n
-  }
-
-
-- Ease of building value types
-- Acknowledge the weight of copy c'tor, move c'tor, yada yada
-- Mutating values inside functions
-
-Reference Protocol
-==================
-
-It would be nice to be able to define "Reference" as a protocol, where
-you're always (in principle) going through getters and setters.
-
-Write Combining
-===============
-
-Doug wants the right to avoid calling getters and setters for each
-mutation to an object, so instead of encoding::
-
-  func grow(r : [byref] Rect) -> Void
-  {
-      --r.left
-      --r.top
-      ++r.bottom
-      ++r.right
-  }
-
-as::
-
-  void grow(RectProperty r)
-  {
-      {
-          Rect temp = r.get();
-          --temp.left;
-          r.set(temp);
-      }
-
-      {
-          Rect temp = r.get();
-          --temp.top;
-          r.set(temp);
-      }
-
-      // etc...
-  }
-
-we can instead do:
-
-  void grow(RectProperty r)
-  {
-      Rect temp = r.get();
-      --temp.left
-      --temp.top
-      ++temp.bottom
-      ++temp.right
-      r.set(temp)
-  }
-
-What are the rules about what you're allowed to count on?  I think the
-compiler has to prove there are no observable differences in order to
-make this optimization.  We must require that the programmer obey the
-law that
-
-   r.set(x).get() == x
-
-Kinds of Mutation
-=================
-
-`someclass.mutating_member()` modifies the referent shared by all someclass'es
-`someclass += 3` may be COW, only modifying the thing someclass is referring to.
-
-Crazy Ideas
-===========
-
-Notes
-=====
 
 ----
 
