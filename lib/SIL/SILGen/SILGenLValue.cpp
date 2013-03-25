@@ -147,8 +147,12 @@ namespace {
       llvm::SmallVector<Value, 2> subscripts;
       prepareAccessorArgs(gen, loc, setter, base, subscripts);
       
-      return gen.emitSetProperty(loc, ManagedValue(setter),
-                                 base ? Optional<ManagedValue>(base) : Nothing,
+      return gen.emitSetProperty(loc,
+                                 ManagedValue(setter, ManagedValue::Unmanaged),
+                                 base
+                                   ? Optional<ManagedValue>(base,
+                                                        ManagedValue::Unmanaged)
+                                   : Nothing,
                                  subscriptExpr
                                    ? Optional<ArrayRef<Value>>(subscripts)
                                    : Nothing,
@@ -161,8 +165,12 @@ namespace {
       llvm::SmallVector<Value, 2> subscripts;
       prepareAccessorArgs(gen, loc, getter, base, subscripts);
       
-      return gen.emitGetProperty(loc, ManagedValue(getter),
-                                 base ? Optional<ManagedValue>(base) : Nothing,
+      return gen.emitGetProperty(loc,
+                                 ManagedValue(getter, ManagedValue::Unmanaged),
+                                 base
+                                   ? Optional<ManagedValue>(base,
+                                                        ManagedValue::Unmanaged)
+                                   : Nothing,
                                  subscriptExpr
                                    ? Optional<ArrayRef<Value>>(subscripts)
                                    : Nothing);

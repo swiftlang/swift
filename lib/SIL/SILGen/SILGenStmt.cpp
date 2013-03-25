@@ -400,7 +400,7 @@ ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
   }
   assert(addr.getType().isAddress() &&
          "resolving lvalue did not give an address");
-  return ManagedValue(addr);
+  return ManagedValue(addr, ManagedValue::LValue);
 }
 
 void SILGenFunction::emitAssignPhysicalAddress(SILLocation loc,

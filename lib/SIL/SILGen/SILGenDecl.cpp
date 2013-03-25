@@ -566,7 +566,7 @@ Value SILGenFunction::emitDestructorProlog(ClassDecl *CD,
     // scope.
     Value thisAddr = B.createAllocVar(DD, AllocKind::Stack, thisType);
     Cleanups.pushCleanup<CleanupDestructorThis>(thisAddr);
-    emitStore(DD, ManagedValue(thisValue), thisAddr);
+    emitStore(DD, ManagedValue(thisValue, ManagedValue::Unmanaged), thisAddr);
     VarLocs[thisDecl] = {Value(), thisAddr};
   }
   return thisValue;

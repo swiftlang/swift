@@ -122,7 +122,8 @@ public:
                    gen.B.createClassMethod(thisCallSite,
                                            thisParam.getValue(),
                                            constant,
-                                           gen.SGM.getConstantType(constant))));
+                                           gen.SGM.getConstantType(constant)),
+                   ManagedValue::Unmanaged));
         // setThisParam bumps the callDepth, but we aren't really past the
         // 'this' call depth in this case.
         --callDepth;
@@ -136,7 +137,8 @@ public:
   }
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *e) {
     setCallee(ManagedValue(gen.emitGlobalConstantRef(e,
-                    SILConstant(e->getDecl(), SILConstant::Kind::Initializer))));
+                    SILConstant(e->getDecl(), SILConstant::Kind::Initializer)),
+                  ManagedValue::Unmanaged));
   }
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e) {
     setSideEffect(e->getLHS());
@@ -146,15 +148,18 @@ public:
     Value existential = gen.visit(e->getBase()).getUnmanagedValue();
     assert(existential.getType().isAddress() && "loadable existential?!");
     // FIXME: Use existential_metatype if method is static.
-    setThisParam(ManagedValue(gen.B.createProjectExistential(e, existential)));
-    setCallee(ManagedValue(gen.emitProtocolMethod(e, existential)));
+    setThisParam(ManagedValue(gen.B.createProjectExistential(e, existential),
+                              ManagedValue::Unmanaged));
+    setCallee(ManagedValue(gen.emitProtocolMethod(e, existential),
+                           ManagedValue::Unmanaged));
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
     setThisParam(gen.visit(e->getBase()));
     assert((thisParam.getValue().getType().isAddress()
             || thisParam.getValue().getType().is<MetaTypeType>())
            && "loadable archetype?!");
-    setCallee(ManagedValue(gen.emitArchetypeMethod(e, thisParam.getValue())));
+    setCallee(ManagedValue(gen.emitArchetypeMethod(e, thisParam.getValue()),
+                           ManagedValue::Unmanaged));
   }
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {
     visit(e->getSubExpr());
@@ -193,7 +198,8 @@ public:
     setThisParam(ManagedValue(superUpcast, super.getCleanup()));
 
     setCallee(ManagedValue(gen.B.createSuperMethod(apply, super.getValue(),
-                                 constant, constantTy)));
+                                 constant, constantTy),
+                           ManagedValue::Unmanaged));
   }
   
   ManagedValue getSpecializedCallee() {
@@ -267,8 +273,8 @@ void SILGenFunction::emitApplyArguments(Expr *argsExpr,
 ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                        Value Fn, ArrayRef<Value> Args) {
   // Get the result type.
-  TypeLoweringInfo const &resultTI = getTypeLoweringInfo(
-                                         Fn.getType().getFunctionResultType());
+  Type resultTy = Fn.getType().getFunctionResultType();
+  TypeLoweringInfo const &resultTI = getTypeLoweringInfo(resultTy);
   
   if (resultTI.isAddressOnly()) {
     // Allocate a temporary to house the indirect return, and pass it to the
@@ -278,11 +284,13 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
     argsWithReturn.push_back(buffer);
     B.createApply(Loc, Fn, SILType::getEmptyTupleType(F.getContext()),
                   argsWithReturn);
-    return emitManagedAddressOnlyValue(buffer);
+    return emitManagedRValueWithCleanup(buffer);
   } else {
     // Receive the result by value.
     Value result = B.createApply(Loc, Fn, resultTI.getLoweredType(), Args);
-    return emitManagedRValueWithCleanup(result);
+    return resultTy->is<LValueType>()
+      ? ManagedValue(result, ManagedValue::LValue)
+      : emitManagedRValueWithCleanup(result);
   }
 }
 

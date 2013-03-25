@@ -35,21 +35,27 @@ namespace Lowering {
 /// properties.
 class ManagedValue {
   /// The value (or address of an address-only value) being managed, and
-  /// whether it represents an address-only value.
-  llvm::PointerIntPair<Value, 1, bool> valueAndIsAddressOnlyValue;
+  /// whether it represents an lvalue.
+  llvm::PointerIntPair<Value, 1, bool> valueAndIsLValue;
   /// A handle to the cleanup that destroys this value, or
   /// CleanupsDepth::invalid if the value has no cleanup.
   CleanupsDepth cleanup;
 
 public:
+  enum Unmanaged_t { Unmanaged };
+  enum LValue_t { LValue };
+  
   ManagedValue() = default;
-  explicit ManagedValue(Value value, bool addressOnlyValue = false)
-    : valueAndIsAddressOnlyValue(value, addressOnlyValue),
+  explicit ManagedValue(Value value, LValue_t)
+    : valueAndIsLValue(value, true),
       cleanup(CleanupsDepth::invalid())
   {}
-  ManagedValue(Value value, CleanupsDepth cleanup,
-               bool isAddressOnlyValue = false)
-    : valueAndIsAddressOnlyValue(value, isAddressOnlyValue),
+  explicit ManagedValue(Value value, Unmanaged_t)
+    : valueAndIsLValue(value, false),
+      cleanup(CleanupsDepth::invalid())
+  {}
+  ManagedValue(Value value, CleanupsDepth cleanup)
+    : valueAndIsLValue(value, false),
       cleanup(cleanup)
   {}
 
@@ -57,11 +63,11 @@ public:
     assert(!hasCleanup());
     return getValue();
   }
-  Value getValue() const { return valueAndIsAddressOnlyValue.getPointer(); }
+  Value getValue() const { return valueAndIsLValue.getPointer(); }
   
   SILType getType() const { return getValue().getType(); }
   
-  bool isAddressOnlyValue() const { return valueAndIsAddressOnlyValue.getInt(); }
+  bool isLValue() const { return valueAndIsLValue.getInt(); }
 
   bool hasCleanup() const { return cleanup.isValid(); }
   CleanupsDepth getCleanup() const { return cleanup; }
@@ -73,44 +79,24 @@ public:
   }
   
   /// Forward this value, deactivating the cleanup and returning the
-  /// underlying value. Not valid for address-only values.
+  /// underlying value.
   Value forward(SILGenFunction &gen) {
-    assert(!isAddressOnlyValue() &&
-           "must forward an address-only value using forwardInto");
     if (hasCleanup())
       forwardCleanup(gen);
     return getValue();
   }
   
-  /// Forward this value if it's loadable, or create a temporary copy if
-  /// it's address-only, per the argument passing convention.
+  /// Forward this value as an argument.
   Value forwardArgument(SILGenFunction &gen, SILLocation loc) {
-    if (isAddressOnlyValue()) {
-      // If the value is already take-able, we don't need to make another copy.
-      // Just pass cleanup responsibility to the callee.
-      if (hasCleanup()) {
-        forwardCleanup(gen);
-        return getValue();
-      }
-      
-      // Make a copy of the address-only value for the callee to consume.
-      Value copy = gen.emitTemporaryAllocation(loc, getType());
-      forwardInto(gen, loc, copy, /*isInitialize*/ true);
-      return copy;
-    } else if (getType().isAddress()) {
-      // Simply pass other addresses--they should correspond to byref args.
-      return getValue();
-    } else {
-      // Forward loadable values.
-      Value v = forward(gen);
-      // Thicken thin function values.
-      // FIXME: Swift type-checking should do this.
-      if (v.getType().is<AnyFunctionType>() &&
-          v.getType().castTo<AnyFunctionType>()->isThin()) {
-        v = gen.emitThickenFunction(loc, v);
-      }
-      return v;
+    // Forward loadable values.
+    Value v = forward(gen);
+    // Thicken thin function values.
+    // FIXME: Swift type-checking should do this.
+    if (v.getType().is<AnyFunctionType>() &&
+        v.getType().castTo<AnyFunctionType>()->isThin()) {
+      v = gen.emitThickenFunction(loc, v);
     }
+    return v;
   }
   
   /// Forward this value into memory by storing it to the given address.
@@ -127,7 +113,7 @@ public:
   /// this method.
   void forwardInto(SILGenFunction &gen, SILLocation loc,
                    Value address, bool isInitialize) {
-    assert(isAddressOnlyValue() &&
+    assert(getType().isAddressOnly() &&
            "must forward loadable value using forward");
     // If we own a cleanup for this value, we can "take" the value and disable
     // the cleanup.
@@ -136,11 +122,6 @@ public:
       forwardCleanup(gen);
     }
     gen.B.createCopyAddr(loc, getValue(), address, canTake, isInitialize);
-  }
-
-  /// Returns true if this value corresponds to an lvalue in Swift.
-  bool isLValue() const {
-    return getType().isAddress() && !isAddressOnlyValue();
   }
 };
 

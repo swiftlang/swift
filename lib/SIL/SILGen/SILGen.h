@@ -151,8 +151,6 @@ struct Materialize {
   /// The cleanup to dispose of the value before deallocating the buffer.
   /// This cleanup can be killed by calling the consume method.
   CleanupsDepth valueCleanup;
-  /// True if the materialized value is of an address-only type.
-  bool isAddressOnlyValue;
   
   /// Load the value out of the temporary buffer and deactivate its value
   /// cleanup. Returns the loaded value, which becomes the caller's
@@ -570,7 +568,6 @@ public:
                        ManagedValue value);
   
   ManagedValue emitManagedRValueWithCleanup(Value v);
-  ManagedValue emitManagedAddressOnlyValue(Value v);
   
   void emitAssignToLValue(SILLocation loc, ManagedValue src,
                           LValue const &dest);
