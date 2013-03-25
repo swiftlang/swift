@@ -550,14 +550,21 @@ void IRGenSILFunction::visitExtractInst(swift::ExtractInst *i) {
   Value v(i, 0);
   Explosion lowered(CurExplosionLevel);
   Explosion operand = getLoweredExplosion(i->getOperand());
+  CanType baseType = i->getOperand().getType().getSwiftRValueType();
   
-  // FIXME: handle extracting from structs.
-  
-  projectTupleElementFromExplosion(*this,
-                                   i->getOperand().getType().getSwiftType(),
-                                   operand,
-                                   i->getFieldNo(),
-                                   lowered);
+  if (baseType->is<TupleType>()) {
+    projectTupleElementFromExplosion(*this,
+                                     i->getOperand().getType().getSwiftType(),
+                                     operand,
+                                     i->getFieldNo(),
+                                     lowered);
+  } else {
+    projectPhysicalStructMemberFromExplosion(*this,
+                                             i->getOperand().getType().getSwiftType(),
+                                             operand,
+                                             i->getFieldNo(),
+                                             lowered);
+  }
   operand.claimAll();
   newLoweredExplosion(v, lowered);
 }

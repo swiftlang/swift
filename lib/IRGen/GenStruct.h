@@ -26,11 +26,17 @@ namespace irgen {
   class LValue;
   class IRGenFunction;
   class OwnedAddress;
+  class Explosion;
   
   OwnedAddress projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                                   OwnedAddress base,
                                                   CanType baseType,
                                                   unsigned fieldIndex);
+  void projectPhysicalStructMemberFromExplosion(IRGenFunction &IGF,
+                                                CanType baseType,
+                                                Explosion &base,
+                                                unsigned fieldNo,
+                                                Explosion &out);
 
   LValue emitPhysicalStructMemberLValue(IRGenFunction &IGF, MemberRefExpr *E);
   LValue emitPhysicalStructMemberLValue(IRGenFunction &IGF,

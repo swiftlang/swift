@@ -166,6 +166,25 @@ OwnedAddress irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
   return OwnedAddress(project, base.getOwner());
 }
 
+void irgen::projectPhysicalStructMemberFromExplosion(IRGenFunction &IGF,
+                                                     CanType baseType,
+                                                     Explosion &base,
+                                                     unsigned fieldNo,
+                                                     Explosion &out) {
+  auto &baseTI = IGF.getFragileTypeInfo(baseType).as<StructTypeInfo>();
+  auto &fieldI = baseTI.getFields()[fieldNo];
+  // If the field requires no storage, there's nothing to do.
+  if (fieldI.isEmpty()) {
+    return IGF.emitFakeExplosion(fieldI.getTypeInfo(), out);
+  }
+  
+  // Otherwise, project from the base.
+  auto fieldRange = fieldI.getProjectionRange(out.getKind());
+  ArrayRef<ManagedValue> element = base.getRange(fieldRange.first,
+                                                 fieldRange.second);
+  out.add(element);
+}
+
 static LValue emitPhysicalStructMemberLValue(IRGenFunction &IGF,
                                              Expr *base,
                                              StructDecl *baseStruct,
