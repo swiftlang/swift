@@ -169,25 +169,62 @@ pseudo-random number generator).  It needs to make one copy and do
 in-place mutation of the state, rather than wholesale value
 replacement via assignment, which might be expensive.
 
-Here’s a version of cycle_length that works on non-classes, but breaks
-on classes::
+Here’s a version of cycle_length that works when state is a mutable
+value type::
 
- func cycle_length<State>(s : State, mutate : ([byref]State)->()) {
-     State x = s    // one copy
+ func cycle_length<State>(
+   s : State, mutate : ([byref]State)->()) -> Int
+   requires State : EqualityComparable
+ {
+     State x = s    // one copy                // 1
      mutate(x)      // in-place mutation
      Int n = 1
-     while x != s {
+     while x != s {                            // 2
           mutate(x) // in-place mutation
           ++n
      }
      return n
  }
 
-You can write a different one that only works on clonable classes and
-another one that works on both values and clonable classes but does
-O(N) copies instead just one.  I don't believe there's a reasonable
-way write this so it works on clonable classes, non-classes, and
-avoids the O(N) copies. [#extension]_
+The reason the above breaks when the state is in a class instance is
+that the intended copy in line 1 instead creates a new reference to
+the same state, and the comparison in line 2 (regardless of whether we
+decide ``!=`` does “identity” or “value” comparison) always succeeds.
+
+You can write a different implementation that only works on clonable
+classes (assuming value comparison semantics for ``!=``):
+
+.. parsed-literal::
+
+ func cycle_length<State>(
+   s : State, mutate : ([byref]State)->()) -> Int
+   requires State : EqualityComparable, **Clonable**
+ {
+     State x = s\ **.clone()** // one copy
+     *etc.*
+
+You could also redefine the interface so that it works on both values and
+clonable classes:
+
+.. parsed-literal::
+
+ func cycle_length<State>(
+   s : State, **next : (State)->State**) -> Int
+   requires State : EqualityComparable
+ {
+     State **x = next(s)**
+     Int n = 1
+     while x != s {
+          **x = next(x)**
+          ++n
+     }
+     return n
+ }
+
+However, this implementation makes O(N) separate copies of the state.
+I don't believe there's a reasonable way write this so it works on
+clonable classes, non-classes, and avoids the O(N)
+copies. [#extension]_
 
 The Role of Moves
 =================
