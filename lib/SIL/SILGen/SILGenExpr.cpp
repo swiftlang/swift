@@ -372,7 +372,7 @@ ManagedValue SILGenFunction::visitFunctionConversionExpr(
   if (original.getType().castTo<FunctionType>()->isThin())
     destTy = getThinFunctionType(destTy);
   
-  Value converted = B.createImplicitConvert(e,
+  Value converted = B.createConvertFunction(e,
                                             original.getValue(),
                                             getLoweredType(destTy));
   return ManagedValue(converted, original.getCleanup());

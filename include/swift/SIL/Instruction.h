@@ -529,14 +529,14 @@ public:
   }
 };
 
-/// ImplicitConvertInst - Change the type of some value without affecting how it
+/// ConvertFunctionInst - Change the type of some value without affecting how it
 /// will codegen.
-class ImplicitConvertInst : public ConversionInst {
+class ConvertFunctionInst : public ConversionInst {
 public:
-  ImplicitConvertInst(SILLocation Loc, Value Operand, SILType Ty);
+  ConvertFunctionInst(SILLocation Loc, Value Operand, SILType Ty);
   
   static bool classof(Value V) {
-    return V->getKind() == ValueKind::ImplicitConvertInst;
+    return V->getKind() == ValueKind::ConvertFunctionInst;
   }
 };
 

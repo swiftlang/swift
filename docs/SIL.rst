@@ -614,21 +614,18 @@ index_addr
 Given a pointer into an array of values, returns the address of the
 ``%1``-th element relative to ``%0``.
 
-implicit_convert
+convert_function
 ````````````````
 ::
 
-  %1 = implicit_convert %0, $T
-  ; %0 must be of a type $U implicitly convertible to $T (see below)
+  %1 = convert_function %0, $T
+  ; %0 must be of a function type $U ABI-compatible with $T
   ; %1 will be of type $T
 
-Performs an implicit conversion of ``%0`` to type ``T``. This instruction is
-limited to conversions that have no runtime effect, such as:
-
-* derived-to-base conversion
-* scalar-to-equivalent-tuple conversion
-* function-to-equivalent-function conversion
-* reference-type-to-``Box`` conversion
+Performs a conversion of the function ``%0`` to type ``T``, which must be ABI-
+compatible with the type of ``%0``. Function types are ABI-compatible if their
+input and/or result types are tuple types that differ only in label names or
+default values.
 
 downcast
 ````````

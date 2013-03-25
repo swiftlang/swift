@@ -538,18 +538,33 @@ public:
            && "address-to-pointer result type must be RawPointer");
   }
   
-  void visitImplicitConvertInst(ImplicitConvertInst *ICI) {
+  void visitConvertFunctionInst(ConvertFunctionInst *ICI) {
     assert(!ICI->getOperand().getType().isAddress() &&
            "conversion operand cannot be an address");
     assert(!ICI->getType().isAddress() &&
            "conversion result cannot be an address");
     
-    if (auto *opFTy = ICI->getOperand().getType().getAs<FunctionType>()) {
-      auto *resFTy = ICI->getType().getAs<FunctionType>();
-      assert(resFTy && "function must be converted to another function");
-      assert(opFTy->isThin() == resFTy->isThin() &&
-             "implicit_convert cannot change function thinness");
-    }
+    auto *opFTy = ICI->getOperand().getType().getAs<AnyFunctionType>();
+    auto *resFTy = ICI->getType().getAs<AnyFunctionType>();
+
+    assert(opFTy && "convert_function operand must be a function");
+    assert(resFTy && "convert_function result must be a function");
+    
+    assert(opFTy->isThin() == resFTy->isThin() &&
+           "convert_function cannot change function thinness");
+    
+    SILFunctionTypeInfo *opTI = F.getModule().getFunctionTypeInfo(
+                                                  ICI->getOperand().getType());
+    SILFunctionTypeInfo *resTI = F.getModule().getFunctionTypeInfo(
+                                                               ICI->getType());
+
+    assert(opTI->getResultType() == resTI->getResultType() &&
+         "result types of convert_function operand and result do no match");
+    assert(opTI->getInputTypes().size() == resTI->getInputTypes().size() &&
+           "input types of convert_function operand and result do not match");
+    assert(std::equal(opTI->getInputTypes().begin(), opTI->getInputTypes().end(),
+                      resTI->getInputTypes().begin()) &&
+           "input types of convert_function operand and result do not match");
   }
   
   void visitIntegerValueInst(IntegerValueInst *IVI) {

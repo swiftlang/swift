@@ -724,7 +724,7 @@ void IRGenSILFunction::visitAllocArrayInst(swift::AllocArrayInst *i) {
   newLoweredAddress(ptrValue, ptr);
 }
 
-void IRGenSILFunction::visitImplicitConvertInst(swift::ImplicitConvertInst *i) {
+void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
   Explosion to(CurExplosionLevel);
   Explosion from = getLoweredExplosion(i->getOperand());
 

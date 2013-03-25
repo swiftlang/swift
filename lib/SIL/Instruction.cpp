@@ -327,9 +327,9 @@ ConversionInst::ConversionInst(ValueKind Kind,
   : Instruction(Kind, Loc, Ty), Operands(this, Operand) {
 }
 
-ImplicitConvertInst::ImplicitConvertInst(SILLocation Loc, Value Operand,
+ConvertFunctionInst::ConvertFunctionInst(SILLocation Loc, Value Operand,
                                          SILType Ty)
-  : ConversionInst(ValueKind::ImplicitConvertInst, Loc, Operand, Ty) {
+  : ConversionInst(ValueKind::ConvertFunctionInst, Loc, Operand, Ty) {
 }
 
 CoerceInst::CoerceInst(SILLocation Loc, Value Operand, SILType Ty)

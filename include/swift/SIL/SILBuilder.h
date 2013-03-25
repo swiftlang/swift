@@ -179,9 +179,9 @@ public:
   }
 
 
-  ImplicitConvertInst *createImplicitConvert(SILLocation Loc, Value Op,
+  ConvertFunctionInst *createConvertFunction(SILLocation Loc, Value Op,
                                              SILType Ty) {
-    return insert(new ImplicitConvertInst(Loc, Op, Ty));
+    return insert(new ConvertFunctionInst(Loc, Op, Ty));
   }
 
   CoerceInst *createCoerce(SILLocation Loc, Value Op, SILType Ty) {

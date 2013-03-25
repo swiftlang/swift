@@ -273,7 +273,7 @@ public:
   void visitCopyAddrInst(CopyAddrInst *i);
   void visitDestroyAddrInst(DestroyAddrInst *i);
 
-  void visitImplicitConvertInst(ImplicitConvertInst *i);
+  void visitConvertFunctionInst(ConvertFunctionInst *i);
   void visitCoerceInst(CoerceInst *i);
   void visitUpcastInst(UpcastInst *i);
   void visitDowncastInst(DowncastInst *i);

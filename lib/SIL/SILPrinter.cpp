@@ -300,8 +300,8 @@ public:
       << CI->getType();
   }
   
-  void visitImplicitConvertInst(ImplicitConvertInst *CI) {
-    printConversionInst(CI, "implicit_convert");
+  void visitConvertFunctionInst(ConvertFunctionInst *CI) {
+    printConversionInst(CI, "convert_function");
   }
   void visitCoerceInst(CoerceInst *CI) {
     printConversionInst(CI, "coerce");
