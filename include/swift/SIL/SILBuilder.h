@@ -88,8 +88,10 @@ public:
   void emitBlock(BasicBlock *BB) {
     Function *F = BB->getParent();
     // If this is a fall through into BB, emit the fall through branch.
-    if (hasValidInsertionPoint())
-      createBranch(BB);
+    if (hasValidInsertionPoint()) {
+      assert(BB->bbarg_empty() && "cannot fall through to bb with args");
+      createBranch(SILLocation(), BB);
+    }
     
     // Start inserting into that block.
     setInsertionPoint(BB);
@@ -370,13 +372,27 @@ public:
   
   CondBranchInst *createCondBranch(SILLocation Loc, Value Cond,
                                    BasicBlock *Target1, BasicBlock *Target2) {
-    return insertTerminator(new CondBranchInst(Loc, Cond, Target1, Target2));
+    return insertTerminator(CondBranchInst::create(Loc, Cond,
+                                                   Target1, Target2, F));
   }
     
-  BranchInst *createBranch(BasicBlock *TargetBlock) {
-    return insertTerminator(new BranchInst(TargetBlock, F));
+  CondBranchInst *createCondBranch(SILLocation Loc, Value Cond,
+                                   BasicBlock *Target1, ArrayRef<Value> Args1,
+                                   BasicBlock *Target2, ArrayRef<Value> Args2) {
+    return insertTerminator(CondBranchInst::create(Loc, Cond,
+                                                   Target1, Args1,
+                                                   Target2, Args2,
+                                                   F));
+  }
+  
+  BranchInst *createBranch(SILLocation Loc, BasicBlock *TargetBlock) {
+    return insertTerminator(BranchInst::create(Loc, TargetBlock, F));
   }
 
+  BranchInst *createBranch(SILLocation Loc, BasicBlock *TargetBlock,
+                           ArrayRef<Value> Args) {
+    return insertTerminator(BranchInst::create(Loc, TargetBlock, Args, F));
+  }
 
   //===--------------------------------------------------------------------===//
   // Private Helper Methods

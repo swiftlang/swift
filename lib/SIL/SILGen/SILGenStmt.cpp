@@ -208,7 +208,7 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S, SGFContext C) {
     Cond.enterTrue(B);
     visit(S->getBody());
     if (B.hasValidInsertionPoint())
-      B.createBranch(LoopBB);
+      B.createBranch(S, LoopBB);
     Cond.exitTrue(B);
   }
   
@@ -245,7 +245,7 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S, SGFContext C) {
     
     Cond.enterTrue(B);
     if (B.hasValidInsertionPoint())
-      B.createBranch(LoopBB);
+      B.createBranch(S, LoopBB);
     
     Cond.exitTrue(B);
     // Complete the conditional execution.
@@ -309,7 +309,7 @@ void SILGenFunction::visitForStmt(ForStmt *S, SGFContext C) {
     }
     
     if (B.hasValidInsertionPoint())
-      B.createBranch(LoopBB);
+      B.createBranch(S, LoopBB);
     Cond.exitTrue(B);
   }
   
@@ -355,7 +355,7 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S, SGFContext C) {
     
     // Loop back to the header.
     if (B.hasValidInsertionPoint())
-      B.createBranch(LoopBB);
+      B.createBranch(S, LoopBB);
     Cond.exitTrue(B);
   }
   

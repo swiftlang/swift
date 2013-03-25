@@ -98,7 +98,8 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest) {
     if (cleanup->isActive())
       cleanup->emit(Gen);
   }
-  B.createBranch(Dest.getBlock());
+  /// FIXME location info
+  B.createBranch(SILLocation(), Dest.getBlock());
 }
 
 void CleanupManager::emitCleanupsForReturn(SILLocation loc) {
@@ -115,7 +116,7 @@ void CleanupManager::emitReturnAndCleanups(SILLocation loc, Value returnValue) {
   
   if (Gen.epilogBB) {
     assert(Gen.hasVoidReturn && "ctor or dtor with non-void return?!");
-    B.createBranch(Gen.epilogBB);
+    B.createBranch(loc, Gen.epilogBB);
   } else {
     // Thicken thin function return values.
     // FIXME: Swift type-checking should to this for us.

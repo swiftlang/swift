@@ -1151,14 +1151,30 @@ public:
 class BranchInst : public TermInst {
   SILSuccessor DestBB;
   TailAllocatedOperandList<0> Operands; // FIXME: probably needs dynamic adjustment
+  
+  BranchInst(SILLocation Loc,
+             BasicBlock *DestBB, ArrayRef<Value> Args);
 public:
   typedef ArrayRef<Value> ArgsTy;
   
-  /// Construct an BranchInst that will branches to the specified block.
-  BranchInst(BasicBlock *DestBB, Function &F);
+  /// Construct a BranchInst that will branch to the specified block.
+  /// The destination block must take no parameters.
+  static BranchInst *create(SILLocation Loc,
+                            BasicBlock *DestBB,
+                            Function &F);
+
+  /// Construct a BranchInst that will branch to the specified block with
+  /// the given parameters.
+  static BranchInst *create(SILLocation Loc,
+                            BasicBlock *DestBB,
+                            ArrayRef<Value> Args,
+                            Function &F);
   
   /// The jump target for the branch.
   BasicBlock *getDestBB() const { return DestBB; }
+  
+  /// The arguments for the destination BB.
+  OperandValueArrayRef getArgs() const { return Operands.getValues(); }
 
   SuccessorListTy getSuccessors() {
     return DestBB;
@@ -1169,19 +1185,37 @@ public:
   }
 };
 
+/// A conditional branch.
 class CondBranchInst : public TermInst {
   enum {
     /// The condition value used for the branch.
     Condition
   };
-  FixedOperandList<1> Operands;
 
   SILSuccessor DestBBs[2];
-public:
-
+  // The first argument is the condition; the rest are BB arguments.
+  TailAllocatedOperandList<1> Operands;
+  
   CondBranchInst(SILLocation Loc, Value Condition,
-                 BasicBlock *TrueBB, BasicBlock *FalseBB);
+                 BasicBlock *TrueBB, BasicBlock *FalseBB,
+                 ArrayRef<Value> Args);
+  
+public:
+  /// Construct a CondBranchInst that will branch to TrueBB or FalseBB based on
+  /// the Condition value. Both blocks must not take any arguments.
+  static CondBranchInst *create(SILLocation Loc, Value Condition,
+                                BasicBlock *TrueBB,
+                                BasicBlock *FalseBB,
+                                Function &F);
 
+  /// Construct a CondBranchInst that will either branch to TrueBB and pass
+  /// TrueArgs or branch to FalseBB and pass FalseArgs based on the Condition
+  /// value.
+  static CondBranchInst *create(SILLocation Loc, Value Condition,
+                                BasicBlock *TrueBB, ArrayRef<Value> TrueArgs,
+                                BasicBlock *FalseBB, ArrayRef<Value> FalseArgs,
+                                Function &F);
+  
   Value getCondition() const { return Operands[Condition].get(); }
 
   SuccessorListTy getSuccessors() {
@@ -1192,9 +1226,11 @@ public:
   const BasicBlock *getTrueBB() const { return DestBBs[0]; }
   BasicBlock *getFalseBB() { return DestBBs[1]; }
   const BasicBlock *getFalseBB() const { return DestBBs[1]; }
-  
-  void setTrueBB(BasicBlock *BB) { DestBBs[0] = BB; }
-  void setFalseBB(BasicBlock *BB) { DestBBs[1] = BB; }
+
+  /// Get the arguments to the true BB.
+  OperandValueArrayRef getTrueArgs() const;
+  /// Get the arguments to the false BB.
+  OperandValueArrayRef getFalseArgs() const;
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::CondBranchInst;

@@ -49,7 +49,7 @@ void Condition::exitTrue(SILBuilder &B) {
   // Otherwise, resume into the continuation block.  This branch might
   // be folded by exitFalse if it turns out that that point is
   // unreachable.
-  B.createBranch(ContBB);
+  B.createBranch(SILLocation(), ContBB);
   
   // Coming out of exitTrue, we can be in one of three states:
   //   - a valid non-terminal IP, but only if there is no continuation
@@ -106,7 +106,7 @@ void Condition::exitFalse(SILBuilder &B) {
            "Zapping the branch should make ContBB dead");
   } else {
     // Otherwise, branch to the continuation block and start inserting there.
-    B.createBranch(ContBB);
+    B.createBranch(SILLocation(), ContBB);
   }
 }
 

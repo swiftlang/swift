@@ -93,6 +93,7 @@ public:
   typedef std::vector<BBArgument*>::const_iterator const_bbarg_iterator;
 
   bool bbarg_empty() const { return BBArgList.empty(); }
+  size_t bbarg_size() const { return BBArgList.size(); }
   bbarg_iterator bbarg_begin() { return BBArgList.begin(); }
   bbarg_iterator bbarg_end() { return BBArgList.end(); }
   const_bbarg_iterator bbarg_begin() const { return BBArgList.begin(); }

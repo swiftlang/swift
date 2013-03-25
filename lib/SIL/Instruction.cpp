@@ -173,7 +173,7 @@ DERIVED *FunctionInst::create(Function &F, ArrayRef<Value> Args,
 
   void *Buffer = F.allocate(sizeof(DERIVED) +
                             decltype(Operands)::getExtraSize(Args.size()),
-                            llvm::AlignOf<DERIVED>::Alignment);
+                            alignof(DERIVED));
   return ::new(Buffer) DERIVED(::std::forward<T>(ConstructorArgs)...);
 }
 
@@ -541,7 +541,7 @@ IntegerValueInst::IntegerValueInst(uint64_t Val, SILType Ty)
 
 
 TermInst::SuccessorListTy TermInst::getSuccessors() {
-  assert(isa<TermInst>(this) && "Only TermInst's are allowed");
+  assert(isa<TermInst>(this) && "Only TermInsts are allowed");
   if (auto I = dyn_cast<UnreachableInst>(this))
     return I->getSuccessors();
   if (auto I = dyn_cast<ReturnInst>(this))
@@ -561,19 +561,69 @@ ReturnInst::ReturnInst(SILLocation Loc, Value ReturnValue)
     Operands(this, ReturnValue) {
 }
 
-BranchInst::BranchInst(BasicBlock *DestBB, Function &F)
-  : TermInst(ValueKind::BranchInst, SILLocation(),
-             SILType::getEmptyTupleType(F.getContext())),
-    DestBB(this, DestBB), Operands(this, ArrayRef<Value>()) {
+BranchInst::BranchInst(SILLocation Loc,
+                       BasicBlock *DestBB,
+                       ArrayRef<Value> Args)
+  : TermInst(ValueKind::BranchInst, Loc),
+    DestBB(this, DestBB), Operands(this, Args)
+{
+  assert(Args.size() == DestBB->bbarg_size() &&
+         "branch argument count does not match target bb");
 }
 
+BranchInst *BranchInst::create(SILLocation Loc,
+                               BasicBlock *DestBB,
+                               Function &F) {
+  return create(Loc, DestBB, {}, F);
+}
+
+BranchInst *BranchInst::create(SILLocation Loc,
+                               BasicBlock *DestBB, ArrayRef<Value> Args,
+                               Function &F) {
+  void *Buffer = F.allocate(sizeof(BranchInst) +
+                              decltype(Operands)::getExtraSize(Args.size()),
+                            alignof(BranchInst));
+  return ::new (Buffer) BranchInst(Loc, DestBB, Args);
+}
 
 CondBranchInst::CondBranchInst(SILLocation Loc, Value Condition,
-                               BasicBlock *TrueBB, BasicBlock *FalseBB)
-  : TermInst(ValueKind::CondBranchInst, Loc), Operands(this, Condition) {
-  DestBBs[0].init(this);
-  DestBBs[1].init(this);
-  DestBBs[0] = TrueBB;
-  DestBBs[1] = FalseBB;
+                               BasicBlock *TrueBB, BasicBlock *FalseBB,
+                               ArrayRef<Value> Args)
+  : TermInst(ValueKind::CondBranchInst, Loc),
+    DestBBs{{this, TrueBB}, {this, FalseBB}},
+    Operands(this, Args, Condition)
+{
 }
 
+CondBranchInst *CondBranchInst::create(SILLocation Loc, Value Condition,
+                                       BasicBlock *TrueBB, BasicBlock *FalseBB,
+                                       Function &F) {
+  return create(Loc, Condition, TrueBB, {}, FalseBB, {}, F);
+}
+
+CondBranchInst *CondBranchInst::create(SILLocation Loc, Value Condition,
+                               BasicBlock *TrueBB, ArrayRef<Value> TrueArgs,
+                               BasicBlock *FalseBB, ArrayRef<Value> FalseArgs,
+                               Function &F) {
+  assert(TrueArgs.size() == TrueBB->bbarg_size() &&
+         FalseArgs.size() == FalseBB->bbarg_size() &&
+         "branch argument counts do not match target bbs");
+
+  SmallVector<Value, 4> Args;
+  Args.append(TrueArgs.begin(), TrueArgs.end());
+  Args.append(FalseArgs.begin(), FalseArgs.end());
+
+  void *Buffer = F.allocate(sizeof(CondBranchInst) +
+                              decltype(Operands)::getExtraSize(Args.size()),
+                            alignof(CondBranchInst));
+  return ::new (Buffer) CondBranchInst(Loc, Condition, TrueBB, FalseBB, Args);
+}
+
+OperandValueArrayRef CondBranchInst::getTrueArgs() const {
+  return Operands.getValues().slice(1, getTrueBB()->bbarg_size());
+}
+
+OperandValueArrayRef CondBranchInst::getFalseArgs() const {
+  return Operands.getValues().slice(1 + getTrueBB()->bbarg_size(),
+                                    getFalseBB()->bbarg_size());
+}

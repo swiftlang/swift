@@ -597,6 +597,10 @@ public:
   void visitCondBranchInst(CondBranchInst *CBI) {
     assert(CBI->getCondition() &&
            "Condition of conditional branch can't be missing");
+    assert(CBI->getCondition().getType() ==
+             SILType::getBuiltinIntegerType(1,
+                                 CBI->getCondition().getType().getASTContext())
+           && "condition of conditional branch must have Int1 type");
   }
   
   void verify() {

@@ -51,12 +51,13 @@ public:
     *this = nullptr;
   }
 
-  /// init - This should only be used when the SILSuccessor is default ctor'd.
-  void init(TermInst *TI) { ContainingInst = TI; SuccessorBlock = nullptr; }
-
   void operator=(BasicBlock *BB);
   
   operator BasicBlock*() const { return SuccessorBlock; }
+  
+  // Do not copy or move these.
+  SILSuccessor(const SILSuccessor &) = delete;
+  SILSuccessor(SILSuccessor &&) = delete;
 };
   
 /// SILSuccessorIterator - This is an iterator for walking the successor list of

@@ -21,6 +21,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Interleave.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
@@ -433,13 +434,28 @@ public:
     OS << "return " << '(' << getID(RI->getReturnValue()) << ')';
   }
 
+  void printBranchArgs(OperandValueArrayRef args) {
+    if (!args.empty()) {
+      OS << '(';
+      interleave(args.begin(), args.end(),
+                 [&](Value v) { OS << getID(v); },
+                 [&]() { OS << ", "; });
+      OS << ')';
+    }
+    
+  }
+  
   void visitBranchInst(BranchInst *UBI) {
     OS << "br " << getID(UBI->getDestBB());
+    printBranchArgs(UBI->getArgs());
   }
 
   void visitCondBranchInst(CondBranchInst *CBI) {
     OS << "condbranch " << getID(CBI->getCondition()) << ", "
-       << getID(CBI->getTrueBB()) << ',' << getID(CBI->getFalseBB());
+       << getID(CBI->getTrueBB());
+    printBranchArgs(CBI->getTrueArgs());
+    OS << ", " << getID(CBI->getFalseBB());
+    printBranchArgs(CBI->getFalseArgs());
   }
 };
 } // end anonymous namespace
