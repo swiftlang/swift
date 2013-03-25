@@ -15,6 +15,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/BBArgument.h"
+#include "Condition.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "ManagedValue.h"
@@ -1480,7 +1481,26 @@ ManagedValue SILGenFunction::visitBridgeToBlockExpr(BridgeToBlockExpr *E,
 }
 
 ManagedValue SILGenFunction::visitIfExpr(IfExpr *E, SGFContext C) {
-  llvm_unreachable("not implemented");
+  Condition cond = emitCondition(E, E->getCondExpr(),
+                                 /*hasFalse*/ true,
+                                 /*invertCondition*/ false,
+                                 getLoweredType(E->getType()));
+  
+  cond.enterTrue(B);
+  Value trueValue = visit(E->getThenExpr()).forward(*this);
+  cond.exitTrue(B, trueValue);
+  
+  cond.enterFalse(B);
+  Value falseValue = visit(E->getElseExpr()).forward(*this);
+  cond.exitFalse(B, falseValue);
+  
+  BasicBlock *cont = cond.complete(B);
+  
+  Value result = cont->bbarg_begin()[0];
+  
+  return result.getType().isAddressOnly()
+    ? emitManagedAddressOnlyValue(result)
+    : emitManagedRValueWithCleanup(result);
 }
 
 Value SILGenFunction::emitThickenFunction(SILLocation loc, Value thinFn) {

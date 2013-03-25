@@ -17,11 +17,13 @@
 #ifndef SWIFT_SIL_LOWERING_CONDITION_H
 #define SWIFT_SIL_LOWERING_CONDITION_H
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Compiler.h"
 
 namespace swift {
   class SILBuilder;
   class BasicBlock;
+  class Value;
   
 namespace Lowering {
 
@@ -39,7 +41,9 @@ class LLVM_LIBRARY_VISIBILITY Condition {
   
 public:
   Condition(BasicBlock *TrueBB, BasicBlock *FalseBB, BasicBlock *ContBB)
-  : TrueBB(TrueBB), FalseBB(FalseBB), ContBB(ContBB) {}
+    : TrueBB(TrueBB), FalseBB(FalseBB), ContBB(ContBB)
+  {
+  }
   
   bool hasTrue() const { return TrueBB; }
   bool hasFalse() const { return FalseBB; }
@@ -50,7 +54,7 @@ public:
   
   /// exitTrue - End the emission of the true block.  This must be called after
   /// enterTrue but before anything else on this Condition.
-  void exitTrue(SILBuilder &B);
+  void exitTrue(SILBuilder &B, llvm::ArrayRef<Value> Args = {});
   
   /// enterFalse - Begin the emission of the false block.  This should only be
   /// called if hasFalse() returns true.
@@ -58,11 +62,11 @@ public:
   
   /// exitFalse - End the emission of the true block.  This must be called after
   /// enterFalse but before anything else on this Condition.
-  void exitFalse(SILBuilder &B);
+  void exitFalse(SILBuilder &B, llvm::ArrayRef<Value> Args = {});
   
   /// complete - Complete this conditional execution.  This should be called
   /// only after all other calls on this Condition have been made.
-  void complete(SILBuilder &B);
+  BasicBlock *complete(SILBuilder &B);
 };
 
 } // end namespace Lowering

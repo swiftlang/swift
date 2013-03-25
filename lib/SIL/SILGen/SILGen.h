@@ -333,15 +333,19 @@ public:
   
   /// emitCondition - Emit a boolean expression as a control-flow condition.
   ///
-  /// \param TheStmt - The statement being lowered, for source information on
+  /// \param Loc - The statement being lowered, for source information on
   ///        the branch.
   /// \param E - The expression to be evaluated as a condition.
   /// \param hasFalseCode - true if the false branch doesn't just lead
   ///        to the fallthrough.
   /// \param invertValue - true if this routine should invert the value before
   ///        testing true/false.
-  Condition emitCondition(Stmt *TheStmt, Expr *E,
-                          bool hasFalseCode = true, bool invertValue = false);
+  /// \param contArgs - the types of the arguments to the continuation BB.
+  ///        Matching argument values must be passed to exitTrue and exitFalse
+  ///        of the resulting Condition object.
+  Condition emitCondition(SILLocation Loc, Expr *E,
+                          bool hasFalseCode = true, bool invertValue = false,
+                          ArrayRef<SILType> contArgs = {});
   
   
   /// emitBranch - Emit a branch to the given jump destination, threading out

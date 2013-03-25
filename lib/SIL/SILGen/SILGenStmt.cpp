@@ -17,6 +17,7 @@
 #include "LValue.h"
 #include "ManagedValue.h"
 #include "swift/AST/AST.h"
+#include "swift/SIL/BBArgument.h"
 #include "llvm/ADT/OwningPtr.h"
 
 using namespace swift;
@@ -39,17 +40,9 @@ static void emitOrDeleteBlock(SILBuilder &B, BasicBlock *BB) {
   }
 }
 
-/// emitCondition - Emit a boolean expression as a control-flow condition.
-///
-/// \param TheStmt - The statement being lowered, for source information on the
-///        branch.
-/// \param E - The expression to be evaluated as a condition.
-/// \param hasFalseCode - true if the false branch doesn't just lead
-///        to the fallthrough.
-/// \param invertValue - true if this routine should invert the value before
-///        testing true/false.
-Condition SILGenFunction::emitCondition(Stmt *TheStmt, Expr *E,
-                                bool hasFalseCode, bool invertValue) {
+Condition SILGenFunction::emitCondition(SILLocation Loc, Expr *E,
+                                bool hasFalseCode, bool invertValue,
+                                ArrayRef<SILType> contArgs) {
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
   
@@ -63,6 +56,10 @@ Condition SILGenFunction::emitCondition(Stmt *TheStmt, Expr *E,
   
   BasicBlock *ContBB = new BasicBlock(&F, "condition.cont");
   BasicBlock *TrueBB = new BasicBlock(&F, "if.true");
+
+  for (SILType argTy : contArgs) {
+    new (F.getModule()) BBArgument(argTy, ContBB);
+  }
   
   BasicBlock *FalseBB, *FalseDestBB;
   if (hasFalseCode) {
@@ -73,9 +70,9 @@ Condition SILGenFunction::emitCondition(Stmt *TheStmt, Expr *E,
   }
   
   if (invertValue)
-    B.createCondBranch(TheStmt, V, FalseDestBB, TrueBB);
+    B.createCondBranch(Loc, V, FalseDestBB, TrueBB);
   else
-    B.createCondBranch(TheStmt, V, TrueBB, FalseDestBB);
+    B.createCondBranch(Loc, V, TrueBB, FalseDestBB);
   
   return Condition(TrueBB, FalseBB, ContBB);
 }

@@ -26,7 +26,7 @@ void Condition::enterTrue(SILBuilder &B) {
   B.emitBlock(TrueBB);
 }
 
-void Condition::exitTrue(SILBuilder &B) {
+void Condition::exitTrue(SILBuilder &B, ArrayRef<Value> Args) {
   // If there's no continuation block, it's because the condition was
   // folded to true.  In that case, we just continue emitting code as
   // if we were still in the true case, and we're unreachable iff the
@@ -49,7 +49,7 @@ void Condition::exitTrue(SILBuilder &B) {
   // Otherwise, resume into the continuation block.  This branch might
   // be folded by exitFalse if it turns out that that point is
   // unreachable.
-  B.createBranch(SILLocation(), ContBB);
+  B.createBranch(SILLocation(), ContBB, Args);
   
   // Coming out of exitTrue, we can be in one of three states:
   //   - a valid non-terminal IP, but only if there is no continuation
@@ -70,7 +70,7 @@ void Condition::enterFalse(SILBuilder &B) {
   B.emitBlock(FalseBB);
 }
 
-void Condition::exitFalse(SILBuilder &B) {
+void Condition::exitFalse(SILBuilder &B, ArrayRef<Value> Args) {
   // If there's no continuation block, it's because the condition was
   // folded to false.  In that case, we just continue emitting code as
   // if we were still in the false case, and we're unreachable iff the
@@ -106,17 +106,17 @@ void Condition::exitFalse(SILBuilder &B) {
            "Zapping the branch should make ContBB dead");
   } else {
     // Otherwise, branch to the continuation block and start inserting there.
-    B.createBranch(SILLocation(), ContBB);
+    B.createBranch(SILLocation(), ContBB, Args);
   }
 }
 
-void Condition::complete(SILBuilder &B) {
+BasicBlock *Condition::complete(SILBuilder &B) {
   // If there is no continuation block, it's because we
   // constant-folded the branch.  The case-exit will have left us in a
   // normal insertion state (i.e. not a post-terminator IP) with
   // nothing to clean up after.
   if (!ContBB) {
-    return;
+    return B.getInsertionBB();
   }
   
   // Kill the continuation block if it's not being used.  Case-exits
@@ -125,11 +125,12 @@ void Condition::complete(SILBuilder &B) {
   if (ContBB->pred_empty()) {
     assert(B.hasValidInsertionPoint());
     ContBB->eraseFromParent();
-    return;
+    return B.getInsertionBB();
   }
   
   // Okay, we need to insert the continuation block.
   B.emitBlock(ContBB);
+  return ContBB;
 }
 
 
