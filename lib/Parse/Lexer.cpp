@@ -370,7 +370,6 @@ void Lexer::lexIdentifier() {
 
     // Statements
     .Case("if", tok::kw_if)
-    .Case("then", tok::kw_then)
     .Case("else", tok::kw_else)
     .Case("for", tok::kw_for)
     .Case("do", tok::kw_do)
@@ -1107,6 +1106,7 @@ Restart:
   case ',': return formToken(tok::comma,    TokStart);
   case ';': return formToken(tok::semi,     TokStart);
   case ':': return formToken(tok::colon,    TokStart);
+  case '?': return formToken(tok::question, TokStart);
       
   // Operator characters.
   case '/':

@@ -1962,7 +1962,10 @@ ill-formed if the type does not conform to the protocol.</p>
   </div>
 
   <pre class="grammar">
-    expr         ::= <a href="#expr-unary">expr-unary</a> <a href="#expr-binary">expr-binary</a>*
+    expr         ::= expr-sequence expr-ternary*
+
+    expr-sequence ::= <a href="#expr-unary">expr-unary</a> <a href="#expr-binary">expr-binary</a>*
+    expr-ternary ::= '?' expr-sequence ':' expr-sequence
     
     expr-primary ::= <a href="#expr-literal">expr-literal</a>
     expr-primary ::= <a href="#expr-identifier">expr-identifier</a>
@@ -1976,7 +1979,6 @@ ill-formed if the type does not conform to the protocol.</p>
     expr-postfix ::= expr-primary
     expr-postfix ::= expr-postfix <a href="#operator">operator-postfix</a>
     expr-postfix ::= <a href="#expr-new">expr-new</a>
-    expr-postfix ::= <a href="#expr-if">expr-if</a>
     expr-postfix ::= <a href="#expr-dot">expr-dot</a>
     expr-postfix ::= <a href="#expr-metatype">expr-metatype</a>
     expr-postfix ::= <a href="#expr-subscript">expr-subscript</a>
@@ -2514,39 +2516,41 @@ ill-formed if the type does not conform to the protocol.</p>
     <a href="#type-array">usual rules for array types</a>.</p>
 
   <!-- ===================================================================== -->
-  <h3 id="expr-if">If Expressions</h3>
+  <h3 id="expr-ternary">Ternary Expressions</h3>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    expr-if ::= 'if' <a href="#expr">expr</a> 'then' <a href="#expr">expr</a> 'else' <a href="#expr">expr</a>
-  </pre>
+    expr-ternary ::= <a href="#expr">expr-sequence</a> '?' <a href="#expr">expr-sequence</a> ':' <a href="#expr">expr-sequence</a>
+  </pre
 
-  <p>Similar to <a href="#stmt-if">'if' statements</a>, 'if' expressions provide
-  simple branching control flow within expressions. In an 'if' expression,
-  the condition subexpression is evaluated, and is converted to 'Bool' using
-  the result's 'getLogicValue' method if it is not natively 'Bool'. If the
-  condition is true, the 'then' subexpression is evaluated, and its result
-  becomes the result of the expression. If the condition is false, the
-  'else' subexpression is instead evaluated, and its result becomes the result
-  of the expression. Only one of the 'then' or 'else' subexpressions will be
-  evaluated. The results of the 'then' and 'else' subexpressions
-  must be implicitly convertible to a common type, which becomes the type of
-  the 'if' expression. Unlike an 'if' statement, an 'if' expression requires
-  an 'else' clause.
+  <p>Similar to <a href="#stmt-if">'if' statements</a>, the ternary operator
+  <tt>a ? b : c</tt> provides simple branching control flow within an expression.
+  The condition subexpression before the '?' is evaluated, and is converted
+  to 'Bool' using the result's 'getLogicValue' method if it is not already
+  'Bool'. If the condition is true, the subexpression to the right of '?' is
+  evaluated, and its result becomes the result of the expression. If the
+  condition is false, the subexpression to the right of ':' is evaluated, and
+  its result becomes the result of the expression. Only one of the
+  '?' or ':' subexpressions will be evaluated. The results of the
+  '?' and ':' subexpressions must be implicitly convertible to a common type,
+  which becomes the type of the ternary expression.
+  
+  <p>The ternary operator is
+  right-associative and has lower precedence than all binary operators. ('='
+  and ',' are not considered operators in Swift, but they syntactically have
+  lower precedence than the ternary.)
 
   <p>Some examples:
 
   <pre class="example">
     for i in 1..101 {
-      println(
-        if i % 15 == 0
-          then "fizzbuzz"
-        else if i % 3 == 0
-          then "fizz"
-        else if i % 5 == 0
-          then "buzz"
-        else
-          "\(i)")
+      println(i % 15
+        ? "fizzbuzz"
+        : i % 3 == 0
+        ? "fizz"
+        : i % 5 == 0
+        ? "buzz"
+        : "\(i)")
     }
   </pre>
 

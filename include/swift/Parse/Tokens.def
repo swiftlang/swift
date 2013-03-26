@@ -60,7 +60,6 @@ KEYWORD(subscript)
 // Statement keywords.
 KEYWORD(if)
 KEYWORD(do)
-KEYWORD(then)
 KEYWORD(else)
 KEYWORD(for)
 KEYWORD(while)
@@ -97,6 +96,8 @@ PUNCTUATOR(ellipsis,    "...")
 
 PUNCTUATOR(amp_prefix,  "&")
 PUNCTUATOR(arrow,       "->")
+
+PUNCTUATOR(question,    "?")
 
 #undef KEYWORD
 #undef IDENTIFIER_KEYWORD

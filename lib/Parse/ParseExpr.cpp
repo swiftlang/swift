@@ -25,13 +25,70 @@ using namespace swift;
 
 /// parseExpr
 ///   expr:
+///     expr-sequence expr-if*
+///
+NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
+  NullablePtr<Expr> first = parseExprSequence(Message);
+  if (first.isNull())
+    return nullptr;
+  
+  NullablePtr<IfExpr> ifExpr = nullptr;
+  
+  while (Tok.is(tok::question)) {
+    NullablePtr<IfExpr> nextIf = parseExprIf(first.get());
+    if (nextIf.isNull())
+      return nullptr;
+    
+    if (ifExpr.isNull())
+      ifExpr = nextIf;
+    else {
+      ifExpr.get()->setElseExpr(nextIf.get());
+    }
+    first = nextIf.get()->getElseExpr();
+  }
+  
+  return ifExpr.isNull() ? first.get() : ifExpr.get();
+}
+
+/// parseExprIf
+///
+///   expr-if:
+///     '?' expr-sequence ':' expr-sequence
+///
+NullablePtr<IfExpr> Parser::parseExprIf(Expr *condExpr) {
+  SourceLoc questionLoc = consumeToken(tok::question);
+  
+  NullablePtr<Expr> thenExpr
+    = parseExprSequence(diag::expected_expr_after_if_question);
+  if (thenExpr.isNull())
+    return nullptr;
+  
+  if (!Tok.is(tok::colon)) {
+    diagnose(Tok, diag::expected_colon_after_if_question);
+    return nullptr;
+  }
+  
+  SourceLoc colonLoc = consumeToken(tok::colon);
+  
+  NullablePtr<Expr> elseExpr
+    = parseExprSequence(diag::expected_expr_after_if_colon);
+  if (elseExpr.isNull())
+    return nullptr;
+  
+  return new (Context) IfExpr(condExpr, questionLoc,
+                              thenExpr.get(), colonLoc, elseExpr.get());
+}
+
+/// parseExprSequence
+///
+///   expr-sequence:
 ///     expr-unary expr-binary*
 ///   expr-binary:
 ///     operator-binary expr-unary
 ///
-/// The sequencing here is not structural, i.e. binary operators are
-/// not inherently right-associative.
-NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
+/// The sequencing for binary exprs is not structural, i.e., binary operators
+/// are not inherently right-associative.
+NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
   SmallVector<Expr*, 8> SequencedExprs;
 
   while (true) {
@@ -68,16 +125,11 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
 ///   expr-unary:
 ///     expr-postfix
 ///     expr-new
-///     expr-if
 ///     operator-prefix expr-unary
 NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
   // If the next token is the keyword 'new', this must be expr-new.
   if (Tok.is(tok::kw_new))
     return parseExprNew();
-  
-  // If the next token is the keyword 'if', this must be expr-if.
-  if (Tok.is(tok::kw_if))
-    return parseExprIf();
   
   // For recovery purposes, accept an oper_binary here.
   if (Tok.is(tok::oper_binary)) {
@@ -218,55 +270,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
   return NewArrayExpr::create(Context, newLoc, elementTy, bounds);
 }
 
-NullablePtr<Expr> Parser::parseExprIf() {
-  SourceLoc IfLoc;
-  Expr *Condition;
-  
-  if (parseIfConditionClause(IfLoc, Condition))
-    return nullptr;
-  
-  // We're in a context where an if statement is invalid.
-  if (Tok.is(tok::l_brace)) {
-    diagnose(Tok.getLoc(), diag::unexpected_if_statement);
-    // Parse and discard the if statement for recovery.
-    NullablePtr<Stmt> ifStmt = parseStmtIf(IfLoc, Condition);
-    if (ifStmt.isNull())
-      return nullptr;
-    else
-      return new (Context) ErrorExpr({ifStmt.get()->getStartLoc(),
-                                      ifStmt.get()->getEndLoc()});
-  }
-  
-  return parseExprIf(IfLoc, Condition);
-}
-
-NullablePtr<Expr> Parser::parseExprIf(SourceLoc IfLoc, Expr *CondExpr) {
-  if (Tok.isNot(tok::kw_then)) {
-    diagnose(Tok.getLoc(), diag::expected_then_after_if_expression);
-    return new (Context) ErrorExpr({IfLoc, CondExpr->getEndLoc()});
-  }
-  
-  SourceLoc ThenLoc = consumeToken(tok::kw_then);
-  
-  NullablePtr<Expr> ThenExpr = parseExpr(diag::expected_expr_then);
-  if (ThenExpr.isNull())
-    return nullptr;
-  
-  if (Tok.isNot(tok::kw_else)) {
-    diagnose(Tok.getLoc(), diag::expected_else_after_if_expression);
-    return new (Context) ErrorExpr({IfLoc, ThenExpr.get()->getEndLoc()});
-  }
-  
-  SourceLoc ElseLoc = consumeToken(tok::kw_else);
-  
-  NullablePtr<Expr> ElseExpr = parseExpr(diag::expected_expr_else);
-  if (ElseExpr.isNull())
-    return nullptr;
-  
-  return new (Context) IfExpr(IfLoc, CondExpr,
-                              ThenLoc, ThenExpr.get(),
-                              ElseLoc, ElseExpr.get());
-}
+#include "llvm/Support/raw_ostream.h"
 
 static VarDecl *getImplicitThisDeclForSuperContext(Parser &P,
                                                    DeclContext *dc,

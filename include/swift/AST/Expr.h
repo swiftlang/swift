@@ -2216,25 +2216,26 @@ public:
   }
 };
   
-/// \brief The conditional expression 'if x then y else z'.
+/// \brief The conditional expression 'x ? y : z'.
 class IfExpr : public Expr {
   Expr *CondExpr, *ThenExpr, *ElseExpr;
-  SourceLoc IfLoc, ThenLoc, ElseLoc;
+  SourceLoc QuestionLoc, ColonLoc;
 public:
-  IfExpr(SourceLoc IfLoc, Expr *CondExpr,
-         SourceLoc ThenLoc, Expr *ThenExpr,
-         SourceLoc ElseLoc, Expr *ElseExpr,
+  IfExpr(Expr *CondExpr,
+         SourceLoc QuestionLoc, Expr *ThenExpr,
+         SourceLoc ColonLoc, Expr *ElseExpr,
          Type Ty = Type())
     : Expr(ExprKind::If, Ty),
       CondExpr(CondExpr), ThenExpr(ThenExpr), ElseExpr(ElseExpr),
-      IfLoc(IfLoc), ThenLoc(ThenLoc), ElseLoc(ElseLoc)
+      QuestionLoc(QuestionLoc), ColonLoc(ColonLoc)
   {}
   
-  SourceLoc getLoc() const { return IfLoc; }
-  SourceRange getSourceRange() const { return {IfLoc, ElseExpr->getEndLoc()}; }
-  SourceLoc getIfLoc() const { return IfLoc; }
-  SourceLoc getThenLoc() const { return ThenLoc; }
-  SourceLoc getElseLoc() const { return ElseLoc; }
+  SourceLoc getLoc() const { return QuestionLoc; }
+  SourceRange getSourceRange() const {
+    return {CondExpr->getStartLoc(), ElseExpr->getEndLoc()};
+  }
+  SourceLoc getQuestionLoc() const { return QuestionLoc; }
+  SourceLoc getColonLoc() const { return ColonLoc; }
   
   Expr *getCondExpr() const { return CondExpr; }
   void setCondExpr(Expr *E) { CondExpr = E; }

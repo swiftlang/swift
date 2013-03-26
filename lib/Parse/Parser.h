@@ -347,11 +347,11 @@ public:
   // error, or an ErrorExpr on a semantic error.  If the method cannot fail, it
   // returns a raw Expr*.
   NullablePtr<Expr> parseExpr(Diag<> ID);
+  NullablePtr<IfExpr> parseExprIf(Expr *condExpr);
+  NullablePtr<Expr> parseExprSequence(Diag<> ID);
   NullablePtr<Expr> parseExprPostfix(Diag<> ID);
   NullablePtr<Expr> parseExprUnary(Diag<> ID);
   NullablePtr<Expr> parseExprNew();
-  NullablePtr<Expr> parseExprIf();
-  NullablePtr<Expr> parseExprIf(SourceLoc IfLoc, Expr *CondExpr);
   NullablePtr<Expr> parseExprSuper();
   Expr *parseExprStringLiteral();
   Expr *parseExprIdentifier();
@@ -394,16 +394,13 @@ public:
   // Statement Parsing
   // Each of these returns null (in a NullablePtr) on a parse error, or an
   // ErrorStmt on a semantic error.
-  static bool isStartOfStmtOtherThanAssignmentOrIf(const Token &Tok);
-  NullablePtr<Stmt> parseStmtOtherThanAssignmentOrIf();
+  static bool isStartOfStmtOtherThanAssignment(const Token &Tok);
+  NullablePtr<Stmt> parseStmtOtherThanAssignment();
   bool parseExprOrStmtAssign(ExprStmtOrDecl &Results);
-  bool parseExprOrStmtIf(ExprStmtOrDecl &Results);
   bool parseExprOrStmt(ExprStmtOrDecl &Results);
   NullablePtr<BraceStmt> parseStmtBrace(Diag<> ID);
   NullablePtr<Stmt> parseStmtReturn();
-  bool parseIfConditionClause(SourceLoc &IfLoc, Expr *&CondExpr);
   NullablePtr<Stmt> parseStmtIf();
-  NullablePtr<Stmt> parseStmtIf(SourceLoc IfLoc, Expr *CondExpr);
   NullablePtr<Stmt> parseStmtWhile();
   NullablePtr<Stmt> parseStmtDoWhile();
   NullablePtr<Stmt> parseStmtFor();
