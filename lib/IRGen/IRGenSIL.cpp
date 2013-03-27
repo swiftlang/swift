@@ -19,6 +19,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SourceMgr.h"
+#include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -60,6 +61,39 @@ IRGenSILFunction::~IRGenSILFunction() {
   DEBUG(CurFn->print(llvm::dbgs()));
 }
 
+static std::vector<llvm::PHINode*>
+emitPHINodesForBBArgs(IRGenSILFunction &IGF,
+                      swift::BasicBlock *silBB,
+                      llvm::BasicBlock *llBB) {
+  std::vector<llvm::PHINode*> phis;
+  unsigned predecessors = std::count_if(silBB->pred_begin(), silBB->pred_end(),
+                                        [](...){ return true; });
+  
+  IGF.Builder.SetInsertPoint(llBB);
+  for (BBArgument *arg : make_range(silBB->bbarg_begin(), silBB->bbarg_end())) {
+    size_t first = phis.size();
+    
+    const TypeInfo &ti = IGF.getFragileTypeInfo(arg->getType().getSwiftType());
+    ExplosionSchema schema = ti.getSchema(IGF.CurExplosionLevel);
+    for (auto &elt : schema) {
+      if (elt.isScalar())
+        phis.push_back(
+                   IGF.Builder.CreatePHI(elt.getScalarType(), predecessors));
+      else
+        phis.push_back(
+                   IGF.Builder.CreatePHI(elt.getAggregateType()->getPointerTo(),
+                   predecessors));
+    }
+    
+    Explosion argValue(IGF.CurExplosionLevel);
+    for (llvm::PHINode *phi : make_range(phis.begin()+first, phis.end()))
+      argValue.addUnmanaged(phi);
+    IGF.newLoweredExplosion(Value(arg,0), argValue);
+  }
+  
+  return phis;
+}
+
 void IRGenSILFunction::emitSILFunction(SILConstant c,
                                        swift::Function *f) {
   DEBUG(llvm::dbgs() << "emitting SIL function: ";
@@ -72,15 +106,16 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
   CurConstant = c;
   CurSILFn = f;
 
-  // Map the entry bbs.
-  loweredBBs[f->begin()] = LoweredBB(CurFn->begin());
+  // Map the entry bb.
+  loweredBBs[f->begin()] = LoweredBB(CurFn->begin(), {});
   // Create LLVM basic blocks for the other bbs.
   for (swift::BasicBlock *bb = f->begin()->getNextNode();
        bb != f->end(); bb = bb->getNextNode()) {
     // FIXME: Use the SIL basic block's name.
     llvm::BasicBlock *llBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+    std::vector<llvm::PHINode*> phis = emitPHINodesForBBArgs(*this, bb, llBB);
     CurFn->getBasicBlockList().push_back(llBB);
-    loweredBBs[bb] = LoweredBB(llBB);
+    loweredBBs[bb] = LoweredBB(llBB, std::move(phis));
   }
 
   auto entry = loweredBBs.begin();
@@ -522,9 +557,23 @@ void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
   emitScalarReturn(result);
 }
 
+// Add branch arguments to destination phi nodes.
+static void addIncomingBBArgumentsToPHINodes(IRGenSILFunction &IGF,
+                                             LoweredBB &lbb,
+                                             OperandValueArrayRef args) {
+  llvm::BasicBlock *curBB = IGF.Builder.GetInsertBlock();
+  ArrayRef<llvm::PHINode*> phis = lbb.phis;
+  size_t phiIndex = 0;
+  for (Value arg : args) {
+    Explosion argValue = IGF.getLoweredExplosion(arg);
+    while (!argValue.empty())
+      phis[phiIndex++]->addIncoming(argValue.claimUnmanagedNext(), curBB);
+  }
+}
+
 void IRGenSILFunction::visitBranchInst(swift::BranchInst *i) {
   LoweredBB &lbb = getLoweredBB(i->getDestBB());
-  // FIXME: Add branch arguments to the destination phi node.
+  addIncomingBBArgumentsToPHINodes(*this, lbb, i->getArgs());
   Builder.CreateBr(lbb.bb);
 }
 
@@ -534,7 +583,8 @@ void IRGenSILFunction::visitCondBranchInst(swift::CondBranchInst *i) {
   llvm::Value *condValue =
     getLoweredExplosion(i->getCondition()).claimUnmanagedNext();
 
-  // FIXME: Add branch arguments to the destination phi nodes.
+  addIncomingBBArgumentsToPHINodes(*this, trueBB, i->getTrueArgs());
+  addIncomingBBArgumentsToPHINodes(*this, falseBB, i->getFalseArgs());
   
   Builder.CreateCondBr(condValue, trueBB.bb, falseBB.bb);
 }

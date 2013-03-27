@@ -14,6 +14,8 @@
 #define SWIFT_SIL_SILSuccessor_H
 
 #include <cassert>
+#include <cstddef>
+#include <iterator>
 
 namespace swift {
 class BasicBlock;
@@ -65,6 +67,12 @@ public:
 class SILSuccessorIterator {
   SILSuccessor *Cur;
 public:
+  using difference_type = std::ptrdiff_t;
+  using value_type = BasicBlock *;
+  using pointer = BasicBlock **;
+  using reference = BasicBlock *&;
+  using iterator_category = std::forward_iterator_tag;
+  
   SILSuccessorIterator(SILSuccessor *Cur = 0) : Cur(Cur) {}
   
   bool operator==(SILSuccessorIterator I2) const { return Cur == I2.Cur; }

@@ -37,6 +37,11 @@ namespace swift {
     T end() { return End; }
     bool empty() const { return Begin == End; }
   };
+  
+  template<typename T>
+  inline Range<T> make_range(const T &begin, const T &end) {
+    return {begin, end};
+  }
 }
 
 #endif

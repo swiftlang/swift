@@ -132,9 +132,13 @@ public:
 /// of SIL branch arguments so that they can be lowered to LLVM phi nodes.
 struct LoweredBB {
   llvm::BasicBlock *bb;
+  std::vector<llvm::PHINode*> phis;
   
   LoweredBB() = default;
-  explicit LoweredBB(llvm::BasicBlock *bb) : bb(bb) {}
+  explicit LoweredBB(llvm::BasicBlock *bb,
+                     std::vector<llvm::PHINode*> &&phis)
+    : bb(bb), phis(std::move(phis))
+  {}
 };
 
 /// Visits a SIL Function and generates LLVM IR.
