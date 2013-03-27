@@ -296,6 +296,8 @@
 
     // Expressions
     keyword ::= 'new'
+    keyword ::= 'as'
+    keyword ::= 'is'
 
     // Identifier-Like Keywords
     keyword ::= 'metatype'
@@ -1962,10 +1964,10 @@ ill-formed if the type does not conform to the protocol.</p>
   </div>
 
   <pre class="grammar">
-    expr         ::= expr-sequence expr-ternary*
+    expr         ::= expr-sequence <a href="#expr-ternary">expr-ternary</a>*
+    expr         ::= expr-sequence <a href="#expr-cast">expr-cast</a>
 
     expr-sequence ::= <a href="#expr-unary">expr-unary</a> <a href="#expr-binary">expr-binary</a>*
-    expr-ternary ::= '?' expr-sequence ':' expr-sequence
     
     expr-primary ::= <a href="#expr-literal">expr-literal</a>
     expr-primary ::= <a href="#expr-identifier">expr-identifier</a>
@@ -1999,6 +2001,74 @@ ill-formed if the type does not conform to the protocol.</p>
     (foo)(())
     bar(49+1)
     baz()
+  </pre>
+
+  <p>A unary or binary expression may optionally be followed by one or more
+    <a href="#expr-ternary">ternary operator</a> expressions or by a
+    <a href="#expr-cast">cast expression</a>.
+
+  <!-- ===================================================================== -->
+  <h3 id="expr-cast">Cast Operators</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    expr-cast ::= 'is' <a href="#type">type</a>
+    expr-cast ::= 'as' <a href="#type">type</a>
+    expr-cast ::= 'as' '!' <a href="#type">type</a>
+  </pre>
+
+  Cast expressions influence the types of their subexpressions.
+
+  <ul>
+  <li><tt>x as T</tt> will coerce the expression <tt>x</tt> to the type T.
+    <tt>x</tt> must be implicitly convertible to <tt>T</tt>; in other words,
+    <tt>var foo:T = x</tt> must be valid. <tt>as</tt> may be used to provide
+    type annotations for literals with insufficient contextual type information,
+    or to force implicit conversions. Some examples:
+
+  <pre class="example">
+    7 as Double // The literal 7 coerced to a Double
+    { $0 + $1 } as (Int, Int) -&gt; Int // A function coerced to a function type
+
+    class B { }
+    class D : B { }
+    new D as B  // A derived class instance coerced to a base class.
+  </pre>
+
+    A cast that can fail, such as from a base class to a derived class, cannot
+    be expressed with <tt>as</tt>.
+
+  <li><tt>x as! T</tt> will try to cast the value of the expression
+    <tt>x</tt> to a subtype of its compile-time type. The type of the value is
+    checked at runtime, and if the cast cannot succeed, the program terminates.
+    <tt>T</tt> must be a subtype of the compile-time type of <tt>x</tt>.
+    An example:
+
+  <pre class="example">
+    var b:B = new D
+    var d = b as! D
+  </pre>
+
+  <li><tt>x is T</tt> will query the type of the value of <tt>x</tt> at runtime.
+    <tt>T</tt> must be a subtype of the compile-time type of <tt>x</tt>.
+    If the runtime value of <tt>x</tt> is <tt>T</tt>, the <tt>is</tt> expression
+    evaluates to true; otherwise, it evaluates to false.
+
+  <pre class="example">
+    if b is D {
+      var d = b as! D
+    }
+  </pre>
+  </ul>
+
+  <p><tt>as</tt>, <tt>as!</tt>, and <tt>is</tt> all have lower precedence than
+  all binary operators. They must be parenthesized if used in larger expressions,
+  including within nested cast expressions or ternary operator expressions.
+
+  <pre class="example">
+    (b as! D).derivedMethod()
+    ((D as B) as! D2)
+    (b is D) ? (b as! D) : new D
   </pre>
   
   <!-- ===================================================================== -->
