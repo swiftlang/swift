@@ -7,7 +7,7 @@ add_swift_executable(swift
   DEPENDS swiftIRGen swiftParse swiftSema swiftClangImporter swiftAST swiftSIL
           swiftSILGen
   COMPONENT_DEPENDS bitreader bitwriter codegen ipo jit linker mcjit asmparser
-                                        selectiondag ${LLVM_TARGETS_TO_BUILD})
+                    irreader selectiondag ${LLVM_TARGETS_TO_BUILD})
 
 find_library(CORE_FOUNDATION NAMES CoreFoundation)
 
