@@ -378,10 +378,8 @@ void ClangImporter::lookupValue(Module *module,
   
   // See if there's a preprocessor macro we can import by this name.
   clang::IdentifierInfo *clangID = clangName.getAsIdentifierInfo();
-  if (clangID) {
-    clang::MacroDirective *clangMacroDir = pp.getMacroDirective(clangID);
-    if (clangMacroDir && clangMacroDir->isDefined()) {
-      clang::MacroInfo *clangMacro = clangMacroDir->getInfo();
+  if (clangID && clangID->hasMacroDefinition()) {
+    if (auto clangMacro = pp.getMacroInfo(clangID)) {
       // Look for the value for an already-imported macro.
       auto known = Impl.ImportedMacros.find(clangMacro);
       if (known != Impl.ImportedMacros.end()) {
