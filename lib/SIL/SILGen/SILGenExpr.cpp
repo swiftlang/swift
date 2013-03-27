@@ -93,10 +93,16 @@ static void initializeWithResult(SILGenFunction &gen,
     return;
       
   case Initialization::Kind::SingleBuffer:
-    if (result.getType().isAddressOnly())
-      result.forwardInto(gen, loc, I->getAddress(), /*isInitialize=*/true);
-    else
-      gen.emitStore(loc, result, I->getAddress());
+    // If we didn't evaluate into the initialization buffer, do so now.
+    if (result.getValue() != I->getAddress()) {
+      if (result.getType().isAddressOnly())
+        result.forwardInto(gen, loc, I->getAddress(), /*isInitialize=*/true);
+      else
+        gen.emitStore(loc, result, I->getAddress());
+    } else {
+      // If we did evaluate into the initialization buffer, forward the cleanup.
+      result.forwardCleanup(gen);
+    }
 
     I->finishInitialization(gen);
     return;
@@ -128,8 +134,9 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
   // FIXME: actually emit into the initialization. The initialization should
   // be passed down in the context argument to visit, and it should be the
   // visit*Expr method's responsibility to store to it if possible.
-  ManagedValue result = visit(E);
-  initializeWithResult(*this, E, I, result);
+  ManagedValue result = visit(E, SGFContext(I));
+  if (result)
+    initializeWithResult(*this, E, I, result);
 }
 
 ManagedValue SILGenFunction::visit(swift::Expr *E) {
@@ -266,8 +273,8 @@ ManagedValue SILGenFunction::visitLoadExpr(LoadExpr *E, SGFContext C) {
   assert(SubV.isLValue() && "subexpr did not produce an lvalue");
   TypeLoweringInfo const &ti = getTypeLoweringInfo(E->getType());
   if (ti.isAddressOnly()) {
-    // Create a temporary copy of the address-only value.
-    Value copy = emitTemporaryAllocation(E, ti.getLoweredType());
+    // Copy the address-only value.
+    Value copy = getBufferForExprResult(E, ti.getLoweredType(), C);
     B.createCopyAddr(E, SubV.getUnmanagedValue(), copy,
                      /*isTake*/ false,
                      /*isInitialize*/ true);
@@ -286,6 +293,36 @@ Value SILGenFunction::emitTemporaryAllocation(SILLocation loc,
   return tmpMem;
 }
 
+Value SILGenFunction::getBufferForExprResult(
+                                    SILLocation loc, SILType ty, SGFContext C) {
+  // If we have a single-buffer "emit into" initialization, use that for the
+  // result.
+  if (Initialization *I = C.getEmitInto()) {
+    switch (I->kind) {
+    case Initialization::Kind::AddressBinding:
+      llvm_unreachable("can't emit into address binding");
+
+    case Initialization::Kind::Ignored:
+      break;
+      
+    case Initialization::Kind::Tuple:
+      // FIXME: For a single-element tuple, we could emit into the single field.
+      
+      // The tuple initialization isn't contiguous, so we can't emit directly
+      // into it.
+      break;
+
+    case Initialization::Kind::SingleBuffer:
+      // Emit into the buffer.
+      return I->getAddress();
+    }
+  }
+  
+  // If we couldn't emit into an Initialization, emit into a temporary
+  // allocation.
+  return emitTemporaryAllocation(loc, ty);
+}
+
 Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
   assert(!v.isLValue() && "materializing an lvalue?!");
   // Address-only values are already materialized.
@@ -296,6 +333,8 @@ Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
   assert(!v.getType().isAddress() &&
          "can't materialize a reference");
   
+  // We don't use getBufferForExprResult here because the result of a
+  // MaterializeExpr is *not* the value, but an lvalue reference to the value.
   Value tmpMem = emitTemporaryAllocation(loc, v.getType());
   emitStore(loc, v, tmpMem);
   
@@ -386,38 +425,57 @@ ManagedValue SILGenFunction::visitFunctionConversionExpr(
   return ManagedValue(converted, original.getCleanup());
 }
 
-ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
-  ManagedValue concrete = visit(E->getSubExpr());
-  // Allocate the existential.
-  Value existential = emitTemporaryAllocation(E, getLoweredType(E->getType()));
+namespace {
+  /// An Initialization representing the concrete value buffer inside an
+  /// existential container.
+  class ExistentialValueInitialization : public SingleInitializationBase {
+    Value valueAddr;
+  public:
+    ExistentialValueInitialization(Value valueAddr)
+      : SingleInitializationBase(valueAddr.getType().getSwiftRValueType()),
+        valueAddr(valueAddr)
+    {}
+    
+    Value getAddressOrNull() override {
+      return valueAddr;
+    }
+    
+    void finishInitialization(SILGenFunction &gen) {
+      // FIXME: Disable the DeinitExistential cleanup and enable the
+      // DestroyAddr cleanup for the existential container.
+    }
+  };
+}
 
-  if (concrete.getType().isExistentialType()) {
+ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
+  // FIXME: Need to stage cleanups here. If code fails between
+  // InitExistential and initializing the value, clean up using
+  // DeinitExistential.
+  
+  // Allocate the existential.
+  Value existential = getBufferForExprResult(E, getLoweredType(E->getType()), C);
+  
+  if (E->getSubExpr()->getType()->isExistentialType()) {
     // If the source value is already of a protocol type, we can use
     // upcast_existential to steal its already-initialized witness tables and
     // concrete value.
+    ManagedValue subExistential = visit(E->getSubExpr());
 
-    B.createUpcastExistential(E, concrete.getValue(), existential,
-                              /*isTake=*/concrete.hasCleanup(),
+    B.createUpcastExistential(E, subExistential.getValue(), existential,
+                              /*isTake=*/subExistential.hasCleanup(),
                               E->getConformances());
   } else {
     // Otherwise, we need to initialize a new existential container from
     // scratch.
     
-    // FIXME: Need to stage cleanups better here. If code fails between
-    // InitExistential and initializing the value, clean up using
-    // DeinitExistential.
-    
     // Allocate the concrete value inside the container.
     Value valueAddr = B.createInitExistential(E, existential,
-                                              concrete.getType(),
-                                              E->getConformances());
-    // Initialize the concrete value.
-    if (concrete.getType().isAddressOnly()) {
-      concrete.forwardInto(*this, E, valueAddr,
-                           /*isInitialize=*/true);
-    } else {
-      emitStore(E, concrete, valueAddr);
-    }
+                                      getLoweredType(E->getSubExpr()->getType()),
+                                      E->getConformances());
+    // Initialize the concrete value in-place.
+    InitializationPtr init(new ExistentialValueInitialization(valueAddr));
+    emitExprInto(E->getSubExpr(), init.get());    
+    init->finishInitialization(*this);
   }
   
   return emitManagedRValueWithCleanup(existential);
@@ -447,7 +505,7 @@ ManagedValue SILGenFunction::visitSuperToArchetypeExpr(SuperToArchetypeExpr *E,
   visit(E->getLHS());
   ManagedValue base = visit(E->getRHS());
   // Allocate an archetype to hold the downcast value.
-  Value archetype = emitTemporaryAllocation(E, getLoweredType(E->getType()));
+  Value archetype = getBufferForExprResult(E, getLoweredType(E->getType()), C);
   // Initialize it with a SuperToArchetypeInst.
   B.createSuperToArchetype(E, base.forward(*this), archetype);
   
@@ -739,9 +797,9 @@ ManagedValue SILGenFunction::visitArchetypeMemberRefExpr(
   assert((archetype.getType().isAddress() ||
           archetype.getType().is<MetaTypeType>()) &&
          "archetype must be an address or metatype");
-  Value method = emitArchetypeMethod(E, archetype);
   // FIXME: curried archetype
-  return emitApply(E, method, archetype);
+  // FIXME: archetype properties
+  llvm_unreachable("unapplied archetype method not implemented");
 }
 
 Value SILGenFunction::emitProtocolMethod(ExistentialMemberRefExpr *e,
@@ -766,10 +824,11 @@ ManagedValue SILGenFunction::visitExistentialMemberRefExpr(
   Value existential = visit(E->getBase()).getUnmanagedValue();
   assert(existential.getType().isAddress() &&
          "existential must be an address");
-  Value projection = B.createProjectExistential(E, existential);
-  Value method = emitProtocolMethod(E, existential);
+  //Value projection = B.createProjectExistential(E, existential);
+  //Value method = emitProtocolMethod(E, existential);
   // FIXME: curried existential
-  return emitApply(E, method, projection);
+  // FIXME: existential properties
+  llvm_unreachable("unapplied protocol method not implemented");
 }
 
 ManagedValue SILGenFunction::visitDotSyntaxBaseIgnoredExpr(

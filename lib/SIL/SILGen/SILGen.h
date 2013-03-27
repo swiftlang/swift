@@ -396,6 +396,11 @@ public:
   /// end of the current scope. Returns the address of the allocation.
   Value emitTemporaryAllocation(SILLocation loc, SILType ty);
   
+  /// Prepares a buffer to receive the result of an expression, either using the
+  /// 'emit into' initialization buffer if available, or allocating a temporary
+  /// allocation if not.
+  Value getBufferForExprResult(SILLocation loc, SILType ty, SGFContext C);
+  
   /// Emits a reassignment to a physical address.
   void emitAssignPhysicalAddress(SILLocation loc,
                                  ManagedValue src,

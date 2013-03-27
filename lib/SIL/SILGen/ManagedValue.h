@@ -123,6 +123,10 @@ public:
     }
     gen.B.createCopyAddr(loc, getValue(), address, canTake, isInitialize);
   }
+  
+  explicit operator bool() const {
+    return bool(getValue());
+  }
 };
 
 } // end namespace Lowering
