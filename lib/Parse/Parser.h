@@ -348,6 +348,8 @@ public:
   // returns a raw Expr*.
   NullablePtr<Expr> parseExpr(Diag<> ID);
   NullablePtr<IfExpr> parseExprIf(Expr *condExpr);
+  NullablePtr<Expr> parseExprIs(Expr *sub);
+  NullablePtr<Expr> parseExprAs(Expr *sub);
   NullablePtr<Expr> parseExprSequence(Diag<> ID);
   NullablePtr<Expr> parseExprPostfix(Diag<> ID);
   NullablePtr<Expr> parseExprUnary(Diag<> ID);

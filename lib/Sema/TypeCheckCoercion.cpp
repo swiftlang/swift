@@ -535,14 +535,23 @@ public:
     llvm_unreachable("This node doesn't exist for unresolved types");
   }
 
-  CoercedResult visitDowncastExpr(DowncastExpr *E) {
+  CoercedResult visitUncheckedDowncastExpr(UncheckedDowncastExpr *E) {
     llvm_unreachable("This node doesn't exist for unresolved types");
   }
 
-  CoercedResult visitSuperToArchetypeExpr(SuperToArchetypeExpr *E) {
+  CoercedResult visitUncheckedSuperToArchetypeExpr(
+                                             UncheckedSuperToArchetypeExpr *E) {
     llvm_unreachable("This node doesn't exist for unresolved types");
   }
 
+  CoercedResult visitIsSubtypeExpr(IsSubtypeExpr *E) {
+    llvm_unreachable("This node doesn't exist for unresolved types");
+  }
+
+  CoercedResult visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E) {
+    llvm_unreachable("This node doesn't exist for unresolved types");
+  }
+  
   CoercedResult visitImplicitConversionExpr(ImplicitConversionExpr *E) {
     llvm_unreachable("This node doesn't exist for unresolved types");
   }

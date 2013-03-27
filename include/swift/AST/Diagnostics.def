@@ -581,6 +581,12 @@ ERROR(expected_colon_after_if_question,expr_parsing,none,
 ERROR(expected_expr_after_if_colon,expr_parsing,none,
       "expected expression after '? ... :' in ternary expression", ())
 
+// Cast expressions
+ERROR(expected_type_after_is,expr_parsing,none,
+      "expected type after 'is'", ())
+ERROR(expected_type_after_as,expr_parsing,none,
+      "expected type after 'as'", ())
+
 // Generic disambiguation
 NOTE(while_parsing_as_left_angle_bracket,expr_parsing,none,
      "while parsing this '<' as a type parameter bracket", ())

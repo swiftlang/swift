@@ -343,38 +343,42 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   }
 
   Expr *visitCoerceExpr(CoerceExpr *E) {
-    Expr *LHS = doIt(E->getLHS());
-    if (!LHS) return nullptr;
-    E->setLHS(LHS);
-    
-    Expr *RHS = doIt(E->getRHS());
-    if (!RHS) return nullptr;
-    E->setRHS(RHS);
+    Expr *Sub = doIt(E->getSubExpr());
+    if (!Sub) return nullptr;
+    E->setSubExpr(Sub);
     
     return E;
   }
 
-  Expr *visitDowncastExpr(DowncastExpr *E) {
-    Expr *LHS = doIt(E->getLHS());
-    if (!LHS) return nullptr;
-    E->setLHS(LHS);
-
-    Expr *RHS = doIt(E->getRHS());
-    if (!RHS) return nullptr;
-    E->setRHS(RHS);
-
+  Expr *visitUncheckedDowncastExpr(UncheckedDowncastExpr *E) {
+    Expr *Sub = doIt(E->getSubExpr());
+    if (!Sub) return nullptr;
+    E->setSubExpr(Sub);
+    
     return E;
   }
 
-  Expr *visitSuperToArchetypeExpr(SuperToArchetypeExpr *E) {
-    Expr *LHS = doIt(E->getLHS());
-    if (!LHS) return nullptr;
-    E->setLHS(LHS);
-
-    Expr *RHS = doIt(E->getRHS());
-    if (!RHS) return nullptr;
-    E->setRHS(RHS);
-
+  Expr *visitUncheckedSuperToArchetypeExpr(UncheckedSuperToArchetypeExpr *E) {
+    Expr *Sub = doIt(E->getSubExpr());
+    if (!Sub) return nullptr;
+    E->setSubExpr(Sub);
+    
+    return E;
+  }
+  
+  Expr *visitIsSubtypeExpr(IsSubtypeExpr *E) {
+    Expr *Sub = doIt(E->getSubExpr());
+    if (!Sub) return nullptr;
+    E->setSubExpr(Sub);
+    
+    return E;
+  }
+  
+  Expr *visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E) {
+    Expr *Sub = doIt(E->getSubExpr());
+    if (!Sub) return nullptr;
+    E->setSubExpr(Sub);
+    
     return E;
   }
   

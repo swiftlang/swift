@@ -26,11 +26,20 @@ using namespace swift;
 /// parseExpr
 ///   expr:
 ///     expr-sequence expr-if*
+///     expr-sequence expr-is
+///     expr-sequence expr-as
 ///
 NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
   NullablePtr<Expr> first = parseExprSequence(Message);
   if (first.isNull())
     return nullptr;
+  
+  if (Tok.is(tok::kw_is)) {
+    return parseExprIs(first.get());
+  }
+  if (Tok.is(tok::kw_as)) {
+    return parseExprAs(first.get());
+  }
   
   NullablePtr<IfExpr> ifExpr = nullptr;
   
@@ -48,6 +57,40 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
   }
   
   return ifExpr.isNull() ? first.get() : ifExpr.get();
+}
+
+/// parseExprIs
+///   expr-is:
+///     'is' type
+NullablePtr<Expr> Parser::parseExprIs(Expr *sub) {
+  SourceLoc isLoc = consumeToken(tok::kw_is);
+  
+  TypeLoc type;
+  if (parseType(type, diag::expected_type_after_is))
+    return nullptr;
+  
+  return new (Context) IsSubtypeExpr(sub, isLoc, type);
+}
+
+/// parseExprAs
+///   expr-as:
+///     'as' type
+///     'as' '!' type
+NullablePtr<Expr> Parser::parseExprAs(Expr *sub) {
+  SourceLoc asLoc = consumeToken(tok::kw_as);
+  SourceLoc bangLoc;
+  
+  if (Tok.isContextualPunctuator("!")) {
+    bangLoc = consumeToken();
+  }
+  
+  TypeLoc type;
+  if (parseType(type, diag::expected_type_after_as))
+    return nullptr;
+  
+  return bangLoc.isValid()
+    ? (Expr*) new (Context) UncheckedDowncastExpr(sub, asLoc, bangLoc, type)
+    : (Expr*) new (Context) CoerceExpr(sub, asLoc, type);
 }
 
 /// parseExprIf

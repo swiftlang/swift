@@ -482,34 +482,41 @@ ManagedValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
 }
 
 ManagedValue SILGenFunction::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
-  // FIXME: do something with lhs value?
-  visit(E->getLHS());
-  
-  ManagedValue coerced = visit(E->getRHS(), C);
+  ManagedValue coerced = visit(E->getSubExpr(), C);
   
   return ManagedValue(B.createCoerce(E, coerced.getValue(), coerced.getType()),
                       coerced.getCleanup());
 }
 
-ManagedValue SILGenFunction::visitDowncastExpr(DowncastExpr *E, SGFContext C) {
-  // FIXME: do something with lhs value?
-  visit(E->getLHS());
-  ManagedValue original = visit(E->getRHS());
+ManagedValue SILGenFunction::visitUncheckedDowncastExpr(UncheckedDowncastExpr *E,
+                                                        SGFContext C) {
+  ManagedValue original = visit(E->getSubExpr());
   Value converted = B.createDowncast(E, original.getValue(),
                                      getLoweredLoadableType(E->getType()));
   return ManagedValue(converted, original.getCleanup());
 }
 
-ManagedValue SILGenFunction::visitSuperToArchetypeExpr(SuperToArchetypeExpr *E,
-                                                       SGFContext C) {
-  visit(E->getLHS());
-  ManagedValue base = visit(E->getRHS());
+ManagedValue SILGenFunction::visitUncheckedSuperToArchetypeExpr(
+                                              UncheckedSuperToArchetypeExpr *E,
+                                              SGFContext C) {
+  ManagedValue base = visit(E->getSubExpr());
   // Allocate an archetype to hold the downcast value.
   Value archetype = getBufferForExprResult(E, getLoweredType(E->getType()), C);
   // Initialize it with a SuperToArchetypeInst.
   B.createSuperToArchetype(E, base.forward(*this), archetype);
   
   return emitManagedRValueWithCleanup(archetype);
+}
+
+ManagedValue SILGenFunction::visitIsSubtypeExpr(IsSubtypeExpr *E, SGFContext C)
+{
+  llvm_unreachable("not implemented");
+}
+
+ManagedValue SILGenFunction::visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E,
+                                                       SGFContext C)
+{
+  llvm_unreachable("not implemented");
 }
 
 ManagedValue SILGenFunction::visitParenExpr(ParenExpr *E, SGFContext C) {

@@ -230,7 +230,9 @@ SourceRange TupleExpr::getSourceRange() const {
     assert(RParenLoc.isValid() && "Mismatched parens?");
     return SourceRange(LParenLoc, RParenLoc);
   }
-  assert(!getElements().empty() && "Empty tuple missing paren locations!");
+  if (getElements().empty())
+    return SourceRange();
+  
   SourceLoc Start = getElement(0)->getStartLoc();
   SourceLoc End = getElement(getElements().size()-1)->getEndLoc();
   return SourceRange(Start, End);
@@ -416,12 +418,6 @@ void ExplicitClosureExpr::GenerateVarDecls(unsigned NumDecls,
     VarDecl *var = new (Context) VarDecl(VarLoc, ident, Type(), this);
     Decls.push_back(var);
   }
-}
-
-ExplicitCastExpr::ExplicitCastExpr(ExprKind kind, Expr *lhs, Expr *rhs)
-  : Expr(kind, lhs->getType()->castTo<MetaTypeType>()->getInstanceType()),
-    LHS(lhs), RHS(rhs)
-{
 }
 
 /// getImplicitThisDecl - If this FuncExpr is a non-static method in an
@@ -869,24 +865,24 @@ public:
     OS << ')';
   }
   void visitCoerceExpr(CoerceExpr *E) {
-    printCommon(E, "coerce_expr") << '\n';
-    printRec(E->getLHS());
+    printCommon(E, "coerce_expr") << ' ';
+    E->getTypeLoc().getType()->print(OS);
     OS << '\n';
-    printRec(E->getRHS());
+    printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitDowncastExpr(DowncastExpr *E) {
-    printCommon(E, "downcast_expr") << '\n';
-    printRec(E->getLHS());
+  void visitUncheckedDowncastExpr(UncheckedDowncastExpr *E) {
+    printCommon(E, "unchecked_downcast_expr") << ' ';
+    E->getTypeLoc().getType()->print(OS);
     OS << '\n';
-    printRec(E->getRHS());
+    printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitSuperToArchetypeExpr(SuperToArchetypeExpr *E) {
-    printCommon(E, "super_to_archetype_expr") << '\n';
-    printRec(E->getLHS());
+  void visitUncheckedSuperToArchetypeExpr(UncheckedSuperToArchetypeExpr *E) {
+    printCommon(E, "unchecked_super_to_archetype_expr") << ' ';
+    E->getTypeLoc().getType()->print(OS);
     OS << '\n';
-    printRec(E->getRHS());
+    printRec(E->getSubExpr());
     OS << ')';
   }
   void visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E) {
@@ -901,6 +897,20 @@ public:
     printRec(E->getThenExpr());
     OS << '\n';
     printRec(E->getElseExpr());
+    OS << ')';
+  }
+  void visitIsSubtypeExpr(IsSubtypeExpr *E) {
+    printCommon(E, "is_subtype_expr") << ' ';
+    E->getTypeLoc().getType()->print(OS);
+    OS << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
+  void visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E) {
+    printCommon(E, "super_is_archetype_expr") << ' ';
+    E->getTypeLoc().getType()->print(OS);
+    OS << '\n';
+    printRec(E->getSubExpr());
     OS << ')';
   }
 };

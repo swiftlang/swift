@@ -633,6 +633,8 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // TypeAlias to see what we're dealing with.  If the typealias was erroneous
     // then silently squish this erroneous subexpression.
     Type Ty = MT->getInstanceType();
+    TypeLoc fakeTyLoc = TypeLoc(Ty, E2->getEndLoc());
+
     E->setType(Ty);
     if (Ty->is<ErrorType>())
       return 0;  // Squelch an erroneous subexpression.
@@ -658,6 +660,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
           assert(srcTy->getClassOrBoundGenericClass());
         }
 
+        // FIXME: Downcasts should be made illegal as construction expressions.
         for (auto superTy = getSuperClassOf(Ty); superTy;
              superTy = getSuperClassOf(superTy)) {
           if (superTy->isEqual(srcTy)) {
@@ -675,22 +678,32 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
                                    E2,
                                    srcArchetype->getSuperclass());
             }
-
+            
             // If the destination type is an archetype, this is a
             // super-to-archetype cast.
             if (Ty->is<ArchetypeType>()) {
-              return new (Context) SuperToArchetypeExpr(E1, E2);
+              return new (Context) UncheckedSuperToArchetypeExpr(E2,
+                                                                 E2->getEndLoc(),
+                                                                 E2->getEndLoc(),
+                                                                 fakeTyLoc);
             }
 
-            return new (Context) DowncastExpr(E1, E2);
+            return new (Context) UncheckedDowncastExpr(E2,
+                                                       E->getEndLoc(),
+                                                       E->getEndLoc(),
+                                                       fakeTyLoc);
           }
         }
       }
 
+      // FIXME: Coercions should be made illegal as construction expressions.
       CoercedExpr CoercedArg = coerceToType(E2, Ty);
       switch (CoercedArg.getKind()) {
-      case CoercionResult::Succeeded:
-        return new (Context) CoerceExpr(E1, CoercedArg);
+      case CoercionResult::Succeeded: {
+        return new (Context) CoerceExpr(CoercedArg,
+                                        E->getLoc(),
+                                        fakeTyLoc);
+      }
 
       case CoercionResult::Failed:
         // We cannot perform this cast.
@@ -1246,18 +1259,30 @@ public:
     return E;
   }
 
-  Expr *visitDowncastExpr(DowncastExpr *E) {
-    // The type of the expr is always the type that the MetaType LHS specifies.
+  Expr *visitUncheckedDowncastExpr(UncheckedDowncastExpr *E) {
+    // The type of the expr is always the type specified.
     assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
     return E;
   }
 
-  Expr *visitSuperToArchetypeExpr(SuperToArchetypeExpr *E) {
-    // The type of the expr is always the type that the MetaType LHS specifies.
+  Expr *visitUncheckedSuperToArchetypeExpr(UncheckedSuperToArchetypeExpr *E) {
+    // The type of the expr is always the type specified.
     assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
     return E;
   }
+    
+  Expr *visitIsSubtypeExpr(IsSubtypeExpr *E) {
+    // The type of the expr is always Bool.
+    assert(!E->getType()->isUnresolvedType() &&"Type always Bool");
+    return E;
+  }
 
+  Expr *visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E) {
+    // The type of the expr is always Bool.
+    assert(!E->getType()->isUnresolvedType() &&"Type always Bool");
+    return E;
+  }
+  
   Expr *visitImplicitConversionExpr(ImplicitConversionExpr *E) {
     assert(!E->getType()->isUnresolvedType());
     // Implicit conversions have been fully checked.

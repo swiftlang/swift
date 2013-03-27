@@ -477,8 +477,11 @@ public:
                                            SGFContext C);
   ManagedValue visitErasureExpr(ErasureExpr *E, SGFContext C);
   ManagedValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
-  ManagedValue visitDowncastExpr(DowncastExpr *E, SGFContext C);
-  ManagedValue visitSuperToArchetypeExpr(SuperToArchetypeExpr *E, SGFContext C);
+  ManagedValue visitUncheckedDowncastExpr(UncheckedDowncastExpr *E, SGFContext C);
+  ManagedValue visitUncheckedSuperToArchetypeExpr(
+                                UncheckedSuperToArchetypeExpr *E, SGFContext C);
+  ManagedValue visitIsSubtypeExpr(IsSubtypeExpr *E, SGFContext C);
+  ManagedValue visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E, SGFContext C);
   ManagedValue visitParenExpr(ParenExpr *E, SGFContext C);
   ManagedValue visitTupleExpr(TupleExpr *E, SGFContext C);
   ManagedValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);

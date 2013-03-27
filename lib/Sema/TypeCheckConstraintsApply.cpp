@@ -912,14 +912,52 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
     }
 
     Expr *visitCoerceExpr(CoerceExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      expr->setType(simplifyType(expr->getType()));
+      Expr *subExpr = convertToType(cs.getTypeChecker(),
+                                    expr->getSubExpr(),
+                                    expr->getType());
+      expr->setSubExpr(subExpr);
+      return expr;
     }
 
-    Expr *visitDowncastExpr(DowncastExpr *expr) {
-      llvm_unreachable("Already type-checked");
+    Expr *visitUncheckedDowncastExpr(UncheckedDowncastExpr *expr) {
+      auto &C = cs.getASTContext();
+
+      expr->setType(simplifyType(expr->getType()));
+
+      // If the source had archetype type, convert to its superclass first.
+      // We then downcast that value.
+      if (auto *srcArchetype
+            = expr->getSubExpr()->getType()->getAs<ArchetypeType>()) {
+        auto *subExpr = new (C) ArchetypeToSuperExpr(expr->getSubExpr(),
+                                                 srcArchetype->getSuperclass());
+        expr->setSubExpr(subExpr);
+      }
+      
+      // If the destination type is an archetype, this is a super-to-archetype
+      // cast.
+      if (expr->getType()->is<ArchetypeType>()) {
+        auto *stoa = new (C) UncheckedSuperToArchetypeExpr(expr->getSubExpr(),
+                                                     expr->getLoc(),
+                                                     expr->getBangLoc(),
+                                                     expr->getTypeLoc());
+        stoa->setType(expr->getType());
+        return stoa;
+      }
+      
+      return expr;
     }
 
-    Expr *visitSuperToArchetypeExpr(SuperToArchetypeExpr *expr) {
+    Expr *visitUncheckedSuperToArchetypeExpr(
+                                         UncheckedSuperToArchetypeExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+    
+    Expr *visitIsSubtypeExpr(IsSubtypeExpr *expr) {
+      llvm_unreachable("not implemented");
+    }
+    
+    Expr *visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
   };

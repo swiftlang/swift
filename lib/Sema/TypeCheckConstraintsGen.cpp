@@ -767,7 +767,7 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       ASTContext &Context = CS.getASTContext();
 
       // If the function subexpression has metatype type, this is a type
-      // coercion or construction.
+      // construction.
       // Note that matching the metatype type here, within constraint
       // generation, naturally restricts the use of metatypes to whatever
       // the constraint generator can eagerly evaluate.
@@ -861,16 +861,32 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
-
+    
     Type visitCoerceExpr(CoerceExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      Type ty = expr->getTypeLoc().getType();
+      CS.addConstraint(ConstraintKind::Conversion,
+                       expr->getSubExpr()->getType(), ty);
+      return ty;
     }
 
-    Type visitDowncastExpr(DowncastExpr *expr) {
-      llvm_unreachable("Already type-checked");
+    Type visitUncheckedDowncastExpr(UncheckedDowncastExpr *expr) {
+      Type ty = expr->getTypeLoc().getType();
+      CS.addConstraint(ConstraintKind::Subtype,
+                       ty, expr->getSubExpr()->getType());
+      return ty;
     }
 
-    Type visitSuperToArchetypeExpr(SuperToArchetypeExpr *expr) {
+    Type visitUncheckedSuperToArchetypeExpr(
+                                          UncheckedSuperToArchetypeExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+    
+    Type visitIsSubtypeExpr(IsSubtypeExpr *expr) {
+      CS.TC.diagnose(expr->getLoc(), diag::not_implemented);
+      return nullptr;
+    }
+
+    Type visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
   };

@@ -482,22 +482,9 @@ namespace {
     }
 
     void verifyChecked(CoerceExpr *E) {
-      Expr *LHS = E->getLHS()->getSemanticsProvidingExpr();
-      while (auto DSBIE = dyn_cast<DotSyntaxBaseIgnoredExpr>(LHS))
-        LHS = DSBIE->getRHS();
-      DeclRefExpr *LHSDRE = dyn_cast_or_null<DeclRefExpr>(LHS);
-      if (!LHSDRE) {
-        Out << "CoerceExpr LHS must be a DeclRefExpr\n";
-        abort();
-      }
-      TypeDecl *TD = dyn_cast_or_null<TypeDecl>(LHSDRE->getDecl());
-      if (!TD) {
-        Out << "CoerceExpr LHS must refer to a TypeDecl\n";
-        abort();
-      }
-      Type Ty = TD->getDeclaredType();
+      Type Ty = E->getTypeLoc().getType();
       if (!Ty->isEqual(E->getType()) ||
-          !Ty->isEqual(E->getRHS()->getType())) {
+          !Ty->isEqual(E->getSubExpr()->getType())) {
         Out << "CoerceExpr types don't match\n";
         abort();
       }

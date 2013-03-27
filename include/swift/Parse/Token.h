@@ -89,6 +89,10 @@ public:
     return is(tok::identifier) && Text == ContextKW;
   }
 
+  bool isContextualPunctuator(StringRef ContextPunc) const {
+    return isAnyOperator() && Text == ContextPunc;
+  }
+
   bool isAnyLParen() const {
     return Kind == tok::l_paren_starting || Kind == tok::l_paren_following;
   }

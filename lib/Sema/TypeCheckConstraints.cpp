@@ -2494,7 +2494,7 @@ namespace {
         return expr;
       }
       
-      // Type check the type parameters in an UnresolvedSpecializeExpr
+      // Type check the type parameters in an UnresolvedSpecializeExpr.
       if (auto us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
         for (TypeLoc &type : us->getUnresolvedParams()) {
           if (TC.validateType(type, /*isFirstPass=*/false)) {
@@ -2503,6 +2503,19 @@ namespace {
             return nullptr;
           }
         }
+        return expr;
+      }
+
+      // Type check the type parameters in cast expressions.
+      if (auto cast = dyn_cast<ExplicitCastExpr>(expr)) {
+        if (TC.validateType(cast->getTypeLoc(), /*isFirstPass=*/false))
+          return nullptr;
+        return expr;
+      }
+      
+      if (auto is = dyn_cast<IsSubtypeExpr>(expr)) {
+        if (TC.validateType(is->getTypeLoc(), /*isFirstPass=*/false))
+          return nullptr;
         return expr;
       }
 

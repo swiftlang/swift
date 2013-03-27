@@ -72,6 +72,8 @@ KEYWORD(default)
 
 // Expression keywords.
 KEYWORD(new)
+KEYWORD(as)
+KEYWORD(is)
 IDENTIFIER_KEYWORD(super)
 IDENTIFIER_KEYWORD(this)
 IDENTIFIER_KEYWORD(This)

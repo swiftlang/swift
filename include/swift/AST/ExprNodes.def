@@ -123,10 +123,12 @@ ABSTRACT_EXPR(ImplicitConversion, Expr)
   EXPR_RANGE(ImplicitConversion, Load, BridgeToBlock)
 ABSTRACT_EXPR(ExplicitCast, Expr)
   EXPR(Coerce, ExplicitCastExpr)
-  EXPR(Downcast, ExplicitCastExpr)
-  EXPR(SuperToArchetype, ExplicitCastExpr)
-  EXPR_RANGE(ExplicitCast, Coerce, SuperToArchetype)
+  EXPR(UncheckedDowncast, ExplicitCastExpr)
+  EXPR(UncheckedSuperToArchetype, ExplicitCastExpr)
+  EXPR_RANGE(ExplicitCast, Coerce, UncheckedSuperToArchetype)
 EXPR(If, Expr)
+EXPR(IsSubtype, Expr)
+EXPR(SuperIsArchetype, Expr)
 
 #undef EXPR_RANGE
 #undef UNCHECKED_EXPR

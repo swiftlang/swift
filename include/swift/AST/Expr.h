@@ -2103,28 +2103,30 @@ public:
   }
 };
 
-/// \brief Represents an explicit cast a(b), where "a" is a DeclRefExpr of
-/// metatype type, and "b" is the expression that will be converted to the
-/// instance type of "a".
+/// \brief Represents an explicit cast, 'a as T', 'a as? T', or 'a as! T',
+/// where "T" is a type, and "a" is the expression that will be converted to
+/// the type.
 class ExplicitCastExpr : public Expr {
-  Expr *LHS;
-  Expr *RHS;
+  Expr *SubExpr;
+  TypeLoc Type;
 
 protected:
-  ExplicitCastExpr(ExprKind kind, Expr *lhs, Expr *rhs);
+  ExplicitCastExpr(ExprKind kind, Expr *sub, TypeLoc type)
+    : Expr(kind, type.getType()), SubExpr(sub), Type(type)
+  {}
 
 public:
-  Expr *getLHS() const { return LHS; }
-  Expr *getRHS() const { return RHS; }
+  Expr *getSubExpr() const { return SubExpr; }
+  TypeLoc &getTypeLoc() { return Type; }
+  TypeLoc getTypeLoc() const { return Type; }
 
-  void setLHS(Expr *E) { LHS = E; }
-  void setRHS(Expr *E) { RHS = E; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
 
-  SourceLoc getStartLoc() const { return LHS->getStartLoc(); }
-  SourceLoc getEndLoc() const { return RHS->getEndLoc(); }
+  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SourceLoc getEndLoc() const { return Type.getSourceRange().End; }
 
   SourceRange getSourceRange() const {
-    return SourceRange(LHS->getStartLoc(), RHS->getEndLoc());
+    return {getStartLoc(), getEndLoc()};
   }
 
   static bool classof(const Expr *E) {
@@ -2134,56 +2136,130 @@ public:
 };
 
 /// \brief Represents an explicit type coercion of an expression to a specified
-/// type.
+/// type, spelled 'a as T'.
 ///
 /// An explicit type coercion makes implicit conversions explicit, clarifying
 /// a type. It does not perform any casting not captured by implicit
 /// conversions.
 class CoerceExpr : public ExplicitCastExpr {
+  SourceLoc AsLoc;
+  
 public:
-  CoerceExpr(Expr *lhs, Expr *rhs)
-    : ExplicitCastExpr(ExprKind::Coerce, lhs, rhs) { }
+  CoerceExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
+    : ExplicitCastExpr(ExprKind::Coerce, sub, type),
+      AsLoc(asLoc) { }
+  
+  SourceLoc getLoc() const { return AsLoc; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Coerce;
   }
 };
 
-/// \brief Represents an explicit downcast, converting from a supertype to
-/// its subtype.
-///
-/// Explicit downcasts are written as function applications a(b) where
-/// "a" is a DeclRefExpr for a TypeDecl and "b" is the expression to
-/// be converted to the type of "a".
+/// \brief Represents an explicit unchecked downcast, converting from a
+/// supertype to its subtype or crashing if the cast is not possible,
+/// spelled 'a as! T'.
 ///
 /// FIXME: At present, only class downcasting is supported.
 /// FIXME: All downcasts are currently unchecked, which is horrible.
-class DowncastExpr : public ExplicitCastExpr {
+class UncheckedDowncastExpr : public ExplicitCastExpr {
+  SourceLoc AsLoc;
+  SourceLoc BangLoc;
+  
 public:
-  DowncastExpr(Expr *lhs, Expr *rhs)
-    : ExplicitCastExpr(ExprKind::Downcast, lhs, rhs) { }
+  UncheckedDowncastExpr(Expr *sub, SourceLoc asLoc, SourceLoc bangLoc,
+                        TypeLoc type)
+    : ExplicitCastExpr(ExprKind::UncheckedDowncast, sub, type),
+      AsLoc(asLoc), BangLoc(bangLoc) { }
 
+  SourceLoc getLoc() const { return AsLoc; }
+  SourceLoc getBangLoc() const { return BangLoc; }
+  
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::Downcast;
+    return E->getKind() == ExprKind::UncheckedDowncast;
   }
 };
 
-/// \brief Represents an explicit downcast from a superclass of an archetype to
-/// the archetype iself.
-///
-/// Super-to-archetype casts are written as function applications a(b) where
-/// "a" is a DeclRefExpr for a TypeDecl and "b" is the expression to
-/// be converted to the type of "a".
+/// \brief Represents an explicit unchecked downcast, converting from a
+/// superclass of an archetype to the archetype iself or crashing if the cast
+/// is not possible, spelled 'a as! T' for an archetype type T.
 ///
 /// FIXME: At present, only class downcasting is supported.
 /// FIXME: All downcasts are currently unchecked, which is horrible.
-class SuperToArchetypeExpr : public ExplicitCastExpr {
+class UncheckedSuperToArchetypeExpr : public ExplicitCastExpr {
+  SourceLoc AsLoc;
+  SourceLoc BangLoc;
+  
 public:
-  SuperToArchetypeExpr(Expr *lhs, Expr *rhs)
-    : ExplicitCastExpr(ExprKind::SuperToArchetype, lhs, rhs) { }
+  UncheckedSuperToArchetypeExpr(Expr *sub, SourceLoc asLoc, SourceLoc bangLoc,
+                                TypeLoc type)
+    : ExplicitCastExpr(ExprKind::UncheckedSuperToArchetype, sub, type),
+      AsLoc(asLoc), BangLoc(bangLoc) { }
+  
+  SourceLoc getLoc() const { return AsLoc; }
+  SourceLoc getBangLoc() const { return BangLoc; }
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::SuperToArchetype;
+    return E->getKind() == ExprKind::UncheckedSuperToArchetype;
+  }
+};
+  
+/// \brief Represents a runtime type check query, 'a is T', where 'T' is a type
+/// and 'a' is a value of a supertype of T. Evaluates to true if 'a' is of the
+/// type and 'a as! T' would succeed, false otherwise.
+class IsSubtypeExpr : public Expr {
+  Expr *SubExpr;
+  TypeLoc Type;
+  SourceLoc IsLoc;
+
+public:
+  IsSubtypeExpr(Expr *sub, SourceLoc isLoc, TypeLoc type)
+    : Expr(ExprKind::IsSubtype), SubExpr(sub), Type(type), IsLoc(isLoc)
+  {}
+  
+  Expr *getSubExpr() const { return SubExpr; }
+  TypeLoc &getTypeLoc() { return Type; }
+  TypeLoc getTypeLoc() const { return Type; }
+  
+  void setSubExpr(Expr *E) { SubExpr = E; }
+  
+  SourceLoc getLoc() const { return IsLoc; }
+  SourceRange getSourceRange() const {
+    return {SubExpr->getStartLoc(), Type.getSourceRange().End};
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::IsSubtype;
+  }
+};
+  
+/// \brief Represents a runtime type check query against an archetype, 'a is T'
+/// where 'T' is an archetype and 'a' is a value of a base class constraint type
+/// of 'T'. Evaluates to true if 'a' is of the type and 'a as! T' would succeed,
+/// false otherwise.
+class SuperIsArchetypeExpr : public Expr {
+  Expr *SubExpr;
+  TypeLoc Type;
+  SourceLoc IsLoc;
+
+public:
+  SuperIsArchetypeExpr(Expr *sub, SourceLoc isLoc, TypeLoc type)
+    : Expr(ExprKind::SuperIsArchetype), SubExpr(sub), Type(type), IsLoc(isLoc)
+  {}
+  
+  Expr *getSubExpr() const { return SubExpr; }
+  TypeLoc &getTypeLoc() { return Type; }
+  TypeLoc getTypeLoc() const { return Type; }
+  
+  void setSubExpr(Expr *E) { SubExpr = E; }
+  
+  SourceLoc getLoc() const { return IsLoc; }
+  SourceRange getSourceRange() const {
+    return {SubExpr->getStartLoc(), Type.getSourceRange().End};
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::SuperIsArchetype;
   }
 };
   

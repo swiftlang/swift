@@ -383,6 +383,8 @@ void Lexer::lexIdentifier() {
 
     // Expressions
     .Case("new", tok::kw_new)
+    .Case("as", tok::kw_as)
+    .Case("is", tok::kw_is)
 
     // Reserved Identifiers
     .Case("metatype", tok::kw_metatype)

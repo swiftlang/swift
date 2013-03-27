@@ -325,6 +325,14 @@ namespace {
         = IGF.Builder.CreateLoad(castPtrVal, IGF.IGM.getPointerAlignment());
       Out.add({castVal, val.getCleanup()});
     }
+    
+    void visitIsSubtypeExpr(IsSubtypeExpr *E) {
+      llvm_unreachable("not implemented");
+    }
+    
+    void visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E) {
+      llvm_unreachable("not implemented");      
+    }
 
     void visitScalarToTupleExpr(ScalarToTupleExpr *E) {
       emitScalarToTuple(IGF, E, Out);
@@ -339,16 +347,13 @@ namespace {
     }
     
     void visitCoerceExpr(CoerceExpr *E) {
-      IGF.emitIgnored(E->getLHS());
-      IGF.emitRValue(E->getRHS(), Out);
+      IGF.emitRValue(E->getSubExpr(), Out);
     }
     
-    void visitDowncastExpr(DowncastExpr *E) {
-      IGF.emitIgnored(E->getLHS());
-
+    void visitUncheckedDowncastExpr(UncheckedDowncastExpr *E) {
       // Emit the value we're casting from.
       Explosion subResult(ExplosionKind::Maximal);
-      IGF.emitRValue(E->getRHS(), subResult);
+      IGF.emitRValue(E->getSubExpr(), subResult);
       ManagedValue val = subResult.claimNext();
       llvm::Value *object = val.getValue();
       llvm::Value *castVal = IGF.emitUnconditionalDowncast(
@@ -357,12 +362,11 @@ namespace {
       Out.add({castVal, val.getCleanup()});
     }
 
-    void visitSuperToArchetypeExpr(SuperToArchetypeExpr *E) {
+    void visitUncheckedSuperToArchetypeExpr(UncheckedSuperToArchetypeExpr *E) {
       // FIXME: We should check whether the dynamic type of the RHS is
       // actually the same as the archetype. Right now, this is an
       // unchecked cast.
-      IGF.emitIgnored(E->getLHS());
-      IGF.emitSupertoArchetypeConversion(E->getRHS(),
+      IGF.emitSupertoArchetypeConversion(E->getSubExpr(),
                                          E->getType()->getCanonicalType(),
                                          Out);
     }
@@ -660,8 +664,10 @@ namespace {
     NOT_LVALUE_EXPR(Metatype)
     NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
     NOT_LVALUE_EXPR(Coerce)
-    NOT_LVALUE_EXPR(Downcast)
-    NOT_LVALUE_EXPR(SuperToArchetype)
+    NOT_LVALUE_EXPR(UncheckedDowncast)
+    NOT_LVALUE_EXPR(UncheckedSuperToArchetype)
+    NOT_LVALUE_EXPR(IsSubtype)
+    NOT_LVALUE_EXPR(SuperIsArchetype)
     NOT_LVALUE_EXPR(Module)
     NOT_LVALUE_EXPR(BridgeToBlock)
     NOT_LVALUE_EXPR(OtherConstructorDeclRef)
@@ -838,8 +844,10 @@ namespace {
     NON_LOCATEABLE(NewArrayExpr)
     NON_LOCATEABLE(MetatypeExpr)
     NON_LOCATEABLE(CoerceExpr)
-    NON_LOCATEABLE(DowncastExpr)
-    NON_LOCATEABLE(SuperToArchetypeExpr)
+    NON_LOCATEABLE(UncheckedDowncastExpr)
+    NON_LOCATEABLE(UncheckedSuperToArchetypeExpr)
+    NON_LOCATEABLE(IsSubtypeExpr)
+    NON_LOCATEABLE(SuperIsArchetypeExpr)
     NON_LOCATEABLE(ExistentialMemberRefExpr)
     NON_LOCATEABLE(ArchetypeMemberRefExpr)
     NON_LOCATEABLE(GenericMemberRefExpr)
