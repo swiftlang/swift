@@ -140,7 +140,9 @@ namespace {
 class IndirectReturnInitialization : public SingleInitializationBase {
   Value address;
 public:
-  IndirectReturnInitialization(Value address) : address(address) {}
+  IndirectReturnInitialization(Value address)
+    : SingleInitializationBase(address.getType().getSwiftRValueType()),
+      address(address) {}
   
   Value getAddressOrNull() override { return address; }
 };

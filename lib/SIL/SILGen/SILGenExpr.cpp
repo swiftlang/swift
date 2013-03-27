@@ -85,40 +85,43 @@ static void initializeWithResult(SILGenFunction &gen,
                                  SILLocation loc,
                                  Initialization *I,
                                  ManagedValue result) {
-  if (I->hasAddress()) {
+  switch (I->kind) {
+  case Initialization::Kind::AddressBinding:
+    llvm_unreachable("cannot emit into a byref binding");
+      
+  case Initialization::Kind::Ignored:
+    return;
+      
+  case Initialization::Kind::SingleBuffer:
     if (result.getType().isAddressOnly())
       result.forwardInto(gen, loc, I->getAddress(), /*isInitialize=*/true);
-    else {
+    else
       gen.emitStore(loc, result, I->getAddress());
+
+    I->finishInitialization(gen);
+    return;
+
+  case Initialization::Kind::Tuple:
+    // Destructure the tuple result into the subinitializations.
+    // FIXME: address-only tuples
+    // FIXME: visitTupleExpr and friends could destructure their subexpressions
+    // directly into the subinitializations.
+    ArrayRef<InitializationPtr> subInits = I->getSubInitializations();
+    Value resultV = result.forward(gen);
+    TupleType *tty = resultV.getType().getAs<TupleType>();
+    
+    assert(tty && "tuple initialization for non-tuple result?!");
+    assert(tty->getFields().size() == subInits.size() &&
+           "tuple initialization size does not match tuple size?!");
+    for (size_t i = 0; i < subInits.size(); ++i) {
+      SILType eltTy = gen.getLoweredLoadableType(tty->getFields()[i].getType());
+      ManagedValue elt(gen.B.createExtract(loc, resultV, i, eltTy),
+                       ManagedValue::Unmanaged);
+      initializeWithResult(gen, loc, subInits[i].get(), elt);
     }
     I->finishInitialization(gen);
     return;
   }
-  
-  // Destructure the tuple result into the subinitializations.
-  // FIXME: address-only tuples
-  // FIXME: visitTupleExpr and friends could destructure their subexpressions
-  // directly into the subinitializations.
-  ArrayRef<Initialization*> subInits = I->getSubInitializations();
-  if (subInits.empty()) {
-    // The initialization is a black hole or an empty tuple, in either case
-    // we can do nothing and drop the result on the floor.
-    return;
-  }
-  
-  Value resultV = result.forward(gen);
-  TupleType *tty = resultV.getType().getAs<TupleType>();
-  
-  assert(tty && "tuple initialization for non-tuple result?!");
-  assert(tty->getFields().size() == subInits.size() &&
-         "tuple initialization size does not match tuple size?!");
-  for (size_t i = 0; i < subInits.size(); ++i) {
-    SILType eltTy = gen.getLoweredLoadableType(tty->getFields()[i].getType());
-    ManagedValue elt(gen.B.createExtract(loc, resultV, i, eltTy),
-                     ManagedValue::Unmanaged);
-    initializeWithResult(gen, loc, subInits[i], elt);
-  }
-  I->finishInitialization(gen);
 }
 
 void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {

@@ -20,11 +20,15 @@
 
 #include "SILGen.h"
 #include "swift/Basic/DiverseList.h"
+#include <memory>
 
 namespace swift {
 namespace Lowering {
   class SILGenFunction;
 
+class Initialization;
+using InitializationPtr = std::unique_ptr<Initialization>;
+  
 /// Initialization - Abstract base class for initialization buffers. An
 /// initialization represents an uninitialized buffer or a tuple of
 /// uninitialized buffers that must be initialized with the result of an
@@ -36,12 +40,29 @@ namespace Lowering {
 /// be cleaned up together with `release`.
 class Initialization {
 public:
-  Initialization() {}
-  virtual ~Initialization() {}
+  enum class Kind {
+    /// This Initialization is for a _ binding or other ignored value; the
+    /// corresponding result can be discarded.
+    Ignored,
+    /// This Initialization is for a [byref] argument binding, which is
+    /// initialized using bindAddress().
+    AddressBinding,
+    /// This Initialization is for a single buffer with a physical address,
+    /// which can be accessed with getAddress() and stored to.
+    SingleBuffer,
+    /// This Initialization is for a tuple of sub-initializations, which can
+    /// be accessed with getSubInitializations().
+    Tuple
+  };
   
-  Initialization(Initialization const &) = delete;
-  Initialization &operator=(Initialization const &) = delete;
-
+  /// The Kind of initialization.
+  const Kind kind;
+  /// The Swift type of the value to be initialized.
+  const Type type;
+  
+  Initialization(Kind kind, Type type) : kind(kind), type(type) {}
+  virtual ~Initialization() {}
+    
   /// If this initialization represents a single contiguous buffer, return the
   /// Value of that buffer's address. If not, returns an invalid Value.
   virtual Value getAddressOrNull() = 0;
@@ -68,23 +89,43 @@ public:
   /// return the sub-initializations. Once all the sub-initializations have been
   /// initialized and finalized with finishInitialization, finishInitialization
   /// must then be called on this aggregate initialization.
-  virtual ArrayRef<Initialization*> getSubInitializations() = 0;
+  virtual ArrayRef<InitializationPtr> getSubInitializations() = 0;
+  
+  /// If this initialization represents an aggregation of sub-initializations,
+  /// return the sub-initializations. If it represents a single
+  /// initialization of tuple type, explode it into initializations for each
+  /// individual tuple element. In either case, once all the sub-initializations
+  /// have been initialized and finalized with finishInitialization,
+  /// finishInitialization must then be called on this aggregate initialization.
+  ///
+  /// \param buf - If new Initializations need to be created, their ownership
+  /// is given to this vector.
+  ArrayRef<InitializationPtr> getSubInitializations(
+                                      SILGenFunction &gen,
+                                      SmallVectorImpl<InitializationPtr> &buf);
   
   /// Perform post-initialization bookkeeping for this initialization.
   virtual void finishInitialization(SILGenFunction &gen) {}
 
   /// Perform a default initialization of this buffer or buffers, then
-  /// invoke finishInitialization() if necessary.
+  /// invoke finishInitialization().
   virtual void defaultInitialize(SILGenFunction &gen) = 0;
   
 private:
+  Initialization(const Initialization &) = delete;
+  Initialization(Initialization &&) = delete;
+  
   virtual void _anchor();
 };
 
 /// Abstract base class for single-buffer initializations.
 class SingleInitializationBase : public Initialization {
 public:
-  ArrayRef<Initialization*> getSubInitializations() override {
+  SingleInitializationBase(Type type)
+    : Initialization(Initialization::Kind::SingleBuffer, type)
+  {}
+  
+  ArrayRef<InitializationPtr> getSubInitializations() override {
     return {};
   }
   
