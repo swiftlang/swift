@@ -193,6 +193,7 @@ they explicitly parameterize everything. In C++ concepts::
   }
 
 .. @ignore()
+.. We don't have a compiler for ConceptC++
 
 Java and C# programmers work around this issue by parameterizing the
 interface, e.g. (in Java)::
