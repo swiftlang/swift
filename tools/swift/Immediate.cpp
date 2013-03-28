@@ -271,14 +271,9 @@ static bool IRGenImportedModules(TranslationUnit *TU,
   return false;
 }
 
-void swift::RunImmediately(TranslationUnit *TU, SILModule *SILMod) {
+void swift::RunImmediately(irgen::Options &Options,
+                           TranslationUnit *TU, SILModule *SILMod) {
   ASTContext &Context = TU->Ctx;
-  irgen::Options Options;
-  Options.OutputFilename = "";
-  Options.Triple = llvm::sys::getDefaultTargetTriple();
-  Options.OptLevel = 2;
-  Options.OutputKind = irgen::OutputKind::Module;
-  Options.UseJIT = true;
   
   // IRGen the main module.
   llvm::LLVMContext LLVMContext;

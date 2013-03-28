@@ -22,6 +22,10 @@ namespace swift {
   class TranslationUnit;
   class SILModule;
   
+  namespace irgen {
+    class Options;
+  }
+  
   /// Publicly available REPL state information.
   class REPLContext {
   public:
@@ -43,7 +47,8 @@ namespace swift {
     bool RanREPLApplicationMain;
   };
 
-  void RunImmediately(TranslationUnit *TU, SILModule *SILMod = nullptr);
+  void RunImmediately(irgen::Options &Options,
+                      TranslationUnit *TU, SILModule *SILMod = nullptr);
   void REPL(ASTContext &Context);
   void REPLRunLoop(ASTContext &Context);
 }
