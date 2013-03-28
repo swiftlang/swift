@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <new>
 #include <string.h>
-#include <objc/runtime.h>
 
 #ifndef SWIFT_DEBUG_RUNTIME
 #define SWIFT_DEBUG_RUNTIME 0
@@ -238,12 +237,16 @@ swift::swift_dynamicCast(const void *object, const Metadata *targetType) {
   const ClassMetadata *targetClassType;
   switch (targetType->getKind()) {
   case MetadataKind::Class:
-    printf("class\n");
+#if SWIFT_DEBUG_RUNTIME
+    printf("casting to class\n");
+#endif
     targetClassType = static_cast<const ClassMetadata *>(targetType);
     break;
 
   case MetadataKind::ObjCClassWrapper:
-    printf("objc class wrapper\n");
+#if SWIFT_DEBUG_RUNTIME
+    printf("casting to objc class wrapper\n");
+#endif
     targetClassType
       = static_cast<const ObjCClassWrapperMetadata *>(targetType)->Class;
     break;
