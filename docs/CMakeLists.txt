@@ -42,6 +42,7 @@ find_program(LITRE_EXECUTABLE
   DOC "LitRe literate programming tool for docutils")
 
 if(LITRE_EXECUTABLE)
+  # Make the LitreTesting cmake module available
   execute_process(
     COMMAND ${LITRE_EXECUTABLE} --cmake_module_path
     OUTPUT_VARIABLE litre_cmake_module_path
@@ -49,13 +50,18 @@ if(LITRE_EXECUTABLE)
     )
   list(APPEND CMAKE_MODULE_PATH ${litre_cmake_module_path})
 
+  # Find all the .rst files
   file(GLOB_RECURSE rst_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.rst)
+
   foreach(rst ${rst_files})
+    # Prepare a testing directory containing a CMakeLists.txt 
+    # and example files extracted from the .rst
     set(test_dir ${CMAKE_CURRENT_BINARY_DIR}/litre-tests/${rst}.litre-tests)
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E make_directory "${test_dir}"
       COMMAND ${LITRE_EXECUTABLE} --dump_dir=${test_dir} --traceback ${CMAKE_CURRENT_SOURCE_DIR}/${rst}
       )
+    # Make that directory part of the build
     add_subdirectory(${test_dir} ${test_dir}/build)
   endforeach()
 else()
