@@ -39,7 +39,7 @@ such as a simple, linear search algorithm::
     return 0;
   }
 
-.. @test('compile', howmany = 'all', cmake_args = ['COMPILER', 'c++'])
+.. @test('compile', howmany = 'all', cmake_args = ['COMPILER', '${CMAKE_CXX_COMPILER}'])
 
 Generics are important for the construction of useful libraries, because they
 allow the library to adapt to application-specific data types without losing
