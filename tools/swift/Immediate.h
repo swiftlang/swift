@@ -49,6 +49,7 @@ namespace swift {
 
   void RunImmediately(irgen::Options &Options,
                       TranslationUnit *TU, SILModule *SILMod = nullptr);
-  void REPL(ASTContext &Context);
-  void REPLRunLoop(ASTContext &Context);
+  
+  void REPL(ASTContext &Context, bool SILIRGen);
+  void REPLRunLoop(ASTContext &Context, bool SILIRGen);
 }

@@ -77,7 +77,7 @@ namespace swift {
 
   /// Turn the given translation unit into SIL IR. The returned SILModule must
   /// be deleted by the caller.
-  SILModule *performSILGeneration(TranslationUnit *TU);
+  SILModule *performSILGeneration(TranslationUnit *TU, unsigned StartElem = 0);
   
   /// Turn the given translation unit into either LLVM IR or native code.
   ///

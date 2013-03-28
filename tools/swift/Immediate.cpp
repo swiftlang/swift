@@ -30,6 +30,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/DiagnosticConsumer.h"
+#include "swift/SIL/SILModule.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -843,6 +844,7 @@ class REPLEnvironment {
 
   ASTContext &Context;
   bool ShouldRunREPLApplicationMain;
+  bool SILIRGen;
   llvm::MemoryBuffer *Buffer;
   Component *Comp;
   TranslationUnit *TU;
@@ -897,10 +899,19 @@ class REPLEnvironment {
     if (!ShouldRun)
       return true;
     
+    
+    
     // IRGen the current line(s).
     llvm::Module LineModule("REPLLine", LLVMContext);
     performCaptureAnalysis(TU, RC.CurIRGenElem);
-    performIRGeneration(Options, &LineModule, TU, /*sil=*/nullptr,
+    
+    llvm::OwningPtr<SILModule> sil;
+    if (SILIRGen) {
+      sil = llvm::OwningPtr<SILModule>(
+                                     performSILGeneration(TU, RC.CurIRGenElem));
+    }
+    
+    performIRGeneration(Options, &LineModule, TU, sil.get(),
                         RC.CurIRGenElem);
     RC.CurIRGenElem = RC.CurTUElem;
     
@@ -947,9 +958,12 @@ class REPLEnvironment {
   }
 
 public:
-  REPLEnvironment(ASTContext &Context, bool ShouldRunREPLApplicationMain)
+  REPLEnvironment(ASTContext &Context,
+                  bool ShouldRunREPLApplicationMain,
+                  bool SILIRGen)
     : Context(Context),
       ShouldRunREPLApplicationMain(ShouldRunREPLApplicationMain),
+      SILIRGen(SILIRGen),
       Buffer(llvm::MemoryBuffer::getNewMemBuffer(BUFFER_SIZE, "<REPL Buffer>")),
       Comp(new (Context.Allocate<Component>(1)) Component()),
       TU(new (Context) TranslationUnit(Context.getIdentifier("REPL"),
@@ -1182,8 +1196,10 @@ void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
   llvm::errs().resetColor();
 }
 
-void swift::REPL(ASTContext &Context) {
-  REPLEnvironment env(Context, /*ShouldRunREPLApplicationMain=*/false);
+void swift::REPL(ASTContext &Context, bool SILIRGen) {
+  REPLEnvironment env(Context,
+                      /*ShouldRunREPLApplicationMain=*/false,
+                      SILIRGen);
 
   llvm::SmallString<80> Line;
   REPLInputKind inputKind;
@@ -1193,8 +1209,10 @@ void swift::REPL(ASTContext &Context) {
   env.exitREPL();
 }
 
-void swift::REPLRunLoop(ASTContext &Context) {
-  REPLEnvironment env(Context, /*ShouldRunREPLApplicationMain=*/true);
+void swift::REPLRunLoop(ASTContext &Context, bool SILIRGen) {
+  REPLEnvironment env(Context,
+                      /*ShouldRunREPLApplicationMain=*/true,
+                      SILIRGen);
   
   CFMessagePortContext portContext;
   portContext.version = 0;

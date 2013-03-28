@@ -198,7 +198,7 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 //===--------------------------------------------------------------------===//
 
 
-SILModule *SILModule::constructSIL(TranslationUnit *tu) {
+SILModule *SILModule::constructSIL(TranslationUnit *tu, unsigned startElem) {
   bool hasTopLevel = true;
   switch (tu->Kind) {
   case TranslationUnit::Library:
@@ -211,13 +211,14 @@ SILModule *SILModule::constructSIL(TranslationUnit *tu) {
   }
   SILModule *m = new SILModule(tu->getASTContext(), hasTopLevel);
   SILGenModule sgm(*m);
-  for (Decl *D : tu->Decls)
+  for (Decl *D : llvm::makeArrayRef(tu->Decls).slice(startElem))
     sgm.visit(D);
   return m;
 }
 
-SILModule *swift::performSILGeneration(TranslationUnit *tu) {
-  return SILModule::constructSIL(tu);
+SILModule *swift::performSILGeneration(TranslationUnit *tu,
+                                       unsigned startElem) {
+  return SILModule::constructSIL(tu, startElem);
 }
 
 //===--------------------------------------------------------------------===//
