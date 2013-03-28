@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <new>
 #include <string.h>
+#include <objc/runtime.h>
 
 #ifndef SWIFT_DEBUG_RUNTIME
 #define SWIFT_DEBUG_RUNTIME 0
@@ -235,14 +236,16 @@ swift::swift_dynamicCastClassUnconditional(const void *object,
 const void *
 swift::swift_dynamicCast(const void *object, const Metadata *targetType) {
   const ClassMetadata *targetClassType;
-  switch (targetType->Kind) {
+  switch (targetType->getKind()) {
   case MetadataKind::Class:
+    printf("class\n");
     targetClassType = static_cast<const ClassMetadata *>(targetType);
     break;
 
   case MetadataKind::ObjCClassWrapper:
+    printf("objc class wrapper\n");
     targetClassType
-    = static_cast<const ObjCClassWrapperMetadata *>(targetType)->Class;
+      = static_cast<const ObjCClassWrapperMetadata *>(targetType)->Class;
     break;
 
   case MetadataKind::Existential:
@@ -266,7 +269,7 @@ const void *
 swift::swift_dynamicCastUnconditional(const void *object,
                                       const Metadata *targetType) {
   const ClassMetadata *targetClassType;
-  switch (targetType->Kind) {
+  switch (targetType->getKind()) {
   case MetadataKind::Class:
     targetClassType = static_cast<const ClassMetadata *>(targetType);
     break;
@@ -365,7 +368,7 @@ swift::swift_getObjCClassMetadata(ClassMetadata *theClass) {
   auto entry = ObjCClassCacheEntry::allocate(args, numGenericArgs, 0);
 
   auto metadata = entry->getData();
-  metadata->Kind = MetadataKind::ObjCClassWrapper;
+  metadata->setKind(MetadataKind::ObjCClassWrapper);
   metadata->ValueWitnesses = &_TWVBO;
   metadata->Class = theClass;
 
@@ -414,7 +417,7 @@ swift::swift_getFunctionTypeMetadata(const Metadata *argMetadata,
   auto entry = FunctionCacheEntry::allocate(args, numGenericArgs, 0);
 
   auto metadata = entry->getData();
-  metadata->Kind = MetadataKind::Function;
+  metadata->setKind(MetadataKind::Function);
   metadata->ValueWitnesses = &_TWVFT_T_; // standard function value witnesses
   metadata->ArgumentType = argMetadata;
   metadata->ResultType = resultMetadata;
@@ -636,7 +639,7 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
   auto witnesses = &entry->Witnesses;
 
   auto metadata = entry->getData();
-  metadata->Kind = MetadataKind::Tuple;
+  metadata->setKind(MetadataKind::Tuple);
   metadata->ValueWitnesses = witnesses;
   metadata->NumElements = numElements;
   metadata->Labels = labels;
@@ -711,7 +714,7 @@ getMetatypeValueWitnesses(const Metadata *instanceType) {
     return &getUnmanagedPointerValueWitnesses();
 
   // Metatypes preserve the triviality of their instance type.
-  if (instanceType->Kind == MetadataKind::Metatype)
+  if (instanceType->getKind() == MetadataKind::Metatype)
     return instanceType->getValueWitnesses();
 
   // Everything else is trivial and can use the empty-tuple metadata.
@@ -731,7 +734,7 @@ swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
   auto entry = MetatypeCacheEntry::allocate(args, numGenericArgs, 0);
 
   auto metadata = entry->getData();
-  metadata->Kind = MetadataKind::Metatype;
+  metadata->setKind(MetadataKind::Metatype);
   metadata->ValueWitnesses = getMetatypeValueWitnesses(instanceMetadata);
   metadata->InstanceType = instanceMetadata;
 

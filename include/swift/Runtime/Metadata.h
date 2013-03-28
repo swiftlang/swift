@@ -369,12 +369,27 @@ struct Metadata {
   /// The basic header type.
   typedef TypeMetadataHeader HeaderType;
 
-  /// The kind.
+private:
+  /// The kind. Only valid for non-class metadata; getKind() must be used to get
+  /// the kind value.
   MetadataKind Kind;
+public:
+  /// Get the metadata kind.
+  MetadataKind getKind() const {
+    if (Kind > MetadataKind::MetadataKind_Last)
+      return MetadataKind::Class;
+    return Kind;
+  }
+  
+  /// Set the metadata kind.
+  void setKind(MetadataKind kind) {
+    Kind = kind;
+  }
 
   /// Is this metadata for a class type?
   bool isClassType() const {
-    return Kind == MetadataKind::Class;
+    return Kind > MetadataKind::MetadataKind_Last
+      || Kind == MetadataKind::Class;
   }
 
   const ValueWitnessTable *getValueWitnesses() const {

@@ -66,7 +66,10 @@ enum class MetadataKind : uintptr_t {
   HeapLocalVariable = 64,
 
   /// A heap-allocated array.
-  HeapArray = 65
+  HeapArray = 65,
+  
+  /// Anything greater than this is a class isa pointer.
+  MetadataKind_Last = HeapArray
 };
 
 }
