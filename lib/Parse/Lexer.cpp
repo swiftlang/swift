@@ -683,7 +683,7 @@ void Lexer::lexNumber() {
 /// lexCharacter - Read a character and return its UTF32 code.  If this is the
 /// end of enclosing string/character sequence, this returns ~0U.
 /// 
-///   character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]'
+///   character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]' | [\]0
 ///   character_escape  ::= [\]x hex hex  
 ///   character_escape  ::= [\]u hex hex hex hex  
 ///   character_escape  ::= [\]U hex hex hex hex hex hex hex hex
