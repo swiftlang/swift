@@ -350,6 +350,11 @@ public:
   /// runtime-checked cast.
   llvm::Value *emitUnconditionalDowncast(llvm::Value *from,
                                          CanType toType);
+  
+  /// \brief Test whether the given value is of the given destination type
+  /// with a runtime check.
+  llvm::Value *emitIsSubtype(llvm::Value *from,
+                             CanType toType);
 
   llvm::Value *emitAsPrimitiveScalar(Expr *E);
 

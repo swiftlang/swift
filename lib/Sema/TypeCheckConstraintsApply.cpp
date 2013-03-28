@@ -924,6 +924,10 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
       auto &C = cs.getASTContext();
 
       expr->setType(simplifyType(expr->getType()));
+      
+      Expr *sub = cs.getTypeChecker().convertToRValue(expr->getSubExpr());
+      if (!sub) return nullptr;
+      expr->setSubExpr(sub);
 
       // If the source had archetype type, convert to its superclass first.
       // We then downcast that value.
@@ -954,7 +958,25 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
     }
     
     Expr *visitIsSubtypeExpr(IsSubtypeExpr *expr) {
-      llvm_unreachable("not implemented");
+      auto &C = cs.getASTContext();
+
+      expr->setType(simplifyType(expr->getType()));
+      
+      Expr *sub = cs.getTypeChecker().convertToRValue(expr->getSubExpr());
+      if (!sub) return nullptr;
+      expr->setSubExpr(sub);
+      
+      // If the destination type is an archetype, this is a super-is-archetype
+      // query.
+      if (expr->getTypeLoc().getType()->is<ArchetypeType>()) {
+        auto *sisa = new (C) SuperIsArchetypeExpr(expr->getSubExpr(),
+                                                  expr->getLoc(),
+                                                  expr->getTypeLoc());
+        sisa->setType(expr->getType());
+        return sisa;
+      }
+      
+      return expr;
     }
     
     Expr *visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *expr) {

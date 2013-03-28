@@ -871,8 +871,14 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
 
     Type visitUncheckedDowncastExpr(UncheckedDowncastExpr *expr) {
       Type ty = expr->getTypeLoc().getType();
+      
+      auto tv = CS.createTypeVariable();
+      CS.addConstraint(ConstraintKind::EqualRvalue, tv,
+           expr->getSubExpr()->getType(),
+           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
+
       CS.addConstraint(ConstraintKind::Subtype,
-                       ty, expr->getSubExpr()->getType());
+                       ty, tv);
       return ty;
     }
 
@@ -882,8 +888,32 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     }
     
     Type visitIsSubtypeExpr(IsSubtypeExpr *expr) {
-      CS.TC.diagnose(expr->getLoc(), diag::not_implemented);
-      return nullptr;
+      ASTContext &C = CS.getASTContext();
+
+      // The subexpression must be castable to the destination type.
+      auto tv = CS.createTypeVariable();
+      CS.addConstraint(ConstraintKind::EqualRvalue, tv,
+           expr->getSubExpr()->getType(),
+           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
+
+      CS.addConstraint(ConstraintKind::Subtype,
+                       expr->getTypeLoc().getType(), tv);
+      
+      // The result is Bool.
+      UnqualifiedLookup boolLookup(C.getIdentifier("Bool"),
+                                   &CS.TC.TU);
+      if (!boolLookup.isSuccess()) {
+        CS.TC.diagnose(expr->getLoc(), diag::bool_type_broken);
+        return nullptr;
+      }
+      TypeDecl *tyDecl = boolLookup.getSingleTypeResult();
+      
+      if (!tyDecl) {
+        CS.TC.diagnose(expr->getLoc(), diag::bool_type_broken);
+        return nullptr;
+      }
+      
+      return tyDecl->getDeclaredType();
     }
 
     Type visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *expr) {

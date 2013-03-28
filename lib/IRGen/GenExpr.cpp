@@ -246,6 +246,31 @@ llvm::Value *IRGenFunction::emitUnconditionalDowncast(llvm::Value *from,
   
 }
 
+/// Emit an is-subtype check.
+llvm::Value *IRGenFunction::emitIsSubtype(llvm::Value *from,
+                                          CanType toType) {
+  // Emit the value we're casting from.
+  if (from->getType() != IGM.Int8PtrTy)
+    from = Builder.CreateBitCast(from, IGM.Int8PtrTy);
+  
+  // Emit a reference to the metadata.
+  llvm::Value *metadataRef
+  = IGM.getAddrOfTypeMetadata(toType, false, false);
+  if (metadataRef->getType() != IGM.Int8PtrTy)
+    metadataRef = Builder.CreateBitCast(metadataRef, IGM.Int8PtrTy);
+
+  // Call the checked dynamic cast.
+  auto call
+    = Builder.CreateCall2(IGM.getDynamicCastClassFn(),
+                          from, metadataRef);
+  call->setDoesNotThrow();
+  
+  // Compare the result to null.
+  return Builder.CreateICmp(llvm::CmpInst::Predicate::ICMP_NE,
+                            call,
+                            llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+}
+
 namespace {
   /// A visitor for emitting a value into an explosion.  We call this
   /// r-value emission, but do note that it's valid to emit an
@@ -327,7 +352,13 @@ namespace {
     }
     
     void visitIsSubtypeExpr(IsSubtypeExpr *E) {
-      llvm_unreachable("not implemented");
+      /// Emit the value we're testing.
+      Explosion subResult(ExplosionKind::Maximal);
+      IGF.emitRValue(E->getSubExpr(), subResult);
+      ManagedValue val = subResult.claimNext();
+      llvm::Value *object = val.getValue();
+      Out.addUnmanaged(IGF.emitIsSubtype(object,
+                               E->getTypeLoc().getType()->getCanonicalType()));
     }
     
     void visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E) {
