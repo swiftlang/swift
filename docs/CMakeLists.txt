@@ -61,7 +61,7 @@ if(LITRE_EXECUTABLE)
       COMMAND ${CMAKE_COMMAND} -E make_directory "${test_dir}"
       COMMAND 
         ${LITRE_EXECUTABLE} 
-        --config=${CMAKE_CURRENT_SOURCE_DIR}/litre_config.py 
+        --default_compiler=${CMAKE_BINARY_DIR}/bin/swift
         --dump_dir=${test_dir} 
         --traceback 
         --report=severe
