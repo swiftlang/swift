@@ -34,3 +34,31 @@ if(SPHINX_EXECUTABLE)
 else(SPHINX_EXECUTABLE)
   message(WARNING "Unable to find sphinx-build program. Not building docs")
 endif(SPHINX_EXECUTABLE)
+
+## Example testing
+
+find_program(LITRE_EXECUTABLE
+  NAMES litre
+  DOC "LitRe literate programming tool for docutils")
+
+if(LITRE_EXECUTABLE)
+  execute_process(
+    COMMAND ${LITRE_EXECUTABLE} --cmake_module_path
+    OUTPUT_VARIABLE litre_cmake_module_path
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+  list(APPEND CMAKE_MODULE_PATH ${litre_cmake_module_path})
+
+  file(GLOB_RECURSE rst_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.rst)
+  foreach(rst ${rst_files})
+    set(test_dir ${CMAKE_CURRENT_BINARY_DIR}/litre-tests/${rst}.litre-tests)
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E make_directory "${test_dir}"
+      COMMAND ${LITRE_EXECUTABLE} --dump_dir=${test_dir} --traceback ${CMAKE_CURRENT_SOURCE_DIR}/${rst}
+      )
+    add_subdirectory(${test_dir} ${test_dir}/build)
+  endforeach()
+else()
+  message(WARNING "LitRe not found; code examples won't be tested.")
+endif()
+
