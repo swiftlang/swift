@@ -66,9 +66,13 @@ if(LITRE_EXECUTABLE)
         --traceback 
         --report=severe
         ${CMAKE_CURRENT_SOURCE_DIR}/${rst}
+      RESULT_VARIABLE litre_failed
       )
-    # Make that directory part of the build
-    add_subdirectory(${test_dir} ${test_dir}/build)
+
+    if(NOT litre_failed)
+      # Make that directory part of the build
+      add_subdirectory(${test_dir} ${test_dir}/build)
+    endif()
   endforeach()
 else()
   message(WARNING "LitRe not found; code examples won't be tested.")
