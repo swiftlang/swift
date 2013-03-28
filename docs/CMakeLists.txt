@@ -59,7 +59,12 @@ if(LITRE_EXECUTABLE)
     set(test_dir ${CMAKE_CURRENT_BINARY_DIR}/litre-tests/${rst}.litre-tests)
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E make_directory "${test_dir}"
-      COMMAND ${LITRE_EXECUTABLE} --dump_dir=${test_dir} --traceback ${CMAKE_CURRENT_SOURCE_DIR}/${rst}
+      COMMAND 
+        ${LITRE_EXECUTABLE} 
+        --config=${CMAKE_CURRENT_SOURCE_DIR}/litre_config.py 
+        --dump_dir=${test_dir} 
+        --traceback 
+        ${CMAKE_CURRENT_SOURCE_DIR}/${rst}
       )
     # Make that directory part of the build
     add_subdirectory(${test_dir} ${test_dir}/build)
