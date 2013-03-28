@@ -39,6 +39,8 @@ such as a simple, linear search algorithm::
     return 0;
   }
 
+.. @test('compile', howmany = 'all', cmake_args = ['COMPILER', 'c++'])
+
 Generics are important for the construction of useful libraries, because they
 allow the library to adapt to application-specific data types without losing
 type safety. This is especially important for foundational libraries containing
@@ -92,6 +94,10 @@ polymorphism) in Swift. For example, given::
 
   func +(x : Int, y : Int) -> Int { add... }
   func +(x : String, y : String) -> String { concat... }
+
+.. @example.replace('add...','return 1')
+   example.replace('concat...','return ""')
+   test()
 
 we can write the expression "x + y", which will work for both integers and
 strings.
@@ -153,6 +159,8 @@ of protocols::
     func saveToFile(filename : path)
   }
 
+.. @test(howmany='all')
+
 Any type that conforms to PersistentDocument also conforms to VersionedDocument,
 Document, and Serializable, which gives us substitutability.
 
@@ -183,12 +191,16 @@ they explicitly parameterize everything. In C++ concepts::
     bool T::isEqual(T);
   }
 
+.. @ignore()
+
 Java and C# programmers work around this issue by parameterizing the
 interface, e.g. (in Java)::
 
   abstract class Comparable<THIS extends Comparable<THIS>> {
     public bool isEqual(THIS other);
   }
+
+.. @test()
 
 and then a class X that wants to be Comparable will inherit from
 Comparable<X>. This is ugly and has a number of pitfalls; see
