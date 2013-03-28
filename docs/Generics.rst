@@ -159,7 +159,8 @@ of protocols::
     func saveToFile(filename : path)
   }
 
-.. @test(howmany='all')
+.. @example.prepend('struct path {} ; protocol Serializable {}')
+    test(howmany='all')
 
 Any type that conforms to PersistentDocument also conforms to VersionedDocument,
 Document, and Serializable, which gives us substitutability.
