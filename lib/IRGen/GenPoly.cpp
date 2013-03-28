@@ -860,6 +860,27 @@ void IRGenFunction::emitRValueAsUnsubstituted(Expr *E, CanType expectedType,
   emitAsUnsubstituted(*this, E, expectedType, subs, out);
 }
 
+/// Get the source instance and destination type metadata for super-to-archetype
+/// casts.
+static void emitSupertoArchetypeCastParameters(IRGenFunction &IGF,
+                                               Expr *srcExpr,
+                                               CanType destType,
+                                               llvm::Value* &src,
+                                               llvm::Value* &destMetadata) {
+  // Emit the expression.
+  Explosion subResult(ExplosionKind::Maximal);
+  IGF.emitRValue(srcExpr, subResult);
+  ManagedValue val = subResult.claimNext();
+  src = val.getValue();
+  if (src->getType() != IGF.IGM.Int8PtrTy)
+    src = IGF.Builder.CreateBitCast(src, IGF.IGM.Int8PtrTy);
+  
+  // Retrieve the metadata.
+  destMetadata = emitTypeMetadataRef(IGF, destType);
+  if (destMetadata->getType() != IGF.IGM.Int8PtrTy)
+    destMetadata = IGF.Builder.CreateBitCast(destMetadata, IGF.IGM.Int8PtrTy);
+}
+
 void IRGenFunction::emitSupertoArchetypeConversion(Expr *E, CanType destType,
                                                    Explosion &explosion) {
   assert(destType->is<ArchetypeType>() && "expected archetype type");
@@ -872,18 +893,11 @@ void IRGenFunction::emitSupertoArchetypeConversion(Expr *E, CanType destType,
   auto addr = init.emitLocalAllocation(*this, object, NotOnHeap, actualTI,
                                        "substitution.temp").getAddress();
 
-  // Emit the expression.
-  Explosion subResult(ExplosionKind::Maximal);
-  emitRValue(E, subResult);
-  ManagedValue val = subResult.claimNext();
-  auto superObject = val.getValue();
-  if (superObject->getType() != IGM.Int8PtrTy)
-    superObject = Builder.CreateBitCast(superObject, IGM.Int8PtrTy);
-
-  // Retrieve the metadata
-  auto metadataRef = emitTypeMetadataRef(*this, destType);
-  if (metadataRef->getType() != IGM.Int8PtrTy)
-    metadataRef = Builder.CreateBitCast(metadataRef, IGM.Int8PtrTy);
+  // Emit the expression and retrieve the metadata.
+  llvm::Value *superObject, *metadataRef;
+  
+  emitSupertoArchetypeCastParameters(*this, E, destType,
+                                     superObject, metadataRef);
 
   {
     // Call the (unconditional) dynamic cast.
@@ -906,4 +920,27 @@ void IRGenFunction::emitSupertoArchetypeConversion(Expr *E, CanType destType,
   // Add the object to the output explosion.
   addr = Builder.CreateBitCast(addr, IGM.OpaquePtrTy, "temp.cast");
   explosion.add(ManagedValue(addr.getAddress(), cleanup));
+}
+
+void IRGenFunction::emitSuperIsArchetype(Expr *E, CanType destType,
+                                         Explosion &explosion) {
+  assert(destType->is<ArchetypeType>() && "expected archetype type");
+
+  // Emit the expression and retrieve the metadata.
+  llvm::Value *superObject, *metadataRef;
+  
+  emitSupertoArchetypeCastParameters(*this, E, destType,
+                                     superObject, metadataRef);
+  // Call the checked dynamic cast.
+  auto call
+    = Builder.CreateCall2(IGM.getDynamicCastFn(),
+                          superObject, metadataRef);
+  // FIXME: Eventually, we may want to throw.
+  call->setDoesNotThrow();
+
+  // Compare the result to null.
+  llvm::Value *result = Builder.CreateICmp(llvm::CmpInst::Predicate::ICMP_NE,
+                                call,
+                                llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+  explosion.addUnmanaged(result);
 }

@@ -362,7 +362,9 @@ namespace {
     }
     
     void visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E) {
-      llvm_unreachable("not implemented");      
+      IGF.emitSuperIsArchetype(E->getSubExpr(),
+                               E->getTypeLoc().getType()->getCanonicalType(),
+                               Out);
     }
 
     void visitScalarToTupleExpr(ScalarToTupleExpr *E) {
@@ -394,9 +396,6 @@ namespace {
     }
 
     void visitUncheckedSuperToArchetypeExpr(UncheckedSuperToArchetypeExpr *E) {
-      // FIXME: We should check whether the dynamic type of the RHS is
-      // actually the same as the archetype. Right now, this is an
-      // unchecked cast.
       IGF.emitSupertoArchetypeConversion(E->getSubExpr(),
                                          E->getType()->getCanonicalType(),
                                          Out);

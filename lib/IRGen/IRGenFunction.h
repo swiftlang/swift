@@ -345,6 +345,11 @@ public:
   /// using a runtime-checked cast.
   void emitSupertoArchetypeConversion(Expr *E, CanType destType,
                                       Explosion &explosion);
+  
+  /// \brief Perform a runtime check that the given expression is of the given
+  /// archetype type.
+  void emitSuperIsArchetype(Expr *E, CanType destType,
+                            Explosion &explosion);
 
   /// \brief Convert the given value to the given destination type, using a
   /// runtime-checked cast.
