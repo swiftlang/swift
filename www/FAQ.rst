@@ -1,3 +1,4 @@
+.. @raise litre.TestsAreMissing
 .. _FAQ:
 
 Frequently Asked Questions about Swift

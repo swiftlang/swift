@@ -1,3 +1,4 @@
+.. @raise litre.TestsAreMissing
 .. _MemoryAndOwnershipModel:
 
 Swift Memory and Ownership Model

@@ -1,3 +1,4 @@
+.. @raise litre.TestsAreMissing
 .. _index:
 
 Index

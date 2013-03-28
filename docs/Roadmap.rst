@@ -1,3 +1,4 @@
+.. @raise litre.TestsAreMissing
 .. _Roadmap:
 
 Roadmap

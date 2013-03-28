@@ -1,3 +1,4 @@
+.. @raise litre.TestsAreMissing
 .. _SimpleUserDefinedDatatypes:
 
 Swift Simple User Defined Datatypes (enum:union:struct)

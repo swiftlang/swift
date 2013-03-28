@@ -1,3 +1,4 @@
+.. @raise litre.TestsAreMissing
 This document summarizes a few email and meeting discussions we have had. Thanks
 goes to Jordan for the intial thorough email summary.
 

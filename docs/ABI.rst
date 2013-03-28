@@ -1,3 +1,4 @@
+.. @raise litre.TestsAreMissing
 .. _ABI:
 
 The Swift ABI

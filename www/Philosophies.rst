@@ -1,3 +1,4 @@
+.. @raise litre.TestsAreMissing
 .. _Philosophies:
 
 Pervasive Philosophies Guiding the Swift Language Design

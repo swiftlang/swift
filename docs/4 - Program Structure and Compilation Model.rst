@@ -1,3 +1,4 @@
+.. @raise litre.TestsAreMissing
 .. _ProgramStructureAndCompilationModel:
 
 Swift Program Structure and Compilation Model

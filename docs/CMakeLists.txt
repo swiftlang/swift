@@ -64,6 +64,7 @@ if(LITRE_EXECUTABLE)
         --config=${CMAKE_CURRENT_SOURCE_DIR}/litre_config.py 
         --dump_dir=${test_dir} 
         --traceback 
+        --report=severe
         ${CMAKE_CURRENT_SOURCE_DIR}/${rst}
       )
     # Make that directory part of the build

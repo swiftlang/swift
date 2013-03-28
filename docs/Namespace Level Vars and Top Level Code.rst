@@ -1,3 +1,4 @@
+.. @raise litre.TestsAreMissing
 Mutable Namespace-Scope Variable Declarations
 =============================================
 

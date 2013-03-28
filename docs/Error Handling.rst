@@ -1,3 +1,4 @@
+.. @raise litre.TestsAreMissing
 .. ErrorHandlingModel:
 
 Swift Error Handling Model

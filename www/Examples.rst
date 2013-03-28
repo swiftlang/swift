@@ -1,3 +1,4 @@
+.. @raise litre.TestsAreMissing
 .. _Examples:
 
 Example Swift Programs

@@ -1,3 +1,4 @@
+.. @raise litre.TestsAreMissing
 ===================
  Swift Expressions
 ===================
