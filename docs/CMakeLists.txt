@@ -132,7 +132,7 @@ if(LITRE_EXECUTABLE)
 
   # Add a target so these tests show up in the Xcode project.
   add_custom_target(
-    LiterateTests ALL SOURCES ${rst_files}
+    LiterateTests SOURCES ${rst_files}
     DEPENDS litre-tests/results
     )
   set_target_properties(LiterateTests PROPERTIES FOLDER "Tests")
