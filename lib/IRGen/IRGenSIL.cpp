@@ -46,6 +46,47 @@
 using namespace swift;
 using namespace irgen;
 
+llvm::Value *StaticFunction::getExplosionValue(IRGenFunction &IGF) const {
+  // FIXME: Thunk C functions to Swift's CC when producing function values.
+  assert(cc != AbstractCC::C && "thunking C functions not yet implemented");
+  
+  return IGF.Builder.CreateBitCast(function, IGF.IGM.Int8PtrTy);
+}
+
+void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
+  switch (kind) {
+  case Kind::Address:
+    llvm_unreachable("not a value");
+      
+  case Kind::Explosion:
+    assert(ex.getKind() == explosion.kind &&
+           "destination explosion kind mismatch");
+    for (auto *value : explosion.values)
+      ex.addUnmanaged(value);
+    break;
+
+  case Kind::StaticFunction:
+    ex.addUnmanaged(staticFunction.getExplosionValue(IGF));
+    break;
+      
+  case Kind::ObjCMethod:
+    llvm_unreachable("not implemented");
+  }
+}
+
+ExplosionKind LoweredValue::getExplosionKind() const {
+  switch (kind) {
+  case Kind::Address:
+    llvm_unreachable("not a value");
+  case Kind::Explosion:
+    return explosion.kind;
+  case Kind::StaticFunction:
+    return ExplosionKind::Minimal;
+  case Kind::ObjCMethod:
+    llvm_unreachable("not implemented");
+  }
+}
+
 IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                                    CanType t,
                                    ExplosionKind explosionLevel,
@@ -261,7 +302,7 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
     fnptr = getAddrOfAnonymousFunction(constant, anon);
     naturalCurryLevel = constant.uncurryLevel;
     
-    // FIXME: c calling convention
+    // FIXME: c calling convention for anonymous funcs?
     cc = AbstractCC::Freestanding;
     
     if (auto *func = dyn_cast<FuncExpr>(anon)) {
@@ -286,7 +327,7 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
     
     fnptr = getAddrOfFunction(fnRef, ExtraData::None);
     // FIXME: c calling convention
-    cc = vd->isInstanceMember() ? AbstractCC::Method : AbstractCC::Freestanding;
+    cc = getAbstractCC(fd);
     body = fd->getBody()->getBody();
     break;
   }
@@ -301,10 +342,13 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
     else
       llvm_unreachable("getter for decl that's not Var or Subscript");
     
-    body = getter->getBody()->getBody();
-    cc = vd->isInstanceMember()
-      ? AbstractCC::Method
-      : AbstractCC::Freestanding;
+    body = getter ? getter->getBody()->getBody() : nullptr;
+    if (getter)
+      cc = getAbstractCC(getter);
+    else
+      cc = vd->isInstanceMember()
+        ? AbstractCC::Method
+        : AbstractCC::Freestanding;
     break;
   }
   case SILConstant::Kind::Setter: {
@@ -318,10 +362,13 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
     else
       llvm_unreachable("getter for decl that's not Var or Subscript");
 
-    body = setter->getBody()->getBody();
-    cc = vd->isInstanceMember()
-      ? AbstractCC::Method
-      : AbstractCC::Freestanding;
+    body = setter ? setter->getBody()->getBody() : nullptr;
+    if (setter)
+      cc = getAbstractCC(setter);
+    else
+      cc = vd->isInstanceMember()
+        ? AbstractCC::Method
+        : AbstractCC::Freestanding;
     break;
   }
   case SILConstant::Kind::Allocator: {
@@ -337,7 +384,7 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
     fnptr = getAddrOfConstructor(cd, ConstructorKind::Initializing,
                                  ExplosionKind::Minimal);
     body = cd->getBody();
-    cc = AbstractCC::Freestanding;
+    cc = AbstractCC::Method;
     break;
   }
   case SILConstant::Kind::Destructor: {
@@ -375,15 +422,22 @@ void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
                            fnptr, naturalCurryLevel, cc, body);
   
   
-  // Bitcast the reference to i8*, the expected storage type for function
-  // values.
   // Destructors have LLVM type void (%swift.refcounted*), but in SIL
-  // are used with type T -> ().
-  llvm::Value *fnValue = Builder.CreateBitCast(fnptr, IGM.Int8PtrTy);
+  // are used with type T -> (). Bitcast them immediately because the static
+  // function value isn't useful.
+  if (i->getConstant().isDestructor()) {
+    llvm::Value *fnValue = Builder.CreateBitCast(fnptr, IGM.Int8PtrTy);
+    
+    Explosion e(ExplosionKind::Minimal);
+    e.addUnmanaged(fnValue);
+    newLoweredExplosion(Value(i, 0), e);
+    return;
+  }
   
-  Explosion e(CurExplosionLevel);
-  e.addUnmanaged(fnValue);
-  newLoweredExplosion(Value(i, 0), e);
+  // For non-destructor functions, store the function constant and calling
+  // convention as a StaticFunction so we can avoid bitcasting or thunking if
+  // we don't need to.
+  newLoweredStaticFunction(Value(i, 0), fnptr, cc);
 }
 
 void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
@@ -404,61 +458,82 @@ void IRGenSILFunction::visitClassMetatypeInst(swift::ClassMetatypeInst *i) {
 static void emitApplyArgument(IRGenSILFunction &IGF,
                               Explosion &args,
                               LoweredValue &newArg) {
-  switch (newArg.kind) {
-  case LoweredValue::Kind::Explosion: {
-    newArg.getExplosion(args);
-    break;
-  }
-  case LoweredValue::Kind::Address:
+  if (newArg.isValue()) {
+    newArg.getExplosion(IGF, args);
+  } else if (newArg.isAddress()) {
     args.addUnmanaged(newArg.getAddress().getAddress());
-    break;
+  } else
+    llvm_unreachable("not value or address?!");
+}
+
+static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
+                                                   SILType calleeTy,
+                                                   SILType resultTy,
+                                                   LoweredValue const &lv) {
+  llvm::Value *calleeFn, *calleeData;
+  ExtraData extraData;
+  AbstractCC cc;
+  
+  if (lv.kind == LoweredValue::Kind::StaticFunction) {
+    calleeFn = lv.getStaticFunction().getFunction();
+    cc = lv.getStaticFunction().getCC();
+    calleeData = nullptr;
+    extraData = ExtraData::None;
+  } else {
+    Explosion calleeValues = lv.getExplosion(IGF);
+    
+    calleeFn = calleeValues.claimUnmanagedNext();
+    if (!calleeTy.castTo<FunctionType>()->isThin())
+      calleeData = calleeValues.claimUnmanagedNext();
+    else
+      calleeData = nullptr;
+    cc = AbstractCC::Freestanding;
+
+    // Guess the "ExtraData" kind from the type of CalleeData.
+    // FIXME: Should these be typed differently by SIL?
+    if (!calleeData)
+      extraData = ExtraData::None;
+    else if (calleeData->getType() == IGF.IGM.RefCountedPtrTy)
+      extraData = ExtraData::Retainable;
+    else if (calleeData->getType() == IGF.IGM.TypeMetadataPtrTy)
+      extraData = ExtraData::Metatype;
+    else
+      llvm_unreachable("unexpected extra data for function value");
+
+    // Cast the callee pointer to the right function type.
+    // FIXME calling convention. attrs are important for C/ObjC functions too.
+    llvm::AttributeSet attrs;
+    auto fnPtrTy = IGF.IGM.getFunctionType(AbstractCC::Freestanding,
+                                           calleeTy.getSwiftType(),
+                                           IGF.CurExplosionLevel,
+                                           calleeTy.getUncurryLevel(),
+                                           extraData,
+                                           attrs)->getPointerTo();
+
+    calleeFn = IGF.Builder.CreateBitCast(calleeFn, fnPtrTy);
   }
+  
+  // FIXME: apply substitutions from specialization
+  Callee callee = Callee::forKnownFunction(cc,
+                                           calleeTy.getSwiftType(),
+                                           resultTy.getSwiftType(),
+                                           /*FIXME substitutions*/ {},
+                                           calleeFn,
+                                           ManagedValue(calleeData),
+                                           IGF.CurExplosionLevel,
+                                           calleeTy.getUncurryLevel());
+  return CallEmission(IGF, callee);
 }
 
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   Value v(i, 0);
   
-  Explosion calleeValues = getLoweredExplosion(i->getCallee());
-  llvm::Value *calleeFn = calleeValues.claimUnmanagedNext();
-  llvm::Value *calleeData = nullptr;
-  
-  SILType calleeTy = i->getCallee().getType();
-  if (!calleeTy.castTo<FunctionType>()->isThin())
-    calleeData = calleeValues.claimUnmanagedNext();
-  
-  // FIXME Guess the "ExtraData" kind from the type of CalleeData.
-  ExtraData extraData;
-  if (!calleeData)
-    extraData = ExtraData::None;
-  else if (calleeData->getType() == IGM.RefCountedPtrTy)
-    extraData = ExtraData::Retainable;
-  else if (calleeData->getType() == IGM.TypeMetadataPtrTy)
-    extraData = ExtraData::Metatype;
-  else
-    llvm_unreachable("unexpected extra data for function value");
-  
-  // Cast the callee pointer to the right function type.
-  // FIXME calling convention. attrs are important for C/ObjC functions too.
-  llvm::AttributeSet attrs;
-  auto fnPtrTy = IGM.getFunctionType(AbstractCC::Freestanding,
-                                     calleeTy.getSwiftType(),
-                                     CurExplosionLevel,
-                                     calleeTy.getUncurryLevel(),
-                                     extraData,
-                                     attrs)->getPointerTo();
-  calleeFn = Builder.CreateBitCast(calleeFn, fnPtrTy);
+  LoweredValue const &calleeLV = getLoweredValue(i->getCallee());
 
-  // FIXME: calling convention for entrypoint
-  // FIXME: apply substitutions from specialization
-  Callee callee = Callee::forKnownFunction(AbstractCC::Freestanding,
-                                     calleeTy.getSwiftType(),
-                                     i->getType().getSwiftType(),
-                                     /*FIXME substitutions*/ {},
-                                     calleeFn,
-                                     ManagedValue(calleeData),
-                                     CurExplosionLevel,
-                                     calleeTy.getUncurryLevel());
-  CallEmission emission(*this, callee);
+  CallEmission emission = getCallEmissionForLoweredValue(*this,
+                                                         i->getCallee().getType(),
+                                                         i->getType(),
+                                                         calleeLV);
   
   SILFunctionTypeInfo *ti
     = IGM.SILMod->getFunctionTypeInfo(i->getCallee().getType());
@@ -488,15 +563,23 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
 void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   Value v(i, 0);
 
-  // For a closure thunk to make sense there must be an llvm::Function*
-  // underlying the operand value. It may have been bitcast.
-  Explosion calleeValues = getLoweredExplosion(i->getCallee());
-  auto *calleeValue = cast<llvm::Constant>(calleeValues.claimUnmanagedNext());
-  auto *calleeFn = cast<llvm::Function>(calleeValue->getOperand(0));
+  // Get the static function value.
+  // FIXME: We'll need to be able to close over runtime function values
+  // too, by including the function pointer and context data into the new
+  // closure context.
+  LoweredValue &lv = getLoweredValue(i->getCallee());
+  assert(lv.kind == LoweredValue::Kind::StaticFunction &&
+         "partial application of non-static functions not yet implemented");
+
+  auto *calleeFn = lv.getStaticFunction().getFunction();
+  assert(lv.getStaticFunction().getCC() != AbstractCC::C &&
+         "partial application of C calling convention functions not implemented");
   
   // Apply the closure up to the next-to-last uncurry level to gather the
   // context arguments.
 
+  // FIXME: We may need to close over fat function values to be able to curry
+  // specialized 
   assert(i->getCallee().getType().castTo<FunctionType>()->isThin() &&
          "can't closure a function that already has context");
   assert(i->getCallee().getType().getUncurryLevel() >= 1 &&

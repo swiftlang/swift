@@ -32,6 +32,24 @@
 namespace swift {
 namespace irgen {
 
+/// Represents a statically-known function as a SIL thin function value.
+class StaticFunction {
+  /// The function reference.
+  llvm::Function *function;
+  /// The function's native calling convention.
+  AbstractCC cc;
+  
+public:
+  StaticFunction(llvm::Function *function, AbstractCC cc)
+    : function(function), cc(cc)
+  {}
+  
+  llvm::Function *getFunction() const { return function; }
+  AbstractCC getCC() const { return cc; }
+  
+  llvm::Value *getExplosionValue(IRGenFunction &IGF) const;
+};
+
 /// Represents a SIL value lowered to IR, in one of these forms:
 /// - an Address, corresponding to a SIL address value;
 /// - an Explosion of (unmanaged) Values, corresponding to a SIL "register"; or
@@ -39,8 +57,22 @@ namespace irgen {
 class LoweredValue {
 public:
   enum class Kind {
+    /// This LoweredValue corresponds to a SIL address value.
     Address,
-    Explosion,
+    
+    /// The following kinds correspond to SIL non-address values.
+    Value_First,
+      /// A normal value, represented as an exploded array of llvm Values.
+      Explosion = Value_First,
+    
+      /// A value that represents a statically-known function symbol that
+      /// can be called directly, represented as a StaticFunction.
+      StaticFunction,
+    
+      /// A value that represents an Objective-C method that must be called with
+      /// a form of objc_msgSend.
+      ObjCMethod,
+    Value_Last = ObjCMethod
   };
   
   Kind kind;
@@ -54,11 +86,16 @@ private:
       ExplosionKind kind;
       ExplosionVector values;
     } explosion;
+    StaticFunction staticFunction;
   };
 
 public:
   LoweredValue(Address const &address)
     : kind(Kind::Address), address(address)
+  {}
+  
+  LoweredValue(StaticFunction &&staticFunction)
+    : kind(Kind::StaticFunction), staticFunction(std::move(staticFunction))
   {}
   
   LoweredValue(Explosion &e)
@@ -88,32 +125,37 @@ public:
       explosion.kind = lv.explosion.kind;
       ::new (&explosion.values) ExplosionVector(std::move(lv.explosion.values));
       break;
+    case Kind::StaticFunction:
+      ::new (&staticFunction) StaticFunction(std::move(lv.staticFunction));
+      break;
+    case Kind::ObjCMethod:
+      llvm_unreachable("not implemented");
     }
   }
-           
-  Address getAddress() {
+  
+  bool isAddress() const { return kind == Kind::Address; }
+  bool isValue() const {
+    return kind >= Kind::Value_First && kind <= Kind::Value_Last;
+  }
+  
+  Address getAddress() const {
     assert(kind == Kind::Address && "not an address");
     return address;
   }
   
-  void getExplosion(Explosion &ex) {
-    assert(kind == Kind::Explosion && "not an explosion");
-    assert(ex.getKind() == explosion.kind &&
-           "destination explosion kind mismatch");
-    for (auto *value : explosion.values)
-      ex.addUnmanaged(value);
-  }
+  void getExplosion(IRGenFunction &IGF, Explosion &ex) const;
   
-  Explosion getExplosion() {
-    assert(kind == Kind::Explosion && "not an explosion");
-    Explosion e(explosion.kind);
-    getExplosion(e);
+  ExplosionKind getExplosionKind() const;
+  
+  Explosion getExplosion(IRGenFunction &IGF) const {
+    Explosion e(getExplosionKind());
+    getExplosion(IGF, e);
     return e;
   }
   
-  ExplosionKind getExplosionKind() {
-    assert(kind == Kind::Explosion && "not an explosion");
-    return explosion.kind;
+  StaticFunction const &getStaticFunction() const {
+    assert(kind == Kind::StaticFunction && "not a static function");
+    return staticFunction;
   }
   
   ~LoweredValue() {
@@ -124,6 +166,11 @@ public:
     case Kind::Explosion:
       explosion.values.~ExplosionVector();
       break;
+    case Kind::StaticFunction:
+      staticFunction.~StaticFunction();
+      break;
+    case Kind::ObjCMethod:
+      llvm_unreachable("not implemented");
     }
   }
 };
@@ -194,6 +241,17 @@ public:
     assert(inserted.second && "already had lowered value for sil value?!");
   }
   
+  /// Create a new StaticFunction corresponding to the given SIL value.
+  void newLoweredStaticFunction(swift::Value v,
+                                llvm::Function *f,
+                                AbstractCC cc) {
+    assert(!v.getType().isAddress() && "function for address value?!");
+    assert(v.getType().is<AnyFunctionType>() &&
+           "function for non-function value?!");
+    auto inserted = loweredValues.insert({v, StaticFunction{f, cc}});
+    assert(inserted.second && "already had lowered value for sil value?!");
+  }
+  
   /// Get the Explosion corresponding to the given SIL value, which must
   /// previously exist.
   LoweredValue &getLoweredValue(swift::Value v) {
@@ -207,10 +265,10 @@ public:
     return getLoweredValue(v).getAddress();
   }
   void getLoweredExplosion(swift::Value v, Explosion &e) {
-    getLoweredValue(v).getExplosion(e);
+    getLoweredValue(v).getExplosion(*this, e);
   }
   Explosion getLoweredExplosion(swift::Value v) {
-    return getLoweredValue(v).getExplosion();
+    return getLoweredValue(v).getExplosion(*this);
   }
   ExplosionKind getExplosionKind(swift::Value v) {
     return getLoweredValue(v).getExplosionKind();
