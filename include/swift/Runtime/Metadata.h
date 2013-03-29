@@ -438,6 +438,9 @@ struct HeapMetadataHeaderPrefix {
 
 /// The header present on all heap metadata.
 struct HeapMetadataHeader : HeapMetadataHeaderPrefix, TypeMetadataHeader {
+  constexpr HeapMetadataHeader(const HeapMetadataHeaderPrefix &heapPrefix,
+                               const TypeMetadataHeader &typePrefix)
+    : HeapMetadataHeaderPrefix(heapPrefix), TypeMetadataHeader(typePrefix) {}
 };
 
 /// The common structure of all metadata for heap-allocated types.  A
@@ -448,6 +451,9 @@ struct HeapMetadataHeader : HeapMetadataHeaderPrefix, TypeMetadataHeader {
 /// not be the Swift type metadata for the object's dynamic type.
 struct HeapMetadata : Metadata {
   typedef HeapMetadataHeader HeaderType;
+
+  HeapMetadata() = default;
+  constexpr HeapMetadata(const Metadata &base) : Metadata(base) {}
 };
 
 /// Information about a nominal type.  Not described for now.
@@ -460,6 +466,13 @@ struct NominalTypeDescriptor;
 /// Note that the layout of this type is compatible with the layout of
 /// an Objective-C class.
 struct ClassMetadata : public HeapMetadata {
+  ClassMetadata() = default;
+  constexpr ClassMetadata(const HeapMetadata &base,
+                          const ClassMetadata *superClass,
+                          uintptr_t data)
+    : HeapMetadata(base), SuperClass(superClass),
+      CacheData{ nullptr, nullptr }, Data(data) {}
+
   /// The metadata for the super class.  This is null for the root class.
   const ClassMetadata *SuperClass;
 

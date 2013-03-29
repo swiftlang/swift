@@ -78,7 +78,10 @@ TEST(MetadataTest, getGenericMetadata) {
   ASSERT_EQ(&Global3, fields[2]);  
 }
 
-FullMetadata<ClassMetadata> MetadataTest2;
+FullMetadata<ClassMetadata> MetadataTest2 = {
+  { { nullptr }, { &_TWVBo } },
+  { { { MetadataKind::Class } }, nullptr, 0 }
+};
 
 TEST(MetadataTest, getMetatypeMetadata) {
   auto inst1a = swift_getMetatypeMetadata(&_TMdBi64_.base);
@@ -92,12 +95,6 @@ TEST(MetadataTest, getMetatypeMetadata) {
   // Both of these are trivial metatypes.
   ASSERT_EQ(size_t(0), inst1a->getValueWitnesses()->size);
   ASSERT_EQ(size_t(0), inst2a->getValueWitnesses()->size);
-
-  // Fill out a fake class metadata.
-  MetadataTest2.Kind = MetadataKind::Class;
-  MetadataTest2.ValueWitnesses = &_TWVBo;
-  MetadataTest2.destroy = nullptr;
-  MetadataTest2.SuperClass = nullptr;
 
   auto inst3a = swift_getMetatypeMetadata(&MetadataTest2);
   auto inst3b = swift_getMetatypeMetadata(&MetadataTest2);
