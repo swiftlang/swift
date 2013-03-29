@@ -41,39 +41,100 @@ find_program(LITRE_EXECUTABLE
   NAMES litre
   DOC "LitRe literate programming tool for docutils")
 
-if(LITRE_EXECUTABLE)
-  # Make the LitreTesting cmake module available
-  execute_process(
-    COMMAND ${LITRE_EXECUTABLE} --cmake_module_path
-    OUTPUT_VARIABLE litre_cmake_module_path
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-  list(APPEND CMAKE_MODULE_PATH ${litre_cmake_module_path})
+find_program(SPHINX_EXECUTABLE
+  NAMES sphinx-build
+  HINTS $ENV{SPHINX_DIR}
+  PATH_SUFFIXES bin
+  DOC "Sphinx documentation generator")
 
+if(LITRE_EXECUTABLE)
   # Find all the .rst files
   file(GLOB_RECURSE rst_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.rst)
+  set(subdir_CMakeLists)
 
   foreach(rst ${rst_files})
     # Prepare a testing directory containing a CMakeLists.txt 
     # and example files extracted from the .rst
-    set(test_dir ${CMAKE_CURRENT_BINARY_DIR}/litre-tests/${rst}.litre-tests)
-    execute_process(
-      COMMAND ${CMAKE_COMMAND} -E make_directory "${test_dir}"
+    set(test_dir "litre-tests/${rst}.litre-tests")
+
+    add_custom_command(
+      OUTPUT 
+        ${test_dir}/CMakeLists.txt
       COMMAND 
         ${LITRE_EXECUTABLE} 
         --default_compiler=${CMAKE_BINARY_DIR}/bin/swift
-        --dump_dir=${test_dir} 
+        "--dump_dir=${test_dir}"
         --traceback 
-        --report=severe
+        --report=severe  # suppress most .rst errors.  We have lots of them.
         ${CMAKE_CURRENT_SOURCE_DIR}/${rst}
-      RESULT_VARIABLE litre_failed
+      COMMENT
+        "Generating/Updating LitRe tests for ${rst}"
+      VERBATIM
       )
 
-    if(NOT litre_failed)
-      # Make that directory part of the build
-      add_subdirectory(${test_dir} ${test_dir}/build)
-    endif()
+    list(APPEND subdir_CMakeLists ${test_dir}/CMakeLists.txt)
   endforeach()
+
+  # Create a top-level CMakeLists.txt in a temporary file
+  add_custom_command(
+    OUTPUT
+      litre-top-CMakeLists.cmake
+    COMMAND
+      ${CMAKE_COMMAND} -DOUTPUT=litre-top-CMakeLists.cmake 
+                      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/GenerateTopLevelLitreCMakeLists.cmake
+          ${rst_files}
+    DEPENDS
+      ${rst_files}
+    COMMENT
+      "Generating top-level LitRe CMakeLists.txt content"
+    VERBATIM
+    )
+
+  # Only update the real top-level CMakeLists.txt if something  changed
+  add_custom_command(
+    OUTPUT
+      litre-tests/CMakeLists.txt
+    COMMAND
+      ${CMAKE_COMMAND} -E copy_if_different litre-top-CMakeLists.cmake litre-tests/CMakeLists.txt
+    DEPENDS
+      litre-top-CMakeLists.cmake
+    COMMENT
+      "Updating top-level LitRe CMakeLists.txt"
+    VERBATIM
+      )
+
+  # Create a build directory
+  add_custom_command(
+    OUTPUT litre-tests/build 
+    COMMAND ${CMAKE_COMMAND} -E make_directory litre-tests/build
+    )
+
+  # Run CMake itself to configure/build the tests
+  add_custom_command(
+    OUTPUT
+      litre-tests/results
+    COMMAND
+      ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" "${CMAKE_CURRENT_BINARY_DIR}/litre-tests"
+    COMMAND
+      ${CMAKE_COMMAND} --build .
+    COMMAND
+      ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/litre-tests/results"
+    WORKING_DIRECTORY
+      litre-tests/build
+    DEPENDS
+      litre-tests/CMakeLists.txt litre-tests/build ${subdir_CMakeLists}
+    COMMENT
+      "Running LitRe tests"
+    VERBATIM
+      )
+
+  # Add a target so these tests show up in the Xcode project.
+  add_custom_target(
+    LiterateTests ALL SOURCES ${rst_files}
+    DEPENDS litre-tests/results
+    )
+  set_target_properties(LiterateTests PROPERTIES FOLDER "Tests")
 else()
   message(WARNING "LitRe not found; code examples won't be tested.")
 endif()
