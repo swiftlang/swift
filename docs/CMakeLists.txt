@@ -123,6 +123,7 @@ if(LITRE_EXECUTABLE)
     WORKING_DIRECTORY
       litre-tests/build
     DEPENDS
+      ${CMAKE_BINARY_DIR}/bin/swift
       litre-tests/CMakeLists.txt litre-tests/build ${subdir_CMakeLists}
     COMMENT
       "Running LitRe tests"
