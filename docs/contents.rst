@@ -10,7 +10,7 @@ Contents
    :maxdepth: 1
 
    2c - Expressions
-   3 - Simple User Defined Datatypes (enum:union:struct)
+   3 - Simple User Defined Datatypes i.e. enum, union, and struct
    4 - Program Structure and Compilation Model
    5 - Memory and Ownership Model
    6 - Memory and Concurrency Model
