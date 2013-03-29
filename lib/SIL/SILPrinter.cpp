@@ -388,6 +388,12 @@ public:
   void visitClassMetatypeInst(ClassMetatypeInst *MI) {
     OS << "class_metatype $" << MI->getType() << ", " << getID(MI->getBase());
   }
+  void visitArchetypeMetatypeInst(ArchetypeMetatypeInst *MI) {
+    OS << "archetype_metatype $" << MI->getType() << ", " << getID(MI->getBase());
+  }
+  void visitProtocolMetatypeInst(ProtocolMetatypeInst *MI) {
+    OS << "protocol_metatype $" << MI->getType() << ", " << getID(MI->getBase());
+  }
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype $" << MI->getType();
   }

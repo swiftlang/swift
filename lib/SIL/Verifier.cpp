@@ -238,6 +238,28 @@ public:
              CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()) &&
            "class_metatype result must be metatype of base class type");
   }
+  void visitArchetypeMetatypeInst(ArchetypeMetatypeInst *MI) {
+    assert(MI->getType().is<MetaTypeType>() &&
+           "archetype_metatype instruction must be of metatype type");
+    assert(MI->getBase().getType().isAddress() &&
+           "archetype_metatype operand must be an address");
+    assert(MI->getBase().getType().getSwiftRValueType()->is<ArchetypeType>() &&
+           "archetype_metatype operand must be address of archetype type");
+    assert(MI->getBase().getType().getSwiftRValueType() ==
+           CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()) &&
+           "archetype_metatype result must be metatype of operand type");
+  }
+  void visitProtocolMetatypeInst(ProtocolMetatypeInst *MI) {
+    assert(MI->getType().is<MetaTypeType>() &&
+           "protocol_metatype instruction must be of metatype type");
+    assert(MI->getBase().getType().isAddress() &&
+           "protocol_metatype operand must be an address");
+    assert(MI->getBase().getType().getSwiftRValueType()->isExistentialType() &&
+           "protocol_metatype operand must be address of protocol type");
+    assert(MI->getBase().getType().getSwiftRValueType() ==
+           CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()) &&
+           "protocol_metatype result must be metatype of operand type");
+  }
   void visitModuleInst(ModuleInst *MI) {
     assert(MI->getType(0).is<ModuleType>() &&
            "module instruction must be of module type");

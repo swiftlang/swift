@@ -313,6 +313,18 @@ public:
     return insert(new ClassMetatypeInst(Loc, Metatype, Base));
   }
 
+  ArchetypeMetatypeInst *createArchetypeMetatype(SILLocation Loc,
+                                                 SILType Metatype,
+                                                 Value Base) {
+    return insert(new ArchetypeMetatypeInst(Loc, Metatype, Base));
+  }
+  
+  ProtocolMetatypeInst *createProtocolMetatype(SILLocation Loc,
+                                               SILType Metatype,
+                                               Value Base) {
+    return insert(new ProtocolMetatypeInst(Loc, Metatype, Base));
+  }
+  
   ModuleInst *createModule(SILLocation Loc, SILType ModuleType) {
     return insert(new ModuleInst(Loc, ModuleType));
   }

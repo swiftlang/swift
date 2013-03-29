@@ -723,17 +723,28 @@ archetype_method
 ::
 
   %1 = archetype_method %0, @method
-  ; %0 must be an address of an archetype $*T
+  ; %0 must be the address of an archetype $*T
+  ;   or an archetype metatype $T.metatype
   ; @method must be a reference to a method of one of the constraints of T
   ; %1 will be of uncurried type (T)(U') -> V' for method type U -> V,
   ;   where self and associated types in U and V are bound relative to T in
   ;   U' and V'
-  ;   e.g. method `(This, Foo) -> Protocol.Bar` becomes `(T, Foo) -> T.Bar`
+  ;   e.g. method `(This)(Foo) -> Protocol.Bar` becomes `(T)(Foo) -> T.Bar`
 
 Obtains a reference to the function implementing ``@method`` for the archetype
 referenced by ``%0``. In the type of the resulting function, self and
 associated types in the signature of ``@method`` are bound relative to
 the type pointed to by ``%0``. The returned function reference is uncurried.
+
+archetype_metatype
+``````````````````
+::
+
+  %1 = archetype_metatype %0
+  ; %0 must be the address of an archetype $*T
+  ; %1 will be of type $T.metatype
+
+Obtains a reference to the metatype of the archetype value ``%0``.
 
 associated_metatype
 ```````````````````
@@ -824,43 +835,55 @@ containers that have been partially initialized by ``init_existential``
 but haven't had their value initialized. A fully initialized existential can
 be destroyed with ``destroy_addr`` like a normal address-only value.
 
+protocol_ref
+````````````
+::
+
+  %1 = protocol_ref $T
+  ; $T must be a protocol type
+  ; %0 will be of type $T.metatype
+  ; FIXME: Should be of "Protocol" type
+
+Obtains a reference to the protocol value for protocol ``T``.
+
 protocol_method
 ```````````````
 ::
 
   %1 = protocol_method %0, @method
   ; %0 must be of an address type $*P for protocol or protocol composition
-  ;   type P
+  ;   type P, or a metatype-of-protocol-type $P.metatype
   ; @method must be a reference to a method of (one of the) protocol(s) P
-  ; %1 will be of uncurried type (T..., Builtin.OpaquePointer) -> U
+  ;
+  ; If %0 is a protocol address, then %1 will be of uncurried type
+  ;   (OpaquePointer)(T...) -> U
+  ;   for method type (T...) -> U
+  ; If %1 is a protocol metatype, then %1 will be of uncurried type
+  ;   (P.metatype)(T...) -> U
   ;   for method type (T...) -> U
 
 Obtains a reference to the function implementing protocol method ``@method``
 for the concrete value referenced by the existential container
-referenced by ``%0``. The resulting function value will take a pointer
-to the ``this`` value as an ``OpaquePointer``. The ``this`` pointer value can
-be derived from the existential container with a ``project_existential``
-instruction (for instance methods) or ``existential_metatype`` (for static
-methods). The returned function reference is uncurried.
+referenced by ``%0``. If ``@method`` is an instance method, the resulting
+function value will take a pointer to the ``this`` value as an
+``OpaquePointer``, which must be derived from the existential container with
+a ``project_existential`` instruction. If ``@method`` is a static method, the
+resulting function value will take ``This`` as a protocol metatype value.
 
-existential_metatype
-````````````````````
+protocol_metatype
+`````````````````
 ::
 
-  %1 = existential_metatype %0
+  %1 = protocol_metatype %0
   ; %0 must be of an address type $*P for protocol or protocol composition
   ;   type P
-  ; %1 will be a $Builtin.OpaquePointer referencing the metatype of the
+  ; %1 will be a $P.metatype value referencing the metatype of the
   ;   concrete value of %0
 
-Obtains an ``OpaquePointer`` pointing to the metatype of the concrete value
-reference by the existential container referenced by ``%0``. This pointer
+Obtains the metatype of the concrete value
+referenced by the existential container referenced by ``%0``. This pointer
 can be passed to protocol static methods obtained by ``protocol_method`` from
 the same existential container.
-
-It is an error if the result of ``existential_metatype`` is used as anything
-other than the "This" argument of a static method reference obtained by
-``protocol_method`` from the same existential container.
 
 project_existential
 ```````````````````
@@ -898,11 +921,11 @@ other than the "this" argument of an instance method reference obtained by
 Functions
 ~~~~~~~~~
 
-curry
-`````
+partial_apply
+`````````````
 ::
 
-  %C = curry %0(%1, %2, ...)
+  %C = partial_apply %0(%1, %2, ...)
   ; %0 must be of a concrete uncurried function type $(A...)(B...)...(C) -> R
   ; %1, %2, etc. must be of the types A..., B..., etc. of the outermost
   ;   uncurry levels
@@ -924,21 +947,21 @@ emits curry thunks in SIL as follows::
   func @foo : $(a:A) -> (b:B) -> (c:C) -> (d:D) -> E {
   entry(%a:$A):
     %foo.1 = constant_ref $(a:A)(b:B) -> (c:C) -> (d:D) -> E, @foo.1
-    %thunk = curry %foo.1(%a)
+    %thunk = partial_apply %foo.1(%a)
     return %thunk
   }
 
   func @foo.1 : $(a:A)(b:B) -> (c:C) -> (d:D) -> E {
   entry(%a:$A, %b:$B):
     %foo.2 = constant_ref $(a:A)(b:B)(c:C) -> (d:D) -> E, @foo.2
-    %thunk = curry %foo.2(%a, %b)
+    %thunk = partial_apply %foo.2(%a, %b)
     return %thunk
   }
 
   func @foo.2 : $(a:A)(b:B)(c:C) -> (d:D) -> E {
   entry(%a:$A, %b:$B, %c:$C):
     %foo.3 = constant_ref $(a:A)(b:B)(c:C)(d:D) -> E, @foo.3
-    %thunk = curry %foo.3(%a, %b, %c)
+    %thunk = partial_apply %foo.3(%a, %b, %c)
     return %thunk
   }
 
@@ -967,7 +990,7 @@ lowers to an uncurried entry point and is curried by the enclosing function::
   entry(%x:$Int):
     ; Create the bar closure
     %bar.uncurry = constant_ref $(x:Int)(y:Int) -> Int, @bar
-    %bar = curry %bar.uncurry(%x)
+    %bar = partial_apply %bar.uncurry(%x)
 
     ; Apply it
     %1 = integer_literal 1

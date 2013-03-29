@@ -698,6 +698,46 @@ public:
     return V->getKind() == ValueKind::ClassMetatypeInst;
   }
 };
+  
+/// ArchetypeMetatypeInst - Represents loading a dynamic metatype from an
+/// archetype instance.
+class ArchetypeMetatypeInst : public Instruction {
+  enum { Base };
+  FixedOperandList<1> Operands;
+
+public:
+  ArchetypeMetatypeInst(SILLocation Loc, SILType Metatype, Value Base);
+
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  
+  /// Get the base instance from which the metatype will be loaded.
+  Value getBase() const { return Operands[Base].get(); }
+
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ArchetypeMetatypeInst;
+  }
+};
+  
+/// ProtocolMetatype - Represents loading a dynamic metatype from an
+/// existential container.
+class ProtocolMetatypeInst : public Instruction {
+  enum { Base };
+  FixedOperandList<1> Operands;
+
+public:
+  ProtocolMetatypeInst(SILLocation Loc, SILType Metatype, Value Base);
+  
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  
+  /// Get the base instance from which the metatype will be loaded.
+  Value getBase() const { return Operands[Base].get(); }
+  
+  static bool classof(Value V) {
+    return V->getKind() == ValueKind::ProtocolMetatypeInst;
+  }
+};
 
 /// ModuleInst - Represents a reference to a module as a value.
 class ModuleInst : public Instruction {

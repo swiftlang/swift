@@ -386,6 +386,16 @@ ClassMetatypeInst::ClassMetatypeInst(SILLocation Loc, SILType Metatype,
   : Instruction(ValueKind::ClassMetatypeInst, Loc, Metatype),
     Operands(this, Base) {}
 
+ArchetypeMetatypeInst::ArchetypeMetatypeInst(SILLocation Loc, SILType Metatype,
+                                             Value Base)
+  : Instruction(ValueKind::ArchetypeMetatypeInst, Loc, Metatype),
+    Operands(this, Base) {}
+
+ProtocolMetatypeInst::ProtocolMetatypeInst(SILLocation Loc, SILType Metatype,
+                                           Value Base)
+  : Instruction(ValueKind::ProtocolMetatypeInst, Loc, Metatype),
+    Operands(this, Base) {}
+
 ModuleInst::ModuleInst(SILLocation Loc, SILType ModuleType)
   : Instruction(ValueKind::ModuleInst, Loc, ModuleType) {}
 

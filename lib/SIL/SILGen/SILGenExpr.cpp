@@ -1114,15 +1114,25 @@ ManagedValue SILGenFunction::visitMetatypeExpr(MetatypeExpr *E, SGFContext C) {
   // Evaluate the base if present.
   if (E->getBase()) {
     ManagedValue base = visit(E->getBase());
-    // For class types, look up the dynamic metatype.
-    if (base.getType().getSwiftType()->getClassOrBoundGenericClass()) {
+    // For class, archetype, and protocol types, look up the dynamic metatype.
+    if (E->getBase()->getType()->getClassOrBoundGenericClass()) {
       return ManagedValue(
         B.createClassMetatype(E, getLoweredLoadableType(E->getType()),
                               base.getValue()),
         ManagedValue::Unmanaged);
     }
-    // FIXME: Archetypes and protocol types should need dynamic metatype lookup
-    // too.
+    if (E->getBase()->getType()->is<ArchetypeType>()) {
+      return ManagedValue(
+        B.createArchetypeMetatype(E, getLoweredLoadableType(E->getType()),
+                                  base.getValue()),
+        ManagedValue::Unmanaged);
+    }
+    if (E->getBase()->getType()->isExistentialType()) {
+      return ManagedValue(
+        B.createProtocolMetatype(E, getLoweredLoadableType(E->getType()),
+                                 base.getValue()),
+        ManagedValue::Unmanaged);
+    }
   }
   
   // Otherwise, ignore the base and return the static metatype.
