@@ -49,6 +49,15 @@ CPP.Flags += -DSWIFT_VENDOR='"$(SWIFT_VENDOR) "'
 endif
 
 ###
+# Create a symlink lib/swift to lib so that we can provide a consistent
+# path schema for installed and build-directory environments.
+
+SWIFT_HEADER_DIR := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift
+
+$(SWIFT_HEADER_DIR):
+	ln -s . $(SWIFT_HEADER_DIR)
+
+###
 # Swift Top Level specific stuff.
 
 ifeq ($(IS_TOP_LEVEL),1)

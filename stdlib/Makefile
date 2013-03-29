@@ -69,15 +69,20 @@ SWIFT_OPTFLAG := -O3
 LDFLAGS += -framework Foundation \
 	   -lswift_runtime -Wl,-force_load,$(LibDir)/libswift_runtime.a
 
-HeaderDir := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift/
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
-$(HeaderDir)/swift.swift: $(PATH_TO_SWIFT_SOURCES) $(HeaderDir)/.dir
+
+$(SWIFT_HEADER_DIR)/swift.swift: $(PATH_TO_SWIFT_SOURCES) $(SWIFT_HEADER_DIR)
 	$(Echo) FIXME -- HACK -- Concatenating $(SWIFT_SOURCES) to build dir
 	$(Verb) cat $(PATH_TO_SWIFT_SOURCES) > $@
 
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
-$(ObjDir)/swift.o: $(HeaderDir)/swift.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
+$(ObjDir)/swift.o: $(SWIFT_HEADER_DIR)/swift.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
 	$(Verb) $(SWIFT_COMPILER) -c $< -o $@ -parse-as-library $(SWIFT_OPTFLAG)
 
-all-local:: $(HeaderDir)/swift.swift
+$(SharedLibDir)/swift/%.$(SHLIBEXT): $(SharedLibDir)/swift/.dir
+	ln -s ../$(@F) $@
+
+$(SharedLibDir)/%.$(SHLIBEXT): $(SharedLibDir)/swift/%.$(SHLIBEXT)
+
+all-local:: $(SWIFT_HEADER_DIR)/swift.swift

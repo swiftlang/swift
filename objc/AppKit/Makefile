@@ -41,15 +41,14 @@ SWIFT_OPTFLAG := -O3
 LDFLAGS += -framework AppKit \
 	   -lswift_stdlib -lswift_runtime -lswiftObjectiveC -lswiftFoundation -Wl,-force_load,$(LibDir)/libswift_runtime.a
 
-HeaderDir := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift/
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
-$(HeaderDir)/AppKit.swift: $(PATH_TO_SWIFT_SOURCES) $(HeaderDir)/.dir
+$(SWIFT_HEADER_DIR)/AppKit.swift: $(PATH_TO_SWIFT_SOURCES) $(SWIFT_HEADER_DIR)
 	$(Echo) FIXME -- HACK -- Concatenating $(SWIFT_SOURCES) to build dir
 	$(Verb) cat $(PATH_TO_SWIFT_SOURCES) > $@
 
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
-$(ObjDir)/AppKit.o: $(HeaderDir)/AppKit.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
+$(ObjDir)/AppKit.o: $(SWIFT_HEADER_DIR)/AppKit.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
 	$(Verb) $(SWIFT_COMPILER) -c $(SWIFT_SDKFLAG) $< -o $@ -parse-as-library $(SWIFT_OPTFLAG)
 
-all-local:: $(HeaderDir)/AppKit.swift
+all-local:: $(SWIFT_HEADER_DIR)/AppKit.swift
