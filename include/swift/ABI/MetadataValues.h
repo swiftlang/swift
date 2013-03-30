@@ -60,7 +60,8 @@ enum class MetadataKind : uintptr_t {
   // Array types?
   // L-value types?
 
-  // After this point start the non-type metadata.
+  /// After this point start the non-type metadata.
+  NonTypeMetadata_First = 64,
 
   /// A heap-allocated local variable.
   HeapLocalVariable = 64,
