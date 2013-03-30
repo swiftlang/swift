@@ -213,6 +213,23 @@ SILModule *SILModule::constructSIL(TranslationUnit *tu, unsigned startElem) {
   SILGenModule sgm(*m);
   for (Decl *D : llvm::makeArrayRef(tu->Decls).slice(startElem))
     sgm.visit(D);
+  
+  // Emit external definitions from Clang modules.
+  // FIXME: O(n^2), since the same Clang module gets seen through multiple TUs
+  for (auto mod : tu->getASTContext().LoadedClangModules) {
+    for (auto &def : mod->getExternalDefinitions()) {
+      switch (def.getStage()) {
+        case ExternalDefinition::NameBound:
+          llvm_unreachable("external definition not type-checked");
+          
+        case ExternalDefinition::TypeChecked:
+          // FIXME: We should emit this definition only if it's actually needed.
+          sgm.emitExternalDefinition(def.getDecl());
+          break;
+      }
+    }
+  }
+
   return m;
 }
 

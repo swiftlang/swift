@@ -696,3 +696,34 @@ void SILGenType::visitConstructorDecl(ConstructorDecl *cd) {
   SGM.emitConstructor(cd);
 }
 
+void SILGenModule::emitExternalDefinition(Decl *d) {
+  switch (d->getKind()) {
+  case DeclKind::Func: {
+    auto *fd = cast<FuncDecl>(d);
+    emitFunction(fd, fd->getBody());
+    break;
+  }
+  case DeclKind::Constructor: {
+    emitConstructor(cast<ConstructorDecl>(d));
+    break;
+  }
+  case DeclKind::Struct: {
+    // Nothing to do in SILGen for external structs.
+    break;
+  }
+      
+  case DeclKind::Extension:
+  case DeclKind::Protocol:
+  case DeclKind::PatternBinding:
+  case DeclKind::OneOfElement:
+  case DeclKind::OneOf:
+  case DeclKind::Class:
+  case DeclKind::TopLevelCode:
+  case DeclKind::TypeAlias:
+  case DeclKind::Var:
+  case DeclKind::Import:
+  case DeclKind::Subscript:
+  case DeclKind::Destructor:
+    llvm_unreachable("Not a valid external definition for SILGen");
+  }
+}
