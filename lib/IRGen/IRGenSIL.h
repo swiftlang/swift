@@ -24,6 +24,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/CallingConv.h"
 #include "CallEmission.h"
+#include "GenObjC.h"
 #include "IRBuilder.h"
 #include "IRGenFunction.h"
 #include "JumpDest.h"
@@ -48,6 +49,30 @@ public:
   AbstractCC getCC() const { return cc; }
   
   llvm::Value *getExplosionValue(IRGenFunction &IGF) const;
+};
+  
+/// Represents an ObjC method reference that will be invoked by a form of
+/// objc_msgSend.
+class ObjCMethod {
+  /// The ValueDecl declaring the method.
+  ValueDecl *method;
+  /// For a super call, the type to pass to msgSendSuper2 dispatch.
+  /// Null for non-super calls.
+  CanType superSearchType;
+
+public:
+  ObjCMethod(ValueDecl *method, CanType superSearchType)
+    : method(method), superSearchType(superSearchType)
+  {}
+  
+  ValueDecl *getMethodDecl() const { return method; }
+  CanType getSuperSearchType() const { return superSearchType; }
+  
+  /// FIXME: Thunk down to a Swift function value?
+  llvm::Value *getExplosionValue(IRGenFunction &IGF) const {
+    llvm_unreachable("thunking unapplied objc method to swift function "
+                     "not yet implemented");
+  }
 };
 
 /// Represents a SIL value lowered to IR, in one of these forms:
@@ -87,6 +112,7 @@ private:
       ExplosionVector values;
     } explosion;
     StaticFunction staticFunction;
+    ObjCMethod objcMethod;
   };
 
 public:
@@ -96,6 +122,10 @@ public:
   
   LoweredValue(StaticFunction &&staticFunction)
     : kind(Kind::StaticFunction), staticFunction(std::move(staticFunction))
+  {}
+
+  LoweredValue(ObjCMethod &&objcMethod)
+    : kind(Kind::ObjCMethod), objcMethod(std::move(objcMethod))
   {}
   
   LoweredValue(Explosion &e)
@@ -129,7 +159,7 @@ public:
       ::new (&staticFunction) StaticFunction(std::move(lv.staticFunction));
       break;
     case Kind::ObjCMethod:
-      llvm_unreachable("not implemented");
+      ::new (&objcMethod) ObjCMethod(std::move(lv.objcMethod));
     }
   }
   
@@ -158,6 +188,11 @@ public:
     return staticFunction;
   }
   
+  ObjCMethod const &getObjCMethod() const {
+    assert(kind == Kind::ObjCMethod && "not an objc method");
+    return objcMethod;
+  }
+  
   ~LoweredValue() {
     switch (kind) {
     case Kind::Address:
@@ -170,7 +205,7 @@ public:
       staticFunction.~StaticFunction();
       break;
     case Kind::ObjCMethod:
-      llvm_unreachable("not implemented");
+      objcMethod.~ObjCMethod();
     }
   }
 };
@@ -249,6 +284,16 @@ public:
     assert(v.getType().is<AnyFunctionType>() &&
            "function for non-function value?!");
     auto inserted = loweredValues.insert({v, StaticFunction{f, cc}});
+    assert(inserted.second && "already had lowered value for sil value?!");
+  }
+  
+  void newLoweredObjCMethod(swift::Value v, ValueDecl *method,
+                            CanType superSearchType = CanType()) {
+    assert(!v.getType().isAddress() && "function for address value?!");
+    assert(v.getType().is<AnyFunctionType>() &&
+           "function for non-function value?!");
+    auto inserted = loweredValues.insert({v,
+                                          ObjCMethod{method, superSearchType}});
     assert(inserted.second && "already had lowered value for sil value?!");
   }
   

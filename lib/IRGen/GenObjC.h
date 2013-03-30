@@ -38,6 +38,20 @@ namespace irgen {
   /// Objective-C member function.
   AbstractCallee getAbstractObjCMethodCallee(IRGenFunction &IGF, ValueDecl *fn);
 
+  CallEmission prepareObjCMethodRootCall(IRGenFunction &IGF,
+                                         ValueDecl *method,
+                                         CanType substResultType,
+                                         llvm::ArrayRef<Substitution> subs,
+                                         ExplosionKind bestExplosion,
+                                         unsigned bestUncurry,
+                                         bool isSuper);
+
+  void addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
+                                          CallEmission &emission,
+                                          ValueDecl *method,
+                                          llvm::Value *self,
+                                          CanType searchType);
+  
   CallEmission prepareObjCMethodCall(IRGenFunction &IGF,
                                      ValueDecl *method,
                                      Expr *self,

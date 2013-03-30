@@ -391,6 +391,8 @@ namespace {
       FOREACH_FAMILY(GET_LABEL)
 #undef GET_LABEL
     };
+    
+    Selector() = default;
 
     Selector(FuncDecl *method) {
       method->getObjCSelector(Text);
@@ -654,16 +656,12 @@ static void emitSelfArgument(IRGenFunction &IGF, bool isInstanceMethod,
 }
 
 static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
-                              Expr *self, Explosion &selfValues,
+                              llvm::Value *selfValue, Explosion &selfValues,
                               CanType searchClass) {
   // Allocate an objc_super struct.
   Address super = IGF.createAlloca(IGF.IGM.ObjCSuperStructTy,
                                    IGF.IGM.getPointerAlignment(),
                                    "objc_super");
-  // Generate the 'self' receiver.
-  Explosion selfValueTmp(ExplosionKind::Minimal);
-  emitSelfArgument(IGF, isInstanceMethod, self, selfValueTmp);
-  llvm::Value *selfValue = selfValueTmp.claimNext().forward(IGF);
   selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.ObjCPtrTy);
   
   // Generate the search class object reference.
@@ -697,15 +695,26 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   selfValues.addUnmanaged(super.getAddress());
 }
 
-/// Prepare a call using ObjC method dispatch.
-CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF,
-                                          ValueDecl *method,
-                                          Expr *self,
-                                          CanType substResultType,
-                                          ArrayRef<Substitution> subs,
-                                          ExplosionKind maxExplosion,
-                                          unsigned maxUncurry,
-                                          CanType searchType) {
+static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
+                              Expr *self, Explosion &selfValues,
+                              CanType searchClass) {
+  // Generate the 'self' receiver.
+  Explosion selfValueTmp(ExplosionKind::Minimal);
+  emitSelfArgument(IGF, isInstanceMethod, self, selfValueTmp);
+  llvm::Value *selfValue = selfValueTmp.claimNext().forward(IGF);
+
+  emitSuperArgument(IGF, isInstanceMethod, selfValue, selfValues, searchClass);
+}
+
+/// Prepare a call using ObjC method dispatch without applying the 'self' and
+/// '_cmd' arguments.
+CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
+                                              ValueDecl *method,
+                                              CanType substResultType,
+                                              ArrayRef<Substitution> subs,
+                                              ExplosionKind maxExplosion,
+                                              unsigned maxUncurry,
+                                              bool isSuper) {
   assert((isa<FuncDecl>(method) || isa<ConstructorDecl>(method))
          && "objc method call must be to a func or constructor decl");
   Type formalType;
@@ -715,17 +724,17 @@ CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF,
     formalType = method->getType();
   }
   CanType origFormalType = formalType->getCanonicalType();
-  ObjCMethodSignature sig(IGF.IGM, origFormalType, bool(searchType));
+  ObjCMethodSignature sig(IGF.IGM, origFormalType, isSuper);
 
   // Create the appropriate messenger function.
   // FIXME: this needs to be target-specific.
   llvm::Constant *messenger;
   if (sig.IsIndirectReturn) {
-    messenger = searchType
+    messenger = isSuper
       ? IGF.IGM.getObjCMsgSendSuperStretFn()
       : IGF.IGM.getObjCMsgSendStretFn();
   } else {
-    messenger = searchType
+    messenger = isSuper
       ? IGF.IGM.getObjCMsgSendSuperFn()
       : IGF.IGM.getObjCMsgSendFn();
   }
@@ -742,13 +751,80 @@ CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF,
                                                       ManagedValue(nullptr),
                                                       ExplosionKind::Minimal,
                                                       /*uncurry*/ 1));
-
+  
   // Compute the selector.
   Selector selector(method);
-
+  
   // Respect conventions.
   Callee &callee = emission.getMutableCallee();
   setOwnershipConventions(callee, method, selector);
+
+  return emission;
+}
+
+/// Emit the 'self'/'super' and '_cmd' arguments for an ObjC method dispatch.
+void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
+                                               CallEmission &emission,
+                                               ValueDecl *method,
+                                               llvm::Value *self,
+                                               CanType searchType) {
+  // Compute the selector.
+  Selector selector(method);
+  
+  // Emit the self or super argument.
+  Explosion selfValues(ExplosionKind::Minimal);
+  
+  // super.constructor references an instance method (even though the
+  // decl is really a 'static' member).
+  bool isInstanceMethod
+    = isa<ConstructorDecl>(method) || method->isInstanceMember();
+  
+  if (searchType) {
+    emitSuperArgument(IGF, isInstanceMethod, self, selfValues,
+                      searchType);
+  } else {
+    selfValues.addUnmanaged(self);
+  }
+  assert(selfValues.size() == 1);
+  
+  // Add the selector value.
+  auto selectorRef = IGF.IGM.getAddrOfObjCSelectorRef(selector.str());
+  llvm::Value *selectorV;
+  if (IGF.IGM.Opts.UseJIT) {
+    // When generating JIT'd code, we need to call sel_registerName() to force
+    // the runtime to unique the selector.
+    selectorV = IGF.Builder.CreateLoad(Address(selectorRef,
+                                               IGF.IGM.getPointerAlignment()));
+    selectorV = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
+                                       selectorV);
+  } else {
+    // When generating statically-compiled code, just build a reference to
+    // the selector.
+    selectorV = IGF.Builder.CreateLoad(Address(selectorRef,
+                                               IGF.IGM.getPointerAlignment()));
+  }
+  selfValues.addUnmanaged(selectorV);
+  
+  // Add that to the emission.
+  emission.addArg(selfValues);
+}
+
+/// Prepare a call using ObjC method dispatch.
+CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF,
+                                          ValueDecl *method,
+                                          Expr *self,
+                                          CanType substResultType,
+                                          ArrayRef<Substitution> subs,
+                                          ExplosionKind maxExplosion,
+                                          unsigned maxUncurry,
+                                          CanType searchType) {
+  CallEmission emission = prepareObjCMethodRootCall(IGF, method,
+                                                    substResultType,
+                                                    subs, maxExplosion,
+                                                    maxUncurry,
+                                                    bool(searchType));
+  // Compute the selector.
+  Selector selector(method);
 
   // Emit the self or super argument.
   Explosion selfValues(ExplosionKind::Minimal);

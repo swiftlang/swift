@@ -70,7 +70,7 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
     break;
       
   case Kind::ObjCMethod:
-    llvm_unreachable("not implemented");
+    ex.addUnmanaged(objcMethod.getExplosionValue(IGF));
   }
 }
 
@@ -81,9 +81,8 @@ ExplosionKind LoweredValue::getExplosionKind() const {
   case Kind::Explosion:
     return explosion.kind;
   case Kind::StaticFunction:
-    return ExplosionKind::Minimal;
   case Kind::ObjCMethod:
-    llvm_unreachable("not implemented");
+    return ExplosionKind::Minimal;
   }
 }
 
@@ -474,12 +473,25 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   ExtraData extraData;
   AbstractCC cc;
   
-  if (lv.kind == LoweredValue::Kind::StaticFunction) {
+  switch (lv.kind) {
+  case LoweredValue::Kind::StaticFunction:
     calleeFn = lv.getStaticFunction().getFunction();
     cc = lv.getStaticFunction().getCC();
     calleeData = nullptr;
     extraData = ExtraData::None;
-  } else {
+    break;
+      
+  case LoweredValue::Kind::ObjCMethod: {
+    auto &objcMethod = lv.getObjCMethod();
+    return prepareObjCMethodRootCall(IGF, objcMethod.getMethodDecl(),
+                                     resultTy.getSwiftType(),
+                                     /*FIXME substitutions*/ {},
+                                     IGF.CurExplosionLevel,
+                                     1,
+                                     bool(objcMethod.getSuperSearchType()));
+  }
+      
+  case LoweredValue::Kind::Explosion: {
     Explosion calleeValues = lv.getExplosion(IGF);
     
     calleeFn = calleeValues.claimUnmanagedNext();
@@ -511,6 +523,11 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                            attrs)->getPointerTo();
 
     calleeFn = IGF.Builder.CreateBitCast(calleeFn, fnPtrTy);
+    break;
+  }
+    
+  case LoweredValue::Kind::Address:
+    llvm_unreachable("sil address isn't a valid callee");
   }
   
   // FIXME: apply substitutions from specialization
@@ -541,8 +558,28 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   // Lower the SIL arguments to IR arguments, and pass them to the CallEmission
   // one curry at a time. CallEmission will arrange the curries in the proper
   // order for the callee.
+
   unsigned arg = 0;
-  for (unsigned inputCount : ti->getUncurriedInputEnds()) {
+  auto uncurriedInputEnds = ti->getUncurriedInputEnds();
+  
+  // ObjC message sends need special handling for the 'this' argument. It may
+  // need to be wrapped in an objc_super struct, and the '_cmd' argument needs
+  // to be passed alongside it.
+  if (calleeLV.kind == LoweredValue::Kind::ObjCMethod) {
+    assert(uncurriedInputEnds[0] == 1 &&
+           "more than one this argument for an objc call?!");
+    Explosion selfArgE = getLoweredExplosion(i->getArguments()[0]);
+    llvm::Value *selfArg = selfArgE.claimUnmanagedNext();
+    addObjCMethodCallImplicitArguments(*this, emission,
+                                 calleeLV.getObjCMethod().getMethodDecl(),
+                                 selfArg,
+                                 calleeLV.getObjCMethod().getSuperSearchType());
+    
+    arg = 1;
+    uncurriedInputEnds = uncurriedInputEnds.slice(1);
+  }
+  
+  for (unsigned inputCount : uncurriedInputEnds) {
     Explosion curryArgs(CurExplosionLevel);
     for (; arg < inputCount; ++arg) {
       emitApplyArgument(*this, curryArgs,
@@ -1024,9 +1061,18 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   addrTI.destroy(*this, base);
 }
 
+static bool silMethodIsObjC(SILConstant t) {
+  return t.hasDecl() && t.getDecl()->isObjC();
+}
+
 void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
-  // FIXME: For Objective-C classes we need to arrange for a msgSendSuper2
+  // For Objective-C classes we need to arrange for a msgSendSuper2
   // to happen when the method is called.
+  if (silMethodIsObjC(i->getMember())) {
+    newLoweredObjCMethod(Value(i, 0), i->getMember().getDecl(),
+                         i->getOperand().getType().getSwiftType());
+    return;
+  }
   
   // For Swift classes, just emit a direct ref to the referenced super method.
   llvm::Function *fnptr;
@@ -1036,17 +1082,17 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   IGM.getAddrOfSILConstant(i->getMember(),
                            fnptr, naturalCurryLevel, cc, body);
   
-  // Bitcast to i8*.
-  llvm::Value *fnValue = Builder.CreateBitCast(fnptr, IGM.Int8PtrTy);
-  
-  Explosion e(CurExplosionLevel);
-  e.addUnmanaged(fnValue);
-  newLoweredExplosion(Value(i, 0), e);
+  newLoweredStaticFunction(Value(i, 0), fnptr, cc);
 }
 
 void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
-  // FIXME: For Objective-C classes we need to arrange for a msgSend
+  // For Objective-C classes we need to arrange for a msgSend
   // to happen when the method is called.
+  if (silMethodIsObjC(i->getMember())) {
+    newLoweredObjCMethod(Value(i, 0), i->getMember().getDecl());
+    return;
+  }
+  
   Explosion base = getLoweredExplosion(i->getOperand());
   llvm::Value *baseValue = base.claimUnmanagedNext();
   

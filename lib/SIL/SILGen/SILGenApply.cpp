@@ -110,10 +110,13 @@ public:
   // Known callees.
   //
   void visitDeclRefExpr(DeclRefExpr *e) {
-    // If this is a class method, emit class_method to dynamically dispatch the
-    // call.
+    // If this is a non-extension class method, emit class_method to
+    // dynamically dispatch the call.
+    // FIXME: Or if it's an ObjC method. Extension methods on classes will
+    // hopefully become dynamically dispatched too--SIL should be ignorant of
+    // ObjC-ness.
     if (auto *fe = dyn_cast<FuncDecl>(e->getDecl())) {
-      if (isa<ClassDecl>(fe->getDeclContext())) {
+      if (isa<ClassDecl>(fe->getDeclContext()) || fe->isObjC()) {
         ApplyExpr *thisCallSite = callSites.back();
         callSites.pop_back();
         setThisParam(gen.visit(thisCallSite->getArg()));
