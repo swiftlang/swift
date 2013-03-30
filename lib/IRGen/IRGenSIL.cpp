@@ -602,6 +602,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
     addObjCMethodCallImplicitArguments(*this, emission,
                                  calleeLV.getObjCMethod().getMethodDecl(),
                                  selfArg.claimNext(),
+                                 thisValue.getType().getSwiftType(),
                                  calleeLV.getObjCMethod().getSuperSearchType());
     
     arg = 1;

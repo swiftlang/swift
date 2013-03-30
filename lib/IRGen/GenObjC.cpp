@@ -769,25 +769,32 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
                                                CallEmission &emission,
                                                ValueDecl *method,
                                                ManagedValue self,
+                                               CanType selfType,
                                                CanType searchType) {
   // Compute the selector.
   Selector selector(method);
   
-  // Emit the self or super argument.
-  Explosion selfValues(ExplosionKind::Minimal);
+  Explosion args(ExplosionKind::Minimal);
   
   // super.constructor references an instance method (even though the
   // decl is really a 'static' member).
   bool isInstanceMethod
     = isa<ConstructorDecl>(method) || method->isInstanceMember();
+
+  // Map a class parameter back to an ObjC Class value (the heap metadata).
+  if (!isInstanceMethod) {
+    CanType selfInstanceType(selfType->castTo<MetaTypeType>()->getInstanceType());
+    self = ManagedValue(emitClassHeapMetadataRefForMetatype(IGF, self.getValue(),
+                                                            selfInstanceType));
+  }
   
   if (searchType) {
-    emitSuperArgument(IGF, isInstanceMethod, self, selfValues,
+    emitSuperArgument(IGF, isInstanceMethod, self, args,
                       searchType);
   } else {
-    selfValues.add(self);
+    args.add(self);
   }
-  assert(selfValues.size() == 1);
+  assert(args.size() == 1);
   
   // Add the selector value.
   auto selectorRef = IGF.IGM.getAddrOfObjCSelectorRef(selector.str());
@@ -805,10 +812,10 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
     selectorV = IGF.Builder.CreateLoad(Address(selectorRef,
                                                IGF.IGM.getPointerAlignment()));
   }
-  selfValues.addUnmanaged(selectorV);
+  args.addUnmanaged(selectorV);
   
   // Add that to the emission.
-  emission.addArg(selfValues);
+  emission.addArg(args);
 }
 
 /// Prepare a call using ObjC method dispatch.
