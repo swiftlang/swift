@@ -460,7 +460,9 @@ void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
 
 void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
   Explosion e(CurExplosionLevel);
-  emitMetaTypeRef(*this, i->getType().getSwiftType(), e);
+  emitMetaTypeRef(*this,
+                  CanType(i->getType().castTo<MetaTypeType>()->getInstanceType()),
+                  e);
   newLoweredExplosion(Value(i, 0), e);
 }
 
