@@ -49,7 +49,7 @@ namespace irgen {
   void addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
                                           CallEmission &emission,
                                           ValueDecl *method,
-                                          llvm::Value *self,
+                                          ManagedValue self,
                                           CanType searchType);
   
   CallEmission prepareObjCMethodCall(IRGenFunction &IGF,

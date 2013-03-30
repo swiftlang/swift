@@ -109,8 +109,17 @@ public:
     return CurCallee.getSubstitutions();
   }
 
+  /// Add a new set of arguments to the function from an explosion.
   void addArg(Explosion &arg);
+  
+  /// Add a new set of arguments to the function by evaluating an argument
+  /// expression.
   void addArg(Expr *arg);
+
+  /// Add a new set of arguments to the function from an explosion containing
+  /// unmanaged values.
+  void addUnmanagedArg(Explosion &arg);
+
   void addMaterializedArg(Address substValue, bool asTake);
   void addEmptyArg();
 

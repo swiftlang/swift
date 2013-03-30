@@ -656,13 +656,14 @@ static void emitSelfArgument(IRGenFunction &IGF, bool isInstanceMethod,
 }
 
 static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
-                              llvm::Value *selfValue, Explosion &selfValues,
+                              ManagedValue selfValue, Explosion &selfValues,
                               CanType searchClass) {
   // Allocate an objc_super struct.
   Address super = IGF.createAlloca(IGF.IGM.ObjCSuperStructTy,
                                    IGF.IGM.getPointerAlignment(),
                                    "objc_super");
-  selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.ObjCPtrTy);
+  llvm::Value *self = IGF.Builder.CreateBitCast(selfValue.getValue(),
+                                                IGF.IGM.ObjCPtrTy);
   
   // Generate the search class object reference.
   llvm::Value *searchValue;
@@ -681,7 +682,7 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   };
   llvm::Value *selfAddr = IGF.Builder.CreateGEP(super.getAddress(),
                                                 selfIndices);
-  IGF.Builder.CreateStore(selfValue, selfAddr, super.getAlignment());
+  IGF.Builder.CreateStore(self, selfAddr, super.getAlignment());
 
   llvm::Value *searchIndices[2] = {
     IGF.Builder.getInt32(0),
@@ -692,7 +693,8 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   IGF.Builder.CreateStore(searchValue, searchAddr, super.getAlignment());
   
   // Pass a pointer to the objc_super struct to the messenger.
-  selfValues.addUnmanaged(super.getAddress());
+  // Project the ownership semantics of 'self' to the super argument.
+  selfValues.add({super.getAddress(), selfValue.getCleanup()});
 }
 
 static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
@@ -701,7 +703,7 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   // Generate the 'self' receiver.
   Explosion selfValueTmp(ExplosionKind::Minimal);
   emitSelfArgument(IGF, isInstanceMethod, self, selfValueTmp);
-  llvm::Value *selfValue = selfValueTmp.claimNext().forward(IGF);
+  ManagedValue selfValue = selfValueTmp.claimNext();
 
   emitSuperArgument(IGF, isInstanceMethod, selfValue, selfValues, searchClass);
 }
@@ -766,7 +768,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
 void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
                                                CallEmission &emission,
                                                ValueDecl *method,
-                                               llvm::Value *self,
+                                               ManagedValue self,
                                                CanType searchType) {
   // Compute the selector.
   Selector selector(method);
@@ -783,7 +785,7 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
     emitSuperArgument(IGF, isInstanceMethod, self, selfValues,
                       searchType);
   } else {
-    selfValues.addUnmanaged(self);
+    selfValues.add(self);
   }
   assert(selfValues.size() == 1);
   

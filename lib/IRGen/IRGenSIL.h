@@ -298,8 +298,8 @@ public:
     assert(inserted.second && "already had lowered value for sil value?!");
   }
   
-  /// Get the Explosion corresponding to the given SIL value, which must
-  /// previously exist.
+  /// Get the LoweredValue corresponding to the given SIL value, which must
+  /// have been lowered.
   LoweredValue &getLoweredValue(swift::Value v) {
     auto foundValue = loweredValues.find(v);
     assert(foundValue != loweredValues.end() &&
@@ -307,19 +307,32 @@ public:
     return foundValue->second;
   }
   
+  /// Get the Address of a SIL value of address type, which must have been
+  /// lowered.
   Address getLoweredAddress(swift::Value v) {
     return getLoweredValue(v).getAddress();
   }
+  /// Add the unmanaged LLVM values lowered from a SIL value to an explosion.
   void getLoweredExplosion(swift::Value v, Explosion &e) {
     getLoweredValue(v).getExplosion(*this, e);
   }
+  /// Create an Explosion containing the unmanaged LLVM values lowered from a
+  /// SIL value.
   Explosion getLoweredExplosion(swift::Value v) {
     return getLoweredValue(v).getExplosion(*this);
   }
+  /// Get the explosion level the value was lowered to.
   ExplosionKind getExplosionKind(swift::Value v) {
     return getLoweredValue(v).getExplosionKind();
   }
   
+  /// Add LLVM values managed by cleanups lowered from a SIL value to an
+  /// explosion.
+  /// FIXME: This is used to lower ApplyInsts that call foreign methods with
+  /// non-standard ownership conventions. In normal circumstances SIL values
+  /// should not be managed.
+  void getLoweredManagedExplosion(swift::Value v, Explosion &out);
+
   LoweredBB &getLoweredBB(swift::BasicBlock *bb) {
     auto foundBB = loweredBBs.find(bb);
     assert(foundBB != loweredBBs.end() && "no llvm bb for sil bb?!");

@@ -41,6 +41,7 @@
 #include "IRGenModule.h"
 #include "IRGenSIL.h"
 #include "Linking.h"
+#include "Scope.h"
 #include "TypeInfo.h"
 
 using namespace swift;
@@ -84,6 +85,13 @@ ExplosionKind LoweredValue::getExplosionKind() const {
   case Kind::ObjCMethod:
     return ExplosionKind::Minimal;
   }
+}
+
+void IRGenSILFunction::getLoweredManagedExplosion(swift::Value v,
+                                                  Explosion &out) {
+  Explosion unmanaged = getLoweredExplosion(v);
+  TypeInfo const &ti = IGM.getFragileTypeInfo(v.getType().getSwiftType());
+  ti.manage(*this, unmanaged, out);
 }
 
 IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
@@ -467,13 +475,15 @@ void IRGenSILFunction::visitClassMetatypeInst(swift::ClassMetatypeInst *i) {
 
 static void emitApplyArgument(IRGenSILFunction &IGF,
                               Explosion &args,
-                              LoweredValue &newArg) {
-  if (newArg.isValue()) {
-    newArg.getExplosion(IGF, args);
-  } else if (newArg.isAddress()) {
-    args.addUnmanaged(newArg.getAddress().getAddress());
-  } else
-    llvm_unreachable("not value or address?!");
+                              swift::Value newArg,
+                              bool managed) {
+  if (newArg.getType().isAddress()) {
+    args.addUnmanaged(IGF.getLoweredAddress(newArg).getAddress());
+  } else if (managed) {
+    IGF.getLoweredManagedExplosion(newArg, args);
+  } else {
+    IGF.getLoweredExplosion(newArg, args);
+  }
 }
 
 static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
@@ -573,17 +583,23 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   unsigned arg = 0;
   auto uncurriedInputEnds = ti->getUncurriedInputEnds();
   
+  // FIXME: We create a cleanups scope and managed explosions so that
+  // CallEmission can handle foreign calls with non-standard ownership.
+  Scope callScope(*this);
+  
   // ObjC message sends need special handling for the 'this' argument. It may
   // need to be wrapped in an objc_super struct, and the '_cmd' argument needs
   // to be passed alongside it.
   if (calleeLV.kind == LoweredValue::Kind::ObjCMethod) {
     assert(uncurriedInputEnds[0] == 1 &&
            "more than one this argument for an objc call?!");
-    Explosion selfArgE = getLoweredExplosion(i->getArguments()[0]);
-    llvm::Value *selfArg = selfArgE.claimUnmanagedNext();
+    Value thisValue = i->getArguments()[0];
+    Explosion selfArg(getExplosionKind(thisValue));
+    getLoweredManagedExplosion(thisValue, selfArg);
+    
     addObjCMethodCallImplicitArguments(*this, emission,
                                  calleeLV.getObjCMethod().getMethodDecl(),
-                                 selfArg,
+                                 selfArg.claimNext(),
                                  calleeLV.getObjCMethod().getSuperSearchType());
     
     arg = 1;
@@ -593,8 +609,8 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   for (unsigned inputCount : uncurriedInputEnds) {
     Explosion curryArgs(CurExplosionLevel);
     for (; arg < inputCount; ++arg) {
-      emitApplyArgument(*this, curryArgs,
-                        getLoweredValue(i->getArguments()[arg]));
+      emitApplyArgument(*this, curryArgs, i->getArguments()[arg],
+                        /*managed*/true);
     }
     emission.addArg(curryArgs);
   }
@@ -643,7 +659,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
     unsigned from = ti->getUncurriedInputBegins()[uncurryLevel],
       to = ti->getUncurriedInputEnds()[uncurryLevel];
     for (Value arg : i->getArguments().slice(from, to - from)) {
-      emitApplyArgument(*this, args, getLoweredValue(arg));
+      emitApplyArgument(*this, args, arg, /*managed*/false);
       argTypes.push_back(&getFragileTypeInfo(arg.getType().getSwiftType()));
     }
   }
