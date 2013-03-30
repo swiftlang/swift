@@ -3813,6 +3813,11 @@ void IRGenModule::emitGlobalFunction(FuncDecl *func) {
 /// Emit the definition for the given SIL constant.
 void IRGenModule::emitSILConstant(SILConstant c,
                                   swift::Function *f) {
+  // FIXME: Destructors of ObjC classes don't do the right thing yet.
+  if (c.kind == SILConstant::Kind::Destructor &&
+      cast<ClassDecl>(c.getDecl())->isObjC())
+    return;
+  
   llvm::Function *entrypoint;
   unsigned naturalCurryLevel;
   AbstractCC cc;

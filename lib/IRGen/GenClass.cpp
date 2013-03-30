@@ -788,7 +788,8 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       emittedDtor = true;
 
       // Destructors are lowered through SIL.
-      if (SILMod)
+      // FIXME: Except for ObjC classes.
+      if (SILMod && !D->isObjC())
         continue;
 
       emitClassDestructor(*this, D, cast<DestructorDecl>(member));
@@ -799,7 +800,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   }
 
   // Emit a defaulted class destructor if we didn't see one explicitly.
-  if (!SILMod && !emittedDtor)
+  if ((!SILMod || D->isObjC()) && !emittedDtor)
     emitClassDestructor(*this, D, nullptr);
 }
 
