@@ -233,6 +233,7 @@ public:
   
   SILConstant CurConstant;
   swift::Function *CurSILFn;
+  Address IndirectReturn;
   
   IRGenSILFunction(IRGenModule &IGM,
                    CanType t,

@@ -165,6 +165,28 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
   SILType funcTy = CurSILFn->getLoweredType();
   SILFunctionTypeInfo *funcTI = IGM.SILMod->getFunctionTypeInfo(funcTy);
   
+  // Map the indirect return if present.
+  if (funcTI->hasIndirectReturn()) {
+    BBArgument *ret = entry->first->bbarg_end()[-1];
+    Value retv(ret, 0);
+    TypeInfo const &retType = IGM.getFragileTypeInfo(
+                                           ret->getType().getSwiftRValueType());
+    
+    newLoweredAddress(retv, Address(params.claimUnmanagedNext(),
+                                    retType.StorageAlignment));
+  } else {
+    // Map an indirect return for a type SIL considers loadable but still
+    // requires an indirect return at the IR level.
+    TypeInfo const &retType = IGM.getFragileTypeInfo(
+                                       funcTI->getResultType().getSwiftType());
+    ExplosionSchema schema = retType.getSchema(CurExplosionLevel);
+    
+    if (schema.requiresIndirectResult()) {
+      IndirectReturn = Address(params.claimUnmanagedNext(),
+                               retType.StorageAlignment);
+    }
+  }
+  
   // Map LLVM arguments in inner-to-outer curry order to match the Swift
   // convention.
   unsigned level = c.uncurryLevel;
@@ -198,17 +220,6 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
       }
     }
   } while (level-- != 0);
-  
-  // Map the indirect return if present.
-  if (funcTI->hasIndirectReturn()) {
-    BBArgument *ret = entry->first->bbarg_end()[-1];
-    Value retv(ret, 0);
-    TypeInfo const &retType = IGM.getFragileTypeInfo(
-                                           ret->getType().getSwiftRValueType());
-    
-    newLoweredAddress(retv, Address(params.claimUnmanagedNext(),
-                                    retType.StorageAlignment));
-  }
   
   assert(params.empty() && "did not map all llvm params to SIL params?!");
   
@@ -674,7 +685,15 @@ void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
 
 void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
   Explosion result = getLoweredExplosion(i->getReturnValue());
-  emitScalarReturn(result);
+  // Even if SIL has a direct return, the IR-level calling convention may
+  // require an indirect return.
+  if (IndirectReturn.isValid()) {
+    TypeInfo const &retType = IGM.getFragileTypeInfo(
+                                 i->getReturnValue().getType().getSwiftType());
+    retType.initialize(*this, result, IndirectReturn);
+    Builder.CreateRetVoid();
+  } else
+    emitScalarReturn(result);
 }
 
 // Add branch arguments to destination phi nodes.
