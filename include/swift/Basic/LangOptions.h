@@ -14,13 +14,6 @@
 //  language and configuration flags.
 //
 //===----------------------------------------------------------------------===//
-//
-//  LangOptions.h
-//  Swift
-//
-//  Created by Doug Gregor on 9/12/12.
-//
-//
 
 #ifndef SWIFT_LANGOPTIONS_H
 #define SWIFT_LANGOPTIONS_H
