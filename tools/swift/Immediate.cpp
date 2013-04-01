@@ -273,7 +273,8 @@ static bool IRGenImportedModules(TranslationUnit *TU,
 }
 
 void swift::RunImmediately(irgen::Options &Options,
-                           TranslationUnit *TU, SILModule *SILMod) {
+                           TranslationUnit *TU,
+                           std::vector<std::string> const& argv, SILModule *SILMod) {
   ASTContext &Context = TU->Ctx;
   
   // IRGen the main module.
@@ -317,11 +318,11 @@ void swift::RunImmediately(irgen::Options &Options,
 
   // Run the generated program.
   for (auto InitFn : InitFns)
-    EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
+    EE->runFunctionAsMain(InitFn, argv, 0);
 
   EE->runStaticConstructorsDestructors(false);
   llvm::Function *EntryFn = Module.getFunction("main");
-  EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
+  EE->runFunctionAsMain(EntryFn, argv, 0);
 }
 
 /// An arbitrary, otherwise-unused char value that editline interprets as

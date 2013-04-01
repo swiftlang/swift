@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <string>
+#include <vector>
 
 namespace swift {
   class ASTContext;
@@ -48,7 +49,10 @@ namespace swift {
   };
 
   void RunImmediately(irgen::Options &Options,
-                      TranslationUnit *TU, SILModule *SILMod = nullptr);
+                      TranslationUnit *TU,
+                      std::vector<std::string> const& argv = std::vector<std::string>(),
+                      SILModule *SILMod = nullptr
+                      );
   
   void REPL(ASTContext &Context, bool SILIRGen);
   void REPLRunLoop(ASTContext &Context, bool SILIRGen);
