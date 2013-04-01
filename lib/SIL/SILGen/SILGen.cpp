@@ -86,8 +86,7 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) {
 }
 
 template<typename T>
-Function *SILGenModule::preEmitFunction(SILConstant constant,
-                                        T *astNode) {
+Function *SILGenModule::preEmitFunction(SILConstant constant, T *astNode) {
   assert(!M.hasFunction(constant) &&
          "already generated function for constant!");
   

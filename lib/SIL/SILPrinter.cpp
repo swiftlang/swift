@@ -169,8 +169,6 @@ public:
 
     for (const Instruction &I : *BB)
       print(&I);
-
-    OS << '\n';
   }
 
   //===--------------------------------------------------------------------===//
@@ -543,8 +541,9 @@ void Function::dump() const {
 /// Pretty-print the Function to the designated stream.
 void Function::print(llvm::raw_ostream &OS) const {
   SILPrinter Printer(OS);
-  for (const BasicBlock &B : *this)
-    Printer.print(&B);
+  interleave(begin(), end(),
+             [&](const BasicBlock &B) { Printer.print(&B); },
+             [&] { OS << '\n'; });
 }
 
 /// Pretty-print the SILModule to errs.
@@ -557,15 +556,15 @@ void SILModule::print(llvm::raw_ostream &OS) const {
   for (std::pair<SILConstant, Function*> vf : *this) {
     OS << "func_decl ";
     vf.first.print(OS);
-    OS << " : $" << vf.second->getLoweredType() << '\n';
+    OS << " : $" << vf.second->getLoweredType() << " {\n";
     vf.second->print(OS);
-    OS << "\n";
+    OS << "}\n\n";
   }
   
   if (toplevel) {
-    OS << "toplevel\n";
+    OS << "toplevel {\n";
     toplevel->print(OS);
-    OS << "\n";
+    OS << "}\n\n";
   }
 }
 
