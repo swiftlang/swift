@@ -26,7 +26,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/OwningPtr.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/FormattedStream.h"
 using namespace swift;
 
 struct ID {
@@ -37,7 +37,7 @@ struct ID {
   int ResultNumber;
 };
 
-raw_ostream &operator<<(raw_ostream &OS, ID i) {
+static raw_ostream &operator<<(raw_ostream &OS, ID i) {
   switch (i.Kind) {
   case ID::BasicBlock: OS << "bb"; break;
   case ID::SSAValue: OS << '%'; break;
@@ -134,7 +134,7 @@ namespace {
 /// SILPrinter class - This holds the internal implementation details of
 /// printing SIL structures.
 class SILPrinter : public SILVisitor<SILPrinter> {
-  raw_ostream &OS;
+  llvm::formatted_raw_ostream OS;
 
   llvm::DenseMap<const BasicBlock *, unsigned> BlocksToIDMap;
   ID getID(const BasicBlock *B);
@@ -144,6 +144,12 @@ class SILPrinter : public SILVisitor<SILPrinter> {
 
 public:
   SILPrinter(raw_ostream &OS) : OS(OS) {
+  }
+
+  void print(const Function *F) {
+    interleave(F->begin(), F->end(),
+               [&](const BasicBlock &B) { print(&B); },
+               [&] { OS << '\n'; });
   }
 
   void print(const BasicBlock *BB) {
@@ -158,10 +164,11 @@ public:
       OS << ')';
     }
 
-    OS << ":\t";
+    OS << ":";
 
     if (!BB->pred_empty()) {
-      OS << " ; Preds:";
+      OS.PadToColumn(50);
+      OS << "; Preds:";
       for (auto BBI = BB->pred_begin(), E = BB->pred_end(); BBI != E; ++BBI)
         OS << ' ' << getID(*BBI);
     }
@@ -180,7 +187,8 @@ public:
     OS << "  " << Name << " = ";
     visit(V);
     if (!V->use_empty()) {
-      OS << "\t; uses: ";
+      OS.PadToColumn(50);
+      OS << "; users: ";
       interleave(V->use_begin(), V->use_end(),
                  [&] (Operand *o) {
                    OS << getID(o->getUser());
@@ -540,10 +548,7 @@ void Function::dump() const {
 
 /// Pretty-print the Function to the designated stream.
 void Function::print(llvm::raw_ostream &OS) const {
-  SILPrinter Printer(OS);
-  interleave(begin(), end(),
-             [&](const BasicBlock &B) { Printer.print(&B); },
-             [&] { OS << '\n'; });
+  SILPrinter(OS).print(this);
 }
 
 /// Pretty-print the SILModule to errs.
@@ -554,7 +559,7 @@ void SILModule::dump() const {
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(llvm::raw_ostream &OS) const {
   for (std::pair<SILConstant, Function*> vf : *this) {
-    OS << "func_decl ";
+    OS << "sil @";
     vf.first.print(OS);
     OS << " : $" << vf.second->getLoweredType() << " {\n";
     vf.second->print(OS);
