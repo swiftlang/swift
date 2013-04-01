@@ -181,6 +181,14 @@ public:
     Name.ResultNumber = -1;  // Don't print subresult number.
     OS << "  " << Name << " = ";
     visit(V);
+    if (!V->use_empty()) {
+      OS << "\t; uses: ";
+      interleave(V->use_begin(), V->use_end(),
+                 [&] (Operand *o) {
+                   OS << getID(o->getUser());
+                 },
+                 [&] { OS << ", "; });
+    }
     OS << '\n';
   }
   void visitInstruction(Instruction *I) {
