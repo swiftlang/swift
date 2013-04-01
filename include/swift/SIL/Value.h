@@ -186,7 +186,7 @@ namespace swift {
 
     /// A back-pointer in the use-chain, required for fast patching
     /// of use-chains.
-    Operand **Back = nullptr;
+    Operand *Back = nullptr;
 
     /// The owner of this operand.
     /// FIXME: this could be space-compressed.
@@ -226,15 +226,16 @@ namespace swift {
 
   private:
     void removeFromCurrent() {
-      if (!Back) return;
-      (*Back)->NextUse = NextUse;
-      if (NextUse) NextUse->Back = Back;
+      if (Back)
+        Back->NextUse = NextUse;
+      if (TheValue->FirstUse == this)
+        TheValue->FirstUse = NextUse;
     }
 
     void insertIntoCurrent() {
-      Back = &TheValue->FirstUse;
+      Back = nullptr;
       NextUse = TheValue->FirstUse;
-      if (NextUse) NextUse->Back = &NextUse;
+      TheValue->FirstUse = this;
     }
 
     friend class ValueBaseUseIterator;
