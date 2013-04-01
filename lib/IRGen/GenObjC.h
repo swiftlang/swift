@@ -50,7 +50,6 @@ namespace irgen {
                                           CallEmission &emission,
                                           ValueDecl *method,
                                           ManagedValue self,
-                                          CanType selfType,
                                           CanType searchType);
   
   CallEmission prepareObjCMethodCall(IRGenFunction &IGF,

@@ -769,7 +769,6 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
                                                CallEmission &emission,
                                                ValueDecl *method,
                                                ManagedValue self,
-                                               CanType selfType,
                                                CanType searchType) {
   // Compute the selector.
   Selector selector(method);
@@ -781,13 +780,6 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
   bool isInstanceMethod
     = isa<ConstructorDecl>(method) || method->isInstanceMember();
 
-  // Map a class parameter back to an ObjC Class value (the heap metadata).
-  if (!isInstanceMethod) {
-    CanType selfInstanceType(selfType->castTo<MetaTypeType>()->getInstanceType());
-    self = ManagedValue(emitClassHeapMetadataRefForMetatype(IGF, self.getValue(),
-                                                            selfInstanceType));
-  }
-  
   if (searchType) {
     emitSuperArgument(IGF, isInstanceMethod, self, args,
                       searchType);

@@ -74,6 +74,30 @@ public:
                      "not yet implemented");
   }
 };
+  
+/// Represents a metatype value. May be produced as a Swift metatype,
+/// Objective-C Class, or both, based on use.
+class MetatypeValue {
+  /// The Swift metatype, or null if the value is not used as a swift metatype.
+  llvm::Value *swiftMetatype;
+  /// The Objective-C Class, or null if the value is not used as an ObjC class.
+  llvm::Value *objcClass;
+
+public:
+  MetatypeValue(llvm::Value *swiftMetatype, llvm::Value *objcClass)
+    : swiftMetatype(swiftMetatype), objcClass(objcClass)
+  {}
+  
+  llvm::Value *getSwiftMetatype() const {
+    assert(swiftMetatype && "not used as swift metatype?!");
+    return swiftMetatype;
+  }
+  
+  llvm::Value *getObjCClass() const {
+    assert(objcClass && "not used as objc class?!");
+    return objcClass;
+  }
+};
 
 /// Represents a SIL value lowered to IR, in one of these forms:
 /// - an Address, corresponding to a SIL address value;
@@ -97,7 +121,10 @@ public:
       /// A value that represents an Objective-C method that must be called with
       /// a form of objc_msgSend.
       ObjCMethod,
-    Value_Last = ObjCMethod
+    
+      /// A value that represents a metatype.
+      MetatypeValue,
+    Value_Last = MetatypeValue
   };
   
   Kind kind;
@@ -113,6 +140,7 @@ private:
     } explosion;
     StaticFunction staticFunction;
     ObjCMethod objcMethod;
+    MetatypeValue metatypeValue;
   };
 
 public:
@@ -126,6 +154,10 @@ public:
 
   LoweredValue(ObjCMethod &&objcMethod)
     : kind(Kind::ObjCMethod), objcMethod(std::move(objcMethod))
+  {}
+  
+  LoweredValue(MetatypeValue &&metatypeValue)
+    : kind(Kind::MetatypeValue), metatypeValue(std::move(metatypeValue))
   {}
   
   LoweredValue(Explosion &e)
@@ -160,6 +192,10 @@ public:
       break;
     case Kind::ObjCMethod:
       ::new (&objcMethod) ObjCMethod(std::move(lv.objcMethod));
+      break;
+    case Kind::MetatypeValue:
+      ::new (&metatypeValue) MetatypeValue(std::move(lv.metatypeValue));
+      break;
     }
   }
   
@@ -193,6 +229,11 @@ public:
     return objcMethod;
   }
   
+  MetatypeValue const &getMetatypeValue() const {
+    assert(kind == Kind::MetatypeValue && "not a metatype value");
+    return metatypeValue;
+  }
+  
   ~LoweredValue() {
     switch (kind) {
     case Kind::Address:
@@ -206,11 +247,15 @@ public:
       break;
     case Kind::ObjCMethod:
       objcMethod.~ObjCMethod();
+      break;
+    case Kind::MetatypeValue:
+      metatypeValue.~MetatypeValue();
+      break;
     }
   }
 };
   
-/// Represents a lowered SIL basic block. This keeps track^W^Wwill keep track
+/// Represents a lowered SIL basic block. This keeps track
 /// of SIL branch arguments so that they can be lowered to LLVM phi nodes.
 struct LoweredBB {
   llvm::BasicBlock *bb;
@@ -267,6 +312,7 @@ public:
     assert(!v.getType().isAddress() && "explosion for address value?!");
     auto inserted = loweredValues.insert({v, LoweredValue(e)});
     assert(inserted.second && "already had lowered value for sil value?!");
+    (void)inserted;
   }
   
   /// Create a new Explosion corresponding to the given SIL value, disabling
@@ -275,6 +321,7 @@ public:
     assert(!v.getType().isAddress() && "explosion for address value?!");
     auto inserted = loweredValues.insert({v, LoweredValue(e, IGF)});
     assert(inserted.second && "already had lowered value for sil value?!");
+    (void)inserted;
   }
   
   /// Create a new StaticFunction corresponding to the given SIL value.
@@ -286,6 +333,7 @@ public:
            "function for non-function value?!");
     auto inserted = loweredValues.insert({v, StaticFunction{f, cc}});
     assert(inserted.second && "already had lowered value for sil value?!");
+    (void)inserted;
   }
   
   void newLoweredObjCMethod(swift::Value v, ValueDecl *method,
@@ -296,6 +344,16 @@ public:
     auto inserted = loweredValues.insert({v,
                                           ObjCMethod{method, superSearchType}});
     assert(inserted.second && "already had lowered value for sil value?!");
+    (void)inserted;
+  }
+  
+  void newLoweredMetatypeValue(swift::Value v,
+                               llvm::Value /*nullable*/ *swiftMetatype,
+                               llvm::Value /*nullable*/ *objcMetatype) {
+    auto inserted = loweredValues.insert({v,
+                                   MetatypeValue{swiftMetatype, objcMetatype}});
+    assert(inserted.second && "already had lowered value for sil value?!");
+    (void)inserted;
   }
   
   /// Get the LoweredValue corresponding to the given SIL value, which must

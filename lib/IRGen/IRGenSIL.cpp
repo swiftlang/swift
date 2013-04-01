@@ -72,6 +72,11 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
       
   case Kind::ObjCMethod:
     ex.addUnmanaged(objcMethod.getExplosionValue(IGF));
+    break;
+  
+  case Kind::MetatypeValue:
+    ex.addUnmanaged(metatypeValue.getSwiftMetatype());
+    break;
   }
 }
 
@@ -83,6 +88,7 @@ ExplosionKind LoweredValue::getExplosionKind() const {
     return explosion.kind;
   case Kind::StaticFunction:
   case Kind::ObjCMethod:
+  case Kind::MetatypeValue:
     return ExplosionKind::Minimal;
   }
 }
@@ -458,21 +464,90 @@ void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
   newLoweredStaticFunction(Value(i, 0), fnptr, cc);
 }
 
+/// Determine whether a metatype value is used as a Swift metatype, ObjC class,
+/// or both.
+static void getMetatypeUses(swift::ValueBase *i,
+                            bool &isUsedAsSwiftMetatype,
+                            bool &isUsedAsObjCClass) {
+  isUsedAsSwiftMetatype = isUsedAsObjCClass = false;
+  for (auto *use : i->getUses()) {
+    // Ignore retains or releases of metatypes.
+    if (isa<RetainInst>(use->getUser()) || isa<ReleaseInst>(use->getUser()))
+      continue;
+    
+    // If a class_method lookup of an ObjC method is done on us, we'll need the
+    // objc class.
+    if (auto *cm = dyn_cast<ClassMethodInst>(use->getUser())) {
+      if (cm->getMember().getDecl()->isObjC()) {
+        isUsedAsObjCClass = true;
+        continue;
+      }
+    }
+    
+    // If we're applied as the 'this' argument to a class_method of an objc
+    // method, we'll need the objc class.
+    // FIXME: Metatypes as other arguments should probably also pass the
+    // Class too.
+    if (auto *apply = dyn_cast<ApplyInst>(use->getUser())) {
+      if (auto *method = dyn_cast<ClassMethodInst>(apply->getCallee())) {
+        if (method->getMember().getDecl()->isObjC()
+            && apply->getArguments().size() >= 1
+            && apply->getArguments()[0].getDef() == i) {
+          isUsedAsObjCClass = true;
+          continue;
+        }
+      }
+    }
+    
+    // All other uses are as Swift metatypes.
+    isUsedAsSwiftMetatype = true;
+  }
+  
+  // If there were no uses, assume it's used as a Swift metatype.
+  isUsedAsSwiftMetatype = true;
+}
+
 void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
-  Explosion e(CurExplosionLevel);
-  emitMetaTypeRef(*this,
-                  CanType(i->getType().castTo<MetaTypeType>()->getInstanceType()),
-                  e);
-  newLoweredExplosion(Value(i, 0), e);
+  CanType instanceType(i->getType().castTo<MetaTypeType>()->getInstanceType());
+  llvm::Value *swiftMetatype = nullptr, *objcClass = nullptr;
+  
+  bool isUsedAsSwiftMetatype, isUsedAsObjCClass;
+  getMetatypeUses(i, isUsedAsSwiftMetatype, isUsedAsObjCClass);
+  
+  if (isUsedAsSwiftMetatype) {
+    Explosion e(CurExplosionLevel);
+    emitMetaTypeRef(*this, instanceType, e);
+    if (!isUsedAsObjCClass) {
+      newLoweredExplosion(Value(i, 0), e);
+      return;
+    }
+    swiftMetatype = e.claimUnmanagedNext();
+  }
+  if (isUsedAsObjCClass) {
+    Explosion e(CurExplosionLevel);
+    objcClass = emitClassHeapMetadataRef(*this, instanceType);
+  }
+  newLoweredMetatypeValue(Value(i,0), swiftMetatype, objcClass);
 }
 
 void IRGenSILFunction::visitClassMetatypeInst(swift::ClassMetatypeInst *i) {
   Explosion base = getLoweredExplosion(i->getBase());
   auto baseValue = base.claimUnmanagedNext();
-  Explosion out(CurExplosionLevel);
-  out.addUnmanaged(emitTypeMetadataRefForHeapObject(*this, baseValue,
-                                        i->getBase().getType().getSwiftType()));
-  newLoweredExplosion(Value(i, 0), out);
+  
+  bool isUsedAsSwiftMetatype, isUsedAsObjCClass;
+  getMetatypeUses(i, isUsedAsSwiftMetatype, isUsedAsObjCClass);
+  
+  CanType instanceType = i->getBase().getType().getSwiftType();
+  
+  llvm::Value *swiftMetatype = nullptr, *objcClass = nullptr;
+  if (isUsedAsSwiftMetatype)
+    swiftMetatype = emitTypeMetadataRefForHeapObject(*this, baseValue,
+                                                     instanceType);
+  
+  if (isUsedAsObjCClass)
+    objcClass = emitHeapMetadataRefForHeapObject(*this, baseValue, instanceType);
+  
+  newLoweredMetatypeValue(Value(i,0), swiftMetatype, objcClass);
 }
 
 static void emitApplyArgument(IRGenSILFunction &IGF,
@@ -548,6 +623,9 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     calleeFn = IGF.Builder.CreateBitCast(calleeFn, fnPtrTy);
     break;
   }
+      
+  case LoweredValue::Kind::MetatypeValue:
+    llvm_unreachable("metatype isn't a valid callee");
     
   case LoweredValue::Kind::Address:
     llvm_unreachable("sil address isn't a valid callee");
@@ -563,6 +641,31 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                            IGF.CurExplosionLevel,
                                            calleeTy.getUncurryLevel());
   return CallEmission(IGF, callee);
+}
+
+static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
+                                         Value v) {
+  LoweredValue const &lv = IGF.getLoweredValue(v);
+  switch (lv.kind) {
+  case LoweredValue::Kind::Address:
+    llvm_unreachable("address isn't a valid metatype");
+  
+  case LoweredValue::Kind::ObjCMethod:
+  case LoweredValue::Kind::StaticFunction:
+    llvm_unreachable("function isn't a valid metatype");
+  
+  case LoweredValue::Kind::MetatypeValue:
+    return lv.getMetatypeValue().getObjCClass();
+
+  // Map a Swift metatype value back to the heap metadata, which will be the
+  // Class for an ObjC type.
+  case LoweredValue::Kind::Explosion: {
+    Explosion e = lv.getExplosion(IGF);
+    llvm::Value *swiftMeta = e.claimUnmanagedNext();
+    CanType instanceType(v.getType().castTo<MetaTypeType>()->getInstanceType());
+    return emitClassHeapMetadataRefForMetatype(IGF, swiftMeta, instanceType);
+  }
+  }
 }
 
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
@@ -596,13 +699,19 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
     assert(uncurriedInputEnds[0] == 1 &&
            "more than one this argument for an objc call?!");
     Value thisValue = i->getArguments()[0];
-    Explosion selfArg(getExplosionKind(thisValue));
-    getLoweredManagedExplosion(thisValue, selfArg);
-    
+    ManagedValue selfArg;
+    // Convert a metatype 'this' argument to the ObjC Class pointer.
+    if (thisValue.getType().is<MetaTypeType>()) {
+      selfArg = ManagedValue(getObjCClassForValue(*this, thisValue));
+    } else {
+      Explosion selfExplosion(getExplosionKind(thisValue));
+      getLoweredManagedExplosion(thisValue, selfExplosion);
+      selfArg = selfExplosion.claimNext();
+    }
+
     addObjCMethodCallImplicitArguments(*this, emission,
                                  calleeLV.getObjCMethod().getMethodDecl(),
-                                 selfArg.claimNext(),
-                                 thisValue.getType().getSwiftType(),
+                                 selfArg,
                                  calleeLV.getObjCMethod().getSuperSearchType());
     
     arg = 1;
