@@ -1590,6 +1590,7 @@ ManagedValue SILGenFunction::visitIfExpr(IfExpr *E, SGFContext C) {
   cond.exitFalse(B, falseValue);
   
   BasicBlock *cont = cond.complete(B);
+  assert(cont && "no continuation block for if expr?!");
   
   Value result = cont->bbarg_begin()[0];
   

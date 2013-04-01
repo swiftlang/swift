@@ -123,9 +123,8 @@ BasicBlock *Condition::complete(SILBuilder &B) {
   // only leave themselves post-terminator if they use the
   // continuation block, so we're in an acceptable insertion state.
   if (ContBB->pred_empty()) {
-    assert(B.hasValidInsertionPoint());
     ContBB->eraseFromParent();
-    return B.getInsertionBB();
+    return B.hasValidInsertionPoint() ? B.getInsertionBB() : nullptr;
   }
   
   // Okay, we need to insert the continuation block.
