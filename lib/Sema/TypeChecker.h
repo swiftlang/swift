@@ -60,7 +60,7 @@ public:
 
     case CoercionResult::Unknowable:
       diagnose();
-      // Fall-through
+      [[clang::fallthrough]];
 
     case CoercionResult::Failed:
       return 0;

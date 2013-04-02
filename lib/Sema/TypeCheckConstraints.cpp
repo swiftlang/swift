@@ -2409,7 +2409,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable){
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
-      // Fall through
+      [[clang::fallthrough]];
     case SolutionCompareResult::Better:
       break;
 

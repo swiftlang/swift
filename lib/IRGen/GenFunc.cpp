@@ -171,7 +171,7 @@ llvm::CallingConv::ID irgen::expandAbstractCC(IRGenModule &IGM,
 
   case AbstractCC::Method:
     //   TODO: maybe add 'inreg' to the first non-result argument.
-    // fallthrough
+    [[clang::fallthrough]];
   case AbstractCC::Freestanding:
     return getFreestandingConvention(IGM);
   }
@@ -2260,7 +2260,7 @@ void CallEmission::emitToMemory(Address addr, const TypeInfo &substResultTI) {
   case ResultDifference::Aliasable: {
     auto origTy = IGF.IGM.getFragileType(CurOrigType)->getPointerTo();
     origAddr = IGF.Builder.CreateBitCast(origAddr, origTy);
-    // fallthrough to Identical
+    [[clang::fallthrough]];
   }
 
   case ResultDifference::Identical:

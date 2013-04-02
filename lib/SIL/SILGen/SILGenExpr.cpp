@@ -1188,7 +1188,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
           ManagedValue v = emitConstantRef(loc, SILConstant(capture,
                                                    SILConstant::Kind::Setter));
           capturedArgs.push_back(v.forward(*this));
-          /* FALLTHROUGH */
+          [[clang::fallthrough]];
         }
         case CaptureKind::Getter: {
           // Pass the getter closure reference on.

@@ -695,7 +695,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
         diagnose(CurPtr-2, diag::lex_nul_character);
       return 0;
     }
-    // FALL THROUGH.
+    [[clang::fallthrough]];
   case '\n':  // String literals cannot have \n or \r in them.
   case '\r':
     --CurPtr;
@@ -1084,7 +1084,7 @@ Restart:
       skipSlashStarComment();
       goto Restart;
     }
-    // FALL THROUGH
+    [[clang::fallthrough]];
   case '=': case '-': case '+': case '*': case '%': case '<': case '>':
   case '!': case '&': case '|': case '^': case '~':
     return lexOperatorIdentifier();

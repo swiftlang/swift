@@ -419,7 +419,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   case tok::kw_static:
     if (peekToken().isNot(tok::kw_func))
       goto ParseError;
-    // FALL THROUGH.
+    [[clang::fallthrough]];
   case tok::kw_func:
     Entries.push_back(parseDeclFunc(Flags));
     break;

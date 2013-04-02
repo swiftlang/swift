@@ -886,6 +886,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     }
 
     // Otherwise, fallthrough into the 'other decl' case.
+    [[clang::fallthrough]];
 
   case Kind::Other:
     // As a special case, Clang functions and globals don't get mangled at all.

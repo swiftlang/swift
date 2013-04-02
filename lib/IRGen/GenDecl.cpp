@@ -548,7 +548,7 @@ static bool isLocalLinkageType(CanType type) {
     auto fn = cast<PolymorphicFunctionType>(base);
     if (isLocalLinkageGenericClause(fn->getGenericParams()))
       return true;
-    // fallthrough
+    [[clang::fallthrough]];
   }
   case TypeKind::Function: {
     AnyFunctionType *fn = cast<AnyFunctionType>(base);

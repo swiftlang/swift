@@ -537,7 +537,7 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
     Value value = new (gen.SGM.M) BBArgument(lSetTy, gen.F.begin());
     gen.LocalConstants[SILConstant(capture, SILConstant::Kind::Setter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
-    /* FALLTHROUGH */
+    [[clang::fallthrough]];
   }
   case CaptureKind::Getter: {
     // Capture the getter closure by value.

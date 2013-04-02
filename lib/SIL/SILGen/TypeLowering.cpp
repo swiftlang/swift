@@ -405,7 +405,7 @@ static Type getFunctionTypeWithCaptures(TypeConverter &types,
       Type setterTy = types.getPropertyType(SILConstant::Kind::Setter,
                                             capture->getType());
       inputFields.push_back(TupleTypeElt(setterTy));
-      /* FALLTHROUGH */
+      [[clang::fallthrough]];
     }
     case CaptureKind::Getter: {
       // Capture the getter closure.
