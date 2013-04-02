@@ -37,7 +37,7 @@
 
 using namespace swift;
 
-static Identifier getModuleIdentifier(std::string OutputName,
+static Identifier getModuleIdentifier(StringRef OutputName,
                                       ASTContext &Context,
                                       bool IsMainModule) {
   StringRef moduleName = OutputName;
@@ -65,8 +65,8 @@ static Identifier getModuleIdentifier(std::string OutputName,
 
 TranslationUnit*
 swift::buildSingleTranslationUnit(ASTContext &Context,
-                                  std::string OutputName,
-                                  std::vector<unsigned> BufferIDs,
+                                  StringRef OutputName,
+                                  ArrayRef<unsigned> BufferIDs,
                                   bool ParseOnly, bool IsMainModule) {
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
   Identifier ID = getModuleIdentifier(OutputName, Context, IsMainModule);

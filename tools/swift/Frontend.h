@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <string>
-#include <vector>
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
   class ASTContext;
@@ -24,8 +24,8 @@ namespace swift {
   class REPLContext;
   
   TranslationUnit* buildSingleTranslationUnit(ASTContext &Context,
-                                              std::string OutputName,
-                                              std::vector<unsigned> BufferIDs,
+                                              llvm::StringRef OutputName,
+                                              llvm::ArrayRef<unsigned>BufferIDs,
                                               bool ParseOnly,
                                               bool IsMainModule);
 
