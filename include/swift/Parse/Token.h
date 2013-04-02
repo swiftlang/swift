@@ -93,10 +93,16 @@ public:
     return isAnyOperator() && Text == ContextPunc;
   }
 
-  bool isAnyLParen() const {
-    return Kind == tok::l_paren_starting || Kind == tok::l_paren_following;
+  /// True if the token is an l_paren token that does not start a new line.
+  bool isFollowingLParen() const {
+    return !isAtStartOfLine() && Kind == tok::l_paren;
   }
-
+  
+  /// True if the token is an l_square token that does not start a new line.
+  bool isFollowingLSquare() const {
+    return !isAtStartOfLine() && Kind == tok::l_square;
+  }
+  
   /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.
   SourceLoc getLoc() const {

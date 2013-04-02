@@ -130,6 +130,11 @@ public:
     return true;
   }
   
+  bool consumeIfNotAtStartOfLine(tok K) {
+    if (Tok.isAtStartOfLine()) return false;
+    return consumeIf(K);
+  }
+  
   /// skipUntil - Read tokens until we get to one of the specified tokens, then
   /// return without consuming it.  Because we cannot guarantee that the token 
   /// will ever occur, this skips to some likely good stopping point.
@@ -256,7 +261,7 @@ public:
   void addVarsToScope(Pattern *Pat, SmallVectorImpl<Decl*> &Decls,
                       DeclAttributes &Attributes);
   bool parseAttributeList(DeclAttributes &Attributes) {
-    if (Tok.is(tok::l_square_starting))
+    if (Tok.is(tok::l_square))
       return parseAttributeListPresent(Attributes);
     return false;
   }

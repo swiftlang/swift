@@ -139,8 +139,6 @@ public:
 private:
   void lexImpl();
   void formToken(tok Kind, const char *TokStart);
-  void formStartingToken(tok Kind, const char *TokStart,
-                         tok FollowingKind = tok::unknown);
 
   void skipSlashSlashComment();
   void skipSlashStarComment();
@@ -153,7 +151,6 @@ private:
                         bool StopAtDoubleQuote, bool EmitDiagnostics);
   void lexCharacterLiteral();
   void lexStringLiteral();
-  bool isStartingToken(const char *TokStart);
 };
   
   

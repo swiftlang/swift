@@ -188,40 +188,6 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
   NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
 }
 
-void Lexer::formStartingToken(tok Kind,const char *TokStart,tok FollowingKind) {
-  if (isStartingToken(TokStart)) {
-    NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
-  } else {
-    if (FollowingKind == tok::unknown)
-      diagnose(TokStart, diag::lex_missing_whitespace);
-    NextToken.setToken(FollowingKind, StringRef(TokStart, CurPtr-TokStart));
-  }
-}
-
-bool Lexer::isStartingToken(const char *TokStart) {
-  // Note: "NextToken" is actually the soon to be previous token.
-  switch (NextToken.getKind()) {
-#define IDENTIFIER_KEYWORD(kw) case tok::kw_##kw:
-#include "swift/Parse/Tokens.def"
-  case tok::identifier:
-  case tok::dollarident:
-  case tok::integer_literal:
-  case tok::floating_literal:
-  case tok::string_literal:
-  case tok::character_literal:
-  case tok::r_paren:
-  case tok::r_square:
-  case tok::r_brace: {
-    // If there is whitespace between the above tokens and this one,
-    // then the current token is a literal.
-    char LastChar = *(TokStart - 1);
-    return isspace(LastChar) || LastChar == '\0';
-  }
-  default:
-    return true;
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // Lexer Subroutines
 //===----------------------------------------------------------------------===//
@@ -394,7 +360,7 @@ void Lexer::lexIdentifier() {
 
     .Default(tok::identifier);
 
-  return formStartingToken(Kind, TokStart);
+  return formToken(Kind, TokStart);
 }
 
 /// Is the operator beginning at the given character "left-bound"?
@@ -525,7 +491,7 @@ void Lexer::lexDollarIdent() {
   while (isalnum(*CurPtr) || *CurPtr == '_' || *CurPtr == '$')
     ++CurPtr;
   
-  return formStartingToken(tok::dollarident, TokStart);
+  return formToken(tok::dollarident, TokStart);
 }
 
 void Lexer::lexHexNumber() {
@@ -546,7 +512,7 @@ void Lexer::lexHexNumber() {
   }
   
   if (*CurPtr != '.' && *CurPtr != 'p' && *CurPtr != 'P')
-    return formStartingToken(tok::integer_literal, TokStart);
+    return formToken(tok::integer_literal, TokStart);
   
   // (\.[0-9A-Fa-f]+)?
   if (*CurPtr == '.') {
@@ -556,7 +522,7 @@ void Lexer::lexHexNumber() {
     // literal followed by a dot expression.
     if (!isxdigit(*CurPtr)) {
       --CurPtr;
-      return formStartingToken(tok::integer_literal, TokStart);
+      return formToken(tok::integer_literal, TokStart);
     }
     
     while (isxdigit(*CurPtr))
@@ -582,7 +548,7 @@ void Lexer::lexHexNumber() {
   while (isdigit(*CurPtr))
     ++CurPtr;
 
-  return formStartingToken(tok::floating_literal, TokStart);
+  return formToken(tok::floating_literal, TokStart);
 }
 
 /// lexNumber:
@@ -611,7 +577,7 @@ void Lexer::lexNumber() {
         ++CurPtr;
       return formToken(tok::unknown, TokStart);
     }
-    return formStartingToken(tok::integer_literal, TokStart);
+    return formToken(tok::integer_literal, TokStart);
   } else if (*TokStart == '0' && *CurPtr == 'b') {
     // 0b[01]+
     ++CurPtr;
@@ -623,7 +589,7 @@ void Lexer::lexNumber() {
         ++CurPtr;
       return formToken(tok::unknown, TokStart);
     }
-    return formStartingToken(tok::integer_literal, TokStart);
+    return formToken(tok::integer_literal, TokStart);
   }
 
   // Handle a leading [0-9]+, lexing an integer or falling through if we have a
@@ -636,7 +602,7 @@ void Lexer::lexNumber() {
     // NextToken is the soon to be previous token
     // Therefore: x.0.1 is sub-tuple access, not x.float_literal
     if (!isdigit(CurPtr[1]) || NextToken.is(tok::period))
-      return formStartingToken(tok::integer_literal, TokStart);
+      return formToken(tok::integer_literal, TokStart);
   } else {
     // Floating literals must have '.', 'e', or 'E' after digits.  If it is
     // something else, then this is the end of the token.
@@ -647,7 +613,7 @@ void Lexer::lexNumber() {
           ++CurPtr;
         return formToken(tok::unknown, TokStart);
       }
-      return formStartingToken(tok::integer_literal, TokStart);
+      return formToken(tok::integer_literal, TokStart);
     }
   }
 
@@ -677,7 +643,7 @@ void Lexer::lexNumber() {
       ++CurPtr;
   }
   
-  return formStartingToken(tok::floating_literal, TokStart);
+  return formToken(tok::floating_literal, TokStart);
 }
 
 /// lexCharacter - Read a character and return its UTF32 code.  If this is the
@@ -827,7 +793,7 @@ void Lexer::lexCharacterLiteral() {
     return formToken(tok::unknown, TokStart);;
   }
   ++CurPtr;
-  return formStartingToken(tok::character_literal, TokStart);
+  return formToken(tok::character_literal, TokStart);
 }
 
 /// getEncodedCharacterLiteral - Return the UTF32 codepoint for the specified
@@ -928,7 +894,7 @@ void Lexer::lexStringLiteral() {
     case '"':
       ++CurPtr;
       if (wasErroneous) return formToken(tok::unknown, TokStart);
-      return formStartingToken(tok::string_literal, TokStart);
+      return formToken(tok::string_literal, TokStart);
     case 0:
     case '\n':  // String literals cannot have \n or \r in them.
     case '\r':
@@ -1091,11 +1057,9 @@ Restart:
     }
     return formToken(tok::eof, TokStart);
 
-  case '{': return formStartingToken(tok::l_brace, TokStart);
-  case '[': return formStartingToken(tok::l_square_starting, TokStart,
-                                     tok::l_square_following);
-  case '(': return formStartingToken(tok::l_paren_starting, TokStart,
-                                     tok::l_paren_following);
+  case '{': return formToken(tok::l_brace, TokStart);
+  case '[': return formToken(tok::l_square, TokStart);
+  case '(': return formToken(tok::l_paren, TokStart);
   case '}': return formToken(tok::r_brace,  TokStart);
   case ']': return formToken(tok::r_square, TokStart);
   case ')':

@@ -35,7 +35,7 @@ static bool parseCurriedFunctionArguments(Parser *parser,
                                           SmallVectorImpl<Pattern*> &bodyP) {
   // parseFunctionArguments parsed the first argument pattern.
   // Parse additional curried argument clauses as long as we can.
-  while (parser->Tok.isAnyLParen()) {
+  while (parser->Tok.is(tok::l_paren)) {
     NullablePtr<Pattern> pattern = parser->parsePatternTuple(
                                                  /*AllowInitExpr=*/true);
     if (pattern.isNull())
@@ -71,7 +71,7 @@ static bool parseSelectorArgument(Parser *parser,
     }
   }
   
-  if (!parser->Tok.isAnyLParen()) {
+  if (!parser->Tok.is(tok::l_paren)) {
     parser->diagnose(parser->Tok.getLoc(),
                      diag::func_selector_without_paren);
     return true;
@@ -183,7 +183,7 @@ static bool parseSelectorFunctionArguments(Parser *parser,
       if (parseSelectorArgument(parser, argElts, bodyElts, selectorNames, rp)) {
         return true;
       }
-    } else if (parser->Tok.isAnyLParen()) {
+    } else if (parser->Tok.is(tok::l_paren)) {
       parser->diagnose(parser->Tok, diag::func_selector_with_curry);
       return true;
     } else
@@ -287,7 +287,7 @@ NullablePtr<Pattern> Parser::parsePatternIdentifier() {
 ///   pattern-atom ::= pattern-tuple
 NullablePtr<Pattern> Parser::parsePatternAtom() {
   switch (Tok.getKind()) {
-  case tok::l_paren_starting:
+  case tok::l_paren:
     return parsePatternTuple(/*AllowInitExpr*/false);
 
   case tok::identifier:
@@ -315,7 +315,7 @@ NullablePtr<Pattern> Parser::parsePatternAtom() {
 ///     pattern ('=' expr)?
 
 NullablePtr<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
-  assert(Tok.isAnyLParen());
+  assert(Tok.is(tok::l_paren));
 
   // We're looking at the left parenthesis; consume it.
   SourceLoc lp = consumeToken();

@@ -55,7 +55,7 @@ static bool isFuncExpr(const Token &Tok1, const Token &Tok2) {
   // "func identifier" and "func [attribute]" is a func declaration,
   // otherwise we have a func expression.
   return Tok2.isNot(tok::identifier) && Tok2.isNotAnyOperator() &&
-         Tok2.isNot(tok::l_square_starting);
+         Tok2.isNot(tok::l_square);
 }
 
 /// isStartOfDecl - Return true if this is the start of a decl or decl-import.
@@ -422,9 +422,9 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
   // a single keyword, so we have to do some lookahead to resolve what is going
   // on.
 
-  if (Tok.is(tok::l_paren_starting)) {
+  if (Tok.is(tok::l_paren)) {
     auto Backup = Tok;
-    consumeToken(tok::l_paren_starting);
+    consumeToken(tok::l_paren);
     skipUntil(tok::r_paren);
     bool IsCStyle = peekToken().is(tok::l_brace);
     Tok = Backup;
@@ -464,7 +464,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   // Introduce a new scope to contain any var decls in the init value.
   Scope ForScope(this, /*AllowLookup=*/true);
   
-  if (Tok.is(tok::l_paren_starting)) {
+  if (Tok.is(tok::l_paren)) {
     LPLoc = consumeToken();
     LPLocConsumed = true;
   }

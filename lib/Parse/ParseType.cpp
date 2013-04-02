@@ -115,7 +115,7 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
     if (parseTypeComposition(Result))
       return true;
     break;
-  case tok::l_paren_starting: {
+  case tok::l_paren: {
     isTupleType = true;
     SourceLoc LPLoc = consumeToken(), RPLoc;
     if (parseTypeTupleBody(LPLoc, Result) ||
@@ -161,8 +161,8 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
     return false;
   }
 
-  // If there is a square bracket without a space, we have an array.
-  if (Tok.is(tok::l_square_following) || Tok.is(tok::l_square_starting))
+  // If there is a square bracket without a newline, we have an array.
+  if (Tok.isFollowingLSquare())
     return parseTypeArray(Result);
   
   return false;
@@ -242,7 +242,7 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
     // unless <anything> is 'metatype' or '('.
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         (peekToken().isNot(tok::kw_metatype) && 
-         peekToken().isNot(tok::l_paren_starting))) {
+         peekToken().isNot(tok::l_paren))) {
       consumeToken();
     } else {
       break;
@@ -418,7 +418,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, TypeLoc &Result) {
 
 
 /// parseTypeArray - Parse the type-array production, given that we
-/// are looking at the initial l_square_following.  Note that this index
+/// are looking at the initial l_square.  Note that this index
 /// clause is actually the outermost (first-indexed) clause.
 ///
 ///   type-array:
@@ -427,7 +427,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, TypeLoc &Result) {
 ///     type-array '[' expr ']'
 ///
 bool Parser::parseTypeArray(TypeLoc &result) {
-  assert(Tok.is(tok::l_square_following) || Tok.is(tok::l_square_starting));
+  assert(Tok.isFollowingLSquare());
   SourceLoc lsquareLoc = consumeToken();
 
   // Handle the [] production, meaning an array slice.
@@ -435,7 +435,7 @@ bool Parser::parseTypeArray(TypeLoc &result) {
     SourceLoc rsquareLoc = consumeToken(tok::r_square);
 
     // If we're starting another square-bracket clause, recur.
-    if (Tok.is(tok::l_square_following) && parseTypeArray(result))
+    if (Tok.isFollowingLSquare() && parseTypeArray(result))
       return true;
 
     // Just build a normal array slice type.
@@ -454,7 +454,7 @@ bool Parser::parseTypeArray(TypeLoc &result) {
     return true;
 
   // If we're starting another square-bracket clause, recur.
-  if (Tok.is(tok::l_square_following) && parseTypeArray(result))
+  if (Tok.isFollowingLSquare() && parseTypeArray(result))
     return true;
   
   // FIXME: We don't supported fixed-length arrays yet.
@@ -472,9 +472,7 @@ static bool isGenericTypeDisambiguatingToken(Token &tok) {
   switch (tok.getKind()) {
   default:
     return false;
-  case tok::l_paren_following:
   case tok::r_paren:
-  case tok::l_square_following:
   case tok::r_square:
   case tok::l_brace:
   case tok::r_brace:
@@ -484,18 +482,21 @@ static bool isGenericTypeDisambiguatingToken(Token &tok) {
   case tok::eof:
     return true;
   
-  case tok::l_paren_starting:
-  case tok::l_square_starting:
   case tok::period_prefix:
     // These will be turned into following tokens if they appear unspaced after
     // a generic angle bracket.
     return tok.getText().data()[-1] == '>';
+      
+  case tok::l_paren:
+  case tok::l_square:
+    // These only apply to the generic type if they don't start a new line.
+    return !tok.isAtStartOfLine();
   }
 }
 
 namespace {
-  /// RAII object that restores the parser and lexer to their original positions
-  /// at the time the object was constructed when it is destroyed.
+  /// RAII object that, when it is destructed, restores the parser and lexer to
+  /// their positions at the time the object was constructed.
   struct BacktrackingScope {
     Parser &P;
     Token BacktrackParserTo;
@@ -559,7 +560,7 @@ bool Parser::canParseType() {
     if (!canParseTypeComposition())
       return false;
     break;
-  case tok::l_paren_starting: {
+  case tok::l_paren: {
     isTupleType = true;
     consumeToken();
     if (!canParseTypeTupleBody())
@@ -588,8 +589,8 @@ bool Parser::canParseType() {
     return true;
   }
   
-  // If there is a square bracket without a space, we have an array.
-  if (Tok.is(tok::l_square_following) || Tok.is(tok::l_square_starting))
+  // If there is a square bracket without a newline, we have an array.
+  if (Tok.isFollowingLSquare())
     return canParseTypeArray();
   
   return true;
@@ -697,7 +698,7 @@ bool Parser::canParseTypeTupleBody() {
 
 
 bool Parser::canParseTypeArray() {
-  assert(Tok.is(tok::l_square_following) || Tok.is(tok::l_square_starting));
+  assert(Tok.isFollowingLSquare());
   consumeToken();
   
   // Handle the [] production, meaning an array slice.
@@ -705,7 +706,7 @@ bool Parser::canParseTypeArray() {
     consumeToken(tok::r_square);
     
     // If we're starting another square-bracket clause, recur.
-    if (Tok.is(tok::l_square_following))
+    if (Tok.isFollowingLSquare())
       return canParseTypeArray();
     
     return true;

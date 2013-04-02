@@ -245,9 +245,9 @@ NullablePtr<Expr> Parser::parseExprNew() {
 
   bool hadInvalid = false;
   SmallVector<NewArrayExpr::Bound, 4> bounds;
-  while (Tok.is(tok::l_square_following)) {
+  while (Tok.isFollowingLSquare()) {
     SourceRange brackets;
-    brackets.Start = consumeToken(tok::l_square_following);
+    brackets.Start = consumeToken(tok::l_square);
 
     // If the bound is missing, that's okay unless this is the first bound.
     if (Tok.is(tok::r_square)) {
@@ -282,7 +282,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
     NullablePtr<Expr> Init;
 
     // Parse '.' selector-args
-    if (Tok.is(tok::period) && peekToken().is(tok::l_paren_starting)) {
+    if (Tok.is(tok::period) && peekToken().is(tok::l_paren)) {
       // Consume the '.'.
       consumeToken(tok::period);
 
@@ -294,7 +294,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
       Init = Arg;
     } 
     // Parse the optional expr-call-suffix.
-    else if (Tok.is(tok::l_paren_following)) {
+    else if (Tok.isFollowingLParen()) {
       Init = parseExprCallSuffix(/*isConstructor=*/true);
       if (Init.isNull())
         return nullptr;
@@ -305,7 +305,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
   }
 
   // TODO: we allow a tuple-expr here as an initializer?
-  if (Tok.is(tok::l_paren_following)) {
+  if (Tok.isFollowingLParen()) {
     diagnose(newLoc, diag::array_new_init_unsupported);
     return nullptr;
   }
@@ -377,7 +377,7 @@ NullablePtr<Expr> Parser::parseExprSuper() {
 
       // If we have a '.' '(', there are selector arguments following
       // this.
-      if (Tok.is(tok::period) && peekToken().is(tok::l_paren_starting)) {
+      if (Tok.is(tok::period) && peekToken().is(tok::l_paren)) {
         // Parse the '.'.
         consumeToken(tok::period);
 
@@ -388,7 +388,7 @@ NullablePtr<Expr> Parser::parseExprSuper() {
         }
         
         result = new (Context) CallExpr(result, args);
-      } else if (Tok.is(tok::l_paren_following)) {
+      } else if (Tok.isFollowingLParen()) {
         // Parse Swift-style constructor arguments.
         NullablePtr<Expr> arg = parseExprCallSuffix(/*isConstructor=*/true);
         // FIXME: Unfortunate recovery here.
@@ -405,7 +405,7 @@ NullablePtr<Expr> Parser::parseExprSuper() {
 
       // The result of the called constructor is used to rebind 'this'.
       return new (Context) RebindThisInConstructorExpr(result, thisDecl);
-    } else if (Tok.is(tok::l_paren_starting)) {
+    } else if (Tok.is(tok::l_paren)) {
       Identifier name;
       SourceLoc nameLoc;
       Expr *arg;
@@ -433,9 +433,9 @@ NullablePtr<Expr> Parser::parseExprSuper() {
       return new (Context) UnresolvedDotExpr(superRef, dotLoc,
                                              name, nameLoc);
     }
-  } else if (Tok.is(tok::l_square_following)) {
+  } else if (Tok.isFollowingLSquare()) {
     // super[expr]
-    NullablePtr<Expr> idx = parseExprList(tok::l_square_following,
+    NullablePtr<Expr> idx = parseExprList(tok::l_square,
                                           tok::r_square);
     if (idx.isNull())
       return 0;
@@ -443,30 +443,6 @@ NullablePtr<Expr> Parser::parseExprSuper() {
   } else {
     diagnose(superLoc, diag::expected_dot_or_subscript_after_super);
     return nullptr;
-  }
-}
-
-static void changeToFollowingTokenAfterRAngle(Token &token) {
-  // If there's no whitespace between a generic '>' angle bracket and a
-  // "starting" token, consider it as a following token.
-  
-  tok followKind;
-  switch (token.getKind()) {
-    default:
-      return;
-    case tok::l_paren_starting:
-      followKind = tok::l_paren_following;
-      break;
-    case tok::l_square_starting:
-      followKind = tok::l_square_following;
-      break;
-    case tok::period_prefix:
-      followKind = tok::period;
-      break;
-  }
-  
-  if (token.getText().data()[-1] == '>') {
-    token.setKind(followKind);
   }
 }
 
@@ -563,11 +539,11 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     break;
   }
 
-  case tok::l_paren_starting:
-    Result = parseExprList(tok::l_paren_starting, tok::r_paren);
+  case tok::l_paren:
+    Result = parseExprList(tok::l_paren, tok::r_paren);
     break;
 
-  case tok::l_square_starting:
+  case tok::l_square:
     Result = parseExprCollection();
     break;
       
@@ -599,8 +575,8 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
                                        peekToken().is(tok::integer_literal))) {
       auto Backup = Tok;
       consumeToken();
-      bool IsPeriod = peekToken().is(tok::l_paren_following) ||
-                      peekToken().is(tok::l_square_following);
+      bool IsPeriod = peekToken().isFollowingLParen() ||
+                      peekToken().isFollowingLSquare();
       Tok = Backup;
       L->backtrackToToken(Backup);
       if (IsPeriod)
@@ -613,7 +589,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
         continue;
       }
 
-      if (Tok.is(tok::l_paren_starting)) {
+      if (Tok.is(tok::l_paren)) {
         Identifier Name;
         SourceLoc NameLoc;
         Expr *Arg;
@@ -646,7 +622,6 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
           if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {
             diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
           }
-          changeToFollowingTokenAfterRAngle(Tok);
           
           Result = new (Context) UnresolvedSpecializeExpr(Result.get(),
                                                           LAngleLoc,
@@ -660,8 +635,8 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     }
     
     // Check for a () suffix, which indicates a call.
-    // Note that this cannot be a l_paren_starting.
-    if (Tok.is(tok::l_paren_following)) {
+    // Note that this cannot be the start of a new line.
+    if (Tok.isFollowingLParen()) {
       NullablePtr<Expr> Arg = parseExprCallSuffix(/*isConstructor=*/false);
       // FIXME: Unfortunate recovery here.
       if (Arg.isNull())
@@ -671,9 +646,9 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     }
     
     // Check for a [expr] suffix.
-    // Note that this cannot be a l_square_starting.
-    if (Tok.is(tok::l_square_following)) {
-      NullablePtr<Expr> Idx = parseExprList(tok::l_square_following,
+    // Note that this cannot be the start of a new line.
+    if (Tok.isFollowingLSquare()) {
+      NullablePtr<Expr> Idx = parseExprList(tok::l_square,
                                             tok::r_square);
       if (Idx.isNull())
         return 0;
@@ -728,9 +703,9 @@ Expr *Parser::parseExprStringLiteral() {
       // Prime the new lexer with a '(' as the first token.
       assert(Segment.Data.data()[-1] == '(' &&
              "Didn't get an lparen before interpolated expression");
-      Tok.setToken(tok::l_paren_starting, StringRef(Segment.Data.data()-1, 1));
+      Tok.setToken(tok::l_paren, StringRef(Segment.Data.data()-1, 1));
       
-      NullablePtr<Expr> E = parseExprList(tok::l_paren_starting, tok::r_paren);
+      NullablePtr<Expr> E = parseExprList(tok::l_paren, tok::r_paren);
       if (E.isNonNull()) {
         Exprs.push_back(E.get());
         
@@ -843,7 +818,6 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
     if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {
       diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
     }
-    changeToFollowingTokenAfterRAngle(Tok);
   }
   
   ValueDecl *D = ScopeInfo.lookupValueName(text);
@@ -968,7 +942,7 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
 /// selector-arg:
 ///   ':'? identifier expr-paren
 NullablePtr<Expr> Parser::parseExprCallSuffix(bool isConstructor) {
-  assert(Tok.is(tok::l_paren_following) && "Not a call suffix?");
+  assert(Tok.isFollowingLParen() && "Not a call suffix?");
 
   // Parse the first argument.
   NullablePtr<Expr> firstArg = parseExprList(Tok.getKind(), tok::r_paren);
@@ -1006,27 +980,17 @@ NullablePtr<Expr> Parser::parseExprCallSuffix(bool isConstructor) {
 
     // Consume the selector piece.
     Identifier selectorPiece = Context.getIdentifier(Tok.getText());
-    SourceLoc selectorPieceLoc = consumeToken(tok::identifier);
+    consumeToken(tok::identifier);
 
     // Look for the following '(' that provides arguments.
-    tok kind = Tok.getKind();
-    if (Tok.isNot(tok::l_paren_following)) {
-      if (Tok.isNot(tok::l_paren_starting)) {
-        diagnose(Tok, diag::expected_selector_call_args, selectorPiece);
-        break;
-      }
-
-      // We had whitespace before the '('. Complain.
-      // FIXME: Fix-It here.
-      diagnose(Tok, diag::whitespace_before_lparen)
-        << SourceRange(Lexer::getLocForEndOfToken(SourceMgr,
-                                                  selectorPieceLoc),
-                       Tok.getLoc());
+    if (Tok.isNot(tok::l_paren)) {
+      diagnose(Tok, diag::expected_selector_call_args, selectorPiece);
+      break;
     }
 
     // Parse the expression. We parse a full expression list, but
     // complain about it later.
-    NullablePtr<Expr> selectorArg = parseExprList(kind, tok::r_paren);
+    NullablePtr<Expr> selectorArg = parseExprList(tok::l_paren, tok::r_paren);
     if (selectorArg.isNull()) {
       // FIXME: Crummy recovery
       return 0;
@@ -1108,7 +1072,7 @@ NullablePtr<Expr> Parser::parseExprCallSuffix(bool isConstructor) {
 bool
 Parser::parseSelectorArgs(Identifier &Name, SourceLoc &NameLoc, Expr *&Arg,
                           bool SeparateFirstName) {
-  SourceLoc leftParen = consumeToken(tok::l_paren_starting);
+  SourceLoc leftParen = consumeToken(tok::l_paren);
   SourceLoc SelectorIdent = Tok.getLoc();
 
   bool Invalid = false;
@@ -1197,7 +1161,7 @@ Parser::parseSelectorArgs(Identifier &Name, SourceLoc &NameLoc, Expr *&Arg,
 ///     expr-dictionary
 //      lsquare-starting ']'
 NullablePtr<Expr> Parser::parseExprCollection() {
-  SourceLoc LSquareLoc = consumeToken(tok::l_square_starting);
+  SourceLoc LSquareLoc = consumeToken(tok::l_square);
 
   // Parse an empty collection literal.
   if (Tok.is(tok::r_square)) {
@@ -1411,7 +1375,7 @@ NullablePtr<Expr> Parser::parseExprFunc() {
       SourceLoc());
     ArgParams.push_back(unitPattern);
     BodyParams.push_back(unitPattern);
-  } else if (!Tok.is(tok::l_paren_starting)) {
+  } else if (!Tok.is(tok::l_paren)) {
     diagnose(Tok, diag::func_decl_without_paren);
     return 0;
   } else if (parseFunctionSignature(ArgParams, BodyParams, RetTy)) {

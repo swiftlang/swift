@@ -22,10 +22,7 @@
 
 /// IDENTIFIER_KEYWORD(kw)
 ///   Expands for Swift keywords that behave grammatically like identifiers,
-///   such as 'super' and 'constructor'. In particular, these keywords cause
-///   a following unwhitespaced left paren or square bracket to be parsed as
-///   l_paren_following or l_square_following instead of l_paren_starting or
-///   l_square_starting.
+///   such as 'super' and 'constructor'.
 #ifndef IDENTIFIER_KEYWORD
 #define IDENTIFIER_KEYWORD(kw) KEYWORD(kw)
 #endif
@@ -33,7 +30,7 @@
 /// PUNCTUATOR(name, str)
 ///   Expands for every Swift punctuator.
 ///   \param name  The symbolic name of the punctuator, such as
-///                'l_paren_starting' or 'arrow'.
+///                'l_paren' or 'arrow'.
 ///   \param str   A string literal containing the spelling of the punctuator,
 ///                such as '"("' or '"->"'.
 #ifndef PUNCTUATOR
@@ -79,13 +76,11 @@ IDENTIFIER_KEYWORD(this)
 IDENTIFIER_KEYWORD(This)
 
 // Punctuators.
-PUNCTUATOR(l_paren_starting,  "(")
-PUNCTUATOR(l_paren_following, "(")
+PUNCTUATOR(l_paren,  "(")
 PUNCTUATOR(r_paren,     ")")
 PUNCTUATOR(l_brace,     "{")
 PUNCTUATOR(r_brace,     "}")
-PUNCTUATOR(l_square_starting,  "[")
-PUNCTUATOR(l_square_following, "[")
+PUNCTUATOR(l_square, "[")
 PUNCTUATOR(r_square,    "]")
 
 PUNCTUATOR(period,      ".")
