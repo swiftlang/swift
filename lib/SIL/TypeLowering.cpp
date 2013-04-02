@@ -10,15 +10,71 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGen.h"
-#include "TypeLowering.h"
-#include "TypeVisitor.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/TypeLowering.h"
+#include "swift/SIL/TypeVisitor.h"
 
-namespace swift {
-namespace Lowering {
+using namespace swift;
+using namespace Lowering;
 
+Type Lowering::getThinFunctionType(Type t) {
+  if (auto *ft = t->getAs<FunctionType>()) {
+    return FunctionType::get(ft->getInput(), ft->getResult(),
+                             ft->isAutoClosure(),
+                             ft->isBlock(),
+                             /*isThin*/ true,
+                             ft->getASTContext());
+  } else if (auto *pft = t->getAs<PolymorphicFunctionType>()) {
+    return PolymorphicFunctionType::get(pft->getInput(), pft->getResult(),
+                                        &pft->getGenericParams(),
+                                        /*isThin*/ true,
+                                        pft->getASTContext());
+  } else {
+    return t;
+  }
+}
+
+Type Lowering::getThickFunctionType(Type t) {
+  if (auto *fTy = t->getAs<FunctionType>()) {
+    return FunctionType::get(fTy->getInput(),
+                             fTy->getResult(),
+                             fTy->isAutoClosure(),
+                             fTy->isBlock(),
+                             /*isThin*/ false,
+                             fTy->getASTContext());
+  } else if (auto *pfTy = t->getAs<PolymorphicFunctionType>()) {
+    return PolymorphicFunctionType::get(pfTy->getInput(),
+                                        pfTy->getResult(),
+                                        &pfTy->getGenericParams(),
+                                        /*isThin*/ false,
+                                        pfTy->getASTContext());
+  } else {
+    return t;
+  }
+}
+
+CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
+  if (VarDecl *var = dyn_cast<VarDecl>(capture)) {
+    if (var->isProperty()) {
+      return var->isSettable()
+      ? CaptureKind::GetterSetter
+      : CaptureKind::Getter;
+    }
+  }
+  
+  if (capture->getType()->is<LValueType>())
+    return CaptureKind::Byref;
+  // FIXME: Check capture analysis info here and capture Byref or
+  // Constant if we can get away with it.
+  if (capture->getTypeOfReference()->is<LValueType>())
+    return CaptureKind::LValue;
+  return CaptureKind::Constant;
+}
+  
 static bool isAddressOnly(Type t) {
   // Archetypes and existentials are always address-only.
   // FIXME: Class archetypes and existentials will one day be representable as
@@ -34,8 +90,8 @@ namespace {
 /// LoadableTypeLoweringInfoVisitor - Recursively descend into fragile struct and
 /// tuple types and visit their element types, storing information about the
 /// reference type members in the TypeLoweringInfo for the type.
-class LoadableTypeLoweringInfoVisitor : public TypeVisitor<LoadableTypeLoweringInfoVisitor,
-                                                   Loadable_t>
+class Lowering::LoadableTypeLoweringInfoVisitor
+  : public Lowering::TypeVisitor<LoadableTypeLoweringInfoVisitor, Loadable_t>
 {
   TypeLoweringInfo &theInfo;
   ReferenceTypePath currentElement;
@@ -111,8 +167,8 @@ public:
   }
 };
   
-TypeConverter::TypeConverter(SILGenModule &sgm)
-  : SGM(sgm), Context(sgm.M.getContext()) {
+TypeConverter::TypeConverter(SILModule &m)
+  : M(m), Context(m.getContext()) {
 }
 
 TypeConverter::~TypeConverter() {
@@ -146,7 +202,7 @@ void TypeConverter::makeLayoutForDecl(
 namespace {
   /// Recursively destructure tuple-type arguments into SIL argument types.
   class LoweredFunctionInputTypeVisitor
-    : public TypeVisitor<LoweredFunctionInputTypeVisitor>
+    : public Lowering::TypeVisitor<LoweredFunctionInputTypeVisitor>
   {
     TypeConverter &tc;
     SmallVectorImpl<SILType> &inputTypes;
@@ -195,7 +251,7 @@ SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
                                      resultType,
                                      uncurriedInputCounts,
                                      hasIndirectReturn,
-                                     SGM.M);
+                                     M);
 }
 
 SILTypeInfo *TypeConverter::makeSILTypeInfo(TypeLoweringInfo &theInfo) {
@@ -213,7 +269,7 @@ SILTypeInfo *TypeConverter::makeSILTypeInfo(TypeLoweringInfo &theInfo) {
     SmallVector<SILCompoundTypeInfo::Element, 4> compoundElements;
     // FIXME: record resilient attribute
     makeLayoutForDecl(compoundElements, ntd);
-    return SILCompoundTypeInfo::create(compoundElements, SGM.M);
+    return SILCompoundTypeInfo::create(compoundElements, M);
   }
   
   //
@@ -223,7 +279,7 @@ SILTypeInfo *TypeConverter::makeSILTypeInfo(TypeLoweringInfo &theInfo) {
     for (auto &elt : tt->getFields()) {
       compoundElements.push_back({getLoweredType(elt.getType()), nullptr});
     }
-    return SILCompoundTypeInfo::create(compoundElements, SGM.M);
+    return SILCompoundTypeInfo::create(compoundElements, M);
   }
   
   //
@@ -273,7 +329,7 @@ TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
   
   // Generate the SILTypeInfo for the lowered type.
   if (SILTypeInfo *sti = makeSILTypeInfo(*theInfo)) {
-    SGM.M.typeInfos[theInfo->loweredType] = sti;
+    M.typeInfos[theInfo->loweredType] = sti;
   }
   
   return *theInfo;
@@ -387,7 +443,7 @@ static Type getFunctionTypeWithCaptures(TypeConverter &types,
   SmallVector<TupleTypeElt, 8> inputFields;
 
   for (ValueDecl *capture : captures) {
-    switch (SILGenFunction::getDeclCaptureKind(capture)) {
+    switch (getDeclCaptureKind(capture)) {
     case CaptureKind::Constant:
       // Constants are captured by value.
       assert(!capture->getTypeOfReference()->is<LValueType>() &&
@@ -522,6 +578,3 @@ Type TypeConverter::makeConstantType(SILConstant c) {
   }
   llvm_unreachable("unexpected constant loc");
 }
-  
-} // namespace Lowering
-} // namespace swift

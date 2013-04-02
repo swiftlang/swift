@@ -1,4 +1,4 @@
-//===--- TypeLowering.h - Type information for SILGen -----------*- C++ -*-===//
+//===--- TypeLowering.h - Convert Swift Types to SILTypes -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SILGen_TypeLoweringInfo_h
-#define SILGen_TypeLoweringInfo_h
+#ifndef SIL_TypeLowering_h
+#define SIL_TypeLowering_h
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -23,9 +23,36 @@
 namespace swift {
   class ValueDecl;
 namespace Lowering {
-  class SILGenFunction;
-  class SILGenModule;
 
+/// Given a function type or polymorphic function type, returns the same type
+/// with the [thin] attribute added.
+/// FIXME: The thinness of func decls should be checked by the Swift
+/// typechecker.
+Type getThinFunctionType(Type t);
+
+/// Given a function type or polymorphic function type, returns the same type
+/// with the [thin] attribute removed.
+/// FIXME: The thinness of func decls should be checked by the Swift
+/// typechecker.
+Type getThickFunctionType(Type t);
+
+/// CaptureKind - Different ways in which a function can capture context.
+enum class CaptureKind {
+  /// A local value captured as a mutable box.
+  LValue,
+  /// A local value captured by value.
+  Constant,
+  /// A byref argument captured by address.
+  Byref,
+  /// A getter-only property.
+  Getter,
+  /// A settable property.
+  GetterSetter
+};
+  
+/// getDeclCaptureKind - Return the CaptureKind to use when capturing a decl.
+CaptureKind getDeclCaptureKind(ValueDecl *capture);
+  
 /// ReferenceTypeElement - a path to a reference type element within a loadable
 /// aggregate type at an arbitrary depth.
 struct ReferenceTypePath {
@@ -44,7 +71,7 @@ struct ReferenceTypePath {
 };
 
 /// TypeLoweringInfo - Extended type information used by SILGen.
-class LLVM_LIBRARY_VISIBILITY TypeLoweringInfo {
+class TypeLoweringInfo {
   friend class TypeConverter;
   friend class LoadableTypeLoweringInfoVisitor;
 
@@ -60,7 +87,7 @@ public:
   TypeLoweringInfo() = default;
 
   TypeLoweringInfo(TypeLoweringInfo const &) = delete;
-  void operator=(TypeLoweringInfo const &) = delete;
+  TypeLoweringInfo &operator=(TypeLoweringInfo const &) = delete;
   TypeLoweringInfo(TypeLoweringInfo &&) = default;
   TypeLoweringInfo &operator=(TypeLoweringInfo &&) = default;
   
@@ -94,7 +121,7 @@ public:
 };
 
 /// TypeConverter - helper class for creating and managing TypeLoweringInfos.
-class LLVM_LIBRARY_VISIBILITY TypeConverter {
+class TypeConverter {
   llvm::BumpPtrAllocator TypeLoweringInfoBPA;
   llvm::DenseMap<TypeBase *, TypeLoweringInfo *> types;
   llvm::DenseMap<SILConstant, SILType> constantTypes;
@@ -110,10 +137,10 @@ class LLVM_LIBRARY_VISIBILITY TypeConverter {
   Type makeConstantType(SILConstant constant);
   
 public:
-  SILGenModule &SGM;
+  SILModule &M;
   ASTContext &Context;
 
-  TypeConverter(SILGenModule &sgm);
+  TypeConverter(SILModule &sgm);
   ~TypeConverter();
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;

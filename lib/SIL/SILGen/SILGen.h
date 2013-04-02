@@ -16,10 +16,10 @@
 #include "ASTVisitor.h"
 #include "Cleanup.h"
 #include "Scope.h"
-#include "TypeLowering.h"
 #include "swift/SIL/Function.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 
@@ -131,20 +131,6 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *) {}
   void visitVarDecl(VarDecl *) {}
   
-};
-
-/// CaptureKind - Closure capture modes.
-enum class CaptureKind {
-  /// A local value captured as a mutable box.
-  LValue,
-  /// A local value captured by value.
-  Constant,
-  /// A byref argument captured by address.
-  Byref,
-  /// A getter-only property.
-  Getter,
-  /// A settable property.
-  GetterSetter
 };
 
 /// Materialize - Represents a temporary allocation.
@@ -624,25 +610,6 @@ public:
   void visitVarDecl(VarDecl *D, SGFContext C) {
     // We handle these in pattern binding.
   }
-
-  /// getDeclCaptureKind - Return the CaptureKind to use when capturing a decl.
-  static CaptureKind getDeclCaptureKind(ValueDecl *capture) {
-    if (VarDecl *var = dyn_cast<VarDecl>(capture)) {
-      if (var->isProperty()) {
-        return var->isSettable()
-          ? CaptureKind::GetterSetter
-          : CaptureKind::Getter;
-      }
-    }
-    
-    if (capture->getType()->is<LValueType>())
-      return CaptureKind::Byref;
-    // FIXME: Check capture analysis info here and capture Byref or
-    // Constant if we can get away with it.
-    if (capture->getTypeOfReference()->is<LValueType>())
-      return CaptureKind::LValue;
-    return CaptureKind::Constant;
-  }
 };
   
 /// SILGenLValue - An ASTVisitor for building logical lvalues.
@@ -680,45 +647,6 @@ public:
   LValue visitRequalifyExpr(RequalifyExpr *e); // FIXME kill lvalue qualifiers
   LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e);
 };
-
-/// A bit of a hack. The types of func decls should natively be thin function
-/// types.
-static inline Type getThinFunctionType(Type t) {
-  if (auto *ft = t->getAs<FunctionType>()) {
-    return FunctionType::get(ft->getInput(), ft->getResult(),
-                             ft->isAutoClosure(),
-                             ft->isBlock(),
-                             /*isThin*/ true,
-                             ft->getASTContext());
-  } else if (auto *pft = t->getAs<PolymorphicFunctionType>()) {
-    return PolymorphicFunctionType::get(pft->getInput(), pft->getResult(),
-                                        &pft->getGenericParams(),
-                                        /*isThin*/ true,
-                                        pft->getASTContext());
-  } else {
-    return t;
-  }
-}
-
-static inline Type getThickFunctionType(Type t) {
-  if (auto *fTy = t->getAs<FunctionType>()) {
-    return FunctionType::get(fTy->getInput(),
-                             fTy->getResult(),
-                             fTy->isAutoClosure(),
-                             fTy->isBlock(),
-                             /*isThin*/ false,
-                             fTy->getASTContext());
-  } else if (auto *pfTy = t->getAs<PolymorphicFunctionType>()) {
-    return PolymorphicFunctionType::get(pfTy->getInput(),
-                                        pfTy->getResult(),
-                                        &pfTy->getGenericParams(),
-                                        /*isThin*/ false,
-                                        pfTy->getASTContext());
-  } else {
-    return t;
-  }
-}
-
   
 } // end namespace Lowering
 } // end namespace swift

@@ -14,10 +14,10 @@
 #include "Initialization.h"
 #include "ManagedValue.h"
 #include "Scope.h"
-#include "TypeLowering.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "swift/SIL/BBArgument.h"
 #include "swift/SIL/SILType.h"
+#include "swift/SIL/TypeLowering.h"
 #include "swift/AST/AST.h"
 #include <iterator>
 using namespace swift;
@@ -497,7 +497,7 @@ public:
 static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
   // FIXME: capture local properties
   ASTContext &c = capture->getASTContext();
-  switch (gen.getDeclCaptureKind(capture)) {
+  switch (getDeclCaptureKind(capture)) {
   case CaptureKind::LValue: {
     // LValues are captured as two arguments: a retained ObjectPointer that owns
     // the captured value, and the address of the value itself.

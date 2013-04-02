@@ -62,7 +62,7 @@ SILGenFunction::~SILGenFunction() {
 //===--------------------------------------------------------------------===//
 
 SILGenModule::SILGenModule(SILModule &M)
-  : M(M), Types(*this), TopLevelSGF(nullptr) {
+  : M(M), Types(M), TopLevelSGF(nullptr) {
   if (M.toplevel) {
     TopLevelSGF = new SILGenFunction(*this, *M.toplevel,
                                      /*hasVoidReturn=*/true);

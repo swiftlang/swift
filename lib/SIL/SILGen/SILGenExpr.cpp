@@ -15,11 +15,11 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/BBArgument.h"
+#include "swift/SIL/TypeLowering.h"
 #include "Condition.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "ManagedValue.h"
-#include "TypeLowering.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
