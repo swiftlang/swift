@@ -37,10 +37,10 @@
 
 using namespace swift;
 
-static Identifier getModuleIdentifier(const llvm::MemoryBuffer *Buffer,
+static Identifier getModuleIdentifier(std::string OutputName,
                                       ASTContext &Context,
                                       bool IsMainModule) {
-  StringRef moduleName = Buffer->getBufferIdentifier();
+  StringRef moduleName = OutputName;
 
   // As a special case, recognize <stdin>.
   if (moduleName == "<stdin>")
@@ -54,7 +54,7 @@ static Identifier getModuleIdentifier(const llvm::MemoryBuffer *Buffer,
     if (IsMainModule) {
       moduleName = "main";
     } else {
-      SourceLoc Loc = SourceLoc(llvm::SMLoc::getFromPointer(Buffer->getBuffer().begin()));
+      SourceLoc Loc;
       Context.Diags.diagnose(Loc, diag::bad_module_name);
       moduleName = "bad";
     }
@@ -64,26 +64,36 @@ static Identifier getModuleIdentifier(const llvm::MemoryBuffer *Buffer,
 }
 
 TranslationUnit*
-swift::buildSingleTranslationUnit(ASTContext &Context, unsigned BufferID,
+swift::buildSingleTranslationUnit(ASTContext &Context,
+                                  std::string OutputName,
+                                  std::vector<unsigned> BufferIDs,
                                   bool ParseOnly, bool IsMainModule) {
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
-  const llvm::MemoryBuffer *Buffer = Context.SourceMgr.getMemoryBuffer(BufferID);
-  Identifier ID = getModuleIdentifier(Buffer, Context, IsMainModule);
+  Identifier ID = getModuleIdentifier(OutputName, Context, IsMainModule);
   TranslationUnit *TU = new (Context) TranslationUnit(ID, Comp, Context,
                                                       IsMainModule,
                                                       /*IsReplModule=*/false);
   Context.LoadedModules[ID.str()] = TU;
-  
-  unsigned BufferOffset = 0;
+
   unsigned CurTUElem = 0;
-  do {
-    parseIntoTranslationUnit(TU, BufferID, &BufferOffset);
-    if (!ParseOnly) {
-      performNameBinding(TU, CurTUElem);
-      performTypeChecking(TU, CurTUElem);
-      CurTUElem = TU->Decls.size();
-    }
-  } while (BufferOffset != Buffer->getBufferSize());
+  for (auto &BufferID : BufferIDs) {
+    unsigned BufferOffset = 0;
+    const llvm::MemoryBuffer *Buffer =
+      Context.SourceMgr.getMemoryBuffer(BufferID);
+    do {
+      parseIntoTranslationUnit(TU, BufferID, &BufferOffset);
+      if (!ParseOnly && BufferIDs.size() == 1) {
+        performNameBinding(TU, CurTUElem);
+        performTypeChecking(TU, CurTUElem);
+        CurTUElem = TU->Decls.size();
+      }
+    } while (BufferOffset != Buffer->getBufferSize());
+  }
+
+  if (!ParseOnly && BufferIDs.size() > 1) {
+    performNameBinding(TU);
+    performTypeChecking(TU);
+  }
 
   return TU;
 }

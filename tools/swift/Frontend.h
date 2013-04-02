@@ -15,13 +15,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <string>
+#include <vector>
+
 namespace swift {
   class ASTContext;
   class TranslationUnit;
   class REPLContext;
   
   TranslationUnit* buildSingleTranslationUnit(ASTContext &Context,
-                                              unsigned BufferID,
+                                              std::string OutputName,
+                                              std::vector<unsigned> BufferIDs,
                                               bool ParseOnly,
                                               bool IsMainModule);
 
