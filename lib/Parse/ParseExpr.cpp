@@ -844,7 +844,6 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
 ///     lparen-any expr-paren-element (',' expr-paren-element)* ')'
 ///
 ///   expr-paren-element:
-///     (identifier '=')? expr // FIXME: To be removed.
 ///     (identifier ':')? expr
 ///
 /// FIXME: the '=' form above will likely go away.
@@ -859,15 +858,12 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
   if (Tok.isNot(RightTok)) {
     do {
       Identifier FieldName;
-      // Check to see if there is a field specifier, like "x =" or "x : ".
-      if (Tok.is(tok::identifier) &&
-          (peekToken().is(tok::equal) || peekToken().is(tok::colon))) {
+      // Check to see if there is a field specifier
+      if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
         if (parseIdentifier(FieldName,
                             diag::expected_field_spec_name_tuple_expr))
           return 0;
-
-        assert(Tok.is(tok::equal) || Tok.is(tok::colon));
-        consumeToken();
+        consumeToken(tok::colon);
       }
 
       if (!SubExprNames.empty())
