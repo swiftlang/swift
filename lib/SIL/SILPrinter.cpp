@@ -100,7 +100,7 @@ void SILType::print(raw_ostream &OS) const {
     OS << "*";
   }
   CanType swiftTy = getSwiftRValueType();
-  unsigned uncurries = uncurryLevel;
+  unsigned uncurries = getUncurryLevel();
   while (uncurries-- > 0) {
     AnyFunctionType *fTy = cast<AnyFunctionType>(swiftTy);
     if (auto *pfTy = dyn_cast<PolymorphicFunctionType>(fTy))

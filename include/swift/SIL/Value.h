@@ -40,38 +40,33 @@ namespace swift {
   /// this.
   class ValueBase : public SILAllocated<ValueBase> {
     struct SILTypeOrTypeList {
-      static constexpr unsigned TypeListMarker = ~0U;
-      
       union {
         SILType Ty;
-        struct {
-          SILTypeList *Ptr;
-          unsigned Marker;
-        } Types;
+        SILTypeList *List;
       };
       
-      static_assert(sizeof(Types) == sizeof(SILType),
+      static_assert(sizeof(Ty) == sizeof(List),
                     "SILTypeOrTypeList union size mismatch");
       
-      SILTypeOrTypeList() : Ty() {}
+      SILTypeOrTypeList() : List() {}
       
       SILTypeOrTypeList(SILType Ty) : Ty(Ty) {}
       
       SILTypeOrTypeList(SILTypeList *Ptr)
-        : Types{Ptr, TypeListMarker} {}
+        : List(Ptr) {}
       
       bool isNull() const {
-        return Ty.isNull();
+        return !List;
       }
       
       SILTypeList *getTypeListOrNull() const {
-        if (Types.Marker == TypeListMarker)
-          return Types.Ptr;
+        if (Ty.isInvalid())
+          return List;
         return nullptr;
       }
       
       SILType getType() const {
-        assert(Types.Marker != TypeListMarker);
+        assert(!Ty.isInvalid() && "got type list but expected single type");
         return Ty;
       }
     } TypeOrTypeList;

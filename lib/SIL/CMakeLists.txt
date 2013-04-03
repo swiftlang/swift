@@ -6,7 +6,7 @@ add_swift_library(swiftSIL
   SILBase.cpp
   SILPrinter.cpp
   SILSuccessor.cpp
-  SILTypeInfo.cpp
+  SILType.cpp
   TypeLowering.cpp
   Verifier.cpp
   DEPENDS swiftAST)

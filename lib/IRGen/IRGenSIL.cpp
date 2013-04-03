@@ -26,7 +26,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/SIL/SILConstant.h"
-#include "swift/SIL/SILTypeInfo.h"
+#include "swift/SIL/SILType.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -177,7 +177,7 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
   // Map the LLVM arguments to arguments on the entry point BB.
   Explosion params = collectParameters();
   SILType funcTy = CurSILFn->getLoweredType();
-  SILFunctionTypeInfo *funcTI = IGM.SILMod->getFunctionTypeInfo(funcTy);
+  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo();
   
   // Map the indirect return if present.
   if (funcTI->hasIndirectReturn()) {
@@ -679,7 +679,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
                                                          calleeLV);
   
   SILFunctionTypeInfo *ti
-    = IGM.SILMod->getFunctionTypeInfo(i->getCallee().getType());
+    = i->getCallee().getType().getFunctionTypeInfo();
   
   // Lower the SIL arguments to IR arguments, and pass them to the CallEmission
   // one curry at a time. CallEmission will arrange the curries in the proper
@@ -763,7 +763,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   
   unsigned uncurryLevel = i->getCallee().getType().getUncurryLevel();
   SILFunctionTypeInfo *ti
-    = IGM.SILMod->getFunctionTypeInfo(i->getCallee().getType());
+    = i->getCallee().getType().getFunctionTypeInfo();
 
   Explosion args(CurExplosionLevel);
   SmallVector<const TypeInfo *, 8> argTypes;

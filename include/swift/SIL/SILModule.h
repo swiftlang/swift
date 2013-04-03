@@ -21,7 +21,6 @@
 #include "swift/SIL/SILBase.h"
 #include "swift/SIL/SILConstant.h"
 #include "swift/SIL/SILType.h"
-#include "swift/SIL/SILTypeInfo.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -56,9 +55,6 @@ private:
   /// The collection of all codegenned Functions in the module.
   llvm::MapVector<SILConstant, Function*> functions;
 
-  /// SILTypeInfos for SILTypes used in the module.
-  llvm::DenseMap<SILType, SILTypeInfo*> typeInfos;
-  
   /// The collection of global variables used in the module.
   llvm::DenseSet<VarDecl*> globals;
   
@@ -109,33 +105,6 @@ public:
   /// Returns a pointer to the Function generated from the given declaration.
   Function *getFunction(ValueDecl *decl) const {
     return getFunction(SILConstant(decl));
-  }
-  
-  /// Returns a pointer to the SILTypeInfo for the given SILType, or null if
-  /// there is no type info for the type.
-  SILTypeInfo *getTypeInfo(SILType ty) const {
-    auto found = typeInfos.find(ty);
-    if (found != typeInfos.end())
-      return found->second;
-    else
-      return nullptr;
-  }
-  
-  /// Returns a pointer to the SILFunctionTypeInfo for the given SILType,
-  /// which must be a function type.
-  SILFunctionTypeInfo *getFunctionTypeInfo(SILType ty) const {
-    assert(ty.is<AnyFunctionType>() && "not a function type?!");
-    return cast<SILFunctionTypeInfo>(getTypeInfo(ty));
-  }
-  
-  /// Returns a pointer to the SILCompoundTypeInfo for the given SILType,
-  /// which must be of a tuple, struct, or class type.
-  SILCompoundTypeInfo *getCompoundTypeInfo(SILType ty) const {
-    assert((ty.is<NominalType>()
-              || ty.is<BoundGenericType>()
-              || ty.is<TupleType>())
-           && "not a tuple, struct, or class type?!");
-    return cast<SILCompoundTypeInfo>(getTypeInfo(ty));
   }
   
   using global_iterator = decltype(globals)::const_iterator;

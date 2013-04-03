@@ -15,6 +15,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Range.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -69,7 +70,7 @@ public:
     assert(!calleeTy.isAddress() && "callee of apply cannot be an address");
     assert(calleeTy.is<FunctionType>() &&
            "callee of apply must have concrete function type");
-    SILFunctionTypeInfo *ti = F.getModule().getFunctionTypeInfo(calleeTy);
+    SILFunctionTypeInfo *ti = calleeTy.getFunctionTypeInfo();
     
     DEBUG(llvm::dbgs() << "function input types:\n";
           for (SILType t : ti->getInputTypes()) {
@@ -122,7 +123,7 @@ public:
     assert(!appliedTy.castTo<FunctionType>()->isThin() &&
            "result of closure cannot have a thin function type");
 
-    SILFunctionTypeInfo *ti = F.getModule().getFunctionTypeInfo(calleeTy);
+    SILFunctionTypeInfo *ti = calleeTy.getFunctionTypeInfo();
     
     // Check that the arguments match the curry levels.
     assert(PAI->getArguments().size() == ti->getCurryInputTypes().size() &&
@@ -575,10 +576,9 @@ public:
     assert(opFTy->isThin() == resFTy->isThin() &&
            "convert_function cannot change function thinness");
     
-    SILFunctionTypeInfo *opTI = F.getModule().getFunctionTypeInfo(
-                                                  ICI->getOperand().getType());
-    SILFunctionTypeInfo *resTI = F.getModule().getFunctionTypeInfo(
-                                                               ICI->getType());
+    SILFunctionTypeInfo *opTI
+      = ICI->getOperand().getType().getFunctionTypeInfo();
+    SILFunctionTypeInfo *resTI = ICI->getType().getFunctionTypeInfo();
 
     assert(opTI->getResultType() == resTI->getResultType() &&
          "result types of convert_function operand and result do no match");
@@ -599,7 +599,7 @@ public:
     assert(RI->getReturnValue() && "Return of null value is invalid");
     
     SILFunctionTypeInfo *ti =
-      F.getModule().getFunctionTypeInfo(F.getLoweredType());
+      F.getLoweredType().getFunctionTypeInfo();
     assert(RI->getReturnValue().getType() == ti->getResultType() &&
            "return value type does not match return type of function");
   }
@@ -644,10 +644,18 @@ public:
   
   void verifyEntryPointArguments(BasicBlock *entry) {
     SILType ty = F.getLoweredType();
-    SILFunctionTypeInfo *ti = F.getModule().getFunctionTypeInfo(ty);
+    SILFunctionTypeInfo *ti = ty.getFunctionTypeInfo();
     
     assert(entry->bbarg_size() == ti->getInputTypes().size() &&
            "entry point has wrong number of arguments");
+    DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
+          for (auto *arg : make_range(entry->bbarg_begin(), entry->bbarg_end()))
+            arg->getType().dump();
+          llvm::dbgs() << "Input types for SIL function type:\n";
+          for (auto input : ti->getInputTypes())
+            input.dump(););
+            
+    
     assert(std::equal(entry->bbarg_begin(), entry->bbarg_end(),
                       ti->getInputTypes().begin(),
                       [](BBArgument *bbarg, SILType ty) {
@@ -668,10 +676,11 @@ public:
 
 #endif //NDEBUG
 
-/// verify - Run the IR verifier to make sure that the Function follows
+/// verify - Run the SIL verifier to make sure that the Function follows
 /// invariants.
 void Function::verify() const {
 #ifndef NDEBUG
   SILVerifier(*this).verify();
 #endif
 }
+

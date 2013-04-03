@@ -657,7 +657,7 @@ ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
   // If this is a physical field, derive its address directly.
   if (VarDecl *var = dyn_cast<VarDecl>(e->getDecl())) {
     if (!var->isProperty()) {
-      SILCompoundTypeInfo *cti = gen.SGM.M.getCompoundTypeInfo(ty);
+      SILCompoundTypeInfo *cti = ty.getCompoundTypeInfo();
       // We can get to the element directly with element_addr or
       // ref_element_addr.
       ManagedValue base = gen.visit(e->getBase());

@@ -12,8 +12,9 @@
 
 #include "swift/SIL/Function.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILConstant.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILType.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -24,24 +25,31 @@ using namespace swift;
 Function::~Function() {
 }
 
-static SILType toplevelFunctionType(ASTContext &C) {
+static SILType toplevelFunctionType(SILModule &M, ASTContext &C) {
   auto t = FunctionType::get(TupleType::getEmpty(C),
                              TupleType::getEmpty(C),
                              /*isAutoClosure=*/ false,
                              /*isBlock=*/ false,
                              /*isThin=*/ true,
                              C);
-  return SILType::getPreLoweredType(t,
+
+  auto *info = SILFunctionTypeInfo::create(CanType(t),
+                                           /*inputTypes=*/ {},
+                                           SILType::getEmptyTupleType(C),
+                                           0,
+                                           /*hasIndirectReturn*/ false,
+                                           M);
+
+  return SILType::getPreLoweredType(info,
                                     /*isAddress=*/ false,
-                                    /*isLoadable=*/ true,
-                                    /*uncurryLevel=*/ 0);
+                                    /*isLoadable=*/ true);
 }
 
 SILModule::SILModule(ASTContext &Context, bool hasTopLevel) :
-  Context(Context), toplevel(nullptr) {
-    
+  Context(Context), toplevel(nullptr)
+{
   if (hasTopLevel)
-    toplevel = new (*this) Function(*this, toplevelFunctionType(Context));
+    toplevel = new (*this) Function(*this, toplevelFunctionType(*this, Context));
 }
 
 SILModule::~SILModule() {
@@ -192,36 +200,31 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc, unsigned atUncurryLevel) {
 SILType SILType::getObjectPointerType(ASTContext &C) {
   return SILType(CanType(C.TheObjectPointerType),
                  /*isAddress=*/ false,
-                 /*isLoadable=*/ true,
-                 /*uncurryLevel=*/ 0);
+                 /*isLoadable=*/ true);
 }
 
 SILType SILType::getRawPointerType(ASTContext &C) {
   return SILType(CanType(C.TheRawPointerType),
                  /*isAddress=*/false,
-                 /*isLoadable=*/true,
-                 /*uncurryLevel=*/ 0);
+                 /*isLoadable=*/true);
 }
 
 SILType SILType::getOpaquePointerType(ASTContext &C) {
   return SILType(CanType(C.TheOpaquePointerType),
                  /*isAddress=*/false,
-                 /*isLoadable=*/true,
-                 /*uncurryLevel=*/ 0);
+                 /*isLoadable=*/true);
 }
 
 SILType SILType::getEmptyTupleType(ASTContext &C) {
   return SILType(CanType(TupleType::getEmpty(C)),
                  /*isAddress=*/false,
-                 /*isLoadable=*/true,
-                 /*uncurryLevel=*/ 0);
+                 /*isLoadable=*/true);
 }
 
 SILType SILType::getBuiltinIntegerType(unsigned bitWidth, ASTContext &C) {
   return SILType(CanType(BuiltinIntegerType::get(bitWidth, C)),
                  /*isAddress=*/false,
-                 /*isLoadable=*/true,
-                 /*uncurryLevel=*/ 0);
+                 /*isLoadable=*/true);
 }
 
 TupleInst *SILBuilder::createEmptyTuple(SILLocation Loc) {

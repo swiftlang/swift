@@ -226,6 +226,7 @@ namespace {
 SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
                                                             unsigned uncurries)
 {
+  CanType topType(ft);
   SmallVector<SILType, 8> inputTypes;
   SmallVector<unsigned, 3> uncurriedInputCounts;
   // Destructure the uncurried input tuple types.
@@ -247,21 +248,21 @@ SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
     resultType = SILType::getEmptyTupleType(Context);
   }
   
-  return SILFunctionTypeInfo::create(inputTypes,
+  return SILFunctionTypeInfo::create(topType,
+                                     inputTypes,
                                      resultType,
                                      uncurriedInputCounts,
                                      hasIndirectReturn,
                                      M);
 }
 
-SILTypeInfo *TypeConverter::makeSILTypeInfo(TypeLoweringInfo &theInfo) {
+SILTypeInfo *TypeConverter::makeSILTypeInfo(CanType t, unsigned uncurryLevel) {
   //
   // Make a SILCompoundTypeInfo for struct or class types.
-  SILType ty = theInfo.loweredType;
   NominalTypeDecl *ntd = nullptr;
-  if (NominalType *nt = ty.getAs<NominalType>()) {
+  if (NominalType *nt = t->getAs<NominalType>()) {
     ntd = nt->getDecl();
-  } else if (BoundGenericType *bgt = ty.getAs<BoundGenericType>()) {
+  } else if (BoundGenericType *bgt = t->getAs<BoundGenericType>()) {
     ntd = bgt->getDecl();
   }
 
@@ -269,23 +270,23 @@ SILTypeInfo *TypeConverter::makeSILTypeInfo(TypeLoweringInfo &theInfo) {
     SmallVector<SILCompoundTypeInfo::Element, 4> compoundElements;
     // FIXME: record resilient attribute
     makeLayoutForDecl(compoundElements, ntd);
-    return SILCompoundTypeInfo::create(compoundElements, M);
+    return SILCompoundTypeInfo::create(t, compoundElements, M);
   }
   
   //
   // Make a SILCompoundTypeInfo for tuple types.
-  if (TupleType *tt = ty.getAs<TupleType>()) {
+  if (TupleType *tt = t->getAs<TupleType>()) {
     SmallVector<SILCompoundTypeInfo::Element, 4> compoundElements;
     for (auto &elt : tt->getFields()) {
       compoundElements.push_back({getLoweredType(elt.getType()), nullptr});
     }
-    return SILCompoundTypeInfo::create(compoundElements, M);
+    return SILCompoundTypeInfo::create(t, compoundElements, M);
   }
   
   //
   // Make a SILFunctionTypeInfo for function types.
-  if (AnyFunctionType *ft = ty.getAs<AnyFunctionType>()) {
-    return makeInfoForFunctionType(ft, ty.getUncurryLevel());
+  if (AnyFunctionType *ft = t->getAs<AnyFunctionType>()) {
+    return makeInfoForFunctionType(ft, uncurryLevel);
   }
   
   //
@@ -321,15 +322,20 @@ TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
       theInfo->referenceTypeElements.clear();
   }
 
-  // Generate the lowered type.
-  theInfo->loweredType = SILType(t,
-                                 /*address=*/ address || addressOnly,
-                                 /*loadable=*/ !addressOnly,
-                                 uncurryLevel);
-  
-  // Generate the SILTypeInfo for the lowered type.
-  if (SILTypeInfo *sti = makeSILTypeInfo(*theInfo)) {
-    M.typeInfos[theInfo->loweredType] = sti;
+  // Derive SILType for LValueType from the object type.
+  if (address) {
+    theInfo->loweredType = getLoweredType(t, uncurryLevel).getAddressType();
+  }
+  // Generate SILTypeInfo for lowered types that need it.
+  else if (SILTypeInfo *info = makeSILTypeInfo(t, uncurryLevel)) {
+    theInfo->loweredType = SILType(info,
+                                   /*address=*/ address || addressOnly,
+                                   /*loadable=*/ !addressOnly);
+  // If there's no SILTypeInfo, create a SILType from just the Swift type.
+  } else {
+    theInfo->loweredType = SILType(t,
+                                   /*address=*/ address || addressOnly,
+                                   /*loadable=*/ !addressOnly);
   }
   
   return *theInfo;

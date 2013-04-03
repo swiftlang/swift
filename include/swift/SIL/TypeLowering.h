@@ -128,7 +128,7 @@ class TypeConverter {
   
   TypeLoweringInfo const &makeTypeLoweringInfo(CanType t,
                                                unsigned uncurryLevel);
-  SILTypeInfo *makeSILTypeInfo(TypeLoweringInfo &theInfo);
+  SILTypeInfo *makeSILTypeInfo(CanType t, unsigned uncurryLevel);
   void makeLayoutForDecl(SmallVectorImpl<SILCompoundTypeInfo::Element> &theInfo,
                          NominalTypeDecl *decl);
   SILFunctionTypeInfo *makeInfoForFunctionType(AnyFunctionType *ft,

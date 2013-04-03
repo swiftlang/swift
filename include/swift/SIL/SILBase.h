@@ -20,7 +20,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/Support/Allocator.h"
-#include "llvm/Support/AlignOf.h"
 
 namespace swift {
 class SILTypeList;
@@ -60,7 +59,7 @@ public:
   /// Custom version of 'new' that uses the SILModule's BumpPtrAllocator with
   /// precise alignment knowledge.
   void *operator new(size_t Bytes, const SILBase &C,
-                     size_t Alignment = llvm::AlignOf<DERIVED>::Alignment) {
+                     size_t Alignment = alignof(DERIVED)) {
     return C.allocate(Bytes, Alignment);
   }
 };

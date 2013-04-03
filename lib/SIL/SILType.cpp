@@ -14,11 +14,11 @@
 #include "swift/SIL/SILBase.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
-#include "swift/SIL/SILTypeInfo.h"
 
 using namespace swift;
 
-SILFunctionTypeInfo *SILFunctionTypeInfo::create(ArrayRef<SILType> inputTypes,
+SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
+                                       ArrayRef<SILType> inputTypes,
                                        SILType resultType,
                                        ArrayRef<unsigned> uncurriedInputCounts,
                                        bool hasIndirectReturn,
@@ -32,6 +32,7 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(ArrayRef<SILType> inputTypes,
                                  + sizeof(unsigned)*(1+uncurriedInputCounts.size()),
                                llvm::AlignOf<SILFunctionTypeInfo>::Alignment);
   SILFunctionTypeInfo *fi = ::new (buffer) SILFunctionTypeInfo(
+                                                     swiftType,
                                                      inputTypes.size(),
                                                      resultType,
                                                      uncurriedInputCounts.size(),
@@ -44,14 +45,15 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(ArrayRef<SILType> inputTypes,
   return fi;
 }
 
-SILCompoundTypeInfo *SILCompoundTypeInfo::create(ArrayRef<Element> elements,
+SILCompoundTypeInfo *SILCompoundTypeInfo::create(CanType swiftType,
+                                                 ArrayRef<Element> elements,
                                                  SILBase &base) {
   
   void *buffer = base.allocate(sizeof(SILCompoundTypeInfo)
                                  + sizeof(Element) * elements.size(),
                                llvm::AlignOf<SILCompoundTypeInfo>::Alignment);
   SILCompoundTypeInfo *cti =
-    ::new (buffer) SILCompoundTypeInfo(elements.size());
+    ::new (buffer) SILCompoundTypeInfo(swiftType, elements.size());
   
   memcpy(cti->getElementBuffer(), elements.data(),
          sizeof(Element) * elements.size());
@@ -68,4 +70,11 @@ size_t SILCompoundTypeInfo::getIndexOfMemberDecl(VarDecl *vd) const {
       return i;
   }
   llvm_unreachable("decl is not a member of type");
+}
+
+unsigned SILType::getUncurryLevel() const {
+  if (auto *info = value.getPointer().dyn_cast<SILTypeInfo*>())
+    if (auto *finfo = dyn_cast<SILFunctionTypeInfo>(info))
+      return finfo->getUncurryLevel();
+  return 0;
 }

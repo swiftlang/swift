@@ -249,7 +249,7 @@ LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
         lv.add<RefElementComponent>(var,
                                     gen.getLoweredType(e->getType()));
       } else {
-        SILCompoundTypeInfo *cti = gen.SGM.M.getCompoundTypeInfo(baseTy);
+        SILCompoundTypeInfo *cti = baseTy.getCompoundTypeInfo();
         lv.add<FragileElementComponent>(cti->getIndexOfMemberDecl(var),
                                         gen.getLoweredType(e->getType()));
       }

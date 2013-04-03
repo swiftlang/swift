@@ -130,8 +130,23 @@ namespace llvm {
     }
   };
 
-  // A Type is "pointer like".
   template<typename T> class PointerLikeTypeTraits;
+
+  // TypeBase* is always at least eight-byte aligned; make the three tag bits
+  // available through PointerLikeTypeTraits.
+  template<>
+  class PointerLikeTypeTraits<swift::TypeBase*> {
+  public:
+    static inline void *getAsVoidPointer(swift::TypeBase *I) {
+      return (void*)I;
+    }
+    static inline swift::TypeBase *getFromVoidPointer(void *P) {
+      return (swift::TypeBase*)P;
+    }
+    enum { NumLowBitsAvailable = 3 };
+  };
+
+  // A Type is "pointer like".
   template<>
   class PointerLikeTypeTraits<swift::Type> {
   public:
