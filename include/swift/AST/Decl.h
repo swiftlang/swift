@@ -17,6 +17,7 @@
 #ifndef SWIFT_DECL_H
 #define SWIFT_DECL_H
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
@@ -1555,7 +1556,152 @@ public:
   
   using DeclContext::operator new;
 };
+  
+/// Abstract base class of operator declarations.
+class OperatorDecl : public Decl {
+  SourceLoc OperatorLoc, NameLoc, LBraceLoc, RBraceLoc;
+  
+  Identifier name;
 
+public:
+  OperatorDecl(DeclKind kind,
+               DeclContext *DC,
+               SourceLoc OperatorLoc,
+               Identifier Name,
+               SourceLoc NameLoc,
+               SourceLoc LBraceLoc,
+               SourceLoc RBraceLoc)
+    : Decl(kind, DC),
+      OperatorLoc(OperatorLoc), NameLoc(NameLoc),
+      LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc) {}
+  
+  SourceLoc getLoc() const { return NameLoc; }
+  SourceRange getSourceRange() const { return {OperatorLoc, RBraceLoc}; }
+
+  SourceLoc getOperatorLoc() const { return OperatorLoc; }
+  SourceLoc getLBraceLoc() const { return LBraceLoc; }
+  SourceLoc getRBraceLoc() const { return RBraceLoc; }
+  Identifier getName() const { return name; }
+  
+  static bool classof(const Decl *D) {
+    return D->getKind() >= DeclKind::First_OperatorDecl
+      && D->getKind() <= DeclKind::Last_OperatorDecl;
+  }
+};
+
+/// Declares the behavior of an infix operator. For example:
+///
+/// \code
+/// operator infix /+/ {
+///   associativity left
+///   precedence 123
+/// }
+/// \endcode
+class InfixOperatorDecl : public OperatorDecl {
+  SourceLoc InfixLoc,
+    AssociativityLoc, AssociativityValueLoc,
+    PrecedenceLoc, PrecedenceValueLoc;
+  
+  InfixData infixData;
+public:
+  InfixOperatorDecl(DeclContext *DC,
+                    SourceLoc OperatorLoc,
+                    SourceLoc InfixLoc,
+                    Identifier Name,
+                    SourceLoc NameLoc,
+                    SourceLoc LBraceLoc,
+                    SourceLoc AssociativityLoc,
+                    SourceLoc AssociativityValueLoc,
+                    SourceLoc PrecedenceLoc,
+                    SourceLoc PrecedenceValueLoc,
+                    SourceLoc RBraceLoc,
+                    InfixData InfixData)
+    : OperatorDecl(DeclKind::InfixOperator, DC,
+                   OperatorLoc,
+                   Name,
+                   NameLoc,
+                   LBraceLoc,
+                   RBraceLoc),
+      InfixLoc(InfixLoc),
+      AssociativityLoc(AssociativityLoc),
+      AssociativityValueLoc(AssociativityValueLoc),
+      PrecedenceLoc(PrecedenceLoc),
+      PrecedenceValueLoc(PrecedenceValueLoc),
+      infixData(InfixData) {}
+  
+  SourceLoc getInfixLoc() const { return InfixLoc; }
+  SourceLoc getAssociativityLoc() const { return AssociativityLoc; }
+  SourceLoc getAssociativityValueLoc() const { return AssociativityValueLoc; }
+  SourceLoc getPrecedenceLoc() const { return PrecedenceLoc; }
+  SourceLoc getPrecedenceValueLoc() const { return PrecedenceValueLoc; }
+  
+  InfixData getInfixData() const { return infixData; }
+  
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::InfixOperator;
+  }
+};
+  
+/// Declares the behavior of a prefix operator. For example:
+///
+/// \code
+/// operator prefix /+/ {}
+/// \endcode
+class PrefixOperatorDecl : public OperatorDecl {
+  SourceLoc PrefixLoc;
+public:
+  PrefixOperatorDecl(DeclContext *DC,
+                     SourceLoc OperatorLoc,
+                     SourceLoc PrefixLoc,
+                     Identifier Name,
+                     SourceLoc NameLoc,
+                     SourceLoc LBraceLoc,
+                     SourceLoc RBraceLoc)
+    : OperatorDecl(DeclKind::InfixOperator, DC,
+                   OperatorLoc,
+                   Name,
+                   NameLoc,
+                   LBraceLoc,
+                   RBraceLoc),
+      PrefixLoc(PrefixLoc) {}
+  
+  SourceLoc getPrefixLoc() const { return PrefixLoc; }
+  
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::PrefixOperator;
+  }
+};
+  
+/// Declares the behavior of a postfix operator. For example:
+///
+/// \code
+/// operator postfix /+/ {}
+/// \endcode
+class PostfixOperatorDecl : public OperatorDecl {
+  SourceLoc PostfixLoc;
+public:
+  PostfixOperatorDecl(DeclContext *DC,
+                     SourceLoc OperatorLoc,
+                     SourceLoc PostfixLoc,
+                     Identifier Name,
+                     SourceLoc NameLoc,
+                     SourceLoc LBraceLoc,
+                     SourceLoc RBraceLoc)
+    : OperatorDecl(DeclKind::InfixOperator, DC,
+                   OperatorLoc,
+                   Name,
+                   NameLoc,
+                   LBraceLoc,
+                   RBraceLoc),
+      PostfixLoc(PostfixLoc) {}
+  
+  SourceLoc getPostfixLoc() const { return PostfixLoc; }
+  
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::PostfixOperator;
+  }
+};
+  
 inline void GenericParam::setDeclContext(DeclContext *DC) {
   TypeParam->setDeclContext(DC);
 }

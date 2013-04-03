@@ -784,6 +784,12 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
       return emitIgnored(Body.get<Expr*>());
     return emitStmt(Body.get<Stmt*>());
   }
+      
+  // Operator decls aren't needed for IRGen.
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    return;
   }
 
   llvm_unreachable("bad decl kind!");
@@ -803,6 +809,9 @@ void IRGenFunction::emitExternalDefinition(Decl *D) {
     case DeclKind::Import:
     case DeclKind::Subscript:
     case DeclKind::Destructor:
+    case DeclKind::InfixOperator:
+    case DeclKind::PrefixOperator:
+    case DeclKind::PostfixOperator:
       llvm_unreachable("Not a valid external definition for IRgen");
 
     case DeclKind::Func:
@@ -1434,6 +1443,9 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     case DeclKind::Protocol:
     case DeclKind::Extension:
     case DeclKind::Destructor:
+    case DeclKind::InfixOperator:
+    case DeclKind::PrefixOperator:
+    case DeclKind::PostfixOperator:
       llvm_unreachable("decl not allowed in extension!");
 
     // PatternBindingDecls don't really make sense here, but we
@@ -1507,6 +1519,9 @@ void IRGenFunction::emitLocal(Decl *D) {
   case DeclKind::OneOfElement:
   case DeclKind::Constructor:
   case DeclKind::Destructor:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
     llvm_unreachable("declaration cannot appear in local scope");
 
   case DeclKind::OneOf:

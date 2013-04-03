@@ -725,6 +725,9 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::Import:
   case DeclKind::Subscript:
   case DeclKind::Destructor:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
     llvm_unreachable("Not a valid external definition for SILGen");
   }
 }

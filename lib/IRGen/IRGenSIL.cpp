@@ -257,6 +257,9 @@ void IRGenSILFunction::emitLocalDecls(BraceStmt *body) {
     case DeclKind::OneOfElement:
     case DeclKind::Constructor:
     case DeclKind::Destructor:
+    case DeclKind::InfixOperator:
+    case DeclKind::PrefixOperator:
+    case DeclKind::PostfixOperator:
       llvm_unreachable("declaration cannot appear in local scope");
 
     case DeclKind::TypeAlias:

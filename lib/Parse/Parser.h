@@ -238,6 +238,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Decl Parsing
   static bool isStartOfDecl(const Token &Tok, const Token &Tok2);
+  static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2);
 
   void parseTranslationUnit(TranslationUnit *TU);
   bool parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);
@@ -292,6 +293,20 @@ public:
 
   ConstructorDecl *parseDeclConstructor(bool HasContainerType);
   DestructorDecl *parseDeclDestructor(unsigned Flags);
+  
+  OperatorDecl *parseDeclOperator(bool AllowTopLevel);
+  OperatorDecl *parseDeclPrefixOperator(SourceLoc OperatorLoc,
+                                        SourceLoc PrefixLoc,
+                                        Identifier Name,
+                                        SourceLoc NameLoc);
+  OperatorDecl *parseDeclPostfixOperator(SourceLoc OperatorLoc,
+                                         SourceLoc PostfixLoc,
+                                         Identifier Name,
+                                         SourceLoc NameLoc);
+  OperatorDecl *parseDeclInfixOperator(SourceLoc OperatorLoc,
+                                       SourceLoc InfixLoc,
+                                       Identifier Name,
+                                       SourceLoc NameLoc);
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

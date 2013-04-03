@@ -345,6 +345,9 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::TopLevelCode:
   case DeclKind::Constructor:
   case DeclKind::Destructor:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
     llvm_unreachable("non-value decls shouldn't get here");
       
   case DeclKind::Func:
@@ -371,6 +374,9 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
   case DeclKind::TopLevelCode:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
     llvm_unreachable("Not a ValueDecl");
 
   case DeclKind::Class:

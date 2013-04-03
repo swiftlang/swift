@@ -595,6 +595,9 @@ namespace {
       case DeclKind::OneOfElement:
       case DeclKind::Constructor:
       case DeclKind::Destructor:
+      case DeclKind::InfixOperator:
+      case DeclKind::PrefixOperator:
+      case DeclKind::PostfixOperator:
         llvm_unreachable("declaration not legal as a protocol member");
 
       case DeclKind::Func:

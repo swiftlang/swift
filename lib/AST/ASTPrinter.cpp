@@ -566,6 +566,45 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   visit(decl->getBody());
 }
 
+void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
+  recordDeclLoc(decl);
+  OS << "operator infix " << decl->getName() << "{\n";
+  {
+    IndentRAII indentMore(*this);
+    if (decl->getAssociativityLoc().isValid()) {
+      indent();
+      OS << "associativity ";
+      switch (decl->getInfixData().getAssociativity()) {
+      case Associativity::None:
+        OS << "none\n";
+        break;
+      case Associativity::Left:
+        OS << "left\n";
+        break;
+      case Associativity::Right:
+        OS << "right\n";
+        break;
+      }
+    }
+    if (decl->getPrecedenceLoc().isValid()) {
+      indent();
+      OS << "precedence " << decl->getInfixData().getPrecedence() << '\n';
+    }
+  }
+  indent();
+  OS << "}";
+}
+
+void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
+  recordDeclLoc(decl);
+  OS << "operator prefix " << decl->getName() << "{\n}";
+}
+
+void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
+  recordDeclLoc(decl);
+  OS << "operator postfix " << decl->getName() << "{\n}";
+}
+
 void PrintAST::visitAssignStmt(AssignStmt *stmt) {
   // FIXME: lhs
   OS << " = ";

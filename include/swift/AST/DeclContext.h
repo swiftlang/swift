@@ -147,7 +147,7 @@ public:
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(DeclContext));
 };
-
+  
 } // end namespace swift
 
 #endif

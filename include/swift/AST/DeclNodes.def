@@ -38,6 +38,13 @@
 #define VALUE_DECL(Id, Parent) DECL(Id, Parent)
 #endif
 
+/// OPERATOR_DECL(Id, Parent)
+///   Used for subclasses of OperatorDecl. The default behavior is to do
+///   the same as for Decl.
+#ifndef OPERATOR_DECL
+#define OPERATOR_DECL(Id, Parent) DECL(Id, Parent)
+#endif
+
 /// NOMINAL_TYPE_DECL(Id, Parent)
 ///   Used for subclasses of NominalTypeDecl.  The default behavior is
 ///   to do the same as for ValueDecl.
@@ -55,6 +62,13 @@ DECL(Import, Decl)
 DECL(Extension, Decl)
 DECL(PatternBinding, Decl)
 DECL(TopLevelCode, Decl)
+
+ABSTRACT_DECL(Operator, Decl)
+  OPERATOR_DECL(InfixOperator, Decl)
+  OPERATOR_DECL(PrefixOperator, Decl)
+  OPERATOR_DECL(PostfixOperator, Decl)
+  DECL_RANGE(Operator, InfixOperator, PostfixOperator)
+
 ABSTRACT_DECL(Value, Decl)
   ABSTRACT_DECL(Type, Decl)
     VALUE_DECL(TypeAlias, TypeDecl)

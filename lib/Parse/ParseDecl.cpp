@@ -357,6 +357,13 @@ bool Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
   return HadError;
 }
 
+bool Parser::isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
+  return Tok.isContextualKeyword("operator")
+    && (Tok2.isContextualKeyword("prefix")
+        || Tok2.isContextualKeyword("postfix")
+        || Tok2.isContextualKeyword("infix"));
+}
+
 /// parseDecl - Parse a single syntactic declaration and return a list of decl
 /// ASTs.  This can return multiple results for var decls that bind to multiple
 /// values, structs that define a struct decl and a constructor, etc.
@@ -371,15 +378,11 @@ bool Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
 ///     decl-oneof
 ///     decl-struct
 ///     decl-import
+///     decl-operator
 ///
 bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   bool HadParseError = false;
   switch (Tok.getKind()) {
-  default:
-  ParseError:
-    diagnose(Tok, diag::expected_decl);
-    HadParseError = true;
-    break;
   case tok::semi:
     // FIXME: Add a fixit to remove the semicolon.
     diagnose(Tok, diag::disallowed_semi);
@@ -416,6 +419,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   case tok::kw_protocol:
     Entries.push_back(parseDeclProtocol(Flags));
     break;
+      
   case tok::kw_static:
     if (peekToken().isNot(tok::kw_func))
       goto ParseError;
@@ -423,10 +427,23 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   case tok::kw_func:
     Entries.push_back(parseDeclFunc(Flags));
     break;
+      
   case tok::kw_subscript:
     HadParseError = parseDeclSubscript(Flags & PD_HasContainerType,
                                        !(Flags & PD_DisallowFuncDef),
                                        Entries);
+    break;
+  
+  case tok::identifier:
+    if (isStartOfOperatorDecl(Tok, peekToken())) {
+      Entries.push_back(parseDeclOperator(Flags & PD_AllowTopLevel));
+      break;
+    }
+    [[clang::fallthrough]];
+  default:
+  ParseError:
+    diagnose(Tok, diag::expected_decl);
+    HadParseError = true;
     break;
   }
 
@@ -502,7 +519,6 @@ bool Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
   
   return false;
 }
-
 
 /// parseDeclExtension - Parse an 'extension' declaration.
 ///   extension:
@@ -1835,4 +1851,197 @@ DestructorDecl *Parser::parseDeclDestructor(unsigned Flags) {
   if (Attributes.isValid()) DD->getMutableAttrs() = Attributes;
 
   return DD;
+}
+
+OperatorDecl *Parser::parseDeclOperator(bool AllowTopLevel) {
+  assert(Tok.isContextualKeyword("operator") &&
+         "no 'operator' at start of operator decl?!");
+  
+
+  SourceLoc OperatorLoc = consumeToken(tok::identifier);
+
+  auto kind = llvm::StringSwitch<Optional<DeclKind>>(Tok.getText())
+    .Case("prefix", DeclKind::PrefixOperator)
+    .Case("postfix", DeclKind::PostfixOperator)
+    .Case("infix", DeclKind::InfixOperator)
+    .Default(Nothing);
+  
+  assert(kind && "no fixity after 'operator'?!");
+
+  SourceLoc KindLoc = consumeToken(tok::identifier);
+  
+  if (!Tok.isAnyOperator()) {
+    diagnose(Tok, diag::expected_operator_name_after_operator);
+    return nullptr;
+  }
+  
+  Identifier Name = Context.getIdentifier(Tok.getText());
+  SourceLoc NameLoc = consumeToken();
+  
+  if (!Tok.is(tok::l_brace)) {
+    diagnose(Tok, diag::expected_lbrace_after_operator);
+    return nullptr;
+  }
+  
+  OperatorDecl *result;
+  
+  switch (*kind) {
+  case DeclKind::PrefixOperator:
+    result = parseDeclPrefixOperator(OperatorLoc, KindLoc, Name, NameLoc);
+    break;
+  case DeclKind::PostfixOperator:
+    result = parseDeclPostfixOperator(OperatorLoc, KindLoc, Name, NameLoc);
+    break;
+  case DeclKind::InfixOperator:
+    result = parseDeclInfixOperator(OperatorLoc, KindLoc, Name, NameLoc);
+    break;
+  default:
+    llvm_unreachable("impossible");
+  }
+  
+  if (Tok.is(tok::r_brace))
+    consumeToken();
+  
+  if (!AllowTopLevel) {
+    diagnose(OperatorLoc, diag::operator_decl_inner_scope);
+    return nullptr;
+  }
+  
+  return result;
+}
+
+OperatorDecl *Parser::parseDeclPrefixOperator(SourceLoc OperatorLoc,
+                                              SourceLoc PrefixLoc,
+                                              Identifier Name,
+                                              SourceLoc NameLoc) {
+  SourceLoc LBraceLoc = consumeToken(tok::l_brace);
+  
+  while (!Tok.is(tok::r_brace)) {
+    // Currently there are no operator attributes for prefix operators.
+    if (Tok.is(tok::identifier))
+      diagnose(Tok, diag::unknown_prefix_operator_attribute, Tok.getText());
+    else
+      diagnose(Tok, diag::expected_operator_attribute);
+    skipUntilDeclRBrace();
+    return nullptr;
+  }
+  
+  SourceLoc RBraceLoc = Tok.getLoc();
+
+  return new (Context) PrefixOperatorDecl(CurDeclContext,
+                                          OperatorLoc,
+                                          PrefixLoc,
+                                          Name, NameLoc,
+                                          LBraceLoc, RBraceLoc);
+}
+
+OperatorDecl *Parser::parseDeclPostfixOperator(SourceLoc OperatorLoc,
+                                              SourceLoc PostfixLoc,
+                                              Identifier Name,
+                                              SourceLoc NameLoc) {
+  SourceLoc LBraceLoc = consumeToken(tok::l_brace);
+  
+  while (!Tok.is(tok::r_brace)) {
+    // Currently there are no operator attributes for postfix operators.
+    if (Tok.is(tok::identifier))
+      diagnose(Tok, diag::unknown_postfix_operator_attribute, Tok.getText());
+    else
+      diagnose(Tok, diag::expected_operator_attribute);
+    skipUntilDeclRBrace();
+    return nullptr;
+  }
+  
+  SourceLoc RBraceLoc = Tok.getLoc();
+  
+  return new (Context) PostfixOperatorDecl(CurDeclContext,
+                                          OperatorLoc,
+                                          PostfixLoc,
+                                          Name, NameLoc,
+                                          LBraceLoc, RBraceLoc);
+}
+
+OperatorDecl *Parser::parseDeclInfixOperator(SourceLoc OperatorLoc,
+                                             SourceLoc InfixLoc,
+                                             Identifier Name,
+                                             SourceLoc NameLoc) {
+  SourceLoc LBraceLoc = consumeToken(tok::l_brace);
+
+  // Initialize InfixData with default attributes:
+  // precedence 100, associativity none
+  unsigned precedence = 100;
+  Associativity associativity = Associativity::None;
+  
+  SourceLoc AssociativityLoc, AssociativityValueLoc,
+    PrecedenceLoc, PrecedenceValueLoc;
+  
+  while (!Tok.is(tok::r_brace)) {
+    if (!Tok.is(tok::identifier)) {
+      diagnose(Tok, diag::expected_operator_attribute);
+      skipUntilDeclRBrace();
+      return nullptr;
+    }
+    
+    if (Tok.getText().equals("associativity")) {
+      if (AssociativityLoc.isValid()) {
+        diagnose(Tok, diag::operator_associativity_redeclared);
+        skipUntilDeclRBrace();
+        return nullptr;
+      }
+      AssociativityLoc = consumeToken();
+      if (!Tok.is(tok::identifier)) {
+        diagnose(Tok, diag::expected_infix_operator_associativity);
+        skipUntilDeclRBrace();
+        return nullptr;
+      }
+      auto parsedAssociativity
+        = llvm::StringSwitch<Optional<Associativity>>(Tok.getText())
+          .Case("none", Associativity::None)
+          .Case("left", Associativity::Left)
+          .Case("right", Associativity::Right)
+          .Default(Nothing);
+      if (!parsedAssociativity) {
+        diagnose(Tok, diag::unknown_infix_operator_associativity, Tok.getText());
+        skipUntilDeclRBrace();
+        return nullptr;
+      }
+      associativity = *parsedAssociativity;
+
+      AssociativityValueLoc = consumeToken();
+      continue;
+    }
+    
+    if (Tok.getText().equals("precedence")) {
+      if (PrecedenceLoc.isValid()) {
+        diagnose(Tok, diag::operator_precedence_redeclared);
+        skipUntilDeclRBrace();
+        return nullptr;
+      }
+      PrecedenceLoc = consumeToken();
+      if (!Tok.is(tok::integer_literal)) {
+        diagnose(Tok, diag::expected_infix_operator_precedence);
+        skipUntilDeclRBrace();
+        return nullptr;
+      }
+      bool error = Tok.getText().getAsInteger(0, precedence);
+      assert(!error && "integer literal precedence did not parse as integer?!");
+      
+      PrecedenceValueLoc = consumeToken();
+      continue;
+    }
+    
+    diagnose(Tok, diag::unknown_infix_operator_attribute, Tok.getText());
+    skipUntilDeclRBrace();
+    return nullptr;
+  }
+  
+  SourceLoc RBraceLoc = Tok.getLoc();
+  
+  return new (Context) InfixOperatorDecl(CurDeclContext,
+                                         OperatorLoc, InfixLoc,
+                                         Name, NameLoc,
+                                         LBraceLoc,
+                                         AssociativityLoc, AssociativityValueLoc,
+                                         PrecedenceLoc, PrecedenceValueLoc,
+                                         RBraceLoc,
+                                         InfixData(precedence, associativity));
 }

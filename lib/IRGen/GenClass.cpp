@@ -731,6 +731,9 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
     case DeclKind::Protocol:
     case DeclKind::OneOfElement:
     case DeclKind::Extension:
+    case DeclKind::InfixOperator:
+    case DeclKind::PrefixOperator:
+    case DeclKind::PostfixOperator:
       llvm_unreachable("decl not allowed in class!");
 
     // We can have meaningful initializers for variables, but

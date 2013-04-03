@@ -512,6 +512,9 @@ void IRGenModule::emitOneOfDecl(OneOfDecl *oneof) {
     case DeclKind::Protocol:
     case DeclKind::Extension:
     case DeclKind::Destructor:
+    case DeclKind::InfixOperator:
+    case DeclKind::PrefixOperator:
+    case DeclKind::PostfixOperator:
       llvm_unreachable("decl not allowed in struct!");
 
     // We can't have meaningful initializers for variables; these just show

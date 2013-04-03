@@ -286,6 +286,32 @@ ERROR(destructor_decl_outside_class,decl_parsing,none,
 ERROR(expected_lbrace_destructor,decl_parsing,none,
       "expected '{' for destructor", ())
 
+// Operator
+ERROR(operator_decl_inner_scope,decl_parsing,none,
+      "'operator' may only be declared at file scope", ())
+ERROR(expected_operator_name_after_operator,decl_parsing,none,
+      "expected operator name after fixity in 'operator' declaration", ())
+ERROR(expected_lbrace_after_operator,decl_parsing,none,
+      "expected '{' after operator name in 'operator' declaration", ())
+ERROR(expected_operator_attribute,decl_parsing,none,
+      "expected operator attribute identifier in 'operator' declaration body", ())
+ERROR(unknown_prefix_operator_attribute,decl_parsing,none,
+      "'%0' is not a valid prefix operator attribute", (StringRef))
+ERROR(unknown_postfix_operator_attribute,decl_parsing,none,
+      "'%0' is not a valid postfix operator attribute", (StringRef))
+ERROR(unknown_infix_operator_attribute,decl_parsing,none,
+      "'%0' is not a valid infix operator attribute", (StringRef))
+ERROR(operator_associativity_redeclared,decl_parsing,none,
+      "'associativity' for infix operator declared multiple times", ())
+ERROR(expected_infix_operator_associativity,decl_parsing,none,
+      "expected identifier after 'associativity' in 'operator' declaration body", ())
+ERROR(unknown_infix_operator_associativity,decl_parsing,none,
+      "'%0' is not a valid infix operator associativity; must be 'none', 'left', or 'right'", (StringRef))
+ERROR(operator_precedence_redeclared,decl_parsing,none,
+      "'precedence' for infix operator declared multiple times", ())
+ERROR(expected_infix_operator_precedence,decl_parsing,none,
+      "expected integer literal after 'precedence' in 'operator' declaration body", ())
+
 
 //------------------------------------------------------------------------------
 // Type parsing diagnostics
