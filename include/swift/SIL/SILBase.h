@@ -47,7 +47,7 @@ class SILAllocated {
 public:
   /// Forward to ordinary 'new'.
   void *operator new(size_t Bytes,
-                     size_t Alignment = llvm::AlignOf<DERIVED>::Alignment) {
+                     size_t Alignment = alignof(DERIVED)) {
     return ::operator new(Bytes);
   }
 

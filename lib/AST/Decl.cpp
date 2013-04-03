@@ -220,7 +220,7 @@ GenericParamList *GenericParamList::create(ASTContext &Context,
                                            SourceLoc RAngleLoc) {
   unsigned Size = sizeof(GenericParamList)
                 + sizeof(GenericParam) * Params.size();
-  void *Mem = Context.Allocate(Size, llvm::alignOf<GenericParamList>());
+  void *Mem = Context.Allocate(Size, alignof(GenericParamList));
   return new (Mem) GenericParamList(LAngleLoc, Params, SourceLoc(),
                                     MutableArrayRef<Requirement>(),
                                     RAngleLoc);
@@ -235,7 +235,7 @@ GenericParamList::create(ASTContext &Context,
                          SourceLoc RAngleLoc) {
   unsigned Size = sizeof(GenericParamList)
                 + sizeof(GenericParam) * Params.size();
-  void *Mem = Context.Allocate(Size, llvm::alignOf<GenericParamList>());
+  void *Mem = Context.Allocate(Size, alignof(GenericParamList));
   return new (Mem) GenericParamList(LAngleLoc, Params,
                                     RequiresLoc,
                                     Context.AllocateCopy(Requirements),

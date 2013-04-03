@@ -30,7 +30,7 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
   void *buffer = base.allocate(sizeof(SILFunctionTypeInfo)
                                  + sizeof(SILType)*inputTypes.size()
                                  + sizeof(unsigned)*(1+uncurriedInputCounts.size()),
-                               llvm::AlignOf<SILFunctionTypeInfo>::Alignment);
+                               alignof(SILFunctionTypeInfo));
   SILFunctionTypeInfo *fi = ::new (buffer) SILFunctionTypeInfo(
                                                      swiftType,
                                                      inputTypes.size(),
@@ -51,7 +51,7 @@ SILCompoundTypeInfo *SILCompoundTypeInfo::create(CanType swiftType,
   
   void *buffer = base.allocate(sizeof(SILCompoundTypeInfo)
                                  + sizeof(Element) * elements.size(),
-                               llvm::AlignOf<SILCompoundTypeInfo>::Alignment);
+                               alignof(SILCompoundTypeInfo));
   SILCompoundTypeInfo *cti =
     ::new (buffer) SILCompoundTypeInfo(swiftType, elements.size());
   

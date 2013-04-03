@@ -555,7 +555,7 @@ private:
     // FIXME: Alignment.
     unsigned size = sizeof(ConstraintLocator)
                   + path.size() * sizeof(PathElement);
-    void *mem = allocator.Allocate(size, llvm::alignOf<ConstraintLocator>());
+    void *mem = allocator.Allocate(size, alignof(ConstraintLocator));
     return new (mem) ConstraintLocator(anchor, path);
   }
 

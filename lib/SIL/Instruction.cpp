@@ -308,7 +308,7 @@ SpecializeInst *SpecializeInst::create(SILLocation Loc, Value Operand,
                                        SILType DestTy, Function &F) {
  void *Buffer = F.allocate(
            sizeof(SpecializeInst) + Substitutions.size() * sizeof(Substitution),
-           llvm::AlignOf<SpecializeInst>::Alignment);
+           alignof(SpecializeInst));
   return ::new(Buffer) SpecializeInst(Loc, Operand, Substitutions, DestTy);
 }
 
@@ -370,7 +370,7 @@ TupleInst *TupleInst::createImpl(SILLocation Loc, SILType Ty,
                                  ArrayRef<Value> Elements, Function &F) {
   void *Buffer = F.allocate(sizeof(TupleInst) +
                             decltype(Operands)::getExtraSize(Elements.size()),
-                            llvm::AlignOf<TupleInst>::Alignment);
+                            alignof(TupleInst));
   return ::new(Buffer) TupleInst(Loc, Ty, Elements);
 }
 

@@ -77,7 +77,7 @@ SILTypeList *SILBase::getSILTypeList(ArrayRef<SILType> Types) const {
   // Otherwise, allocate a new one.
   void *NewListP = BPA.Allocate(sizeof(SILTypeList)+
                                 sizeof(SILType)*(Types.size()-1),
-                                llvm::AlignOf<SILTypeList>::Alignment);
+                                alignof(SILTypeList));
   SILTypeList *NewList = new (NewListP) SILTypeList();
   NewList->NumTypes = Types.size();
   std::copy(Types.begin(), Types.end(), NewList->Types);
