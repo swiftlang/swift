@@ -72,6 +72,12 @@ public:
   /// responsibility to 'delete' this object.
   static SILModule *constructSIL(TranslationUnit *tu, unsigned startElem);
 
+  /// createEmptyModule - Create and return an empty SIL module that we can
+  /// later parse SIL bodies directly into, without converting from an AST.
+  static SILModule *createEmptyModule(ASTContext &Context) {
+    return new SILModule(Context, false);
+  }
+  
   ASTContext &getContext() const { return Context; }
   
   /// Returns true if this module has top-level code.

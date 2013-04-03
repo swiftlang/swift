@@ -207,8 +207,7 @@ class LLVM_LIBRARY_VISIBILITY SILGenFunction
                       /*StmtRetTy=*/ void,
                       /*DeclRetTy=*/ void,
                       /*PatternRetTy=*/ void,
-                      /*Args...=*/ SGFContext>
-{
+                      /*Args...=*/ SGFContext> {
 public:
   /// The SILGenModule this function belongs to.
   SILGenModule &SGM;

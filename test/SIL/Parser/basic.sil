@@ -1,0 +1,2 @@
+// RUN: %swift %s -emit-sil
+
