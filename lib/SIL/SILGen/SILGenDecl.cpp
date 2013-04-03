@@ -15,7 +15,7 @@
 #include "ManagedValue.h"
 #include "Scope.h"
 #include "llvm/ADT/OwningPtr.h"
-#include "swift/SIL/SILBBArgument.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/AST/AST.h"

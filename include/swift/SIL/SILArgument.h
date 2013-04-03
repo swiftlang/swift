@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_BBARGUMENT_H
-#define SWIFT_SIL_BBARGUMENT_H
+#ifndef SWIFT_SIL_SILARGUMENT_H
+#define SWIFT_SIL_SILARGUMENT_H
 
 #include "swift/SIL/SILValue.h"
 
