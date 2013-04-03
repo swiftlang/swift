@@ -35,7 +35,7 @@ enum class PatternKind {
 };
 
 /// Pattern - Base class for all patterns in Swift.
-class Pattern {
+class alignas(8) Pattern {
   class PatternBitfields {
     friend class Pattern;
     unsigned Kind : 8;
@@ -99,8 +99,6 @@ public:
   static bool classof(const Pattern *P) { return true; }
   
   //*** Allocation Routines ************************************************/
-
-  enum { Alignment = 8U };
 
   void *operator new(size_t bytes, ASTContext &C);
 

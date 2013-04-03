@@ -38,7 +38,7 @@ enum class StmtKind {
 };
 
 /// Stmt - Base class for all statements in swift.
-class Stmt {
+class alignas(8) Stmt {
   Stmt(const Stmt&) = delete;
   void operator=(const Stmt&) = delete;
 
@@ -66,13 +66,11 @@ public:
   
   void dump() const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;
-  
-  enum { Alignment = 8 };
 
   // Only allow allocation of Exprs using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = Stmt::Alignment);
+                     unsigned Alignment = alignof(Stmt));
   
   // Make vanilla new/delete illegal for Stmts.
   void *operator new(size_t Bytes) throw() = delete;

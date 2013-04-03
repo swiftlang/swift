@@ -60,7 +60,9 @@ namespace swift {
   
 
 /// TypeBase - Base class for all types in Swift.
-class TypeBase {
+class alignas(8) TypeBase {
+  // alignas(8) because we need three tag bits on Type.
+  
   friend class ASTContext;
   TypeBase(const TypeBase&) = delete;
   void operator=(const TypeBase&) = delete;

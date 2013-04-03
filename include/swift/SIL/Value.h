@@ -558,7 +558,7 @@ namespace llvm {
   template<> struct simplify_type< ::swift::Value>
     : public simplify_type<const ::swift::Value> {};
 
-  // Value's hash just like pointers.
+  // Values hash just like pointers.
   template<> struct DenseMapInfo<swift::Value> {
     static swift::Value getEmptyKey() {
       return llvm::DenseMapInfo<swift::ValueBase*>::getEmptyKey();
@@ -585,7 +585,7 @@ namespace llvm {
       return Value::getFromOpaqueValue(p);
     }
     
-    enum { NumLowBitsAvailable = 1 };
+    enum { NumLowBitsAvailable = 2 - swift::ValueResultNumberBits };
   };
 }  // end namespace llvm
 

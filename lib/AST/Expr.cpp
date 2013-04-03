@@ -204,7 +204,7 @@ bool OverloadSetRefExpr::hasBaseObject() const {
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   void *Buffer = ctx.Allocate(sizeof(SequenceExpr) +
                               elements.size() * sizeof(Expr*),
-                              Expr::Alignment);
+                              alignof(SequenceExpr));
   return ::new(Buffer) SequenceExpr(elements);
 }
 
@@ -212,7 +212,7 @@ NewArrayExpr *NewArrayExpr::create(ASTContext &ctx, SourceLoc newLoc,
                                    TypeLoc elementTy, ArrayRef<Bound> bounds) {
   void *buffer = ctx.Allocate(sizeof(NewArrayExpr) +
                               bounds.size() * sizeof(Bound),
-                              Expr::Alignment);
+                              alignof(NewArrayExpr));
   NewArrayExpr *E =
     ::new (buffer) NewArrayExpr(newLoc, elementTy, bounds.size());
   memcpy(E->getBoundsBuffer(), bounds.data(), bounds.size() * sizeof(Bound));
@@ -360,7 +360,7 @@ FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
   assert(argParams.size() == bodyParams.size());
   unsigned nParams = argParams.size();
   void *buf = C.Allocate(sizeof(FuncExpr) + 2 * nParams * sizeof(Pattern*),
-                         Expr::Alignment);
+                         alignof(FuncExpr));
   FuncExpr *fn = ::new (buf) FuncExpr(funcLoc, nParams, fnRetType,
                                       body, parent);
   for (unsigned i = 0; i != nParams; ++i)

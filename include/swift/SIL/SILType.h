@@ -42,7 +42,9 @@ enum class SILTypeInfoKind : unsigned {
 
 /// SILTypeInfo - Abstract base class for SIL types that need to carry
 /// additional information along with the underlying Swift type.
-class SILTypeInfo : public SILAllocated<SILTypeInfo> {
+class alignas(8) SILTypeInfo : public SILAllocated<SILTypeInfo> {
+  // alignas(8) because we need three tag bits on SILTypeInfo* for SILType.
+  
   enum : unsigned { KindBits = 1 };
   static_assert(1U << KindBits > unsigned(SILTypeInfoKind::SILTypeInfo_Last),
                 "not enough kind bits for all SILTypeInfo kinds");
@@ -68,12 +70,6 @@ public:
            && ti->getKind() <= SILTypeInfoKind::SILTypeInfo_Last
            && "invalid SILTypeInfo kind!");
     return true;
-  }
-  
-  // Default to at least eight-byte alignment for SILTypeInfos.
-  void *operator new(size_t Bytes, const SILBase &C,
-                     size_t Alignment = 8) {
-    return SILAllocated::operator new(Bytes, C, Alignment);
   }
 };
 

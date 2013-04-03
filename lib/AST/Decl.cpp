@@ -152,6 +152,14 @@ void *Decl::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
+#include "llvm/Support/raw_ostream.h"
+
+// Only allow allocation of DeclContext using the allocator in ASTContext.
+void *DeclContext::operator new(size_t Bytes, ASTContext &C,
+                                unsigned Alignment) {
+  return C.Allocate(Bytes, Alignment);
+}
+
 // Only allow allocation of Modules using the allocator in ASTContext.
 void *Module::operator new(size_t Bytes, ASTContext &C,
                            unsigned Alignment) {
@@ -247,7 +255,7 @@ ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
                                ArrayRef<AccessPathElement> Path) {
   void *buffer = Ctx.Allocate(sizeof(ImportDecl) +
                               Path.size() * sizeof(AccessPathElement),
-                              Decl::Alignment);
+                              alignof(ImportDecl));
   return new (buffer) ImportDecl(DC, ImportLoc, Path);
 }
 

@@ -65,7 +65,9 @@ enum class DeclKind {
 };
 
 /// Decl - Base class for all declarations in Swift.
-class Decl {
+class alignas(8) Decl {
+  // alignas(8) because we use three tag bits on Decl*.
+  
   class DeclBitfields {
     friend class Decl;
     unsigned Kind : 8;
@@ -146,9 +148,6 @@ protected:
   ClangNode getClangNodeSlow();
 
 public:
-  /// Alignment - The required alignment of Decl objects.
-  enum { Alignment = 8 };
-
   DeclKind getKind() const { return DeclKind(DeclBits.Kind); }
 
   DeclContext *getDeclContext() const { return Context; }
@@ -241,7 +240,7 @@ public:
   // Only allow allocation of Decls using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = Decl::Alignment);
+                     unsigned Alignment = alignof(Decl));
   void *operator new(size_t Bytes, void *Mem) { 
     assert(Mem); 
     return Mem; 
@@ -639,6 +638,8 @@ public:
   static bool classof(const DeclContext *C) {
     return C->getContextKind() == DeclContextKind::ExtensionDecl;
   }
+  
+  using DeclContext::operator new;
 };
 
 // PatternBindingDecl - This decl contains a pattern and optional initializer
@@ -709,6 +710,8 @@ public:
   static bool classof(const DeclContext *C) {
     return C->getContextKind() == DeclContextKind::TopLevelCodeDecl;
   }
+  
+  using DeclContext::operator new;
 };
 
 
@@ -944,6 +947,8 @@ public:
   static bool classof(const DeclContext *C) {
     return C->getContextKind() == DeclContextKind::NominalTypeDecl;
   }
+  
+  using DeclContext::operator new;
 };
 
 /// OneOfDecl - This is the declaration of a oneof, for example:
@@ -1501,6 +1506,8 @@ public:
   /// Get the type of the initializing constructor.
   Type getInitializerType() const { return InitializerType; }
   void setInitializerType(Type t) { InitializerType = t; }
+  
+  using DeclContext::operator new;
 };
 
 /// DestructorDecl - Declares a destructor for a type.  For example:
@@ -1545,6 +1552,8 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::DestructorDecl;
   }
+  
+  using DeclContext::operator new;
 };
 
 inline void GenericParam::setDeclContext(DeclContext *DC) {

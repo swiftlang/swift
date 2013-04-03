@@ -132,7 +132,7 @@ Pattern *Pattern::clone(ASTContext &context) const {
 
 /// Standard allocator for Patterns.
 void *Pattern::operator new(size_t numBytes, ASTContext &C) {
-  return C.Allocate(numBytes, Pattern::Alignment);
+  return C.Allocate(numBytes, alignof(Pattern));
 }
 
 /// Find the name directly bound by this pattern.  When used as a
@@ -154,7 +154,7 @@ TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
                                    SourceLoc rp) {
   unsigned n = elts.size();
   void *buffer = C.Allocate(sizeof(TuplePattern) + n * sizeof(TuplePatternElt),
-                            Pattern::Alignment);
+                            alignof(TuplePattern));
   TuplePattern *pattern = ::new(buffer) TuplePattern(lp, n, rp);
   memcpy(pattern->getFieldsBuffer(), elts.data(), n * sizeof(TuplePatternElt));
   return pattern;

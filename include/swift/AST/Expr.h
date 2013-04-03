@@ -53,7 +53,7 @@ enum class ExprKind : uint8_t {
 };
   
 /// Expr - Base class for all expressions in swift.
-class Expr {
+class alignas(8) Expr {
   Expr(const Expr&) = delete;
   void operator=(const Expr&) = delete;
 
@@ -123,12 +123,10 @@ public:
   void dump() const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;
 
-  enum { Alignment = 8U };
-
   // Only allow allocation of Exprs using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = Expr::Alignment);  
+                     unsigned Alignment = alignof(Expr));
 
   // Make placement new and vanilla new/delete illegal for Exprs.
   void *operator new(size_t Bytes) throw() = delete;
@@ -1533,6 +1531,8 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::CapturingExpr;
   }
+  
+  using DeclContext::operator new;
 };
 
 /// FuncExpr - An explicit unnamed func definition, which can optionally

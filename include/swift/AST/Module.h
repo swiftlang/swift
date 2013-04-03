@@ -126,7 +126,7 @@ public:
   // Only allow allocation of Modules using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = 8);
+                     unsigned Alignment = alignof(Module));
 };
   
 /// TranslationUnit - This contains information about all of the decls and

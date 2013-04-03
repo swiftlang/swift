@@ -68,7 +68,7 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
                              ArrayRef<ExprStmtOrDecl> elts, SourceLoc rbloc) {
   void *Buffer = ctx.Allocate(sizeof(BraceStmt)
                                 + elts.size() * sizeof(ExprStmtOrDecl),
-                              Stmt::Alignment);
+                              alignof(BraceStmt));
   return ::new(Buffer) BraceStmt(lbloc, elts, rbloc);
 }
 
