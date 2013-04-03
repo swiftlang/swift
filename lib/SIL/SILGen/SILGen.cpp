@@ -30,7 +30,7 @@ static bool isVoidableType(Type type) {
   return type->isEqual(type->getASTContext().TheEmptyTupleType);
 }
 
-SILGenFunction::SILGenFunction(SILGenModule &SGM, Function &F,
+SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
                                bool hasVoidReturn)
   : SGM(SGM), F(F), B(new (F.getModule()) BasicBlock(&F), F),
     Cleanups(*this),
@@ -86,7 +86,7 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) {
 }
 
 template<typename T>
-Function *SILGenModule::preEmitFunction(SILConstant constant, T *astNode) {
+SILFunction *SILGenModule::preEmitFunction(SILConstant constant, T *astNode) {
   assert(!M.hasFunction(constant) &&
          "already generated function for constant!");
   
@@ -100,11 +100,11 @@ Function *SILGenModule::preEmitFunction(SILConstant constant, T *astNode) {
           llvm::dbgs() << '\n';
         });
   
-  return new (M) Function(M, getConstantType(constant));
+  return new (M) SILFunction(M, getConstantType(constant));
 }
 
 void SILGenModule::postEmitFunction(SILConstant constant,
-                                    Function *F) {
+                                    SILFunction *F) {
 
   DEBUG(llvm::dbgs() << "lowered sil:\n";
         F->print(llvm::dbgs()));
@@ -112,12 +112,12 @@ void SILGenModule::postEmitFunction(SILConstant constant,
   M.functions[constant] = F;
 }
 
-Function *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
+SILFunction *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   // Ignore prototypes.
   if (fe->getBody() == nullptr) return nullptr;
   
   SILConstant constant(decl);
-  Function *f = preEmitFunction(constant, fe);
+  SILFunction *f = preEmitFunction(constant, fe);
   bool hasVoidReturn = isVoidableType(fe->getResultType(f->getContext()));
   SILGenFunction(*this, *f, hasVoidReturn).emitFunction(fe);
   postEmitFunction(constant, f);
@@ -129,14 +129,14 @@ void SILGenModule::addGlobalVariable(VarDecl *global) {
   M.globals.insert(global);
 }
 
-Function *SILGenModule::emitConstructor(ConstructorDecl *decl) {
+SILFunction *SILGenModule::emitConstructor(ConstructorDecl *decl) {
   // Ignore prototypes.
   // FIXME: generate default constructor, which appears in the AST as a
   // prototype
   if (decl->getBody() == nullptr) return nullptr;
 
   SILConstant constant(decl);
-  Function *f = preEmitFunction(constant, decl);
+  SILFunction *f = preEmitFunction(constant, decl);
   
   if (decl->getImplicitThisDecl()->getType()->hasReferenceSemantics()) {
     // Class constructors have separate entry points for allocation and
@@ -146,7 +146,7 @@ Function *SILGenModule::emitConstructor(ConstructorDecl *decl) {
     postEmitFunction(constant, f);
     
     SILConstant initConstant(decl, SILConstant::Kind::Initializer);
-    Function *initF = preEmitFunction(initConstant, decl);
+    SILFunction *initF = preEmitFunction(initConstant, decl);
     SILGenFunction(*this, *initF, /*hasVoidReturn=*/true)
       .emitClassConstructorInitializer(decl);
     postEmitFunction(initConstant, initF);
@@ -160,20 +160,20 @@ Function *SILGenModule::emitConstructor(ConstructorDecl *decl) {
   return f;
 }
 
-Function *SILGenModule::emitClosure(ClosureExpr *ce) {
+SILFunction *SILGenModule::emitClosure(ClosureExpr *ce) {
   SILConstant constant(ce);
-  Function *f = preEmitFunction(constant, ce);
+  SILFunction *f = preEmitFunction(constant, ce);
   SILGenFunction(*this, *f, /*hasVoidReturn=*/false).emitClosure(ce);
   postEmitFunction(constant, f);
   
   return f;
 }
 
-Function *SILGenModule::emitDestructor(ClassDecl *cd,
+SILFunction *SILGenModule::emitDestructor(ClassDecl *cd,
                                        DestructorDecl /*nullable*/ *dd) {
   SILConstant constant(cd, SILConstant::Kind::Destructor);
   
-  Function *f = preEmitFunction(constant, dd);
+  SILFunction *f = preEmitFunction(constant, dd);
   SILGenFunction(*this, *f, /*hasVoidReturn=*/true).emitDestructor(cd, dd);
   postEmitFunction(constant, f);
   

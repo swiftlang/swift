@@ -22,7 +22,7 @@
 
 namespace swift {
   class BasicBlock;
-  class Function;
+  class SILFunction;
   class Value;
   
 namespace Lowering {

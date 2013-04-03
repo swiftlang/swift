@@ -257,7 +257,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     
     for (auto &cf : *SILMod) {
       SILConstant c = cf.first;
-      swift::Function *f = cf.second;
+      SILFunction *f = cf.second;
       emitSILConstant(c, f);
     }
   } else {
@@ -905,7 +905,7 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
   SILConstant silConstant = SILConstant(fn.getDecl());
   llvm::AttributeSet attrs;
   if (SILMod && SILMod->hasFunction(silConstant)) {
-    swift::Function *silFn = SILMod->getFunction(silConstant);
+    SILFunction *silFn = SILMod->getFunction(silConstant);
     fnType = getFunctionType(convention,
                              silFn->getLoweredType().getSwiftType(),
                              fn.getExplosionLevel(),

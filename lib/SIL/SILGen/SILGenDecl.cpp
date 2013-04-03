@@ -350,9 +350,9 @@ struct ArgumentInitVisitor :
                         /*Args...=*/ Initialization*>
 {
   SILGenFunction &gen;
-  Function &f;
+  SILFunction &f;
   SILBuilder initB;
-  ArgumentInitVisitor(SILGenFunction &gen, Function &f)
+  ArgumentInitVisitor(SILGenFunction &gen, SILFunction &f)
     : gen(gen), f(f), initB(f.begin(), f) {}
 
   Value makeArgument(Type ty, BasicBlock *parent) {

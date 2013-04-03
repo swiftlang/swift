@@ -277,7 +277,7 @@ public:
   llvm::MapVector<swift::BasicBlock *, LoweredBB> loweredBBs;
   
   SILConstant CurConstant;
-  swift::Function *CurSILFn;
+  SILFunction *CurSILFn;
   Address IndirectReturn;
   
   IRGenSILFunction(IRGenModule &IGM,
@@ -287,7 +287,7 @@ public:
   ~IRGenSILFunction();
   
   /// Generate IR for the given SIL Function.
-  void emitSILFunction(SILConstant c, swift::Function *f);
+  void emitSILFunction(SILConstant c, SILFunction *f);
 
   /// Generate code from the global toplevel. This will emit all the
   /// declarations in the given translation unit along with the toplevel

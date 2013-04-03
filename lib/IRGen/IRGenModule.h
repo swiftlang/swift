@@ -53,7 +53,7 @@ namespace swift {
   class DestructorDecl;
   class ExtensionDecl;
   class FuncDecl;
-  class Function;
+  class SILFunction;
   class OneOfElementDecl;
   class OneOfDecl;
   class ProtocolCompositionType;
@@ -313,7 +313,7 @@ public:
   void emitClassConstructors(ConstructorDecl *D);
   Address emitGlobalVariable(VarDecl *var, const TypeInfo &type);
   
-  void emitSILConstant(SILConstant c, swift::Function *f);
+  void emitSILConstant(SILConstant c, SILFunction *f);
 
   llvm::FunctionType *getFunctionType(AbstractCC cc,
                                       CanType fnType, ExplosionKind kind,

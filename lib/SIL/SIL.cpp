@@ -22,7 +22,7 @@
 #include "swift/AST/Types.h"
 using namespace swift;
 
-Function::~Function() {
+SILFunction::~SILFunction() {
 }
 
 static SILType toplevelFunctionType(SILModule &M, ASTContext &C) {
@@ -49,7 +49,7 @@ SILModule::SILModule(ASTContext &Context, bool hasTopLevel) :
   Context(Context), toplevel(nullptr)
 {
   if (hasTopLevel)
-    toplevel = new (*this) Function(*this, toplevelFunctionType(*this, Context));
+    toplevel = new (*this) SILFunction(*this, toplevelFunctionType(*this, Context));
 }
 
 SILModule::~SILModule() {

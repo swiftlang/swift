@@ -72,11 +72,11 @@ ValueRetTy visit##CLASS(CLASS *I) {                         \
     this->ImplClass::visitBasicBlock(&BB);
   }
 
-  void visitFunction(Function *F) {
+  void visitFunction(SILFunction *F) {
     for (auto &BB : *F)
       this->ImplClass::visitBasicBlock(&BB);
   }
-  void visitFunction(Function &F) {
+  void visitFunction(SILFunction &F) {
     this->ImplClass::visitFunction(&F);
   }
 };

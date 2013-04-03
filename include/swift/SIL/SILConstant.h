@@ -34,7 +34,7 @@ namespace swift {
   class ClassDecl;
 
 /// SILConstant - A key for referencing an entity that can be the subject of a
-/// SIL ConstantRefInst or the name of a SIL Function body. This can currently
+/// SIL ConstantRefInst or the name of a SILFunction body. This can currently
 /// be either a reference to a ValueDecl for functions, methods, constructors,
 /// and other named entities, or a reference to a CapturingExpr (that is, a
 /// FuncExpr or ClosureExpr) for an anonymous function. In addition to the AST

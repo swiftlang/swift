@@ -149,7 +149,7 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
 }
 
 void IRGenSILFunction::emitSILFunction(SILConstant c,
-                                       swift::Function *f) {
+                                       SILFunction *f) {
   DEBUG(llvm::dbgs() << "emitting SIL function: ";
         c.print(llvm::dbgs());
         llvm::dbgs() << '\n';

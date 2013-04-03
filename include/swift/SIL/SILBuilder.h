@@ -22,22 +22,23 @@ class SILBuilder {
   /// BB - If this is non-null, the instruction is inserted in the specified
   /// basic block, at the specified InsertPt.  If null, created instructions
   /// are not auto-inserted.
-  Function &F;
+  SILFunction &F;
   BasicBlock *BB;
   BasicBlock::iterator InsertPt;
 public:
 
-  SILBuilder(Function &F) : F(F), BB(0) {}
+  SILBuilder(SILFunction &F) : F(F), BB(0) {}
 
-  SILBuilder(Instruction *I, Function &F) : F(F) {
+  SILBuilder(Instruction *I, SILFunction &F) : F(F) {
     setInsertionPoint(I);
   }
 
-  SILBuilder(BasicBlock *BB, Function &F) : F(F) {
+  SILBuilder(BasicBlock *BB, SILFunction &F) : F(F) {
     setInsertionPoint(BB);
   }
 
-  SILBuilder(BasicBlock *BB, BasicBlock::iterator InsertPt, Function &F) : F(F){
+  SILBuilder(BasicBlock *BB, BasicBlock::iterator InsertPt, SILFunction &F)
+    : F(F){
     setInsertionPoint(BB, InsertPt);
   }
 
@@ -74,8 +75,9 @@ public:
   }
 
   /// emitBlock - Each basic block is individually new'd then emitted with
-  /// this function.  Since each block is implicitly added to the Function's list of
-  /// blocks when created, the construction order is not particularly useful.
+  /// this function.  Since each block is implicitly added to the Function's
+  /// list of blocks when created, the construction order is not particularly
+  /// useful.
   ///
   /// Instead, we want blocks to end up in the order that they are *emitted*.
   /// The cheapest way to ensure this is to just move each block to the end of
@@ -86,7 +88,7 @@ public:
   /// This function also sets the insertion point of the builder to be the newly
   /// emitted block.
   void emitBlock(BasicBlock *BB) {
-    Function *F = BB->getParent();
+    SILFunction *F = BB->getParent();
     // If this is a fall through into BB, emit the fall through branch.
     if (hasValidInsertionPoint()) {
       assert(BB->bbarg_empty() && "cannot fall through to bb with args");
@@ -209,7 +211,7 @@ public:
   }
   
   ArchetypeToSuperInst *createArchetypeToSuper(SILLocation Loc,
-                                               Value Archetype, SILType BaseTy) {
+                                               Value Archetype, SILType BaseTy){
     return insert(new ArchetypeToSuperInst(Loc, Archetype, BaseTy));
   }
   
@@ -219,7 +221,7 @@ public:
     return insert(new SuperToArchetypeInst(Loc, SrcBase, DestArchetypeAddr));
   }
   
-  TupleInst *createTuple(SILLocation Loc, SILType Ty, ArrayRef<Value> Elements) {
+  TupleInst *createTuple(SILLocation Loc, SILType Ty, ArrayRef<Value> Elements){
     return insert(TupleInst::create(Loc, Ty, Elements, F));
   }
   

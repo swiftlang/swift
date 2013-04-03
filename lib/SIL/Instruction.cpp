@@ -97,7 +97,7 @@ void Instruction::destroy(Instruction *I) {
 
 AllocVarInst::AllocVarInst(SILLocation loc, AllocKind allocKind,
                            SILType elementType,
-                           Function &F)
+                           SILFunction &F)
   : AllocInst(ValueKind::AllocVarInst, loc,
               elementType.getAddressType(),
               allocKind) {
@@ -115,7 +115,7 @@ VarDecl *AllocVarInst::getDecl() const {
 
 AllocRefInst::AllocRefInst(SILLocation loc, AllocKind allocKind,
                            SILType elementType,
-                           Function &F)
+                           SILFunction &F)
 : AllocInst(ValueKind::AllocRefInst, loc,
             elementType,
             allocKind) {
@@ -129,7 +129,7 @@ Type AllocVarInst::getElementType() const {
 }
 
 // Allocations always return two results: Builtin.ObjectPointer & LValue[EltTy]
-static SILTypeList *getAllocType(SILType EltTy, Function &F) {
+static SILTypeList *getAllocType(SILType EltTy, SILFunction &F) {
   ASTContext &Ctx = EltTy.getASTContext();
 
   SILType ResTys[] = {
@@ -140,7 +140,7 @@ static SILTypeList *getAllocType(SILType EltTy, Function &F) {
   return F.getModule().getSILTypeList(ResTys);
 }
 
-AllocBoxInst::AllocBoxInst(SILLocation Loc, SILType ElementType, Function &F)
+AllocBoxInst::AllocBoxInst(SILLocation Loc, SILType ElementType, SILFunction &F)
   : Instruction(ValueKind::AllocBoxInst, Loc, getAllocType(ElementType, F)) {
 }
 
@@ -149,7 +149,7 @@ Type AllocBoxInst::getElementType() const {
 }
 
 AllocArrayInst::AllocArrayInst(SILLocation Loc, SILType ElementType,
-                               Value NumElements, Function &F)
+                               Value NumElements, SILFunction &F)
   : Instruction(ValueKind::AllocArrayInst, Loc, getAllocType(ElementType, F)),
     Operands(this, NumElements) {
 }
@@ -165,7 +165,7 @@ FunctionInst::FunctionInst(ValueKind kind,
 }
 
 template<typename DERIVED, typename...T>
-DERIVED *FunctionInst::create(Function &F, ArrayRef<Value> Args,
+DERIVED *FunctionInst::create(SILFunction &F, ArrayRef<Value> Args,
                               T &&...ConstructorArgs) {
   // The way we store operands requires this.
   static_assert(sizeof(DERIVED) == sizeof(FunctionInst),
@@ -186,7 +186,7 @@ ApplyInst::ApplyInst(SILLocation Loc, Value Callee,
 
 ApplyInst *ApplyInst::create(SILLocation Loc, Value Callee,
                              SILType Result, ArrayRef<Value> Args,
-                             Function &F) {
+                             SILFunction &F) {
   return FunctionInst::create<ApplyInst>(F, Args,
                                          Loc, Callee, Result, Args);
 }
@@ -204,7 +204,7 @@ PartialApplyInst::PartialApplyInst(SILLocation Loc, Value Callee,
 PartialApplyInst *PartialApplyInst::create(SILLocation Loc, Value Callee,
                                            ArrayRef<Value> Args,
                                            SILType ClosureType,
-                                           Function &F) {
+                                           SILFunction &F) {
   return FunctionInst::create<PartialApplyInst>(F, Args, Loc, Callee,
                                                 Args, ClosureType);
 }
@@ -305,7 +305,7 @@ InitializeVarInst::InitializeVarInst(SILLocation Loc, Value Dest)
 
 SpecializeInst *SpecializeInst::create(SILLocation Loc, Value Operand,
                                        ArrayRef<Substitution> Substitutions,
-                                       SILType DestTy, Function &F) {
+                                       SILType DestTy, SILFunction &F) {
  void *Buffer = F.allocate(
            sizeof(SpecializeInst) + Substitutions.size() * sizeof(Substitution),
            alignof(SpecializeInst));
@@ -367,7 +367,7 @@ SuperToArchetypeInst::SuperToArchetypeInst(SILLocation Loc,
 }
 
 TupleInst *TupleInst::createImpl(SILLocation Loc, SILType Ty,
-                                 ArrayRef<Value> Elements, Function &F) {
+                                 ArrayRef<Value> Elements, SILFunction &F) {
   void *Buffer = F.allocate(sizeof(TupleInst) +
                             decltype(Operands)::getExtraSize(Elements.size()),
                             alignof(TupleInst));
@@ -427,7 +427,7 @@ DynamicMethodInst::DynamicMethodInst(ValueKind Kind,
                                                SILLocation Loc, Value Operand,
                                                SILConstant Member,
                                                SILType Ty,
-                                               Function &F)
+                                               SILFunction &F)
   : Instruction(Kind, Loc, Ty),
     Operands(this, Operand), Member(Member) {
 }
@@ -435,7 +435,7 @@ DynamicMethodInst::DynamicMethodInst(ValueKind Kind,
 ClassMethodInst::ClassMethodInst(SILLocation Loc, Value Operand,
                                  SILConstant Member,
                                  SILType Ty,
-                                 Function &F)
+                                 SILFunction &F)
   : DynamicMethodInst(ValueKind::ClassMethodInst,
                       Loc, Operand, Member,
                       Ty, F) {
@@ -444,7 +444,7 @@ ClassMethodInst::ClassMethodInst(SILLocation Loc, Value Operand,
 SuperMethodInst::SuperMethodInst(SILLocation Loc, Value Operand,
                                  SILConstant Member,
                                  SILType Ty,
-                                 Function &F)
+                                 SILFunction &F)
   : DynamicMethodInst(ValueKind::SuperMethodInst,
                       Loc, Operand, Member,
                       Ty, F) {
@@ -453,7 +453,7 @@ SuperMethodInst::SuperMethodInst(SILLocation Loc, Value Operand,
 ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, Value Operand,
                                          SILConstant Member,
                                          SILType Ty,
-                                         Function &F)
+                                         SILFunction &F)
 : DynamicMethodInst(ValueKind::ArchetypeMethodInst,
                     Loc, Operand, Member,
                     Ty, F) {
@@ -462,14 +462,14 @@ ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, Value Operand,
 ProtocolMethodInst::ProtocolMethodInst(SILLocation Loc, Value Operand,
                                              SILConstant Member,
                                              SILType Ty,
-                                             Function &F)
+                                             SILFunction &F)
   : DynamicMethodInst(ValueKind::ProtocolMethodInst,
                            Loc, Operand, Member,
                            Ty, F) {
 }
 
 ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc, Value Operand,
-                                               Function &F)
+                                               SILFunction &F)
   : Instruction(ValueKind::ProjectExistentialInst, Loc,
                 SILType::getOpaquePointerType(F.getContext())),
     Operands(this, Operand) {
@@ -561,7 +561,7 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   return cast<BranchInst>(this)->getSuccessors();
 }
 
-UnreachableInst::UnreachableInst(Function &F)
+UnreachableInst::UnreachableInst(SILFunction &F)
   : TermInst(ValueKind::UnreachableInst, SILLocation(),
              SILType::getEmptyTupleType(F.getContext())) {
 }
@@ -583,13 +583,13 @@ BranchInst::BranchInst(SILLocation Loc,
 
 BranchInst *BranchInst::create(SILLocation Loc,
                                BasicBlock *DestBB,
-                               Function &F) {
+                               SILFunction &F) {
   return create(Loc, DestBB, {}, F);
 }
 
 BranchInst *BranchInst::create(SILLocation Loc,
                                BasicBlock *DestBB, ArrayRef<Value> Args,
-                               Function &F) {
+                               SILFunction &F) {
   void *Buffer = F.allocate(sizeof(BranchInst) +
                               decltype(Operands)::getExtraSize(Args.size()),
                             alignof(BranchInst));
@@ -607,14 +607,14 @@ CondBranchInst::CondBranchInst(SILLocation Loc, Value Condition,
 
 CondBranchInst *CondBranchInst::create(SILLocation Loc, Value Condition,
                                        BasicBlock *TrueBB, BasicBlock *FalseBB,
-                                       Function &F) {
+                                       SILFunction &F) {
   return create(Loc, Condition, TrueBB, {}, FalseBB, {}, F);
 }
 
 CondBranchInst *CondBranchInst::create(SILLocation Loc, Value Condition,
                                BasicBlock *TrueBB, ArrayRef<Value> TrueArgs,
                                BasicBlock *FalseBB, ArrayRef<Value> FalseArgs,
-                               Function &F) {
+                               SILFunction &F) {
   assert(TrueArgs.size() == TrueBB->bbarg_size() &&
          FalseArgs.size() == FalseBB->bbarg_size() &&
          "branch argument counts do not match target bbs");

@@ -28,9 +28,9 @@ namespace {
 /// SILVerifier class - This class implements the SIL verifier, which walks over
 /// SIL, checking and enforcing its invariants.
 class SILVerifier : public SILVisitor<SILVerifier> {
-  Function const &F;
+  SILFunction const &F;
 public:
-  SILVerifier(Function const &F) : F(F) {}
+  SILVerifier(SILFunction const &F) : F(F) {}
   
   void visit(Instruction *I) {
     
@@ -664,21 +664,21 @@ public:
            "entry point argument types do not match function type");
   }
   
-  void visitFunction(Function *F) {
+  void visitFunction(SILFunction *F) {
     verifyEntryPointArguments(F->getBlocks().begin());
   }
   
   void verify() {
-    visitFunction(const_cast<Function*>(&F));
+    visitFunction(const_cast<SILFunction*>(&F));
   }
 };
 } // end anonymous namespace
 
 #endif //NDEBUG
 
-/// verify - Run the SIL verifier to make sure that the Function follows
+/// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
-void Function::verify() const {
+void SILFunction::verify() const {
 #ifndef NDEBUG
   SILVerifier(*this).verify();
 #endif

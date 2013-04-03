@@ -30,7 +30,7 @@ namespace swift {
 
 class ValueDecl;
 class SILType;
-class Function;
+class SILFunction;
 class BasicBlock;
 class CharacterLiteralExpr;
 class DeclRefExpr;
@@ -140,7 +140,7 @@ public:
 class AllocVarInst : public AllocInst {
 public:
   AllocVarInst(SILLocation loc, AllocKind allocKind, SILType elementType,
-               Function &F);
+               SILFunction &F);
 
   /// getDecl - Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.
@@ -161,7 +161,7 @@ public:
 class AllocRefInst : public AllocInst {
 public:
   AllocRefInst(SILLocation loc, AllocKind allocKind, SILType type,
-               Function &F);
+               SILFunction &F);
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::AllocRefInst;
@@ -176,7 +176,7 @@ public:
 ///
 class AllocBoxInst : public Instruction {
 public:
-  AllocBoxInst(SILLocation Loc, SILType ElementType, Function &F);
+  AllocBoxInst(SILLocation Loc, SILType ElementType, SILFunction &F);
 
   Type getElementType() const;
 
@@ -200,7 +200,7 @@ class AllocArrayInst : public Instruction {
 public:
 
   AllocArrayInst(SILLocation Loc, SILType ElementType, Value NumElements,
-                 Function &F);
+                 SILFunction &F);
 
   Type getElementType() const;
   Value getNumElements() const { return Operands[NumElements].get(); }
@@ -227,7 +227,7 @@ protected:
                SILLocation Loc, SILType Ty, Value Callee, ArrayRef<Value> Args);
 
   template<typename DERIVED, typename...T>
-  static DERIVED *create(Function &F, ArrayRef<Value> Args,
+  static DERIVED *create(SILFunction &F, ArrayRef<Value> Args,
                          T &&...ConstructorArgs);
 
 public:
@@ -261,7 +261,7 @@ public:
   static ApplyInst *create(SILLocation Loc, Value Callee,
                            SILType ReturnType,
                            ArrayRef<Value> Args,
-                           Function &F);
+                           SILFunction &F);
 };
 
 /// PartialApplyInst - Represents the creation of a closure object by partial
@@ -274,7 +274,7 @@ public:
   static PartialApplyInst *create(SILLocation Loc, Value Callee,
                                   ArrayRef<Value> Args,
                                   SILType ClosureType,
-                                  Function &F);
+                                  SILFunction &F);
 };
 
 /// ConstantRefInst - Represents a reference to a *constant* declaration,
@@ -494,7 +494,7 @@ public:
   static SpecializeInst *create(SILLocation Loc, Value Operand,
                                 ArrayRef<Substitution> Substitutions,
                                 SILType DestTy,
-                                Function &F);
+                                SILFunction &F);
 
   Value getOperand() const { return Operands[Operand].get(); }
   
@@ -636,7 +636,7 @@ class TupleInst : public Instruction {
   /// TupleInst, object creation goes through 'create()'.
   TupleInst(SILLocation Loc, SILType Ty, ArrayRef<Value> Elements);
   static TupleInst *createImpl(SILLocation Loc, SILType Ty,
-                               ArrayRef<Value> Elements, Function &F);
+                               ArrayRef<Value> Elements, SILFunction &F);
 
 public:
   /// The elements referenced by this TupleInst.
@@ -651,7 +651,7 @@ public:
 
   /// Construct a TupleInst.
   static TupleInst *create(SILLocation Loc, SILType Ty, ArrayRef<Value> Elements,
-                           Function &F) {
+                           SILFunction &F) {
     return createImpl(Loc, Ty, Elements, F);
   }
 
@@ -836,7 +836,7 @@ class DynamicMethodInst : public Instruction {
 public:
   DynamicMethodInst(ValueKind Kind,
                     SILLocation Loc, Value Operand, SILConstant Member,
-                    SILType Ty, Function &F);
+                    SILType Ty, SILFunction &F);
   
   Value getOperand() const { return Operands[Operand].get(); }
   SILConstant getMember() const { return Member; }
@@ -853,7 +853,7 @@ public:
 class ClassMethodInst : public DynamicMethodInst {
 public:
   ClassMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
-                  SILType Ty, Function &F);
+                  SILType Ty, SILFunction &F);
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ClassMethodInst;
@@ -866,7 +866,7 @@ public:
 class SuperMethodInst : public DynamicMethodInst {
 public:
   SuperMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
-                  SILType Ty, Function &F);
+                  SILType Ty, SILFunction &F);
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::SuperMethodInst;
@@ -878,7 +878,7 @@ public:
 class ArchetypeMethodInst : public DynamicMethodInst {
 public:
   ArchetypeMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
-                      SILType Ty, Function &F);
+                      SILType Ty, SILFunction &F);
   
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ArchetypeMethodInst;
@@ -893,7 +893,7 @@ public:
 class ProtocolMethodInst : public DynamicMethodInst {
 public:
   ProtocolMethodInst(SILLocation Loc, Value Operand, SILConstant Member,
-                     SILType Ty, Function &F);
+                     SILType Ty, SILFunction &F);
 
   static bool classof(Value V) {
     return V->getKind() == ValueKind::ProtocolMethodInst;
@@ -906,7 +906,7 @@ class ProjectExistentialInst : public Instruction {
   enum { Operand };
   FixedOperandList<1> Operands;
 public:
-  ProjectExistentialInst(SILLocation Loc, Value Operand, Function &F);
+  ProjectExistentialInst(SILLocation Loc, Value Operand, SILFunction &F);
   
   Value getOperand() const { return Operands[Operand].get(); }
   
@@ -1146,7 +1146,7 @@ public:
 /// function or after a no-return function call.
 class UnreachableInst : public TermInst {
 public:
-  UnreachableInst(Function &F);
+  UnreachableInst(SILFunction &F);
   
   SuccessorListTy getSuccessors() {
     // No Successors.
@@ -1201,14 +1201,14 @@ public:
   /// The destination block must take no parameters.
   static BranchInst *create(SILLocation Loc,
                             BasicBlock *DestBB,
-                            Function &F);
+                            SILFunction &F);
 
   /// Construct a BranchInst that will branch to the specified block with
   /// the given parameters.
   static BranchInst *create(SILLocation Loc,
                             BasicBlock *DestBB,
                             ArrayRef<Value> Args,
-                            Function &F);
+                            SILFunction &F);
   
   /// The jump target for the branch.
   BasicBlock *getDestBB() const { return DestBB; }
@@ -1246,7 +1246,7 @@ public:
   static CondBranchInst *create(SILLocation Loc, Value Condition,
                                 BasicBlock *TrueBB,
                                 BasicBlock *FalseBB,
-                                Function &F);
+                                SILFunction &F);
 
   /// Construct a CondBranchInst that will either branch to TrueBB and pass
   /// TrueArgs or branch to FalseBB and pass FalseArgs based on the Condition
@@ -1254,7 +1254,7 @@ public:
   static CondBranchInst *create(SILLocation Loc, Value Condition,
                                 BasicBlock *TrueBB, ArrayRef<Value> TrueArgs,
                                 BasicBlock *FalseBB, ArrayRef<Value> FalseArgs,
-                                Function &F);
+                                SILFunction &F);
   
   Value getCondition() const { return Operands[Condition].get(); }
 

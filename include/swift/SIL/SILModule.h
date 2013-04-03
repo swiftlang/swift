@@ -31,7 +31,7 @@ namespace swift {
   class TranslationUnit;
   class ASTContext;
   class FuncDecl;
-  class Function;
+  class SILFunction;
   
   namespace Lowering {
     class SILGenModule;
@@ -39,27 +39,27 @@ namespace swift {
   }
   
 /// SILModule - A SIL translation unit. The module object owns all of the SIL
-/// Function and other top-level objects generated when a translation unit is
+/// SILFunction and other top-level objects generated when a translation unit is
 /// lowered to SIL.
 class SILModule : public SILBase {
 private:
   friend class BasicBlock;
-  friend class Function;
+  friend class SILFunction;
   friend class Lowering::SILGenModule;
   friend class Lowering::TypeConverter;
 
   /// Context - This is the context that uniques the types used by this
-  /// Function.
+  /// SILFunction.
   ASTContext &Context;
   
   /// The collection of all codegenned Functions in the module.
-  llvm::MapVector<SILConstant, Function*> functions;
+  llvm::MapVector<SILConstant, SILFunction*> functions;
 
   /// The collection of global variables used in the module.
   llvm::DenseSet<VarDecl*> globals;
   
-  /// The top-level Function for the module.
-  Function *toplevel;
+  /// The top-level SILFunction for the module.
+  SILFunction *toplevel;
 
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
@@ -85,31 +85,31 @@ public:
     return toplevel != nullptr;
   }
   
-  /// Returns the Function containing top-level code for the module.
-  Function *getTopLevelFunction() const {
+  /// Returns the SILFunction containing top-level code for the module.
+  SILFunction *getTopLevelFunction() const {
     assert(toplevel && "no toplevel");
     return toplevel;
   }
   
-  /// Returns true if a Function was generated from the given declaration.
+  /// Returns true if a SILFunction was generated from the given declaration.
   bool hasFunction(SILConstant decl) const {
     return functions.find(decl) != functions.end();
   }
   
-  /// Returns true if a Function was generated from the given declaration.
+  /// Returns true if a SILFunction was generated from the given declaration.
   bool hasFunction(ValueDecl *decl) const {
     return hasFunction(SILConstant(decl));
   }
   
-  /// Returns a pointer to the Function generated from the given declaration.
-  Function *getFunction(SILConstant constant) const {
+  /// Returns a pointer to the SILFunction generated from the given declaration.
+  SILFunction *getFunction(SILConstant constant) const {
     auto found = functions.find(constant);
-    assert(found != functions.end() && "no Function generated for Decl");
+    assert(found != functions.end() && "no SILFunction generated for Decl");
     return found->second;
   }
 
-  /// Returns a pointer to the Function generated from the given declaration.
-  Function *getFunction(ValueDecl *decl) const {
+  /// Returns a pointer to the SILFunction generated from the given declaration.
+  SILFunction *getFunction(ValueDecl *decl) const {
     return getFunction(SILConstant(decl));
   }
   
@@ -127,7 +127,7 @@ public:
     return globals.end();
   }
   
-  typedef llvm::MapVector<SILConstant, Function*>::const_iterator iterator;
+  typedef llvm::MapVector<SILConstant, SILFunction*>::const_iterator iterator;
   typedef iterator const_iterator;
   
   iterator begin() const { return functions.begin(); }

@@ -75,26 +75,26 @@ public:
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
 
   /// emitFunction - Generates code for the given FuncExpr and adds the
-  /// Function to the current SILModule under the name SILConstant(decl). For
+  /// SILFunction to the current SILModule under the name SILConstant(decl). For
   /// curried functions, curried entry point Functions are also generated and
   /// added to the current SILModule.
-  Function *emitFunction(SILConstant::Loc decl, FuncExpr *fe);
+  SILFunction *emitFunction(SILConstant::Loc decl, FuncExpr *fe);
   /// emitClosure - Generates code for the given ClosureExpr and adds the
-  /// Function to the current SILModule under the name SILConstant(ce).
-  Function *emitClosure(ClosureExpr *ce);
+  /// SILFunction to the current SILModule under the name SILConstant(ce).
+  SILFunction *emitClosure(ClosureExpr *ce);
   /// emitConstructor - Generates code for the given ConstructorDecl and adds
-  /// the Function to the current SILModule under the name SILConstant(decl).
-  Function *emitConstructor(ConstructorDecl *decl);
+  /// the SILFunction to the current SILModule under the name SILConstant(decl).
+  SILFunction *emitConstructor(ConstructorDecl *decl);
   /// emitDestructor - Generates code for the given class's destructor and adds
-  /// the Function to the current SILModule under the name
+  /// the SILFunction to the current SILModule under the name
   /// SILConstant(cd, Destructor). If a DestructorDecl is provided, it will be
   /// used, otherwise only the implicit destruction behavior will be emitted.
-  Function *emitDestructor(ClassDecl *cd,
+  SILFunction *emitDestructor(ClassDecl *cd,
                            DestructorDecl /*nullable*/ *dd);
   
   template<typename T>
-  Function *preEmitFunction(SILConstant constant, T *astNode);
-  void postEmitFunction(SILConstant constant, Function *F);
+  SILFunction *preEmitFunction(SILConstant constant, T *astNode);
+  void postEmitFunction(SILConstant constant, SILFunction *F);
   
   /// Add a global variable to the SILModule.
   void addGlobalVariable(VarDecl *global);
@@ -212,10 +212,10 @@ public:
   /// The SILGenModule this function belongs to.
   SILGenModule &SGM;
     
-  /// The Function being constructed.
-  Function &F;
+  /// The SILFunction being constructed.
+  SILFunction &F;
   
-  /// B - The SILBuilder used to construct the Function.  It is what maintains
+  /// B - The SILBuilder used to construct the SILFunction.  It is what maintains
   /// the notion of the current block being emitted into.
   SILBuilder B;
     
@@ -262,7 +262,7 @@ public:
   BasicBlock *epilogBB;
 
 public:
-  SILGenFunction(SILGenModule &SGM, Function &F, bool hasVoidReturn);
+  SILGenFunction(SILGenModule &SGM, SILFunction &F, bool hasVoidReturn);
   ~SILGenFunction();
   
   /// Return a stable reference to the current cleanup.
@@ -270,7 +270,7 @@ public:
     return Cleanups.getCleanupsDepth();
   }
   
-  Function &getFunction() { return F; }
+  SILFunction &getFunction() { return F; }
   SILBuilder &getBuilder() { return B; }
   
   TypeLoweringInfo const &getTypeLoweringInfo(Type t,

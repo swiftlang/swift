@@ -146,7 +146,7 @@ public:
   SILPrinter(raw_ostream &OS) : OS(OS) {
   }
 
-  void print(const Function *F) {
+  void print(const SILFunction *F) {
     interleave(F->begin(), F->end(),
                [&](const BasicBlock &B) { print(&B); },
                [&] { OS << '\n'; });
@@ -520,7 +520,7 @@ ID SILPrinter::getID(Value V) {
 }
 
 //===----------------------------------------------------------------------===//
-// Printing for Instruction, BasicBlock, Function, and SILModule
+// Printing for Instruction, BasicBlock, SILFunction, and SILModule
 //===----------------------------------------------------------------------===//
 
 void ValueBase::dump() const {
@@ -541,13 +541,13 @@ void BasicBlock::print(raw_ostream &OS) const {
   SILPrinter(OS).print(this);
 }
 
-/// Pretty-print the Function to errs.
-void Function::dump() const {
+/// Pretty-print the SILFunction to errs.
+void SILFunction::dump() const {
   print(llvm::errs());
 }
 
-/// Pretty-print the Function to the designated stream.
-void Function::print(llvm::raw_ostream &OS) const {
+/// Pretty-print the SILFunction to the designated stream.
+void SILFunction::print(llvm::raw_ostream &OS) const {
   SILPrinter(OS).print(this);
 }
 
@@ -558,7 +558,7 @@ void SILModule::dump() const {
 
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(llvm::raw_ostream &OS) const {
-  for (std::pair<SILConstant, Function*> vf : *this) {
+  for (std::pair<SILConstant, SILFunction*> vf : *this) {
     OS << "sil @";
     vf.first.print(OS);
     OS << " : $" << vf.second->getLoweredType() << " {\n";

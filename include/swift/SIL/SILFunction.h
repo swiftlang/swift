@@ -1,4 +1,4 @@
-//===--- Function.h - Defines the Function class ----------------*- C++ -*-===//
+//===--- SILFunction.h - Defines the SILFunction class ----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the Function class.
+// This file defines the SILFunction class.
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,10 +31,10 @@ namespace Lowering {
   class SILGenModule;
 }
 
-/// Function - A function body that has been lowered to SIL. This consists of
+/// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL BasicBlock objects that contain the Instruction objects
 /// making up the function.
-class Function : public SILAllocated<Function> {
+class SILFunction : public SILAllocated<SILFunction> {
 public:
   typedef llvm::iplist<BasicBlock> BlockListType;
 
@@ -54,16 +54,16 @@ private:
   /// original function if the function consumes or returns address-only values.
   SILType LoweredType;
   
-  /// The collection of all BasicBlocks in the Function.
+  /// The collection of all BasicBlocks in the SILFunction.
   BlockListType BlockList;
 
   // Intentionally marked private so that we need to use
-  // 'SILModule::constructSIL()' to generate a Function.
-  Function(SILModule &Module, SILType LoweredType)
+  // 'SILModule::constructSIL()' to generate a SILFunction.
+  SILFunction(SILModule &Module, SILType LoweredType)
     : Module(Module), LoweredType(LoweredType) {}
   
 public:
-  ~Function();
+  ~SILFunction();
 
   SILModule &getModule() const { return Module; }
   ASTContext &getContext() const { return Module.Context; }
@@ -94,14 +94,14 @@ public:
   // Miscellaneous
   //===--------------------------------------------------------------------===//
 
-  /// verify - Run the IR verifier to make sure that the Function follows
+  /// verify - Run the IR verifier to make sure that the SILFunction follows
   /// invariants.
   void verify() const;
   
-  /// Pretty-print the Function.
+  /// Pretty-print the SILFunction.
   void dump() const;
 
-  /// Pretty-print the Function with the designated stream.
+  /// Pretty-print the SILFunction with the designated stream.
   void print(raw_ostream &OS) const;
   
   //===--------------------------------------------------------------------===//
