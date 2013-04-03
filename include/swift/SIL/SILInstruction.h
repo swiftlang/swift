@@ -20,7 +20,7 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILSuccessor.h"
 #include "swift/SIL/SILConstant.h"
-#include "swift/SIL/Value.h"
+#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/APFloat.h"

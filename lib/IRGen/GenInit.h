@@ -36,7 +36,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "IRGenFunction.h"
-#include "swift/SIL/Value.h"
+#include "swift/SIL/SILValue.h"
 
 namespace swift {
   class ValueDecl;

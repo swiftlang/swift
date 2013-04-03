@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/Value.h"
+#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 using namespace swift;

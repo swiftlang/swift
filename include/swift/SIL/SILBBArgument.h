@@ -13,7 +13,7 @@
 #ifndef SWIFT_SIL_BBARGUMENT_H
 #define SWIFT_SIL_BBARGUMENT_H
 
-#include "swift/SIL/Value.h"
+#include "swift/SIL/SILValue.h"
 
 namespace swift {
   class BasicBlock;
