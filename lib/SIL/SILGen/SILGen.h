@@ -16,7 +16,7 @@
 #include "ASTVisitor.h"
 #include "Cleanup.h"
 #include "Scope.h"
-#include "swift/SIL/Function.h"
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/TypeLowering.h"

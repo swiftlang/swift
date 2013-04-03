@@ -16,7 +16,7 @@
 
 #include "swift/SIL/BasicBlock.h"
 #include "swift/SIL/BBArgument.h"
-#include "swift/SIL/Function.h"
+#include "swift/SIL/SILFunction.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//

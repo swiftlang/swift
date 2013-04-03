@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/Function.h"
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"

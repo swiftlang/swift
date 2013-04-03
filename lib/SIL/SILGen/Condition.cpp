@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Condition.h"
-#include "swift/SIL/Function.h"
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILBuilder.h"
 using namespace swift;
 using namespace Lowering;

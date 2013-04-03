@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/Function.h"
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstant.h"
 #include "swift/SIL/SILModule.h"

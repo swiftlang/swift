@@ -17,7 +17,7 @@
 #include "swift/SIL/Instruction.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/AST.h"
-#include "swift/SIL/Function.h"
+#include "swift/SIL/SILFunction.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
 
