@@ -13,7 +13,7 @@
 #include "SILGen.h"
 #include "llvm/ADT/Optional.h"
 #include "swift/AST/AST.h"
-#include "swift/SIL/BBArgument.h"
+#include "swift/SIL/SILBBArgument.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;

@@ -18,7 +18,7 @@
 #define SWIFT_SIL_SILVISITOR_H
 
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/BBArgument.h"
+#include "swift/SIL/SILBBArgument.h"
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {

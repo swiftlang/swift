@@ -17,7 +17,7 @@
 #ifndef SWIFT_SIL_SILFUNCTION_H
 #define SWIFT_SIL_SILFUNCTION_H
 
-#include "swift/SIL/BasicBlock.h"
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILModule.h"
 
 namespace swift {

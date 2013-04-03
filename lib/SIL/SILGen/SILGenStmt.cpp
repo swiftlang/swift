@@ -17,7 +17,7 @@
 #include "LValue.h"
 #include "ManagedValue.h"
 #include "swift/AST/AST.h"
-#include "swift/SIL/BBArgument.h"
+#include "swift/SIL/SILBBArgument.h"
 #include "llvm/ADT/OwningPtr.h"
 
 using namespace swift;

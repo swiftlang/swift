@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/Instruction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/AST.h"
 #include "swift/SIL/SILFunction.h"

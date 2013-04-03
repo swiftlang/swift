@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILSuccessor.h"
-#include "swift/SIL/BasicBlock.h"
+#include "swift/SIL/SILBasicBlock.h"
 using namespace swift;
 
 void SILSuccessor::operator=(BasicBlock *BB) {

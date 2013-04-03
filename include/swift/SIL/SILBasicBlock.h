@@ -17,7 +17,7 @@
 #ifndef SWIFT_SIL_BASICBLOCK_H
 #define SWIFT_SIL_BASICBLOCK_H
 
-#include "swift/SIL/Instruction.h"
+#include "swift/SIL/SILInstruction.h"
 
 namespace swift {
 class SILFunction;

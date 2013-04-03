@@ -1,7 +1,7 @@
 add_subdirectory(SILGen)
 add_swift_library(swiftSIL
-  BasicBlock.cpp
-  Instruction.cpp
+  SILBasicBlock.cpp
+  SILInstruction.cpp
   SIL.cpp
   SILBase.cpp
   SILPrinter.cpp

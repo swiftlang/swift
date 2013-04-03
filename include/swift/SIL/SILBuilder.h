@@ -13,8 +13,8 @@
 #ifndef SWIFT_SIL_SILBUILDER_H
 #define SWIFT_SIL_SILBUILDER_H
 
-#include "swift/SIL/BasicBlock.h"
-#include "swift/SIL/Instruction.h"
+#include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILInstruction.h"
 
 namespace swift {
 
