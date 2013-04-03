@@ -3759,12 +3759,10 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
 }
 
 /// Emit a SIL function.
-static void emitSILFunction(IRGenModule &IGM,
-                            SILConstant c,
+static void emitSILFunction(IRGenModule &IGM, SILConstant c,
                             swift::Function *f,
                             llvm::Function *entrypoint,
-                            BraceStmt *body = nullptr)
-{
+                            BraceStmt *body = nullptr) {
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   
   // Emit the code for the function.
@@ -3811,8 +3809,7 @@ void IRGenModule::emitGlobalFunction(FuncDecl *func) {
 }
 
 /// Emit the definition for the given SIL constant.
-void IRGenModule::emitSILConstant(SILConstant c,
-                                  swift::Function *f) {
+void IRGenModule::emitSILConstant(SILConstant c, swift::Function *f) {
   // FIXME: Destructors of ObjC classes don't do the right thing yet.
   if (c.kind == SILConstant::Kind::Destructor &&
       cast<ClassDecl>(c.getDecl())->isObjC())

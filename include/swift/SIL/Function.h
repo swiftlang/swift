@@ -46,6 +46,10 @@ private:
   /// Module - This is the SIL module that the function belongs to.
   SILModule &Module;
 
+  /// MangledName - This is the mangled name of the SIL function, which will
+  /// be propagated into LLVM IR.
+  std::string MangledName;
+
   /// The lowered type of the function. This will differ from the type of the
   /// original function if the function consumes or returns address-only values.
   SILType LoweredType;
@@ -64,6 +68,10 @@ public:
   SILModule &getModule() const { return Module; }
   ASTContext &getContext() const { return Module.Context; }
   SILType getLoweredType() const { return LoweredType; }
+
+  const std::string &getMangledName() const { return MangledName; }
+  void setMangledName(const std::string &N) { MangledName = N; }
+
 
   //===--------------------------------------------------------------------===//
   // Block List Access
