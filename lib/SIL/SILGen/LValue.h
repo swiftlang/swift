@@ -103,9 +103,9 @@ protected:
   PhysicalPathComponent() : PathComponent(true) {}
 
 public:
-  virtual Value offset(SILGenFunction &gen,
+  virtual SILValue offset(SILGenFunction &gen,
                        SILLocation loc,
-                       Value base) const = 0;
+                       SILValue base) const = 0;
 };
 
 inline PhysicalPathComponent &PathComponent::asPhysical() {
@@ -130,12 +130,12 @@ public:
   /// Perform a store operation with a value produced by the given
   /// expression.
   virtual void storeRValue(SILGenFunction &gen, SILLocation loc,
-                           ManagedValue rvalue, Value base) const = 0;
+                           ManagedValue rvalue, SILValue base) const = 0;
 
   /// Perform a load operation from this path into temporary
   /// memory.
   virtual Materialize loadAndMaterialize(SILGenFunction &gen, SILLocation loc,
-                                         Value base) const = 0;
+                                         SILValue base) const = 0;
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {
@@ -201,7 +201,7 @@ struct Writeback {
   LValue lvalue;
   /// tempAddress - The address containing the source value to write back to
   /// the lvalue.
-  Value tempAddress;
+  SILValue tempAddress;
 };
 
 } // end namespace Lowering

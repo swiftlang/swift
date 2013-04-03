@@ -28,7 +28,7 @@ namespace swift {
 template<typename ImplClass, typename ValueRetTy = void>
 class SILVisitor {
 public:
-  ValueRetTy visitValue(ValueBase *V) {
+  ValueRetTy visitSILValue(ValueBase *V) {
     // Base class, used if some class of value isn't handled.
   }
 
@@ -43,7 +43,7 @@ public:
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
-  ValueRetTy visit(Value V) {
+  ValueRetTy visit(SILValue V) {
     return visit(V.getDef());
   }
 
@@ -59,7 +59,7 @@ ValueRetTy visit##CLASS(CLASS *I) {                         \
 }
 #include "swift/SIL/SILNodes.def"
 
-  void visitBasicBlock(BasicBlock *BB) {
+  void visitSILBasicBlock(SILBasicBlock *BB) {
     for (auto argI = BB->bbarg_begin(), argEnd = BB->bbarg_end();
          argI != argEnd;
          ++argI)
@@ -68,16 +68,16 @@ ValueRetTy visit##CLASS(CLASS *I) {                         \
     for (auto &I : *BB)
       visit(&I);
   }
-  void visitBasicBlock(BasicBlock &BB) {
-    this->ImplClass::visitBasicBlock(&BB);
+  void visitSILBasicBlock(SILBasicBlock &BB) {
+    this->ImplClass::visitSILBasicBlock(&BB);
   }
 
-  void visitFunction(SILFunction *F) {
+  void visitSILFunction(SILFunction *F) {
     for (auto &BB : *F)
-      this->ImplClass::visitBasicBlock(&BB);
+      this->ImplClass::visitSILBasicBlock(&BB);
   }
-  void visitFunction(SILFunction &F) {
-    this->ImplClass::visitFunction(&F);
+  void visitSILFunction(SILFunction &F) {
+    this->ImplClass::visitSILFunction(&F);
   }
 };
 

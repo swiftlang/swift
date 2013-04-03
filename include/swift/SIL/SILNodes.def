@@ -16,14 +16,14 @@
 
 /// VALUE(Id, Parent)
 ///   The expression enumerator value is an ValueKind.  The node's class name is
-///   Id, and the name of its base class (in the Value hierarchy) is Parent.
+///   Id, and the name of its base class (in the SILValue hierarchy) is Parent.
 #ifndef VALUE
 #define VALUE(Id, Parent)
 #endif
 
 /// INST(Id, Parent)
 ///   The expression enumerator value is an ValueKind.  The node's class name is
-///   Id, and the name of its base class (in the Instruction hierarchy) is
+///   Id, and the name of its base class (in the SILInstruction hierarchy) is
 ///   Parent.
 #ifndef INST
 #define INST(Id, Parent) VALUE(Id, Parent)
@@ -45,62 +45,62 @@
 #define VALUE_RANGE(Id, First, Last)
 #endif
 
-VALUE(BBArgument, Value)
+VALUE(SILArgument, SILValue)
 
-ABSTRACT_VALUE(Instruction, Value)
-  ABSTRACT_VALUE(AllocInst, Instruction)
+ABSTRACT_VALUE(SILInstruction, SILValue)
+  ABSTRACT_VALUE(AllocInst, SILInstruction)
     INST(AllocVarInst, AllocInst)
     INST(AllocRefInst, AllocInst)
     VALUE_RANGE(AllocInst, AllocVarInst, AllocRefInst)
-  INST(AllocBoxInst, Instruction)
-  INST(AllocArrayInst, Instruction)
-  INST(ConstantRefInst, Instruction)
+  INST(AllocBoxInst, SILInstruction)
+  INST(AllocArrayInst, SILInstruction)
+  INST(ConstantRefInst, SILInstruction)
 
-  ABSTRACT_VALUE(FunctionInst, Instruction)
+  ABSTRACT_VALUE(FunctionInst, SILInstruction)
     INST(ApplyInst, FunctionInst)
     INST(PartialApplyInst, FunctionInst)
     VALUE_RANGE(FunctionInst, ApplyInst, PartialApplyInst)
 
   // Literals
-  INST(IntegerLiteralInst, Instruction)
-  INST(FloatLiteralInst, Instruction)
-  INST(StringLiteralInst, Instruction)
+  INST(IntegerLiteralInst, SILInstruction)
+  INST(FloatLiteralInst, SILInstruction)
+  INST(StringLiteralInst, SILInstruction)
 
-  INST(LoadInst, Instruction)
-  INST(StoreInst, Instruction)
-  INST(InitializeVarInst, Instruction)
-  INST(CopyAddrInst, Instruction)
-  INST(SpecializeInst, Instruction)
-  INST(TupleInst, Instruction)
-  INST(ClassMetatypeInst, Instruction)
-  INST(ArchetypeMetatypeInst, Instruction)
-  INST(ProtocolMetatypeInst, Instruction)
-  INST(MetatypeInst, Instruction)
-  INST(ModuleInst, Instruction)
-  INST(AssociatedMetatypeInst, Instruction)
-  INST(ExtractInst, Instruction)
-  INST(ElementAddrInst, Instruction)
-  INST(RefElementAddrInst, Instruction)
+  INST(LoadInst, SILInstruction)
+  INST(StoreInst, SILInstruction)
+  INST(InitializeVarInst, SILInstruction)
+  INST(CopyAddrInst, SILInstruction)
+  INST(SpecializeInst, SILInstruction)
+  INST(TupleInst, SILInstruction)
+  INST(ClassMetatypeInst, SILInstruction)
+  INST(ArchetypeMetatypeInst, SILInstruction)
+  INST(ProtocolMetatypeInst, SILInstruction)
+  INST(MetatypeInst, SILInstruction)
+  INST(ModuleInst, SILInstruction)
+  INST(AssociatedMetatypeInst, SILInstruction)
+  INST(ExtractInst, SILInstruction)
+  INST(ElementAddrInst, SILInstruction)
+  INST(RefElementAddrInst, SILInstruction)
   
-  ABSTRACT_VALUE(DynamicMethodInst, Instruction)
+  ABSTRACT_VALUE(DynamicMethodInst, SILInstruction)
     INST(ArchetypeMethodInst, DynamicMethodInst)
     INST(ProtocolMethodInst, DynamicMethodInst)
     INST(ClassMethodInst, DynamicMethodInst)
     INST(SuperMethodInst, DynamicMethodInst)
     VALUE_RANGE(DynamicMethodInst, ArchetypeMethodInst, SuperMethodInst)
     
-  INST(ProjectExistentialInst, Instruction)
-  INST(InitExistentialInst, Instruction)
-  INST(UpcastExistentialInst, Instruction)
-  INST(DeinitExistentialInst, Instruction)
+  INST(ProjectExistentialInst, SILInstruction)
+  INST(InitExistentialInst, SILInstruction)
+  INST(UpcastExistentialInst, SILInstruction)
+  INST(DeinitExistentialInst, SILInstruction)
 
-  INST(RetainInst, Instruction)
-  INST(ReleaseInst, Instruction)
-  INST(DeallocVarInst, Instruction)
-  INST(DeallocRefInst, Instruction)
-  INST(DestroyAddrInst, Instruction)
+  INST(RetainInst, SILInstruction)
+  INST(ReleaseInst, SILInstruction)
+  INST(DeallocVarInst, SILInstruction)
+  INST(DeallocRefInst, SILInstruction)
+  INST(DestroyAddrInst, SILInstruction)
   
-  ABSTRACT_VALUE(ConversionInst, Instruction)
+  ABSTRACT_VALUE(ConversionInst, SILInstruction)
     INST(ConvertFunctionInst, ConversionInst)
     INST(CoerceInst, ConversionInst)
     INST(UpcastInst, ConversionInst)
@@ -109,21 +109,21 @@ ABSTRACT_VALUE(Instruction, Value)
     INST(ThinToThickFunctionInst, ConversionInst)
     INST(ArchetypeToSuperInst, ConversionInst)
     VALUE_RANGE(ConversionInst, ConvertFunctionInst, ArchetypeToSuperInst)
-  INST(SuperToArchetypeInst, Instruction)
+  INST(SuperToArchetypeInst, SILInstruction)
 
   // SIL-only instructions that don't have an AST analog.
-  INST(IndexAddrInst, Instruction)
-  INST(IntegerValueInst, Instruction)
+  INST(IndexAddrInst, SILInstruction)
+  INST(IntegerValueInst, SILInstruction)
 
   // Terminators.
-  ABSTRACT_VALUE(TermInst, Instruction)
+  ABSTRACT_VALUE(TermInst, SILInstruction)
     INST(UnreachableInst, TermInst)
     INST(ReturnInst, TermInst)
     INST(BranchInst, TermInst)
     INST(CondBranchInst, TermInst)
     VALUE_RANGE(TermInst, UnreachableInst, CondBranchInst)
 
-  VALUE_RANGE(Instruction, AllocVarInst, CondBranchInst)
+  VALUE_RANGE(SILInstruction, AllocVarInst, CondBranchInst)
 
 #undef VALUE_RANGE
 #undef ABSTRACT_VALUE

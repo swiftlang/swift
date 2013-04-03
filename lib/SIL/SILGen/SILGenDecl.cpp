@@ -37,7 +37,7 @@ namespace {
       : Initialization(Initialization::Kind::Ignored, type)
     {}
     
-    Value getAddressOrNull() override { return Value(); }
+    SILValue getAddressOrNull() override { return SILValue(); }
     ArrayRef<InitializationPtr> getSubInitializations() override {
       return {};
     }
@@ -49,14 +49,14 @@ namespace {
   /// An Initialization subclass used to destructure tuple initializations.
   class TupleElementInitialization : public SingleInitializationBase {
   public:
-    Value elementAddr;
+    SILValue elementAddr;
     
-    TupleElementInitialization(Value addr)
+    TupleElementInitialization(SILValue addr)
       : SingleInitializationBase(addr.getType().getSwiftRValueType()),
         elementAddr(addr)
     {}
     
-    Value getAddressOrNull() override { return elementAddr; }
+    SILValue getAddressOrNull() override { return elementAddr; }
     
     void finishInitialization(SILGenFunction &gen) override {}
   };
@@ -79,10 +79,10 @@ ArrayRef<InitializationPtr> Initialization::getSubInitializations(
   }
   case Kind::SingleBuffer: {
     // Destructure the buffer into per-element buffers.
-    Value baseAddr = getAddress();
+    SILValue baseAddr = getAddress();
     for (unsigned i = 0; i < tupleTy->getFields().size(); ++i) {
       auto &field = tupleTy->getFields()[i];
-      Value fieldAddr = gen.B.createElementAddr(SILLocation(),
+      SILValue fieldAddr = gen.B.createElementAddr(SILLocation(),
                                           baseAddr, i,
                                           gen.getLoweredType(field.getType()));
       buf.push_back(InitializationPtr(new TupleElementInitialization(fieldAddr)));
@@ -95,9 +95,9 @@ ArrayRef<InitializationPtr> Initialization::getSubInitializations(
 
 namespace {
   class CleanupClosureConstant : public Cleanup {
-    Value closure;
+    SILValue closure;
   public:
-    CleanupClosureConstant(Value closure) : closure(closure) {}
+    CleanupClosureConstant(SILValue closure) : closure(closure) {}
     void emit(SILGenFunction &gen) override {
       gen.B.createRelease(SILLocation(), closure);
     }
@@ -111,7 +111,7 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd, SGFContext C) {
   // If there are captures, build the local closure value for the function and
   // store it as a local constant.
   if (!fd->getBody()->getCaptures().empty()) {
-    Value closure = emitClosureForCapturingExpr(fd, SILConstant(fd),
+    SILValue closure = emitClosureForCapturingExpr(fd, SILConstant(fd),
                                                 fd->getBody())
       .forward(*this);
     Cleanups.pushCleanup<CleanupClosureConstant>(closure);
@@ -133,11 +133,11 @@ public:
     : Initialization(Initialization::Kind::Tuple, type)
   {}
   
-  Value getAddressOrNull() override {
+  SILValue getAddressOrNull() override {
     if (subInitializations.size() == 1)
       return subInitializations[0]->getAddressOrNull();
     else
-      return Value();
+      return SILValue();
   }
   
   ArrayRef<InitializationPtr> getSubInitializations() override {
@@ -158,7 +158,7 @@ public:
     : box(box) {}
   
   void emit(SILGenFunction &gen) override {
-    gen.B.createRelease(SILLocation(), Value(box, 0));
+    gen.B.createRelease(SILLocation(), SILValue(box, 0));
   }
 };
 
@@ -189,8 +189,8 @@ public:
     assert(didFinish && "did not call BoxInit::finishInitialization!");
   }
   
-  Value getAddressOrNull() override {
-    return Value(box, 1);
+  SILValue getAddressOrNull() override {
+    return SILValue(box, 1);
   }
   
   void finishInitialization(SILGenFunction &gen) override {
@@ -203,15 +203,15 @@ public:
 /// An initialization for a global variable.
 class GlobalInitialization : public SingleInitializationBase {
   /// The physical address of the global.
-  Value address;
+  SILValue address;
   
 public:
-  GlobalInitialization(Value address)
+  GlobalInitialization(SILValue address)
     : SingleInitializationBase(address.getType().getSwiftRValueType()),
       address(address)
   {}
   
-  Value getAddressOrNull() override {
+  SILValue getAddressOrNull() override {
     return address;
   }
   
@@ -231,16 +231,16 @@ public:
       vd(vd)
   {}
   
-  Value getAddressOrNull() override {
+  SILValue getAddressOrNull() override {
     llvm_unreachable("byref argument does not have an address to store to");
   }
   ArrayRef<InitializationPtr> getSubInitializations() override { return {}; }
 
-  void bindAddress(Value address, SILGenFunction &gen) override {
+  void bindAddress(SILValue address, SILGenFunction &gen) override {
     // Use the input address as the var's address.
     assert(address.getType().isAddress() &&
            "binding a non-address to a byref argument?!");
-    gen.VarLocs[vd] = {Value(), address};
+    gen.VarLocs[vd] = {SILValue(), address};
   }
 
   void defaultInitialize(SILGenFunction &gen) override {}
@@ -288,7 +288,7 @@ struct InitializationForPattern
     // cleanups.
     if (!vd->getDeclContext()->isLocalContext()) {
       Gen.SGM.addGlobalVariable(vd);
-      Value addr = Gen.emitGlobalConstantRef(vd,
+      SILValue addr = Gen.emitGlobalConstantRef(vd,
                              SILConstant(vd, SILConstant::Kind::GlobalAddress));
       return InitializationPtr(new GlobalInitialization(addr));
     }
@@ -298,8 +298,8 @@ struct InitializationForPattern
     // escape and thus don't need boxes.
     SILType lType = Gen.getLoweredType(vd->getType());
     AllocBoxInst *allocBox = Gen.B.createAllocBox(vd, lType);
-    auto box = Value(allocBox, 0);
-    auto addr = Value(allocBox, 1);
+    auto box = SILValue(allocBox, 0);
+    auto addr = SILValue(allocBox, 1);
 
     /// Remember that this is the memory location that we're emitting the
     /// decl to.
@@ -343,10 +343,10 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D,
 namespace {
 
 /// ArgumentInitVisitor - A visitor for traversing a pattern, creating
-/// BBArguments, and initializing the local value for each pattern variable
+/// SILArguments, and initializing the local value for each pattern variable
 /// in a function argument list.
 struct ArgumentInitVisitor :
-  public PatternVisitor<ArgumentInitVisitor, /*RetTy=*/ Value,
+  public PatternVisitor<ArgumentInitVisitor, /*RetTy=*/ SILValue,
                         /*Args...=*/ Initialization*>
 {
   SILGenFunction &gen;
@@ -355,11 +355,11 @@ struct ArgumentInitVisitor :
   ArgumentInitVisitor(SILGenFunction &gen, SILFunction &f)
     : gen(gen), f(f), initB(f.begin(), f) {}
 
-  Value makeArgument(Type ty, BasicBlock *parent) {
+  SILValue makeArgument(Type ty, SILBasicBlock *parent) {
     assert(ty && "no type?!");
     // Destructure tuple arguments.
     if (TupleType *tupleTy = ty->getAs<TupleType>()) {
-      SmallVector<Value, 4> tupleArgs;
+      SmallVector<SILValue, 4> tupleArgs;
       for (auto &field : tupleTy->getFields()) {
         tupleArgs.push_back(makeArgument(field.getType(), parent));
       }
@@ -367,10 +367,10 @@ struct ArgumentInitVisitor :
       return initB.createTuple(SILLocation(), gen.getLoweredType(ty),
                                tupleArgs);
     }
-    return new (f.getModule()) BBArgument(gen.getLoweredType(ty), parent);
+    return new (f.getModule()) SILArgument(gen.getLoweredType(ty), parent);
   }
   
-  void storeArgumentInto(Type ty, Value arg, SILLocation loc, Initialization *I)
+  void storeArgumentInto(Type ty, SILValue arg, SILLocation loc, Initialization *I)
   {
     assert(ty && "no type?!");
     if (I) {
@@ -402,21 +402,21 @@ struct ArgumentInitVisitor :
     }
   }
 
-  /// Create a BBArgument and store its value into the given Initialization,
+  /// Create a SILArgument and store its value into the given Initialization,
   /// if not null.
-  Value makeArgumentInto(Type ty, BasicBlock *parent,
+  SILValue makeArgumentInto(Type ty, SILBasicBlock *parent,
                         SILLocation loc, Initialization *I) {
     assert(ty && "no type?!");
-    Value arg = makeArgument(ty, parent);
+    SILValue arg = makeArgument(ty, parent);
     storeArgumentInto(ty, arg, loc, I);
     return arg;
   }
     
   // Paren & Typed patterns are no-ops. Just look through them.
-  Value visitParenPattern(ParenPattern *P, Initialization *I) {
+  SILValue visitParenPattern(ParenPattern *P, Initialization *I) {
     return visit(P->getSubPattern(), I);
   }
-  Value visitTypedPattern(TypedPattern *P, Initialization *I) {
+  SILValue visitTypedPattern(TypedPattern *P, Initialization *I) {
     // FIXME: work around a bug in visiting the "this" argument of methods
     if (NamedPattern *np = dyn_cast<NamedPattern>(P->getSubPattern()))
       return makeArgumentInto(P->getType(), f.begin(),
@@ -425,7 +425,7 @@ struct ArgumentInitVisitor :
       return visit(P->getSubPattern(), I);
   }
 
-  Value visitTuplePattern(TuplePattern *P, Initialization *I) {
+  SILValue visitTuplePattern(TuplePattern *P, Initialization *I) {
     // If the tuple is empty, so should be our initialization. Just pass an
     // empty tuple upwards.
     if (P->getFields().empty()) {
@@ -457,44 +457,44 @@ struct ArgumentInitVisitor :
            "TupleInitialization size does not match tuple pattern size!");
     for (size_t i = 0; i < P->getFields().size(); ++i)
       visit(P->getFields()[i].getPattern(), subInits[i].get());
-    return Value();
+    return SILValue();
   }
 
-  Value visitAnyPattern(AnyPattern *P, Initialization *I) {
+  SILValue visitAnyPattern(AnyPattern *P, Initialization *I) {
     // A value bound to _ is unused and can be immediately released.
     assert(I->kind == Initialization::Kind::Ignored &&
            "any pattern should match a black-hole Initialization");
-    Value arg = makeArgument(P->getType(), f.begin());
+    SILValue arg = makeArgument(P->getType(), f.begin());
     if (arg.getType().isLoadable())
       gen.emitReleaseRValue(SILLocation(), arg);
     return arg;
   }
 
-  Value visitNamedPattern(NamedPattern *P, Initialization *I) {
+  SILValue visitNamedPattern(NamedPattern *P, Initialization *I) {
     return makeArgumentInto(P->getType(), f.begin(),
                             P->getDecl(), I);
   }
 };
 
 class CleanupCaptureBox : public Cleanup {
-  Value box;
+  SILValue box;
 public:
-  CleanupCaptureBox(Value box) : box(box) {}
+  CleanupCaptureBox(SILValue box) : box(box) {}
   void emit(SILGenFunction &gen) override {
     gen.B.createRelease(SILLocation(), box);
   }
 };
   
 class CleanupCaptureValue : public Cleanup {
-  Value v;
+  SILValue v;
 public:
-  CleanupCaptureValue(Value v) : v(v) {}
+  CleanupCaptureValue(SILValue v) : v(v) {}
   void emit(SILGenFunction &gen) override {
     gen.emitReleaseRValue(SILLocation(), v);
   }
 };
   
-static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
+static void makeCaptureSILArguments(SILGenFunction &gen, ValueDecl *capture) {
   // FIXME: capture local properties
   ASTContext &c = capture->getASTContext();
   switch (getDeclCaptureKind(capture)) {
@@ -502,9 +502,9 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
     // LValues are captured as two arguments: a retained ObjectPointer that owns
     // the captured value, and the address of the value itself.
     SILType ty = gen.getLoweredType(capture->getTypeOfReference());
-    Value box = new (gen.SGM.M) BBArgument(SILType::getObjectPointerType(c),
+    SILValue box = new (gen.SGM.M) SILArgument(SILType::getObjectPointerType(c),
                                            gen.F.begin());
-    Value addr = new (gen.SGM.M) BBArgument(ty,
+    SILValue addr = new (gen.SGM.M) SILArgument(ty,
                                             gen.F.begin());
     gen.VarLocs[capture] = {box, addr};
     gen.Cleanups.pushCleanup<CleanupCaptureBox>(box);
@@ -514,8 +514,8 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
     // Byref captures are non-escaping, so it's sufficient to capture only the
     // address.
     SILType ty = gen.getLoweredType(capture->getTypeOfReference());
-    Value addr = new (gen.SGM.M) BBArgument(ty, gen.F.begin());
-    gen.VarLocs[capture] = {Value(), addr};
+    SILValue addr = new (gen.SGM.M) SILArgument(ty, gen.F.begin());
+    gen.VarLocs[capture] = {SILValue(), addr};
     break;
   }
   case CaptureKind::Constant: {
@@ -523,7 +523,7 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
     assert(!capture->getType()->is<LValueType>() &&
            "capturing byref by value?!");
     TypeLoweringInfo const &ti = gen.getTypeLoweringInfo(capture->getType());
-    Value value = new (gen.SGM.M) BBArgument(ti.getLoweredType(),
+    SILValue value = new (gen.SGM.M) SILArgument(ti.getLoweredType(),
                                              gen.F.begin());
     gen.LocalConstants[SILConstant(capture)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
@@ -534,7 +534,7 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
     Type setTy = gen.SGM.Types.getPropertyType(SILConstant::Kind::Setter,
                                                capture->getType());
     SILType lSetTy = gen.getLoweredType(setTy);
-    Value value = new (gen.SGM.M) BBArgument(lSetTy, gen.F.begin());
+    SILValue value = new (gen.SGM.M) SILArgument(lSetTy, gen.F.begin());
     gen.LocalConstants[SILConstant(capture, SILConstant::Kind::Setter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     [[clang::fallthrough]];
@@ -544,7 +544,7 @@ static void makeCaptureBBArguments(SILGenFunction &gen, ValueDecl *capture) {
     Type getTy = gen.SGM.Types.getPropertyType(SILConstant::Kind::Getter,
                                                capture->getType());
     SILType lGetTy = gen.getLoweredType(getTy);
-    Value value = new (gen.SGM.M) BBArgument(lGetTy, gen.F.begin());
+    SILValue value = new (gen.SGM.M) SILArgument(lGetTy, gen.F.begin());
     gen.LocalConstants[SILConstant(capture, SILConstant::Kind::Getter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     break;
@@ -560,7 +560,7 @@ void SILGenFunction::emitProlog(CapturingExpr *ce,
   // Emit the capture argument variables. These are placed first because they
   // become the first curry level of the SIL function.
   for (auto capture : ce->getCaptures()) {
-    makeCaptureBBArguments(*this, capture);
+    makeCaptureSILArguments(*this, capture);
   }
 
   emitProlog(paramPatterns, resultType);
@@ -573,23 +573,24 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
     // Allocate the local mutable argument storage and set up an Initialization.
     InitializationPtr argInit =
                        InitializationForPattern(*this).visit(paramPatterns[i]);
-    // Add the BBArguments and use them to initialize the local argument values.
+    // Add the SILArguments and use them to initialize the local argument
+    // values.
     ArgumentInitVisitor(*this, F).visit(paramPatterns[i], argInit.get());
   }
 
   // If the return type is address-only, emit the indirect return argument.
   TypeLoweringInfo const &returnTI = getTypeLoweringInfo(resultType);
   if (returnTI.isAddressOnly()) {
-    IndirectReturnAddress = new (SGM.M) BBArgument(returnTI.getLoweredType(),
+    IndirectReturnAddress = new (SGM.M) SILArgument(returnTI.getLoweredType(),
                                                    F.begin());
   }
 }
 
 namespace {
   class CleanupDestructorThis : public Cleanup {
-    Value thisAddr;
+    SILValue thisAddr;
   public:
-    CleanupDestructorThis(Value thisAddr) : thisAddr(thisAddr) {
+    CleanupDestructorThis(SILValue thisAddr) : thisAddr(thisAddr) {
     }
     
     void emit(SILGenFunction &gen) override {
@@ -598,7 +599,7 @@ namespace {
   };
 } // end anonymous namespace
 
-Value SILGenFunction::emitDestructorProlog(ClassDecl *CD,
+SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
                                           DestructorDecl *DD) {
   // Emit the implicit 'this' argument.
   VarDecl *thisDecl = DD ? DD->getImplicitThisDecl() : nullptr;
@@ -609,7 +610,7 @@ Value SILGenFunction::emitDestructorProlog(ClassDecl *CD,
   assert((!thisDecl || getLoweredLoadableType(thisDecl->getType()) == thisType)
          && "decl type doesn't match destructor's implicit this type");
   
-  Value thisValue = new (SGM.M) BBArgument(thisType, F.begin());
+  SILValue thisValue = new (SGM.M) SILArgument(thisType, F.begin());
   
   if (DD) {
     // FIXME: Bump the retain count so that destruction doesn't fire
@@ -619,18 +620,18 @@ Value SILGenFunction::emitDestructorProlog(ClassDecl *CD,
     // Materialize an lvalue for 'this' in the body's scope. It doesn't need a
     // full box because 'this' shouldn't be capturable out of a destructor
     // scope.
-    Value thisAddr = B.createAllocVar(DD, AllocKind::Stack, thisType);
+    SILValue thisAddr = B.createAllocVar(DD, AllocKind::Stack, thisType);
     Cleanups.pushCleanup<CleanupDestructorThis>(thisAddr);
     emitStore(DD, ManagedValue(thisValue, ManagedValue::Unmanaged), thisAddr);
-    VarLocs[thisDecl] = {Value(), thisAddr};
+    VarLocs[thisDecl] = {SILValue(), thisAddr};
   }
   return thisValue;
 }
 
 static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc,
-                                   Value v,
+                                   SILValue v,
                                    void (SILBuilder::*createRR)(SILLocation,
-                                                                Value),
+                                                                SILValue),
                                    ReferenceTypePath const &elt) {
   for (auto &comp : elt.path) {
     TypeLoweringInfo const &ti = gen.getTypeLoweringInfo(comp.type);
@@ -640,14 +641,14 @@ static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc,
   (gen.B.*createRR)(loc, v);
 }
 
-static void rrLoadableValue(SILGenFunction &gen, SILLocation loc, Value v,
-                            void (SILBuilder::*createRR)(SILLocation, Value),
+static void rrLoadableValue(SILGenFunction &gen, SILLocation loc, SILValue v,
+                            void (SILBuilder::*createRR)(SILLocation, SILValue),
                             ArrayRef<ReferenceTypePath> elts) {
   for (auto &elt : elts)
     rrLoadableValueElement(gen, loc, v, createRR, elt);
 }
 
-void SILGenFunction::emitRetainRValue(SILLocation loc, Value v) {
+void SILGenFunction::emitRetainRValue(SILLocation loc, SILValue v) {
   assert(!v.getType().isAddress() &&
          "emitRetainRValue cannot retain an address");
 
@@ -656,7 +657,7 @@ void SILGenFunction::emitRetainRValue(SILLocation loc, Value v) {
                   ti.getReferenceTypeElements());
 }
 
-void SILGenFunction::emitReleaseRValue(SILLocation loc, Value v) {
+void SILGenFunction::emitReleaseRValue(SILLocation loc, SILValue v) {
   assert(!v.getType().isAddress() &&
          "emitReleaseRValue cannot release an address");
 

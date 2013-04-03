@@ -148,7 +148,7 @@ public:
     visit(e->getRHS());
   }
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *e) {
-    Value existential = gen.visit(e->getBase()).getUnmanagedValue();
+    SILValue existential = gen.visit(e->getBase()).getUnmanagedValue();
     assert(existential.getType().isAddress() && "loadable existential?!");
     // FIXME: Use existential_metatype if method is static.
     setThisParam(ManagedValue(gen.B.createProjectExistential(e, existential),
@@ -196,7 +196,7 @@ public:
     SILType constantTy = gen.SGM.getConstantType(constant);
     SILType constantThisTy
       = gen.getLoweredLoadableType(constantTy.castTo<FunctionType>()->getInput());
-    Value superUpcast = gen.B.createUpcast(apply->getArg(), super.getValue(),
+    SILValue superUpcast = gen.B.createUpcast(apply->getArg(), super.getValue(),
                                            constantThisTy);
     setThisParam(ManagedValue(superUpcast, super.getCleanup()));
 
@@ -209,7 +209,7 @@ public:
     // If the callee needs to be specialized, do so.
     if (specializeLoc) {
       CleanupsDepth cleanup = callee.getCleanup();
-      Value spec = gen.B.createSpecialize(specializeLoc, callee.getValue(),
+      SILValue spec = gen.B.createSpecialize(specializeLoc, callee.getValue(),
                                           substitutions, specializedType);
       return ManagedValue(spec, cleanup);
     }
@@ -220,14 +220,14 @@ public:
 
 static void emitDestructureArgumentTuple(SILGenFunction &gen,
                                          SILLocation loc,
-                                         Value argValue,
-                                         SmallVectorImpl<Value> &argsV) {
+                                         SILValue argValue,
+                                         SmallVectorImpl<SILValue> &argsV) {
   TupleType *ty = argValue.getType().castTo<TupleType>();
   
   // FIXME: address-only tuple
   // FIXME: varargs
   for (size_t i = 0, size = ty->getFields().size(); i < size; ++i) {
-    Value elt = gen.B.createExtract(loc, argValue, i,
+    SILValue elt = gen.B.createExtract(loc, argValue, i,
                     gen.getLoweredLoadableType(ty->getFields()[i].getType()));
     if (ty->getFields()[i].getType()->is<TupleType>())
       emitDestructureArgumentTuple(gen, loc, elt, argsV);
@@ -240,7 +240,7 @@ static void emitDestructureArgumentTuple(SILGenFunction &gen,
 
 void SILGenFunction::emitApplyArgumentValue(SILLocation loc,
                                             ManagedValue argValue,
-                                            llvm::SmallVectorImpl<Value> &argsV)
+                                            llvm::SmallVectorImpl<SILValue> &argsV)
 {
   // If the result of the subexpression is a tuple value, destructure it.
   if (!argValue.isLValue() && argValue.getType().is<TupleType>()) {
@@ -254,7 +254,7 @@ void SILGenFunction::emitApplyArgumentValue(SILLocation loc,
 }
 
 void SILGenFunction::emitApplyArguments(Expr *argsExpr,
-                                        llvm::SmallVectorImpl<Value> &ArgsV) {
+                                        llvm::SmallVectorImpl<SILValue> &ArgsV) {
   // Skim off any ParenExprs.
   while (ParenExpr *pe = dyn_cast<ParenExpr>(argsExpr))
     argsExpr = pe->getSubExpr();
@@ -274,7 +274,7 @@ void SILGenFunction::emitApplyArguments(Expr *argsExpr,
 }
 
 ManagedValue SILGenFunction::emitApply(SILLocation Loc,
-                                       Value Fn, ArrayRef<Value> Args) {
+                                       SILValue Fn, ArrayRef<SILValue> Args) {
   // Get the result type.
   Type resultTy = Fn.getType().getFunctionResultType();
   TypeLoweringInfo const &resultTI = getTypeLoweringInfo(resultTy);
@@ -282,15 +282,15 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
   if (resultTI.isAddressOnly()) {
     // Allocate a temporary to house the indirect return, and pass it to the
     // function as an implicit argument.
-    SmallVector<Value, 4> argsWithReturn(Args.begin(), Args.end());
-    Value buffer = emitTemporaryAllocation(Loc, resultTI.getLoweredType());
+    SmallVector<SILValue, 4> argsWithReturn(Args.begin(), Args.end());
+    SILValue buffer = emitTemporaryAllocation(Loc, resultTI.getLoweredType());
     argsWithReturn.push_back(buffer);
     B.createApply(Loc, Fn, SILType::getEmptyTupleType(F.getContext()),
                   argsWithReturn);
     return emitManagedRValueWithCleanup(buffer);
   } else {
     // Receive the result by value.
-    Value result = B.createApply(Loc, Fn, resultTI.getLoweredType(), Args);
+    SILValue result = B.createApply(Loc, Fn, resultTI.getLoweredType(), Args);
     return resultTy->is<LValueType>()
       ? ManagedValue(result, ManagedValue::LValue)
       : emitManagedRValueWithCleanup(result);
@@ -302,10 +302,10 @@ namespace {
     SILGenFunction &gen;
     
     // FIXME: Need to fix emitApplyArgument to preserve cleanups and emit into
-    // a ManagedValue vector instead of Value. We shouldn't forward until the
+    // a ManagedValue vector instead of SILValue. We shouldn't forward until the
     // final apply is emitted.
-    SmallVector<Value, 8> uncurriedArgs;
-    std::vector<SmallVector<Value, 2>> extraArgs;
+    SmallVector<SILValue, 8> uncurriedArgs;
+    std::vector<SmallVector<SILValue, 2>> extraArgs;
     ManagedValue callee;
     unsigned uncurries;
     bool applied;
@@ -318,7 +318,7 @@ namespace {
         applied(false)
     {}
     
-    SmallVectorImpl<Value> &addArgs() {
+    SmallVectorImpl<SILValue> &addArgs() {
       assert(!applied && "already applied!");
 
       // Append to the main argument list if we have uncurry levels remaining.
@@ -347,7 +347,7 @@ namespace {
       ManagedValue result = gen.emitApply(loc, callee.forward(gen), uncurriedArgs);
       
       // If there are remaining call sites, apply them to the result function.
-      for (ArrayRef<Value> args : extraArgs) {
+      for (ArrayRef<SILValue> args : extraArgs) {
         result = gen.emitApply(loc, result.forward(gen), args);
       }
       
@@ -406,9 +406,9 @@ ManagedValue SILGenFunction::emitApplyExpr(ApplyExpr *e) {
 /// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
 /// (which represents the retain count), a base pointer to some elements, and a
 /// length.
-ManagedValue SILGenFunction::emitArrayInjectionCall(Value ObjectPtr,
-                                            Value BasePtr,
-                                            Value Length,
+ManagedValue SILGenFunction::emitArrayInjectionCall(SILValue ObjectPtr,
+                                            SILValue BasePtr,
+                                            SILValue Length,
                                             Expr *ArrayInjectionFunction) {
   // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
   if (BasePtr.getType() != SILType::getRawPointerType(F.getContext()))
@@ -418,7 +418,7 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(Value ObjectPtr,
 
   // Construct a call to the injection function.
   CallEmission emission = prepareApplyExpr(*this, ArrayInjectionFunction);
-  Value InjectionArgs[] = {BasePtr, ObjectPtr, Length};
+  SILValue InjectionArgs[] = {BasePtr, ObjectPtr, Length};
   
   emission.addArgs().append(std::begin(InjectionArgs), std::end(InjectionArgs));
   
@@ -429,7 +429,7 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(Value ObjectPtr,
 Materialize SILGenFunction::emitGetProperty(SILLocation loc,
                                   ManagedValue getter,
                                   Optional<ManagedValue> thisValue,
-                                  Optional<ArrayRef<Value>> subscripts) {
+                                  Optional<ArrayRef<SILValue>> subscripts) {
   CallEmission emission(*this, getter);
   // This ->
   if (thisValue)
@@ -447,7 +447,7 @@ Materialize SILGenFunction::emitGetProperty(SILLocation loc,
 void SILGenFunction::emitSetProperty(SILLocation loc,
                                      ManagedValue setter,
                                      Optional<ManagedValue> thisValue,
-                                     Optional<ArrayRef<Value>> subscripts,
+                                     Optional<ArrayRef<SILValue>> subscripts,
                                      ManagedValue result) {
   CallEmission emission(*this, setter);
   // This ->

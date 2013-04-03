@@ -1,4 +1,4 @@
-//===--- Instruction.cpp - Instructions for SIL code ----------------------===//
+//===--- SILInstruction.cpp - Instructions for SIL code -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the high-level Instruction classes used for Swift SIL code.
+// This file defines the high-level SILInstruction classes used for  SIL code.
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,37 +22,37 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-// ilist_traits<Instruction> Implementation
+// ilist_traits<SILInstruction> Implementation
 //===----------------------------------------------------------------------===//
 
 // The trait object is embedded into a basic block.  Use dirty hacks to
 // reconstruct the BB from the 'this' pointer of the trait.
-BasicBlock *llvm::ilist_traits<Instruction>::getContainingBlock() {
-  typedef iplist<Instruction> BasicBlock::*Sublist;
- size_t Offset(size_t(&((BasicBlock*)0->*BasicBlock::getSublistAccess())));
-  iplist<Instruction>* Anchor(static_cast<iplist<Instruction>*>(this));
-  return reinterpret_cast<BasicBlock*>(reinterpret_cast<char*>(Anchor)-Offset);
+SILBasicBlock *llvm::ilist_traits<SILInstruction>::getContainingBlock() {
+  typedef iplist<SILInstruction> SILBasicBlock::*Sublist;
+size_t Offset(size_t(&((SILBasicBlock*)0->*SILBasicBlock::getSublistAccess())));
+  iplist<SILInstruction>* Anchor(static_cast<iplist<SILInstruction>*>(this));
+return reinterpret_cast<SILBasicBlock*>(reinterpret_cast<char*>(Anchor)-Offset);
 }
 
 
-void llvm::ilist_traits<Instruction>::addNodeToList(Instruction *I) {
+void llvm::ilist_traits<SILInstruction>::addNodeToList(SILInstruction *I) {
   assert(I->ParentBB == 0 && "Already in a list!");
   I->ParentBB = getContainingBlock();
 }
 
-void llvm::ilist_traits<Instruction>::removeNodeFromList(Instruction *I) {
+void llvm::ilist_traits<SILInstruction>::removeNodeFromList(SILInstruction *I) {
   // When an instruction is removed from a BB, clear the parent pointer.
   assert(I->ParentBB && "Not in a list!");
   I->ParentBB = 0;
 }
 
-void llvm::ilist_traits<Instruction>::
-transferNodesFromList(llvm::ilist_traits<Instruction> &L2,
-                      llvm::ilist_iterator<Instruction> first,
-                      llvm::ilist_iterator<Instruction> last) {
+void llvm::ilist_traits<SILInstruction>::
+transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
+                      llvm::ilist_iterator<SILInstruction> first,
+                      llvm::ilist_iterator<SILInstruction> last) {
   // If transfering instructions within the same basic block, no reason to
   // update their parent pointers.
-  BasicBlock *ThisParent = getContainingBlock();
+  SILBasicBlock *ThisParent = getContainingBlock();
   if (ThisParent == L2.getContainingBlock()) return;
 
   // Update the parent fields in the instructions.
@@ -62,20 +62,20 @@ transferNodesFromList(llvm::ilist_traits<Instruction> &L2,
 
 
 //===----------------------------------------------------------------------===//
-// Instruction Implementation
+// SILInstruction Implementation
 //===----------------------------------------------------------------------===//
 
 /// removeFromParent - This method unlinks 'this' from the containing basic
 /// block, but does not delete it.
 ///
-void Instruction::removeFromParent() {
+void SILInstruction::removeFromParent() {
   getParent()->getInsts().remove(this);
 }
 
 /// eraseFromParent - This method unlinks 'this' from the containing basic
 /// block and deletes it.
 ///
-void Instruction::eraseFromParent() {
+void SILInstruction::eraseFromParent() {
   getParent()->getInsts().erase(this);
 }
 
@@ -87,12 +87,12 @@ namespace {
   };
 } // end anonymous namespace
 
-void Instruction::destroy(Instruction *I) {
+void SILInstruction::destroy(SILInstruction *I) {
   InstructionDestroyer().visit(I);
 }
 
 //===----------------------------------------------------------------------===//
-// Instruction Subclasses
+// SILInstruction Subclasses
 //===----------------------------------------------------------------------===//
 
 AllocVarInst::AllocVarInst(SILLocation loc, AllocKind allocKind,
@@ -141,7 +141,7 @@ static SILTypeList *getAllocType(SILType EltTy, SILFunction &F) {
 }
 
 AllocBoxInst::AllocBoxInst(SILLocation Loc, SILType ElementType, SILFunction &F)
-  : Instruction(ValueKind::AllocBoxInst, Loc, getAllocType(ElementType, F)) {
+  : SILInstruction(ValueKind::AllocBoxInst, Loc, getAllocType(ElementType, F)) {
 }
 
 Type AllocBoxInst::getElementType() const {
@@ -149,8 +149,8 @@ Type AllocBoxInst::getElementType() const {
 }
 
 AllocArrayInst::AllocArrayInst(SILLocation Loc, SILType ElementType,
-                               Value NumElements, SILFunction &F)
-  : Instruction(ValueKind::AllocArrayInst, Loc, getAllocType(ElementType, F)),
+                               SILValue NumElements, SILFunction &F)
+  : SILInstruction(ValueKind::AllocArrayInst, Loc, getAllocType(ElementType, F)),
     Operands(this, NumElements) {
 }
 
@@ -159,13 +159,13 @@ Type AllocArrayInst::getElementType() const {
 }
 
 FunctionInst::FunctionInst(ValueKind kind,
-                           SILLocation Loc, SILType Ty, Value Callee,
-                           ArrayRef<Value> Args)
-  : Instruction(kind, Loc, Ty), Operands(this, Args, Callee) {
+                           SILLocation Loc, SILType Ty, SILValue Callee,
+                           ArrayRef<SILValue> Args)
+  : SILInstruction(kind, Loc, Ty), Operands(this, Args, Callee) {
 }
 
 template<typename DERIVED, typename...T>
-DERIVED *FunctionInst::create(SILFunction &F, ArrayRef<Value> Args,
+DERIVED *FunctionInst::create(SILFunction &F, ArrayRef<SILValue> Args,
                               T &&...ConstructorArgs) {
   // The way we store operands requires this.
   static_assert(sizeof(DERIVED) == sizeof(FunctionInst),
@@ -177,22 +177,22 @@ DERIVED *FunctionInst::create(SILFunction &F, ArrayRef<Value> Args,
   return ::new(Buffer) DERIVED(::std::forward<T>(ConstructorArgs)...);
 }
 
-ApplyInst::ApplyInst(SILLocation Loc, Value Callee,
-                     SILType Result, ArrayRef<Value> Args)
+ApplyInst::ApplyInst(SILLocation Loc, SILValue Callee,
+                     SILType Result, ArrayRef<SILValue> Args)
   : FunctionInst(ValueKind::ApplyInst, Loc, Result,
                  Callee, Args) {
   
 }
 
-ApplyInst *ApplyInst::create(SILLocation Loc, Value Callee,
-                             SILType Result, ArrayRef<Value> Args,
+ApplyInst *ApplyInst::create(SILLocation Loc, SILValue Callee,
+                             SILType Result, ArrayRef<SILValue> Args,
                              SILFunction &F) {
   return FunctionInst::create<ApplyInst>(F, Args,
                                          Loc, Callee, Result, Args);
 }
 
-PartialApplyInst::PartialApplyInst(SILLocation Loc, Value Callee,
-                                   ArrayRef<Value> Args, SILType ClosureType)
+PartialApplyInst::PartialApplyInst(SILLocation Loc, SILValue Callee,
+                                   ArrayRef<SILValue> Args, SILType ClosureType)
 // FIXME: the callee should have a lowered SIL function type, and PartialApplyInst
 // should derive the type of its result by partially applying the callee's type.
   : FunctionInst(ValueKind::PartialApplyInst, Loc,
@@ -201,8 +201,8 @@ PartialApplyInst::PartialApplyInst(SILLocation Loc, Value Callee,
   
 }
 
-PartialApplyInst *PartialApplyInst::create(SILLocation Loc, Value Callee,
-                                           ArrayRef<Value> Args,
+PartialApplyInst *PartialApplyInst::create(SILLocation Loc, SILValue Callee,
+                                           ArrayRef<SILValue> Args,
                                            SILType ClosureType,
                                            SILFunction &F) {
   return FunctionInst::create<PartialApplyInst>(F, Args, Loc, Callee,
@@ -210,7 +210,7 @@ PartialApplyInst *PartialApplyInst::create(SILLocation Loc, Value Callee,
 }
 
 ConstantRefInst::ConstantRefInst(SILLocation Loc, SILConstant C, SILType Ty)
-  : Instruction(ValueKind::ConstantRefInst, Loc, Ty),
+  : SILInstruction(ValueKind::ConstantRefInst, Loc, Ty),
     Constant(C) {
 }
 
@@ -219,14 +219,14 @@ SILConstant ConstantRefInst::getConstant() const {
 }
 
 IntegerLiteralInst::IntegerLiteralInst(IntegerLiteralExpr *E)
-  : Instruction(ValueKind::IntegerLiteralInst, E,
+  : SILInstruction(ValueKind::IntegerLiteralInst, E,
                 // Builtin integer types are always valid SIL types.
                 SILType::getPreLoweredType(E->getType()->getCanonicalType(),
                                      /*address=*/false, /*loadable=*/true)) {
 }
 
 IntegerLiteralInst::IntegerLiteralInst(CharacterLiteralExpr *E)
-  : Instruction(ValueKind::IntegerLiteralInst, E,
+  : SILInstruction(ValueKind::IntegerLiteralInst, E,
                 // Builtin integer types are always valid SIL types.
                 SILType::getPreLoweredType(E->getType()->getCanonicalType(),
                                      /*address=*/false, /*loadable=*/true)) {
@@ -249,7 +249,7 @@ APInt IntegerLiteralInst::getValue() const {
 }
 
 FloatLiteralInst::FloatLiteralInst(FloatLiteralExpr *E)
-  : Instruction(ValueKind::FloatLiteralInst, E,
+  : SILInstruction(ValueKind::FloatLiteralInst, E,
                 // Builtin floating-point types are always valid SIL types.
                 SILType::getPreLoweredType(E->getType()->getCanonicalType(),
                                      /*address=*/false, /*loadable=*/true)) {
@@ -264,7 +264,7 @@ APFloat FloatLiteralInst::getValue() const {
 }
 
 StringLiteralInst::StringLiteralInst(StringLiteralExpr *E)
-  : Instruction(ValueKind::StringLiteralInst, E,
+  : SILInstruction(ValueKind::StringLiteralInst, E,
                 // The string literal tuple type is always a valid SIL type.
                 SILType::getPreLoweredType(E->getType()->getCanonicalType(),
                                      /*address=*/false, /*loadable=*/true)) {
@@ -279,31 +279,31 @@ StringRef StringLiteralInst::getValue() const {
 }
 
 
-LoadInst::LoadInst(SILLocation Loc, Value LValue)
-  : Instruction(ValueKind::LoadInst, Loc, LValue.getType().getObjectType()),
+LoadInst::LoadInst(SILLocation Loc, SILValue LValue)
+  : SILInstruction(ValueKind::LoadInst, Loc, LValue.getType().getObjectType()),
     Operands(this, LValue) {
 }
 
 
-StoreInst::StoreInst(SILLocation Loc, Value Src, Value Dest)
-  : Instruction(ValueKind::StoreInst, Loc),
+StoreInst::StoreInst(SILLocation Loc, SILValue Src, SILValue Dest)
+  : SILInstruction(ValueKind::StoreInst, Loc),
     Operands(this, Src, Dest) {
 }
 
 
-CopyAddrInst::CopyAddrInst(SILLocation Loc, Value SrcLValue, Value DestLValue,
+CopyAddrInst::CopyAddrInst(SILLocation Loc, SILValue SrcLValue, SILValue DestLValue,
                            bool IsTakeOfSrc, bool IsInitializationOfDest)
-  : Instruction(ValueKind::CopyAddrInst, Loc),
+  : SILInstruction(ValueKind::CopyAddrInst, Loc),
     IsTakeOfSrc(IsTakeOfSrc), IsInitializationOfDest(IsInitializationOfDest),
     Operands(this, SrcLValue, DestLValue)
 {
 }
 
-InitializeVarInst::InitializeVarInst(SILLocation Loc, Value Dest)
-  : Instruction(ValueKind::InitializeVarInst, Loc), Operands(this, Dest) {
+InitializeVarInst::InitializeVarInst(SILLocation Loc, SILValue Dest)
+  : SILInstruction(ValueKind::InitializeVarInst, Loc), Operands(this, Dest) {
 }
 
-SpecializeInst *SpecializeInst::create(SILLocation Loc, Value Operand,
+SpecializeInst *SpecializeInst::create(SILLocation Loc, SILValue Operand,
                                        ArrayRef<Substitution> Substitutions,
                                        SILType DestTy, SILFunction &F) {
  void *Buffer = F.allocate(
@@ -312,10 +312,10 @@ SpecializeInst *SpecializeInst::create(SILLocation Loc, Value Operand,
   return ::new(Buffer) SpecializeInst(Loc, Operand, Substitutions, DestTy);
 }
 
-SpecializeInst::SpecializeInst(SILLocation Loc, Value Operand,
+SpecializeInst::SpecializeInst(SILLocation Loc, SILValue Operand,
                                ArrayRef<Substitution> Substitutions,
                                SILType DestTy)
-  : Instruction(ValueKind::SpecializeInst, Loc, DestTy),
+  : SILInstruction(ValueKind::SpecializeInst, Loc, DestTy),
     Operands(this, Operand), NumSubstitutions(Substitutions.size())
 {
   memcpy(getSubstitutionsStorage(), Substitutions.data(),
@@ -323,116 +323,116 @@ SpecializeInst::SpecializeInst(SILLocation Loc, Value Operand,
 }
 
 ConversionInst::ConversionInst(ValueKind Kind,
-                               SILLocation Loc, Value Operand, SILType Ty)
-  : Instruction(Kind, Loc, Ty), Operands(this, Operand) {
+                               SILLocation Loc, SILValue Operand, SILType Ty)
+  : SILInstruction(Kind, Loc, Ty), Operands(this, Operand) {
 }
 
-ConvertFunctionInst::ConvertFunctionInst(SILLocation Loc, Value Operand,
+ConvertFunctionInst::ConvertFunctionInst(SILLocation Loc, SILValue Operand,
                                          SILType Ty)
   : ConversionInst(ValueKind::ConvertFunctionInst, Loc, Operand, Ty) {
 }
 
-CoerceInst::CoerceInst(SILLocation Loc, Value Operand, SILType Ty)
+CoerceInst::CoerceInst(SILLocation Loc, SILValue Operand, SILType Ty)
   : ConversionInst(ValueKind::CoerceInst, Loc, Operand, Ty) {
 }
 
-UpcastInst::UpcastInst(SILLocation Loc, Value Operand, SILType Ty)
+UpcastInst::UpcastInst(SILLocation Loc, SILValue Operand, SILType Ty)
   : ConversionInst(ValueKind::UpcastInst, Loc, Operand, Ty) {
 }
 
-DowncastInst::DowncastInst(SILLocation Loc, Value Operand, SILType Ty)
+DowncastInst::DowncastInst(SILLocation Loc, SILValue Operand, SILType Ty)
   : ConversionInst(ValueKind::DowncastInst, Loc, Operand, Ty) {
 }
 
-AddressToPointerInst::AddressToPointerInst(SILLocation Loc, Value Operand,
+AddressToPointerInst::AddressToPointerInst(SILLocation Loc, SILValue Operand,
                                            SILType Ty)
   : ConversionInst(ValueKind::AddressToPointerInst, Loc, Operand, Ty) {
 }
 
-ThinToThickFunctionInst::ThinToThickFunctionInst(SILLocation Loc, Value Operand,
+ThinToThickFunctionInst::ThinToThickFunctionInst(SILLocation Loc, SILValue Operand,
                                                  SILType Ty)
   : ConversionInst(ValueKind::ThinToThickFunctionInst, Loc, Operand, Ty) {
 }
 
 ArchetypeToSuperInst::ArchetypeToSuperInst(SILLocation Loc,
-                                           Value Operand, SILType Ty)
+                                           SILValue Operand, SILType Ty)
   : ConversionInst(ValueKind::ArchetypeToSuperInst, Loc, Operand, Ty) {
 }
 
 SuperToArchetypeInst::SuperToArchetypeInst(SILLocation Loc,
-                                           Value SrcBase,
-                                           Value DestArchetypeAddress)
-  : Instruction(ValueKind::SuperToArchetypeInst, Loc),
+                                           SILValue SrcBase,
+                                           SILValue DestArchetypeAddress)
+  : SILInstruction(ValueKind::SuperToArchetypeInst, Loc),
     Operands(this, SrcBase, DestArchetypeAddress) {
 }
 
 TupleInst *TupleInst::createImpl(SILLocation Loc, SILType Ty,
-                                 ArrayRef<Value> Elements, SILFunction &F) {
+                                 ArrayRef<SILValue> Elements, SILFunction &F) {
   void *Buffer = F.allocate(sizeof(TupleInst) +
                             decltype(Operands)::getExtraSize(Elements.size()),
                             alignof(TupleInst));
   return ::new(Buffer) TupleInst(Loc, Ty, Elements);
 }
 
-TupleInst::TupleInst(SILLocation Loc, SILType Ty, ArrayRef<Value> Elems)
-  : Instruction(ValueKind::TupleInst, Loc, Ty), Operands(this, Elems) {
+TupleInst::TupleInst(SILLocation Loc, SILType Ty, ArrayRef<SILValue> Elems)
+  : SILInstruction(ValueKind::TupleInst, Loc, Ty), Operands(this, Elems) {
 }
 
 MetatypeInst::MetatypeInst(SILLocation Loc, SILType Metatype)
-  : Instruction(ValueKind::MetatypeInst, Loc, Metatype) {}
+  : SILInstruction(ValueKind::MetatypeInst, Loc, Metatype) {}
 
 ClassMetatypeInst::ClassMetatypeInst(SILLocation Loc, SILType Metatype,
-                                     Value Base)
-  : Instruction(ValueKind::ClassMetatypeInst, Loc, Metatype),
+                                     SILValue Base)
+  : SILInstruction(ValueKind::ClassMetatypeInst, Loc, Metatype),
     Operands(this, Base) {}
 
 ArchetypeMetatypeInst::ArchetypeMetatypeInst(SILLocation Loc, SILType Metatype,
-                                             Value Base)
-  : Instruction(ValueKind::ArchetypeMetatypeInst, Loc, Metatype),
+                                             SILValue Base)
+  : SILInstruction(ValueKind::ArchetypeMetatypeInst, Loc, Metatype),
     Operands(this, Base) {}
 
 ProtocolMetatypeInst::ProtocolMetatypeInst(SILLocation Loc, SILType Metatype,
-                                           Value Base)
-  : Instruction(ValueKind::ProtocolMetatypeInst, Loc, Metatype),
+                                           SILValue Base)
+  : SILInstruction(ValueKind::ProtocolMetatypeInst, Loc, Metatype),
     Operands(this, Base) {}
 
 ModuleInst::ModuleInst(SILLocation Loc, SILType ModuleType)
-  : Instruction(ValueKind::ModuleInst, Loc, ModuleType) {}
+  : SILInstruction(ValueKind::ModuleInst, Loc, ModuleType) {}
 
 AssociatedMetatypeInst::AssociatedMetatypeInst(SILLocation Loc,
-                                               Value MetatypeSrc,
+                                               SILValue MetatypeSrc,
                                                SILType MetatypeDest)
-  : Instruction(ValueKind::AssociatedMetatypeInst, Loc, MetatypeDest),
+  : SILInstruction(ValueKind::AssociatedMetatypeInst, Loc, MetatypeDest),
     Operands(this, MetatypeSrc) {}
 
-ExtractInst::ExtractInst(SILLocation Loc, Value Operand,
+ExtractInst::ExtractInst(SILLocation Loc, SILValue Operand,
                          unsigned FieldNo, SILType ResultTy)
-  : Instruction(ValueKind::ExtractInst, Loc, ResultTy),
+  : SILInstruction(ValueKind::ExtractInst, Loc, ResultTy),
     Operands(this, Operand), FieldNo(FieldNo) {
 }
 
-ElementAddrInst::ElementAddrInst(SILLocation Loc, Value Operand,
+ElementAddrInst::ElementAddrInst(SILLocation Loc, SILValue Operand,
                                  unsigned FieldNo, SILType ResultTy)
-  : Instruction(ValueKind::ElementAddrInst, Loc, ResultTy),
+  : SILInstruction(ValueKind::ElementAddrInst, Loc, ResultTy),
     Operands(this, Operand), FieldNo(FieldNo) {
 }
 
-RefElementAddrInst::RefElementAddrInst(SILLocation Loc, Value Operand,
+RefElementAddrInst::RefElementAddrInst(SILLocation Loc, SILValue Operand,
                                        VarDecl *Field, SILType ResultTy)
-  : Instruction(ValueKind::RefElementAddrInst, Loc, ResultTy),
+  : SILInstruction(ValueKind::RefElementAddrInst, Loc, ResultTy),
     Operands(this, Operand), Field(Field) {
 }
 
 DynamicMethodInst::DynamicMethodInst(ValueKind Kind,
-                                               SILLocation Loc, Value Operand,
+                                               SILLocation Loc, SILValue Operand,
                                                SILConstant Member,
                                                SILType Ty,
                                                SILFunction &F)
-  : Instruction(Kind, Loc, Ty),
+  : SILInstruction(Kind, Loc, Ty),
     Operands(this, Operand), Member(Member) {
 }
 
-ClassMethodInst::ClassMethodInst(SILLocation Loc, Value Operand,
+ClassMethodInst::ClassMethodInst(SILLocation Loc, SILValue Operand,
                                  SILConstant Member,
                                  SILType Ty,
                                  SILFunction &F)
@@ -441,7 +441,7 @@ ClassMethodInst::ClassMethodInst(SILLocation Loc, Value Operand,
                       Ty, F) {
 }
 
-SuperMethodInst::SuperMethodInst(SILLocation Loc, Value Operand,
+SuperMethodInst::SuperMethodInst(SILLocation Loc, SILValue Operand,
                                  SILConstant Member,
                                  SILType Ty,
                                  SILFunction &F)
@@ -450,7 +450,7 @@ SuperMethodInst::SuperMethodInst(SILLocation Loc, Value Operand,
                       Ty, F) {
 }
 
-ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, Value Operand,
+ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, SILValue Operand,
                                          SILConstant Member,
                                          SILType Ty,
                                          SILFunction &F)
@@ -459,7 +459,7 @@ ArchetypeMethodInst::ArchetypeMethodInst(SILLocation Loc, Value Operand,
                     Ty, F) {
 }
 
-ProtocolMethodInst::ProtocolMethodInst(SILLocation Loc, Value Operand,
+ProtocolMethodInst::ProtocolMethodInst(SILLocation Loc, SILValue Operand,
                                              SILConstant Member,
                                              SILType Ty,
                                              SILFunction &F)
@@ -468,18 +468,18 @@ ProtocolMethodInst::ProtocolMethodInst(SILLocation Loc, Value Operand,
                            Ty, F) {
 }
 
-ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc, Value Operand,
+ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc, SILValue Operand,
                                                SILFunction &F)
-  : Instruction(ValueKind::ProjectExistentialInst, Loc,
+  : SILInstruction(ValueKind::ProjectExistentialInst, Loc,
                 SILType::getOpaquePointerType(F.getContext())),
     Operands(this, Operand) {
 }
 
 InitExistentialInst::InitExistentialInst(SILLocation Loc,
-                                   Value Existential,
+                                   SILValue Existential,
                                    SILType ConcreteType,
                                    ArrayRef<ProtocolConformance*> Conformances)
-  : Instruction(ValueKind::InitExistentialInst, Loc,
+  : SILInstruction(ValueKind::InitExistentialInst, Loc,
                 ConcreteType.getAddressType()),
     Operands(this, Existential),
     Conformances(Conformances) {
@@ -490,11 +490,11 @@ Type InitExistentialInst::getConcreteType() const {
 }
 
 UpcastExistentialInst::UpcastExistentialInst(SILLocation Loc,
-                                 Value SrcExistential,
-                                 Value DestExistential,
+                                 SILValue SrcExistential,
+                                 SILValue DestExistential,
                                  bool isTakeOfSrc,
                                  ArrayRef<ProtocolConformance*> Conformances)
-  : Instruction(ValueKind::UpcastExistentialInst, Loc),
+  : SILInstruction(ValueKind::UpcastExistentialInst, Loc),
     IsTakeOfSrc(isTakeOfSrc),
     Operands(this, SrcExistential, DestExistential),
     Conformances(Conformances)
@@ -502,47 +502,47 @@ UpcastExistentialInst::UpcastExistentialInst(SILLocation Loc,
 }
 
 DeinitExistentialInst::DeinitExistentialInst(SILLocation Loc,
-                                             Value Existential)
-  : Instruction(ValueKind::DeinitExistentialInst, Loc,
+                                             SILValue Existential)
+  : SILInstruction(ValueKind::DeinitExistentialInst, Loc,
             SILType::getEmptyTupleType(Existential.getType().getASTContext())),
     Operands(this, Existential) {
 }
 
-RetainInst::RetainInst(SILLocation Loc, Value Operand)
-  : Instruction(ValueKind::RetainInst, Loc, Operand.getType()),
+RetainInst::RetainInst(SILLocation Loc, SILValue Operand)
+  : SILInstruction(ValueKind::RetainInst, Loc, Operand.getType()),
     Operands(this, Operand) {
 }
 
-ReleaseInst::ReleaseInst(SILLocation Loc, Value Operand)
-  : Instruction(ValueKind::ReleaseInst, Loc), Operands(this, Operand) {
+ReleaseInst::ReleaseInst(SILLocation Loc, SILValue Operand)
+  : SILInstruction(ValueKind::ReleaseInst, Loc), Operands(this, Operand) {
 }
 
 DeallocVarInst::DeallocVarInst(SILLocation loc, AllocKind allocKind,
-                               Value operand)
-  : Instruction(ValueKind::DeallocVarInst, loc), allocKind(allocKind),
+                               SILValue operand)
+  : SILInstruction(ValueKind::DeallocVarInst, loc), allocKind(allocKind),
     Operands(this, operand) {
 }
 
-DeallocRefInst::DeallocRefInst(SILLocation loc, Value operand)
-  : Instruction(ValueKind::DeallocRefInst, loc),
+DeallocRefInst::DeallocRefInst(SILLocation loc, SILValue operand)
+  : SILInstruction(ValueKind::DeallocRefInst, loc),
     Operands(this, operand) {
 }
 
-DestroyAddrInst::DestroyAddrInst(SILLocation Loc, Value Operand)
-  : Instruction(ValueKind::DestroyAddrInst, Loc), Operands(this, Operand) {
+DestroyAddrInst::DestroyAddrInst(SILLocation Loc, SILValue Operand)
+  : SILInstruction(ValueKind::DestroyAddrInst, Loc), Operands(this, Operand) {
 }
 
 //===----------------------------------------------------------------------===//
 // SIL-only instructions that don't have an AST analog
 //===----------------------------------------------------------------------===//
 
-IndexAddrInst::IndexAddrInst(SILLocation Loc, Value Operand, unsigned Index)
-  : Instruction(ValueKind::IndexAddrInst, Loc, Operand.getType()),
+IndexAddrInst::IndexAddrInst(SILLocation Loc, SILValue Operand, unsigned Index)
+  : SILInstruction(ValueKind::IndexAddrInst, Loc, Operand.getType()),
     Operands(this, Operand), Index(Index) {
 }
 
 IntegerValueInst::IntegerValueInst(uint64_t Val, SILType Ty)
-  : Instruction(ValueKind::IntegerValueInst, SILLocation(), Ty), Val(Val) {}
+  : SILInstruction(ValueKind::IntegerValueInst, SILLocation(), Ty), Val(Val) {}
 
 
 //===----------------------------------------------------------------------===//
@@ -566,14 +566,14 @@ UnreachableInst::UnreachableInst(SILFunction &F)
              SILType::getEmptyTupleType(F.getContext())) {
 }
 
-ReturnInst::ReturnInst(SILLocation Loc, Value ReturnValue)
+ReturnInst::ReturnInst(SILLocation Loc, SILValue ReturnValue)
   : TermInst(ValueKind::ReturnInst, Loc),
     Operands(this, ReturnValue) {
 }
 
 BranchInst::BranchInst(SILLocation Loc,
-                       BasicBlock *DestBB,
-                       ArrayRef<Value> Args)
+                       SILBasicBlock *DestBB,
+                       ArrayRef<SILValue> Args)
   : TermInst(ValueKind::BranchInst, Loc),
     DestBB(this, DestBB), Operands(this, Args)
 {
@@ -582,13 +582,13 @@ BranchInst::BranchInst(SILLocation Loc,
 }
 
 BranchInst *BranchInst::create(SILLocation Loc,
-                               BasicBlock *DestBB,
+                               SILBasicBlock *DestBB,
                                SILFunction &F) {
   return create(Loc, DestBB, {}, F);
 }
 
 BranchInst *BranchInst::create(SILLocation Loc,
-                               BasicBlock *DestBB, ArrayRef<Value> Args,
+                               SILBasicBlock *DestBB, ArrayRef<SILValue> Args,
                                SILFunction &F) {
   void *Buffer = F.allocate(sizeof(BranchInst) +
                               decltype(Operands)::getExtraSize(Args.size()),
@@ -596,30 +596,30 @@ BranchInst *BranchInst::create(SILLocation Loc,
   return ::new (Buffer) BranchInst(Loc, DestBB, Args);
 }
 
-CondBranchInst::CondBranchInst(SILLocation Loc, Value Condition,
-                               BasicBlock *TrueBB, BasicBlock *FalseBB,
-                               ArrayRef<Value> Args)
+CondBranchInst::CondBranchInst(SILLocation Loc, SILValue Condition,
+                               SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
+                               ArrayRef<SILValue> Args)
   : TermInst(ValueKind::CondBranchInst, Loc),
     DestBBs{{this, TrueBB}, {this, FalseBB}},
     Operands(this, Args, Condition)
 {
 }
 
-CondBranchInst *CondBranchInst::create(SILLocation Loc, Value Condition,
-                                       BasicBlock *TrueBB, BasicBlock *FalseBB,
+CondBranchInst *CondBranchInst::create(SILLocation Loc, SILValue Condition,
+                                       SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
                                        SILFunction &F) {
   return create(Loc, Condition, TrueBB, {}, FalseBB, {}, F);
 }
 
-CondBranchInst *CondBranchInst::create(SILLocation Loc, Value Condition,
-                               BasicBlock *TrueBB, ArrayRef<Value> TrueArgs,
-                               BasicBlock *FalseBB, ArrayRef<Value> FalseArgs,
+CondBranchInst *CondBranchInst::create(SILLocation Loc, SILValue Condition,
+                               SILBasicBlock *TrueBB, ArrayRef<SILValue> TrueArgs,
+                               SILBasicBlock *FalseBB, ArrayRef<SILValue> FalseArgs,
                                SILFunction &F) {
   assert(TrueArgs.size() == TrueBB->bbarg_size() &&
          FalseArgs.size() == FalseBB->bbarg_size() &&
          "branch argument counts do not match target bbs");
 
-  SmallVector<Value, 4> Args;
+  SmallVector<SILValue, 4> Args;
   Args.append(TrueArgs.begin(), TrueArgs.end());
   Args.append(FalseArgs.begin(), FalseArgs.end());
 

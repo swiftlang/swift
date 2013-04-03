@@ -18,8 +18,8 @@ using namespace swift;
 
 namespace swift {
 
-/// SILTypeList - The uniqued backing store for the Value type list.  This
-/// is only exposed out of Value as an ArrayRef of types, so it should never be
+/// SILTypeList - The uniqued backing store for the SILValue type list.  This
+/// is only exposed out of SILValue as an ArrayRef of types, so it should never be
 /// used outside of libSIL.
 class SILTypeList : public llvm::FoldingSetNode {
 public:
@@ -59,7 +59,7 @@ SILBase::~SILBase() {
 
 
 /// getSILTypeList - Get a uniqued pointer to a SIL type list.  This can only
-/// be used by Value.
+/// be used by SILValue.
 SILTypeList *SILBase::getSILTypeList(ArrayRef<SILType> Types) const {
   assert(Types.size() > 1 && "Shouldn't use type list for 0 or 1 types");
   auto UniqueMap = (SILTypeListUniquingType*)TypeListUniquing;

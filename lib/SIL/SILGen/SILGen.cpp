@@ -32,7 +32,7 @@ static bool isVoidableType(Type type) {
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
                                bool hasVoidReturn)
-  : SGM(SGM), F(F), B(new (F.getModule()) BasicBlock(&F), F),
+  : SGM(SGM), F(F), B(new (F.getModule()) SILBasicBlock(&F), F),
     Cleanups(*this),
     hasVoidReturn(hasVoidReturn),
     epilogBB(nullptr) {
@@ -50,7 +50,7 @@ SILGenFunction::~SILGenFunction() {
   // empty tuple, or a dynamically unreachable location.
   if (hasVoidReturn) {
     assert(!epilogBB && "epilog bb not terminated?!");
-    Value emptyTuple = B.createEmptyTuple(SILLocation());
+    SILValue emptyTuple = B.createEmptyTuple(SILLocation());
     Cleanups.emitReturnAndCleanups(SILLocation(), emptyTuple);
   } else {
     B.createUnreachable();

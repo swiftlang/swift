@@ -1,4 +1,4 @@
-//===--- BasicBlock.h - Basic blocks for SIL --------------------*- C++ -*-===//
+//===--- SILBasicBlock.h - Basic blocks for SIL -----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -21,13 +21,13 @@
 
 namespace swift {
 class SILFunction;
-class BBArgument;
+class SILArgument;
 
-class BasicBlock :
-public llvm::ilist_node<BasicBlock>, public SILAllocated<BasicBlock> {
+class SILBasicBlock :
+public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
   friend class SILSuccessor;
 public:
-  typedef llvm::iplist<Instruction> InstListType;
+  typedef llvm::iplist<SILInstruction> InstListType;
 private:
   /// A backreference to the containing SILFunction.
   SILFunction * const Parent;
@@ -38,19 +38,19 @@ private:
   SILSuccessor *PredList;
 
   /// BBArgList - This is the list of basic block arguments for this block.
-  std::vector<BBArgument*> BBArgList;
+  std::vector<SILArgument*> BBArgList;
 
-  /// The ordered set of instructions in the BasicBlock.
+  /// The ordered set of instructions in the SILBasicBlock.
   InstListType InstList;
   
-  friend struct llvm::ilist_sentinel_traits<BasicBlock>;
-  BasicBlock() : Parent(0) {}
-  void operator=(const BasicBlock &) = delete;
+  friend struct llvm::ilist_sentinel_traits<SILBasicBlock>;
+  SILBasicBlock() : Parent(0) {}
+  void operator=(const SILBasicBlock &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
 
 public:
-  BasicBlock(SILFunction *F, const char *Name = "");
-  ~BasicBlock();
+  SILBasicBlock(SILFunction *F, const char *Name = "");
+  ~SILBasicBlock();
 
   SILFunction *getParent() { return Parent; }
   const SILFunction *getParent() const { return Parent; }
@@ -61,7 +61,7 @@ public:
   void eraseFromParent();
 
   //===--------------------------------------------------------------------===//
-  // Instruction List Inspection and Manipulation
+  // SILInstruction List Inspection and Manipulation
   //===--------------------------------------------------------------------===//
 
   InstListType &getInsts() { return InstList; }
@@ -82,15 +82,15 @@ public:
   }
   
   const TermInst *getTerminator() const {
-    return const_cast<BasicBlock*>(this)->getTerminator();
+    return const_cast<SILBasicBlock*>(this)->getTerminator();
   }
 
   //===--------------------------------------------------------------------===//
-  // BasicBlock Argument List Inspection and Manipulation
+  // SILBasicBlock Argument List Inspection and Manipulation
   //===--------------------------------------------------------------------===//
 
-  typedef std::vector<BBArgument*>::iterator bbarg_iterator;
-  typedef std::vector<BBArgument*>::const_iterator const_bbarg_iterator;
+  typedef std::vector<SILArgument*>::iterator bbarg_iterator;
+  typedef std::vector<SILArgument*>::const_iterator const_bbarg_iterator;
 
   bool bbarg_empty() const { return BBArgList.empty(); }
   size_t bbarg_size() const { return BBArgList.size(); }
@@ -111,61 +111,61 @@ public:
      
   typedef ArrayRef<SILSuccessor> Successors;
 
-  /// The successors of a BasicBlock are defined either explicitly as
+  /// The successors of a SILBasicBlock are defined either explicitly as
   /// a single successor as the branch targets of the terminator instruction.
   Successors getSuccs() const {
     return getTerminator()->getSuccessors();
   }
 
-  /// Pretty-print the BasicBlock.
+  /// Pretty-print the SILBasicBlock.
   void dump() const;
 
-  /// Pretty-print the BasicBlock with the designated stream.
+  /// Pretty-print the SILBasicBlock with the designated stream.
   void print(llvm::raw_ostream &OS) const;
 
 
   /// getSublistAccess() - returns pointer to member of instruction list
-  static InstListType BasicBlock::*getSublistAccess() {
-    return &BasicBlock::InstList;
+  static InstListType SILBasicBlock::*getSublistAccess() {
+    return &SILBasicBlock::InstList;
   }
 
 private:
-  friend class BBArgument;
+  friend class SILArgument;
   /// BBArgument's ctor adds it to the argument list of this block.
-  void addArgument(BBArgument *Arg) { BBArgList.push_back(Arg); }
+  void addArgument(SILArgument *Arg) { BBArgList.push_back(Arg); }
 };
 
 } // end swift namespace
 
 namespace llvm {
 
-  raw_ostream &operator<<(raw_ostream &, const swift::BasicBlock &B);
+  raw_ostream &operator<<(raw_ostream &, const swift::SILBasicBlock &B);
 
 //===----------------------------------------------------------------------===//
-// ilist_traits for BasicBlock
+// ilist_traits for SILBasicBlock
 //===----------------------------------------------------------------------===//
 
 template <>
-struct ilist_traits<::swift::BasicBlock> :
-public ilist_default_traits<::swift::BasicBlock> {
-  typedef ::swift::BasicBlock BasicBlock;
+struct ilist_traits<::swift::SILBasicBlock> :
+public ilist_default_traits<::swift::SILBasicBlock> {
+  typedef ::swift::SILBasicBlock SILBasicBlock;
 
 private:
-  mutable ilist_half_node<BasicBlock> Sentinel;
+  mutable ilist_half_node<SILBasicBlock> Sentinel;
 
 public:
-  BasicBlock *createSentinel() const {
-    return static_cast<BasicBlock*>(&Sentinel);
+  SILBasicBlock *createSentinel() const {
+    return static_cast<SILBasicBlock*>(&Sentinel);
   }
-  void destroySentinel(BasicBlock *) const {}
+  void destroySentinel(SILBasicBlock *) const {}
 
-  BasicBlock *provideInitialHead() const { return createSentinel(); }
-  BasicBlock *ensureHead(BasicBlock*) const { return createSentinel(); }
-  static void noteHead(BasicBlock*, BasicBlock*) {}
-  static void deleteNode(BasicBlock *V) {}
+  SILBasicBlock *provideInitialHead() const { return createSentinel(); }
+  SILBasicBlock *ensureHead(SILBasicBlock*) const { return createSentinel(); }
+  static void noteHead(SILBasicBlock*, SILBasicBlock*) {}
+  static void deleteNode(SILBasicBlock *V) {}
   
 private:
-  void createNode(const BasicBlock &);
+  void createNode(const SILBasicBlock &);
 };
 
 } // end llvm namespace

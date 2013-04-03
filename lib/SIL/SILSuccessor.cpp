@@ -14,7 +14,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 using namespace swift;
 
-void SILSuccessor::operator=(BasicBlock *BB) {
+void SILSuccessor::operator=(SILBasicBlock *BB) {
   // If we're not changing anything, we're done.
   if (SuccessorBlock == BB) return;
   
@@ -38,8 +38,8 @@ void SILSuccessor::operator=(BasicBlock *BB) {
   SuccessorBlock = BB;
 }
 
-// Derferencing the SuccIterator returns the predecessors BasicBlock.
-BasicBlock *SILSuccessorIterator::operator*() {
+// Derferencing the SuccIterator returns the predecessors SILBasicBlock.
+SILBasicBlock *SILSuccessorIterator::operator*() {
   assert(Cur && "Can't deference end (or default constructed) iterator");
   return Cur->ContainingInst->getParent();
 }

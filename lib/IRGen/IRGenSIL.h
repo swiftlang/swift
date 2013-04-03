@@ -273,8 +273,8 @@ class IRGenSILFunction :
   public IRGenFunction, public SILVisitor<IRGenSILFunction>
 {
 public:
-  llvm::DenseMap<swift::Value, LoweredValue> loweredValues;
-  llvm::MapVector<swift::BasicBlock *, LoweredBB> loweredBBs;
+  llvm::DenseMap<SILValue, LoweredValue> loweredValues;
+  llvm::MapVector<SILBasicBlock *, LoweredBB> loweredBBs;
   
   SILConstant CurConstant;
   SILFunction *CurSILFn;
@@ -300,7 +300,7 @@ public:
   void emitLocalDecls(BraceStmt *body);
   
   /// Create a new Address corresponding to the given SIL address value.
-  void newLoweredAddress(swift::Value v, Address const &address) {
+  void newLoweredAddress(SILValue v, Address const &address) {
     assert(v.getType().isAddress() && "address for non-address value?!");
     auto inserted = loweredValues.insert({v, address});
     assert(inserted.second && "already had lowered value for sil value?!");
@@ -308,7 +308,7 @@ public:
   }
   
   /// Create a new Explosion corresponding to the given SIL value.
-  void newLoweredExplosion(swift::Value v, Explosion &e) {
+  void newLoweredExplosion(SILValue v, Explosion &e) {
     assert(!v.getType().isAddress() && "explosion for address value?!");
     auto inserted = loweredValues.insert({v, LoweredValue(e)});
     assert(inserted.second && "already had lowered value for sil value?!");
@@ -317,7 +317,7 @@ public:
   
   /// Create a new Explosion corresponding to the given SIL value, disabling
   /// cleanups on the input Explosion if necessary.
-  void newLoweredExplosion(swift::Value v, Explosion &e, IRGenFunction &IGF) {
+  void newLoweredExplosion(SILValue v, Explosion &e, IRGenFunction &IGF) {
     assert(!v.getType().isAddress() && "explosion for address value?!");
     auto inserted = loweredValues.insert({v, LoweredValue(e, IGF)});
     assert(inserted.second && "already had lowered value for sil value?!");
@@ -325,7 +325,7 @@ public:
   }
   
   /// Create a new StaticFunction corresponding to the given SIL value.
-  void newLoweredStaticFunction(swift::Value v,
+  void newLoweredStaticFunction(SILValue v,
                                 llvm::Function *f,
                                 AbstractCC cc) {
     assert(!v.getType().isAddress() && "function for address value?!");
@@ -336,7 +336,7 @@ public:
     (void)inserted;
   }
   
-  void newLoweredObjCMethod(swift::Value v, ValueDecl *method,
+  void newLoweredObjCMethod(SILValue v, ValueDecl *method,
                             CanType superSearchType = CanType()) {
     assert(!v.getType().isAddress() && "function for address value?!");
     assert(v.getType().is<AnyFunctionType>() &&
@@ -347,7 +347,7 @@ public:
     (void)inserted;
   }
   
-  void newLoweredMetatypeValue(swift::Value v,
+  void newLoweredMetatypeValue(SILValue v,
                                llvm::Value /*nullable*/ *swiftMetatype,
                                llvm::Value /*nullable*/ *objcMetatype) {
     auto inserted = loweredValues.insert({v,
@@ -358,7 +358,7 @@ public:
   
   /// Get the LoweredValue corresponding to the given SIL value, which must
   /// have been lowered.
-  LoweredValue &getLoweredValue(swift::Value v) {
+  LoweredValue &getLoweredValue(SILValue v) {
     auto foundValue = loweredValues.find(v);
     assert(foundValue != loweredValues.end() &&
            "no lowered explosion for sil value!");
@@ -367,20 +367,20 @@ public:
   
   /// Get the Address of a SIL value of address type, which must have been
   /// lowered.
-  Address getLoweredAddress(swift::Value v) {
+  Address getLoweredAddress(SILValue v) {
     return getLoweredValue(v).getAddress();
   }
   /// Add the unmanaged LLVM values lowered from a SIL value to an explosion.
-  void getLoweredExplosion(swift::Value v, Explosion &e) {
+  void getLoweredExplosion(SILValue v, Explosion &e) {
     getLoweredValue(v).getExplosion(*this, e);
   }
   /// Create an Explosion containing the unmanaged LLVM values lowered from a
   /// SIL value.
-  Explosion getLoweredExplosion(swift::Value v) {
+  Explosion getLoweredExplosion(SILValue v) {
     return getLoweredValue(v).getExplosion(*this);
   }
   /// Get the explosion level the value was lowered to.
-  ExplosionKind getExplosionKind(swift::Value v) {
+  ExplosionKind getExplosionKind(SILValue v) {
     return getLoweredValue(v).getExplosionKind();
   }
   
@@ -389,9 +389,9 @@ public:
   /// FIXME: This is used to lower ApplyInsts that call foreign methods with
   /// non-standard ownership conventions. In normal circumstances SIL values
   /// should not be managed.
-  void getLoweredManagedExplosion(swift::Value v, Explosion &out);
+  void getLoweredManagedExplosion(SILValue v, Explosion &out);
 
-  LoweredBB &getLoweredBB(swift::BasicBlock *bb) {
+  LoweredBB &getLoweredBB(SILBasicBlock *bb) {
     auto foundBB = loweredBBs.find(bb);
     assert(foundBB != loweredBBs.end() && "no llvm bb for sil bb?!");
     return foundBB->second;
@@ -401,9 +401,9 @@ public:
   // SIL instruction lowering
   //===--------------------------------------------------------------------===//
 
-  void visitBasicBlock(BasicBlock *BB);
+  void visitSILBasicBlock(SILBasicBlock *BB);
   
-  void visitInstruction(Instruction *i) {
+  void visitSILInstruction(SILInstruction *i) {
     i->dump();
     llvm_unreachable("irgen for SIL instruction not yet implemented");
   }

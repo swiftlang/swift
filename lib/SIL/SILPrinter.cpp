@@ -31,7 +31,7 @@ using namespace swift;
 
 struct ID {
   enum {
-    BasicBlock, SSAValue
+    SILBasicBlock, SSAValue
   } Kind;
   unsigned Number;
   int ResultNumber;
@@ -39,7 +39,7 @@ struct ID {
 
 static raw_ostream &operator<<(raw_ostream &OS, ID i) {
   switch (i.Kind) {
-  case ID::BasicBlock: OS << "bb"; break;
+  case ID::SILBasicBlock: OS << "bb"; break;
   case ID::SSAValue: OS << '%'; break;
   }
   OS << i.Number;
@@ -136,11 +136,11 @@ namespace {
 class SILPrinter : public SILVisitor<SILPrinter> {
   llvm::formatted_raw_ostream OS;
 
-  llvm::DenseMap<const BasicBlock *, unsigned> BlocksToIDMap;
-  ID getID(const BasicBlock *B);
+  llvm::DenseMap<const SILBasicBlock *, unsigned> BlocksToIDMap;
+  ID getID(const SILBasicBlock *B);
 
   llvm::DenseMap<const ValueBase*, unsigned> ValueToIDMap;
-  ID getID(Value V);
+  ID getID(SILValue V);
 
 public:
   SILPrinter(raw_ostream &OS) : OS(OS) {
@@ -148,11 +148,11 @@ public:
 
   void print(const SILFunction *F) {
     interleave(F->begin(), F->end(),
-               [&](const BasicBlock &B) { print(&B); },
+               [&](const SILBasicBlock &B) { print(&B); },
                [&] { OS << '\n'; });
   }
 
-  void print(const BasicBlock *BB) {
+  void print(const SILBasicBlock *BB) {
     OS << getID(BB);
 
     if (!BB->bbarg_empty()) {
@@ -174,14 +174,14 @@ public:
     }
     OS << '\n';
 
-    for (const Instruction &I : *BB)
+    for (const SILInstruction &I : *BB)
       print(&I);
   }
 
   //===--------------------------------------------------------------------===//
-  // Instruction Printing Logic
+  // SILInstruction Printing Logic
 
-  void print(Value V) {
+  void print(SILValue V) {
     ID Name = getID(V);
     Name.ResultNumber = -1;  // Don't print subresult number.
     OS << "  " << Name << " = ";
@@ -197,7 +197,7 @@ public:
     }
     OS << '\n';
   }
-  void visitInstruction(Instruction *I) {
+  void visitSILInstruction(SILInstruction *I) {
     assert(0 && "SILPrinter not implemented for this instruction!");
   }
   
@@ -458,7 +458,7 @@ public:
     if (!args.empty()) {
       OS << '(';
       interleave(args.begin(), args.end(),
-                 [&](Value v) { OS << getID(v); },
+                 [&](SILValue v) { OS << getID(v); },
                  [&]() { OS << ", "; });
       OS << ')';
     }
@@ -480,26 +480,26 @@ public:
 };
 } // end anonymous namespace
 
-ID SILPrinter::getID(const BasicBlock *Block) {
+ID SILPrinter::getID(const SILBasicBlock *Block) {
   // Lazily initialize the Blocks-to-IDs mapping.
   if (BlocksToIDMap.empty()) {
     unsigned idx = 0;
-    for (const BasicBlock &B : *Block->getParent())
+    for (const SILBasicBlock &B : *Block->getParent())
       BlocksToIDMap[&B] = idx++;
   }
 
-  ID R = { ID::BasicBlock, BlocksToIDMap[Block], -1 };
+  ID R = { ID::SILBasicBlock, BlocksToIDMap[Block], -1 };
   return R;
 }
 
-ID SILPrinter::getID(Value V) {
+ID SILPrinter::getID(SILValue V) {
   // Lazily initialize the instruction -> ID mapping.
   if (ValueToIDMap.empty()) {
-    const BasicBlock *ParentBB;
-    if (const Instruction *I = dyn_cast<Instruction>(V))
+    const SILBasicBlock *ParentBB;
+    if (const SILInstruction *I = dyn_cast<SILInstruction>(V))
       ParentBB = I->getParent();
     else
-      ParentBB = cast<BBArgument>(V)->getParent();
+      ParentBB = cast<SILArgument>(V)->getParent();
 
     unsigned idx = 0;
     for (auto &BB : *ParentBB->getParent()) {
@@ -520,7 +520,7 @@ ID SILPrinter::getID(Value V) {
 }
 
 //===----------------------------------------------------------------------===//
-// Printing for Instruction, BasicBlock, SILFunction, and SILModule
+// Printing for SILInstruction, SILBasicBlock, SILFunction, and SILModule
 //===----------------------------------------------------------------------===//
 
 void ValueBase::dump() const {
@@ -531,13 +531,13 @@ void ValueBase::print(raw_ostream &OS) const {
   SILPrinter(OS).print(this);
 }
 
-/// Pretty-print the BasicBlock to errs.
-void BasicBlock::dump() const {
+/// Pretty-print the SILBasicBlock to errs.
+void SILBasicBlock::dump() const {
   print(llvm::errs());
 }
 
-/// Pretty-print the BasicBlock to the designated stream.
-void BasicBlock::print(raw_ostream &OS) const {
+/// Pretty-print the SILBasicBlock to the designated stream.
+void SILBasicBlock::print(raw_ostream &OS) const {
   SILPrinter(OS).print(this);
 }
 

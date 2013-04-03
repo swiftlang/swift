@@ -230,6 +230,6 @@ SILType SILType::getBuiltinIntegerType(unsigned bitWidth, ASTContext &C) {
 TupleInst *SILBuilder::createEmptyTuple(SILLocation Loc) {
   return createTuple(Loc,
                      SILType::getEmptyTupleType(F.getContext()),
-                     ArrayRef<Value>());
+                     ArrayRef<SILValue>());
 }
 

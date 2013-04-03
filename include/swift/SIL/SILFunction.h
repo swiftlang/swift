@@ -24,7 +24,7 @@ namespace swift {
 
 class ASTContext;
 class FuncExpr;
-class Instruction;
+class SILInstruction;
 class TranslationUnit;
   
 namespace Lowering {
@@ -32,14 +32,14 @@ namespace Lowering {
 }
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of
-/// zero or more SIL BasicBlock objects that contain the Instruction objects
-/// making up the function.
+/// zero or more SIL SILBasicBlock objects that contain the SILInstruction
+/// objects making up the function.
 class SILFunction : public SILAllocated<SILFunction> {
 public:
-  typedef llvm::iplist<BasicBlock> BlockListType;
+  typedef llvm::iplist<SILBasicBlock> BlockListType;
 
 private:
-  friend class BasicBlock;
+  friend class SILBasicBlock;
   friend class SILModule;
   friend class Lowering::SILGenModule;
 

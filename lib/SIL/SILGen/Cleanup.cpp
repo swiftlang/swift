@@ -108,7 +108,7 @@ void CleanupManager::emitCleanupsForReturn(SILLocation loc) {
       cleanup.emit(Gen);
 }
 
-void CleanupManager::emitReturnAndCleanups(SILLocation loc, Value returnValue) {
+void CleanupManager::emitReturnAndCleanups(SILLocation loc, SILValue returnValue) {
   SILBuilder &B = Gen.getBuilder();
   assert(B.hasValidInsertionPoint() && "Inserting return in invalid spot");
 

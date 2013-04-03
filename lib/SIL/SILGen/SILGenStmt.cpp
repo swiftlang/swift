@@ -30,7 +30,7 @@ using namespace Lowering;
 /// emitOrDeleteBlock - If there are branches to the specified basic block,
 /// emit it per emitBlock.  If there aren't, then just delete the block - it
 /// turns out to have not been needed.
-static void emitOrDeleteBlock(SILBuilder &B, BasicBlock *BB) {
+static void emitOrDeleteBlock(SILBuilder &B, SILBasicBlock *BB) {
   if (BB->pred_empty()) {
     // If the block is unused, we don't need it; just delete it.
     BB->eraseFromParent();
@@ -47,23 +47,23 @@ Condition SILGenFunction::emitCondition(SILLocation Loc, Expr *E,
          "emitting condition at unreachable point");
   
   // Sema forces conditions to have Builtin.i1 type, which guarantees this.
-  Value V;
+  SILValue V;
   {
     FullExpr Scope(Cleanups);
     V = visit(E).forward(*this);
   }
   assert(V.getType().castTo<BuiltinIntegerType>()->getBitWidth() == 1);
   
-  BasicBlock *ContBB = new BasicBlock(&F, "condition.cont");
-  BasicBlock *TrueBB = new BasicBlock(&F, "if.true");
+  SILBasicBlock *ContBB = new SILBasicBlock(&F, "condition.cont");
+  SILBasicBlock *TrueBB = new SILBasicBlock(&F, "if.true");
 
   for (SILType argTy : contArgs) {
-    new (F.getModule()) BBArgument(argTy, ContBB);
+    new (F.getModule()) SILArgument(argTy, ContBB);
   }
   
-  BasicBlock *FalseBB, *FalseDestBB;
+  SILBasicBlock *FalseBB, *FalseDestBB;
   if (hasFalseCode) {
-    FalseBB = FalseDestBB = new BasicBlock(&F, "if.false");
+    FalseBB = FalseDestBB = new SILBasicBlock(&F, "if.false");
   } else {
     FalseBB = nullptr;
     FalseDestBB = ContBB;
@@ -104,12 +104,12 @@ static void emitAssignStmtRecursive(AssignStmt *S, ManagedValue Src, Expr *Dest,
                                     SILGenFunction &Gen) {
   // If the destination is a tuple, recursively destructure.
   if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
-    Value SrcV = Src.forward(Gen);
+    SILValue SrcV = Src.forward(Gen);
     unsigned EltNo = 0;
     for (Expr *DestElem : TE->getElements()) {
       SILType elemType = Gen.getLoweredType(
                                           DestElem->getType()->getRValueType());
-      Value SrcVal = Gen.B.createExtract(SILLocation(), SrcV,
+      SILValue SrcVal = Gen.B.createExtract(SILLocation(), SrcV,
                                          EltNo++,
                                          elemType);
       emitAssignStmtRecursive(S,
@@ -138,19 +138,19 @@ namespace {
 /// IndirectReturnInitialization - represents initializing an indirect return
 /// value.
 class IndirectReturnInitialization : public SingleInitializationBase {
-  Value address;
+  SILValue address;
 public:
-  IndirectReturnInitialization(Value address)
+  IndirectReturnInitialization(SILValue address)
     : SingleInitializationBase(address.getType().getSwiftRValueType()),
       address(address) {}
   
-  Value getAddressOrNull() override { return address; }
+  SILValue getAddressOrNull() override { return address; }
 };
 
 } // end anonymous namespace
 
 void SILGenFunction::visitReturnStmt(ReturnStmt *S, SGFContext C) {
-  Value ArgV;
+  SILValue ArgV;
   if (IndirectReturnAddress) {
     // Indirect return of an address-only value.
     FullExpr scope(Cleanups);
@@ -159,7 +159,7 @@ void SILGenFunction::visitReturnStmt(ReturnStmt *S, SGFContext C) {
     emitExprInto(S->getResult(), returnInit.get());
     ArgV = B.createEmptyTuple(S);
   } else if (S->hasResult()) {
-    // Value return.
+    // SILValue return.
     FullExpr scope(Cleanups);
     ArgV = visit(S->getResult()).forward(*this);
   } else {
@@ -190,11 +190,11 @@ void SILGenFunction::visitIfStmt(IfStmt *S, SGFContext C) {
 
 void SILGenFunction::visitWhileStmt(WhileStmt *S, SGFContext C) {
   // Create a new basic block and jump into it.
-  BasicBlock *LoopBB = new (F.getModule()) BasicBlock(&F, "while");
+  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F, "while");
   B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
-  BasicBlock *EndBB = new (F.getModule()) BasicBlock(&F, "while.end");
+  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F, "while.end");
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
   ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth());
   
@@ -221,12 +221,12 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S, SGFContext C) {
 
 void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S, SGFContext C) {
   // Create a new basic block and jump into it.
-  BasicBlock *LoopBB = new (F.getModule()) BasicBlock(&F, "dowhile");
+  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F, "dowhile");
   B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
-  BasicBlock *EndBB = new (F.getModule()) BasicBlock(&F, "dowhile.end");
-  BasicBlock *CondBB = new (F.getModule()) BasicBlock(&F, "dowhile.cond");
+  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F, "dowhile.end");
+  SILBasicBlock *CondBB = new (F.getModule()) SILBasicBlock(&F, "dowhile.cond");
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
   ContinueDestStack.emplace_back(CondBB, getCleanupsDepth());
   
@@ -276,12 +276,12 @@ void SILGenFunction::visitForStmt(ForStmt *S, SGFContext C) {
   if (!B.hasValidInsertionPoint()) return;
   
   // Create a new basic block and jump into it.
-  BasicBlock *LoopBB = new (F.getModule()) BasicBlock(&F, "for.condition");
+  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F, "for.condition");
   B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
-  BasicBlock *IncBB = new (F.getModule()) BasicBlock(&F, "for.inc");
-  BasicBlock *EndBB = new (F.getModule()) BasicBlock(&F, "for.end");
+  SILBasicBlock *IncBB = new (F.getModule()) SILBasicBlock(&F, "for.inc");
+  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F, "for.end");
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
   ContinueDestStack.emplace_back(IncBB, getCleanupsDepth());
   
@@ -330,11 +330,11 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S, SGFContext C) {
   if (!B.hasValidInsertionPoint()) return;
   
   // Create a new basic block and jump into it.
-  BasicBlock *LoopBB = new (F.getModule()) BasicBlock(&F, "foreach.cond");
+  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F, "foreach.cond");
   B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
-  BasicBlock *EndBB = new (F.getModule()) BasicBlock(&F, "foreach.end");
+  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F, "foreach.end");
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
   ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth());
   
@@ -384,7 +384,7 @@ void SILGenFunction::visitCaseStmt(CaseStmt *S, SGFContext C) {
 
 ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
                                                            LValue const &src) {
-  Value addr;
+  SILValue addr;
   
   assert(src.begin() != src.end() && "lvalue must have at least one component");
   for (auto &component : src) {
@@ -407,7 +407,7 @@ ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
 
 void SILGenFunction::emitAssignPhysicalAddress(SILLocation loc,
                                                ManagedValue src,
-                                               Value addr) {
+                                               SILValue addr) {
   SILType srcTy = src.getType();
   
   if (srcTy.isAddressOnly()) {
@@ -419,7 +419,7 @@ void SILGenFunction::emitAssignPhysicalAddress(SILLocation loc,
            "can't assign loadable type from address");
     TypeLoweringInfo const &ti = getTypeLoweringInfo(srcTy.getSwiftRValueType());
     
-    Value old;
+    SILValue old;
     
     if (!ti.isTrivial()) {
       old = B.createLoad(loc, addr);
@@ -434,11 +434,11 @@ void SILGenFunction::emitAssignPhysicalAddress(SILLocation loc,
 void SILGenFunction::emitAssignToLValue(SILLocation loc,
                                         ManagedValue src, LValue const &dest) {
   struct StoreWriteback {
-    Value base;
+    SILValue base;
     Materialize member;
     LogicalPathComponent const *component;
   };
-  Value destAddr;
+  SILValue destAddr;
   SmallVector<StoreWriteback, 4> writebacks;
 
   assert(dest.begin() != dest.end() &&
@@ -467,7 +467,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   
   // Write to the tail component.
   if (component->isPhysical()) {
-    Value finalDestAddr = component->asPhysical().offset(*this, loc, destAddr);
+    SILValue finalDestAddr = component->asPhysical().offset(*this, loc, destAddr);
     emitAssignPhysicalAddress(loc, src, finalDestAddr);
   } else {
     component->asLogical().storeRValue(*this, loc,

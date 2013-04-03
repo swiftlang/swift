@@ -18,12 +18,13 @@
 #include <iterator>
 
 namespace swift {
-class BasicBlock;
+class SILBasicBlock;
 class TermInst;
 
-/// SILSuccessor - This represents a reference to a BasicBlock in a terminator
-/// instruction, forming a list of TermInst references to BasicBlocks.  This
-/// forms the predecessor list, ensuring that it is always kept up to date.
+/// SILSuccessor - This represents a reference to a SILBasicBlock in a
+/// terminator instruction, forming a list of TermInst references to
+/// BasicBlocks.  This forms the predecessor list, ensuring that it is always
+/// kept up to date.
 class SILSuccessor {
   friend class SILSuccessorIterator;
   /// ContainingInst - This is the Terminator instruction that contains this
@@ -32,7 +33,7 @@ class SILSuccessor {
   
   /// SuccessorBlock - If non-null, this is the BasicBlock that the terminator
   /// branches to.
-  BasicBlock *SuccessorBlock;
+  SILBasicBlock *SuccessorBlock;
   
   /// This is the prev and next terminator reference to SuccessorBlock, or
   /// null if SuccessorBlock is null.
@@ -44,7 +45,7 @@ public:
     : ContainingInst(CI), SuccessorBlock(nullptr) {
   }
 
-  SILSuccessor(TermInst *CI, BasicBlock *Succ)
+  SILSuccessor(TermInst *CI, SILBasicBlock *Succ)
     : ContainingInst(CI), SuccessorBlock(nullptr) {
     *this = Succ;
   }
@@ -53,9 +54,9 @@ public:
     *this = nullptr;
   }
 
-  void operator=(BasicBlock *BB);
+  void operator=(SILBasicBlock *BB);
   
-  operator BasicBlock*() const { return SuccessorBlock; }
+  operator SILBasicBlock*() const { return SuccessorBlock; }
   
   // Do not copy or move these.
   SILSuccessor(const SILSuccessor &) = delete;
@@ -63,14 +64,14 @@ public:
 };
   
 /// SILSuccessorIterator - This is an iterator for walking the successor list of
-/// a BasicBlock.
+/// a SILBasicBlock.
 class SILSuccessorIterator {
   SILSuccessor *Cur;
 public:
   using difference_type = std::ptrdiff_t;
-  using value_type = BasicBlock *;
-  using pointer = BasicBlock **;
-  using reference = BasicBlock *&;
+  using value_type = SILBasicBlock *;
+  using pointer = SILBasicBlock **;
+  using reference = SILBasicBlock *&;
   using iterator_category = std::forward_iterator_tag;
   
   SILSuccessorIterator(SILSuccessor *Cur = 0) : Cur(Cur) {}
@@ -83,7 +84,7 @@ public:
     Cur = Cur->Next;
   }
   
-  BasicBlock *operator*();
+  SILBasicBlock *operator*();
 };
   
 

@@ -21,7 +21,7 @@
 #include "llvm/Support/Compiler.h"
 
 namespace swift {
-  class BasicBlock;
+  class SILBasicBlock;
   
 namespace Lowering {
 
@@ -32,13 +32,13 @@ typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
 /// support indirect branches or goto, so the jump mechanism only
 /// needs to worry about branches out of scopes, not into them.
 class LLVM_LIBRARY_VISIBILITY JumpDest {
-  BasicBlock *Block;
+  SILBasicBlock *Block;
   CleanupsDepth Depth;
 public:
-  JumpDest(BasicBlock *block, CleanupsDepth depth)
+  JumpDest(SILBasicBlock *block, CleanupsDepth depth)
     : Block(block), Depth(depth) {}
 
-  BasicBlock *getBlock() const { return Block; }
+  SILBasicBlock *getBlock() const { return Block; }
   CleanupsDepth getDepth() const { return Depth; }
 };
 

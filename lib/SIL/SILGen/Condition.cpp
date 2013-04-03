@@ -26,7 +26,7 @@ void Condition::enterTrue(SILBuilder &B) {
   B.emitBlock(TrueBB);
 }
 
-void Condition::exitTrue(SILBuilder &B, ArrayRef<Value> Args) {
+void Condition::exitTrue(SILBuilder &B, ArrayRef<SILValue> Args) {
   // If there's no continuation block, it's because the condition was
   // folded to true.  In that case, we just continue emitting code as
   // if we were still in the true case, and we're unreachable iff the
@@ -70,7 +70,7 @@ void Condition::enterFalse(SILBuilder &B) {
   B.emitBlock(FalseBB);
 }
 
-void Condition::exitFalse(SILBuilder &B, ArrayRef<Value> Args) {
+void Condition::exitFalse(SILBuilder &B, ArrayRef<SILValue> Args) {
   // If there's no continuation block, it's because the condition was
   // folded to false.  In that case, we just continue emitting code as
   // if we were still in the false case, and we're unreachable iff the
@@ -91,7 +91,7 @@ void Condition::exitFalse(SILBuilder &B, ArrayRef<Value> Args) {
     // Note that doing this tends to strand the false code after
     // everything else in the function, so maybe it's not a great idea.
     auto PI = ContBB->pred_begin();
-    BasicBlock *ContPred = *PI;
+    SILBasicBlock *ContPred = *PI;
 
     // Verify there was only a single predecessor to ContBB.
     ++PI;
@@ -110,7 +110,7 @@ void Condition::exitFalse(SILBuilder &B, ArrayRef<Value> Args) {
   }
 }
 
-BasicBlock *Condition::complete(SILBuilder &B) {
+SILBasicBlock *Condition::complete(SILBuilder &B) {
   // If there is no continuation block, it's because we
   // constant-folded the branch.  The case-exit will have left us in a
   // normal insertion state (i.e. not a post-terminator IP) with

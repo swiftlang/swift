@@ -1,4 +1,4 @@
-//===--- BasicBlock.cpp - Basic blocks for high-level SIL code -------------==//
+//===--- SILBasicBlock.cpp - Basic blocks for high-level SIL code ----------==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -20,30 +20,30 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-// BBArgument Implementation
+// SILArgument Implementation
 //===----------------------------------------------------------------------===//
 
-BBArgument::BBArgument(SILType Ty, BasicBlock *ParentBB)
-  : ValueBase(ValueKind::BBArgument, Ty), ParentBB(ParentBB) {
+SILArgument::SILArgument(SILType Ty, SILBasicBlock *ParentBB)
+  : ValueBase(ValueKind::SILArgument, Ty), ParentBB(ParentBB) {
   ParentBB->addArgument(this);
 }
 
 //===----------------------------------------------------------------------===//
-// BasicBlock Implementation
+// SILBasicBlock Implementation
 //===----------------------------------------------------------------------===//
 
-BasicBlock::BasicBlock(SILFunction *Parent, const char *Name)
+SILBasicBlock::SILBasicBlock(SILFunction *Parent, const char *Name)
   : Parent(Parent), PredList(0) {
   Parent->getBlocks().push_back(this);
     
   // FIXME: Drop the name on the floor for now.
 }
-BasicBlock::~BasicBlock() {}
+SILBasicBlock::~SILBasicBlock() {}
 
 
 /// eraseFromParent - This method unlinks 'this' from the containing SIL and
 /// deletes it.
 ///
-void BasicBlock::eraseFromParent() {
+void SILBasicBlock::eraseFromParent() {
   getParent()->getBlocks().erase(this);
 }

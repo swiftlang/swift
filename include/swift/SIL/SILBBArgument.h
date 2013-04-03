@@ -1,4 +1,4 @@
-//===--- BBArgument.h - SIL BasicBlock Argument Representation --*- C++ -*-===//
+//===--- SILArgument.h - SIL BasicBlock Argument Representation -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,24 +16,24 @@
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
-  class BasicBlock;
+  class SILBasicBlock;
 
-class BBArgument : public ValueBase {
-  void operator=(const BBArgument &) = delete;
+class SILArgument : public ValueBase {
+  void operator=(const SILArgument &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
 
-  BasicBlock *ParentBB;
+  SILBasicBlock *ParentBB;
 public:
-  explicit BBArgument(SILType Ty, BasicBlock *ParentBB);
+  explicit SILArgument(SILType Ty, SILBasicBlock *ParentBB);
 
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
-  BasicBlock *getParent() { return ParentBB; }
-  const BasicBlock *getParent() const { return ParentBB; }
+  SILBasicBlock *getParent() { return ParentBB; }
+  const SILBasicBlock *getParent() const { return ParentBB; }
 
-  static bool classof(Value V) {
-    return V->getKind() == ValueKind::BBArgument;
+  static bool classof(SILValue V) {
+    return V->getKind() == ValueKind::SILArgument;
   }
 };
 

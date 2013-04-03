@@ -21,9 +21,9 @@
 #include "swift/SIL/SILLocation.h"
 
 namespace swift {
-  class BasicBlock;
+  class SILBasicBlock;
   class SILFunction;
-  class Value;
+  class SILValue;
   
 namespace Lowering {
   class SILGenFunction;
@@ -99,7 +99,7 @@ public:
   /// emitReturnAndCleanups - Emit a return from the current function, threading
   /// out through all active cleanups that need to run. This does not pop the
   /// cleanup stack.
-  void emitReturnAndCleanups(SILLocation loc, Value returnValue);
+  void emitReturnAndCleanups(SILLocation loc, SILValue returnValue);
   
   /// emitCleanupsForReturn - Emit all the cleanups necessary before a return
   /// branch (but not the branch itself).

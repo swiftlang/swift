@@ -23,22 +23,22 @@ class SILBuilder {
   /// basic block, at the specified InsertPt.  If null, created instructions
   /// are not auto-inserted.
   SILFunction &F;
-  BasicBlock *BB;
-  BasicBlock::iterator InsertPt;
+  SILBasicBlock *BB;
+  SILBasicBlock::iterator InsertPt;
 public:
 
   SILBuilder(SILFunction &F) : F(F), BB(0) {}
 
-  SILBuilder(Instruction *I, SILFunction &F) : F(F) {
+  SILBuilder(SILInstruction *I, SILFunction &F) : F(F) {
     setInsertionPoint(I);
   }
 
-  SILBuilder(BasicBlock *BB, SILFunction &F) : F(F) {
+  SILBuilder(SILBasicBlock *BB, SILFunction &F) : F(F) {
     setInsertionPoint(BB);
   }
 
-  SILBuilder(BasicBlock *BB, BasicBlock::iterator InsertPt, SILFunction &F)
-    : F(F){
+  SILBuilder(SILBasicBlock *BB, SILBasicBlock::iterator InsertPt,
+             SILFunction &F) : F(F) {
     setInsertionPoint(BB, InsertPt);
   }
 
@@ -47,8 +47,8 @@ public:
   //===--------------------------------------------------------------------===//
 
   bool hasValidInsertionPoint() const { return BB != nullptr; }
-  BasicBlock *getInsertionBB() { return BB; }
-  BasicBlock::iterator getInsertionPoint() { return InsertPt; }
+  SILBasicBlock *getInsertionBB() { return BB; }
+  SILBasicBlock::iterator getInsertionPoint() { return InsertPt; }
   
   /// clearInsertionPoint - Clear the insertion point: created instructions will
   /// not be inserted into a block.
@@ -57,20 +57,20 @@ public:
   }
 
   /// setInsertionPoint - Set the insertion point.
-  void setInsertionPoint(BasicBlock *BB, BasicBlock::iterator InsertPt) {
+  void setInsertionPoint(SILBasicBlock *BB, SILBasicBlock::iterator InsertPt) {
     this->BB = BB;
     this->InsertPt = InsertPt;
   }
 
   /// setInsertionPoint - Set the insertion point to insert before the specified
   /// instruction.
-  void setInsertionPoint(Instruction *I) {
+  void setInsertionPoint(SILInstruction *I) {
     setInsertionPoint(I->getParent(), I);
   }
 
   /// setInsertionPoint - Set the insertion point to insert at the end of the
   /// specified block.
-  void setInsertionPoint(BasicBlock *BB) {
+  void setInsertionPoint(SILBasicBlock *BB) {
     setInsertionPoint(BB, BB->end());
   }
 
@@ -87,7 +87,7 @@ public:
   ///
   /// This function also sets the insertion point of the builder to be the newly
   /// emitted block.
-  void emitBlock(BasicBlock *BB) {
+  void emitBlock(SILBasicBlock *BB) {
     SILFunction *F = BB->getParent();
     // If this is a fall through into BB, emit the fall through branch.
     if (hasValidInsertionPoint()) {
@@ -104,7 +104,7 @@ public:
   }
   
   //===--------------------------------------------------------------------===//
-  // Instruction Creation Methods
+  // SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//
 
   AllocVarInst *createAllocVar(SILLocation Loc, AllocKind allocKind,
@@ -122,22 +122,23 @@ public:
   }
 
   AllocArrayInst *createAllocArray(SILLocation Loc, SILType ElementType,
-                                   Value NumElements) {
+                                   SILValue NumElements) {
     return insert(new AllocArrayInst(Loc, ElementType, NumElements, F));
   }
 
-  ApplyInst *createApply(SILLocation Loc, Value Fn,
-                         SILType Result, ArrayRef<Value> Args) {
+  ApplyInst *createApply(SILLocation Loc, SILValue Fn,
+                         SILType Result, ArrayRef<SILValue> Args) {
     return insert(ApplyInst::create(Loc, Fn, Result, Args, F));
   }
 
-  PartialApplyInst *createPartialApply(SILLocation Loc, Value Fn,
-                                       ArrayRef<Value> Args,
+  PartialApplyInst *createPartialApply(SILLocation Loc, SILValue Fn,
+                                       ArrayRef<SILValue> Args,
                                        SILType ClosureTy) {
     return insert(PartialApplyInst::create(Loc, Fn, Args, ClosureTy, F));
   }
 
-  ConstantRefInst *createConstantRef(SILLocation loc, SILConstant c, SILType ty) {
+  ConstantRefInst *createConstantRef(SILLocation loc, SILConstant c,
+                                     SILType ty) {
     return insert(new ConstantRefInst(loc, c, ty));
   }
 
@@ -154,28 +155,28 @@ public:
     return insert(new StringLiteralInst(E));
   }
 
-  LoadInst *createLoad(SILLocation Loc, Value LV) {
+  LoadInst *createLoad(SILLocation Loc, SILValue LV) {
     return insert(new LoadInst(Loc, LV));
   }
 
-  StoreInst *createStore(SILLocation Loc, Value Src, Value DestLValue) {
+  StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestLValue) {
     return insert(new StoreInst(Loc, Src, DestLValue));
   }
 
   InitializeVarInst *createInitializeVar(SILLocation Loc,
-                                         Value DestLValue) {
+                                         SILValue DestLValue) {
     return insert(new InitializeVarInst(Loc, DestLValue));
   }
 
   CopyAddrInst *createCopyAddr(SILLocation Loc,
-                               Value SrcLValue, Value DestLValue,
+                               SILValue SrcLValue, SILValue DestLValue,
                                bool isTake = false,
                                bool isInitialize = false) {
     return insert(new CopyAddrInst(Loc, SrcLValue, DestLValue,
                                    isTake, isInitialize));
   }
   
-  SpecializeInst *createSpecialize(SILLocation Loc, Value Operand,
+  SpecializeInst *createSpecialize(SILLocation Loc, SILValue Operand,
                                    ArrayRef<Substitution> Substitutions,
                                    SILType DestTy) {
     return insert(SpecializeInst::create(Loc, Operand, Substitutions, DestTy,
@@ -183,51 +184,53 @@ public:
   }
 
 
-  ConvertFunctionInst *createConvertFunction(SILLocation Loc, Value Op,
+  ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
     return insert(new ConvertFunctionInst(Loc, Op, Ty));
   }
 
-  CoerceInst *createCoerce(SILLocation Loc, Value Op, SILType Ty) {
+  CoerceInst *createCoerce(SILLocation Loc, SILValue Op, SILType Ty) {
     return insert(new CoerceInst(Loc, Op, Ty));
   }
   
-  UpcastInst *createUpcast(SILLocation Loc, Value Op, SILType Ty) {
+  UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty) {
     return insert(new UpcastInst(Loc, Op, Ty));
   }
   
-  DowncastInst *createDowncast(SILLocation Loc, Value Op, SILType Ty) {
+  DowncastInst *createDowncast(SILLocation Loc, SILValue Op, SILType Ty) {
     return insert(new DowncastInst(Loc, Op, Ty));
   }
   
-  AddressToPointerInst *createAddressToPointer(
-                                       SILLocation Loc, Value Op, SILType Ty) {
+  AddressToPointerInst *createAddressToPointer(SILLocation Loc, SILValue Op,
+                                               SILType Ty) {
     return insert(new AddressToPointerInst(Loc, Op, Ty));
   }
   
-  ThinToThickFunctionInst *createThinToThickFunction(
-                                       SILLocation Loc, Value Op, SILType Ty) {
+  ThinToThickFunctionInst *createThinToThickFunction(SILLocation Loc,
+                                                     SILValue Op, SILType Ty) {
     return insert(new ThinToThickFunctionInst(Loc, Op, Ty));
   }
   
   ArchetypeToSuperInst *createArchetypeToSuper(SILLocation Loc,
-                                               Value Archetype, SILType BaseTy){
+                                               SILValue Archetype,
+                                               SILType BaseTy) {
     return insert(new ArchetypeToSuperInst(Loc, Archetype, BaseTy));
   }
   
   SuperToArchetypeInst *createSuperToArchetype(SILLocation Loc,
-                                               Value SrcBase,
-                                               Value DestArchetypeAddr) {
+                                               SILValue SrcBase,
+                                               SILValue DestArchetypeAddr) {
     return insert(new SuperToArchetypeInst(Loc, SrcBase, DestArchetypeAddr));
   }
   
-  TupleInst *createTuple(SILLocation Loc, SILType Ty, ArrayRef<Value> Elements){
+  TupleInst *createTuple(SILLocation Loc, SILType Ty,
+                         ArrayRef<SILValue> Elements){
     return insert(TupleInst::create(Loc, Ty, Elements, F));
   }
   
   TupleInst *createEmptyTuple(SILLocation Loc);
 
-  Value createExtract(SILLocation Loc, Value Operand, unsigned FieldNo,
+  SILValue createExtract(SILLocation Loc, SILValue Operand, unsigned FieldNo,
                            SILType ResultTy) {
     // Fold extract(tuple(a,b,c), 1) -> b.
     if (TupleInst *TI = dyn_cast<TupleInst>(Operand))
@@ -236,31 +239,31 @@ public:
     return insert(new ExtractInst(Loc, Operand, FieldNo, ResultTy));
   }
 
-  Value createElementAddr(SILLocation Loc, Value Operand, unsigned FieldNo,
-                          SILType ResultTy) {
+  SILValue createElementAddr(SILLocation Loc, SILValue Operand,
+                             unsigned FieldNo, SILType ResultTy) {
     return insert(new ElementAddrInst(Loc, Operand, FieldNo, ResultTy));
   }
   
-  Value createRefElementAddr(SILLocation Loc, Value Operand, VarDecl *Field,
-                          SILType ResultTy) {
+  SILValue createRefElementAddr(SILLocation Loc, SILValue Operand,
+                                VarDecl *Field, SILType ResultTy) {
     return insert(new RefElementAddrInst(Loc, Operand, Field, ResultTy));
   }
   
-  ClassMethodInst *createClassMethod(SILLocation Loc, Value Operand,
+  ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
                                      SILConstant Member,
                                      SILType MethodTy)
   {
     return insert(new ClassMethodInst(Loc, Operand, Member, MethodTy, F));
   }
   
-  SuperMethodInst *createSuperMethod(SILLocation Loc, Value Operand,
+  SuperMethodInst *createSuperMethod(SILLocation Loc, SILValue Operand,
                                      SILConstant Member,
                                      SILType MethodTy)
   {
     return insert(new SuperMethodInst(Loc, Operand, Member, MethodTy, F));
   }
   
-  ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc, Value Operand,
+  ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc, SILValue Operand,
                                              SILConstant Member,
                                              SILType MethodTy)
   {
@@ -268,19 +271,19 @@ public:
   }
   
   ProtocolMethodInst *createProtocolMethod(SILLocation Loc,
-                                                 Value Operand,
+                                                 SILValue Operand,
                                                  SILConstant Member,
                                                  SILType MethodTy) {
     return insert(new ProtocolMethodInst(Loc, Operand, Member, MethodTy, F));
   }
   
   ProjectExistentialInst *createProjectExistential(SILLocation Loc,
-                                                   Value Operand) {
+                                                   SILValue Operand) {
     return insert(new ProjectExistentialInst(Loc, Operand, F));
   }
   
   InitExistentialInst *createInitExistential(SILLocation Loc,
-                                 Value Existential,
+                                 SILValue Existential,
                                  SILType ConcreteType,
                                  ArrayRef<ProtocolConformance*> Conformances) {
     return insert(new InitExistentialInst(Loc,
@@ -290,8 +293,8 @@ public:
   }
   
   UpcastExistentialInst *createUpcastExistential(SILLocation Loc,
-                                 Value SrcExistential,
-                                 Value DestExistential,
+                                 SILValue SrcExistential,
+                                 SILValue DestExistential,
                                  bool isTakeOfSrc,
                                  ArrayRef<ProtocolConformance*> Conformances) {
     return insert(new UpcastExistentialInst(Loc,
@@ -302,7 +305,7 @@ public:
   }
   
   DeinitExistentialInst *createDeinitExistential(SILLocation Loc,
-                                                 Value Existential) {
+                                                 SILValue Existential) {
     return insert(new DeinitExistentialInst(Loc, Existential));
   }
   
@@ -311,19 +314,19 @@ public:
   }
 
   ClassMetatypeInst *createClassMetatype(SILLocation Loc, SILType Metatype,
-                                         Value Base) {
+                                         SILValue Base) {
     return insert(new ClassMetatypeInst(Loc, Metatype, Base));
   }
 
   ArchetypeMetatypeInst *createArchetypeMetatype(SILLocation Loc,
                                                  SILType Metatype,
-                                                 Value Base) {
+                                                 SILValue Base) {
     return insert(new ArchetypeMetatypeInst(Loc, Metatype, Base));
   }
   
   ProtocolMetatypeInst *createProtocolMetatype(SILLocation Loc,
                                                SILType Metatype,
-                                               Value Base) {
+                                               SILValue Base) {
     return insert(new ProtocolMetatypeInst(Loc, Metatype, Base));
   }
   
@@ -332,29 +335,29 @@ public:
   }
   
   AssociatedMetatypeInst *createAssociatedMetatype(SILLocation Loc,
-                                                   Value MetatypeSrc,
+                                                   SILValue MetatypeSrc,
                                                    SILType MetatypeDest) {
     return insert(new AssociatedMetatypeInst(Loc, MetatypeSrc, MetatypeDest));
   }
   
-  void createRetain(SILLocation Loc, Value Operand) {
+  void createRetain(SILLocation Loc, SILValue Operand) {
     // Retaining a constant_ref is a no-op.
     if (!isa<ConstantRefInst>(Operand))
       insert(new RetainInst(Loc, Operand));
   }
-  void createRelease(SILLocation Loc, Value Operand) {
+  void createRelease(SILLocation Loc, SILValue Operand) {
     // Releasing a constant_ref is a no-op.
     if (!isa<ConstantRefInst>(Operand))
       insert(new ReleaseInst(Loc, Operand));
   }
   DeallocVarInst *createDeallocVar(SILLocation loc, AllocKind allocKind,
-                                   Value operand) {
+                                   SILValue operand) {
     return insert(new DeallocVarInst(loc, allocKind, operand));
   }
-  DeallocRefInst *createDeallocRef(SILLocation loc, Value operand) {
+  DeallocRefInst *createDeallocRef(SILLocation loc, SILValue operand) {
     return insert(new DeallocRefInst(loc, operand));
   }
-  DestroyAddrInst *createDestroyAddr(SILLocation Loc, Value Operand) {
+  DestroyAddrInst *createDestroyAddr(SILLocation Loc, SILValue Operand) {
     return insert(new DestroyAddrInst(Loc, Operand));
   }
 
@@ -362,7 +365,7 @@ public:
   // SIL-only instructions that don't have an AST analog
   //===--------------------------------------------------------------------===//
 
-  IndexAddrInst *createIndexAddr(SILLocation loc, Value Operand,
+  IndexAddrInst *createIndexAddr(SILLocation loc, SILValue Operand,
                                  unsigned Index) {
     return insert(new IndexAddrInst(loc, Operand, Index));
   }
@@ -373,38 +376,41 @@ public:
 
 
   //===--------------------------------------------------------------------===//
-  // Terminator Instruction Creation Methods
+  // Terminator SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//
 
   UnreachableInst *createUnreachable() {
     return insertTerminator(new UnreachableInst(F));
   }
 
-  ReturnInst *createReturn(SILLocation Loc, Value ReturnValue) {
+  ReturnInst *createReturn(SILLocation Loc, SILValue ReturnValue) {
     return insertTerminator(new ReturnInst(Loc, ReturnValue));
   }
   
-  CondBranchInst *createCondBranch(SILLocation Loc, Value Cond,
-                                   BasicBlock *Target1, BasicBlock *Target2) {
+  CondBranchInst *createCondBranch(SILLocation Loc, SILValue Cond,
+                                   SILBasicBlock *Target1,
+                                   SILBasicBlock *Target2) {
     return insertTerminator(CondBranchInst::create(Loc, Cond,
                                                    Target1, Target2, F));
   }
     
-  CondBranchInst *createCondBranch(SILLocation Loc, Value Cond,
-                                   BasicBlock *Target1, ArrayRef<Value> Args1,
-                                   BasicBlock *Target2, ArrayRef<Value> Args2) {
+  CondBranchInst *createCondBranch(SILLocation Loc, SILValue Cond,
+                                   SILBasicBlock *Target1,
+                                   ArrayRef<SILValue> Args1,
+                                   SILBasicBlock *Target2,
+                                   ArrayRef<SILValue> Args2) {
     return insertTerminator(CondBranchInst::create(Loc, Cond,
                                                    Target1, Args1,
                                                    Target2, Args2,
                                                    F));
   }
   
-  BranchInst *createBranch(SILLocation Loc, BasicBlock *TargetBlock) {
+  BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock) {
     return insertTerminator(BranchInst::create(Loc, TargetBlock, F));
   }
 
-  BranchInst *createBranch(SILLocation Loc, BasicBlock *TargetBlock,
-                           ArrayRef<Value> Args) {
+  BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock,
+                           ArrayRef<SILValue> Args) {
     return insertTerminator(BranchInst::create(Loc, TargetBlock, Args, F));
   }
 
@@ -430,7 +436,7 @@ private:
     return TheInst;
   }
 
-  void insertImpl(Instruction *TheInst) {
+  void insertImpl(SILInstruction *TheInst) {
     if (BB == 0) return;
     BB->getInsts().insert(InsertPt, TheInst);
   }

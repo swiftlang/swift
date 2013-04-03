@@ -1,4 +1,4 @@
-//===--- ManagedValue.h - Exploded R-Value Representation -------*- C++ -*-===//
+//===--- ManagedValue.h - Exploded R-SILValue Representation -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -23,11 +23,11 @@
 #include "SILGen.h"
 
 namespace swift {
-  class Value;
+  class SILValue;
   
 namespace Lowering {
 
-/// ManagedValue - represents a SIL rvalue. It consists of a Value and an
+/// ManagedValue - represents a SIL rvalue. It consists of a SILValue and an
 /// optional cleanup. Ownership of the ManagedValue can be "forwarded" to
 /// disable its cleanup when the rvalue is consumed. Read-only addresses may
 /// also be stored in a ManagedValue, but for general lvalues, the LValue type
@@ -36,7 +36,7 @@ namespace Lowering {
 class ManagedValue {
   /// The value (or address of an address-only value) being managed, and
   /// whether it represents an lvalue.
-  llvm::PointerIntPair<Value, 1, bool> valueAndIsLValue;
+  llvm::PointerIntPair<SILValue, 1, bool> valueAndIsLValue;
   /// A handle to the cleanup that destroys this value, or
   /// CleanupsDepth::invalid if the value has no cleanup.
   CleanupsDepth cleanup;
@@ -46,24 +46,24 @@ public:
   enum LValue_t { LValue };
   
   ManagedValue() = default;
-  explicit ManagedValue(Value value, LValue_t)
+  explicit ManagedValue(SILValue value, LValue_t)
     : valueAndIsLValue(value, true),
       cleanup(CleanupsDepth::invalid())
   {}
-  explicit ManagedValue(Value value, Unmanaged_t)
+  explicit ManagedValue(SILValue value, Unmanaged_t)
     : valueAndIsLValue(value, false),
       cleanup(CleanupsDepth::invalid())
   {}
-  ManagedValue(Value value, CleanupsDepth cleanup)
+  ManagedValue(SILValue value, CleanupsDepth cleanup)
     : valueAndIsLValue(value, false),
       cleanup(cleanup)
   {}
 
-  Value getUnmanagedValue() const {
+  SILValue getUnmanagedValue() const {
     assert(!hasCleanup());
     return getValue();
   }
-  Value getValue() const { return valueAndIsLValue.getPointer(); }
+  SILValue getValue() const { return valueAndIsLValue.getPointer(); }
   
   SILType getType() const { return getValue().getType(); }
   
@@ -80,16 +80,16 @@ public:
   
   /// Forward this value, deactivating the cleanup and returning the
   /// underlying value.
-  Value forward(SILGenFunction &gen) {
+  SILValue forward(SILGenFunction &gen) {
     if (hasCleanup())
       forwardCleanup(gen);
     return getValue();
   }
   
   /// Forward this value as an argument.
-  Value forwardArgument(SILGenFunction &gen, SILLocation loc) {
+  SILValue forwardArgument(SILGenFunction &gen, SILLocation loc) {
     // Forward loadable values.
-    Value v = forward(gen);
+    SILValue v = forward(gen);
     // Thicken thin function values.
     // FIXME: Swift type-checking should do this.
     if (v.getType().is<AnyFunctionType>() &&
@@ -112,7 +112,7 @@ public:
   /// FIXME: Ideally we would initialize directly into destinations and not need
   /// this method.
   void forwardInto(SILGenFunction &gen, SILLocation loc,
-                   Value address, bool isInitialize) {
+                   SILValue address, bool isInitialize) {
     assert(getType().isAddressOnly() &&
            "must forward loadable value using forward");
     // If we own a cleanup for this value, we can "take" the value and disable

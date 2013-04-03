@@ -1,4 +1,4 @@
-//===--- Value.h - Value base class for SIL ---------------------*- C++ -*-===//
+//===--- SILValue.h - Value base class for SIL ------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the Value class.
+// This file defines the SILValue class.
 //
 //===----------------------------------------------------------------------===//
 
@@ -36,8 +36,8 @@ namespace swift {
   };
 
   /// ValueBase - This is the base class of the SIL value hierarchy, which
-  /// represents a runtime computed value.  Things like Instruction derive from
-  /// this.
+  /// represents a runtime computed value.  Things like SILInstruction derive
+  /// from this.
   class ValueBase : public SILAllocated<ValueBase> {
     struct SILTypeOrTypeList {
       union {
@@ -73,7 +73,7 @@ namespace swift {
 
     Operand *FirstUse = nullptr;
     friend class Operand;
-    friend class Value;
+    friend class SILValue;
     
     const ValueKind Kind;
 
@@ -101,7 +101,7 @@ namespace swift {
     inline ValueBaseUseIterator use_end();
     inline Range<ValueBaseUseIterator> getUses();
 
-    /// Pretty-print the Instruction.
+    /// Pretty-print the SILInstruction.
     void dump() const;
     void print(raw_ostream &OS) const;
   };
@@ -113,18 +113,18 @@ namespace swift {
     ValueResultNumberBits = 1
   };
 
-  /// Value - A Value is a use of a specific result of an ValueBase.  As such,
+  /// SILValue - A SILValue is a use of a specific result of an ValueBase.  As such,
   /// it is a pair of the ValueBase and the result number being referenced.
-  class Value {
+  class SILValue {
     llvm::PointerIntPair<ValueBase*, ValueResultNumberBits> ValueAndResultNumber;
     
-    Value(void *p) {
+    SILValue(void *p) {
       ValueAndResultNumber =
         decltype(ValueAndResultNumber)::getFromOpaqueValue(p);
     }
     
   public:
-    Value(const ValueBase *V = 0, unsigned ResultNumber = 0)
+    SILValue(const ValueBase *V = 0, unsigned ResultNumber = 0)
       : ValueAndResultNumber((ValueBase*)V, ResultNumber) {
       assert(ResultNumber == getResultNumber() && "Overflow");
     }
@@ -140,12 +140,12 @@ namespace swift {
     }
 
     // Comparison.
-    bool operator==(Value RHS) const {
+    bool operator==(SILValue RHS) const {
       return ValueAndResultNumber == RHS.ValueAndResultNumber;
     }
-    bool operator!=(Value RHS) const { return !(*this == RHS); }
+    bool operator!=(SILValue RHS) const { return !(*this == RHS); }
     // Ordering (for std::map).
-    bool operator<(Value RHS) const {
+    bool operator<(SILValue RHS) const {
       return ValueAndResultNumber.getOpaqueValue() <
       RHS.ValueAndResultNumber.getOpaqueValue();
     }
@@ -163,8 +163,8 @@ namespace swift {
     void *getOpaqueValue() const {
       return ValueAndResultNumber.getOpaqueValue();
     }
-    static Value getFromOpaqueValue(void *p) {
-      return Value(p);
+    static SILValue getFromOpaqueValue(void *p) {
+      return SILValue(p);
     }
   };
 
@@ -172,7 +172,7 @@ namespace swift {
   /// operand.
   class Operand {
     /// The value used as this operand.
-    Value TheValue;
+    SILValue TheValue;
 
     /// The next operand in the use-chain.  Note that the chain holds
     /// every use of the current ValueBase, not just those of the
@@ -188,7 +188,7 @@ namespace swift {
     ValueBase *Owner;
 
     Operand(ValueBase *owner) : Owner(owner) {}
-    Operand(ValueBase *owner, Value theValue)
+    Operand(ValueBase *owner, SILValue theValue)
         : TheValue(theValue), Owner(owner) {
       insertIntoCurrent();
     }
@@ -201,10 +201,10 @@ namespace swift {
     Operand &operator=(const Operand &use) = delete;
 
     /// Return the current value being used by this operand.
-    Value get() const { return TheValue; }
+    SILValue get() const { return TheValue; }
 
     /// Set the current value being used by this operand.
-    void set(Value newValue) {
+    void set(SILValue newValue) {
       // It's probably not worth optimizing for the case of switching
       // operands on a single value.
       removeFromCurrent();
@@ -254,7 +254,7 @@ namespace swift {
       const Operand *Ptr;
     public:
       iterator(const Operand *ptr) : Ptr(ptr) {}
-      Value operator*() const { assert(Ptr); return Ptr->get(); }
+      SILValue operator*() const { assert(Ptr); return Ptr->get(); }
       iterator &operator++() { ++Ptr; return *this; }
       iterator operator++(int) { iterator copy = *this; ++Ptr; return copy; }
 
@@ -270,7 +270,7 @@ namespace swift {
     iterator end() const { return iterator(Operands.end()); }
     size_t size() const { return Operands.size(); }
     bool empty() const { return Operands.empty(); }
-    Value operator[](unsigned i) const { return Operands[i].get(); }
+    SILValue operator[](unsigned i) const { return Operands[i].get(); }
     OperandValueArrayRef slice(unsigned begin, unsigned length) const {
       return OperandValueArrayRef(Operands.slice(begin, length));
     }
@@ -358,17 +358,17 @@ namespace swift {
       return !(lhs == rhs);
     }
   };
-  inline ValueUseIterator Value::use_begin() {
+  inline ValueUseIterator SILValue::use_begin() {
     return ValueUseIterator((*this)->FirstUse, getResultNumber());
   }
-  inline ValueUseIterator Value::use_end() {
+  inline ValueUseIterator SILValue::use_end() {
     return ValueUseIterator(nullptr, 0);
   }
-  inline Range<ValueUseIterator> Value::getUses() {
+  inline Range<ValueUseIterator> SILValue::getUses() {
     return { use_begin(), use_end() };
   }
-  inline bool Value::use_empty() const {
-    Value *mthis = const_cast<Value*>(this);
+  inline bool SILValue::use_empty() const {
+    SILValue *mthis = const_cast<SILValue*>(this);
     return mthis->use_begin() == mthis->use_end();
   }
 
@@ -434,7 +434,7 @@ namespace swift {
     /// the variadic arguments have to come last.
     template <class... T>
     TailAllocatedOperandList(ValueBase *user,
-                             ArrayRef<Value> dynamicArgs,
+                             ArrayRef<SILValue> dynamicArgs,
                              T&&... fixedArgs)
         : NumExtra(dynamicArgs.size()),
           Buffer{ { user, std::forward<T>(fixedArgs) }... } {
@@ -498,7 +498,7 @@ namespace swift {
       return sizeof(Operand) * (numExtra > 0 ? numExtra - 1 : 0);
     }
 
-    TailAllocatedOperandList(ValueBase *user, ArrayRef<Value> dynamicArgs)
+    TailAllocatedOperandList(ValueBase *user, ArrayRef<SILValue> dynamicArgs)
         : NumExtra(dynamicArgs.size()) {
 
       Operand *dynamicSlot = Buffer;
@@ -548,41 +548,41 @@ namespace swift {
 
 
 namespace llvm {
-  // A Value casts like a ValueBase*.
-  template<> struct simplify_type<const ::swift::Value> {
+  // A SILValue casts like a ValueBase*.
+  template<> struct simplify_type<const ::swift::SILValue> {
     typedef ::swift::ValueBase *SimpleType;
-    static SimpleType getSimplifiedValue(::swift::Value Val) {
+    static SimpleType getSimplifiedValue(::swift::SILValue Val) {
       return Val.getDef();
     }
   };
-  template<> struct simplify_type< ::swift::Value>
-    : public simplify_type<const ::swift::Value> {};
+  template<> struct simplify_type< ::swift::SILValue>
+    : public simplify_type<const ::swift::SILValue> {};
 
   // Values hash just like pointers.
-  template<> struct DenseMapInfo<swift::Value> {
-    static swift::Value getEmptyKey() {
+  template<> struct DenseMapInfo<swift::SILValue> {
+    static swift::SILValue getEmptyKey() {
       return llvm::DenseMapInfo<swift::ValueBase*>::getEmptyKey();
     }
-    static swift::Value getTombstoneKey() {
+    static swift::SILValue getTombstoneKey() {
       return llvm::DenseMapInfo<swift::ValueBase*>::getTombstoneKey();
     }
-    static unsigned getHashValue(swift::Value V) {
+    static unsigned getHashValue(swift::SILValue V) {
       return DenseMapInfo<swift::ValueBase*>::getHashValue(V.getDef());
     }
-    static bool isEqual(swift::Value LHS, swift::Value RHS) {
+    static bool isEqual(swift::SILValue LHS, swift::SILValue RHS) {
       return LHS == RHS;
     }
   };
   
-  // Value is a PointerLikeType.
-  template<> class PointerLikeTypeTraits<::swift::Value> {
-    using Value = ::swift::Value;
+  // SILValue is a PointerLikeType.
+  template<> class PointerLikeTypeTraits<::swift::SILValue> {
+    using SILValue = ::swift::SILValue;
   public:
-    static void *getAsVoidPointer(Value v) {
+    static void *getAsVoidPointer(SILValue v) {
       return v.getOpaqueValue();
     }
-    static Value getFromVoidPointer(void *p) {
-      return Value::getFromOpaqueValue(p);
+    static SILValue getFromVoidPointer(void *p) {
+      return SILValue::getFromOpaqueValue(p);
     }
     
     enum { NumLowBitsAvailable = 2 - swift::ValueResultNumberBits };

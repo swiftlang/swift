@@ -43,7 +43,7 @@ namespace swift {
 /// lowered to SIL.
 class SILModule : public SILBase {
 private:
-  friend class BasicBlock;
+  friend class SILBasicBlock;
   friend class SILFunction;
   friend class Lowering::SILGenModule;
   friend class Lowering::TypeConverter;

@@ -64,12 +64,12 @@ public:
   virtual ~Initialization() {}
     
   /// If this initialization represents a single contiguous buffer, return the
-  /// Value of that buffer's address. If not, returns an invalid Value.
-  virtual Value getAddressOrNull() = 0;
+  /// SILValue of that buffer's address. If not, returns an invalid SILValue.
+  virtual SILValue getAddressOrNull() = 0;
   
   /// Binds an address value to this initialization. Used for [byref] arguments,
   /// but invalid anywhere else.
-  virtual void bindAddress(Value address, SILGenFunction &gen) {
+  virtual void bindAddress(SILValue address, SILGenFunction &gen) {
     llvm_unreachable("unexpected address value in initialization!");
   }
   
@@ -79,8 +79,8 @@ public:
   /// Returns the address of the single contiguous buffer represented by this
   /// initialization. Once the address has been stored to,
   /// finishInitialization must be called.
-  Value getAddress() {
-    Value address = getAddressOrNull();
+  SILValue getAddress() {
+    SILValue address = getAddressOrNull();
     assert(address && "initialization does not represent a single buffer");
     return address;
   }
@@ -130,7 +130,7 @@ public:
   }
   
   void defaultInitialize(SILGenFunction &gen) override {
-    Value address = getAddress();
+    SILValue address = getAddress();
     gen.B.createInitializeVar(SILLocation(), address);
     finishInitialization(gen);
   }

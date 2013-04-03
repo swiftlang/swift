@@ -24,7 +24,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
-  class BasicBlock;
+  class SILBasicBlock;
   
 namespace Lowering {
   class Condition;
@@ -136,7 +136,7 @@ public:
 /// Materialize - Represents a temporary allocation.
 struct Materialize {
   /// The address of the allocation.
-  Value address;
+  SILValue address;
   /// The cleanup to dispose of the value before deallocating the buffer.
   /// This cleanup can be killed by calling the consume method.
   CleanupsDepth valueCleanup;
@@ -151,7 +151,7 @@ struct Materialize {
 struct SGFContext {
 private:
   using EmitIntoOrArgumentVectorPointer =
-    PointerUnion<Initialization*, SmallVectorImpl<Value>*>;
+    PointerUnion<Initialization*, SmallVectorImpl<SILValue>*>;
   
   using State =
     llvm::PointerIntPair<EmitIntoOrArgumentVectorPointer, 1, bool>;
@@ -168,7 +168,7 @@ public:
   
   /// Creates an argument tuple context that will recursively append tuple
   /// elements to the given argument vector.
-  SGFContext(SmallVectorImpl<Value> &argumentVector)
+  SGFContext(SmallVectorImpl<SILValue> &argumentVector)
     : state(EmitIntoOrArgumentVectorPointer(&argumentVector), false)
   {}
   
@@ -189,8 +189,8 @@ public:
   /// Returns a pointer to the argument vector the current tuple expression
   /// should destructure its result elements into, or null if the expression
   /// should return a tuple value.
-  SmallVectorImpl<Value> *getArgumentVector() const {
-    return state.getPointer().dyn_cast<SmallVectorImpl<Value>*>();
+  SmallVectorImpl<SILValue> *getArgumentVector() const {
+    return state.getPointer().dyn_cast<SmallVectorImpl<SILValue>*>();
   }
   
   /// Returns true if the current expression is a child of a LoadExpr, and
@@ -222,7 +222,7 @@ public:
   /// IndirectReturnAddress - For a function with an indirect return, holds a
   /// value representing the address to initialize with the return value. Null
   /// for a function that returns by value.
-  Value IndirectReturnAddress;
+  SILValue IndirectReturnAddress;
   
   std::vector<JumpDest> BreakDestStack;
   std::vector<JumpDest> ContinueDestStack;
@@ -234,9 +234,9 @@ public:
   struct VarLoc {
     /// box - the retainable box for the variable, or invalid if no box was
     /// made for the value.
-    Value box;
+    SILValue box;
     /// address - the address at which the variable is stored.
-    Value address;
+    SILValue address;
   };
     
   /// VarLocs - Entries in this map are generated when a PatternBindingDecl is
@@ -248,7 +248,7 @@ public:
   /// declaration that requires local context, such as a func closure, is
   /// emitted. This map is then queried to produce the value for a DeclRefExpr
   /// to a local constant.
-  llvm::DenseMap<SILConstant, Value> LocalConstants;
+  llvm::DenseMap<SILConstant, SILValue> LocalConstants;
   
   /// True if 'return' without an operand or falling off the end of the current
   /// function is valid.
@@ -259,7 +259,7 @@ public:
   /// block that executes implicit behavior. epilogBB points to the epilog
   /// block that 'return' jumps to in those contexts, or 'null' if returning
   /// can return normally from the function.
-  BasicBlock *epilogBB;
+  SILBasicBlock *epilogBB;
 
 public:
   SILGenFunction(SILGenModule &SGM, SILFunction &F, bool hasVoidReturn);
@@ -356,8 +356,8 @@ public:
   
   /// emitDestructorProlog - Generates prolog code for a destructor. Unlike
   /// a normal function, the destructor does not consume a reference to its
-  /// argument. Returns the 'this' argument Value.
-  Value emitDestructorProlog(ClassDecl *CD, DestructorDecl *DD);
+  /// argument. Returns the 'this' argument SILValue.
+  SILValue emitDestructorProlog(ClassDecl *CD, DestructorDecl *DD);
   
   /// emitRetainRValue - Emits the instructions necessary to increase the
   /// retain count of a temporary, in order to use it as part of another
@@ -368,7 +368,7 @@ public:
   ///   members are all retained.
   /// - FIXME For address-only types, this currently crashes. It should instead
   ///   allocate and return a copy made using copy_addr.
-  void emitRetainRValue(SILLocation loc, Value v);
+  void emitRetainRValue(SILLocation loc, SILValue v);
     
   /// emitReleaseRValue - Emits the instructions necessary to clean up a
   /// temporary value.
@@ -378,21 +378,21 @@ public:
   ///   members are all released.
   /// - For address-only types, the value at the address is destroyed using
   ///   a destroy_addr instruction.
-  void emitReleaseRValue(SILLocation loc, Value v);
+  void emitReleaseRValue(SILLocation loc, SILValue v);
 
   /// Emits a temporary allocation that will be deallocated automatically at the
   /// end of the current scope. Returns the address of the allocation.
-  Value emitTemporaryAllocation(SILLocation loc, SILType ty);
+  SILValue emitTemporaryAllocation(SILLocation loc, SILType ty);
   
   /// Prepares a buffer to receive the result of an expression, either using the
   /// 'emit into' initialization buffer if available, or allocating a temporary
   /// allocation if not.
-  Value getBufferForExprResult(SILLocation loc, SILType ty, SGFContext C);
+  SILValue getBufferForExprResult(SILLocation loc, SILType ty, SGFContext C);
   
   /// Emits a reassignment to a physical address.
   void emitAssignPhysicalAddress(SILLocation loc,
                                  ManagedValue src,
-                                 Value addr);
+                                 SILValue addr);
   
   //===--------------------------------------------------------------------===//
   // Recursive entry points
@@ -507,14 +507,14 @@ public:
 
   void emitApplyArgumentValue(SILLocation loc,
                               ManagedValue argValue,
-                              llvm::SmallVectorImpl<Value> &argsV);
+                              llvm::SmallVectorImpl<SILValue> &argsV);
   void emitApplyArguments(Expr *argsExpr,
-                          llvm::SmallVectorImpl<Value> &args);
+                          llvm::SmallVectorImpl<SILValue> &args);
 
-  ManagedValue emitApply(SILLocation Loc, Value Fn, ArrayRef<Value> Args);
-  ManagedValue emitArrayInjectionCall(Value ObjectPtr,
-                                      Value BasePtr,
-                                      Value Length,
+  ManagedValue emitApply(SILLocation Loc, SILValue Fn, ArrayRef<SILValue> Args);
+  ManagedValue emitArrayInjectionCall(SILValue ObjectPtr,
+                                      SILValue BasePtr,
+                                      SILValue Length,
                                       Expr *ArrayInjectionFunction);
   ManagedValue emitTupleShuffleOfExprs(Expr *E,
                                        ArrayRef<Expr *> InExprs,
@@ -522,24 +522,24 @@ public:
                                        Expr *VarargsInjectionFunction,
                                        SGFContext C);
   ManagedValue emitTupleShuffle(Expr *E,
-                                ArrayRef<Value> InElts,
+                                ArrayRef<SILValue> InElts,
                                 ArrayRef<int> ElementMapping,
                                 Expr *VarargsInjectionFunction);
   ManagedValue emitTuple(Expr *E,
                          ArrayRef<Expr *> Elements,
                          Type VarargsBaseTy,
-                         ArrayRef<Value> VariadicElements,
+                         ArrayRef<SILValue> VariadicElements,
                          Expr *VarargsInjectionFunction,
                          SGFContext C);
 
   /// Returns a reference to a constant in global context. For local func decls
   /// this returns the function constant with unapplied closure context.
-  Value emitGlobalConstantRef(SILLocation loc, SILConstant constant);
+  SILValue emitGlobalConstantRef(SILLocation loc, SILConstant constant);
   /// Returns a reference to a constant in local context. This will return a
   /// closure object reference if the constant refers to a local func decl.
   /// In rvalue contexts, emitConstantRef should be used instead, which retains
   /// a local constant and returns a ManagedValue with a cleanup.
-  Value emitUnmanagedConstantRef(SILLocation loc, SILConstant constant);
+  SILValue emitUnmanagedConstantRef(SILLocation loc, SILConstant constant);
   /// Returns a reference to a constant in local context. This will return a
   /// retained closure object reference if the constant refers to a local func
   /// decl.
@@ -556,14 +556,14 @@ public:
   Materialize emitGetProperty(SILLocation loc,
                               ManagedValue getter,
                               Optional<ManagedValue> thisValue,
-                              Optional<ArrayRef<Value>> subscripts);
+                              Optional<ArrayRef<SILValue>> subscripts);
   void emitSetProperty(SILLocation loc,
                        ManagedValue setter,
                        Optional<ManagedValue> thisValue,
-                       Optional<ArrayRef<Value>> subscripts,
+                       Optional<ArrayRef<SILValue>> subscripts,
                        ManagedValue value);
   
-  ManagedValue emitManagedRValueWithCleanup(Value v);
+  ManagedValue emitManagedRValueWithCleanup(SILValue v);
   
   void emitAssignToLValue(SILLocation loc, ManagedValue src,
                           LValue const &dest);
@@ -574,18 +574,18 @@ public:
                                             SILConstant constant,
                                             ArrayRef<Substitution> substs);
   ManagedValue emitMethodRef(SILLocation loc,
-                             Value thisValue,
+                             SILValue thisValue,
                              SILConstant methodConstant);
   
-  Value emitThickenFunction(SILLocation loc, Value thinFn);
-  void emitStore(SILLocation loc, ManagedValue src, Value destAddr);
+  SILValue emitThickenFunction(SILLocation loc, SILValue thinFn);
+  void emitStore(SILLocation loc, ManagedValue src, SILValue destAddr);
   
   //
   // Helpers for emitting ApplyExpr chains.
   //
   
-  Value emitArchetypeMethod(ArchetypeMemberRefExpr *e, Value archetype);
-  Value emitProtocolMethod(ExistentialMemberRefExpr *e, Value existential);
+  SILValue emitArchetypeMethod(ArchetypeMemberRefExpr *e, SILValue archetype);
+  SILValue emitProtocolMethod(ExistentialMemberRefExpr *e, SILValue existential);
   
   ManagedValue emitApplyExpr(ApplyExpr *e);
 

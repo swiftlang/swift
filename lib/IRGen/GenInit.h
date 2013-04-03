@@ -83,7 +83,7 @@ public:
   }
   
   /// Create an object reference for the given SIL value.
-  InitializedObject getObjectForValue(swift::Value v) {
+  InitializedObject getObjectForValue(SILValue v) {
     return InitializedObject(v.getOpaqueValue());
   }
 

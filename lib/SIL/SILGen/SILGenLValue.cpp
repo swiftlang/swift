@@ -28,15 +28,15 @@ void LogicalPathComponent::_anchor() {}
 
 namespace {
   class AddressComponent : public PhysicalPathComponent {
-    Value address;
+    SILValue address;
   public:
-    AddressComponent(Value address) : address(address) {
+    AddressComponent(SILValue address) : address(address) {
       assert(address.getType().isAddress() &&
              "var component value must be an address");
     }
     
-    Value offset(SILGenFunction &gen, SILLocation loc,
-                 Value base) const override {
+    SILValue offset(SILGenFunction &gen, SILLocation loc,
+                 SILValue base) const override {
       assert(!base && "var component must be root of lvalue path");
       return address;
     }
@@ -49,7 +49,7 @@ namespace {
     RefElementComponent(VarDecl *field, SILType type)
       : field(field), type(type) {}
     
-    Value offset(SILGenFunction &gen, SILLocation loc, Value base)
+    SILValue offset(SILGenFunction &gen, SILLocation loc, SILValue base)
       const override
     {
       assert(!base.getType().isAddress() &&
@@ -67,8 +67,8 @@ namespace {
     FragileElementComponent(unsigned elementIndex, SILType type)
       : elementIndex(elementIndex), type(type) {}
     
-    Value offset(SILGenFunction &gen, SILLocation loc,
-                 Value base) const override {
+    SILValue offset(SILGenFunction &gen, SILLocation loc,
+                 SILValue base) const override {
       assert(base && "invalid value for element base");
       SILType baseType = base.getType();
       (void)baseType;
@@ -81,33 +81,33 @@ namespace {
   };
 
   class RefComponent : public PhysicalPathComponent {
-    Value value;
+    SILValue value;
   public:
     RefComponent(ManagedValue value) : value(value.getValue()) {
       assert(value.getType().hasReferenceSemantics() &&
              "ref component must be of reference type");
     }
     
-    Value offset(SILGenFunction &gen, SILLocation loc,
-                 Value base) const override {
+    SILValue offset(SILGenFunction &gen, SILLocation loc,
+                 SILValue base) const override {
       assert(!base && "ref component must be root of lvalue path");
       return value;
     }
   };
   
   class GetterSetterComponent : public LogicalPathComponent {
-    Value getter;
-    Value setter;
+    SILValue getter;
+    SILValue setter;
     Expr *subscriptExpr;
     
     void getSubscriptArguments(SILGenFunction &gen,
-                               llvm::SmallVectorImpl<Value> &args) const {
+                               llvm::SmallVectorImpl<SILValue> &args) const {
       gen.emitApplyArguments(subscriptExpr, args);
     }
     
     void prepareAccessorArgs(SILGenFunction &gen, SILLocation loc,
-                             Value accessor, Value base,
-                             SmallVectorImpl<Value> &subscripts) const
+                             SILValue accessor, SILValue base,
+                             SmallVectorImpl<SILValue> &subscripts) const
     {
       
       
@@ -126,14 +126,14 @@ namespace {
     }
     
   public:
-    GetterSetterComponent(Value getter, Value setter)
+    GetterSetterComponent(SILValue getter, SILValue setter)
       : getter(getter), setter(setter), subscriptExpr(nullptr)
     {
       assert(getter && setter &&
              "settable lvalue must have both getter and setter");
     }
 
-    GetterSetterComponent(Value getter, Value setter,
+    GetterSetterComponent(SILValue getter, SILValue setter,
                           Expr *subscriptExpr)
       : getter(getter), setter(setter), subscriptExpr(subscriptExpr)
     {
@@ -142,9 +142,9 @@ namespace {
     }
     
     void storeRValue(SILGenFunction &gen, SILLocation loc,
-                     ManagedValue rvalue, Value base) const override
+                     ManagedValue rvalue, SILValue base) const override
     {
-      llvm::SmallVector<Value, 2> subscripts;
+      llvm::SmallVector<SILValue, 2> subscripts;
       prepareAccessorArgs(gen, loc, setter, base, subscripts);
       
       return gen.emitSetProperty(loc,
@@ -154,15 +154,15 @@ namespace {
                                                         ManagedValue::Unmanaged)
                                    : Nothing,
                                  subscriptExpr
-                                   ? Optional<ArrayRef<Value>>(subscripts)
+                                   ? Optional<ArrayRef<SILValue>>(subscripts)
                                    : Nothing,
                                  rvalue);
     }
     
     Materialize loadAndMaterialize(SILGenFunction &gen, SILLocation loc,
-                                   Value base) const override
+                                   SILValue base) const override
     {
-      llvm::SmallVector<Value, 2> subscripts;
+      llvm::SmallVector<SILValue, 2> subscripts;
       prepareAccessorArgs(gen, loc, getter, base, subscripts);
       
       return gen.emitGetProperty(loc,
@@ -172,7 +172,7 @@ namespace {
                                                         ManagedValue::Unmanaged)
                                    : Nothing,
                                  subscriptExpr
-                                   ? Optional<ArrayRef<Value>>(subscripts)
+                                   ? Optional<ArrayRef<SILValue>>(subscripts)
                                    : Nothing);
     }
   };
@@ -201,9 +201,9 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
   // If it's a property, push a reference to the getter and setter.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     if (var->isProperty()) {
-      Value get = gen.emitUnmanagedConstantRef(e,
+      SILValue get = gen.emitUnmanagedConstantRef(e,
                                   SILConstant(var, SILConstant::Kind::Getter));
-      Value set = gen.emitUnmanagedConstantRef(e,
+      SILValue set = gen.emitUnmanagedConstantRef(e,
                                   SILConstant(var, SILConstant::Kind::Setter));
       lv.add<GetterSetterComponent>(get, set);
       return ::std::move(lv);
@@ -211,7 +211,7 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
   }
 
   // If it's a physical value, push its address.
-  Value address = gen.emitReferenceToDecl(e, decl).getUnmanagedValue();
+  SILValue address = gen.emitReferenceToDecl(e, decl).getUnmanagedValue();
   assert(address.getType().isAddress() &&
          "physical lvalue decl ref must evaluate to an address");
   lv.add<AddressComponent>(address);
@@ -220,7 +220,7 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
 
 LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
   LValue lv;
-  Value materialized = gen.visit(e).getUnmanagedValue();
+  SILValue materialized = gen.visit(e).getUnmanagedValue();
   lv.add<AddressComponent>(materialized);
   return ::std::move(lv);
 }

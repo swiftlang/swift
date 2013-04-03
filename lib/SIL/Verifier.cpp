@@ -32,9 +32,9 @@ class SILVerifier : public SILVisitor<SILVerifier> {
 public:
   SILVerifier(SILFunction const &F) : F(F) {}
   
-  void visit(Instruction *I) {
+  void visit(SILInstruction *I) {
     
-    const BasicBlock *BB = I->getParent();
+    const SILBasicBlock *BB = I->getParent();
     // Check that non-terminators look ok.
     if (!isa<TermInst>(I)) {
       assert(!BB->empty() &&
@@ -83,7 +83,7 @@ public:
           llvm::dbgs() << '\n');
 
     DEBUG(llvm::dbgs() << "argument types:\n";
-          for (Value arg : AI->getArguments()) {
+          for (SILValue arg : AI->getArguments()) {
             llvm::dbgs() << "  ";
             arg.getType().print(llvm::dbgs());
             llvm::dbgs() << '\n';
@@ -609,7 +609,7 @@ public:
            "branch has wrong number of arguments for dest bb");
     assert(std::equal(BI->getArgs().begin(), BI->getArgs().end(),
                       BI->getDestBB()->bbarg_begin(),
-                      [](Value branchArg, BBArgument *bbArg) {
+                      [](SILValue branchArg, SILArgument *bbArg) {
                         return branchArg.getType() == bbArg->getType();
                       }) &&
            "branch argument types do not match arguments for dest bb");
@@ -627,7 +627,7 @@ public:
            "true branch has wrong number of arguments for dest bb");
     assert(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
                       CBI->getTrueBB()->bbarg_begin(),
-                      [](Value branchArg, BBArgument *bbArg) {
+                      [](SILValue branchArg, SILArgument *bbArg) {
                         return branchArg.getType() == bbArg->getType();
                       }) &&
            "true branch argument types do not match arguments for dest bb");
@@ -636,13 +636,13 @@ public:
            "false branch has wrong number of arguments for dest bb");
     assert(std::equal(CBI->getFalseArgs().begin(), CBI->getFalseArgs().end(),
                       CBI->getFalseBB()->bbarg_begin(),
-                      [](Value branchArg, BBArgument *bbArg) {
+                      [](SILValue branchArg, SILArgument *bbArg) {
                         return branchArg.getType() == bbArg->getType();
                       }) &&
            "false branch argument types do not match arguments for dest bb");
   }
   
-  void verifyEntryPointArguments(BasicBlock *entry) {
+  void verifyEntryPointArguments(SILBasicBlock *entry) {
     SILType ty = F.getLoweredType();
     SILFunctionTypeInfo *ti = ty.getFunctionTypeInfo();
     
@@ -658,18 +658,18 @@ public:
     
     assert(std::equal(entry->bbarg_begin(), entry->bbarg_end(),
                       ti->getInputTypes().begin(),
-                      [](BBArgument *bbarg, SILType ty) {
+                      [](SILArgument *bbarg, SILType ty) {
                         return bbarg->getType() == ty;
                       }) &&
            "entry point argument types do not match function type");
   }
   
-  void visitFunction(SILFunction *F) {
+  void visitSILFunction(SILFunction *F) {
     verifyEntryPointArguments(F->getBlocks().begin());
   }
   
   void verify() {
-    visitFunction(const_cast<SILFunction*>(&F));
+    visitSILFunction(const_cast<SILFunction*>(&F));
   }
 };
 } // end anonymous namespace
