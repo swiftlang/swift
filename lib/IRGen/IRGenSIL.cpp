@@ -19,6 +19,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SourceMgr.h"
+#include "swift/Basic/Interleave.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/ASTContext.h"
@@ -77,6 +78,9 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
   case Kind::MetatypeValue:
     ex.addUnmanaged(metatypeValue.getSwiftMetatype());
     break;
+  
+  case Kind::SpecializedValue:
+    llvm_unreachable("thunking generic function not yet supported");
   }
 }
 
@@ -90,6 +94,8 @@ ExplosionKind LoweredValue::getExplosionKind() const {
   case Kind::ObjCMethod:
   case Kind::MetatypeValue:
     return ExplosionKind::Minimal;
+  case Kind::SpecializedValue:
+    return specializedValue.getUnspecializedValue().getExplosionKind();
   }
 }
 
@@ -200,10 +206,22 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
                                retType.StorageAlignment);
     }
   }
-  
+
+  // Unravel the function types for each uncurry level.
+  unsigned level = c.uncurryLevel;
+  llvm::SmallVector<AnyFunctionType*, 4> uncurriedTypes;
+  AnyFunctionType *uncurriedType = funcTy.castTo<AnyFunctionType>();
+  for (;;) {
+    uncurriedTypes.push_back(uncurriedType);
+    if (level-- != 0)
+      uncurriedType = uncurriedType->getResult()->castTo<AnyFunctionType>();
+    else
+      break;
+  }
+
   // Map LLVM arguments in inner-to-outer curry order to match the Swift
   // convention.
-  unsigned level = c.uncurryLevel;
+  level = c.uncurryLevel;
   do {
     unsigned from = funcTI->getUncurriedInputBegins()[level],
       to = funcTI->getUncurriedInputEnds()[level];
@@ -233,6 +251,12 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
         newLoweredExplosion(arg, explosion);
       }
     }
+    
+    // Bind polymorphic arguments for this uncurry level.
+    auto fn = uncurriedTypes.back();
+    uncurriedTypes.pop_back();
+    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fn))
+      emitPolymorphicParameters(*this, polyFn, params);    
   } while (level-- != 0);
   
   assert(params.empty() && "did not map all llvm params to SIL params?!");
@@ -567,9 +591,10 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
 }
 
 static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
-                                                   SILType calleeTy,
-                                                   SILType resultTy,
-                                                   LoweredValue const &lv) {
+                                         SILType calleeTy,
+                                         SILType resultTy,
+                                         LoweredValue const &lv,
+                                         ArrayRef<Substitution> substitutions) {
   llvm::Value *calleeFn, *calleeData;
   ExtraData extraData;
   AbstractCC cc;
@@ -586,7 +611,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     auto &objcMethod = lv.getObjCMethod();
     return prepareObjCMethodRootCall(IGF, objcMethod.getMethodDecl(),
                                      resultTy.getSwiftType(),
-                                     /*FIXME substitutions*/ {},
+                                     substitutions,
                                      IGF.CurExplosionLevel,
                                      1,
                                      bool(objcMethod.getSuperSearchType()));
@@ -632,18 +657,46 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     
   case LoweredValue::Kind::Address:
     llvm_unreachable("sil address isn't a valid callee");
+  
+  case LoweredValue::Kind::SpecializedValue:
+    llvm_unreachable("specialized value should be handled before reaching here");
   }
   
-  // FIXME: apply substitutions from specialization
   Callee callee = Callee::forKnownFunction(cc,
                                            calleeTy.getSwiftType(),
                                            resultTy.getSwiftType(),
-                                           /*FIXME substitutions*/ {},
+                                           substitutions,
                                            calleeFn,
                                            ManagedValue(calleeData),
                                            IGF.CurExplosionLevel,
                                            calleeTy.getUncurryLevel());
   return CallEmission(IGF, callee);
+}
+
+static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
+                                                   SILType calleeTy,
+                                                   SILType resultTy,
+                                                   LoweredValue const &lv) {
+  switch (lv.kind) {
+  case LoweredValue::Kind::SpecializedValue:
+    return getCallEmissionForLoweredValue(IGF,
+                              lv.getSpecializedValue().getUnspecializedType(),
+                              resultTy,
+                              lv.getSpecializedValue().getUnspecializedValue(),
+                              lv.getSpecializedValue().getSubstitutions());
+  case LoweredValue::Kind::ObjCMethod:
+  case LoweredValue::Kind::StaticFunction:
+  case LoweredValue::Kind::Explosion:
+    // No substitutions.
+    return getCallEmissionForLoweredValue(IGF, calleeTy, resultTy, lv,
+                                          /*substitutions=*/ {});
+
+  case LoweredValue::Kind::MetatypeValue:
+    llvm_unreachable("metatype isn't a valid callee");
+    
+  case LoweredValue::Kind::Address:
+    llvm_unreachable("sil address isn't a valid callee");
+  }
 }
 
 static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
@@ -655,6 +708,7 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
   
   case LoweredValue::Kind::ObjCMethod:
   case LoweredValue::Kind::StaticFunction:
+  case LoweredValue::Kind::SpecializedValue:
     llvm_unreachable("function isn't a valid metatype");
   
   case LoweredValue::Kind::MetatypeValue:
@@ -721,16 +775,22 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
     uncurriedInputEnds = uncurriedInputEnds.slice(1);
   }
   
-  for (unsigned inputCount : uncurriedInputEnds) {
-    Explosion curryArgs(CurExplosionLevel);
-    for (; arg < inputCount; ++arg) {
-      emitApplyArgument(*this, curryArgs, i->getArguments()[arg],
-                        /*managed*/true);
-    }
-    emission.addArg(curryArgs);
-  }
+  AnyFunctionType *calleeTy = i->getCallee().getType().castTo<AnyFunctionType>();
+  interleave(uncurriedInputEnds.begin(), uncurriedInputEnds.end(),
+             [&](unsigned inputCount) {
+               Explosion curryArgs(CurExplosionLevel);
+               for (; arg < inputCount; ++arg) {
+                 emitApplyArgument(*this, curryArgs, i->getArguments()[arg],
+                                   /*managed*/true);
+               }
+               emission.addSubstitutedArg(CanType(calleeTy->getInput()),
+                                          curryArgs);
+             },
+             [&] {
+               calleeTy = calleeTy->getResult()->castTo<AnyFunctionType>();
+             });
   
-  // FIXME: Handle indirect return.
+  // FIXME: handle SIL indirect return.
   // FIXME: handle the result being an address. This doesn't happen normally
   // in Swift but is how SIL currently models global accessors, and could also
   // be how we model "address" properties in the future.
@@ -1264,4 +1324,11 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   Explosion e(CurExplosionLevel);
   e.addUnmanaged(fnValue);
   newLoweredExplosion(SILValue(i, 0), e);
+}
+
+void IRGenSILFunction::visitSpecializeInst(swift::SpecializeInst *i) {
+  return newLoweredSpecializedValue(SILValue(i, 0),
+                                    i->getOperand().getType(),
+                                    getLoweredValue(i->getOperand()),
+                                    i->getSubstitutions());
 }

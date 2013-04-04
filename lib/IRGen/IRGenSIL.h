@@ -33,6 +33,8 @@
 namespace swift {
 namespace irgen {
 
+class LoweredValue;
+  
 /// Represents a statically-known function as a SIL thin function value.
 class StaticFunction {
   /// The function reference.
@@ -99,6 +101,37 @@ public:
   }
 };
 
+/// Represents the application of a SpecializeInst to a value.
+class SpecializedValue {
+  // The type of the unspecialized function.
+  SILType unspecializedType;
+  // The unspecialized value.
+  LoweredValue const &unspecializedValue;
+  // The substitutions applied to the value.
+  ArrayRef<Substitution> substitutions;
+
+public:
+  SpecializedValue(SILType unspecializedType,
+                   LoweredValue const &unspecializedValue,
+                   ArrayRef<Substitution> substitutions)
+    : unspecializedType(unspecializedType),
+      unspecializedValue(unspecializedValue),
+      substitutions(substitutions)
+  {}
+  
+  SILType getUnspecializedType() const {
+    return unspecializedType;
+  }
+  
+  LoweredValue const &getUnspecializedValue() const {
+    return unspecializedValue;
+  }
+  
+  ArrayRef<Substitution> getSubstitutions() const {
+    return substitutions;
+  }
+};
+  
 /// Represents a SIL value lowered to IR, in one of these forms:
 /// - an Address, corresponding to a SIL address value;
 /// - an Explosion of (unmanaged) Values, corresponding to a SIL "register"; or
@@ -124,7 +157,10 @@ public:
     
       /// A value that represents a metatype.
       MetatypeValue,
-    Value_Last = MetatypeValue
+    
+      /// A SpecializedValue.
+      SpecializedValue,
+    Value_Last = SpecializedValue
   };
   
   Kind kind;
@@ -141,6 +177,7 @@ private:
     StaticFunction staticFunction;
     ObjCMethod objcMethod;
     MetatypeValue metatypeValue;
+    SpecializedValue specializedValue;
   };
 
 public:
@@ -158,6 +195,10 @@ public:
   
   LoweredValue(MetatypeValue &&metatypeValue)
     : kind(Kind::MetatypeValue), metatypeValue(std::move(metatypeValue))
+  {}
+  
+  LoweredValue(SpecializedValue &&specializedValue)
+    : kind(Kind::SpecializedValue), specializedValue(std::move(specializedValue))
   {}
   
   LoweredValue(Explosion &e)
@@ -195,6 +236,9 @@ public:
       break;
     case Kind::MetatypeValue:
       ::new (&metatypeValue) MetatypeValue(std::move(lv.metatypeValue));
+      break;
+    case Kind::SpecializedValue:
+      ::new (&specializedValue) SpecializedValue(std::move(lv.specializedValue));
       break;
     }
   }
@@ -234,6 +278,11 @@ public:
     return metatypeValue;
   }
   
+  SpecializedValue const &getSpecializedValue() const {
+    assert(kind == Kind::SpecializedValue && "not a specialized value");
+    return specializedValue;
+  }
+  
   ~LoweredValue() {
     switch (kind) {
     case Kind::Address:
@@ -250,6 +299,9 @@ public:
       break;
     case Kind::MetatypeValue:
       metatypeValue.~MetatypeValue();
+      break;
+    case Kind::SpecializedValue:
+      specializedValue.~SpecializedValue();
       break;
     }
   }
@@ -356,6 +408,18 @@ public:
     (void)inserted;
   }
   
+  void newLoweredSpecializedValue(SILValue v,
+                                  SILType unspecializedType,
+                                  LoweredValue const &unspecializedValue,
+                                  ArrayRef<Substitution> substitutions) {
+    auto inserted = loweredValues.insert({v,
+                                          SpecializedValue{unspecializedType,
+                                                           unspecializedValue,
+                                                           substitutions}});
+    assert(inserted.second && "already had lowered value for sil value?!");
+    (void)inserted;
+  }
+  
   /// Get the LoweredValue corresponding to the given SIL value, which must
   /// have been lowered.
   LoweredValue &getLoweredValue(SILValue v) {
@@ -415,7 +479,7 @@ public:
 
   void visitApplyInst(ApplyInst *i);
   void visitPartialApplyInst(PartialApplyInst *i);
-  //void visitSpecializeInst(SpecializeInst *i);
+  void visitSpecializeInst(SpecializeInst *i);
 
   void visitConstantRefInst(ConstantRefInst *i);
 

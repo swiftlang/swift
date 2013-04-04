@@ -111,7 +111,12 @@ public:
 
   /// Add a new set of arguments to the function from an explosion.
   void addArg(Explosion &arg);
-  
+
+  /// Add a new set of arguments to the function from an explosion, adjusting
+  /// the abstraction levels of the values if needed by the function's
+  /// substitutions.
+  void addSubstitutedArg(CanType substInputType, Explosion &arg);
+
   /// Add a new set of arguments to the function by evaluating an argument
   /// expression.
   void addArg(Expr *arg);

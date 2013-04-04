@@ -824,7 +824,7 @@ static Callee emitDirectCallee(IRGenFunction &IGF, ValueDecl *val,
 
   if (OneOfElementDecl *oneofelt = dyn_cast<OneOfElementDecl>(val)) {
     llvm::Constant *fnPtr;
-    if (bestUncurry != oneofelt->hasArgumentType() ? 1 : 0) {
+    if (bestUncurry != (oneofelt->hasArgumentType() ? 1 : 0)) {
       IGF.unimplemented(val->getLoc(), "uncurried reference to oneof element");
       fnPtr = llvm::UndefValue::get(
           IGF.IGM.getFunctionType(AbstractCC::Freestanding,
@@ -2914,6 +2914,43 @@ void CallEmission::addArg(Explosion &arg) {
 
   // Walk into the original function type.
   drillIntoOrigFnType(CurOrigType);
+}
+
+/// Add a new set of arguments to the function, adjusting their abstraction
+/// level as needed for the active substitutions.
+void CallEmission::addSubstitutedArg(CanType substInputType, Explosion &arg) {
+  // If we're calling something with polymorphic type, we'd better have
+  // substitutions.
+  auto subs = getSubstitutions();
+  assert(!subs.empty() || !isa<PolymorphicFunctionType>(CurOrigType));
+
+  // If we have no substitutions, go through the default path.
+  if (subs.empty()) {
+    addArg(arg);
+    return;
+  }
+  
+  // If we have substitutions, then (1) it's possible for this to
+  // be a polymorphic function type that we need to expand and
+  // (2) we might need to reexplode the value differently.
+  Explosion argE(arg.getKind());
+  CanType origInputType;
+  auto fnType = dyn_cast<AnyFunctionType>(CurOrigType);
+  if (fnType) {
+    origInputType = CanType(fnType->getInput());
+  } else {
+    assert(isa<ArchetypeType>(CurOrigType));
+    origInputType = CurOrigType;
+  }
+  
+  reemitAsUnsubstituted(IGF, origInputType, substInputType, subs, arg, argE);
+  
+  // FIXME: this doesn't handle instantiating at a generic type.
+  if (auto polyFn = dyn_cast_or_null<PolymorphicFunctionType>(fnType)) {
+    emitPolymorphicArguments(IGF, polyFn, substInputType, subs, argE);
+  }
+  
+  addArg(argE);
 }
 
 /// Evaluate the given expression as a new set of arguments to the
