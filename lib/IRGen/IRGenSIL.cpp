@@ -93,9 +93,8 @@ ExplosionKind LoweredValue::getExplosionKind() const {
   case Kind::StaticFunction:
   case Kind::ObjCMethod:
   case Kind::MetatypeValue:
-    return ExplosionKind::Minimal;
   case Kind::SpecializedValue:
-    return specializedValue.getUnspecializedValue().getExplosionKind();
+    return ExplosionKind::Minimal;
   }
 }
 
@@ -678,12 +677,15 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                                    SILType resultTy,
                                                    LoweredValue const &lv) {
   switch (lv.kind) {
-  case LoweredValue::Kind::SpecializedValue:
+  case LoweredValue::Kind::SpecializedValue: {
+    LoweredValue const &unspecializedValue
+      = IGF.getLoweredValue(lv.getSpecializedValue().getUnspecializedValue());
     return getCallEmissionForLoweredValue(IGF,
                               lv.getSpecializedValue().getUnspecializedType(),
                               resultTy,
-                              lv.getSpecializedValue().getUnspecializedValue(),
+                              unspecializedValue,
                               lv.getSpecializedValue().getSubstitutions());
+  }
   case LoweredValue::Kind::ObjCMethod:
   case LoweredValue::Kind::StaticFunction:
   case LoweredValue::Kind::Explosion:
@@ -999,6 +1001,14 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
 }
 
 void IRGenSILFunction::visitRetainInst(swift::RetainInst *i) {
+  // FIXME: Specialization thunks may eventually require retaining. For now,
+  // since we don't yet thunk specialized function values, ignore retains
+  // of lowered SpecializedValues.
+  if (getLoweredValue(i->getOperand()).kind
+        == LoweredValue::Kind::SpecializedValue) {
+    return;
+  }
+  
   Explosion lowered = getLoweredExplosion(i->getOperand());
   TypeInfo const &ti = getFragileTypeInfo(
                                       i->getOperand().getType().getSwiftType());
@@ -1006,6 +1016,14 @@ void IRGenSILFunction::visitRetainInst(swift::RetainInst *i) {
 }
 
 void IRGenSILFunction::visitReleaseInst(swift::ReleaseInst *i) {
+  // FIXME: Specialization thunks may eventually require retaining. For now,
+  // since we don't yet thunk specialized function values, ignore retains
+  // of lowered SpecializedValues.
+  if (getLoweredValue(i->getOperand()).kind
+      == LoweredValue::Kind::SpecializedValue) {
+    return;
+  }
+  
   Explosion lowered = getLoweredExplosion(i->getOperand());
   TypeInfo const &ti = getFragileTypeInfo(
                                       i->getOperand().getType().getSwiftType());
@@ -1328,7 +1346,6 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
 
 void IRGenSILFunction::visitSpecializeInst(swift::SpecializeInst *i) {
   return newLoweredSpecializedValue(SILValue(i, 0),
-                                    i->getOperand().getType(),
-                                    getLoweredValue(i->getOperand()),
+                                    i->getOperand(),
                                     i->getSubstitutions());
 }

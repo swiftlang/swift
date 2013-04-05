@@ -103,27 +103,23 @@ public:
 
 /// Represents the application of a SpecializeInst to a value.
 class SpecializedValue {
-  // The type of the unspecialized function.
-  SILType unspecializedType;
-  // The unspecialized value.
-  LoweredValue const &unspecializedValue;
+  // The SILValue of the unspecialized generic function.
+  SILValue unspecializedValue;
   // The substitutions applied to the value.
   ArrayRef<Substitution> substitutions;
 
 public:
-  SpecializedValue(SILType unspecializedType,
-                   LoweredValue const &unspecializedValue,
+  SpecializedValue(SILValue unspecializedValue,
                    ArrayRef<Substitution> substitutions)
-    : unspecializedType(unspecializedType),
-      unspecializedValue(unspecializedValue),
+    : unspecializedValue(unspecializedValue),
       substitutions(substitutions)
   {}
   
   SILType getUnspecializedType() const {
-    return unspecializedType;
+    return unspecializedValue.getType();
   }
   
-  LoweredValue const &getUnspecializedValue() const {
+  SILValue getUnspecializedValue() const {
     return unspecializedValue;
   }
   
@@ -409,12 +405,10 @@ public:
   }
   
   void newLoweredSpecializedValue(SILValue v,
-                                  SILType unspecializedType,
-                                  LoweredValue const &unspecializedValue,
+                                  SILValue unspecializedValue,
                                   ArrayRef<Substitution> substitutions) {
     auto inserted = loweredValues.insert({v,
-                                          SpecializedValue{unspecializedType,
-                                                           unspecializedValue,
+                                          SpecializedValue{unspecializedValue,
                                                            substitutions}});
     assert(inserted.second && "already had lowered value for sil value?!");
     (void)inserted;
