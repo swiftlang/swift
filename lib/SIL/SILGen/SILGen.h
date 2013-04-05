@@ -73,6 +73,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *vd);
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td);
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
+  void visitExtensionDecl(ExtensionDecl *ed);
 
   /// emitFunction - Generates code for the given FuncExpr and adds the
   /// SILFunction to the current SILModule under the name SILConstant(decl). For
@@ -103,36 +104,6 @@ public:
   void emitExternalDefinition(Decl *d);
 };
   
-/// SILGenType - an ASTVisitor for generating SIL from method declarations
-/// inside nominal types.
-class LLVM_LIBRARY_VISIBILITY SILGenType : public ASTVisitor<SILGenType> {
-public:
-  SILGenModule &SGM;
-  NominalTypeDecl *theType;
-  DestructorDecl *explicitDestructor;
-  
-public:
-  SILGenType(SILGenModule &SGM, NominalTypeDecl *theType);
-  ~SILGenType();
-
-  /// Emit SIL functions for all the members of the type.
-  void emitType();
-  
-  //===--------------------------------------------------------------------===//
-  // Visitors for subdeclarations
-  //===--------------------------------------------------------------------===//
-  void visitNominalTypeDecl(NominalTypeDecl *ntd);
-  void visitFuncDecl(FuncDecl *fd);
-  void visitConstructorDecl(ConstructorDecl *cd);
-  void visitDestructorDecl(DestructorDecl *dd);
-  // FIXME: other special members?
-  
-  // no-ops. We don't deal with the layout of types here.
-  void visitPatternBindingDecl(PatternBindingDecl *) {}
-  void visitVarDecl(VarDecl *) {}
-  
-};
-
 /// Materialize - Represents a temporary allocation.
 struct Materialize {
   /// The address of the allocation.

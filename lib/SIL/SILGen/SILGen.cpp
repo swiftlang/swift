@@ -236,19 +236,3 @@ SILModule *swift::performSILGeneration(TranslationUnit *tu,
                                        unsigned startElem) {
   return SILModule::constructSIL(tu, startElem);
 }
-
-//===--------------------------------------------------------------------===//
-// SILGenType Class implementation
-//===--------------------------------------------------------------------===//
-
-SILGenType::SILGenType(SILGenModule &SGM, NominalTypeDecl *theType)
-  : SGM(SGM), theType(theType), explicitDestructor(nullptr) {}
-
-SILGenType::~SILGenType() {
-  // Emit the destructor for a class type.
-  if (ClassDecl *theClass = dyn_cast<ClassDecl>(theType)) {
-    SGM.emitDestructor(theClass, explicitDestructor);
-  } else {
-    assert(!explicitDestructor && "destructor in non-class type?!");
-  }
-}

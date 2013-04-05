@@ -666,35 +666,63 @@ void SILGenFunction::emitReleaseRValue(SILLocation loc, SILValue v) {
                   ti.getReferenceTypeElements());
 }
 
+/// SILGenType - an ASTVisitor for generating SIL from method declarations
+/// inside nominal types.
+class SILGenType : public Lowering::ASTVisitor<SILGenType> {
+public:
+  SILGenModule &SGM;
+  NominalTypeDecl *theType;
+  DestructorDecl *explicitDestructor;
+  
+  SILGenType(SILGenModule &SGM, NominalTypeDecl *theType)
+    : SGM(SGM), theType(theType), explicitDestructor(nullptr) {}
+
+  ~SILGenType() {
+    // Emit the destructor for a class type.
+    if (ClassDecl *theClass = dyn_cast<ClassDecl>(theType)) {
+      SGM.emitDestructor(theClass, explicitDestructor);
+    } else {
+      assert(!explicitDestructor && "destructor in non-class type?!");
+    }
+  }
+  
+  /// Emit SIL functions for all the members of the type.
+  void emitType() {
+    for (Decl *member : theType->getMembers())
+      visit(member);
+  }
+  
+  //===--------------------------------------------------------------------===//
+  // Visitors for subdeclarations
+  //===--------------------------------------------------------------------===//
+  void visitNominalTypeDecl(NominalTypeDecl *ntd) {
+    SILGenType(SGM, ntd).emitType();
+  }
+  void visitFuncDecl(FuncDecl *fd) {
+    SGM.emitFunction(fd, fd->getBody());
+  }
+  void visitConstructorDecl(ConstructorDecl *cd) {
+    SGM.emitConstructor(cd);
+  }
+  void visitDestructorDecl(DestructorDecl *dd) {
+    // Save the destructor decl so we can use it to generate the destructor later.
+    assert(!explicitDestructor && "more than one destructor decl in type?!");
+    explicitDestructor = dd;
+  }
+  
+  
+  // no-ops. We don't deal with the layout of types here.
+  void visitPatternBindingDecl(PatternBindingDecl *) {}
+  void visitVarDecl(VarDecl *) {}
+  
+};
+
 void SILGenModule::visitNominalTypeDecl(NominalTypeDecl *ntd) {
   SILGenType(*this, ntd).emitType();
 }
 
 void SILGenFunction::visitNominalTypeDecl(NominalTypeDecl *ntd, SGFContext C) {
   SILGenType(SGM, ntd).emitType();
-}
-
-void SILGenType::emitType() {
-  for (Decl *member : theType->getMembers())
-    visit(member);
-}
-
-void SILGenType::visitNominalTypeDecl(NominalTypeDecl *ntd) {
-  SILGenType(SGM, ntd).emitType();
-}
-
-void SILGenType::visitFuncDecl(FuncDecl *fd) {
-  SGM.emitFunction(fd, fd->getBody());
-}
-
-void SILGenType::visitDestructorDecl(DestructorDecl *dd) {
-  // Save the destructor decl so we can use it to generate the destructor later.
-  assert(!explicitDestructor && "more than one destructor decl in type?!");
-  explicitDestructor = dd;
-}
-
-void SILGenType::visitConstructorDecl(ConstructorDecl *cd) {
-  SGM.emitConstructor(cd);
 }
 
 void SILGenModule::emitExternalDefinition(Decl *d) {
@@ -730,4 +758,44 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::PostfixOperator:
     llvm_unreachable("Not a valid external definition for SILGen");
   }
+}
+
+/// SILGenExtension - an ASTVisitor for generating SIL from method declarations
+/// inside type extensions.
+class SILGenExtension : public Lowering::ASTVisitor<SILGenExtension> {
+public:
+  SILGenModule &SGM;
+
+  SILGenExtension(SILGenModule &SGM)
+    : SGM(SGM) {}
+  
+  /// Emit SIL functions for all the members of the type.
+  void emitExtension(ExtensionDecl *e) {
+    for (Decl *member : e->getMembers())
+      visit(member);
+  }
+  
+  //===--------------------------------------------------------------------===//
+  // Visitors for subdeclarations
+  //===--------------------------------------------------------------------===//
+  void visitNominalTypeDecl(NominalTypeDecl *ntd) {
+    SILGenType(SGM, ntd).emitType();
+  }
+  void visitFuncDecl(FuncDecl *fd) {
+    SGM.emitFunction(fd, fd->getBody());
+  }
+  void visitConstructorDecl(ConstructorDecl *cd) {
+    SGM.emitConstructor(cd);
+  }
+  void visitDestructorDecl(DestructorDecl *dd) {
+    llvm_unreachable("destructor in extension?!");
+  }
+  
+  // no-ops. We don't deal with the layout of types here.
+  void visitPatternBindingDecl(PatternBindingDecl *) {}
+  void visitVarDecl(VarDecl *) {}
+};
+
+void SILGenModule::visitExtensionDecl(ExtensionDecl *ed) {
+  SILGenExtension(*this).emitExtension(ed);
 }
