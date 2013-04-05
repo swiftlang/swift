@@ -495,13 +495,5 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
   if (!TopLevelSGF->B.hasValidInsertionPoint())
     return;
   
-  auto body = td->getBody();
-  if (Expr *e = body.dyn_cast<Expr*>()) {
-    FullExpr scope(TopLevelSGF->Cleanups);
-    TopLevelSGF->visit(e);
-  } else if (Stmt *s = body.dyn_cast<Stmt*>()) {
-    TopLevelSGF->visit(s);
-  } else {
-    llvm_unreachable("unexpected toplevel decl");
-  }
+  TopLevelSGF->visit(td->getBody());
 }

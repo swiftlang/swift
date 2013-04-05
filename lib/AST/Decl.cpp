@@ -306,15 +306,11 @@ SourceRange PatternBindingDecl::getSourceRange() const {
 }
 
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
-  if (Body.is<Expr*>())
-    return Body.get<Expr*>()->getStartLoc();
-  return Body.get<Stmt*>()->getStartLoc();
+  return Body->getStartLoc();
 }
 
 SourceRange TopLevelCodeDecl::getSourceRange() const {
-  if (Body.is<Expr*>())
-    return Body.get<Expr*>()->getSourceRange();
-  return Body.get<Stmt*>()->getSourceRange();
+  return Body->getSourceRange();
 }
 
 /// getTypeOfReference - Return the full type judgement for a non-member
@@ -1254,13 +1250,9 @@ namespace {
 
     void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
       printCommon(TLCD, "top_level_code_decl");
-      auto Body = TLCD->getBody();
-      if (!Body.isNull()) {
+      if (TLCD->getBody()) {
         OS << "\n";
-        if (Body.is<Expr*>())
-          printRec(Body.get<Expr*>());
-        else
-          printRec(Body.get<Stmt*>());
+        printRec(TLCD->getBody());
       }
     }
 

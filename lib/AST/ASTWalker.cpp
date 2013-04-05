@@ -731,16 +731,8 @@ public:
         if (doIt(Member))
           return true;
     } else if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-      auto Body = TLCD->getBody();
-      if (Body.is<Expr*>()) {
-        Expr *E = Body.get<Expr*>();
-        E = doIt(E);
-        TLCD->setBody(E);
-      } else {
-        Stmt *S = Body.get<Stmt*>();
-        S = doIt(S);
+      if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(TLCD->getBody())))
         TLCD->setBody(S);
-      }
     } else if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D)) {
       Stmt *S = CD->getBody();
       if (S) {

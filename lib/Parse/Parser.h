@@ -56,6 +56,8 @@ class Parser {
   void operator=(const Parser&) = delete;
 
 public:
+  typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
+
   llvm::SourceMgr &SourceMgr;
   DiagnosticEngine &Diags;
   const llvm::MemoryBuffer *Buffer;
@@ -67,6 +69,8 @@ public:
   std::vector<TranslationUnit::IdentTypeAndContext> UnresolvedIdentifierTypes;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   std::vector<TranslationUnit::TupleTypeAndContext> TypesWithDefaultValues;
+  std::vector<ExprStmtOrDecl> TopLevelCode;
+  TopLevelCodeDecl *TheTopLevelCodeDecl;
   bool IsMainModule;
   bool FoundSideEffects;
 
@@ -76,8 +80,6 @@ public:
   /// \brief The location of the previous token.
   SourceLoc PreviousLoc;
   
-  typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
-
   /// A RAII object for temporarily changing CurDeclContext.
   class ContextChange {
     Parser &P;

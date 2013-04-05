@@ -138,8 +138,7 @@ static bool shouldBindREPLMetavariableToExpr(Expr *E) {
   return true;
 }
 
-static void reparseREPLMetavariable(TranslationUnit *TU,
-                                    REPLContext &RC) {
+static void reparseREPLMetavariable(TranslationUnit *TU, REPLContext &RC) {
   // Turn a TopLevelCodeDecl containing an expression into a variable binding.
   if (TU->Decls.size() != RC.CurTUElem + 1)
     return;
@@ -147,24 +146,22 @@ static void reparseREPLMetavariable(TranslationUnit *TU,
   auto *TLCD = dyn_cast<TopLevelCodeDecl>(TU->Decls[RC.CurTUElem]);
   if (!TLCD)
     return;
-  
-  auto *E = TLCD->getBody().dyn_cast<Expr*>();
-  if (!E)
-    return;
 
-  if (!shouldBindREPLMetavariableToExpr(E))
-    return;
-        
-  ASTContext &C = TU->getASTContext();
+  // Find any top-level expressions and add bindings for them so that the repl
+  // will print out the computed expression.
+  for (auto Elt : TLCD->getBody()->getElements())
+    if (auto *E = Elt.dyn_cast<Expr*>())
+      if (shouldBindREPLMetavariableToExpr(E)) {
+        ASTContext &C = TU->getASTContext();
 
-  VarDecl *metavar = getNextREPLMetavar(TU, RC, E->getStartLoc());
-  Pattern *metavarPat = new (C) NamedPattern(metavar);
-  PatternBindingDecl *metavarBinding
-    = new (C) PatternBindingDecl(E->getStartLoc(), metavarPat, E, TU);
-  
-  TU->Decls.pop_back();
-  TU->Decls.push_back(metavar);
-  TU->Decls.push_back(metavarBinding);
+        VarDecl *metavar = getNextREPLMetavar(TU, RC, E->getStartLoc());
+        Pattern *metavarPat = new (C) NamedPattern(metavar);
+        PatternBindingDecl *metavarBinding
+           = new (C) PatternBindingDecl(E->getStartLoc(), metavarPat, E, TU);
+
+        TU->Decls.push_back(metavar);
+        TU->Decls.push_back(metavarBinding);
+      }
 }
 
 bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,

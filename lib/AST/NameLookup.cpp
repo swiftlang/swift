@@ -431,10 +431,8 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
 
   void checkTranslationUnit(TranslationUnit *TU) {
     for (Decl *D : TU->Decls) {
-      if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-        if (Stmt *S = TLCD->getBody().dyn_cast<Stmt*>())
-          visit(S);
-      }
+      if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D))
+        visit(TLCD->getBody());
     }
   }
 

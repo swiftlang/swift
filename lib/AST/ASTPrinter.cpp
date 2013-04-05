@@ -323,11 +323,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
 }
 
 void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
-  if (auto stmt = decl->getBody().dyn_cast<Stmt *>()) {
-    visit(stmt);
-  } else {
-    // FIXME: print expression
-  }
+  visit(decl->getBody());
 }
 
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {

@@ -167,7 +167,6 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)
          && !isTerminatorForBraceItemListKind(Tok, Kind)) {
     bool NeedParseErrorRecovery = false;
-    TopLevelCodeDecl *TLCD = 0;
     llvm::OwningPtr<ContextChange> CC;
     ExprStmtOrDecl Result;
 
@@ -194,25 +193,38 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       }
 
       TmpDecls.clear();
-    } else if (IsTopLevel) {
-      TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
-      ContextChange CC(*this, TLCD);
+    } else if (IsTopLevel && IsMainModule) {
+      // If this is a statement or expression at the top level of the module,
+      // Parse it as a child of the TopLevelCodeDecl and accumulate the ASTs in
+      // the TopLevelCode list, which will eventually be dropped into the body
+      // of the decl.
+      ContextChange CC(*this, TheTopLevelCodeDecl);
 
       if (parseExprOrStmt(Result)) {
         NeedParseErrorRecovery = true;
       } else {
-        if (Result.is<Expr*>())
-           TLCD->setBody(Result.get<Expr*>());
-        else
-          TLCD->setBody(Result.get<Stmt*>());
-        Entries.push_back(TLCD);
+        TopLevelCode.push_back(Result);
+        FoundSideEffects = true;
       }
     } else {
+      SourceLoc StartLoc = Tok.getLoc();
       if (parseExprOrStmt(Result))
         NeedParseErrorRecovery = true;
-      else
-        Entries.push_back(Result);
+      else {
+
+        // If this is a normal library, you can't have expressions or statements
+        // outside at the top level.  Diagnose this error.
+        if (IsTopLevel) {
+          if (!NeedParseErrorRecovery)
+            diagnose(StartLoc,
+                     Result.is<Stmt*>() ? diag::illegal_top_level_stmt :
+                     diag::illegal_top_level_expr);
+        } else {
+          Entries.push_back(Result);
+        }
+      }
     }
+
     if (!NeedParseErrorRecovery && !previousHadSemi && Tok.is(tok::semi)) {
       if (Result.is<Expr*>()) {
         Result.get<Expr*>()->TrailingSemiLoc = consumeToken(tok::semi);
@@ -229,20 +241,9 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     if (NeedParseErrorRecovery)
       skipUntilDeclStmtRBrace();
 
-    if (TLCD && !IsMainModule && !NeedParseErrorRecovery) {
-      if (Stmt *s = TLCD->getBody().dyn_cast<Stmt*>()) {
-        // Statements are not allowed at the top level outside the main module.
-        SourceLoc Loc = s->getStartLoc();
-        diagnose(Loc, diag::illegal_top_level_stmt);
-      } else {
-        // Expressions are not allowed at the top level outside the main module.
-        SourceLoc Loc = TLCD->getBody().get<Expr*>()->getStartLoc();
-        diagnose(Loc, diag::illegal_top_level_expr);
-      }
-    }
-
     if (IsTopLevel && IsMainModule && !NeedParseErrorRecovery) {
-      if (TLCD || isa<PatternBindingDecl>(Entries.back().get<Decl*>())) {
+      if (!Entries.empty() &&
+          isa<PatternBindingDecl>(Entries.back().get<Decl*>())) {
         FoundSideEffects = true;
 
         // If the next token is the end of the buffer or starts a new line,

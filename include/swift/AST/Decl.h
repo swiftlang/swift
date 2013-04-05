@@ -690,16 +690,16 @@ public:
   typedef llvm::PointerUnion<Expr*, Stmt*> ExprOrStmt;
 
 private:
-  ExprOrStmt Body;
+  BraceStmt *Body;
 
 public:
-  TopLevelCodeDecl(DeclContext *Parent)
+  TopLevelCodeDecl(DeclContext *Parent, BraceStmt *Body = nullptr)
     : Decl(DeclKind::TopLevelCode, Parent),
-      DeclContext(DeclContextKind::TopLevelCodeDecl, Parent) {}
+      DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
+      Body(Body) {}
 
-  ExprOrStmt getBody() { return Body; }
-  void setBody(Expr *E) { Body = E; }
-  void setBody(Stmt *S) { Body = S; }
+  BraceStmt *getBody() const { return Body; }
+  void setBody(BraceStmt *b) { Body = b; }
 
   SourceLoc getStartLoc() const;
   SourceLoc getLoc() const { return getStartLoc(); }

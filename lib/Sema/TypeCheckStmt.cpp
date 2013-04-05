@@ -582,8 +582,15 @@ public:
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   for (auto &elem : BS->getElements()) {
     if (Expr *SubExpr = elem.dyn_cast<Expr*>()) {
+      // Type check the expression.
       if (typeCheckExpr(SubExpr)) continue;
-      TC.typeCheckIgnoredExpr(SubExpr);
+
+      // If this is the top level of the REPL, apply secret sauce.
+      if (isa<TopLevelCodeDecl>(DC) && TC.TU.Kind == TranslationUnit::Repl)
+        TC.typeCheckTopLevelReplExpr(SubExpr, cast<TopLevelCodeDecl>(DC));
+      else
+        TC.typeCheckIgnoredExpr(SubExpr);
+
       elem = SubExpr;
       continue;
     }
@@ -658,21 +665,9 @@ void TypeChecker::typeCheckDestructorBody(DestructorDecl *DD) {
 }
 
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
-  auto Elem = TLCD->getBody();
-  if (Expr *E = Elem.dyn_cast<Expr*>()) {
-    if (typeCheckExpression(E, Type()))
-      return;
-    if (TU.Kind == TranslationUnit::Repl)
-      typeCheckTopLevelReplExpr(E, TLCD);
-    else
-      typeCheckIgnoredExpr(E);
-    TLCD->setBody(E);
-  } else {
-    Stmt *S = Elem.get<Stmt*>();
-    if (StmtChecker(*this, TLCD).typeCheckStmt(S))
-      return;
-    TLCD->setBody(S);
-  }
+  BraceStmt *Body = TLCD->getBody();
+  StmtChecker(*this, TLCD).typeCheckStmt(Body);
+  TLCD->setBody(Body);
 }
 
 ProtocolDecl *TypeChecker::getEnumerableProtocol() {

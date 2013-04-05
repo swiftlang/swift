@@ -779,10 +779,7 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     if (IGM.SILMod)
       return;
     
-    auto Body = cast<TopLevelCodeDecl>(D)->getBody();
-    if (Body.is<Expr*>())
-      return emitIgnored(Body.get<Expr*>());
-    return emitStmt(Body.get<Stmt*>());
+    return emitStmt(cast<TopLevelCodeDecl>(D)->getBody());
   }
       
   // Operator decls aren't needed for IRGen.
