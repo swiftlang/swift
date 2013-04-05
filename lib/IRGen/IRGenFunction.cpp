@@ -194,8 +194,8 @@ void IRGenFunction::emitDeallocObjectCall(llvm::Value *ptr, llvm::Value *size) {
   return emitDeallocatingCall(*this, IGM.getDeallocObjectFn(), ptr, size);
 }
 
-void IRGenFunction::emitDeallocBoxCall(llvm::Value *box) {
-  llvm::CallInst *call = Builder.CreateCall(IGM.getDeallocBoxFn(), box);
+void IRGenFunction::emitDeallocBoxCall(llvm::Value *box, llvm::Value *type) {
+  llvm::CallInst *call = Builder.CreateCall2(IGM.getDeallocBoxFn(), box, type);
   call->setCallingConv(IGM.RuntimeCC);
   call->setDoesNotThrow();
 }

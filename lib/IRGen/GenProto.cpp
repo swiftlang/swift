@@ -527,11 +527,12 @@ namespace {
   
   struct DeallocateBox : Cleanup {
     llvm::Value *Box;
-    DeallocateBox(llvm::Value *box)
-      : Box(box) {}
+    llvm::Value *Type;
+    DeallocateBox(llvm::Value *box, llvm::Value *type)
+      : Box(box), Type(type) {}
 
     void emit(IRGenFunction &IGF) const {
-      IGF.emitDeallocBoxCall(Box);
+      IGF.emitDeallocBoxCall(Box, Type);
     }
   };
 
@@ -1011,7 +1012,7 @@ namespace {
         Address rawAddr(address, Alignment(1));
         
         // Push a cleanup to dealloc the allocation.
-        IGF.pushCleanup<DeallocateBox>(box);
+        IGF.pushCleanup<DeallocateBox>(box, metadata);
         CleanupsDepth dealloc = IGF.getCleanupsDepth();
         OwnedAddress addr(rawAddr, box);
         init.markAllocated(IGF, object, addr, dealloc);

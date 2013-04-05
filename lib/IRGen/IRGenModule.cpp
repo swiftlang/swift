@@ -223,6 +223,7 @@ static llvm::Constant *createReadnoneRuntimeFunction(IRGenModule &IGM,
 llvm::Constant *IRGenModule::getAllocBoxFn() {
   if (AllocBoxFn) return AllocBoxFn;
 
+  // struct { RefCounted *box; void *value; } swift_allocBox(Metadata *type);
   llvm::Type *returnTypes[] = { RefCountedPtrTy, OpaquePtrTy };
   llvm::StructType *retType =
     llvm::StructType::get(LLVMContext, returnTypes, /*packed*/ false);
@@ -367,9 +368,10 @@ llvm::Constant *IRGenModule::getDeallocObjectFn() {
 llvm::Constant *IRGenModule::getDeallocBoxFn() {
   if (DeallocObjectFn) return DeallocBoxFn;
   
-  // void swift_deallocObject(void *ptr, size_t size);
+  // void swift_deallocBox(void *ptr, Metadata *type);
+  llvm::Type *argTypes[] = { RefCountedPtrTy, TypeMetadataPtrTy };
   llvm::FunctionType *fnType =
-    llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
+    llvm::FunctionType::get(VoidTy, argTypes, false);
   DeallocObjectFn = createRuntimeFunction(*this, "swift_deallocBox", fnType);
   return DeallocObjectFn;
 }

@@ -25,6 +25,7 @@ namespace swift {
 
 struct Metadata;
 struct HeapMetadata;
+struct OpaqueValue;
 
 /// The Swift heap-object header.
 struct HeapObject {
@@ -62,12 +63,12 @@ extern "C" HeapObject *swift_allocObject(HeapMetadata const *metadata,
                                          size_t requiredAlignment);
 
 /// The structure returned by swift_allocBox.
-struct Box {
+struct BoxPair {
   /// The pointer to the heap object.
   HeapObject *heapObject;
   
   /// The pointer to the value inside the box.
-  void *value;
+  OpaqueValue *value;
 };
 
 /// Allocates a heap object that can contain a value of the given type.
@@ -77,7 +78,7 @@ struct Box {
 /// appropriate to store a value of the given type.
 /// The heap object has an initial retain count of 1, and its metadata is set
 /// such that destroying the heap object destroys the contained value.
-extern "C" Box swift_allocBox(Metadata const *type);
+extern "C" BoxPair swift_allocBox(Metadata const *type);
 
 // Allocate plain old memory, this is the generalized entry point
 //
@@ -204,8 +205,10 @@ extern "C" void swift_release(HeapObject *object);
 extern "C" void swift_deallocObject(HeapObject *object, size_t allocatedSize);
 
 /// Deallocate the given memory allocated by swift_allocBox; it was returned
-/// by swift_allocBox but is otherwise in an unknown state.
-extern "C" void swift_deallocBox(HeapObject *object);
+/// by swift_allocBox but is otherwise in an unknown state. The given Metadata
+/// pointer must be the same metadata pointer that was passed to swift_allocBox
+/// when the memory was allocated.
+extern "C" void swift_deallocBox(HeapObject *object, Metadata const *type);
   
 /// RAII object that wraps a Swift heap object and releases it upon
 /// destruction.
