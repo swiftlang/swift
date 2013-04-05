@@ -15,6 +15,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/TypeVisitor.h"
 
@@ -245,7 +246,7 @@ SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
   bool hasIndirectReturn = resultType.isAddressOnly();
   if (hasIndirectReturn) {
     inputTypes.push_back(resultType);
-    resultType = SILType::getEmptyTupleType(Context);
+    resultType = getEmptyTupleType();
   }
   
   return SILFunctionTypeInfo::create(topType,

@@ -18,10 +18,11 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILConstant.h"
-#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILType.h"
 
 namespace swift {
   class ValueDecl;
+  class SILModule;
 namespace Lowering {
 
 /// Given a function type or polymorphic function type, returns the same type
@@ -156,6 +157,23 @@ public:
   
   /// Returns the SIL type of a constant reference.
   SILType getConstantType(SILConstant constant);
+  
+  /// Get the empty tuple type as a SILType.
+  SILType getEmptyTupleType() {
+    return getLoweredType(TupleType::getEmpty(Context));
+  }
+  
+  /// Get the () -> () function type as a SILType.
+  SILType getTopLevelFunctionType() {
+    auto t = FunctionType::get(TupleType::getEmpty(Context),
+                               TupleType::getEmpty(Context),
+                               /*isAutoClosure=*/ false,
+                               /*isBlock=*/ false,
+                               /*isThin=*/ true,
+                               Context);
+
+    return getLoweredType(t);
+  }
   
   /// Returns the type of the "this" parameter to methods of a type.
   Type getMethodThisType(Type thisType) const;

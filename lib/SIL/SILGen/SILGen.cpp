@@ -50,7 +50,7 @@ SILGenFunction::~SILGenFunction() {
   // empty tuple, or a dynamically unreachable location.
   if (hasVoidReturn) {
     assert(!epilogBB && "epilog bb not terminated?!");
-    SILValue emptyTuple = B.createEmptyTuple(SILLocation());
+    SILValue emptyTuple = emitEmptyTuple(SILLocation());
     Cleanups.emitReturnAndCleanups(SILLocation(), emptyTuple);
   } else {
     B.createUnreachable();
@@ -62,7 +62,7 @@ SILGenFunction::~SILGenFunction() {
 //===--------------------------------------------------------------------===//
 
 SILGenModule::SILGenModule(SILModule &M)
-  : M(M), Types(M), TopLevelSGF(nullptr) {
+  : M(M), Types(M.Types), TopLevelSGF(nullptr) {
   if (M.toplevel) {
     TopLevelSGF = new SILGenFunction(*this, *M.toplevel,
                                      /*hasVoidReturn=*/true);

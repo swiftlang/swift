@@ -157,14 +157,14 @@ void SILGenFunction::visitReturnStmt(ReturnStmt *S, SGFContext C) {
     llvm::OwningPtr<Initialization> returnInit(
                        new IndirectReturnInitialization(IndirectReturnAddress));
     emitExprInto(S->getResult(), returnInit.get());
-    ArgV = B.createEmptyTuple(S);
+    ArgV = emitEmptyTuple(S);
   } else if (S->hasResult()) {
     // SILValue return.
     FullExpr scope(Cleanups);
     ArgV = visit(S->getResult()).forward(*this);
   } else {
     // Void return.
-    ArgV = B.createEmptyTuple(S);
+    ArgV = emitEmptyTuple(S);
   }
   Cleanups.emitReturnAndCleanups(S, ArgV);
 }

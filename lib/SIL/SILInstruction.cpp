@@ -503,8 +503,7 @@ UpcastExistentialInst::UpcastExistentialInst(SILLocation Loc,
 
 DeinitExistentialInst::DeinitExistentialInst(SILLocation Loc,
                                              SILValue Existential)
-  : SILInstruction(ValueKind::DeinitExistentialInst, Loc,
-            SILType::getEmptyTupleType(Existential.getType().getASTContext())),
+  : SILInstruction(ValueKind::DeinitExistentialInst, Loc),
     Operands(this, Existential) {
 }
 
@@ -562,8 +561,7 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
 }
 
 UnreachableInst::UnreachableInst(SILFunction &F)
-  : TermInst(ValueKind::UnreachableInst, SILLocation(),
-             SILType::getEmptyTupleType(F.getContext())) {
+  : TermInst(ValueKind::UnreachableInst, SILLocation()) {
 }
 
 ReturnInst::ReturnInst(SILLocation Loc, SILValue ReturnValue)

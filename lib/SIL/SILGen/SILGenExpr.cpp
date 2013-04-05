@@ -147,6 +147,12 @@ ManagedValue SILGenFunction::visitApplyExpr(ApplyExpr *E, SGFContext C) {
   return emitApplyExpr(E);
 }
 
+SILValue SILGenFunction::emitEmptyTuple(SILLocation loc) {
+  return B.createTuple(loc,
+                       getLoweredType(TupleType::getEmpty(SGM.M.getContext())),
+                       {});
+}
+
 SILValue SILGenFunction::emitGlobalConstantRef(SILLocation loc,
                                             SILConstant constant) {
   return B.createConstantRef(loc, constant, SGM.getConstantType(constant));
@@ -1321,11 +1327,11 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
                                     getLoweredLoadableType(baseTy));
     ManagedValue dtorValue = emitMethodRef(dd, baseThis, dtorConstant);
     B.createApply(dd, dtorValue.forward(*this),
-                  SILType::getEmptyTupleType(SGM.M.getContext()),
+                  SGM.Types.getEmptyTupleType(),
                   baseThis);
   }
   
-  B.createReturn(dd, B.createEmptyTuple(dd));
+  B.createReturn(dd, emitEmptyTuple(dd));
 }
 
 namespace {
@@ -1397,7 +1403,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   if (thisTy.isAddressOnly()) {
     // We already initialized the return value in-place.
-    B.createReturn(ctor, B.createEmptyTuple(ctor));
+    B.createReturn(ctor, emitEmptyTuple(ctor));
   } else {
     assert(thisValue && "thisValue not initialized?!");
     B.createReturn(ctor, thisValue);
@@ -1557,7 +1563,7 @@ ManagedValue SILGenFunction::visitRebindThisInConstructorExpr(
   SILValue thisAddr = emitReferenceToDecl(E, E->getThis()).getUnmanagedValue();
   emitAssignPhysicalAddress(E, newThis, thisAddr);
   
-  return ManagedValue(B.createEmptyTuple(E), ManagedValue::Unmanaged);
+  return ManagedValue(emitEmptyTuple(E), ManagedValue::Unmanaged);
 }
 
 ManagedValue SILGenFunction::visitArchetypeSubscriptExpr(

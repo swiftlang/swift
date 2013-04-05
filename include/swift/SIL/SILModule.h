@@ -21,6 +21,7 @@
 #include "swift/SIL/SILBase.h"
 #include "swift/SIL/SILConstant.h"
 #include "swift/SIL/SILType.h"
+#include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -35,7 +36,6 @@ namespace swift {
   
   namespace Lowering {
     class SILGenModule;
-    class TypeConverter;
   }
   
 /// SILModule - A SIL translation unit. The module object owns all of the SIL
@@ -65,9 +65,13 @@ private:
   // to construct a SILModule.
   SILModule(ASTContext &Context, bool hasTopLevel);
   
+  
 public:
   ~SILModule();
 
+  /// Types - This converts Swift types to SILTypes.
+  Lowering::TypeConverter Types;
+  
   /// Construct a SIL module from a translation unit.  It is the caller's
   /// responsibility to 'delete' this object.
   static SILModule *constructSIL(TranslationUnit *tu, unsigned startElem);

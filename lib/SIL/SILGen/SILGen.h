@@ -42,9 +42,8 @@ public:
   /// The Module being constructed.
   SILModule &M;
   
-  /// Types - This creates and manages TypeLoweringInfo objects containing extra
-  /// information about types needed for SIL generation.
-  TypeConverter Types;
+  /// The type converter for the module.
+  TypeConverter &Types;
   
   /// TopLevelSGF - The SILGenFunction used to visit top-level code, or null if
   /// the module is not a main module.
@@ -502,6 +501,8 @@ public:
                          ArrayRef<SILValue> VariadicElements,
                          Expr *VarargsInjectionFunction,
                          SGFContext C);
+                        
+  SILValue emitEmptyTuple(SILLocation loc);
 
   /// Returns a reference to a constant in global context. For local func decls
   /// this returns the function constant with unapplied closure context.

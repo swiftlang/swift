@@ -228,8 +228,6 @@ public:
     return insert(TupleInst::create(Loc, Ty, Elements, F));
   }
   
-  TupleInst *createEmptyTuple(SILLocation Loc);
-
   SILValue createExtract(SILLocation Loc, SILValue Operand, unsigned FieldNo,
                            SILType ResultTy) {
     // Fold extract(tuple(a,b,c), 1) -> b.

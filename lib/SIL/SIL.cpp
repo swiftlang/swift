@@ -25,31 +25,11 @@ using namespace swift;
 SILFunction::~SILFunction() {
 }
 
-static SILType toplevelFunctionType(SILModule &M, ASTContext &C) {
-  auto t = FunctionType::get(TupleType::getEmpty(C),
-                             TupleType::getEmpty(C),
-                             /*isAutoClosure=*/ false,
-                             /*isBlock=*/ false,
-                             /*isThin=*/ true,
-                             C);
-
-  auto *info = SILFunctionTypeInfo::create(CanType(t),
-                                           /*inputTypes=*/ {},
-                                           SILType::getEmptyTupleType(C),
-                                           0,
-                                           /*hasIndirectReturn*/ false,
-                                           M);
-
-  return SILType::getPreLoweredType(info,
-                                    /*isAddress=*/ false,
-                                    /*isLoadable=*/ true);
-}
-
-SILModule::SILModule(ASTContext &Context, bool hasTopLevel) :
-  Context(Context), toplevel(nullptr)
+SILModule::SILModule(ASTContext &Context, bool hasTopLevel)
+  : Context(Context), toplevel(nullptr), Types(*this)
 {
   if (hasTopLevel)
-    toplevel = new (*this) SILFunction(*this, toplevelFunctionType(*this, Context));
+    toplevel = new (*this) SILFunction(*this, Types.getTopLevelFunctionType());
 }
 
 SILModule::~SILModule() {
@@ -215,21 +195,8 @@ SILType SILType::getOpaquePointerType(ASTContext &C) {
                  /*isLoadable=*/true);
 }
 
-SILType SILType::getEmptyTupleType(ASTContext &C) {
-  return SILType(CanType(TupleType::getEmpty(C)),
-                 /*isAddress=*/false,
-                 /*isLoadable=*/true);
-}
-
 SILType SILType::getBuiltinIntegerType(unsigned bitWidth, ASTContext &C) {
   return SILType(CanType(BuiltinIntegerType::get(bitWidth, C)),
                  /*isAddress=*/false,
                  /*isLoadable=*/true);
 }
-
-TupleInst *SILBuilder::createEmptyTuple(SILLocation Loc) {
-  return createTuple(Loc,
-                     SILType::getEmptyTupleType(F.getContext()),
-                     ArrayRef<SILValue>());
-}
-

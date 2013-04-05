@@ -600,7 +600,13 @@ public:
     
     SILFunctionTypeInfo *ti =
       F.getLoweredType().getFunctionTypeInfo();
-    assert(RI->getReturnValue().getType() == ti->getResultType() &&
+    SILType functionResultType = ti->getResultType();
+    SILType instResultType = RI->getReturnValue().getType();
+    DEBUG(llvm::dbgs() << "function return type: ";
+          functionResultType.dump();
+          llvm::dbgs() << "return inst type: ";
+          instResultType.dump(););
+    assert(functionResultType == instResultType &&
            "return value type does not match return type of function");
   }
   
@@ -666,6 +672,7 @@ public:
   
   void visitSILFunction(SILFunction *F) {
     verifyEntryPointArguments(F->getBlocks().begin());
+    SILVisitor::visitSILFunction(F);
   }
   
   void verify() {

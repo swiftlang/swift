@@ -285,7 +285,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
     SmallVector<SILValue, 4> argsWithReturn(Args.begin(), Args.end());
     SILValue buffer = emitTemporaryAllocation(Loc, resultTI.getLoweredType());
     argsWithReturn.push_back(buffer);
-    B.createApply(Loc, Fn, SILType::getEmptyTupleType(F.getContext()),
+    B.createApply(Loc, Fn, SGM.Types.getEmptyTupleType(),
                   argsWithReturn);
     return emitManagedRValueWithCleanup(buffer);
   } else {

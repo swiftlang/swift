@@ -306,8 +306,6 @@ public:
   // Accessors for types used in SIL instructions:
   //
   
-  /// Get the empty tuple type as a SILType.
-  static SILType getEmptyTupleType(ASTContext &C);
   /// Get the ObjectPointer type as a SILType.
   static SILType getObjectPointerType(ASTContext &C);
   /// Get the RawPointer type as a SILType.
