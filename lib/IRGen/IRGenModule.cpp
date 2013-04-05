@@ -55,9 +55,11 @@ IRGenModule::IRGenModule(ASTContext &Context,
   SizeTy = DataLayout.getIntPtrType(getLLVMContext(), /*addrspace*/ 0);
   MemCpyFn = nullptr;
   AllocObjectFn = nullptr;
+  AllocBoxFn = nullptr;
   RetainNoResultFn = nullptr;
   ReleaseFn = nullptr;
   DeallocObjectFn = nullptr;
+  DeallocBoxFn = nullptr;
   ObjCRetainFn = nullptr;
   ObjCReleaseFn = nullptr;
   RawAllocFn = nullptr;
@@ -218,6 +220,18 @@ static llvm::Constant *createReadnoneRuntimeFunction(IRGenModule &IGM,
   return addr;
 }
 
+llvm::Constant *IRGenModule::getAllocBoxFn() {
+  if (AllocBoxFn) return AllocBoxFn;
+
+  llvm::Type *returnTypes[] = { RefCountedPtrTy, OpaquePtrTy };
+  llvm::StructType *retType =
+    llvm::StructType::get(LLVMContext, returnTypes, /*packed*/ false);
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(retType, TypeMetadataPtrTy, false);
+  AllocBoxFn = createRuntimeFunction(*this, "swift_allocBox", fnType);
+  return AllocBoxFn;
+}
+
 llvm::Constant *IRGenModule::getAllocObjectFn() {
   if (AllocObjectFn) return AllocObjectFn;
 
@@ -347,6 +361,16 @@ llvm::Constant *IRGenModule::getDeallocObjectFn() {
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(VoidTy, argTypes, false);
   DeallocObjectFn = createRuntimeFunction(*this, "swift_deallocObject", fnType);
+  return DeallocObjectFn;
+}
+
+llvm::Constant *IRGenModule::getDeallocBoxFn() {
+  if (DeallocObjectFn) return DeallocBoxFn;
+  
+  // void swift_deallocObject(void *ptr, size_t size);
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
+  DeallocObjectFn = createRuntimeFunction(*this, "swift_deallocBox", fnType);
   return DeallocObjectFn;
 }
 

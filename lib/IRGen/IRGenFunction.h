@@ -278,6 +278,12 @@ public:
   llvm::Value *emitAllocRawCall(llvm::Value *size, llvm::Value *align,
                                 const llvm::Twine &name ="");
   void emitDeallocRawCall(llvm::Value *pointer, llvm::Value *size);
+  
+  void emitAllocBoxCall(llvm::Value *typeMetadata,
+                        llvm::Value *&box,
+                        llvm::Value *&valueAddress);
+  void emitDeallocBoxCall(llvm::Value *box);
+  
 private:
   llvm::Instruction *AllocaIP;
 

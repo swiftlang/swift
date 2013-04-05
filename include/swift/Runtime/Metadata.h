@@ -351,7 +351,7 @@ template <class T> struct FullMetadata : T::HeaderType, T {
     : HeaderType(header), T(metadata) {}
 };
 
-/// Given a canonical metadata pointer, produce the adjusted metadata
+/// Given a canonical metadata pointer, produce the adjusted metadata pointer.
 template <class T>
 static inline FullMetadata<T> *asFullMetadata(T *metadata) {
   return (FullMetadata<T>*) (((typename T::HeaderType*) metadata) - 1);

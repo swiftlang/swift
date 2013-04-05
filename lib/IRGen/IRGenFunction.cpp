@@ -147,6 +147,22 @@ llvm::Value *IRGenFunction::emitAllocObjectCall(llvm::Value *metadata,
                             { metadata, size, align }, name);
 }
 
+void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
+                                     llvm::Value *&box,
+                                     llvm::Value *&valueAddress) {
+  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
+                                       llvm::AttributeSet::FunctionIndex,
+                                       llvm::Attribute::NoUnwind);
+  
+  llvm::CallInst *call =
+    Builder.CreateCall(IGM.getAllocBoxFn(), typeMetadata);
+  call->setCallingConv(IGM.RuntimeCC);
+  call->setAttributes(attrs);
+
+  box = Builder.CreateExtractValue(call, 0);
+  valueAddress = Builder.CreateExtractValue(call, 1);
+}
+
 static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
                                  llvm::Value *pointer, llvm::Value *arg) {
   llvm::CallInst *call = IGF.Builder.CreateCall2(fn, pointer, arg);
@@ -176,6 +192,12 @@ void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
 void IRGenFunction::emitDeallocObjectCall(llvm::Value *ptr, llvm::Value *size) {
   // For now, all we have is swift_deallocObject.
   return emitDeallocatingCall(*this, IGM.getDeallocObjectFn(), ptr, size);
+}
+
+void IRGenFunction::emitDeallocBoxCall(llvm::Value *box) {
+  llvm::CallInst *call = Builder.CreateCall(IGM.getDeallocBoxFn(), box);
+  call->setCallingConv(IGM.RuntimeCC);
+  call->setDoesNotThrow();
 }
 
 void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {

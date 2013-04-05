@@ -23,12 +23,13 @@
 
 namespace swift {
 
+struct Metadata;
 struct HeapMetadata;
 
 /// The Swift heap-object header.
 struct HeapObject {
   /// This is always a valid pointer to a metadata object.
-  HeapMetadata *metadata;
+  HeapMetadata const *metadata;
 
   uint32_t refCount;
   /// The compiler assumes one "word" of runtime metadata
@@ -56,9 +57,27 @@ struct HeapObject {
 ///
 /// POSSIBILITIES: The argument order is fair game.  It may be useful
 /// to have a variant which guarantees zero-initialized memory.
-extern "C" HeapObject *swift_allocObject(HeapMetadata *metadata,
+extern "C" HeapObject *swift_allocObject(HeapMetadata const *metadata,
                                          size_t requiredSize,
                                          size_t requiredAlignment);
+
+/// The structure returned by swift_allocBox.
+struct Box {
+  /// The pointer to the heap object.
+  HeapObject *heapObject;
+  
+  /// The pointer to the value inside the box.
+  void *value;
+};
+
+/// Allocates a heap object that can contain a value of the given type.
+/// Returns a Box structure containing a HeapObject* pointer to the
+/// allocated object, and a pointer to the value inside the heap object.
+/// The value pointer points to an uninitialized buffer of size and alignment
+/// appropriate to store a value of the given type.
+/// The heap object has an initial retain count of 1, and its metadata is set
+/// such that destroying the heap object destroys the contained value.
+extern "C" Box swift_allocBox(Metadata const *type);
 
 // Allocate plain old memory, this is the generalized entry point
 //
@@ -184,6 +203,10 @@ extern "C" void swift_release(HeapObject *object);
 /// sizeof(SwiftHeapObject) to allocatedSize.
 extern "C" void swift_deallocObject(HeapObject *object, size_t allocatedSize);
 
+/// Deallocate the given memory allocated by swift_allocBox; it was returned
+/// by swift_allocBox but is otherwise in an unknown state.
+extern "C" void swift_deallocBox(HeapObject *object);
+  
 /// RAII object that wraps a Swift heap object and releases it upon
 /// destruction.
 class SwiftRAII {

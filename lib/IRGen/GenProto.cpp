@@ -524,6 +524,16 @@ namespace {
       emitDeallocateBufferCall(IGF, Table, Metatype, Buffer);
     }
   };
+  
+  struct DeallocateBox : Cleanup {
+    llvm::Value *Box;
+    DeallocateBox(llvm::Value *box)
+      : Box(box) {}
+
+    void emit(IRGenFunction &IGF) const {
+      IGF.emitDeallocBoxCall(Box);
+    }
+  };
 
   struct DestroyExistential : Cleanup {
     ExistentialLayout Layout;
@@ -994,27 +1004,17 @@ namespace {
                           InitializedObject object, OnHeap_t onHeap,
                           const llvm::Twine &name) const {
       if (onHeap) {
-        // Lay out the type as a heap object.
-        HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, this);
-        assert(!layout.empty() && "non-empty type had empty layout?");
-        auto &elt = layout.getElements()[0];
-
-        // Allocate a new object.
-        // TODO: lifetime intrinsics?
-        llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout,
-                                                         name + ".alloc");
-
-        // Cast and GEP down to the element.
-        Address rawAddr = layout.emitCastTo(IGF, allocation);
-        rawAddr = elt.project(IGF, rawAddr, name);
-
+        // Allocate a new object using the allocBox runtime call.
+        llvm::Value *metadata = getMetadataRef(IGF);
+        llvm::Value *box, *address;
+        IGF.emitAllocBoxCall(metadata, box, address);
+        Address rawAddr(address, Alignment(1));
+        
         // Push a cleanup to dealloc the allocation.
-        // FIXME: don't emit the size twice!
-        CleanupsDepth deallocCleanup
-          = IGF.pushDeallocCleanup(allocation, layout.emitSize(IGF));
-
-        OwnedAddress addr(rawAddr, allocation);
-        init.markAllocated(IGF, object, addr, deallocCleanup);
+        IGF.pushCleanup<DeallocateBox>(box);
+        CleanupsDepth dealloc = IGF.getCleanupsDepth();
+        OwnedAddress addr(rawAddr, box);
+        init.markAllocated(IGF, object, addr, dealloc);
         return addr;
       }
 
