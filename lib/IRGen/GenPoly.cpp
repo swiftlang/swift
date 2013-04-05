@@ -405,7 +405,7 @@ namespace {
 
     void visitLeafType(CanType origTy, CanType substTy) {
       assert(origTy == substTy);
-      Out.transferInto(In, IGF.IGM.getExplosionSize(origTy, In.getKind()));
+      In.transferInto(Out, IGF.IGM.getExplosionSize(origTy, Out.getKind()));
     }
 
     void visitArchetypeType(ArchetypeType *origTy, CanType substTy) {
