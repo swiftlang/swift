@@ -1123,12 +1123,12 @@ private:
   };
   
   GetSetRecord *GetSet;
-  llvm::PointerIntPair<VarDecl *, 1, bool> OverriddenDeclAndIsREPLResult;
+  VarDecl *OverriddenDecl;
 
 public:
   VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, DeclContext *DC)
     : ValueDecl(DeclKind::Var, DC, Name, Ty),
-      VarLoc(VarLoc), GetSet(), OverriddenDeclAndIsREPLResult() {}
+      VarLoc(VarLoc), GetSet(), OverriddenDecl(nullptr) {}
 
   SourceLoc getLoc() const { return VarLoc; }
   SourceLoc getStartLoc() const { return VarLoc; }
@@ -1154,18 +1154,10 @@ public:
   bool isSettable() const { return !GetSet || GetSet->Set; }
   
   VarDecl *getOverriddenDecl() const {
-    return OverriddenDeclAndIsREPLResult.getPointer();
+    return OverriddenDecl;
   }
   void setOverriddenDecl(VarDecl *over) {
-    OverriddenDeclAndIsREPLResult =
-      {over, OverriddenDeclAndIsREPLResult.getInt()};
-  }
-  
-  /// \brief Returns whether the var was bound by the REPL to hold a result.
-  bool isREPLResult() const { return OverriddenDeclAndIsREPLResult.getInt(); }
-  void setREPLResult(bool value) {
-    OverriddenDeclAndIsREPLResult =
-      {OverriddenDeclAndIsREPLResult.getPointer(), value};
+    OverriddenDecl = over;
   }
   
   /// Given that this is an Objective-C property declaration, produce

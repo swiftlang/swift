@@ -567,8 +567,6 @@ static void processREPLTopLevelCodeDecl(TopLevelCodeDecl *TLCD,
                                           TC->getNextResponseVariableName(),
                                           E->getType(), &TC->TU);
   TC->TU.Decls.push_back(vd);
-  // FIXME: Kill REPLResult!
-  vd->setREPLResult(true);
   
   // Create a PatternBindingDecl to bind the expression into the decl.
   Pattern *metavarPat = new (TC->Context) NamedPattern(vd);
