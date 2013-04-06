@@ -502,33 +502,6 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
 }
 
 
-/// processREPLTopLevelPatternBinding - When we see a new PatternBinding parsed
-/// into the REPL, process it by generating code to print it out.
-static void processREPLTopLevelPatternBinding(PatternBindingDecl *D,
-                                              TypeChecker *TC) {
-  // FIXME: I'm assuming we don't need to bother printing the pattern binding
-  // if it's a null initialization.
-  if (!D->getInit())
-    return;
-
-  llvm::SmallString<16> PatternString;
-  PatternBindingPrintLHS(PatternString).visit(D->getPattern());
-
-  // If the bound pattern is a single value, use a DeclRefExpr on the underlying
-  // Decl to print it.
-  if (auto *NP = dyn_cast<NamedPattern>(D->getPattern())) {
-    Expr *E = new (TC->Context) DeclRefExpr(NP->getDecl(), D->getStartLoc(),
-                                           NP->getDecl()->getTypeOfReference());
-    generatePrintOfExpression(PatternString, E, TC);
-    return;
-  }
-  
-  Expr *E = D->getInit();
-
-  
-  generatePrintOfExpression(PatternString, E, TC);
-}
-
 
 /// processREPLTopLevelCodeDecl - When we see a new TopLevelCodeDecl parsed into
 /// the REPL, process it, adding the proper decls back to the top level of the
@@ -581,6 +554,71 @@ static void processREPLTopLevelCodeDecl(TopLevelCodeDecl *TLCD,
                                     vd->getTypeOfReference());
   generatePrintOfExpression(vd->getName().str(), E, TC);
 }
+
+/// processREPLTopLevelPatternBinding - When we see a new PatternBinding parsed
+/// into the REPL, process it by generating code to print it out.
+static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
+                                              TypeChecker *TC) {
+  // FIXME: Don't bother printing the pattern binding if it's a null
+  // initialization.
+  if (!PBD->getInit())
+    return;
+  
+  llvm::SmallString<16> PatternString;
+  PatternBindingPrintLHS(PatternString).visit(PBD->getPattern());
+  
+  // If the bound pattern is a single value, use a DeclRefExpr on the underlying
+  // Decl to print it.
+  if (auto *NP = dyn_cast<NamedPattern>(PBD->getPattern()->
+                                           getSemanticsProvidingPattern())) {
+    Expr *E = new (TC->Context) DeclRefExpr(NP->getDecl(), PBD->getStartLoc(),
+                                            NP->getDecl()->getTypeOfReference());
+    generatePrintOfExpression(PatternString, E, TC);
+    return;
+  }
+
+  // Otherwise, we may not have a way to name all of the pieces of the pattern.
+  // Create a repl metavariable to capture the whole thing so we can reference
+  // it, then assign that into the pattern.  For example, translate:
+  //   var (x, y, _) = foo()
+  // into:
+  //   var r123 = foo()
+  //   var (x, y, _) = r123
+  //   replPrint(r123)
+  
+  // Remove PBD from the list of Decls so we can insert before it.
+  assert(PBD == TC->TU.Decls.back());
+  TC->TU.Decls.pop_back();
+  
+  // Create the meta-variable, let the typechecker name it.
+  VarDecl *vd = new (TC->Context) VarDecl(PBD->getStartLoc(),
+                                          TC->getNextResponseVariableName(),
+                                          PBD->getPattern()->getType(),&TC->TU);
+  TC->TU.Decls.push_back(vd);
+
+  
+  // Create a PatternBindingDecl to bind the expression into the decl.
+  Pattern *metavarPat = new (TC->Context) NamedPattern(vd);
+  metavarPat->setType(vd->getType());
+  PatternBindingDecl *metavarBinding
+    = new (TC->Context) PatternBindingDecl(PBD->getStartLoc(), metavarPat,
+                                           PBD->getInit(), &TC->TU);
+  TC->TU.Decls.push_back(metavarBinding);
+
+  
+  // Replace the initializer of PBD with a reference to our repl temporary.
+  Expr *E = new (TC->Context) DeclRefExpr(vd, vd->getStartLoc(),
+                                          vd->getTypeOfReference());
+  E = TC->convertToMaterializable(E);
+  PBD->setInit(E);
+  TC->TU.Decls.push_back(PBD);
+
+  // Finally, print out the result, by referring to the repl temp.
+  E = new (TC->Context) DeclRefExpr(vd, vd->getStartLoc(),
+                                    vd->getTypeOfReference());
+  generatePrintOfExpression(PatternString, E, TC);
+}
+
 
 
 /// processREPLTopLevel - This is called after we've parsed and typechecked some
