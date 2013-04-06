@@ -981,7 +981,6 @@ public:
       DumpModule("REPL", LLVMContext),
       Input(*this),
       RC{
-        /*NextResponseVariableIndex*/ 0,
         /*BufferID*/ Context.SourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc()),
         /*CurTUElem*/ 0,
         /*CurIRGenElem*/ 0

@@ -301,6 +301,9 @@ private:
   
   DiagnosticEngine &Diags;
 
+  /// The index of the next response metavariable to bind to a REPL result.
+  unsigned NextResponseVariableIndex = 0;
+
 public:
   TypeChecker(TranslationUnit &TU)
     : TU(TU), Context(TU.Ctx),
@@ -394,8 +397,8 @@ public:
   void typeCheckDestructorBody(DestructorDecl *DD);
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  void typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD);
-  void REPLCheckPatternBinding(PatternBindingDecl *D);
+  void processREPLTopLevel(unsigned StartElem);
+  Identifier getNextResponseVariableName();
 
   /// \brief Perform a shallow recheck of the given newly-built AST node.
   ///

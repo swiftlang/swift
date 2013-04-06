@@ -584,13 +584,9 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
     if (Expr *SubExpr = elem.dyn_cast<Expr*>()) {
       // Type check the expression.
       if (typeCheckExpr(SubExpr)) continue;
-
-      // If this is the top level of the REPL, apply secret sauce.
-      if (isa<TopLevelCodeDecl>(DC) && TC.TU.Kind == TranslationUnit::Repl)
-        TC.typeCheckTopLevelReplExpr(SubExpr, cast<TopLevelCodeDecl>(DC));
-      else
+      
+      if (TC.TU.Kind != TranslationUnit::Repl || !isa<TopLevelCodeDecl>(DC))
         TC.typeCheckIgnoredExpr(SubExpr);
-
       elem = SubExpr;
       continue;
     }

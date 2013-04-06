@@ -36,9 +36,6 @@ namespace swift {
   /// Publicly available REPL state information.
   class REPLContext {
   public:
-    /// The index of the next response metavariable to bind to a REPL result.
-    unsigned NextResponseVariableIndex;
-    
     /// The SourceMgr buffer ID of the REPL input.
     unsigned BufferID;
     

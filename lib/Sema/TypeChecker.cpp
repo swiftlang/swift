@@ -742,11 +742,13 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       prePass.doWalk(D);
       TC.typeCheckDecl(D, /*isFirstPass*/false);
     }
-    if (TU->Kind == TranslationUnit::Repl && !TC.Context.hadError())
-      if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
-        TC.REPLCheckPatternBinding(PBD);
   }
-
+  
+  // If we're in REPL mode, inject temporary result variables and other stuff
+  // that the REPL needs to synthesize.
+  if (TU->Kind == TranslationUnit::Repl && !TC.Context.hadError())
+    TC.processREPLTopLevel(StartElem);
+  
   // Check overloaded vars/funcs.
   // FIXME: This is quadratic time for TUs with multiple chunks.
   // FIXME: Can we make this more efficient?

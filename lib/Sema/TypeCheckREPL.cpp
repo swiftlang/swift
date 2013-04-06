@@ -21,6 +21,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Stmt.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
 void
@@ -356,95 +357,38 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
                      BodyContent);
 }
 
-/// If an expression consists only of a DeclRef (with potential implicit
-/// conversions such as Load/Materialize), returns the name of the referenced
-/// declaration. Otherwise, returns an empty StringRef.
-static llvm::StringRef getDisplayNameOfExpr(Expr *E) {
+Identifier TypeChecker::getNextResponseVariableName() {
+  llvm::SmallString<4> namebuf;
+  llvm::raw_svector_ostream names(namebuf);
+  Identifier ident;
+  
+  bool nameUsed = false;
+  do {
+    names.flush();
+    namebuf.clear();
+    
+    names << "r" << NextResponseVariableIndex++;
+    
+    ident = Context.getIdentifier(names.str());
+    UnqualifiedLookup lookup(ident, &TU);
+    nameUsed = lookup.isSuccess();
+  } while (nameUsed);
+
+  return ident;
+}
+
+
+static VarDecl *getObviousDECLFromExpr(Expr *E) {
+  // Ignore lvalue->rvalue and other implicit conversions.
   while (auto *ICE = dyn_cast<ImplicitConversionExpr>(E))
     E = ICE->getSubExpr();
-  if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-    return DRE->getDecl()->getName().str();
-  return {};
+
+  // Don't bind REPL metavariables to simple declrefs.
+  if (auto DRE = dyn_cast<DeclRefExpr>(E))
+    return dyn_cast<VarDecl>(DRE->getDecl());
+  return nullptr;
 }
 
-/// Check an expression at the top level in a REPL.
-void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
-  // If the input is an lvalue, force an lvalue-to-rvalue conversion.
-  Expr *ConvertedE = convertToMaterializable(E);
-  if (!ConvertedE)
-    return;
-  E = ConvertedE;
-
-  CanType T = E->getType()->getCanonicalType();
-  SourceLoc Loc = E->getStartLoc();
-  SourceLoc EndLoc = E->getEndLoc();
-
-  // Don't try to print invalid expressions.
-  if (isa<ErrorType>(T))
-    return;
-
-  // Skip printing for expressions of void or module type.
-  if (isa<TupleType>(T) && cast<TupleType>(T)->getFields().empty())
-    return;
-  if (isa<ModuleType>(T))
-    return;
-
-  // Build a function to call to print the expression.
-  VarDecl *Arg = new (Context) VarDecl(Loc, Context.getIdentifier("arg"), T,
-                                       nullptr);
-  Pattern* ParamPat = new (Context) NamedPattern(Arg);
-  ParamPat = new (Context) TypedPattern(ParamPat,
-                                        TypeLoc::withoutLoc(Arg->getType()));
-  if (!isa<TupleType>(T)) {
-    TuplePatternElt elt{ParamPat};
-    ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
-  }
-  typeCheckPattern(ParamPat, /*isFirstPass*/false, /*allowUnknownTypes*/false);
-  FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, ParamPat, TypeLoc(),
-                                  0, TLCD);
-  Type FuncTy = FunctionType::get(ParamPat->getType(),
-                                  TupleType::getEmpty(Context), Context);
-  FE->setType(FuncTy);
-  Arg->setDeclContext(FE);
-
-  // Build the body of the function which prints the expression.
-  SmallVector<unsigned, 4> MemberIndexes;
-  SmallVector<BraceStmt::ExprStmtOrDecl, 4> BodyContent;
-  SmallVector<ValueDecl*, 4> PrintDecls;
-  UnqualifiedLookup PrintDeclLookup(Context.getIdentifier("print"), &TU);
-  if (!PrintDeclLookup.isSuccess())
-    return;
-  for (auto Result : PrintDeclLookup.Results)
-    PrintDecls.push_back(Result.getValueDecl());
-
-  // Printing format is:
-  //   "// Int = 0\n"        for an anonymous expression, or
-  //   "// name : Int = 0\n" for an expression bound to a variable 'name'.
-  
-  auto NameStr = getDisplayNameOfExpr(E);
-  // Use an Identifier since PrintLiteralString is building an AST around the
-  // string that must persist beyond the lifetime of getString().
-  auto TypeStr = Context.getIdentifier(E->getType()->getString()).str();
-  PrintLiteralString("// ", *this, Loc, PrintDecls, BodyContent);
-  if (!NameStr.empty()) {
-    PrintLiteralString(NameStr, *this, Loc, PrintDecls, BodyContent);
-    PrintLiteralString(" : ", *this, Loc, PrintDecls, BodyContent);
-  }
-  PrintLiteralString(TypeStr, *this, Loc, PrintDecls, BodyContent);
-  PrintLiteralString(" = ", *this, Loc, PrintDecls, BodyContent);
-  PrintReplExpr(*this, Arg, E->getType(), T, Loc, EndLoc,
-                MemberIndexes, BodyContent, PrintDecls, FE);
-  PrintLiteralString("\n", *this, Loc, PrintDecls, BodyContent);
-
-  // Typecheck the function.
-  BraceStmt *Body = BraceStmt::create(Context, Loc, BodyContent, EndLoc);
-  FE->setBody(Body);
-  typeCheckFunctionBody(FE);
-
-  // Typecheck the call.
-  CallExpr *CE = new (Context) CallExpr(FE, E);
-  E = semaApplyExpr(CE);
-}
 
 /// PatternBindingPrintLHS - This is a lot like Pattern::print, but prints
 /// typed patterns and parenthesized patterns a bit differently.
@@ -484,84 +428,181 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
 };
 } // end anonymous namespace.
 
-static bool isREPLResultPattern(PatternBindingDecl *D) {
-  NamedPattern *named = dyn_cast<NamedPattern>(D->getPattern());
-  if (!named)
-    return false;
-  return named->getDecl()->isREPLResult();
-}
+/// generatePrintOfExpression - Emit logic to print the specified expression
+/// value with the given description of the pattern involved.
+static void generatePrintOfExpression(StringRef NameStr, Expr *E,
+                                      TypeChecker *TC) {
+  ASTContext &C = TC->Context;
 
-void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
-  Expr *E = D->getInit();
-
-  // Don't print the binding if it's a REPL result binding of void type.
-  if (isREPLResultPattern(D) &&
-      E->getType()->isEqual(TupleType::getEmpty(D->getASTContext())))
-    return;
-  
-  // FIXME: I'm assuming we don't need to bother printing the pattern binding
-  // if it's a null initialization.
-  if (!E)
-    return;
+  // Always print rvalues, not lvalues.
+  E = TC->convertToMaterializable(E);
 
   CanType T = E->getType()->getCanonicalType();
   SourceLoc Loc = E->getStartLoc();
   SourceLoc EndLoc = E->getEndLoc();
-
+  
   SmallVector<ValueDecl*, 4> PrintDecls;
-  UnqualifiedLookup PrintDeclLookup(Context.getIdentifier("print"), &TU);
+  UnqualifiedLookup PrintDeclLookup(C.getIdentifier("print"), &TC->TU);
   if (!PrintDeclLookup.isSuccess())
     return;
   for (auto Result : PrintDeclLookup.Results)
     PrintDecls.push_back(Result.getValueDecl());
-
-  // Build function of type T->T which prints the operand.
-  VarDecl *Arg = new (Context) VarDecl(Loc, Context.getIdentifier("arg"), T,
-                                       nullptr);
-  Pattern* ParamPat = new (Context) NamedPattern(Arg);
-  ParamPat = new (Context) TypedPattern(ParamPat,
-                                        TypeLoc::withoutLoc(Arg->getType()));
+  
+  // Build function of type T->() which prints the operand.
+  VarDecl *Arg = new (C) VarDecl(Loc,TC->Context.getIdentifier("arg"),
+                                 E->getType(), nullptr);
+  Pattern *ParamPat = new (C) NamedPattern(Arg);
+  ParamPat = new (C) TypedPattern(ParamPat,TypeLoc::withoutLoc(Arg->getType()));
   if (!isa<TupleType>(T)) {
     TuplePatternElt elt{ParamPat};
-    ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
+    ParamPat = TuplePattern::create(C, SourceLoc(), elt, SourceLoc());
   }
-  typeCheckPattern(ParamPat, /*isFirstPass*/false, /*allowUnknownTypes*/false);
-  FuncExpr *FE = FuncExpr::create(Context, Loc,
-                                  ParamPat, ParamPat, TypeLoc(),
-                                  0, &TU);
-  Type FuncTy = FunctionType::get(ParamPat->getType(), T, Context);
+  TC->typeCheckPattern(ParamPat, /*isFirstPass*/false,
+                       /*allowUnknownTypes*/false);
+  FuncExpr *FE = FuncExpr::create(C, Loc, ParamPat, ParamPat, TypeLoc(),
+                                  0, &TC->TU);
+  Type FuncTy = FunctionType::get(ParamPat->getType(), TupleType::getEmpty(C),
+                                  C);
   FE->setType(FuncTy);
   Arg->setDeclContext(FE);
-
+  
   // Convert the pattern to a string we can print.
-  llvm::SmallString<16> PatternString;
-  PatternString += "// ";
-  PatternBindingPrintLHS(PatternString).visit(D->getPattern());
-  PatternString += " : ";
-  PatternString += E->getType()->getString();
-  PatternString += " = ";
-
+  llvm::SmallString<16> PrefixString;
+  PrefixString += "// ";
+  PrefixString += NameStr;
+  PrefixString += " : ";
+  PrefixString += E->getType()->getString();
+  PrefixString += " = ";
+  
   // Unique the type string into an identifier since PrintLiteralString is
   // building an AST around the string that must persist beyond the lifetime of
-  // getString().
-  auto TmpStr = Context.getIdentifier(PatternString).str();
-
-  // Fill in body of function.  Start with the pattern string.
+  // PrefixString.
+  auto TmpStr = C.getIdentifier(PrefixString).str();
+  
+  // Fill in body of function.  Start with the string prefix to print.
   SmallVector<BraceStmt::ExprStmtOrDecl, 4> BodyContent;
-  PrintLiteralString(TmpStr, *this, Loc, PrintDecls, BodyContent);
+  PrintLiteralString(TmpStr, *TC, Loc, PrintDecls, BodyContent);
   
   SmallVector<unsigned, 4> MemberIndexes;
-  PrintReplExpr(*this, Arg, E->getType(), T, Loc, EndLoc, MemberIndexes,
+  PrintReplExpr(*TC, Arg, E->getType(), T, Loc, EndLoc, MemberIndexes,
                 BodyContent, PrintDecls, FE);
-  PrintLiteralString("\n", *this, Loc, PrintDecls, BodyContent);
-  Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc, Arg->getTypeOfReference());
-  BodyContent.push_back(new (Context) ReturnStmt(Loc, ArgRef));
-
+  PrintLiteralString("\n", *TC, Loc, PrintDecls, BodyContent);
+  
   // Typecheck the function.
-  BraceStmt *Body = BraceStmt::create(Context, Loc, BodyContent, EndLoc);
+  BraceStmt *Body = BraceStmt::create(C, Loc, BodyContent, EndLoc);
   FE->setBody(Body);
-  typeCheckFunctionBody(FE);
-
-  CallExpr *CE = new (Context) CallExpr(FE, E);
-  D->setInit(semaApplyExpr(CE));
+  TC->typeCheckFunctionBody(FE);
+  
+  Expr *TheCall = TC->semaApplyExpr(new (C) CallExpr(FE, E));
+  
+  // Inject the call into the top level stream by wrapping it with a TLCD.
+  auto *BS = BraceStmt::create(C, Loc, BraceStmt::ExprStmtOrDecl(TheCall),
+                               EndLoc);
+  TC->TU.Decls.push_back(new (C) TopLevelCodeDecl(&TC->TU, BS));
 }
+
+
+/// processREPLTopLevelPatternBinding - When we see a new PatternBinding parsed
+/// into the REPL, process it by generating code to print it out.
+static void processREPLTopLevelPatternBinding(PatternBindingDecl *D,
+                                              TypeChecker *TC) {
+  // FIXME: I'm assuming we don't need to bother printing the pattern binding
+  // if it's a null initialization.
+  if (!D->getInit())
+    return;
+
+  llvm::SmallString<16> PatternString;
+  PatternBindingPrintLHS(PatternString).visit(D->getPattern());
+
+  // If the bound pattern is a single value, use a DeclRefExpr on the underlying
+  // Decl to print it.
+  if (auto *NP = dyn_cast<NamedPattern>(D->getPattern())) {
+    Expr *E = new (TC->Context) DeclRefExpr(NP->getDecl(), D->getStartLoc(),
+                                           NP->getDecl()->getTypeOfReference());
+    generatePrintOfExpression(PatternString, E, TC);
+    return;
+  }
+  
+  Expr *E = D->getInit();
+
+  
+  generatePrintOfExpression(PatternString, E, TC);
+}
+
+
+/// processREPLTopLevelCodeDecl - When we see a new TopLevelCodeDecl parsed into
+/// the REPL, process it, adding the proper decls back to the top level of the
+/// TranslationUnit.
+static void processREPLTopLevelCodeDecl(TopLevelCodeDecl *TLCD,
+                                        TypeChecker *TC) {
+  // Check to see if the TLCD has an expression that we have to transform.  If
+  // not, we can just leave the TLCD alone.
+  Expr *E = TLCD->getBody()->getElements()[0].dyn_cast<Expr*>();
+  if (E == nullptr) return;
+  
+  CanType T = E->getType()->getCanonicalType();
+  
+  // Don't try to print invalid expressions, module exprs, or void expressions.
+  if (isa<ErrorType>(T) || isa<ModuleType>(T) ||
+      (isa<TupleType>(T) && cast<TupleType>(T)->getFields().empty()))
+    return;
+  
+  // Okay, we need to print this expression.  We generally do this by creating a
+  // REPL metavariable (e.g. r4) to hold the result, so it can be referred to
+  // in the future.  However, if this is a direct reference to a decl (e.g. "x")
+  // then don't create a repl metavariable.
+  if (VarDecl *d = getObviousDECLFromExpr(E)) {
+    generatePrintOfExpression(d->getName().str(), E, TC);
+    return;
+  }
+  
+  // Remove the expression from being in the list of decls to execute, we're
+  // going to reparent it.
+  TC->TU.Decls.pop_back();
+
+  E = TC->convertToMaterializable(E);
+
+  // Create the meta-variable, let the typechecker name it.
+  VarDecl *vd = new (TC->Context) VarDecl(E->getStartLoc(),
+                                          TC->getNextResponseVariableName(),
+                                          E->getType(), &TC->TU);
+  TC->TU.Decls.push_back(vd);
+  // FIXME: Kill REPLResult!
+  vd->setREPLResult(true);
+  
+  // Create a PatternBindingDecl to bind the expression into the decl.
+  Pattern *metavarPat = new (TC->Context) NamedPattern(vd);
+  metavarPat->setType(E->getType());
+  PatternBindingDecl *metavarBinding
+    = new (TC->Context) PatternBindingDecl(E->getStartLoc(), metavarPat, E,
+                                           &TC->TU);
+  TC->TU.Decls.push_back(metavarBinding);
+
+  // Finally, print the variable's value.
+  E = new (TC->Context) DeclRefExpr(vd, E->getStartLoc(),
+                                    vd->getTypeOfReference());
+  generatePrintOfExpression(vd->getName().str(), E, TC);
+}
+
+
+/// processREPLTopLevel - This is called after we've parsed and typechecked some
+/// new decls at the top level.  We inject code to print out expressions and
+/// pattern bindings the are evaluated.
+void TypeChecker::processREPLTopLevel(unsigned FirstDecl) {
+  // Loop over all of the new decls, moving them out of the Decls list, then
+  // adding them back (with modifications) one at a time.
+  std::vector<Decl*> NewDecls(TU.Decls.begin()+FirstDecl, TU.Decls.end());
+  TU.Decls.resize(FirstDecl);
+  
+  // Loop over each of the new decls, processing them, adding them back to
+  // the TU->Decls list.
+  for (Decl *D : NewDecls) {
+    TU.Decls.push_back(D);
+    
+    if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D))
+      processREPLTopLevelCodeDecl(TLCD, this);
+    else if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
+      processREPLTopLevelPatternBinding(PBD, this);
+  }
+}
+
