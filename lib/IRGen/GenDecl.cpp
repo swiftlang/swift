@@ -321,6 +321,13 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     IRGenFunction mainIGF(*this, CanType(), nullptr, ExplosionKind::Minimal,
                           /*uncurry*/ 0, mainFn, Prologue::Bare);
     
+    auto args = mainFn->arg_begin();
+    llvm::Value* argc = args++;
+    argc->setName("argc");
+    llvm::Value* argv = args++;
+    argv->setName("argv");
+    assert(args == mainFn->arg_end());
+
     // Emit Objective-C runtime interop setup for immediate-mode code.
     if (ObjCInterop && Opts.UseJIT) {
       if (!ObjCClasses.empty()) {
