@@ -28,6 +28,7 @@
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/IR/TypeBuilder.h"
 
 #include "CallingConvention.h"
 #include "Explosion.h"
@@ -306,8 +307,14 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     // FIXME: We should squirrel away argc and argv where relevant; maybe
     // other startup initialization?
     // FIXME: We should only emit this in non-JIT modes.
+
+    llvm::Type* argcArgvTypes[2] = {
+      llvm::TypeBuilder<llvm::types::i<32>, true>::get(LLVMContext),
+      llvm::TypeBuilder<llvm::types::i<8>**, true>::get(LLVMContext)
+    };
+
     llvm::Function *mainFn =
-      llvm::Function::Create(llvm::FunctionType::get(Int32Ty, false),
+      llvm::Function::Create(llvm::FunctionType::get(Int32Ty, argcArgvTypes, false),
                              llvm::GlobalValue::ExternalLinkage,
                              "main", &Module);
     
