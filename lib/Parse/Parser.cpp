@@ -112,7 +112,6 @@ Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context,
     Component(Comp),
     Context(Context),
     ScopeInfo(*this),
-    TheTopLevelCodeDecl(nullptr),
     IsMainModule(IsMainModule),
     FoundSideEffects(false) {
 }

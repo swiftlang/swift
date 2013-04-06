@@ -69,8 +69,6 @@ public:
   std::vector<TranslationUnit::IdentTypeAndContext> UnresolvedIdentifierTypes;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   std::vector<TranslationUnit::TupleTypeAndContext> TypesWithDefaultValues;
-  std::vector<ExprStmtOrDecl> TopLevelCode;
-  TopLevelCodeDecl *TheTopLevelCodeDecl;
   bool IsMainModule;
   bool FoundSideEffects;
 

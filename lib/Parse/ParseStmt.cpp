@@ -195,15 +195,17 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       TmpDecls.clear();
     } else if (IsTopLevel && IsMainModule) {
       // If this is a statement or expression at the top level of the module,
-      // Parse it as a child of the TopLevelCodeDecl and accumulate the ASTs in
-      // the TopLevelCode list, which will eventually be dropped into the body
-      // of the decl.
-      ContextChange CC(*this, TheTopLevelCodeDecl);
-
+      // Parse it as a child of a TopLevelCodeDecl.
+      auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
+      ContextChange CC(*this, TLCD);
+      SourceLoc StartLoc = Tok.getLoc();
+      
       if (parseExprOrStmt(Result)) {
         NeedParseErrorRecovery = true;
       } else {
-        TopLevelCode.push_back(Result);
+        auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
+        TLCD->setBody(Brace);
+        Entries.push_back(TLCD);
         FoundSideEffects = true;
       }
     } else {

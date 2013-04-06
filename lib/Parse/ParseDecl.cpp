@@ -40,15 +40,8 @@ void Parser::parseTranslationUnit(TranslationUnit *TU) {
 
   TU->ASTStage = TranslationUnit::Parsing;
 
-  if (IsMainModule) {
-    TheTopLevelCodeDecl = new (Context) TopLevelCodeDecl(TU);
-  } else {
-    TheTopLevelCodeDecl = nullptr;
-  }
-
   // Prime the lexer.
   consumeToken();
-  SourceLoc StartLoc = Tok.getLoc();
 
   CurDeclContext = TU;
   
@@ -64,18 +57,6 @@ void Parser::parseTranslationUnit(TranslationUnit *TU) {
 
   for (auto Item : Items)
     TU->Decls.push_back(Item.get<Decl*>());
-
-  // If we're a main module and parsed some top level code, dump it into a
-  // TopLevelCodeDecl now.
-  if (!TopLevelCode.empty()) {
-    auto Brace = BraceStmt::create(Context, StartLoc,
-                                   TopLevelCode, Tok.getLoc());
-    TheTopLevelCodeDecl->setBody(Brace);
-    TU->Decls.push_back(TheTopLevelCodeDecl);
-    TopLevelCode.clear();
-  }
-
-  TheTopLevelCodeDecl = 0;
 
   TU->setUnresolvedIdentifierTypes(
           Context.AllocateCopy(llvm::makeArrayRef(UnresolvedIdentifierTypes)));

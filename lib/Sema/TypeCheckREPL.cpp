@@ -332,6 +332,10 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
   }
   
   if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(T)) {
+    // FIXME: We have to hack Slice into here, because replPrint on Slice isn't
+    // implementable yet.  We don't want the T argument of the slice to be
+    // constrained to being replPrintable.  We need replPrint to be more
+    // dynamically reflective in its implementation.
     if (!BGST->getParent() && BGST->getDecl()->getName().str() == "Slice") {
       PrintSlice(TC, Arg, BGST->getGenericArgs()[0], Loc, EndLoc, MemberIndexes,
                  BodyContent, PrintDecls, DC);
