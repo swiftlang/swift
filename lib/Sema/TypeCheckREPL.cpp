@@ -20,8 +20,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Stmt.h"
-#include "llvm/Support/SaveAndRestore.h"
-
+#include "llvm/ADT/SmallString.h"
 using namespace swift;
 
 void
@@ -447,39 +446,30 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   E = semaApplyExpr(CE);
 }
 
+/// PatternBindingPrintLHS - This is a lot like Pattern::print, but prints
+/// typed patterns and parenthesized patterns a bit differently.
+namespace {
 struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
-  SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent;
-  SmallVectorImpl<ValueDecl*> &PrintDecls;
-  SourceLoc Loc;
-  TypeChecker &TC;
-  ASTContext &Context;
+  llvm::SmallString<16> &ResultString;
 
-  PatternBindingPrintLHS(SmallVectorImpl<BraceStmt::ExprStmtOrDecl>&BodyContent,
-                         SmallVectorImpl<ValueDecl*> &PrintDecls,
-                         SourceLoc Loc,
-                         TypeChecker &TC)
-    : BodyContent(BodyContent), PrintDecls(PrintDecls), Loc(Loc),
-      TC(TC), Context(TC.Context) {}
-
-  void print(StringRef Str) {
-    PrintLiteralString(Str, TC, Loc, PrintDecls, BodyContent);
-  }
+  PatternBindingPrintLHS(llvm::SmallString<16> &ResultString)
+    : ResultString(ResultString) {}
 
   void visitTuplePattern(TuplePattern *P) {
     // We print tuples as "(x, y)".
-    print("(");
+    ResultString += "(";
     for (unsigned i = 0, e = P->getNumFields(); i != e; ++i) {
       visit(P->getFields()[i].getPattern());
       if (i + 1 != e)
-        print(", ");
+        ResultString += ", ";
     }
-    print(")");
+    ResultString += ")";
   }
   void visitNamedPattern(NamedPattern *P) {
-    print(P->getBoundName().str());
+    ResultString += P->getBoundName().str();
   }
   void visitAnyPattern(AnyPattern *P) {
-    print("_");
+    ResultString += "_";
   }
 
   void visitTypedPattern(TypedPattern *P) {
@@ -492,6 +482,7 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
     visit(P->getSubPattern());
   }
 };
+} // end anonymous namespace.
 
 static bool isREPLResultPattern(PatternBindingDecl *D) {
   NamedPattern *named = dyn_cast<NamedPattern>(D->getPattern());
@@ -541,20 +532,24 @@ void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
   Type FuncTy = FunctionType::get(ParamPat->getType(), T, Context);
   FE->setType(FuncTy);
   Arg->setDeclContext(FE);
-  
-  // Fill in body of function.
-  SmallVector<BraceStmt::ExprStmtOrDecl, 4> BodyContent;
-  PrintLiteralString("// ", *this, Loc, PrintDecls, BodyContent);
-  PatternBindingPrintLHS PatPrinter(BodyContent, PrintDecls, Loc, *this);
-  PatPrinter.visit(D->getPattern());
-  PrintLiteralString(" : ", *this, Loc, PrintDecls, BodyContent);
-  
+
+  // Convert the pattern to a string we can print.
+  llvm::SmallString<16> PatternString;
+  PatternString += "// ";
+  PatternBindingPrintLHS(PatternString).visit(D->getPattern());
+  PatternString += " : ";
+  PatternString += E->getType()->getString();
+  PatternString += " = ";
+
   // Unique the type string into an identifier since PrintLiteralString is
   // building an AST around the string that must persist beyond the lifetime of
   // getString().
-  auto TypeStr = Context.getIdentifier(E->getType()->getString()).str();
-  PrintLiteralString(TypeStr, *this, Loc, PrintDecls, BodyContent);
-  PrintLiteralString(" = ", *this, Loc, PrintDecls, BodyContent);
+  auto TmpStr = Context.getIdentifier(PatternString).str();
+
+  // Fill in body of function.  Start with the pattern string.
+  SmallVector<BraceStmt::ExprStmtOrDecl, 4> BodyContent;
+  PrintLiteralString(TmpStr, *this, Loc, PrintDecls, BodyContent);
+  
   SmallVector<unsigned, 4> MemberIndexes;
   PrintReplExpr(*this, Arg, E->getType(), T, Loc, EndLoc, MemberIndexes,
                 BodyContent, PrintDecls, FE);
