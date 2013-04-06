@@ -559,11 +559,6 @@ static void processREPLTopLevelCodeDecl(TopLevelCodeDecl *TLCD,
 /// into the REPL, process it by generating code to print it out.
 static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
                                               TypeChecker *TC) {
-  // FIXME: Don't bother printing the pattern binding if it's a null
-  // initialization.
-  if (!PBD->getInit())
-    return;
-  
   llvm::SmallString<16> PatternString;
   PatternBindingPrintLHS(PatternString).visit(PBD->getPattern());
   
