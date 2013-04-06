@@ -156,10 +156,10 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
 
 } // end anonymous namespace
 
-static void loadRuntimeLib(StringRef sharedLibName) {
+static void loadRuntimeLib(StringRef sharedLibName, ProcessCmdLine const& CmdLine) {
   // FIXME: Need error-checking.
   llvm::sys::Path LibPath =
-  llvm::sys::Path::GetMainExecutable(0, (void*)&swift::RunImmediately);
+  llvm::sys::Path::GetMainExecutable(CmdLine[0].data(), (void*)&swift::RunImmediately);
   LibPath.eraseComponent();
   LibPath.eraseComponent();
   LibPath.appendComponent("lib");
@@ -168,12 +168,13 @@ static void loadRuntimeLib(StringRef sharedLibName) {
   dlopen(LibPath.c_str(), 0);
 }
 
-static void loadSwiftRuntime() {
-  loadRuntimeLib("libswift_stdlib.dylib");
+static void loadSwiftRuntime(ProcessCmdLine const& CmdLine) {
+  loadRuntimeLib("libswift_stdlib.dylib", CmdLine);
 }
 
 static bool IRGenImportedModules(TranslationUnit *TU,
                                  llvm::Module &Module,
+                                 ProcessCmdLine const& CmdLine,
                                  llvm::SmallPtrSet<TranslationUnit*, 8>
                                      &ImportedModules,
                                  SmallVectorImpl<llvm::Function*> &InitFns,
@@ -227,7 +228,7 @@ static bool IRGenImportedModules(TranslationUnit *TU,
       continue;
 
     // Recursively IRGen imported modules.
-    IRGenImportedModules(SubTU, Module, ImportedModules, InitFns, Options);
+    IRGenImportedModules(SubTU, Module, CmdLine, ImportedModules, InitFns, Options);
 
     // FIXME: Need to check whether this is actually safe in general.
     llvm::Module SubModule(SubTU->Name.str(), Module.getContext());
@@ -265,7 +266,7 @@ static bool IRGenImportedModules(TranslationUnit *TU,
           .Case("AppKit",     "libswiftAppKit.dylib")
           .Default("");
     if (!sharedLibName.empty()) {
-      loadRuntimeLib(sharedLibName);
+      loadRuntimeLib(sharedLibName, CmdLine);
     }
   }
 
@@ -274,7 +275,7 @@ static bool IRGenImportedModules(TranslationUnit *TU,
 
 void swift::RunImmediately(irgen::Options &Options,
                            TranslationUnit *TU,
-                           std::vector<std::string> const& argv, SILModule *SILMod) {
+                           ProcessCmdLine const& CmdLine, SILModule *SILMod) {
   ASTContext &Context = TU->Ctx;
   
   // IRGen the main module.
@@ -288,7 +289,7 @@ void swift::RunImmediately(irgen::Options &Options,
 
   SmallVector<llvm::Function*, 8> InitFns;
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
-  if (IRGenImportedModules(TU, Module, ImportedModules, InitFns, Options,
+  if (IRGenImportedModules(TU, Module, CmdLine, ImportedModules, InitFns, Options,
                            /*IsREPL*/false))
     return;
 
@@ -300,7 +301,7 @@ void swift::RunImmediately(irgen::Options &Options,
   PMBuilder.populateModulePassManager(ModulePasses);
   ModulePasses.run(Module);
 
-  loadSwiftRuntime();
+  loadSwiftRuntime(CmdLine);
 
   // Build the ExecutionEngine.
   llvm::EngineBuilder builder(&Module);
@@ -318,11 +319,11 @@ void swift::RunImmediately(irgen::Options &Options,
 
   // Run the generated program.
   for (auto InitFn : InitFns)
-    EE->runFunctionAsMain(InitFn, argv, 0);
+    EE->runFunctionAsMain(InitFn, CmdLine, 0);
 
   EE->runStaticConstructorsDestructors(false);
   llvm::Function *EntryFn = Module.getFunction("main");
-  EE->runFunctionAsMain(EntryFn, argv, 0);
+  EE->runFunctionAsMain(EntryFn, CmdLine, 0);
 }
 
 /// An arbitrary, otherwise-unused char value that editline interprets as
@@ -846,6 +847,7 @@ class REPLEnvironment {
   ASTContext &Context;
   bool ShouldRunREPLApplicationMain;
   bool SILIRGen;
+  ProcessCmdLine CmdLine;
   llvm::MemoryBuffer *Buffer;
   Component *Comp;
   TranslationUnit *TU;
@@ -867,7 +869,7 @@ class REPLEnvironment {
     return const_cast<char*>(Buffer->getBufferStart());
   }
   
-  bool executeSwiftSource(llvm::StringRef Line) {
+  bool executeSwiftSource(llvm::StringRef Line, ProcessCmdLine const& CmdLine) {
     assert(Line.size() < BUFFER_SIZE &&
            "line too big for our stupid fixed-size repl buffer");
     memcpy(getBufferStart(), Line.data(), Line.size());
@@ -937,11 +939,11 @@ class REPLEnvironment {
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
     DumpModuleMain->setName("repl.line");
     
-    if (IRGenImportedModules(TU, Module, ImportedModules, InitFns, Options))
+    if (IRGenImportedModules(TU, Module, CmdLine, ImportedModules, InitFns, Options))
       return false;
     
     for (auto InitFn : InitFns)
-      EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
+      EE->runFunctionAsMain(InitFn, CmdLine, 0);
     InitFns.clear();
     
     // FIXME: The way we do this is really ugly... we should be able to
@@ -951,7 +953,7 @@ class REPLEnvironment {
       RanGlobalInitializers = true;
     }
     llvm::Function *EntryFn = Module.getFunction("main");
-    EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
+    EE->runFunctionAsMain(EntryFn, CmdLine, 0);
     EE->freeMachineCodeForFunction(EntryFn);
     EntryFn->eraseFromParent();
     
@@ -961,10 +963,13 @@ class REPLEnvironment {
 public:
   REPLEnvironment(ASTContext &Context,
                   bool ShouldRunREPLApplicationMain,
-                  bool SILIRGen)
+                  bool SILIRGen,
+                  ProcessCmdLine const& CmdLine
+                 )
     : Context(Context),
       ShouldRunREPLApplicationMain(ShouldRunREPLApplicationMain),
       SILIRGen(SILIRGen),
+      CmdLine(CmdLine),
       Buffer(llvm::MemoryBuffer::getNewMemBuffer(BUFFER_SIZE, "<REPL Buffer>")),
       Comp(new (Context.Allocate<Component>(1)) Component()),
       TU(new (Context) TranslationUnit(Context.getIdentifier("REPL"),
@@ -982,7 +987,7 @@ public:
         /*CurIRGenElem*/ 0
       }
   {
-    loadSwiftRuntime();
+    loadSwiftRuntime(CmdLine);
 
     llvm::EngineBuilder builder(&Module);
     std::string ErrorMsg;
@@ -1159,7 +1164,7 @@ public:
         
       case REPLInputKind::SourceCode: {
         // Execute this source line.
-        auto result = executeSwiftSource(Line);
+        auto result = executeSwiftSource(Line, CmdLine);
         if (RC.RanREPLApplicationMain || !ShouldRunREPLApplicationMain)
           return result;
 
@@ -1168,7 +1173,7 @@ public:
                                  TU);
         if (lookup.isSuccess()) {
           // Execute replApplicationMain().
-          executeSwiftSource("replApplicationMain()\n");
+          executeSwiftSource("replApplicationMain()\n", CmdLine);
           RC.RanREPLApplicationMain = true;
         }
 
@@ -1183,7 +1188,7 @@ public:
     /// Invoke replExit() if available.
     UnqualifiedLookup lookup(Context.getIdentifier("replExit"), TU);
     if (lookup.isSuccess()) {
-      executeSwiftSource("replExit()\n");
+      executeSwiftSource("replExit()\n", CmdLine);
     }
   }
 };
@@ -1197,10 +1202,11 @@ void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
   llvm::errs().resetColor();
 }
 
-void swift::REPL(ASTContext &Context, bool SILIRGen) {
+void swift::REPL(ASTContext &Context, bool SILIRGen, ProcessCmdLine const& CmdLine) {
   REPLEnvironment env(Context,
                       /*ShouldRunREPLApplicationMain=*/false,
-                      SILIRGen);
+                      SILIRGen,
+                      CmdLine);
 
   llvm::SmallString<80> Line;
   REPLInputKind inputKind;
@@ -1210,10 +1216,11 @@ void swift::REPL(ASTContext &Context, bool SILIRGen) {
   env.exitREPL();
 }
 
-void swift::REPLRunLoop(ASTContext &Context, bool SILIRGen) {
+void swift::REPLRunLoop(ASTContext &Context, bool SILIRGen, ProcessCmdLine const& CmdLine) {
   REPLEnvironment env(Context,
                       /*ShouldRunREPLApplicationMain=*/true,
-                      SILIRGen);
+                      SILIRGen,
+                      CmdLine);
   
   CFMessagePortContext portContext;
   portContext.version = 0;

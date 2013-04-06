@@ -22,7 +22,13 @@ namespace swift {
   class ASTContext;
   class TranslationUnit;
   class SILModule;
-  
+
+  // Using LLVM containers to store command-line arguments turns out
+  // to be a lose, because LLVM's execution engine demands this vector
+  // type.  We can flip the typedef if/when the LLVM interface
+  // supports LLVM containers.
+  using ProcessCmdLine = std::vector<std::string>;
+
   namespace irgen {
     class Options;
   }
@@ -50,10 +56,10 @@ namespace swift {
 
   void RunImmediately(irgen::Options &Options,
                       TranslationUnit *TU,
-                      std::vector<std::string> const& argv = std::vector<std::string>(),
+                      ProcessCmdLine const& CmdLine,
                       SILModule *SILMod = nullptr
                       );
   
-  void REPL(ASTContext &Context, bool SILIRGen);
-  void REPLRunLoop(ASTContext &Context, bool SILIRGen);
+  void REPL(ASTContext &Context, bool SILIRGen, ProcessCmdLine const& CmdLine);
+  void REPLRunLoop(ASTContext &Context, bool SILIRGen, ProcessCmdLine const& CmdLine);
 }
