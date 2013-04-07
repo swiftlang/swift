@@ -156,7 +156,7 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
 
 } // end anonymous namespace
 
-static void loadRuntimeLib(StringRef sharedLibName, ProcessCmdLine const& CmdLine) {
+static void loadRuntimeLib(StringRef sharedLibName, const ProcessCmdLine &CmdLine) {
   // FIXME: Need error-checking.
   llvm::sys::Path LibPath =
   llvm::sys::Path::GetMainExecutable(CmdLine[0].data(), (void*)&swift::RunImmediately);
@@ -168,13 +168,13 @@ static void loadRuntimeLib(StringRef sharedLibName, ProcessCmdLine const& CmdLin
   dlopen(LibPath.c_str(), 0);
 }
 
-static void loadSwiftRuntime(ProcessCmdLine const& CmdLine) {
+static void loadSwiftRuntime(const ProcessCmdLine &CmdLine) {
   loadRuntimeLib("libswift_stdlib.dylib", CmdLine);
 }
 
 static bool IRGenImportedModules(TranslationUnit *TU,
                                  llvm::Module &Module,
-                                 ProcessCmdLine const& CmdLine,
+                                 const ProcessCmdLine &CmdLine,
                                  llvm::SmallPtrSet<TranslationUnit*, 8>
                                      &ImportedModules,
                                  SmallVectorImpl<llvm::Function*> &InitFns,
@@ -275,7 +275,7 @@ static bool IRGenImportedModules(TranslationUnit *TU,
 
 void swift::RunImmediately(irgen::Options &Options,
                            TranslationUnit *TU,
-                           ProcessCmdLine const& CmdLine, SILModule *SILMod) {
+                           const ProcessCmdLine &CmdLine, SILModule *SILMod) {
   ASTContext &Context = TU->Ctx;
   
   // IRGen the main module.
@@ -869,7 +869,7 @@ class REPLEnvironment {
     return const_cast<char*>(Buffer->getBufferStart());
   }
   
-  bool executeSwiftSource(llvm::StringRef Line, ProcessCmdLine const& CmdLine) {
+  bool executeSwiftSource(llvm::StringRef Line, const ProcessCmdLine &CmdLine) {
     assert(Line.size() < BUFFER_SIZE &&
            "line too big for our stupid fixed-size repl buffer");
     memcpy(getBufferStart(), Line.data(), Line.size());
@@ -964,7 +964,7 @@ public:
   REPLEnvironment(ASTContext &Context,
                   bool ShouldRunREPLApplicationMain,
                   bool SILIRGen,
-                  ProcessCmdLine const& CmdLine
+                  const ProcessCmdLine &CmdLine
                  )
     : Context(Context),
       ShouldRunREPLApplicationMain(ShouldRunREPLApplicationMain),
@@ -1201,7 +1201,7 @@ void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
   llvm::errs().resetColor();
 }
 
-void swift::REPL(ASTContext &Context, bool SILIRGen, ProcessCmdLine const& CmdLine) {
+void swift::REPL(ASTContext &Context, bool SILIRGen, const ProcessCmdLine &CmdLine) {
   REPLEnvironment env(Context,
                       /*ShouldRunREPLApplicationMain=*/false,
                       SILIRGen,
@@ -1215,7 +1215,7 @@ void swift::REPL(ASTContext &Context, bool SILIRGen, ProcessCmdLine const& CmdLi
   env.exitREPL();
 }
 
-void swift::REPLRunLoop(ASTContext &Context, bool SILIRGen, ProcessCmdLine const& CmdLine) {
+void swift::REPLRunLoop(ASTContext &Context, bool SILIRGen, const ProcessCmdLine &CmdLine) {
   REPLEnvironment env(Context,
                       /*ShouldRunREPLApplicationMain=*/true,
                       SILIRGen,

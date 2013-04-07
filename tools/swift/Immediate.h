@@ -53,10 +53,10 @@ namespace swift {
 
   void RunImmediately(irgen::Options &Options,
                       TranslationUnit *TU,
-                      ProcessCmdLine const& CmdLine,
+                      const ProcessCmdLine &CmdLine,
                       SILModule *SILMod = nullptr
                       );
   
-  void REPL(ASTContext &Context, bool SILIRGen, ProcessCmdLine const& CmdLine);
-  void REPLRunLoop(ASTContext &Context, bool SILIRGen, ProcessCmdLine const& CmdLine);
+  void REPL(ASTContext &Context, bool SILIRGen, const ProcessCmdLine &CmdLine);
+  void REPLRunLoop(ASTContext &Context, bool SILIRGen, const ProcessCmdLine &CmdLine);
 }
