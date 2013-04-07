@@ -21,8 +21,6 @@
 // ATTR(name) - Invokes a macro for each attribute.
 ATTR(assignment)
 ATTR(conversion)
-ATTR(infix_left)
-ATTR(infix_right)
 ATTR(infix)
 ATTR(resilient)
 ATTR(fragile)

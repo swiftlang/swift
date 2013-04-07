@@ -87,15 +87,6 @@ static AttrName getAttrName(StringRef text) {
     .Default(AttrName::none);
 }
 
-static Associativity getAssociativity(AttrName attr) {
-  switch (attr) {
-  case AttrName::infix: return Associativity::None;
-  case AttrName::infix_left: return Associativity::Left;
-  case AttrName::infix_right: return Associativity::Right;
-  default: llvm_unreachable("bad associativity");
-  }
-}
-
 static Resilience getResilience(AttrName attr) {
   switch (attr) {
   case AttrName::resilient: return Resilience::Resilient;
@@ -127,33 +118,11 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return true;
 
   // Infix attributes.
-  case AttrName::infix:
-  case AttrName::infix_left:
-  case AttrName::infix_right: {
+  case AttrName::infix: {
     if (Attributes.isInfix())
       diagnose(Tok, diag::duplicate_attribute, Tok.getText());
     consumeToken(tok::identifier);
-
-    Associativity Assoc = getAssociativity(attr);
-
-    // The default precedence is 100.
-    Attributes.Infix = InfixData(100, Assoc);
-    
-    if (consumeIf(tok::equal)) {
-      SourceLoc PrecLoc = Tok.getLoc();
-      StringRef Text = Tok.getText();
-      if (!parseToken(tok::integer_literal, diag::expected_precedence_value)){
-        long long Value;
-        if (Text.getAsInteger(10, Value) || Value > 255 || Value < 0)
-          diagnose(PrecLoc, diag::invalid_precedence, Text);
-        else
-          Attributes.Infix = InfixData(Value, Assoc);
-      } else {
-        // FIXME: I'd far rather that we describe this in terms of some
-        // list structure in the caller. This feels too ad hoc.
-        skipUntil(tok::r_square, tok::comma);
-      }
-    }
+    Attributes.ExplicitInfix = true;
 
     return false;
   }

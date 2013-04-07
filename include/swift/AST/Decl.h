@@ -1172,6 +1172,7 @@ public:
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
 };
 
+class OperatorDecl;
 
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public ValueDecl {
@@ -1182,6 +1183,7 @@ class FuncDecl : public ValueDecl {
   FuncExpr *Body;
   llvm::PointerIntPair<Decl *, 1, bool> GetOrSetDecl;
   FuncDecl *OverriddenDecl;
+  OperatorDecl *Operator;
 
 public:
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
@@ -1189,7 +1191,7 @@ public:
            FuncExpr *Body, DeclContext *DC)
     : ValueDecl(DeclKind::Func, DC, Name, Ty), StaticLoc(StaticLoc),
       FuncLoc(FuncLoc), NameLoc(NameLoc), GenericParams(GenericParams),
-      Body(Body), OverriddenDecl(nullptr) {
+      Body(Body), OverriddenDecl(nullptr), Operator(nullptr) {
     FuncDeclBits.Static = StaticLoc.isValid() || getName().isOperator();
   }
   
@@ -1299,6 +1301,12 @@ public:
 
   FuncDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(FuncDecl *over) { OverriddenDecl = over; }
+  
+  OperatorDecl *getOperatorDecl() const { return Operator; }
+  void setOperatorDecl(OperatorDecl *o) {
+    assert(isOperator() && "can't set an OperatorDecl for a non-operator");
+    Operator = o;
+  }
 
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
 };
@@ -1565,7 +1573,8 @@ public:
                SourceLoc RBraceLoc)
     : Decl(kind, DC),
       OperatorLoc(OperatorLoc), NameLoc(NameLoc),
-      LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc) {}
+      LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
+      name(Name) {}
   
   SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const { return {OperatorLoc, RBraceLoc}; }
@@ -1629,6 +1638,12 @@ public:
   
   InfixData getInfixData() const { return infixData; }
   
+  /// True if this decl's attributes conflict with those declared by another
+  /// PrefixOperatorDecl.
+  bool conflictsWith(InfixOperatorDecl *other) {
+    return infixData != other->infixData;
+  }
+  
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::InfixOperator;
   }
@@ -1649,7 +1664,7 @@ public:
                      SourceLoc NameLoc,
                      SourceLoc LBraceLoc,
                      SourceLoc RBraceLoc)
-    : OperatorDecl(DeclKind::InfixOperator, DC,
+    : OperatorDecl(DeclKind::PrefixOperator, DC,
                    OperatorLoc,
                    Name,
                    NameLoc,
@@ -1658,6 +1673,12 @@ public:
       PrefixLoc(PrefixLoc) {}
   
   SourceLoc getPrefixLoc() const { return PrefixLoc; }
+  
+  /// True if this decl's attributes conflict with those declared by another
+  /// PrefixOperatorDecl.
+  bool conflictsWith(PrefixOperatorDecl *other) {
+    return false;
+  }
   
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PrefixOperator;
@@ -1679,7 +1700,7 @@ public:
                      SourceLoc NameLoc,
                      SourceLoc LBraceLoc,
                      SourceLoc RBraceLoc)
-    : OperatorDecl(DeclKind::InfixOperator, DC,
+    : OperatorDecl(DeclKind::PostfixOperator, DC,
                    OperatorLoc,
                    Name,
                    NameLoc,
@@ -1688,6 +1709,12 @@ public:
       PostfixLoc(PostfixLoc) {}
   
   SourceLoc getPostfixLoc() const { return PostfixLoc; }
+
+  /// True if this decl's attributes conflict with those declared by another
+  /// PostfixOperatorDecl.
+  bool conflictsWith(PostfixOperatorDecl *other) {
+    return false;
+  }
   
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PostfixOperator;

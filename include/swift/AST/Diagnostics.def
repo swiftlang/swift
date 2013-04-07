@@ -780,6 +780,20 @@ ERROR(use_undeclared_type,sema_nb,none,
 ERROR(cannot_resolve_extension_dot,sema_nb,none,
       "cannot lookup members of types while resolving extension declarations", ())
 
+// Operator decls
+ERROR(declared_unary_op_without_attribute,sema_nb,none,
+      "declaration of unary operator implementation without 'prefix' or 'postfix' attribute", ())
+ERROR(ambiguous_operator_decls,sema_nb,none,
+      "ambiguous operator declarations found for operator", ())
+NOTE(found_this_operator_decl,sema_nb,none,
+     "found this matching operator declaration", ())
+ERROR(operator_redeclared,sema_nb,none,
+      "operator redeclared", ())
+NOTE(previous_operator_decl,sema_nb,none,
+     "previous operator declaration here", ())
+ERROR(declared_operator_without_operator_decl,sema_nb,none,
+      "operator implementation without matching operator declaration", ())
+
 //------------------------------------------------------------------------------
 // Type Check Coercions
 //------------------------------------------------------------------------------
@@ -989,7 +1003,7 @@ ERROR(invalid_module_member,sema_tce,none,
       "%0 is not a member of %1 module", (Identifier, Identifier))
 
 ERROR(unary_op_without_attribute,sema_tce,none,
-      "use of unary operator without 'unary' attribute specified", ())
+      "use of unary operator without 'prefix' or 'postfix' attribute specified", ())
 ERROR(binary_op_without_attribute,sema_tce,none,
       "use of binary operator without 'infix' attribute specified", ())
 ERROR(called_expr_indirect_metatype,sema_tce,none,

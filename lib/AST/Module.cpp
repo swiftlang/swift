@@ -13,7 +13,8 @@
 //  This file implements the Module class and subclasses.
 //
 //===----------------------------------------------------------------------===//
-  
+
+#include "swift/AST/Diagnostics.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -284,6 +285,89 @@ void Module::lookupVisibleDecls(AccessPathTy AccessPath,
   // everything horrendously slow.
   
   return;
+}
+
+namespace {
+// Returns Nothing on error, Optional(nullptr) if no operator decl found, or
+// Optional(decl) if decl was found.
+template<typename OP_DECL>
+Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
+                          SourceLoc Loc,
+                          Identifier Name,
+                          llvm::StringMap<OP_DECL *> TranslationUnit::*OP_MAP)
+{
+  // Only Swift TUs contain operators currently.
+  auto *TU = dyn_cast<TranslationUnit>(M);
+  if (!TU)
+    return nullptr;
+
+  // Look for an operator declaration in the current module.
+  auto found = (TU->*OP_MAP).find(Name.get());
+  if (found != (TU->*OP_MAP).end())
+    return found->getValue();
+  
+  // Look for imported operator decls.
+  
+  llvm::DenseSet<OP_DECL*> importedOperators;
+  for (auto &imported : TU->getImportedModules()) {
+    Optional<OP_DECL *> maybeOp
+      = lookupOperatorDeclForName(imported.second, Loc, Name, OP_MAP);
+    if (!maybeOp)
+      return Nothing;
+    
+    if (OP_DECL *op = *maybeOp)
+      importedOperators.insert(op);
+  }
+  
+  // If we found a single import, use it.
+  if (importedOperators.empty()) {
+    // Cache the mapping so we don't need to troll imports next time.
+    (TU->*OP_MAP)[Name.get()] = nullptr;
+    return nullptr;
+  }
+  if (importedOperators.size() == 1) {
+    // Cache the mapping so we don't need to troll imports next time.
+    OP_DECL *result = *importedOperators.begin();
+    (TU->*OP_MAP)[Name.get()] = result;
+    return result;
+  }
+  
+  // Otherwise, check for conflicts.
+  auto i = importedOperators.begin(), end = importedOperators.end();
+  OP_DECL *first = *i;
+  for (++i; i != end; ++i) {
+    if ((*i)->conflictsWith(first)) {
+      if (Loc.isValid()) {
+        ASTContext &C = M->getASTContext();
+        C.Diags.diagnose(Loc, diag::ambiguous_operator_decls);
+        C.Diags.diagnose(first->getLoc(), diag::found_this_operator_decl);
+        C.Diags.diagnose((*i)->getLoc(), diag::found_this_operator_decl);
+      }
+      return Nothing;
+    }
+  }
+  // Cache the mapping so we don't need to troll imports next time.
+  (TU->*OP_MAP)[Name.get()] = first;
+  return first;
+}
+} // end anonymous namespace
+
+Optional<PrefixOperatorDecl *> Module::lookupPrefixOperator(Identifier name,
+                                                            SourceLoc diagLoc) {
+  return lookupOperatorDeclForName(this, diagLoc, name,
+                                   &TranslationUnit::PrefixOperators);
+}
+
+Optional<PostfixOperatorDecl *> Module::lookupPostfixOperator(Identifier name,
+                                                            SourceLoc diagLoc) {
+  return lookupOperatorDeclForName(this, diagLoc, name,
+                                   &TranslationUnit::PostfixOperators);
+}
+
+Optional<InfixOperatorDecl *> Module::lookupInfixOperator(Identifier name,
+                                                          SourceLoc diagLoc) {
+  return lookupOperatorDeclForName(this, diagLoc, name,
+                                   &TranslationUnit::InfixOperators);
 }
 
 //===----------------------------------------------------------------------===//

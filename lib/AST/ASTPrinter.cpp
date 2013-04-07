@@ -109,20 +109,7 @@ void PrintAST::printAttributes(const DeclAttributes &attrs) {
   }
   if (attrs.isInfix()) {
     comma();
-    switch (attrs.getInfixData().getAssociativity()) {
-    case Associativity::Left:
-      OS << "infix_left=";
-      break;
-
-    case Associativity::None:
-      OS << "infix=";
-      break;
-
-    case Associativity::Right:
-      OS << "infix_right=";
-      break;
-    }
-    OS << attrs.getInfixData().getPrecedence();
+    OS << "infix";
   }
   if (attrs.getResilienceData().isValid()) {
     comma();
@@ -564,7 +551,7 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
 
 void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
   recordDeclLoc(decl);
-  OS << "operator infix " << decl->getName() << "{\n";
+  OS << "operator infix " << decl->getName() << " {\n";
   {
     IndentRAII indentMore(*this);
     if (decl->getAssociativityLoc().isValid()) {
@@ -593,12 +580,12 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
 
 void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
   recordDeclLoc(decl);
-  OS << "operator prefix " << decl->getName() << "{\n}";
+  OS << "operator prefix " << decl->getName() << " {\n}";
 }
 
 void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
   recordDeclLoc(decl);
-  OS << "operator postfix " << decl->getName() << "{\n}";
+  OS << "operator postfix " << decl->getName() << " {\n}";
 }
 
 void PrintAST::visitAssignStmt(AssignStmt *stmt) {

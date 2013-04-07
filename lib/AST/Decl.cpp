@@ -1255,7 +1255,30 @@ namespace {
         printRec(TLCD->getBody());
       }
     }
+    
+    void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {
+      printCommon(IOD, "infix_operator_decl ");
+      OS << IOD->getName() << "\n";
+      OS.indent(Indent+2);
+      OS << "associativity ";
+      switch (IOD->getInfixData().getAssociativity()) {
+      case Associativity::None: OS << "none\n"; break;
+      case Associativity::Left: OS << "left\n"; break;
+      case Associativity::Right: OS << "right\n"; break;
+      }
+      OS.indent(Indent+2);
+      OS << "precedence " << IOD->getInfixData().getPrecedence() << ')';
+    }
+    
+    void visitPrefixOperatorDecl(PrefixOperatorDecl *POD) {
+      printCommon(POD, "prefix_operator_decl ");
+      OS << POD->getName() << ')';
+    }
 
+    void visitPostfixOperatorDecl(PostfixOperatorDecl *POD) {
+      printCommon(POD, "postfix_operator_decl ");
+      OS << POD->getName() << ')';
+    }
   };
 } // end anonymous namespace.
 

@@ -20,9 +20,11 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/StringMap.h"
 
 namespace clang {
   class Module;
@@ -35,9 +37,13 @@ namespace swift {
   class Decl;
   class ExtensionDecl;
   class IdentifierType;
+  class InfixOperatorDecl;
   class LookupCache;
   class NameAliasType;
   class OneOfElementDecl;
+  class OperatorDecl;
+  class PostfixOperatorDecl;
+  class PrefixOperatorDecl;
   struct PrintOptions;
   class TupleType;
   class Type;
@@ -113,6 +119,29 @@ public:
   /// extending the specified type and return a list of them.
   ArrayRef<ExtensionDecl*> lookupExtensions(Type T);
 
+  /// Look up an InfixOperatorDecl for the given operator
+  /// name in this module (which must be NameBound) and return it, or return
+  /// null if there is no operator decl. Returns Nothing if there was an error
+  /// resolving the operator name (such as if there were conflicting importing
+  /// operator declarations).
+  Optional<InfixOperatorDecl *> lookupInfixOperator(Identifier name,
+                                              SourceLoc diagLoc = SourceLoc());
+  
+  /// Look up an PrefixOperatorDecl for the given operator
+  /// name in this module (which must be NameBound) and return it, or return
+  /// null if there is no operator decl. Returns Nothing if there was an error
+  /// resolving the operator name (such as if there were conflicting importing
+  /// operator declarations).
+  Optional<PrefixOperatorDecl *> lookupPrefixOperator(Identifier name,
+                                              SourceLoc diagLoc = SourceLoc());
+  /// Look up an PostfixOperatorDecl for the given operator
+  /// name in this module (which must be NameBound) and return it, or return
+  /// null if there is no operator decl. Returns Nothing if there was an error
+  /// resolving the operator name (such as if there were conflicting importing
+  /// operator declarations).
+  Optional<PostfixOperatorDecl *> lookupPostfixOperator(Identifier name,
+                                              SourceLoc diagLoc = SourceLoc());
+
   static bool classof(const DeclContext *DC) {
     return DC->isModuleContext();
   }
@@ -160,6 +189,21 @@ public:
 
   /// Decls; the list of top-level declarations for a translation unit.
   std::vector<Decl*> Decls;
+  
+  /// A map of operator names to InfixOperatorDecls.
+  /// Populated during name binding; the mapping will be incomplete until name
+  /// binding is complete.
+  llvm::StringMap<InfixOperatorDecl*> InfixOperators;
+
+  /// A map of operator names to PostfixOperatorDecls.
+  /// Populated during name binding; the mapping will be incomplete until name
+  /// binding is complete.
+  llvm::StringMap<PostfixOperatorDecl*> PostfixOperators;
+
+  /// A map of operator names to PrefixOperatorDecls.
+  /// Populated during name binding; the mapping will be incomplete until name
+  /// binding is complete.
+  llvm::StringMap<PrefixOperatorDecl*> PrefixOperators;
 
   TranslationUnit(Identifier Name, Component *Comp, ASTContext &C,
                   bool IsMainModule, bool IsReplModule)

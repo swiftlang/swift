@@ -1552,40 +1552,23 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
 
 
 /// getInfixData - If the specified expression is an infix binary
-/// operator, return its precedence.
+/// operator, return its infix operator attributes.
 static InfixData getInfixData(TypeChecker &TC, Expr *E) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-    if (DRE->getDecl()->getAttrs().isInfix())
-      return DRE->getDecl()->getAttrs().getInfixData();
-
-    TC.diagnose(DRE->getLoc(), diag::binop_not_infix);
-
-  // If this is an overload set, the entire overload set is required
-  // to have the same infix data.
-  } else if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
-    ValueDecl *FirstDecl = nullptr;
-    InfixData Infix;
-    for (auto D : OO->getDecls()) {
-      // It is possible some unary operators got mixed into the overload set.
-      if (!D->getAttrs().isInfix())
-        continue;
-      
-      if (Infix.isValid() && Infix != D->getAttrs().getInfixData()) {
-        TC.diagnose(OO->getLoc(), diag::binop_mismatched_infix);
-        TC.diagnose(FirstDecl, diag::first_declaration);
-        TC.diagnose(D, diag::second_declaration);
-        return Infix;
-      }
-      
-      Infix = D->getAttrs().getInfixData();
-      FirstDecl = D;
+    if (Optional<InfixOperatorDecl*> maybeOp
+      = TC.TU.lookupInfixOperator(DRE->getDecl()->getName(), E->getLoc())) {
+      if (auto *op = *maybeOp)
+        return op->getInfixData();
+      TC.diagnose(DRE->getLoc(), diag::unknown_binop);
     }
-
-    if (Infix.isValid())
-      return Infix;
-
-    TC.diagnose(OO->getLoc(), diag::binop_not_overloaded);
-
+  } else if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
+    Identifier name = OO->getDecls()[0]->getName();
+    if (Optional<InfixOperatorDecl*> maybeOp
+        = TC.TU.lookupInfixOperator(name, E->getLoc())) {
+      if (auto *op = *maybeOp)
+        return op->getInfixData();
+      TC.diagnose(OO->getLoc(), diag::unknown_binop);
+    }
   // Otherwise, complain.
   } else {
     TC.diagnose(E->getLoc(), diag::unknown_binop);

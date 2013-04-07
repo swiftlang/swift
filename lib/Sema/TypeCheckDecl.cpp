@@ -712,7 +712,6 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   
     if (NumArguments == 0 || NumArguments > 2) {
       TC.diagnose(VD->getStartLoc(), diag::invalid_arg_count_for_operator);
-      VD->getMutableAttrs().Infix = InfixData();
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
@@ -783,7 +782,6 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     // Only operator functions can be infix.
     if (!isOperator) {
       TC.diagnose(VD->getStartLoc(), diag::infix_not_an_operator);
-      VD->getMutableAttrs().Infix = InfixData();
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
@@ -791,7 +789,6 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     // Only binary operators can be infix.
     if (NumArguments != 2) {
       TC.diagnose(Attrs.LSquareLoc, diag::invalid_infix_left_input);
-      VD->getMutableAttrs().Infix = InfixData();
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
@@ -871,62 +868,6 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     }
   }
   
-  if (VD->isOperator() && !VD->getAttrs().isInfix() && NumArguments != 1) {
-    // If this declaration is defined in the translation unit, check whether
-    // there are any other operators in this scope with the same name that are
-    // infix. If so, inherit that infix.
-    // FIXME: This is a hack in so many ways. We may eventually want to separate
-    // the declaration of an operator name + precedence from a new operator
-    // function, or at the very least check the consistency of operator
-    // associativity and precedence within a given scope.
-    if (TranslationUnit *TU = dyn_cast<TranslationUnit>(VD->getDeclContext())) {
-      // Look in the translation unit.
-      for (Decl *D : TU->Decls) {
-        if (ValueDecl *Existing = dyn_cast<ValueDecl>(D)) {
-          if (Existing->getName() == VD->getName() &&
-              Existing->getAttrs().isInfix()) {
-            VD->getMutableAttrs().Infix = Existing->getAttrs().Infix;
-            break;
-          }
-        }
-      }
-      
-      // Look in imported modules.
-      if (!VD->getAttrs().isInfix()) {
-        // FIXME: Hack to avoid searching Clang modules more than once.
-        bool searchedClangModule = false;
-        for (auto &ModPath : TU->getImportedModules()) {
-          if (Module *Mod = ModPath.second) {
-            // FIXME: Only searching Clang modules once.
-            if (isa<ClangModule>(Mod)) {
-              if (searchedClangModule)
-                continue;
-
-              searchedClangModule = true;
-            }
-
-            SmallVector<ValueDecl *, 4> Found;
-            Mod->lookupValue(Module::AccessPathTy(), VD->getName(),
-                             NLKind::QualifiedLookup, Found);
-            for (ValueDecl *Existing : Found) {
-              if (Existing->getName() == VD->getName() &&
-                  Existing->getAttrs().isInfix()) {
-                VD->getMutableAttrs().Infix = Existing->getAttrs().Infix;
-                break;              
-              }
-
-            if (VD->getAttrs().isInfix())
-              break;
-            }
-          }
-        }
-      }
-    }
-    
-    if (!VD->getAttrs().isInfix())
-      TC.diagnose(VD->getStartLoc(), diag::binops_infix_left);
-  }
-
   if (Attrs.isByref()) {
     TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "byref");
     VD->getMutableAttrs().Byref = false;

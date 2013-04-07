@@ -46,16 +46,7 @@ Scope::Scope(Parser *P, bool ResolvableScope)
 /// D1/D3 are valid overloads and we don't have to check all permutations.
 static bool checkValidOverload(const ValueDecl *D1, const ValueDecl *D2,
                                Parser &P) {
-  if (D1->getAttrs().isInfix() && D2->getAttrs().isInfix() &&
-      D1->getAttrs().getInfixData() != D2->getAttrs().getInfixData()) {
-    P.diagnose(D1->getLoc(), diag::precedence_overload);
-    // FIXME: Pass identifier through, when the diagnostics system can handle
-    // it.
-    P.diagnose(D2->getLoc(), diag::previous_declaration, D2->getName());
-    return true;
-  }
-  
-  // Otherwise, everything is fine.
+  // Currently, there is no restriction on overloading.
   return false;
 }
 

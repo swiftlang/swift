@@ -134,7 +134,6 @@ public:
   /// will be invalid locs.
   SourceLoc LSquareLoc, RSquareLoc;
 
-  InfixData Infix;
   ResilienceData Resilience;
   StringRef AsmName;
   bool Byref = false;
@@ -145,6 +144,7 @@ public:
   bool ObjC = false;
   bool ExplicitPrefix = false;
   bool ExplicitPostfix = false;
+  bool ExplicitInfix = false;
   bool IBOutlet = false;
   bool IBAction = false;
   
@@ -152,8 +152,6 @@ public:
 
   bool isValid() const { return LSquareLoc.isValid(); }
 
-  bool isInfix() const { return Infix.isValid(); }
-  InfixData getInfixData() const { return Infix; }
   ResilienceData getResilienceData() const { return Resilience; }
   bool isByref() const { return Byref; }
   bool isByrefHeap() const { assert(isByref()); return ByrefHeap; }
@@ -162,6 +160,7 @@ public:
   bool isConversion() const { return Conversion; }
   bool isPrefix() const { return ExplicitPrefix; }
   bool isPostfix() const { return ExplicitPostfix; }
+  bool isInfix() const { return ExplicitInfix; }
   bool isObjC() const { return ObjC; }
   bool isIBOutlet() const { return IBOutlet; }
   bool isIBAction() const { return IBAction; }

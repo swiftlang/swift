@@ -423,6 +423,48 @@ static void collectExportedClangModules(clang::Module *mod, SourceLoc importLoc,
   }
 }
 
+template<typename OP_DECL>
+static void insertOperatorDecl(NameBinder &Binder,
+                               llvm::StringMap<OP_DECL*> &Operators,
+                               OP_DECL *OpDecl) {
+  auto previousDecl = Operators.find(OpDecl->getName().get());
+  if (previousDecl != Operators.end()) {
+    Binder.diagnose(OpDecl->getLoc(), diag::operator_redeclared);
+    Binder.diagnose(previousDecl->getValue(), diag::previous_operator_decl);
+    return;
+  }
+  
+  Operators[OpDecl->getName().get()] = OpDecl;
+}
+
+static void bindFuncDeclToOperator(NameBinder &Binder,
+                                   TranslationUnit *TU,
+                                   FuncDecl *FD) {
+  OperatorDecl *op;
+  if (FD->getAttrs().isPrefix()) {
+    if (auto maybeOp = TU->lookupPrefixOperator(FD->getName(), FD->getLoc()))
+      op = *maybeOp;
+    else
+      return;
+  } else if (FD->getAttrs().isPostfix()) {
+    if (auto maybeOp = TU->lookupPostfixOperator(FD->getName(), FD->getLoc()))
+      op = *maybeOp;
+    else
+      return;
+  } else {
+    if (auto maybeOp = TU->lookupInfixOperator(FD->getName(), FD->getLoc()))
+      op = *maybeOp;
+    else
+      return;
+  }
+  
+  if (!op) {
+    Binder.diagnose(FD->getLoc(), diag::declared_operator_without_operator_decl);
+  } else {
+    FD->setOperatorDecl(op);
+  }
+}
+
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
 ///
@@ -449,10 +491,18 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   ImportedModules.append(TU->getImportedModules().begin(),
                          TU->getImportedModules().end());
 
-  // Do a prepass over the declarations to find and load the imported modules.
-  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i)
+  // Do a prepass over the declarations to find and load the imported modules
+  // and map operator decls.
+  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     if (ImportDecl *ID = dyn_cast<ImportDecl>(TU->Decls[i]))
       Binder.addImport(ID, ImportedModules);
+    else if (auto *OD = dyn_cast<PrefixOperatorDecl>(TU->Decls[i]))
+      insertOperatorDecl(Binder, TU->PrefixOperators, OD);
+    else if (auto *OD = dyn_cast<PostfixOperatorDecl>(TU->Decls[i]))
+      insertOperatorDecl(Binder, TU->PostfixOperators, OD);
+    else if (auto *OD = dyn_cast<InfixOperatorDecl>(TU->Decls[i]))
+      insertOperatorDecl(Binder, TU->InfixOperators, OD);
+  }
 
   // Walk the dependencies of imported Clang modules. For any imported
   // dependencies, also load the corresponding Swift module, if it exists.
@@ -534,11 +584,12 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
 
   // FIXME: This is quadratic time for TUs with multiple chunks.
   // FIXME: Can we make this more efficient?
-  // Check for declarations with the same name which aren't overloaded
-  // vars/funcs.
+
   llvm::DenseMap<Identifier, ValueDecl*> CheckTypes;
   for (unsigned i = 0, e = TU->Decls.size(); i != e; ++i) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(TU->Decls[i])) {
+      // Check for declarations with the same name which aren't overloaded
+      // vars/funcs.
       // FIXME: I'm not sure this check is really correct.
       if (VD->getName().empty())
         continue;
@@ -696,6 +747,10 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
           CD->setInherited(inherited);
         }
       }
+    } else if (FuncDecl *FD = dyn_cast<FuncDecl>(TU->Decls[i])) {
+      // If this is an operator implementation, bind it to an operator decl.
+      if (FD->isOperator())
+        bindFuncDeclToOperator(Binder, TU, FD);
     }
   }
 
