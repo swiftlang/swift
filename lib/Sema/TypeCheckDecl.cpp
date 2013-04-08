@@ -811,6 +811,32 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       return;
     }
   }
+  
+  if (Attrs.isPrefix()) {
+    // Only operator functions can be postfix.
+    if (!isOperator) {
+      TC.diagnose(VD->getStartLoc(), diag::prefix_not_an_operator);
+      VD->getMutableAttrs().ExplicitPostfix = false;
+      // FIXME: Set the 'isError' bit on the decl.
+      return;
+    }
+    
+    // Only unary operators can be postfix.
+    if (NumArguments != 1) {
+      TC.diagnose(VD->getStartLoc(), diag::invalid_prefix_input);
+      VD->getMutableAttrs().ExplicitPostfix = false;
+      // FIXME: Set the 'isError' bit on the decl.
+      return;
+    }
+  }
+  
+  if (isOperator && NumArguments == 1
+      && !Attrs.isPrefix() && !Attrs.isPostfix()) {
+    // Unary operators must be declared 'prefix' or 'postfix'.
+    TC.diagnose(VD->getStartLoc(), diag::declared_unary_op_without_attribute);
+    // FIXME: Set the 'isError' bit on the decl.
+    return;
+  }
 
   if (Attrs.isAssignment()) {
     // Only function declarations can be assignments.
