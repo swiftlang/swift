@@ -63,6 +63,17 @@ BUILTIN_BINARY_OPERATION(URem,    "urem",     Integer)
 BUILTIN_BINARY_OPERATION(Xor,     "xor",      Integer)
 #undef BUILTIN_BINARY_OPERATION
 
+/// Unary operations have type (T) -> T.
+#ifndef BUILTIN_UNARY_OPERATION
+#define BUILTIN_UNARY_OPERATION(Id, Name, Overload) BUILTIN(Id, Name)
+#endif
+
+// "fneg" is a separate builtin because its LLVM representation is
+// 'fsub -0.0, %x', but defining it in swift as
+// 'func [prefix] -(x) { -0.0 - x }' would be infinitely recursive.
+BUILTIN_UNARY_OPERATION(FNeg, "fneg", Float)
+#undef BUILTIN_UNARY_OPERATION
+
 /// Binary predicates have type (T,T) -> i1
 #ifndef BUILTIN_BINARY_PREDICATE
 #define BUILTIN_BINARY_PREDICATE(Id, Name, Overload) BUILTIN(Id, Name)

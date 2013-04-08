@@ -91,7 +91,7 @@ namespace {
 }
 
 
-/// Build a builtin function declarations.
+/// Build a builtin function declaration.
 static FuncDecl *getBuiltinFunction(ASTContext &Context, Identifier Id, Type T){
   return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, SourceLoc(),
                                 /*generic=*/nullptr, T, /*init*/ nullptr,
@@ -114,6 +114,12 @@ static ValueDecl *getBinaryOperation(ASTContext &Context, Identifier Id,
   TupleTypeElt ArgElts[] = { ArgType, ArgType };
   Type Arg = TupleType::get(ArgElts, Context);
   Type FnTy = FunctionType::get(Arg, ArgType, Context);
+  return getBuiltinFunction(Context, Id, FnTy);
+}
+
+static ValueDecl *getUnaryOperation(ASTContext &Context, Identifier Id,
+                                    Type ArgType) {
+  Type FnTy = FunctionType::get(ArgType, ArgType, Context);
   return getBuiltinFunction(Context, Id, FnTy);
 }
 
@@ -402,6 +408,8 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
    OverloadedBuiltinKind::overload,
 #define BUILTIN_BINARY_PREDICATE(id, name, overload) \
    OverloadedBuiltinKind::overload,
+#define BUILTIN_UNARY_OPERATION(id, name, overload) \
+   OverloadedBuiltinKind::overload,
 #define BUILTIN_MISC_OPERATION(id, name, overload) \
    OverloadedBuiltinKind::overload,
 #include "swift/AST/Builtins.def"
@@ -669,6 +677,12 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
 #include "swift/AST/Builtins.def"
     if (Types.size() != 1) return nullptr;
     return getBinaryPredicate(Context, Id, Types[0]);
+
+#define BUILTIN(id, name)
+#define BUILTIN_UNARY_OPERATION(id, name, overload)   case BuiltinValueKind::id:
+#include "swift/AST/Builtins.def"
+    if (Types.size() != 1) return nullptr;
+    return getUnaryOperation(Context, Id, Types[0]);
       
 #define BUILTIN(id, name)
 #define BUILTIN_CAST_OPERATION(id, name)  case BuiltinValueKind::id:

@@ -1609,13 +1609,19 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     llvm::Value *v = IGF.Builder.Create##id(lhs, rhs); \
     return emission.setScalarUnmanagedSubstResult(v); \
   }
-  
+
 #define BUILTIN_BINARY_PREDICATE(id, name, overload) \
   if (BuiltinName == name) \
     return emitCompareBuiltin(IGF, fn, emission, args, llvm::CmpInst::id);
 #define BUILTIN(ID, Name)  // Ignore the rest.
 #include "swift/AST/Builtins.def"
 
+  if (BuiltinName == "fneg") {
+    llvm::Value *rhs = args.claimUnmanagedNext();
+    llvm::Value *lhs = llvm::ConstantFP::get(rhs->getType(), "-0.0");
+    llvm::Value *v = IGF.Builder.CreateFSub(lhs, rhs);
+    return emission.setScalarUnmanagedSubstResult(v);
+  }
   
   if (BuiltinName == "gep") {
     llvm::Value *lhs = args.claimUnmanagedNext();
