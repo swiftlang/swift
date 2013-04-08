@@ -14,6 +14,7 @@ fi
 find "$TMPDIR" -name "*.pcm" -exec rm '{}' ';'
 find /var/tmp -name "*.pcm" -exec rm '{}' ';'
 find /tmp -name "*.pcm" -exec rm '{}' ';'
+find "$(getconf DARWIN_USER_CACHE_DIR)" -name "*.pcm" -exec rm '{}' ';'
 
 # The package name should be given as the first argument.
 PACKAGE_NAME="$1"
