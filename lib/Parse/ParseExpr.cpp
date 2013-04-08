@@ -846,72 +846,63 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
 ///   expr-paren-element:
 ///     (identifier ':')? expr
 ///
-/// FIXME: the '=' form above will likely go away.
-///
 NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
-  SourceLoc LLoc = consumeToken(LeftTok);
-  SourceLoc RLoc;
+  SourceLoc RLoc, LLoc = consumeToken(LeftTok);
 
   SmallVector<Expr*, 8> SubExprs;
   SmallVector<Identifier, 8> SubExprNames;
 
-  if (Tok.isNot(RightTok)) {
-    do {
-      Identifier FieldName;
-      // Check to see if there is a field specifier
-      if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
-        if (parseIdentifier(FieldName,
-                            diag::expected_field_spec_name_tuple_expr))
-          return 0;
-        consumeToken(tok::colon);
+  bool Invalid = parseList(RightTok, LLoc, RLoc,
+                           tok::comma, /*OptionalSep=*/false,
+                           RightTok == tok::r_paren ?
+                           diag::expected_rparen_expr_list :
+                           diag::expected_rsquare_expr_list,
+                           [&] () -> bool {
+    Identifier FieldName;
+    // Check to see if there is a field specifier
+    if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
+      if (parseIdentifier(FieldName,
+                          diag::expected_field_spec_name_tuple_expr)) {
+        return true;
       }
+      consumeToken(tok::colon);
+    }
 
-      if (!SubExprNames.empty())
-        SubExprNames.push_back(FieldName);
-      else if (FieldName.get()) {
-        SubExprNames.resize(SubExprs.size());
-        SubExprNames.push_back(FieldName);
-      }
+    if (!SubExprNames.empty()) {
+      SubExprNames.push_back(FieldName);
+    } else if (FieldName.get()) {
+      SubExprNames.resize(SubExprs.size());
+      SubExprNames.push_back(FieldName);
+    }
 
-      // See if we have an operator decl ref '(<op>)'. The operator token in
-      // this case lexes as a binary operator because it neither leads nor
-      // follows a proper subexpression.
-      if (Tok.is(tok::oper_binary) &&
-          (peekToken().is(RightTok) || peekToken().is(tok::comma))) {
-        SourceLoc Loc = Tok.getLoc();
-        Identifier OperName;
-        if (parseAnyIdentifier(OperName, diag::expected_operator_ref))
-          return nullptr;
-        // Bypass local lookup. Use an 'Ordinary' reference kind so that the
-        // reference may resolve to any unary or binary operator based on
-        // context.
-        auto *SubExpr = new(Context)UnresolvedDeclRefExpr(OperName,
-                                                          DeclRefKind::Ordinary,
-                                                          Loc);
-        SubExprs.push_back(SubExpr);
-      } else {
-        NullablePtr<Expr> SubExpr = parseExpr(diag::expected_expr_in_expr_list);
-        if (SubExpr.isNull())
-          return 0;
-        SubExprs.push_back(SubExpr.get());
+    // See if we have an operator decl ref '(<op>)'. The operator token in
+    // this case lexes as a binary operator because it neither leads nor
+    // follows a proper subexpression.
+    if (Tok.is(tok::oper_binary) &&
+        (peekToken().is(RightTok) || peekToken().is(tok::comma))) {
+      SourceLoc Loc = Tok.getLoc();
+      Identifier OperName;
+      if (parseAnyIdentifier(OperName, diag::expected_operator_ref)) {
+        return true;
       }
-    } while (consumeIf(tok::comma));
-  }
-  
-  
-  // Check to see if the lexer stopped with an EOF token whose spelling is ')'.
-  // If this happens, then this is actually the tuple that is a string literal
-  // interpolation context.  Just accept the ) and build the tuple as we usually
-  // do.
-  if (Tok.is(tok::eof) && Tok.getText()[0] == ')')
-    RLoc = Tok.getLoc();
-  else {
-    if (parseMatchingToken(RightTok, RLoc,
-                           RightTok == tok::r_paren
-                           ? diag::expected_rparen_expr_list
-                           : diag::expected_rsquare_expr_list, LLoc))
-      return 0;
-  }
+      // Bypass local lookup. Use an 'Ordinary' reference kind so that the
+      // reference may resolve to any unary or binary operator based on
+      // context.
+      auto *SubExpr = new(Context)UnresolvedDeclRefExpr(OperName,
+                                                        DeclRefKind::Ordinary,
+                                                        Loc);
+      SubExprs.push_back(SubExpr);
+    } else {
+      NullablePtr<Expr> SubExpr = parseExpr(diag::expected_expr_in_expr_list);
+      if (SubExpr.isNull()) {
+        return true;
+      }
+      SubExprs.push_back(SubExpr.get());
+    }
+    return false;
+  });
+
+  if (Invalid) return nullptr;
 
   MutableArrayRef<Expr *> NewSubExprs = Context.AllocateCopy(SubExprs);
   
@@ -1197,38 +1188,27 @@ NullablePtr<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
   SmallVector<Expr *, 8> SubExprs;
   SubExprs.push_back(FirstExpr);
   SourceLoc RSquareLoc;
-  do {
-    // If we see the closing square bracket, we're done.
-    if (Tok.is(tok::r_square)) {
-      RSquareLoc = consumeToken();
-      break;
-    }
+  bool Invalid = false;
 
-    // If we don't see a comma, we're done.
-    if (!Tok.is(tok::comma)) {
-      skipUntil(tok::r_square);
-      RSquareLoc = Tok.getLoc();
-      if (Tok.is(tok::r_square))
-        consumeToken();
-      break;
-    }
+  if (Tok.isNot(tok::r_square) && !consumeIf(tok::comma)) {
+    diagnose(Tok, diag::expected_separator, ",");
+    Invalid |= true;
+  }
 
-    // Parse the comma.
-    consumeToken(tok::comma);
-
-    // Parse the next expression.
+  Invalid = parseList(tok::r_square, LSquareLoc, RSquareLoc,
+                      tok::comma, /*OptionalSep=*/false,
+                      diag::expected_rsquare_array_expr,
+                      [&] () -> bool {
     NullablePtr<Expr> Element
       = parseExpr(diag::expected_expr_in_collection_literal);
-    if (Element.isNull()) {
-      skipUntil(tok::r_square);
-      RSquareLoc = Tok.getLoc();
-      if (Tok.is(tok::r_square))
-        consumeToken();
-      break;
-    }
+    if (Element.isNull())
+      return true;
 
     SubExprs.push_back(Element.get());
-  } while (true);
+    return false;
+  });
+
+  if (Invalid) return nullptr;
 
   Expr *SubExpr;
   if (SubExprs.size() == 1)
@@ -1255,20 +1235,10 @@ NullablePtr<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
   // FIXME: We're not tracking the colon locations in the AST.
   SmallVector<Expr *, 8> SubExprs;
   SourceLoc RSquareLoc;
+  bool Invalid = false;
 
   // Consume the ':'.
   consumeToken(tok::colon);
-
-  // Parse the first value.
-  NullablePtr<Expr> FirstValue 
-    = parseExpr(diag::expected_value_in_dictionary_literal);
-  if (FirstValue.isNull()) {
-    skipUntil(tok::r_square);
-    RSquareLoc = Tok.getLoc();
-    if (Tok.is(tok::r_square))
-      consumeToken();
-    return 0;
-  }
 
   // Function that adds a new key/value pair.
   auto addKeyValuePair = [&](Expr *Key, Expr *Value) -> void {
@@ -1281,64 +1251,46 @@ NullablePtr<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
                                                SourceLoc()));
   };
 
-  // Add the first key/value pair.
-  addKeyValuePair(FirstKey, FirstValue.get());
+  // Parse the first value.
+  NullablePtr<Expr> FirstValue 
+    = parseExpr(diag::expected_value_in_dictionary_literal);
+  if (FirstValue.isNull()) {
+    Invalid |= true;
+  } else {
+    // Add the first key/value pair.
+    addKeyValuePair(FirstKey, FirstValue.get());
+  }
 
-  do {
-    // If we see the closing square bracket, we're done.
-    if (Tok.is(tok::r_square)) {
-      RSquareLoc = consumeToken();
-      break;
-    }
+  consumeIf(tok::comma);
 
-    // If we don't see a comma, we're done.
-    if (!Tok.is(tok::comma)) {
-      skipUntil(tok::r_square);
-      RSquareLoc = Tok.getLoc();
-      if (Tok.is(tok::r_square))
-        consumeToken();
-      break;
-    }
-
-    // Parse the comma.
-    consumeToken(tok::comma);
-
+  Invalid |= parseList(tok::r_square, LSquareLoc, RSquareLoc,
+                       tok::comma, /*OptionalSep=*/false,
+                       diag::expected_rsquare_array_expr, [&] {
     // Parse the next key.
     NullablePtr<Expr> Key
       = parseExpr(diag::expected_key_in_dictionary_literal);
-    if (Key.isNull()) {
-      skipUntil(tok::r_square);
-      RSquareLoc = Tok.getLoc();
-      if (Tok.is(tok::r_square))
-        consumeToken();
-      break;
-    }
+    if (Key.isNull())
+      return true;
 
     // Parse the ':'.
     if (Tok.isNot(tok::colon)) {
       diagnose(Tok, diag::expected_colon_in_dictionary_literal);
-      skipUntil(tok::r_square);
-      RSquareLoc = Tok.getLoc();
-      if (Tok.is(tok::r_square))
-        consumeToken();
-      break;      
+      return true;
     }
     consumeToken();
 
     // Parse the next value.
     NullablePtr<Expr> Value
       = parseExpr(diag::expected_value_in_dictionary_literal);
-    if (Value.isNull()) {
-      skipUntil(tok::r_square);
-      RSquareLoc = Tok.getLoc();
-      if (Tok.is(tok::r_square))
-        consumeToken();
-      break;
-    }
+    if (Value.isNull())
+      return true;
 
     // Add this key/value pair.
     addKeyValuePair(Key.get(), Value.get());
-  } while (true);
+    return false;
+  });
+
+  if (Invalid) return nullptr;
 
   Expr *SubExpr;
   if (SubExprs.size() == 1)

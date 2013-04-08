@@ -302,6 +302,56 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   return false;
 }
 
+/// parseList - Parse the list of statements, expressions, or declarations.
+bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
+                       tok SeparatorK, bool OptionalSep, Diag<> ErrorDiag,
+                       std::function<bool()> callback)
+{
+  assert(SeparatorK == tok::comma || SeparatorK == tok::semi);
+
+  if (Tok.is(RightK)) {
+    RightLoc = consumeToken(RightK);
+    return false;
+  }
+
+  bool Invalid = false;
+  while (true) {
+    while (Tok.is(SeparatorK)) {
+      // FIXME: Add a fixit to remove optional separators
+      diagnose(Tok, diag::unexpected_separator,
+               SeparatorK == tok::comma ? "," : ";");
+      consumeToken();
+    }
+    SourceLoc StartLoc = Tok.getLoc();
+    Invalid |= callback();
+    if (Tok.is(RightK))
+      break;
+    // If the lexer stopped with an EOF token whose spelling is ')', then this
+    // is actually the tuple that is a string literal interpolation context.
+    // Just accept the ) and build the tuple as we usually do.
+    if (Tok.is(tok::eof) && Tok.getText()[0] == ')') {
+      RightLoc = Tok.getLoc();
+      return Invalid;
+    }
+    if (consumeIf(SeparatorK))
+      continue;
+    if (!OptionalSep) {
+      diagnose(Tok, diag::expected_separator,
+               SeparatorK == tok::comma ? "," : ";");
+      Invalid = true;
+    }
+    // If we haven't made progress, skip ahead
+    if (Tok.getLoc() == StartLoc) {
+      skipUntil(RightK, SeparatorK);
+      if (Tok.is(RightK))
+        break;
+      consumeIf(SeparatorK);
+    }
+  }
+
+  Invalid |= parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc);
+  return Invalid;
+}
 
 
 /// value-specifier:

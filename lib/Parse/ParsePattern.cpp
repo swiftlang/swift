@@ -315,74 +315,65 @@ NullablePtr<Pattern> Parser::parsePatternAtom() {
 ///     pattern ('=' expr)?
 
 NullablePtr<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
-  assert(Tok.is(tok::l_paren));
-
-  // We're looking at the left parenthesis; consume it.
-  SourceLoc lp = consumeToken();
+  SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
 
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
   bool hadEllipsis = false;
   bool Invalid = false;
-  if (Tok.isNot(tok::r_paren)) {
-    do {
-      NullablePtr<Pattern> pattern = parsePattern();
-      ExprHandle *init = nullptr;
+  Invalid |= parseList(tok::r_paren, LPLoc, RPLoc,
+                       tok::comma, /*OptionalSep=*/false,
+                       diag::expected_rparen_tuple_pattern_list,
+                       [&] () -> bool {
+    NullablePtr<Pattern> pattern = parsePattern();
+    ExprHandle *init = nullptr;
 
-      if (pattern.isNull()) {
-        skipUntil(tok::r_paren);
-        return nullptr;
-      } else if (Tok.is(tok::equal)) {
-        SourceLoc EqualLoc = consumeToken();
-        if (!AllowInitExpr) {
-          diagnose(EqualLoc, diag::non_func_decl_pattern_init);
-          Invalid = true;
-        }
-        NullablePtr<Expr> initR = parseExpr(diag::expected_initializer_expr);
-        if (initR.isNull()) {
-          skipUntil(tok::r_paren);
-          return nullptr;
-        }
-        
-        init = ExprHandle::get(Context, initR.get());
+    if (pattern.isNull())
+      return true;
+
+    if (Tok.is(tok::equal)) {
+      SourceLoc EqualLoc = consumeToken();
+      if (!AllowInitExpr) {
+        diagnose(EqualLoc, diag::non_func_decl_pattern_init);
+        Invalid |= true;
       }
+      NullablePtr<Expr> initR = parseExpr(diag::expected_initializer_expr);
+      if (initR.isNull())
+        return true;
 
-      elts.push_back(TuplePatternElt(pattern.get(), init));
-    } while (consumeIf(tok::comma));
-
-    if (Tok.is(tok::ellipsis)) {
-      if (elts.back().getInit()) {
-        diagnose(Tok.getLoc(), diag::tuple_ellipsis_init);
-        skipUntil(tok::r_paren);
-        return nullptr;
-      }
-      hadEllipsis = true;
-      consumeToken(tok::ellipsis);
-
-      TypedPattern *subpattern =
-          dyn_cast<TypedPattern>(elts.back().getPattern());
-      if (!subpattern) {
-        diagnose(elts.back().getPattern()->getLoc(),
-                 diag::untyped_pattern_ellipsis);
-        skipUntil(tok::r_paren);
-        return nullptr;
-      }
-      Type subTy = subpattern->getTypeLoc().getType();
-      elts.back().setVarargBaseType(subTy);
-      // FIXME: This is wrong for TypeLoc info.
-      subpattern->getTypeLoc() =
-          TypeLoc::withoutLoc(ArraySliceType::get(subTy, Context));
+      init = ExprHandle::get(Context, initR.get());
     }
 
-    if (Tok.isNot(tok::r_paren)) {
-      diagnose(Tok, diag::expected_rparen_tuple_pattern_list);
-      skipUntil(tok::r_paren);
-      return nullptr;
-    }
-  }
+    elts.push_back(TuplePatternElt(pattern.get(), init));
 
-  // Consume the right parenthesis.
-  SourceLoc rp = consumeToken(tok::r_paren);
+    if (Tok.isNot(tok::ellipsis))
+      return false;
+
+    if (elts.back().getInit()) {
+      diagnose(Tok.getLoc(), diag::tuple_ellipsis_init);
+      return true;
+    }
+    hadEllipsis = true;
+    consumeToken(tok::ellipsis);
+
+    // FIXME -- add diag
+    assert(Tok.is(tok::r_paren));
+
+    TypedPattern *subpattern =
+        dyn_cast<TypedPattern>(elts.back().getPattern());
+    if (!subpattern) {
+      diagnose(elts.back().getPattern()->getLoc(),
+               diag::untyped_pattern_ellipsis);
+      return true;
+    }
+
+    Type subTy = subpattern->getTypeLoc().getType();
+    elts.back().setVarargBaseType(subTy);
+    // FIXME: This is wrong for TypeLoc info.
+    subpattern->getTypeLoc() =
+        TypeLoc::withoutLoc(ArraySliceType::get(subTy, Context));
+    return false;
+  });
 
   if (Invalid)
     return nullptr;
@@ -392,7 +383,7 @@ NullablePtr<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
       elts[0].getInit() == nullptr &&
       elts[0].getPattern()->getBoundName().empty() &&
       !hadEllipsis)
-    return new (Context) ParenPattern(lp, elts[0].getPattern(), rp);
+    return new (Context) ParenPattern(LPLoc, elts[0].getPattern(), RPLoc);
 
-  return TuplePattern::create(Context, lp, elts, rp);
-}    
+  return TuplePattern::create(Context, LPLoc, elts, RPLoc);
+}

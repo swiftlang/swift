@@ -164,8 +164,6 @@ ERROR(disallowed_type,decl_parsing,none,
       "type not allowed here", ())
 ERROR(disallowed_init,decl_parsing,none,
       "variable initializer is not allowed here", ())
-ERROR(disallowed_semi,decl_parsing,none,
-      "semicolon is not allowed here", ())
 ERROR(decl_inner_scope,decl_parsing,none,
       "declaration is only valid at file scope", ())
 
@@ -369,6 +367,8 @@ ERROR(empty_tuple_ellipsis,type_parsing,none,
       "varargs used in tuple type with no fields", ())
 ERROR(tuple_ellipsis_init,type_parsing,none,
       "varargs used with tuple field with initializer", ())
+ERROR(unexpected_ellipsis_in_tuple,type_parsing,none,
+      "unexpected '...' before the end of a tuple list", ())
 
 // Protocol Types
 ERROR(expected_lbrace_protocol_type,type_parsing,none,
@@ -493,6 +493,10 @@ ERROR(case_colon_start_of_line,stmt_parsing,none,
 
 ERROR(expected_expr,expr_parsing,none,
       "expected expression", ())
+ERROR(expected_separator,expr_parsing,none,
+      "expected '%0' separator", (StringRef))
+ERROR(unexpected_separator,expr_parsing,none,
+      "unexpected '%0' separator", (StringRef))
 
 ERROR(expected_expr_after_operator,expr_parsing,none,
       "expected expression after operator", ())

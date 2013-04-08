@@ -228,6 +228,11 @@ public:
   /// a note at the specified note location.
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
+
+  /// parseList - Parse the list of statements, expressions, or declarations.
+  bool parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
+                 tok SeparatorK, bool OptionalSep, Diag<> ErrorDiag,
+                 std::function<bool()> callback);
   
   bool parseValueSpecifier(TypeLoc &Loc, NullablePtr<Expr> &Init);
 
@@ -274,8 +279,9 @@ public:
   Decl *parseDeclExtension(unsigned Flags);
   bool parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
 
-  bool parseNominalDeclMembers(llvm::SmallVectorImpl<Decl *> &memberDecls,
-                               unsigned flags);
+  bool parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
+                               SourceLoc LBLoc, SourceLoc &RBLoc,
+                               Diag<> ErrorDiag, unsigned flags);
   bool parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
@@ -320,7 +326,7 @@ public:
                              SourceLoc &RAngleLoc);
   bool parseTypeIdentifier(TypeLoc &ResultLoc);
   bool parseTypeComposition(TypeLoc &ResultLoc);
-  bool parseTypeTupleBody(SourceLoc LPLoc, TypeLoc &ResultLoc);
+  bool parseTypeTupleBody(TypeLoc &ResultLoc);
   bool parseTypeArray(TypeLoc &ResultLoc);
 
   //===--------------------------------------------------------------------===//

@@ -117,10 +117,7 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
     break;
   case tok::l_paren: {
     isTupleType = true;
-    SourceLoc LPLoc = consumeToken(), RPLoc;
-    if (parseTypeTupleBody(LPLoc, Result) ||
-        parseMatchingToken(tok::r_paren, RPLoc,
-                           diag::expected_rparen_tuple_type_list, LPLoc))
+    if (parseTypeTupleBody(Result))
       return true;
     break;
   }
@@ -331,66 +328,63 @@ bool Parser::parseTypeComposition(TypeLoc &Result) {
 ///   type-tuple-element:
 ///     identifier value-specifier
 ///     type-annotation
-bool Parser::parseTypeTupleBody(SourceLoc LPLoc, TypeLoc &Result) {
+bool Parser::parseTypeTupleBody(TypeLoc &Result) {
+  SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
+  SourceLoc EllipsisLoc;
   SmallVector<TupleTypeElt, 8> Elements;
   bool HadExpr = false;
+  bool HadEllipsis = false;
 
-  if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
-      Tok.isNot(tok::ellipsis) && !isStartOfDecl(Tok, peekToken())) {
-    bool HadError = false;
-    do {
-      // If the tuple element starts with "ident :" or "ident =", then
-      // the identifier is an element tag, and it is followed by a
-      // value-specifier.
-      if (Tok.is(tok::identifier) &&
-          (peekToken().is(tok::colon) || peekToken().is(tok::equal))) {
-        Identifier name = Context.getIdentifier(Tok.getText());
-        consumeToken(tok::identifier);
+  bool Invalid = parseList(tok::r_paren, LPLoc, RPLoc,
+                           tok::comma, /*OptionalSep=*/false,
+                           diag::expected_rparen_tuple_type_list,
+                           [&] () -> bool {
+    // If the tuple element starts with "ident :" or "ident =", then
+    // the identifier is an element tag, and it is followed by a
+    // value-specifier.
+    if (Tok.is(tok::identifier) &&
+        (peekToken().is(tok::colon) || peekToken().is(tok::equal))) {
+      Identifier name = Context.getIdentifier(Tok.getText());
+      consumeToken(tok::identifier);
 
-        NullablePtr<Expr> init;
-        TypeLoc type;
-        if ((HadError = parseValueSpecifier(type, init)))
-          break;
+      NullablePtr<Expr> init;
+      TypeLoc type;
+      if (parseValueSpecifier(type, init))
+        return true;
 
-        ExprHandle *initHandle = nullptr;
-        if (init.isNonNull()) {
-          HadExpr = true;
-          initHandle = ExprHandle::get(Context, init.get());
-        }
-        HadExpr |= init.isNonNull();
-        Elements.push_back(TupleTypeElt(type.getType(), name, initHandle));
-        continue;
+      ExprHandle *initHandle = nullptr;
+      if (init.isNonNull()) {
+        Invalid = true;
+        initHandle = ExprHandle::get(Context, init.get());
       }
-
+      HadExpr |= init.isNonNull();
+      Elements.push_back(TupleTypeElt(type.getType(), name, initHandle));
+    } else {
       // Otherwise, this has to be a type.
       TypeLoc type;
-      if ((HadError = parseTypeAnnotation(type)))
-        break;
-
+      if (parseTypeAnnotation(type))
+        return true;
       Elements.push_back(type.getType());
-    } while (consumeIf(tok::comma));
-    
-    if (HadError) {
-      skipUntil(tok::r_paren);
-      if (Tok.is(tok::r_paren))
-        consumeToken(tok::r_paren);
-      return true;
     }
-  }
+    if (Tok.is(tok::ellipsis)) {
+      EllipsisLoc = consumeToken(tok::ellipsis);
+      if (Tok.is(tok::r_paren)) {
+        HadEllipsis = true;
+      } else {
+        diagnose(EllipsisLoc, diag::unexpected_ellipsis_in_tuple);
+        Invalid = true;
+      }
+    }
+    return false;
+  });
 
-  bool HadEllipsis = false;
-  SourceLoc EllipsisLoc;
-  if (Tok.is(tok::ellipsis)) {
-    EllipsisLoc = consumeToken();
-    HadEllipsis = true;
-  }
 
   // A "tuple" with one anonymous element is actually not a tuple.
   if (Elements.size() == 1 && !Elements.back().hasName() && !HadEllipsis) {
     assert(!HadExpr && "Only TupleTypes have default values");
     Result = { ParenType::get(Context, Elements.back().getType()),
                SourceRange(LPLoc, Tok.getLoc()) };
-    return false;
+    return Invalid;
   }
 
   if (HadEllipsis) {
@@ -412,8 +406,9 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, TypeLoc &Result) {
   TupleType *TT = TupleType::get(Elements, Context)->castTo<TupleType>();
   if (HadExpr)
     TypesWithDefaultValues.emplace_back(TT, CurDeclContext);
-  Result = { TT, SourceRange(LPLoc, Tok.getLoc()) };
-  return false;
+
+  Result = { TT, SourceRange(LPLoc, RPLoc) };
+  return Invalid;
 }
 
 

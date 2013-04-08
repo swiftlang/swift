@@ -304,26 +304,13 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
 ///     '[' attribute (',' attribute)* ']'
 bool Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
   Attributes.LSquareLoc = consumeToken(tok::l_square);
-  
-  // If this is an empty attribute list, consume it and return.
-  if (Tok.is(tok::r_square)) {
-    Attributes.RSquareLoc = consumeToken(tok::r_square);
-    return false;
-  }
-  
-  bool HadError = false;
-  do {
-    HadError |= parseAttribute(Attributes);
-  } while (consumeIf(tok::comma));
 
-  if (parseMatchingToken(tok::r_square, Attributes.RSquareLoc,
-                         diag::expected_in_attribute_list,
-                         Attributes.LSquareLoc)) {
-    skipUntil(tok::r_square);
-    consumeIf(tok::r_square);
-    return true;
-  }
-  return HadError;
+  return parseList(tok::r_square, Attributes.LSquareLoc, Attributes.RSquareLoc,
+                   tok::comma, /*OptionalSep=*/false,
+                   diag::expected_in_attribute_list,
+                   [&] () -> bool {
+    return parseAttribute(Attributes);
+  });
 }
 
 bool Parser::isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
@@ -352,12 +339,6 @@ bool Parser::isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
 bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   bool HadParseError = false;
   switch (Tok.getKind()) {
-  case tok::semi:
-    // FIXME: Add a fixit to remove the semicolon.
-    diagnose(Tok, diag::disallowed_semi);
-    // Don't set HadParseError; just eat the semicolon and continue.
-    consumeToken(tok::semi);
-    break;
   case tok::kw_import:
     Entries.push_back(parseDeclImport(Flags));
     break;
@@ -517,13 +498,15 @@ Decl *Parser::parseDeclExtension(unsigned Flags) {
   Scope ExtensionScope(this, /*AllowLookup=*/false);
 
   SmallVector<Decl*, 8> MemberDecls;
-  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    if (parseDecl(MemberDecls,
-                  PD_HasContainerType|PD_DisallowVar))
-      skipUntilDeclRBrace();
-  }
 
-  parseMatchingToken(tok::r_brace, RBLoc,diag::expected_rbrace_extension,LBLoc);
+  bool Invalid = parseList(tok::r_brace, LBLoc, RBLoc,
+                           tok::semi, /*OptionalSep=*/true,
+                           diag::expected_rbrace_extension,
+                           [&] () -> bool {
+    return parseDecl(MemberDecls, PD_HasContainerType|PD_DisallowVar);
+  });
+
+  if (Invalid) return nullptr;
 
   ED->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
 
@@ -1247,37 +1230,38 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
     MemberDecls.push_back(OOED);
   }
 
+  bool Invalid = false;
+
   // Parse the extended body of the oneof.
   {
     ContextChange CC(*this, OOD);
     Scope OneofBodyScope(this, /*AllowLookup=*/false);
-    parseNominalDeclMembers(MemberDecls, PD_HasContainerType|PD_DisallowVar);
+    Invalid |= parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
+                                       diag::expected_rbrace_oneof_type,
+                                       PD_HasContainerType|PD_DisallowVar);
   }
 
-  OOD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, Tok.getLoc() });
+  OOD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
 
   ScopeInfo.addToScope(OOD);
-
-  if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_oneof_type,
-                         LBLoc))
-    return true;
 
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(OneOfLoc, diag::disallowed_type);
     return true;
   }
 
-  return false;
+  return Invalid;
 }
 
 /// \brief Parse the members in a struct/class/protocol definition.
 ///
 ///    decl*
 bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
-                                     unsigned flags) {
-  bool hadError = false;
+                                     SourceLoc LBLoc, SourceLoc &RBLoc,
+                                     Diag<> ErrorDiag, unsigned flags) {
   bool previousHadSemi = true;
-  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
+  return parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/true,
+                   ErrorDiag, [&] () -> bool {
     // If the previous declaration didn't have a semicolon and this new
     // declaration doesn't start a line, complain.
     if (!previousHadSemi && !Tok.isAtStartOfLine()) {
@@ -1289,16 +1273,15 @@ bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
     }
 
     previousHadSemi = false;
-    if (parseDecl(memberDecls, flags)) {
-      hadError = true;
-      skipUntilDeclRBrace();
-    }
+    if (parseDecl(memberDecls, flags))
+      return true;
 
     // Check whether the previous declaration had a semicolon after it.
     if (!memberDecls.empty() && memberDecls.back()->TrailingSemiLoc.isValid())
       previousHadSemi = true;
-  }
-  return hadError;
+
+    return false;
+  });
 }
 
 /// parseDeclStruct - Parse a 'struct' declaration, returning true (and doing no
@@ -1318,7 +1301,6 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
 
   Identifier StructName;
   SourceLoc StructNameLoc = Tok.getLoc();
-  SourceLoc LBLoc, RBLoc;
   if (parseIdentifier(StructName, diag::expected_identifier_in_decl, "struct"))
     return true;
 
@@ -1333,7 +1315,8 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
     parseInheritance(Inherited);
-  
+
+  SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct))
     return true;
 
@@ -1354,12 +1337,16 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
     }
   }
 
+  bool Invalid = false;
+
   // Parse the body.
   SmallVector<Decl*, 8> MemberDecls;
   {
     ContextChange CC(*this, SD);
     Scope StructBodyScope(this, /*AllowLookup=*/false);
-    parseNominalDeclMembers(MemberDecls, PD_HasContainerType);
+    Invalid |= parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
+                                       diag::expected_rbrace_struct,
+                                       PD_HasContainerType);
   }
 
   // FIXME: Need better handling for implicit constructors.
@@ -1374,18 +1361,15 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   MemberDecls.push_back(ValueCD);
   ThisDecl->setDeclContext(ValueCD);
 
-  SD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, Tok.getLoc() });
+  SD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
   ScopeInfo.addToScope(SD);
-
-  if (parseMatchingToken(tok::r_brace,RBLoc,diag::expected_rbrace_struct,LBLoc))
-    return true;
 
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(StructLoc, diag::disallowed_type);
     return true;
   }
 
-  return false;
+  return Invalid;
 }
 
 /// parseDeclClass - Parse a 'class' declaration, returning true (and doing no
@@ -1439,12 +1423,16 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
     }
   }
 
+  bool Invalid = false;
+
   // Parse the body.
   SmallVector<Decl*, 8> MemberDecls;
   {
     ContextChange CC(*this, CD);
     Scope ClassBodyScope(this, /*AllowLookup=*/false);
-    parseNominalDeclMembers(MemberDecls,PD_HasContainerType|PD_AllowDestructor);
+    Invalid |= parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
+                                       diag::expected_rbrace_class,
+                                       PD_HasContainerType|PD_AllowDestructor);
   }
 
   bool hasConstructor = false;
@@ -1467,19 +1455,16 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
     ThisDecl->setDeclContext(Constructor);
     MemberDecls.push_back(Constructor);
   }
-  
-  CD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, Tok.getLoc() });
-  ScopeInfo.addToScope(CD);
 
-  if (parseMatchingToken(tok::r_brace, RBLoc,diag::expected_rbrace_class,LBLoc))
-    return true;
+  CD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
+  ScopeInfo.addToScope(CD);
 
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(ClassLoc, diag::disallowed_type);
     return true;
   }
 
-  return false;
+  return Invalid;
 }
 
 /// parseDeclProtocol - Parse a 'protocol' declaration, returning null (and
@@ -1539,21 +1524,15 @@ Decl *Parser::parseDeclProtocol(unsigned Flags) {
                                                   CurDeclContext,
                                                   MutableArrayRef<TypeLoc>()));
 
+    SourceLoc RBraceLoc;
     // Parse the members.
-    bool HadError = parseNominalDeclMembers(Members,
-                      PD_HasContainerType|PD_DisallowProperty|
-                      PD_DisallowFuncDef|PD_DisallowNominalTypes|
-                      PD_DisallowInit|PD_DisallowTypeAliasDef);
+    if (parseNominalDeclMembers(Members, LBraceLoc, RBraceLoc,
+                                diag::expected_rbrace_protocol,
+                                PD_HasContainerType|PD_DisallowProperty|
+                                PD_DisallowFuncDef|PD_DisallowNominalTypes|
+                                PD_DisallowInit|PD_DisallowTypeAliasDef))
+      return nullptr;
 
-    // Find the closing brace.
-    SourceLoc RBraceLoc = Tok.getLoc();
-    if (Tok.is(tok::r_brace))
-      consumeToken();
-    else if (!HadError) {
-      diagnose(Tok.getLoc(), diag::expected_rbrace_protocol);
-      diagnose(LBraceLoc, diag::opening_brace);
-    }
-    
     // Install the protocol elements.
     Proto->setMembers(Context.AllocateCopy(Members),
                       SourceRange(LBraceLoc, RBraceLoc));
@@ -1583,12 +1562,6 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
                                 SmallVectorImpl<Decl *> &Decls) {
   bool Invalid = false;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
-  
-  // Reject 'subscript' functions outside of type decls
-  if (!HasContainerType) {
-    diagnose(Tok, diag::subscript_decl_wrong_scope);
-    Invalid = true;
-  }
 
   // attribute-list
   DeclAttributes Attributes;
@@ -1658,7 +1631,13 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
       diagnose(SubscriptLoc, diag::subscript_without_get);
     Invalid = true;
   }
-  
+
+  // Reject 'subscript' functions outside of type decls
+  if (!HasContainerType) {
+    diagnose(SubscriptLoc, diag::subscript_decl_wrong_scope);
+    Invalid = true;
+  }
+
   if (!Invalid) {
     // FIXME: We should build the declarations even if they are invalid.
 
@@ -1783,12 +1762,6 @@ ConstructorDecl *Parser::parseDeclConstructor(bool HasContainerType) {
 
 DestructorDecl *Parser::parseDeclDestructor(unsigned Flags) {
   SourceLoc DestructorLoc = consumeToken(tok::kw_destructor);
-  
-  // Reject 'destructor' functions outside of classes
-  if (!(Flags & PD_AllowDestructor)) {
-    diagnose(Tok, diag::destructor_decl_outside_class);
-    return nullptr;
-  }
 
   // attribute-list
   DeclAttributes Attributes;
@@ -1818,6 +1791,12 @@ DestructorDecl *Parser::parseDeclDestructor(unsigned Flags) {
     DD->setBody(Body.get());
 
   if (Attributes.isValid()) DD->getMutableAttrs() = Attributes;
+
+  // Reject 'destructor' functions outside of classes
+  if (!(Flags & PD_AllowDestructor)) {
+    diagnose(DestructorLoc, diag::destructor_decl_outside_class);
+    return nullptr;
+  }
 
   return DD;
 }
