@@ -227,7 +227,7 @@ public:
   /// location on success.  On failure, emit the specified error diagnostic, and
   /// a note at the specified note location.
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
-                          SourceLoc OtherLoc, tok SkipToTok = tok::unknown);
+                          SourceLoc OtherLoc);
   
   bool parseValueSpecifier(TypeLoc &Loc, NullablePtr<Expr> &Init);
 

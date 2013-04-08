@@ -286,7 +286,7 @@ bool Parser::parseToken(tok K, SourceLoc &TokLoc, Diag<> ID, tok SkipToTok) {
 /// location on success.  On failure, emit the specified error diagnostic, and a
 /// note at the specified note location.
 bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
-                                SourceLoc OtherLoc, tok SkipToTok) {
+                                SourceLoc OtherLoc) {
   Diag<> OtherNote;
   switch (K) {
   case tok::r_paren:  OtherNote = diag::opening_paren;    break;
@@ -294,7 +294,7 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   case tok::r_brace:  OtherNote = diag::opening_brace;    break;
   default:            assert(!"unknown matching token!"); break;
   }
-  if (parseToken(K, TokLoc, ErrorDiag, SkipToTok)) {
+  if (parseToken(K, TokLoc, ErrorDiag, tok::unknown)) {
     diagnose(OtherLoc, OtherNote);
     return true;
   }
