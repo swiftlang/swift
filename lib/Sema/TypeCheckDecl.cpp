@@ -691,9 +691,10 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   
   // Get the number of lexical arguments, for semantic checks below.
   int NumArguments = -1;
-  if (FuncDecl *FD = dyn_cast<FuncDecl>(VD)) {
+  FuncDecl *FDOrNull = dyn_cast<FuncDecl>(VD);
+  if (FDOrNull) {
     if (AnyFunctionType *FT = Ty->getAs<AnyFunctionType>()) {
-      if (FD->getDeclContext()->isTypeContext() && FD->isStatic())
+      if (FDOrNull->getDeclContext()->isTypeContext() && FDOrNull->isStatic())
         FT = FT->getResult()->castTo<AnyFunctionType>();
       if (TupleType *TT = FT->getInput()->getAs<TupleType>())
         NumArguments = TT->getFields().size();
@@ -704,20 +705,15 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
 
   // Operators must be declared with 'func', not 'var'.
   if (isOperator) {
-    if (!isa<FuncDecl>(VD)) {
-      TC.diagnose(VD->getStartLoc(), diag::operator_not_func);
+    if (!FDOrNull) {
+      TC.diagnose(VD->getLoc(), diag::operator_not_func);
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
   
-    if (NumArguments == 0 || NumArguments > 2) {
-      TC.diagnose(VD->getStartLoc(), diag::invalid_arg_count_for_operator);
-      // FIXME: Set the 'isError' bit on the decl.
-      return;
-    }
-
     // The unary prefix operator '&' is reserved and cannot be overloaded.
-    if (NumArguments == 1 && VD->getName().str() == "&" && !Attrs.isPostfix()) {
+    if (FDOrNull->isUnaryOperator() && VD->getName().str() == "&"
+        && !Attrs.isPostfix()) {
       TC.diagnose(VD->getStartLoc(), diag::custom_operator_addressof);
       return;
     }
@@ -787,8 +783,8 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     }
 
     // Only binary operators can be infix.
-    if (NumArguments != 2) {
-      TC.diagnose(Attrs.LSquareLoc, diag::invalid_infix_left_input);
+    if (!FDOrNull || !FDOrNull->isBinaryOperator()) {
+      TC.diagnose(Attrs.LSquareLoc, diag::invalid_infix_input);
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
@@ -804,7 +800,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     }
 
     // Only unary operators can be postfix.
-    if (NumArguments != 1) {
+    if (!FDOrNull || !FDOrNull->isUnaryOperator()) {
       TC.diagnose(VD->getStartLoc(), diag::invalid_postfix_input);
       VD->getMutableAttrs().ExplicitPostfix = false;
       // FIXME: Set the 'isError' bit on the decl.
@@ -822,7 +818,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     }
     
     // Only unary operators can be postfix.
-    if (NumArguments != 1) {
+    if (!FDOrNull || !FDOrNull->isUnaryOperator()) {
       TC.diagnose(VD->getStartLoc(), diag::invalid_prefix_input);
       VD->getMutableAttrs().ExplicitPostfix = false;
       // FIXME: Set the 'isError' bit on the decl.
@@ -830,14 +826,6 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     }
   }
   
-  if (isOperator && NumArguments == 1
-      && !Attrs.isPrefix() && !Attrs.isPostfix()) {
-    // Unary operators must be declared 'prefix' or 'postfix'.
-    TC.diagnose(VD->getStartLoc(), diag::declared_unary_op_without_attribute);
-    // FIXME: Set the 'isError' bit on the decl.
-    return;
-  }
-
   if (Attrs.isAssignment()) {
     // Only function declarations can be assignments.
     if (!isa<FuncDecl>(VD) || !VD->isOperator()) {

@@ -1261,6 +1261,27 @@ public:
   /// type.
   bool isGeneric() const { return GenericParams != nullptr; }
 
+  /// isUnaryOperator - Determine whether this is a unary operator
+  /// implementation, in other words, the name of the function is an operator,
+  /// and the argument list consists syntactically of a single-element tuple
+  /// pattern. This check is syntactic rather than type-based in order to allow
+  /// for the definition of unary operators on tuples, as in:
+  ///   func [prefix] + (_:(a:Int, b:Int))
+  /// This also allows the unary-operator-ness of a func decl to be determined
+  /// prior to type checking.
+  bool isUnaryOperator() const;
+  
+  /// isBinaryOperator - Determine whether this is a binary operator
+  /// implementation, in other words, the name of the function is an operator,
+  /// and the argument list consists syntactically of a two-element tuple
+  /// pattern. This check is syntactic rather than type-based in order to
+  /// distinguish a binary operator from a unary operator on tuples, as in:
+  ///   func [prefix] + (_:(a:Int, b:Int)) // unary operator +(1,2)
+  ///   func [infix]  + (a:Int, b:Int)     // binary operator 1 + 2
+  /// This also allows the binary-operator-ness of a func decl to be determined
+  /// prior to type checking.
+  bool isBinaryOperator() const;
+  
   /// makeGetter - Note that this function is the getter for the given
   /// declaration, which may be either a variable or a subscript declaration.
   void makeGetter(Decl *D) {

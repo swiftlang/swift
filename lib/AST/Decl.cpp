@@ -724,6 +724,36 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
                          getASTContext());
 }
 
+bool FuncDecl::isUnaryOperator() const {
+  if (!isOperator())
+    return false;
+  
+  unsigned opArgIndex = isa<ProtocolDecl>(getDeclContext()) ? 1 : 0;
+  
+  auto *argTuple
+    = dyn_cast<TuplePattern>(getBody()->getArgParamPatterns()[opArgIndex]);
+  if (!argTuple)
+    return true;
+
+  return argTuple->getNumFields() == 1
+    && !argTuple->getFields()[0].isVararg();
+}
+
+bool FuncDecl::isBinaryOperator() const {
+  if (!isOperator())
+    return false;
+  
+  unsigned opArgIndex = isa<ProtocolDecl>(getDeclContext()) ? 1 : 0;
+  
+  auto *argTuple
+    = dyn_cast<TuplePattern>(getBody()->getArgParamPatterns()[opArgIndex]);
+  if (!argTuple)
+    return false;
+  
+  return argTuple->getNumFields() == 2
+    || (argTuple->getNumFields() == 1 && argTuple->getFields()[0].isVararg());
+}
+
 StringRef VarDecl::getObjCGetterSelector(llvm::SmallVectorImpl<char> &buffer)
   const
 {

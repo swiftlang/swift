@@ -441,28 +441,35 @@ static void bindFuncDeclToOperator(NameBinder &Binder,
                                    TranslationUnit *TU,
                                    FuncDecl *FD) {
   OperatorDecl *op;
-  if (FD->getAttrs().isPrefix()) {
-    if (auto maybeOp = TU->lookupPrefixOperator(FD->getName(), FD->getLoc()))
-      op = *maybeOp;
-    else
+  if (FD->isUnaryOperator()) {
+    if (FD->getAttrs().isPrefix()) {
+      if (auto maybeOp = TU->lookupPrefixOperator(FD->getName(), FD->getLoc()))
+        op = *maybeOp;
+      else
+        return;
+    } else if (FD->getAttrs().isPostfix()) {
+      if (auto maybeOp = TU->lookupPostfixOperator(FD->getName(), FD->getLoc()))
+        op = *maybeOp;
+      else
+        return;
+    } else {
+      Binder.diagnose(FD->getLoc(), diag::declared_unary_op_without_attribute);
       return;
-  } else if (FD->getAttrs().isPostfix()) {
-    if (auto maybeOp = TU->lookupPostfixOperator(FD->getName(), FD->getLoc()))
-      op = *maybeOp;
-    else
-      return;
-  } else {
+    }
+  } else if (FD->isBinaryOperator()) {
     if (auto maybeOp = TU->lookupInfixOperator(FD->getName(), FD->getLoc()))
       op = *maybeOp;
     else
       return;
+  } else {
+    Binder.diagnose(FD->getLoc(), diag::invalid_arg_count_for_operator);
+    return;
   }
   
-  if (!op) {
+  if (!op)
     Binder.diagnose(FD->getLoc(), diag::declared_operator_without_operator_decl);
-  } else {
+  else
     FD->setOperatorDecl(op);
-  }
 }
 
 /// performNameBinding - Once parsing is complete, this walks the AST to
