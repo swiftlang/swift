@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeMemberVisitor.h"
@@ -304,8 +305,6 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   if (tunit->Kind == TranslationUnit::Main ||
       tunit->Kind == TranslationUnit::Repl) {
     // Emit main().
-    // FIXME: We should squirrel away argc and argv where relevant; maybe
-    // other startup initialization?
     // FIXME: We should only emit this in non-JIT modes.
 
     llvm::Type* argcArgvTypes[2] = {
@@ -320,13 +319,40 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     
     IRGenFunction mainIGF(*this, CanType(), nullptr, ExplosionKind::Minimal,
                           /*uncurry*/ 0, mainFn, Prologue::Bare);
-    
+
+    // Poke argc and argv into variables declared in the Swift stdlib
     auto args = mainFn->arg_begin();
-    llvm::Value* argc = args++;
-    argc->setName("argc");
-    llvm::Value* argv = args++;
-    argv->setName("argv");
-    assert(args == mainFn->arg_end());
+    for(auto varNames: { std::make_pair("argc", "C_ARGC"), std::make_pair("argv", "C_ARGV") }) {
+      const char *fnParameterName;
+      const char *swiftVarName;
+      std::tie(fnParameterName, swiftVarName) = varNames;
+
+      llvm::Value* fnParameter = args++;
+      fnParameter->setName(fnParameterName);
+      
+      UnqualifiedLookup lookup(Context.getIdentifier(swiftVarName), tunit);
+
+      // If you're running without a standard library, there's nowhere
+      // to poke the variable.
+      unsigned const resultCount = lookup.Results.size();
+      if (resultCount != 0) {
+        assert(lookup.Results.size() == 1);
+        auto swiftVarDecl = cast<VarDecl>(lookup.Results.front().getValueDecl());
+        Address swiftVarAddress = getAddrOfGlobalVariable(swiftVarDecl);
+
+        // The swift vars are structs whose first member is a raw LLVM value
+        Address firstMemberAddress = mainIGF.Builder.CreateStructGEP(swiftVarAddress, 0, Size(0));
+        
+        if (fnParameterName[3] == 'v') { // extra step for argv
+          // The first member of CPointer<T> is just an opaque LLVM
+          // void*; interpret it as char** so we can store into it.
+          firstMemberAddress = mainIGF.Builder
+            .CreateBitCast(firstMemberAddress, llvm::TypeBuilder<llvm::types::i<8>***, true>::get(LLVMContext));
+        }
+      
+        mainIGF.Builder.CreateStore(fnParameter, firstMemberAddress);
+      }
+    }
 
     // Emit Objective-C runtime interop setup for immediate-mode code.
     if (ObjCInterop && Opts.UseJIT) {

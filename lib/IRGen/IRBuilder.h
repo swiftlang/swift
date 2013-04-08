@@ -181,7 +181,8 @@ public:
   llvm::LoadInst *CreateLoad(Address addr, const llvm::Twine &name = "") {
     return CreateLoad(addr.getAddress(), addr.getAlignment(), name);
   }
-
+  using IRBuilderBase::CreateLoad;
+  
   llvm::StoreInst *CreateStore(llvm::Value *value, llvm::Value *addr,
                                Alignment align) {
     llvm::StoreInst *store = IRBuilderBase::CreateStore(value, addr);
@@ -191,6 +192,7 @@ public:
   llvm::StoreInst *CreateStore(llvm::Value *value, Address addr) {
     return CreateStore(value, addr.getAddress(), addr.getAlignment());
   }
+  using IRBuilderBase::CreateStore;
 
   using IRBuilderBase::CreateStructGEP;
   Address CreateStructGEP(Address address, unsigned index, Size size,
