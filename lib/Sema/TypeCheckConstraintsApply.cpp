@@ -530,47 +530,9 @@ namespace {
       ProtocolDecl *arrayProto = cs.getTypeChecker().getArrayLiteralProtocol();
       assert(arrayProto && "type-checked array literal w/o protocol?!");
 
-      /* FIXME: Ideally we'd use the protocol conformance as below, but
-       * generic types (an in particular, T[]) can't be checked for conformance
-       * yet <rdar://problem/13153805>
-       *
-
-       // Get the ArrayLiteralConvertible conformance.
-       ProtocolConformance *conformance = nullptr;
-       if (!CS.TC.conformsToProtocol(arrayTy, arrayProto, &conformance,
-       expr->getLoc())) {
-       // FIXME: This shouldn't happen at all when we solve the system using
-       // a proper protocol constraint.
-       CS.TC.diagnose(arrayProto->getLoc(), diag::array_protocol_broken);
-       return nullptr;
-       }
-
-       // Find the convertFromArrayLiteral witness.
-       FuncDecl *converterDecl;
-       for (auto member : arrayProto->getMembers()) {
-       auto func = dyn_cast<FuncDecl>(member);
-       if (!func) continue;
-
-       if (func->getName().str().equals("convertFromArrayLiteral")) {
-       converterDecl = cast<FuncDecl>(conformance->Mapping[func]);
-       break;
-       }
-       }
-
-       if (!converterDecl) {
-       CS.TC.diagnose(arrayProto->getLoc(), diag::array_protocol_broken);
-       return nullptr;
-       }
-
-       if (!converterDecl->isStatic()) {
-       CS.TC.diagnose(arrayProto->getLoc(), diag::array_protocol_broken);
-       return nullptr;
-       }
-
-       *
-       * For the time being, use a value member constraint to find the
-       * appropriate convertFromArrayLiteral call.
-       */
+       // Use a value member constraint to find the appropriate
+       // convertFromArrayLiteral call.
+       // FIXME: Switch to protocol conformance.
       auto choice = getOverloadChoice(
                       cs.getConstraintLocator(
                         expr,
@@ -613,14 +575,9 @@ namespace {
       = cs.getTypeChecker().getDictionaryLiteralProtocol();
       assert(dictionaryProto && "type-checked dictionary literal w/o protocol?");
 
-      /* FIXME: Ideally we'd use the protocol conformance as below, but
-       * generic types (an in particular, T[]) can't be checked for conformance
-       * yet <rdar://problem/13153805>
-       *
-       *
-       * For the time being, use a value member constraint to find the
-       * appropriate convertFromDictionaryLiteral call.
-       */
+      // Use a value member constraint to find the appropriate
+      // convertFromDictionaryLiteral call.
+      // FIXME: Switch to protocol conformance.
       auto choice = getOverloadChoice(
                       cs.getConstraintLocator(
                         expr,
