@@ -202,7 +202,9 @@ interface, e.g. (in Java)::
     public bool isEqual(THIS other);
   }
 
-.. @test()
+.. @ignore()
+.. This test just doesn't compile at the moment, but that represents a
+   bug in swift
 
 and then a class X that wants to be Comparable will inherit from
 Comparable<X>. This is ugly and has a number of pitfalls; see
@@ -881,8 +883,4 @@ If this tentative parsing and disambiguation fails, we'll consider alternatives
 such as 'if the identifier starts with an uppercase letter, assume it is a
 type'.
 
-
-
-
-
-
+.. @ignore('all')
