@@ -105,11 +105,48 @@ namespace {
       return new (tc.Context) SpecializeExpr(expr, type, encodedSubs);
     }
 
+    /// \brief Build an existential member reference.
+    Expr *buildExistentialMemberRef(Expr *base, SourceLoc dotLoc,
+                                    ValueDecl *member, SourceLoc memberLoc,
+                                    Type openedType) {
+      auto &tc = cs.getTypeChecker();
+      auto &context = tc.Context;
+      
+      // Convert the base to the type of the 'this' parameter.
+      auto containerTy = member->getDeclContext()->getDeclaredTypeOfContext();
+      base = convertObjectArgumentToType(tc, base, containerTy);
+      assert(base && "Unable to convert base?");
+
+      // Build the existential member reference.
+      Expr *result = new (context) ExistentialMemberRefExpr(base, dotLoc,
+                                                            member, memberLoc);
+
+      // Simplify the type of this reference.
+      result->setType(simplifyType(openedType));
+      return result;
+    }
+
     /// \brief Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, SourceLoc dotLoc, ValueDecl *member,
                          SourceLoc memberLoc, Type openedType) {
-      // FIXME: Falls back to the old type checker.
+      // Figure out the actual base type, and whether we have an instance of that
+      // type or its metatype.
+      Type baseTy = base->getType()->getRValueType();
+      bool baseIsInstance = true;
+      if (auto baseMeta = baseTy->getAs<MetaTypeType>()) {
+        baseIsInstance = false;
+        baseTy = baseMeta->getInstanceType();
+      }
 
+      // Okay to refer to the member of an existential type.
+      // FIXME: ExistentialMemberRefExpr needs to reject a base of metatype
+      // type.
+      if (baseTy->isExistentialType()) {
+        return buildExistentialMemberRef(base, dotLoc, member, memberLoc,
+                                         openedType);
+      }
+
+      // FIXME: Falls back to the old type checker.
       auto &tc = cs.getTypeChecker();
       auto result = tc.buildMemberRefExpr(base, dotLoc, { &member, 1 },
                                           memberLoc);
