@@ -67,6 +67,8 @@ if(LITRE_EXECUTABLE)
         --traceback 
         --report=severe  # suppress most .rst errors.  We have lots of them.
         ${CMAKE_CURRENT_SOURCE_DIR}/${rst}
+      DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/${rst}
       COMMENT
         "Generating/Updating LitRe tests for ${rst}"
       VERBATIM
