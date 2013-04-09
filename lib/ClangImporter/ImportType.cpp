@@ -172,7 +172,8 @@ namespace {
       // "builtin-SEL *" maps to Swift's ObjCSel.
       if (type->getPointeeType()->isSpecificBuiltinType(
                                                  clang::BuiltinType::ObjCSel)) {
-        return Impl.getNamedSwiftType(Impl.getNamedModule("ObjectiveC"), "ObjCSel");
+        return Impl.getNamedSwiftType(Impl.getNamedModule("ObjectiveC"),
+                                      "ObjCSel");
       }
 
       // Import void* as COpaquePointer.
