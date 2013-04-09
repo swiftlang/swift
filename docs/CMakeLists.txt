@@ -16,7 +16,7 @@ if(SPHINX_EXECUTABLE)
   add_custom_target(docs_html ALL
     ${SPHINX_EXECUTABLE} ${SPHINX_ARGS} -b html
       . ${CMAKE_BINARY_DIR}/docs/html
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/docs
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Building HTML documentation")
 
   # Selectively install docs intended for general consumption.
