@@ -93,16 +93,16 @@ class TypeVariableType::Implementation {
 
 public:
   explicit Implementation(unsigned ID)
-  : ID(ID), Archetype(nullptr),
-  ParentOrFixed(getTypeVariable()) { }
+    : ID(ID), Archetype(nullptr),
+      ParentOrFixed(getTypeVariable()) { }
 
   explicit Implementation(unsigned ID, Expr *TheExpr)
     : ID(ID), Archetype(nullptr),
-  ParentOrFixed(getTypeVariable()) { }
+      ParentOrFixed(getTypeVariable()) { }
 
   explicit Implementation(unsigned ID, ArchetypeType *Archetype)
     : ID(ID), Archetype(Archetype),
-  ParentOrFixed(getTypeVariable()) { }
+      ParentOrFixed(getTypeVariable()) { }
 
   /// \brief Retrieve the unique ID corresponding to this type variable.
   unsigned getID() const { return ID; }
@@ -1409,6 +1409,9 @@ public:
 
   /// \brief Retrieve the AST context.
   ASTContext &getASTContext() const { return TC.Context; }
+
+  /// \brief Retrieve the constraints.
+  ArrayRef<Constraint *> getConstraints() const { return Constraints; }
 
   /// \brief Retrieve the top-level constraint system.
   ConstraintSystem &getTopConstraintSystem() {
