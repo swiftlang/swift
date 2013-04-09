@@ -19,6 +19,9 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APInt.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -54,6 +57,177 @@ static bool isAssignmentFn(Expr *expr) {
   if (auto gmr = dyn_cast<GenericMemberRefExpr>(expr))
     return gmr->getDecl()->getAttrs().isAssignment();
   return false;
+}
+
+/// \brief Determine if this literal kind is a string literal.
+static bool isStringLiteralKind(LiteralKind kind) {
+  return kind == LiteralKind::UTFString ||
+         kind == LiteralKind::ASCIIString;
+}
+
+// Check for (Builtin.RawPointer, Builtin.Int64).
+static bool isRawPtrAndInt64(Type ty) {
+  TupleType *tt = ty->getAs<TupleType>();
+  if (!tt)
+    return false;
+  if (tt->getFields().size() != 2)
+    return false;
+  if (!tt->getElementType(0)->is<BuiltinRawPointerType>())
+    return false;
+  BuiltinIntegerType *intTy
+    = tt->getElementType(1)->getAs<BuiltinIntegerType>();
+  if (!intTy)
+    return false;
+  if (intTy->getBitWidth() != 64)
+    return false;
+  return true;
+}
+
+/// \brief Convert the given literal expression to the specified literal kind.
+static Expr *convertLiteral(TypeChecker &tc, Expr *literal,
+                            Type type, LiteralKind kind) {
+  // Check the destination type to see if it is compatible with literals,
+  // diagnosing the failure if not.
+  // FIXME: The Complain and Location arguments are pointless for us.
+  FuncDecl *method;
+  Type argType;
+  std::tie(method, argType)
+    = tc.isLiteralCompatibleType(type, SourceLoc(), kind, /*Complain=*/false);
+  assert(method && "Literal type is not compatible?");
+
+  // If the destination type is equivalent to the default literal type, use
+  // the default literal type as the sugared type of the literal.
+  Type defaultLiteralTy = tc.getDefaultLiteralType(kind);
+  if (type->isEqual(defaultLiteralTy))
+    type = defaultLiteralTy;
+
+  // The argument type must either be a Builtin:: type (in which case
+  // this is a type in the standard library) or some other type that itself has
+  // a conversion function from a builtin type (in which case we have
+  // "chaining", and an implicit conversion through that type).
+  Expr *intermediate;
+  BuiltinIntegerType *BIT;
+  BuiltinFloatType *BFT;
+  if (kind == LiteralKind::Int &&
+      (BIT = argType->getAs<BuiltinIntegerType>())) {
+    // If this is a direct use of the builtin integer type, use the integer size
+    // to diagnose excess precision issues.
+    llvm::APInt Value(1, 0);
+    StringRef IntText = cast<IntegerLiteralExpr>(literal)->getText();
+    unsigned Radix;
+    if (IntText.startswith("0x")) {
+      IntText = IntText.substr(2);
+      Radix = 16;
+    } else if (IntText.startswith("0o")) {
+      IntText = IntText.substr(2);
+      Radix = 8;
+    } else if (IntText.startswith("0b")) {
+      IntText = IntText.substr(2);
+      Radix = 2;
+    } else {
+      Radix = 10;
+    }
+    bool Failure = IntText.getAsInteger(Radix, Value);
+    assert(!Failure && "Lexer should have verified a reasonable type!");
+    (void)Failure;
+
+    if (Value.getActiveBits() > BIT->getBitWidth())
+      tc.diagnose(literal->getLoc(), diag::int_literal_too_large,
+                  Value.getBitWidth(), type);
+
+    // Give the integer literal the builtin integer type.
+    literal->setType(argType);
+    intermediate = literal;
+  }
+  else if (kind == LiteralKind::Float &&
+           (BFT = argType->getAs<BuiltinFloatType>())) {
+    // If this is a direct use of a builtin floating point type, use the
+    // floating point type to do the syntax verification.
+    llvm::APFloat Val(BFT->getAPFloatSemantics());
+    switch (Val.convertFromString(cast<FloatLiteralExpr>(literal)->getText(),
+                                  llvm::APFloat::rmNearestTiesToEven)) {
+      case llvm::APFloat::opOverflow: {
+        llvm::SmallString<20> Buffer;
+        llvm::APFloat::getLargest(Val.getSemantics()).toString(Buffer);
+        tc.diagnose(literal->getLoc(), diag::float_literal_overflow, Buffer);
+        break;
+      }
+      case llvm::APFloat::opUnderflow: {
+        // Denormals are ok, but reported as underflow by APFloat.
+        if (!Val.isZero()) break;
+        llvm::SmallString<20> Buffer;
+        llvm::APFloat::getSmallest(Val.getSemantics()).toString(Buffer);
+        tc.diagnose(literal->getLoc(), diag::float_literal_underflow, Buffer);
+        break;
+      }
+      default:
+        break;
+    }
+
+    literal->setType(argType);
+    intermediate = literal;
+  } else if (isStringLiteralKind(kind) && argType->is<BuiltinRawPointerType>()){
+    // Nothing to do.
+    literal->setType(argType);
+    intermediate = literal;
+  } else if (isStringLiteralKind(kind) && isRawPtrAndInt64(argType)) {
+    // Nothing to do.
+    literal->setType(argType);
+    intermediate = literal;
+  } else if (kind == LiteralKind::Char &&
+             argType->is<BuiltinIntegerType>() &&
+             argType->getAs<BuiltinIntegerType>()->getBitWidth() == 32) {
+    // Nothing to do.
+    literal->setType(argType);
+    intermediate = literal;
+  } else {
+    // Check to see if this is the chaining case, where ArgType itself has a
+    // conversion from a Builtin type.
+    FuncDecl *chainedMethod;
+    Type chainedArgType;
+    std::tie(chainedMethod, chainedArgType)
+      = tc.isLiteralCompatibleType(argType, SourceLoc(), kind, false);
+    assert(chainedMethod && "Literal type is not compatible?");
+
+    if (kind == LiteralKind::Int &&
+        chainedArgType->is<BuiltinIntegerType>()) {
+      // ok.
+    } else if (kind == LiteralKind::Float &&
+               chainedArgType->is<BuiltinFloatType>()) {
+      // ok.
+    } else if (kind == LiteralKind::Char &&
+               chainedArgType->is<BuiltinIntegerType>() &&
+               chainedArgType->getAs<BuiltinIntegerType>()->getBitWidth() == 32) {
+      // ok.
+
+    } else if (isStringLiteralKind(kind) &&
+               chainedArgType->is<BuiltinRawPointerType>()) {
+      // ok.
+    } else if (isStringLiteralKind(kind) && isRawPtrAndInt64(chainedArgType)) {
+      // ok.
+    } else {
+      llvm_unreachable("Literal conversion defined improperly");
+    }
+
+    // If this a 'chaining' case, recursively convert the literal to the
+    // intermediate type, then use our conversion function to finish the
+    // translation.
+    intermediate = convertLiteral(tc, literal, argType, kind);
+
+    // Okay, now Intermediate is known to have type 'argType' so we can use a
+    // call to our conversion function to finish things off.
+  }
+
+  Expr *result = new (tc.Context) MetatypeExpr(nullptr,
+                                            intermediate->getStartLoc(),
+                                            method->computeThisType());
+  result = tc.recheckTypes(tc.buildMemberRefExpr(result, SourceLoc(), method,
+                                                 intermediate->getStartLoc()));
+
+  // Return a new call of the conversion function, passing in the (possible
+  // converted) argument.
+  return new (tc.Context) CallExpr(result, intermediate, type);
+
 }
 
 /// \brief Apply a given solution to the expression, producing a fully
@@ -241,13 +415,47 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
       return expr;
     }
 
-    Expr *visitLiteralExpr(LiteralExpr *expr) {
+    Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
+      auto &tc = cs.getTypeChecker();
+      return convertLiteral(tc, expr, simplifyType(expr->getType()),
+                            LiteralKind::Int);
+    }
+
+    Expr *visitFloatLiteralExpr(FloatLiteralExpr *expr) {
+      auto &tc = cs.getTypeChecker();
+      return convertLiteral(tc, expr, simplifyType(expr->getType()),
+                            LiteralKind::Float);
+    }
+
+    Expr *visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
+      auto &tc = cs.getTypeChecker();
+      return convertLiteral(tc, expr, simplifyType(expr->getType()),
+                            LiteralKind::Char);
+    }
+
+    Expr *visitStringLiteralExpr(StringLiteralExpr *expr) {
+      auto &tc = cs.getTypeChecker();
+
+      // FIXME: Already did this when generating constraints.
+      auto kind = LiteralKind::ASCIIString;
+      for (unsigned char c : expr->getValue()) {
+        if (c > 127) {
+          kind = LiteralKind::UTFString;
+          break;
+        }
+      }
+
+      return convertLiteral(tc, expr, simplifyType(expr->getType()), kind);
+    }
+
+    Expr *
+    visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
       // FIXME: The existing literal coercion code should move here.
       auto type = simplifyType(expr->getType());
       expr->setType(UnstructuredUnresolvedType::get(cs.getASTContext()));
       return convertToType(cs.getTypeChecker(), expr, type);
     }
-    
+
     // FIXME: Add specific entries for the various literal expressions.
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
