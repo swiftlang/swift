@@ -611,10 +611,8 @@ namespace {
       MemberLookup &lookup = cs.lookupMember(oneofMetaTy, expr->getName());
       assert(lookup.isSuccess() && "Failed lookup?");
       auto member = lookup.Results[0].D;
-      auto result = tc.buildMemberRefExpr(base, expr->getDotLoc(),
-                                          ArrayRef<ValueDecl *>(&member, 1),
-                                          expr->getNameLoc());
-      return tc.recheckTypes(result);
+      return buildMemberRef(base, expr->getDotLoc(), member, expr->getNameLoc(),
+                            expr->getType());
     }
 
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
@@ -957,7 +955,7 @@ namespace {
       if (auto fnType = fn->getType()->getAs<FunctionType>()) {
         auto origArg = expr->getArg();
         Expr *arg = nullptr;
-        if (isa<DotSyntaxCallExpr>(expr))
+        if (isa<ThisApplyExpr>(expr))
           arg = convertObjectArgumentToType(tc, origArg, fnType->getInput());
         else
           arg = convertToType(tc, origArg, fnType->getInput(),
