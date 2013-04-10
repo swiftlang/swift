@@ -185,7 +185,10 @@ namespace {
                                      /*OnlyInnermostParams=*/false);
 
           Expr *apply;
-          if (!baseIsInstance && member->isInstanceMember()) {
+          if (isa<ConstructorDecl>(member)) {
+            // FIXME: Provide type annotation.
+            apply = new (context) ConstructorRefCallExpr(specializedRef, base);
+          } else if (!baseIsInstance && member->isInstanceMember()) {
             apply = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
                                                            specializedRef);
           } else {
@@ -252,9 +255,13 @@ namespace {
       // Refer to a member function that binds 'this':
       if ((isa<FuncDecl>(member) && member->getDeclContext()->isTypeContext()) ||
           isa<OneOfElementDecl>(member) || isa<ConstructorDecl>(member)) {
-        if (baseIsInstance == member->isInstanceMember())
+        if (isa<ConstructorDecl>(member)) {
+          // FIXME: Provide type annotation.
+          result = new (context) ConstructorRefCallExpr(ref, base);
+        } else if (baseIsInstance == member->isInstanceMember()) {
           result = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
-
+        }
+        
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
       }
@@ -986,10 +993,11 @@ namespace {
       expr->setType(instanceTy);
 
       // Find the constructor we selected for this expression.
-      auto choice = getOverloadChoice(
+      auto selected = getOverloadChoice(
                       cs.getConstraintLocator(
                         expr,
-                        ConstraintLocator::ConstructorMember)).first;
+                        ConstraintLocator::ConstructorMember));
+      auto choice = selected.first;
       auto constructor = cast<ConstructorDecl>(choice.getDecl());
 
       // Form the constructor call expression.
@@ -997,9 +1005,9 @@ namespace {
       auto classMetaTy = MetaTypeType::get(instanceTy, tc.Context);
       Expr *typeBase = new (tc.Context) MetatypeExpr(nullptr, expr->getLoc(),
                                                      classMetaTy);
-      Expr *ctorRef = new (tc.Context) DeclRefExpr(constructor, expr->getLoc(),
-                                                   constructor->getTypeOfReference());
-      ctorRef = new (tc.Context) ConstructorRefCallExpr(ctorRef, typeBase);
+      Expr *ctorRef = buildMemberRef(typeBase, expr->getLoc(),
+                                     constructor, expr->getLoc(),
+                                     selected.second);
 
       // Extract (or create) the argument;
       Expr *arg = expr->getArg();
