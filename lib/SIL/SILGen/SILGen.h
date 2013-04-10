@@ -29,6 +29,7 @@ namespace swift {
 namespace Lowering {
   class Condition;
   class LValue;
+  class RValue;
   class ManagedValue;
   class TypeConverter;
   class SILGenFunction;
@@ -120,11 +121,8 @@ struct Materialize {
 /// SGFContext - Internal context information for the SILGenFunction visitor.
 struct SGFContext {
 private:
-  using EmitIntoOrArgumentVectorPointer =
-    PointerUnion<Initialization*, SmallVectorImpl<SILValue>*>;
-  
   using State =
-    llvm::PointerIntPair<EmitIntoOrArgumentVectorPointer, 1, bool>;
+    llvm::PointerIntPair<Initialization *, 1, bool>;
   
   State state;
 public:
@@ -133,34 +131,21 @@ public:
   /// Creates an emitInto context that will store the result of the visited expr
   /// into the given Initialization.
   SGFContext(Initialization *emitInto)
-    : state(EmitIntoOrArgumentVectorPointer(emitInto), false)
-  {}
-  
-  /// Creates an argument tuple context that will recursively append tuple
-  /// elements to the given argument vector.
-  SGFContext(SmallVectorImpl<SILValue> &argumentVector)
-    : state(EmitIntoOrArgumentVectorPointer(&argumentVector), false)
+    : state(emitInto, false)
   {}
   
   /// Creates a load expr context, in which a temporary lvalue that would
   /// normally be materialized can be left as an rvalue to avoid a useless
   /// immediately-consumed allocation.
   SGFContext(bool isChildOfLoadExpr)
-    : state(EmitIntoOrArgumentVectorPointer(), isChildOfLoadExpr)
+    : state(nullptr, isChildOfLoadExpr)
   {}
 
   /// Returns a pointer to the Initialization that the current expression should
   /// store its result to, or null if the expression should allocate temporary
   /// storage for its result.
   Initialization *getEmitInto() const {
-    return state.getPointer().dyn_cast<Initialization*>();
-  }
-  
-  /// Returns a pointer to the argument vector the current tuple expression
-  /// should destructure its result elements into, or null if the expression
-  /// should return a tuple value.
-  SmallVectorImpl<SILValue> *getArgumentVector() const {
-    return state.getPointer().dyn_cast<SmallVectorImpl<SILValue>*>();
+    return state.getPointer();
   }
   
   /// Returns true if the current expression is a child of a LoadExpr, and
@@ -173,7 +158,7 @@ public:
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
   : public ASTVisitor<SILGenFunction,
-                      /*ExprRetTy=*/ ManagedValue,
+                      /*ExprRetTy=*/ RValue,
                       /*StmtRetTy=*/ void,
                       /*DeclRetTy=*/ void,
                       /*PatternRetTy=*/ void,
@@ -370,7 +355,7 @@ public:
 
   using ASTVisitorType::visit;
   
-  ManagedValue visit(Expr *E);
+  RValue visit(Expr *E);
   void visit(Stmt *S) { visit(S, SGFContext()); }
   void visit(Decl *D) { visit(D, SGFContext()); }
   
@@ -410,101 +395,80 @@ public:
   
   /// Generate SIL for the given expression, storing the final result into the
   /// specified Initialization buffer(s). This avoids an allocation and copy if
-  /// the result would be allocated into temporary memory normally.*
-  ///
-  /// *FIXME: does not actually avoid copy yet!
+  /// the result would be allocated into temporary memory normally.
   void emitExprInto(Expr *E, Initialization *I);
   
-  ManagedValue visitApplyExpr(ApplyExpr *E, SGFContext C);
+  RValue visitApplyExpr(ApplyExpr *E, SGFContext C);
 
-  ManagedValue visitDeclRefExpr(DeclRefExpr *E, SGFContext C);
-  ManagedValue visitSuperRefExpr(SuperRefExpr *E, SGFContext C);
-  ManagedValue visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E,
+  RValue visitDeclRefExpr(DeclRefExpr *E, SGFContext C);
+  RValue visitSuperRefExpr(SuperRefExpr *E, SGFContext C);
+  RValue visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E,
                                                 SGFContext C);
   
-  ManagedValue visitIntegerLiteralExpr(IntegerLiteralExpr *E, SGFContext C);
-  ManagedValue visitFloatLiteralExpr(FloatLiteralExpr *E, SGFContext C);
-  ManagedValue visitCharacterLiteralExpr(CharacterLiteralExpr *E, SGFContext C);
-  ManagedValue visitStringLiteralExpr(StringLiteralExpr *E, SGFContext C);
-  ManagedValue visitLoadExpr(LoadExpr *E, SGFContext C);
-  ManagedValue visitMaterializeExpr(MaterializeExpr *E, SGFContext C);
-  ManagedValue visitDerivedToBaseExpr(DerivedToBaseExpr *E, SGFContext C);
-  ManagedValue visitMetatypeConversionExpr(MetatypeConversionExpr *E,
+  RValue visitIntegerLiteralExpr(IntegerLiteralExpr *E, SGFContext C);
+  RValue visitFloatLiteralExpr(FloatLiteralExpr *E, SGFContext C);
+  RValue visitCharacterLiteralExpr(CharacterLiteralExpr *E, SGFContext C);
+  RValue visitStringLiteralExpr(StringLiteralExpr *E, SGFContext C);
+  RValue visitLoadExpr(LoadExpr *E, SGFContext C);
+  RValue visitMaterializeExpr(MaterializeExpr *E, SGFContext C);
+  RValue visitDerivedToBaseExpr(DerivedToBaseExpr *E, SGFContext C);
+  RValue visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                            SGFContext C);
-  ManagedValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
-  ManagedValue visitRequalifyExpr(RequalifyExpr *E, SGFContext C);
-  ManagedValue visitFunctionConversionExpr(FunctionConversionExpr *E,
+  RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
+  RValue visitRequalifyExpr(RequalifyExpr *E, SGFContext C);
+  RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
                                            SGFContext C);
-  ManagedValue visitErasureExpr(ErasureExpr *E, SGFContext C);
-  ManagedValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
-  ManagedValue visitUncheckedDowncastExpr(UncheckedDowncastExpr *E, SGFContext C);
-  ManagedValue visitUncheckedSuperToArchetypeExpr(
+  RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
+  RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
+  RValue visitUncheckedDowncastExpr(UncheckedDowncastExpr *E, SGFContext C);
+  RValue visitUncheckedSuperToArchetypeExpr(
                                 UncheckedSuperToArchetypeExpr *E, SGFContext C);
-  ManagedValue visitIsSubtypeExpr(IsSubtypeExpr *E, SGFContext C);
-  ManagedValue visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E, SGFContext C);
-  ManagedValue visitParenExpr(ParenExpr *E, SGFContext C);
-  ManagedValue visitTupleExpr(TupleExpr *E, SGFContext C);
-  ManagedValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);
-  ManagedValue visitSpecializeExpr(SpecializeExpr *E, SGFContext C);
-  ManagedValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C);
-  ManagedValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
-  ManagedValue visitGenericMemberRefExpr(GenericMemberRefExpr *E, SGFContext C);
-  ManagedValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
+  RValue visitIsSubtypeExpr(IsSubtypeExpr *E, SGFContext C);
+  RValue visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E, SGFContext C);
+  RValue visitParenExpr(ParenExpr *E, SGFContext C);
+  RValue visitTupleExpr(TupleExpr *E, SGFContext C);
+  RValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);
+  RValue visitSpecializeExpr(SpecializeExpr *E, SGFContext C);
+  RValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C);
+  RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
+  RValue visitGenericMemberRefExpr(GenericMemberRefExpr *E, SGFContext C);
+  RValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
                                            SGFContext C);
-  ManagedValue visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E,
+  RValue visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E,
                                              SGFContext C);
-  ManagedValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E,
+  RValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E,
                                              SGFContext C);
-  ManagedValue visitModuleExpr(ModuleExpr *E, SGFContext C);
-  ManagedValue visitTupleElementExpr(TupleElementExpr *E, SGFContext C);
-  ManagedValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
-  ManagedValue visitGenericSubscriptExpr(GenericSubscriptExpr *E, SGFContext C);
-  ManagedValue visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E,
+  RValue visitModuleExpr(ModuleExpr *E, SGFContext C);
+  RValue visitTupleElementExpr(TupleElementExpr *E, SGFContext C);
+  RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
+  RValue visitGenericSubscriptExpr(GenericSubscriptExpr *E, SGFContext C);
+  RValue visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E,
                                            SGFContext C);
-  ManagedValue visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E,
+  RValue visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E,
                                              SGFContext C);
-  ManagedValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
-  ManagedValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
-  ManagedValue visitMetatypeExpr(MetatypeExpr *E, SGFContext C);
-  ManagedValue visitFuncExpr(FuncExpr *E, SGFContext C);
-  ManagedValue visitClosureExpr(ClosureExpr *E, SGFContext C);
-  ManagedValue visitInterpolatedStringLiteralExpr(
+  RValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
+  RValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
+  RValue visitMetatypeExpr(MetatypeExpr *E, SGFContext C);
+  RValue visitFuncExpr(FuncExpr *E, SGFContext C);
+  RValue visitClosureExpr(ClosureExpr *E, SGFContext C);
+  RValue visitInterpolatedStringLiteralExpr(
                                               InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
-  ManagedValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
-  ManagedValue visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E,
+  RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
+  RValue visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E,
                                                 SGFContext C);
-  ManagedValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
-  ManagedValue visitIfExpr(IfExpr *E, SGFContext C);
+  RValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
+  RValue visitIfExpr(IfExpr *E, SGFContext C);
 
-  void emitApplyArgumentValue(SILLocation loc,
-                              ManagedValue argValue,
-                              llvm::SmallVectorImpl<SILValue> &argsV);
-  void emitApplyArguments(Expr *argsExpr,
-                          llvm::SmallVectorImpl<SILValue> &args);
-
-  ManagedValue emitApply(SILLocation Loc, SILValue Fn, ArrayRef<SILValue> Args);
   ManagedValue emitArrayInjectionCall(SILValue ObjectPtr,
                                       SILValue BasePtr,
                                       SILValue Length,
                                       Expr *ArrayInjectionFunction);
-  ManagedValue emitTupleShuffleOfExprs(Expr *E,
-                                       ArrayRef<Expr *> InExprs,
-                                       ArrayRef<int> ElementMapping,
-                                       Expr *VarargsInjectionFunction,
-                                       SGFContext C);
-  ManagedValue emitTupleShuffle(Expr *E,
-                                ArrayRef<SILValue> InElts,
-                                ArrayRef<int> ElementMapping,
-                                Expr *VarargsInjectionFunction);
-  ManagedValue emitTuple(Expr *E,
-                         ArrayRef<Expr *> Elements,
-                         Type VarargsBaseTy,
-                         ArrayRef<SILValue> VariadicElements,
-                         Expr *VarargsInjectionFunction,
-                         SGFContext C);
                         
+  /// Emit the empty tuple value by emitting
   SILValue emitEmptyTuple(SILLocation loc);
+  /// "Emit" an RValue representing an empty tuple.
+  RValue emitEmptyTupleRValue(SILLocation loc);
 
   /// Returns a reference to a constant in global context. For local func decls
   /// this returns the function constant with unapplied closure context.
@@ -529,17 +493,17 @@ public:
   Materialize emitMaterialize(SILLocation loc, ManagedValue v);
   Materialize emitGetProperty(SILLocation loc,
                               ManagedValue getter,
-                              Optional<ManagedValue> thisValue,
-                              Optional<ArrayRef<SILValue>> subscripts);
+                              RValue &&optionalthisValue,
+                              RValue &&optionalSubscripts);
   void emitSetProperty(SILLocation loc,
                        ManagedValue setter,
-                       Optional<ManagedValue> thisValue,
-                       Optional<ArrayRef<SILValue>> subscripts,
-                       ManagedValue value);
+                       RValue &&optionalThisValue,
+                       RValue &&optionalSubscripts,
+                       RValue &&value);
   
   ManagedValue emitManagedRValueWithCleanup(SILValue v);
   
-  void emitAssignToLValue(SILLocation loc, ManagedValue src,
+  void emitAssignToLValue(SILLocation loc, RValue &&src,
                           LValue const &dest);
   ManagedValue emitMaterializedLoadFromLValue(SILLocation loc,
                                               LValue const &src);
@@ -561,7 +525,10 @@ public:
   SILValue emitArchetypeMethod(ArchetypeMemberRefExpr *e, SILValue archetype);
   SILValue emitProtocolMethod(ExistentialMemberRefExpr *e, SILValue existential);
   
-  ManagedValue emitApplyExpr(ApplyExpr *e);
+  RValue emitApplyExpr(ApplyExpr *e);
+
+  ManagedValue emitApply(SILLocation Loc, SILValue Fn,
+                         ArrayRef<ManagedValue> Args);
 
   //===--------------------------------------------------------------------===//
   // Declarations

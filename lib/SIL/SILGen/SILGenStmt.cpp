@@ -15,7 +15,7 @@
 #include "Condition.h"
 #include "Initialization.h"
 #include "LValue.h"
-#include "ManagedValue.h"
+#include "RValue.h"
 #include "swift/AST/AST.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/ADT/OwningPtr.h"
@@ -50,7 +50,7 @@ Condition SILGenFunction::emitCondition(SILLocation Loc, Expr *E,
   SILValue V;
   {
     FullExpr Scope(Cleanups);
-    V = visit(E).forward(*this);
+    V = visit(E).forwardAsSingleValue(*this);
   }
   assert(V.getType().castTo<BuiltinIntegerType>()->getBitWidth() == 1);
   
@@ -100,20 +100,16 @@ void SILGenFunction::visitBraceStmt(BraceStmt *S, SGFContext C) {
 
 /// emitAssignStmtRecursive - Used to destructure (potentially) recursive
 /// assignments into tuple expressions down to their scalar stores.
-static void emitAssignStmtRecursive(AssignStmt *S, ManagedValue Src, Expr *Dest,
+static void emitAssignStmtRecursive(AssignStmt *S, RValue &&Src, Expr *Dest,
                                     SILGenFunction &Gen) {
   // If the destination is a tuple, recursively destructure.
   if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
-    SILValue SrcV = Src.forward(Gen);
+    SmallVector<RValue, 4> elements;
+    std::move(Src).extractElements(elements);
     unsigned EltNo = 0;
     for (Expr *DestElem : TE->getElements()) {
-      SILType elemType = Gen.getLoweredType(
-                                          DestElem->getType()->getRValueType());
-      SILValue SrcVal = Gen.B.createExtract(SILLocation(), SrcV,
-                                         EltNo++,
-                                         elemType);
       emitAssignStmtRecursive(S,
-                              Gen.emitManagedRValueWithCleanup(SrcVal),
+                              std::move(elements[EltNo++]),
                               DestElem, Gen);
     }
     return;
@@ -121,16 +117,15 @@ static void emitAssignStmtRecursive(AssignStmt *S, ManagedValue Src, Expr *Dest,
   
   // Otherwise, emit the scalar assignment.
   LValue DstLV = SILGenLValue(Gen).visit(Dest);
-  Gen.emitAssignToLValue(S, Src, DstLV);
+  Gen.emitAssignToLValue(S, std::move(Src), DstLV);
 }
 
 
 void SILGenFunction::visitAssignStmt(AssignStmt *S, SGFContext C) {
   FullExpr scope(Cleanups);
-  ManagedValue SrcV = visit(S->getSrc());
 
   // Handle tuple destinations by destructuring them if present.
-  return emitAssignStmtRecursive(S, SrcV, S->getDest(), *this);
+  return emitAssignStmtRecursive(S, visit(S->getSrc()), S->getDest(), *this);
 }
 
 namespace {
@@ -154,14 +149,14 @@ void SILGenFunction::visitReturnStmt(ReturnStmt *S, SGFContext C) {
   if (IndirectReturnAddress) {
     // Indirect return of an address-only value.
     FullExpr scope(Cleanups);
-    llvm::OwningPtr<Initialization> returnInit(
+    InitializationPtr returnInit(
                        new IndirectReturnInitialization(IndirectReturnAddress));
     emitExprInto(S->getResult(), returnInit.get());
     ArgV = emitEmptyTuple(S);
   } else if (S->hasResult()) {
     // SILValue return.
     FullExpr scope(Cleanups);
-    ArgV = visit(S->getResult()).forward(*this);
+    ArgV = visit(S->getResult()).forwardAsSingleValue(*this);
   } else {
     // Void return.
     ArgV = emitEmptyTuple(S);
@@ -436,7 +431,7 @@ void SILGenFunction::emitAssignPhysicalAddress(SILLocation loc,
 }
 
 void SILGenFunction::emitAssignToLValue(SILLocation loc,
-                                        ManagedValue src, LValue const &dest) {
+                                        RValue &&src, LValue const &dest) {
   struct StoreWriteback {
     SILValue base;
     Materialize member;
@@ -472,19 +467,19 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   // Write to the tail component.
   if (component->isPhysical()) {
     SILValue finalDestAddr = component->asPhysical().offset(*this, loc, destAddr);
-    emitAssignPhysicalAddress(loc, src, finalDestAddr);
+    emitAssignPhysicalAddress(loc, std::move(src).getAsSingleValue(*this),
+                              finalDestAddr);
   } else {
     component->asLogical().storeRValue(*this, loc,
-                                       src, destAddr);
+                                       std::move(src), destAddr);
   }
   
   // Write back through value-type logical properties.
   for (auto wb = writebacks.rbegin(), wend = writebacks.rend();
        wb != wend; ++wb) {
-    // FIXME: address-only writeback
     ManagedValue wbValue = wb->member.consume(*this, loc);
     wb->component->storeRValue(*this, loc,
-                               wbValue, wb->base);
+                               RValue(*this, wbValue), wb->base);
   }
 }
 

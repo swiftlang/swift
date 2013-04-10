@@ -12,7 +12,7 @@
 
 #include "SILGen.h"
 #include "Initialization.h"
-#include "ManagedValue.h"
+#include "RValue.h"
 #include "Scope.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "swift/SIL/SILArgument.h"
@@ -82,11 +82,13 @@ ArrayRef<InitializationPtr> Initialization::getSubInitializations(
     SILValue baseAddr = getAddress();
     for (unsigned i = 0; i < tupleTy->getFields().size(); ++i) {
       auto &field = tupleTy->getFields()[i];
+      SILType fieldTy = gen.getLoweredType(field.getType()).getAddressType();
       SILValue fieldAddr = gen.B.createElementAddr(SILLocation(),
-                                          baseAddr, i,
-                                          gen.getLoweredType(field.getType()));
+                                                   baseAddr, i, fieldTy);
+                          
       buf.push_back(InitializationPtr(new TupleElementInitialization(fieldAddr)));
     }
+    return buf;
   }
   case Kind::AddressBinding:
     llvm_unreachable("cannot destructure an address binding initialization");

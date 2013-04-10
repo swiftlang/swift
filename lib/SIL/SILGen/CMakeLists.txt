@@ -1,6 +1,7 @@
 add_swift_library(swiftSILGen
   Cleanup.cpp
   Condition.cpp
+  RValue.cpp
   SILGen.cpp
   SILGenApply.cpp
   SILGenDecl.cpp

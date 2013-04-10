@@ -28,7 +28,7 @@ class Stmt;
 /// instantiation info, etc (when we get to it).
 ///
 typedef llvm::PointerUnion3<Stmt*,Expr*, Decl*> SILLocation;
-
+  
 } // end swift namespace
 
 

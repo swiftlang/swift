@@ -130,7 +130,7 @@ public:
   /// Perform a store operation with a value produced by the given
   /// expression.
   virtual void storeRValue(SILGenFunction &gen, SILLocation loc,
-                           ManagedValue rvalue, SILValue base) const = 0;
+                           RValue &&rvalue, SILValue base) const = 0;
 
   /// Perform a load operation from this path into temporary
   /// memory.

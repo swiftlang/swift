@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
-#include "ManagedValue.h"
+#include "RValue.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -28,7 +28,7 @@ class LLVM_LIBRARY_VISIBILITY SILGenApply
 public:
   SILGenFunction &gen;
   ManagedValue callee;
-  ManagedValue thisParam;
+  RValue thisParam;
   std::vector<ApplyExpr*> callSites;
   std::vector<Substitution> substitutions;
   SILType specializedType;
@@ -41,7 +41,7 @@ public:
   {}
   
   void setCallee(ManagedValue theCallee) {
-    assert((thisParam.getValue() ? callDepth == 1 : callDepth == 0)
+    assert((thisParam ? callDepth == 1 : callDepth == 0)
            && "setting callee at non-zero call depth?!");
     assert(!callee.getValue() && "already set callee!");
     callee = theCallee;
@@ -53,15 +53,15 @@ public:
     sideEffect = sideEffectExpr;
   }
   
-  void setThisParam(ManagedValue theThisParam) {
-    assert(!thisParam.getValue() && "already set this!");
-    thisParam = theThisParam;
+  void setThisParam(RValue &&theThisParam) {
+    assert(!thisParam && "already set this!");
+    thisParam = std::move(theThisParam);
     ++callDepth;
   }
 
   /// Fall back to an unknown, indirect callee.
   void visitExpr(Expr *e) {
-    setCallee(gen.visit(e));
+    setCallee(gen.visit(e).getAsSingleValue(gen));
   }
   
   /// Add a call site to the curry.
@@ -80,6 +80,8 @@ public:
     visit(e->getSubExpr());
     // Currently generic methods of generic types are the deepest we should
     // be able to stack specializations.
+    // FIXME: Generic local functions can add type parameters to arbitrary
+    // depth.
     assert(callDepth < 2 && "specialization below 'this' or argument depth?!");
     substitutions.insert(substitutions.end(),
                          e->getSubstitutions().begin(),
@@ -121,9 +123,10 @@ public:
         callSites.pop_back();
         setThisParam(gen.visit(thisCallSite->getArg()));
         SILConstant constant(fe);
+        
         setCallee(ManagedValue(
                    gen.B.createClassMethod(thisCallSite,
-                                           thisParam.getValue(),
+                                           thisParam.peekScalarValue(),
                                            constant,
                                            gen.SGM.getConstantType(constant)),
                    ManagedValue::Unmanaged));
@@ -148,20 +151,24 @@ public:
     visit(e->getRHS());
   }
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *e) {
-    SILValue existential = gen.visit(e->getBase()).getUnmanagedValue();
+    ManagedValue existential = gen.visit(e->getBase()).getAsSingleValue(gen);
     assert(existential.getType().isAddress() && "loadable existential?!");
     // FIXME: Use existential_metatype if method is static.
-    setThisParam(ManagedValue(gen.B.createProjectExistential(e, existential),
-                              ManagedValue::Unmanaged));
-    setCallee(ManagedValue(gen.emitProtocolMethod(e, existential),
+    
+    // Attach the existential cleanup to the projection so that it gets consumed
+    // (or not) when the call is applied to it (or isn't).
+    ManagedValue projection
+      = ManagedValue(gen.B.createProjectExistential(e, existential.getValue()),
+                     existential.getCleanup());
+    
+    setThisParam(RValue(gen, projection));
+    setCallee(ManagedValue(gen.emitProtocolMethod(e, existential.getValue()),
                            ManagedValue::Unmanaged));
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
     setThisParam(gen.visit(e->getBase()));
-    assert((thisParam.getValue().getType().isAddress()
-            || thisParam.getValue().getType().is<MetaTypeType>())
-           && "loadable archetype?!");
-    setCallee(ManagedValue(gen.emitArchetypeMethod(e, thisParam.getValue()),
+    setCallee(ManagedValue(gen.emitArchetypeMethod(e,
+                                                   thisParam.peekScalarValue()),
                            ManagedValue::Unmanaged));
   }
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {
@@ -174,7 +181,7 @@ public:
     Expr *arg = apply->getArg();
     while (auto *conversion = dyn_cast<ImplicitConversionExpr>(arg))
       arg = conversion->getSubExpr();
-    ManagedValue super = gen.visit(arg);
+    ManagedValue super = gen.visit(arg).getAsSingleValue(gen);
     if (super.isLValue()) {
       super = gen.emitManagedRValueWithCleanup(
                                        gen.B.createLoad(arg, super.getValue()));
@@ -198,8 +205,8 @@ public:
       = gen.getLoweredLoadableType(constantTy.castTo<FunctionType>()->getInput());
     SILValue superUpcast = gen.B.createUpcast(apply->getArg(), super.getValue(),
                                            constantThisTy);
-    setThisParam(ManagedValue(superUpcast, super.getCleanup()));
-
+    
+    setThisParam(RValue(gen, ManagedValue(superUpcast, super.getCleanup())));
     setCallee(ManagedValue(gen.B.createSuperMethod(apply, super.getValue(),
                                  constant, constantTy),
                            ManagedValue::Unmanaged));
@@ -218,63 +225,11 @@ public:
   }
 };
 
-static void emitDestructureArgumentTuple(SILGenFunction &gen,
-                                         SILLocation loc,
-                                         SILValue argValue,
-                                         SmallVectorImpl<SILValue> &argsV) {
-  TupleType *ty = argValue.getType().castTo<TupleType>();
-  
-  // FIXME: address-only tuple
-  // FIXME: varargs
-  for (size_t i = 0, size = ty->getFields().size(); i < size; ++i) {
-    SILValue elt = gen.B.createExtract(loc, argValue, i,
-                    gen.getLoweredLoadableType(ty->getFields()[i].getType()));
-    if (ty->getFields()[i].getType()->is<TupleType>())
-      emitDestructureArgumentTuple(gen, loc, elt, argsV);
-    else
-      argsV.push_back(elt);
-  }
-}
-
 } // end anonymous namespace
 
-void SILGenFunction::emitApplyArgumentValue(SILLocation loc,
-                                            ManagedValue argValue,
-                                            llvm::SmallVectorImpl<SILValue> &argsV)
-{
-  // If the result of the subexpression is a tuple value, destructure it.
-  if (!argValue.isLValue() && argValue.getType().is<TupleType>()) {
-    emitDestructureArgumentTuple(*this, loc,
-                                 argValue.forward(*this), argsV);
-    return;
-  }
-  
-  // Otherwise, the value is a single argument.
-  argsV.push_back(argValue.forwardArgument(*this, loc));
-}
-
-void SILGenFunction::emitApplyArguments(Expr *argsExpr,
-                                        llvm::SmallVectorImpl<SILValue> &ArgsV) {
-  // Skim off any ParenExprs.
-  while (ParenExpr *pe = dyn_cast<ParenExpr>(argsExpr))
-    argsExpr = pe->getSubExpr();
-  
-  // FIXME: byref arguments need to generate LValues with writebacks.
-  
-  // Visit the subexpression with an argument vector context so that tupling
-  // expressions will destructure into the argument list.
-  ManagedValue argValue = visit(argsExpr, SGFContext(ArgsV));
-  
-  // If visiting the subexpression returned a null value, then it emitted its
-  // elements into the argument vector.
-  if (!argValue.getValue())
-    return;
-  
-  emitApplyArgumentValue(argsExpr, argValue, ArgsV);
-}
-
 ManagedValue SILGenFunction::emitApply(SILLocation Loc,
-                                       SILValue Fn, ArrayRef<SILValue> Args) {
+                                       SILValue Fn,
+                                       ArrayRef<ManagedValue> Args) {
   // Get the result type.
   Type resultTy = Fn.getType().getFunctionResultType();
   TypeLoweringInfo const &resultTI = getTypeLoweringInfo(resultTy);
@@ -282,15 +237,28 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
   if (resultTI.isAddressOnly()) {
     // Allocate a temporary to house the indirect return, and pass it to the
     // function as an implicit argument.
-    SmallVector<SILValue, 4> argsWithReturn(Args.begin(), Args.end());
+    // FIXME: Should pass down SGFContext so we can emit into an initialization.
     SILValue buffer = emitTemporaryAllocation(Loc, resultTI.getLoweredType());
+    auto argsWithReturn
+      = map<SmallVector<SILValue, 4>>(Args,
+                                      [&](ManagedValue v) {
+                                        return v.forwardArgument(*this, Loc);
+                                      });
     argsWithReturn.push_back(buffer);
     B.createApply(Loc, Fn, SGM.Types.getEmptyTupleType(),
                   argsWithReturn);
+
     return emitManagedRValueWithCleanup(buffer);
   } else {
     // Receive the result by value.
-    SILValue result = B.createApply(Loc, Fn, resultTI.getLoweredType(), Args);
+    auto fwdArgs
+      = map<SmallVector<SILValue, 4>>(Args,
+                                      [&](ManagedValue v) {
+                                        return v.forwardArgument(*this, Loc);
+                                      });
+
+    SILValue result = B.createApply(Loc, Fn, resultTI.getLoweredType(),
+                                    fwdArgs);
     return resultTy->is<LValueType>()
       ? ManagedValue(result, ManagedValue::LValue)
       : emitManagedRValueWithCleanup(result);
@@ -304,8 +272,8 @@ namespace {
     // FIXME: Need to fix emitApplyArgument to preserve cleanups and emit into
     // a ManagedValue vector instead of SILValue. We shouldn't forward until the
     // final apply is emitted.
-    SmallVector<SILValue, 8> uncurriedArgs;
-    std::vector<SmallVector<SILValue, 2>> extraArgs;
+    SmallVector<ManagedValue, 8> uncurriedArgs;
+    std::vector<SmallVector<ManagedValue, 2>> extraArgs;
     ManagedValue callee;
     unsigned uncurries;
     bool applied;
@@ -318,17 +286,19 @@ namespace {
         applied(false)
     {}
     
-    SmallVectorImpl<SILValue> &addArgs() {
+    void addArgs(RValue &&args) {
       assert(!applied && "already applied!");
 
       // Append to the main argument list if we have uncurry levels remaining.
       if (uncurries > 0) {
         --uncurries;
-        return uncurriedArgs;
+        std::move(args).getAll(uncurriedArgs);
+        return;
       }
-      // Otherwise, apply these arguments to the result of the uncurried call.
+      
+      // Otherwise, apply these arguments to the result of the previous call.
       extraArgs.emplace_back();
-      return extraArgs.back();
+      std::move(args).getAll(extraArgs.back());
     }
     
     // FIXME: Tie argument clauses to more specific expr nodes.
@@ -347,7 +317,7 @@ namespace {
       ManagedValue result = gen.emitApply(loc, callee.forward(gen), uncurriedArgs);
       
       // If there are remaining call sites, apply them to the result function.
-      for (ArrayRef<SILValue> args : extraArgs) {
+      for (ArrayRef<ManagedValue> args : extraArgs) {
         result = gen.emitApply(loc, result.forward(gen), args);
       }
       
@@ -370,7 +340,7 @@ namespace {
     CallEmission(const CallEmission &) = delete;
     CallEmission &operator=(const CallEmission &) = delete;
   };
-}
+} // end anonymous namespace
 
 static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   SILGenApply apply(gen);
@@ -386,21 +356,21 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   CallEmission emission(gen, apply.getSpecializedCallee());
   
   // Apply 'this' if provided.
-  if (apply.thisParam.getValue()) {
-    emission.addArgs().push_back(apply.thisParam.forward(gen));
+  if (apply.thisParam) {
+    emission.addArgs(std::move(apply.thisParam));
   }
   // Apply arguments from call sites, innermost to outermost.
   for (auto site = apply.callSites.rbegin(), end = apply.callSites.rend();
        site != end;
        ++site) {
-    gen.emitApplyArguments((*site)->getArg(), emission.addArgs());
+    emission.addArgs(gen.visit((*site)->getArg()));
   }
   
   return emission;
 }
 
-ManagedValue SILGenFunction::emitApplyExpr(ApplyExpr *e) {
-  return prepareApplyExpr(*this, e).apply(e);
+RValue SILGenFunction::emitApplyExpr(ApplyExpr *e) {
+  return RValue(*this, prepareApplyExpr(*this, e).apply(e));
 }
 
 /// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
@@ -418,27 +388,38 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(SILValue ObjectPtr,
 
   // Construct a call to the injection function.
   CallEmission emission = prepareApplyExpr(*this, ArrayInjectionFunction);
-  SILValue InjectionArgs[] = {BasePtr, ObjectPtr, Length};
+//  SILValue InjectionArgs[] = {BasePtr, ObjectPtr, Length};
   
-  emission.addArgs().append(std::begin(InjectionArgs), std::end(InjectionArgs));
+  CanType injectionArgsTy
+   = ArrayInjectionFunction->getType()->getAs<FunctionType>()->getInput()
+     ->getCanonicalType();
+  RValue InjectionArgs(injectionArgsTy);
+  InjectionArgs.addElement(RValue(*this,
+                                ManagedValue(BasePtr, ManagedValue::Unmanaged)));
+  // FIXME: ObjectPtr ought to have a cleanup on it.
+  InjectionArgs.addElement(RValue(*this,
+                                ManagedValue(ObjectPtr, ManagedValue::Unmanaged)));
+  InjectionArgs.addElement(RValue(*this,
+                                ManagedValue(Length, ManagedValue::Unmanaged)));
   
+  emission.addArgs(std::move(InjectionArgs));
   return emission.apply(SILLocation());
 }
 
 /// Emit a call to a getter and materialize its result.
 Materialize SILGenFunction::emitGetProperty(SILLocation loc,
-                                  ManagedValue getter,
-                                  Optional<ManagedValue> thisValue,
-                                  Optional<ArrayRef<SILValue>> subscripts) {
+                                            ManagedValue getter,
+                                            RValue &&thisValue,
+                                            RValue &&subscripts) {
   CallEmission emission(*this, getter);
   // This ->
   if (thisValue)
-    emission.addArgs().push_back(thisValue->forward(*this));
+    emission.addArgs(std::move(thisValue));
   // Index ->
   if (subscripts)
-    emission.addArgs().append(subscripts->begin(), subscripts->end());
+    emission.addArgs(std::move(subscripts));
   // () ->
-  emission.addArgs();
+  emission.addArgs(emitEmptyTupleRValue(loc));
   // T
   ManagedValue result = emission.apply(loc);
   return emitMaterialize(loc, result);
@@ -446,18 +427,18 @@ Materialize SILGenFunction::emitGetProperty(SILLocation loc,
 
 void SILGenFunction::emitSetProperty(SILLocation loc,
                                      ManagedValue setter,
-                                     Optional<ManagedValue> thisValue,
-                                     Optional<ArrayRef<SILValue>> subscripts,
-                                     ManagedValue result) {
+                                     RValue &&thisValue,
+                                     RValue &&subscripts,
+                                     RValue &&setValue) {
   CallEmission emission(*this, setter);
   // This ->
   if (thisValue)
-    emission.addArgs().push_back(thisValue->forward(*this));
+    emission.addArgs(std::move(thisValue));
   // Index ->
   if (subscripts)
-    emission.addArgs().append(subscripts->begin(), subscripts->end());
+    emission.addArgs(std::move(subscripts));
   // T ->
-  emitApplyArgumentValue(loc, result, emission.addArgs());
+  emission.addArgs(std::move(setValue));
   // ()
   emission.apply(loc);
 }

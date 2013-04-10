@@ -15,7 +15,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "LValue.h"
-#include "ManagedValue.h"
+#include "RValue.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -100,29 +100,34 @@ namespace {
     SILValue setter;
     Expr *subscriptExpr;
     
-    void getSubscriptArguments(SILGenFunction &gen,
-                               llvm::SmallVectorImpl<SILValue> &args) const {
-      gen.emitApplyArguments(subscriptExpr, args);
-    }
-    
-    void prepareAccessorArgs(SILGenFunction &gen, SILLocation loc,
-                             SILValue accessor, SILValue base,
-                             SmallVectorImpl<SILValue> &subscripts) const
+    /// Returns a pair of RValues holding the base (retained if necessary) and
+    /// subscript arguments to an accessor, in that order.
+    std::pair<RValue, RValue>
+    prepareAccessorArgs(SILGenFunction &gen, SILLocation loc,
+                             SILValue accessor, SILValue base) const
     {
-      
-      
       assert((!base || (base.getType().isAddress() ^
-              base.getType().hasReferenceSemantics())) &&
+                        base.getType().hasReferenceSemantics())) &&
              "base of getter/setter component must be invalid, lvalue, or "
              "of reference type");
       
       gen.B.createRetain(loc, accessor);
       
-      if (base && base.getType().hasReferenceSemantics())
-        gen.B.createRetain(loc, base);
+      RValue baseRV, subscriptsRV;
+      
+      if (base) {
+        if (base.getType().hasReferenceSemantics()) {
+          gen.B.createRetain(loc, base);
+          baseRV = RValue(gen, gen.emitManagedRValueWithCleanup(base));
+        } else {
+          baseRV = RValue(gen, ManagedValue(base, ManagedValue::LValue));
+        }
+      }
       
       if (subscriptExpr)
-        getSubscriptArguments(gen, subscripts);
+        subscriptsRV = gen.visit(subscriptExpr);
+      
+      return {std::move(baseRV), std::move(subscriptsRV)};
     }
     
   public:
@@ -142,38 +147,28 @@ namespace {
     }
     
     void storeRValue(SILGenFunction &gen, SILLocation loc,
-                     ManagedValue rvalue, SILValue base) const override
+                     RValue &&rvalue, SILValue base) const override
     {
-      llvm::SmallVector<SILValue, 2> subscripts;
-      prepareAccessorArgs(gen, loc, setter, base, subscripts);
+      auto baseAndSubscripts
+        = prepareAccessorArgs(gen, loc, setter, base);
       
       return gen.emitSetProperty(loc,
-                                 ManagedValue(setter, ManagedValue::Unmanaged),
-                                 base
-                                   ? Optional<ManagedValue>(base,
-                                                        ManagedValue::Unmanaged)
-                                   : Nothing,
-                                 subscriptExpr
-                                   ? Optional<ArrayRef<SILValue>>(subscripts)
-                                   : Nothing,
-                                 rvalue);
+                                 gen.emitManagedRValueWithCleanup(setter),
+                                 std::move(baseAndSubscripts.first),
+                                 std::move(baseAndSubscripts.second),
+                                 std::move(rvalue));
     }
     
     Materialize loadAndMaterialize(SILGenFunction &gen, SILLocation loc,
                                    SILValue base) const override
     {
-      llvm::SmallVector<SILValue, 2> subscripts;
-      prepareAccessorArgs(gen, loc, getter, base, subscripts);
+      auto baseAndSubscripts
+        = prepareAccessorArgs(gen, loc, getter, base);
       
       return gen.emitGetProperty(loc,
-                                 ManagedValue(getter, ManagedValue::Unmanaged),
-                                 base
-                                   ? Optional<ManagedValue>(base,
-                                                        ManagedValue::Unmanaged)
-                                   : Nothing,
-                                 subscriptExpr
-                                   ? Optional<ArrayRef<SILValue>>(subscripts)
-                                   : Nothing);
+                                 gen.emitManagedRValueWithCleanup(getter),
+                                 std::move(baseAndSubscripts.first),
+                                 std::move(baseAndSubscripts.second));
     }
   };
 }
@@ -182,7 +177,7 @@ LValue SILGenLValue::visitRec(Expr *e) {
   if (e->getType()->hasReferenceSemantics()) {
     // Any reference type expression can form the root of a logical lvalue.
     LValue lv;
-    lv.add<RefComponent>(gen.visit(e));
+    lv.add<RefComponent>(gen.visit(e).getAsSingleValue(gen));
     return ::std::move(lv);
   } else {
     return visit(e);
@@ -220,7 +215,7 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
 
 LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
   LValue lv;
-  SILValue materialized = gen.visit(e).getUnmanagedValue();
+  SILValue materialized = gen.visit(e).getUnmanagedSingleValue(gen);
   lv.add<AddressComponent>(materialized);
   return ::std::move(lv);
 }
