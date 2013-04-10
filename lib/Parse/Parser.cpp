@@ -51,12 +51,12 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
            TU->Kind == TranslationUnit::Main ||
            TU->Kind == TranslationUnit::Repl);
   PrettyStackTraceParser stackTrace(P);
-  P.parseTranslationUnit(TU);
+  bool FoundSideEffects = P.parseTranslationUnit(TU);
   if (BufferOffset)
     *BufferOffset = P.Tok.getLoc().Value.getPointer() -
                     P.Buffer->getBuffer().begin();
 
-  return P.FoundSideEffects;
+  return FoundSideEffects;
 }
 
 Expr *swift::parseCompletionContextExpr(TranslationUnit *TU,
@@ -112,8 +112,7 @@ Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context,
     Component(Comp),
     Context(Context),
     ScopeInfo(*this),
-    IsMainModule(IsMainModule),
-    FoundSideEffects(false) {
+    IsMainModule(IsMainModule) {
 }
 
 Parser::Parser(swift::Component *Comp, ASTContext &Context,
@@ -126,8 +125,7 @@ Parser::Parser(swift::Component *Comp, ASTContext &Context,
     Component(Comp),
     Context(Context),
     ScopeInfo(*this),
-    IsMainModule(false),
-    FoundSideEffects(false)
+    IsMainModule(false)
 {
 }
 

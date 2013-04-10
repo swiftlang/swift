@@ -29,7 +29,7 @@ using namespace swift;
 /// parseTranslationUnit - Main entrypoint for the parser.
 ///   translation-unit:
 ///     stmt-brace-item*
-void Parser::parseTranslationUnit(TranslationUnit *TU) {
+bool Parser::parseTranslationUnit(TranslationUnit *TU) {
   if (TU->ASTStage == TranslationUnit::Parsed) {
     // FIXME: This is a bit messy; need to figure out a better way to deal
     // with memory allocation for TranslationUnit.
@@ -55,6 +55,19 @@ void Parser::parseTranslationUnit(TranslationUnit *TU) {
   
   parseBraceItemList(Items, true);
 
+
+  // If this is a MainModule, determine if we found code that needs to be
+  // executed (this is used by the repl to know whether to compile and run the
+  // newly parsed stuff).
+  bool FoundTopLevelCodeToExecute = false;
+  if (IsMainModule) {
+    for (auto V : Items)
+      if (isa<PatternBindingDecl>(V.get<Decl*>()) ||
+          isa<TopLevelCodeDecl>(V.get<Decl*>()))
+        FoundTopLevelCodeToExecute = true;
+  }
+
+  // Add newly parsed decls to the translation unit.
   for (auto Item : Items)
     TU->Decls.push_back(Item.get<Decl*>());
 
@@ -69,6 +82,8 @@ void Parser::parseTranslationUnit(TranslationUnit *TU) {
   // Note that the translation unit is fully parsed and verify it.
   TU->ASTStage = TranslationUnit::Parsed;
   verify(TU);
+
+  return FoundTopLevelCodeToExecute;
 }
 
 namespace {

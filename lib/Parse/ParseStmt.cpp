@@ -207,7 +207,6 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
-        FoundSideEffects = true;
       }
     } else {
       SourceLoc StartLoc = Tok.getLoc();
@@ -247,7 +246,6 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     if (IsTopLevel && IsMainModule && !NeedParseErrorRecovery) {
       if (!Entries.empty() &&
           isa<PatternBindingDecl>(Entries.back().get<Decl*>())) {
-        FoundSideEffects = true;
 
         // If the next token is the end of the buffer or starts a new line,
         // we're done. Otherwise, keep parsing; we may need to complain here.

@@ -70,7 +70,6 @@ public:
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   std::vector<TranslationUnit::TupleTypeAndContext> TypesWithDefaultValues;
   bool IsMainModule;
-  bool FoundSideEffects;
 
   /// Tok - This is the current token being considered by the parser.
   Token Tok;
@@ -245,7 +244,7 @@ public:
   static bool isStartOfDecl(const Token &Tok, const Token &Tok2);
   static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2);
 
-  void parseTranslationUnit(TranslationUnit *TU);
+  bool parseTranslationUnit(TranslationUnit *TU);
   bool parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);
   enum {
     PD_Default              = 0,
