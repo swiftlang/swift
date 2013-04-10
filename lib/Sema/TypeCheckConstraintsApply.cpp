@@ -108,6 +108,9 @@ namespace {
     /// \brief Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, SourceLoc dotLoc, ValueDecl *member,
                          SourceLoc memberLoc, Type openedType) {
+      auto &tc = cs.getTypeChecker();
+      auto &context = tc.Context;
+
       // Figure out the actual base type, and whether we have an instance of that
       // type or its metatype.
       Type baseTy = base->getType()->getRValueType();
@@ -119,9 +122,6 @@ namespace {
 
       // Member references into existential or archetype types.
       if (baseTy->isExistentialType() || baseTy->is<ArchetypeType>()) {
-        auto &tc = cs.getTypeChecker();
-        auto &context = tc.Context;
-
         // Convert the base to the type of the 'this' parameter.
         Type containerTy;
         if (baseTy->isExistentialType())
@@ -155,8 +155,80 @@ namespace {
         return result;
       }
 
+      // Reference to a member of a generic type.
+      if (baseTy->isSpecialized()) {
+        // FIXME: Feels like we're re-doing a lot of work that the type
+        // checker already did, given that we know the eventual type we're
+        // going to produce.
+        GenericParamList *genericParams = nullptr;
+        CoercionContext cc(tc);
+        Type substTy
+          = tc.substBaseForGenericTypeMember(member, baseTy,
+                                             member->getTypeOfReference(),
+                                             memberLoc, cc,
+                                             &genericParams);
+
+        if (isa<FuncDecl>(member) || isa<OneOfElementDecl>(member) ||
+            isa<ConstructorDecl>(member)) {
+          // We're binding a reference to an instance method of a generic
+          // type, which we build as a reference to the underlying declaration
+          // specialized based on the deducing the arguments of the generic
+          // type.
+
+          // Reference to the generic member.
+          Expr *ref = new (context) DeclRefExpr(member, memberLoc,
+                                                member->getTypeOfReference());
+
+          // Specialize the member with the types deduced from the object
+          // argument. This eliminates the genericity that comes from being
+          // an instance method of a generic class.
+          Expr *specializedRef
+            = tc.buildSpecializeExpr(ref, substTy, cc.Substitutions,
+                                     cc.Conformance,
+                                     /*OnlyInnermostParams=*/false);
+
+          Expr *apply;
+          if (!baseIsInstance && member->isInstanceMember()) {
+            apply = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
+                                                           specializedRef);
+          } else {
+            assert((!baseIsInstance || member->isInstanceMember()) &&
+                   "can't call a static method on an instance");
+            apply = new (context) DotSyntaxCallExpr(specializedRef, dotLoc, base);
+          }
+          return tc.recheckTypes(apply);
+        }
+
+        // Convert the base appropriately.
+        // FIXME: We could be referring to a member of a superclass, so find
+        // that superclass and convert to it.
+        if (baseIsInstance) {
+          // Convert the base to the appropriate container type, turning it
+          // into an lvalue if required.
+          base = convertObjectArgumentToType(tc, base, baseTy);
+        } else {
+          // Convert the base to an rvalue of the appropriate metatype.
+          base = convertToType(tc, base,
+                               MetaTypeType::get(baseTy, context));
+          base = tc.convertToRValue(base);
+        }
+        assert(base && "Unable to convert base?");
+
+        // Build a reference to a generic member.
+        auto result = new (context) GenericMemberRefExpr(base, dotLoc, member,
+                                                         memberLoc);
+
+        // Set the (substituted) type and the set of substitutions.
+        // FIXME: Use simplifyType(openedType);
+        result->setType(substTy);
+        result->setSubstitutions(tc.encodeSubstitutions(genericParams,
+                                                        cc.Substitutions,
+                                                        cc.Conformance,
+                                                        true, false));
+        return result;
+      }
+
       // FIXME: Falls back to the old type checker.
-      auto &tc = cs.getTypeChecker();
       auto result = tc.buildMemberRefExpr(base, dotLoc, { &member, 1 },
                                           memberLoc);
       if (!result)

@@ -2193,7 +2193,18 @@ Type Solution::simplifyType(TypeChecker &tc, Type type) const {
              if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
                auto known = typeBindings.find(tvt);
                assert(known != typeBindings.end());
-               return known->second;
+               type = known->second;
+             }
+
+             // Strip the implicit bit off lvalue types.
+             if (auto lvalue = type->getAs<LValueType>()) {
+               auto wantQuals = lvalue->getQualifiers() -
+                                  (LValueType::Qual::Implicit |
+                                   LValueType::Qual::NonSettable);
+               if (lvalue->getQualifiers() != wantQuals) {
+                 auto objectType = simplifyType(tc, lvalue->getObjectType());
+                 type = LValueType::get(objectType, wantQuals, tc.Context);
+               }
              }
 
              return type;

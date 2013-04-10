@@ -1377,6 +1377,7 @@ public:
 
     bool isHeap() const { return !(*this & NonHeap); }
     bool isSettable() const { return !(*this & NonSettable); }
+    bool isImplicit() const { return (*this & Implicit); }
     
     friend Qual operator|(QualBits l, QualBits r) {
       return Qual(opaque_type(l) | opaque_type(r));
