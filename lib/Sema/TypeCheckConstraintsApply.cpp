@@ -246,12 +246,26 @@ namespace {
         }
       }
 
-      // FIXME: Falls back to the old type checker.
-      auto result = tc.buildMemberRefExpr(base, dotLoc, { &member, 1 },
-                                          memberLoc);
-      if (!result)
-        return nullptr;
+      // Handle references to non-variable struct/class/oneof members, as
+      // well as module members.
+      Expr *ref = new (context) DeclRefExpr(member, memberLoc,
+                                            member->getTypeOfReference());
+      Expr *result = nullptr;
 
+      // Refer to a member function that binds 'this':
+      if ((isa<FuncDecl>(member) && member->getDeclContext()->isTypeContext()) ||
+          isa<OneOfElementDecl>(member) || isa<ConstructorDecl>(member)) {
+        if (baseIsInstance == member->isInstanceMember())
+          result = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
+
+        assert((!baseIsInstance || member->isInstanceMember()) &&
+               "can't call a static method on an instance");
+      }
+
+      if (!result)
+        result =  new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
+
+      // FIXME: Falls back to the old type checker.
       result = tc.recheckTypes(result);
       if (!result)
         return nullptr;
