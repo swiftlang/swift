@@ -48,7 +48,10 @@ namespace swift {
     Property,
     /// A statement list in a case block. The list is terminated
     /// by a closing brace or a 'case' or 'default' label.
-    Case
+    Case,
+    /// The top-level of a file, when not in parse-as-library mode (i.e. the
+    /// repl or a script).
+    TopLevelCode
   };
 
 class Parser {

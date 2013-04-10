@@ -53,7 +53,9 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
     consumeToken();
   }
   
-  parseBraceItemList(Items, true);
+  parseBraceItemList(Items, true,
+                     IsMainModule ? BraceItemListKind::TopLevelCode
+                                  : BraceItemListKind::Brace);
 
 
   // If this is a MainModule, determine if we found code that needs to be

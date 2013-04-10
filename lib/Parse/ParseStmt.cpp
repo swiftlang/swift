@@ -129,8 +129,9 @@ bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
   return parseExprOrStmtAssign(Result);
 }
 
-static bool isTerminatorForBraceItemListKind(Token const &Tok,
-                                             BraceItemListKind Kind) {
+static bool isTerminatorForBraceItemListKind(const Token &Tok,
+                                             BraceItemListKind Kind,
+                                 ArrayRef<Parser::ExprStmtOrDecl> ParsedDecls) {
   switch (Kind) {
   case BraceItemListKind::Brace:
     return false;
@@ -138,6 +139,25 @@ static bool isTerminatorForBraceItemListKind(Token const &Tok,
     return Tok.isContextualKeyword("get") || Tok.isContextualKeyword("set");
   case BraceItemListKind::Case:
     return Tok.is(tok::kw_case) || Tok.is(tok::kw_default);
+  case BraceItemListKind::TopLevelCode:
+    // When parsing the top level executable code for a module, if we parsed
+    // some executable code, then we're done.  We want to process (name bind,
+    // type check, etc) decls one at a time to make sure that there are not
+    // forward type references, etc.  There is an outer loop around the parser
+    // that will reinvoke the parser at the top level on each statement until
+    // EOF.  In contrast, it is ok to have forward references between classes,
+    // functions, etc.
+    for (auto I : ParsedDecls) {
+      if (isa<PatternBindingDecl>(I.get<Decl*>()) ||
+          isa<TopLevelCodeDecl>(I.get<Decl*>()))
+        // Only bail out if the next token is at the start of a line.  If we
+        // don't, then we may accidentally allow things like "a = 1 b = 4".
+        // FIXME: This is really dubious.  This will reject some things, but
+        // allow other things we don't want.
+        if (Tok.isAtStartOfLine())
+          return true;
+    }
+    return false;
   }
 }
 
@@ -165,10 +185,9 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
   SmallVector<Decl*, 8> TmpDecls;
 
   bool previousHadSemi = true;
-  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)
-         && !isTerminatorForBraceItemListKind(Tok, Kind)) {
+  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof) &&
+         !isTerminatorForBraceItemListKind(Tok, Kind, Entries)) {
     bool NeedParseErrorRecovery = false;
-    llvm::OwningPtr<ContextChange> CC;
     ExprStmtOrDecl Result;
 
     // If the previous statement didn't have a semicolon and this new
@@ -240,24 +259,13 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     // would be ideal to stop at the start of the next expression (e.g. "X = 4")
     // but distinguishing the start of an expression from the middle of one is
     // "hard".
-    if (NeedParseErrorRecovery)
+    if (NeedParseErrorRecovery) {
       skipUntilDeclStmtRBrace();
 
-    if (IsTopLevel && IsMainModule && !NeedParseErrorRecovery) {
-      if (!Entries.empty() &&
-          isa<PatternBindingDecl>(Entries.back().get<Decl*>())) {
-
-        // If the next token is the end of the buffer or starts a new line,
-        // we're done. Otherwise, keep parsing; we may need to complain here.
-        if (Tok.is(tok::eof) || Tok.isAtStartOfLine())
-          break;
-      }
-    }
-
-    // If we have to recover, pretend that we had a semicolon; it's less
-    // noisy that way.
-    if (NeedParseErrorRecovery)
+      // If we have to recover, pretend that we had a semicolon; it's less
+      // noisy that way.
       previousHadSemi = true;
+    }
   }
 }
 
