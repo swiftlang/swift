@@ -24,6 +24,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Interleave.h"
+#include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
@@ -48,7 +49,9 @@ public:
   /// DC - This is the current DeclContext.
   DeclContext *DC;
 
-  unsigned LoopNestLevel;
+  unsigned LoopNestLevel, SwitchLevel;
+  
+  CaseStmt /*nullable*/ *FallthroughDest;
 
   struct AddLoopNest {
     StmtChecker &SC;
@@ -61,16 +64,20 @@ public:
   };
 
   StmtChecker(TypeChecker &TC, FuncExpr *TheFunc)
-    : TC(TC), TheFunc(TheFunc), DC(TheFunc), LoopNestLevel(0) { }
+    : TC(TC), TheFunc(TheFunc), DC(TheFunc),
+      LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
 
   StmtChecker(TypeChecker &TC, ConstructorDecl *TheCtor)
-    : TC(TC), TheFunc(TheCtor), DC(TheCtor), LoopNestLevel(0) { }
+    : TC(TC), TheFunc(TheCtor), DC(TheCtor),
+      LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
   
   StmtChecker(TypeChecker &TC, DestructorDecl *TheDtor)
-    : TC(TC), TheFunc(TheDtor), DC(TheDtor), LoopNestLevel(0) { }
+    : TC(TC), TheFunc(TheDtor), DC(TheDtor),
+      LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
   
   StmtChecker(TypeChecker &TC, DeclContext *DC)
-    : TC(TC), TheFunc(), DC(DC), LoopNestLevel(0) { }
+    : TC(TC), TheFunc(), DC(DC),
+      LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
 
   //===--------------------------------------------------------------------===//
   // Helper Functions.
@@ -466,6 +473,19 @@ public:
     return S;
   }
   
+  Stmt *visitFallthroughStmt(FallthroughStmt *S) {
+    if (!SwitchLevel) {
+      TC.diagnose(S->getLoc(), diag::fallthrough_outside_switch);
+      return nullptr;
+    }
+    if (!FallthroughDest) {
+      TC.diagnose(S->getLoc(), diag::fallthrough_from_last_case);
+      return nullptr;
+    }
+    S->setFallthroughDest(FallthroughDest);
+    return nullptr;
+  }
+  
   /// Check a case of a switch statement.
   bool typeCheckCaseStmt(CaseStmt *Case, SwitchStmt *ParentSwitch) {
     if (!Case->isDefault()) {      
@@ -481,12 +501,11 @@ public:
         TC.diagnose(ParentSwitch->getLoc(), diag::no_match_operator);
         return true;
       }
-      SmallVector<ValueDecl*, 8> matchDecls;
-      std::transform(matchLookup.Results.begin(), matchLookup.Results.end(),
-                     std::back_inserter(matchDecls),
-                     [](UnqualifiedLookupResult &res) {
-                       return res.getValueDecl();
-                     });
+      auto matchDecls
+        = map<SmallVector<ValueDecl*, 8>>(matchLookup.Results,
+                                          [](UnqualifiedLookupResult &res) {
+                                            return res.getValueDecl();
+                                          });
       
       Identifier orOp = TC.Context.getIdentifier("||");
       UnqualifiedLookup orLookup(orOp, &TC.TU);
@@ -494,12 +513,11 @@ public:
         TC.diagnose(ParentSwitch->getLoc(), diag::no_or_operator);
         return true;
       }
-      SmallVector<ValueDecl*, 2> orDecls;
-      std::transform(orLookup.Results.begin(), orLookup.Results.end(),
-                     std::back_inserter(orDecls),
-                     [](UnqualifiedLookupResult &res) {
-                       return res.getValueDecl();
-                     });
+      auto orDecls
+        = map<SmallVector<ValueDecl*, 2>>(orLookup.Results,
+                                          [](UnqualifiedLookupResult &res) {
+                                            return res.getValueDecl();
+                                          });
       
       // Construct the condition expression.
       Expr *condition = nullptr;
@@ -557,7 +575,12 @@ public:
     
     bool failed = false;
     CaseStmt *defaultCase = nullptr;
-    for (CaseStmt *C : S->getCases()) {
+    ++SwitchLevel;
+    for (auto i = S->getCases().begin(), end = S->getCases().end();
+         i != end; ++i) {
+      CaseStmt *C = *i;
+      // Fallthrough transfers control to the next case block.
+      FallthroughDest = i+1 == end ? nullptr : i[1];
       if (C->isDefault()) {
         if (defaultCase) {
           TC.diagnose(C->getLoc(), diag::multiple_defaults_in_switch);
@@ -567,6 +590,8 @@ public:
       }
       failed |= typeCheckCaseStmt(C, S);
     }
+    --SwitchLevel;
+    FallthroughDest = nullptr;
     
     return failed ? nullptr : S;
   }

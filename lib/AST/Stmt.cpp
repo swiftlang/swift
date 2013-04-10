@@ -267,6 +267,9 @@ public:
   void visitContinueStmt(ContinueStmt *S) {
     OS.indent(Indent) << "(continue_stmt)";
   }
+  void visitFallthroughStmt(FallthroughStmt *S) {
+    OS.indent(Indent) << "(fallthrough_stmt)";
+  }
   void visitSwitchStmt(SwitchStmt *S) {
     OS.indent(Indent) << "(switch_stmt\n";
     printRec(S->getSubjectExpr());

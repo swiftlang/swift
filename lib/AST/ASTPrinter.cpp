@@ -677,6 +677,10 @@ void PrintAST::visitContinueStmt(ContinueStmt *stmt) {
   OS << "continue";
 }
 
+void PrintAST::visitFallthroughStmt(FallthroughStmt *stmt) {
+  OS << "fallthrough";
+}
+
 void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
   OS << "switch ";
   // FIXME: print subject

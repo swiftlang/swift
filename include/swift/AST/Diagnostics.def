@@ -1178,7 +1178,7 @@ ERROR(break_outside_loop,sema_tcs,none,
       "'break' is only allowed inside a loop", ())
 ERROR(continue_outside_loop,sema_tcs,none,
       "'continue' is only allowed inside a loop", ())
-      
+
 // Switch Stmt
 ERROR(multiple_defaults_in_switch,sema_tcs,none,
       "multiple 'default' branches in 'switch' statement", ())
@@ -1188,6 +1188,10 @@ ERROR(no_match_operator,sema_tcs,none,
       "no binary '=~' operator available for 'switch' statement", ())
 ERROR(no_or_operator,sema_tcs,none,
       "no binary '||' operator available for 'switch' statement", ())
+ERROR(fallthrough_outside_switch,sema_tcs,none,
+      "'fallthrough' is only allowed inside a switch", ())
+ERROR(fallthrough_from_last_case,sema_tcs,none,
+      "'fallthrough' without a following 'case' or 'default' block", ())
 
 //------------------------------------------------------------------------------
 // Type Check Patterns

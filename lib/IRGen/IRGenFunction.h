@@ -43,6 +43,7 @@ namespace swift {
   class Decl;
   class Expr;
   class ExtensionDecl;
+  class FallthroughStmt;
   class ForEachStmt;
   class ForStmt;
   class FuncDecl;
@@ -322,6 +323,7 @@ private:
   void emitForEachStmt(ForEachStmt *S);
   void emitBreakStmt(BreakStmt *S);
   void emitContinueStmt(ContinueStmt *S);
+  void emitFallthroughStmt(FallthroughStmt *S);
   void emitSwitchStmt(SwitchStmt *S);
 
 //--- Expression emission ------------------------------------------------------

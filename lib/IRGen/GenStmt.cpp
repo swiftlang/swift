@@ -66,6 +66,9 @@ void IRGenFunction::emitStmt(Stmt *S) {
   case StmtKind::Continue:
     return emitContinueStmt(cast<ContinueStmt>(S));
       
+  case StmtKind::Fallthrough:
+    return emitFallthroughStmt(cast<FallthroughStmt>(S));
+      
   case StmtKind::Switch:
     return emitSwitchStmt(cast<SwitchStmt>(S));
   
@@ -380,6 +383,10 @@ void IRGenFunction::emitBreakStmt(BreakStmt *S) {
 void IRGenFunction::emitContinueStmt(ContinueStmt *S) {
   emitBranch(ContinueDestStack.back());
   Builder.ClearInsertionPoint();
+}
+
+void IRGenFunction::emitFallthroughStmt(FallthroughStmt *S) {
+  unimplemented(S->getLoc(), "fallthrough statement");
 }
 
 void IRGenFunction::emitSwitchStmt(SwitchStmt *S) {

@@ -343,6 +343,7 @@ void Lexer::lexIdentifier() {
     .Case("return", tok::kw_return)
     .Case("break", tok::kw_break)
     .Case("continue", tok::kw_continue)
+    .Case("fallthrough", tok::kw_fallthrough)
     .Case("switch", tok::kw_switch)
     .Case("case", tok::kw_case)
     .Case("default", tok::kw_default)

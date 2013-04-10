@@ -23,6 +23,7 @@
 #ifndef SWIFT_BASIC_RANGE_H
 #define SWIFT_BASIC_RANGE_H
 
+#include <algorithm>
 #include <utility>
 
 namespace swift {
@@ -41,6 +42,17 @@ namespace swift {
   template<typename T>
   inline Range<T> make_range(const T &begin, const T &end) {
     return {begin, end};
+  }
+  
+  // Wrapper for std::transform that creates a new back-insertable container
+  // and transforms a range into it.
+  template<typename T, typename InputRange, typename MapFn>
+  T map(InputRange &&range, MapFn &&mapFn) {
+    T result;
+    std::transform(std::begin(range), std::end(range),
+                   std::back_inserter(result),
+                   std::forward<MapFn>(mapFn));
+    return result;
   }
 }
 

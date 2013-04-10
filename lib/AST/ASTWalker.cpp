@@ -413,6 +413,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   Stmt *visitContinueStmt(ContinueStmt *CS) {
     return CS;
   }
+
+  Stmt *visitFallthroughStmt(FallthroughStmt *CS) {
+    return CS;
+  }
   
   Stmt *visitAssignStmt(AssignStmt *AS) {
     if (Expr *E = doIt(AS->getDest()))

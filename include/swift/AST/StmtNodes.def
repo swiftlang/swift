@@ -41,6 +41,7 @@ STMT(Switch, Stmt)
 STMT(Case, Stmt)
 STMT(Break, Stmt)
 STMT(Continue, Stmt)
+STMT(Fallthrough, Stmt)
 
 #undef ABSTRACT_STMT
 #undef STMT

@@ -539,6 +539,35 @@ public:
   }
 };
 
+/// FallthroughStmt - The keyword "fallthrough".
+class FallthroughStmt : public Stmt {
+  SourceLoc Loc;
+  CaseStmt *FallthroughDest;
+  
+public:
+  FallthroughStmt(SourceLoc Loc)
+    : Stmt(StmtKind::Fallthrough), Loc(Loc), FallthroughDest(nullptr)
+  {}
+  
+  SourceLoc getLoc() const { return Loc; }
+  
+  SourceRange getSourceRange() const { return Loc; }
+  
+  /// Get the CaseStmt block to which the fallthrough transfers control.
+  /// Set during Sema.
+  CaseStmt *getFallthroughDest() const {
+    assert(FallthroughDest && "fallthrough dest is not set until Sema");
+    return FallthroughDest;
+  }
+  void setFallthroughDest(CaseStmt *C) {
+    assert(!FallthroughDest && "fallthrough dest already set?!");
+    FallthroughDest = C;
+  }
+  
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Fallthrough;
+  }
+};
 
 } // end namespace swift
 

@@ -374,6 +374,10 @@ void SILGenFunction::visitContinueStmt(ContinueStmt *S, SGFContext C) {
   Cleanups.emitBranchAndCleanups(ContinueDestStack.back());
 }
 
+void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S, SGFContext C) {
+  llvm_unreachable("not implemented");
+}
+
 void SILGenFunction::visitSwitchStmt(SwitchStmt *S, SGFContext C) {
   llvm_unreachable("not implemented");
 }

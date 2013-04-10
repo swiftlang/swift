@@ -40,6 +40,7 @@ bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
   case tok::kw_for:
   case tok::kw_break:
   case tok::kw_continue:
+  case tok::kw_fallthrough:
   case tok::kw_switch:
   case tok::kw_case:
   case tok::kw_default:
@@ -296,6 +297,8 @@ NullablePtr<Stmt> Parser::parseStmtOtherThanAssignment() {
     return new (Context) BreakStmt(consumeToken(tok::kw_break));
   case tok::kw_continue:
     return new (Context) ContinueStmt(consumeToken(tok::kw_continue));
+  case tok::kw_fallthrough:
+    return new (Context) FallthroughStmt(consumeToken(tok::kw_fallthrough));
   }
 }
 
