@@ -1286,9 +1286,9 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
   Expr *result = new (tc.Context) MetatypeExpr(nullptr,
                                                intermediate->getStartLoc(),
                                                method->computeThisType());
-  result = tc.recheckTypes(buildMemberRef(result, SourceLoc(), method,
-                                          intermediate->getStartLoc(),
-                                          openedType));
+  result = buildMemberRef(result, SourceLoc(), method,
+                          intermediate->getStartLoc(),
+                          openedType);
 
   // Return a new call of the conversion function, passing in the (possible
   // converted) argument.
