@@ -48,7 +48,7 @@ namespace swift {
 // The indentation of the members of this enum describe the inheritance
 // hierarchy.  Commented out members are abstract classes.  This formation
 // allows for range checks in classof.
-enum class DeclContextKind : unsigned {
+enum class DeclContextKind {
   First_Module,
     TranslationUnit = First_Module,
     BuiltinModule,
@@ -76,11 +76,11 @@ class alignas(16) DeclContext {
   static_assert(unsigned(DeclContextKind::Last_DeclContextKind) < 1U << KindBits,
                 "Not enough KindBits for DeclContextKind");
   
-  llvm::PointerIntPair<DeclContext*, KindBits, unsigned> ParentAndKind;
+  llvm::PointerIntPair<DeclContext*, KindBits, DeclContextKind> ParentAndKind;
   
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
-    : ParentAndKind(Parent, unsigned(Kind))
+    : ParentAndKind(Parent, Kind)
   {
     assert((Parent != 0 || isModuleContext()) &&
            "DeclContext must have a parent unless it is a module!");
@@ -88,7 +88,7 @@ public:
 
   /// Returns the kind of context this is.
   DeclContextKind getContextKind() const {
-    return DeclContextKind(ParentAndKind.getInt());
+    return ParentAndKind.getInt();
   }
 
   /// Determines whether this context is itself a local scope in a

@@ -32,7 +32,7 @@ namespace Lowering {
   class TypeConverter;
 }
 
-enum class SILTypeInfoKind : unsigned {
+enum class SILTypeInfoKind {
   // SILTypeInfo,
   SILTypeInfo_First,
     SILFunctionTypeInfo = SILTypeInfo_First,
@@ -49,17 +49,17 @@ class alignas(8) SILTypeInfo : public SILAllocated<SILTypeInfo> {
   static_assert(1U << KindBits > unsigned(SILTypeInfoKind::SILTypeInfo_Last),
                 "not enough kind bits for all SILTypeInfo kinds");
   
-  llvm::PointerIntPair<TypeBase*, KindBits> SwiftTypeAndKind;
+  llvm::PointerIntPair<TypeBase*, KindBits, SILTypeInfoKind> SwiftTypeAndKind;
 
 public:
   SILTypeInfo(SILTypeInfoKind kind, CanType swiftType)
-    : SwiftTypeAndKind(swiftType.getPointer(), unsigned(kind)) {}
+    : SwiftTypeAndKind(swiftType.getPointer(), kind) {}
   
   SILTypeInfo(const SILTypeInfo &) = delete;
   SILTypeInfo &operator=(const SILTypeInfo &) = delete;
   
   SILTypeInfoKind getKind() const {
-    return SILTypeInfoKind(SwiftTypeAndKind.getInt());
+    return SwiftTypeAndKind.getInt();
   }
   CanType getSwiftType() const {
     return CanType(SwiftTypeAndKind.getPointer());

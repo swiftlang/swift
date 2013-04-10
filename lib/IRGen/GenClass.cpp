@@ -96,16 +96,16 @@ enum class FieldAccess : uint8_t {
 
 namespace {
   class FieldEntry {
-    llvm::PointerIntPair<VarDecl*, 2> VarAndAccess;
+    llvm::PointerIntPair<VarDecl*, 2, FieldAccess> VarAndAccess;
   public:
     FieldEntry(VarDecl *var, FieldAccess access)
-      : VarAndAccess(var, unsigned(access)) {}
+      : VarAndAccess(var, access) {}
 
     VarDecl *getVar() const {
       return VarAndAccess.getPointer();
     }
     FieldAccess getAccess() const {
-      return FieldAccess(VarAndAccess.getInt());
+      return VarAndAccess.getInt();
     }
   };
 
