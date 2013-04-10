@@ -109,28 +109,56 @@ public:
   }
   
   /// Forward this value into memory by storing it to the given address.
-  /// Currently only implemented for address-only values.
   ///
   /// \param gen - The SILGenFunction.
   /// \param loc - the AST location to associate with emitted instructions.
-  /// \param address - the address to store to.
-  /// \param isInitialize - True if the address references uninitialized memory.
-  ///                       False if the address currently contains a valid
-  ///                       value.
+  /// \param address - the address to assign to.
+  void forwardInto(SILGenFunction &gen, SILLocation loc, SILValue address) {
+    if (getType().isAddressOnly()) {
+      bool canTake = hasCleanup();
+      if (canTake) {
+        forwardCleanup(gen);
+      }
+      gen.B.createCopyAddr(loc, getValue(), address, canTake,
+                           /*isInitialize*/ true);
+    } else
+      gen.emitStore(loc, *this, address);
+  }
+  
+  /// Assign this value into memory, destroying the existing
+  /// value at the destination address.
   ///
-  /// FIXME: Ideally we would initialize directly into destinations and not need
-  /// this method.
-  void forwardInto(SILGenFunction &gen, SILLocation loc,
-                   SILValue address, bool isInitialize) {
-    assert(getType().isAddressOnly() &&
-           "must forward loadable value using forward");
-    // If we own a cleanup for this value, we can "take" the value and disable
-    // the cleanup.
-    bool canTake = hasCleanup();
-    if (canTake) {
-      forwardCleanup(gen);
+  /// \param gen - The SILGenFunction.
+  /// \param loc - the AST location to associate with emitted instructions.
+  /// \param address - the address to assign to.
+  void assignInto(SILGenFunction &gen, SILLocation loc, SILValue address) {
+    if (getType().isAddressOnly()) {
+      // If we own a cleanup for this value, we can "take" the value and disable
+      // the cleanup.
+      bool canTake = hasCleanup();
+      if (canTake) {
+        forwardCleanup(gen);
+      }
+      gen.B.createCopyAddr(loc, getValue(), address, canTake,
+                           /*isInitialize*/ false);
+    } else {
+      // src is a loadable type; release the old value if necessary and store
+      // the new.
+      assert(!getType().isAddress() &&
+             "can't assign loadable type from address");
+      TypeLoweringInfo const &ti
+        = gen.getTypeLoweringInfo(getType().getSwiftRValueType());
+      
+      SILValue old;
+      
+      if (!ti.isTrivial())
+        old = gen.B.createLoad(loc, address);
+      
+      gen.emitStore(loc, *this, address);
+      
+      if (old)
+        gen.emitReleaseRValue(loc, old);
     }
-    gen.B.createCopyAddr(loc, getValue(), address, canTake, isInitialize);
   }
   
   explicit operator bool() const {

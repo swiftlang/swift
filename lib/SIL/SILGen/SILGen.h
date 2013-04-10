@@ -344,11 +344,6 @@ public:
   /// allocation if not.
   SILValue getBufferForExprResult(SILLocation loc, SILType ty, SGFContext C);
   
-  /// Emits a reassignment to a physical address.
-  void emitAssignPhysicalAddress(SILLocation loc,
-                                 ManagedValue src,
-                                 SILValue addr);
-  
   //===--------------------------------------------------------------------===//
   // Recursive entry points
   //===--------------------------------------------------------------------===//

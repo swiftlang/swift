@@ -303,7 +303,7 @@ Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
   // We don't use getBufferForExprResult here because the result of a
   // MaterializeExpr is *not* the value, but an lvalue reference to the value.
   SILValue tmpMem = emitTemporaryAllocation(loc, v.getType());
-  emitStore(loc, v, tmpMem);
+  v.forwardInto(*this, loc, tmpMem);
   
   CleanupsDepth valueCleanup = CleanupsDepth::invalid();
   if (!getTypeLoweringInfo(v.getType().getSwiftType()).isTrivial()) {
@@ -502,7 +502,8 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
     SILValue eltPtr = i == 0
       ? basePtr
       : gen.B.createIndexAddr(loc, basePtr, i);
-    gen.emitStore(loc, elements[i], eltPtr);
+    ManagedValue v = elements[i];
+    v.forwardInto(gen, loc, eltPtr);
   }
 
   return gen.emitArrayInjectionCall(objectPtr, basePtr,
@@ -932,7 +933,7 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
     ManagedValue scalar = gen.visit(E->getSubExpr()).getAsSingleValue(gen);
     ManagedValue varargs = emitVarargs(gen, E, E->getSubExpr()->getType(),
                                        scalar, E->getVarargsInjectionFunction());
-    gen.emitStore(E, varargs, scalarInit->getAddress());
+    varargs.forwardInto(gen, E, scalarInit->getAddress());
     scalarInit->finishInitialization(gen);
   }
   
@@ -945,8 +946,7 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
       assert(i == e - 1 && "vararg isn't last?!");
       ManagedValue varargs = emitVarargs(gen, E, outerFields[i].getVarargBaseTy(),
                                          {}, E->getVarargsInjectionFunction());
-      gen.emitStore(E, varargs,
-                    subInitializations[i]->getAddress());
+      varargs.forwardInto(gen, E, subInitializations[i]->getAddress());
       subInitializations[i]->finishInitialization(gen);
     }
     // Evaluate default initializers in-place.
@@ -1475,7 +1475,7 @@ RValue SILGenFunction::visitRebindThisInConstructorExpr(
   }
   
   SILValue thisAddr = emitReferenceToDecl(E, E->getThis()).getUnmanagedValue();
-  emitAssignPhysicalAddress(E, newThis, thisAddr);
+  newThis.assignInto(*this, E, thisAddr);
   
   return emitEmptyTupleRValue(E);
 }

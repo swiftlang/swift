@@ -71,8 +71,11 @@ SILGenModule::SILGenModule(SILModule &M)
 
 SILGenModule::~SILGenModule() {
   delete TopLevelSGF;
-  if (M.toplevel)
+  if (M.toplevel) {
+    DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
+          M.toplevel->print(llvm::dbgs()));
     M.toplevel->verify();
+  }
 }
 
 SILType SILGenModule::getConstantType(SILConstant constant) {

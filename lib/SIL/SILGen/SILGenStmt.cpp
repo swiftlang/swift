@@ -404,32 +404,6 @@ ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
   return ManagedValue(addr, ManagedValue::LValue);
 }
 
-void SILGenFunction::emitAssignPhysicalAddress(SILLocation loc,
-                                               ManagedValue src,
-                                               SILValue addr) {
-  SILType srcTy = src.getType();
-  
-  if (srcTy.isAddressOnly()) {
-    src.forwardInto(*this, loc, addr, /*isInitialize=*/false);
-  } else {
-    // src is a loadable type; release the old value if necessary and store
-    // the new.
-    assert(!srcTy.isAddress() &&
-           "can't assign loadable type from address");
-    TypeLoweringInfo const &ti = getTypeLoweringInfo(srcTy.getSwiftRValueType());
-    
-    SILValue old;
-    
-    if (!ti.isTrivial()) {
-      old = B.createLoad(loc, addr);
-    }
-    
-    emitStore(loc, src, addr);
-    if (old)
-      emitReleaseRValue(loc, old);
-  }
-}
-
 void SILGenFunction::emitAssignToLValue(SILLocation loc,
                                         RValue &&src, LValue const &dest) {
   struct StoreWriteback {
@@ -467,8 +441,9 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   // Write to the tail component.
   if (component->isPhysical()) {
     SILValue finalDestAddr = component->asPhysical().offset(*this, loc, destAddr);
-    emitAssignPhysicalAddress(loc, std::move(src).getAsSingleValue(*this),
-                              finalDestAddr);
+    
+    std::move(src).getAsSingleValue(*this)
+      .assignInto(*this, loc, finalDestAddr);
   } else {
     component->asLogical().storeRValue(*this, loc,
                                        std::move(src), destAddr);

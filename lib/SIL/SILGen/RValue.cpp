@@ -156,10 +156,7 @@ public:
   
   void visitType(TypeBase *t, SILValue address) {
     ManagedValue v = values[0];
-    if (v.getType().isAddressOnly())
-      v.forwardInto(gen, SILLocation(), address, /*isInitialize=*/true);
-    else
-      gen.emitStore(SILLocation(), v, address);
+    v.forwardInto(gen, SILLocation(), address);
     values = values.slice(1);
   }
   
@@ -272,11 +269,7 @@ public:
     case Initialization::Kind::SingleBuffer: {
       // If we didn't evaluate into the initialization buffer, do so now.
       if (result.getValue() != I->getAddress()) {
-        if (result.getType().isAddressOnly())
-          result.forwardInto(gen, SILLocation(), I->getAddress(),
-                             /*isInitialize=*/true);
-        else
-          gen.emitStore(SILLocation(), result, I->getAddress());
+        result.forwardInto(gen, SILLocation(), I->getAddress());
       } else {
         // If we did evaluate into the initialization buffer, disable the
         // cleanup.
