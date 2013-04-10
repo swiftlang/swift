@@ -105,27 +105,6 @@ namespace {
       return new (tc.Context) SpecializeExpr(expr, type, encodedSubs);
     }
 
-    /// \brief Build an existential member reference.
-    Expr *buildExistentialMemberRef(Expr *base, SourceLoc dotLoc,
-                                    ValueDecl *member, SourceLoc memberLoc,
-                                    Type openedType) {
-      auto &tc = cs.getTypeChecker();
-      auto &context = tc.Context;
-      
-      // Convert the base to the type of the 'this' parameter.
-      auto containerTy = member->getDeclContext()->getDeclaredTypeOfContext();
-      base = convertObjectArgumentToType(tc, base, containerTy);
-      assert(base && "Unable to convert base?");
-
-      // Build the existential member reference.
-      Expr *result = new (context) ExistentialMemberRefExpr(base, dotLoc,
-                                                            member, memberLoc);
-
-      // Simplify the type of this reference.
-      result->setType(simplifyType(openedType));
-      return result;
-    }
-
     /// \brief Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, SourceLoc dotLoc, ValueDecl *member,
                          SourceLoc memberLoc, Type openedType) {
@@ -138,12 +117,42 @@ namespace {
         baseTy = baseMeta->getInstanceType();
       }
 
-      // Okay to refer to the member of an existential type.
-      // FIXME: ExistentialMemberRefExpr needs to reject a base of metatype
-      // type.
-      if (baseTy->isExistentialType()) {
-        return buildExistentialMemberRef(base, dotLoc, member, memberLoc,
-                                         openedType);
+      // Member references into existential or archetype types.
+      if (baseTy->isExistentialType() || baseTy->is<ArchetypeType>()) {
+        auto &tc = cs.getTypeChecker();
+        auto &context = tc.Context;
+
+        // Convert the base to the type of the 'this' parameter.
+        Type containerTy;
+        if (baseTy->isExistentialType())
+          containerTy = member->getDeclContext()->getDeclaredTypeOfContext();
+        else
+          containerTy = baseTy;
+        
+        if (baseIsInstance) {
+          // Convert the base to the appropriate container type, turning it
+          // into an lvalue if required.
+          base = convertObjectArgumentToType(tc, base, containerTy);
+        } else {
+          // Convert the base to an rvalue of the appropriate metatype.
+          base = convertToType(tc, base,
+                               MetaTypeType::get(containerTy, context));
+          base = tc.convertToRValue(base);
+        }
+        assert(base && "Unable to convert base?");
+
+        // Build the member reference expression.
+        Expr *result;
+        if (baseTy->isExistentialType())
+          result = new (context) ExistentialMemberRefExpr(base, dotLoc,
+                                                          member, memberLoc);
+        else
+          result = new (context) ArchetypeMemberRefExpr(base, dotLoc,
+                                                        member, memberLoc);
+
+        // Simplify the type of this reference.
+        result->setType(simplifyType(openedType));
+        return result;
       }
 
       // FIXME: Falls back to the old type checker.

@@ -675,6 +675,29 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value) {
   return valueType;
 }
 
+/// \brief Retrieve the substituted type when replacing an archetype
+/// in the type of a protocol member with an actual type.
+static Type
+getTypeForArchetype(ConstraintSystem &cs, ArchetypeType *archetype,
+                    llvm::DenseMap<ArchetypeType *, Type> &mappedTypes) {
+  // If we've already seen this archetype, return it.
+  auto known = mappedTypes.find(archetype);
+  if (known != mappedTypes.end())
+    return known->second;
+
+  // Get the type for the parent archetype.
+  Type parentTy = getTypeForArchetype(cs, archetype->getParent(),
+                                      mappedTypes);
+
+  // Look for this member type.
+  MemberLookup &lookup = cs.lookupMember(parentTy, archetype->getName());
+  auto member = cast<TypeDecl>(lookup.Results[0].D);
+  auto type = member->getDeclaredType();
+  type = cs.getTypeChecker().substMemberTypeWithBase(type, member, parentTy);
+  mappedTypes[archetype] = type;
+  return type;
+}
+
 Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                                 bool isTypeReference) {
   // If the base is a module type, just use the type of the decl.
@@ -747,11 +770,13 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     if (auto ownerProtoTy = ownerTy->getAs<ProtocolType>()) {
       auto thisArchetype = ownerProtoTy->getDecl()->getThis()->getDeclaredType()
                              ->castTo<ArchetypeType>();
+
+      llvm::DenseMap<ArchetypeType *, Type> mappedTypes;
+      mappedTypes[thisArchetype] = baseObjTy;
       type = TC.transformType(type,
                [&](Type type) -> Type {
                  if (auto archetype = type->getAs<ArchetypeType>()) {
-                   if (archetype == thisArchetype)
-                     return baseObjTy;
+                   return getTypeForArchetype(*this, archetype, mappedTypes);
                  }
 
                  return type;
