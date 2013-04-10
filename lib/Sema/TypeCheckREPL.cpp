@@ -507,16 +507,10 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
 
 
 
-/// processREPLTopLevelCodeDecl - When we see a new TopLevelCodeDecl parsed into
-/// the REPL, process it, adding the proper decls back to the top level of the
-/// TranslationUnit.
-static void processREPLTopLevelCodeDecl(TopLevelCodeDecl *TLCD,
-                                        TypeChecker *TC) {
-  // Check to see if the TLCD has an expression that we have to transform.  If
-  // not, we can just leave the TLCD alone.
-  Expr *E = TLCD->getBody()->getElements()[0].dyn_cast<Expr*>();
-  if (E == nullptr) return;
-  
+/// processREPLTopLevelExpr - When we see an Expression in a TopLevelCodeDecl
+/// in the REPL, process it, adding the proper decls back to the top level of
+/// the TranslationUnit.
+static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC) {
   CanType T = E->getType()->getCanonicalType();
   
   // Don't try to print invalid expressions, module exprs, or void expressions.
@@ -586,9 +580,9 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   //   replPrint(r123)
   
   // Remove PBD from the list of Decls so we can insert before it.
-  assert(PBD == TC->TU.Decls.back());
+  TopLevelCodeDecl *PBTLCD = cast<TopLevelCodeDecl>(TC->TU.Decls.back());
   TC->TU.Decls.pop_back();
-  
+
   // Create the meta-variable, let the typechecker name it.
   VarDecl *vd = new (TC->Context) VarDecl(PBD->getStartLoc(),
                                           TC->getNextResponseVariableName(),
@@ -602,7 +596,13 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   PatternBindingDecl *metavarBinding
     = new (TC->Context) PatternBindingDecl(PBD->getStartLoc(), metavarPat,
                                            PBD->getInit(), &TC->TU);
-  TC->TU.Decls.push_back(metavarBinding);
+
+  auto MVBrace = BraceStmt::create(TC->Context, metavarBinding->getStartLoc(),
+                                   BraceStmt::ExprStmtOrDecl(metavarBinding),
+                                   metavarBinding->getEndLoc());
+
+  auto *MVTLCD = new (TC->Context) TopLevelCodeDecl(&TC->TU, MVBrace);
+  TC->TU.Decls.push_back(MVTLCD);
 
   
   // Replace the initializer of PBD with a reference to our repl temporary.
@@ -610,7 +610,7 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
                                           vd->getTypeOfReference());
   E = TC->convertToMaterializable(E);
   PBD->setInit(E);
-  TC->TU.Decls.push_back(PBD);
+  TC->TU.Decls.push_back(PBTLCD);
 
   // Finally, print out the result, by referring to the repl temp.
   E = new (TC->Context) DeclRefExpr(vd, vd->getStartLoc(),
@@ -634,10 +634,17 @@ void TypeChecker::processREPLTopLevel(unsigned FirstDecl) {
   for (Decl *D : NewDecls) {
     TU.Decls.push_back(D);
     
-    if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D))
-      processREPLTopLevelCodeDecl(TLCD, this);
-    else if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
-      processREPLTopLevelPatternBinding(PBD, this);
+    TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D);
+    if (TLCD == 0) continue;
+
+    auto Entry = TLCD->getBody()->getElements()[0];
+
+    // Check to see if the TLCD has an expression that we have to transform.
+    if (Expr *E = Entry.dyn_cast<Expr*>())
+      processREPLTopLevelExpr(E, this);
+    else if (Decl *D = Entry.dyn_cast<Decl*>())
+      if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
+        processREPLTopLevelPatternBinding(PBD, this);
   }
 }
 
