@@ -677,24 +677,23 @@ namespace {
        // Use a value member constraint to find the appropriate
        // convertFromArrayLiteral call.
        // FIXME: Switch to protocol conformance.
-      auto choice = getOverloadChoice(
-                      cs.getConstraintLocator(
-                        expr,
-                        ConstraintLocator::MemberRefBase)).first;
+      auto selected = getOverloadChoice(
+                        cs.getConstraintLocator(
+                          expr,
+                          ConstraintLocator::MemberRefBase));
+      auto choice = selected.first;
       auto converterDecl = cast<FuncDecl>(choice.getDecl());
 
       // Construct the semantic expr as a convertFromArrayLiteral application.
       ASTContext &C = cs.getASTContext();
-      Expr *converterRef = new (C) DeclRefExpr(converterDecl, expr->getLoc(),
-                                               converterDecl->getTypeOfReference());
       Expr *typeRef = new (C) MetatypeExpr(nullptr,
                                            expr->getLoc(),
                                            MetaTypeType::get(arrayTy, C));
-
-      Expr *semanticExpr = new (C) DotSyntaxCallExpr(converterRef,
-                                                     expr->getLoc(),
-                                                     typeRef);
-      semanticExpr = cs.getTypeChecker().recheckTypes(semanticExpr);
+      // FIXME: Location information is suspect.
+      Expr *semanticExpr = buildMemberRef(typeRef, expr->getLoc(),
+                                          converterDecl,
+                                          expr->getLoc(),
+                                          selected.second);
 
       semanticExpr = new (C) CallExpr(semanticExpr,
                                       expr->getSubExpr());
@@ -722,25 +721,25 @@ namespace {
       // Use a value member constraint to find the appropriate
       // convertFromDictionaryLiteral call.
       // FIXME: Switch to protocol conformance.
-      auto choice = getOverloadChoice(
-                      cs.getConstraintLocator(
-                        expr,
-                        ConstraintLocator::MemberRefBase)).first;
+      auto selected = getOverloadChoice(
+                        cs.getConstraintLocator(
+                          expr,
+                          ConstraintLocator::MemberRefBase));
+      auto choice = selected.first;
       auto converterDecl = cast<FuncDecl>(choice.getDecl());
 
       // Construct the semantic expr as a convertFromDictionaryLiteral
       // application.
       ASTContext &C = cs.getASTContext();
-      Expr *converterRef = new (C) DeclRefExpr(converterDecl, expr->getLoc(),
-                                               converterDecl->getTypeOfReference());
       Expr *typeRef = new (C) MetatypeExpr(nullptr,
                                            expr->getLoc(),
                                            MetaTypeType::get(dictionaryTy, C));
 
-      Expr *semanticExpr = new (C) DotSyntaxCallExpr(converterRef,
-                                                     expr->getLoc(),
-                                                     typeRef);
-      semanticExpr = cs.getTypeChecker().recheckTypes(semanticExpr);
+      // FIXME: Location information is suspect.
+      Expr *semanticExpr = buildMemberRef(typeRef, expr->getLoc(),
+                                          converterDecl,
+                                          expr->getLoc(),
+                                          selected.second);
 
       semanticExpr = new (C) CallExpr(semanticExpr,
                                       expr->getSubExpr());
