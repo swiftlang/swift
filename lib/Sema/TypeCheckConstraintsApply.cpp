@@ -276,7 +276,8 @@ namespace {
 
     /// \brief Convert the given literal expression to a specific type with
     /// a known literal kind.
-    Expr *convertLiteral(Expr *literal, Type type, LiteralKind kind);
+    Expr *convertLiteral(Expr *literal, Type type, LiteralKind kind,
+                         Type openedType);
 
     /// \brief Retrieve the fixed type for the given type variable.
     Type getFixedType(TypeVariableType *typeVar) {
@@ -398,17 +399,17 @@ namespace {
 
     Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
       return convertLiteral(expr, simplifyType(expr->getType()),
-                            LiteralKind::Int);
+                            LiteralKind::Int, expr->getType());
     }
 
     Expr *visitFloatLiteralExpr(FloatLiteralExpr *expr) {
       return convertLiteral(expr, simplifyType(expr->getType()),
-                            LiteralKind::Float);
+                            LiteralKind::Float, expr->getType());
     }
 
     Expr *visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
       return convertLiteral(expr, simplifyType(expr->getType()),
-                            LiteralKind::Char);
+                            LiteralKind::Char, expr->getType());
     }
 
     Expr *visitStringLiteralExpr(StringLiteralExpr *expr) {
@@ -421,7 +422,8 @@ namespace {
         }
       }
 
-      return convertLiteral(expr, simplifyType(expr->getType()), kind);
+      return convertLiteral(expr, simplifyType(expr->getType()), kind,
+                            expr->getType());
     }
 
     Expr *
@@ -1145,7 +1147,8 @@ static bool isRawPtrAndInt64(Type ty) {
   return true;
 }
 
-Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind) {
+Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
+                                   Type openedType) {
   TypeChecker &tc = cs.getTypeChecker();
   
   // Check the destination type to see if it is compatible with literals,
@@ -1274,7 +1277,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind) {
     // If this a 'chaining' case, recursively convert the literal to the
     // intermediate type, then use our conversion function to finish the
     // translation.
-    intermediate = convertLiteral(literal, argType, kind);
+    intermediate = convertLiteral(literal, argType, kind, argType);
 
     // Okay, now Intermediate is known to have type 'argType' so we can use a
     // call to our conversion function to finish things off.
@@ -1283,8 +1286,9 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind) {
   Expr *result = new (tc.Context) MetatypeExpr(nullptr,
                                                intermediate->getStartLoc(),
                                                method->computeThisType());
-  result = tc.recheckTypes(tc.buildMemberRefExpr(result, SourceLoc(), method,
-                                                 intermediate->getStartLoc()));
+  result = tc.recheckTypes(buildMemberRef(result, SourceLoc(), method,
+                                          intermediate->getStartLoc(),
+                                          openedType));
 
   // Return a new call of the conversion function, passing in the (possible
   // converted) argument.
