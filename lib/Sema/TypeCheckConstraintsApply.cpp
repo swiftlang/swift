@@ -565,13 +565,11 @@ namespace {
     }
 
     Expr *visitMemberRefExpr(MemberRefExpr *expr) {
-      // FIXME: Falls back to the old type checker.
-      return cs.getTypeChecker().recheckTypes(expr);
+      return buildMemberRef(expr->getBase(), expr->getDotLoc(), expr->getDecl(),
+                            expr->getNameLoc(), expr->getType());
     }
 
     Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
-      // FIXME: Falls back to the old type checker.
-
       llvm_unreachable("Already type-checked");
     }
 
