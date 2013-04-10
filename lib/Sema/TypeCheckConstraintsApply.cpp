@@ -228,6 +228,24 @@ namespace {
         return result;
       }
 
+      // Reference to a variable within a class.
+      if (auto var = dyn_cast<VarDecl>(member)) {
+        if (!baseTy->is<ModuleType>()) {
+          // Convert the base to the type of the 'this' parameter.
+          Type containerTy = var->getDeclContext()->getDeclaredTypeOfContext();
+          assert(baseIsInstance && "Can only access variables of an instance");
+
+          // Convert the base to the appropriate container type, turning it
+          // into an lvalue if required.
+          base = convertObjectArgumentToType(tc, base, containerTy);
+
+          auto result
+            = new (context) MemberRefExpr(base, dotLoc, var, memberLoc);
+          result->setType(simplifyType(openedType));
+          return result;
+        }
+      }
+
       // FIXME: Falls back to the old type checker.
       auto result = tc.buildMemberRefExpr(base, dotLoc, { &member, 1 },
                                           memberLoc);
