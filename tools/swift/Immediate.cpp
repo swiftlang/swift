@@ -457,6 +457,13 @@ public:
   ~REPLInput() {
     if (ShowColors)
       llvm::outs().resetColor();
+
+    // FIXME: This should not be needed, but seems to help when stdout is being
+    // redirected to a file.  Perhaps there is some underlying editline bug
+    // where it is setting stdout into some weird state and not restoring it
+    // with el_end?
+    llvm::outs().flush();
+    fflush(stdout);
     el_end(e);
   }
   
@@ -507,8 +514,8 @@ public:
       }
       
       // Enter the line into the line history.
-      // FIXME: We should probably be a bit more clever here about which lines we
-      // put into the history and when we put them in.
+      // FIXME: We should probably be a bit more clever here about which lines
+      // we put into the history and when we put them in.
       HistEventW ev;
       history_w(h, &ev, H_ENTER, WLine);
       
@@ -576,7 +583,8 @@ private:
 
     if (ShowColors) {
       const char *colorCode =
-        llvm::sys::Process::OutputColor(llvm::raw_ostream::YELLOW, false, false);
+        llvm::sys::Process::OutputColor(llvm::raw_ostream::YELLOW,
+                                        false, false);
       if (colorCode)
         appendEscapeSequence(PromptString, colorCode);
     }
