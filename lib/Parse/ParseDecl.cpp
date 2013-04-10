@@ -64,8 +64,7 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
   bool FoundTopLevelCodeToExecute = false;
   if (IsMainModule) {
     for (auto V : Items)
-      if (isa<PatternBindingDecl>(V.get<Decl*>()) ||
-          isa<TopLevelCodeDecl>(V.get<Decl*>()))
+      if (isa<TopLevelCodeDecl>(V.get<Decl*>()))
         FoundTopLevelCodeToExecute = true;
   }
 
@@ -916,7 +915,9 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
 
   SmallVector<PatternBindingDecl*, 4> PBDs;
   bool HasGetSet = false;
-  bool Invalid = false;
+  bool isInvalid = false;
+
+  unsigned FirstDecl = Decls.size();
 
   do {
     DeclAttributes Attributes;
@@ -938,7 +939,7 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
       SourceLoc EqualLoc = consumeToken(tok::equal);
       Init = parseExpr(diag::expected_initializer_expr);
       if (Init.isNull()) {
-        Invalid = true;
+        isInvalid = true;
         break;
       }
     
@@ -949,15 +950,16 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
       }
       if (Flags & PD_DisallowInit) {
         diagnose(EqualLoc, diag::disallowed_init);
-        Invalid = true;
+        isInvalid = true;
       }
     }
 
     addVarsToScope(pattern.get(), Decls, Attributes);
 
+    // In the normal case, just add PatternBindingDecls to our DeclContext.
     PatternBindingDecl *PBD =
-        new (Context) PatternBindingDecl(VarLoc, pattern.get(),
-                                         Init.getPtrOrNull(), CurDeclContext);
+      new (Context) PatternBindingDecl(VarLoc, pattern.get(),
+                                       Init.getPtrOrNull(), CurDeclContext);
     Decls.push_back(PBD);
 
     // Propagate back types for simple patterns, like "var A, B : T".
@@ -971,7 +973,7 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
           if (HasGetSet) {
             // FIXME -- offer a fixit to explicitly specify the type
             diagnose(PrevPat->getLoc(), diag::getset_cannot_be_implied);
-            Invalid = true;
+            isInvalid = true;
           }
 
           TypedPattern *NewTP = new (Context) TypedPattern(PrevPat,
@@ -993,7 +995,24 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
     return true;
   }
 
-  return Invalid;
+
+  // If this is a var in the top-level of script/repl translation unit, then
+  // wrap the PatternBindingDecls in TopLevelCodeDecls, since they represents
+  // executable code.
+  if (IsMainModule && isa<TranslationUnit>(CurDeclContext)) {
+    for (unsigned i = FirstDecl; i != Decls.size(); ++i) {
+      auto *PBD = dyn_cast<PatternBindingDecl>(Decls[i]);
+      if (PBD == 0) continue;
+      auto *Brace = BraceStmt::create(Context, PBD->getStartLoc(),
+                                      ExprStmtOrDecl(PBD), PBD->getEndLoc());
+
+      auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext, Brace);
+      PBD->setDeclContext(TLCD);
+      Decls[i] = TLCD;
+    }
+  }
+
+  return isInvalid;
 }
 
 /// addImplicitThisParameter - Add an implicit 'this' parameter to the given

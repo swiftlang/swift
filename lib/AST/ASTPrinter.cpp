@@ -206,7 +206,10 @@ void PrintAST::printPattern(Pattern *pattern) {
     auto typed = cast<TypedPattern>(pattern);
     printPattern(typed->getSubPattern());
     OS << " : ";
-    typed->getType()->print(OS);
+    if (typed->hasType())
+      typed->getType()->print(OS);
+    else
+      OS << "<<null type>>";
     break;
   }
 }

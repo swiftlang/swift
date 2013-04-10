@@ -148,8 +148,7 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
     // EOF.  In contrast, it is ok to have forward references between classes,
     // functions, etc.
     for (auto I : ParsedDecls) {
-      if (isa<PatternBindingDecl>(I.get<Decl*>()) ||
-          isa<TopLevelCodeDecl>(I.get<Decl*>()))
+      if (isa<TopLevelCodeDecl>(I.get<Decl*>()))
         // Only bail out if the next token is at the start of a line.  If we
         // don't, then we may accidentally allow things like "a = 1 b = 4".
         // FIXME: This is really dubious.  This will reject some things, but

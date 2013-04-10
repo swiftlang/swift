@@ -161,6 +161,7 @@ public:
   }
 
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
+  SourceLoc getEndLoc() const { return getSourceRange().End; }
   SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
 
