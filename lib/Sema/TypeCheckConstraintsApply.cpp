@@ -59,9 +59,6 @@ static bool isAssignmentFn(Expr *expr) {
   return false;
 }
 
-static Expr *convertLiteral(TypeChecker &tc, Expr *literal,
-                            Type type, LiteralKind kind);
-
 namespace {
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
@@ -277,6 +274,10 @@ namespace {
       return result;
     }
 
+    /// \brief Convert the given literal expression to a specific type with
+    /// a known literal kind.
+    Expr *convertLiteral(Expr *literal, Type type, LiteralKind kind);
+
     /// \brief Retrieve the fixed type for the given type variable.
     Type getFixedType(TypeVariableType *typeVar) {
       auto knownBinding = solution.typeBindings.find(typeVar);
@@ -396,26 +397,21 @@ namespace {
     }
 
     Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
-      auto &tc = cs.getTypeChecker();
-      return convertLiteral(tc, expr, simplifyType(expr->getType()),
+      return convertLiteral(expr, simplifyType(expr->getType()),
                             LiteralKind::Int);
     }
 
     Expr *visitFloatLiteralExpr(FloatLiteralExpr *expr) {
-      auto &tc = cs.getTypeChecker();
-      return convertLiteral(tc, expr, simplifyType(expr->getType()),
+      return convertLiteral(expr, simplifyType(expr->getType()),
                             LiteralKind::Float);
     }
 
     Expr *visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
-      auto &tc = cs.getTypeChecker();
-      return convertLiteral(tc, expr, simplifyType(expr->getType()),
+      return convertLiteral(expr, simplifyType(expr->getType()),
                             LiteralKind::Char);
     }
 
     Expr *visitStringLiteralExpr(StringLiteralExpr *expr) {
-      auto &tc = cs.getTypeChecker();
-
       // FIXME: Already did this when generating constraints.
       auto kind = LiteralKind::ASCIIString;
       for (unsigned char c : expr->getValue()) {
@@ -425,7 +421,7 @@ namespace {
         }
       }
 
-      return convertLiteral(tc, expr, simplifyType(expr->getType()), kind);
+      return convertLiteral(expr, simplifyType(expr->getType()), kind);
     }
 
     Expr *
@@ -1149,9 +1145,9 @@ static bool isRawPtrAndInt64(Type ty) {
   return true;
 }
 
-/// \brief Convert the given literal expression to the specified literal kind.
-static Expr *convertLiteral(TypeChecker &tc, Expr *literal,
-                            Type type, LiteralKind kind) {
+Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind) {
+  TypeChecker &tc = cs.getTypeChecker();
+  
   // Check the destination type to see if it is compatible with literals,
   // diagnosing the failure if not.
   // FIXME: The Complain and Location arguments are pointless for us.
@@ -1278,7 +1274,7 @@ static Expr *convertLiteral(TypeChecker &tc, Expr *literal,
     // If this a 'chaining' case, recursively convert the literal to the
     // intermediate type, then use our conversion function to finish the
     // translation.
-    intermediate = convertLiteral(tc, literal, argType, kind);
+    intermediate = convertLiteral(literal, argType, kind);
 
     // Okay, now Intermediate is known to have type 'argType' so we can use a
     // call to our conversion function to finish things off.
