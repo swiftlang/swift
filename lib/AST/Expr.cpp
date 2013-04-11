@@ -115,7 +115,10 @@ APInt IntegerLiteralExpr::getValue() const {
   unsigned BitWidth = getType()->castTo<BuiltinIntegerType>()->getBitWidth();
   
   llvm::APInt Value(BitWidth, 0);
-  bool Error = getText().getAsInteger(0, Value);
+  auto Text = getText();
+  // swift encodes octal differently than C
+  bool IsCOctal = Text.size() > 1 && Text[0] == '0' && isdigit(Text[1]);
+  bool Error = Text.getAsInteger(IsCOctal ? 8 : 0, Value);
   assert(!Error && "Invalid IntegerLiteral formed"); (void)Error;
   if (Value.getBitWidth() != BitWidth)
     Value = Value.zextOrTrunc(BitWidth);
