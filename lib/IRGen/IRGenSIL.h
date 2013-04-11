@@ -493,7 +493,7 @@ public:
 
   void visitClassMethodInst(ClassMethodInst *i);
   void visitSuperMethodInst(SuperMethodInst *i);
-  //void visitArchetypeMethodInst(ArchetypeMethodInst *i);
+  void visitArchetypeMethodInst(ArchetypeMethodInst *i);
   void visitProtocolMethodInst(ProtocolMethodInst *i);
   
   void visitProjectExistentialInst(ProjectExistentialInst *i);

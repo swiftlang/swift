@@ -3661,6 +3661,50 @@ static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
   return emission;
 }
 
+void
+irgen::getArchetypeMethodValue(IRGenFunction &IGF,
+                               Address thisObject,
+                               CanType baseTy,
+                               SILConstant member,
+                               CanType substResultType,
+                               ArrayRef<Substitution> subs,
+                               Explosion &out) {
+  // The function we're going to call.
+  // FIXME: Support getters and setters (and curried entry points?)
+  assert(member.kind == SILConstant::Kind::Func
+         && "getters and setters not yet supported");
+  ValueDecl *vd = member.getDecl();
+  FuncDecl *fn = cast<FuncDecl>(vd);
+  
+  // Find the archetype we're calling on.
+  // FIXME: static methods
+  ArchetypeType *archetype = cast<ArchetypeType>(baseTy);
+  
+  // The protocol we're calling on.
+  ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
+  
+  // Find the witness table.
+  auto &archetypeTI = IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
+  ProtocolPath path(IGF.IGM, archetypeTI.getProtocols(), fnProto);
+  llvm::Value *origin = archetypeTI.getWitnessTable(IGF, path.getOriginIndex());
+  llvm::Value *wtable = path.apply(IGF, origin);
+  
+  // Find the actual witness.
+  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(fnProto);
+  auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
+  llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
+  
+  // Acquire the archetype metadata.
+  llvm::Value *metadata = archetypeTI.getMetadataRef(IGF);
+  
+  // Cast the witness pointer to i8*.
+  witness = IGF.Builder.CreateBitCast(witness, IGF.IGM.Int8PtrTy);
+  
+  // Build the value.
+  out.addUnmanaged(witness);
+  out.addUnmanaged(metadata);
+}
+
 /// Extract the method pointer and metadata from a protocol witness table
 /// as a function value.
 void

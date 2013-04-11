@@ -192,7 +192,8 @@ public:
       
       // Build an identity mapping with the derived conformances.
       auto replacement = SubstitutedType::get(archetype, archetype, TC.Context);
-      results[i] = {archetype, replacement, TC.Context.AllocateCopy(conformances)};
+      results[i] = {archetype, replacement,
+                    TC.Context.AllocateCopy(conformances)};
     }
     
     return results;

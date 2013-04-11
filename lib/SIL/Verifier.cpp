@@ -346,8 +346,8 @@ public:
           llvm::dbgs() << "\n");
     assert(methodType &&
            "result method must be of a concrete function type");
-    assert(methodType->isThin() &&
-           "result method must be of a thin function type");
+    assert(!methodType->isThin() &&
+           "result method must not be of a thin function type");
     SILType operandType = AMI->getOperand().getType();
     DEBUG(llvm::dbgs() << "operand type ";
           operandType.print(llvm::dbgs());

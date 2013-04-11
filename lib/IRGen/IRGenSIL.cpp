@@ -1242,6 +1242,22 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
   newLoweredExplosion(SILValue(i, 0), lowered);
 }
 
+void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
+  Address base = getLoweredAddress(i->getOperand());
+  CanType baseTy = i->getOperand().getType().getSwiftRValueType();
+  CanType resultTy = getResultType(i->getType(0).getSwiftType(),
+                                   /*uncurryLevel=*/1);
+  SILConstant member = i->getMember();
+
+  Explosion lowered(CurExplosionLevel);
+  
+  getArchetypeMethodValue(*this, base, baseTy, member, resultTy,
+                          /*FIXME substitutions*/ {},
+                          lowered);
+  
+  newLoweredExplosion(SILValue(i, 0), lowered);
+}
+
 void IRGenSILFunction::visitInitializeVarInst(swift::InitializeVarInst *i) {
   CanType ty = i->getDest().getType().getSwiftRValueType();
   TypeInfo const &ti = getFragileTypeInfo(ty);

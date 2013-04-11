@@ -759,15 +759,12 @@ RValue SILGenFunction::visitGenericMemberRefExpr(GenericMemberRefExpr *E,
 }
 
 SILValue SILGenFunction::emitArchetypeMethod(ArchetypeMemberRefExpr *e,
-                                          SILValue archetype) {
+                                             SILValue archetype) {
   if (isa<FuncDecl>(e->getDecl())) {
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
     Type methodType = FunctionType::get(archetype.getType().getSwiftType(),
                                         e->getType(),
-                                        /*isAutoClosure*/ false,
-                                        /*isBlock*/ false,
-                                        /*isThin*/ true,
                                         F.getContext());
     SILConstant c(e->getDecl());
     return B.createArchetypeMethod(e, archetype,
