@@ -620,7 +620,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     Explosion calleeValues = lv.getExplosion(IGF);
     
     calleeFn = calleeValues.claimUnmanagedNext();
-    if (!calleeTy.castTo<FunctionType>()->isThin())
+    if (!calleeTy.castTo<AnyFunctionType>()->isThin())
       calleeData = calleeValues.claimUnmanagedNext();
     else
       calleeData = nullptr;
