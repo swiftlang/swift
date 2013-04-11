@@ -1341,8 +1341,11 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // We're constructing a struct or oneof. Look for the constructor or oneof
   // element to use.
+  // Note: we also allow class types here, for now, because T(x) is still
+  // allowed to use coercion syntax.
   assert(ty->is<StructType>() || ty->is<BoundGenericStructType>() ||
-         ty->is<OneOfType>() || ty->is<BoundGenericOneOfType>());
+         ty->is<OneOfType>() || ty->is<BoundGenericOneOfType>() ||
+         ty->is<ClassType>() || ty->is<BoundGenericClassType>());
   assert(origExpr && "Missing original expression for construction");
   auto selected = getOverloadChoiceIfAvailable(
                     cs.getConstraintLocator(
@@ -1357,6 +1360,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     // FIXME: Need an AST to represent this properly.
     return convertToType(tc, apply->getArg(), ty);
   }
+  assert(!ty->is<ClassType>() && !ty->is<BoundGenericClassType>());
 
   // We have the constructor.
   auto choice = selected->first;
