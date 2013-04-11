@@ -158,12 +158,15 @@ static ManagedValue emitGlobalVariable(SILGenFunction &gen,
 }
 
 ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
-                                                 ValueDecl *decl) {
+                                                 ValueDecl *decl,
+                                                 Type declType) {
+  if (!declType) declType = decl->getType();
+  
   // If this is a reference to a type, produce a metatype.
   if (isa<TypeDecl>(decl)) {
     assert(decl->getType()->is<MetaTypeType>() &&
            "type declref does not have metatype type?!");
-    return ManagedValue(B.createMetatype(loc, getLoweredType(decl->getType())),
+    return ManagedValue(B.createMetatype(loc, getLoweredType(declType)),
                         ManagedValue::Unmanaged);
   }
   
@@ -195,11 +198,11 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
 }
 
 RValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
-  return RValue(*this, emitReferenceToDecl(E, E->getDecl()));
+  return RValue(*this, emitReferenceToDecl(E, E->getDecl(), E->getType()));
 }
 
 RValue SILGenFunction::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
-  return RValue(*this, emitReferenceToDecl(E, E->getThis()));
+  return RValue(*this, emitReferenceToDecl(E, E->getThis(), E->getType()));
 }
 
 RValue SILGenFunction::visitOtherConstructorDeclRefExpr(
@@ -774,9 +777,8 @@ SILValue SILGenFunction::emitArchetypeMethod(ArchetypeMemberRefExpr *e,
   }
 }
 
-RValue SILGenFunction::visitArchetypeMemberRefExpr(
-                                                    ArchetypeMemberRefExpr *E,
-                                                    SGFContext C) {
+RValue SILGenFunction::visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
+                                                   SGFContext C) {
   SILValue archetype = visit(E->getBase()).getUnmanagedSingleValue(*this);
   assert((archetype.getType().isAddress() ||
           archetype.getType().is<MetaTypeType>()) &&
@@ -787,7 +789,7 @@ RValue SILGenFunction::visitArchetypeMemberRefExpr(
 }
 
 SILValue SILGenFunction::emitProtocolMethod(ExistentialMemberRefExpr *e,
-                                         SILValue existential) {
+                                            SILValue existential) {
   if (isa<FuncDecl>(e->getDecl())) {
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.

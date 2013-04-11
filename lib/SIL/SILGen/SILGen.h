@@ -479,7 +479,8 @@ public:
   ManagedValue emitConstantRef(SILLocation loc, SILConstant constant);
 
   ManagedValue emitReferenceToDecl(SILLocation loc,
-                                   ValueDecl *decl);
+                                   ValueDecl *decl,
+                                   Type declType = Type());
 
   ManagedValue emitClosureForCapturingExpr(SILLocation loc,
                                            SILConstant function,
