@@ -69,6 +69,11 @@ enum class DeclContextKind {
 /// contexts broadly: a lambda expression in a function is a new
 /// DeclContext, but a new brace statement is not.  There's no
 /// particular mandate for this, though.
+///
+/// Note that DeclContexts have stricter alignment requirements than AST nodes
+/// in general, so if an AST node class multiply inherits from DeclContext
+/// and another base class, it must 'using DeclContext::operator new;' in order
+/// to use an allocator with the correct alignment.
 class alignas(16) DeclContext {
   // alignas(16) because we use four tag bits on DeclContext.
   

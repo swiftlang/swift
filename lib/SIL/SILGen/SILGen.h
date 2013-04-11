@@ -508,7 +508,8 @@ public:
                                             ArrayRef<Substitution> substs);
   ManagedValue emitMethodRef(SILLocation loc,
                              SILValue thisValue,
-                             SILConstant methodConstant);
+                             SILConstant methodConstant,
+                             ArrayRef<Substitution> innerSubstitutions);
   
   SILValue emitThickenFunction(SILLocation loc, SILValue thinFn);
   void emitStore(SILLocation loc, ManagedValue src, SILValue destAddr);

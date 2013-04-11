@@ -166,6 +166,38 @@ public:
     }
   }
 
+  ArrayRef<Substitution> buildForwardingSubstitutions(GenericParamList *gp) {
+    ArrayRef<ArchetypeType*> params = gp->getAllArchetypes();
+    
+    size_t paramCount = params.size();
+    Substitution *resultBuf = TC.Context.Allocate<Substitution>(paramCount);
+    MutableArrayRef<Substitution> results{resultBuf, paramCount};
+    
+    for (size_t i = 0; i < paramCount; ++i) {
+      // FIXME: better way to do this?
+      ArchetypeType *archetype = params[i];
+      // "Check conformance" on each declared protocol to build a
+      // conformance map.
+      SmallVector<ProtocolConformance*, 2> conformances;
+      
+      for (ProtocolDecl *conformsTo : archetype->getConformsTo()) {
+        ProtocolConformance *conformance;
+        bool x = TC.conformsToProtocol(archetype, conformsTo,
+                                       &conformance);
+        (void)x;
+        assert(x && "archetype did not conform to protocol?!");
+        
+        conformances.push_back(conformance);
+      }
+      
+      // Build an identity mapping with the derived conformances.
+      auto replacement = SubstitutedType::get(archetype, archetype, TC.Context);
+      results[i] = {archetype, replacement, TC.Context.AllocateCopy(conformances)};
+    }
+    
+    return results;
+  }
+  
   //===--------------------------------------------------------------------===//
   // Visit Methods.
   //===--------------------------------------------------------------------===//
@@ -558,8 +590,7 @@ public:
 
     // Require the carried type to be materializable.
     if (!ED->getArgumentType()->isMaterializable()) {
-      TC.diagnose(ED->getLoc(),
-                  diag::oneof_element_not_materializable);
+      TC.diagnose(ED->getLoc(), diag::oneof_element_not_materializable);
     }
   }
 
@@ -608,6 +639,7 @@ public:
     if (auto gp = CD->getGenericParams()) {
       gp->setOuterParameters(outerGenericParams);
       checkGenericParams(gp);
+      CD->setForwardingSubstitutions(buildForwardingSubstitutions(gp));
     }
 
     if (TC.typeCheckPattern(CD->getArguments(), IsFirstPass,

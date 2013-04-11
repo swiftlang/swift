@@ -671,29 +671,66 @@ ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
 
 ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
                                            SILValue thisValue,
-                                           SILConstant methodConstant) {
+                                           SILConstant methodConstant,
+                                           ArrayRef<Substitution> innerSubs) {
   SILType methodType = SGM.getConstantType(methodConstant);
   SILValue methodValue = B.createConstantRef(loc,
                                           methodConstant,
                                           methodType);
+  
   /// If the 'this' type is a bound generic, specialize the method ref with
-  /// its substitutions
-  /// FIXME: Doesn't specialize generic method archetypes.
-  if (BoundGenericType *bgt = thisValue.getType().getAs<BoundGenericType>()) {
-    PolymorphicFunctionType *methodFT =
-      methodType.castTo<PolymorphicFunctionType>();
-    Type specializedType = FunctionType::get(thisValue.getType().getSwiftType(),
-                                             methodFT->getResult(),
-                                             /*isAutoClosure*/ false,
-                                             /*isBlock*/ false,
-                                             /*isThin*/ true,
-                                             F.getContext());
-    methodValue = B.createSpecialize(loc, methodValue, bgt->getSubstitutions(),
-               getLoweredLoadableType(specializedType,
-                                      methodValue.getType().getUncurryLevel()));
-    return emitManagedRValueWithCleanup(methodValue);
+  /// its substitutions.
+  ArrayRef<Substitution> outerSubs;
+  
+  Type innerMethodTy = methodType.castTo<AnyFunctionType>()->getResult();
+  
+  if (!innerSubs.empty()) {
+    // Specialize the inner method type.
+    // FIXME: This assumes that 'innerSubs' is an identity mapping, which is
+    // true for generic allocating constructors calling initializers but not in
+    // general.
+    
+    PolymorphicFunctionType *innerPFT
+      = innerMethodTy->castTo<PolymorphicFunctionType>();
+    innerMethodTy = FunctionType::get(innerPFT->getInput(),
+                                      innerPFT->getResult(),
+                                      F.getContext());
   }
   
+  Type outerMethodTy = FunctionType::get(thisValue.getType().getSwiftType(),
+                                         innerMethodTy,
+                                         /*isAutoClosure*/ false,
+                                         /*isBlock*/ false,
+                                         /*isThin*/ true,
+                                         F.getContext());
+
+  if (BoundGenericType *bgt = thisValue.getType().getAs<BoundGenericType>())
+    outerSubs = bgt->getSubstitutions();
+  
+  if (!innerSubs.empty() || !outerSubs.empty()) {
+    // Specialize the generic method.
+    ArrayRef<Substitution> allSubs;
+    if (outerSubs.empty())
+      allSubs = innerSubs;
+    else if (innerSubs.empty())
+      allSubs = outerSubs;
+    else {
+      Substitution *allSubsBuf
+        = F.getContext().Allocate<Substitution>(outerSubs.size()
+                                                  + innerSubs.size());
+      std::memcpy(allSubsBuf,
+                  outerSubs.data(), outerSubs.size() * sizeof(Substitution));
+      std::memcpy(allSubsBuf + outerSubs.size(),
+                  innerSubs.data(), innerSubs.size() * sizeof(Substitution));
+      allSubs = {allSubsBuf, outerSubs.size()+innerSubs.size()};
+    }
+    
+    SILType specType = getLoweredLoadableType(outerMethodTy,
+                                      methodValue.getType().getUncurryLevel());
+    
+    methodValue = B.createSpecialize(loc, methodValue, allSubs, specType);
+  }
+
   return ManagedValue(methodValue, ManagedValue::Unmanaged);
 }
 
@@ -1239,7 +1276,8 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     SILValue baseThis = B.createUpcast(dd,
                                     thisValue,
                                     getLoweredLoadableType(baseTy));
-    ManagedValue dtorValue = emitMethodRef(dd, baseThis, dtorConstant);
+    ManagedValue dtorValue = emitMethodRef(dd, baseThis, dtorConstant,
+                                           /*innerSubstitutions*/ {});
     B.createApply(dd, dtorValue.forward(*this),
                   SGM.Types.getEmptyTupleType(),
                   baseThis);
@@ -1406,7 +1444,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   // Call the initializer.
   SILConstant initConstant = SILConstant(ctor, SILConstant::Kind::Initializer);
-  ManagedValue initVal = emitMethodRef(ctor, thisValue, initConstant);
+  ManagedValue initVal = emitMethodRef(ctor, thisValue, initConstant,
+                                       ctor->getForwardingSubstitutions());
   
   SILValue initedThisValue
     = B.createApply(ctor, initVal.forward(*this), thisTy, args);
@@ -1453,8 +1492,7 @@ RValue SILGenFunction::visitInterpolatedStringLiteralExpr(
   return visit(E->getSemanticExpr());
 }
 
-RValue SILGenFunction::visitCollectionExpr(CollectionExpr *E,
-                                                 SGFContext C) {
+RValue SILGenFunction::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   return visit(E->getSemanticExpr());
 }
 
@@ -1491,7 +1529,7 @@ RValue SILGenFunction::visitExistentialSubscriptExpr(
 }
 
 RValue SILGenFunction::visitBridgeToBlockExpr(BridgeToBlockExpr *E,
-                                                    SGFContext C) {
+                                              SGFContext C) {
   llvm_unreachable("not implemented");
 }
 

@@ -20,6 +20,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/SourceLoc.h"
@@ -1469,6 +1470,10 @@ class ConstructorDecl : public ValueDecl, public DeclContext {
   /// \brief When non-null, the expression that should be used to
   /// allocate 'this'.
   Expr *AllocThis = nullptr;
+  
+  /// \brief When non-null, an identity map of substitutions for this
+  /// constructor's generic parameters.
+  ArrayRef<Substitution> ForwardingSubstitutions;
 
 public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
@@ -1529,6 +1534,20 @@ public:
   /// Get the type of the initializing constructor.
   Type getInitializerType() const { return InitializerType; }
   void setInitializerType(Type t) { InitializerType = t; }
+  
+  /// Get an identity map of substitutions for this
+  /// constructor's generic parameters. Used by SILGen to emit a call from
+  /// a generic allocating constructor to the corresponding generic initializing
+  /// constructor.
+  ArrayRef<Substitution> getForwardingSubstitutions() const {
+    return ForwardingSubstitutions;
+  }
+  
+  /// Set the forwarding substitution map. 'subs' must reference an array
+  /// allocated in the constructor's ASTContext.
+  void setForwardingSubstitutions(ArrayRef<Substitution> subs) {
+    ForwardingSubstitutions = subs;
+  }
   
   using DeclContext::operator new;
 };
