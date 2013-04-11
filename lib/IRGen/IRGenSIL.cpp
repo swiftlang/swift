@@ -363,7 +363,7 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
     return;
   }
   
-  Decl *vd = constant.loc.get<Decl*>();
+  ValueDecl *vd = constant.loc.get<ValueDecl*>();  
   naturalCurryLevel = constant.uncurryLevel;
 
   switch (constant.kind) {
@@ -382,7 +382,7 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
     break;
   }
   case SILConstant::Kind::Getter: {
-    fnptr = getAddrOfGetter(cast<ValueDecl>(vd), ExplosionKind::Minimal);
+    fnptr = getAddrOfGetter(vd, ExplosionKind::Minimal);
     // FIXME: subscript
     FuncDecl *getter;
     if (auto *var = dyn_cast<VarDecl>(vd))
@@ -396,13 +396,13 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
     if (getter)
       cc = getAbstractCC(getter);
     else
-      cc = cast<ValueDecl>(vd)->isInstanceMember()
+      cc = vd->isInstanceMember()
         ? AbstractCC::Method
         : AbstractCC::Freestanding;
     break;
   }
   case SILConstant::Kind::Setter: {
-    fnptr = getAddrOfSetter(cast<ValueDecl>(vd), ExplosionKind::Minimal);
+    fnptr = getAddrOfSetter(vd, ExplosionKind::Minimal);
     // FIXME: subscript
     FuncDecl *setter;
     if (auto *var = dyn_cast<VarDecl>(vd))
@@ -416,7 +416,7 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
     if (setter)
       cc = getAbstractCC(setter);
     else
-      cc = cast<ValueDecl>(vd)->isInstanceMember()
+      cc = vd->isInstanceMember()
         ? AbstractCC::Method
         : AbstractCC::Freestanding;
     break;
@@ -504,7 +504,7 @@ static void getMetatypeUses(ValueBase *i,
     // If a class_method lookup of an ObjC method is done on us, we'll need the
     // objc class.
     if (auto *cm = dyn_cast<ClassMethodInst>(use->getUser())) {
-      if (cast<ValueDecl>(cm->getMember().getDecl())->isObjC()) {
+      if (cm->getMember().getDecl()->isObjC()) {
         isUsedAsObjCClass = true;
         continue;
       }
@@ -516,7 +516,7 @@ static void getMetatypeUses(ValueBase *i,
     // Class too.
     if (auto *apply = dyn_cast<ApplyInst>(use->getUser())) {
       if (auto *method = dyn_cast<ClassMethodInst>(apply->getCallee())) {
-        if (cast<ValueDecl>(method->getMember().getDecl())->isObjC()
+        if (method->getMember().getDecl()->isObjC()
             && apply->getArguments().size() >= 1
             && apply->getArguments()[0].getDef() == i) {
           isUsedAsObjCClass = true;
@@ -1290,16 +1290,14 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
 }
 
 static bool silMethodIsObjC(SILConstant t) {
-  return t.hasDecl() && isa<ValueDecl>(t.getDecl()) &&
-         cast<ValueDecl>(t.getDecl())->isObjC();
+  return t.hasDecl() && t.getDecl()->isObjC();
 }
 
 void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   // For Objective-C classes we need to arrange for a msgSendSuper2
   // to happen when the method is called.
   if (silMethodIsObjC(i->getMember())) {
-    newLoweredObjCMethod(SILValue(i, 0),
-                         cast<ValueDecl>(i->getMember().getDecl()),
+    newLoweredObjCMethod(SILValue(i, 0), i->getMember().getDecl(),
                          i->getOperand().getType().getSwiftType());
     return;
   }
@@ -1319,8 +1317,7 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   // For Objective-C classes we need to arrange for a msgSend
   // to happen when the method is called.
   if (silMethodIsObjC(i->getMember())) {
-    newLoweredObjCMethod(SILValue(i, 0),
-                         cast<ValueDecl>(i->getMember().getDecl()));
+    newLoweredObjCMethod(SILValue(i, 0), i->getMember().getDecl());
     return;
   }
   
@@ -1333,7 +1330,7 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   Callee callee = emitVirtualCallee(*this,
                                   baseValue,
                                   i->getOperand().getType().getSwiftType(),
-                                  cast<FuncDecl>(method.loc.get<Decl*>()),
+                                  cast<FuncDecl>(method.loc.get<ValueDecl*>()),
                                   i->getType(0).getFunctionResultType(),
                                   /*FIXME substitutions*/ {},
                                   CurExplosionLevel,

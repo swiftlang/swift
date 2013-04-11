@@ -32,7 +32,6 @@ namespace swift {
   class CapturingExpr;
   class ASTContext;
   class ClassDecl;
-  class Decl;
 
 /// SILConstant - A key for referencing an entity that can be the subject of a
 /// SIL ConstantRefInst or the name of a SILFunction body. This can currently
@@ -42,7 +41,7 @@ namespace swift {
 /// reference, there is also an identifier for distinguishing definitions with
 /// multiple associated entry points, such as a curried function.
 struct SILConstant {
-  typedef llvm::PointerUnion<Decl*, CapturingExpr*> Loc;
+  typedef llvm::PointerUnion<ValueDecl*, CapturingExpr*> Loc;
   
   /// Represents the "kind" of the SILConstant. For some Swift decls there
   /// are multiple SIL entry points, and the kind is used to distinguish them.
@@ -51,9 +50,9 @@ struct SILConstant {
     /// directly.
     Func,
     
-    /// Getter - this constant references the getter for the Decl in loc.
+    /// Getter - this constant references the getter for the ValueDecl in loc.
     Getter,
-    /// Setter - this constant references the setter for the Decl in loc.
+    /// Setter - this constant references the setter for the ValueDecl in loc.
     Setter,
     
     /// Allocator - this constant references the allocating constructor
@@ -77,7 +76,7 @@ struct SILConstant {
     GlobalAddress
   };
   
-  /// The Decl or CapturingExpr represented by this SILConstant.
+  /// The ValueDecl or CapturingExpr represented by this SILConstant.
   Loc loc;
   /// The Kind of this SILConstant.
   Kind kind : 4;
@@ -92,10 +91,10 @@ struct SILConstant {
   SILConstant() : loc(), kind(Kind::Func), uncurryLevel(0) {}
   
   /// Produces a SILConstant of the given kind for the given decl.
-  explicit SILConstant(Decl *decl, Kind kind,
+  explicit SILConstant(ValueDecl *decl, Kind kind,
                        unsigned uncurryLevel = ConstructAtNaturalUncurryLevel);
   
-  /// Produces the 'natural' SILConstant for the given Decl or
+  /// Produces the 'natural' SILConstant for the given ValueDecl or
   /// CapturingExpr:
   /// - If 'loc' is a func or closure, this returns a Func SILConstant.
   /// - If 'loc' is a getter or setter FuncDecl, this returns the Getter or
@@ -114,10 +113,10 @@ struct SILConstant {
     
   bool isNull() const { return loc.isNull(); }
   
-  bool hasDecl() const { return loc.is<Decl*>(); }
+  bool hasDecl() const { return loc.is<ValueDecl*>(); }
   bool hasExpr() const { return loc.is<CapturingExpr*>(); }
   
-  Decl *getDecl() const { return (Decl*)loc.get<Decl*>(); }
+  ValueDecl *getDecl() const { return loc.get<ValueDecl*>(); }
   CapturingExpr *getExpr() const { return loc.get<CapturingExpr*>(); }
   
   /// True if the SILConstant references a function.

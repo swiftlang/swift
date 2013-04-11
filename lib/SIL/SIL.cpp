@@ -45,8 +45,10 @@ static unsigned getNaturalUncurryLevel(CapturingExpr *func) {
   return level;
 }
 
-SILConstant::SILConstant(Decl *vd, SILConstant::Kind kind,
-                         unsigned atUncurryLevel) : loc(vd), kind(kind) {
+SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
+                         unsigned atUncurryLevel)
+  : loc(vd), kind(kind)
+{
   unsigned naturalUncurryLevel;
   
   if (auto *func = dyn_cast<FuncDecl>(vd)) {
@@ -115,8 +117,8 @@ SILConstant::SILConstant(Decl *vd, SILConstant::Kind kind,
 
 SILConstant::SILConstant(SILConstant::Loc baseLoc, unsigned atUncurryLevel) {
   unsigned naturalUncurryLevel;
-  if (Decl *d = baseLoc.dyn_cast<Decl*>()) {
-    if (FuncDecl *fd = dyn_cast<FuncDecl>(d)) {
+  if (ValueDecl *vd = baseLoc.dyn_cast<ValueDecl*>()) {
+    if (FuncDecl *fd = dyn_cast<FuncDecl>(vd)) {
       // Map getter or setter FuncDecls to Getter or Setter SILConstants of the
       // property.
       if (fd->isGetterOrSetter()) {
@@ -138,20 +140,20 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc, unsigned atUncurryLevel) {
       naturalUncurryLevel = getNaturalUncurryLevel(fd->getBody());
     }
     // Map DestructorDecls to Destructor SILConstants of the ClassDecl.
-    else if (DestructorDecl *dd = dyn_cast<DestructorDecl>(d)) {
+    else if (DestructorDecl *dd = dyn_cast<DestructorDecl>(vd)) {
       ClassDecl *cd = cast<ClassDecl>(dd->getParent());
       loc = cd;
       kind = Kind::Destructor;
       naturalUncurryLevel = 0;
     }
     // Map ConstructorDecls to the Allocator SILConstant of the constructor.
-    else if (ConstructorDecl *cd = dyn_cast<ConstructorDecl>(d)) {
+    else if (ConstructorDecl *cd = dyn_cast<ConstructorDecl>(vd)) {
       loc = cd;
       kind = Kind::Allocator;
       naturalUncurryLevel = 1;
     }
     // VarDecl constants require an explicit kind.
-    else if (isa<VarDecl>(d)) {
+    else if (isa<VarDecl>(vd)) {
       llvm_unreachable("must create SILConstant for VarDecl with explicit kind");
     }
     else {

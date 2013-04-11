@@ -502,7 +502,7 @@ static Type getFunctionTypeWithCaptures(TypeConverter &types,
 Type TypeConverter::makeConstantType(SILConstant c) {
   // FIXME: This needs to be cleaned up to switch on c.kind
   
-  if (Decl *vd = c.loc.dyn_cast<Decl*>()) {
+  if (ValueDecl *vd = c.loc.dyn_cast<ValueDecl*>()) {
     Type /*nullable*/ contextType =
       vd->getDeclContext()->getDeclaredTypeOfContext();
     GenericParamList *genericParams = nullptr;
@@ -522,17 +522,18 @@ Type TypeConverter::makeConstantType(SILConstant c) {
       return getMethodTypeInContext(contextType, subscriptType, genericParams);
     } else {
       // If this is a destructor, derive the destructor type.
-      if (c.kind == SILConstant::Kind::Destructor)
+      if (c.kind == SILConstant::Kind::Destructor) {
         return getDestructorType(cast<ClassDecl>(vd), Context);
+      }
       
       // If this is a constructor initializer, derive the initializer type.
-      if (c.kind == SILConstant::Kind::Initializer)
+      if (c.kind == SILConstant::Kind::Initializer) {
         return cast<ConstructorDecl>(vd)->getInitializerType();
+      }
       
       // If this is a property accessor, derive the property type.
       if (c.isProperty()) {
-        Type propertyType = getPropertyType(c.kind,
-                                            cast<ValueDecl>(vd)->getType());
+        Type propertyType = getPropertyType(c.kind, vd->getType());
         Type propertyMethodType = getMethodTypeInContext(contextType,
                                                          propertyType,
                                                          genericParams);
@@ -574,7 +575,7 @@ Type TypeConverter::makeConstantType(SILConstant c) {
       }
       
       // Otherwise, return the Swift-level type.
-      return cast<ValueDecl>(vd)->getTypeOfReference();
+      return vd->getTypeOfReference();
     }
   } else if (CapturingExpr *e = c.loc.dyn_cast<CapturingExpr*>()) {
     assert(c.kind == SILConstant::Kind::Func &&

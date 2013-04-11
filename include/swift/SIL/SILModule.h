@@ -101,7 +101,7 @@ public:
   }
   
   /// Returns true if a SILFunction was generated from the given declaration.
-  bool hasFunction(Decl *decl) const {
+  bool hasFunction(ValueDecl *decl) const {
     return hasFunction(SILConstant(decl));
   }
   
@@ -113,7 +113,7 @@ public:
   }
 
   /// Returns a pointer to the SILFunction generated from the given declaration.
-  SILFunction *getFunction(Decl *decl) const {
+  SILFunction *getFunction(ValueDecl *decl) const {
     return getFunction(SILConstant(decl));
   }
   
