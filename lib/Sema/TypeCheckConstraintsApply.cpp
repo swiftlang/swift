@@ -46,6 +46,8 @@ static Expr *convertObjectArgumentToType(TypeChecker &tc, Expr *expr,
 /// function.
 static bool isAssignmentFn(Expr *expr) {
   expr = expr->getSemanticsProvidingExpr();
+  if (auto spec = dyn_cast<SpecializeExpr>(expr))
+    expr = spec->getSubExpr()->getSemanticsProvidingExpr();
   if (auto dre = dyn_cast<DeclRefExpr>(expr))
     return dre->getDecl()->getAttrs().isAssignment();
   if (auto dotCall = dyn_cast<DotSyntaxCallExpr>(expr))
@@ -548,8 +550,7 @@ namespace {
                                               decl->getTypeOfReference());
 
       // For a polymorphic function type, we have to specialize our reference.
-      if (auto polyFn = expr->getType()->getAs<PolymorphicFunctionType>()) {
-        assert(false);
+      if (auto polyFn = result->getType()->getAs<PolymorphicFunctionType>()) {
         return specialize(result, polyFn, selected.second);
       }
 
@@ -1309,6 +1310,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType) {
   }
 
   // FIXME: Fall back to old type checker for arguments of metatype type.
+  assert(fn->getType()->is<MetaTypeType>());
   return tc.semaApplyExpr(apply);
 }
 
