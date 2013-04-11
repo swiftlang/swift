@@ -198,7 +198,7 @@ namespace {
                    "can't call a static method on an instance");
             apply = new (context) DotSyntaxCallExpr(specializedRef, dotLoc, base);
           }
-          return finishApply(apply, openedType);
+          return finishApply(apply, openedType, nullptr);
         }
 
         // Convert the base appropriately.
@@ -259,13 +259,13 @@ namespace {
         // Constructor calls.
         if (isa<ConstructorDecl>(member)) {
           return finishApply(new (context) ConstructorRefCallExpr(ref, base),
-                             openedType);
+                             openedType, nullptr);
         }
 
         // Non-static member function calls.
         if (baseIsInstance == member->isInstanceMember()) {
           return finishApply(new (context) DotSyntaxCallExpr(ref, dotLoc, base),
-                             openedType);
+                             openedType, nullptr);
         }
         
         assert((!baseIsInstance || member->isInstanceMember()) &&
@@ -289,7 +289,19 @@ namespace {
     /// \brief Finish a function application by performing the appropriate
     /// conversions on the function and argument expressions and setting
     /// the resulting type.
-    Expr *finishApply(ApplyExpr *apply, Type openedType);
+    ///
+    /// \param apply The function application to finish type-checking, which
+    /// may be a newly-built expression.
+    ///
+    /// \param openedType The "opened" type this expression had during
+    /// type checking, which will be used to specialize the resulting,
+    /// type-checked expression appropriately.
+    ///
+    /// \param origExpr The original expression that resulted in this
+    /// application. This is only needed when the application could be a
+    /// constructor.
+    Expr *finishApply(ApplyExpr *apply, Type openedType,
+                      Expr *origExpr);
 
     /// \brief Retrieve the fixed type for the given type variable.
     Type getFixedType(TypeVariableType *typeVar) {
@@ -302,9 +314,18 @@ namespace {
     /// locator.
     std::pair<OverloadChoice, Type>
     getOverloadChoice(ConstraintLocator *locator) {
+      return *getOverloadChoiceIfAvailable(locator);
+    }
+
+    /// \brief Retrieve the overload choice associated with the given
+    /// locator.
+    Optional<std::pair<OverloadChoice, Type>>
+    getOverloadChoiceIfAvailable(ConstraintLocator *locator) {
       auto known = solution.overloadChoices.find(locator);
-      assert(known != solution.overloadChoices.end());
-      return known->second;
+      if (known != solution.overloadChoices.end())
+        return known->second;
+
+      return Nothing;
     }
 
     /// \brief Simplify the given type by substituting all occurrences of
@@ -524,7 +545,7 @@ namespace {
         = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef,
                                                      expr->getDotLoc(),
                                                      expr->getSubExpr());
-      return finishApply(call, expr->getType());
+      return finishApply(call, expr->getType(), expr);
     }
 
     Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
@@ -712,7 +733,7 @@ namespace {
                                        selected.second);
 
       ApplyExpr *apply = new (C) CallExpr(memberRef, expr->getSubExpr());
-      expr->setSemanticExpr(finishApply(apply, openedType));
+      expr->setSemanticExpr(finishApply(apply, openedType, expr));
       if (!expr->getSemanticExpr()) {
         // FIXME: Should never happen.
         cs.getTypeChecker().diagnose(arrayProto->getLoc(),
@@ -756,7 +777,7 @@ namespace {
                                        selected.second);
 
       ApplyExpr *apply = new (C) CallExpr(memberRef, expr->getSubExpr());
-      expr->setSemanticExpr(finishApply(apply, openedType));
+      expr->setSemanticExpr(finishApply(apply, openedType, expr));
       if (!expr->getSemanticExpr()) {
         // FIXME: Should never happen.
         cs.getTypeChecker().diagnose(dictionaryProto->getLoc(),
@@ -950,7 +971,7 @@ namespace {
     }
 
     Expr *visitApplyExpr(ApplyExpr *expr) {
-      return finishApply(expr, expr->getType());
+      return finishApply(expr, expr->getType(), expr);
     }
 
     Expr *visitNewReferenceExpr(NewReferenceExpr *expr) {
@@ -985,7 +1006,7 @@ namespace {
 
       expr->setFn(ctorRef);
       expr->setArg(arg);
-      return finishApply(expr, expr->getType());
+      return finishApply(expr, expr->getType(), expr);
     }
 
     // FIXME: Other subclasses of ApplyExpr?
@@ -1264,7 +1285,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
 
 }
 
-Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType) {
+Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
+                                Expr *origExpr) {
   TypeChecker &tc = cs.getTypeChecker();
 
   // The function is always an rvalue.
@@ -1319,7 +1341,38 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType) {
     return convertToType(tc, apply->getArg(), tupleTy);
   }
 
-  // FIXME: Fall back to old type checker for constructor calls.
+  if (ty->is<StructType>()) {
+    // We're calling a constructor. Dig out the constructor we used.
+    assert(origExpr && "Missing original expression for construction");
+    auto selected = getOverloadChoiceIfAvailable(
+                      cs.getConstraintLocator(
+                        origExpr,
+                        ConstraintLocator::ConstructorMember));
+
+    // If there is no overload choice, it's because this was a coercion
+    // rather than a construction. Just perform the appropriate conversion.
+    if (!selected) {
+      // FIXME: Need an AST to represent this properly.
+      return convertToType(tc, apply->getArg(), ty);
+    }
+
+    // We have the constructor.
+    auto choice = selected->first;
+    auto constructor = cast<ConstructorDecl>(choice.getDecl());
+
+    // Form the constructor reference.
+    Expr *typeBase = new (tc.Context) MetatypeExpr(nullptr, apply->getLoc(),
+                                                   metaTy);
+    Expr *ctorRef = buildMemberRef(typeBase, apply->getLoc(),
+                                   constructor, apply->getLoc(),
+                                   selected->second);
+    apply->setFn(ctorRef);
+
+    // Tail-recurse to actually call the constructor.
+    return finishApply(apply, openedType, nullptr);
+  }
+
+  // FIXME: Falling back to old type checker for oneofs.
   return tc.semaApplyExpr(apply);
 }
 

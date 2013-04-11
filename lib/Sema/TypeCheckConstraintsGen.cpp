@@ -779,8 +779,7 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
           auto instanceTy = metaTy->getInstanceType();
           CS.addConstraint(ConstraintKind::Construction,
                            expr->getArg()->getType(), instanceTy,
-            CS.getConstraintLocator(expr,
-                                    ConstraintLocator::ConstructionArgument));
+                           CS.getConstraintLocator(expr, { }));
           return instanceTy;
         }
       }

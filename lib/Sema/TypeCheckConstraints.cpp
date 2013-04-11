@@ -1697,9 +1697,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     // T1 is convertible to T2 (by loading the value).
     if (auto lvalue1 = type1->getAs<LValueType>()) {
       return matchTypes(lvalue1->getObjectType(), type2, kind, subFlags,
-                        locator.withPathElement(
-                          ConstraintLocator::RvalueAdjustment),
-                        trivial);
+                        locator, trivial);
     }
 
     // An expression can be converted to an auto-closure function type, creating
@@ -2047,6 +2045,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       // to consider.
       needIdentityConstructor = false;
     } else {
+      // FIXME: Busted for generic types.
       for (auto constructor : constructors.Results) {
         if (auto funcTy = constructor->getType()->getAs<FunctionType>()) {
           if ((funcTy = funcTy->getResult()->getAs<FunctionType>())) {
