@@ -184,19 +184,19 @@ namespace {
                                      cc.Conformance,
                                      /*OnlyInnermostParams=*/false);
 
-          Expr *apply;
+          ApplyExpr *apply;
           if (isa<ConstructorDecl>(member)) {
             // FIXME: Provide type annotation.
             apply = new (context) ConstructorRefCallExpr(specializedRef, base);
           } else if (!baseIsInstance && member->isInstanceMember()) {
-            apply = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
-                                                           specializedRef);
+            return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
+                                                          specializedRef);
           } else {
             assert((!baseIsInstance || member->isInstanceMember()) &&
                    "can't call a static method on an instance");
             apply = new (context) DotSyntaxCallExpr(specializedRef, dotLoc, base);
           }
-          return tc.recheckTypes(apply);
+          return finishApply(apply, openedType);
         }
 
         // Convert the base appropriately.
@@ -250,30 +250,28 @@ namespace {
       // well as module members.
       Expr *ref = new (context) DeclRefExpr(member, memberLoc,
                                             member->getTypeOfReference());
-      Expr *result = nullptr;
 
       // Refer to a member function that binds 'this':
       if ((isa<FuncDecl>(member) && member->getDeclContext()->isTypeContext()) ||
           isa<OneOfElementDecl>(member) || isa<ConstructorDecl>(member)) {
+        // Constructor calls.
         if (isa<ConstructorDecl>(member)) {
-          // FIXME: Provide type annotation.
-          result = new (context) ConstructorRefCallExpr(ref, base);
-        } else if (baseIsInstance == member->isInstanceMember()) {
-          result = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
+          return finishApply(new (context) ConstructorRefCallExpr(ref, base),
+                             openedType);
+        }
+
+        // Non-static member function calls.
+        if (baseIsInstance == member->isInstanceMember()) {
+          return finishApply(new (context) DotSyntaxCallExpr(ref, dotLoc, base),
+                             openedType);
         }
         
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
       }
 
-      if (!result)
-        result =  new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
-
-      // FIXME: Falls back to the old type checker.
-      result = tc.recheckTypes(result);
-      if (!result)
-        return nullptr;
-
+      // Build a reference where the base is ignored.
+      Expr *result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
       if (auto polyFn = result->getType()->getAs<PolymorphicFunctionType>()) {
         return specialize(result, polyFn, openedType);
       }
@@ -285,6 +283,11 @@ namespace {
     /// a known literal kind.
     Expr *convertLiteral(Expr *literal, Type type, LiteralKind kind,
                          Type openedType);
+
+    /// \brief Finish a function application by performing the appropriate
+    /// conversions on the function and argument expressions and setting
+    /// the resulting type.
+    Expr *finishApply(ApplyExpr *apply, Type openedType);
 
     /// \brief Retrieve the fixed type for the given type variable.
     Type getFixedType(TypeVariableType *typeVar) {
@@ -502,19 +505,24 @@ namespace {
       auto selected = getOverloadChoice(
                         cs.getConstraintLocator(
                           expr,
-                          ConstraintLocator::ConstructorMember)).first;
-      auto *ctor = cast<ConstructorDecl>(selected.getDecl());
+                          ConstraintLocator::ConstructorMember));
+      auto choice = selected.first;
+      auto *ctor = cast<ConstructorDecl>(choice.getDecl());
+
       // Build a call to the initializer for the constructor.
-      auto *ctorRef
+      Expr *ctorRef
         = new (cs.getASTContext()) OtherConstructorDeclRefExpr(ctor,
                                      expr->getConstructorLoc(),
                                      ctor->getInitializerType());
+      if (auto polyFn = ctorRef->getType()->getAs<PolymorphicFunctionType>()) {
+        ctorRef = specialize(ctorRef, polyFn, selected.second);
+      }
+
       auto *call
         = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef,
                                                      expr->getDotLoc(),
                                                      expr->getSubExpr());
-      auto &tc = cs.getTypeChecker();
-      return tc.semaApplyExpr(call);
+      return finishApply(call, expr->getType());
     }
 
     Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
@@ -675,8 +683,8 @@ namespace {
     }
 
     Expr *visitArrayExpr(ArrayExpr *expr) {
-      simplifyExprType(expr);
-      Type arrayTy = expr->getType();
+      Type openedType = expr->getType();
+      Type arrayTy = simplifyType(openedType);
 
       ProtocolDecl *arrayProto = cs.getTypeChecker().getArrayLiteralProtocol();
       assert(arrayProto && "type-checked array literal w/o protocol?!");
@@ -697,29 +705,27 @@ namespace {
                                            expr->getLoc(),
                                            MetaTypeType::get(arrayTy, C));
       // FIXME: Location information is suspect.
-      Expr *semanticExpr = buildMemberRef(typeRef, expr->getLoc(),
-                                          converterDecl,
-                                          expr->getLoc(),
-                                          selected.second);
+      Expr *memberRef = buildMemberRef(typeRef, expr->getLoc(),
+                                       converterDecl,
+                                       expr->getLoc(),
+                                       selected.second);
 
-      semanticExpr = new (C) CallExpr(semanticExpr,
-                                      expr->getSubExpr());
-
-      semanticExpr = cs.getTypeChecker().recheckTypes(semanticExpr);
-
-      if (!semanticExpr) {
+      ApplyExpr *apply = new (C) CallExpr(memberRef, expr->getSubExpr());
+      expr->setSemanticExpr(finishApply(apply, openedType));
+      if (!expr->getSemanticExpr()) {
+        // FIXME: Should never happen.
         cs.getTypeChecker().diagnose(arrayProto->getLoc(),
                                      diag::array_protocol_broken);
         return nullptr;
       }
 
-      expr->setSemanticExpr(semanticExpr);
+      expr->setType(arrayTy);
       return expr;
     }
 
     Expr *visitDictionaryExpr(DictionaryExpr *expr) {
-      simplifyExprType(expr);
-      Type dictionaryTy = expr->getType();
+      Type openedType = expr->getType();
+      Type dictionaryTy = simplifyType(openedType);
 
       ProtocolDecl *dictionaryProto
       = cs.getTypeChecker().getDictionaryLiteralProtocol();
@@ -743,23 +749,21 @@ namespace {
                                            MetaTypeType::get(dictionaryTy, C));
 
       // FIXME: Location information is suspect.
-      Expr *semanticExpr = buildMemberRef(typeRef, expr->getLoc(),
-                                          converterDecl,
-                                          expr->getLoc(),
-                                          selected.second);
+      Expr *memberRef = buildMemberRef(typeRef, expr->getLoc(),
+                                       converterDecl,
+                                       expr->getLoc(),
+                                       selected.second);
 
-      semanticExpr = new (C) CallExpr(semanticExpr,
-                                      expr->getSubExpr());
-
-      semanticExpr = cs.getTypeChecker().recheckTypes(semanticExpr);
-
-      if (!semanticExpr) {
+      ApplyExpr *apply = new (C) CallExpr(memberRef, expr->getSubExpr());
+      expr->setSemanticExpr(finishApply(apply, openedType));
+      if (!expr->getSemanticExpr()) {
+        // FIXME: Should never happen.
         cs.getTypeChecker().diagnose(dictionaryProto->getLoc(),
                                      diag::dictionary_protocol_broken);
         return nullptr;
       }
 
-      expr->setSemanticExpr(semanticExpr);
+      expr->setType(dictionaryTy);
       return expr;
     }
 
@@ -945,47 +949,7 @@ namespace {
     }
 
     Expr *visitApplyExpr(ApplyExpr *expr) {
-      auto &tc = cs.getTypeChecker();
-
-      // The function is always an rvalue.
-      // FIXME: Bring convertToRvalue into the application step.
-      auto fn = tc.convertToRValue(expr->getFn());
-      if (!fn)
-        return nullptr;
-      expr->setFn(fn);
-
-      // For function application, convert the argument to the input type of
-      // the function.
-      if (auto fnType = fn->getType()->getAs<FunctionType>()) {
-        auto origArg = expr->getArg();
-        Expr *arg = nullptr;
-        if (isa<ThisApplyExpr>(expr))
-          arg = convertObjectArgumentToType(tc, origArg, fnType->getInput());
-        else
-          arg = convertToType(tc, origArg, fnType->getInput(),
-                              isAssignmentFn(fn));
-
-        if (!arg) {
-          tc.diagnose(fn->getLoc(), diag::while_converting_function_argument,
-                      fnType->getInput())
-            << origArg->getSourceRange();
-
-          return nullptr;
-        }
-
-        auto origType = expr->getType();
-        expr->setArg(arg);
-        expr->setType(fnType->getResult());
-
-        if (auto polyFn = expr->getType()->getAs<PolymorphicFunctionType>()) {
-          return specialize(expr, polyFn, origType);
-        }
-
-        return tc.substituteInputSugarTypeForResult(expr);
-      }
-
-      // FIXME: Implement support for metatypes here.
-      return tc.semaApplyExpr(expr);
+      return finishApply(expr, expr->getType());
     }
 
     Expr *visitNewReferenceExpr(NewReferenceExpr *expr) {
@@ -1018,13 +982,9 @@ namespace {
         arg->setType(TupleType::getEmpty(tc.Context));
       }
 
-      // FIXME: We need to know what happened to the constraints on the function
-      // and on the argument to perform the appropriate conversions,
-      // specializations, etc. For now, fall back to the existing type checker.
-      ctorRef = tc.recheckTypes(ctorRef);
       expr->setFn(ctorRef);
       expr->setArg(arg);
-      return tc.semaApplyExpr(expr);
+      return finishApply(expr, expr->getType());
     }
 
     // FIXME: Other subclasses of ApplyExpr?
@@ -1301,6 +1261,55 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
   // converted) argument.
   return new (tc.Context) CallExpr(result, intermediate, type);
 
+}
+
+Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType) {
+  TypeChecker &tc = cs.getTypeChecker();
+
+  // The function is always an rvalue.
+  // FIXME: Bring convertToRvalue into the application step.
+  auto fn = tc.convertToRValue(apply->getFn());
+  assert(fn && "Rvalue conversion failed?");
+  if (!fn)
+    return nullptr;
+  apply->setFn(fn);
+
+  // Check whether the argument is 'super'.
+  bool isSuper = isa<SuperRefExpr>(apply->getArg());
+  
+  // For function application, convert the argument to the input type of
+  // the function.
+  if (auto fnType = fn->getType()->getAs<FunctionType>()) {
+    auto origArg = apply->getArg();
+    Expr *arg = nullptr;
+    if (isa<ThisApplyExpr>(apply))
+      arg = convertObjectArgumentToType(tc, origArg, fnType->getInput());
+    else
+      arg = convertToType(tc, origArg, fnType->getInput(),
+                          isAssignmentFn(fn));
+
+    if (!arg) {
+      // FIXME: Shouldn't ever happen.
+      tc.diagnose(fn->getLoc(), diag::while_converting_function_argument,
+                  fnType->getInput())
+        << origArg->getSourceRange();
+
+      return nullptr;
+    }
+
+    apply->setArg(arg);
+    apply->setType(fnType->getResult());
+    apply->setIsSuper(isSuper);
+
+    if (auto polyFn = apply->getType()->getAs<PolymorphicFunctionType>()) {
+      return specialize(apply, polyFn, openedType);
+    }
+
+    return tc.substituteInputSugarTypeForResult(apply);
+  }
+
+  // FIXME: Fall back to old type checker for arguments of metatype type.
+  return tc.semaApplyExpr(apply);
 }
 
 /// \brief Apply a given solution to the expression, producing a fully
