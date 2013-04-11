@@ -1309,8 +1309,17 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType) {
     return tc.substituteInputSugarTypeForResult(apply);
   }
 
-  // FIXME: Fall back to old type checker for arguments of metatype type.
-  assert(fn->getType()->is<MetaTypeType>());
+  // We have a type constructor.
+  auto metaTy = fn->getType()->castTo<MetaTypeType>();
+  auto ty = metaTy->getInstanceType();
+  
+  // If we're "constructing" a tuple type, it's simply a conversion.
+  if (auto tupleTy = ty->getAs<TupleType>()) {
+    // FIXME: Need an AST to represent this properly.
+    return convertToType(tc, apply->getArg(), tupleTy);
+  }
+
+  // FIXME: Fall back to old type checker for constructor calls.
   return tc.semaApplyExpr(apply);
 }
 
