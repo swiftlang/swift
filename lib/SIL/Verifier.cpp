@@ -225,6 +225,12 @@ public:
 
     assert(TI->getElements().size() == ResTy->getFields().size() &&
            "Tuple field count mismatch!");
+    
+    for (size_t i = 0; i < TI->getElements().size(); ++i) {
+      assert(TI->getElements()[i].getType().getSwiftType()
+               ->isEqual(ResTy->getFields()[i].getType()) &&
+             "Tuple element arguments do not match tuple type!");
+    }
   }
   void visitMetatypeInst(MetatypeInst *MI) {
     assert(MI->getType(0).is<MetaTypeType>() &&
