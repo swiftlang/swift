@@ -547,10 +547,11 @@ public:
   }
   
   void visitDowncastInst(DowncastInst *DI) {
-    assert(DI->getOperand().getType().hasReferenceSemantics() &&
-           "downcast operand must be a reference type");
-    assert(DI->getType().hasReferenceSemantics() &&
-           "downcast must convert to a reference type");
+    assert(DI->getOperand().getType().getSwiftType()
+             ->getClassOrBoundGenericClass() &&
+           "downcast operand must be a class type");
+    assert(DI->getType().getSwiftType()->getClassOrBoundGenericClass() &&
+           "downcast must convert to a class type");
   }
   
   void visitAddressToPointerInst(AddressToPointerInst *AI) {
