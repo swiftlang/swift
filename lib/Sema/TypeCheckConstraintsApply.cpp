@@ -1009,8 +1009,6 @@ namespace {
       return finishApply(expr, expr->getType(), expr);
     }
 
-    // FIXME: Other subclasses of ApplyExpr?
-
     Expr *visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *expr) {
       return expr;
     }
@@ -1341,40 +1339,39 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     return convertToType(tc, apply->getArg(), tupleTy);
   }
 
-  if (ty->is<StructType>() || ty->is<BoundGenericStructType>()) {
-    // We're calling a constructor. Dig out the constructor we used.
-    assert(origExpr && "Missing original expression for construction");
-    auto selected = getOverloadChoiceIfAvailable(
-                      cs.getConstraintLocator(
-                        origExpr,
-                        ConstraintLocator::ConstructorMember));
+  // We're constructing a struct or oneof. Look for the constructor or oneof
+  // element to use.
+  assert(ty->is<StructType>() || ty->is<BoundGenericStructType>() ||
+         ty->is<OneOfType>() || ty->is<BoundGenericOneOfType>());
+  assert(origExpr && "Missing original expression for construction");
+  auto selected = getOverloadChoiceIfAvailable(
+                    cs.getConstraintLocator(
+                      origExpr,
+                      ConstraintLocator::ConstructorMember));
 
-    // If there is no overload choice, it's because this was a coercion
-    // rather than a construction. Just perform the appropriate conversion.
-    if (!selected) {
-      // FIXME: Need an AST to represent this properly.
-      return convertToType(tc, apply->getArg(), ty);
-    }
-
-    // We have the constructor.
-    auto choice = selected->first;
-    auto constructor = cast<ConstructorDecl>(choice.getDecl());
-
-    // Form the constructor reference.
-    Expr *typeBase = new (tc.Context) MetatypeExpr(nullptr, apply->getLoc(),
-                                                   metaTy);
-    Expr *ctorRef = buildMemberRef(typeBase, apply->getLoc(),
-                                   constructor, apply->getLoc(),
-                                   selected->second);
-    apply->setFn(ctorRef);
-
-    // Tail-recurse to actually call the constructor.
-    return finishApply(apply, openedType, nullptr);
+  // If there is no overload choice, or it was simply the identity function,
+  // it's because this was a coercion rather than a construction. Just perform
+  // the appropriate conversion.
+  if (!selected ||
+      selected->first.getKind() == OverloadChoiceKind::IdentityFunction) {
+    // FIXME: Need an AST to represent this properly.
+    return convertToType(tc, apply->getArg(), ty);
   }
 
-  // FIXME: Falling back to old type checker for oneofs.
-  assert(ty->is<OneOfType>());
-  return tc.semaApplyExpr(apply);
+  // We have the constructor.
+  auto choice = selected->first;
+  auto decl = choice.getDecl();
+
+  // Form a reference to the constructor or oneof declaration.
+  Expr *typeBase = new (tc.Context) MetatypeExpr(nullptr, apply->getLoc(),
+                                                 metaTy);
+  Expr *declRef = buildMemberRef(typeBase, apply->getLoc(),
+                                 decl, apply->getLoc(),
+                                 selected->second);
+  apply->setFn(declRef);
+
+  // Tail-recurse to actually call the constructor.
+  return finishApply(apply, openedType, nullptr);
 }
 
 /// \brief Apply a given solution to the expression, producing a fully
