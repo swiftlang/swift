@@ -159,7 +159,8 @@ OwnedAddress irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                                        OwnedAddress base,
                                                        CanType baseType,
                                                        unsigned fieldIndex) {
-  assert(baseType->is<StructType>() && "not a struct type");
+  assert((baseType->is<StructType>() || baseType->is<BoundGenericStructType>())
+         && "not a struct type");
   auto &baseTI = IGF.getFragileTypeInfo(baseType).as<StructTypeInfo>();
   auto &fieldI = baseTI.getFields()[fieldIndex];
   Address project = fieldI.projectAddress(IGF, base);
