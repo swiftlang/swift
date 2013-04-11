@@ -3680,8 +3680,7 @@ irgen::getProtocolMethodValue(IRGenFunction &IGF,
   // FIXME: Support getters and setters (and curried entry points?)
   assert(member.kind == SILConstant::Kind::Func
          && "getters and setters not yet supported");
-  ValueDecl *vd = member.getDecl();
-  FuncDecl *fn = cast<FuncDecl>(vd);
+  FuncDecl *fn = cast<FuncDecl>(member.getDecl());
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
 
   // Load the witness table.

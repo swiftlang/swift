@@ -56,7 +56,10 @@ void SILConstant::print(raw_ostream &OS) const {
   }
   
   if (hasDecl()) {
-    OS << getDecl()->getName();
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(getDecl()))
+      OS << VD->getName();
+    else
+      OS << "<anonymous function>";
   } else {
     OS << "<anonymous function>";
   }
@@ -581,9 +584,9 @@ void PrettyStackTraceSILConstant::print(llvm::raw_ostream &out) const {
   out << "While " << Action << ' ';
   ASTContext *Ctx;
   SourceLoc sloc;
-  if (ValueDecl *decl = C.loc.dyn_cast<ValueDecl*>()) {
-    if (decl->getName().get())
-      out << '\'' << decl->getName() << '\'';
+  if (Decl *decl = C.loc.dyn_cast<Decl*>()) {
+    if (isa<ValueDecl>(decl) && cast<ValueDecl>(decl)->getName().get())
+      out << '\'' << cast<ValueDecl>(decl)->getName() << '\'';
     else
       out << "'anonname=" << (const void*)decl << '\'';
     Ctx = &decl->getASTContext();
