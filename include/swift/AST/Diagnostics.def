@@ -867,7 +867,9 @@ ERROR(invalid_tuple_element_unused,sema_tcc,none,
 ERROR(does_not_have_member,sema_tcc,none,
   "%0 does not have a member named %1",
   (Type, Identifier))
-  
+ERROR(cannot_construct_type,sema_tcc,none,
+  "cannot construct a value of type %0", (Type))
+
 //------------------------------------------------------------------------------
 // Type Check Declarations
 //------------------------------------------------------------------------------

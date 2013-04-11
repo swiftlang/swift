@@ -49,6 +49,18 @@ class SubscriptDecl;
 class Type;
 class ValueDecl;
 
+/// \brief Describes the kind of conversion to apply to a constant value.
+enum class ConstantConvertKind {
+  /// \brief No conversion required.
+  None,
+  /// \brief Coerce the constant to the given type.
+  Coerce,
+  /// \brief Construct the given type from the constant value.
+  Construction,
+  /// \brief Perform an unchecked downcast to the given type.
+  Downcast
+};
+
 /// \brief Implementation of the Clang importer.
 struct ClangImporter::Implementation {
   /// \brief Describes how a particular C enumeration type will be imported
@@ -232,11 +244,10 @@ public:
   /// \param dc The declaration context into which the name will be introduced.
   /// \param type The type of the named constant.
   /// \param value The value of the named constant.
-  /// \param requiresCast Whether a cast is necessary to make the constant
-  /// value work.
+  /// \param convertKind How to convert the constant to the given type.
   ValueDecl *createConstant(Identifier name, DeclContext *dc,
                             Type type, const clang::APValue &value,
-                            bool requiresCast);
+                            ConstantConvertKind convertKind);
 
   /// \brief Retrieve the 'swift' module.
   ///

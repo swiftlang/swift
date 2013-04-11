@@ -495,7 +495,7 @@ namespace {
         // Create the global constant.
         return Impl.createConstant(name, dc, type,
                                    clang::APValue(decl->getInitVal()),
-                                   /*requiresConversion=*/false);
+                                   ConstantConvertKind::Coerce);
       }
           
       case EnumKind::Options: {
@@ -521,7 +521,7 @@ namespace {
         // Create the global constant.
         return Impl.createConstant(name, dc, enumType,
                                    clang::APValue(decl->getInitVal()),
-                                   /*requiresCast=*/true);
+                                   ConstantConvertKind::Construction);
       }
 
       case EnumKind::OneOf: {
@@ -1067,9 +1067,11 @@ namespace {
         initExpr = new (Impl.SwiftContext) CallExpr(allocCall, emptyTuple);
 
         // Cast the result of the alloc call to the (metatype) 'this'.
-        auto toTypeRef = new (Impl.SwiftContext) MetatypeExpr(nullptr, loc,
-                                                              thisMetaTy);
-        initExpr = new (Impl.SwiftContext) CallExpr(toTypeRef, initExpr);
+        initExpr = new (Impl.SwiftContext) UncheckedDowncastExpr(
+                                             initExpr,
+                                             SourceLoc(),
+                                             SourceLoc(),
+                                             TypeLoc::withoutLoc(thisTy));
 
         result->setAllocThisExpr(initExpr);
       }
@@ -1133,9 +1135,11 @@ namespace {
       initExpr = new (Impl.SwiftContext) CallExpr(initExpr, callArg);
 
       // Cast the result of the alloc call to the (metatype) 'this'.
-      auto toTypeRef = new (Impl.SwiftContext) MetatypeExpr(nullptr, loc,
-                                                            thisMetaTy);
-      initExpr = new (Impl.SwiftContext) CallExpr(toTypeRef, initExpr);
+      initExpr = new (Impl.SwiftContext) UncheckedDowncastExpr(
+                                           initExpr,
+                                           SourceLoc(),
+                                           SourceLoc(),
+                                           TypeLoc::withoutLoc(thisTy));
 
       // Form the assignment statement.
       auto refThis
@@ -2275,7 +2279,7 @@ ValueDecl *
 ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               Type type,
                                               const clang::APValue &value,
-                                              bool requiresCast) {
+                                              ConstantConvertKind convertKind) {
   auto &context = SwiftContext;
 
   auto var = new (context) VarDecl(SourceLoc(), name, type, dc);
@@ -2394,12 +2398,27 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   }
   }
 
-  // If we need a cast, add one now.
-  if (requiresCast) {
-    // Create a reference to the struct type.
+  // If we need a conversion, add one now.
+  switch (convertKind) {
+  case ConstantConvertKind::None:
+    break;
+
+  case ConstantConvertKind::Construction: {
     auto typeRef = new (context) MetatypeExpr(nullptr, SourceLoc(),
                                               MetaTypeType::get(type, context));
     expr = new (context) CallExpr(typeRef, expr);
+    break;
+   }
+
+  case ConstantConvertKind::Coerce:
+    expr = new (context) CoerceExpr(expr, SourceLoc(),
+                                    TypeLoc::withoutLoc(type));
+    break;
+
+  case ConstantConvertKind::Downcast:
+    expr = new (context) UncheckedDowncastExpr(expr, SourceLoc(), SourceLoc(),
+                                               TypeLoc::withoutLoc(type));
+    break;
   }
 
   // Create the return statement.

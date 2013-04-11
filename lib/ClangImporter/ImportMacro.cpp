@@ -59,7 +59,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
       }
 
       return Impl.createConstant(name, dc, type, clang::APValue(value),
-                                 /*requiresCast=*/true);
+                                 ConstantConvertKind::Coerce);
     }
 
     if (auto *floating = dyn_cast<clang::FloatingLiteral>(parsed)) {
@@ -77,7 +77,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
       }
 
       return Impl.createConstant(name, dc, type, clang::APValue(value),
-                                 /*requiresCast=*/true);
+                                 ConstantConvertKind::Coerce);
     }
     // TODO: Other numeric literals (complex, imaginary, etc.)
   }

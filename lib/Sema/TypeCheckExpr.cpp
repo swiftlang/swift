@@ -633,88 +633,27 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // TypeAlias to see what we're dealing with.  If the typealias was erroneous
     // then silently squish this erroneous subexpression.
     Type Ty = MT->getInstanceType();
-    TypeLoc fakeTyLoc = TypeLoc(Ty, E2->getEndLoc());
 
     E->setType(Ty);
     if (Ty->is<ErrorType>())
       return 0;  // Squelch an erroneous subexpression.
 
-    // If the 'function' is a direct reference to a type, and the type isn't
-    // a struct or oneof, this is a cast.  If the type is a struct or oneof,
-    // we first try to cast, then try to construct an object.
-    bool IsCast = true;
-    // FIXME: Should this check for coercions to any nominal type?
-    if (isConstructibleType(Ty))
-      IsCast = isCoercibleToType(E2, Ty) != CoercionResult::Failed;
-    if (IsCast) {
-      // If we're casting from one class to another, and it's not coercible,
-      // try downcasting.
-      if (E2->getType()->getRValueType()->mayHaveSuperclass() &&
-          Ty->mayHaveSuperclass() &&
-          isCoercibleToType(E2, Ty) == CoercionResult::Failed) {
-        // Figure out the source type, which may need to look through 
-        auto srcTy = E2->getType()->getRValueType();
-        auto srcArchetype = srcTy->getAs<ArchetypeType>();
-        if (srcArchetype) {
-          srcTy = srcArchetype->getSuperclass();
-          assert(srcTy->getClassOrBoundGenericClass());
-        }
+    // If the 'function' is a tuple type, coerce to it.
+    if (Ty->is<TupleType>()) {
+      E2 = coerceToType(E2, Ty);
+      if (!E2)
+        return 0;
 
-        // FIXME: Downcasts should be made illegal as construction expressions.
-        for (auto superTy = getSuperClassOf(Ty); superTy;
-             superTy = getSuperClassOf(superTy)) {
-          if (superTy->isEqual(srcTy)) {
-            // Convert the argument to an rvalue.
-            E2 = convertToRValue(E2);
-            if (!E2) {
-              E->setType(ErrorType::get(Context));
-              return nullptr;
-            }
+      // FIXME: Need a new AST for "coerced with construction syntax".
+      return E2;
+    }
 
-            // If the source had archetype type, convert to its superclass
-            // first. Then, we downcast that object.
-            if (srcArchetype) {
-              E2 = new (Context) ArchetypeToSuperExpr(
-                                   E2,
-                                   srcArchetype->getSuperclass());
-            }
-            
-            // If the destination type is an archetype, this is a
-            // super-to-archetype cast.
-            if (Ty->is<ArchetypeType>()) {
-              return new (Context) UncheckedSuperToArchetypeExpr(E2,
-                                                                 E2->getEndLoc(),
-                                                                 E2->getEndLoc(),
-                                                                 fakeTyLoc);
-            }
-
-            return new (Context) UncheckedDowncastExpr(E2,
-                                                       E->getEndLoc(),
-                                                       E->getEndLoc(),
-                                                       fakeTyLoc);
-          }
-        }
-      }
-
-      // FIXME: Coercions should be made illegal as construction expressions.
-      CoercedExpr CoercedArg = coerceToType(E2, Ty);
-      switch (CoercedArg.getKind()) {
-      case CoercionResult::Succeeded: {
-        return new (Context) CoerceExpr(CoercedArg,
-                                        E->getLoc(),
-                                        fakeTyLoc);
-      }
-
-      case CoercionResult::Failed:
-        // We cannot perform this cast.
-        E->setType(ErrorType::get(Context));
-        return nullptr;
-
-      case CoercionResult::Unknowable:
-        // Delay type checking. However, we do know the type of this expression.
-        E->setType(Ty);
-        return E;
-      }
+    // If the 'function' is a direct reference to a type, this is a
+    // construction. The type needs to be a struct or oneof.
+    if (!isConstructibleType(Ty)) {
+      diagnose(E->getLoc(), diag::cannot_construct_type, Ty);
+      E->setType(ErrorType::get(Context));
+      return 0;
     }
 
     // Check for a struct or oneof with a constructor.
@@ -1256,18 +1195,62 @@ public:
   Expr *visitCoerceExpr(CoerceExpr *E) {
     // The type of the expr is always the type that the MetaType LHS specifies.
     assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
+    if (TC.validateType(E->getTypeLoc(), false)) {
+      E->setType(ErrorType::get(TC.Context));
+      return 0;
+    }
     return E;
   }
 
   Expr *visitUncheckedDowncastExpr(UncheckedDowncastExpr *E) {
     // The type of the expr is always the type specified.
     assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
+    if (TC.validateType(E->getTypeLoc(), false)) {
+      E->setType(ErrorType::get(TC.Context));
+      return 0;
+    }
+
+    Expr *subExpr = TC.convertToRValue(E->getSubExpr());
+    if (!subExpr) {
+      E->setType(ErrorType::get(TC.Context));
+      return 0;
+    }
+    E->setSubExpr(subExpr);
+
+    Type ty = E->getType();
+    Type srcTy = E->getSubExpr()->getType();
+    auto srcArchetype = srcTy->getAs<ArchetypeType>();
+    for (auto superTy = TC.getSuperClassOf(ty); superTy;
+         superTy = TC.getSuperClassOf(superTy)) {
+      if (superTy->isEqual(srcTy)) {
+        // If the source had archetype type, convert to its superclass
+        // first. Then, we downcast that object.
+        if (srcArchetype) {
+          subExpr = new (TC.Context) ArchetypeToSuperExpr(
+                                                  subExpr,
+                                                  srcArchetype->getSuperclass());
+        }
+
+        // If the destination type is an archetype, this is a
+        // super-to-archetype cast.
+        if (ty->is<ArchetypeType>()) {
+          return new (TC.Context) UncheckedSuperToArchetypeExpr(subExpr,
+                                                             subExpr->getEndLoc(),
+                                                             subExpr->getEndLoc(),
+                                                             E->getTypeLoc());
+        }
+
+        return E;
+      }
+    }
+    
     return E;
   }
 
   Expr *visitUncheckedSuperToArchetypeExpr(UncheckedSuperToArchetypeExpr *E) {
     // The type of the expr is always the type specified.
     assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
+    TC.validateType(E->getTypeLoc(), false);
     return E;
   }
     
