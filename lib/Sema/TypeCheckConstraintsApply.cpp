@@ -1341,7 +1341,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     return convertToType(tc, apply->getArg(), tupleTy);
   }
 
-  if (ty->is<StructType>()) {
+  if (ty->is<StructType>() || ty->is<BoundGenericStructType>()) {
     // We're calling a constructor. Dig out the constructor we used.
     assert(origExpr && "Missing original expression for construction");
     auto selected = getOverloadChoiceIfAvailable(
@@ -1373,6 +1373,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // FIXME: Falling back to old type checker for oneofs.
+  assert(ty->is<OneOfType>());
   return tc.semaApplyExpr(apply);
 }
 
