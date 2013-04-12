@@ -322,16 +322,18 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // directly within the constraint system. Instead, we introduce a new
       // overload set with two entries: one for T0 and one for T2 -> T0.
       auto oneofMetaTy = MetaTypeType::get(oneofTy, CS.getASTContext());
-      auto locator = CS.getConstraintLocator(
-                       expr,
-                       ConstraintLocator::UnresolvedMemberRefBase);
       CS.addValueMemberConstraint(oneofMetaTy, expr->getName(), memberTy,
-                                  locator);
+                                  CS.getConstraintLocator(
+                                    expr,
+                                    ConstraintLocator::Member));
 
       OverloadChoice choices[2] = {
         OverloadChoice(oneofTy, OverloadChoiceKind::BaseType),
         OverloadChoice(oneofTy, OverloadChoiceKind::FunctionReturningBaseType),
       };
+      auto locator = CS.getConstraintLocator(
+                         expr,
+                         ConstraintLocator::UnresolvedMemberRefBase);
       CS.addOverloadSet(OverloadSet::getNew(CS, memberTy, locator, choices));
       return memberTy;
     }

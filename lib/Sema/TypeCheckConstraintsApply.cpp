@@ -636,18 +636,20 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto oneofMetaTy = MetaTypeType::get(oneofTy, tc.Context);
 
+      // Find the selected member.
+      auto selected = getOverloadChoice(
+                        cs.getConstraintLocator(expr,
+                                                ConstraintLocator::Member));
+      auto member = selected.first.getDecl();
+
       // The base expression is simply the metatype of a oneof type.
       auto base = new (tc.Context) MetatypeExpr(nullptr,
                                                 expr->getDotLoc(),
                                                 oneofMetaTy);
 
-      // Find the member and build a reference to it.
-      // FIXME: Redundant member lookup.
-      MemberLookup &lookup = cs.lookupMember(oneofMetaTy, expr->getName());
-      assert(lookup.isSuccess() && "Failed lookup?");
-      auto member = lookup.Results[0].D;
+      // Build the member reference.
       return buildMemberRef(base, expr->getDotLoc(), member, expr->getNameLoc(),
-                            expr->getType());
+                            selected.second);
     }
 
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
