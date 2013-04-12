@@ -17,35 +17,147 @@ using namespace swift;
 using namespace Lowering;
 
 namespace {
-/// SILGenApply - An ASTVisitor for building SIL function calls.
+  
+/// Abstractly represents a callee, and knows how to emit the entry point
+/// reference for a callee at any valid uncurry level.
+class Callee {
+public:
+  enum class Kind {
+    /// A generic SIL value.
+    /// FIXME: We should use more specific kinds so we can emit curried calls
+    /// to methods.
+    GenericValue,
+    /// A standalone function, referenceable by a ConstantRefInst.
+    StandaloneFunction,
+  };
+  
+  const Kind kind;
+  
+  // Move, don't copy.
+  Callee(const Callee &) = delete;
+  Callee &operator=(const Callee &) = delete;
+private:
+  union {
+    ManagedValue genericValue;
+    SILConstant standaloneFunction;
+  };
+  std::vector<Substitution> substitutions;
+  SILType specializedType;
+  SpecializeExpr *specializeLoc = nullptr;
+  
+public:
+  Callee(ManagedValue genericValue)
+    : kind(Kind::GenericValue), genericValue(genericValue),
+      specializedType(genericValue.getType())
+  {}
+  
+  Callee(SILGenFunction &gen, SILConstant standaloneFunction)
+    : kind(Kind::StandaloneFunction), standaloneFunction(standaloneFunction),
+      specializedType(gen.SGM.getConstantType(standaloneFunction))
+  {}
+  
+  Callee(Callee &&) = default;
+  Callee &operator=(Callee &&) = default;
+  
+  void addSubstitutions(SILGenFunction &gen,
+                        SpecializeExpr *e,
+                        unsigned callDepth) {
+    // Currently generic methods of generic types are the deepest we should
+    // be able to stack specializations.
+    // FIXME: Generic local functions can add type parameters to arbitrary
+    // depth.
+    assert(callDepth < 2 && "specialization below 'this' or argument depth?!");
+    substitutions.insert(substitutions.end(),
+                         e->getSubstitutions().begin(),
+                         e->getSubstitutions().end());
+    // Save the type of the SpecializeExpr at the right depth in the type.
+    assert(specializedType.getUncurryLevel() >= callDepth
+           && "specializations below uncurry level?!");
+    if (callDepth == 0) {
+      specializedType = gen.getLoweredLoadableType(
+                                             getThinFunctionType(e->getType()),
+                                             specializedType.getUncurryLevel());
+    } else {
+      FunctionType *ft = specializedType.castTo<FunctionType>();
+      Type outerInput = ft->getInput();
+      Type newSpecialized = FunctionType::get(outerInput,
+                                              e->getType(),
+                                              /*isAutoClosure*/ false,
+                                              /*isBlock*/ false,
+                                              /*isThin*/ true,
+                                              outerInput->getASTContext());
+      specializedType = gen.getLoweredLoadableType(newSpecialized,
+                                             specializedType.getUncurryLevel());
+    }
+    specializeLoc = e;
+  }
+  
+  unsigned getNaturalUncurryLevel() const {
+    return specializedType.getUncurryLevel();
+  }
+  
+  ManagedValue getAtUncurryLevel(SILGenFunction &gen, unsigned level) const {
+    ManagedValue mv;
+
+    switch (kind) {
+    case Kind::GenericValue:
+      assert(level == genericValue.getType().getUncurryLevel()
+             && "currying non-standalone function not yet supported");
+      mv = genericValue;
+      break;
+    case Kind::StandaloneFunction: {
+      assert(level <= standaloneFunction.uncurryLevel
+             && "currying past natural uncurry level of standalone function");
+      SILConstant constant = standaloneFunction.atUncurryLevel(level);
+      SILValue ref = gen.emitGlobalConstantRef(SILLocation(), constant);
+      mv = ManagedValue(ref, ManagedValue::Unmanaged);
+      break;
+    }
+    };
+    
+    // If the callee needs to be specialized, do so.
+    if (specializeLoc) {
+      CleanupsDepth cleanup = mv.getCleanup();
+      SILValue spec = gen.B.createSpecialize(specializeLoc, mv.getValue(),
+                                             substitutions, specializedType);
+      mv = ManagedValue(spec, cleanup);
+    }
+    
+    return mv;
+  }
+};
+  
+/// An ASTVisitor for building SIL function calls.
 /// Nested ApplyExprs applied to an underlying curried function or method
 /// reference are flattened into a single SIL apply to the most uncurried entry
 /// point fitting the call site, avoiding pointless intermediate closure
 /// construction.
-class LLVM_LIBRARY_VISIBILITY SILGenApply
-  : public ExprVisitor<SILGenApply>
+class SILGenApply : public ExprVisitor<SILGenApply>
 {
 public:
   SILGenFunction &gen;
-  ManagedValue callee;
+  Optional<Callee> callee;
   RValue thisParam;
   std::vector<ApplyExpr*> callSites;
-  std::vector<Substitution> substitutions;
-  SILType specializedType;
-  SpecializeExpr *specializeLoc;
   Expr *sideEffect;
   unsigned callDepth;
   
   SILGenApply(SILGenFunction &gen)
-    : gen(gen), specializeLoc(nullptr), sideEffect(nullptr), callDepth(0)
+    : gen(gen), sideEffect(nullptr), callDepth(0)
   {}
   
   void setCallee(ManagedValue theCallee) {
     assert((thisParam ? callDepth == 1 : callDepth == 0)
            && "setting callee at non-zero call depth?!");
-    assert(!callee.getValue() && "already set callee!");
-    callee = theCallee;
-    specializedType = theCallee.getType();
+    assert(!callee && "already set callee!");
+    callee.emplace(theCallee);
+  }
+  
+  void setCallee(SILConstant standaloneCallee) {
+    assert((thisParam ? callDepth == 1 : callDepth == 0)
+           && "setting callee at non-zero call depth?!");
+    assert(!callee && "already set callee!");
+    callee.emplace(gen, standaloneCallee);
   }
   
   void setSideEffect(Expr *sideEffectExpr) {
@@ -78,34 +190,8 @@ public:
   /// Add specializations to the curry.
   void visitSpecializeExpr(SpecializeExpr *e) {
     visit(e->getSubExpr());
-    // Currently generic methods of generic types are the deepest we should
-    // be able to stack specializations.
-    // FIXME: Generic local functions can add type parameters to arbitrary
-    // depth.
-    assert(callDepth < 2 && "specialization below 'this' or argument depth?!");
-    substitutions.insert(substitutions.end(),
-                         e->getSubstitutions().begin(),
-                         e->getSubstitutions().end());
-    // Save the type of the SpecializeExpr at the right depth in the type..
-    assert(specializedType.getUncurryLevel() >= callDepth
-           && "specializations below uncurry level?!");
-    if (callDepth == 0) {
-      specializedType = gen.getLoweredLoadableType(
-                                             getThinFunctionType(e->getType()),
-                                             specializedType.getUncurryLevel());
-    } else {
-      FunctionType *ft = specializedType.castTo<FunctionType>();
-      Type outerInput = ft->getInput();
-      Type newSpecialized = FunctionType::get(outerInput,
-                                              e->getType(),
-                                              /*isAutoClosure*/ false,
-                                              /*isBlock*/ false,
-                                              /*isThin*/ true,
-                                              outerInput->getASTContext());
-      specializedType = gen.getLoweredLoadableType(newSpecialized,
-                                             specializedType.getUncurryLevel());
-    }
-    specializeLoc = e;
+    assert(callee && "did not find callee below SpecializeExpr?!");
+    callee->addSubstitutions(gen, e, callDepth);
   }
   
   //
@@ -139,7 +225,14 @@ public:
     
     // FIXME: Store context values for local funcs in a way that we can
     // apply them directly as an added "call site" here.
-    setCallee(gen.emitReferenceToDecl(e, e->getDecl()));
+    SILConstant constant(e->getDecl());
+
+    // Obtain a reference for a local closure.
+    if (gen.LocalConstants.count(constant))
+      setCallee(gen.emitReferenceToDecl(e, e->getDecl()));
+    // Otherwise, stash the SILConstant.
+    else
+      setCallee(constant);
   }
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *e) {
     setCallee(ManagedValue(gen.emitGlobalConstantRef(e,
@@ -212,16 +305,9 @@ public:
                            ManagedValue::Unmanaged));
   }
   
-  ManagedValue getSpecializedCallee() {
-    // If the callee needs to be specialized, do so.
-    if (specializeLoc) {
-      CleanupsDepth cleanup = callee.getCleanup();
-      SILValue spec = gen.B.createSpecialize(specializeLoc, callee.getValue(),
-                                          substitutions, specializedType);
-      return ManagedValue(spec, cleanup);
-    }
-    
-    return callee;
+  Callee getCallee() {
+    assert(callee && "did not find callee?!");
+    return *std::move(callee);
   }
 };
 
@@ -274,15 +360,15 @@ namespace {
     // final apply is emitted.
     SmallVector<ManagedValue, 8> uncurriedArgs;
     std::vector<SmallVector<ManagedValue, 2>> extraArgs;
-    ManagedValue callee;
+    Callee callee;
     unsigned uncurries;
     bool applied;
     
   public:
-    CallEmission(SILGenFunction &gen, ManagedValue callee)
+    CallEmission(SILGenFunction &gen, Callee &&callee)
       : gen(gen),
-        callee(callee),
-        uncurries(callee.getType().getUncurryLevel() + 1),
+        callee(std::move(callee)),
+        uncurries(callee.getNaturalUncurryLevel() + 1),
         applied(false)
     {}
     
@@ -307,14 +393,14 @@ namespace {
       
       applied = true;
 
-      // See if we need a curried thunk.
-      // FIXME: Implement this.
-      if (uncurries > 0) {
-        llvm_unreachable("curried thunk not yet implemented");
-      }
+      // Get the callee value at the needed uncurry level.
+      unsigned uncurryLevel = callee.getNaturalUncurryLevel() - uncurries;
+      ManagedValue calleeValue = callee.getAtUncurryLevel(gen, uncurryLevel);
 
       // Emit the uncurried call.
-      ManagedValue result = gen.emitApply(loc, callee.forward(gen), uncurriedArgs);
+      ManagedValue result = gen.emitApply(loc,
+                                          calleeValue.forward(gen),
+                                          uncurriedArgs);
       
       // If there are remaining call sites, apply them to the result function.
       for (ArrayRef<ManagedValue> args : extraArgs) {
@@ -353,7 +439,7 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
     gen.visit(apply.sideEffect);
   
   // Build the call.
-  CallEmission emission(gen, apply.getSpecializedCallee());
+  CallEmission emission(gen, apply.getCallee());
   
   // Apply 'this' if provided.
   if (apply.thisParam) {
@@ -388,7 +474,6 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(SILValue ObjectPtr,
 
   // Construct a call to the injection function.
   CallEmission emission = prepareApplyExpr(*this, ArrayInjectionFunction);
-//  SILValue InjectionArgs[] = {BasePtr, ObjectPtr, Length};
   
   CanType injectionArgsTy
    = ArrayInjectionFunction->getType()->getAs<FunctionType>()->getInput()

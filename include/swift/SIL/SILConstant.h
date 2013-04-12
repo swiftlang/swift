@@ -155,7 +155,7 @@ struct SILConstant {
   void dump() const;
   
   // Returns the SILConstant for an entity at a shallower uncurry level.
-  SILConstant atUncurryLevel(unsigned level) {
+  SILConstant atUncurryLevel(unsigned level) const {
     assert(level <= uncurryLevel && "can't safely go to deeper uncurry level");
     return SILConstant(loc.getOpaqueValue(), kind, level);
   }

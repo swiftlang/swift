@@ -130,16 +130,30 @@ namespace swift {
       HasValue = false;
     }
     
-    T &getValue() { assert(HasValue); return Value; }
-    const T &getValue() const { assert(HasValue); return Value; }
+    T &getValue() & { assert(HasValue); return Value; }
+    const T &getValue() const & { assert(HasValue); return Value; }
+    
+    T getValue() && {
+      assert(HasValue);
+      T result = std::move(Value);
+      reset();
+      return result;
+    }
     
     bool hasValue() const { return HasValue; }
     explicit operator bool() const { return HasValue; }
     
     const T* operator->() const { assert(HasValue); return &Value; }
           T* operator->()       { assert(HasValue); return &Value; }
-    const T& operator*() const { assert(HasValue); return Value; }
-          T& operator*()       { assert(HasValue); return Value; }
+    const T& operator*() const & { assert(HasValue); return Value; }
+          T& operator*() &       { assert(HasValue); return Value; }
+    
+    T operator*() && {
+      assert(HasValue);
+      T result = std::move(Value);
+      reset();
+      return result;
+    }
   };
 }
 
