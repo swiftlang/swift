@@ -268,6 +268,14 @@ public:
     visit(e->getSubExpr());
   }
   
+  void visitParenExpr(ParenExpr *e) {
+    visit(e->getSubExpr());
+  }
+  
+  void visitCoerceExpr(CoerceExpr *e) {
+    visit(e->getSubExpr());
+  }
+  
   void applySuper(ApplyExpr *apply) {
     // Load the 'super' argument.
     // FIXME: Eliminate the implicit coercions of the SuperExpr.

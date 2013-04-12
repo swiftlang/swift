@@ -168,19 +168,27 @@ static ManagedValue emitGlobalVariable(SILGenFunction &gen,
 
 ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
                                                  ValueDecl *decl,
-                                                 Type declType) {
+                                                 Type declType,
+                                                 unsigned uncurryLevel) {
   if (!declType) declType = decl->getType();
   
   // If this is a reference to a type, produce a metatype.
   if (isa<TypeDecl>(decl)) {
     assert(decl->getType()->is<MetaTypeType>() &&
            "type declref does not have metatype type?!");
+    assert((uncurryLevel == SILConstant::ConstructAtNaturalUncurryLevel
+            || uncurryLevel == 0)
+           && "uncurry level doesn't make sense for types");
     return ManagedValue(B.createMetatype(loc, getLoweredType(declType)),
                         ManagedValue::Unmanaged);
   }
   
   // If this is a reference to a var, produce an address.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
+    assert((uncurryLevel == SILConstant::ConstructAtNaturalUncurryLevel
+            || uncurryLevel == 0)
+           && "uncurry level doesn't make sense for vars");
+
     // If it's a property, invoke its getter.
     if (var->isProperty()) {
       ManagedValue get = emitConstantRef(loc,
@@ -202,16 +210,24 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   // sort.
   assert(!decl->getTypeOfReference()->is<LValueType>() &&
          "unexpected lvalue decl ref?!");
+  
+  // If the referenced decl is a local func with context, then the SILConstant
+  // uncurry level is one deeper (for the context vars).
+  if (auto *fd = dyn_cast<FuncDecl>(decl)) {
+    if (!fd->getBody()->getCaptures().empty()
+        && uncurryLevel != SILConstant::ConstructAtNaturalUncurryLevel)
+      ++uncurryLevel;
+  }
 
-  return emitConstantRef(loc, SILConstant(decl));
+  return emitConstantRef(loc, SILConstant(decl, uncurryLevel));
 }
 
 RValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
-  return RValue(*this, emitReferenceToDecl(E, E->getDecl(), E->getType()));
+  return RValue(*this, emitReferenceToDecl(E, E->getDecl(), E->getType(), 0));
 }
 
 RValue SILGenFunction::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
-  return RValue(*this, emitReferenceToDecl(E, E->getThis(), E->getType()));
+  return RValue(*this, emitReferenceToDecl(E, E->getThis(), E->getType(), 0));
 }
 
 RValue SILGenFunction::visitOtherConstructorDeclRefExpr(
