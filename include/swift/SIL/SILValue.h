@@ -386,21 +386,21 @@ namespace swift {
     }
 
     /// Returns the full list of operands.
-    MutableArrayRef<Operand> getOperands() {
+    MutableArrayRef<Operand> asArray() {
       return MutableArrayRef<Operand>(Buffer, N);
     }
-    ArrayRef<Operand> getOperands() const {
+    ArrayRef<Operand> asArray() const {
       return ArrayRef<Operand>(Buffer, N);
     }
 
     /// Returns the full list of operand values.
-    OperandValueArrayRef getValues() const {
-      return OperandValueArrayRef(getOperands());
+    OperandValueArrayRef asValueArray() const {
+      return OperandValueArrayRef(asArray());
     }
 
     /// Indexes into the full list of operands.
-    Operand &operator[](unsigned i) { return getOperands()[i]; }
-    const Operand &operator[](unsigned i) const { return getOperands()[i]; }
+    Operand &operator[](unsigned i) { return asArray()[i]; }
+    const Operand &operator[](unsigned i) const { return asArray()[i]; }
   };
 
   /// An operator list with a fixed number of known operands
@@ -447,40 +447,40 @@ namespace swift {
     }
 
     ~TailAllocatedOperandList() {
-      for (auto &op : getDynamicOperands()) {
+      for (auto &op : getDynamicAsArray()) {
         op.~Operand();
       }
     }
 
     /// Returns the full list of operands.
-    MutableArrayRef<Operand> getOperands() {
+    MutableArrayRef<Operand> asArray() {
       return MutableArrayRef<Operand>(Buffer, N+NumExtra);
     }
-    ArrayRef<Operand> getOperands() const {
+    ArrayRef<Operand> asArray() const {
       return ArrayRef<Operand>(Buffer, N+NumExtra);
     }
 
     /// Returns the full list of operand values.
-    OperandValueArrayRef getValues() const {
-      return OperandValueArrayRef(getOperands());
+    OperandValueArrayRef asValueArray() const {
+      return OperandValueArrayRef(asArray());
     }
 
     /// Returns the list of the dynamic operands.
-    MutableArrayRef<Operand> getDynamicOperands() {
+    MutableArrayRef<Operand> getDynamicAsArray() {
       return MutableArrayRef<Operand>(Buffer+N, NumExtra);
     }
-    ArrayRef<Operand> getDynamicOperands() const {
+    ArrayRef<Operand> getDynamicAsArray() const {
       return ArrayRef<Operand>(Buffer+N, NumExtra);
     }
 
     /// Returns the list of the dynamic operand values.
-    OperandValueArrayRef getDynamicValues() const {
-      return OperandValueArrayRef(getDynamicOperands());
+    OperandValueArrayRef getDynamicValuesAsArray() const {
+      return OperandValueArrayRef(getDynamicAsArray());
     }
 
     /// Indexes into the full list of operands.
-    Operand &operator[](unsigned i) { return getOperands()[i]; }
-    const Operand &operator[](unsigned i) const { return getOperands()[i]; }
+    Operand &operator[](unsigned i) { return asArray()[i]; }
+    const Operand &operator[](unsigned i) const { return asArray()[i]; }
   };
 
   /// A specialization of TailAllocatedOperandList for zero static operands.
@@ -508,40 +508,40 @@ namespace swift {
     }
 
     ~TailAllocatedOperandList() {
-      for (auto &op : getDynamicOperands()) {
+      for (auto &op : getDynamicAsArray()) {
         op.~Operand();
       }
     }
 
     /// Returns the full list of operands.
-    MutableArrayRef<Operand> getOperands() {
+    MutableArrayRef<Operand> asArray() {
       return MutableArrayRef<Operand>(Buffer, NumExtra);
     }
-    ArrayRef<Operand> getOperands() const {
+    ArrayRef<Operand> asArray() const {
       return ArrayRef<Operand>(Buffer, NumExtra);
     }
 
     /// Returns the full list of operand values.
-    OperandValueArrayRef getValues() const {
-      return OperandValueArrayRef(getOperands());
+    OperandValueArrayRef asValueArray() const {
+      return OperandValueArrayRef(asArray());
     }
 
     /// Returns the list of the dynamic operands.
-    MutableArrayRef<Operand> getDynamicOperands() {
+    MutableArrayRef<Operand> getDynamicAsArray() {
       return MutableArrayRef<Operand>(Buffer, NumExtra);
     }
-    ArrayRef<Operand> getDynamicOperands() const {
+    ArrayRef<Operand> getDynamicAsArray() const {
       return ArrayRef<Operand>(Buffer, NumExtra);
     }
 
     /// Returns the list of the dynamic operand values.
-    OperandValueArrayRef getDynamicValues() const {
-      return OperandValueArrayRef(getDynamicOperands());
+    OperandValueArrayRef getDynamicValuesAsArray() const {
+      return OperandValueArrayRef(getDynamicAsArray());
     }
 
     /// Indexes into the full list of operands.
-    Operand &operator[](unsigned i) { return getOperands()[i]; }
-    const Operand &operator[](unsigned i) const { return getOperands()[i]; }
+    Operand &operator[](unsigned i) { return asArray()[i]; }
+    const Operand &operator[](unsigned i) const { return asArray()[i]; }
   };
 
 } // end namespace swift

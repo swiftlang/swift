@@ -17,6 +17,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/AST.h"
+#include "swift/Basic/AssertImplements.h"
 #include "swift/SIL/SILFunction.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
@@ -89,6 +90,28 @@ namespace {
 
 void SILInstruction::destroy(SILInstruction *I) {
   InstructionDestroyer().visit(I);
+}
+
+namespace {
+  class AllOperandsAccessor : public SILVisitor<AllOperandsAccessor,
+                                                ArrayRef<Operand> > {
+  public:
+#define VALUE(CLASS, PARENT) \
+    ArrayRef<Operand> visit##CLASS(const CLASS *I) {                    \
+      llvm_unreachable("accessing non-instruction " #CLASS);            \
+    }
+#define INST(CLASS, PARENT) \
+    ArrayRef<Operand> visit##CLASS(const CLASS *I) {                    \
+      ASSERT_IMPLEMENTS(CLASS, SILInstruction, getAllOperands,          \
+                        ArrayRef<Operand>() const);                     \
+      return I->getAllOperands();                                       \
+    }
+#include "swift/SIL/SILNodes.def"
+  };
+} // end anonymous namespace
+
+ArrayRef<Operand> SILInstruction::getAllOperands() const {
+  return AllOperandsAccessor().visit(const_cast<SILInstruction*>(this));
 }
 
 //===----------------------------------------------------------------------===//
@@ -628,10 +651,10 @@ CondBranchInst *CondBranchInst::create(SILLocation Loc, SILValue Condition,
 }
 
 OperandValueArrayRef CondBranchInst::getTrueArgs() const {
-  return Operands.getValues().slice(1, getTrueBB()->bbarg_size());
+  return Operands.asValueArray().slice(1, getTrueBB()->bbarg_size());
 }
 
 OperandValueArrayRef CondBranchInst::getFalseArgs() const {
-  return Operands.getValues().slice(1 + getTrueBB()->bbarg_size(),
-                                    getFalseBB()->bbarg_size());
+  return Operands.asValueArray().slice(1 + getTrueBB()->bbarg_size(),
+                                       getFalseBB()->bbarg_size());
 }
