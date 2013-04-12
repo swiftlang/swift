@@ -574,6 +574,10 @@ public:
             "thin_to_thick_function operand must be a function");
     require(TTFI->getType().is<AnyFunctionType>(),
             "thin_to_thick_function result must be a function");
+    require(TTFI->getType().getUncurryLevel()
+              == TTFI->getOperand().getType().getUncurryLevel(),
+            "thin_to_thick_function operand and result type must have same "
+            "uncurry level");
     if (auto *opFTy = dyn_cast<FunctionType>(
                                  TTFI->getOperand().getType().getSwiftType())) {
       auto *resFTy = dyn_cast<FunctionType>(TTFI->getType().getSwiftType());
