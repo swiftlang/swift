@@ -459,8 +459,20 @@ void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
   // address.
   if (i->getConstant().kind == SILConstant::Kind::GlobalAddress) {
     VarDecl *global = cast<VarDecl>(i->getConstant().getDecl());
-    newLoweredAddress(SILValue(i, 0),
-                      IGM.getAddrOfGlobalVariable(global));
+    TypeInfo const &type = getFragileTypeInfo(global->getType());
+    
+    Address addr;
+    
+    // If the variable is empty, don't actually emit it; just return undef.
+    // FIXME: fragility?  global destructors?
+    if (type.isEmpty(ResilienceScope::Local)) {
+      auto undef = llvm::UndefValue::get(type.StorageType->getPointerTo());
+      addr = Address(undef, Alignment(1));
+    } else {
+      addr = IGM.getAddrOfGlobalVariable(global);
+    }
+
+    newLoweredAddress(SILValue(i, 0), addr);
     return;
   }
   
