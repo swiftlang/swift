@@ -74,6 +74,7 @@ public:
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td);
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitExtensionDecl(ExtensionDecl *ed);
+  void visitVarDecl(VarDecl *vd);
 
   /// emitFunction - Generates code for the given FuncExpr and adds the
   /// SILFunction to the current SILModule under the name SILConstant(decl). For

@@ -193,6 +193,10 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
   // FIXME: generate accessor functions for global variables
 }
 
+void SILGenModule::visitVarDecl(VarDecl *vd) {
+  addGlobalVariable(vd);
+}
+
 //===--------------------------------------------------------------------===//
 // SILModule::constructSIL method implementation
 //===--------------------------------------------------------------------===//
