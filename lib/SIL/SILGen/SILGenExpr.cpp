@@ -141,6 +141,14 @@ static ManagedValue emitGlobalVariable(SILGenFunction &gen,
   assert(!var->isProperty() &&
          "not a physical global variable!");
   
+  // FIXME: Always emit global variables directly. Eventually we want "true"
+  // global variables to be indirectly accessed so that they can be initialized
+  // on demand.
+  SILValue addr = gen.emitGlobalConstantRef(loc,
+                                            SILConstant(var, SILConstant::Kind::GlobalAddress));
+  return ManagedValue(addr, ManagedValue::LValue);
+
+  /*
   // For global vars in top-level code, emit the address of the variable
   // directly.
   auto *TU = dyn_cast<TranslationUnit>(var->getDeclContext());
@@ -155,6 +163,7 @@ static ManagedValue emitGlobalVariable(SILGenFunction &gen,
   SILValue accessor = gen.emitGlobalConstantRef(loc,
                            SILConstant(var, SILConstant::Kind::GlobalAccessor));
   return gen.emitApply(loc, accessor, {});
+   */
 }
 
 ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
