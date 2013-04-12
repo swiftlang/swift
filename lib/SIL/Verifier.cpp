@@ -12,6 +12,7 @@
 
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/Dominance.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
@@ -50,8 +51,10 @@ public:
 class SILVerifier : public SILVerifierBase<SILVerifier> {
   SILFunction const &F;
   const SILInstruction *CurInstruction = nullptr;
+  DominanceInfo Dominance;
 public:
-  SILVerifier(SILFunction const &F) : F(F) {}
+  SILVerifier(SILFunction const &F)
+    : F(F), Dominance(const_cast<SILFunction*>(&F)) {}
   
   void _require(bool condition, const char *complaint) {
     if (condition) return;
@@ -109,9 +112,10 @@ public:
       if (auto *valueI = dyn_cast<SILInstruction>(operand.get())) {
         require(valueI->getParent(),
                 "instruction uses value of unparented instruction");
-        // TODO: check dominance
         require(valueI->getParent()->getParent() == &F,
                 "instruction uses value of instruction from different function");
+        require(Dominance.properlyDominates(valueI, I),
+                "instruction doesn't dominate its operand");
       }
 
       require(operand.getUser() == I,
