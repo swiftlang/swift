@@ -28,10 +28,6 @@ namespace swift {
 template<typename ImplClass, typename ValueRetTy = void>
 class SILVisitor {
 public:
-  ValueRetTy visitSILValue(ValueBase *V) {
-    // Base class, used if some class of value isn't handled.
-  }
-
 #define VALUE(CLASS, PARENT)              \
   case ValueKind::CLASS:                  \
     return static_cast<ImplClass*>(this)  \
@@ -78,6 +74,20 @@ ValueRetTy visit##CLASS(CLASS *I) {                         \
   }
   void visitSILFunction(SILFunction &F) {
     this->ImplClass::visitSILFunction(&F);
+  }
+};
+
+/// A simple convenience class for a visitor that should only visit
+/// SIL instructions.
+template<typename ImplClass, typename ValueRetTy = void>
+class SILInstructionVisitor : public SILVisitor<ImplClass, ValueRetTy> {
+public:
+  void visitSILArgument(SILArgument *A) {
+    llvm_unreachable("should only be visiting instructions");
+  }
+
+  ValueRetTy visit(SILInstruction *I) {
+    return SILVisitor<ImplClass, ValueRetTy>::visit(I);
   }
 };
 

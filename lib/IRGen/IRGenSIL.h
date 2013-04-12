@@ -318,7 +318,7 @@ struct LoweredBB {
 
 /// Visits a SIL Function and generates LLVM IR.
 class IRGenSILFunction :
-  public IRGenFunction, public SILVisitor<IRGenSILFunction>
+  public IRGenFunction, public SILInstructionVisitor<IRGenSILFunction>
 {
 public:
   llvm::DenseMap<SILValue, LoweredValue> loweredValues;

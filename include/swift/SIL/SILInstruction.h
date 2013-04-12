@@ -103,7 +103,7 @@ public:
   /// Return the array of operands for this instruction.
   ArrayRef<Operand> getAllOperands() const;
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_SILInstruction &&
            V->getKind() <= ValueKind::Last_SILInstruction;
   }
@@ -134,7 +134,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_AllocInst &&
            V->getKind() <= ValueKind::Last_AllocInst;
   }
@@ -155,7 +155,7 @@ public:
   /// type of the instruction itself, which will be an address type).
   Type getElementType() const;
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocVarInst;
   }
 };
@@ -168,7 +168,7 @@ public:
   AllocRefInst(SILLocation loc, AllocKind allocKind, SILType type,
                SILFunction &F);
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocRefInst;
   }
 };
@@ -187,7 +187,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocBoxInst;
   }
 };
@@ -215,7 +215,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocArrayInst;
   }
 };
@@ -259,7 +259,7 @@ public:
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_FunctionInst &&
            V->getKind() <= ValueKind::Last_FunctionInst;
   }
@@ -275,6 +275,10 @@ public:
                            SILType ReturnType,
                            ArrayRef<SILValue> Args,
                            SILFunction &F);
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::ApplyInst;
+  }
 };
 
 /// PartialApplyInst - Represents the creation of a closure object by partial
@@ -288,6 +292,10 @@ public:
                                   ArrayRef<SILValue> Args,
                                   SILType ClosureType,
                                   SILFunction &F);
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::PartialApplyInst;
+  }
 };
 
 /// ConstantRefInst - Represents a reference to a *constant* declaration,
@@ -310,7 +318,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ConstantRefInst;
   }
 };
@@ -332,7 +340,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::IntegerLiteralInst;
   }
 };
@@ -353,7 +361,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::FloatLiteralInst;
   }
 };
@@ -374,7 +382,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::StringLiteralInst;
   }
 };
@@ -403,7 +411,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::LoadInst;
   }
 };
@@ -426,7 +434,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::StoreInst;
   }
 };
@@ -446,7 +454,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::InitializeVarInst;
   }
 };
@@ -487,7 +495,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::CopyAddrInst;
   }
 };
@@ -536,7 +544,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::SpecializeInst;
   }
 };
@@ -556,7 +564,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_ConversionInst &&
       V->getKind() <= ValueKind::Last_ConversionInst;
   }
@@ -568,7 +576,7 @@ class ConvertFunctionInst : public ConversionInst {
 public:
   ConvertFunctionInst(SILLocation Loc, SILValue Operand, SILType Ty);
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ConvertFunctionInst;
   }
 };
@@ -578,7 +586,7 @@ class CoerceInst : public ConversionInst {
 public:
   CoerceInst(SILLocation Loc, SILValue Operand, SILType ty);
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::CoerceInst;
   }
 };
@@ -588,7 +596,7 @@ class UpcastInst : public ConversionInst {
 public:
   UpcastInst(SILLocation Loc, SILValue Operand, SILType ty);
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::UpcastInst;
   }
 };
@@ -599,7 +607,7 @@ class DowncastInst : public ConversionInst {
 public:
   DowncastInst(SILLocation Loc, SILValue Operand, SILType ty);
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::DowncastInst;
   }
 };
@@ -609,7 +617,7 @@ class AddressToPointerInst : public ConversionInst {
 public:
   AddressToPointerInst(SILLocation Loc, SILValue Operand, SILType ty);
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AddressToPointerInst;
   }
 };
@@ -620,7 +628,7 @@ class ThinToThickFunctionInst : public ConversionInst {
 public:
   ThinToThickFunctionInst(SILLocation Loc, SILValue Operand, SILType ty);
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ThinToThickFunctionInst;
   }
 };
@@ -631,7 +639,7 @@ class ArchetypeToSuperInst : public ConversionInst {
 public:
   ArchetypeToSuperInst(SILLocation Loc, SILValue Archetype, SILType BaseTy);
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ArchetypeToSuperInst;
   }
 };
@@ -658,7 +666,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::SuperToArchetypeInst;
   }
 };
@@ -695,7 +703,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::TupleInst;
   }
 };
@@ -713,7 +721,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::MetatypeInst;
   }
 };
@@ -735,7 +743,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ClassMetatypeInst;
   }
 };
@@ -757,7 +765,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ArchetypeMetatypeInst;
   }
 };
@@ -779,7 +787,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ProtocolMetatypeInst;
   }
 };
@@ -795,7 +803,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ModuleInst;
   }
 };
@@ -817,7 +825,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AssociatedMetatypeInst;
   }
 };
@@ -837,7 +845,7 @@ public:
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ExtractInst;
   }
 };
@@ -857,7 +865,7 @@ public:
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ElementAddrInst;
   }
 };
@@ -877,7 +885,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::RefElementAddrInst;
   }
 };
@@ -898,7 +906,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_DynamicMethodInst &&
       V->getKind() <= ValueKind::Last_DynamicMethodInst;
   }
@@ -912,7 +920,7 @@ public:
   ClassMethodInst(SILLocation Loc, SILValue Operand, SILConstant Member,
                   SILType Ty, SILFunction &F);
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ClassMethodInst;
   }
 };
@@ -925,7 +933,7 @@ public:
   SuperMethodInst(SILLocation Loc, SILValue Operand, SILConstant Member,
                   SILType Ty, SILFunction &F);
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::SuperMethodInst;
   }
 };
@@ -937,7 +945,7 @@ public:
   ArchetypeMethodInst(SILLocation Loc, SILValue Operand, SILConstant Member,
                       SILType Ty, SILFunction &F);
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ArchetypeMethodInst;
   }
 };
@@ -952,7 +960,7 @@ public:
   ProtocolMethodInst(SILLocation Loc, SILValue Operand, SILConstant Member,
                      SILType Ty, SILFunction &F);
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ProtocolMethodInst;
   }
 };
@@ -969,7 +977,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ProjectExistentialInst;
   }
 };
@@ -996,7 +1004,7 @@ public:
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::InitExistentialInst;
   }
 };
@@ -1031,7 +1039,7 @@ public:
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::UpcastExistentialInst;
   }
 };
@@ -1047,7 +1055,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::RetainInst;
   }
 };
@@ -1068,7 +1076,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::DeinitExistentialInst;
   }
 };
@@ -1085,7 +1093,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ReleaseInst;
   }
 };
@@ -1103,7 +1111,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::DeallocVarInst;
   }
 };
@@ -1121,7 +1129,7 @@ public:
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::DeallocRefInst;
   }
 };
@@ -1143,7 +1151,7 @@ public:
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ReleaseInst;
   }
 };
@@ -1171,7 +1179,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::IndexAddrInst;
   }
 };
@@ -1190,7 +1198,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::IntegerValueInst;
   }
 };
@@ -1218,7 +1226,7 @@ public:
     return const_cast<TermInst*>(this)->getSuccessors();
   }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_TermInst &&
            V->getKind() <= ValueKind::Last_TermInst;
   }
@@ -1238,7 +1246,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
   
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::UnreachableInst;
   }
 };
@@ -1269,7 +1277,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ReturnInst;
   }
 };
@@ -1310,7 +1318,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::BranchInst;
   }
 };
@@ -1366,7 +1374,7 @@ public:
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::CondBranchInst;
   }
 };

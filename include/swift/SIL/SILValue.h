@@ -104,6 +104,8 @@ namespace swift {
     /// Pretty-print the SILInstruction.
     void dump() const;
     void print(raw_ostream &OS) const;
+
+    static bool classof(const ValueBase *V) { return true; }
   };
 
   enum {

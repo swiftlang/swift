@@ -27,7 +27,7 @@ using namespace swift;
 namespace {
 /// SILVerifier class - This class implements the SIL verifier, which walks over
 /// SIL, checking and enforcing its invariants.
-class SILVerifier : public SILVisitor<SILVerifier> {
+class SILVerifier : public SILInstructionVisitor<SILVerifier> {
   SILFunction const &F;
 public:
   SILVerifier(SILFunction const &F) : F(F) {}
@@ -50,6 +50,9 @@ public:
     // Dispatch to our more-specialized instances below.
     ((SILVisitor<SILVerifier>*)this)->visit(I);
   }
+
+  // Base case: no extra verification to do.
+  void visitSILInstruction(SILInstruction *I) {}
 
   void visitAllocVarInst(AllocVarInst *AI) {
     assert(AI->getType().isAddress() && "alloc_var must return address");

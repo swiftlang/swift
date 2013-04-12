@@ -66,6 +66,11 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
 // SILInstruction Implementation
 //===----------------------------------------------------------------------===//
 
+// Assert that all subclasses of ValueBase implement classof.
+#define VALUE(CLASS, PARENT) \
+  ASSERT_IMPLEMENTS_STATIC(CLASS, PARENT, classof, bool(const ValueBase*));
+#include "swift/SIL/SILNodes.def"
+
 /// removeFromParent - This method unlinks 'this' from the containing basic
 /// block, but does not delete it.
 ///

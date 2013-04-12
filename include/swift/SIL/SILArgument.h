@@ -32,7 +32,7 @@ public:
   SILBasicBlock *getParent() { return ParentBB; }
   const SILBasicBlock *getParent() const { return ParentBB; }
 
-  static bool classof(SILValue V) {
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::SILArgument;
   }
 };

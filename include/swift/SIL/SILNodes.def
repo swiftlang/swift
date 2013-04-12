@@ -45,9 +45,9 @@
 #define VALUE_RANGE(Id, First, Last)
 #endif
 
-VALUE(SILArgument, SILValue)
+VALUE(SILArgument, ValueBase)
 
-ABSTRACT_VALUE(SILInstruction, SILValue)
+ABSTRACT_VALUE(SILInstruction, ValueBase)
   ABSTRACT_VALUE(AllocInst, SILInstruction)
     INST(AllocVarInst, AllocInst)
     INST(AllocRefInst, AllocInst)

@@ -197,8 +197,10 @@ public:
     }
     OS << '\n';
   }
-  void visitSILInstruction(SILInstruction *I) {
-    assert(0 && "SILPrinter not implemented for this instruction!");
+
+  void visitSILArgument(SILArgument *A) {
+    // This should really only happen during debugging.
+    OS << "argument of " << getID(A->getParent());
   }
   
   void printAllocKind(AllocKind kind) {
