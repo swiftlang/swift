@@ -124,7 +124,7 @@ public:
 /// TypeConverter - helper class for creating and managing TypeLoweringInfos.
 class TypeConverter {
   llvm::BumpPtrAllocator TypeLoweringInfoBPA;
-  llvm::DenseMap<TypeBase *, TypeLoweringInfo *> types;
+  llvm::DenseMap<std::pair<TypeBase *, unsigned>, TypeLoweringInfo *> types;
   llvm::DenseMap<SILConstant, SILType> constantTypes;
   
   TypeLoweringInfo const &makeTypeLoweringInfo(CanType t,

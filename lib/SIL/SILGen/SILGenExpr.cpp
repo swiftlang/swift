@@ -1402,7 +1402,11 @@ namespace {
     }
     
     void visitTypedPattern(TypedPattern *P) {
-      visit(P->getSubPattern());
+      // FIXME: work around a bug in visiting the "this" argument of methods
+      if (isa<NamedPattern>(P->getSubPattern()))
+        makeArgument(P->getType());
+      else
+        visit(P->getSubPattern());
     }
     
     void visitTuplePattern(TuplePattern *P) {
@@ -1492,6 +1496,80 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   B.createReturn(ctor, thisValue);
 }
 
+static void forwardCaptureArgs(SILGenFunction &gen,
+                               SmallVectorImpl<SILValue> &args,
+                               ValueDecl *capture) {
+  ASTContext &c = capture->getASTContext();
+  
+  auto addSILArgument = [&](SILType t) {
+    args.push_back(new (gen.SGM.M) SILArgument(t, gen.F.begin()));
+  };
+
+  switch (getDeclCaptureKind(capture)) {
+  case CaptureKind::LValue: {
+    SILType ty = gen.getLoweredType(capture->getTypeOfReference());
+    // Forward the captured owning ObjectPointer.
+    addSILArgument(SILType::getObjectPointerType(c));
+    // Forward the captured value address.
+    addSILArgument(ty);
+    break;
+  }
+  case CaptureKind::Byref: {
+    // Forward the captured address.
+    SILType ty = gen.getLoweredType(capture->getTypeOfReference());
+    addSILArgument(ty);
+    break;
+  }
+  case CaptureKind::Constant: {
+    // Forward the captured value.
+    SILType ty = gen.getLoweredType(capture->getType());
+    addSILArgument(ty);
+    break;
+  }
+  case CaptureKind::GetterSetter: {
+    // Forward the captured setter.
+    Type setTy = gen.SGM.Types.getPropertyType(SILConstant::Kind::Setter,
+                                               capture->getType());
+    addSILArgument(gen.getLoweredType(setTy));
+    [[clang::fallthrough]];
+  }
+  case CaptureKind::Getter: {
+    // Forward the captured getter.
+    Type setTy = gen.SGM.Types.getPropertyType(SILConstant::Kind::Getter,
+                                               capture->getType());
+    addSILArgument(gen.getLoweredType(setTy));
+    break;
+  }
+  }
+}
+
+void SILGenFunction::emitCurryThunk(FuncExpr *fe,
+                                    SILConstant from, SILConstant to) {
+  SmallVector<SILValue, 8> curriedArgs;
+  
+  unsigned paramCount = from.uncurryLevel + 1;
+  
+  // If the function has implicit closure context arguments, forward them.
+  if (!fe->getCaptures().empty()) {
+    for (auto capture : fe->getCaptures())
+      forwardCaptureArgs(*this, curriedArgs, capture);
+    --paramCount;
+  }
+
+  // Forward the curried formal arguments.
+  ArgumentForwardVisitor forwarder(*this, curriedArgs);
+  for (auto *paramPattern : fe->getBodyParamPatterns().slice(0, paramCount))
+    forwarder.visit(paramPattern);
+  
+  // FIXME: Forward archetypes and specialize if the function is generic.
+  
+  // Partially apply the next uncurry level and return the result closure.
+  auto toFn = B.createConstantRef(fe, to, SGM.getConstantType(to));
+  SILType resultTy
+    = SGM.getConstantType(from).getFunctionTypeInfo()->getResultType();
+  auto toClosure = B.createPartialApply(fe, toFn, curriedArgs, resultTy);
+  B.createReturn(fe, toClosure);
+}
 
 RValue SILGenFunction::visitInterpolatedStringLiteralExpr(
                                               InterpolatedStringLiteralExpr *E,

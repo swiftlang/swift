@@ -18,6 +18,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/TypeVisitor.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -299,7 +300,7 @@ TypeLoweringInfo const &
 TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
   void *infoBuffer = TypeLoweringInfoBPA.Allocate<TypeLoweringInfo>();
   TypeLoweringInfo *theInfo = ::new (infoBuffer) TypeLoweringInfo();
-  types[t.getPointer()] = theInfo;
+  types[{t.getPointer(), uncurryLevel}] = theInfo;
   bool address = false;
   bool addressOnly = false;
   
@@ -345,7 +346,7 @@ TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
 TypeLoweringInfo const &
 TypeConverter::getTypeLoweringInfo(Type t, unsigned uncurryLevel) {
   CanType ct = t->getCanonicalType();
-  auto existing = types.find(ct.getPointer());
+  auto existing = types.find({ct.getPointer(), uncurryLevel});
   if (existing == types.end()) {
     return makeTypeLoweringInfo(ct, uncurryLevel);
   } else
@@ -358,6 +359,11 @@ SILType TypeConverter::getConstantType(SILConstant constant) {
     Type swiftTy = getThinFunctionType(makeConstantType(constant));
     SILType loweredTy
       = getTypeLoweringInfo(swiftTy, constant.uncurryLevel).getLoweredType();
+    DEBUG(llvm::dbgs() << "constant ";
+          constant.print(llvm::dbgs());
+          llvm::dbgs() << " has type ";
+          loweredTy.print(llvm::dbgs());
+          llvm::dbgs() << "\n");
     constantTypes[constant] = loweredTy;
     return loweredTy;
   } else

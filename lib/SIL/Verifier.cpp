@@ -56,7 +56,7 @@ public:
   void _require(bool condition, const char *complaint) {
     if (condition) return;
 
-    llvm::dbgs() << "SIL verification failed" << complaint << "\n";
+    llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
 
     if (CurInstruction) {
       llvm::dbgs() << "Verifying instruction:\n";
@@ -733,15 +733,18 @@ public:
     SILType ty = F.getLoweredType();
     SILFunctionTypeInfo *ti = ty.getFunctionTypeInfo();
     
-    require(entry->bbarg_size() == ti->getInputTypes().size(),
-            "entry point has wrong number of arguments");
     DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
           for (auto *arg : make_range(entry->bbarg_begin(), entry->bbarg_end()))
             arg->getType().dump();
-          llvm::dbgs() << "Input types for SIL function type:\n";
+          llvm::dbgs() << "Input types for SIL function type ";
+          ty.print(llvm::dbgs());
+          llvm::dbgs() << ":\n";
           for (auto input : ti->getInputTypes())
             input.dump(););
-            
+    
+    require(entry->bbarg_size() == ti->getInputTypes().size(),
+            "entry point has wrong number of arguments");
+    
     
     require(std::equal(entry->bbarg_begin(), entry->bbarg_end(),
                       ti->getInputTypes().begin(),

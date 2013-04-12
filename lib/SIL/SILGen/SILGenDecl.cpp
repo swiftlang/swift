@@ -496,7 +496,6 @@ public:
 };
   
 static void makeCaptureSILArguments(SILGenFunction &gen, ValueDecl *capture) {
-  // FIXME: capture local properties
   ASTContext &c = capture->getASTContext();
   switch (getDeclCaptureKind(capture)) {
   case CaptureKind::LValue: {

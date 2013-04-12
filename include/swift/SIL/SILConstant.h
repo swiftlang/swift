@@ -154,6 +154,12 @@ struct SILConstant {
   void print(llvm::raw_ostream &os) const;
   void dump() const;
   
+  // Returns the SILConstant for an entity at a shallower uncurry level.
+  SILConstant atUncurryLevel(unsigned level) {
+    assert(level <= uncurryLevel && "can't safely go to deeper uncurry level");
+    return SILConstant(loc.getOpaqueValue(), kind, level);
+  }
+  
   /// Produces a SILConstant from an opaque value.
   explicit SILConstant(void *opaqueLoc, Kind kind, unsigned uncurryLevel)
     : loc(Loc::getFromOpaqueValue(opaqueLoc)),

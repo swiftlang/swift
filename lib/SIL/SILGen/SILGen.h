@@ -94,6 +94,12 @@ public:
   SILFunction *emitDestructor(ClassDecl *cd,
                            DestructorDecl /*nullable*/ *dd);
   
+  /// emitCurryThunk - Emits the curry thunk between two uncurry levels of a
+  /// function.
+  void emitCurryThunk(SILConstant entryPoint,
+                      SILConstant nextEntryPoint,
+                      FuncExpr *fe);
+  
   template<typename T>
   SILFunction *preEmitFunction(SILConstant constant, T *astNode);
   void postEmitFunction(SILConstant constant, SILFunction *F);
@@ -268,6 +274,9 @@ public:
   /// initializing entry point. This takes 'this' and the constructor arguments
   /// as parameters and executes the constructor body to initialize 'this'.
   void emitClassConstructorInitializer(ConstructorDecl *ctor);
+  /// emitCurryThunk - Generates code for a curry thunk from one uncurry level
+  /// of a function to another.
+  void emitCurryThunk(FuncExpr *fe, SILConstant fromLevel, SILConstant toLevel);
 
   //===--------------------------------------------------------------------===//
   // Control flow
