@@ -59,16 +59,16 @@ public:
     values.push_back(v);
   }
   
-  void visitTupleType(TupleType *t, ManagedValue v) {
+  void visitTupleType(TupleType *t, ManagedValue mv) {
     ++depth;
+    SILValue v = mv.forward(gen);
     if (v.getType().isAddressOnly()) {
       // Destructure address-only types by addressing the individual members.
       for (unsigned i = 0; i < t->getFields().size(); ++i) {
         auto &field = t->getFields()[i];
         SILType fieldTy = gen.getLoweredType(field.getType());
         SILValue member = gen.B.createElementAddr(SILLocation(),
-                                                  v.getValue(),
-                                                  i,
+                                                  v, i,
                                                   fieldTy.getAddressType());
         if (!fieldTy.isAddressOnly() && !field.getType()->is<LValueType>())
           member = gen.B.createLoad(SILLocation(), member);
@@ -83,8 +83,7 @@ public:
         auto &field = t->getFields()[i];
         SILType fieldTy = gen.getLoweredType(field.getType());
         SILValue member = gen.B.createExtract(SILLocation(),
-                                              v.getValue(),
-                                              i,
+                                              v, i,
                                               fieldTy);
         visit(CanType(field.getType()),
               gen.emitManagedRValueWithCleanup(member));
