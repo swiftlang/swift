@@ -88,7 +88,10 @@ public:
   iterator end() { return BlockList.end(); }
   const_iterator begin() const { return BlockList.begin(); }
   const_iterator end() const { return BlockList.end(); }
+  unsigned size() { return BlockList.size(); }
 
+  SILBasicBlock &front() { return *begin(); }
+  const SILBasicBlock &front() const { return *begin(); }
 
   //===--------------------------------------------------------------------===//
   // Miscellaneous

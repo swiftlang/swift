@@ -182,6 +182,10 @@ public:
   //===--------------------------------------------------------------------===//
   // SILInstruction Printing Logic
 
+  void printAsOperand(SILBasicBlock *BB) {
+    OS << getID(BB);
+  }
+
   void print(SILValue V) {
     ID Name = getID(V);
     Name.ResultNumber = -1;  // Don't print subresult number.
@@ -504,15 +508,17 @@ public:
   }
   
   void visitBranchInst(BranchInst *UBI) {
-    OS << "br " << getID(UBI->getDestBB());
+    OS << "br ";
+    printAsOperand(UBI->getDestBB());
     printBranchArgs(UBI->getArgs());
   }
 
   void visitCondBranchInst(CondBranchInst *CBI) {
-    OS << "condbranch " << getID(CBI->getCondition()) << ", "
-       << getID(CBI->getTrueBB());
+    OS << "condbranch " << getID(CBI->getCondition()) << ", ";
+    printAsOperand(CBI->getTrueBB());
     printBranchArgs(CBI->getTrueArgs());
-    OS << ", " << getID(CBI->getFalseBB());
+    OS << ", ";
+    printAsOperand(CBI->getFalseBB());
     printBranchArgs(CBI->getFalseArgs());
   }
 };
@@ -555,6 +561,11 @@ ID SILPrinter::getID(SILValue V) {
 
   ID R = { ID::SSAValue, ValueToIDMap[V.getDef()], ResultNumber };
   return R;
+}
+
+void swift::WriteAsOperand(raw_ostream &out, SILBasicBlock *BB,
+                           bool printType) {
+  SILPrinter(out).printAsOperand(BB);
 }
 
 //===----------------------------------------------------------------------===//

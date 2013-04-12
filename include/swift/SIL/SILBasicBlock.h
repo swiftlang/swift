@@ -19,6 +19,10 @@
 
 #include "swift/SIL/SILInstruction.h"
 
+namespace llvm {
+  template <class T> struct GraphTraits;
+};
+
 namespace swift {
 class SILFunction;
 class SILArgument;
@@ -135,11 +139,12 @@ private:
   void addArgument(SILArgument *Arg) { BBArgList.push_back(Arg); }
 };
 
+void WriteAsOperand(raw_ostream &out, swift::SILBasicBlock *BB,
+                    bool printType = true);
+
 } // end swift namespace
 
 namespace llvm {
-
-  raw_ostream &operator<<(raw_ostream &, const swift::SILBasicBlock &B);
 
 //===----------------------------------------------------------------------===//
 // ilist_traits for SILBasicBlock

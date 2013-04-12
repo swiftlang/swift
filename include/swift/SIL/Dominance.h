@@ -18,33 +18,24 @@
 #ifndef SWIFT_SIL_DOMINANCE_H
 #define SWIFT_SIL_DOMINANCE_H
 
-#include "llvm/ADT/DenseMap.h"
-#include "swift/SIL/SILBasicBlock.h"
+#include "llvm/Analysis/Dominators.h"
+#include "swift/SIL/CFG.h"
+
+extern template class llvm::DominatorTreeBase<swift::SILBasicBlock>;
+extern template class llvm::DominatorBase<swift::SILBasicBlock>;
+extern template class llvm::DomTreeNodeBase<swift::SILBasicBlock>;
 
 namespace swift {
 
-  /// A class for computing basic dominance information.
-  class DominanceInfo {
-    /// A map from basic blocks to their immediate dominators.
-    llvm::DenseMap<SILBasicBlock*, SILBasicBlock*> ImmediateDominators;
+/// A class for computing basic dominance information.
+class DominanceInfo : public llvm::DominatorTreeBase<SILBasicBlock> {
+public:
+  DominanceInfo(SILFunction *F);
 
-    typedef std::pair<SILBasicBlock*, SILBasicBlock*> DominanceCacheKey;
-    mutable llvm::DenseMap<DominanceCacheKey, bool> DominanceCache;
-
-  public:
-    DominanceInfo(SILFunction *F);
-
-    SILBasicBlock *getImmediateDominator(SILBasicBlock *BB) const {
-      auto it = ImmediateDominators.find(BB);
-      return (it != ImmediateDominators.end() ? it->second : nullptr);
-    }
-
-    /// Does instruction A strictly dominate instruction B?
-    bool dominates(SILInstruction *a, SILInstruction *b) const;
-
-    /// Does basic block A non-strictly dominate basic block B?
-    bool dominates(SILBasicBlock *a, SILBasicBlock *b) const;
-  };
+  /// Does instruction A properly dominate instruction B?
+  bool properlyDominates(SILInstruction *a, SILInstruction *b);
+  using DominatorTreeBase::properlyDominates;
+};
 
 }  // end namespace swift
 
