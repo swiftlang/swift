@@ -135,6 +135,7 @@ namespace {
 /// printing SIL structures.
 class SILPrinter : public SILVisitor<SILPrinter> {
   llvm::formatted_raw_ostream OS;
+  SILValue subjectValue;
 
   llvm::DenseMap<const SILBasicBlock *, unsigned> BlocksToIDMap;
   ID getID(const SILBasicBlock *B);
@@ -196,6 +197,40 @@ public:
                  [&] { OS << ", "; });
     }
     OS << '\n';
+  }
+  
+  void printInContext(SILValue V) {
+    subjectValue = V;
+    
+    auto sortByID = [&](SILValue a, SILValue b) {
+      return getID(a).Number < getID(b).Number;
+    };
+
+    
+    if (auto *I = dyn_cast<SILInstruction>(V)) {
+      auto operands = map<SmallVector<SILValue,4>>(I->getAllOperands(),
+                                                   [](Operand const &o) {
+                                                     return o.get();
+                                                   });
+      std::sort(operands.begin(), operands.end(), sortByID);
+      for (auto &operand : operands) {
+        OS << "   ";
+        print(operand);
+      }
+    }
+    
+    OS << "-> ";
+    print(V);
+    
+    auto users = map<SmallVector<SILValue,4>>(V->getUses(),
+                                              [](Operand *o) {
+                                                return o->getUser();
+                                              });
+    std::sort(users.begin(), users.end(), sortByID);
+    for (auto &user : users) {
+      OS << "   ";
+      print(user);
+    }
   }
 
   void visitSILArgument(SILArgument *A) {
@@ -574,6 +609,10 @@ void SILModule::print(llvm::raw_ostream &OS) const {
     toplevel->print(OS);
     OS << "}\n\n";
   }
+}
+
+void ValueBase::dumpInContext() const {
+  SILPrinter(llvm::errs()).printInContext(this);
 }
 
 //===----------------------------------------------------------------------===//

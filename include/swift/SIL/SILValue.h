@@ -101,9 +101,14 @@ namespace swift {
     inline ValueBaseUseIterator use_end();
     inline Range<ValueBaseUseIterator> getUses();
 
-    /// Pretty-print the SILInstruction.
+    /// Pretty-print the value.
     void dump() const;
     void print(raw_ostream &OS) const;
+    
+    /// Pretty-print the value in context, preceded by its operands (if the
+    /// value represents the result of an instruction) and followed by its
+    /// users.
+    void dumpInContext() const;
 
     static bool classof(const ValueBase *V) { return true; }
   };
