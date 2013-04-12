@@ -49,52 +49,74 @@ public:
 /// checking and enforcing its invariants.
 class SILVerifier : public SILVerifierBase<SILVerifier> {
   SILFunction const &F;
+  const SILInstruction *CurInstruction = nullptr;
 public:
   SILVerifier(SILFunction const &F) : F(F) {}
   
+  void _require(bool condition, const char *complaint) {
+    if (condition) return;
+
+    llvm::dbgs() << "SIL verification failed" << complaint << "\n";
+
+    if (CurInstruction) {
+      llvm::dbgs() << "Verifying instruction:\n";
+      CurInstruction->print(llvm::dbgs());
+      llvm::dbgs() << "In basic block:\n";
+      CurInstruction->getParent()->print(llvm::dbgs());
+    }
+
+    assert(0 && "triggering standard assertion failure routine");
+  }
+#define require(condition, complaint) _require(condition, complaint ": " #condition)
+
+  void visitSILInstruction(SILInstruction *I) {
+    CurInstruction = I;
+  }
+
   void checkSILInstruction(SILInstruction *I) {
     const SILBasicBlock *BB = I->getParent();
     // Check that non-terminators look ok.
     if (!isa<TermInst>(I)) {
-      assert(!BB->empty() &&
-             "Can't be in a parent block if it is empty");
-      assert(&*BB->getInsts().rbegin() != I &&
-             "Non-terminators cannot be the last in a block");
+      require(!BB->empty(), "Can't be in a parent block if it is empty");
+      require(&*BB->getInsts().rbegin() != I,
+              "Non-terminators cannot be the last in a block");
     } else {
-      assert(&*BB->getInsts().rbegin() == I &&
-             "Terminator must be the last in block");
+      require(&*BB->getInsts().rbegin() == I,
+              "Terminator must be the last in block");
     }
 
     // Verify that all of our uses are in this function.
     for (Operand *use : I->getUses()) {
       auto user = use->getUser();
-      assert(user && "instruction user is null?");
-      assert(isa<SILInstruction>(user) &&
-             "instruction used by non-instruction");
+      require(user, "instruction user is null?");
+      require(isa<SILInstruction>(user),
+              "instruction used by non-instruction");
       auto userI = cast<SILInstruction>(user);
-      assert(userI->getParent() &&
-             "instruction used by unparented instruction");
-      assert(userI->getParent()->getParent() == &F &&
-             "instruction used by instruction in different function");
+      require(userI->getParent(),
+              "instruction used by unparented instruction");
+      require(userI->getParent()->getParent() == &F,
+              "instruction used by instruction in different function");
 
       auto operands = userI->getAllOperands();
-      assert(operands.begin() <= use && use <= operands.end() &&
-             "use doesn't actually belong to instruction it claims to");
+      require(operands.begin() <= use && use <= operands.end(),
+              "use doesn't actually belong to instruction it claims to");
     }
 
     // Verify some basis structural stuff about an instruction's operands.
     for (auto &operand : I->getAllOperands()) {
+      require(operand.get().isValid(), "instruction has null operand");
+
       if (auto *valueI = dyn_cast<SILInstruction>(operand.get())) {
-        assert(valueI->getParent() &&
-               "instruction uses value of unparented instruction");
+        require(valueI->getParent(),
+                "instruction uses value of unparented instruction");
         // TODO: check dominance
-        assert(valueI->getParent()->getParent() == &F &&
-               "instruction uses value of instruction from different function");
+        require(valueI->getParent()->getParent() == &F,
+                "instruction uses value of instruction from different function");
       }
 
-      assert(operand.getUser() == I &&
-             "instruction's operand's owner isn't the instruction");
-      assert(isInValueUses(&operand) && "operand value isn't used by operand");
+      require(operand.getUser() == I,
+              "instruction's operand's owner isn't the instruction");
+      require(isInValueUses(&operand), "operand value isn't used by operand");
     }
   }
 
@@ -107,12 +129,12 @@ public:
   }
 
   void checkAllocVarInst(AllocVarInst *AI) {
-    assert(AI->getType().isAddress() && "alloc_var must return address");
+    require(AI->getType().isAddress(), "alloc_var must return address");
   }
   
   void checkAllocRefInst(AllocRefInst *AI) {
-    assert(AI->getType().hasReferenceSemantics() && !AI->getType().isAddress()
-           && "alloc_ref must return reference type value");
+    require(AI->getType().hasReferenceSemantics() && !AI->getType().isAddress(),
+            "alloc_ref must return reference type value");
   }
   
   void checkApplyInst(ApplyInst *AI) {
@@ -122,9 +144,9 @@ public:
     DEBUG(llvm::dbgs() << "callee type: ";
           AI->getCallee().getType().print(llvm::dbgs());
           llvm::dbgs() << '\n');
-    assert(!calleeTy.isAddress() && "callee of apply cannot be an address");
-    assert(calleeTy.is<FunctionType>() &&
-           "callee of apply must have concrete function type");
+    require(!calleeTy.isAddress(), "callee of apply cannot be an address");
+    require(calleeTy.is<FunctionType>(),
+            "callee of apply must have concrete function type");
     SILFunctionTypeInfo *ti = calleeTy.getFunctionTypeInfo();
     
     DEBUG(llvm::dbgs() << "function input types:\n";
@@ -145,52 +167,52 @@ public:
           });
     
     // Check that the arguments and result match.
-    assert(AI->getArguments().size() == ti->getInputTypes().size() &&
-           "apply doesn't have right number of arguments for function");
+    require(AI->getArguments().size() == ti->getInputTypes().size(),
+            "apply doesn't have right number of arguments for function");
     for (size_t i = 0, size = AI->getArguments().size(); i < size; ++i) {
       DEBUG(llvm::dbgs() << "  argument type ";
             AI->getArguments()[i].getType().print(llvm::dbgs());
             llvm::dbgs() << " for input type ";
             ti->getInputTypes()[i].print(llvm::dbgs());
             llvm::dbgs() << '\n');
-      assert(AI->getArguments()[i].getType() == ti->getInputTypes()[i] &&
-             "input types to apply don't match function input types");
+      require(AI->getArguments()[i].getType() == ti->getInputTypes()[i],
+              "input types to apply don't match function input types");
     }
     DEBUG(llvm::dbgs() << "result type ";
           AI->getType().print(llvm::dbgs());
           llvm::dbgs() << '\n');
-    assert(AI->getType() == ti->getResultType() &&
-           "type of apply instruction doesn't match function result type");
+    require(AI->getType() == ti->getResultType(),
+            "type of apply instruction doesn't match function result type");
   }
   
   void checkPartialApplyInst(PartialApplyInst *PAI) {
     SILType calleeTy = PAI->getCallee().getType();
-    assert(!calleeTy.isAddress() && "callee of closure cannot be an address");
-    assert(calleeTy.is<FunctionType>() &&
-           "callee of closure must have concrete function type");
-    assert(calleeTy.castTo<FunctionType>()->isThin() &&
-           "callee of closure must have a thin function type");
+    require(!calleeTy.isAddress(), "callee of closure cannot be an address");
+    require(calleeTy.is<FunctionType>(),
+            "callee of closure must have concrete function type");
+    require(calleeTy.castTo<FunctionType>()->isThin(),
+            "callee of closure must have a thin function type");
     SILType appliedTy = PAI->getType();
-    assert(!appliedTy.isAddress() && "result of closure cannot be an address");
-    assert(appliedTy.is<FunctionType>() &&
-           "result of closure must have concrete function type");
+    require(!appliedTy.isAddress(), "result of closure cannot be an address");
+    require(appliedTy.is<FunctionType>(),
+            "result of closure must have concrete function type");
     // FIXME: A "curry" with no arguments could remain thin.
-    assert(!appliedTy.castTo<FunctionType>()->isThin() &&
-           "result of closure cannot have a thin function type");
+    require(!appliedTy.castTo<FunctionType>()->isThin(),
+            "result of closure cannot have a thin function type");
 
     SILFunctionTypeInfo *ti = calleeTy.getFunctionTypeInfo();
     
     // Check that the arguments match the curry levels.
-    assert(PAI->getArguments().size() == ti->getCurryInputTypes().size() &&
-           "closure doesn't have right number of curry arguments for function");
+    require(PAI->getArguments().size() == ti->getCurryInputTypes().size(),
+            "closure doesn't have right number of curry arguments for function");
     for (size_t i = 0, size = PAI->getArguments().size(); i < size; ++i) {
       DEBUG(llvm::dbgs() << "  argument type ";
             PAI->getArguments()[i].getType().print(llvm::dbgs());
             llvm::dbgs() << " for input type ";
             ti->getCurryInputTypes()[i].print(llvm::dbgs());
             llvm::dbgs() << '\n');
-      assert(PAI->getArguments()[i].getType() == ti->getCurryInputTypes()[i] &&
-             "input types to closure don't match function input types");
+      require(PAI->getArguments()[i].getType() == ti->getCurryInputTypes()[i],
+              "input types to closure don't match function input types");
     }
     DEBUG(llvm::dbgs() << "result type ";
           PAI->getType().print(llvm::dbgs());
@@ -201,252 +223,252 @@ public:
     for (unsigned i = 0; i < calleeTy.getUncurryLevel(); ++i)
       ft = ft->getResult()->castTo<FunctionType>();
     
-    assert(PAI->getType().getSwiftType()->isEqual(ft)
-           && PAI->getType().getUncurryLevel() == 0
-           && "type of apply instruction doesn't match function result type");
+    require(PAI->getType().getSwiftType()->isEqual(ft)
+            && PAI->getType().getUncurryLevel() == 0,
+            "type of apply instruction doesn't match function result type");
     
   }
 
   void checkConstantRefInst(ConstantRefInst *CRI) {
     if (CRI->getConstant().kind == SILConstant::Kind::GlobalAddress) {
-      assert(CRI->getType().isAddress() &&
-             "GlobalAddress SILConstant must have an address result type");
+      require(CRI->getType().isAddress(),
+              "GlobalAddress SILConstant must have an address result type");
       return;
     }
     
-    assert(CRI->getType().is<AnyFunctionType>() &&
-           "constant_ref should have a function result");
-    assert(CRI->getType().castTo<AnyFunctionType>()->isThin() &&
-           "constant_ref should have a thin function result");
+    require(CRI->getType().is<AnyFunctionType>(),
+            "constant_ref should have a function result");
+    require(CRI->getType().castTo<AnyFunctionType>()->isThin(),
+            "constant_ref should have a thin function result");
   }
 
   void checkIntegerLiteralInst(IntegerLiteralInst *ILI) {
-    assert(ILI->getType().is<BuiltinIntegerType>() &&
-           "invalid integer literal type");
+    require(ILI->getType().is<BuiltinIntegerType>(),
+            "invalid integer literal type");
   }
   void checkLoadInst(LoadInst *LI) {
-    assert(!LI->getType().isAddress() && "Can't load an address");
-    assert(LI->getLValue().getType().isAddress() &&
-           "Load operand must be an address");
-    assert(LI->getLValue().getType().getObjectType() == LI->getType() &&
-           "Load operand type and result type mismatch");
+    require(!LI->getType().isAddress(), "Can't load an address");
+    require(LI->getLValue().getType().isAddress(),
+            "Load operand must be an address");
+    require(LI->getLValue().getType().getObjectType() == LI->getType(),
+            "Load operand type and result type mismatch");
   }
 
   void checkStoreInst(StoreInst *SI) {
-    assert(!SI->getSrc().getType().isAddress() &&
-           "Can't store from an address source");
-    assert(SI->getDest().getType().isAddress() &&
-           "Must store to an address dest");
-    assert(SI->getDest().getType().getObjectType() == SI->getSrc().getType() &&
-           "Store operand type and dest type mismatch");
+    require(!SI->getSrc().getType().isAddress(),
+            "Can't store from an address source");
+    require(SI->getDest().getType().isAddress(),
+            "Must store to an address dest");
+    require(SI->getDest().getType().getObjectType() == SI->getSrc().getType(),
+            "Store operand type and dest type mismatch");
   }
 
   void checkCopyAddrInst(CopyAddrInst *SI) {
-    assert(SI->getSrc().getType().isAddress() &&
-           "Src value should be lvalue");
-    assert(SI->getDest().getType().isAddress() &&
-           "Dest address should be lvalue");
-    assert(SI->getDest().getType() == SI->getSrc().getType() &&
-           "Store operand type and dest type mismatch");
+    require(SI->getSrc().getType().isAddress(),
+            "Src value should be lvalue");
+    require(SI->getDest().getType().isAddress(),
+            "Dest address should be lvalue");
+    require(SI->getDest().getType() == SI->getSrc().getType(),
+            "Store operand type and dest type mismatch");
   }
   
   void checkInitializeVarInst(InitializeVarInst *ZI) {
-    assert(ZI->getDest().getType().isAddress() &&
-           "Dest address should be lvalue");
+    require(ZI->getDest().getType().isAddress(),
+            "Dest address should be lvalue");
   }
   
   void checkSpecializeInst(SpecializeInst *SI) {
-    assert(SI->getType().is<FunctionType>() &&
-           "Specialize result should have a function type");
-    assert(SI->getType().castTo<FunctionType>()->isThin() &&
-           "Specialize result should have a thin function type");
+    require(SI->getType().is<FunctionType>(),
+            "Specialize result should have a function type");
+    require(SI->getType().castTo<FunctionType>()->isThin(),
+            "Specialize result should have a thin function type");
     
     SILType operandTy = SI->getOperand().getType();
-    assert((operandTy.is<PolymorphicFunctionType>()
+    require((operandTy.is<PolymorphicFunctionType>()
             || (operandTy.is<FunctionType>()
                 && operandTy.castTo<FunctionType>()->getResult()
-                  ->is<PolymorphicFunctionType>()))
-           && "Specialize source should have a polymorphic function type");
-    assert(operandTy.castTo<AnyFunctionType>()->isThin()
-           && "Specialize source should have a thin function type");
-    assert(SI->getType().getUncurryLevel()
-             == SI->getOperand().getType().getUncurryLevel()
-           && "Specialize source and dest uncurry levels must match");
+                  ->is<PolymorphicFunctionType>())),
+            "Specialize source should have a polymorphic function type");
+    require(operandTy.castTo<AnyFunctionType>()->isThin(),
+            "Specialize source should have a thin function type");
+    require(SI->getType().getUncurryLevel()
+             == SI->getOperand().getType().getUncurryLevel(),
+            "Specialize source and dest uncurry levels must match");
   }
 
   void checkTupleInst(TupleInst *TI) {
-    assert(TI->getType().is<TupleType>() && "TupleInst should return a tuple");
+    require(TI->getType().is<TupleType>(), "TupleInst should return a tuple");
     TupleType *ResTy = TI->getType().castTo<TupleType>();
 
-    assert(TI->getElements().size() == ResTy->getFields().size() &&
-           "Tuple field count mismatch!");
+    require(TI->getElements().size() == ResTy->getFields().size(),
+            "Tuple field count mismatch!");
     
     for (size_t i = 0; i < TI->getElements().size(); ++i) {
-      assert(TI->getElements()[i].getType().getSwiftType()
-               ->isEqual(ResTy->getFields()[i].getType()) &&
-             "Tuple element arguments do not match tuple type!");
+      require(TI->getElements()[i].getType().getSwiftType()
+               ->isEqual(ResTy->getFields()[i].getType()),
+              "Tuple element arguments do not match tuple type!");
     }
   }
   void checkMetatypeInst(MetatypeInst *MI) {
-    assert(MI->getType(0).is<MetaTypeType>() &&
-           "metatype instruction must be of metatype type");
+    require(MI->getType(0).is<MetaTypeType>(),
+            "metatype instruction must be of metatype type");
   }
   void checkClassMetatypeInst(ClassMetatypeInst *MI) {
-    assert(MI->getType().is<MetaTypeType>() &&
-           "class_metatype instruction must be of metatype type");
-    assert(MI->getBase().getType().getSwiftType()->getClassOrBoundGenericClass() &&
-           "class_metatype base must be of class type");
-    assert(MI->getBase().getType().getSwiftType() ==
-             CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()) &&
-           "class_metatype result must be metatype of base class type");
+    require(MI->getType().is<MetaTypeType>(),
+            "class_metatype instruction must be of metatype type");
+    require(MI->getBase().getType().getSwiftType()->getClassOrBoundGenericClass(),
+            "class_metatype base must be of class type");
+    require(MI->getBase().getType().getSwiftType() ==
+             CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()),
+            "class_metatype result must be metatype of base class type");
   }
   void checkArchetypeMetatypeInst(ArchetypeMetatypeInst *MI) {
-    assert(MI->getType().is<MetaTypeType>() &&
-           "archetype_metatype instruction must be of metatype type");
-    assert(MI->getBase().getType().isAddress() &&
-           "archetype_metatype operand must be an address");
-    assert(MI->getBase().getType().getSwiftRValueType()->is<ArchetypeType>() &&
-           "archetype_metatype operand must be address of archetype type");
-    assert(MI->getBase().getType().getSwiftRValueType() ==
-           CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()) &&
-           "archetype_metatype result must be metatype of operand type");
+    require(MI->getType().is<MetaTypeType>(),
+            "archetype_metatype instruction must be of metatype type");
+    require(MI->getBase().getType().isAddress(),
+            "archetype_metatype operand must be an address");
+    require(MI->getBase().getType().getSwiftRValueType()->is<ArchetypeType>(),
+            "archetype_metatype operand must be address of archetype type");
+    require(MI->getBase().getType().getSwiftRValueType() ==
+            CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()),
+            "archetype_metatype result must be metatype of operand type");
   }
   void checkProtocolMetatypeInst(ProtocolMetatypeInst *MI) {
-    assert(MI->getType().is<MetaTypeType>() &&
-           "protocol_metatype instruction must be of metatype type");
-    assert(MI->getBase().getType().isAddress() &&
-           "protocol_metatype operand must be an address");
-    assert(MI->getBase().getType().getSwiftRValueType()->isExistentialType() &&
-           "protocol_metatype operand must be address of protocol type");
-    assert(MI->getBase().getType().getSwiftRValueType() ==
-           CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()) &&
-           "protocol_metatype result must be metatype of operand type");
+    require(MI->getType().is<MetaTypeType>(),
+            "protocol_metatype instruction must be of metatype type");
+    require(MI->getBase().getType().isAddress(),
+            "protocol_metatype operand must be an address");
+    require(MI->getBase().getType().getSwiftRValueType()->isExistentialType(),
+            "protocol_metatype operand must be address of protocol type");
+    require(MI->getBase().getType().getSwiftRValueType() ==
+            CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()),
+            "protocol_metatype result must be metatype of operand type");
   }
   void checkModuleInst(ModuleInst *MI) {
-    assert(MI->getType(0).is<ModuleType>() &&
-           "module instruction must be of module type");
+    require(MI->getType(0).is<ModuleType>(),
+            "module instruction must be of module type");
   }
   void checkAssociatedMetatypeInst(AssociatedMetatypeInst *MI) {
-    assert(MI->getType(0).is<MetaTypeType>() &&
-           "associated_metatype instruction must be of metatype type");
-    assert(MI->getSourceMetatype().getType().is<MetaTypeType>() &&
-           "associated_metatype operand must be of metatype type");
+    require(MI->getType(0).is<MetaTypeType>(),
+            "associated_metatype instruction must be of metatype type");
+    require(MI->getSourceMetatype().getType().is<MetaTypeType>(),
+            "associated_metatype operand must be of metatype type");
   }
   
   void checkRetainInst(RetainInst *RI) {
-    assert(!RI->getOperand().getType().isAddress() &&
-           "Operand of retain must not be address");
-    assert(RI->getOperand().getType().hasReferenceSemantics() &&
-           "Operand of dealloc_ref must be reference type");
+    require(!RI->getOperand().getType().isAddress(),
+            "Operand of retain must not be address");
+    require(RI->getOperand().getType().hasReferenceSemantics(),
+            "Operand of dealloc_ref must be reference type");
   }
   void checkReleaseInst(ReleaseInst *RI) {
-    assert(!RI->getOperand().getType().isAddress() &&
-           "Operand of release must not be address");
-    assert(RI->getOperand().getType().hasReferenceSemantics() &&
-           "Operand of dealloc_ref must be reference type");
+    require(!RI->getOperand().getType().isAddress(),
+            "Operand of release must not be address");
+    require(RI->getOperand().getType().hasReferenceSemantics(),
+            "Operand of dealloc_ref must be reference type");
   }
   void checkDeallocVarInst(DeallocVarInst *DI) {
-    assert(DI->getOperand().getType().isAddress() &&
-           "Operand of dealloc_var must be address");
+    require(DI->getOperand().getType().isAddress(),
+            "Operand of dealloc_var must be address");
   }
   void checkDeallocRefInst(DeallocRefInst *DI) {
-    assert(!DI->getOperand().getType().isAddress() &&
-           "Operand of dealloc_ref must not be address");
-    assert(DI->getOperand().getType().hasReferenceSemantics() &&
-           "Operand of dealloc_ref must be reference type");
+    require(!DI->getOperand().getType().isAddress(),
+            "Operand of dealloc_ref must not be address");
+    require(DI->getOperand().getType().hasReferenceSemantics(),
+            "Operand of dealloc_ref must be reference type");
   }
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
-    assert(DI->getOperand().getType().isAddressOnly() &&
-           "Operand of destroy_addr must be address-only");
+    require(DI->getOperand().getType().isAddressOnly(),
+            "Operand of destroy_addr must be address-only");
   }
 
   void checkIndexAddrInst(IndexAddrInst *IAI) {
-    assert(IAI->getType().isAddress() &&
-           IAI->getType() == IAI->getOperand().getType() &&
-           "invalid IndexAddrInst");
+    require(IAI->getType().isAddress() &&
+            IAI->getType() == IAI->getOperand().getType(),
+            "invalid IndexAddrInst");
   }
   
   void checkExtractInst(ExtractInst *EI) {
     SILType operandTy = EI->getOperand().getType();
-    assert(!operandTy.isAddress() &&
-           "cannot extract from address");
-    assert(!operandTy.hasReferenceSemantics() &&
-           "cannot extract from reference type");
-    assert(!EI->getType(0).isAddress() &&
-           "result of extract cannot be address");
+    require(!operandTy.isAddress(),
+            "cannot extract from address");
+    require(!operandTy.hasReferenceSemantics(),
+            "cannot extract from reference type");
+    require(!EI->getType(0).isAddress(),
+            "result of extract cannot be address");
   }
 
   void checkElementAddrInst(ElementAddrInst *EI) {
     SILType operandTy = EI->getOperand().getType();
-    assert(operandTy.isAddress() &&
-           "must derive element_addr from address");
-    assert(!operandTy.hasReferenceSemantics() &&
-           "cannot derive element_addr from reference type");
-    assert(EI->getType(0).isAddress() &&
-           "result of element_addr must be lvalue");
+    require(operandTy.isAddress(),
+            "must derive element_addr from address");
+    require(!operandTy.hasReferenceSemantics(),
+            "cannot derive element_addr from reference type");
+    require(EI->getType(0).isAddress(),
+            "result of element_addr must be lvalue");
   }
   
   void checkRefElementAddrInst(RefElementAddrInst *EI) {
     SILType operandTy = EI->getOperand().getType();
-    assert(!operandTy.isAddress() &&
-           "must derive ref_element_addr from non-address");
-    assert(operandTy.hasReferenceSemantics() &&
-           "must derive ref_element_addr from reference type");
-    assert(EI->getType(0).isAddress() &&
-           "result of ref_element_addr must be lvalue");
+    require(!operandTy.isAddress(),
+            "must derive ref_element_addr from non-address");
+    require(operandTy.hasReferenceSemantics(),
+            "must derive ref_element_addr from reference type");
+    require(EI->getType(0).isAddress(),
+            "result of ref_element_addr must be lvalue");
   }
   
   void checkArchetypeMethodInst(ArchetypeMethodInst *AMI) {
     DEBUG(llvm::dbgs() << "verifying";
           AMI->print(llvm::dbgs()));
-    assert(AMI->getType(0).getUncurryLevel() == AMI->getMember().uncurryLevel &&
-           "result method must be at natural uncurry level of method");
+    require(AMI->getType(0).getUncurryLevel() == AMI->getMember().uncurryLevel,
+            "result method must be at natural uncurry level of method");
     FunctionType *methodType = AMI->getType(0).getAs<FunctionType>();
     DEBUG(llvm::dbgs() << "method type ";
           methodType->print(llvm::dbgs());
           llvm::dbgs() << "\n");
-    assert(methodType &&
-           "result method must be of a concrete function type");
-    assert(!methodType->isThin() &&
-           "result method must not be of a thin function type");
+    require(methodType,
+            "result method must be of a concrete function type");
+    require(!methodType->isThin(),
+            "result method must not be of a thin function type");
     SILType operandType = AMI->getOperand().getType();
     DEBUG(llvm::dbgs() << "operand type ";
           operandType.print(llvm::dbgs());
           llvm::dbgs() << "\n");
-    assert(methodType->getInput()->isEqual(operandType.getSwiftType()) &&
-           "result must be a method of the operand");
-    assert(methodType->getResult()->is<FunctionType>() &&
-           "result must be a method");
+    require(methodType->getInput()->isEqual(operandType.getSwiftType()),
+            "result must be a method of the operand");
+    require(methodType->getResult()->is<FunctionType>(),
+            "result must be a method");
     if (operandType.isAddress()) {
-      assert(operandType.is<ArchetypeType>() &&
-             "archetype_method must apply to an archetype address");
+      require(operandType.is<ArchetypeType>(),
+              "archetype_method must apply to an archetype address");
     } else if (MetaTypeType *mt = operandType.getAs<MetaTypeType>()) {
-      assert(mt->getInstanceType()->is<ArchetypeType>() &&
-             "archetype_method must apply to an archetype metatype");
+      require(mt->getInstanceType()->is<ArchetypeType>(),
+              "archetype_method must apply to an archetype metatype");
     } else
       llvm_unreachable("method must apply to an address or metatype");
   }
   
   void checkProtocolMethodInst(ProtocolMethodInst *EMI) {
-    assert(EMI->getType(0).getUncurryLevel() == EMI->getMember().uncurryLevel &&
-           "result method must be at natural uncurry level of method");
-    assert(EMI->getType(0).getUncurryLevel() == 1 &&
-           "protocol method result must be at uncurry level 1");
+    require(EMI->getType(0).getUncurryLevel() == EMI->getMember().uncurryLevel,
+            "result method must be at natural uncurry level of method");
+    require(EMI->getType(0).getUncurryLevel() == 1,
+            "protocol method result must be at uncurry level 1");
     FunctionType *methodType = EMI->getType(0).getAs<FunctionType>();
-    assert(methodType &&
-           "result method must be of a concrete function type");
-    assert(!methodType->isThin() &&
-           "result method must not be of a thin function type");
+    require(methodType,
+            "result method must be of a concrete function type");
+    require(!methodType->isThin(),
+            "result method must not be of a thin function type");
     SILType operandType = EMI->getOperand().getType();
-    assert(methodType->getInput()->isEqual(
-                            operandType.getASTContext().TheOpaquePointerType) &&
-           "result must be a method of opaque pointer");
-    assert(methodType->getResult()->is<FunctionType>() &&
-           "result must be a method");
-    assert(operandType.isAddress() &&
-           "protocol_method must apply to an existential address");
-    assert(operandType.isExistentialType() &&
-           "protocol_method must apply to an existential address");
+    require(methodType->getInput()->isEqual(
+                            operandType.getASTContext().TheOpaquePointerType),
+            "result must be a method of opaque pointer");
+    require(methodType->getResult()->is<FunctionType>(),
+            "result must be a method");
+    require(operandType.isAddress(),
+            "protocol_method must apply to an existential address");
+    require(operandType.isExistentialType(),
+            "protocol_method must apply to an existential address");
   }
   
   static bool isClassOrClassMetatype(Type t) {
@@ -458,207 +480,206 @@ public:
   }
   
   void checkClassMethodInst(ClassMethodInst *CMI) {
-    assert(CMI->getType(0).getUncurryLevel() == CMI->getMember().uncurryLevel &&
-           "result method must be at natural uncurry level of method");
+    require(CMI->getType(0).getUncurryLevel() == CMI->getMember().uncurryLevel,
+            "result method must be at natural uncurry level of method");
     auto *methodType = CMI->getType(0).getAs<AnyFunctionType>();
-    assert(methodType &&
-           "result method must be of a function type");
-    assert(methodType->isThin() &&
-           "result method must be of a thin function type");
+    require(methodType,
+            "result method must be of a function type");
+    require(methodType->isThin(),
+            "result method must be of a thin function type");
     SILType operandType = CMI->getOperand().getType();
-    assert(isClassOrClassMetatype(operandType.getSwiftType()) &&
-           "operand must be of a class type");
-    assert(isClassOrClassMetatype(methodType->getInput()) &&
-           "result must be a method of a class");
-    assert(methodType->getResult()->is<AnyFunctionType>() &&
-           "result must be a method");
+    require(isClassOrClassMetatype(operandType.getSwiftType()),
+            "operand must be of a class type");
+    require(isClassOrClassMetatype(methodType->getInput()),
+            "result must be a method of a class");
+    require(methodType->getResult()->is<AnyFunctionType>(),
+            "result must be a method");
   }
   
   void checkSuperMethodInst(SuperMethodInst *CMI) {
-    assert(CMI->getType(0).getUncurryLevel() == CMI->getMember().uncurryLevel &&
-           "result method must be at natural uncurry level of method");
+    require(CMI->getType(0).getUncurryLevel() == CMI->getMember().uncurryLevel,
+            "result method must be at natural uncurry level of method");
     auto *methodType = CMI->getType(0).getAs<AnyFunctionType>();
-    assert(methodType &&
-           "result method must be of a function type");
-    assert(methodType->isThin() &&
-           "result method must be of a thin function type");
+    require(methodType,
+            "result method must be of a function type");
+    require(methodType->isThin(),
+            "result method must be of a thin function type");
     SILType operandType = CMI->getOperand().getType();
-    assert(isClassOrClassMetatype(operandType.getSwiftType()) &&
-           "operand must be of a class type");
-    assert(isClassOrClassMetatype(methodType->getInput()) &&
-           "result must be a method of a class");
-    assert(methodType->getResult()->is<AnyFunctionType>() &&
-           "result must be a method");
+    require(isClassOrClassMetatype(operandType.getSwiftType()),
+            "operand must be of a class type");
+    require(isClassOrClassMetatype(methodType->getInput()),
+            "result must be a method of a class");
+    require(methodType->getResult()->is<AnyFunctionType>(),
+            "result must be a method");
   }
   
   void checkProjectExistentialInst(ProjectExistentialInst *PEI) {
     SILType operandType = PEI->getOperand().getType();
-    assert(operandType.isAddress() && "project_existential must be applied to address");
-    assert(operandType.isExistentialType() &&
-           "project_existential must be applied to address of existential");
+    require(operandType.isAddress(), "project_existential must be applied to address");
+    require(operandType.isExistentialType(),
+            "project_existential must be applied to address of existential");
   }
   
   void checkInitExistentialInst(InitExistentialInst *AEI) {
     SILType exType = AEI->getExistential().getType();
-    assert(exType.isAddress() &&
-           "init_existential must be applied to an address");
-    assert(exType.isExistentialType() &&
-           "init_existential must be applied to address of existential");
-    assert(!AEI->getConcreteType()->isExistentialType() &&
-           "init_existential cannot put an existential container inside "
-           "an existential container");
+    require(exType.isAddress(),
+            "init_existential must be applied to an address");
+    require(exType.isExistentialType(),
+            "init_existential must be applied to address of existential");
+    require(!AEI->getConcreteType()->isExistentialType(),
+            "init_existential cannot put an existential container inside "
+            "an existential container");
   }
   
   void checkUpcastExistentialInst(UpcastExistentialInst *UEI) {
     SILType srcType = UEI->getSrcExistential().getType();
     SILType destType = UEI->getDestExistential().getType();
-    assert(srcType.isAddress() &&
-           "upcast_existential source must be an address");
-    assert(srcType.isExistentialType() &&
-           "upcast_existential source must be address of existential");
-    assert(destType.isAddress() &&
-           "upcast_existential dest must be an address");
-    assert(destType.isExistentialType() &&
-           "upcast_existential dest must be address of existential");
+    require(srcType.isAddress(),
+            "upcast_existential source must be an address");
+    require(srcType.isExistentialType(),
+            "upcast_existential source must be address of existential");
+    require(destType.isAddress(),
+            "upcast_existential dest must be an address");
+    require(destType.isExistentialType(),
+            "upcast_existential dest must be address of existential");
   }
   
   void checkDeinitExistentialInst(DeinitExistentialInst *DEI) {
     SILType exType = DEI->getExistential().getType();
-    assert(exType.isAddress() &&
-           "deinit_existential must be applied to an address");
-    assert(exType.isExistentialType() &&
-           "deinit_existential must be applied to address of existential");
+    require(exType.isAddress(),
+            "deinit_existential must be applied to an address");
+    require(exType.isExistentialType(),
+            "deinit_existential must be applied to address of existential");
   }
   
   void checkArchetypeToSuperInst(ArchetypeToSuperInst *ASI) {
-    assert(ASI->getOperand().getType().isAddressOnly() &&
-           "archetype_to_super operand must be an address");
-    assert(ASI->getOperand().getType().is<ArchetypeType>() &&
-           "archetype_to_super operand must be archetype");
-    assert(ASI->getType().hasReferenceSemantics() &&
-           "archetype_to_super must convert to a reference type");
+    require(ASI->getOperand().getType().isAddressOnly(),
+            "archetype_to_super operand must be an address");
+    require(ASI->getOperand().getType().is<ArchetypeType>(),
+            "archetype_to_super operand must be archetype");
+    require(ASI->getType().hasReferenceSemantics(),
+            "archetype_to_super must convert to a reference type");
   }
   
   void checkThinToThickFunctionInst(ThinToThickFunctionInst *TTFI) {
-    assert(!TTFI->getOperand().getType().isAddress() &&
-           "thin_to_thick_function operand cannot be an address");
-    assert(!TTFI->getType().isAddress() &&
-           "thin_to_thick_function result cannot be an address");
-    assert(TTFI->getOperand().getType().is<AnyFunctionType>() &&
-           "thin_to_thick_function operand must be a function");
-    assert(TTFI->getType().is<AnyFunctionType>() &&
-           "thin_to_thick_function result must be a function");
+    require(!TTFI->getOperand().getType().isAddress(),
+            "thin_to_thick_function operand cannot be an address");
+    require(!TTFI->getType().isAddress(),
+            "thin_to_thick_function result cannot be an address");
+    require(TTFI->getOperand().getType().is<AnyFunctionType>(),
+            "thin_to_thick_function operand must be a function");
+    require(TTFI->getType().is<AnyFunctionType>(),
+            "thin_to_thick_function result must be a function");
     if (auto *opFTy = dyn_cast<FunctionType>(
                                  TTFI->getOperand().getType().getSwiftType())) {
       auto *resFTy = dyn_cast<FunctionType>(TTFI->getType().getSwiftType());
-      assert(resFTy &&
-             opFTy->getInput()->isEqual(resFTy->getInput()) &&
-             opFTy->getResult()->isEqual(resFTy->getResult()) &&
-             opFTy->isAutoClosure() == resFTy->isAutoClosure() &&
-             opFTy->isBlock() == resFTy->isBlock() &&
-             "thin_to_thick_function operand and result type must differ only "
-             " in thinness");
-      assert(!resFTy->isThin() &&
-             "thin_to_thick_function result must not be thin");
-      assert(opFTy->isThin() &&
-             "thin_to_thick_function operand must be thin");
+      require(resFTy &&
+              opFTy->getInput()->isEqual(resFTy->getInput()) &&
+              opFTy->getResult()->isEqual(resFTy->getResult()) &&
+              opFTy->isAutoClosure() == resFTy->isAutoClosure() &&
+              opFTy->isBlock() == resFTy->isBlock(),
+              "thin_to_thick_function operand and result type must differ only "
+              " in thinness");
+      require(!resFTy->isThin(),
+              "thin_to_thick_function result must not be thin");
+      require(opFTy->isThin(),
+              "thin_to_thick_function operand must be thin");
     } else if (auto *opPTy = dyn_cast<PolymorphicFunctionType>(
                                  TTFI->getOperand().getType().getSwiftType())) {
       auto *resPTy = dyn_cast<PolymorphicFunctionType>(
                                                TTFI->getType().getSwiftType());
-      assert(resPTy &&
-             opPTy->getInput()->isEqual(resPTy->getInput()) &&
-             opPTy->getResult()->isEqual(resPTy->getResult()) &&
-             "thin_to_thick_function operand and result type must differ only "
-             " in thinness");
-      assert(!resPTy->isThin() &&
-             "thin_to_thick_function result must not be thin");
-      assert(opPTy->isThin() &&
-             "thin_to_thick_function operand must be thin");
+      require(resPTy &&
+              opPTy->getInput()->isEqual(resPTy->getInput()) &&
+              opPTy->getResult()->isEqual(resPTy->getResult()),
+              "thin_to_thick_function operand and result type must differ only "
+              " in thinness");
+      require(!resPTy->isThin(),
+              "thin_to_thick_function result must not be thin");
+      require(opPTy->isThin(),
+              "thin_to_thick_function operand must be thin");
     } else {
       llvm_unreachable("invalid AnyFunctionType?!");
     }
   }
   
   void checkSuperToArchetypeInst(SuperToArchetypeInst *SAI) {
-    assert(SAI->getSrcBase().getType().hasReferenceSemantics() &&
-           "super_to_archetype source must be a reference type");
-    assert(SAI->getDestArchetypeAddress().getType().is<ArchetypeType>() &&
-           "super_to_archetype dest must be an archetype address");
+    require(SAI->getSrcBase().getType().hasReferenceSemantics(),
+            "super_to_archetype source must be a reference type");
+    require(SAI->getDestArchetypeAddress().getType().is<ArchetypeType>(),
+            "super_to_archetype dest must be an archetype address");
   }
 
   void checkUpcastInst(UpcastInst *UI) {
     if (UI->getType().is<MetaTypeType>()) {
       CanType instTy(UI->getType().castTo<MetaTypeType>()->getInstanceType());
-      assert(UI->getOperand().getType().is<MetaTypeType>()
-             && "upcast operand must be a class or class metatype instance");
+      require(UI->getOperand().getType().is<MetaTypeType>(),
+              "upcast operand must be a class or class metatype instance");
       CanType opInstTy(UI->getOperand().getType().castTo<MetaTypeType>()
                          ->getInstanceType());
-      assert(opInstTy->getClassOrBoundGenericClass()
-             && "upcast operand must be a class or class metatype instance");
-      assert(instTy->getClassOrBoundGenericClass()
-             && "upcast must convert a class metatype to a class metatype");
+      require(opInstTy->getClassOrBoundGenericClass(),
+              "upcast operand must be a class or class metatype instance");
+      require(instTy->getClassOrBoundGenericClass(),
+              "upcast must convert a class metatype to a class metatype");
     } else {
-      assert(UI->getOperand().getType().getSwiftType()
-              ->getClassOrBoundGenericClass() &&
-             "upcast operand must be a class or class metatype instance");
-      assert(UI->getType().getSwiftType()->getClassOrBoundGenericClass() &&
-             "upcast must convert a class instance to a class type");
+      require(UI->getOperand().getType().getSwiftType()
+                ->getClassOrBoundGenericClass(),
+              "upcast operand must be a class or class metatype instance");
+      require(UI->getType().getSwiftType()->getClassOrBoundGenericClass(),
+              "upcast must convert a class instance to a class type");
     }
   }
   
   void checkDowncastInst(DowncastInst *DI) {
-    assert(DI->getOperand().getType().getSwiftType()
-             ->getClassOrBoundGenericClass() &&
-           "downcast operand must be a class type");
-    assert(DI->getType().getSwiftType()->getClassOrBoundGenericClass() &&
-           "downcast must convert to a class type");
+    require(DI->getOperand().getType().getSwiftType()
+              ->getClassOrBoundGenericClass(),
+            "downcast operand must be a class type");
+    require(DI->getType().getSwiftType()->getClassOrBoundGenericClass(),
+            "downcast must convert to a class type");
   }
   
   void checkAddressToPointerInst(AddressToPointerInst *AI) {
-    assert(AI->getOperand().getType().isAddress() &&
-           "address-to-pointer operand must be an address");
-    assert(AI->getType().getSwiftType()->isEqual(
-                              AI->getType().getASTContext().TheRawPointerType)
-           && "address-to-pointer result type must be RawPointer");
+    require(AI->getOperand().getType().isAddress(),
+            "address-to-pointer operand must be an address");
+    require(AI->getType().getSwiftType()->isEqual(
+                              AI->getType().getASTContext().TheRawPointerType),
+            "address-to-pointer result type must be RawPointer");
   }
   
   void checkConvertFunctionInst(ConvertFunctionInst *ICI) {
-    assert(!ICI->getOperand().getType().isAddress() &&
-           "conversion operand cannot be an address");
-    assert(!ICI->getType().isAddress() &&
-           "conversion result cannot be an address");
+    require(!ICI->getOperand().getType().isAddress(),
+            "conversion operand cannot be an address");
+    require(!ICI->getType().isAddress(),
+            "conversion result cannot be an address");
     
     auto *opFTy = ICI->getOperand().getType().getAs<AnyFunctionType>();
     auto *resFTy = ICI->getType().getAs<AnyFunctionType>();
 
-    assert(opFTy && "convert_function operand must be a function");
-    assert(resFTy && "convert_function result must be a function");
+    require(opFTy, "convert_function operand must be a function");
+    require(resFTy, "convert_function result must be a function");
     
-    assert(opFTy->isThin() == resFTy->isThin() &&
-           "convert_function cannot change function thinness");
+    require(opFTy->isThin() == resFTy->isThin(),
+            "convert_function cannot change function thinness");
     
     SILFunctionTypeInfo *opTI
       = ICI->getOperand().getType().getFunctionTypeInfo();
     SILFunctionTypeInfo *resTI = ICI->getType().getFunctionTypeInfo();
 
-    assert(opTI->getResultType() == resTI->getResultType() &&
-         "result types of convert_function operand and result do no match");
-    assert(opTI->getInputTypes().size() == resTI->getInputTypes().size() &&
-           "input types of convert_function operand and result do not match");
-    assert(std::equal(opTI->getInputTypes().begin(), opTI->getInputTypes().end(),
-                      resTI->getInputTypes().begin()) &&
-           "input types of convert_function operand and result do not match");
+    require(opTI->getResultType() == resTI->getResultType(),
+            "result types of convert_function operand and result do no match");
+    require(opTI->getInputTypes().size() == resTI->getInputTypes().size(),
+            "input types of convert_function operand and result do not match");
+    require(std::equal(opTI->getInputTypes().begin(), opTI->getInputTypes().end(),
+                      resTI->getInputTypes().begin()),
+            "input types of convert_function operand and result do not match");
   }
   
   void checkIntegerValueInst(IntegerValueInst *IVI) {
-    assert(IVI->getType().is<BuiltinIntegerType>() &&
-           "invalid integer value type");
+    require(IVI->getType().is<BuiltinIntegerType>(),
+            "invalid integer value type");
   }
 
   void checkReturnInst(ReturnInst *RI) {
     DEBUG(RI->print(llvm::dbgs()));
-    assert(RI->getReturnValue() && "Return of null value is invalid");
     
     SILFunctionTypeInfo *ti =
       F.getLoweredType().getFunctionTypeInfo();
@@ -668,54 +689,52 @@ public:
           functionResultType.dump();
           llvm::dbgs() << "return inst type: ";
           instResultType.dump(););
-    assert(functionResultType == instResultType &&
-           "return value type does not match return type of function");
+    require(functionResultType == instResultType,
+            "return value type does not match return type of function");
   }
   
   void checkBranchInst(BranchInst *BI) {
-    assert(BI->getArgs().size() == BI->getDestBB()->bbarg_size() &&
-           "branch has wrong number of arguments for dest bb");
-    assert(std::equal(BI->getArgs().begin(), BI->getArgs().end(),
+    require(BI->getArgs().size() == BI->getDestBB()->bbarg_size(),
+            "branch has wrong number of arguments for dest bb");
+    require(std::equal(BI->getArgs().begin(), BI->getArgs().end(),
                       BI->getDestBB()->bbarg_begin(),
                       [](SILValue branchArg, SILArgument *bbArg) {
                         return branchArg.getType() == bbArg->getType();
-                      }) &&
-           "branch argument types do not match arguments for dest bb");
+                      }),
+            "branch argument types do not match arguments for dest bb");
   }
   
   void checkCondBranchInst(CondBranchInst *CBI) {
-    assert(CBI->getCondition() &&
-           "Condition of conditional branch can't be missing");
-    assert(CBI->getCondition().getType() ==
+    require(CBI->getCondition().getType() ==
              SILType::getBuiltinIntegerType(1,
-                                 CBI->getCondition().getType().getASTContext())
-           && "condition of conditional branch must have Int1 type");
+                                 CBI->getCondition().getType().getASTContext()),
+            "condition of conditional branch must have Int1 type");
     
-    assert(CBI->getTrueArgs().size() == CBI->getTrueBB()->bbarg_size() &&
-           "true branch has wrong number of arguments for dest bb");
-    assert(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
+    require(CBI->getTrueArgs().size() == CBI->getTrueBB()->bbarg_size(),
+            "true branch has wrong number of arguments for dest bb");
+    require(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
                       CBI->getTrueBB()->bbarg_begin(),
                       [](SILValue branchArg, SILArgument *bbArg) {
                         return branchArg.getType() == bbArg->getType();
-                      }) &&
-           "true branch argument types do not match arguments for dest bb");
+                      }),
+            "true branch argument types do not match arguments for dest bb");
 
-    assert(CBI->getFalseArgs().size() == CBI->getFalseBB()->bbarg_size() &&
-           "false branch has wrong number of arguments for dest bb");
-    assert(std::equal(CBI->getFalseArgs().begin(), CBI->getFalseArgs().end(),
+    require(CBI->getFalseArgs().size() == CBI->getFalseBB()->bbarg_size(),
+            "false branch has wrong number of arguments for dest bb");
+    require(std::equal(CBI->getFalseArgs().begin(), CBI->getFalseArgs().end(),
                       CBI->getFalseBB()->bbarg_begin(),
                       [](SILValue branchArg, SILArgument *bbArg) {
                         return branchArg.getType() == bbArg->getType();
-                      }) &&
-           "false branch argument types do not match arguments for dest bb");
+                      }),
+            "false branch argument types do not match arguments for dest bb");
   }
   
   void verifyEntryPointArguments(SILBasicBlock *entry) {
     SILType ty = F.getLoweredType();
     SILFunctionTypeInfo *ti = ty.getFunctionTypeInfo();
     
-    assert(entry->bbarg_size() == ti->getInputTypes().size() &&
-           "entry point has wrong number of arguments");
+    require(entry->bbarg_size() == ti->getInputTypes().size(),
+            "entry point has wrong number of arguments");
     DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
           for (auto *arg : make_range(entry->bbarg_begin(), entry->bbarg_end()))
             arg->getType().dump();
@@ -724,12 +743,12 @@ public:
             input.dump(););
             
     
-    assert(std::equal(entry->bbarg_begin(), entry->bbarg_end(),
+    require(std::equal(entry->bbarg_begin(), entry->bbarg_end(),
                       ti->getInputTypes().begin(),
                       [](SILArgument *bbarg, SILType ty) {
                         return bbarg->getType() == ty;
-                      }) &&
-           "entry point argument types do not match function type");
+                      }),
+            "entry point argument types do not match function type");
   }
   
   void visitSILFunction(SILFunction *F) {
