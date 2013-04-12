@@ -3878,11 +3878,13 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                        CanType outType,
                                        HeapLayout const &layout) {
   llvm::AttributeSet attrs;
+  ExtraData extraData
+    = layout.empty() ? ExtraData::None : ExtraData::Retainable;
   llvm::FunctionType *fwdTy = IGM.getFunctionType(AbstractCC::Freestanding,
                                                   outType,
                                                   explosionLevel,
                                                   /*curryLevel=*/ 0,
-                                                  ExtraData::Retainable,
+                                                  extraData,
                                                   attrs);
   // FIXME: Give the thunk a real name.
   // FIXME: Maybe cache the thunk by function and closure types? Could there
