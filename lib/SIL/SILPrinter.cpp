@@ -277,7 +277,8 @@ public:
        << StringRef(Buffer.data(), Buffer.size());
   }
   void visitStringLiteralInst(StringLiteralInst *SLI) {
-    OS << "string_literal \"" << SLI->getValue() << "\"";
+    OS << "string_literal $" << SLI->getType()
+       << ", \"" << SLI->getValue() << "\"";
   }
   void visitLoadInst(LoadInst *LI) {
     OS << "load " << getID(LI->getLValue());
