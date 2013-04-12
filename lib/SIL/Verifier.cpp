@@ -25,15 +25,34 @@ using namespace swift;
 #ifndef NDEBUG
 
 namespace {
-/// SILVerifier class - This class implements the SIL verifier, which walks over
-/// SIL, checking and enforcing its invariants.
-class SILVerifier : public SILInstructionVisitor<SILVerifier> {
+/// Metaprogramming-friendly base class.
+template <class Impl>
+class SILVerifierBase : public SILInstructionVisitor<Impl> {
+public:
+  // visitCLASS calls visitPARENT and checkCLASS.
+  // checkCLASS does nothing by default.
+#define VALUE(CLASS, PARENT)                                    \
+  void visit##CLASS(CLASS *I) {                                 \
+    static_cast<Impl*>(this)->visit##PARENT(I);                 \
+    static_cast<Impl*>(this)->check##CLASS(I);                  \
+  }                                                             \
+  void check##CLASS(CLASS *I) {}
+#include "swift/SIL/SILNodes.def"
+
+  void visitValueBase(ValueBase *V) {
+    static_cast<Impl*>(this)->checkValueBase(V);
+  }
+  void checkValueBase(ValueBase *V) {}
+};
+
+/// The SIL verifier walks over a SIL function / basic block / instruction,
+/// checking and enforcing its invariants.
+class SILVerifier : public SILVerifierBase<SILVerifier> {
   SILFunction const &F;
 public:
   SILVerifier(SILFunction const &F) : F(F) {}
   
-  void visit(SILInstruction *I) {
-    
+  void checkSILInstruction(SILInstruction *I) {
     const SILBasicBlock *BB = I->getParent();
     // Check that non-terminators look ok.
     if (!isa<TermInst>(I)) {
@@ -46,24 +65,57 @@ public:
              "Terminator must be the last in block");
     }
 
-    
-    // Dispatch to our more-specialized instances below.
-    ((SILVisitor<SILVerifier>*)this)->visit(I);
+    // Verify that all of our uses are in this function.
+    for (Operand *use : I->getUses()) {
+      auto user = use->getUser();
+      assert(user && "instruction user is null?");
+      assert(isa<SILInstruction>(user) &&
+             "instruction used by non-instruction");
+      auto userI = cast<SILInstruction>(user);
+      assert(userI->getParent() &&
+             "instruction used by unparented instruction");
+      assert(userI->getParent()->getParent() == &F &&
+             "instruction used by instruction in different function");
+
+      auto operands = userI->getAllOperands();
+      assert(operands.begin() <= use && use <= operands.end() &&
+             "use doesn't actually belong to instruction it claims to");
+    }
+
+    // Verify some basis structural stuff about an instruction's operands.
+    for (auto &operand : I->getAllOperands()) {
+      if (auto *valueI = dyn_cast<SILInstruction>(operand.get())) {
+        assert(valueI->getParent() &&
+               "instruction uses value of unparented instruction");
+        // TODO: check dominance
+        assert(valueI->getParent()->getParent() == &F &&
+               "instruction uses value of instruction from different function");
+      }
+
+      assert(operand.getUser() == I &&
+             "instruction's operand's owner isn't the instruction");
+      assert(isInValueUses(&operand) && "operand value isn't used by operand");
+    }
   }
 
-  // Base case: no extra verification to do.
-  void visitSILInstruction(SILInstruction *I) {}
+  /// Check that this operand appears in the use-chain of the value it uses.
+  static bool isInValueUses(const Operand *operand) {
+    for (auto use : operand->get()->getUses())
+      if (use == operand)
+        return true;
+    return false;
+  }
 
-  void visitAllocVarInst(AllocVarInst *AI) {
+  void checkAllocVarInst(AllocVarInst *AI) {
     assert(AI->getType().isAddress() && "alloc_var must return address");
   }
   
-  void visitAllocRefInst(AllocRefInst *AI) {
+  void checkAllocRefInst(AllocRefInst *AI) {
     assert(AI->getType().hasReferenceSemantics() && !AI->getType().isAddress()
            && "alloc_ref must return reference type value");
   }
   
-  void visitApplyInst(ApplyInst *AI) {
+  void checkApplyInst(ApplyInst *AI) {
     DEBUG(llvm::dbgs() << "verifying";
           AI->print(llvm::dbgs()));
     SILType calleeTy = AI->getCallee().getType();
@@ -111,7 +163,7 @@ public:
            "type of apply instruction doesn't match function result type");
   }
   
-  void visitPartialApplyInst(PartialApplyInst *PAI) {
+  void checkPartialApplyInst(PartialApplyInst *PAI) {
     SILType calleeTy = PAI->getCallee().getType();
     assert(!calleeTy.isAddress() && "callee of closure cannot be an address");
     assert(calleeTy.is<FunctionType>() &&
@@ -155,7 +207,7 @@ public:
     
   }
 
-  void visitConstantRefInst(ConstantRefInst *CRI) {
+  void checkConstantRefInst(ConstantRefInst *CRI) {
     if (CRI->getConstant().kind == SILConstant::Kind::GlobalAddress) {
       assert(CRI->getType().isAddress() &&
              "GlobalAddress SILConstant must have an address result type");
@@ -168,11 +220,11 @@ public:
            "constant_ref should have a thin function result");
   }
 
-  void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
+  void checkIntegerLiteralInst(IntegerLiteralInst *ILI) {
     assert(ILI->getType().is<BuiltinIntegerType>() &&
            "invalid integer literal type");
   }
-  void visitLoadInst(LoadInst *LI) {
+  void checkLoadInst(LoadInst *LI) {
     assert(!LI->getType().isAddress() && "Can't load an address");
     assert(LI->getLValue().getType().isAddress() &&
            "Load operand must be an address");
@@ -180,7 +232,7 @@ public:
            "Load operand type and result type mismatch");
   }
 
-  void visitStoreInst(StoreInst *SI) {
+  void checkStoreInst(StoreInst *SI) {
     assert(!SI->getSrc().getType().isAddress() &&
            "Can't store from an address source");
     assert(SI->getDest().getType().isAddress() &&
@@ -189,7 +241,7 @@ public:
            "Store operand type and dest type mismatch");
   }
 
-  void visitCopyAddrInst(CopyAddrInst *SI) {
+  void checkCopyAddrInst(CopyAddrInst *SI) {
     assert(SI->getSrc().getType().isAddress() &&
            "Src value should be lvalue");
     assert(SI->getDest().getType().isAddress() &&
@@ -198,12 +250,12 @@ public:
            "Store operand type and dest type mismatch");
   }
   
-  void visitInitializeVarInst(InitializeVarInst *ZI) {
+  void checkInitializeVarInst(InitializeVarInst *ZI) {
     assert(ZI->getDest().getType().isAddress() &&
            "Dest address should be lvalue");
   }
   
-  void visitSpecializeInst(SpecializeInst *SI) {
+  void checkSpecializeInst(SpecializeInst *SI) {
     assert(SI->getType().is<FunctionType>() &&
            "Specialize result should have a function type");
     assert(SI->getType().castTo<FunctionType>()->isThin() &&
@@ -222,7 +274,7 @@ public:
            && "Specialize source and dest uncurry levels must match");
   }
 
-  void visitTupleInst(TupleInst *TI) {
+  void checkTupleInst(TupleInst *TI) {
     assert(TI->getType().is<TupleType>() && "TupleInst should return a tuple");
     TupleType *ResTy = TI->getType().castTo<TupleType>();
 
@@ -235,11 +287,11 @@ public:
              "Tuple element arguments do not match tuple type!");
     }
   }
-  void visitMetatypeInst(MetatypeInst *MI) {
+  void checkMetatypeInst(MetatypeInst *MI) {
     assert(MI->getType(0).is<MetaTypeType>() &&
            "metatype instruction must be of metatype type");
   }
-  void visitClassMetatypeInst(ClassMetatypeInst *MI) {
+  void checkClassMetatypeInst(ClassMetatypeInst *MI) {
     assert(MI->getType().is<MetaTypeType>() &&
            "class_metatype instruction must be of metatype type");
     assert(MI->getBase().getType().getSwiftType()->getClassOrBoundGenericClass() &&
@@ -248,7 +300,7 @@ public:
              CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()) &&
            "class_metatype result must be metatype of base class type");
   }
-  void visitArchetypeMetatypeInst(ArchetypeMetatypeInst *MI) {
+  void checkArchetypeMetatypeInst(ArchetypeMetatypeInst *MI) {
     assert(MI->getType().is<MetaTypeType>() &&
            "archetype_metatype instruction must be of metatype type");
     assert(MI->getBase().getType().isAddress() &&
@@ -259,7 +311,7 @@ public:
            CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()) &&
            "archetype_metatype result must be metatype of operand type");
   }
-  void visitProtocolMetatypeInst(ProtocolMetatypeInst *MI) {
+  void checkProtocolMetatypeInst(ProtocolMetatypeInst *MI) {
     assert(MI->getType().is<MetaTypeType>() &&
            "protocol_metatype instruction must be of metatype type");
     assert(MI->getBase().getType().isAddress() &&
@@ -270,51 +322,51 @@ public:
            CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()) &&
            "protocol_metatype result must be metatype of operand type");
   }
-  void visitModuleInst(ModuleInst *MI) {
+  void checkModuleInst(ModuleInst *MI) {
     assert(MI->getType(0).is<ModuleType>() &&
            "module instruction must be of module type");
   }
-  void visitAssociatedMetatypeInst(AssociatedMetatypeInst *MI) {
+  void checkAssociatedMetatypeInst(AssociatedMetatypeInst *MI) {
     assert(MI->getType(0).is<MetaTypeType>() &&
            "associated_metatype instruction must be of metatype type");
     assert(MI->getSourceMetatype().getType().is<MetaTypeType>() &&
            "associated_metatype operand must be of metatype type");
   }
   
-  void visitRetainInst(RetainInst *RI) {
+  void checkRetainInst(RetainInst *RI) {
     assert(!RI->getOperand().getType().isAddress() &&
            "Operand of retain must not be address");
     assert(RI->getOperand().getType().hasReferenceSemantics() &&
            "Operand of dealloc_ref must be reference type");
   }
-  void visitReleaseInst(ReleaseInst *RI) {
+  void checkReleaseInst(ReleaseInst *RI) {
     assert(!RI->getOperand().getType().isAddress() &&
            "Operand of release must not be address");
     assert(RI->getOperand().getType().hasReferenceSemantics() &&
            "Operand of dealloc_ref must be reference type");
   }
-  void visitDeallocVarInst(DeallocVarInst *DI) {
+  void checkDeallocVarInst(DeallocVarInst *DI) {
     assert(DI->getOperand().getType().isAddress() &&
            "Operand of dealloc_var must be address");
   }
-  void visitDeallocRefInst(DeallocRefInst *DI) {
+  void checkDeallocRefInst(DeallocRefInst *DI) {
     assert(!DI->getOperand().getType().isAddress() &&
            "Operand of dealloc_ref must not be address");
     assert(DI->getOperand().getType().hasReferenceSemantics() &&
            "Operand of dealloc_ref must be reference type");
   }
-  void visitDestroyAddrInst(DestroyAddrInst *DI) {
+  void checkDestroyAddrInst(DestroyAddrInst *DI) {
     assert(DI->getOperand().getType().isAddressOnly() &&
            "Operand of destroy_addr must be address-only");
   }
 
-  void visitIndexAddrInst(IndexAddrInst *IAI) {
+  void checkIndexAddrInst(IndexAddrInst *IAI) {
     assert(IAI->getType().isAddress() &&
            IAI->getType() == IAI->getOperand().getType() &&
            "invalid IndexAddrInst");
   }
   
-  void visitExtractInst(ExtractInst *EI) {
+  void checkExtractInst(ExtractInst *EI) {
     SILType operandTy = EI->getOperand().getType();
     assert(!operandTy.isAddress() &&
            "cannot extract from address");
@@ -324,7 +376,7 @@ public:
            "result of extract cannot be address");
   }
 
-  void visitElementAddrInst(ElementAddrInst *EI) {
+  void checkElementAddrInst(ElementAddrInst *EI) {
     SILType operandTy = EI->getOperand().getType();
     assert(operandTy.isAddress() &&
            "must derive element_addr from address");
@@ -334,7 +386,7 @@ public:
            "result of element_addr must be lvalue");
   }
   
-  void visitRefElementAddrInst(RefElementAddrInst *EI) {
+  void checkRefElementAddrInst(RefElementAddrInst *EI) {
     SILType operandTy = EI->getOperand().getType();
     assert(!operandTy.isAddress() &&
            "must derive ref_element_addr from non-address");
@@ -344,7 +396,7 @@ public:
            "result of ref_element_addr must be lvalue");
   }
   
-  void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
+  void checkArchetypeMethodInst(ArchetypeMethodInst *AMI) {
     DEBUG(llvm::dbgs() << "verifying";
           AMI->print(llvm::dbgs()));
     assert(AMI->getType(0).getUncurryLevel() == AMI->getMember().uncurryLevel &&
@@ -375,7 +427,7 @@ public:
       llvm_unreachable("method must apply to an address or metatype");
   }
   
-  void visitProtocolMethodInst(ProtocolMethodInst *EMI) {
+  void checkProtocolMethodInst(ProtocolMethodInst *EMI) {
     assert(EMI->getType(0).getUncurryLevel() == EMI->getMember().uncurryLevel &&
            "result method must be at natural uncurry level of method");
     assert(EMI->getType(0).getUncurryLevel() == 1 &&
@@ -405,7 +457,7 @@ public:
     }
   }
   
-  void visitClassMethodInst(ClassMethodInst *CMI) {
+  void checkClassMethodInst(ClassMethodInst *CMI) {
     assert(CMI->getType(0).getUncurryLevel() == CMI->getMember().uncurryLevel &&
            "result method must be at natural uncurry level of method");
     auto *methodType = CMI->getType(0).getAs<AnyFunctionType>();
@@ -422,7 +474,7 @@ public:
            "result must be a method");
   }
   
-  void visitSuperMethodInst(SuperMethodInst *CMI) {
+  void checkSuperMethodInst(SuperMethodInst *CMI) {
     assert(CMI->getType(0).getUncurryLevel() == CMI->getMember().uncurryLevel &&
            "result method must be at natural uncurry level of method");
     auto *methodType = CMI->getType(0).getAs<AnyFunctionType>();
@@ -439,14 +491,14 @@ public:
            "result must be a method");
   }
   
-  void visitProjectExistentialInst(ProjectExistentialInst *PEI) {
+  void checkProjectExistentialInst(ProjectExistentialInst *PEI) {
     SILType operandType = PEI->getOperand().getType();
     assert(operandType.isAddress() && "project_existential must be applied to address");
     assert(operandType.isExistentialType() &&
            "project_existential must be applied to address of existential");
   }
   
-  void visitInitExistentialInst(InitExistentialInst *AEI) {
+  void checkInitExistentialInst(InitExistentialInst *AEI) {
     SILType exType = AEI->getExistential().getType();
     assert(exType.isAddress() &&
            "init_existential must be applied to an address");
@@ -457,7 +509,7 @@ public:
            "an existential container");
   }
   
-  void visitUpcastExistentialInst(UpcastExistentialInst *UEI) {
+  void checkUpcastExistentialInst(UpcastExistentialInst *UEI) {
     SILType srcType = UEI->getSrcExistential().getType();
     SILType destType = UEI->getDestExistential().getType();
     assert(srcType.isAddress() &&
@@ -470,7 +522,7 @@ public:
            "upcast_existential dest must be address of existential");
   }
   
-  void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
+  void checkDeinitExistentialInst(DeinitExistentialInst *DEI) {
     SILType exType = DEI->getExistential().getType();
     assert(exType.isAddress() &&
            "deinit_existential must be applied to an address");
@@ -478,7 +530,7 @@ public:
            "deinit_existential must be applied to address of existential");
   }
   
-  void visitArchetypeToSuperInst(ArchetypeToSuperInst *ASI) {
+  void checkArchetypeToSuperInst(ArchetypeToSuperInst *ASI) {
     assert(ASI->getOperand().getType().isAddressOnly() &&
            "archetype_to_super operand must be an address");
     assert(ASI->getOperand().getType().is<ArchetypeType>() &&
@@ -487,7 +539,7 @@ public:
            "archetype_to_super must convert to a reference type");
   }
   
-  void visitThinToThickFunctionInst(ThinToThickFunctionInst *TTFI) {
+  void checkThinToThickFunctionInst(ThinToThickFunctionInst *TTFI) {
     assert(!TTFI->getOperand().getType().isAddress() &&
            "thin_to_thick_function operand cannot be an address");
     assert(!TTFI->getType().isAddress() &&
@@ -528,14 +580,14 @@ public:
     }
   }
   
-  void visitSuperToArchetypeInst(SuperToArchetypeInst *SAI) {
+  void checkSuperToArchetypeInst(SuperToArchetypeInst *SAI) {
     assert(SAI->getSrcBase().getType().hasReferenceSemantics() &&
            "super_to_archetype source must be a reference type");
     assert(SAI->getDestArchetypeAddress().getType().is<ArchetypeType>() &&
            "super_to_archetype dest must be an archetype address");
   }
 
-  void visitUpcastInst(UpcastInst *UI) {
+  void checkUpcastInst(UpcastInst *UI) {
     if (UI->getType().is<MetaTypeType>()) {
       CanType instTy(UI->getType().castTo<MetaTypeType>()->getInstanceType());
       assert(UI->getOperand().getType().is<MetaTypeType>()
@@ -555,7 +607,7 @@ public:
     }
   }
   
-  void visitDowncastInst(DowncastInst *DI) {
+  void checkDowncastInst(DowncastInst *DI) {
     assert(DI->getOperand().getType().getSwiftType()
              ->getClassOrBoundGenericClass() &&
            "downcast operand must be a class type");
@@ -563,7 +615,7 @@ public:
            "downcast must convert to a class type");
   }
   
-  void visitAddressToPointerInst(AddressToPointerInst *AI) {
+  void checkAddressToPointerInst(AddressToPointerInst *AI) {
     assert(AI->getOperand().getType().isAddress() &&
            "address-to-pointer operand must be an address");
     assert(AI->getType().getSwiftType()->isEqual(
@@ -571,7 +623,7 @@ public:
            && "address-to-pointer result type must be RawPointer");
   }
   
-  void visitConvertFunctionInst(ConvertFunctionInst *ICI) {
+  void checkConvertFunctionInst(ConvertFunctionInst *ICI) {
     assert(!ICI->getOperand().getType().isAddress() &&
            "conversion operand cannot be an address");
     assert(!ICI->getType().isAddress() &&
@@ -599,12 +651,12 @@ public:
            "input types of convert_function operand and result do not match");
   }
   
-  void visitIntegerValueInst(IntegerValueInst *IVI) {
+  void checkIntegerValueInst(IntegerValueInst *IVI) {
     assert(IVI->getType().is<BuiltinIntegerType>() &&
            "invalid integer value type");
   }
 
-  void visitReturnInst(ReturnInst *RI) {
+  void checkReturnInst(ReturnInst *RI) {
     DEBUG(RI->print(llvm::dbgs()));
     assert(RI->getReturnValue() && "Return of null value is invalid");
     
@@ -620,7 +672,7 @@ public:
            "return value type does not match return type of function");
   }
   
-  void visitBranchInst(BranchInst *BI) {
+  void checkBranchInst(BranchInst *BI) {
     assert(BI->getArgs().size() == BI->getDestBB()->bbarg_size() &&
            "branch has wrong number of arguments for dest bb");
     assert(std::equal(BI->getArgs().begin(), BI->getArgs().end(),
@@ -631,7 +683,7 @@ public:
            "branch argument types do not match arguments for dest bb");
   }
   
-  void visitCondBranchInst(CondBranchInst *CBI) {
+  void checkCondBranchInst(CondBranchInst *CBI) {
     assert(CBI->getCondition() &&
            "Condition of conditional branch can't be missing");
     assert(CBI->getCondition().getType() ==

@@ -219,7 +219,8 @@ namespace swift {
     }
 
     /// Return the user that owns this use.
-    inline ValueBase *getUser() { return Owner; }
+    ValueBase *getUser() { return Owner; }
+    const ValueBase *getUser() const { return Owner; }
 
   private:
     void removeFromCurrent() {
