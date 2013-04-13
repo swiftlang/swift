@@ -1167,6 +1167,13 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
   newLoweredExplosion(SILValue(i, 0), to);
 }
 
+void IRGenSILFunction::visitBridgeToBlockInst(swift::BridgeToBlockInst *i) {
+  Explosion from = getLoweredExplosion(i->getOperand());
+  Explosion to(CurExplosionLevel);
+  emitBridgeToBlock(*this, i->getType().getSwiftType(), from, to);
+  newLoweredExplosion(SILValue(i, 0), to, *this);
+}
+
 void IRGenSILFunction::visitCoerceInst(swift::CoerceInst *i) {
   Explosion from = getLoweredExplosion(i->getOperand());
   newLoweredExplosion(SILValue(i, 0), from);

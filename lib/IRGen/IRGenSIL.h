@@ -516,6 +516,7 @@ public:
   void visitDowncastInst(DowncastInst *i);
   void visitAddressToPointerInst(AddressToPointerInst *i);
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
+  void visitBridgeToBlockInst(BridgeToBlockInst *i);
   //void visitArchetypeToSuperInst(ArchetypeToSuperInst *i);
   //void visitSuperToArchetypeInst(SuperToArchetypeInst *i);
 
