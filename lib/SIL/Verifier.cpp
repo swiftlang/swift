@@ -565,6 +565,43 @@ public:
             "archetype_to_super must convert to a reference type");
   }
   
+  void checkBridgeToBlockInst(BridgeToBlockInst *BBI) {
+    SILType operandTy = BBI->getOperand().getType();
+    SILType resultTy = BBI->getType();
+    
+    require(!operandTy.isAddress(),
+            "bridge_to_block operand cannot be an address");
+    require(!resultTy.isAddress(),
+            "bridge_to_block result cannot be an address");
+    require(operandTy.is<FunctionType>(),
+            "bridge_to_block operand must be a function type");
+    require(resultTy.is<FunctionType>(),
+            "bridge_to_block result must be a function type");
+    require(operandTy.getUncurryLevel() == 0,
+            "bridge_to_block operand cannot be uncurried");
+    require(resultTy.getUncurryLevel() == 0,
+            "bridge_to_block result cannot be uncurried");
+    
+    auto *operandFTy = BBI->getOperand().getType().castTo<FunctionType>();
+    auto *resultFTy = BBI->getType().castTo<FunctionType>();
+    
+    require(CanType(operandFTy->getInput()) == CanType(resultFTy->getInput()),
+            "bridge_to_block operand and result types must differ only in "
+            "[objc_block]-ness");
+    require(CanType(operandFTy->getResult()) == CanType(resultFTy->getResult()),
+            "bridge_to_block operand and result types must differ only in "
+            "[objc_block]-ness");
+    require(operandFTy->isAutoClosure() == resultFTy->isAutoClosure(),
+            "bridge_to_block operand and result types must differ only in "
+            "[objc_block]-ness");
+    require(!operandFTy->isThin(), "bridge_to_block operand cannot be [thin]");
+    require(!resultFTy->isThin(), "bridge_to_block result cannot be [thin]");
+    require(!operandFTy->isBlock(),
+            "bridge_to_block operand cannot be [objc_block]");
+    require(resultFTy->isBlock(),
+            "bridge_to_block result must be [objc_block]");
+  }
+  
   void checkThinToThickFunctionInst(ThinToThickFunctionInst *TTFI) {
     require(!TTFI->getOperand().getType().isAddress(),
             "thin_to_thick_function operand cannot be an address");

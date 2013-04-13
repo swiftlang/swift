@@ -377,6 +377,11 @@ AddressToPointerInst::AddressToPointerInst(SILLocation Loc, SILValue Operand,
   : ConversionInst(ValueKind::AddressToPointerInst, Loc, Operand, Ty) {
 }
 
+BridgeToBlockInst::BridgeToBlockInst(SILLocation Loc, SILValue Operand,
+                                     SILType Ty)
+  : ConversionInst(ValueKind::BridgeToBlockInst, Loc, Operand, Ty) {
+}
+
 ThinToThickFunctionInst::ThinToThickFunctionInst(SILLocation Loc, SILValue Operand,
                                                  SILType Ty)
   : ConversionInst(ValueKind::ThinToThickFunctionInst, Loc, Operand, Ty) {

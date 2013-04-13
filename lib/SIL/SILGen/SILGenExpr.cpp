@@ -1632,11 +1632,24 @@ RValue SILGenFunction::visitExistentialSubscriptExpr(
 
 RValue SILGenFunction::visitBridgeToBlockExpr(BridgeToBlockExpr *E,
                                               SGFContext C) {
-  llvm_unreachable("not implemented");
+  SILValue func = visit(E->getSubExpr()).forwardAsSingleValue(*this);
+  // Thicken thin function value if necessary.
+  // FIXME: This should go away when Swift typechecking learns how to handle
+  // thin functions.
+  if (func.getType().is<FunctionType>() &&
+      func.getType().castTo<FunctionType>()->isThin()) {
+    func = emitThickenFunction(E, func);
+  }
+  
+  // Emit the bridge_to_block instruction.
+  SILValue block = B.createBridgeToBlock(E, func,
+                                         getLoweredLoadableType(E->getType()));
+  return RValue(*this, emitManagedRValueWithCleanup(block));
 }
 
 RValue SILGenFunction::visitIfExpr(IfExpr *E, SGFContext C) {
   // FIXME: We could avoid imploding and reexploding tuples here.
+  // FIXME: "emit into" optimization
   
   Condition cond = emitCondition(E, E->getCondExpr(),
                                  /*hasFalse*/ true,

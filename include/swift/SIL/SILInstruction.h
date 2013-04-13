@@ -632,6 +632,17 @@ public:
     return V->getKind() == ValueKind::ThinToThickFunctionInst;
   }
 };
+  
+/// BridgeToBlockInst - Converts a Swift function value to an ObjC-compatible
+/// block.
+class BridgeToBlockInst : public ConversionInst {
+public:
+  BridgeToBlockInst(SILLocation Loc, SILValue Operand, SILType ty);
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::BridgeToBlockInst;
+  }
+};
 
 /// ArchetypeToSuperInst - Given the address of an archetype value with a base
 /// class constraint, returns a reference to the base class instance.

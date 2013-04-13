@@ -210,7 +210,12 @@ public:
                                                      SILValue Op, SILType Ty) {
     return insert(new ThinToThickFunctionInst(Loc, Op, Ty));
   }
-  
+
+  BridgeToBlockInst *createBridgeToBlock(SILLocation Loc,
+                                         SILValue Op, SILType Ty) {
+    return insert(new BridgeToBlockInst(Loc, Op, Ty));
+  }
+
   ArchetypeToSuperInst *createArchetypeToSuper(SILLocation Loc,
                                                SILValue Archetype,
                                                SILType BaseTy) {

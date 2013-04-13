@@ -375,6 +375,9 @@ public:
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *CI) {
     printConversionInst(CI, "thin_to_thick_function");
   }
+  void visitBridgeToBlockInst(BridgeToBlockInst *CI) {
+    printConversionInst(CI, "bridge_to_block");
+  }
   void visitArchetypeToSuperInst(ArchetypeToSuperInst *CI) {
     printConversionInst(CI, "archetype_to_super");
   }
