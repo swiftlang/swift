@@ -463,12 +463,18 @@ static Type getFunctionTypeWithCaptures(TypeConverter &types,
              "constant capture is an lvalue?!");
       inputFields.push_back(TupleTypeElt(capture->getType()));
       break;
-    case CaptureKind::Byref:
+    case CaptureKind::Byref: {
       // Capture the address.
-      assert(capture->getTypeOfReference()->is<LValueType>() &&
+      assert(capture->getType()->is<LValueType>() &&
              "byref capture not an lvalue?!");
-      inputFields.push_back(TupleTypeElt(capture->getTypeOfReference()));
+      Type objectType
+        = capture->getType()->castTo<LValueType>()->getObjectType();
+      LValueType *lvType = LValueType::get(objectType,
+                                           LValueType::Qual::DefaultForType,
+                                           types.Context);
+      inputFields.push_back(TupleTypeElt(lvType));
       break;
+    }
     case CaptureKind::GetterSetter: {
       // Capture the setter and getter closures.
       Type setterTy = types.getPropertyType(SILConstant::Kind::Setter,

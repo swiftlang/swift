@@ -929,8 +929,10 @@ llvm::Function *IRGenModule::getAddrOfAnonymousFunction(SILConstant c,
   if (entry) return cast<llvm::Function>(entry);
 
   llvm::AttributeSet attrs;
+  SILType silTy = SILMod->getFunction(c)->getLoweredType();
+  CanType ty = silTy.getSwiftType();
   auto *fnType = getFunctionType(AbstractCC::Freestanding,
-                       SILMod->getFunction(c)->getLoweredType().getSwiftType(),
+                       ty,
                        entity.getExplosionKind(),
                        c.uncurryLevel,
                        ExtraData::None,
