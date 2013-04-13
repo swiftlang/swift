@@ -1489,10 +1489,10 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   SILValue thisValue = new (SGM.M) SILArgument(thisTy, F.begin());
   assert(thisTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");
-  SILValue thisLV = emitTemporaryAllocation(ctor, thisTy);
-  B.createRetain(ctor, thisValue);
+  // FIXME: The allocation and value here would need to be cleaned up on a
+  // constructor failure unwinding.
+  SILValue thisLV = B.createAllocVar(ctor, AllocKind::Stack, thisTy);
   emitStore(ctor, ManagedValue(thisValue, ManagedValue::Unmanaged), thisLV);
-  Cleanups.pushCleanup<CleanupMaterializedValue>(thisLV);
   VarLocs[thisDecl] = {SILValue(), thisLV};
   
   // Emit the prolog for the non-this arguments.
@@ -1508,8 +1508,11 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // Return 'this' in the epilog.
   if (!emitEpilogBB(ctor))
     return;
-  
-  B.createReturn(ctor, thisValue);
+
+  // Load and return the final 'this'.
+  SILValue finalThisValue = B.createLoad(ctor, thisLV);
+  B.createDeallocVar(ctor, AllocKind::Stack, thisLV);
+  B.createReturn(ctor, finalThisValue);
 }
 
 static void forwardCaptureArgs(SILGenFunction &gen,
