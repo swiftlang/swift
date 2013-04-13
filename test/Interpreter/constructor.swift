@@ -10,11 +10,17 @@ class B<T> {
   constructor() { println("d") }
   constructor(x:Int) { println("e") }
   constructor(x:T) { println("f") }
-  /* FIXME: Generic ctors of generic classes currently assert out.
-  rdar://problem/13083304
+
   constructor<U>(x:Int, y:U) { println("g") }
   constructor<U>(x:T, y:U) { println("h") }
-  */
+}
+
+protocol Runcible {}
+
+class C<T : Runcible> {
+  constructor() { println("i") }
+  constructor(x:Int) { println("j") }
+  constructor(x:T) { println("k") }
 }
 
 // CHECK: a
@@ -31,9 +37,19 @@ new BChar()
 new BChar(1)
 // CHECK: f
 new BChar('2')
-/* FIXME
-// C/HECK: g
+// CHECK: g
 new BChar(1, "2")
-// C/HECK: h
+// CHECK: h
 new BChar('1', "2")
-*/
+
+// <rdar://problem/12965934> Destructors for classes with constrained type parameters
+
+struct Hat : Runcible {}
+
+typealias CHat = C<Hat>
+// CHECK: i
+new CHat()
+// CHECK: j
+new CHat(1)
+// CHECK: k
+new CHat(Hat())
