@@ -705,6 +705,10 @@ ERROR(asmname_expected_string_literal,attribute_parsing,none,
 ERROR(asmname_interpolated_string,attribute_parsing,none,
       "asmname cannot be an interpolated string literal", ())
       
+// objc_block
+ERROR(objc_block_requires_function_type,attribute_parsing,none,
+      "objc_block attribute only applies to syntactic function types", ())
+
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------

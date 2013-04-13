@@ -53,29 +53,37 @@ bool Parser::parseTypeAnnotation(TypeLoc &result, Diag<> message) {
     attrs.Byref = false; // so that the empty() check below works
   }
 
-  // Handle the auto_closure attribute.
-  if (attrs.isAutoClosure()) {
+  // Handle the auto_closure and objc_block attributes for function types.
+  if (attrs.isAutoClosure() || attrs.isObjCBlock()) {
     FunctionType *FT = dyn_cast<FunctionType>(result.getType().getPointer());
     TupleType *InputTy = 0;
     if (FT) InputTy = dyn_cast<TupleType>(FT->getInput().getPointer());
     if (FT == 0) {
-      // Autoclosure's require a syntactic function type.
-      diagnose(attrs.LSquareLoc, diag::autoclosure_requires_function_type);
-    } else if (InputTy == 0 || !InputTy->getFields().empty()) {
-      // Function must take () syntactically.
+      // auto_closures and objc_blocks require a syntactic function type.
+      if (attrs.isAutoClosure())
+        diagnose(attrs.LSquareLoc, diag::autoclosure_requires_function_type);
+      else
+        diagnose(attrs.LSquareLoc, diag::objc_block_requires_function_type);
+    } else if (attrs.isAutoClosure() &&
+               (InputTy == 0 || !InputTy->getFields().empty())) {
+      // auto_closures must take () syntactically.
       diagnose(attrs.LSquareLoc, diag::autoclosure_function_input_nonunit,
                FT->getInput());
     } else {
-      // Otherwise, we're ok, rebuild type, adding the AutoClosure bit.
+      // Otherwise, we're ok, rebuild type, adding the AutoClosure and ObjcBlock
+      // bit.
       Type resultType = FunctionType::get(FT->getInput(), FT->getResult(),
-                                          true, Context);
+                                          attrs.isAutoClosure(),
+                                          attrs.isObjCBlock(),
+                                          Context);
       SourceRange resultRange = { attrs.LSquareLoc,
                                   result.getSourceRange().End };
       result = { resultType, resultRange };
     }
     attrs.AutoClosure = false;
+    attrs.ObjCBlock = false;
   }
-
+  
   // FIXME: this is lame.
   if (!attrs.empty())
     diagnose(attrs.LSquareLoc, diag::attribute_does_not_apply_to_type);

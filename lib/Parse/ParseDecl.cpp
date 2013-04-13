@@ -197,6 +197,18 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     
     return false;
   }
+    
+  // 'objc_block' attribute.
+  // FIXME: only permit this in type contexts.
+  case AttrName::objc_block: {
+    if (Attributes.Byref)
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    consumeToken(tok::identifier);
+    
+    Attributes.ObjCBlock = true;
+    
+    return false;
+  }
       
   // FIXME: Only valid on var and tuple elements, not on func's, typealias, etc.
   case AttrName::auto_closure: {

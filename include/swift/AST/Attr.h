@@ -142,6 +142,7 @@ public:
   bool Assignment = false;
   bool Conversion = false;
   bool ObjC = false;
+  bool ObjCBlock = false;
   bool ExplicitPrefix = false;
   bool ExplicitPostfix = false;
   bool ExplicitInfix = false;
@@ -162,6 +163,7 @@ public:
   bool isPostfix() const { return ExplicitPostfix; }
   bool isInfix() const { return ExplicitInfix; }
   bool isObjC() const { return ObjC; }
+  bool isObjCBlock() const { return ObjCBlock; }
   bool isIBOutlet() const { return IBOutlet; }
   bool isIBAction() const { return IBAction; }
 
@@ -169,7 +171,7 @@ public:
     return !isInfix() && !getResilienceData().isValid() && !isByref() &&
            !isAutoClosure() && !isAssignment() && !isConversion() &&
            !isPostfix() && !isPrefix() &&
-           !isObjC() && !isIBOutlet() && !isIBAction();
+           !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction();
   }
 };
   
