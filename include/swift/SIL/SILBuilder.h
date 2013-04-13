@@ -164,8 +164,9 @@ public:
   }
 
   InitializeVarInst *createInitializeVar(SILLocation Loc,
-                                         SILValue DestLValue) {
-    return insert(new InitializeVarInst(Loc, DestLValue));
+                                         SILValue DestLValue,
+                                         bool canDefaultConstruct) {
+    return insert(new InitializeVarInst(Loc, DestLValue, canDefaultConstruct));
   }
 
   CopyAddrInst *createCopyAddr(SILLocation Loc,

@@ -445,14 +445,18 @@ class InitializeVarInst : public SILInstruction {
     /// The address of the var to initialize.
     Dest
   };
+  bool CanDefaultConstruct;
   FixedOperandList<1> Operands;
   
 public:
-  InitializeVarInst(SILLocation Loc, SILValue Dest);
+  InitializeVarInst(SILLocation Loc, SILValue Dest, bool CanDefaultConstruct);
   
   SILValue getDest() const { return Operands[Dest].get(); }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  
+  /// True if this InitializeVar can be lowered to a default constructor call.
+  bool canDefaultConstruct() const { return CanDefaultConstruct; }
   
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::InitializeVarInst;

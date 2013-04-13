@@ -1359,11 +1359,18 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   } else {
     // Materialize a temporary for the loadable value type.
     thisLV = B.createAllocVar(ctor, AllocKind::Stack,
-                                 thisTy);
+                              thisTy);
+
     // Set up a cleanup to load the final value at the end of the constructor
     // body.
     Cleanups.pushCleanup<CleanupMaterializeThisValue>(ctor, thisLV, thisValue);
   }
+  
+  // Emit a default initialization of the this value.
+  // Note that this initialization *cannot* be lowered to a
+  // default constructor--we're already in a constructor!
+  B.createInitializeVar(ctor, thisLV, /*CanDefaultConstruct*/ false);
+
   VarLocs[thisDecl] = {SILValue(), thisLV};
   
   // Create a basic block to jump to for the implicit 'this' return.

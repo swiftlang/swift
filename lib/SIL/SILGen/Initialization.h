@@ -131,7 +131,8 @@ public:
   
   void defaultInitialize(SILGenFunction &gen) override {
     SILValue address = getAddress();
-    gen.B.createInitializeVar(SILLocation(), address);
+    gen.B.createInitializeVar(SILLocation(), address,
+                              /*CanDefaultConstruct*/ true);
     finishInitialization(gen);
   }
 };

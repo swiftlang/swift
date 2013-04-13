@@ -336,7 +336,10 @@ public:
       OS << " [initialization]";
   }
   void visitInitializeVarInst(InitializeVarInst *ZI) {
-    OS << "initialize_var " << getID(ZI->getDest());
+    OS << "initialize_var ";
+    if (!ZI->canDefaultConstruct())
+      OS << "[no_default_construct] ";
+    OS << getID(ZI->getDest());
   }
   void visitSpecializeInst(SpecializeInst *SI) {
     OS << "specialize " << getID(SI->getOperand()) << ", $"

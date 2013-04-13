@@ -327,8 +327,11 @@ CopyAddrInst::CopyAddrInst(SILLocation Loc, SILValue SrcLValue, SILValue DestLVa
 {
 }
 
-InitializeVarInst::InitializeVarInst(SILLocation Loc, SILValue Dest)
-  : SILInstruction(ValueKind::InitializeVarInst, Loc), Operands(this, Dest) {
+InitializeVarInst::InitializeVarInst(SILLocation Loc, SILValue Dest,
+                                     bool CanDefaultConstruct)
+  : SILInstruction(ValueKind::InitializeVarInst, Loc),
+    CanDefaultConstruct(CanDefaultConstruct),
+    Operands(this, Dest) {
 }
 
 SpecializeInst *SpecializeInst::create(SILLocation Loc, SILValue Operand,
