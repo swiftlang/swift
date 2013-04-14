@@ -214,7 +214,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   // If the referenced decl is a local func with context, then the SILConstant
   // uncurry level is one deeper (for the context vars).
   if (auto *fd = dyn_cast<FuncDecl>(decl)) {
-    if (!fd->getBody()->getCaptures().empty()
+    if (!fd->getCaptures().empty()
         && uncurryLevel != SILConstant::ConstructAtNaturalUncurryLevel)
       ++uncurryLevel;
   }

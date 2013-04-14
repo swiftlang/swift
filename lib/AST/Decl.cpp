@@ -645,6 +645,13 @@ unsigned FuncDecl::getNaturalArgumentCount() const {
   return getBody()->getNaturalArgumentCount();
 }
 
+ArrayRef<ValueDecl*> FuncDecl::getCaptures() const {
+  if (Body)
+    return Body->getCaptures();
+  else
+    return {};
+}
+
 /// getExtensionType - If this is a method in a type extension for some type,
 /// return that type, otherwise return Type().
 Type FuncDecl::getExtensionType() const {

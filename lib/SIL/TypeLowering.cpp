@@ -559,7 +559,7 @@ Type TypeConverter::makeConstantType(SILConstant c) {
             auto *propTy = propertyMethodType->castTo<AnyFunctionType>();
             return getFunctionTypeWithCaptures(*this,
                                            propTy,
-                                           property->getBody()->getCaptures());
+                                           property->getCaptures());
           }
         }
         return propertyMethodType;
@@ -583,7 +583,7 @@ Type TypeConverter::makeConstantType(SILConstant c) {
         assert(c.kind == SILConstant::Kind::Func &&
                "non-Func SILConstant for function");
         return getFunctionTypeWithCaptures(*this, funcTy,
-                                           func->getBody()->getCaptures());
+                                           func->getCaptures());
       }
       
       // Otherwise, return the Swift-level type.

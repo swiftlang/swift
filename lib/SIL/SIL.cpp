@@ -36,6 +36,7 @@ SILModule::~SILModule() {
 }
 
 static unsigned getNaturalUncurryLevel(CapturingExpr *func) {
+  assert(func && "no function body?!");
   assert(func->getParamPatterns().size() >= 1 && "no arguments for func?!");
   unsigned level = func->getParamPatterns().size() - 1;
   // Functions with captures have an extra uncurry level for the capture
@@ -43,6 +44,13 @@ static unsigned getNaturalUncurryLevel(CapturingExpr *func) {
   if (!func->getCaptures().empty())
     level += 1;
   return level;
+}
+
+static unsigned getNaturalUncurryLevel(FuncDecl *fd) {
+  if (fd->getBody())
+    return getNaturalUncurryLevel(fd->getBody());
+  // Assume func decls without bodies (e.g., builtins) have uncurry level zero.
+  return 0;
 }
 
 SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
@@ -56,7 +64,7 @@ SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
            "cannot create a Func SILConstant for a property accessor");
     assert(kind == Kind::Func &&
            "can only create a Func SILConstant for a func decl");
-    naturalUncurryLevel = getNaturalUncurryLevel(func->getBody());
+    naturalUncurryLevel = getNaturalUncurryLevel(func);
   } else if (isa<ConstructorDecl>(vd)) {
     assert((kind == Kind::Allocator || kind == Kind::Initializer)
            && "can only create Allocator or Initializer SILConstant for ctor");
@@ -93,9 +101,9 @@ SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
       // Local properties may have captures that affect the natural uncurry
       // level.
       else if (kind == Kind::Getter && var->getGetter())
-        naturalUncurryLevel = getNaturalUncurryLevel(var->getGetter()->getBody());
+        naturalUncurryLevel = getNaturalUncurryLevel(var->getGetter());
       else if (kind == Kind::Setter && var->getSetter())
-        naturalUncurryLevel = getNaturalUncurryLevel(var->getSetter()->getBody());
+        naturalUncurryLevel = getNaturalUncurryLevel(var->getSetter());
       // A property accessor for a non-instance variable without getters and
       // setters must be a resilient property, so it can't have context.
       else
@@ -141,7 +149,7 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc, unsigned atUncurryLevel) {
         loc = fd;
         kind = Kind::Func;
       }
-      naturalUncurryLevel = getNaturalUncurryLevel(fd->getBody());
+      naturalUncurryLevel = getNaturalUncurryLevel(fd);
     }
     // Map DestructorDecls to Destructor SILConstants of the ClassDecl.
     else if (DestructorDecl *dd = dyn_cast<DestructorDecl>(vd)) {

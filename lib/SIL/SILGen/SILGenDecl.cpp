@@ -112,7 +112,7 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd, SGFContext C) {
   
   // If there are captures, build the local closure value for the function and
   // store it as a local constant.
-  if (!fd->getBody()->getCaptures().empty()) {
+  if (!fd->getCaptures().empty()) {
     SILValue closure = emitClosureForCapturingExpr(fd, SILConstant(fd),
                                                 fd->getBody())
       .forward(*this);

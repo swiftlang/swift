@@ -1206,6 +1206,11 @@ public:
 
   FuncExpr *getBody() const { return Body; }
   void setBody(FuncExpr *NewBody) { Body = NewBody; }
+  
+  /// getCaptures - If this is a local function declaration with captured
+  /// local variables from its context, returns a list of the captured
+  /// declarations.
+  ArrayRef<ValueDecl*> getCaptures() const;
 
   /// getNaturalArgumentCount - Returns the "natural" number of
   /// argument clauses taken by this function.  This value is always
