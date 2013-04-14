@@ -1310,24 +1310,6 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   B.createReturn(dd, emitEmptyTuple(dd));
 }
 
-namespace {
-  class CleanupMaterializeThisValue : public Cleanup {
-    ConstructorDecl *ctor;
-    SILValue thisLV;
-    SILValue &thisValue;
-  public:
-    CleanupMaterializeThisValue(ConstructorDecl *ctor,
-                                SILValue thisLV, SILValue &thisValue)
-      : ctor(ctor), thisLV(thisLV), thisValue(thisValue) {}
-    
-    void emit(SILGenFunction &gen) override {
-      thisValue = gen.B.createLoad(ctor, thisLV);
-      gen.B.createDeallocVar(ctor, AllocKind::Stack, thisLV);
-    }
-  };
-}
-
-
 static void emitConstructorMetatypeArg(SILGenFunction &gen,
                                        ConstructorDecl *ctor) {
   // In addition to the declared arguments, the constructor implicitly takes
@@ -1347,31 +1329,22 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   //
   VarDecl *thisDecl = ctor->getImplicitThisDecl();
   SILType thisTy = getLoweredType(thisDecl->getType());
-  SILValue thisLV, thisValue;
-  assert(!ctor->getAllocThisExpr() && "alloc_this expr for value type?!");
-  assert(!thisTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
-  if (thisTy.isAddressOnly()) {
-    // If 'this' is of an address-only value type, then we can construct the
-    // indirect return argument directly.
-    assert(IndirectReturnAddress &&
-           "address-only constructor without indirect return?!");
-    thisLV = IndirectReturnAddress;
-  } else {
-    // Materialize a temporary for the loadable value type.
-    thisLV = B.createAllocVar(ctor, AllocKind::Stack,
-                              thisTy);
 
-    // Set up a cleanup to load the final value at the end of the constructor
-    // body.
-    Cleanups.pushCleanup<CleanupMaterializeThisValue>(ctor, thisLV, thisValue);
-  }
+  // Create a box for the 'this' value.
+  // FIXME: Avoid boxing if capture analysis finds it unnecessary.
+  // FIXME: This box would need to be cleaned up on an error unwind.
+  auto *thisInst = B.createAllocBox(ctor, thisTy);
+  SILValue thisBox(thisInst, 0), thisLV(thisInst, 1);
+  
+  assert(!thisTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
+  assert(!ctor->getAllocThisExpr() && "alloc_this expr for value type?!");
   
   // Emit a default initialization of the this value.
   // Note that this initialization *cannot* be lowered to a
   // default constructor--we're already in a constructor!
   B.createInitializeVar(ctor, thisLV, /*CanDefaultConstruct*/ false);
 
-  VarLocs[thisDecl] = {SILValue(), thisLV};
+  VarLocs[thisDecl] = {thisBox, thisLV};
   
   // Create a basic block to jump to for the implicit 'this' return.
   // We won't emit this until after we've emitted the body.
@@ -1384,11 +1357,19 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   if (!emitEpilogBB(ctor))
     return;
 
+  // Copy 'this' into the indirect return slot.
   if (thisTy.isAddressOnly()) {
-    // We already initialized the return value in-place.
+    assert(IndirectReturnAddress &&
+           "no indirect return for address-only ctor?!");
+    B.createCopyAddr(ctor, thisLV, IndirectReturnAddress,
+                     /*isTake=*/ false,
+                     /*isInit=*/ true);
+    B.createRelease(ctor, thisBox);
     B.createReturn(ctor, emitEmptyTuple(ctor));
   } else {
-    assert(thisValue && "thisValue not initialized?!");
+    SILValue thisValue = B.createLoad(ctor, thisLV);
+    emitRetainRValue(ctor, thisValue);
+    B.createRelease(ctor, thisBox);
     B.createReturn(ctor, thisValue);
   }
 }
@@ -1496,11 +1477,13 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   SILValue thisValue = new (SGM.M) SILArgument(thisTy, F.begin());
   assert(thisTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");
+  // FIXME: Avoid allocating the box if capture analysis says we don't need it.
   // FIXME: The allocation and value here would need to be cleaned up on a
   // constructor failure unwinding.
-  SILValue thisLV = B.createAllocVar(ctor, AllocKind::Stack, thisTy);
+  auto *thisInst = B.createAllocBox(ctor, thisTy);
+  SILValue thisBox(thisInst, 0), thisLV(thisInst, 1);
   emitStore(ctor, ManagedValue(thisValue, ManagedValue::Unmanaged), thisLV);
-  VarLocs[thisDecl] = {SILValue(), thisLV};
+  VarLocs[thisDecl] = {thisBox, thisLV};
   
   // Emit the prolog for the non-this arguments.
   emitProlog(ctor->getArguments(), TupleType::getEmpty(F.getContext()));
@@ -1518,7 +1501,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Load and return the final 'this'.
   SILValue finalThisValue = B.createLoad(ctor, thisLV);
-  B.createDeallocVar(ctor, AllocKind::Stack, thisLV);
+  B.createRetain(ctor, finalThisValue);
+  B.createRelease(ctor, thisBox);
   B.createReturn(ctor, finalThisValue);
 }
 

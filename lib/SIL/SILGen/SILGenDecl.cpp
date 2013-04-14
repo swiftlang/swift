@@ -588,13 +588,13 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
 
 namespace {
   class CleanupDestructorThis : public Cleanup {
-    SILValue thisAddr;
+    SILValue thisBox;
   public:
-    CleanupDestructorThis(SILValue thisAddr) : thisAddr(thisAddr) {
+    CleanupDestructorThis(SILValue thisBox) : thisBox(thisBox) {
     }
     
     void emit(SILGenFunction &gen) override {
-      gen.B.createDeallocVar(SILLocation(), AllocKind::Stack, thisAddr);
+      gen.B.createRelease(SILLocation(), thisBox);
     }
   };
 } // end anonymous namespace
@@ -617,13 +617,14 @@ SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
     // recursively while passing 'this' around in the destructor body.
     B.createRetain(DD, thisValue);
   
-    // Materialize an lvalue for 'this' in the body's scope. It doesn't need a
-    // full box because 'this' shouldn't be capturable out of a destructor
+    // Make a box for 'this' in the body's scope.
+    // FIXME: 'this' shouldn't be capturable out of a destructor
     // scope.
-    SILValue thisAddr = B.createAllocVar(DD, AllocKind::Stack, thisType);
-    Cleanups.pushCleanup<CleanupDestructorThis>(thisAddr);
+    auto *thisInst = B.createAllocBox(DD, thisType);
+    SILValue thisBox(thisInst, 0), thisAddr(thisInst, 1);
     emitStore(DD, ManagedValue(thisValue, ManagedValue::Unmanaged), thisAddr);
-    VarLocs[thisDecl] = {SILValue(), thisAddr};
+    Cleanups.pushCleanup<CleanupDestructorThis>(thisBox);
+    VarLocs[thisDecl] = {thisBox, thisAddr};
   }
   return thisValue;
 }
