@@ -61,6 +61,10 @@ SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
     assert((kind == Kind::Allocator || kind == Kind::Initializer)
            && "can only create Allocator or Initializer SILConstant for ctor");
     naturalUncurryLevel = 1;
+  } else if (auto *ed = dyn_cast<OneOfElementDecl>(vd)) {
+    assert(kind == Kind::OneOfElement
+           && "can only create OneOfElement SILConstant for oneof element");
+    naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
   } else if (isa<ClassDecl>(vd)) {
     assert(kind == Kind::Destructor
            && "can only create Destructor SILConstant for class");
@@ -151,6 +155,12 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc, unsigned atUncurryLevel) {
       loc = cd;
       kind = Kind::Allocator;
       naturalUncurryLevel = 1;
+    }
+    // Map OneOfElementDecls to the OneOfElement SILConstant of the element.
+    else if (OneOfElementDecl *ed = dyn_cast<OneOfElementDecl>(vd)) {
+      loc = ed;
+      kind = Kind::OneOfElement;
+      naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
     }
     // VarDecl constants require an explicit kind.
     else if (isa<VarDecl>(vd)) {

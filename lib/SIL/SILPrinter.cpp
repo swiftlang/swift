@@ -75,6 +75,9 @@ void SILConstant::print(raw_ostream &OS) const {
   case SILConstant::Kind::Initializer:
     OS << ".initializer";
     break;
+  case SILConstant::Kind::OneOfElement:
+    OS << ".oneofelt";
+    break;
   case SILConstant::Kind::Destructor:
     OS << ".destructor";
     break;

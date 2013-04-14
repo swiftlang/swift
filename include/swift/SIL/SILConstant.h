@@ -63,6 +63,10 @@ struct SILConstant {
     /// entry point of the class ConstructorDecl in loc.
     Initializer,
     
+    /// OneOfElement - this constant references the injection function for
+    /// a OneOfElementDecl.
+    OneOfElement,
+    
     /// Destructor = this constant references the destructor for the ClassDecl
     /// in loc.
     Destructor,
@@ -101,6 +105,8 @@ struct SILConstant {
   ///   Setter SILConstant for the property VarDecl.
   /// - If 'loc' is a ConstructorDecl, this returns the Allocator SILConstant
   ///   for the constructor.
+  /// - If 'loc' is a OneOfElementDecl, this returns the OneOfElement
+  ///   SILConstant for the oneof element.
   /// - If 'loc' is a DestructorDecl, this returns the Destructor SILConstant
   ///   for the containing ClassDecl.
   /// - If 'loc' is a global VarDecl, this returns its GlobalAccessor
@@ -130,6 +136,10 @@ struct SILConstant {
   /// True if the SILConstant references a constructor entry point.
   bool isConstructor() const {
     return kind == Kind::Allocator || kind == Kind::Initializer;
+  }
+  /// True if the SILConstant references a oneof entry point.
+  bool isOneOfElement() const {
+    return kind == Kind::OneOfElement;
   }
   /// True if the SILConstant references a destructor.
   bool isDestructor() const {

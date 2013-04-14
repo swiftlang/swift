@@ -435,6 +435,13 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
     cc = AbstractCC::Method;
     break;
   }
+  case SILConstant::Kind::OneOfElement: {
+    OneOfElementDecl *ed = cast<OneOfElementDecl>(vd);
+    fnptr = getAddrOfInjectionFunction(ed);
+    body = nullptr;
+    cc = AbstractCC::Freestanding;
+    break;
+  }
   case SILConstant::Kind::Destructor: {
     ClassDecl *cd = cast<ClassDecl>(vd);
     fnptr = getAddrOfDestructor(cd, DestructorKind::Destroying);

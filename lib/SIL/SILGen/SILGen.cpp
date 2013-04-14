@@ -237,7 +237,8 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 }
 
 void SILGenModule::visitVarDecl(VarDecl *vd) {
-  addGlobalVariable(vd);
+  if (!vd->isProperty())
+    addGlobalVariable(vd);
 }
 
 //===--------------------------------------------------------------------===//
