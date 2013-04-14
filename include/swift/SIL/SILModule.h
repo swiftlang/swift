@@ -63,8 +63,7 @@ private:
 
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(ASTContext &Context, bool hasTopLevel);
-  
+  SILModule(ASTContext &Context, bool makeToplevel = true);
   
 public:
   ~SILModule();
@@ -83,11 +82,6 @@ public:
   }
   
   ASTContext &getContext() const { return Context; }
-  
-  /// Returns true if this module has top-level code.
-  bool hasTopLevelFunction() const {
-    return toplevel != nullptr;
-  }
   
   /// Returns the SILFunction containing top-level code for the module.
   SILFunction *getTopLevelFunction() const {

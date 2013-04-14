@@ -25,10 +25,10 @@ using namespace swift;
 SILFunction::~SILFunction() {
 }
 
-SILModule::SILModule(ASTContext &Context, bool hasTopLevel)
+SILModule::SILModule(ASTContext &Context, bool makeToplevel)
   : Context(Context), toplevel(nullptr), Types(*this)
 {
-  if (hasTopLevel)
+  if (makeToplevel)
     toplevel = new (*this) SILFunction(*this, Types.getTopLevelFunctionType());
 }
 

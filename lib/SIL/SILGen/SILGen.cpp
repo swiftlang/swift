@@ -63,19 +63,15 @@ SILGenFunction::~SILGenFunction() {
 
 SILGenModule::SILGenModule(SILModule &M)
   : M(M), Types(M.Types), TopLevelSGF(nullptr) {
-  if (M.toplevel) {
-    TopLevelSGF = new SILGenFunction(*this, *M.toplevel,
-                                     /*hasVoidReturn=*/true);
-  }
+  TopLevelSGF = new SILGenFunction(*this, *M.toplevel,
+                                   /*hasVoidReturn=*/true);
 }
 
 SILGenModule::~SILGenModule() {
   delete TopLevelSGF;
-  if (M.toplevel) {
-    DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
-          M.toplevel->print(llvm::dbgs()));
-    M.toplevel->verify();
-  }
+  DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
+        M.toplevel->print(llvm::dbgs()));
+  M.toplevel->verify();
 }
 
 SILType SILGenModule::getConstantType(SILConstant constant) {
@@ -229,6 +225,7 @@ SILFunction *SILGenModule::emitDestructor(ClassDecl *cd,
 
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
   // Emit initializers for variables in top-level code.
+  // FIXME: Global initialization order?!
   if (TopLevelSGF) {
     if (!TopLevelSGF->B.hasValidInsertionPoint())
       return;
@@ -249,17 +246,7 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
 
 
 SILModule *SILModule::constructSIL(TranslationUnit *tu, unsigned startElem) {
-  bool hasTopLevel = true;
-  switch (tu->Kind) {
-  case TranslationUnit::Library:
-    hasTopLevel = false;
-    break;
-  case TranslationUnit::Main:
-  case TranslationUnit::Repl:
-    hasTopLevel = true;
-    break;
-  }
-  SILModule *m = new SILModule(tu->getASTContext(), hasTopLevel);
+  SILModule *m = new SILModule(tu->getASTContext());
   SILGenModule sgm(*m);
   for (Decl *D : llvm::makeArrayRef(tu->Decls).slice(startElem))
     sgm.visit(D);

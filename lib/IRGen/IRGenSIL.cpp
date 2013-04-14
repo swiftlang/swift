@@ -310,10 +310,8 @@ void IRGenSILFunction::emitLocalDecls(BraceStmt *body) {
 void IRGenSILFunction::emitGlobalTopLevel(TranslationUnit *TU,
                                           SILModule *SILMod) {
   // Emit the toplevel function.
-  if (SILMod->hasTopLevelFunction()) {
-    emitSILFunction(SILConstant(),
-                    SILMod->getTopLevelFunction());
-  }
+  emitSILFunction(SILConstant(),
+                  SILMod->getTopLevelFunction());
   
   // Emit global variables.
   for (VarDecl *global : SILMod->getGlobals()) {
