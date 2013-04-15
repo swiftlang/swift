@@ -142,22 +142,25 @@ endif ()
 # Compile a swift file into an object file (as a library).
 #
 # Usage:
-#   compile_swift_file(file         # Name of the source file, e.g., swift.swift)
-#     target                        # The target of which this file is a part
-#     objectvar)                    # Variable to receive the object file name
-function(compile_swift_file file target objectvar)	
-  parse_arguments(SWIFTFILE  "" "IS_MAIN" ${ARGN})
+#   compile_swift_files(OUTPUT objfile                      # Name of the resulting object file
+#     SOURCES swift_src [swift_src swift_src...]  # Swift source files to compile
+#     [IS_MAIN])                                  # This file is not a library but an executable
+function(compile_swift_files)	
+  parse_arguments(SWIFTFILE "OUTPUT;SOURCES" "IS_MAIN" ${ARGN})
   
   set(swift_flags)
 
-  # Determine where this file is.
-  get_filename_component(file_path ${file} PATH) 
-  if(IS_ABSOLUTE "${file_path}")
-    set(source_file "${file}")
-  else()
-    set(source_file "${CMAKE_CURRENT_SOURCE_DIR}/${file}")
-  endif()
-  
+  set(source_files)
+  foreach(file ${SWIFTFILE_SOURCES})
+    # Determine where this file is.
+    get_filename_component(file_path ${file} PATH) 
+    if(IS_ABSOLUTE "${file_path}")
+      list(APPEND source_files "${file}")
+    else()
+      list(APPEND source_files "${CMAKE_CURRENT_SOURCE_DIR}/${file}")
+    endif()
+  endforeach()
+
   # Compute flags to be passed down to swift when compiling a swift
   # file.
   if(SWIFT_OPTIMIZED)
@@ -185,15 +188,17 @@ function(compile_swift_file file target objectvar)
   # Use the constraint checker, because we can
   list(APPEND swift_flags "-constraint-checker")
 
-  get_filename_component(file_name ${file} NAME_WE)
-  set(objfile
-    "${CMAKE_CURRENT_BINARY_DIR}/${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
+  set(objfile ${SWIFTFILE_OUTPUT})
+  if (NOT IS_ABSOLUTE ${objfile})
+    set(objfile
+      "${CMAKE_CURRENT_BINARY_DIR}/${objfile}")
+  endif()
   add_custom_command(
     OUTPUT ${objfile}
-    COMMAND swift "-c" ${swift_flags} "-o" "${objfile}" "${source_file}"
-    DEPENDS ${source_file}
+    COMMAND swift "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
+    DEPENDS ${source_files}
 #    MAIN_DEPENDENCY ${target}
-    COMMENT "Compiling ${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
+    COMMENT "Compiling ${objfile}")
   
   # Make sure the build system knows the file is a generated object file.
   set_source_files_properties(${objfile}
@@ -201,14 +206,11 @@ function(compile_swift_file file target objectvar)
     GENERATED true 
     EXTERNAL_OBJECT true
     LANGUAGE C
-    OBJECT_DEPENDS "${source_file}")
+    OBJECT_DEPENDS "${source_files}")
 
   # Make sure this object file gets cleaned up.
   set_directory_properties(
     PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${objfile}")
-
-  # Pass the object file name back to the caller.
-  set(${objectvar} "${objfile}" PARENT_SCOPE)
 endfunction()
 
 # Compile an assembler file into an object file.
@@ -263,32 +265,47 @@ function(handle_swift_sources sourcesvar externalvar target)
   parse_arguments(SWIFTSOURCES  "" "IS_MAIN" ${ARGN})
 
   set(result)
-  set(externally_compiled)
+  set(swift_sources)
+  set(asm_sources)
   foreach(src ${${sourcesvar}})
     get_filename_component(extension ${src} EXT)
     if(extension STREQUAL ".swift")
-      # We have a swift file; compile it.
-      # FIXME: It's probably not okay to consider /every/ file a main file.
-      if (SWIFTSOURCES_IS_MAIN)
-        compile_swift_file(${src} ${target} "obj" IS_MAIN)
-      else()
-        compile_swift_file(${src} ${target} "obj")
-      endif()
-      list(APPEND result ${obj})
-      list(APPEND externally_compiled ${src})
+      list(APPEND swift_sources ${src})
     elseif(extension STREQUAL ".s")
       # We have an assembler file; compile it.
       compile_assembler_file(${src} ${target} "obj")
       list(APPEND result ${obj})
-      list(APPEND externally_compiled ${obj})
+      list(APPEND asm_sources ${obj})
     else()
       list(APPEND result ${src})
     endif()
   endforeach()
 
+  set(IS_MAIN_arg)
+  if (SWIFTSOURCES_IS_MAIN)
+    set(IS_MAIN_arg IS_MAIN)
+  endif()
+
+  if(swift_sources)
+
+    # Special-case hack to create swift.o for the swift_stdlib target
+    if(target STREQUAL swift_stdlib)
+      set(swift_obj_base "swift")
+    else()
+      # Otherwise, get the name from the first swift input file.  Also
+      # a hack!
+      list(GET swift_sources 0 swift_obj_base)
+      get_filename_component(swift_obj_base ${swift_obj_base} NAME_WE)
+    endif()
+
+    set(swift_obj "${swift_obj_base}${CMAKE_C_OUTPUT_EXTENSION}")
+    compile_swift_files(OUTPUT ${swift_obj} SOURCES ${swift_sources} ${IS_MAIN_arg})
+    list(APPEND result ${swift_obj})
+  endif()
+
   llvm_process_sources(result ${result})
   set(${sourcesvar} "${result}" PARENT_SCOPE)
-  set(${externalvar} "${externally_compiled}" PARENT_SCOPE)
+  set(${externalvar} ${swift_sources} ${asm_sources} PARENT_SCOPE)
 endfunction()
 
 # Set SWIFTLIB_DIR to the directory in the build tree where Swift source files
