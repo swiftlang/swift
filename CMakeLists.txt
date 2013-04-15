@@ -202,14 +202,15 @@ function(compile_swift_files)
     # except for swift.swift, which is composed of multiple .swift
     # files.
     get_filename_component(module_source_name ${objfile} NAME_WE)
-    set(module_source_file ${SWIFTLIB_DIR}/swift/${module_source_name}.swift)
+    set(module_source_dir ${SWIFTLIB_DIR}/swift)
+    set(module_source_file ${module_source_dir}/${module_source_name}.swift)
 
     add_custom_command(
       OUTPUT ${module_source_file}
-      COMMAND cat ${source_files} > "${module_source_file}"
       COMMAND ${CMAKE_COMMAND} -E make_directory ${module_source_dir}
+      COMMAND cat ${source_files} > "${module_source_file}"
       DEPENDS ${source_files}
-      COMMENT "FIXME: Concatenating Swift module sources")
+      COMMENT "FIXME: generating module source file ${module_source_name}.swift")
     set_source_files_properties("${module_source_file}" PROPERTIES GENERATED ON)
   endif()
 
