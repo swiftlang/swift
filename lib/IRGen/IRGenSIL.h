@@ -359,7 +359,6 @@ public:
   llvm::DenseMap<SILValue, LoweredValue> loweredValues;
   llvm::MapVector<SILBasicBlock *, LoweredBB> loweredBBs;
   
-  SILConstant CurConstant;
   SILFunction *CurSILFn;
   Address IndirectReturn;
   

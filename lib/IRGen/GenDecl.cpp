@@ -367,14 +367,12 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     if (ObjCInterop && Opts.UseJIT) {
       if (!ObjCClasses.empty()) {
         // Emit an initializer for the Objective-C classes.
-        llvm::Function *classInit = emitObjCClassInitializer(*this, ObjCClasses);
-        mainIGF.Builder.CreateCall(classInit);
+        mainIGF.Builder.CreateCall(emitObjCClassInitializer(*this,ObjCClasses));
       }
       if (!ObjCCategoryDecls.empty()) {
         // Emit an initializer to add declarations from category decls.
-        llvm::Function *catInit = emitObjCCategoryInitializer(*this,
-                                                              ObjCCategoryDecls);
-        mainIGF.Builder.CreateCall(catInit);
+        mainIGF.Builder.CreateCall(emitObjCCategoryInitializer(*this,
+                                                            ObjCCategoryDecls));
       }
     }
     

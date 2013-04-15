@@ -166,7 +166,6 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
   
   assert(!f->empty() && "function has no basic blocks?!");
   
-  CurConstant = c;
   CurSILFn = f;
 
   // Map the entry bb.
