@@ -193,10 +193,29 @@ function(compile_swift_files)
     set(objfile
       "${CMAKE_CURRENT_BINARY_DIR}/${objfile}")
   endif()
+
+  if(SWIFTFILE_IS_MAIN)
+    set(module_source_file)
+  else()
+    # Compute the module source file; a hack until we get real module
+    # compilation.  In principle this separate file might not be needed
+    # except for swift.swift, which is composed of multiple .swift
+    # files.
+    get_filename_component(module_source_name ${objfile} NAME_WE)
+    set(module_source_file ${SWIFTLIB_DIR}/swift/${module_source_name}.swift)
+
+    add_custom_command(
+      OUTPUT ${module_source_file}
+      COMMAND cat ${source_files} > "${module_source_file}"
+      DEPENDS ${source_files}
+      COMMENT "FIXME: Concatenating Swift module sources")
+    set_source_files_properties("${module_source_file}" PROPERTIES GENERATED ON)
+  endif()
+
   add_custom_command(
     OUTPUT ${objfile}
     COMMAND swift "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
-    DEPENDS ${source_files}
+    DEPENDS ${source_files} ${module_source_file}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${objfile}")
   

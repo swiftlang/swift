@@ -14,8 +14,6 @@ if(SWIFT_OPTIMIZED)
  endif()
 endif()
 
-install_swift_module(Foundation.swift)
-
 # Link against frameworks
 target_link_libraries(swiftFoundation
   "-framework Foundation")

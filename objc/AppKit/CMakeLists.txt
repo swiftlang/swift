@@ -13,8 +13,6 @@ if(SWIFT_OPTIMIZED)
  endif()
 endif()
 
-install_swift_module(AppKit.swift)
-
 # Link against frameworks
 target_link_libraries(swiftAppKit
   "-framework AppKit")
