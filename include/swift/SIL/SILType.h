@@ -396,6 +396,12 @@ public:
     return bool(indirectReturn);
   }
   
+  /// Get the indirect return argument type. Always an address.
+  SILType getIndirectReturnType() const {
+    assert(hasIndirectReturn() && "type doesn't have an indirect return?!");
+    return getInputTypes().back();
+  }
+  
   /// Get the uncurry level of this type.
   unsigned getUncurryLevel() const {
     return uncurryCount - 1;

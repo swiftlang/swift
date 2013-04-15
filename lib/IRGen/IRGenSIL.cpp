@@ -81,6 +81,9 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
   
   case Kind::SpecializedValue:
     llvm_unreachable("thunking generic function not yet supported");
+
+  case Kind::BuiltinValue:
+    llvm_unreachable("reifying builtin function not yet supported");
   }
 }
 
@@ -94,6 +97,7 @@ ExplosionKind LoweredValue::getExplosionKind() const {
   case Kind::ObjCMethod:
   case Kind::MetatypeValue:
   case Kind::SpecializedValue:
+  case Kind::BuiltinValue:
     return ExplosionKind::Minimal;
   }
 }
@@ -481,6 +485,15 @@ void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
     return;
   }
   
+  // Emit references to builtin decls specially.
+  if (auto *decl = i->getConstant().loc.dyn_cast<ValueDecl*>()) {
+    if (isa<BuiltinModule>(decl->getDeclContext())) {
+      newLoweredBuiltinValue(SILValue(i, 0), cast<FuncDecl>(decl),
+                             /*substitutions*/ {});
+      return;
+    }
+  }
+  
   llvm::Function *fnptr;
   unsigned naturalCurryLevel;
   AbstractCC cc;
@@ -676,6 +689,9 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   
   case LoweredValue::Kind::SpecializedValue:
     llvm_unreachable("specialized value should be handled before reaching here");
+      
+  case LoweredValue::Kind::BuiltinValue:
+    llvm_unreachable("builtins should be handled before reaching here");
   }
   
   Callee callee = Callee::forKnownFunction(cc,
@@ -715,6 +731,9 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     
   case LoweredValue::Kind::Address:
     llvm_unreachable("sil address isn't a valid callee");
+      
+  case LoweredValue::Kind::BuiltinValue:
+    llvm_unreachable("builtins should be handled before reaching here");
   }
 }
 
@@ -728,6 +747,7 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
   case LoweredValue::Kind::ObjCMethod:
   case LoweredValue::Kind::StaticFunction:
   case LoweredValue::Kind::SpecializedValue:
+  case LoweredValue::Kind::BuiltinValue:
     llvm_unreachable("function isn't a valid metatype");
   
   case LoweredValue::Kind::MetatypeValue:
@@ -744,10 +764,43 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
   }
 }
 
+static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
+                                 FuncDecl *builtin,
+                                 ApplyInst *i,
+                                 ArrayRef<Substitution> substitutions) {
+  Explosion args(IGF.CurExplosionLevel);
+  
+  auto argValues = i->getArguments();
+  
+  Address indirectResult;
+  if (i->hasIndirectReturn()) {
+    indirectResult = IGF.getLoweredAddress(i->getIndirectReturn());
+    argValues = argValues.slice(0, argValues.size() - 1);
+  }
+  
+  for (SILValue arg : argValues)
+    emitApplyArgument(IGF, args, arg, /*managed*/ false);
+  
+  if (indirectResult.isValid()) {
+    emitBuiltinCall(IGF, builtin, args, nullptr, indirectResult, substitutions);
+  } else {
+    Explosion result(IGF.CurExplosionLevel);
+    emitBuiltinCall(IGF, builtin, args, &result, Address(), substitutions);
+    IGF.newLoweredExplosion(SILValue(i,0), result, IGF);
+  }
+}
+
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   SILValue v(i, 0);
   
   LoweredValue const &calleeLV = getLoweredValue(i->getCallee());
+  
+  // Handle builtin calls separately.
+  if (calleeLV.kind == LoweredValue::Kind::BuiltinValue) {
+    auto &builtin = calleeLV.getBuiltinValue();
+    return emitBuiltinApplyInst(*this, builtin.getDecl(), i,
+                                builtin.getSubstitutions());
+  }
 
   CallEmission emission = getCallEmissionForLoweredValue(*this,
                                                          i->getCallee().getType(),
@@ -809,10 +862,21 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
                calleeTy = calleeTy->getResult()->castTo<AnyFunctionType>();
              });
   
-  // FIXME: handle SIL indirect return.
+  // If the function takes an indirect return argument, emit into it.
+  if (i->hasIndirectReturn()) {
+    SILValue indirectReturn = i->getIndirectReturn();
+    Address a = getLoweredAddress(indirectReturn);
+    TypeInfo const &ti
+      = getFragileTypeInfo(indirectReturn.getType().getSwiftRValueType());
+    emission.emitToMemory(a, ti);
+    return;
+  }
+  
   // FIXME: handle the result being an address. This doesn't happen normally
   // in Swift but is how SIL currently models global accessors, and could also
   // be how we model "address" properties in the future.
+  
+  // If the result is a non-address value, emit to an explosion.
   Explosion result(CurExplosionLevel);
   emission.emitToExplosion(result);
   newLoweredExplosion(SILValue(i, 0), result, *this);
@@ -952,16 +1016,17 @@ void IRGenSILFunction::visitExtractInst(swift::ExtractInst *i) {
   Explosion lowered(CurExplosionLevel);
   Explosion operand = getLoweredExplosion(i->getOperand());
   CanType baseType = i->getOperand().getType().getSwiftRValueType();
+  CanType refType = i->getOperand().getType().getSwiftType();
   
   if (baseType->is<TupleType>()) {
     projectTupleElementFromExplosion(*this,
-                                     i->getOperand().getType().getSwiftType(),
+                                     refType,
                                      operand,
                                      i->getFieldNo(),
                                      lowered);
   } else {
     projectPhysicalStructMemberFromExplosion(*this,
-                                             i->getOperand().getType().getSwiftType(),
+                                             refType,
                                              operand,
                                              i->getFieldNo(),
                                              lowered);
@@ -1000,6 +1065,12 @@ void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
                                                     i->getField())
     .getAddress();
   newLoweredAddress(SILValue(i, 0), field);
+}
+
+void IRGenSILFunction::visitModuleInst(swift::ModuleInst *i) {
+  // Currently, module values are always empty.
+  Explosion empty(CurExplosionLevel);
+  newLoweredExplosion(SILValue(i, 0), empty);
 }
 
 void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
@@ -1387,6 +1458,17 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
 }
 
 void IRGenSILFunction::visitSpecializeInst(swift::SpecializeInst *i) {
+  // If we're specializing a builtin, store the substitutions directly with the
+  // builtin.
+  LoweredValue const &operand = getLoweredValue(i->getOperand());
+  if (operand.kind == LoweredValue::Kind::BuiltinValue) {
+    assert(operand.getBuiltinValue().getSubstitutions().empty() &&
+           "builtin already specialized");
+    return newLoweredBuiltinValue(SILValue(i, 0),
+                                  operand.getBuiltinValue().getDecl(),
+                                  i->getSubstitutions());
+  }
+  
   return newLoweredSpecializedValue(SILValue(i, 0),
                                     i->getOperand(),
                                     i->getSubstitutions());

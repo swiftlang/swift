@@ -1511,6 +1511,34 @@ static void emitCompareBuiltin(IRGenFunction &IGF, FuncDecl *fn,
   emission.setScalarUnmanagedSubstResult(v);
 }
 
+static void emitCastBuiltin(IRGenFunction &IGF, FuncDecl *fn,
+                            Explosion &result,
+                            Explosion &args,
+                            llvm::Instruction::CastOps opcode) {
+  llvm::Value *input = args.claimUnmanagedNext();
+  Type DestType = fn->getType()->castTo<AnyFunctionType>()->getResult();
+  llvm::Type *destTy = IGF.IGM.getFragileTypeInfo(DestType).getStorageType();
+  assert(args.empty() && "wrong operands to cast operation");
+  llvm::Value *output = IGF.Builder.CreateCast(opcode, input, destTy);
+  result.addUnmanaged(output);
+}
+
+static void emitCompareBuiltin(IRGenFunction &IGF, FuncDecl *fn,
+                               Explosion &result,
+                               Explosion &args,
+                               llvm::CmpInst::Predicate pred) {
+  llvm::Value *lhs = args.claimUnmanagedNext();
+  llvm::Value *rhs = args.claimUnmanagedNext();
+  
+  llvm::Value *v;
+  if (lhs->getType()->isFPOrFPVectorTy())
+    v = IGF.Builder.CreateFCmp(pred, lhs, rhs);
+  else
+    v = IGF.Builder.CreateICmp(pred, lhs, rhs);
+  
+  result.addUnmanaged(v);
+}
+
 /// decodeLLVMAtomicOrdering - turn a string like "release" into the LLVM enum.
 static llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O) {
   using namespace llvm;
@@ -1523,6 +1551,367 @@ static llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O) {
     .Case("seqcst", SequentiallyConsistent);
 }
 
+/// emitBuiltinCall - Emit a call to a builtin function.
+void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
+                            Explosion &args, Explosion *out,
+                            Address indirectOut,
+                            ArrayRef<Substitution> substitutions) {
+  assert(((out != nullptr) ^ indirectOut.isValid()) &&
+         "cannot emit builtin to both explosion and memory");
+  
+  // True if the builtin returns void.
+  bool voidResult = false;
+  
+  // Decompose the function's name into a builtin name and type list.
+  SmallVector<Type, 4> Types;
+  StringRef BuiltinName = getBuiltinBaseName(IGF.IGM.Context,
+                                             fn->getName().str(), Types);
+
+  // These builtins don't care about their argument:
+  if (BuiltinName == "sizeof") {
+    args.claimAll();
+    Type valueTy = substitutions[0].Replacement;
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    out->addUnmanaged(valueTI.getSize(IGF));
+    return;
+  }
+
+  if (BuiltinName == "strideof") {
+    args.claimAll();
+    Type valueTy = substitutions[0].Replacement;
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    out->addUnmanaged(valueTI.getStride(IGF));
+    return;
+  }
+
+  if (BuiltinName == "alignof") {
+    args.claimAll();
+    Type valueTy = substitutions[0].Replacement;
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    out->addUnmanaged(valueTI.getAlignment(IGF));
+    return;
+  }
+  
+  // addressof expects an lvalue argument.
+  if (BuiltinName == "addressof") {
+    llvm::Value *address = args.claimUnmanagedNext();
+    llvm::Value *value = IGF.Builder.CreateBitCast(address,
+                                                   IGF.IGM.Int8PtrTy);
+    out->addUnmanaged(value);
+    return;
+  }
+
+  // Everything else cares about the (rvalue) argument.
+  
+  // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
+  if (unsigned IID = getLLVMIntrinsicID(BuiltinName, !Types.empty())) {
+    SmallVector<llvm::Type*, 4> ArgTys;
+    for (auto T : Types)
+      ArgTys.push_back(IGF.IGM.getFragileTypeInfo(T).getStorageType());
+      
+    auto F = llvm::Intrinsic::getDeclaration(&IGF.IGM.Module,
+                                             (llvm::Intrinsic::ID)IID, ArgTys);
+    llvm::FunctionType *FT = F->getFunctionType();
+    SmallVector<llvm::Value*, 8> IRArgs;
+    for (unsigned i = 0, e = FT->getNumParams(); i != e; ++i)
+      IRArgs.push_back(args.claimUnmanagedNext());
+    llvm::Value *TheCall = IGF.Builder.CreateCall(F, IRArgs);
+
+    if (TheCall->getType()->isVoidTy())
+      voidResult = true;
+    else
+      extractUnmanagedScalarResults(IGF, TheCall, *out);
+
+    return;
+  }
+  
+  // TODO: A linear series of ifs is suboptimal.
+#define BUILTIN_CAST_OPERATION(id, name) \
+  if (BuiltinName == name) \
+    return emitCastBuiltin(IGF, fn, *out, args, llvm::Instruction::id);
+  
+#define BUILTIN_BINARY_OPERATION(id, name, overload) \
+  if (BuiltinName == name) { \
+    llvm::Value *lhs = args.claimUnmanagedNext(); \
+    llvm::Value *rhs = args.claimUnmanagedNext(); \
+    llvm::Value *v = IGF.Builder.Create##id(lhs, rhs); \
+    return out->addUnmanaged(v); \
+  }
+
+#define BUILTIN_BINARY_PREDICATE(id, name, overload) \
+  if (BuiltinName == name) \
+    return emitCompareBuiltin(IGF, fn, *out, args, llvm::CmpInst::id);
+#define BUILTIN(ID, Name)  // Ignore the rest.
+#include "swift/AST/Builtins.def"
+
+  if (BuiltinName == "fneg") {
+    llvm::Value *rhs = args.claimUnmanagedNext();
+    llvm::Value *lhs = llvm::ConstantFP::get(rhs->getType(), "-0.0");
+    llvm::Value *v = IGF.Builder.CreateFSub(lhs, rhs);
+    return out->addUnmanaged(v);
+  }
+  
+  if (BuiltinName == "gep") {
+    llvm::Value *lhs = args.claimUnmanagedNext();
+    llvm::Value *rhs = args.claimUnmanagedNext();
+    assert(args.empty() && "wrong operands to gep operation");
+    
+    // We don't expose a non-inbounds GEP operation.
+    llvm::Value *gep = IGF.Builder.CreateInBoundsGEP(lhs, rhs);
+    return out->addUnmanaged(gep);
+  }
+
+  if (BuiltinName == "load" || BuiltinName == "move") {
+    // The type of the operation is the generic parameter type.
+    Type valueTy = substitutions[0].Replacement;
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+
+    // Treat the raw pointer as a physical l-value of that type.
+    // FIXME: remapping
+    llvm::Value *addrValue = args.claimUnmanagedNext();
+    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
+
+    // Handle the result being naturally in memory.
+    if (indirectOut.isValid()) {
+      if (BuiltinName == "move")
+        return valueTI.initializeWithTake(IGF, indirectOut, addr);
+      return valueTI.initializeWithCopy(IGF, indirectOut, addr);
+    }
+    
+    // Perform the load.
+    if (BuiltinName == "move")
+      return valueTI.loadAsTake(IGF, addr, *out);
+    return valueTI.load(IGF, addr, *out);
+  }
+
+  if (BuiltinName == "destroy") {
+    // The type of the operation is the generic parameter type.
+    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
+
+    // Skip the metatype if it has a non-trivial representation.
+    if (!IGF.IGM.hasTrivialMetatype(valueTy))
+      args.claimUnmanagedNext();
+
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+
+    llvm::Value *addrValue = args.claimUnmanagedNext();
+    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
+    valueTI.destroy(IGF, addr);
+
+    voidResult = true;
+    return;
+  }
+
+  if (BuiltinName == "assign") {
+    // The type of the operation is the generic parameter type.
+    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    
+    // Treat the raw pointer as a physical l-value of that type.
+    llvm::Value *addrValue = args.takeLast().getUnmanagedValue();
+    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
+    
+    // Mark that we're not returning anything.
+    voidResult = true;
+    
+    // Perform the assignment operation.
+    return valueTI.assign(IGF, args, addr);
+  }
+  
+  if (BuiltinName == "init") {
+    // The type of the operation is the type of the first argument of
+    // the store function.
+    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    
+    // Treat the raw pointer as a physical l-value of that type.
+    llvm::Value *addrValue = args.takeLast().getUnmanagedValue();
+    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
+    
+    // Mark that we're not returning anything.
+    voidResult = true;    
+    
+    // Perform the init operation.
+    return valueTI.initialize(IGF, args, addr);
+  }
+
+  if (BuiltinName == "allocRaw") {
+    auto size = args.claimUnmanagedNext();
+    auto align = args.claimUnmanagedNext();
+    auto alloc = IGF.emitAllocRawCall(size, align, "builtin-allocRaw");
+    out->addUnmanaged(alloc);
+    return;
+  }
+
+  if (BuiltinName == "deallocRaw") {
+    auto pointer = args.claimUnmanagedNext();
+    auto size = args.claimUnmanagedNext();
+    IGF.emitDeallocRawCall(pointer, size);
+    
+    voidResult = true;
+    return;
+  }
+
+  if (BuiltinName == "castToObjectPointer" ||
+      BuiltinName == "castFromObjectPointer" ||
+      BuiltinName == "bridgeToRawPointer" ||
+      BuiltinName == "bridgeFromRawPointer") {
+    Type valueTy = substitutions[0].Replacement;
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    if (!valueTI.isSingleRetainablePointer(ResilienceScope::Local)) {
+      IGF.unimplemented(SourceLoc(), "builtin pointer cast on invalid type");
+      IGF.emitFakeExplosion(valueTI, *out);
+      return;
+    }
+
+    if (BuiltinName == "castToObjectPointer") {
+      // Just bitcast and rebuild the cleanup.
+      llvm::Value *value = args.forwardNext(IGF);
+      value = IGF.Builder.CreateBitCast(value, IGF.IGM.RefCountedPtrTy);
+      out->add(IGF.enterReleaseCleanup(value));
+    } else if (BuiltinName == "castFromObjectPointer") {
+      // Just bitcast and rebuild the cleanup.
+      llvm::Value *value = args.forwardNext(IGF);
+      value = IGF.Builder.CreateBitCast(value, valueTI.StorageType);
+      out->add(IGF.enterReleaseCleanup(value));
+    } else if (BuiltinName == "bridgeToRawPointer") {
+      // Bitcast and immediately release the operand.
+      // FIXME: Should annotate the ownership semantics of this builtin
+      // so that SILGen can emit the release and expose it to ARC optimization
+      llvm::Value *value = args.forwardNext(IGF);
+      IGF.emitRelease(value);
+      value = IGF.Builder.CreateBitCast(value, IGF.IGM.Int8PtrTy);
+      out->addUnmanaged(value);
+    } else if (BuiltinName == "bridgeFromRawPointer") {
+      // Bitcast, and immediately retain (and introduce a release cleanup).
+      // FIXME: Should annotate the ownership semantics of this builtin
+      // so that SILGen can emit the retain and expose it to ARC optimization
+      llvm::Value *value = args.claimUnmanagedNext();
+      value = IGF.Builder.CreateBitCast(value, valueTI.StorageType);
+      IGF.emitRetain(value, *out);
+    }
+    return;
+  }
+  
+  if (BuiltinName.startswith("fence_")) {
+    BuiltinName = BuiltinName.drop_front(strlen("fence_"));
+    // Decode the ordering argument, which is required.
+    auto underscore = BuiltinName.find('_');
+    auto ordering = decodeLLVMAtomicOrdering(BuiltinName.substr(0, underscore));
+    BuiltinName = BuiltinName.substr(underscore);
+    
+    // Accept singlethread if present.
+    bool isSingleThread = BuiltinName.startswith("_singlethread");
+    if (isSingleThread)
+      BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
+    assert(BuiltinName.empty() && "Mismatch with sema");
+    
+    IGF.Builder.CreateFence(ordering,
+                      isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+    voidResult = true;
+    return;
+  }
+
+  
+  if (BuiltinName.startswith("cmpxchg_")) {
+    BuiltinName = BuiltinName.drop_front(strlen("cmpxchg_"));
+    // Decode the ordering argument, which is required.
+    auto underscore = BuiltinName.find('_');
+    auto ordering = decodeLLVMAtomicOrdering(BuiltinName.substr(0, underscore));
+    BuiltinName = BuiltinName.substr(underscore);
+    
+    // Accept volatile and singlethread if present.
+    bool isVolatile = BuiltinName.startswith("_volatile");
+    if (isVolatile) BuiltinName = BuiltinName.drop_front(strlen("_volatile"));
+    
+    bool isSingleThread = BuiltinName.startswith("_singlethread");
+    if (isSingleThread)
+      BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
+    assert(BuiltinName.empty() && "Mismatch with sema");
+
+    auto pointer = args.claimUnmanagedNext();
+    auto cmp = args.claimUnmanagedNext();
+    auto newval = args.claimUnmanagedNext();
+
+    llvm::Type *origTy = cmp->getType();
+    if (origTy->isPointerTy()) {
+      cmp = IGF.Builder.CreatePtrToInt(cmp, IGF.IGM.IntPtrTy);
+      newval = IGF.Builder.CreatePtrToInt(newval, IGF.IGM.IntPtrTy);
+    }
+
+    pointer = IGF.Builder.CreateBitCast(pointer,
+                                  llvm::PointerType::getUnqual(cmp->getType()));
+    llvm::Value *value = IGF.Builder.CreateAtomicCmpXchg(pointer, cmp, newval,
+                                                          ordering,
+                      isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+    cast<llvm::AtomicCmpXchgInst>(value)->setVolatile(isVolatile);
+
+    if (origTy->isPointerTy())
+      value = IGF.Builder.CreateIntToPtr(value, origTy);
+
+    out->addUnmanaged(value);
+    return;
+  }
+  
+  if (BuiltinName.startswith("atomicrmw_")) {
+    using namespace llvm;
+    
+    BuiltinName = BuiltinName.drop_front(strlen("atomicrmw_"));
+    auto underscore = BuiltinName.find('_');
+    StringRef SubOp = BuiltinName.substr(0, underscore);
+    
+    auto SubOpcode = StringSwitch<AtomicRMWInst::BinOp>(SubOp)
+      .Case("xchg", AtomicRMWInst::Xchg)
+      .Case("add",  AtomicRMWInst::Add)
+      .Case("sub",  AtomicRMWInst::Sub)
+      .Case("and",  AtomicRMWInst::And)
+      .Case("nand", AtomicRMWInst::Nand)
+      .Case("or",   AtomicRMWInst::Or)
+      .Case("xor",  AtomicRMWInst::Xor)
+      .Case("max",  AtomicRMWInst::Max)
+      .Case("min",  AtomicRMWInst::Min)
+      .Case("umax", AtomicRMWInst::UMax)
+      .Case("umin", AtomicRMWInst::UMin);
+    BuiltinName = BuiltinName.drop_front(underscore+1);
+    
+    // Decode the ordering argument, which is required.
+    underscore = BuiltinName.find('_');
+    auto ordering = decodeLLVMAtomicOrdering(BuiltinName.substr(0, underscore));
+    BuiltinName = BuiltinName.substr(underscore);
+    
+    // Accept volatile and singlethread if present.
+    bool isVolatile = BuiltinName.startswith("_volatile");
+    if (isVolatile) BuiltinName = BuiltinName.drop_front(strlen("_volatile"));
+    
+    bool isSingleThread = BuiltinName.startswith("_singlethread");
+    if (isSingleThread)
+      BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
+    assert(BuiltinName.empty() && "Mismatch with sema");
+    
+    auto pointer = args.claimUnmanagedNext();
+    auto val = args.claimUnmanagedNext();
+
+    // Handle atomic ops on pointers by casting to intptr_t.
+    llvm::Type *origTy = val->getType();
+    if (origTy->isPointerTy())
+      val = IGF.Builder.CreatePtrToInt(val, IGF.IGM.IntPtrTy);
+
+    pointer = IGF.Builder.CreateBitCast(pointer,
+                                  llvm::PointerType::getUnqual(val->getType()));
+    llvm::Value *value = IGF.Builder.CreateAtomicRMW(SubOpcode, pointer, val,
+                                                      ordering,
+                      isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+    cast<AtomicRMWInst>(value)->setVolatile(isVolatile);
+
+    if (origTy->isPointerTy())
+      value = IGF.Builder.CreateIntToPtr(value, origTy);
+
+    out->addUnmanaged(value);
+    return;
+  }
+
+  llvm_unreachable("IRGen unimplemented for this builtin!");
+}
 
 /// emitBuiltinCall - Emit a call to a builtin function.
 static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
@@ -1784,7 +2173,6 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     emission.setVoidResult();
     return;
   }
-
   
   if (BuiltinName.startswith("cmpxchg_")) {
     BuiltinName = BuiltinName.drop_front(strlen("cmpxchg_"));

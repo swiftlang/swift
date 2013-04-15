@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_IRGENSIL_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/DenseMap.h"
@@ -128,6 +129,21 @@ public:
   }
 };
   
+/// Represents a builtin function.
+class BuiltinValue {
+  FuncDecl *decl;
+  ArrayRef<Substitution> substitutions;
+  
+public:
+  BuiltinValue(FuncDecl *decl, ArrayRef<Substitution> substitutions)
+    : decl(decl), substitutions(substitutions)
+  {}
+  
+  FuncDecl *getDecl() const { return decl; }
+  
+  ArrayRef<Substitution> getSubstitutions() const { return substitutions; }
+};
+  
 /// Represents a SIL value lowered to IR, in one of these forms:
 /// - an Address, corresponding to a SIL address value;
 /// - an Explosion of (unmanaged) Values, corresponding to a SIL "register"; or
@@ -156,6 +172,9 @@ public:
     
       /// A SpecializedValue.
       SpecializedValue,
+    
+      /// A builtin function.
+      BuiltinValue,
     Value_Last = SpecializedValue
   };
   
@@ -174,6 +193,7 @@ private:
     ObjCMethod objcMethod;
     MetatypeValue metatypeValue;
     SpecializedValue specializedValue;
+    BuiltinValue builtinValue;
   };
 
 public:
@@ -195,6 +215,10 @@ public:
   
   LoweredValue(SpecializedValue &&specializedValue)
     : kind(Kind::SpecializedValue), specializedValue(std::move(specializedValue))
+  {}
+  
+  LoweredValue(BuiltinValue &&builtinValue)
+    : kind(Kind::BuiltinValue), builtinValue(std::move(builtinValue))
   {}
   
   LoweredValue(Explosion &e)
@@ -235,6 +259,9 @@ public:
       break;
     case Kind::SpecializedValue:
       ::new (&specializedValue) SpecializedValue(std::move(lv.specializedValue));
+      break;
+    case Kind::BuiltinValue:
+      ::new (&builtinValue) BuiltinValue(std::move(lv.builtinValue));
       break;
     }
   }
@@ -279,6 +306,11 @@ public:
     return specializedValue;
   }
   
+  BuiltinValue const &getBuiltinValue() const {
+    assert(kind == Kind::BuiltinValue && "not a builtin");
+    return builtinValue;
+  }
+  
   ~LoweredValue() {
     switch (kind) {
     case Kind::Address:
@@ -298,6 +330,9 @@ public:
       break;
     case Kind::SpecializedValue:
       specializedValue.~SpecializedValue();
+      break;
+    case Kind::BuiltinValue:
+      builtinValue.~BuiltinValue();
       break;
     }
   }
@@ -347,29 +382,29 @@ public:
   /// other locals that are consumed by SIL.
   void emitLocalDecls(BraceStmt *body);
   
+  void newLoweredValue(SILValue v, LoweredValue &&lv) {
+    auto inserted = loweredValues.insert({v, std::move(lv)});
+    assert(inserted.second && "already had lowered value for sil value?!");
+    (void)inserted;
+  }
+  
   /// Create a new Address corresponding to the given SIL address value.
   void newLoweredAddress(SILValue v, Address const &address) {
     assert(v.getType().isAddress() && "address for non-address value?!");
-    auto inserted = loweredValues.insert({v, address});
-    assert(inserted.second && "already had lowered value for sil value?!");
-    (void)inserted;
+    newLoweredValue(v, address);
   }
   
   /// Create a new Explosion corresponding to the given SIL value.
   void newLoweredExplosion(SILValue v, Explosion &e) {
     assert(!v.getType().isAddress() && "explosion for address value?!");
-    auto inserted = loweredValues.insert({v, LoweredValue(e)});
-    assert(inserted.second && "already had lowered value for sil value?!");
-    (void)inserted;
+    newLoweredValue(v, LoweredValue(e));
   }
   
   /// Create a new Explosion corresponding to the given SIL value, disabling
   /// cleanups on the input Explosion if necessary.
   void newLoweredExplosion(SILValue v, Explosion &e, IRGenFunction &IGF) {
     assert(!v.getType().isAddress() && "explosion for address value?!");
-    auto inserted = loweredValues.insert({v, LoweredValue(e, IGF)});
-    assert(inserted.second && "already had lowered value for sil value?!");
-    (void)inserted;
+    newLoweredValue(v, LoweredValue(e, IGF));
   }
   
   /// Create a new StaticFunction corresponding to the given SIL value.
@@ -379,9 +414,7 @@ public:
     assert(!v.getType().isAddress() && "function for address value?!");
     assert(v.getType().is<AnyFunctionType>() &&
            "function for non-function value?!");
-    auto inserted = loweredValues.insert({v, StaticFunction{f, cc}});
-    assert(inserted.second && "already had lowered value for sil value?!");
-    (void)inserted;
+    newLoweredValue(v, StaticFunction{f, cc});
   }
   
   void newLoweredObjCMethod(SILValue v, ValueDecl *method,
@@ -389,29 +422,27 @@ public:
     assert(!v.getType().isAddress() && "function for address value?!");
     assert(v.getType().is<AnyFunctionType>() &&
            "function for non-function value?!");
-    auto inserted = loweredValues.insert({v,
-                                          ObjCMethod{method, superSearchType}});
-    assert(inserted.second && "already had lowered value for sil value?!");
-    (void)inserted;
+    newLoweredValue(v, ObjCMethod{method, superSearchType});
   }
   
   void newLoweredMetatypeValue(SILValue v,
                                llvm::Value /*nullable*/ *swiftMetatype,
                                llvm::Value /*nullable*/ *objcMetatype) {
-    auto inserted = loweredValues.insert({v,
-                                   MetatypeValue{swiftMetatype, objcMetatype}});
-    assert(inserted.second && "already had lowered value for sil value?!");
-    (void)inserted;
+    newLoweredValue(v, MetatypeValue{swiftMetatype, objcMetatype});
   }
   
   void newLoweredSpecializedValue(SILValue v,
                                   SILValue unspecializedValue,
                                   ArrayRef<Substitution> substitutions) {
-    auto inserted = loweredValues.insert({v,
-                                          SpecializedValue{unspecializedValue,
-                                                           substitutions}});
-    assert(inserted.second && "already had lowered value for sil value?!");
-    (void)inserted;
+    newLoweredValue(v, SpecializedValue{unspecializedValue, substitutions});
+  }
+  
+  void newLoweredBuiltinValue(SILValue v,
+                              FuncDecl *builtin,
+                              ArrayRef<Substitution> substitutions) {
+    assert(isa<BuiltinModule>(builtin->getDeclContext())
+           && "not a builtin");
+    newLoweredValue(v, BuiltinValue{builtin, substitutions});
   }
   
   /// Get the LoweredValue corresponding to the given SIL value, which must
@@ -490,6 +521,7 @@ public:
   void visitExtractInst(ExtractInst *i);
   void visitElementAddrInst(ElementAddrInst *i);
   void visitRefElementAddrInst(RefElementAddrInst *i);
+  void visitModuleInst(ModuleInst *i);
 
   void visitClassMethodInst(ClassMethodInst *i);
   void visitSuperMethodInst(SuperMethodInst *i);

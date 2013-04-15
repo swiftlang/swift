@@ -105,6 +105,13 @@ namespace irgen {
                                   llvm::AttributeSet &attrs,
                                   unsigned argIndex,
                                   Alignment align);
+  
+  /// Emit a call to a builtin function.
+  void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
+                       Explosion &args, Explosion *result,
+                       Address indirectResult,
+                       ArrayRef<Substitution> substitutions);
+
 } // end namespace irgen
 } // end namespace swift
 

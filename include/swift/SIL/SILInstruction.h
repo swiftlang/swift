@@ -276,6 +276,15 @@ public:
                            ArrayRef<SILValue> Args,
                            SILFunction &F);
 
+  bool hasIndirectReturn() const {
+    return getCallee().getType().getFunctionTypeInfo()->hasIndirectReturn();
+  }
+  
+  SILValue getIndirectReturn() const {
+    assert(hasIndirectReturn() && "apply inst does not have indirect return!");
+    return getArguments().back();
+  }
+  
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ApplyInst;
   }

@@ -278,6 +278,10 @@ namespace swift {
     iterator end() const { return iterator(Operands.end()); }
     size_t size() const { return Operands.size(); }
     bool empty() const { return Operands.empty(); }
+    
+    SILValue front() const { return Operands.front().get(); }
+    SILValue back() const { return Operands.back().get(); }
+    
     SILValue operator[](unsigned i) const { return Operands[i].get(); }
     OperandValueArrayRef slice(unsigned begin, unsigned length) const {
       return OperandValueArrayRef(Operands.slice(begin, length));
