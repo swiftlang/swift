@@ -54,7 +54,7 @@ static Identifier getModuleIdentifier(StringRef OutputName,
       moduleName = "main";
     } else {
       SourceLoc Loc;
-      Context.Diags.diagnose(Loc, diag::bad_module_name);
+      Context.Diags.diagnose(Loc, diag::bad_module_name, moduleName);
       moduleName = "bad";
     }
   }

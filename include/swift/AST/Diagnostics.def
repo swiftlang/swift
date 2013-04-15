@@ -134,7 +134,7 @@ ERROR(lex_unexpected_long_period_series,lexing,none,
 //------------------------------------------------------------------------------
 
 ERROR(bad_module_name,decl_parsing,none,
-      "file name is not a valid identifier", ())
+      "file name \"%0\" is not a valid identifier", (StringRef))
 
 ERROR(declaration_same_line_without_semi,decl_parsing,none,
       "consecutive declarations on a line must be separated by ';'", ())
