@@ -40,10 +40,8 @@ private:
   unsigned ExplosionLevel : 2;
   unsigned UncurryLevel : 28;
 
-  CodeRef(Kind kind,
-              ValueDecl *theDecl,
-              ExplosionKind explosionLevel,
-              unsigned uncurryLevel)
+  CodeRef(Kind kind, ValueDecl *theDecl, ExplosionKind explosionLevel,
+          unsigned uncurryLevel)
     : TheDecl(theDecl),
       TheKind(unsigned(kind)),
       ExplosionLevel(unsigned(explosionLevel)),

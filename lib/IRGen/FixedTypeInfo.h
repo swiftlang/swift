@@ -45,7 +45,8 @@ public:
   void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                           Address srcAddr) const;
 
-  std::pair<llvm::Value*, llvm::Value*> getSizeAndAlignment(IRGenFunction &IGF) const;
+  std::pair<llvm::Value*, llvm::Value*>
+  getSizeAndAlignment(IRGenFunction &IGF) const;
   llvm::Value *getSize(IRGenFunction &IGF) const;
   llvm::Value *getAlignment(IRGenFunction &IGF) const;
   llvm::Value *getStride(IRGenFunction &IGF) const;

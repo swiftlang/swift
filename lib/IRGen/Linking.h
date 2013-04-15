@@ -122,6 +122,10 @@ class LinkEntity {
     /// The pointer is a Decl*.
     Other,
 
+    /// A SIL function that has no backing Decl.  The pointer is a SILFunction
+    /// which has a name already set.
+    SILFunction,
+
     // Everything following this is a type kind.
 
     /// A value witness for a type.
@@ -319,6 +323,13 @@ public:
     return entity;
   }
 
+  static LinkEntity forSILFunction(SILFunction *F) {
+    LinkEntity entity;
+    entity.Pointer = F;
+    entity.Data = unsigned(Kind::SILFunction) << KindShift;
+    return entity;
+  }
+
   void mangle(llvm::raw_ostream &out) const;
   void mangle(llvm::SmallVectorImpl<char> &buffer) const;
   bool isLocalLinkage() const;
@@ -332,6 +343,11 @@ public:
   CapturingExpr *getCapturingExpr() const {
     assert(isCapturingExprKind(getKind()));
     return reinterpret_cast<CapturingExpr*>(Pointer);
+  }
+
+  SILFunction *getSILFunction() const {
+    assert(getKind() == Kind::SILFunction);
+    return reinterpret_cast<SILFunction*>(Pointer);
   }
   
   ExplosionKind getExplosionKind() const {

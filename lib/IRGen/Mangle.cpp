@@ -20,6 +20,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/SIL/SILFunction.h"  // FIXME: remove when this is in SILGen.
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/StringRef.h"
@@ -927,6 +928,11 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   // An Objective-C metaclass reference;  not a swift mangling.
   case Kind::ObjCMetaclass:
     buffer << "OBJC_METACLASS_$_" << getDecl()->getName().str();
+    return;
+  case Kind::SILFunction:
+    assert(!getSILFunction()->getMangledName().empty() &&
+           "Direct SILFunction references should be premangled");
+    buffer << getSILFunction()->getMangledName();
     return;
   }
   llvm_unreachable("bad entity kind!");
