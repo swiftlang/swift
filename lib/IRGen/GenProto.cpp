@@ -3661,9 +3661,27 @@ static CallEmission prepareProtocolMethodCall(IRGenFunction &IGF, FuncDecl *fn,
   return emission;
 }
 
+static void getWitnessMethodValue(IRGenFunction &IGF,
+                                  FuncDecl *fn,
+                                  ProtocolDecl *fnProto,
+                                  llvm::Value *wtable,
+                                  llvm::Value *metadata,
+                                  Explosion &out) {
+  // Find the actual witness.
+  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(fnProto);
+  auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
+  llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
+
+  // Cast the witness pointer to i8*.
+  witness = IGF.Builder.CreateBitCast(witness, IGF.IGM.Int8PtrTy);
+  
+  // Build the value.
+  out.addUnmanaged(witness);
+  out.addUnmanaged(metadata);
+}
+
 void
 irgen::getArchetypeMethodValue(IRGenFunction &IGF,
-                               Address thisObject,
                                CanType baseTy,
                                SILConstant member,
                                CanType substResultType,
@@ -3689,20 +3707,11 @@ irgen::getArchetypeMethodValue(IRGenFunction &IGF,
   llvm::Value *origin = archetypeTI.getWitnessTable(IGF, path.getOriginIndex());
   llvm::Value *wtable = path.apply(IGF, origin);
   
-  // Find the actual witness.
-  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(fnProto);
-  auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
-  llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
-  
   // Acquire the archetype metadata.
   llvm::Value *metadata = archetypeTI.getMetadataRef(IGF);
   
-  // Cast the witness pointer to i8*.
-  witness = IGF.Builder.CreateBitCast(witness, IGF.IGM.Int8PtrTy);
-  
   // Build the value.
-  out.addUnmanaged(witness);
-  out.addUnmanaged(metadata);
+  getWitnessMethodValue(IGF, fn, fnProto, wtable, metadata, out);
 }
 
 /// Extract the method pointer and metadata from a protocol witness table
@@ -3735,17 +3744,8 @@ irgen::getProtocolMethodValue(IRGenFunction &IGF,
   auto existLayout = baseTI.getLayout();  
   llvm::Value *metadata = existLayout.loadMetadataRef(IGF, existAddr);
 
-  // Find the actual witness.
-  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(fnProto);
-  auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
-  llvm::Value *witness = loadOpaqueWitness(IGF, wtable, index);
-
-  // Cast the witness pointer to i8*.
-  witness = IGF.Builder.CreateBitCast(witness, IGF.IGM.Int8PtrTy);
-  
   // Build the value.
-  out.addUnmanaged(witness);
-  out.addUnmanaged(metadata);
+  getWitnessMethodValue(IGF, fn, fnProto, wtable, metadata, out);
 }
 
 /// Emit an existential member reference as a callee.

@@ -517,7 +517,7 @@ public:
   void visitTupleInst(TupleInst *i);
   void visitMetatypeInst(MetatypeInst *i);
   void visitClassMetatypeInst(ClassMetatypeInst *i);
-  //void visitAssociatedMetatypeInst(AssociatedMetatypeInst *i);
+  void visitAssociatedMetatypeInst(AssociatedMetatypeInst *i);
   void visitExtractInst(ExtractInst *i);
   void visitElementAddrInst(ElementAddrInst *i);
   void visitRefElementAddrInst(RefElementAddrInst *i);

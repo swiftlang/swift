@@ -104,7 +104,6 @@ namespace irgen {
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
   void getArchetypeMethodValue(IRGenFunction &IGF,
-                               Address archetypeAddr,
                                CanType baseTy,
                                SILConstant member,
                                CanType substResultType,

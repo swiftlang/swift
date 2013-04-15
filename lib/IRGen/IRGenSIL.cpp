@@ -182,6 +182,7 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
   }
 
   auto entry = loweredBBs.begin();
+  Builder.SetInsertPoint(entry->second.bb);
 
   // Map the LLVM arguments to arguments on the entry point BB.
   Explosion params = collectParameters();
@@ -563,27 +564,32 @@ static void getMetatypeUses(ValueBase *i,
   isUsedAsSwiftMetatype = true;
 }
 
-void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
-  CanType instanceType(i->getType().castTo<MetaTypeType>()->getInstanceType());
+static void emitMetatypeInst(IRGenSILFunction &IGF,
+                             SILInstruction *i, CanType instanceType) {
   llvm::Value *swiftMetatype = nullptr, *objcClass = nullptr;
   
   bool isUsedAsSwiftMetatype, isUsedAsObjCClass;
   getMetatypeUses(i, isUsedAsSwiftMetatype, isUsedAsObjCClass);
   
   if (isUsedAsSwiftMetatype) {
-    Explosion e(CurExplosionLevel);
-    emitMetaTypeRef(*this, instanceType, e);
+    Explosion e(IGF.CurExplosionLevel);
+    emitMetaTypeRef(IGF, instanceType, e);
     if (!isUsedAsObjCClass) {
-      newLoweredExplosion(SILValue(i, 0), e);
+      IGF.newLoweredExplosion(SILValue(i, 0), e);
       return;
     }
     swiftMetatype = e.claimUnmanagedNext();
   }
   if (isUsedAsObjCClass) {
-    Explosion e(CurExplosionLevel);
-    objcClass = emitClassHeapMetadataRef(*this, instanceType);
+    Explosion e(IGF.CurExplosionLevel);
+    objcClass = emitClassHeapMetadataRef(IGF, instanceType);
   }
-  newLoweredMetatypeValue(SILValue(i,0), swiftMetatype, objcClass);
+  IGF.newLoweredMetatypeValue(SILValue(i,0), swiftMetatype, objcClass);
+}
+
+void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
+  CanType instanceType(i->getType().castTo<MetaTypeType>()->getInstanceType());
+  emitMetatypeInst(*this, i, instanceType);
 }
 
 void IRGenSILFunction::visitClassMetatypeInst(swift::ClassMetatypeInst *i) {
@@ -604,6 +610,12 @@ void IRGenSILFunction::visitClassMetatypeInst(swift::ClassMetatypeInst *i) {
     objcClass = emitHeapMetadataRefForHeapObject(*this, baseValue, instanceType);
   
   newLoweredMetatypeValue(SILValue(i,0), swiftMetatype, objcClass);
+}
+
+void IRGenSILFunction::visitAssociatedMetatypeInst(
+                                             swift::AssociatedMetatypeInst *i) {
+  CanType instanceType(i->getType().castTo<MetaTypeType>()->getInstanceType());
+  emitMetatypeInst(*this, i, instanceType);  
 }
 
 static void emitApplyArgument(IRGenSILFunction &IGF,
@@ -1340,15 +1352,17 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
 }
 
 void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
-  Address base = getLoweredAddress(i->getOperand());
   CanType baseTy = i->getOperand().getType().getSwiftRValueType();
+  if (auto *metaTy = dyn_cast<MetaTypeType>(baseTy))
+    baseTy = CanType(metaTy->getInstanceType());
+  
   CanType resultTy = getResultType(i->getType(0).getSwiftType(),
                                    /*uncurryLevel=*/1);
   SILConstant member = i->getMember();
 
   Explosion lowered(CurExplosionLevel);
   
-  getArchetypeMethodValue(*this, base, baseTy, member, resultTy,
+  getArchetypeMethodValue(*this, baseTy, member, resultTy,
                           /*FIXME substitutions*/ {},
                           lowered);
   
