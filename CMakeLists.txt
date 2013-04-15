@@ -207,6 +207,7 @@ function(compile_swift_files)
     add_custom_command(
       OUTPUT ${module_source_file}
       COMMAND cat ${source_files} > "${module_source_file}"
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${module_source_dir}
       DEPENDS ${source_files}
       COMMENT "FIXME: Concatenating Swift module sources")
     set_source_files_properties("${module_source_file}" PROPERTIES GENERATED ON)
