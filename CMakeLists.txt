@@ -139,12 +139,6 @@ else ()
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -stdlib=libc++")
 endif ()
 
-# Look for a way to map error messages in swift.swift back into their
-# corresponding source files.
-find_program(LITRE_LINE_DIRECTIVE_EXECUTABLE
-  NAMES litre-line-directive
-  DOC "tool for mapping error messages to lines in their original source files")
-
 # Compile a swift file into an object file (as a library).
 #
 # Usage:
@@ -194,15 +188,9 @@ function(compile_swift_file file target objectvar)
   get_filename_component(file_name ${file} NAME_WE)
   set(objfile
     "${CMAKE_CURRENT_BINARY_DIR}/${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
-
-  set(error_postprocessor)
-  if(LITRE_LINE_DIRECTIVE_EXECUTABLE)
-    set(error_postprocessor 2>&1 | ${LITRE_LINE_DIRECTIVE_EXECUTABLE} "${source_file}")
-  endif()
-
   add_custom_command(
     OUTPUT ${objfile}
-    COMMAND swift "-c" ${swift_flags} "-o" "${objfile}" "${source_file}" ${error_postprocessor}
+    COMMAND swift "-c" ${swift_flags} "-o" "${objfile}" "${source_file}"
     DEPENDS ${source_file}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
