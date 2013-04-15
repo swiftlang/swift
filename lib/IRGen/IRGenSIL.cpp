@@ -1261,6 +1261,37 @@ void IRGenSILFunction::visitBridgeToBlockInst(swift::BridgeToBlockInst *i) {
   newLoweredExplosion(SILValue(i, 0), to, *this);
 }
 
+void IRGenSILFunction::visitArchetypeToSuperInst(swift::ArchetypeToSuperInst *i)
+{
+  // Get the archetype address.
+  Address archetype = getLoweredAddress(i->getOperand());
+  
+  // The data associated with the archetype is simply a pointer; grab it
+  // and cast it to the superclass type.
+  Explosion out(CurExplosionLevel);
+  
+  const TypeInfo &baseTypeInfo
+    = getFragileTypeInfo(i->getType().getSwiftType());
+  llvm::Type *baseTy = baseTypeInfo.StorageType;
+  llvm::Type *basePtrTy = baseTy->getPointerTo();
+  llvm::Value *castPtrVal = Builder.CreateBitCast(archetype.getAddress(),
+                                                  basePtrTy);
+  llvm::Value *castVal
+    = Builder.CreateLoad(castPtrVal, IGM.getPointerAlignment());
+
+  out.addUnmanaged(castVal);
+  newLoweredExplosion(SILValue(i, 0), out);
+}
+
+void IRGenSILFunction::visitSuperToArchetypeInst(swift::SuperToArchetypeInst *i)
+{
+  Address archetype = getLoweredAddress(i->getDestArchetypeAddress());
+  Explosion super = getLoweredExplosion(i->getSrcBase());
+  emitSupertoArchetypeConversion(super,
+                   i->getDestArchetypeAddress().getType().getSwiftRValueType(),
+                   archetype);
+}
+
 void IRGenSILFunction::visitCoerceInst(swift::CoerceInst *i) {
   Explosion from = getLoweredExplosion(i->getOperand());
   newLoweredExplosion(SILValue(i, 0), from);

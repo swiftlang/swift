@@ -881,6 +881,33 @@ static void emitSupertoArchetypeCastParameters(IRGenFunction &IGF,
     destMetadata = IGF.Builder.CreateBitCast(destMetadata, IGF.IGM.Int8PtrTy);
 }
 
+void IRGenFunction::emitSupertoArchetypeConversion(Explosion &input,
+                                                   CanType destType,
+                                                   Address outputArchetype) {
+  assert(destType->is<ArchetypeType>() && "expected archetype type");
+  
+  llvm::Value *superObject = input.forwardNext(*this);
+  superObject = Builder.CreateBitCast(superObject, IGM.Int8PtrTy);
+  
+  // Retrieve the metadata.
+  llvm::Value *metadataRef = emitTypeMetadataRef(*this, destType);
+  if (metadataRef->getType() != IGM.Int8PtrTy)
+    metadataRef = Builder.CreateBitCast(metadataRef, IGM.Int8PtrTy);
+  
+  // Call the (unconditional) dynamic cast.
+  auto call
+    = Builder.CreateCall2(IGM.getDynamicCastUnconditionalFn(),
+                          superObject, metadataRef);
+
+  // FIXME: Eventually, we may want to throw.
+  call->setDoesNotThrow();
+  
+  // Store the result into the archetype.
+  llvm::Value *addr = Builder.CreateBitCast(outputArchetype.getAddress(),
+                                            IGM.Int8PtrPtrTy);
+  Builder.CreateStore(call, addr, outputArchetype.getAlignment());  
+}
+
 void IRGenFunction::emitSupertoArchetypeConversion(Expr *E, CanType destType,
                                                    Explosion &explosion) {
   assert(destType->is<ArchetypeType>() && "expected archetype type");

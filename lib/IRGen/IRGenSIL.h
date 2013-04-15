@@ -548,8 +548,8 @@ public:
   void visitAddressToPointerInst(AddressToPointerInst *i);
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
   void visitBridgeToBlockInst(BridgeToBlockInst *i);
-  //void visitArchetypeToSuperInst(ArchetypeToSuperInst *i);
-  //void visitSuperToArchetypeInst(SuperToArchetypeInst *i);
+  void visitArchetypeToSuperInst(ArchetypeToSuperInst *i);
+  void visitSuperToArchetypeInst(SuperToArchetypeInst *i);
 
   void visitIndexAddrInst(IndexAddrInst *i);
   void visitIntegerValueInst(IntegerValueInst *i);
