@@ -471,7 +471,7 @@ void IRGenModule::emitGlobalLists() {
                  llvm::GlobalValue::AppendingLinkage);
 }
 
-void IRGenFunction::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) {
+void IRGenFunction::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem){
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     assert(Builder.hasValidIP());
     emitGlobalDecl(TU->Decls[i]);

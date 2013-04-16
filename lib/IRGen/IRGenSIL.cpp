@@ -242,8 +242,8 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
         Explosion explosion(CurExplosionLevel);
         
         if (c.isDestructor()) {
-          // The argument for a destructor comes in as a %swift.refcounted*. Cast
-          // to the correct local type.
+          // The argument for a destructor comes in as a %swift.refcounted*.
+          // Cast to the correct local type.
           TypeInfo const &thisTI
             = getFragileTypeInfo(arg->getType().getSwiftType());
           llvm::Value *argValue = params.claimUnmanagedNext();
@@ -348,8 +348,7 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
                                        llvm::Function* &fnptr,
                                        unsigned &naturalCurryLevel,
                                        AbstractCC &cc,
-                                       BraceStmt* &body)
-{
+                                       BraceStmt *&body) {
   if (CapturingExpr *anon = constant.loc.dyn_cast<CapturingExpr*>()) {    
     fnptr = getAddrOfAnonymousFunction(constant, anon);
     naturalCurryLevel = constant.uncurryLevel;

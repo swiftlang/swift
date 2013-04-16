@@ -26,10 +26,11 @@ SILFunction::~SILFunction() {
 }
 
 SILModule::SILModule(ASTContext &Context, bool makeToplevel)
-  : Context(Context), toplevel(nullptr), Types(*this)
-{
-  if (makeToplevel)
+  : Context(Context), toplevel(nullptr), Types(*this) {
+  if (makeToplevel) {
     toplevel = new (*this) SILFunction(*this, Types.getTopLevelFunctionType());
+    toplevel->setMangledName("top_level_code");
+  }
 }
 
 SILModule::~SILModule() {
