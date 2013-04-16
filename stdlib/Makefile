@@ -78,7 +78,7 @@ $(SWIFT_HEADER_DIR)/swift.swift: $(PATH_TO_SWIFT_SOURCES) $(SWIFT_HEADER_DIR)
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
 $(ObjDir)/swift.o: $(SWIFT_HEADER_DIR)/swift.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) -o $@ -parse-as-library $(PATH_TO_SWIFT_SOURCES)
+	$(Verb) $(SWIFT_COMPILER) -no-sil-irgen -o $@ -parse-as-library $(PATH_TO_SWIFT_SOURCES)
 
 $(SharedLibDir)/swift/%.$(SHLIBEXT): $(SharedLibDir)/swift/.dir
 	ln -s ../$(@F) $@

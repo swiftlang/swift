@@ -49,6 +49,6 @@ $(SWIFT_HEADER_DIR)/AppKit.swift: $(PATH_TO_SWIFT_SOURCES) $(SWIFT_HEADER_DIR)
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
 $(ObjDir)/AppKit.o: $(SWIFT_HEADER_DIR)/AppKit.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) $(SWIFT_SDKFLAG) -o $@ -parse-as-library $(SWIFT_OPTFLAG) $(PATH_TO_SWIFT_SOURCES)
+	$(Verb) $(SWIFT_COMPILER) $(SWIFT_SDKFLAG) -o -no-sil-irgen $@ -parse-as-library $(SWIFT_OPTFLAG) $(PATH_TO_SWIFT_SOURCES)
 
 all-local:: $(SWIFT_HEADER_DIR)/AppKit.swift

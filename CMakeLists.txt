@@ -103,6 +103,7 @@ set(SWIFT_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
 option(SWIFT_ASSERTS "Enable assertions for the Swift standard library" YES)
+option(SWIFT_SIL_IRGEN "Enable SIL-IRGen for the Swift standard library" NO)
 set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
 
@@ -160,6 +161,10 @@ function(compile_swift_files)
       list(APPEND source_files "${CMAKE_CURRENT_SOURCE_DIR}/${file}")
     endif()
   endforeach()
+
+  if(NOT SWIFT_SIL_IRGEN)
+    list(APPEND swift_flags "-no-sil-irgen")
+  endif()
 
   # Compute flags to be passed down to swift when compiling a swift
   # file.
