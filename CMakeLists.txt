@@ -222,7 +222,7 @@ function(compile_swift_files)
   add_custom_command(
     OUTPUT ${objfile}
     COMMAND swift "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
-    DEPENDS ${source_files} ${module_source_file}
+    DEPENDS swift ${source_files} ${module_source_file}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${objfile}")
   
