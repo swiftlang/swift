@@ -177,8 +177,8 @@ bool Parser::parseRequiresClause(SourceLoc &RequiresLoc,
                Tok.is(tok::equal)) {
       // A same-type-requirement
       if (Tok.is(tok::equal)) {
-        // FIXME: Fix-It here!
-        diagnose(Tok, diag::requires_single_equal);
+        diagnose(Tok, diag::requires_single_equal)
+          << Diagnostic::FixIt::makeReplacement(SourceRange(Tok.getLoc()),"==");
       }
       SourceLoc EqualLoc = consumeToken();
 

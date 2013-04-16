@@ -340,6 +340,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   // Pass the diagnostic off to the consumer.
   DiagnosticInfo Info;
   Info.Ranges = ActiveDiagnostic->getRanges();
+  Info.FixIts = ActiveDiagnostic->getFixIts();
   Consumer.handleDiagnostic(SourceMgr, loc, StoredInfo.Kind, Text, Info);
   
   // Reset the active diagnostic.

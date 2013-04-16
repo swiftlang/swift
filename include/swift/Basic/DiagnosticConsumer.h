@@ -21,10 +21,11 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
+#include <string>
 
 namespace llvm {
   class SourceMgr;
-  class StringRef;
 }
 
 namespace swift {
@@ -61,8 +62,36 @@ struct DiagnosticInfo {
       : Start(SR.Start), End(SR.End), IsTokenRange(true) {}
   };
 
+  /// Represents a fix-it, a replacement of one range of text with another.
+  class FixIt {
+    DiagnosticInfo::Range Range;
+    std::string Text;
+
+    FixIt(DiagnosticInfo::Range R, llvm::StringRef Str)
+      : Range(R), Text(Str) {}
+
+  public:
+    static FixIt makeInsertion(SourceLoc L, llvm::StringRef Str) {
+      return FixIt(DiagnosticInfo::Range(L, L), Str);
+    }
+
+    static FixIt makeReplacement(DiagnosticInfo::Range R, llvm::StringRef Str) {
+      return FixIt(R, Str);
+    }
+
+    static FixIt makeDeletion(DiagnosticInfo::Range R) {
+      return FixIt(R, {});
+    }
+
+    DiagnosticInfo::Range getRange() const { return Range; }
+    llvm::StringRef getText() const { return Text; }
+  };
+
   /// \brief Extra source ranges that are attached to the diagnostic.
   llvm::ArrayRef<Range> Ranges;
+
+  /// \brief Extra source ranges that are attached to the diagnostic.
+  llvm::ArrayRef<FixIt> FixIts;
 };
   
 /// \brief Abstract interface for classes that present diagnostics to the user.

@@ -32,6 +32,11 @@ static llvm::SMRange getRawRange(llvm::SourceMgr &SM, DiagnosticInfo::Range R) {
   return llvm::SMRange(R.Start.Value, End.Value);
 }
 
+static llvm::SMFixIt getRawFixIt(llvm::SourceMgr &SM, DiagnosticInfo::FixIt F) {
+  // FIXME: It's unfortunate that we have to copy the replacement text.
+  return llvm::SMFixIt(getRawRange(SM, F.getRange()), F.getText());
+}
+
 void
 PrintingDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
                                              DiagnosticKind Kind, 
@@ -53,11 +58,16 @@ PrintingDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
   }
   
   // Translate ranges.
-  SmallVector<llvm::SMRange, 2> Ranges(Info.Ranges.size());
+  SmallVector<llvm::SMRange, 2> Ranges;
   for (DiagnosticInfo::Range R : Info.Ranges)
     Ranges.push_back(getRawRange(SM, R));
-  
+
+  // Translate fixits.
+  SmallVector<llvm::SMFixIt, 2> FixIts;
+  for (DiagnosticInfo::FixIt F : Info.FixIts)
+    FixIts.push_back(getRawFixIt(SM, F));
+
   // Display the diagnostic.
-  SM.PrintMessage(Loc.Value, SMKind, StringRef(Text), Ranges);
+  SM.PrintMessage(Loc.Value, SMKind, StringRef(Text), Ranges, FixIts);
 }
 

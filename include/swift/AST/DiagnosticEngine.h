@@ -151,12 +151,14 @@ namespace swift {
   class Diagnostic {
   public:
     typedef DiagnosticInfo::Range Range;
+    typedef DiagnosticInfo::FixIt FixIt;
 
   private:
     DiagID ID;
     SmallVector<DiagnosticArgument, 3> Args;
     SmallVector<Range, 2> Ranges;
-    
+    SmallVector<FixIt, 2> FixIts;
+
   public:
     // All constructors are intentionally implicit.
     template<typename ...ArgTypes>
@@ -176,9 +178,15 @@ namespace swift {
     DiagID getID() const { return ID; }
     ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
     ArrayRef<Range> getRanges() const { return Ranges; }
-    
+    ArrayRef<FixIt> getFixIts() const { return FixIts; }
+
     Diagnostic &operator<<(Range R) {
       Ranges.push_back(R);
+      return *this;
+    }
+
+    Diagnostic &operator<<(FixIt F) {
+      FixIts.push_back(F);
       return *this;
     }
   };
@@ -228,11 +236,16 @@ namespace swift {
     
     /// \brief Flush the active diagnostic to the diagnostic output engine.
     void flush();
-    
+
     /// \brief Add a range to the currently-active diagnostic.
     ///
-    /// \sa Diagnostic::Range
+    /// \sa DiagnosticInfo::Range
     InFlightDiagnostic &operator<<(Diagnostic::Range R);
+
+    /// \brief Add a fixit to the currently-active diagnostic.
+    ///
+    /// \sa DiagnosticInfo::FixIt
+    InFlightDiagnostic &operator<<(Diagnostic::FixIt F);
   };
     
   /// \brief Class responsible for formatting diagnostics and presenting them
@@ -406,12 +419,20 @@ namespace swift {
     /// \brief Retrieve the active diagnostic.
     Diagnostic &getActiveDiagnostic() { return *ActiveDiagnostic; }
   };
-  
+
   inline InFlightDiagnostic &
   InFlightDiagnostic::operator<<(Diagnostic::Range R) {
     assert(IsActive && "Cannot modify an inactive diagnostic");
     if (Engine)
       Engine->getActiveDiagnostic() << R;
+    return *this;
+  }
+
+  inline InFlightDiagnostic &
+  InFlightDiagnostic::operator<<(Diagnostic::FixIt F) {
+    assert(IsActive && "Cannot modify an inactive diagnostic");
+    if (Engine)
+      Engine->getActiveDiagnostic() << F;
     return *this;
   }
 } // end namespace swift
