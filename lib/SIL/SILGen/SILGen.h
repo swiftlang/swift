@@ -169,7 +169,8 @@ class LLVM_LIBRARY_VISIBILITY SILGenFunction
                       /*StmtRetTy=*/ void,
                       /*DeclRetTy=*/ void,
                       /*PatternRetTy=*/ void,
-                      /*Args...=*/ SGFContext> {
+                      /*Args...=*/ SGFContext>
+{ // style violation because Xcode <rdar://problem/13065676>
 public:
   /// The SILGenModule this function belongs to.
   SILGenModule &SGM;
@@ -559,6 +560,16 @@ public:
   void visitVarDecl(VarDecl *D, SGFContext C) {
     // We handle these in pattern binding.
   }
+  
+  /// Emit the allocation for a local variable. Returns the address of the
+  /// value. Does not register a cleanup.
+  void emitLocalVariable(VarDecl *D);
+  
+  /// Destroy and deallocate an initialized local variable.
+  void destroyLocalVariable(VarDecl *D);
+  
+  /// Deallocate an uninitialized local variable.
+  void deallocateUninitializedLocalVariable(VarDecl *D);
 };
   
 /// SILGenLValue - An ASTVisitor for building logical lvalues.

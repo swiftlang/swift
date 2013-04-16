@@ -1137,7 +1137,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
     llvm::SmallVector<SILValue, 4> capturedArgs;
     for (ValueDecl *capture : captures) {
       switch (getDeclCaptureKind(capture)) {
-        case CaptureKind::LValue: {
+        case CaptureKind::Box: {
           // LValues are captured as both the box owning the value and the
           // address of the value.
           assert(VarLocs.count(capture) &&
@@ -1324,27 +1324,31 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   emitConstructorMetatypeArg(*this, ctor);
   emitProlog(ctor->getArguments(), ctor->getImplicitThisDecl()->getType());
   
-  //
-  // Create the 'this' value.
-  //
+  // Get the 'this' decl and type.
   VarDecl *thisDecl = ctor->getImplicitThisDecl();
   SILType thisTy = getLoweredType(thisDecl->getType());
-
-  // Create a box for the 'this' value.
-  // FIXME: Avoid boxing if capture analysis finds it unnecessary.
-  // FIXME: This box would need to be cleaned up on an error unwind.
-  auto *thisInst = B.createAllocBox(ctor, thisTy);
-  SILValue thisBox(thisInst, 0), thisLV(thisInst, 1);
-  
   assert(!thisTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
   assert(!ctor->getAllocThisExpr() && "alloc_this expr for value type?!");
+
+  // Emit a local variable for 'this'.
+  // FIXME: The (potentially partially initialized) variable would need to be
+  // cleaned up on an error unwind.
+  
+  // If we don't need to heap-allocate the local 'this' and we're returning
+  // indirectly, we can emplace 'this' in the return slot.
+  bool canConstructInPlace
+    = thisDecl->hasFixedLifetime() && IndirectReturnAddress.isValid();
+  if (canConstructInPlace)
+    VarLocs[thisDecl] = {SILValue(), IndirectReturnAddress};
+  else
+    emitLocalVariable(thisDecl);
+
+  SILValue thisLV = VarLocs[thisDecl].address;
   
   // Emit a default initialization of the this value.
   // Note that this initialization *cannot* be lowered to a
   // default constructor--we're already in a constructor!
   B.createInitializeVar(ctor, thisLV, /*CanDefaultConstruct*/ false);
-
-  VarLocs[thisDecl] = {thisBox, thisLV};
   
   // Create a basic block to jump to for the implicit 'this' return.
   // We won't emit this until after we've emitted the body.
@@ -1357,21 +1361,40 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   if (!emitEpilogBB(ctor))
     return;
 
-  // Copy 'this' into the indirect return slot.
+  // If we constructed in-place, we're done.
+  if (canConstructInPlace) {
+    B.createReturn(ctor, emitEmptyTuple(ctor));
+    return;
+  }
+  
+  // If 'this' is address-only, copy 'this' into the indirect return slot.
   if (thisTy.isAddressOnly()) {
     assert(IndirectReturnAddress &&
            "no indirect return for address-only ctor?!");
+    SILValue thisBox = VarLocs[thisDecl].box;
+    assert(thisBox &&
+           "address-only non-heap this should have been allocated in-place");
+    // We have to do a non-take copy because someone else may be using the box.
     B.createCopyAddr(ctor, thisLV, IndirectReturnAddress,
                      /*isTake=*/ false,
                      /*isInit=*/ true);
     B.createRelease(ctor, thisBox);
     B.createReturn(ctor, emitEmptyTuple(ctor));
-  } else {
-    SILValue thisValue = B.createLoad(ctor, thisLV);
+    return;
+  }
+
+  // Otherwise, load and return the final 'this' value.
+  SILValue thisValue = B.createLoad(ctor, thisLV);
+  if (SILValue thisBox = VarLocs[thisDecl].box) {
+    // We have to do a retain because someone else may be using the box.
     emitRetainRValue(ctor, thisValue);
     B.createRelease(ctor, thisBox);
-    B.createReturn(ctor, thisValue);
+  } else {
+    // We can just take ownership from the stack slot and consider it
+    // deinitialized.
+    B.createDeallocVar(ctor, AllocKind::Stack, thisLV);
   }
+  B.createReturn(ctor, thisValue);
 }
 
 namespace {
@@ -1474,16 +1497,15 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // Emit the 'this' argument and make an lvalue for it.
   VarDecl *thisDecl = ctor->getImplicitThisDecl();
   SILType thisTy = getLoweredType(thisDecl->getType());
-  SILValue thisValue = new (SGM.M) SILArgument(thisTy, F.begin());
+  SILValue thisArg = new (SGM.M) SILArgument(thisTy, F.begin());
   assert(thisTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");
-  // FIXME: Avoid allocating the box if capture analysis says we don't need it.
-  // FIXME: The allocation and value here would need to be cleaned up on a
-  // constructor failure unwinding.
-  auto *thisInst = B.createAllocBox(ctor, thisTy);
-  SILValue thisBox(thisInst, 0), thisLV(thisInst, 1);
-  emitStore(ctor, ManagedValue(thisValue, ManagedValue::Unmanaged), thisLV);
-  VarLocs[thisDecl] = {thisBox, thisLV};
+
+  // FIXME: The (potentially partially initialized) value here would need to be
+  // cleaned up on a constructor failure unwinding.
+  emitLocalVariable(thisDecl);
+  SILValue thisLV = VarLocs[thisDecl].address;
+  emitStore(ctor, ManagedValue(thisArg, ManagedValue::Unmanaged), thisLV);
   
   // Emit the prolog for the non-this arguments.
   emitProlog(ctor->getArguments(), TupleType::getEmpty(F.getContext()));
@@ -1500,10 +1522,17 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     return;
 
   // Load and return the final 'this'.
-  SILValue finalThisValue = B.createLoad(ctor, thisLV);
-  B.createRetain(ctor, finalThisValue);
-  B.createRelease(ctor, thisBox);
-  B.createReturn(ctor, finalThisValue);
+  SILValue thisValue = B.createLoad(ctor, thisLV);
+  if (SILValue thisBox = VarLocs[thisDecl].box) {
+    // We have to do a retain because someone else may be using the box.
+    emitRetainRValue(ctor, thisValue);
+    B.createRelease(ctor, thisBox);
+  } else {
+    // We can just take ownership from the stack slot and consider it
+    // deinitialized.
+    B.createDeallocVar(ctor, AllocKind::Stack, thisLV);
+  }
+  B.createReturn(ctor, thisValue);
 }
 
 static void forwardCaptureArgs(SILGenFunction &gen,
@@ -1516,7 +1545,7 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   };
 
   switch (getDeclCaptureKind(capture)) {
-  case CaptureKind::LValue: {
+  case CaptureKind::Box: {
     SILType ty = gen.getLoweredType(capture->getTypeOfReference());
     // Forward the captured owning ObjectPointer.
     addSILArgument(SILType::getObjectPointerType(c));

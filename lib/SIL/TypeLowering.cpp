@@ -70,10 +70,15 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
   
   if (capture->getType()->is<LValueType>())
     return CaptureKind::Byref;
-  // FIXME: Check capture analysis info here and capture Byref or
-  // Constant if we can get away with it.
-  if (capture->getTypeOfReference()->is<LValueType>())
-    return CaptureKind::LValue;
+  if (capture->getTypeOfReference()->is<LValueType>()) {
+    // FIXME: Not-used-as-lvalue captures can be captured by value.
+
+    // If the capture has a fixed lifetime, we can pass it simply by reference.
+    if (capture->hasFixedLifetime())
+      return CaptureKind::Byref;
+    // Otherwise, we need to pass a box.
+    return CaptureKind::Box;
+  }
   return CaptureKind::Constant;
 }
   
@@ -489,7 +494,7 @@ static Type getFunctionTypeWithCaptures(TypeConverter &types,
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
     }
-    case CaptureKind::LValue:
+    case CaptureKind::Box:
       // Capture the owning ObjectPointer and the address of the value.
       assert(capture->getTypeOfReference()->is<LValueType>() &&
              "lvalue capture not an lvalue?!");

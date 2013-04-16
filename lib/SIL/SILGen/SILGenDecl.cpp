@@ -152,52 +152,54 @@ public:
   }
 };
 
-/// Cleanup for an initialized boxed variable using a release instruction.
-class CleanupBox : public Cleanup {
-  AllocBoxInst *box;
+/// Cleanup to destroy an initialized variable
+class CleanupLocalVariable : public Cleanup {
+  VarDecl *var;
 public:
-  CleanupBox(AllocBoxInst *box)
-    : box(box) {}
+  CleanupLocalVariable(VarDecl *var)
+    : var(var) {}
   
   void emit(SILGenFunction &gen) override {
-    gen.B.createRelease(SILLocation(), SILValue(box, 0));
+    gen.destroyLocalVariable(var);
   }
 };
 
-/// An initialization of a box allocated by alloc_box.
-class BoxInitialization : public SingleInitializationBase {
-  /// The box being initialized.
-  AllocBoxInst *box;
-  /// The cleanup for the allocated but uninitialized box. Once
-  /// this box has been initialized, it can be replaced by a 'release'
-  /// cleanup.
-  CleanupsDepth cleanup;
+/// An initialization of a local variable.
+class LocalVariableInitialization : public SingleInitializationBase {
+  // FIXME: We should install a deallocation cleanup then deactivate it and
+  // activate a destroying cleanup when the value is initialized.
+  
+  /// The local variable decl being initialized.
+  VarDecl *var;
+  SILGenFunction &gen;
   
   bool didFinish;
 public:
   /// Sets up an initialization for the allocated box. This pushes a
   /// CleanupUninitializedBox cleanup that will be replaced when
   /// initialization is completed.
-  BoxInitialization(AllocBoxInst *box, SILGenFunction &gen)
-    : SingleInitializationBase(box->getType(1).getSwiftRValueType()),
-      box(box),
+  LocalVariableInitialization(VarDecl *var, SILGenFunction &gen)
+    : SingleInitializationBase(var->getType()),
+      var(var),
+      gen(gen),
       didFinish(false)
   {
-    gen.Cleanups.pushCleanup<CleanupBox>(box);
-    cleanup = gen.getCleanupsDepth();
+    gen.Cleanups.pushCleanup<CleanupLocalVariable>(var);
   }
   
-  ~BoxInitialization() override {
-    assert(didFinish && "did not call BoxInit::finishInitialization!");
+  ~LocalVariableInitialization() override {
+    assert(didFinish && "did not call VarInit::finishInitialization!");
   }
   
   SILValue getAddressOrNull() override {
-    return SILValue(box, 1);
+    assert(gen.VarLocs.count(var) && "did not emit var?!");
+    return gen.VarLocs[var].address;
   }
   
   void finishInitialization(SILGenFunction &gen) override {
     assert(!didFinish && "called BoxInit::finishInitialization twice!");
-    // FIXME: deactivate the dealloc_ref cleanup and activate the release one.
+    // FIXME: deactivate the deallocating cleanup and activate the
+    // destroying one.
     didFinish = true;
   }
 };
@@ -247,7 +249,7 @@ public:
 
   void defaultInitialize(SILGenFunction &gen) override {}
 };
-
+  
 /// InitializationForPattern - A visitor for traversing a pattern, generating
 /// SIL code to allocate the declared variables, and generating an
 /// Initialization representing the needed initializations. 
@@ -293,21 +295,10 @@ struct InitializationForPattern
                              SILConstant(vd, SILConstant::Kind::GlobalAddress));
       return InitializationPtr(new GlobalInitialization(addr));
     }
-    
-    // FIXME: Use escape analysis info to generate "alloc_var"/"dealloc_var"
-    // stack allocations instead of "alloc_box"/"release" for values that don't
-    // escape and thus don't need boxes.
-    SILType lType = Gen.getLoweredType(vd->getType());
-    AllocBoxInst *allocBox = Gen.B.createAllocBox(vd, lType);
-    auto box = SILValue(allocBox, 0);
-    auto addr = SILValue(allocBox, 1);
 
-    /// Remember that this is the memory location that we're emitting the
-    /// decl to.
-    Gen.VarLocs[vd] = {box, addr};
-
+    Gen.emitLocalVariable(vd);
     /// Create a BoxInitialization for the uninitialized box.
-    return InitializationPtr(new BoxInitialization(allocBox, Gen));
+    return InitializationPtr(new LocalVariableInitialization(vd, Gen));
   }
   
   // Bind a tuple pattern by aggregating the component variables into a
@@ -498,7 +489,7 @@ public:
 static void makeCaptureSILArguments(SILGenFunction &gen, ValueDecl *capture) {
   ASTContext &c = capture->getASTContext();
   switch (getDeclCaptureKind(capture)) {
-  case CaptureKind::LValue: {
+  case CaptureKind::Box: {
     // LValues are captured as two arguments: a retained ObjectPointer that owns
     // the captured value, and the address of the value itself.
     SILType ty = gen.getLoweredType(capture->getTypeOfReference());
@@ -588,19 +579,19 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
 
 namespace {
   class CleanupDestructorThis : public Cleanup {
-    SILValue thisBox;
+    VarDecl *thisDecl;
   public:
-    CleanupDestructorThis(SILValue thisBox) : thisBox(thisBox) {
+    CleanupDestructorThis(VarDecl *thisDecl) : thisDecl(thisDecl) {
     }
     
     void emit(SILGenFunction &gen) override {
-      gen.B.createRelease(SILLocation(), thisBox);
+      gen.destroyLocalVariable(thisDecl);
     }
   };
 } // end anonymous namespace
 
 SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
-                                          DestructorDecl *DD) {
+                                              DestructorDecl *DD) {
   // Emit the implicit 'this' argument.
   VarDecl *thisDecl = DD ? DD->getImplicitThisDecl() : nullptr;
   assert((!thisDecl || thisDecl->getType()->hasReferenceSemantics()) &&
@@ -620,14 +611,11 @@ SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
     B.createRetain(DD, thisValue);
     B.createRetain(DD, thisValue);
   
-    // Make a box for 'this' in the body's scope.
-    // FIXME: 'this' shouldn't be capturable out of a destructor
-    // scope.
-    auto *thisInst = B.createAllocBox(DD, thisType);
-    SILValue thisBox(thisInst, 0), thisAddr(thisInst, 1);
+    // Make a local variable for 'this'.
+    emitLocalVariable(thisDecl);
+    SILValue thisAddr = VarLocs[thisDecl].address;
     emitStore(DD, ManagedValue(thisValue, ManagedValue::Unmanaged), thisAddr);
-    Cleanups.pushCleanup<CleanupDestructorThis>(thisBox);
-    VarLocs[thisDecl] = {thisBox, thisAddr};
+    Cleanups.pushCleanup<CleanupDestructorThis>(thisDecl);
   }
   return thisValue;
 }
@@ -802,4 +790,82 @@ public:
 
 void SILGenModule::visitExtensionDecl(ExtensionDecl *ed) {
   SILGenExtension(*this).emitExtension(ed);
+}
+
+void SILGenFunction::emitLocalVariable(VarDecl *vd) {
+  assert(vd->getDeclContext()->isLocalContext() &&
+         "can't emit a local var for a non-local var decl");
+  assert(!vd->isProperty() &&
+         "can't emit a physical local var for a property");
+
+  SILType lType = getLoweredType(vd->getType());
+
+  if (vd->hasFixedLifetime()) {
+    // If the variable has a fixed lifetime, allocate it on the stack.
+    SILValue addr = B.createAllocVar(vd, AllocKind::Stack, lType);
+    VarLocs[vd] = {SILValue(), addr};
+  } else {
+    // If the variable has its lifetime extended by a closure, heap-allocate it
+    // using a box.
+
+    AllocBoxInst *allocBox = B.createAllocBox(vd, lType);
+    auto box = SILValue(allocBox, 0);
+    auto addr = SILValue(allocBox, 1);
+  
+    /// Remember that this is the memory location that we're emitting the
+    /// decl to.
+    VarLocs[vd] = {box, addr};
+  }
+}
+
+void SILGenFunction::destroyLocalVariable(VarDecl *vd) {
+  assert(vd->getDeclContext()->isLocalContext() &&
+         "can't emit a local var for a non-local var decl");
+  assert(!vd->isProperty() &&
+         "can't emit a physical local var for a property");
+
+  assert(VarLocs.count(vd) && "var decl wasn't emitted?!");
+  
+  auto &loc = VarLocs[vd];
+  
+  if (vd->hasFixedLifetime()) {
+    // For a stack variable, we're responsible for both the value and the
+    // allocation, so load and destroy the value (or destroy it indirectly if
+    // it's address-only) then deallocate the variable.
+    assert(!loc.box && "fixed-lifetime var shouldn't have been given a box");
+    TypeLoweringInfo const &ti = getTypeLoweringInfo(vd->getType());
+    if (!ti.isTrivial()) {
+      if (ti.isAddressOnly()) {
+        B.createDestroyAddr(vd, loc.address);
+      } else {
+        SILValue value = B.createLoad(vd, loc.address);
+        emitReleaseRValue(vd, value);
+      }
+    }
+    B.createDeallocVar(vd, AllocKind::Stack, loc.address);
+  } else {
+    // For a heap variable, the box is responsible for the value. We just need
+    // to give up our retain count on it.
+    assert(loc.box && "captured var should have been given a box");
+    B.createRelease(vd, loc.box);
+  }
+}
+
+void SILGenFunction::deallocateUninitializedLocalVariable(VarDecl *vd) {
+  assert(vd->getDeclContext()->isLocalContext() &&
+         "can't emit a local var for a non-local var decl");
+  assert(!vd->isProperty() &&
+         "can't emit a physical local var for a property");
+
+  assert(VarLocs.count(vd) && "var decl wasn't emitted?!");
+
+  auto &loc = VarLocs[vd];
+  
+  if (vd->hasFixedLifetime()) {
+    assert(!loc.box && "fixed-lifetime var shouldn't have been given a box");
+    B.createDeallocVar(vd, AllocKind::Stack, loc.address);
+  } else {
+    assert(loc.box && "captured var should have been given a box");
+    B.createDeallocRef(vd, loc.box);
+  }
 }
