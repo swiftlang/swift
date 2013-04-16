@@ -22,7 +22,17 @@
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;
 
-void 
+static llvm::SMRange getRawRange(llvm::SourceMgr &SM, DiagnosticInfo::Range R) {
+  SourceLoc End;
+  if (R.IsTokenRange)
+    End = Lexer::getLocForEndOfToken(SM, R.End);
+  else
+    End = R.End;
+
+  return llvm::SMRange(R.Start.Value, End.Value);
+}
+
+void
 PrintingDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
                                              DiagnosticKind Kind, 
                                              llvm::StringRef Text,
@@ -43,11 +53,9 @@ PrintingDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
   }
   
   // Translate ranges.
-  SmallVector<llvm::SMRange, 2> Ranges;
-  for (SourceRange R : Info.Ranges) {
-    SourceLoc End = Lexer::getLocForEndOfToken(SM, R.End);
-    Ranges.push_back(llvm::SMRange(R.Start.Value, End.Value));
-  }
+  SmallVector<llvm::SMRange, 2> Ranges(Info.Ranges.size());
+  for (DiagnosticInfo::Range R : Info.Ranges)
+    Ranges.push_back(getRawRange(SM, R));
   
   // Display the diagnostic.
   SM.PrintMessage(Loc.Value, SMKind, StringRef(Text), Ranges);

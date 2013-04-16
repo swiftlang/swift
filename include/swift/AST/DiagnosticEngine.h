@@ -149,9 +149,13 @@ namespace swift {
   /// Diagnostic - This is a specific instance of a diagnostic along with all of
   /// the DiagnosticArguments that it requires. 
   class Diagnostic {
+  public:
+    typedef DiagnosticInfo::Range Range;
+
+  private:
     DiagID ID;
     SmallVector<DiagnosticArgument, 3> Args;
-    SmallVector<SourceRange, 2> Ranges;
+    SmallVector<Range, 2> Ranges;
     
   public:
     // All constructors are intentionally implicit.
@@ -171,9 +175,9 @@ namespace swift {
     // Accessors.
     DiagID getID() const { return ID; }
     ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
-    ArrayRef<SourceRange> getRanges() const { return Ranges; }
+    ArrayRef<Range> getRanges() const { return Ranges; }
     
-    Diagnostic &operator<<(SourceRange R) {
+    Diagnostic &operator<<(Range R) {
       Ranges.push_back(R);
       return *this;
     }
@@ -225,8 +229,10 @@ namespace swift {
     /// \brief Flush the active diagnostic to the diagnostic output engine.
     void flush();
     
-    /// \brief Add a source range to the currently-active diagnostic.
-    InFlightDiagnostic &operator<<(SourceRange R);
+    /// \brief Add a range to the currently-active diagnostic.
+    ///
+    /// \sa Diagnostic::Range
+    InFlightDiagnostic &operator<<(Diagnostic::Range R);
   };
     
   /// \brief Class responsible for formatting diagnostics and presenting them
@@ -401,7 +407,8 @@ namespace swift {
     Diagnostic &getActiveDiagnostic() { return *ActiveDiagnostic; }
   };
   
-  inline InFlightDiagnostic &InFlightDiagnostic::operator<<(SourceRange R) {
+  inline InFlightDiagnostic &
+  InFlightDiagnostic::operator<<(Diagnostic::Range R) {
     assert(IsActive && "Cannot modify an inactive diagnostic");
     if (Engine)
       Engine->getActiveDiagnostic() << R;

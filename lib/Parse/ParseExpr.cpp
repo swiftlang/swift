@@ -954,7 +954,7 @@ NullablePtr<Expr> Parser::parseExprCallSuffix(bool isConstructor) {
       // If there is no identifier after the colon, we have an error.
       if (Tok.isNot(tok::identifier)) {
         diagnose(Tok, diag::selector_argument_name_missing)
-          << colonLoc;
+          << SourceRange(colonLoc);
         break;
       }
     }
