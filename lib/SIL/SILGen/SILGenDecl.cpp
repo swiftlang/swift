@@ -615,6 +615,9 @@ SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
   if (DD) {
     // FIXME: Bump the retain count so that destruction doesn't fire
     // recursively while passing 'this' around in the destructor body.
+    // FIXME: We have to retain it twice to counter the release that will happen
+    // when the 'this' box is released below. Gross.
+    B.createRetain(DD, thisValue);
     B.createRetain(DD, thisValue);
   
     // Make a box for 'this' in the body's scope.
