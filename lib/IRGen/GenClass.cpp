@@ -762,25 +762,14 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
         continue;
       // FIXME: Will need an implementation here for resilience
       continue;
-    case DeclKind::Func: {
+    case DeclKind::Func:
       // Methods should be lowered through SIL.
-      if (SILMod)
-        continue;
-      
-      FuncDecl *func = cast<FuncDecl>(member);
-      if (func->isStatic()) {
-        // Eventually this won't always be the right thing.
-        emitStaticMethod(func);
-      } else {
-        emitInstanceMethod(func);
-      }
       continue;
-    }
     case DeclKind::Constructor: {
       // Constructors are lowered through SIL.
       // FIXME: SIL doesn't build the implicit constructor for structs yet.
       ConstructorDecl *cd = cast<ConstructorDecl>(member);
-      if (SILMod && cd->getBody())
+      if (cd->getBody())
         continue;
       
       ::emitClassConstructors(*this, cd);
@@ -792,7 +781,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
 
       // Destructors are lowered through SIL.
       // FIXME: Except for ObjC classes.
-      if (SILMod && !D->isObjC())
+      if (!D->isObjC())
         continue;
 
       emitClassDestructor(*this, D, cast<DestructorDecl>(member));
@@ -803,7 +792,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   }
 
   // Emit a defaulted class destructor if we didn't see one explicitly.
-  if ((!SILMod || D->isObjC()) && !emittedDtor)
+  if (D->isObjC() && !emittedDtor)
     emitClassDestructor(*this, D, nullptr);
 }
 

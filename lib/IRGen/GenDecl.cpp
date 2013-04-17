@@ -778,12 +778,7 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     return IGM.emitProtocolDecl(cast<ProtocolDecl>(D));
       
   case DeclKind::PatternBinding:
-    // If we have a SIL module, the global initializations will be lowered
-    // separately.
-    if (IGM.SILMod)
-      return;
-
-    emitPatternBindingDecl(cast<PatternBindingDecl>(D));
+    // The global initializations will be lowered separately for a SIL module.
     return;
 
   case DeclKind::Subscript:
@@ -819,20 +814,11 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::Func:
-    // If we have a SIL module, the function will be lowered separately.
-    if (IGM.SILMod)
-      return;
-      
-    return IGM.emitGlobalFunction(cast<FuncDecl>(D));
+    return;  // Handled as SIL functions.
 
-  case DeclKind::TopLevelCode: {
-    // If we have a SIL module, all the top-level code will be lowered
-    // separately.
-    if (IGM.SILMod)
-      return;
-    
-    return emitStmt(cast<TopLevelCodeDecl>(D)->getBody());
-  }
+  case DeclKind::TopLevelCode:
+    // All the top-level code will be lowered separately.
+    return;
       
   // Operator decls aren't needed for IRGen.
   case DeclKind::InfixOperator:
@@ -864,30 +850,9 @@ void IRGenFunction::emitExternalDefinition(Decl *D) {
       llvm_unreachable("Not a valid external definition for IRgen");
 
     case DeclKind::Func:
-      // Emit methods through SIL if possible.
-      if (IGM.SILMod)
-        return;
-      
-      // The only functions available are getters and setters.
-      assert(cast<FuncDecl>(D)->isGetterOrSetter() &&
-             "Not a synthesized getter/setter");
-      if (D->getDeclContext()->isTypeContext())
-        IGM.emitInstanceMethod(cast<FuncDecl>(D));
-      else
-        IGM.emitGlobalFunction(cast<FuncDecl>(D));
-      break;
-
     case DeclKind::Constructor:
-      if (IGM.SILMod)
-        return;
-      
-      if (D->getDeclContext()->getDeclaredTypeOfContext()
-            ->getClassOrBoundGenericClass()) {
-        IGM.emitClassConstructors(cast<ConstructorDecl>(D));
-      } else {
-        IGM.emitConstructor(cast<ConstructorDecl>(D));
-      }
-      break;
+      // Methods are emitted as SIL functions already.
+      return;
       
     case DeclKind::Struct:
       // Emit Swift metadata for the external struct.
@@ -1524,27 +1489,10 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
         // Getter/setter will be handled separately.
         continue;
       llvm_unreachable("decl not allowed in extension!");
-    case DeclKind::Func: {
-      // Methods are emitted through SIL.
-      if (SILMod)
-        continue;
-
-      FuncDecl *func = cast<FuncDecl>(member);
-      if (func->isStatic()) {
-        // Eventually this won't always be the right thing.
-        emitStaticMethod(func);
-      } else {
-        emitInstanceMethod(func);
-      }
+    case DeclKind::Func:
+    case DeclKind::Constructor:
+      // Methods are emitted as their own SIL functions.
       continue;
-    }
-    case DeclKind::Constructor: {
-      if (SILMod)
-        continue;
-
-      emitConstructor(cast<ConstructorDecl>(member));
-      continue;
-    }
     }
     llvm_unreachable("bad extension member kind");
   }

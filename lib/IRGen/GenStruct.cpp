@@ -263,20 +263,9 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
         continue;
       // FIXME: Will need an implementation here for resilience
       continue;
-    case DeclKind::Func: {
-      // Methods are emitted through SIL if possible.
-      if (SILMod)
-        continue;
-      
-      FuncDecl *func = cast<FuncDecl>(member);
-      if (func->isStatic()) {
-        // Eventually this won't always be the right thing.
-        emitStaticMethod(func);
-      } else {
-        emitInstanceMethod(func);
-      }
+    case DeclKind::Func:
+      // Methods are emitted as SIL Functions already.
       continue;
-    }
     case DeclKind::Constructor: {
       auto ctor = cast<ConstructorDecl>(member);
       if (!ctor->getBody()) {
@@ -285,12 +274,9 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
                                ExplosionKind::Minimal);
         emitValueConstructor(*this, fn, ctor);
       } else {
-        // Constructors get emitted through SIL.
+        // Constructors get emitted as SIL Functions.
         // FIXME: SIL does not generate the implicit constructor.
-        if (SILMod)
-          continue;
-        
-        emitConstructor(ctor);
+        continue;
       }
       continue;
     }

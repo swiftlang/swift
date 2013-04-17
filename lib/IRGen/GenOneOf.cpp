@@ -542,31 +542,14 @@ void IRGenModule::emitOneOfDecl(OneOfDecl *oneof) {
         continue;
       // FIXME: Will need an implementation here for resilience
       continue;
-    case DeclKind::Func: {
-      // Methods are emitted through SIL, if possible.
-      if (SILMod)
-        continue;
-      
-      FuncDecl *func = cast<FuncDecl>(member);
-      if (func->isStatic()) {
-        // Eventually this won't always be the right thing.
-        emitStaticMethod(func);
-      } else {
-        emitInstanceMethod(func);
-      }
+    case DeclKind::Func:
+    case DeclKind::Constructor:
+      // Methods are emitted as SIL Functions already.
       continue;
-    }
     case DeclKind::OneOfElement: {
       OneOfElementDecl *elt = cast<OneOfElementDecl>(member);
       llvm::Function *fn = getAddrOfInjectionFunction(elt);
       emitInjectionFunction(*this, fn, elt);
-      continue;
-    }
-    case DeclKind::Constructor: {
-      if (SILMod)
-        continue;
-      
-      emitConstructor(cast<ConstructorDecl>(member));
       continue;
     }
     }
