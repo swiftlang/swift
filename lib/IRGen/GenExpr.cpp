@@ -131,9 +131,7 @@ static void emitDeclRef(IRGenFunction &IGF, ValueDecl *D, Type Ty, SourceLoc Loc
   }
 
   case DeclKind::Var:
-    return IGF.emitLValueAsScalar(emitDeclRefLValue(IGF, D, Ty),
-                                  OnHeap, explosion);
-
+ 
   case DeclKind::Func:
     return emitRValueForFunction(IGF, cast<FuncDecl>(D), explosion);
 
@@ -478,9 +476,6 @@ namespace {
 #define FOR_MEMBER_KIND(KIND)                                              \
     void visit##KIND##MemberRefExpr(KIND##MemberRefExpr *E) {              \
       if (isLValueMember(E->getDecl())) {                                  \
-        assert(E->getType()->is<LValueType>());                            \
-        return IGF.emitLValueAsScalar(emit##KIND##MemberRefLValue(IGF, E), \
-                                      isOnHeap(E->getType()), Out);        \
       }                                                                    \
       if (isTypeMember(E->getDecl())) {                                    \
         auto type = cast<TypeDecl>(E->getDecl())->getDeclaredType()        \
@@ -492,10 +487,7 @@ namespace {
       emit##KIND##MemberRef(IGF, E, Out);                                  \
     }                                                                      \
     void visit##KIND##SubscriptExpr(KIND##SubscriptExpr *E) {              \
-      assert(E->getType()->is<LValueType>());                              \
-      return IGF.emitLValueAsScalar(emit##KIND##SubscriptLValue(IGF, E),   \
-                                    isOnHeap(E->getType()), Out);          \
-    }
+     }
 
     FOR_MEMBER_KIND(Existential)
     FOR_MEMBER_KIND(Archetype)

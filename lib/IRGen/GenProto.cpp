@@ -3770,8 +3770,7 @@ irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
 
   // The base of an existential member reference is always an l-value.
   LValue lvalue;
-  Address existAddr = IGF.emitMaterializeWithWriteback(std::move(lvalue),
-                                                       NotOnHeap);
+  Address existAddr;
 
   // Load the witness table.
   llvm::Value *wtable = baseTI.findWitnessTable(IGF, existAddr, fnProto);

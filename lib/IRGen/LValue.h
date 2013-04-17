@@ -32,7 +32,6 @@ namespace irgen {
   class RValue;
 
 class PhysicalPathComponent;
-class LogicalPathComponent;
 
 /// An enumeration indicating whether to "preserve" a value or "consume" it.
 enum ShouldPreserveValues : bool {
@@ -88,9 +87,6 @@ public:
 
   PhysicalPathComponent &asPhysical();
   const PhysicalPathComponent &asPhysical() const;
-
-  LogicalPathComponent &asLogical();
-  const LogicalPathComponent &asLogical() const;
 };
 
 /// An abstract class for "physical" path components, i.e. path
@@ -116,59 +112,6 @@ inline const PhysicalPathComponent &PathComponent::asPhysical() const {
   return static_cast<const PhysicalPathComponent&>(*this);
 }
 
-/// An abstract class for "logical" path components, i.e. path
-/// components that require getter/setter methods to access.  See the
-/// comment for PathComponent for more information.
-class LogicalPathComponent : public PathComponent {
-  virtual void _anchor();
-
-protected:
-  LogicalPathComponent() : PathComponent(false) {}
-
-public:
-  /// Perform a store operation with a value produced by the given
-  /// expression.
-  virtual void storeRValue(IRGenFunction &IGF, Expr *rvalue,
-                           Address base,
-                           ShouldPreserveValues preserve) const = 0;
-
-  /// Perform a store operation with a value held in memory.
-  virtual void storeMaterialized(IRGenFunction &IGF, Address temp,
-                                 Address base,
-                                 ShouldPreserveValues preserve) const = 0;
-
-  /// Perform a store operation with a value from the given explosion.
-  virtual void storeExplosion(IRGenFunction &IGF, Explosion &value,
-                              Address base,
-                              ShouldPreserveValues preserve) const = 0;
-
-  /// Perform a load operation from this path into the given
-  /// explosion.
-  virtual void loadExplosion(IRGenFunction &IGF, Address base,
-                             Explosion &exp,
-                             ShouldPreserveValues preserve) const = 0;
-
-  /// Perform a load operation from this path into memory
-  /// at a given address.
-  virtual void loadMaterialized(IRGenFunction &IGF, Address base,
-                                Address temp,
-                                ShouldPreserveValues preserve) const = 0;
-
-  /// Perform a load operation from this path into temporary
-  /// memory.
-  virtual OwnedAddress loadAndMaterialize(IRGenFunction &IGF,
-                                          OnHeap_t onHeap, Address base,
-                                    ShouldPreserveValues preserve) const = 0;
-};
-
-inline LogicalPathComponent &PathComponent::asLogical() {
-  assert(isLogical());
-  return static_cast<LogicalPathComponent&>(*this);
-}
-inline const LogicalPathComponent &PathComponent::asLogical() const {
-  assert(isLogical());
-  return static_cast<const LogicalPathComponent&>(*this);
-}
 
 /// An l-value represents a reference to storage holding a value
 /// of a type, as opposed to an r-value, which is an actual value

@@ -315,11 +315,7 @@ public:
 
   LValue emitAddressLValue(OwnedAddress addr);
   OwnedAddress emitAddressForPhysicalLValue(const LValue &lvalue);
-  void emitLValueAsScalar(LValue &&lvalue, OnHeap_t onHeap,
-                          Explosion &explosion);
-  Address emitMaterializeWithWriteback(LValue &&lvalue, OnHeap_t onHeap);
-
-  void emitRValueAsInit(Expr *E, Address addr, const TypeInfo &type);
+ void emitRValueAsInit(Expr *E, Address addr, const TypeInfo &type);
   void emitRValue(Expr *E, Explosion &explosion);
   void emitRValueAsUnsubstituted(Expr *E, CanType destType,
                                  ArrayRef<Substitution> subs,
@@ -348,12 +344,6 @@ public:
   /// with a runtime check.
   llvm::Value *emitIsSubtype(llvm::Value *from,
                              CanType toType);
-
-   void emitLoad(const LValue &lvalue, const TypeInfo &type,
-                Explosion &explosion);
-  void emitAssign(Expr *E, const LValue &lvalue, const TypeInfo &type);
-  void emitAssign(Explosion &explosion, const LValue &lvalue,
-                  const TypeInfo &type);
 
   OwnedAddress getAddrForParameter(VarDecl *param, Explosion &paramValues);
 

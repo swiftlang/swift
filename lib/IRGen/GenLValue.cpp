@@ -41,7 +41,6 @@ using namespace swift;
 using namespace irgen;
 
 void PathComponent::_anchor() {}
-void LogicalPathComponent::_anchor() {}
 void PhysicalPathComponent::_anchor() {}
 
 namespace {
@@ -66,138 +65,8 @@ LValue IRGenFunction::emitAddressLValue(OwnedAddress address) {
   return lvalue;
 }
 
-/// Load this l-value to create an exploded r-value.
-void IRGenFunction::emitLoad(const LValue &lvalue, const TypeInfo &type,
-                             Explosion &explosion) {
-  OwnedAddress address;
 
-  for (auto i = lvalue.begin(), e = lvalue.end(); i != e; ) {
-    const PathComponent &component = *i++;
-
-    // If this is a physical component, just compute it relative to the
-    // previous component.  The address is initialized on the first pass,
-    // but that's okay, because the first component should never care.
-    if (component.isPhysical()) {
-      address = component.asPhysical().offset(*this, address);
-      continue;
-    }
-
-    // If this is the last component, load it and return that as the result.
-    if (i == e)
-      return component.asLogical().loadExplosion(*this, address, explosion,
-                                                 ConsumeValues);
-
-    // Otherwise, load and materialize the result into memory.
-    address = component.asLogical().loadAndMaterialize(*this, NotOnHeap,
-                                                       address,
-                                                       ConsumeValues);
-  }
-
-  return type.load(*this, address, explosion);
-}
-
-namespace {
-  /// A visitor for emitting an assignment to a physical object.
-  class AssignEmitter : public irgen::ASTVisitor<AssignEmitter> {
-    IRGenFunction &IGF;
-    Address Dest;
-    const TypeInfo &ObjectTI;
-
-  public:
-    AssignEmitter(IRGenFunction &IGF, Address dest, const TypeInfo &objectTI)
-      : IGF(IGF), Dest(dest), ObjectTI(objectTI) {}
-
-    /// If the expression is a load from something, try to emit that
-    /// as an address and then do a copy-assign.
-    void visitLoadExpr(LoadExpr *E) {
-      abort();
-      
-      return visitExpr(E);
-    }
-
-    /// Default case.
-    void visitExpr(Expr *E) {
-      // TODO: if's natural to emit this r-value into memory, do so
-      // and emit a take-assign.
-
-      Explosion value(ExplosionKind::Maximal);
-      IGF.emitRValue(E, value);
-      ObjectTI.assign(IGF, value, Dest);
-    }
-  };
-}
-
-/// Emit the given expression for assignment into the given physical object.
-static void emitRValueAsAssign(IRGenFunction &IGF,
-                               Expr *E, Address object,
-                               const TypeInfo &objectTI) {
-  AssignEmitter(IGF, object, objectTI).visit(E);
-}
-
-/// Perform a store into the given path, given the base of the first
-/// component.
-static void emitAssignRecursive(IRGenFunction &IGF,
-                                Address base,
-                                const TypeInfo &finalType,
-                                Expr *finalExpr,
-                                Explosion *finalExplosion,
-                                LValue::const_iterator pathStart,
-                                LValue::const_iterator pathEnd) {
-  // Drill into any physical components.
-  while (true) {
-    assert(pathStart != pathEnd);
-
-    const PathComponent &component = *pathStart;
-    if (component.isLogical()) break;
-    base = component.asPhysical().offset(IGF,
-                                   OwnedAddress(base, IGF.IGM.RefCountedNull));
-
-    // If we reach the end, do an assignment and we're done.
-    if (++pathStart == pathEnd) {
-      if (finalExpr)
-        return emitRValueAsAssign(IGF, finalExpr, base, finalType);
-      return finalType.assign(IGF, *finalExplosion, base);
-    }
-  }
-
-  // Okay, we have a logical component.
-  assert(pathStart != pathEnd);
-  const LogicalPathComponent &component = pathStart->asLogical();
-  ++pathStart;
-  
-  // If this is the final component, just do a logical store.
-  if (pathStart == pathEnd) {
-    if (finalExpr)
-      return component.storeRValue(IGF, finalExpr, base, ConsumeValues);
-    return component.storeExplosion(IGF, *finalExplosion, base,
-                                    ConsumeValues);
-  }
-
-  // Otherwise, load and materialize into a temporary.
-  Address temp = component.loadAndMaterialize(IGF, NotOnHeap, base,
-                                              PreserveValues);
-
-  // Recursively perform the store.
-  emitAssignRecursive(IGF, temp, finalType, finalExpr, finalExplosion,
-                      pathStart, pathEnd);
-
-  // Store the temporary back.
-  component.storeMaterialized(IGF, temp, base, ConsumeValues);
-}
                            
-
-void IRGenFunction::emitAssign(Expr *E, const LValue &lvalue,
-                              const TypeInfo &type) {
-  emitAssignRecursive(*this, Address(), type, E, nullptr,
-                      lvalue.begin(), lvalue.end());
-}
-
-void IRGenFunction::emitAssign(Explosion &explosion, const LValue &lvalue,
-                              const TypeInfo &type) {
-  emitAssignRecursive(*this, Address(), type, nullptr, &explosion,
-                      lvalue.begin(), lvalue.end());
-}
-
 /// Given an l-value which is known to be physical, load from it.
 OwnedAddress IRGenFunction::emitAddressForPhysicalLValue(const LValue &lvalue) {
   OwnedAddress address;
@@ -205,48 +74,6 @@ OwnedAddress IRGenFunction::emitAddressForPhysicalLValue(const LValue &lvalue) {
     address = component.asPhysical().offset(*this, address);
   }
   return address;
-}
-
-static OwnedAddress emitMaterializeWithWriteback(IRGenFunction &IGF,
-                                                 LValue &&lvalue,
-                                                 OnHeap_t onHeap) {
-  OwnedAddress address;
-  for (auto &component : lvalue) {
-    if (component.isLogical()) {
-      // FIXME: we only need to materialize the *final* logical value
-      // to the heap.
-      address = component.asLogical().loadAndMaterialize(IGF, onHeap, address,
-                                                         ConsumeValues);
-    } else {
-      address = component.asPhysical().offset(IGF, address);
-    }
-  }
-
-  // FIXME: writebacks
-  // FIXME: rematerialize if inadequate alignment
-  return address;
-}
-
-void IRGenFunction::emitLValueAsScalar(LValue &&lvalue, OnHeap_t onHeap,
-                                       Explosion &explosion) {
-  OwnedAddress address =
-    ::emitMaterializeWithWriteback(*this, std::move(lvalue), onHeap);
-
-  // Add the address.
-  explosion.addUnmanaged(address.getAddressPointer());
-
-  // If we're emitting a heap l-value, also emit the owner pointer.
-  if (onHeap == OnHeap) {
-    // We need to retain.  We're optimistically delaying the retain
-    // until here, but that may not be safe in general.
-    emitRetain(address.getOwner(), explosion);
-  }
-}
-
-/// Given an l-value, locate it in memory, using the appropriate writeback.
-Address IRGenFunction::emitMaterializeWithWriteback(LValue &&lvalue,
-                                                    OnHeap_t onHeap) {
-  return ::emitMaterializeWithWriteback(*this, std::move(lvalue), onHeap);
 }
 
 namespace {
