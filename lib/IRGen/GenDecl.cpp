@@ -253,19 +253,13 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   }
   fn->setAttributes(attrs);
 
-  if (SILMod) {
-    IRGenSILFunction(*this, unitToUnit, ExplosionKind::Minimal, fn)
-      .emitGlobalTopLevel(tunit, SILMod);
-    
-    for (auto &cf : *SILMod) {
-      SILConstant c = cf.first;
-      SILFunction *f = cf.second;
-      emitSILConstant(c, f);
-    }
-  } else {
-    IRGenFunction(*this, unitToUnit, params, ExplosionKind::Minimal,
-                  /*uncurry*/ 0, fn)
-      .emitGlobalTopLevel(tunit, StartElem);
+  IRGenSILFunction(*this, unitToUnit, ExplosionKind::Minimal, fn)
+    .emitGlobalTopLevel(tunit, SILMod);
+  
+  for (auto &cf : *SILMod) {
+    SILConstant c = cf.first;
+    SILFunction *f = cf.second;
+    emitSILConstant(c, f);
   }
 
   SmallVector<llvm::Constant *, 2> allInits;
