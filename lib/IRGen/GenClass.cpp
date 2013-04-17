@@ -497,57 +497,6 @@ namespace {
   };
 }
 
-/// Emit the destructors for a class.
-///
-static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD) {
-  // FIXME: emit the destroying destructor first.
-  llvm::Function *fn = IGM.getAddrOfDestructor(CD, DestructorKind::Deallocating);
-
-  IRGenFunction IGF(IGM, CanType(), nullptr,
-                    ExplosionKind::Minimal, 0, fn, Prologue::Bare);
-
-  Type thisType = CD->getDeclaredTypeInContext();
-  const ClassTypeInfo &info =
-      IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();
-  llvm::Value *thisValue = fn->arg_begin();
-  thisValue = IGF.Builder.CreateBitCast(thisValue, info.getStorageType());
-  
-  // Set up a return block.
-  IGF.emitBBForReturn();
-
-  // Bind generic parameters.  This is only really necessary if we
-  // have either (1) an explicit destructor or (2) something dependent
-  // to destroy implicitly.
-  if (auto generics = CD->getGenericParamsOfContext()) {
-    Explosion fakeArgs(ExplosionKind::Minimal);
-    fakeArgs.addUnmanaged(thisValue);
-    fakeArgs.claimUnmanagedNext();
-
-    auto argType = CD->getDeclaredTypeInContext()->getCanonicalType();
-    auto polyFn =
-      PolymorphicFunctionType::get(argType,
-                                   TupleType::getEmpty(IGF.IGM.Context),
-                                   generics,
-                                   IGF.IGM.Context);
-    emitPolymorphicParameters(IGF, polyFn, fakeArgs);
-  }
-
-  // FIXME: This extra retain call is sort of strange, but it's necessary
-  // for the moment to prevent re-triggering destruction.
-  IGF.emitRetainCall(thisValue);
-
-  Scope scope(IGF);
-  IGF.pushCleanup<ClassDestroyCleanup>(thisValue, info);
-
-  scope.pop();
-  
-  // Return the size to the deallocator.
-  if (IGF.emitBranchToReturnBB()) {
-    llvm::Value *size = info.getLayout(IGM).emitSize(IGF);
-    IGF.Builder.CreateRet(size);
-  }
-}
-
 /// Emit the deallocating destructor for a class in terms of its destroying
 /// destructor.
 void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
@@ -603,8 +552,6 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   // Emit the class metadata.
   emitClassMetadata(*this, D, layout);
 
-  bool emittedDtor = false;
-
   // FIXME: This is mostly copy-paste from emitExtension;
   // figure out how to refactor! 
   for (Decl *member : D->getMembers()) {
@@ -647,20 +594,12 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       continue;
     case DeclKind::Func:
     case DeclKind::Constructor:
-      // Functions should be lowered through SIL.
-      continue;
     case DeclKind::Destructor:
-      assert(!emittedDtor && "two destructors in class?");
-      emittedDtor = true;
+      // Functions should be lowered through SIL.
       continue;
     }
     llvm_unreachable("bad extension member kind");
   }
-
-  // Emit a defaulted class destructor if we didn't see one explicitly.
-  // FIXME: Remove this!
-  if (D->isObjC() && !emittedDtor)
-    emitClassDestructor(*this, D);
 }
 
 namespace {

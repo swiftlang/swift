@@ -1295,9 +1295,17 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   
   // If we have a base class, invoke its destructor.
   if (Type baseTy = cd->getBaseClass()) {
+    ClassDecl *baseClass = baseTy->getClassOrBoundGenericClass();
+    
+    // FIXME: We can't sensibly call up to ObjC dealloc methods right now
+    // because they aren't really destroying destructors.
+    if (baseClass->hasClangNode() && baseClass->isObjC()) {
+      B.createReturn(dd, emitEmptyTuple(dd));
+      return;
+    }
+    
     SILConstant dtorConstant =
-      SILConstant(baseTy->getClassOrBoundGenericClass(),
-                  SILConstant::Kind::Destructor);
+      SILConstant(baseClass, SILConstant::Kind::Destructor);
     SILValue baseThis = B.createUpcast(dd,
                                     thisValue,
                                     getLoweredLoadableType(baseTy));

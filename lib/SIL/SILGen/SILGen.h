@@ -92,7 +92,7 @@ public:
   /// SILConstant(cd, Destructor). If a DestructorDecl is provided, it will be
   /// used, otherwise only the implicit destruction behavior will be emitted.
   SILFunction *emitDestructor(ClassDecl *cd,
-                           DestructorDecl /*nullable*/ *dd);
+                              DestructorDecl /*nullable*/ *dd);
   
   /// emitCurryThunk - Emits the curry thunk between two uncurry levels of a
   /// function.

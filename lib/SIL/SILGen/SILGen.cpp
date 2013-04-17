@@ -208,7 +208,7 @@ SILFunction *SILGenModule::emitClosure(ClosureExpr *ce) {
 }
 
 SILFunction *SILGenModule::emitDestructor(ClassDecl *cd,
-                                       DestructorDecl /*nullable*/ *dd) {
+                                          DestructorDecl /*nullable*/ *dd) {
   SILConstant constant(cd, SILConstant::Kind::Destructor);
   
   SILFunction *f = preEmitFunction(constant, dd);

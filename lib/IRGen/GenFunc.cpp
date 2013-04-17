@@ -3106,8 +3106,6 @@ void IRGenFunction::emitBBForReturn() {
   CurFn->getBasicBlockList().push_back(ReturnBB);
 }
 
-
-
 /// Emit the prologue for the function.
 void IRGenFunction::emitPrologue() {  
   // Set up the IRBuilder.
@@ -3310,6 +3308,8 @@ static void emitSILFunction(IRGenModule &IGM, SILConstant c,
   
   // If the function was a destroying destructor, emit the corresponding
   // deallocating destructor.
+  // FIXME: Deallocating destructors are currently trivial and never explicitly
+  // referenced in SIL, but may eventually benefit from SIL representation.
   if (c.isDestructor()) {
     ClassDecl *cd = cast<ClassDecl>(c.getDecl());
     llvm::Function *deallocator
@@ -3320,11 +3320,6 @@ static void emitSILFunction(IRGenModule &IGM, SILConstant c,
 
 /// Emit the definition for the given SIL constant.
 void IRGenModule::emitSILConstant(SILConstant c, SILFunction *f) {
-  // FIXME: Destructors of ObjC classes don't do the right thing yet.
-  if (c.kind == SILConstant::Kind::Destructor &&
-      cast<ClassDecl>(c.getDecl())->isObjC())
-    return;
-  
   llvm::Function *entrypoint;
   unsigned naturalCurryLevel;
   AbstractCC cc;
