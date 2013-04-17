@@ -310,11 +310,6 @@ public:
   void emitStructDecl(StructDecl *D);
   void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
-  void emitGlobalFunction(FuncDecl *D);  
-  void emitStaticMethod(FuncDecl *D);
-  void emitInstanceMethod(FuncDecl *D);
-  void emitConstructor(ConstructorDecl *D);
-  void emitClassConstructors(ConstructorDecl *D);
   Address emitGlobalVariable(VarDecl *var, const TypeInfo &type);
   
   void emitSILConstant(SILConstant c, SILFunction *f);

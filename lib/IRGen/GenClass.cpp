@@ -701,13 +701,8 @@ static void emitClassConstructors(IRGenModule &IGM, ConstructorDecl *CD) {
   llvm::Function *initFn = IGM.getAddrOfConstructor(CD,
                                                   ConstructorKind::Initializing,
                                                   ExplosionKind::Minimal);
-
   emitClassAllocatingConstructor(IGM, CD, allocFn, initFn);
   emitClassInitializingConstructor(IGM, CD, initFn);
-}
-
-void IRGenModule::emitClassConstructors(ConstructorDecl *D) {
-  return ::emitClassConstructors(*this, D);
 }
 
 /// emitClassDecl - Emit all the declarations associated with this class type.
@@ -772,7 +767,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       if (cd->getBody())
         continue;
       
-      ::emitClassConstructors(*this, cd);
+      emitClassConstructors(*this, cd);
       continue;
     }
     case DeclKind::Destructor: {

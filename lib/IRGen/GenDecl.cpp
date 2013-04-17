@@ -929,7 +929,7 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
   // prepackaged.
   SILConstant silConstant = SILConstant(fn.getDecl());
   llvm::AttributeSet attrs;
-  if (SILMod && SILMod->hasFunction(silConstant)) {
+  if (SILMod->hasFunction(silConstant)) {
     SILFunction *silFn = SILMod->getFunction(silConstant);
     fnType = getFunctionType(convention,
                              silFn->getLoweredType().getSwiftType(),

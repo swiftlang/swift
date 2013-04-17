@@ -4115,6 +4115,8 @@ namespace {
   };
 }
 
+
+#if 0
 /// Emit a range of curried entry points for a function declaration.
 /// Returns the address of the natural curry level entrypoint.
 static llvm::Function *emitFunctionCurriedEntrypoints(IRGenModule &IGM,
@@ -4159,35 +4161,7 @@ static llvm::Function *emitFunctionCurriedEntrypoints(IRGenModule &IGM,
 
   return entrypoint;
 }
-
-/// Emit a function declaration, starting at the given uncurry level.
-static void emitFunction(IRGenModule &IGM, FuncDecl *func,
-                         unsigned startingUncurryLevel) {
-  // Nothing to do if the function has no body.
-  if (!func->getBody()->getBody()) return;
-  FuncExpr *funcExpr = func->getBody();
-
-  // FIXME: support defining currying entrypoints for local functions.
-  ExtraData extraData = ExtraData::None;
-
-  // FIXME: variant currying levels!
-  // FIXME: also emit entrypoints with maximal explosion when all types are known!
-  unsigned naturalUncurryLevel = getDeclNaturalUncurryLevel(func);
-
-  ExplosionKind explosionLevel = ExplosionKind::Minimal;
-
-  // Emit the curried entry points.
-  llvm::Function *entrypoint
-    = emitFunctionCurriedEntrypoints(IGM, func, extraData, explosionLevel,
-                                     startingUncurryLevel, naturalUncurryLevel);
-
-  // Finally, emit the uncurried entrypoint.
-  PrettyStackTraceDecl stackTrace("emitting IR for", func);
-  IRGenFunction(IGM, funcExpr->getType()->getCanonicalType(),
-                funcExpr->getBodyParamPatterns(), explosionLevel,
-                naturalUncurryLevel, entrypoint)
-    .emitFunctionTopLevel(funcExpr->getBody());
-}
+#endif
 
 /// Emit a SIL function.
 static void emitSILFunction(IRGenModule &IGM, SILConstant c,
@@ -4217,26 +4191,6 @@ static void emitSILFunction(IRGenModule &IGM, SILConstant c,
       = IGM.getAddrOfDestructor(cd, DestructorKind::Deallocating);
     emitDeallocatingDestructor(IGM, cd, deallocator, entrypoint);
   }
-}
-
-/// Emit the definition for the given instance method.
-void IRGenModule::emitInstanceMethod(FuncDecl *func) {
-  assert(!func->isStatic());
-  unsigned startingUncurry = 1;
-  if (dyn_cast_or_null<SubscriptDecl>(func->getGetterOrSetterDecl()))
-    startingUncurry++;
-  emitFunction(*this, func, startingUncurry);
-}
-
-/// Emit the definition for the given static method.
-void IRGenModule::emitStaticMethod(FuncDecl *func) {
-  assert(func->isStatic());
-  emitFunction(*this, func, 0);
-}
-
-/// Emit the definition for the given global function.
-void IRGenModule::emitGlobalFunction(FuncDecl *func) {
-  emitFunction(*this, func, 0);
 }
 
 /// Emit the definition for the given SIL constant.

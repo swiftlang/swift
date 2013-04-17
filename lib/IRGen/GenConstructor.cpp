@@ -24,35 +24,8 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "llvm/IR/Function.h"
-
 using namespace swift;
 using namespace irgen;
-
-void IRGenModule::emitConstructor(ConstructorDecl *CD) {
-  // FIXME: kind of constructor?
-  llvm::Function *fn = getAddrOfConstructor(CD, ConstructorKind::Allocating,
-                                            ExplosionKind::Minimal);
-
-  auto thisDecl = CD->getImplicitThisDecl();
-  Pattern *pats[] = {
-    new (Context) AnyPattern(SourceLoc()),
-    CD->getArguments()
-  };
-  pats[0]->setType(MetaTypeType::get(thisDecl->getType(), Context));
-  IRGenFunction IGF(*this, CD->getType()->getCanonicalType(), pats,
-                    ExplosionKind::Minimal, 1, fn, Prologue::Standard);
-  const TypeInfo &type = getFragileTypeInfo(thisDecl->getType());
-
-  // Emit the "this" variable.
-  Initialization I;
-  InitializedObject object = I.getObjectForDecl(thisDecl);
-  I.registerObject(IGF, object,
-                   thisDecl->hasFixedLifetime() ? NotOnHeap : OnHeap, type);
-  Address addr = I.emitVariable(IGF, thisDecl, type);
-  I.emitZeroInit(IGF, object, addr, type);
-
-  IGF.emitConstructorBody(CD);
-}
 
 void IRGenFunction::emitConstructorBody(ConstructorDecl *CD) {
   // FIXME: Member init here?
