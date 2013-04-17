@@ -15,7 +15,6 @@ add_swift_library(swiftIRGen
   GenOneOf.cpp
   GenPoly.cpp
   GenProto.cpp
-  GenStmt.cpp
   GenStruct.cpp
   GenTuple.cpp
   GenType.cpp

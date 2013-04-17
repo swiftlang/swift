@@ -499,9 +499,7 @@ namespace {
 
 /// Emit the destructors for a class.
 ///
-/// \param DD - the optional explicit destructor declaration
-static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
-                                DestructorDecl *DD) {
+static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD) {
   // FIXME: emit the destroying destructor first.
   llvm::Function *fn = IGM.getAddrOfDestructor(CD, DestructorKind::Deallocating);
 
@@ -520,8 +518,6 @@ static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
   // Bind generic parameters.  This is only really necessary if we
   // have either (1) an explicit destructor or (2) something dependent
   // to destroy implicitly.
-  assert((!DD || DD->getDeclContext() == CD) &&
-         "destructor not defined in main class decl; archetypes might be off");
   if (auto generics = CD->getGenericParamsOfContext()) {
     Explosion fakeArgs(ExplosionKind::Minimal);
     fakeArgs.addUnmanaged(thisValue);
@@ -543,19 +539,6 @@ static void emitClassDestructor(IRGenModule &IGM, ClassDecl *CD,
   Scope scope(IGF);
   IGF.pushCleanup<ClassDestroyCleanup>(thisValue, info);
 
-  if (DD) {
-    auto thisDecl = DD->getImplicitThisDecl();
-    Initialization I;
-    I.registerObject(IGF, I.getObjectForDecl(thisDecl),
-                      thisDecl->hasFixedLifetime() ? NotOnHeap : OnHeap, info);
-    Address addr = I.emitVariable(IGF, thisDecl, info);
-    Explosion thisE(ExplosionKind::Maximal);
-    IGF.emitRetain(thisValue, thisE);
-    info.initialize(IGF, thisE, addr);
-    I.markInitialized(IGF, I.getObjectForDecl(thisDecl));
-
-    IGF.emitFunctionTopLevel(DD->getBody());
-  }
   scope.pop();
   
   // Return the size to the deallocator.
@@ -773,13 +756,6 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
     case DeclKind::Destructor: {
       assert(!emittedDtor && "two destructors in class?");
       emittedDtor = true;
-
-      // Destructors are lowered through SIL.
-      // FIXME: Except for ObjC classes.
-      if (!D->isObjC())
-        continue;
-
-      emitClassDestructor(*this, D, cast<DestructorDecl>(member));
       continue;
     }
     }
@@ -787,9 +763,9 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   }
 
   // Emit a defaulted class destructor if we didn't see one explicitly.
-  // FIXME: 
+  // FIXME: Remove this!
   if (D->isObjC() && !emittedDtor)
-    emitClassDestructor(*this, D, nullptr);
+    emitClassDestructor(*this, D);
 }
 
 namespace {

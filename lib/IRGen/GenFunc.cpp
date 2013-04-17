@@ -3369,11 +3369,6 @@ void IRGenModule::emitSILConstant(SILConstant c, SILFunction *f) {
   emitSILFunction(*this, c, f, entrypoint, body);
 }
 
-/// Emit the code for the top-level of a function.
-void IRGenFunction::emitFunctionTopLevel(BraceStmt *S) {
-  emitBraceStmt(S);
-}
-
 /// Emit the forwarding stub function for a partial application.
 static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                        llvm::Function *fnPtr,

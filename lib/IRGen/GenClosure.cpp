@@ -191,6 +191,7 @@ static void emitLocalFunctionBody(IRGenFunction &definingIGF,
                                   unsigned uncurryLevel,
                                   const CaptureInfo &info,
                                   const HeapLayout *layout) {
+  assert(0);
   IRGenModule &IGM = definingIGF.IGM;
   assert(info.requiresData() == (layout != nullptr));
 
@@ -256,15 +257,6 @@ static void emitLocalFunctionBody(IRGenFunction &definingIGF,
       OwnedAddress innerVar(Address(addr, alignment), owner);
       IGF.setLocalVar(capturedVar, innerVar);
     }
-  }
-
-  if (FuncExpr *FE = dyn_cast<FuncExpr>(E)) {
-    IGF.emitFunctionTopLevel(FE->getBody());
-  } else {
-    // Emit the body of the closure as if it were a single return
-    // statement.
-    ReturnStmt ret(SourceLoc(), cast<ClosureExpr>(E)->getBody());
-    IGF.emitStmt(&ret);
   }
 }
 

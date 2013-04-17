@@ -244,7 +244,6 @@ private:
 //--- Function prologue and epilogue -------------------------------------------
 public:
   Explosion collectParameters();
-  void emitFunctionTopLevel(BraceStmt *S);
   void emitScalarReturn(Explosion &scalars);
   
   void emitBBForReturn();
@@ -307,24 +306,6 @@ public:
   llvm::Value *emitObjCRetainCall(llvm::Value *value);
   void emitObjCRelease(llvm::Value *value);
   ManagedValue enterObjCReleaseCleanup(llvm::Value *value);
-
-//--- Statement emission -------------------------------------------------------
-public:
-  void emitStmt(Stmt *S);
-
-private:
-  void emitBraceStmt(BraceStmt *S);
-  void emitAssignStmt(AssignStmt *S);
-  void emitIfStmt(IfStmt *S);
-  void emitReturnStmt(ReturnStmt *S);
-  void emitWhileStmt(WhileStmt *S);
-  void emitDoWhileStmt(DoWhileStmt *S);
-  void emitForStmt(ForStmt *S);
-  void emitForEachStmt(ForEachStmt *S);
-  void emitBreakStmt(BreakStmt *S);
-  void emitContinueStmt(ContinueStmt *S);
-  void emitFallthroughStmt(FallthroughStmt *S);
-  void emitSwitchStmt(SwitchStmt *S);
 
 //--- Expression emission ------------------------------------------------------
 public:
