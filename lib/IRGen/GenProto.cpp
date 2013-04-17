@@ -2185,14 +2185,16 @@ namespace {
 
           auto &implTI = IGF.getFragileTypeInfo(implInputType);
 
-          // It's an l-value, so the next value is the address.
-          auto sigThis = implTI.getAddressForPointer(sigClause.claimUnmanagedNext());
+          // It's an l-value, so the next value is the address.  Cast to T*.
 
-          // Cast to T* and load.  In theory this might require
+          auto sigThisValue = sigClause.claimUnmanagedNext();
+          auto implPtrTy = implTI.getStorageType()->getPointerTo();
+          sigThisValue = IGF.Builder.CreateBitCast(sigThisValue, implPtrTy);
+          auto sigThis = implTI.getAddressForPointer(sigThisValue);
+
+          // Load.  In theory this might require
           // remapping, but in practice the constraints (which we
           // assert just above) don't permit that.
-          auto implPtrTy = implTI.getStorageType()->getPointerTo();
-          sigThis = IGF.Builder.CreateBitCast(sigThis, implPtrTy);
           implTI.load(IGF, sigThis, implArgs);
 
         // Otherwise, the impl type is the result of some substitution
