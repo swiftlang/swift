@@ -57,6 +57,6 @@ namespace swift {
                       SILModule *SILMod = nullptr
                       );
   
-  void REPL(ASTContext &Context, bool SILIRGen, const ProcessCmdLine &CmdLine);
-  void REPLRunLoop(ASTContext &Context, bool SILIRGen, const ProcessCmdLine &CmdLine);
+  void REPL(ASTContext &Context, const ProcessCmdLine &CmdLine);
+  void REPLRunLoop(ASTContext &Context, const ProcessCmdLine &CmdLine);
 }

@@ -854,7 +854,6 @@ class REPLEnvironment {
 
   ASTContext &Context;
   bool ShouldRunREPLApplicationMain;
-  bool SILIRGen;
   ProcessCmdLine CmdLine;
   llvm::MemoryBuffer *Buffer;
   Component *Comp;
@@ -916,11 +915,7 @@ class REPLEnvironment {
     llvm::Module LineModule("REPLLine", LLVMContext);
     performCaptureAnalysis(TU, RC.CurIRGenElem);
     
-    llvm::OwningPtr<SILModule> sil;
-    if (SILIRGen) {
-      sil = llvm::OwningPtr<SILModule>(
-                                     performSILGeneration(TU, RC.CurIRGenElem));
-    }
+    llvm::OwningPtr<SILModule> sil(performSILGeneration(TU, RC.CurIRGenElem));
     
     performIRGeneration(Options, &LineModule, TU, sil.get(),
                         RC.CurIRGenElem);
@@ -971,12 +966,9 @@ class REPLEnvironment {
 public:
   REPLEnvironment(ASTContext &Context,
                   bool ShouldRunREPLApplicationMain,
-                  bool SILIRGen,
-                  const ProcessCmdLine &CmdLine
-                 )
+                  const ProcessCmdLine &CmdLine)
     : Context(Context),
       ShouldRunREPLApplicationMain(ShouldRunREPLApplicationMain),
-      SILIRGen(SILIRGen),
       CmdLine(CmdLine),
       Buffer(llvm::MemoryBuffer::getNewMemBuffer(BUFFER_SIZE, "<REPL Buffer>")),
       Comp(new (Context.Allocate<Component>(1)) Component()),
@@ -1209,10 +1201,9 @@ void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
   llvm::errs().resetColor();
 }
 
-void swift::REPL(ASTContext &Context, bool SILIRGen, const ProcessCmdLine &CmdLine) {
+void swift::REPL(ASTContext &Context, const ProcessCmdLine &CmdLine) {
   REPLEnvironment env(Context,
                       /*ShouldRunREPLApplicationMain=*/false,
-                      SILIRGen,
                       CmdLine);
 
   llvm::SmallString<80> Line;
@@ -1223,10 +1214,9 @@ void swift::REPL(ASTContext &Context, bool SILIRGen, const ProcessCmdLine &CmdLi
   env.exitREPL();
 }
 
-void swift::REPLRunLoop(ASTContext &Context, bool SILIRGen, const ProcessCmdLine &CmdLine) {
+void swift::REPLRunLoop(ASTContext &Context, const ProcessCmdLine &CmdLine) {
   REPLEnvironment env(Context,
                       /*ShouldRunREPLApplicationMain=*/true,
-                      SILIRGen,
                       CmdLine);
   
   CFMessagePortContext portContext;
