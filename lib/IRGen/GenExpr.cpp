@@ -97,10 +97,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, ValueDecl *D, Type Ty) {
     llvm_unreachable("decl cannot be emitted as an l-value");
 
   case DeclKind::Var:
-    if (D->getDeclContext()->isLocalContext())
-      return IGF.emitAddressLValue(IGF.getLocalVar(cast<VarDecl>(D)));
-    return IGF.getGlobal(cast<VarDecl>(D));
-      
+
   case DeclKind::Subscript:
     llvm_unreachable("subscript decl cannot be referenced");
 

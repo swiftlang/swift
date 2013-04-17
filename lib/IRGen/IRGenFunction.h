@@ -361,7 +361,6 @@ public:
 
 //--- Declaration emission -----------------------------------------------------
 public:
-  LValue getGlobal(VarDecl *D);
   OwnedAddress getLocalVar(VarDecl *D);
   void setLocalVar(VarDecl *D, OwnedAddress addr);
 
