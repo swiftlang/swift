@@ -364,8 +364,6 @@ public:
                      llvm::Value *metadata,
                      ArrayRef<llvm::Value*> wtables);
 
-  void emitConstructorBody(ConstructorDecl *CD);
-
 private:
   union LocalEntry {
     struct {

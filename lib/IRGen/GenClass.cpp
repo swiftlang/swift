@@ -646,17 +646,13 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       // FIXME: Will need an implementation here for resilience
       continue;
     case DeclKind::Func:
-      // Methods should be lowered through SIL.
+    case DeclKind::Constructor:
+      // Functions should be lowered through SIL.
       continue;
-    case DeclKind::Constructor: {
-      // Constructors are lowered through SIL.
-      continue;
-    }
-    case DeclKind::Destructor: {
+    case DeclKind::Destructor:
       assert(!emittedDtor && "two destructors in class?");
       emittedDtor = true;
       continue;
-    }
     }
     llvm_unreachable("bad extension member kind");
   }
