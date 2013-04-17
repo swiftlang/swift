@@ -153,21 +153,21 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
     // RO-data will need to be fixed.
 
     // The struct alignment is the max of the alignment of the fields.
-    CurAlignment = std::max(CurAlignment, eltTI.StorageAlignment);
+    CurAlignment = std::max(CurAlignment, eltTI.getFixedAlignment());
 
     // If the current tuple size isn't a multiple of the field's
     // required alignment, we need to pad out.
-    if (Size offsetFromAlignment = CurSize % eltTI.StorageAlignment) {
+    if (Size offsetFromAlignment = CurSize % eltTI.getFixedAlignment()) {
       unsigned paddingRequired
-        = eltTI.StorageAlignment.getValue() - offsetFromAlignment.getValue();
+        = eltTI.getFixedAlignment().getValue() - offsetFromAlignment.getValue();
       assert(paddingRequired != 0);
 
       // We don't actually need to uglify the IR unless the natural
       // alignment of the IR type for the field isn't good enough.
       Alignment fieldIRAlignment(
           IGM.DataLayout.getABITypeAlignment(eltTI.StorageType));
-      assert(fieldIRAlignment <= eltTI.StorageAlignment);
-      if (fieldIRAlignment != eltTI.StorageAlignment) {
+      assert(fieldIRAlignment <= eltTI.getFixedAlignment());
+      if (fieldIRAlignment != eltTI.getFixedAlignment()) {
         auto paddingTy = llvm::ArrayType::get(IGM.Int8Ty, paddingRequired);
         StructFields.push_back(paddingTy);
       }
@@ -181,7 +181,7 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
     elt.StructIndex = StructFields.size();
 
     StructFields.push_back(eltTI.getStorageType());
-    CurSize += eltTI.StorageSize;
+    CurSize += eltTI.getFixedSize();
   }
 
   return addedStorage;

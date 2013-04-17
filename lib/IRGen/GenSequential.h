@@ -274,9 +274,8 @@ protected:
   BuilderImpl *asImpl() { return static_cast<BuilderImpl*>(this); }
 
   void recordLayout(StructLayout &layout, llvm::Type *StorageType) {
-    SeqTI->StorageSize = layout.getSize();
-    SeqTI->StorageAlignment = layout.getAlignment();
     SeqTI->StorageType = StorageType;
+    SeqTI->completeFixed(layout.getSize(), layout.getAlignment());
 
     FieldImpl *nextFieldInfo = SeqTI->getFieldsBuffer();    
     for (auto &fieldLayout : layout.getElements()) {
@@ -288,7 +287,7 @@ protected:
 
 public:
   static void completeEmpty(TypeInfoImpl *seqTI) {
-    seqTI->StorageAlignment = Alignment(1);
+    seqTI->completeFixed(Size(0), Alignment(1));
     assert(seqTI->isComplete());
   }
 

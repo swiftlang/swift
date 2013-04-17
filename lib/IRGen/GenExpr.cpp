@@ -476,8 +476,7 @@ LValue IRGenFunction::emitFakeLValue(Type type) {
   const TypeInfo &lvalueInfo = getFragileTypeInfo(objTy);
   llvm::Value *fakeAddr =
     llvm::UndefValue::get(lvalueInfo.getStorageType()->getPointerTo());
-  return emitAddressLValue(OwnedAddress(Address(fakeAddr,
-                                                lvalueInfo.StorageAlignment),
+  return emitAddressLValue(OwnedAddress(lvalueInfo.getAddressForPointer(fakeAddr),
                                         IGM.RefCountedNull));
 }
 

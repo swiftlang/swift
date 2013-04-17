@@ -44,6 +44,11 @@ ExplosionSchema TypeInfo::getSchema(ExplosionKind kind) const {
   return schema;
 }
 
+Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
+  assert(ptr->getType()->getPointerElementType() == StorageType);
+  return Address(ptr, StorageAlignment);
+}
+
 /// Copy a value from one object to a new object, directly taking
 /// responsibility for anything it might have.  This is like C++
 /// move-initialization, except the old object will not be destroyed.
@@ -61,7 +66,7 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
   }
 
   // Otherwise, use a memcpy.
-  IGF.emitMemCpy(destAddr, srcAddr, StorageSize);
+  IGF.emitMemCpy(destAddr, srcAddr, getFixedSize());
 }
 
 /// Copy a value from one object to a new object.  This is just the
@@ -95,21 +100,21 @@ llvm::Value *FixedTypeInfo::getSize(IRGenFunction &IGF) const {
   return FixedTypeInfo::getStaticSize(IGF.IGM);
 }
 llvm::Constant *FixedTypeInfo::getStaticSize(IRGenModule &IGM) const {
-  return asSizeConstant(IGM, StorageSize);
+  return asSizeConstant(IGM, getFixedSize());
 }
 
 llvm::Value *FixedTypeInfo::getAlignment(IRGenFunction &IGF) const {
   return FixedTypeInfo::getStaticAlignment(IGF.IGM);
 }
 llvm::Constant *FixedTypeInfo::getStaticAlignment(IRGenModule &IGM) const {
-  return asSizeConstant(IGM, Size(StorageAlignment.getValue()));
+  return asSizeConstant(IGM, Size(getFixedAlignment().getValue()));
 }
 
 llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF) const {
   return FixedTypeInfo::getStaticStride(IGF.IGM);
 }
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
-  return asSizeConstant(IGM, StorageSize.roundUpToAlignment(StorageAlignment));
+  return asSizeConstant(IGM, getFixedStride());
 }
 
 namespace {

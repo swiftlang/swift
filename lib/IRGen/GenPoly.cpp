@@ -584,7 +584,7 @@ namespace {
 
       // Otherwise, load as a take and then kill the cleanup attached
       // to the archetype value.
-      substTI.loadAsTake(IGF, Address(inAddr, substTI.StorageAlignment), Out);
+      substTI.loadAsTake(IGF, substTI.getAddressForPointer(inAddr), Out);
       if (inValue.hasCleanup())
         IGF.setCleanupState(inValue.getCleanup(), CleanupState::Dead);
     }

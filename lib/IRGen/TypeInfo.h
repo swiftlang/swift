@@ -20,7 +20,6 @@
 
 #include "IRGen.h"
 
-
 namespace llvm {
   class Constant;
   class Twine;
@@ -29,11 +28,11 @@ namespace llvm {
 
 namespace swift {
 namespace irgen {
+  class Address;
   class IRGenFunction;
   class IRGenModule;
   class Initialization;
   class InitializedObject;
-  class Address;
   class Explosion;
   enum class ExplosionKind : unsigned;
   class ExplosionSchema;
@@ -73,9 +72,11 @@ public:
     return static_cast<const T &>(*this);
   }
 
-  /// The LLVM representation of a stored value of this type.
+  /// The LLVM representation of a stored value of this type.  For
+  /// non-fixed types, this is really useful only for forming pointers to it.
   llvm::Type *StorageType;
 
+private:
   /// The storage size of this type in bytes.  This may be zero even
   /// for well-formed and complete types, such as a trivial oneof or
   /// tuple.
@@ -85,11 +86,15 @@ public:
   /// for a completely-converted type.
   Alignment StorageAlignment;
 
-private:
   /// Whether this type is known to be POD.
   unsigned POD : 1;
 
 public:
+  void completeFixed(Size size, Alignment alignment) {
+    StorageSize = size;
+    StorageAlignment = alignment;
+  }
+
   /// Sets whether this type is POD.  Should only be called during
   /// completion of a forward-declaration.
   void setPOD(IsPOD_t isPOD) { POD = unsigned(isPOD); }
@@ -107,6 +112,29 @@ public:
 
   llvm::Type *getStorageType() const { return StorageType; }
 
+  Size getFixedSize() const {
+    return StorageSize;
+  }
+
+  Alignment getFixedAlignment() const {
+    return StorageAlignment;
+  }
+
+  Alignment getBestKnownAlignment() const {
+    return StorageAlignment;
+  }
+
+  /// Returns the (assumed fixed) stride of the storage for this
+  /// object.  The stride is the storage size rounded up to the
+  /// alignment; its practical use is that, in an array, it is the
+  /// offset from the size of one element to the offset of the next.
+  Size getFixedStride() const {
+    return StorageSize.roundUpToAlignment(StorageAlignment);
+  }
+
+  /// Given a generic pointer to this type, produce an Address for it.
+  Address getAddressForPointer(llvm::Value *ptr) const;
+    
   /// Return the size and alignment of this type.
   virtual std::pair<llvm::Value*,llvm::Value*>
     getSizeAndAlignment(IRGenFunction &IGF) const = 0;

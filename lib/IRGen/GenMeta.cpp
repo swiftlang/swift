@@ -291,10 +291,10 @@ namespace {
     llvm::Value *visitOpaqueType(CanType type) {
       IRGenModule &IGM = IGF.IGM;
       const TypeInfo &opaqueTI = IGM.getFragileTypeInfo(type);
-      assert(opaqueTI.StorageSize ==
-             Size(opaqueTI.StorageAlignment.getValue()));
-      assert(opaqueTI.StorageSize.isPowerOf2());
-      auto numBits = 8 * opaqueTI.StorageSize.getValue();
+      assert(opaqueTI.getFixedSize() ==
+             Size(opaqueTI.getFixedAlignment().getValue()));
+      assert(opaqueTI.getFixedSize().isPowerOf2());
+      auto numBits = 8 * opaqueTI.getFixedSize().getValue();
       auto intTy = BuiltinIntegerType::get(numBits, IGM.Context);
       return emitDirectMetadataRef(CanType(intTy));
     }

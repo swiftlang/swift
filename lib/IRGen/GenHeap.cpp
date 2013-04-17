@@ -189,12 +189,12 @@ ArrayHeapLayout::ArrayHeapLayout(IRGenFunction &IGF, CanType T)
   size += Bindings.getBufferSize(IGF.IGM);
 
   // Update the required alignment.
-  if (ElementTI.StorageAlignment > align)
-    align = ElementTI.StorageAlignment;
+  if (ElementTI.getFixedAlignment() > align)
+    align = ElementTI.getFixedAlignment();
 
   // Round the size up to the alignment of the element type.
   // FIXME: resilient types.
-  size = size.roundUpToAlignment(ElementTI.StorageAlignment);
+  size = size.roundUpToAlignment(ElementTI.getFixedAlignment());
 
   HeaderSize = size;
   Align = align;
@@ -237,7 +237,7 @@ static void emitArrayDestroy(IRGenFunction &IGF,
   }
 
   // Destroy this element.
-  elementTI.destroy(IGF, Address(cur, elementTI.StorageAlignment));
+  elementTI.destroy(IGF, elementTI.getAddressForPointer(cur));
 
   // Loop if we haven't reached the end.
   prev->addIncoming(cur, IGF.Builder.GetInsertBlock());
@@ -319,11 +319,6 @@ static llvm::Value *checkOverflow(IRGenFunction &IGF,
   return IGF.Builder.CreateSelect(hasOverflow, getSizeMax(IGF), result);
 }
 
-/// Return the array stride for the given type.
-static Size getElementStride(const TypeInfo &type) {
-  return type.StorageSize.roundUpToAlignment(type.StorageAlignment);
-}
-
 /// Compute the size of an array allocation.
 ///
 /// \param length - the requested length; must be a size_t unless
@@ -357,8 +352,7 @@ llvm::Value *ArrayHeapLayout::getAllocationSize(IRGenFunction &IGF,
     bool overflow = false;
 
     // Scale the length by the element stride.
-    llvm::APInt elementStride(sizeWidth,
-                              getElementStride(ElementTI).getValue());
+    llvm::APInt elementStride(sizeWidth, ElementTI.getFixedStride().getValue());
     assert(elementStride);
     auto scaledLength = lenval.umul_ov(elementStride, overflow);
     if (overflow) return getSizeMax(IGF);
@@ -470,7 +464,7 @@ llvm::Value *ArrayHeapLayout::emitUnmanagedAlloc(IRGenFunction &IGF,
 
   // Find the begin pointer.
   llvm::Value *beginPtr = getBeginPointer(IGF, alloc);
-  begin = Address(beginPtr, ElementTI.StorageAlignment);
+  begin = ElementTI.getAddressForPointer(beginPtr);
 
   // If we don't have an initializer, just zero-initialize and
   // immediately enter a release cleanup.

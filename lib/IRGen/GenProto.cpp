@@ -889,7 +889,7 @@ namespace {
     using FixedTypeInfo::allocate;
     Address allocate(IRGenFunction &IGF,
                      const Twine &name = "protocol.temporary") const {
-      return IGF.createAlloca(getStorageType(), StorageAlignment, name);
+      return IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
@@ -1165,7 +1165,7 @@ public:
 static FixedPacking computePacking(IRGenModule &IGM,
                                    const TypeInfo &concreteTI) {
   Size bufferSize = getFixedBufferSize(IGM);
-  Size requiredSize = concreteTI.StorageSize;
+  Size requiredSize = concreteTI.getFixedSize();
 
   // Flat out, if we need more space than the buffer provides,
   // we always have to allocate.
@@ -1175,7 +1175,7 @@ static FixedPacking computePacking(IRGenModule &IGM,
     return FixedPacking::Allocate;
 
   Alignment bufferAlign = getFixedBufferAlignment(IGM);
-  Alignment requiredAlign = concreteTI.StorageAlignment;
+  Alignment requiredAlign = concreteTI.getFixedAlignment();
 
   // If the buffer alignment is good enough for the type, great.
   if (bufferAlign >= requiredAlign)
@@ -1207,7 +1207,7 @@ static Address emitProjectBuffer(IRGenFunction &IGF,
     Address slot = IGF.Builder.CreateBitCast(buffer, resultTy->getPointerTo(),
                                              "storage-slot");
     llvm::Value *address = IGF.Builder.CreateLoad(slot);
-    return Address(address, type.StorageAlignment);
+    return type.getAddressForPointer(address);
   }
 
   case FixedPacking::OffsetZero: {
@@ -1231,8 +1231,10 @@ static Address emitAllocateBuffer(IRGenFunction &IGF,
       IGF.emitAllocRawCall(sizeAndAlign.first, sizeAndAlign.second);
     buffer = IGF.Builder.CreateBitCast(buffer, IGF.IGM.Int8PtrPtrTy);
     IGF.Builder.CreateStore(addr, buffer);
-    return IGF.Builder.CreateBitCast(Address(addr, type.StorageAlignment),
+
+    addr = IGF.Builder.CreateBitCast(addr,
                                      type.getStorageType()->getPointerTo());
+    return type.getAddressForPointer(addr);
   }
 
   case FixedPacking::OffsetZero:
@@ -1382,7 +1384,7 @@ static Address getArgAs(IRGenFunction &IGF,
   llvm::Value *arg = getArg(it, name);
   llvm::Value *result =
     IGF.Builder.CreateBitCast(arg, type.getStorageType()->getPointerTo());
-  return Address(result, type.StorageAlignment);
+  return type.getAddressForPointer(result);
 }
 
 /// Get the next argument as a pointer to the given storage type.
@@ -1810,9 +1812,9 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
   {
     llvm::raw_svector_ostream nameStream(name);
     nameStream << "__swift_memcpy";
-    nameStream << type.StorageSize.getValue();
+    nameStream << type.getFixedSize().getValue();
     nameStream << '_';
-    nameStream << type.StorageAlignment.getValue();
+    nameStream << type.getFixedAlignment().getValue();
   }
 
   llvm::Constant *fn = IGM.Module.getOrInsertFunction(name, fnTy);
@@ -1820,9 +1822,9 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
     IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     auto it = def->arg_begin();
-    Address dest(it++, type.StorageAlignment);
-    Address src(it++, type.StorageAlignment);
-    IGF.emitMemCpy(dest, src, type.StorageSize);
+    Address dest = type.getAddressForPointer(it++);
+    Address src = type.getAddressForPointer(it++);
+    IGF.emitMemCpy(dest, src, type.getFixedSize());
     IGF.Builder.CreateRet(dest.getAddress());
   }
   return fn;
@@ -2184,8 +2186,7 @@ namespace {
           auto &implTI = IGF.getFragileTypeInfo(implInputType);
 
           // It's an l-value, so the next value is the address.
-          auto sigThis = Address(sigClause.claimUnmanagedNext(),
-                                 implTI.StorageAlignment);
+          auto sigThis = implTI.getAddressForPointer(sigClause.claimUnmanagedNext());
 
           // Cast to T* and load.  In theory this might require
           // remapping, but in practice the constraints (which we
@@ -2231,8 +2232,7 @@ namespace {
                               implResultTI.getStorageType()->getPointerTo());
         }
 
-        emission.emitToMemory(Address(implResultAddr,
-                                      implResultTI.StorageAlignment),
+        emission.emitToMemory(implResultTI.getAddressForPointer(implResultAddr),
                               implResultTI);
 
         // TODO: remap here.

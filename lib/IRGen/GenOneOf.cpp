@@ -85,7 +85,7 @@ namespace {
 
     void getSchema(ExplosionSchema &schema) const {
       schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
-                                                        StorageAlignment));
+                                                        getFixedAlignment()));
     }
 
     unsigned getExplosionSize(ExplosionKind kind) const {
@@ -258,8 +258,8 @@ namespace {
       ExplosionSchema schema(params.getKind());
       Singleton->getSchema(schema);
       if (schema.requiresIndirectResult()) {
-        Address returnSlot(params.claimUnmanagedNext(),
-                           Singleton->StorageAlignment);
+        Address returnSlot =
+          Singleton->getAddressForPointer(params.claimUnmanagedNext());
         initialize(IGF, params, returnSlot);
         IGF.Builder.CreateRetVoid();
       } else {

@@ -373,7 +373,7 @@ static LValue emitLValueAtOffset(IRGenFunction &IGF,
   auto &fieldTI = IGF.getFragileTypeInfo(field->getType());
   auto addr = emitGEPToOffset(IGF, base, offset, fieldTI.getStorageType(),
                               base->getName() + "." + field->getName().str());
-  Address fieldAddr(addr, fieldTI.StorageAlignment);
+  Address fieldAddr = fieldTI.getAddressForPointer(addr);
   return IGF.emitAddressLValue(OwnedAddress(fieldAddr, base));
 }
 

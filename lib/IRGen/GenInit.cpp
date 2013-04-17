@@ -204,7 +204,7 @@ OwnedAddress Initialization::emitGlobalVariable(IRGenFunction &IGF,
 static OwnedAddress createEmptyAlloca(IRGenModule &IGM, const TypeInfo &type) {
   llvm::Value *badPointer =
     llvm::UndefValue::get(type.getStorageType()->getPointerTo());
-  return OwnedAddress(Address(badPointer, type.StorageAlignment),
+  return OwnedAddress(type.getAddressForPointer(badPointer),
                       IGM.RefCountedNull);
 }
 
@@ -233,7 +233,7 @@ OwnedAddress FixedTypeInfo::allocate(IRGenFunction &IGF, Initialization &init,
   // allocate it on the stack.
   if (!onHeap) {
     Address rawAddr =
-      IGF.createAlloca(getStorageType(), StorageAlignment, name);
+      IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
     // TODO: lifetime intrinsics?
 
     OwnedAddress addr(rawAddr, IGF.IGM.RefCountedNull);
@@ -331,7 +331,7 @@ void Initialization::emitZeroInit(IRGenFunction &IGF, InitializedObject object,
   IGF.Builder.CreateMemSet(IGF.Builder.CreateBitCast(addr.getAddress(),
                                                      IGF.IGM.Int8PtrTy),
                            IGF.Builder.getInt8(0),
-                           IGF.Builder.getInt64(type.StorageSize.getValue()),
+                           type.getSize(IGF),
                            addr.getAlignment().getValue(),
                            /*volatile*/ false);
 }

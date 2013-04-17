@@ -49,13 +49,13 @@ protected:
 public:
   void getSchema(ExplosionSchema &schema) const {
     schema.add(ExplosionSchema::Element::forAggregate(this->getStorageType(),
-                                                      this->StorageAlignment));
+                                              this->getBestKnownAlignment()));
   }
 
   unsigned getExplosionSize(ExplosionKind kind) const { return 1; }
 
   void initializeWithTake(IRGenFunction &IGF, Address dest, Address src) const {
-    IGF.emitMemCpy(dest, src, this->Base::StorageSize);
+    IGF.emitMemCpy(dest, src, this->Base::getFixedSize());
   }
 
   void load(IRGenFunction &IGF, Address src, Explosion &out) const {
@@ -123,7 +123,7 @@ public:
 
   void initialize(IRGenFunction &IGF, Explosion &in, Address dest) const {
     // Take ownership of the temporary and memcpy it into place.
-    Address src(in.forwardNext(IGF), this->StorageAlignment);
+    Address src = asDerived().Derived::getAddressForPointer(in.forwardNext(IGF));
     asDerived().Derived::initializeWithTake(IGF, dest, src);
   }
 
@@ -133,13 +133,13 @@ public:
 
   void copy(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
     auto srcManaged = in.claimNext();
-    Address src(srcManaged.getValue(), this->StorageAlignment);
+    Address src = asDerived().Derived::getAddressForPointer(srcManaged.getValue());
     asDerived().Derived::load(IGF, src, out);
     // Force the cleanup here?
   }
   
   void manage(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
-    Address obj(in.claimUnmanagedNext(), this->StorageAlignment);
+    Address obj = asDerived().Derived::getAddressForPointer(in.claimUnmanagedNext());
     if (asDerived().Derived::isPOD(ResilienceScope::Local)) {
       out.addUnmanaged(obj.getAddress());
     } else {

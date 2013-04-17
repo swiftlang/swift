@@ -1478,7 +1478,7 @@ static Address getAddressForUnsafePointer(IRGenFunction &IGF,
                                           llvm::Value *addr) {
   llvm::Value *castAddr =
   IGF.Builder.CreateBitCast(addr, type.getStorageType()->getPointerTo());
-  return Address(castAddr, type.StorageAlignment);
+  return type.getAddressForPointer(castAddr);
 }
 
 
@@ -2964,7 +2964,7 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
       enterReleaseCleanup(owner);
     }
 
-    return OwnedAddress(Address(addr, paramType.StorageAlignment), owner);
+    return OwnedAddress(paramType.getAddressForPointer(addr), owner);
   }
 
   OnHeap_t onHeap = param->hasFixedLifetime() ? NotOnHeap : OnHeap;
@@ -2976,7 +2976,7 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
     addr->setName(name);
     addr = Builder.CreateBitCast(addr,
                     paramSchema.begin()->getAggregateType()->getPointerTo());
-    Address paramAddr(addr, paramType.StorageAlignment);
+    Address paramAddr = paramType.getAddressForPointer(addr);
 
     // If we don't locally need the variable on the heap, just use the
     // original address.
@@ -3139,8 +3139,7 @@ void IRGenFunction::emitPrologue() {
     resultType.getSchema(resultSchema);
 
     if (resultSchema.requiresIndirectResult()) {
-      ReturnSlot = Address(values.claimUnmanagedNext(),
-                           resultType.StorageAlignment);
+      ReturnSlot = resultType.getAddressForPointer(values.claimUnmanagedNext());
     } else if (resultSchema.empty()) {
       assert(!ReturnSlot.isValid());
     } else {

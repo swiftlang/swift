@@ -195,8 +195,7 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
     TypeInfo const &retType = IGM.getFragileTypeInfo(
                                            ret->getType().getSwiftRValueType());
     
-    newLoweredAddress(retv, Address(params.claimUnmanagedNext(),
-                                    retType.StorageAlignment));
+    newLoweredAddress(retv, retType.getAddressForPointer(params.claimUnmanagedNext()));
   } else {
     // Map an indirect return for a type SIL considers loadable but still
     // requires an indirect return at the IR level.
@@ -205,8 +204,7 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
     ExplosionSchema schema = retType.getSchema(CurExplosionLevel);
     
     if (schema.requiresIndirectResult()) {
-      IndirectReturn = Address(params.claimUnmanagedNext(),
-                               retType.StorageAlignment);
+      IndirectReturn = retType.getAddressForPointer(params.claimUnmanagedNext());
     }
   }
 
@@ -236,8 +234,8 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
       TypeInfo const &argType = IGM.getFragileTypeInfo(
                                            arg->getType().getSwiftRValueType());
       if (arg->getType().isAddress()) {
-        newLoweredAddress(argv, Address(params.claimUnmanagedNext(),
-                                        argType.StorageAlignment));
+        newLoweredAddress(argv,
+                   argType.getAddressForPointer(params.claimUnmanagedNext()));
       } else {
         Explosion explosion(CurExplosionLevel);
         
@@ -1412,7 +1410,7 @@ void IRGenSILFunction::visitInitializeVarInst(swift::InitializeVarInst *i) {
   Builder.CreateMemSet(Builder.CreateBitCast(dest.getAddress(),
                                              IGM.Int8PtrTy),
                        Builder.getInt8(0),
-                       Builder.getInt64(ti.StorageSize.getValue()),
+                       ti.getSize(*this),
                        dest.getAlignment().getValue(),
                        /*isVolatile=*/ false);
 }

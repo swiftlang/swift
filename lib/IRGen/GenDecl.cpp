@@ -872,11 +872,15 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
   LinkInfo link = LinkInfo::get(*this, entity);
   auto addr = link.createVariable(*this, type.StorageType);
 
-  Alignment align = type.StorageAlignment;
-  addr->setAlignment(align.getValue());
+  // Ask the type to give us an Address.
+  Address result = type.getAddressForPointer(addr);
 
+  // Set that alignment back on the global variable.
+  addr->setAlignment(result.getAlignment().getValue());
+
+  // Write this to the cache and return.
   entry = addr;
-  return Address(addr, align);
+  return result;
 }
 
 /// Fetch the declaration corresponding to the given CapturingExpr.
