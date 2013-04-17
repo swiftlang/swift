@@ -23,7 +23,8 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/CallingConv.h"
 #include "IRBuilder.h"
-#include "JumpDest.h"
+#include "swift/Basic/DiverseStack.h"
+
 
 namespace llvm {
   class AllocaInst;
@@ -76,6 +77,9 @@ namespace irgen {
   class ManagedValue;
   class Scope;
   class TypeInfo;
+  class Cleanup;
+  typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
+
 
 /// LocalTypeData - A nonce value for storing some sort of
 /// locally-known information about a type.
@@ -147,7 +151,7 @@ public:
 
 //--- Control flow -------------------------------------------------------------
 public:
-  void emitBranch(JumpDest D);
+  void emitBranch(llvm::BasicBlock *block, CleanupsDepth depth);
 
   /// Push a new cleanup in the current scope.
   template <class T, class... A>
@@ -232,9 +236,7 @@ private:
   llvm::BasicBlock *UnreachableBB;
   llvm::Instruction *JumpDestSlot;
   CleanupsDepth InnermostScope;
-  std::vector<JumpDest> BreakDestStack;
-  std::vector<JumpDest> ContinueDestStack;
-
+  
   friend class Cleanup; // just so that it can befriend initCleanup
   friend class Scope;
   Cleanup &initCleanup(Cleanup &cleanup, size_t allocSize, CleanupState state);

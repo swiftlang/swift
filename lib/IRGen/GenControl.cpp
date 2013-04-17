@@ -21,7 +21,6 @@
 #include "Cleanup.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "JumpDest.h"
 #include "Scope.h"
 
 using namespace swift;
@@ -533,7 +532,7 @@ void IRGenFunction::endScope(CleanupsDepth depth) {
   if (Builder.hasValidIP() &&
       hasAnyActiveCleanups(Cleanups.begin(), Cleanups.find(depth))) {
     contBB = createBasicBlock("cleanups.fallthrough");
-    emitBranch(JumpDest(contBB, depth));
+    emitBranch(contBB, depth);
   }
 
   // Iteratively mark cleanups dead and pop them.
@@ -695,10 +694,10 @@ void IRGenFunction::setCleanupState(Cleanup &cleanup, CleanupState newState) {
 /// Emit a branch to the given jump destination, threading out through
 /// any cleanups we might need to run.  Leaves the insertion point in
 /// the current block.
-void IRGenFunction::emitBranch(JumpDest dest) {
+void IRGenFunction::emitBranch(llvm::BasicBlock *cblock, CleanupsDepth cdepth) {
   assert(Builder.hasValidIP());
 
-  auto depth = Cleanups.find(dest.getDepth());
+  auto depth = Cleanups.find(cdepth);
 
   // Find the topmost active cleanup.
   auto it = Cleanups.begin();
@@ -709,7 +708,7 @@ void IRGenFunction::emitBranch(JumpDest dest) {
 
   // If we got out to the destination depth, we're done.
   if (it == depth) {
-    Builder.CreateBr(dest.getBlock());
+    Builder.CreateBr(cblock);
     return;
   }
 
@@ -747,7 +746,7 @@ void IRGenFunction::emitBranch(JumpDest dest) {
   CleanupOutflows *outs = getOrCreateOutflows(*outermost);
   llvm::ConstantInt *labelValue = llvm::ConstantInt::get(IGM.Int32Ty,
                                                          destLabel);
-  outs->add(labelValue, dest.getBlock());
+  outs->add(labelValue, cblock);
 
   // Add the label to the outermost cleanup.
   outermost->addActiveUse();

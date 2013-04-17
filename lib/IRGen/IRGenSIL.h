@@ -28,7 +28,6 @@
 #include "GenObjC.h"
 #include "IRBuilder.h"
 #include "IRGenFunction.h"
-#include "JumpDest.h"
 #include <map>
 
 namespace swift {
