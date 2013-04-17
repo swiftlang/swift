@@ -1822,8 +1822,8 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
     IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     auto it = def->arg_begin();
-    Address dest = type.getAddressForPointer(it++);
-    Address src = type.getAddressForPointer(it++);
+    Address dest(it++, type.getFixedAlignment());
+    Address src(it++, type.getFixedAlignment());
     IGF.emitMemCpy(dest, src, type.getFixedSize());
     IGF.Builder.CreateRet(dest.getAddress());
   }
