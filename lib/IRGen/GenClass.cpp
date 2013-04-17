@@ -787,6 +787,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   }
 
   // Emit a defaulted class destructor if we didn't see one explicitly.
+  // FIXME: 
   if (D->isObjC() && !emittedDtor)
     emitClassDestructor(*this, D, nullptr);
 }

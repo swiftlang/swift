@@ -166,6 +166,7 @@ static void emitDeclRef(IRGenFunction &IGF, ValueDecl *D, Type Ty, SourceLoc Loc
 /// as that primitive scalar value.  This is just a convenience method
 /// for not needing to construct and destroy an Explosion.
 llvm::Value *IRGenFunction::emitAsPrimitiveScalar(Expr *E) {
+  assert(0);
   Explosion explosion(ExplosionKind::Minimal);
   emitRValue(E, explosion);
 
@@ -605,6 +606,7 @@ namespace {
 }
 
 void IRGenFunction::emitRValue(Expr *E, Explosion &explosion) {
+  assert(0);
   RValueEmitter(*this, explosion).visit(E);
 }
 
@@ -755,6 +757,7 @@ namespace {
 /// expression as an aggressive local optimization, use
 /// tryEmitAsAddress.
 LValue IRGenFunction::emitLValue(Expr *E) {
+  assert(0);
   assert(E->getType()->is<LValueType>());
   return LValueEmitter(*this).visit(E);
 }
@@ -900,6 +903,8 @@ namespace {
 /// This is useful for local optimizations.
 Optional<Address>
 IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
+  assert(0);
+
   return AddressEmitter(*this, type).visit(E);
 }
 
@@ -969,6 +974,8 @@ namespace {
 
 /// Emit an expression whose value is being ignored.
 void IRGenFunction::emitIgnored(Expr *E) {
+  assert(0);
+
   IgnoredExprEmitter(*this).visit(E);
 }
 
