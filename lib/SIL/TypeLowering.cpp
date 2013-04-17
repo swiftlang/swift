@@ -276,6 +276,8 @@ SILTypeInfo *TypeConverter::makeSILTypeInfo(CanType t, unsigned uncurryLevel) {
   if (ntd) {
     SmallVector<SILCompoundTypeInfo::Element, 4> compoundElements;
     // FIXME: record resilient attribute
+    // FIXME: We need to apply subsitutions from bound generic types to the
+    // generic field types.
     makeLayoutForDecl(compoundElements, ntd);
     return SILCompoundTypeInfo::create(t, compoundElements, M);
   }

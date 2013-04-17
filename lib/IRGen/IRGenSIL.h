@@ -513,6 +513,7 @@ public:
 
   void visitLoadInst(LoadInst *i);
   void visitStoreInst(StoreInst *i);
+  void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
   void visitMetatypeInst(MetatypeInst *i);
   void visitClassMetatypeInst(ClassMetatypeInst *i);

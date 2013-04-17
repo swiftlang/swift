@@ -1014,6 +1014,13 @@ void IRGenSILFunction::visitCondBranchInst(swift::CondBranchInst *i) {
   Builder.CreateCondBr(condValue, trueBB.bb, falseBB.bb);
 }
 
+void IRGenSILFunction::visitStructInst(swift::StructInst *i) {
+  Explosion out(CurExplosionLevel);
+  for (SILValue elt : i->getElements())
+    out.add(getLoweredExplosion(elt).claimAll());
+  newLoweredExplosion(SILValue(i, 0), out);
+}
+
 void IRGenSILFunction::visitTupleInst(swift::TupleInst *i) {
   Explosion out(CurExplosionLevel);
   for (SILValue elt : i->getElements())

@@ -151,8 +151,8 @@ public:
   FloatLiteralInst *createFloatLiteral(FloatLiteralExpr *E) {
     return insert(new FloatLiteralInst(E));
   }
-  StringLiteralInst *createStringLiteral(StringLiteralExpr *E) {
-    return insert(new StringLiteralInst(E));
+  StringLiteralInst *createStringLiteral(StringLiteralExpr *E, SILType Ty) {
+    return insert(new StringLiteralInst(E, Ty));
   }
 
   LoadInst *createLoad(SILLocation Loc, SILValue LV) {
@@ -171,8 +171,8 @@ public:
 
   CopyAddrInst *createCopyAddr(SILLocation Loc,
                                SILValue SrcLValue, SILValue DestLValue,
-                               bool isTake = false,
-                               bool isInitialize = false) {
+                               bool isTake,
+                               bool isInitialize) {
     return insert(new CopyAddrInst(Loc, SrcLValue, DestLValue,
                                    isTake, isInitialize));
   }
@@ -228,7 +228,12 @@ public:
                                                SILValue DestArchetypeAddr) {
     return insert(new SuperToArchetypeInst(Loc, SrcBase, DestArchetypeAddr));
   }
-  
+
+  StructInst *createStruct(SILLocation Loc, SILType Ty,
+                           ArrayRef<SILValue> Elements){
+    return insert(StructInst::create(Loc, Ty, Elements, F));
+  }
+
   TupleInst *createTuple(SILLocation Loc, SILType Ty,
                          ArrayRef<SILValue> Elements){
     return insert(TupleInst::create(Loc, Ty, Elements, F));

@@ -379,7 +379,7 @@ public:
 /// a StringLiteralExpr.
 class StringLiteralInst : public SILInstruction {
 public:
-  StringLiteralInst(StringLiteralExpr *E);
+  StringLiteralInst(StringLiteralExpr *E, SILType ty);
 
   StringLiteralExpr *getExpr() const;
 
@@ -694,7 +694,44 @@ public:
     return V->getKind() == ValueKind::SuperToArchetypeInst;
   }
 };
-  
+
+/// StructInst - Represents a constructed tuple.
+class StructInst : public SILInstruction {
+  TailAllocatedOperandList<0> Operands;
+
+  /// Private constructor.  Because of the storage requirements of
+  /// StructInst, object creation goes through 'create()'.
+  StructInst(SILLocation Loc, SILType Ty, ArrayRef<SILValue> Elements);
+  static StructInst *createImpl(SILLocation Loc, SILType Ty,
+                                ArrayRef<SILValue> Elements, SILFunction &F);
+
+public:
+  /// The elements referenced by this TupleInst.
+  MutableArrayRef<Operand> getElementOperands() {
+    return Operands.getDynamicAsArray();
+  }
+
+  /// The elements referenced by this TupleInst.
+  OperandValueArrayRef getElements() const {
+    return Operands.getDynamicValuesAsArray();
+  }
+
+  /// Construct a StructInst.
+  static StructInst *create(SILLocation Loc, SILType Ty,
+                            ArrayRef<SILValue> Elements, SILFunction &F) {
+    return createImpl(Loc, Ty, Elements, F);
+  }
+
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::StructInst;
+  }
+};
+
 /// TupleInst - Represents a constructed tuple.
 class TupleInst : public SILInstruction {
   TailAllocatedOperandList<0> Operands;

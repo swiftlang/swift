@@ -392,7 +392,22 @@ public:
     OS << "super_to_archetype " << getID(I->getSrcBase()) << " to "
        << getID(I->getDestArchetypeAddress());
   }
-  
+
+  void visitStructInst(StructInst *TI) {
+    OS << "struct $";
+    TI->getType().print(OS);
+    OS << ", (";
+    bool isFirst = true;
+    for (const auto &Elem : TI->getElements()) {
+      if (isFirst)
+        isFirst = false;
+      else
+        OS << ", ";
+      OS << getID(Elem);
+    }
+    OS << ')';
+  }
+
   void visitTupleInst(TupleInst *TI) {
     OS << "tuple (";
     bool isFirst = true;

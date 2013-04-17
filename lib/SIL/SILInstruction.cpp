@@ -291,11 +291,8 @@ APFloat FloatLiteralInst::getValue() const {
   return getExpr()->getValue();
 }
 
-StringLiteralInst::StringLiteralInst(StringLiteralExpr *E)
-  : SILInstruction(ValueKind::StringLiteralInst, E,
-                // The string literal tuple type is always a valid SIL type.
-                SILType::getPreLoweredType(E->getType()->getCanonicalType(),
-                                     /*address=*/false, /*loadable=*/true)) {
+StringLiteralInst::StringLiteralInst(StringLiteralExpr *E, SILType ty)
+  : SILInstruction(ValueKind::StringLiteralInst, E, ty) {
 }
 
 StringLiteralExpr *StringLiteralInst::getExpr() const {
@@ -400,6 +397,18 @@ SuperToArchetypeInst::SuperToArchetypeInst(SILLocation Loc,
                                            SILValue DestArchetypeAddress)
   : SILInstruction(ValueKind::SuperToArchetypeInst, Loc),
     Operands(this, SrcBase, DestArchetypeAddress) {
+}
+
+StructInst *StructInst::createImpl(SILLocation Loc, SILType Ty,
+                                 ArrayRef<SILValue> Elements, SILFunction &F) {
+  void *Buffer = F.allocate(sizeof(StructInst) +
+                            decltype(Operands)::getExtraSize(Elements.size()),
+                            alignof(StructInst));
+  return ::new(Buffer) StructInst(Loc, Ty, Elements);
+}
+
+StructInst::StructInst(SILLocation Loc, SILType Ty, ArrayRef<SILValue> Elems)
+  : SILInstruction(ValueKind::StructInst, Loc, Ty), Operands(this, Elems) {
 }
 
 TupleInst *TupleInst::createImpl(SILLocation Loc, SILType Ty,

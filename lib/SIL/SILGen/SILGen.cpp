@@ -173,15 +173,10 @@ void SILGenModule::addGlobalVariable(VarDecl *global) {
 }
 
 SILFunction *SILGenModule::emitConstructor(ConstructorDecl *decl) {
-  // Ignore prototypes.
-  // FIXME: generate default constructor, which appears in the AST as a
-  // prototype
-  if (decl->getBody() == nullptr) return nullptr;
-
   SILConstant constant(decl);
   SILFunction *f = preEmitFunction(constant, decl);
-  
-  if (decl->getImplicitThisDecl()->getType()->hasReferenceSemantics()) {
+
+  if (decl->getImplicitThisDecl()->getType()->getClassOrBoundGenericClass()) {
     // Class constructors have separate entry points for allocation and
     // initialization.
     SILGenFunction(*this, *f, /*hasVoidReturn=*/true)

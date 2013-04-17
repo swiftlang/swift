@@ -255,8 +255,9 @@ RValue SILGenFunction::visitCharacterLiteralExpr(CharacterLiteralExpr *E,
 }
 RValue SILGenFunction::visitStringLiteralExpr(StringLiteralExpr *E,
                                                     SGFContext C) {
-  return RValue(*this,
-              ManagedValue(B.createStringLiteral(E), ManagedValue::Unmanaged));
+  SILType ty = getLoweredLoadableType(E->getType());
+  SILValue string = B.createStringLiteral(E, ty);
+  return RValue(*this, ManagedValue(string, ManagedValue::Unmanaged));
 }
 
 RValue SILGenFunction::visitLoadExpr(LoadExpr *E, SGFContext C) {
@@ -1316,10 +1317,96 @@ static void emitConstructorMetatypeArg(SILGenFunction &gen,
   // the metatype as its first argument, like a static function.
   Type metatype = ctor->getType()->castTo<AnyFunctionType>()->getInput();
   new (gen.F.getModule()) SILArgument(gen.getLoweredType(metatype),
-                                     gen.F.begin());
+                                      gen.F.begin());
+}
+
+static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
+                                              SILLocation loc,
+                                              Type ty) {
+  SILType argTy = gen.getLoweredType(ty);
+  
+  // Restructure tuple arguments.
+  if (TupleType *tupleTy = argTy.getAs<TupleType>()) {
+    RValue tuple(tupleTy->getCanonicalType());
+    for (auto &field : tupleTy->getFields())
+      tuple.addElement(
+                   emitImplicitValueConstructorArg(gen, loc, field.getType()));
+
+    return tuple;
+  } else {
+    SILValue arg = new (gen.F.getModule()) SILArgument(gen.getLoweredType(ty),
+                                                       gen.F.begin());
+    return RValue(gen, ManagedValue(arg, ManagedValue::Unmanaged));
+  }
+}
+
+namespace {
+  class ImplicitValueInitialization : public SingleInitializationBase {
+    SILValue slot;
+  public:
+    ImplicitValueInitialization(SILValue slot, Type type)
+      : SingleInitializationBase(type), slot(slot)
+    {}
+    
+    SILValue getAddressOrNull() override {
+      return slot;
+    };
+  };
+}
+
+static void emitImplicitValueConstructor(SILGenFunction &gen,
+                                         ConstructorDecl *ctor) {
+  emitConstructorMetatypeArg(gen, ctor);
+
+  auto *TP = cast<TuplePattern>(ctor->getArguments());
+  SILType thisTy
+    = gen.getLoweredType(ctor->getImplicitThisDecl()->getType());
+
+  // Emit the elementwise arguments.
+  SmallVector<RValue, 4> elements;
+  for (size_t i = 0; i < TP->getFields().size(); ++i) {
+    auto *P = cast<TypedPattern>(TP->getFields()[i].getPattern());
+    
+    elements.push_back(
+                     emitImplicitValueConstructorArg(gen, ctor, P->getType()));
+  }
+  
+  // If we have an indirect return slot, initialize it in-place in the implicit
+  // return slot.
+  if (thisTy.isAddressOnly()) {
+    SILValue resultSlot
+      = new (gen.F.getModule()) SILArgument(thisTy, gen.F.begin());
+    
+    for (size_t i = 0; i < elements.size(); ++i) {
+      SILType argTy = gen.getLoweredType(elements[i].getType());
+
+      // Store each argument in the corresponding element of 'this'.
+      SILValue slot = gen.B.createElementAddr(ctor, resultSlot, i,
+                                              argTy.getAddressType());
+      InitializationPtr init(new ImplicitValueInitialization(slot,
+                                                         elements[i].getType()));
+      std::move(elements[i]).forwardInto(gen, init.get());
+    }
+    gen.B.createReturn(ctor, gen.emitEmptyTuple(ctor));
+    return;
+  }
+  
+  // Otherwise, build a struct value directly from the elements.
+  SmallVector<SILValue, 4> eltValues;
+  for (RValue &rv : elements) {
+    eltValues.push_back(std::move(rv).forwardAsSingleValue(gen));
+  }
+  
+  SILValue thisValue = gen.B.createStruct(ctor, thisTy, eltValues);
+  gen.B.createReturn(ctor, thisValue);
+  return;
 }
 
 void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
+  // If there's no body, this is the implicit elementwise constructor.
+  if (!ctor->getBody())
+    return emitImplicitValueConstructor(*this, ctor);
+  
   // Emit the prolog.
   emitConstructorMetatypeArg(*this, ctor);
   emitProlog(ctor->getArguments(), ctor->getImplicitThisDecl()->getType());
@@ -1493,10 +1580,31 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   B.createReturn(ctor, initedThisValue);
 }
 
+static void emitClassImplicitConstructorInitializer(SILGenFunction &gen,
+                                                    ConstructorDecl *ctor) {
+  // The default constructor is currently a no-op. Just return back 'this'.
+  // FIXME: We should default-construct fields maybe?
+
+  assert(cast<TuplePattern>(ctor->getArguments())->getNumFields() == 0
+         && "implicit class ctor has arguments?!");
+
+  VarDecl *thisDecl = ctor->getImplicitThisDecl();
+  SILType thisTy = gen.getLoweredLoadableType(thisDecl->getType());
+  SILValue thisArg = new (gen.SGM.M) SILArgument(thisTy, gen.F.begin());
+  assert(thisTy.hasReferenceSemantics() &&
+         "can't emit a value type ctor here");
+  
+  gen.B.createReturn(ctor, thisArg);
+}
+
 void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
+  // If there's no body, this is the implicit constructor.
+  if (!ctor->getBody())
+    return emitClassImplicitConstructorInitializer(*this, ctor);
+  
   // Emit the 'this' argument and make an lvalue for it.
   VarDecl *thisDecl = ctor->getImplicitThisDecl();
-  SILType thisTy = getLoweredType(thisDecl->getType());
+  SILType thisTy = getLoweredLoadableType(thisDecl->getType());
   SILValue thisArg = new (SGM.M) SILArgument(thisTy, F.begin());
   assert(thisTy.hasReferenceSemantics() &&
          "can't emit a value type ctor here");

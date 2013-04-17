@@ -593,101 +593,6 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, CanType thisType) {
   return IGF.Builder.CreateBitCast(val, destType);
 }
 
-static void emitClassAllocatingConstructor(IRGenModule &IGM,
-                                           ConstructorDecl *CD,
-                                           llvm::Function *allocFn,
-                                           llvm::Function *initFn) {
-  auto thisDecl = CD->getImplicitThisDecl();
-  CanType thisType = thisDecl->getType()->getCanonicalType();
-  CanType thisMetaType = MetaTypeType::get(thisDecl->getType(), IGM.Context)
-    ->getCanonicalType();
-  
-  Pattern* pats[] = {
-    new (IGM.Context) AnyPattern(SourceLoc()),
-    CD->getArguments()
-  };
-  pats[0]->setType(thisMetaType);
-  
-  IRGenFunction IGF(IGM, CD->getType()->getCanonicalType(), pats,
-                    ExplosionKind::Minimal, 1, allocFn, Prologue::Bare);
-  
-  // Gather our arguments.
-  Explosion args = IGF.collectParameters();
-  
-  // Pick out the metatype we received and use it as the local type data for
-  // the 'this' type.
-  llvm::Value *metadata = args.takeLast().getUnmanagedValue();
-  
-  // If the argument wasn't a type metadata pointer, something is screwed up in
-  // extracting fulfillments from the class metadata.
-  assert(metadata->getType() == IGM.TypeMetadataPtrTy &&
-         "allocating ctor did not receive class metadata as its last param?!");
-  
-  IGF.setUnscopedLocalTypeData(thisType,
-                               LocalTypeData::Metatype,
-                               metadata);
-
-  // We'll forward the rest of the arguments to the initializer.
-  SmallVector<llvm::Value*, 8> argValues;
-  for (ManagedValue arg : args.claimAll()) {
-    argValues.push_back(arg.getValue());
-  }
-
-  // Allocate the "this" value.
-  llvm::Value *thisValue;
-  if (!CD->getAllocThisExpr()) {
-    thisValue = emitClassAllocation(IGF, thisType);
-  } else {
-    // Use the allocation expression described in the AST to initialize 'this'.
-    Explosion allocedThis(ExplosionKind::Minimal);
-    IGF.emitRValue(CD->getAllocThisExpr(), allocedThis);
-    thisValue = allocedThis.claimNext().getValue();
-  }
-  
-  // Pass 'this' on to the initializer.
-  argValues.push_back(thisValue);
-    
-  // Emit a tail call to the initializing constructor.
-  llvm::CallSite callSite = IGF.emitInvoke(initFn->getCallingConv(),
-                                           initFn, argValues,
-                                           initFn->getAttributes());
-  llvm::CallInst *call = cast<llvm::CallInst>(callSite.getInstruction());
-  call->setTailCall();
-  IGF.Builder.CreateRet(call);
-}
-
-static void emitClassInitializingConstructor(IRGenModule &IGM,
-                                             ConstructorDecl *CD,
-                                             llvm::Function *initFn) {
-  auto thisDecl = CD->getImplicitThisDecl();
-  CanType thisType = thisDecl->getType()->getCanonicalType();
-  
-  // The initializing constructor looks like a function with param patterns
-  // (this:T)(args...) -> T.
-  Pattern *pats[] = {
-    new (IGM.Context) NamedPattern(thisDecl),
-    CD->getArguments()
-  };
-  pats[0]->setType(thisType);
-
-  // Emit the constructor body, if any.
-  IRGenFunction IGF(IGM, CD->getInitializerType()->getCanonicalType(), pats,
-                    ExplosionKind::Minimal, 1, initFn, Prologue::Standard);
-  
-  IGF.emitConstructorBody(CD);
-}
-
-static void emitClassConstructors(IRGenModule &IGM, ConstructorDecl *CD) {
-  llvm::Function *allocFn = IGM.getAddrOfConstructor(CD,
-                                                    ConstructorKind::Allocating,
-                                                    ExplosionKind::Minimal);
-  llvm::Function *initFn = IGM.getAddrOfConstructor(CD,
-                                                  ConstructorKind::Initializing,
-                                                  ExplosionKind::Minimal);
-  emitClassAllocatingConstructor(IGM, CD, allocFn, initFn);
-  emitClassInitializingConstructor(IGM, CD, initFn);
-}
-
 /// emitClassDecl - Emit all the declarations associated with this class type.
 void IRGenModule::emitClassDecl(ClassDecl *D) {
   PrettyStackTraceDecl prettyStackTrace("emitting class metadata for", D);
@@ -745,12 +650,6 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       continue;
     case DeclKind::Constructor: {
       // Constructors are lowered through SIL.
-      // FIXME: SIL doesn't build the implicit constructor for structs yet.
-      ConstructorDecl *cd = cast<ConstructorDecl>(member);
-      if (cd->getBody())
-        continue;
-      
-      emitClassConstructors(*this, cd);
       continue;
     }
     case DeclKind::Destructor: {

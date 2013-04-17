@@ -87,49 +87,6 @@ namespace {
   };
 }  // end anonymous namespace.
 
-static void emitValueConstructor(IRGenModule &IGM,
-                                 llvm::Function *fn,
-                                 ConstructorDecl *ctor) {
-  auto thisDecl = ctor->getImplicitThisDecl();
-
-  Pattern *pats[] = {
-    new (IGM.Context) AnyPattern(SourceLoc()),
-    ctor->getArguments()
-  };
-  pats[0]->setType(MetaTypeType::get(thisDecl->getType(), IGM.Context));
-  IRGenFunction IGF(IGM, ctor->getType()->getCanonicalType(), pats,
-                    ExplosionKind::Minimal, 1, fn, Prologue::Standard);
-
-  const StructTypeInfo &thisTI =
-      IGF.getFragileTypeInfo(thisDecl->getType()).as<StructTypeInfo>();
-  Initialization I;
-  I.registerObject(IGF, I.getObjectForDecl(thisDecl),
-                   thisDecl->hasFixedLifetime() ? NotOnHeap : OnHeap, thisTI);
-  OwnedAddress addr = I.emitVariable(IGF, thisDecl, thisTI);
-
-  unsigned FieldIndex = 0;
-  TuplePattern *TP = cast<TuplePattern>(ctor->getArguments());
-  StructDecl *SD = cast<StructDecl>(ctor->getDeclContext());
-  for (Decl *D : SD->getMembers()) {
-    if (isa<VarDecl>(D) && !cast<VarDecl>(D)->isProperty()) {
-      TypedPattern *P = cast<TypedPattern>(TP->getFields()[FieldIndex].getPattern());
-      NamedPattern *NP = cast<NamedPattern>(P->getSubPattern());
-      OwnedAddress inaddr = IGF.getLocalVar(NP->getDecl());
-
-      Explosion e(ExplosionKind::Minimal);
-      const StructFieldInfo &field = thisTI.getFields()[FieldIndex];
-      field.getTypeInfo().load(IGF, inaddr, e);
-      field.getTypeInfo().initialize(IGF, e, field.projectAddress(IGF, addr));
-      FieldIndex++;
-    }
-  }
-
-  I.markInitialized(IGF, I.getObjectForDecl(thisDecl));
-
-  IGF.emitConstructorBody(ctor);
-}
-
-
 OwnedAddress irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                                        OwnedAddress base,
                                                        CanType baseType,
@@ -209,17 +166,7 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
       // Methods are emitted as SIL Functions already.
       continue;
     case DeclKind::Constructor: {
-      auto ctor = cast<ConstructorDecl>(member);
-      if (!ctor->getBody()) {
-        llvm::Function *fn =
-          getAddrOfConstructor(ctor, ConstructorKind::Allocating,
-                               ExplosionKind::Minimal);
-        emitValueConstructor(*this, fn, ctor);
-      } else {
-        // Constructors get emitted as SIL Functions.
-        // FIXME: SIL does not generate the implicit constructor.
-        continue;
-      }
+      // Constructors get emitted as SIL Functions.
       continue;
     }
     }

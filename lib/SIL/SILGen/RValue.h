@@ -115,11 +115,10 @@ public:
   /// \param address - the address to assign to.
   void forwardInto(SILGenFunction &gen, SILLocation loc, SILValue address) {
     if (getType().isAddressOnly()) {
-      bool canTake = hasCleanup();
-      if (canTake) {
+      if (hasCleanup())
         forwardCleanup(gen);
-      }
-      gen.B.createCopyAddr(loc, getValue(), address, canTake,
+      gen.B.createCopyAddr(loc, getValue(), address,
+                           /*isTake*/ true,
                            /*isInitialize*/ true);
     } else
       gen.emitStore(loc, *this, address);
@@ -133,13 +132,10 @@ public:
   /// \param address - the address to assign to.
   void assignInto(SILGenFunction &gen, SILLocation loc, SILValue address) {
     if (getType().isAddressOnly()) {
-      // If we own a cleanup for this value, we can "take" the value and disable
-      // the cleanup.
-      bool canTake = hasCleanup();
-      if (canTake) {
+      if (hasCleanup())
         forwardCleanup(gen);
-      }
-      gen.B.createCopyAddr(loc, getValue(), address, canTake,
+      gen.B.createCopyAddr(loc, getValue(), address,
+                           /*isTake*/ true,
                            /*isInitialize*/ false);
     } else {
       // src is a loadable type; release the old value if necessary and store
@@ -281,6 +277,8 @@ public:
   
   /// Extract the tuple elements from the rvalue.
   void extractElements(llvm::SmallVectorImpl<RValue> &elements) &&;
+  
+  CanType getType() const & { return type; }
 };
 
 } // end namespace Lowering

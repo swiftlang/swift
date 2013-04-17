@@ -300,8 +300,27 @@ public:
             "Specialize source and dest uncurry levels must match");
   }
 
+  void checkStructInst(StructInst *SI) {
+    require(SI->getType().is<StructType>()
+            || SI->getType().is<BoundGenericStructType>(),
+            "StructInst should return a struct");
+    require(!SI->getType().isAddress(),
+            "StructInst cannot produce an address");
+    
+    SILCompoundTypeInfo *ti = SI->getType().getCompoundTypeInfo();
+    require(SI->getElements().size() == ti->getElements().size(),
+            "struct field count mismatch!");
+    
+    for (size_t i = 0; i < SI->getElements().size(); ++i) {
+      require(SI->getElements()[i].getType() == ti->getElements()[i].type,
+              "struct element arguments do not match struct type!");
+    }
+  }
+
   void checkTupleInst(TupleInst *TI) {
     require(TI->getType().is<TupleType>(), "TupleInst should return a tuple");
+    require(!TI->getType().isAddress(),
+            "TupleInst cannot produce an address");
     TupleType *ResTy = TI->getType().castTo<TupleType>();
 
     require(TI->getElements().size() == ResTy->getFields().size(),
@@ -400,6 +419,17 @@ public:
             "cannot extract from reference type");
     require(!EI->getType(0).isAddress(),
             "result of extract cannot be address");
+    require(operandTy.is<TupleType>() || operandTy.is<StructType>()
+            || operandTy.is<BoundGenericStructType>(),
+            "must extract from tuple or struct");
+    
+    SILCompoundTypeInfo *ti = operandTy.getCompoundTypeInfo();
+    require(EI->getFieldNo() < ti->getElements().size(),
+            "invalid field index for extract instruction");
+    // FIXME: TypeLowering does not properly apply substitutions to generic
+    // struct types.
+    //require(EI->getType(0) == ti->getElements()[EI->getFieldNo()].type,
+    //        "result type does not match type of element");
   }
 
   void checkElementAddrInst(ElementAddrInst *EI) {
@@ -410,6 +440,18 @@ public:
             "cannot derive element_addr from reference type");
     require(EI->getType(0).isAddress(),
             "result of element_addr must be lvalue");
+    require(operandTy.is<TupleType>() || operandTy.is<StructType>()
+            || operandTy.is<BoundGenericStructType>(),
+            "must extract from tuple or struct");
+
+    SILCompoundTypeInfo *ti = operandTy.getCompoundTypeInfo();
+    require(EI->getFieldNo() < ti->getElements().size(),
+            "invalid field index for element_addr instruction");
+    // FIXME: TypeLowering does not properly apply substitutions to generic
+    // struct types.
+    // require(EI->getType(0)
+    //           == ti->getElements()[EI->getFieldNo()].type.getAddressType(),
+    //         "result type does not match type of address to element");
   }
   
   void checkRefElementAddrInst(RefElementAddrInst *EI) {
