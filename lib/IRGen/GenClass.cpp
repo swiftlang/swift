@@ -367,22 +367,24 @@ static llvm::Value *emitGEPToOffset(IRGenFunction &IGF,
 }
 
 /// Emit a field l-value by applying the given offset to the given base.
-static LValue emitLValueAtOffset(IRGenFunction &IGF,
-                                 llvm::Value *base, llvm::Value *offset,
-                                 VarDecl *field) {
+static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
+                                        llvm::Value *base,
+                                        llvm::Value *offset,
+                                        VarDecl *field) {
   auto &fieldTI = IGF.getFragileTypeInfo(field->getType());
   auto addr = emitGEPToOffset(IGF, base, offset, fieldTI.getStorageType(),
                               base->getName() + "." + field->getName().str());
   Address fieldAddr = fieldTI.getAddressForPointer(addr);
-  return IGF.emitAddressLValue(OwnedAddress(fieldAddr, base));
+  return OwnedAddress(fieldAddr, base);
 }
 
-static LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
-                                            llvm::Value *base,
-                                            CanType baseType,
-                                            ClassDecl *baseClass,
-                                            const ClassTypeInfo &baseClassTI,
-                                            VarDecl *field) {
+OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
+                                                      llvm::Value *base,
+                                                      CanType baseType,
+                                                      VarDecl *field) {
+  auto &baseClassTI = IGF.getFragileTypeInfo(baseType).as<ClassTypeInfo>();
+  ClassDecl *baseClass = baseType->getClassOrBoundGenericClass();
+  
   LayoutClass layout(IGF.IGM, ResilienceScope::Local, baseClass, baseType);
   
   auto &entry = layout.getFieldEntry(field);
@@ -394,32 +396,32 @@ static LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
       Address baseAddr(base, baseClassTI.getHeapAlignment(IGF.IGM));
       auto &element = baseClassTI.getElements(IGF.IGM)[fieldIndex];
       Address memberAddr = element.project(IGF, baseAddr);
-      return IGF.emitAddressLValue(OwnedAddress(memberAddr, base));
+      return OwnedAddress(memberAddr, base);
     }
       
     case FieldAccess::NonConstantDirect: {
       Address offsetA = IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ false);
       auto offset = IGF.Builder.CreateLoad(offsetA, "offset");
-      return emitLValueAtOffset(IGF, base, offset, field);
+      return emitAddressAtOffset(IGF, base, offset, field);
     }
       
     case FieldAccess::ConstantIndirect: {
       auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
       auto offset = emitClassFieldOffset(IGF, baseClass, field, metadata);
-      return emitLValueAtOffset(IGF, base, offset, field);
+      return emitAddressAtOffset(IGF, base, offset, field);
     }
       
     case FieldAccess::NonConstantIndirect: {
       auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
       Address indirectOffsetA =
-      IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ true);
+        IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ true);
       auto indirectOffset =
-      IGF.Builder.CreateLoad(indirectOffsetA, "indirect-offset");
+        IGF.Builder.CreateLoad(indirectOffsetA, "indirect-offset");
       auto offsetA =
-      emitGEPToOffset(IGF, metadata, indirectOffset, IGF.IGM.SizeTy);
+        emitGEPToOffset(IGF, metadata, indirectOffset, IGF.IGM.SizeTy);
       auto offset =
-      IGF.Builder.CreateLoad(Address(offsetA, IGF.IGM.getPointerAlignment()));
-      return emitLValueAtOffset(IGF, base, offset, field);
+        IGF.Builder.CreateLoad(Address(offsetA, IGF.IGM.getPointerAlignment()));
+      return emitAddressAtOffset(IGF, base, offset, field);
     }
   }
   llvm_unreachable("bad field-access strategy");
@@ -427,8 +429,6 @@ static LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
 
 static LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
                                             Expr *baseE,
-                                            ClassDecl *baseClass,
-                                            const ClassTypeInfo &baseClassTI,
                                             VarDecl *field) {
   Explosion explosion(ExplosionKind::Maximal);
   // FIXME: Can we avoid the retain/release here in some cases?
@@ -436,39 +436,21 @@ static LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
   ManagedValue baseVal = explosion.claimNext();
   llvm::Value *base = baseVal.getValue();
   auto baseType = baseE->getType()->getCanonicalType();
-  return ::emitPhysicalClassMemberLValue(IGF, base, baseType,
-                                         baseClass, baseClassTI, field);
-}
-
-OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
-                                                      llvm::Value *base,
-                                                      CanType baseType,
-                                                      VarDecl *field) {
-  auto &baseTI = IGF.getFragileTypeInfo(baseType).as<ClassTypeInfo>();
-  LValue lv = ::emitPhysicalClassMemberLValue(IGF,
-                                      base,
-                                      baseType,
-                                      baseType->getClassOrBoundGenericClass(),
-                                      baseTI,
-                                      field);
-  return IGF.emitAddressForPhysicalLValue(lv);
+  OwnedAddress addr
+    = projectPhysicalClassMemberAddress(IGF, base, baseType, field);
+  return IGF.emitAddressLValue(addr);
 }
 
 LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
                                             MemberRefExpr *E) {
-  auto baseType = E->getBase()->getType()->castTo<ClassType>();
-  auto &baseTI = IGF.getFragileTypeInfo(baseType).as<ClassTypeInfo>();
   return ::emitPhysicalClassMemberLValue(IGF, E->getBase(),
-                                         baseType->getDecl(), baseTI,
                                          E->getDecl());
 }
 
 LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
                                             GenericMemberRefExpr *E) {
-  auto baseType = E->getBase()->getType()->castTo<BoundGenericClassType>();
-  auto &baseTI = IGF.getFragileTypeInfo(baseType).as<ClassTypeInfo>();
-  return ::emitPhysicalClassMemberLValue(IGF, E->getBase(), baseType->getDecl(),
-                                         baseTI, cast<VarDecl>(E->getDecl()));
+  return ::emitPhysicalClassMemberLValue(IGF, E->getBase(),
+                                         cast<VarDecl>(E->getDecl()));
 }
 
 namespace {
