@@ -50,13 +50,6 @@ namespace irgen {
   void emitTupleElement(IRGenFunction &IGF, TupleElementExpr *E,
                         Explosion &explosion);
 
-  /// Try to emit an element projection as a 'natural' physical address.
-  Optional<Address> tryEmitTupleElementAsAddress(IRGenFunction &IGF,
-                                                 TupleElementExpr *E);
-
-  /// Emit an element projection l-value.
-  LValue emitTupleElementLValue(IRGenFunction &IGF, TupleElementExpr *E);
-
   /// Emit a tuple literal expression as an r-value.
   void emitTupleLiteral(IRGenFunction &IGF, TupleExpr *E,
                         Explosion &explosion);

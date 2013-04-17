@@ -311,12 +311,8 @@ public:
   void emitFakeExplosion(const TypeInfo &type, Explosion &explosion);
   LValue emitFakeLValue(Type type);
 
-  void emitIgnored(Expr *E);
-
   void emitInit(Expr *E, Address address, const TypeInfo &type);
 
-  LValue emitLValue(Expr *E);
-  Optional<Address> tryEmitAsAddress(Expr *E, const TypeInfo &type);
   LValue emitAddressLValue(OwnedAddress addr);
   OwnedAddress emitAddressForPhysicalLValue(const LValue &lvalue);
   void emitLValueAsScalar(LValue &&lvalue, OnHeap_t onHeap,

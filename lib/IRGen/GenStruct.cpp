@@ -186,39 +186,6 @@ void irgen::projectPhysicalStructMemberFromExplosion(IRGenFunction &IGF,
   out.add(element);
 }
 
-static LValue emitPhysicalStructMemberLValue(IRGenFunction &IGF,
-                                             Expr *base,
-                                             StructDecl *baseStruct,
-                                             const StructTypeInfo &baseTI,
-                                             VarDecl *field) {
-  LValue lvalue = IGF.emitLValue(base);
-  unsigned fieldIndex = getFieldIndex(baseStruct, field);
-  auto &fieldI = baseTI.getFields()[fieldIndex];
-  lvalue.add<PhysicalStructMember>(fieldI);
-  return lvalue;
-}
-
-LValue irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
-                                             MemberRefExpr *E) {
-  auto lvalueType = E->getBase()->getType()->castTo<LValueType>();
-  auto baseType = lvalueType->getObjectType()->castTo<StructType>();
-  auto &baseTI = IGF.getFragileTypeInfo(baseType).as<StructTypeInfo>();
-  return ::emitPhysicalStructMemberLValue(IGF, E->getBase(),
-                                          baseType->getDecl(), baseTI,
-                                          E->getDecl());
-}
-
-LValue irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
-                                             GenericMemberRefExpr *E) {
-  auto lvalueType = E->getBase()->getType()->castTo<LValueType>();
-  auto baseType = lvalueType->getObjectType()->castTo<BoundGenericType>();
-  auto &baseTI = IGF.getFragileTypeInfo(baseType).as<StructTypeInfo>();
-  return ::emitPhysicalStructMemberLValue(IGF, E->getBase(),
-                                          cast<StructDecl>(baseType->getDecl()),
-                                          baseTI, cast<VarDecl>(E->getDecl()));
-}
-
-
 /// emitStructDecl - Emit all the declarations associated with this struct type.
 void IRGenModule::emitStructDecl(StructDecl *st) {
   emitStructMetadata(*this, st);

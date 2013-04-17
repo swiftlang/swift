@@ -204,7 +204,6 @@ static void emitGetMetatype(IRGenFunction &IGF, Expr *base, Explosion &out) {
   }
 
   // Otherwise, ignore and use the static type.
-  IGF.emitIgnored(base);
   emitMetaTypeRef(IGF, type, out);
 }
 
@@ -270,10 +269,10 @@ namespace {
   public:
     RValueEmitter(IRGenFunction &IGF, Explosion &out) : IGF(IGF), Out(out) {}
 
+    void visitExpr(Expr *) {}
+    
     void visitLoadExpr(LoadExpr *E) {
-      const TypeInfo &type = IGF.getFragileTypeInfo(E->getType());
-      return IGF.emitLoad(IGF.emitLValue(E->getSubExpr()),
-                          type, Out);
+      abort();
     }
 
     void visitMaterializeExpr(MaterializeExpr *E) {
@@ -290,9 +289,7 @@ namespace {
     }
 
     void visitSubscriptExpr(SubscriptExpr *E) {
-      IGF.emitLValueAsScalar(emitSubscriptLValue(IGF, E),
-                             isOnHeap(E->getType()), Out);
-    }
+     }
     
     void visitTupleShuffleExpr(TupleShuffleExpr *E) {
       emitTupleShuffle(IGF, E, Out);
@@ -362,7 +359,6 @@ namespace {
     }
 
     void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
-      IGF.emitIgnored(E->getLHS());
       IGF.emitRValue(E->getRHS(), Out);
     }
     
@@ -474,8 +470,6 @@ namespace {
     }
 
     void visitMemberRefExpr(MemberRefExpr *E) {
-      IGF.emitLValueAsScalar(emitMemberRefLValue(IGF, E),
-                             isOnHeap(E->getType()), Out);
     }
     
     bool isLValueMember(ValueDecl *D) {
@@ -494,7 +488,6 @@ namespace {
                                       isOnHeap(E->getType()), Out);        \
       }                                                                    \
       if (isTypeMember(E->getDecl())) {                                    \
-        IGF.emitIgnored(E->getBase());                                     \
         auto type = cast<TypeDecl>(E->getDecl())->getDeclaredType()        \
           ->getCanonicalType();                                            \
         return emitMetaTypeRef(IGF, type, Out);                            \
@@ -511,7 +504,6 @@ namespace {
 
     FOR_MEMBER_KIND(Existential)
     FOR_MEMBER_KIND(Archetype)
-    FOR_MEMBER_KIND(Generic)
 #undef FOR_MEMBER_KIND
 
     void visitCapturingExpr(CapturingExpr *E) {
@@ -566,8 +558,6 @@ namespace {
     }
 
     void visitLoadExpr(LoadExpr *E) {
-      return emitLoadAsInit(IGF, IGF.emitLValue(E->getSubExpr()),
-                            Addr, AddrTI);
     }
 
     void visitErasureExpr(ErasureExpr *E) {
@@ -588,325 +578,6 @@ void IRGenFunction::emitRValueAsInit(Expr *E, Address addr,
                                      const TypeInfo &addrTI) {
   assert(0);
   RValueInitEmitter(*this, addrTI, addr).visit(E);
-}
-
-namespace {
-  class LValueEmitter : public irgen::ExprVisitor<LValueEmitter, LValue> {
-    IRGenFunction &IGF;
-
-  public:
-    LValueEmitter(IRGenFunction &IGF) : IGF(IGF) {}
-
-#define NOT_LVALUE_EXPR(Id) \
-    LValue visit##Id##Expr(Id##Expr *E) { \
-      llvm_unreachable("these expression kinds should never be l-values"); \
-    }
-    NOT_LVALUE_EXPR(Apply)
-    NOT_LVALUE_EXPR(IntegerLiteral)
-    NOT_LVALUE_EXPR(FloatLiteral)
-    NOT_LVALUE_EXPR(CharacterLiteral)
-    NOT_LVALUE_EXPR(StringLiteral)
-    NOT_LVALUE_EXPR(InterpolatedStringLiteral)
-    NOT_LVALUE_EXPR(TupleShuffle)
-    NOT_LVALUE_EXPR(FunctionConversion)
-    NOT_LVALUE_EXPR(MetatypeConversion)
-    NOT_LVALUE_EXPR(Erasure)
-    NOT_LVALUE_EXPR(Specialize) // FIXME: Generic subscripts?
-    NOT_LVALUE_EXPR(DerivedToBase)
-    NOT_LVALUE_EXPR(ArchetypeToSuper)
-    NOT_LVALUE_EXPR(ScalarToTuple)
-    NOT_LVALUE_EXPR(Func)
-    NOT_LVALUE_EXPR(Closure)
-    NOT_LVALUE_EXPR(Load)
-    NOT_LVALUE_EXPR(Tuple)
-    NOT_LVALUE_EXPR(Array)
-    NOT_LVALUE_EXPR(Collection)
-    NOT_LVALUE_EXPR(NewArray)
-    NOT_LVALUE_EXPR(NewReference)
-    NOT_LVALUE_EXPR(Metatype)
-    NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
-    NOT_LVALUE_EXPR(Coerce)
-    NOT_LVALUE_EXPR(UncheckedDowncast)
-    NOT_LVALUE_EXPR(UncheckedSuperToArchetype)
-    NOT_LVALUE_EXPR(IsSubtype)
-    NOT_LVALUE_EXPR(SuperIsArchetype)
-    NOT_LVALUE_EXPR(Module)
-    NOT_LVALUE_EXPR(BridgeToBlock)
-    NOT_LVALUE_EXPR(OtherConstructorDeclRef)
-    NOT_LVALUE_EXPR(RebindThisInConstructor)
-    NOT_LVALUE_EXPR(If)
-#undef NOT_LVALUE_EXPR
-
-    LValue visitTupleElementExpr(TupleElementExpr *E) {
-      return emitTupleElementLValue(IGF, E);
-    }
-
-    // Qualification never affects emission as an l-value.
-    LValue visitRequalifyExpr(RequalifyExpr *E) {
-      return visit(E->getSubExpr());
-    }
-
-    LValue visitMaterializeExpr(MaterializeExpr *E) {
-      OwnedAddress addr = emitMaterializeExpr(IGF, E);
-      return IGF.emitAddressLValue(addr);
-    }
-
-    LValue visitDeclRefExpr(DeclRefExpr *E) {
-      return emitDeclRefLValue(IGF, E->getDecl(), E->getType());
-    }
-    
-    LValue visitSuperRefExpr(SuperRefExpr *E) {
-      return emitDeclRefLValue(IGF, E->getThis(), E->getType());
-    }
-    
-    LValue visitMemberRefExpr(MemberRefExpr *E) {
-      return emitMemberRefLValue(IGF, E);
-    }
-    
-    LValue visitSubscriptExpr(SubscriptExpr *E) {
-      return emitSubscriptLValue(IGF, E);
-    }
-
-#define FOR_MEMBER_KIND(KIND)                                              \
-    LValue visit##KIND##MemberRefExpr(KIND##MemberRefExpr *E) {            \
-      return emit##KIND##MemberRefLValue(IGF, E);                          \
-    }                                                                      \
-    LValue visit##KIND##SubscriptExpr(KIND##SubscriptExpr *E) {            \
-      return emit##KIND##SubscriptLValue(IGF, E);                          \
-    }
-
-    FOR_MEMBER_KIND(Existential)
-    FOR_MEMBER_KIND(Archetype)
-    FOR_MEMBER_KIND(Generic)
-#undef FOR_MEMBER_KIND
-  };
-}
-
-/// Emit the given expression as an l-value.  The expression must
-/// actually have l-value kind; to try to find an address for an
-/// expression as an aggressive local optimization, use
-/// tryEmitAsAddress.
-LValue IRGenFunction::emitLValue(Expr *E) {
-  assert(0);
-  assert(E->getType()->is<LValueType>());
-  return LValueEmitter(*this).visit(E);
-}
-
-namespace {
-  class AddressEmitter : public irgen::ASTVisitor<AddressEmitter,
-                                                  Optional<Address>,
-                                                  void,
-                                                  Optional<Address> >
-  {
-    IRGenFunction &IGF;
-    const TypeInfo &ObjectType;
-
-  public:
-    AddressEmitter(IRGenFunction &IGF, const TypeInfo &objectType)
-      : IGF(IGF), ObjectType(objectType) {}
-
-#define NON_LOCATEABLE(T) \
-    Optional<Address> visit##T(T *D) { return Nothing; }
-
-    // Look through loads without further ado.
-    Optional<Address> visitLoadExpr(LoadExpr *E) {
-      return visit(E->getSubExpr());
-    }
-
-    // We can find addresses for some locals.
-    Optional<Address> visitDeclRefExpr(DeclRefExpr *E) {
-      return visit(E->getDecl());
-    }
-    Optional<Address> visitSuperRefExpr(SuperRefExpr *E) {
-      return visit(E->getThis());
-    }
-
-    // Visiting a decl is equivalent to visiting a reference to it.
-
-    // Ignore non-value decls.
-#define DECL(Id, Parent) \
-    Optional<Address> visit##Id##Decl(Id##Decl *D) { \
-      llvm_unreachable("not a value decl!"); \
-    }
-#define VALUE_DECL(Id, Parent)
-#include "swift/AST/DeclNodes.def"
-
-    // These are r-values.
-    NON_LOCATEABLE(FuncDecl)
-    NON_LOCATEABLE(OneOfElementDecl)
-
-    // These are potentially supportable.
-    NON_LOCATEABLE(TypeAliasDecl)
-    NON_LOCATEABLE(OneOfDecl)
-    NON_LOCATEABLE(StructDecl)
-    NON_LOCATEABLE(ClassDecl)
-    NON_LOCATEABLE(ProtocolDecl)
-                                                    
-    // FIXME: Not really a ValueDecl.
-    NON_LOCATEABLE(SubscriptDecl)
-    NON_LOCATEABLE(ConstructorDecl)
-    NON_LOCATEABLE(DestructorDecl)
-                                                    
-    // These we support.
-    Optional<Address> visitVarDecl(VarDecl *D) {
-      // For now, only bother with locals.
-      if (!D->getDeclContext()->isLocalContext())
-        return Nothing;
-
-      return IGF.getLocalVar(D);
-    }
-
-    // Some call results will naturally come back in memory.
-    Optional<Address> visitApplyExpr(ApplyExpr *E) {
-      return tryEmitApplyAsAddress(IGF, E, ObjectType);
-    }
-
-    // Changes in qualification are unimportant for this.
-    Optional<Address> visitRequalifyExpr(RequalifyExpr *E) {
-      return visit(E->getSubExpr());
-    }
-    Optional<Address> visitAddressOfExpr(AddressOfExpr *E) {
-      return visit(E->getSubExpr());
-    }
-
-    // We can locate a tuple element if we can locate the tuple.
-    Optional<Address> visitTupleElementExpr(TupleElementExpr *E) {
-      return tryEmitTupleElementAsAddress(IGF, E);
-    }
-
-    // Materializations are always in memory.
-    Optional<Address> visitMaterializeExpr(MaterializeExpr *E) {
-      return emitMaterializeExpr(IGF, cast<MaterializeExpr>(E));
-    }
-
-    Optional<Address> visitMemberRefExpr(MemberRefExpr *E) {
-      return tryEmitMemberRefAsAddress(IGF, E);
-    }
-
-    // These expressions aren't naturally already in memory.
-    NON_LOCATEABLE(TupleExpr)
-    NON_LOCATEABLE(ArrayExpr)
-    NON_LOCATEABLE(CollectionExpr)
-    NON_LOCATEABLE(IntegerLiteralExpr)
-    NON_LOCATEABLE(FloatLiteralExpr)
-    NON_LOCATEABLE(CharacterLiteralExpr)
-    NON_LOCATEABLE(StringLiteralExpr)
-    NON_LOCATEABLE(InterpolatedStringLiteralExpr)
-    NON_LOCATEABLE(TupleShuffleExpr)
-    NON_LOCATEABLE(ErasureExpr)
-    NON_LOCATEABLE(SpecializeExpr) // FIXME: Generic subscripts?
-    NON_LOCATEABLE(DerivedToBaseExpr)
-    NON_LOCATEABLE(ArchetypeToSuperExpr)
-    NON_LOCATEABLE(ScalarToTupleExpr)
-    NON_LOCATEABLE(FunctionConversionExpr)
-    NON_LOCATEABLE(MetatypeConversionExpr)
-    NON_LOCATEABLE(CapturingExpr)
-    NON_LOCATEABLE(ModuleExpr)
-    NON_LOCATEABLE(DotSyntaxBaseIgnoredExpr)
-    NON_LOCATEABLE(NewReferenceExpr)
-    NON_LOCATEABLE(NewArrayExpr)
-    NON_LOCATEABLE(MetatypeExpr)
-    NON_LOCATEABLE(CoerceExpr)
-    NON_LOCATEABLE(UncheckedDowncastExpr)
-    NON_LOCATEABLE(UncheckedSuperToArchetypeExpr)
-    NON_LOCATEABLE(IsSubtypeExpr)
-    NON_LOCATEABLE(SuperIsArchetypeExpr)
-    NON_LOCATEABLE(ExistentialMemberRefExpr)
-    NON_LOCATEABLE(ArchetypeMemberRefExpr)
-    NON_LOCATEABLE(GenericMemberRefExpr)
-    NON_LOCATEABLE(BridgeToBlockExpr)
-    NON_LOCATEABLE(OtherConstructorDeclRefExpr)
-    NON_LOCATEABLE(RebindThisInConstructorExpr)
-    NON_LOCATEABLE(IfExpr)
-
-    // FIXME: We may want to specialize IR generation for array subscripts.
-    NON_LOCATEABLE(SubscriptExpr)
-    NON_LOCATEABLE(ExistentialSubscriptExpr)
-    NON_LOCATEABLE(ArchetypeSubscriptExpr)
-    NON_LOCATEABLE(GenericSubscriptExpr)
-
-#undef NON_LOCATEABLE
-  };
-}
-
-/// Try to emit the given expression as an entity with an address.
-/// This is useful for local optimizations.
-Optional<Address>
-IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
-  assert(0);
-
-  return AddressEmitter(*this, type).visit(E);
-}
-
-namespace {
-  struct IgnoredExprEmitter : irgen::ASTVisitor<IgnoredExprEmitter> {
-    IRGenFunction &IGF;
-    IgnoredExprEmitter(IRGenFunction &IGF) : IGF(IGF) {}
-
-#define EXPR(Id, Parent)
-#define UNCHECKED_EXPR(Id, Parent) \
-    void visit##Id##Expr(Id##Expr *E) { \
-      llvm_unreachable("expression should not have survived to IR-gen"); \
-    }
-#include "swift/AST/ExprNodes.def"
-    void visitErrorExpr(ErrorExpr *E) {
-      llvm_unreachable("expression should not have survived to IR-gen");
-    }
-    void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {}
-    void visitFloatLiteralExpr(FloatLiteralExpr *E) {}
-    void visitDeclRefExpr(DeclRefExpr *E) {}
-    void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
-      visit(E->getLHS());
-      visit(E->getRHS());
-    }
-    void visitTupleExpr(TupleExpr *E) {
-      for (auto elt : E->getElements())
-        visit(elt);
-    }
-    void visitTupleElementExpr(TupleElementExpr *E) {
-      visit(E->getBase());
-    }
-    void visitFuncExpr(FuncExpr *E) {}
-    void visitClosureExpr(ClosureExpr *E) {}
-    void visitModuleExpr(ModuleExpr *E) {}
-
-#define USING_SUBEXPR(Id) \
-    void visit##Id##Expr(Id##Expr *E) { \
-      return visit(E->getSubExpr()); \
-    }
-    USING_SUBEXPR(Paren)
-    USING_SUBEXPR(AddressOf)
-    USING_SUBEXPR(Requalify)
-    USING_SUBEXPR(Materialize)
-
-    void visitTupleShuffleExpr(TupleShuffleExpr *E) {
-      // First, evaluate the base expression.
-      visit(E->getSubExpr());
-
-      // Then evaluate any defaulted elements.
-      TupleType *TT = E->getType()->castTo<TupleType>();
-      for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
-        if (E->getElementMapping()[i] == -1)
-          visit(TT->getFields()[i].getInit()->getExpr());
-      }
-    }
-
-    void visitExpr(Expr *E) {
-      // If all else fails, emit it as an r-value.
-      Explosion explosion(ExplosionKind::Maximal);
-      IGF.emitRValue(E, explosion);
-
-      // Ignore all the values.
-      explosion.ignoreAndDestroy(IGF, explosion.size());
-    }
-  };
-}
-
-/// Emit an expression whose value is being ignored.
-void IRGenFunction::emitIgnored(Expr *E) {
-  assert(0);
-
-  IgnoredExprEmitter(*this).visit(E);
 }
 
 /// Emit a fake l-value which obeys the given specification.  This

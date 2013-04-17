@@ -43,11 +43,6 @@ namespace irgen {
   void emitApplyExpr(IRGenFunction &IGF, ApplyExpr *apply,
                      Explosion &explosion);
 
-  /// Try to emit the result of a function call as a value naturally
-  /// held in memory.
-  Optional<Address> tryEmitApplyAsAddress(IRGenFunction &IGF, ApplyExpr *apply,
-                                          const TypeInfo &resultTI);
-
   /// Initialize a location in memory with the result of a function
   /// call.
   void emitApplyExprToMemory(IRGenFunction &IGF, ApplyExpr *apply,

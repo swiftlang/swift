@@ -39,12 +39,6 @@ namespace irgen {
   /// Emit a requalification expression as an r-value.
   void emitRequalify(IRGenFunction &IGF, RequalifyExpr *E, Explosion &expl);
 
-  /// Emit an l-value for a member reference.
-  LValue emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E);
-
-  /// Emit an l-value for a subscripting.
-  LValue emitSubscriptLValue(IRGenFunction &IGF, SubscriptExpr *E);
-
   /// Emit a generic member reference into an explosion.
   void emitGenericMemberRef(IRGenFunction &IGF, GenericMemberRefExpr *E,
                             Explosion &out);
@@ -53,13 +47,6 @@ namespace irgen {
   LValue emitGenericMemberRefLValue(IRGenFunction &IGF,
                                     GenericMemberRefExpr *E);
 
-  /// Emit a generic subscript reference as an l-value.
-  LValue emitGenericSubscriptLValue(IRGenFunction &IGF,
-                                    GenericSubscriptExpr *E);
-
-  /// Try to emit a member reference as an address.
-  Optional<Address> tryEmitMemberRefAsAddress(IRGenFunction &IGF,
-                                              MemberRefExpr *E);
 
 } // end namespace irgen
 } // end namespace swift

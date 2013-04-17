@@ -3513,7 +3513,6 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
   // If the type is provably empty, just emit the operand as ignored.
   if (srcTI.isEmpty(ResilienceScope::Local)) {
     assert(packing == FixedPacking::OffsetZero);
-    IGF.emitIgnored(E->getSubExpr());
     return;
   }
 
@@ -3756,6 +3755,8 @@ irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
                                        ArrayRef<Substitution> subs,
                                        ExplosionKind maxExplosionLevel,
                                        unsigned maxUncurry) {
+  abort();
+  
   // The protocol we're calling on.
   // TODO: support protocol compositions here.
   Type baseTy = E->getBase()->getType();
@@ -3768,7 +3769,7 @@ irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
 
   // The base of an existential member reference is always an l-value.
-  LValue lvalue = IGF.emitLValue(E->getBase());
+  LValue lvalue;
   Address existAddr = IGF.emitMaterializeWithWriteback(std::move(lvalue),
                                                        NotOnHeap);
 
@@ -3825,6 +3826,8 @@ irgen::prepareArchetypeMemberRefCall(IRGenFunction &IGF,
                                      ArrayRef<Substitution> subs,
                                      ExplosionKind maxExplosionLevel,
                                      unsigned maxUncurry) {
+  abort();
+  
   // The function we're going to call.
   FuncDecl *fn = cast<FuncDecl>(E->getDecl());
 
@@ -3832,12 +3835,6 @@ irgen::prepareArchetypeMemberRefCall(IRGenFunction &IGF,
   // If we're accessing a static function, though, the l-value is
   // unnecessary.
   Address thisObject;
-  if (fn->isStatic()) {
-    IGF.emitIgnored(E->getBase());
-  } else {
-    LValue lvalue = IGF.emitLValue(E->getBase());
-    thisObject = IGF.emitMaterializeWithWriteback(std::move(lvalue), NotOnHeap);
-  }
 
   // Find the archetype we're calling on.
   CanType baseTy = E->getBase()->getType()->getCanonicalType();

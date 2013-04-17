@@ -167,18 +167,6 @@ static HeapLayout getHeapLayout(IRGenModule &IGM, const CaptureInfo &info) {
   return HeapLayout(IGM, LayoutStrategy::Optimal, info.CaptureFields);
 }
 
-/// Emit the data pointer for a capturing expression.
-static ManagedValue emitClosureData(IRGenFunction &IGF, CapturingExpr *E) {
-  CaptureInfo info(IGF, E);
-
-  // We're done if we don't actually capture anything non-trivial.
-  if (!info.requiresData())
-    return ManagedValue(IGF.IGM.RefCountedNull);
-
-  HeapLayout layout = getHeapLayout(IGF.IGM, info);
-  return emitClosureData(IGF, E, info, layout);
-}
-
 /// Emit the body of a local function.
 ///
 /// \param definingIGF - the IGF for the function in which this local

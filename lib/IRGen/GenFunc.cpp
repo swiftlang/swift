@@ -1908,9 +1908,6 @@ CallEmission CalleeSource::prepareRootCall(IRGenFunction &IGF,
   unsigned bestUncurry = numArgs - 1;
   assert(bestUncurry != -1U);
 
-  if (auto sideEffects = getSideEffects())
-    IGF.emitIgnored(sideEffects);
-
   switch (getKind()) {
   case Kind::Direct:
     return CallEmission(IGF, emitDirectCallee(IGF, getDirectFunction(),
@@ -2912,37 +2909,6 @@ void irgen::emitApplyExprToMemory(IRGenFunction &IGF, ApplyExpr *E,
     return;
 
   emitCalleeToMemory(IGF, source, resultAddress, substResultTI);
-}
-
-/// See whether we can emit the result of the given call as an object
-/// naturally located in memory.
-Optional<Address>
-irgen::tryEmitApplyAsAddress(IRGenFunction &IGF, ApplyExpr *E,
-                             const TypeInfo &substResultTI) {
-  // Decompose the expression.  Vitally, this doesn't change any state.
-  CalleeSource source = CalleeSource::decompose(E);
-
-  // Give up if the call won't be returned indirectly.
-  // FIXME: this is suboptimal;  we might have something returned
-  // indirectly due to abstraction.
-  ExplosionSchema schema(source.getFinalResultExplosionLevel(IGF));
-  substResultTI.getSchema(schema);
-  if (!schema.requiresIndirectResult())
-    return Nothing;
-
-  // Create a temporary.
-  Initialization init;
-  InitializedObject obj = init.getObjectForTemporary();
-  init.registerObject(IGF, obj, NotOnHeap, substResultTI);
-  Address temp = init.emitLocalAllocation(IGF, obj, NotOnHeap, substResultTI,
-                                          "call.as-address");
-
-  // Emit to memory.
-  emitCalleeToMemory(IGF, source, temp, substResultTI);
-  init.markInitialized(IGF, obj);
-
-  // Leave the cleanup active.
-  return temp;
 }
 
 /// Emit a nullary call to the given monomorphic function, using the

@@ -143,9 +143,8 @@ namespace {
     /// If the expression is a load from something, try to emit that
     /// as an address and then do a copy-assign.
     void visitLoadExpr(LoadExpr *E) {
-      if (Optional<Address> src
-            = IGF.tryEmitAsAddress(E->getSubExpr(), ObjectTI))
-        return ObjectTI.assignWithCopy(IGF, Dest, src.getValue());
+      abort();
+      
       return visitExpr(E);
     }
 
@@ -426,18 +425,16 @@ const TypeInfo *TypeConverter::convertLValueType(LValueType *T) {
 /// l-value to a non-heap l-value.
 void swift::irgen::emitRequalify(IRGenFunction &IGF, RequalifyExpr *E,
                                  Explosion &explosion) {
+  abort();
+  
+  
   LValueType *srcType = E->getSubExpr()->getType()->castTo<LValueType>();
   LValueType::Qual srcQs = srcType->getQualifiers();
   LValueType::Qual destQs = E->getType()->castTo<LValueType>()->getQualifiers();
 
   // If we're losing heap-qualification, this involves a representation change.
   if (srcQs.isHeap() && !destQs.isHeap()) {
-    const TypeInfo &heapTI = IGF.getFragileTypeInfo(srcType->getObjectType());
-
-    // Try to just figure out an address and use that.
-    if (Optional<Address> addr = IGF.tryEmitAsAddress(E->getSubExpr(), heapTI))
-      return explosion.addUnmanaged(addr.getValue().getAddress());
-
+   
     // Otherwise, emit as a heap l-value and project out the reference.
     Explosion subExplosion(explosion.getKind());
     IGF.emitRValue(E->getSubExpr(), subExplosion);
@@ -966,58 +963,6 @@ namespace {
   };
 }
 
-static LValue emitLogicalClassMemberLValue(IRGenFunction &IGF,
-                                           MemberRefExpr *E) {
-  // Emit the base value.
-  Explosion base(ExplosionKind::Maximal);
-  IGF.emitRValue(E->getBase(), base);
-
-  // Build the logical lvalue.
-  LValue lvalue;
-  lvalue.addWithExtra<DirectMemberGetterSetter>(E->getDecl(), base);
-  return lvalue;
-}
-
-static LValue emitLogicalStructMemberLValue(IRGenFunction &IGF,
-                                            MemberRefExpr *E) {
-
-  // Emit the base l-value.
-  LValue lvalue = IGF.emitLValue(E->getBase());
-
-  // Push a logical member reference.
-  lvalue.add<IndirectMemberGetterSetter>(E->getDecl());
-
-  return lvalue;
-}
-
-static LValue emitLogicalClassMemberLValue(IRGenFunction &IGF,
-                                           GenericMemberRefExpr *E) {
-  // Emit the base value.
-  Explosion base(ExplosionKind::Maximal);
-  IGF.emitRValue(E->getBase(), base);
-
-  // Build the logical lvalue.
-  LValue lvalue;
-  lvalue.addWithExtra<GenericDirectMemberGetterSetter>(
-                                                 cast<VarDecl>(E->getDecl()),
-                                                       base)
-    .setExpr(E);
-  return lvalue;
-}
-
-static LValue emitLogicalStructMemberLValue(IRGenFunction &IGF,
-                                            GenericMemberRefExpr *E) {
-
-  // Emit the base l-value.
-  LValue lvalue = IGF.emitLValue(E->getBase());
-
-  // Push a logical member reference.
-  lvalue.add<GenericIndirectMemberGetterSetter>(cast<VarDecl>(E->getDecl()))
-    .setExpr(E);
-
-  return lvalue;
-}
-
 template <class T>
 static LValue emitAnyMemberRefLValue(IRGenFunction &IGF, T *E) {
   VarDecl *var = cast<VarDecl>(E->getDecl());
@@ -1025,38 +970,14 @@ static LValue emitAnyMemberRefLValue(IRGenFunction &IGF, T *E) {
   if (!baseType->is<LValueType>()) {
     if (!isVarAccessLogical(IGF, var)) {
       return emitPhysicalClassMemberLValue(IGF, E);
-    } else {
-      return emitLogicalClassMemberLValue(IGF, E);
-    }
-  } else {
-    if (!isVarAccessLogical(IGF, var)) {
-      return emitPhysicalStructMemberLValue(IGF, E);
-    } else {
-      return emitLogicalStructMemberLValue(IGF, E);
-    }
+     }
   }
-}
-
-/// Emit an l-value for the given member reference.
-LValue irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
-  return emitAnyMemberRefLValue(IGF, E);
 }
 
 /// Emit an l-value which accesses a member out of a generic type.
 LValue irgen::emitGenericMemberRefLValue(IRGenFunction &IGF,
                                          GenericMemberRefExpr *E) {
   return emitAnyMemberRefLValue(IGF, E);
-}
-
-/// Try to emit the given member-reference as an address.
-Optional<Address> irgen::tryEmitMemberRefAsAddress(IRGenFunction &IGF,
-                                                   MemberRefExpr *E) {
-  // Can't do anything if the member reference is logical.
-  if (isVarAccessLogical(IGF, E->getDecl()))
-    return Nothing;
-
-  // FIXME: actually implement this.
-  return Nothing;
 }
 
 /// Emit a reference to a global variable.
@@ -1081,97 +1002,6 @@ LValue IRGenFunction::getGlobal(VarDecl *var) {
   return emitAddressLValue(addr);
 }
 
-static LValue emitLogicalClassSubscriptLValue(IRGenFunction &IGF,
-                                              SubscriptExpr *E) {
-  // Emit the base value.
-  Explosion base(ExplosionKind::Maximal);
-  IGF.emitRValue(E->getBase(), base);
-
-  // Emit the index.
-  Explosion index(ExplosionKind::Maximal);
-  IGF.emitRValue(E->getIndex(), index);
-
-  // Build the logical lvalue.
-  LValue lvalue;
-  lvalue.addWithExtra<DirectMemberGetterSetter>(E->getDecl(), base, index);
-  return lvalue;
-}
-
-static LValue emitLogicalStructSubscriptLValue(IRGenFunction &IGF,
-                                               SubscriptExpr *E) {
-  // Emit the base l-value.
-  LValue lvalue = IGF.emitLValue(E->getBase());
-
-  // Emit the index.  IndirectMemberGetterSetter requires this to be
-  // maximal; in theory it might be better to try to match the
-  // getter/setter, but that would require some significant
-  // complexity.
-  Explosion index(ExplosionKind::Maximal);
-  IGF.emitRValue(E->getIndex(), index);
-
-  // Subscript accesses are always logical (for now).
-  lvalue.addWithExtra<IndirectMemberGetterSetter>(E->getDecl(), index);
-
-  return lvalue;
-}
-
-static LValue emitLogicalClassSubscriptLValue(IRGenFunction &IGF,
-                                              GenericSubscriptExpr *E) {
-  // Emit the base value.
-  Explosion base(ExplosionKind::Maximal);
-  IGF.emitRValue(E->getBase(), base);
-
-  // Emit the index.
-  Explosion index(ExplosionKind::Maximal);
-  IGF.emitRValue(E->getIndex(), index);
-
-  // Build the logical lvalue.
-  LValue lvalue;
-  lvalue.addWithExtra<GenericDirectMemberGetterSetter>(E->getDecl(),
-                                                       base, index)
-    .setExpr(E);
-  return lvalue;
-}
-
-static LValue emitLogicalStructSubscriptLValue(IRGenFunction &IGF,
-                                               GenericSubscriptExpr *E) {
-  // Emit the base l-value.
-  LValue lvalue = IGF.emitLValue(E->getBase());
-
-  // Emit the index.  IndirectMemberGetterSetter requires this to be
-  // maximal; in theory it might be better to try to match the
-  // getter/setter, but that would require some significant
-  // complexity.
-  Explosion index(ExplosionKind::Maximal);
-  IGF.emitRValue(E->getIndex(), index);
-
-  // Subscript accesses are always logical (for now).
-  lvalue.addWithExtra<GenericIndirectMemberGetterSetter>(E->getDecl(), index)
-    .setExpr(E);
-
-  return lvalue;
-}
-
-
-template <class T>
-static LValue emitAnySubscriptLValue(IRGenFunction &IGF, T *E) {
-  if (!E->getBase()->getType()->template is<LValueType>()) {
-    return emitLogicalClassSubscriptLValue(IGF, E);
-  } else {
-    return emitLogicalStructSubscriptLValue(IGF, E);
-  }
-}
-
-/// Emit an l-value for the given subscripted reference.
-LValue irgen::emitSubscriptLValue(IRGenFunction &IGF, SubscriptExpr *E) {
-  return emitAnySubscriptLValue(IGF, E);
-}
-
-/// Emit an l-value for the given subscripted reference.
-LValue irgen::emitGenericSubscriptLValue(IRGenFunction &IGF,
-                                         GenericSubscriptExpr *E) {
-  return emitAnySubscriptLValue(IGF, E);
-}
 
 /// Emit an expression which accesses a member out of a generic type.
 void irgen::emitGenericMemberRef(IRGenFunction &IGF,

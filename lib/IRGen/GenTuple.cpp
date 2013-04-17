@@ -164,31 +164,12 @@ void swift::irgen::projectTupleElementFromExplosion(IRGenFunction &IGF,
 
 void swift::irgen::emitTupleElement(IRGenFunction &IGF, TupleElementExpr *E,
                                     Explosion &explosion) {
-  // If we're doing an l-value projection, this is straightforward.
-  if (LValueType *lv = E->getType()->getAs<LValueType>())
-    return IGF.emitLValueAsScalar(emitTupleElementLValue(IGF, E),
-                                  lv->isHeap() ? OnHeap : NotOnHeap,
-                                  explosion);
-
+  abort();
   Expr *tuple = E->getBase();
   const TupleTypeInfo &tupleType = getAsTupleTypeInfo(IGF, tuple->getType());
 
   const TupleFieldInfo &field =
     tupleType.getFields()[E->getFieldNumber()];
-
-  // If the field requires no storage, there's nothing to do.
-  if (field.isEmpty()) {
-    // Emit the base in case it has side-effects.
-    IGF.emitIgnored(tuple);
-    return IGF.emitFakeExplosion(field.getTypeInfo(), explosion);
-  }
-
-  // If we can emit the base as an l-value, we can avoid a lot
-  // of unnecessary work.
-  if (Optional<Address> tupleAddr = IGF.tryEmitAsAddress(tuple, tupleType)) {
-    Address addr = field.projectAddress(IGF, tupleAddr.getValue());
-    return field.getTypeInfo().load(IGF, addr, explosion);
-  }
 
   // Otherwise, emit the base as an r-value and project.
   Explosion tupleExplosion(explosion.getKind());
@@ -219,56 +200,6 @@ OwnedAddress swift::irgen::projectTupleElementAddress(IRGenFunction &IGF,
   return {fieldAddr, base.getOwner()};
 }
 
-/// Try to emit a tuple-element reference expression as an address.
-Optional<Address>
-swift::irgen::tryEmitTupleElementAsAddress(IRGenFunction &IGF,
-                                           TupleElementExpr *E) {
-  Expr *tuple = E->getBase();
-
-  // There are two kinds of TupleElementExprs; ones where the input is an
-  // lvalue, and ones where the input is an rvalue.  Either way, we just
-  // want to tryEmitAsAddress on the operand and GEP into it.
-  CanType TT = tuple->getType()->getCanonicalType();
-  if (!isa<TupleType>(TT))
-    TT = cast<LValueType>(TT)->getObjectType()->getCanonicalType();
-
-  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(IGF, TT);
-
-  // This is contigent exclusively on whether we can emit an address
-  // for the tuple.
-  Optional<Address> tupleAddr = IGF.tryEmitAsAddress(tuple, tupleType);
-  if (!tupleAddr) return Nothing;
-
-  // We succeeded;  now just GEP down.
-  const TupleFieldInfo &field =
-    tupleType.getFields()[E->getFieldNumber()];
-  if (field.isEmpty()) return Address();
-
-  return field.projectAddress(IGF, tupleAddr.getValue());
-}
-
-LValue swift::irgen::emitTupleElementLValue(IRGenFunction &IGF,
-                                            TupleElementExpr *E) {
-  assert(E->getType()->is<LValueType>());
-
-  // Emit the base l-value.
-  Expr *tuple = E->getBase();
-  LValue tupleLV = IGF.emitLValue(tuple);
-
-  Type tupleType = tuple->getType()->castTo<LValueType>()->getObjectType();
-  const TupleTypeInfo &tupleTI = getAsTupleTypeInfo(IGF, tupleType);
-  const TupleFieldInfo &field =
-    tupleTI.getFields()[E->getFieldNumber()];
-
-  // If the field requires no storage, there's nothing to do.
-  if (field.isEmpty()) {
-    return tupleLV; // as good as anything
-  }
-
-  // Project.
-  tupleLV.add<TupleElement>(field);
-  return tupleLV;
-}
 
 void swift::irgen::emitScalarToTuple(IRGenFunction &IGF, ScalarToTupleExpr *E,
                                      Explosion &outerTupleExplosion) {
@@ -278,16 +209,7 @@ void swift::irgen::emitScalarToTuple(IRGenFunction &IGF, ScalarToTupleExpr *E,
   // Emit the inner tuple.  We prefer to emit it as an address.
   Explosion innerExplosion(outerTupleExplosion.getKind());
   Address innerAddr;
-#if 0
-  // FIXME: This currently explodes because of a bug in GenFunc.
-  if (auto addr = IGF.tryEmitAsAddress(innerExpr, innerType)) {
-    innerAddr = addr.getValue();
-  } else {
-    IGF.emitRValue(innerExpr, innerExplosion);
-  }
-#else
   IGF.emitRValue(innerExpr, innerExplosion);
-#endif
 
   ArrayRef<TupleTypeElt> outerFields =
     cast<TupleType>(E->getType()->getCanonicalType())->getFields();
@@ -350,6 +272,8 @@ void swift::irgen::emitScalarToTuple(IRGenFunction &IGF, ScalarToTupleExpr *E,
 /// as an exploded r-value.
 void swift::irgen::emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
                                     Explosion &outerTupleExplosion) {
+  abort();
+  
   Expr *innerTuple = E->getSubExpr();
   const TupleTypeInfo &innerTupleType =
     getAsTupleTypeInfo(IGF, innerTuple->getType());
@@ -357,13 +281,8 @@ void swift::irgen::emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
   // Emit the inner tuple.  We prefer to emit it as an address.
   Explosion innerTupleExplosion(outerTupleExplosion.getKind());
   Address innerTupleAddr;
-  if (Optional<Address> addr
-        = IGF.tryEmitAsAddress(innerTuple, innerTupleType)) {
-    innerTupleAddr = addr.getValue();
-  } else {
     IGF.emitRValue(innerTuple, innerTupleExplosion);
-  }
-
+ 
   llvm::ArrayRef<TupleTypeElt> outerFields =
     cast<TupleType>(E->getType()->getCanonicalType())->getFields();
 
