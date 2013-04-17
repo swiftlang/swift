@@ -150,7 +150,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
         SubOpts.OptLevel = 2;
         llvm::Module SubModule(SubTU->Name.str(), Module->getContext());
         performCaptureAnalysis(SubTU);
-        performIRGeneration(SubOpts, &SubModule, SubTU);
+        performIRGeneration(SubOpts, &SubModule, SubTU, SILMod);
 
         SmallVector<GlobalValue*, 8> DeclsToErase;
         for (llvm::Function &F : SubModule)

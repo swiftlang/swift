@@ -86,8 +86,7 @@ namespace swift {
   /// \param StartElem  Indicates where to start for incremental IRGen in the
   ///   main module.
   void performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
-                           TranslationUnit *TU,
-                           SILModule *SILMod = nullptr,
+                           TranslationUnit *TU, SILModule *SILMod,
                            unsigned StartElem = 0);
   
   // Optimization passes.

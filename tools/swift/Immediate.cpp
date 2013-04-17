@@ -179,6 +179,7 @@ static bool IRGenImportedModules(TranslationUnit *TU,
                                      &ImportedModules,
                                  SmallVectorImpl<llvm::Function*> &InitFns,
                                  irgen::Options &Options,
+                                 SILModule *SILMod,
                                  bool IsREPL = true) {
   // IRGen the modules this module depends on.
   for (auto ModPair : TU->getImportedModules()) {
@@ -228,12 +229,13 @@ static bool IRGenImportedModules(TranslationUnit *TU,
       continue;
 
     // Recursively IRGen imported modules.
-    IRGenImportedModules(SubTU, Module, CmdLine, ImportedModules, InitFns, Options);
+    IRGenImportedModules(SubTU, Module, CmdLine, ImportedModules, InitFns,
+                         Options, SILMod);
 
     // FIXME: Need to check whether this is actually safe in general.
     llvm::Module SubModule(SubTU->Name.str(), Module.getContext());
     performCaptureAnalysis(SubTU);
-    performIRGeneration(Options, &SubModule, SubTU);
+    performIRGeneration(Options, &SubModule, SubTU, SILMod);
 
     if (TU->Ctx.hadError())
       return true;
@@ -290,7 +292,7 @@ void swift::RunImmediately(irgen::Options &Options,
   SmallVector<llvm::Function*, 8> InitFns;
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
   if (IRGenImportedModules(TU, Module, CmdLine, ImportedModules, InitFns, Options,
-                           /*IsREPL*/false))
+                           SILMod, /*IsREPL*/false))
     return;
 
   llvm::PassManagerBuilder PMBuilder;
@@ -942,7 +944,8 @@ class REPLEnvironment {
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
     DumpModuleMain->setName("repl.line");
     
-    if (IRGenImportedModules(TU, Module, CmdLine, ImportedModules, InitFns, Options))
+    if (IRGenImportedModules(TU, Module, CmdLine, ImportedModules, InitFns,
+                             Options, sil.get()))
       return false;
     
     for (auto InitFn : InitFns)
